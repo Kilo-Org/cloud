@@ -111,6 +111,45 @@ jest.mock('@/components/ui/dropdown-menu', () => {
   };
 });
 
+jest.mock('@/components/ui/alert-dialog', () => {
+  const react = jest.requireActual<typeof React>('react');
+  const Context = react.createContext({ open: false, onOpenChange: (_open: boolean) => {} });
+  const passthrough = ({ children }: { children?: ReactNode }) =>
+    react.createElement(react.Fragment, null, children);
+  return {
+    AlertDialog: ({
+      open,
+      onOpenChange,
+      children,
+    }: {
+      open: boolean;
+      onOpenChange: (open: boolean) => void;
+      children?: ReactNode;
+    }) => react.createElement(Context.Provider, { value: { open, onOpenChange } }, children),
+    AlertDialogContent: ({ children }: { children?: ReactNode }) =>
+      react.useContext(Context).open
+        ? react.createElement('div', { role: 'dialog' }, children)
+        : null,
+    AlertDialogHeader: passthrough,
+    AlertDialogTitle: passthrough,
+    AlertDialogDescription: passthrough,
+    AlertDialogFooter: passthrough,
+    AlertDialogCancel: ({ children }: { children?: ReactNode }) => {
+      const { onOpenChange } = react.useContext(Context);
+      return react.createElement('button', { onClick: () => onOpenChange(false) }, children);
+    },
+    AlertDialogAction: ({
+      children,
+      onClick,
+      disabled,
+    }: {
+      children?: ReactNode;
+      onClick: () => void;
+      disabled?: boolean;
+    }) => react.createElement('button', { onClick, disabled }, children),
+  };
+});
+
 jest.mock('./SessionPrIndicator', () => ({
   SessionPrIndicator: jest.fn(({ session }: { session: StoredSession }) =>
     jest.requireActual<typeof React>('react').createElement('span', {
@@ -650,6 +689,15 @@ describe('ChatSidebar row rendering', () => {
           sortMode: 'manual' as const,
           worktreeIds: [] as string[],
         },
+        {
+          id: ids[1],
+          name: 'Needs you',
+          color: 'yellow' as const,
+          kind: 'smart' as const,
+          smartPreset: 'needs_you' as const,
+          sortMode: 'activity' as const,
+          worktreeIds: [] as string[],
+        },
       ],
       isLoading: false,
       isFirstLoadPending: false,
@@ -690,6 +738,58 @@ describe('ChatSidebar row rendering', () => {
     };
     return { sessions, workspaceFolders, dataTransfer, dragEvent };
   }
+
+  it('requires confirmation before deleting a folder and allows cancellation', async () => {
+    const { sessions, workspaceFolders } = folderDragFixture();
+    renderSidebar({ sessions, workspaceFolders });
+    const folder = dom.container.querySelector<HTMLElement>('[data-folder-id]');
+    if (!folder) throw new Error('Folder missing');
+
+    click(menuItem(folder, 'Delete folder'));
+    expect(workspaceFolders.deleteFolder).not.toHaveBeenCalled();
+
+    const dialog = document.querySelector('[role="dialog"]');
+    if (!dialog) throw new Error('Delete confirmation missing');
+    expect(dialog.textContent).toContain('Product');
+    expect(dialog.textContent).toContain('will move to Ungrouped, not be deleted');
+    const cancel = Array.from(dialog.querySelectorAll('button')).find(
+      button => button.textContent === 'Cancel'
+    );
+    if (!cancel) throw new Error('Cancel button missing');
+    click(cancel);
+    expect(workspaceFolders.deleteFolder).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+
+    click(menuItem(folder, 'Delete folder'));
+    const confirm = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')
+    ).find(button => button.textContent === 'Delete folder');
+    if (!confirm) throw new Error('Delete confirmation button missing');
+    await act(async () => {
+      confirm.click();
+    });
+    expect(workspaceFolders.deleteFolder).toHaveBeenCalledTimes(1);
+    expect(workspaceFolders.deleteFolder).toHaveBeenCalledWith(workspaceFolders.folders[0].id);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('removes a smart folder from the sidebar without confirmation', async () => {
+    const { sessions, workspaceFolders } = folderDragFixture();
+    renderSidebar({ sessions, workspaceFolders, workspaceGroups: [] });
+    const smartFolder = workspaceFolders.folders[1];
+    const folder = dom.container.querySelector<HTMLElement>(`[data-folder-id="${smartFolder.id}"]`);
+    if (!folder) throw new Error('Smart folder missing');
+    expect(workspaceFolders.deleteFolder).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+
+    await act(async () => {
+      menuItem(folder, 'Remove from sidebar').click();
+    });
+
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(workspaceFolders.deleteFolder).toHaveBeenCalledTimes(1);
+    expect(workspaceFolders.deleteFolder).toHaveBeenCalledWith(smartFolder.id);
+  });
 
   it.each([0, 1])('drags only ungrouped workspace row %i from its title into a folder', index => {
     const { sessions, workspaceFolders, dataTransfer, dragEvent } = folderDragFixture();

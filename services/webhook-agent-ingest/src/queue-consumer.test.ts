@@ -661,6 +661,76 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
     }
   );
 
+  it.each([undefined, null, '44444444-4444-4444-8444-444444444444'] as const)(
+    'forwards environment selection %s only to prepareSession',
+    async environmentId => {
+      const prepareRequests: Request[] = [];
+      const initiateRequests: Request[] = [];
+      const webhook = makeWebhook();
+      const stub = {
+        getRequest: vi.fn(async () => makeRequest()),
+        getConfig: vi.fn(async () =>
+          makeTriggerConfig({
+            targetType: 'cloud_agent',
+            mode: 'code',
+            model: 'model-1',
+            githubRepo: 'owner/repo',
+            ...(environmentId !== undefined ? { environmentId } : {}),
+          })
+        ),
+        updateRequest: vi.fn(async () => ({ success: true })),
+      };
+      const env = {
+        WEBHOOK_AGENT_URL: 'https://hooks.test',
+        WEBHOOK_TOKEN_CACHE: {
+          get: vi.fn(async () => 'api-token'),
+          put: vi.fn(async () => undefined),
+        },
+        INTERNAL_API_SECRET: { get: vi.fn(async () => 'test-internal-secret') },
+        CALLBACK_TOKEN_SECRET: { get: vi.fn(async () => 'test-callback-token-secret') },
+        TRIGGER_DO: {
+          idFromName: vi.fn((name: string) => name),
+          get: vi.fn(() => stub),
+        },
+        CLOUD_AGENT: {
+          fetch: vi.fn(async (request: Request) => {
+            if (request.url.includes('/trpc/prepareSession')) {
+              prepareRequests.push(request);
+              return Response.json({
+                result: { data: { cloudAgentSessionId: 'cloud-session-1' } },
+              });
+            }
+            initiateRequests.push(request);
+            return Response.json({
+              result: { data: { executionId: 'execution-1', status: 'running' } },
+            });
+          }),
+        },
+      } as unknown as Env;
+      const ack = vi.fn();
+      const retry = vi.fn();
+      const batch = {
+        queue: 'webhook-delivery',
+        messages: [{ body: webhook, attempts: 1, ack, retry }],
+      } as unknown as MessageBatch<ReturnType<typeof makeWebhook>>;
+
+      await handleWebhookDeliveryBatch(batch, env);
+
+      expect(prepareRequests).toHaveLength(1);
+      const prepareBody = await prepareRequests[0].json<{
+        requestedEnvironment?: { id: string };
+      }>();
+      if (environmentId == null) {
+        expect(prepareBody).not.toHaveProperty('requestedEnvironment');
+      } else {
+        expect(prepareBody).toHaveProperty('requestedEnvironment', { id: environmentId });
+      }
+      expect(await initiateRequests[0].json()).not.toHaveProperty('requestedEnvironment');
+      expect(ack).toHaveBeenCalledTimes(1);
+      expect(retry).not.toHaveBeenCalled();
+    }
+  );
+
   it.each(['webhook', 'scheduled'] as const)(
     'keeps %s KiloClaw dispatch independent of Cloud Agent allocation',
     async activationMode => {

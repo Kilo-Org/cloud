@@ -726,6 +726,20 @@ keep environment snapshots and existing history/worktree recovery.
   env, secrets and MCP configuration from the route before accepting work.
   Existing native sessions are reused; missing native sessions use history-only recovery.
   New chats and later siblings share that runtime and directory without resetting files.
+
+  On a shared-workspace Kilo v2 runtime start without a workspace snapshot, the wrapper also preloads
+  the five most recently updated root chats from that workspace's ownership ledger. Their native
+  histories import in parallel with the requested chat before preparation reports ready; existing
+  native sessions are reused. Preloading runs once per live runtime, never restores transcript file
+  patches, and never attaches routes or starts turns for those chats. Owner, organization, workspace
+  membership, and a non-deleting workspace are checked on discovery and sibling history reads.
+  The discovery authorization covers its exact chat IDs for at most ten seconds on that wrapper
+  socket and route attempt; later reads recheck the ledger, so revocation can lag by at most that window.
+  Preloading has a ten-second best-effort budget; an import gets one retry, and a failed or timed-out
+  preload does not fail the requested chat. Other chats still restore on demand. Kilo v1 chats
+  always restore on demand, so history-only warmup cannot suppress their saved file patches.
+  Cancelling a caller stops its wait immediately, but its import lock remains until the underlying
+  harness open settles. A queued requested open keeps its own inputs and cancellation deadline.
 - **Diagnostics and retention.** Existing diagnostics report workspace, requesting session,
   allocation, capture time, selected source and skip/fallback reason. They never log handles,
   credentials or file contents. Replacing a descriptor makes the previous artifact unselectable;

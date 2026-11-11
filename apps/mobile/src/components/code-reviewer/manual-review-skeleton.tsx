@@ -8,11 +8,12 @@ import { Skeleton } from '@/components/ui/skeleton';
  * the connect state it may resolve to, so the page never shows nothing under
  * its header and the state that arrives keeps the same shape.
  *
- * It centers itself instead of going through `CenteredState`, because that
- * component hides its content until the surface has been measured (up to
- * `STATE_SURFACE_FALLBACK_MS`) to keep a data state from flashing at the wrong
- * spot. A placeholder has the opposite requirement: it is the only thing on
- * screen while the status is unknown, so it is drawn from the first frame.
+ * It centers itself instead of going through `CenteredState`: that component
+ * places a data state against the band its surface reports and the size its
+ * own content reports, so its placement settles one layout pass later. A
+ * placeholder has the opposite requirement: it is the only thing on screen
+ * while the status is unknown, so it paints from the first frame at a
+ * placement that needs no measurement.
  */
 export function ManualReviewSkeleton() {
   return (

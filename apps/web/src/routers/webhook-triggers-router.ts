@@ -6,6 +6,12 @@ import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  getEnvironment,
+  normalizeRepoFullName,
+  type EnvironmentOwner,
+  type EnvironmentResponse,
+} from '@kilocode/cloud-agent-profile';
 import { TRPCError } from '@trpc/server';
 import { and, eq, isNull } from 'drizzle-orm';
 import * as z from 'zod';
@@ -74,6 +80,7 @@ export const WebhookTriggerCreateInput = z
     model: z.string().min(1, 'Model is required').optional(),
     variant: variantSchema.optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
+    environmentId: z.string().uuid().nullable().optional(),
     profileId: z.string().uuid().nullable().optional(),
     bodySchema: webhookBodySchema.nullable().optional(),
     // Shared fields
@@ -187,6 +194,13 @@ export const WebhookTriggerCreateInput = z
           path: ['sandboxAllocation'],
         });
       }
+      if (data.environmentId != null) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Environment selection is not applicable for KiloClaw Chat triggers',
+          path: ['environmentId'],
+        });
+      }
     }
   });
 
@@ -200,6 +214,7 @@ export const WebhookTriggerUpdateInput = z
     model: z.string().min(1).optional(),
     variant: variantSchema.nullable().optional(),
     sandboxAllocation: sandboxAllocationSchema.nullable().optional(),
+    environmentId: z.string().uuid().nullable().optional(),
     promptTemplate: z.string().min(1).max(10000).optional(),
     profileId: z.string().uuid().nullable().optional(),
     bodySchema: webhookBodySchema.nullable().optional(),
@@ -375,6 +390,50 @@ async function assertProfileOwnership(
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Profile not found or not accessible',
+    });
+  }
+}
+
+function environmentOwner(userId: string, organizationId?: string): EnvironmentOwner {
+  return organizationId
+    ? { type: 'organization', id: organizationId }
+    : { type: 'user', id: userId };
+}
+
+function environmentHasGithubRepository(
+  environment: EnvironmentResponse,
+  githubRepo: string
+): boolean {
+  const normalizedRepo = normalizeRepoFullName(githubRepo);
+  if (environment.repositories !== undefined) {
+    return environment.repositories.some(
+      repository =>
+        repository.platform === 'github' &&
+        normalizeRepoFullName(repository.repoFullName) === normalizedRepo
+    );
+  }
+  return (
+    environment.platform === 'github' &&
+    normalizeRepoFullName(environment.repoFullName) === normalizedRepo
+  );
+}
+
+async function assertEnvironmentOwnershipAndRepository(
+  userId: string,
+  organizationId: string | undefined,
+  environmentId: string,
+  githubRepo: string
+): Promise<void> {
+  const environment = await getEnvironment(
+    db,
+    environmentId,
+    environmentOwner(userId, organizationId)
+  );
+
+  if (!environmentHasGithubRepository(environment, githubRepo)) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Environment does not include the selected repository',
     });
   }
 }
@@ -684,6 +743,20 @@ export const webhookTriggersRouter = createTRPCRouter({
         input.profileId
       );
     }
+    if (input.environmentId != null) {
+      if (!input.githubRepo) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Environment selection requires a GitHub repository',
+        });
+      }
+      await assertEnvironmentOwnershipAndRepository(
+        userId,
+        input.organizationId,
+        input.environmentId,
+        input.githubRepo
+      );
+    }
     if (input.targetType === 'kiloclaw_chat') {
       if (!input.kiloclawInstanceId) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'KiloClaw instance is required' });
@@ -756,6 +829,7 @@ export const webhookTriggersRouter = createTRPCRouter({
           model: input.model,
           variant: input.variant,
           sandboxAllocation: input.sandboxAllocation,
+          environmentId: input.environmentId,
           promptTemplate: input.promptTemplate,
           profileId: input.profileId,
           bodySchema: input.bodySchema,
@@ -859,6 +933,13 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
+    if (input.environmentId != null && dbTrigger.target_type === 'kiloclaw_chat') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Environment selection is not applicable for KiloClaw Chat triggers',
+      });
+    }
+
     if (input.sandboxAllocation !== undefined && input.sandboxAllocation !== null) {
       await assertSandboxAllocationAvailable(
         ctx.user,
@@ -887,11 +968,27 @@ export const webhookTriggersRouter = createTRPCRouter({
       );
     }
 
+    if (input.environmentId != null) {
+      if (!dbTrigger.github_repo) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Environment selection requires a GitHub repository',
+        });
+      }
+      await assertEnvironmentOwnershipAndRepository(
+        userId,
+        input.organizationId,
+        input.environmentId,
+        dbTrigger.github_repo
+      );
+    }
+
     const hasUpdates = [
       input.mode,
       input.model,
       input.variant,
       input.sandboxAllocation,
+      input.environmentId,
       input.promptTemplate,
       input.profileId,
       input.bodySchema,
@@ -919,6 +1016,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       model: input.model,
       variant: input.variant,
       sandboxAllocation: input.sandboxAllocation,
+      environmentId: input.environmentId,
       promptTemplate: input.promptTemplate,
       isActive: input.isActive,
       profileId: input.profileId,

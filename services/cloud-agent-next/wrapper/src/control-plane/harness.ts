@@ -67,6 +67,8 @@ export type HarnessReads = Pick<
 };
 
 export type Harness = {
+  /** Safe to open siblings without suppressing later session-ingest file restoration. */
+  supportsHistoryPreload?: boolean;
   open(
     input: HarnessSession & {
       /** Reads one page of this session's Cloud history; v2 restores from it. */

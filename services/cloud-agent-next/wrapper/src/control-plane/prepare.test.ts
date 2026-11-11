@@ -26,6 +26,7 @@ import {
   createPreparationManager,
   stackedBaseMismatchError,
   type PrepareRuntimePort,
+  type PrepareDeps,
 } from './prepare.js';
 import type { WorkspaceStamp } from './workspace-stamp.js';
 import { directoryHome } from './workspace-home.js';
@@ -40,6 +41,85 @@ import {
 } from './kilo-runtime.js';
 import type { restoreWorktreeRecovery } from './worktree-recovery.js';
 import { restoreSession } from '../restore-session.js';
+
+describe('workspace startup history', () => {
+  it('restores the requested chat and recent siblings in parallel before reporting ready', async () => {
+    const base = routeSpec();
+    const recent = [
+      { sessionId: base.sessionId, kiloSessionId: base.kiloSessionId },
+      ...Array.from({ length: 4 }, (_, index) => ({
+        sessionId: `workspace_sibling_${index}`,
+        kiloSessionId: `ses_${String(index + 2).repeat(26)}`,
+      })),
+    ];
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const h = createHarness(FAST_TIMERS, {
+      supportsHistoryPreload: true,
+      readRecentHistory: async () => recent,
+      readHistoryPage: async () => ({}),
+    });
+    h.setSessionExists(false);
+    h.setRestore(async () => {
+      if (h.restoreOptions().length === 5) started.resolve();
+      await release.promise;
+      return { ok: true, diffs: { applied: 0, skipped: 0, total: 0 } };
+    });
+    const preparing = h.manager.prepare({
+      ...base,
+      kilo: { ...base.kilo!, scopeId: 'worktree_6a7199ec-d6d7-4788-b5a5-d74960f401e3' },
+    });
+    await started.promise;
+    expect(h.frames.some(frame => frame.type === 'session.ready')).toBe(false);
+    expect(h.restoreOptions().map(options => options?.restoreFiles)).toEqual([
+      true,
+      false,
+      false,
+      false,
+      false,
+    ]);
+    release.resolve();
+    await preparing;
+    expect(h.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+  });
+
+  it('reports the requested chat ready even when recent-chat discovery fails', async () => {
+    const base = routeSpec();
+    const h = createHarness(FAST_TIMERS, {
+      supportsHistoryPreload: true,
+      readRecentHistory: async () => {
+        throw new Error('unavailable');
+      },
+      readHistoryPage: async () => ({}),
+    });
+    await h.manager.prepare({
+      ...base,
+      kilo: { ...base.kilo!, scopeId: 'worktree_6a7199ec-d6d7-4788-b5a5-d74960f401e3' },
+    });
+    expect(h.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    expect(h.frames.some(frame => frame.type === 'session.failed')).toBe(false);
+  });
+
+  it('does not preload legacy chats before their on-demand file restore', async () => {
+    let discoveries = 0;
+    const h = createHarness(FAST_TIMERS, {
+      readRecentHistory: async () => {
+        discoveries++;
+        return [];
+      },
+      readHistoryPage: async () => ({}),
+    });
+    h.setSessionExists(false);
+    const base = routeSpec();
+    await h.manager.prepare({
+      ...base,
+      kilo: { ...base.kilo!, scopeId: 'worktree_6a7199ec-d6d7-4788-b5a5-d74960f401e3' },
+    });
+    expect(discoveries).toBe(0);
+    expect(h.restoreOptions().map(options => options?.restoreFiles)).toEqual([true]);
+    expect(h.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+  });
+});
 
 describe('replacement workspace local recovery', () => {
   const recovery = {
@@ -734,6 +814,9 @@ function createHarness(
     runtimes?: PrepareRuntimePort;
     runSkillInstall?: typeof processUtils.runProcess;
     spawnSetup?: ProcessSpawn;
+    readRecentHistory?: PrepareDeps['readRecentHistory'];
+    readHistoryPage?: PrepareDeps['readHistoryPage'];
+    supportsHistoryPreload?: boolean;
   } = {}
 ): Harness {
   const frames: ControlPlaneWrapperFrame[] = [];
@@ -862,6 +945,7 @@ function createHarness(
         },
         log: message => logs.push(message),
       });
+      currentClient.supportsHistoryPreload = options.supportsHistoryPreload;
       return currentClient;
     },
     installCredentials: async (key, env, cloudAgentMcp) => {
@@ -892,6 +976,8 @@ function createHarness(
     inheritedEnv: {},
     homeRoots: homeRootsFor(options.homeRoot ?? '/tmp/prepare-test-homes'),
     allocationId: 'alloc-current',
+    readRecentHistory: options.readRecentHistory,
+    readHistoryPage: options.readHistoryPage,
     ...(options.releaseCleanupDeadlineMs === undefined
       ? {}
       : { releaseCleanupDeadlineMs: options.releaseCleanupDeadlineMs }),

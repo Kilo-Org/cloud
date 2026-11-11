@@ -971,7 +971,7 @@
       "statusUnavailable": "État indisponible"
     },
     "providerConnect": {
-      "description": "Établissez la connexion entre Kilo et votre {{label}} pour examiner automatiquement les pull requests.",
+      "description": "Établissez la connexion entre Kilo et votre {{label}} pour examiner automatiquement les demandes de fusion.",
       "githubApp": "Application GitHub",
       "githubError": "Impossible d'ouvrir la configuration de GitHub. Réessayez.",
       "gitlabAccount": "Compte GitLab",

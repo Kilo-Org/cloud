@@ -4277,10 +4277,10 @@
     "snapshotSummaryFailed": "Isifinyezo se-AI sehlulekile. Umbiko wakho wesimo onamaqiniso ahleliwe usatholakala.",
     "scheduledContextEnabled": "Imibiko ehleliwe",
     "scheduledContextSettings": "Imibiko ehleliwe · {{context}}",
-    "scheduledContextHint": "Vula ukuqoqwa kwesimo okuhleliwe nezifinyezo ze-AI ezikhokhelwayo kulo mongo kuphela. Izingcaphuno ezikhethiwe okususwe kuzo imininingwane ebucayi kanye namaqiniso ahleliwe kuthunyelwa kumodeli yakho. Izifinyezo zisebenzisa ulimi lwe-app olulondolozwa kuphela lapho ushintsha izilungiselelo zombiko ngokwakho. Lolu limi olulondoloziwe alushintshi ngokuzenzakalelayo lapho ushintsha ulimi lwe-app. Izindleko zisebenzisa ibhalansi yalo mongo. Imibiko yesimo engenamsebenzi okhethiwe ayisebenzisi i-AI.",
+    "scheduledContextHint": "Vula ukuqoqwa kwesimo okuhleliwe nezifinyezo ze-AI ezikhokhelwayo kulo mongo kuphela. Izingcaphuno ezikhethiwe okususwe kuzo imininingwane ebucayi kanye namaqiniso ahleliwe kuthunyelwa kumodeli yakho. Izifinyezo zisebenzisa ulimi lwe-app olulondolozwa lapho ushintsha izilungiselelo zombiko. Izindleko zisebenzisa ibhalansi yalo mongo. Imibiko yesimo engenamsebenzi okhethiwe ayisebenzisi i-AI.",
     "snapshotSafeguards": "Imikhawulo yesikhathi neyezindleko yesifinyezo ngasinye isebenza embikweni wesimo ngamunye ohleliwe, hhayi njengesabelomali sansuku zonke.",
     "snapshotEstimateInputTooLarge": "Lo mbiko wesimo unobufakazi obuningi kakhulu kunalokho imodeli ekhethiwe engakusingatha.",
-    "quietSnapshot": "Awukho umsebenzi weseshini okhethelwe lo mbiko wesimo ekukhethweni okwenziwe ngokusemandleni. Akucelwanga isifinyezo se-AI, akubizwanga imodeli ye-AI futhi akukho nkokhelo ekhokhisiwe.",
+    "quietSnapshot": "Awukho umsebenzi weseshini okhethelwe lo mbiko wesimo. Akucelwanga isifinyezo se-AI futhi akukho nkokhelo ekhokhisiwe.",
     "noEnabledContexts": "Ayikho imongo evulelwe imibiko ehleliwe",
     "sourceBlocker": "Iseshini idinga ukunakwa",
     "sourceMetadata": "Imethadatha yeseshini eqoqiwe"

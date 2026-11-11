@@ -4271,10 +4271,10 @@
     "snapshotSummaryFailed": "AI xülasəsi alınmadı. Strukturlu anlıq görüntünüz hələ də mövcuddur.",
     "scheduledContextEnabled": "Planlaşdırılmış hesabatlar",
     "scheduledContextSettings": "Planlaşdırılmış hesabatlar · {{context}}",
-    "scheduledContextHint": "Yalnız bu kontekst üçün planlaşdırılmış qeydəalmanı və ödənişli AI xülasələrini aktiv edin. Seçilmiş, həssas məlumatları silinmiş fraqmentlər və strukturlu faktlar modelinizə göndərilir. Xülasələr yalnız hesabat ayarlarını özünüz yenilədiyiniz zaman yadda saxlanılan tətbiq dilində hazırlanır. Tətbiqin dilini dəyişmək xülasələrin dilini avtomatik yeniləmir. Ödənişlər bu kontekstin balansından çıxılır. Fəaliyyət olmayan anlıq görüntülər üçün AI istifadə edilmir.",
+    "scheduledContextHint": "Yalnız bu kontekst üçün planlaşdırılmış qeydəalmanı və ödənişli AI xülasələrini aktiv edin. Seçilmiş, həssas məlumatları silinmiş fraqmentlər və strukturlu faktlar modelinizə göndərilir. Xülasələr hesabat ayarlarını özünüz yenilədiyiniz zaman yadda saxlanılan tətbiq dilində hazırlanır. Ödənişlər bu kontekstin balansından çıxılır. Fəaliyyət olmayan anlıq görüntülər üçün AI istifadə edilmir.",
     "snapshotSafeguards": "Hər xülasə üçün vaxt və xərc limitləri hər planlaşdırılmış anlıq görüntüyə ayrıca tətbiq olunur, gündəlik büdcə deyil.",
     "snapshotEstimateInputTooLarge": "Bu anlıq görüntüdə seçilmiş model üçün həddindən artıq çox sübut var.",
-    "quietSnapshot": "İmkan daxilində aparılan seçim zamanı bu anlıq görüntü üçün heç bir sessiya fəaliyyəti seçilmədi. AI xülasəsi üçün modelə sorğu göndərilmədi və heç bir ödəniş tutulmadı.",
+    "quietSnapshot": "Bu anlıq görüntü üçün heç bir sessiya fəaliyyəti seçilmədi. AI xülasəsi tələb edilmədi və heç bir ödəniş tutulmadı.",
     "noEnabledContexts": "Planlaşdırılmış hesabatlar üçün heç bir kontekst aktiv deyil",
     "sourceBlocker": "Sessiyaya diqqət yetirilməlidir",
     "sourceMetadata": "Qeydə alınmış sessiya metaməlumatları"

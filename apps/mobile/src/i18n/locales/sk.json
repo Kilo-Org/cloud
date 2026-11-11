@@ -4403,10 +4403,10 @@
     "snapshotSummaryFailed": "AI zhrnutie zlyhalo. Vaša štruktúrovaná snímka je stále k dispozícii.",
     "scheduledContextEnabled": "Naplánované prehľady",
     "scheduledContextSettings": "Naplánované prehľady · {{context}}",
-    "scheduledContextHint": "Povoľte plánované zachytávanie stavu a platené AI zhrnutia iba pre tento kontext. Vybrané úryvky s odstránenými citlivými údajmi a štruktúrované fakty sa odošlú vášmu modelu. Zhrnutia používajú jazyk aplikácie uložený pri výslovnej zmene nastavení prehľadu. Uložený jazyk sa pri zmene jazyka aplikácie automaticky neaktualizuje. Poplatky sa strhávajú zo zostatku tohto kontextu. Snímky bez aktivity nevyužívajú AI.",
+    "scheduledContextHint": "Povoľte plánované zachytávanie stavu a platené AI zhrnutia iba pre tento kontext. Vybrané úryvky s odstránenými citlivými údajmi a štruktúrované fakty sa odošlú vášmu modelu. Zhrnutia používajú jazyk aplikácie uložený pri aktualizácii nastavení prehľadu. Poplatky sa strhávajú zo zostatku tohto kontextu. Snímky bez aktivity nevyužívajú AI.",
     "snapshotSafeguards": "Časový limit a limit výdavkov na jedno zhrnutie platia pre každú naplánovanú snímku, nie ako denný rozpočet.",
     "snapshotEstimateInputTooLarge": "Táto snímka obsahuje príliš veľa podkladov pre vybraný model.",
-    "quietSnapshot": "Pre túto snímku nebola vybraná žiadna aktivita relácií. Výber nemusí byť úplný. AI model sa nepoužil a nebol účtovaný žiadny poplatok za AI zhrnutie.",
+    "quietSnapshot": "Pre túto snímku nebola vybraná žiadna aktivita relácií. Žiadne AI zhrnutie nebolo vyžiadané ani účtované.",
     "noEnabledContexts": "Pre naplánované prehľady nie sú povolené žiadne kontexty",
     "sourceBlocker": "Relácia si vyžaduje pozornosť",
     "sourceMetadata": "Zachytené metadáta relácie"

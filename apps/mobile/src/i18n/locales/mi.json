@@ -4271,10 +4271,10 @@
     "snapshotSummaryFailed": "I rahua te whakarāpopototanga AI. Kei te wātea tonu tō hopuāhua hanganga.",
     "scheduledContextEnabled": "Ngā pūrongo kua hōtaka",
     "scheduledContextSettings": "Ngā pūrongo kua hōtaka · {{context}}",
-    "scheduledContextHint": "Whakahohea te hopu kua hōtaka me ngā whakarāpopototanga AI utu mō tēnei horopaki anake. Ka tukuna ngā wāhanga kua kōwhiria, kua hunahia hoki ngā mōhiohio matatapu, me ngā meka hanganga ki tō tauira. Ka whakamahia e ngā whakarāpopototanga te reo o te taupānga ka tiakina ina āta whakahou koe i ngā tautuhinga pūrongo. Kāore taua reo e whakahoutia aunoatia ina huri te reo o te taupānga. Ka whakamahia e ngā utu te toenga o tēnei horopaki. Kāore ngā hopuāhua kāore he mahi e whakamahi AI.",
+    "scheduledContextHint": "Whakahohea te hopu kua hōtaka me ngā whakarāpopototanga AI utu mō tēnei horopaki anake. Ka tukuna ngā wāhanga kua kōwhiria, kua hunahia hoki, me ngā meka hanganga ki tō tauira. Ka whakamahia e ngā whakarāpopototanga te reo o te taupānga kua tiakina ina whakahou koe i ngā tautuhinga pūrongo. Ka whakamahia e ngā utu te toenga o tēnei horopaki. Kāore ngā hopuāhua kāore he mahi e whakamahi AI.",
     "snapshotSafeguards": "Ka pā ngā tepe wā me ngā tepe whakapaunga o ia whakarāpopototanga ki ia hopuāhua kua hōtaka, ehara i te tahua ia rā.",
     "snapshotEstimateInputTooLarge": "He nui rawa ngā taunakitanga i tēnei hopuāhua mō te tauira kua kōwhiria.",
-    "quietSnapshot": "I runga i ngā mōhiohio i taea te kohi, kāore he mahi wātū i kōwhiria mō tēnei hopuāhua. Kāore he whakarāpopototanga AI i tonoa, kāore he tauira AI i karangatia, kāore hoki he utu i utaina.",
+    "quietSnapshot": "Kāore he mahi wātū i kōwhiria mō tēnei hopuāhua. Kāore he whakarāpopototanga AI i tonoa, ā, kāore hoki he utu i utaina.",
     "noEnabledContexts": "Kāore he horopaki kua whakahohea mō ngā pūrongo kua hōtaka",
     "sourceBlocker": "Me aro ki te wātū",
     "sourceMetadata": "Ngā raraungameta wātū kua hopukina"

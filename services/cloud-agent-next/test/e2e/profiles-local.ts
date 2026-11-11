@@ -410,6 +410,8 @@ try {
   console.log('PASS cold start and Cloud slash-command discovery');
   for (const key of [
     'harness',
+    'profileFile',
+    'wrapperProfileBridge',
     'variables',
     'setup',
     'rules',

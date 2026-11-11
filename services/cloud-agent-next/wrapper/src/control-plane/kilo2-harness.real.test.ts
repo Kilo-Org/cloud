@@ -18,6 +18,9 @@ import {
 } from './runtime-profile.js';
 import { buildWorktreeKiloEnvironment } from '../control/worktree-runtime.js';
 import { buildCloudAgentRules } from '../../../src/shared/cloud-agent-rules.js';
+import { createTurnManager } from './turn.js';
+import { runtimeKey } from './prepare.js';
+import type { ControlPlaneWrapperFrame } from '../../../src/shared/control-plane-protocol.js';
 
 const binary = process.env.KILO2_BINARY;
 const suite = binary ? describe : describe.skip;
@@ -584,7 +587,10 @@ suite('real Kilo v2 harness', () => {
       log: message => {
         if (process.env.KILO2_TEST_LOG) console.error(message);
       },
-      onEvent: event => events.push(event),
+      onEvent(event) {
+        events.push(event);
+        manager.observeKiloEvent({ ...event, runtimeKey: runtimeKey(route) });
+      },
       onHarnessActivity() {},
       openFeed(source, callbacks) {
         profileServer = source.server;
@@ -593,6 +599,26 @@ suite('real Kilo v2 harness', () => {
     });
     const signal = AbortSignal.timeout(60_000);
     const sessionId = `ses_${'b'.repeat(26)}`;
+    const route = {
+      sessionId: 'workspace_profile',
+      kiloSessionId: sessionId,
+      directory,
+      attemptId: 'profile',
+    };
+    const frames: ControlPlaneWrapperFrame[] = [];
+    const manager = createTurnManager({
+      timers: CONTROL_PLANE_TIMERS,
+      runtimes: { get: key => (key === runtimeKey(route) ? runtime : undefined) },
+      emit: frame => frames.push(frame),
+    });
+    manager.registerRoute(route);
+    async function until(check: () => Promise<boolean>, label: string) {
+      const deadline = Date.now() + 20_000;
+      while (!(await check())) {
+        if (Date.now() > deadline) throw new Error(`Timed out: ${label}`);
+        await Bun.sleep(50);
+      }
+    }
     try {
       const harness = await runtime.ensure();
       await harness.open({
@@ -611,13 +637,23 @@ suite('real Kilo v2 harness', () => {
         model: 'fake-deterministic',
         signal,
       });
-      const deadline = Date.now() + 20_000;
       const turnClose = () => events.find(event => event.type === 'session.turn.close');
-      while (!turnClose()) {
-        if (Date.now() > deadline) throw new Error('Timed out: profile instruction turn');
-        await Bun.sleep(50);
-      }
+      await until(async () => Boolean(turnClose()), 'profile instruction turn');
       expect(turnClose()?.properties.reason).toBe('completed');
+      await until(
+        async () =>
+          frames.some(
+            frame =>
+              frame.type === 'session.events' &&
+              frame.events.some(
+                event =>
+                  event.type === 'commands.available' &&
+                  JSON.stringify(event.properties.commands).includes('profile-command')
+              )
+          ),
+        'native command.updated catalog publication'
+      );
+      expect(events.some(event => event.type === 'command.updated')).toBe(true);
       expect(requests.at(-1)).toContain('SYNTHETIC_REPOSITORY_INSTRUCTION');
       expect(requests.at(-1)).toContain('SYNTHETIC_ENABLED_PROFILE_INSTRUCTION');
       expect(requests.at(-1)).not.toContain('SYNTHETIC_DISABLED_PROFILE_INSTRUCTION');
@@ -656,10 +692,10 @@ suite('real Kilo v2 harness', () => {
         model: 'fake-deterministic',
         signal,
       });
-      while (!events.slice(start).some(event => event.type === 'session.turn.close')) {
-        if (Date.now() > deadline) throw new Error('Timed out: profile command turn');
-        await Bun.sleep(50);
-      }
+      await until(
+        async () => events.slice(start).some(event => event.type === 'session.turn.close'),
+        'profile command turn'
+      );
       expect(requests.at(-1)).toContain('Run the profile command SYNTHETIC_ARGUMENT');
       expect(requests.at(-1)).toContain('SYNTHETIC_PROFILE_AGENT');
       await harness.command({
@@ -670,12 +706,14 @@ suite('real Kilo v2 harness', () => {
         signal,
       });
       const children = () => api.data(`/api/session?${query}`);
-      let sessions = z.array(z.object({ parentID: z.string().optional() })).parse(await children());
-      while (!sessions.some(child => child.parentID === sessionId)) {
-        if (Date.now() > deadline) throw new Error('Timed out: profile subtask child');
-        await Bun.sleep(50);
-        sessions = z.array(z.object({ parentID: z.string().optional() })).parse(await children());
-      }
+      await until(
+        async () =>
+          z
+            .array(z.object({ parentID: z.string().optional() }))
+            .parse(await children())
+            .some(child => child.parentID === sessionId),
+        'profile subtask child'
+      );
     } finally {
       await runtime.shutdown();
       await fake.stop(true);

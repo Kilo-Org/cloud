@@ -851,18 +851,14 @@ for (const [name, defect] of [
   [
     'Kilo CLI cache key without the resolved version',
     workflow => {
-      const step = workflow.jobs[prJobName].steps.find(item =>
-        kiloCacheAnyAction(item)
-      );
+      const step = workflow.jobs[prJobName].steps.find(item => kiloCacheAnyAction(item));
       step.with.key = '${{ runner.os }}-${{ runner.arch }}-kilo-cli';
     },
   ],
   [
     'Kilo CLI cache restore may fail the job',
     workflow => {
-      const step = workflow.jobs[prJobName].steps.find(item =>
-        kiloCacheAnyAction(item)
-      );
+      const step = workflow.jobs[prJobName].steps.find(item => kiloCacheAnyAction(item));
       delete step['continue-on-error'];
     },
   ],

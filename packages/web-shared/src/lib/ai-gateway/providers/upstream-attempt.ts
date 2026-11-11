@@ -71,7 +71,6 @@ type SendUpstreamAttemptResult =
       toolsUsed: string[];
     };
 
-/** Sends one upstream attempt and mutates the request with provider-specific transforms. */
 /** Whether the request's gateway lists the model. Other providers are not checked. */
 async function gatewayServesModel(provider: Provider, requestedModel: string) {
   switch (provider.type) {
@@ -84,6 +83,7 @@ async function gatewayServesModel(provider: Provider, requestedModel: string) {
   }
 }
 
+/** Sends one upstream attempt and mutates the request with provider-specific transforms. */
 export async function sendUpstreamAttempt({
   providerContext,
   requestedModel,

@@ -20,7 +20,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { CreditsCard } from './profile-credits-card';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import {
+  ICON_TARGET_BOX_CLASS,
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
+} from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { OrganizationProvider } from '@/lib/organization-context';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
@@ -325,11 +329,19 @@ async function choose(renderer: ReactTestRenderer, label: string) {
   });
 }
 
-/** The header container's classes: the only View the card gives `min-h-11 gap-3`. */
+/**
+ * The header container's classes: the row that lays out the credits eyebrow
+ * beside the account picker. The card's outer box is the only View whose whole
+ * class list is `gap-3`, so the header is the one that adds to it.
+ */
 function headerClasses(renderer: ReactTestRenderer): string[] {
-  const header = renderer.root.find(
-    node => Object.is(node.type, 'View') && String(node.props.className).includes('min-h-11 gap-3')
-  );
+  const header = renderer.root.find(node => {
+    if (!Object.is(node.type, 'View')) {
+      return false;
+    }
+    const className = String(node.props.className);
+    return className.includes('gap-3') && className !== 'gap-3';
+  });
   return String(header.props.className).split(' ');
 }
 
@@ -1319,6 +1331,22 @@ describe('CreditsCard credits header', () => {
     expect(classes).not.toContain('flex-row');
     // The eyebrow keeps its full copy instead of breaking mid-word.
     expect(texts()).toContain('Credits');
+    unmount();
+  });
+
+  it('keeps the header on the eyebrow line instead of the picker box height', async () => {
+    const { renderer, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
+
+    // The picker is a line action: its box cancels its own layout height and
+    // overflows the eyebrow's line. A minimum height on the row would centre
+    // the eyebrow in the box's height instead and open the gap to the credits
+    // card to twice the gap the section headers below keep to their rows.
+    expect(headerClasses(renderer)).not.toContain('min-h-11');
+    const picker = renderer.root.find(
+      node => Object.is(node.type, Pressable) && node.props.accessibilityHint === 'Select account'
+    );
+    expect(String(picker.props.className)).toContain(LINE_ACTION_BOX_CLASS);
+    expect(picker.props.hitSlop).toEqual(LINE_ACTION_HIT_SLOP);
     unmount();
   });
 });

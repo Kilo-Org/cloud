@@ -15,10 +15,11 @@
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
-const ROOT = new URL('../../', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const LANGUAGES_FILE = join(ROOT, 'apps/mobile/src/i18n/languages.ts');
 const SOURCE_DIRS = [join(ROOT, 'apps/mobile/src')];
 const CATALOGS = [
@@ -170,6 +171,8 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'common.gitlab',
   'profile.providerGoogle',
   'profile.providerLinkedin',
+  'profile.providerChatgpt',
+  'profile.providerClaude',
   'consent.kilo',
   'securityAgent.findingDetails.cve',
   'securityAgent.findingDetails.ghsa',
@@ -462,6 +465,12 @@ const LOCALE_SEPARATED_KEYS = new Set([
   // alone separates ("ja", "zh-Hans", "zh-Hant"). "th" ends no sentence with a
   // mark, so it keeps the space the hint needs to stay a separate sentence.
   'agentChat.contextUsage.tapToViewDetails',
+  // The sentence and list joiners are the catalog's own statement about how it
+  // closes a sentence and separates two items, so both carry their own edges: a
+  // space after the mark nearly everywhere, none where the mark alone separates
+  // ("ja", "zh-Hans", "zh-Hant").
+  'common.sentenceJoiner',
+  'common.listJoiner',
 ]);
 
 /**

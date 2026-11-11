@@ -12,6 +12,7 @@ import {
   composeProjectName,
   currentComposeProject,
   DEFAULT_COMPOSE_PROJECT,
+  localByokKmsServiceConfig,
   syncInfraEnv,
 } from './infra-env';
 import { applyPortOffset, portOffset } from './services';
@@ -261,4 +262,12 @@ test('currentComposeProject names the project compose really uses', () => {
   // database look like another worktree's squatter.
   assert.equal(currentComposeProject('/repo/kilo', 0), DEFAULT_COMPOSE_PROJECT);
   assert.equal(currentComposeProject('/repo/kilo', 2500), 'kilo-dev-kilo-2500');
+});
+
+test('derives the seed fallback KMS endpoint from the port offset', () => {
+  assert.deepEqual(localByokKmsServiceConfig(0), {
+    url: 'http://127.0.0.1:8901',
+    token: 'dev-byok-kms-token',
+  });
+  assert.equal(localByokKmsServiceConfig(300).url, 'http://127.0.0.1:9201');
 });

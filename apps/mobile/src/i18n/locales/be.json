@@ -22,6 +22,8 @@
     "expired": "Тэрмін дзеяння скончыўся"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Адмяніць",
     "done": "Гатова",
     "retry": "Паўтарыць",
@@ -227,6 +229,21 @@
     "signInCodeField": "Код уваходу",
     "or": "або"
   },
+  "pendingLink": {
+    "description": "Уліковы запіс з {{email}} ужо існуе. Увайдзіце адным з яго спосабаў, каб дадаць {{provider}}.",
+    "emailCode": "Даслаць мне код уваходу па электроннай пошце",
+    "continueInBrowser": "Працягнуць у браўзеры",
+    "startAgain": "Пачаць нанова",
+    "expired": "Тэрмін дзеяння гэтага запыту на даданне {{provider}} скончыўся.",
+    "noMethods": "У гэтага ўліковага запісу няма іншага спосабу ўваходу, таму {{provider}} нельга дадаць.",
+    "linked": "{{provider}} дададзены да вашага ўліковага запісу.",
+    "failedExpired": "{{provider}} не дададзены, бо тэрмін дзеяння запыту скончыўся.",
+    "failedWrongAccount": "{{provider}} не дададзены, бо вы ўвайшлі ў іншы ўліковы запіс.",
+    "failedAccountAlreadyLinked": "{{provider}} не дададзены, бо ён ужо звязаны з іншым уліковым запісам.",
+    "failedProviderAlreadyLinked": "{{provider}} не дададзены, бо ў вашым уліковым запісе ўжо ёсць іншы ўваход праз {{provider}}.",
+    "failedLinking": "Не ўдалося дадаць {{provider}} да вашага ўліковага запісу.",
+    "notAdded": "Вы ўвайшлі. {{provider}} не дададзены да вашага ўліковага запісу."
+  },
   "profile": {
     "codeReviewerSubtitle": "Аўтаматычныя праверкі PR",
     "securityAgentSubtitle": "Знаходзіць і ліквідаваць уразлівасці",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Тэставы ўліковы запіс",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Карпаратыўны SSO",
     "passkeysTitle": "Ключы доступу",
     "passkeysSubtitle": "Увайсці без пароля",
@@ -343,7 +362,15 @@
       "retryLoadingFiles": "Паўтарыць загрузку файлаў",
       "filterPlaceholder": "Пошук файлаў па шляху",
       "viewedCount": "прагледжана {{viewed}} з {{total}}",
+      "viewedCount_one": "прагледжана {{viewed}} з {{total}}",
+      "viewedCount_few": "прагледжана {{viewed}} з {{total}}",
+      "viewedCount_many": "прагледжана {{viewed}} з {{total}}",
+      "viewedCount_other": "прагледжана {{viewed}} з {{total}}",
       "viewedOfListed": "прагледжана {{viewed}} з {{total}} файлаў у спісе",
+      "viewedOfListed_one": "прагледжана {{viewed}} з {{total}} файлаў у спісе",
+      "viewedOfListed_few": "прагледжана {{viewed}} з {{total}} файлаў у спісе",
+      "viewedOfListed_many": "прагледжана {{viewed}} з {{total}} файлаў у спісе",
+      "viewedOfListed_other": "прагледжана {{viewed}} з {{total}} файлаў у спісе",
       "loadingFiles": "Загрузка {{loaded}} з {{total}}…",
       "failedToLoadAllFiles": "Не атрымалася загрузіць усе файлы.",
       "couldNotLoadMoreFiles": "Не атрымалася загрузіць астатнія файлы.",
@@ -1915,7 +1942,7 @@
       "cloningSession": "Кланаванне сеанса",
       "couldNotLoadThisSession": "Не ўдалося загрузіць гэты сеанс.",
       "cloneFailedRetry": "Не ўдалося кланаваць гэты сеанс. Паспрабуйце яшчэ раз.",
-      "notEnoughCredits": "Недастаткова крэдытаў для запуску Cloud Agent. Папоўніце баланс і паспрабуйце яшчэ раз.",
+      "notEnoughCredits": "Недастаткова крэдытаў для гэтага запыту. Папоўніце баланс і паспрабуйце яшчэ раз.",
       "previousTaskFinishing": "Папярэдняя задача яшчэ завяршаецца. Крыху пачакайце.",
       "serviceUnavailable": "Сэрвіс зараз недаступны. Паспрабуйце яшчэ раз.",
       "connectionTrouble": "Узнікла праблема з падключэннем. Крыху пачакайце і паспрабуйце яшчэ раз.",
@@ -2057,7 +2084,8 @@
       "selectedProfile": "Абраны профіль",
       "manualOverrides": "Ручныя перавызначэнні",
       "openSettingsToReview": "Адкрыйце налады для прагляду",
-      "profileSelection": "Выбар профілю"
+      "profileSelection": "Выбар профілю",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл.",
@@ -2079,6 +2107,8 @@
       "toolList": "спіс файлаў",
       "toolPatch": "выпраўленне",
       "toolTask": "задача",
+      "toolSendFile": "Дасланы файл",
+      "toolSendFileAction": "Дасыланне файла",
       "readTodos": "Прачытаць план",
       "updateTodos": "Абнавіць план",
       "linesBadge": "радкоў: {{displayCount}}",
@@ -2185,7 +2215,21 @@
       "thought": "Развагі",
       "showDetails": "Паказаць падрабязнасці",
       "pending": "У чаканні…",
-      "running": "Выконваецца…"
+      "running": "Выконваецца…",
+      "field": {
+        "filePath": "Шлях файла",
+        "path": "Шлях",
+        "offset": "Зрух",
+        "limit": "Абмежаванне",
+        "pattern": "Узор",
+        "include": "Уключэнне",
+        "patchText": "Тэкст латкі",
+        "query": "Запыт",
+        "prompt": "Інструкцыя",
+        "header": "Загаловак",
+        "question": "Пытанне",
+        "options": "Варыянты"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Не ўдалося адлюстраваць змесціва."
@@ -2201,7 +2245,7 @@
       "assistantContextOverflow": "Размова занадта доўгая для мадэлі.",
       "assistantProviderError": "Пастаўшчык вярнуў памылку.",
       "assistantProviderRefused": "Пастаўшчык адхіліў гэты запыт, і яго нельга паўтарыць.",
-      "assistantCreditsRefusal": "Недастаткова крэдытаў для запуску Cloud Agent.",
+      "assistantCreditsRefusal": "Недастаткова крэдытаў для гэтага запыту.",
       "assistantOutputLimit": "Адказ дасягнуў максімальнай даўжыні вываду мадэлі.",
       "assistantStructuredOutput": "Адказ не адпавядае патрабаванаму фармату.",
       "assistantFailed": "Не ўдалося стварыць адказ."
@@ -2346,7 +2390,7 @@
       "positionHint": "(1 з {{displayCount}})",
       "movedPastPrompt": "Агент ужо перайшоў да наступнага кроку. Гэтая картка закрыецца, калі сеанс працягнецца.",
       "waitingForAnswer": "Агент чакае вашага адказу. Пакуль пытанне адкрытае, адпраўка вашага паведамлення агенту прыпыненая.",
-      "waitingForPermission": "Агент чакае дазволу. Пакуль запыт адкрыты, адпраўка вашага паведамлення агенту прыпыненая."
+      "waitingForPermission": "Пакуль запыт адкрыты, адпраўка вашага паведамлення агенту прыпыненая."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3142,7 +3186,7 @@
       "provider": "Спынена: памылка правайдэра",
       "tool": "Спынена: памылка інструмента",
       "cancelled": "Спынена: скасавана",
-      "other": "СПЫНЕНЫ"
+      "other": "Спынены"
     }
   },
   "transcriptionModel": {
@@ -3649,6 +3693,7 @@
       "namePlaceholder": "Мой агент",
       "promptPlaceholder": "Вы...",
       "tools": "інструменты",
+      "wholeToolRule": "Гэты агент прымяняе адно правіла да ўсіх інструментаў адначасова: {{rule}}. Гэтыя перамыкачы даступныя толькі для чытання.",
       "visibility": "Бачнасць",
       "visibilityPrimary": "Асноўны — паказваецца ў выбары",
       "visibilitySubagent": "Субагент — можна выклікаць толькі ад іншых",
@@ -3690,6 +3735,7 @@
     },
     "repoBindings": {
       "title": "Профілі па змаўчанні для рэпазітараў",
+      "entryLabel": "Профілі па змаўчанні",
       "add": "Дадаць па змаўчанні",
       "empty": "Стандартныя параметры не настроены",
       "emptyDescription": "Дадайце стандартнае для аўтаматычнага прымянення профілю пры запуску сеансаў для рэпазітара.",
@@ -3898,10 +3944,10 @@
     "snapshotSummaryFailed": "Не ўдалося стварыць AI-рэзюмэ. Ваш структураваны здымак па-ранейшаму даступны.",
     "scheduledContextEnabled": "Запланаваныя зводкі",
     "scheduledContextSettings": "Запланаваныя зводкі · {{context}}",
-    "scheduledContextHint": "Уключыце фіксацыю стану па раскладзе і платныя AI-рэзюмэ толькі для гэтага кантэксту. Выбраныя ўрыўкі з выдаленай канфідэнцыйнай інфармацыяй і структураваныя факты адпраўляюцца вашай мадэлі. Рэзюмэ выкарыстоўваюць мову праграмы, захаваную пры яўным змяненні налад зводкі. Змена мовы праграмы сама па сабе не абнаўляе захаваную мову рэзюмэ. Плата спісваецца з балансу гэтага кантэксту. Здымкі без актыўнасці не выкарыстоўваюць AI.",
+    "scheduledContextHint": "Уключыце фіксацыю стану па раскладзе і платныя AI-рэзюмэ толькі для гэтага кантэксту. Выбраныя ўрыўкі з выдаленай канфідэнцыйнай інфармацыяй і структураваныя факты адпраўляюцца вашай мадэлі. Рэзюмэ выкарыстоўваюць мову праграмы, захаваную пры абнаўленні налад зводкі. Плата спісваецца з балансу гэтага кантэксту. Здымкі без актыўнасці не выкарыстоўваюць AI.",
     "snapshotSafeguards": "Ліміты часу і выдаткаў на адно рэзюмэ дзейнічаюць для кожнага запланаванага здымка, а не як штодзённы бюджэт.",
     "snapshotEstimateInputTooLarge": "У гэтым здымку занадта шмат доказаў для выбранай мадэлі.",
-    "quietSnapshot": "Для гэтага здымка не выбрана актыўнасці сеансаў. Адбор можа быць няпоўным. Запыт на AI-рэзюмэ не адпраўляўся, плата не спісвалася.",
+    "quietSnapshot": "Для гэтага здымка не выбрана актыўнасці сеансаў. Запыт на AI-рэзюмэ не адпраўляўся, плата не спісвалася.",
     "noEnabledContexts": "Няма ўключаных кантэкстаў для запланаваных зводак",
     "sourceBlocker": "Сеанс патрабуе ўвагі",
     "sourceMetadata": "Зафіксаваныя метаданыя сеанса"

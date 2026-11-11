@@ -114,6 +114,7 @@ jest.mock('./useSavedWorktreeChanges', () => ({
   useSavedWorktreeChanges: () => ({ saved: { data: undefined }, queryKey: [] }),
 }));
 jest.mock('./use-cached-transcript-page', () => ({ useCachedTranscriptPage: () => null }));
+jest.mock('./useChatStackInfo', () => ({ useChatStackInfo: () => null }));
 jest.mock('./use-preview', () => ({
   ...jest.requireActual('./use-preview'),
   usePreviewUrlTemplate: () => null,
@@ -855,6 +856,25 @@ describe('CloudChatPage route-aware transcript phase', () => {
     expect(skeleton()).toBeNull();
     expect(dom.container.querySelector('[data-conversation]')).not.toBeNull();
     expect(alert()?.textContent).toContain('Replay disconnected');
+  });
+
+  it('attaches a readable session error above the composer with a details action', () => {
+    mockAtomValues.fetchedSessionData = { kiloSessionId: 'ses_b', organizationId: null };
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.cloudStatus = { type: 'error', message: 'workspace_setup_failed' };
+    mockAtomValues.statusIndicator = { type: 'error', message: 'workspace_setup_failed' };
+    mockAtomValues.preparationAttempts = [{ id: 'attempt_1', status: 'failed', steps: [] }];
+    mockAtomValues.isLoading = false;
+
+    render();
+
+    const notice = alert();
+    expect(notice?.textContent).toContain('Workspace setup failed');
+    expect(notice?.textContent).not.toContain('workspace_setup_failed');
+    expect(notice?.parentElement?.nextElementSibling?.hasAttribute('data-composer')).toBe(true);
+    expect(
+      Array.from(notice?.querySelectorAll('button') ?? []).map(button => button.textContent)
+    ).toEqual(['View details']);
   });
 
   it('does not resume the ?at= anchor until the requested session owns the transcript', () => {

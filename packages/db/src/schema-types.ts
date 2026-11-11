@@ -1468,7 +1468,8 @@ export const EnkryptOutputDetectorsUpdateSchema =
  * Enkrypt AI input scan of each gateway chat request. Requests flagged by a blocking detector are
  * blocked. Blocking scans fail closed while Enkrypt is unavailable; log-only scans do not gate
  * requests. Without `detectors` the gateway applies Kilo Default. The gateway checks every input,
- * including tool results; `scan_tool_results` is no longer read and is always written as true.
+ * including tool results.
+ * With `group_id`, only members of that organization group are scanned; without it, every member.
  *
  * `detectors` is validated with `EnkryptInputDetectorsSchema` where it is written and read, not
  * here: organization settings are parsed on every settings write and on some reads, and a stored
@@ -1476,8 +1477,8 @@ export const EnkryptOutputDetectorsUpdateSchema =
  */
 export const EnkryptInputGuardrailSettingsSchema = z.object({
   enabled: z.boolean(),
-  scan_tool_results: z.boolean().optional(),
   detectors: z.unknown().optional(),
+  group_id: z.string().nullable().optional(),
 });
 
 export type EnkryptInputGuardrailSettings = z.infer<typeof EnkryptInputGuardrailSettingsSchema>;
@@ -3280,7 +3281,11 @@ export const CustomPricingConfigSchema = z.object({
 
 export type CustomPricingConfig = z.infer<typeof CustomPricingConfigSchema>;
 
-// --- StoredModel ---
+// --- Gateway models ---
+
+export const ModelArchitectureSchema = z.object({
+  output_modalities: z.array(z.string()),
+});
 
 export const ModelSchema = z.object({
   id: z.string(),
@@ -3306,12 +3311,7 @@ export const ModelSchema = z.object({
     })
     .optional()
     .catch(undefined),
-  architecture: z
-    .object({
-      output_modalities: z.array(z.string()),
-    })
-    .optional()
-    .catch(undefined),
+  architecture: ModelArchitectureSchema.optional().catch(undefined),
   reasoning: z
     .object({
       mandatory: z.boolean(),
@@ -3321,25 +3321,27 @@ export const ModelSchema = z.object({
     .catch(undefined),
 });
 
+export type GatewayModel = z.infer<typeof ModelSchema>;
+
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
+
+export const EndpointPricingSchema = z.object({
+  prompt: z.string(),
+  completion: z.string(),
+  image: z.string().optional(),
+  request: z.string().optional(),
+  input_cache_read: z.string().optional(),
+  input_cache_write: z.string().optional(),
+  web_search: z.string().optional(),
+  internal_reasoning: z.string().optional(),
+  discount: z.number().optional(),
+});
 
 export const EndpointSchema = z.object({
   tag: z.string().optional(),
   provider_name: z.string().optional(),
   context_length: z.number().optional(),
-  pricing: z
-    .object({
-      prompt: z.string(),
-      completion: z.string(),
-      image: z.string().optional(),
-      request: z.string().optional(),
-      input_cache_read: z.string().optional(),
-      input_cache_write: z.string().optional(),
-      web_search: z.string().optional(),
-      internal_reasoning: z.string().optional(),
-      discount: z.number().optional(),
-    })
-    .optional(),
+  pricing: EndpointPricingSchema.optional(),
   // Vercel AI Gateway endpoint data policy flags; OpenRouter does not set them.
   has_zdr: z.boolean().optional().catch(undefined),
   has_no_training: z.boolean().optional().catch(undefined),
@@ -3350,14 +3352,6 @@ export type Endpoint = z.infer<typeof EndpointSchema>;
 export const EndpointsSchema = z.object({
   data: z.object({ endpoints: z.array(EndpointSchema) }),
 });
-
-export const StoredModelSchema = ModelSchema.and(
-  z.object({
-    endpoints: z.array(EndpointSchema),
-  })
-);
-
-export type StoredModel = z.infer<typeof StoredModelSchema>;
 
 // =============================================================================
 // C. Stripe type (inline)

@@ -22,6 +22,8 @@
     "expired": "انتهت الصلاحية"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": "، ",
     "cancel": "إلغاء",
     "done": "تم",
     "retry": "إعادة المحاولة",
@@ -227,6 +229,21 @@
     "pleaseEnterEmail": "أدخل عنوان بريدك الإلكتروني.",
     "or": "أو"
   },
+  "pendingLink": {
+    "description": "يوجد حساب يستخدم {{email}} بالفعل. سجّل الدخول بإحدى طرقه لإضافة {{provider}}.",
+    "emailCode": "أرسل لي رمز تسجيل الدخول",
+    "continueInBrowser": "المتابعة في المتصفح",
+    "startAgain": "البدء من جديد",
+    "expired": "انتهت صلاحية طلب إضافة {{provider}}.",
+    "noMethods": "لا يملك هذا الحساب أي طريقة أخرى لتسجيل الدخول، لذا لا يمكن إضافة {{provider}}.",
+    "linked": "تمت إضافة {{provider}} إلى حسابك.",
+    "failedExpired": "لم تتم إضافة {{provider}} لأن صلاحية الطلب انتهت.",
+    "failedWrongAccount": "لم تتم إضافة {{provider}} لأنك سجّلت الدخول إلى حساب مختلف.",
+    "failedAccountAlreadyLinked": "لم تتم إضافة {{provider}} لأنه مرتبط بالفعل بحساب آخر.",
+    "failedProviderAlreadyLinked": "لم تتم إضافة {{provider}} لأن حسابك يحتوي بالفعل على تسجيل دخول مختلف عبر {{provider}}.",
+    "failedLinking": "تعذّرت إضافة {{provider}} إلى حسابك.",
+    "notAdded": "لقد سجّلت الدخول. لم تتم إضافة {{provider}} إلى حسابك."
+  },
   "profile": {
     "codeReviewerSubtitle": "مراجعات PR تلقائية",
     "securityAgentSubtitle": "اكتشاف الثغرات ومعالجتها",
@@ -265,6 +282,8 @@
     "providerTestAccount": "حساب تجريبي",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "تسجيل الدخول الموحّد للمؤسسات",
     "passkeysTitle": "مفاتيح المرور",
     "passkeysSubtitle": "سجّل الدخول بدون كلمة مرور",
@@ -1371,7 +1390,7 @@
       "cloningSession": "جارٍ استنساخ الجلسة",
       "couldNotLoadThisSession": "تعذّر تحميل هذه الجلسة.",
       "cloneFailedRetry": "تعذّر استنساخ هذه الجلسة. حاول مرة أخرى.",
-      "notEnoughCredits": "رصيدك غير كافٍ لتشغيل Cloud Agent. اشحن رصيدك وحاول مرة أخرى.",
+      "notEnoughCredits": "رصيدك غير كافٍ لهذا الطلب. اشحن رصيدك وحاول مرة أخرى.",
       "previousTaskFinishing": "لم تنتهِ المهمة السابقة بعد. انتظر لحظة.",
       "serviceUnavailable": "الخدمة غير متاحة الآن. حاول مرة أخرى.",
       "connectionTrouble": "هناك مشكلة في الاتصال. حاول مرة أخرى بعد لحظة.",
@@ -1481,7 +1500,7 @@
       "discardWithUploadsMessage": "ستُحذف تعليماتك وأي ملفات مرفوعة لم تُرفق برسائل مرسلة.",
       "discardFailed": "تعذّر حذف المسودة. حاول مرة أخرى.",
       "remoteHint": "لتشغيل الجلسة على حاسوبك، شغّل Kilo هناك واتركه يعمل.",
-      "continueFrom": "تجري متابعة {{title}}.",
+      "continueFrom": "تجري متابعة «{{title}}».",
       "importingSession": "جارٍ استيراد الجلسة",
       "cliCannotContinue": "إصدار CLI هذا لا يدعم متابعة الجلسات. اختر Cloud Agent أو CLI آخر.",
       "importFailed": "تعذر استيراد هذه الجلسة.",
@@ -1513,7 +1532,8 @@
       "selectedProfile": "الملف الشخصي المحدد",
       "manualOverrides": "التجاوزات اليدوية",
       "openSettingsToReview": "افتح الإعدادات للمراجعة",
-      "profileSelection": "اختيار الملف الشخصي"
+      "profileSelection": "اختيار الملف الشخصي",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "تم تحديث ملف واحد.",
@@ -1537,6 +1557,8 @@
       "toolList": "عرض قائمة",
       "toolPatch": "تطبيق تصحيح",
       "toolTask": "المهمة",
+      "toolSendFile": "إرسال الملف",
+      "toolSendFileAction": "إرسال ملف",
       "readTodos": "قراءة الخطة",
       "updateTodos": "تحديث الخطة",
       "linesBadge": "الأسطر: {{displayCount}}",
@@ -1649,7 +1671,21 @@
       "thought": "التفكير",
       "showDetails": "عرض التفاصيل",
       "pending": "قيد الانتظار…",
-      "running": "جارٍ التنفيذ…"
+      "running": "جارٍ التنفيذ…",
+      "field": {
+        "filePath": "مسار الملف",
+        "path": "المسار",
+        "offset": "الإزاحة",
+        "limit": "الحد الأقصى",
+        "pattern": "النمط",
+        "include": "التضمين",
+        "patchText": "نص الرقعة",
+        "query": "الاستعلام",
+        "prompt": "المطالبة",
+        "header": "العنوان",
+        "question": "السؤال",
+        "options": "الخيارات"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "تعذّر عرض المحتوى."
@@ -1665,7 +1701,7 @@
       "assistantContextOverflow": "المحادثة أطول من أن يستوعبها النموذج.",
       "assistantProviderError": "أعاد المزود رسالة خطأ.",
       "assistantProviderRefused": "رفض المزود هذا الطلب ولا يمكن إعادة المحاولة.",
-      "assistantCreditsRefusal": "رصيدك غير كافٍ لتشغيل Cloud Agent.",
+      "assistantCreditsRefusal": "رصيدك غير كافٍ لهذا الطلب.",
       "assistantOutputLimit": "وصل الرد إلى حدّ الإخراج الأقصى للنموذج.",
       "assistantStructuredOutput": "لم يتطابق الرد مع التنسيق المطلوب.",
       "assistantFailed": "تعذّر إنشاء الرد."
@@ -1810,7 +1846,7 @@
       "positionHint": "(1 من {{displayCount}})",
       "movedPastPrompt": "تجاوز الوكيل هذا الطلب. ستُغلق هذه البطاقة عند استئناف الجلسة.",
       "waitingForAnswer": "الوكيل في انتظار إجابتك. يبقى إرسال رسالتك إلى الوكيل متوقفًا مؤقتًا ما دام هذا السؤال مفتوحًا.",
-      "waitingForPermission": "الوكيل في انتظار الإذن. يبقى إرسال رسالتك إلى الوكيل متوقفًا مؤقتًا ما دام هذا الطلب مفتوحًا."
+      "waitingForPermission": "يبقى إرسال رسالتك إلى الوكيل متوقفًا مؤقتًا ما دام هذا الطلب مفتوحًا."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}، {{taskName}}{{modelLabel}}، {{latestActivityLabel}}، {{status}}",
@@ -2598,7 +2634,19 @@
       "retryLoadingMoreFiles": "إعادة محاولة تحميل المزيد من الملفات",
       "title": "الملفات",
       "viewedCount": "تم الاطلاع على {{viewed}} من {{total}}",
-      "viewedOfListed": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات"
+      "viewedCount_zero": "تم الاطلاع على {{viewed}} من {{total}}",
+      "viewedCount_one": "تم الاطلاع على {{viewed}} من {{total}}",
+      "viewedCount_two": "تم الاطلاع على {{viewed}} من {{total}}",
+      "viewedCount_few": "تم الاطلاع على {{viewed}} من {{total}}",
+      "viewedCount_many": "تم الاطلاع على {{viewed}} من {{total}}",
+      "viewedCount_other": "تم الاطلاع على {{viewed}} من {{total}}",
+      "viewedOfListed": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات",
+      "viewedOfListed_zero": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات",
+      "viewedOfListed_one": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات",
+      "viewedOfListed_two": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات",
+      "viewedOfListed_few": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات",
+      "viewedOfListed_many": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات",
+      "viewedOfListed_other": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات"
     },
     "fileRows": {
       "collapseFile": "طي الملف",
@@ -3767,6 +3815,7 @@
       "namePlaceholder": "وكيل أعمالي",
       "promptPlaceholder": "أنت ...",
       "tools": "أدوات",
+      "wholeToolRule": "يطبّق هذا الوكيل قاعدة واحدة على كل الأدوات دفعةً واحدة: {{rule}}. هذه المفاتيح للقراءة فقط.",
       "visibility": "الرؤية",
       "visibilityPrimary": "الأساسي — يظهر في المنتقي",
       "visibilitySubagent": "وكيل فرعي — يمكن الاتصال به فقط من الآخرين",
@@ -3808,6 +3857,7 @@
     },
     "repoBindings": {
       "title": "الملفات الشخصية الافتراضية للمستودعات",
+      "entryLabel": "الملفات الشخصية الافتراضية",
       "add": "أضف الافتراضي",
       "empty": "لم يتم تكوين أي إعدادات افتراضية",
       "emptyDescription": "أضف افتراضيًا لتطبيق ملف شخصي تلقائيًا عند بدء جلسات المستودعات.",
@@ -4005,7 +4055,7 @@
     "estimate": "التقدير {{estimate}} · الحد الأقصى {{maximum}}",
     "estimateUnavailable": "الملخص المدفوع غير متاح لهذه الإعدادات.",
     "confirmPaid": "تفعيل الملخصات المدفوعة لـ {{context}}؟",
-    "paidDisclosure": "التكلفة المقدّرة {{estimate}}، وحتى {{maximum}}، بحد زمني {{minutes}} دقيقة. تُطبّق الرسوم حتى إذا فشل الإنشاء.",
+    "paidDisclosure": "التكلفة المقدّرة {{estimate}}، وحتى {{maximum}}، بحد زمني {{minutes}} د. تُطبّق الرسوم حتى إذا فشل الإنشاء.",
     "enable": "تفعيل الملخصات المدفوعة",
     "allContexts": "تبقى التقارير الشخصية وتقارير المؤسسة منفصلة.",
     "emptyHistory": "لا توجد تقارير محفوظة",
@@ -4024,10 +4074,10 @@
     "snapshotSummaryFailed": "فشل ملخص AI. لا تزال لقطتك المنظّمة متاحة.",
     "scheduledContextEnabled": "التقارير المجدولة",
     "scheduledContextSettings": "التقارير المجدولة · {{context}}",
-    "scheduledContextHint": "فعّل الالتقاط المجدول وملخصات AI المدفوعة لهذا السياق فقط. تُرسل مقتطفات مختارة حُجبت منها المعلومات الحساسة وحقائق منظّمة إلى نموذجك. تستخدم الملخصات لغة التطبيق المحفوظة عند تحديثك إعدادات التقرير صراحةً، ولا تتغير لغة الملخصات تلقائيًا عند تغيير لغة التطبيق. تُخصم الرسوم من رصيد هذا السياق. لا يُستخدم AI في اللقطات الخالية من النشاط.",
+    "scheduledContextHint": "فعّل الالتقاط المجدول وملخصات AI المدفوعة لهذا السياق فقط. تُرسل مقتطفات مختارة حُجبت منها المعلومات الحساسة وحقائق منظّمة إلى نموذجك. تستخدم الملخصات لغة التطبيق المحفوظة عند تحديثك إعدادات التقرير. تُخصم الرسوم من رصيد هذا السياق. لا يُستخدم AI في اللقطات الخالية من النشاط.",
     "snapshotSafeguards": "تُطبّق حدود الوقت والإنفاق لكل ملخص على كل لقطة مجدولة، وليست ميزانية يومية.",
     "snapshotEstimateInputTooLarge": "تحتوي هذه اللقطة على أدلة أكثر مما يمكن للنموذج المحدد استيعابه.",
-    "quietSnapshot": "لم يُختَر أي نشاط للجلسات لهذه اللقطة؛ فالاختيار يتم حسب المتاح. لم يُطلب أي ملخص AI أو يُستدعَ أي نموذج، ولم تُفرض أي رسوم.",
+    "quietSnapshot": "لم يُختَر أي نشاط للجلسات لهذه اللقطة. لم يُطلب أي ملخص AI ولم تُفرض أي رسوم.",
     "noEnabledContexts": "لا توجد سياقات مفعّلة للتقارير المجدولة",
     "sourceBlocker": "الجلسة تحتاج إلى اهتمام",
     "sourceMetadata": "البيانات الوصفية الملتقطة للجلسة"

@@ -52,6 +52,9 @@ export const WORKSPACE_FAILURE_SUBTYPES = [
   'git_pack_corrupt',
   'git_checkout_conflict',
   'git_branch_missing',
+  'base_branch_changed',
+  'base_branch_missing',
+  'base_branch_stale',
   'sandbox_storage_full',
   'kilo_import_timeout',
   'kilo_import_failed',
@@ -102,6 +105,10 @@ const WORKSPACE_FAILURE_MESSAGES = {
   git_pack_corrupt: 'Repository data is corrupt',
   git_checkout_conflict: 'Repository checkout conflict',
   git_branch_missing: 'Requested repository branch was not found',
+  base_branch_changed: 'Base branch changed while the workspace was starting',
+  base_branch_missing: 'Base branch has not been pushed',
+  base_branch_stale:
+    'Base branch no longer contains this workspace’s recorded base; recreate the stacked workspace',
   sandbox_storage_full: 'Workspace setup failed: sandbox storage full',
   kilo_import_timeout: 'Session import timed out',
   kilo_import_failed: 'Session import failed',
@@ -230,6 +237,7 @@ export const CLOUD_AGENT_FAILURE_REASONS = [
   'managed_provider_unavailable',
   'managed_provider_authentication',
   'managed_model_configuration',
+  'model_catalog_unavailable',
   'provider_unavailable',
   'provider_disconnect',
   'gateway_unavailable',
@@ -295,6 +303,7 @@ export const CLOUD_AGENT_ASSISTANT_FAILURE_REASONS = [
   'output_limit',
   'content_filter',
   'structured_output',
+  'model_catalog_unavailable',
   'unknown',
 ] as const;
 export const CloudAgentAssistantFailureReasonSchema = z.enum(CLOUD_AGENT_ASSISTANT_FAILURE_REASONS);
@@ -338,6 +347,9 @@ function classifyWorkspaceFailure(
       return classified('user', 'source_control_authentication');
     case 'git_checkout_conflict':
     case 'git_branch_missing':
+    case 'base_branch_changed':
+    case 'base_branch_missing':
+    case 'base_branch_stale':
       return classified('user', 'source_control_configuration');
     case 'setup_command_timeout':
       return classified('user', 'setup_command_timeout');
@@ -413,11 +425,15 @@ function classifyAdmissionFailure(
  * provider are indistinguishable from the cloud agent's point of view, so
  * ownership does not change the responsibility for a provider outage, rate
  * limit, timeout or model-availability failure. Only a failure whose handling
- * the cloud agent platform itself controls stays `platform`.
+ * the cloud agent platform itself controls stays `platform`, such as a model
+ * catalog path that the runtime credential proxy does not allow.
  */
 function classifyAssistantFailure(input: RunFailureFacts): CloudAgentFailureClassification {
   if (input.code === 'payment_required' || input.assistantReason === 'insufficient_credits') {
     return classified('user', 'insufficient_credits');
+  }
+  if (input.assistantReason === 'model_catalog_unavailable') {
+    return classified('platform', 'model_catalog_unavailable');
   }
   if (input.assistantReason === 'rate_limited') return classified('provider', 'rate_limited');
   if (input.code === 'model_missing' || input.assistantReason === 'model_unavailable') {

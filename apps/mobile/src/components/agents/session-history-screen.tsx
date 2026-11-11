@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Keyboard, View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useNavigation } from 'expo-router';
 
@@ -15,6 +14,7 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
 import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
+import { OwnedKeyboardLift } from '@/components/agents/owned-keyboard-lift';
 import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
 import { SESSION_FILTERS_KEY } from '@/lib/storage-keys';
@@ -55,6 +55,7 @@ export function SessionHistoryScreen() {
 
   const {
     searchQuery,
+    restorePending,
     searchInputRef,
     hasText,
     awaitingCommit,
@@ -192,12 +193,18 @@ export function SessionHistoryScreen() {
     clearFilters();
   }, [clearSearchInput, searchController, clearFilters, isSearching]);
 
-  const isLoading = selectSessionListIsLoading({
-    ready,
-    isSearching,
-    searchIsPending: search.isPending,
-    storedIsPending,
-  });
+  // The durable draft is the saved search this screen reopens with. Until the
+  // hook has applied it, the body cannot know whether a search applies, so it
+  // shows the loading body: painting the unfiltered list or "No past sessions"
+  // first claims a result the saved search is about to replace.
+  const isLoading =
+    restorePending ||
+    selectSessionListIsLoading({
+      ready,
+      isSearching,
+      searchIsPending: search.isPending,
+      storedIsPending,
+    });
 
   // One permanently mounted body inside one keyboard container: the empty-state
   // subtitle, the rows, the skeletons and the reserved refresh band all lift
@@ -259,9 +266,7 @@ export function SessionHistoryScreen() {
           />
         }
       />
-      <KeyboardAvoidingView className="flex-1" behavior="padding" enabled={keyboard.owned}>
-        {sessionListBody}
-      </KeyboardAvoidingView>
+      <OwnedKeyboardLift occlusion={keyboard.occlusion}>{sessionListBody}</OwnedKeyboardLift>
       <SessionFilterModal
         visible={showFilterModal}
         selectedPlatforms={platformFilter}

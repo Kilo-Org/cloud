@@ -182,7 +182,6 @@ test('adds the Enkrypt guardrail report read at upload time', async () => {
   const enkrypt: EnkryptGuardrailReport = {
     settings: {
       status: 'ready',
-      scan_tool_results: true,
       detectors: [{ detector: 'injection_attack', action: 'block' }],
     },
     verdict: 'block',
@@ -230,7 +229,6 @@ test('adds the Enkrypt output guardrail report read at upload time', async () =>
   const enkryptOutput: EnkryptOutputGuardrailReport = {
     settings: {
       status: 'ready',
-      scan_tool_results: false,
       detectors: [{ detector: 'pii', action: 'block', pii_entities: ['secrets'] }],
     },
     held_back: true,

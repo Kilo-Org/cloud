@@ -54,7 +54,6 @@ const detectors = {
 } satisfies EnkryptDetectRequestDetectors;
 
 const config = {
-  scanToolResults: true,
   status: 'ready',
   detectors: { injection_attack: detectors.injection_attack },
   blockingDetectors: ['injection_attack'],
@@ -73,7 +72,6 @@ const scan: EnkryptGuardrailRequest = {
 const mixedScan: EnkryptGuardrailRequest = {
   ...scan,
   config: {
-    scanToolResults: true,
     status: 'ready',
     detectors,
     blockingDetectors: ['injection_attack'],
@@ -83,7 +81,6 @@ const mixedScan: EnkryptGuardrailRequest = {
 const logOnlyScan: EnkryptGuardrailRequest = {
   ...scan,
   config: {
-    scanToolResults: true,
     status: 'ready',
     detectors: { pii: detectors.pii },
     blockingDetectors: [],
@@ -131,6 +128,8 @@ function call(overrides: Partial<EnkryptGuardrailCall> = {}): EnkryptGuardrailCa
     apiKind: scan.apiKind,
     decision: 'allowed',
     creditsCost: 3,
+    scannedCharacters: 2_400,
+    totalCharacters: 10_000,
     ...overrides,
   };
 }
@@ -172,7 +171,7 @@ describe('startEnkryptInputGuardrail', () => {
     }
   );
 
-  it('starts the request scan with a 30-second timeout', async () => {
+  it('starts the request scan with a 5-second timeout', async () => {
     mockedScanRequest.mockResolvedValue({
       verdict: { action: 'allow' },
       report: scanReport,
@@ -184,7 +183,7 @@ describe('startEnkryptInputGuardrail', () => {
 
     expect(mockedScanRequest).toHaveBeenCalledWith(
       expect.objectContaining({ text: 'system prompt\n\ntool output' }),
-      expect.objectContaining({ timeoutMs: 30_000, signal })
+      expect.objectContaining({ timeoutMs: 5_000, signal })
     );
   });
 
@@ -382,11 +381,11 @@ describe('startEnkryptInputGuardrail', () => {
     expect(mockedScanRequest.mock.calls).toEqual([
       [
         scanOf({ ...request, config: scan.config }),
-        expect.objectContaining({ timeoutMs: 30_000, signal }),
+        expect.objectContaining({ timeoutMs: 5_000, signal }),
       ],
       [
         scanOf({ ...request, config: logOnlyScan.config }),
-        expect.objectContaining({ timeoutMs: 30_000, signal }),
+        expect.objectContaining({ timeoutMs: 5_000, signal }),
       ],
     ]);
 
@@ -504,7 +503,6 @@ describe('startEnkryptInputGuardrail', () => {
     expect(await guardrail.report()).toEqual({
       settings: {
         status: 'ready',
-        scan_tool_results: true,
         detectors: [
           { detector: 'injection_attack', action: 'block' },
           { detector: 'pii', action: 'log', pii_entities: ['secrets'] },
@@ -575,7 +573,6 @@ describe('startEnkryptInputGuardrail', () => {
     expect(await guardrail.report()).toEqual({
       settings: {
         status: 'ready',
-        scan_tool_results: true,
         detectors: [{ detector: 'pii', action: 'log', pii_entities: ['secrets'] }],
       },
       verdict: 'skip',

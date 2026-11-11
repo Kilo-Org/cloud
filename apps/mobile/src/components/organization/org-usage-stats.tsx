@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { formatMoney, formatNumber } from '@/lib/format';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import { formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { useOrgUsageStats } from '@/lib/hooks/use-organization-queries';
 
 /**
@@ -60,8 +61,14 @@ export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) 
         <View className="flex-row gap-3">
           <StatTile
             label={t('common.cost')}
+            // A money amount's symbol is neutral to the paragraph's direction, so
+            // the run keeps its own left-to-right order inside the tile.
             value={
-              data ? formatMoney(fromMicrodollars(data.totalCost), i18n.language) : missingValue
+              data
+                ? isolateLtrBidiText(
+                    formatPrefixedMoney(fromMicrodollars(data.totalCost), i18n.language)
+                  )
+                : missingValue
             }
           />
           <StatTile

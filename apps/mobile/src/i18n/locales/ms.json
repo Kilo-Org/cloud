@@ -22,6 +22,8 @@
     "expired": "Tamat tempoh"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Batal",
     "done": "Selesai",
     "retry": "Cuba lagi",
@@ -227,6 +229,21 @@
     "signInCodeField": "Kod log masuk",
     "or": "atau"
   },
+  "pendingLink": {
+    "description": "Sebuah akaun sudah menggunakan {{email}}. Log masuk dengan salah satu kaedahnya untuk menambah {{provider}}.",
+    "emailCode": "E-melkan saya kod log masuk",
+    "continueInBrowser": "Teruskan dalam penyemak imbas",
+    "startAgain": "Mulakan semula",
+    "expired": "Permintaan untuk menambah {{provider}} ini telah tamat tempoh.",
+    "noMethods": "Akaun ini tiada kaedah log masuk lain, jadi {{provider}} tidak dapat ditambah.",
+    "linked": "{{provider}} telah ditambah pada akaun anda.",
+    "failedExpired": "{{provider}} tidak ditambah kerana permintaan telah tamat tempoh.",
+    "failedWrongAccount": "{{provider}} tidak ditambah kerana anda log masuk ke akaun lain.",
+    "failedAccountAlreadyLinked": "{{provider}} tidak ditambah kerana ia sudah dipautkan ke akaun lain.",
+    "failedProviderAlreadyLinked": "{{provider}} tidak ditambah kerana akaun anda sudah mempunyai log masuk {{provider}} yang lain.",
+    "failedLinking": "{{provider}} tidak dapat ditambah pada akaun anda.",
+    "notAdded": "Anda telah log masuk. {{provider}} tidak ditambah pada akaun anda."
+  },
   "profile": {
     "codeReviewerSubtitle": "Semakan PR automatik",
     "securityAgentSubtitle": "Cari dan baiki kelemahan",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Akaun ujian",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO perusahaan",
     "passkeysTitle": "Kunci laluan",
     "passkeysSubtitle": "Log masuk tanpa kata laluan",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "Cuba memuatkan fail semula",
       "filterPlaceholder": "Laluan fail untuk ditapis",
       "viewedCount": "{{viewed}} daripada {{total}} sudah dilihat",
+      "viewedCount_one": "{{viewed}} daripada {{total}} sudah dilihat",
+      "viewedCount_other": "{{viewed}} daripada {{total}} sudah dilihat",
       "viewedOfListed": "{{viewed}} daripada {{total}} fail yang disenaraikan sudah dilihat",
+      "viewedOfListed_one": "{{viewed}} daripada {{total}} fail yang disenaraikan sudah dilihat",
+      "viewedOfListed_other": "{{viewed}} daripada {{total}} fail yang disenaraikan sudah dilihat",
       "loadingFiles": "Memuatkan {{loaded}} daripada {{total}}…",
       "failedToLoadAllFiles": "Gagal memuatkan semua fail.",
       "couldNotLoadMoreFiles": "Tidak dapat memuatkan lebih banyak fail.",
@@ -1837,7 +1860,7 @@
       "cloningSession": "Mengklon sesi",
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini.",
       "cloneFailedRetry": "Tidak dapat mengklon sesi ini. Cuba semula.",
-      "notEnoughCredits": "Kredit tidak mencukupi untuk menjalankan Cloud Agent. Tambah kredit dan cuba semula.",
+      "notEnoughCredits": "Kredit tidak mencukupi untuk permintaan ini. Tambah kredit dan cuba semula.",
       "previousTaskFinishing": "Tugasan sebelumnya masih dalam proses penyelesaian. Sila tunggu sebentar.",
       "serviceUnavailable": "Perkhidmatan tidak tersedia buat masa ini. Sila cuba semula.",
       "connectionTrouble": "Sambungan bermasalah. Sila cuba semula sebentar lagi.",
@@ -1947,7 +1970,7 @@
       "discardWithUploadsMessage": "Gesaan anda dan fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam.",
       "discardFailed": "Tidak dapat membuang draf. Sila cuba semula.",
       "remoteHint": "Untuk dijalankan pada komputer anda, mulakan Kilo di sana dan biarkan ia terus berjalan.",
-      "continueFrom": "Sesi {{title}} diteruskan.",
+      "continueFrom": "Sesi “{{title}}” diteruskan.",
       "importingSession": "Mengimport sesi",
       "cliCannotContinue": "CLI ini tidak dapat meneruskan sesi. Pilih Cloud Agent atau CLI lain.",
       "importFailed": "Tidak dapat mengimport sesi ini.",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "Profil yang dipilih",
       "manualOverrides": "Penggantian manual",
       "openSettingsToReview": "Buka Tetapan untuk menyemak",
-      "profileSelection": "Pemilihan profil"
+      "profileSelection": "Pemilihan profil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fail telah dikemas kini.",
@@ -1999,6 +2023,8 @@
       "toolList": "senaraikan",
       "toolPatch": "tampal",
       "toolTask": "tugasan",
+      "toolSendFile": "Fail telah dihantar",
+      "toolSendFileAction": "Hantar fail",
       "readTodos": "Baca pelan",
       "updateTodos": "Kemas kini pelan",
       "linesBadge": "{{displayCount}} baris",
@@ -2099,7 +2125,21 @@
       "thought": "Pemikiran",
       "showDetails": "Paparkan butiran",
       "pending": "Menunggu…",
-      "running": "Sedang berjalan…"
+      "running": "Sedang berjalan…",
+      "field": {
+        "filePath": "Laluan fail",
+        "path": "Laluan",
+        "offset": "Ofset",
+        "limit": "Had",
+        "pattern": "Corak",
+        "include": "Sertakan",
+        "patchText": "Teks tampalan",
+        "query": "Pertanyaan",
+        "prompt": "Gesaan",
+        "header": "Pengepala",
+        "question": "Soalan",
+        "options": "Pilihan"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Gagal memaparkan kandungan."
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "Perbualan terlalu panjang untuk model.",
       "assistantProviderError": "Penyedia mengembalikan ralat.",
       "assistantProviderRefused": "Penyedia menolak permintaan ini dan ia tidak boleh dicuba semula.",
-      "assistantCreditsRefusal": "Kredit tidak mencukupi untuk menjalankan Cloud Agent.",
+      "assistantCreditsRefusal": "Kredit tidak mencukupi untuk permintaan ini.",
       "assistantOutputLimit": "Respons mencapai had output model.",
       "assistantStructuredOutput": "Respons tidak sepadan dengan format yang diperlukan.",
       "assistantFailed": "Respons gagal."
@@ -2260,7 +2300,7 @@
       "positionHint": "(1 daripada {{displayCount}})",
       "movedPastPrompt": "Ejen telah melepasi gesaan ini. Kad ini akan ditutup apabila sesi diteruskan.",
       "waitingForAnswer": "Ejen sedang menunggu jawapan anda. Penghantaran mesej anda kepada ejen dijeda selagi soalan ini belum dijawab.",
-      "waitingForPermission": "Ejen sedang menunggu kebenaran. Penghantaran mesej anda kepada ejen dijeda selagi permintaan ini belum dijawab."
+      "waitingForPermission": "Penghantaran mesej anda kepada ejen dijeda selagi permintaan ini belum dijawab."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3038,7 +3078,7 @@
       "provider": "Berhenti: ralat pembekal",
       "tool": "Berhenti: ralat alat",
       "cancelled": "Berhenti: dibatalkan",
-      "other": "DIHENTIKAN"
+      "other": "Dihentikan"
     }
   },
   "transcriptionModel": {
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "Ejen saya",
       "promptPlaceholder": "Anda seorang...",
       "tools": "Alatan",
+      "wholeToolRule": "Ejen ini menggunakan satu peraturan pada setiap alat sekali gus: {{rule}}. Suis ini adalah baca sahaja.",
       "visibility": "Keterlihatan",
       "visibilityPrimary": "Utama — ditunjukkan dalam pemilih",
       "visibilitySubagent": "Subagen — hanya boleh dipanggil daripada orang lain",
@@ -3571,7 +3612,8 @@
       "duplicateName": "Arahan dengan nama ini telah wujud dalam profil ini"
     },
     "repoBindings": {
-      "title": "Profil Lalai untuk Repos",
+      "title": "Profil lalai untuk Repos",
+      "entryLabel": "Profil lalai",
       "add": "Tambah lalai",
       "empty": "Tiada lalai dikonfigurasikan",
       "emptyDescription": "Tambahkan lalai untuk menggunakan profil secara automatik apabila memulakan sesi untuk repo.",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "Ringkasan AI gagal. Syot kilat berstruktur anda masih tersedia.",
     "scheduledContextEnabled": "Laporan berjadual",
     "scheduledContextSettings": "Laporan berjadual · {{context}}",
-    "scheduledContextHint": "Dayakan rakaman berjadual dan ringkasan AI berbayar untuk konteks ini sahaja. Petikan terpilih yang disunting untuk menyembunyikan maklumat sensitif dan fakta berstruktur dihantar ke model anda. Ringkasan menggunakan bahasa aplikasi yang disimpan apabila anda mengemas kini tetapan laporan. Bahasa ini tidak diselaraskan secara automatik apabila bahasa aplikasi berubah. Caj menggunakan baki konteks ini. Syot kilat tanpa aktiviti tidak menggunakan AI.",
+    "scheduledContextHint": "Dayakan rakaman berjadual dan ringkasan AI berbayar untuk konteks ini sahaja. Petikan terpilih yang disunting untuk menyembunyikan maklumat sensitif dan fakta berstruktur dihantar ke model anda. Ringkasan menggunakan bahasa aplikasi yang disimpan apabila anda mengemas kini tetapan laporan. Caj menggunakan baki konteks ini. Syot kilat tanpa aktiviti tidak menggunakan AI.",
     "snapshotSafeguards": "Had masa dan perbelanjaan bagi setiap ringkasan dikenakan pada setiap syot kilat berjadual, bukan sebagai bajet harian.",
     "snapshotEstimateInputTooLarge": "Syot kilat ini mempunyai terlalu banyak bukti untuk model yang dipilih.",
-    "quietSnapshot": "Pemilihan aktiviti sesi dibuat sebaik mungkin, tetapi tiada aktiviti dipilih untuk syot kilat ini. Tiada ringkasan AI diminta, tiada model AI dipanggil dan tiada caj dikenakan.",
+    "quietSnapshot": "Tiada aktiviti sesi dipilih untuk syot kilat ini. Tiada ringkasan AI diminta atau caj dikenakan.",
     "noEnabledContexts": "Tiada konteks didayakan untuk laporan berjadual",
     "sourceBlocker": "Sesi memerlukan perhatian",
     "sourceMetadata": "Metadata sesi yang dirakam"

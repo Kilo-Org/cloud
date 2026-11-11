@@ -22,6 +22,8 @@
     "expired": "Müddəti bitib"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Ləğv et",
     "done": "Hazır",
     "retry": "Yenidən cəhd et",
@@ -227,6 +229,21 @@
     "signInCodeField": "Giriş kodu",
     "or": "və ya"
   },
+  "pendingLink": {
+    "description": "{{email}} artıq bir hesabda istifadə olunur. {{provider}} əlavə etmək üçün həmin hesabın giriş üsullarından biri ilə daxil ol.",
+    "emailCode": "Mənə e-poçtla giriş kodu göndər",
+    "continueInBrowser": "Brauzerdə davam et",
+    "startAgain": "Yenidən başla",
+    "expired": "{{provider}} əlavə etmək sorğusunun vaxtı bitib.",
+    "noMethods": "Bu hesabın başqa giriş üsulu yoxdur, ona görə {{provider}} əlavə edilə bilməz.",
+    "linked": "{{provider}} hesabına əlavə edildi.",
+    "failedExpired": "Sorğunun vaxtı bitdiyi üçün {{provider}} əlavə edilmədi.",
+    "failedWrongAccount": "Başqa hesaba daxil olduğun üçün {{provider}} əlavə edilmədi.",
+    "failedAccountAlreadyLinked": "{{provider}} artıq başqa hesaba bağlı olduğu üçün əlavə edilmədi.",
+    "failedProviderAlreadyLinked": "Hesabında artıq başqa {{provider}} girişi olduğu üçün {{provider}} əlavə edilmədi.",
+    "failedLinking": "{{provider}} hesabına əlavə edilə bilmədi.",
+    "notAdded": "Daxil olmusan. {{provider}} hesabına əlavə edilmədi."
+  },
   "profile": {
     "codeReviewerSubtitle": "Avtomatik PR yoxlamaları",
     "securityAgentSubtitle": "Təhlükəsizlik boşluqlarını tap və aradan qaldır",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Sınaq hesabı",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Korporativ SSO",
     "passkeysTitle": "Giriş açarları",
     "passkeysSubtitle": "Şifrəsiz daxil ol",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "Faylları yükləməyə yenidən cəhd et",
       "filterPlaceholder": "Fayl yoluna görə filtr",
       "viewedCount": "baxılıb: {{viewed}} / {{total}}",
+      "viewedCount_one": "baxılıb: {{viewed}} / {{total}}",
+      "viewedCount_other": "baxılıb: {{viewed}} / {{total}}",
       "viewedOfListed": "siyahıdakı fayllardan baxılanlar: {{viewed}} / {{total}}",
+      "viewedOfListed_one": "siyahıdakı fayllardan baxılanlar: {{viewed}} / {{total}}",
+      "viewedOfListed_other": "siyahıdakı fayllardan baxılanlar: {{viewed}} / {{total}}",
       "loadingFiles": "{{loaded}} / {{total}} yüklənir…",
       "failedToLoadAllFiles": "Bütün faylları yükləmək mümkün olmadı.",
       "couldNotLoadMoreFiles": "Əlavə faylları yükləmək mümkün olmadı.",
@@ -1837,7 +1860,7 @@
       "cloningSession": "Sessiya klonlanır",
       "couldNotLoadThisSession": "Bu sessiyanı yükləmək mümkün olmadı.",
       "cloneFailedRetry": "Bu sessiyanı klonlamaq mümkün olmadı. Yenidən cəhd et.",
-      "notEnoughCredits": "Cloud Agent-i işə salmaq üçün kifayət qədər kredit yoxdur. Kredit əlavə et və yenidən cəhd et.",
+      "notEnoughCredits": "Bu sorğu üçün kifayət qədər kredit yoxdur. Kredit əlavə et və yenidən cəhd et.",
       "previousTaskFinishing": "Əvvəlki tapşırıq hələ tamamlanmayıb. Bir az gözlə.",
       "serviceUnavailable": "Xidmət hazırda əlçatan deyil. Yenidən cəhd et.",
       "connectionTrouble": "Bağlantıda problem var. Bir az sonra yenidən cəhd et.",
@@ -1947,7 +1970,7 @@
       "discardWithUploadsMessage": "Sorğun və heç bir mesaja əlavə edilməmiş yüklənən fayllar silinəcək.",
       "discardFailed": "Qaralamanı silmək mümkün olmadı. Yenidən cəhd et.",
       "remoteHint": "Seansın kompüterində işləməsi üçün Kilonu orada başlat və işlək vəziyyətdə saxla.",
-      "continueFrom": "{{title}} davam etdirilir.",
+      "continueFrom": "“{{title}}” davam etdirilir.",
       "importingSession": "Sessiya idxal olunur",
       "cliCannotContinue": "Bu CLI sessiyanı davam etdirə bilmir. Cloud Agent və ya başqa CLI seç.",
       "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı.",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "Seçilmiş profil",
       "manualOverrides": "Əl ilə ləğvlər",
       "openSettingsToReview": "Nəzərdən keçirmək üçün Parametrləri açın",
-      "profileSelection": "Profil seçimi"
+      "profileSelection": "Profil seçimi",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl yeniləndi.",
@@ -1999,6 +2023,8 @@
       "toolList": "siyahıla",
       "toolPatch": "düzəliş et",
       "toolTask": "tapşırıq",
+      "toolSendFile": "Fayl göndərildi",
+      "toolSendFileAction": "Fayl göndər",
       "readTodos": "Planı oxu",
       "updateTodos": "Planı yenilə",
       "linesBadge": "{{displayCount}} sətir",
@@ -2099,7 +2125,21 @@
       "thought": "Düşüncə",
       "showDetails": "Təfərrüatları göstər",
       "pending": "Gözlənilir…",
-      "running": "İşləyir…"
+      "running": "İşləyir…",
+      "field": {
+        "filePath": "Fayl yolu",
+        "path": "Yol",
+        "offset": "Başlanğıc",
+        "limit": "Məhdudiyyət",
+        "pattern": "Nümunə",
+        "include": "Daxiletmə",
+        "patchText": "Yamaq mətni",
+        "query": "Sorğu",
+        "prompt": "Təlimat",
+        "header": "Başlıq",
+        "question": "Sual",
+        "options": "Seçimlər"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Məzmunu göstərmək mümkün olmadı."
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "Söhbət model üçün çox uzundur.",
       "assistantProviderError": "Təminatçı xəta qaytardı.",
       "assistantProviderRefused": "Təminatçı bu sorğunu rədd etdi və təkrar cəhd mümkün deyil.",
-      "assistantCreditsRefusal": "Cloud Agent-i işə salmaq üçün kifayət qədər kredit yoxdur.",
+      "assistantCreditsRefusal": "Bu sorğu üçün kifayət qədər kredit yoxdur.",
       "assistantOutputLimit": "Cavab modelin çıxış həddinə çatdı.",
       "assistantStructuredOutput": "Cavab tələb olunan formatla uyğun gəlmədi.",
       "assistantFailed": "Cavabı yaratmaq mümkün olmadı."
@@ -2260,7 +2300,7 @@
       "positionHint": "(1 / {{displayCount}})",
       "movedPastPrompt": "Agent artıq bu sorğunu keçib. Sessiya davam etdikdə bu kart bağlanacaq.",
       "waitingForAnswer": "Agent cavabını gözləyir. Bu sual açıq olduğu müddətdə agentə mesajın göndərilməsi dayandırılıb.",
-      "waitingForPermission": "Agent icazə gözləyir. Bu sorğu açıq olduğu müddətdə agentə mesajın göndərilməsi dayandırılıb."
+      "waitingForPermission": "Bu sorğu açıq olduğu müddətdə agentə mesajın göndərilməsi dayandırılıb."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3038,7 +3078,7 @@
       "provider": "Dayandı: provayder xətası",
       "tool": "Dayandı: alət xətası",
       "cancelled": "Dayandı: ləğv edildi",
-      "other": "DAYANDIRILIB"
+      "other": "Dayandırılıb"
     }
   },
   "transcriptionModel": {
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "Mənim Agentim",
       "promptPlaceholder": "Siz bir...",
       "tools": "Alətlər",
+      "wholeToolRule": "Bu agent bütün alətlərə eyni anda bir qayda tətbiq edir: {{rule}}. Bu keçidlər yalnız oxunaqlıdır.",
       "visibility": "Görünüş",
       "visibilityPrimary": "Əsas — seçicidə göstərilir",
       "visibilitySubagent": "Subagent — yalnız başqalarından zəng etmək olar",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "Repos üçün defolt profillər",
+      "entryLabel": "Defolt profillər",
       "add": "Defolt əlavə edin",
       "empty": "Defolt konfiqurasiya edilməyib",
       "emptyDescription": "Repo üçün sessiyalara başladıqda profili avtomatik tətbiq etmək üçün defolt əlavə edin.",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "AI xülasəsi alınmadı. Strukturlu anlıq görüntünüz hələ də mövcuddur.",
     "scheduledContextEnabled": "Planlaşdırılmış hesabatlar",
     "scheduledContextSettings": "Planlaşdırılmış hesabatlar · {{context}}",
-    "scheduledContextHint": "Yalnız bu kontekst üçün planlaşdırılmış qeydəalmanı və ödənişli AI xülasələrini aktiv edin. Seçilmiş, həssas məlumatları silinmiş fraqmentlər və strukturlu faktlar modelinizə göndərilir. Xülasələr yalnız hesabat ayarlarını özünüz yenilədiyiniz zaman yadda saxlanılan tətbiq dilində hazırlanır. Tətbiqin dilini dəyişmək xülasələrin dilini avtomatik yeniləmir. Ödənişlər bu kontekstin balansından çıxılır. Fəaliyyət olmayan anlıq görüntülər üçün AI istifadə edilmir.",
+    "scheduledContextHint": "Yalnız bu kontekst üçün planlaşdırılmış qeydəalmanı və ödənişli AI xülasələrini aktiv edin. Seçilmiş, həssas məlumatları silinmiş fraqmentlər və strukturlu faktlar modelinizə göndərilir. Xülasələr hesabat ayarlarını özünüz yenilədiyiniz zaman yadda saxlanılan tətbiq dilində hazırlanır. Ödənişlər bu kontekstin balansından çıxılır. Fəaliyyət olmayan anlıq görüntülər üçün AI istifadə edilmir.",
     "snapshotSafeguards": "Hər xülasə üçün vaxt və xərc limitləri hər planlaşdırılmış anlıq görüntüyə ayrıca tətbiq olunur, gündəlik büdcə deyil.",
     "snapshotEstimateInputTooLarge": "Bu anlıq görüntüdə seçilmiş model üçün həddindən artıq çox sübut var.",
-    "quietSnapshot": "İmkan daxilində aparılan seçim zamanı bu anlıq görüntü üçün heç bir sessiya fəaliyyəti seçilmədi. AI xülasəsi üçün modelə sorğu göndərilmədi və heç bir ödəniş tutulmadı.",
+    "quietSnapshot": "Bu anlıq görüntü üçün heç bir sessiya fəaliyyəti seçilmədi. AI xülasəsi tələb edilmədi və heç bir ödəniş tutulmadı.",
     "noEnabledContexts": "Planlaşdırılmış hesabatlar üçün heç bir kontekst aktiv deyil",
     "sourceBlocker": "Sessiyaya diqqət yetirilməlidir",
     "sourceMetadata": "Qeydə alınmış sessiya metaməlumatları"

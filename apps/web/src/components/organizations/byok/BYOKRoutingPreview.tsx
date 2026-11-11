@@ -19,23 +19,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+import { API_KIND_LABELS, isApiKind, type ApiKind } from '@/lib/api-kind-labels';
+import { byokKeyLabel } from '@/lib/byok/provider-names';
 import { cn } from '@/lib/utils';
 
 type ByokRoutingPreview = inferRouterOutputs<RootRouter>['byok']['previewRouting'];
 type RouteStep = Extract<ByokRoutingPreview, { kind: 'routes' }>['steps'][number];
-type ApiKind = 'chat_completions' | 'responses' | 'messages';
 
-const API_KIND_LABELS = {
-  chat_completions: 'Chat Completions',
-  responses: 'Responses',
-  messages: 'Anthropic Messages',
-} satisfies Record<ApiKind, string>;
-
-const API_KINDS = Object.keys(API_KIND_LABELS) as ApiKind[];
-
-function isApiKind(value: string): value is ApiKind {
-  return value in API_KIND_LABELS;
-}
+const API_KINDS = Object.keys(API_KIND_LABELS).filter(isApiKind);
 
 const GATEWAY_NAMES = { vercel: 'Vercel AI Gateway', openrouter: 'OpenRouter' } as const;
 
@@ -44,12 +35,6 @@ const DIRECT_BYOK_MODEL_PREFIXES = Object.keys(DIRECT_BYOK_PROVIDERS_META).map(i
 
 function formatApiKinds(apiKinds: readonly ApiKind[]) {
   return apiKinds.map(apiKind => API_KIND_LABELS[apiKind]).join(' and ');
-}
-
-/** Some display names already name the credential ("OpenAI API key"), so they keep one "key". */
-function keyLabel(names: string[]) {
-  const providers = names.map(name => name.replace(/\s+key$/i, ''));
-  return `${providers.join(', ')} ${names.length === 1 ? 'key' : 'keys'}`;
 }
 
 type StepDescription = { title: string; detail: string };
@@ -72,7 +57,7 @@ function describeStepReason(
 ): StepDescription {
   switch (step.route) {
     case 'direct-byok': {
-      const title = keyLabel([getProviderName(step.providerId)]);
+      const title = byokKeyLabel([getProviderName(step.providerId)]);
       switch (step.reason) {
         case 'serves':
           return { title, detail: 'Serves this model with Kilo catalog model IDs.' };
@@ -100,12 +85,12 @@ function describeStepReason(
           : 'Used when your ChatGPT connection is active.',
       };
     case 'vercel-byok': {
-      const title = `${keyLabel(step.providerIds.map(getProviderName))} via Vercel AI Gateway`;
+      const title = `${byokKeyLabel(step.providerIds.map(getProviderName))} via Vercel AI Gateway`;
       if (step.reason === 'disabled') return { title, detail: 'Skipped: the key is disabled.' };
       return { title, detail: 'Serves this model with the key.' };
     }
     case 'gateway-byok': {
-      const title = keyLabel([getProviderName(step.providerId)]);
+      const title = byokKeyLabel([getProviderName(step.providerId)]);
       switch (step.reason) {
         case 'serves':
           return { title, detail: 'Serves this model through your gateway account.' };
@@ -121,7 +106,7 @@ function describeStepReason(
     case 'unsupported-api-kind':
       return {
         title: 'Request fails',
-        detail: `The ${keyLabel([getProviderName(step.providerId)])} serves this model over ${formatApiKinds(step.supportedApiKinds)} only. Requests for a model your keys serve never fall back to Kilo credits.`,
+        detail: `The ${byokKeyLabel([getProviderName(step.providerId)])} serves this model over ${formatApiKinds(step.supportedApiKinds)} only. Requests for a model your keys serve never fall back to Kilo credits.`,
       };
     case 'kilo':
       return {
@@ -159,7 +144,7 @@ function RouteList({
   if (preview.kind === 'custom-llm') {
     return (
       <p className="text-muted-foreground text-sm">
-        This is a custom model. It always uses its own configured provider, not BYOK keys.
+        This is a promotional model. It always uses its own provider, not BYOK keys.
       </p>
     );
   }

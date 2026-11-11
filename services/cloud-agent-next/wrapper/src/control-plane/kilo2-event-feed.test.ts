@@ -62,6 +62,14 @@ it('does not acknowledge a later prompt from an earlier interrupted execution sn
   }
   try {
     await feed.open();
+    controller?.enqueue(frame('command.updated', {}));
+    await until(() => events.some(event => event.type === 'command.updated'));
+    expect(events.find(event => event.type === 'command.updated')).toEqual({
+      type: 'command.updated',
+      properties: {},
+      directory,
+      nativeRuntimeId: 'runtime_local',
+    });
     controller?.enqueue(frame('session.execution.interrupted', { sessionID }));
     await until(() => events.some(event => event.type === 'session.turn.close'));
     expect(messages()).toEqual([]);
@@ -293,6 +301,29 @@ it.each([
   [{ type: 'unknown', message: 'Request failed' }, 'unknown'],
 ] as const)('classifies a native execution error by its status and type', (error, reason) => {
   expect(classifyAssistantFailure(nativeTurnError(error)).reason).toBe(reason);
+});
+
+// Kilo v2 0.0.0-v2-77 reports every model catalog load failure with this text.
+const catalogFailure = (detail: string) =>
+  `Failed to load the Kilo model catalog (${detail}). Check your connection and credentials.`;
+
+it.each([
+  [catalogFailure('HTTP 404'), 'model_catalog_unavailable'],
+  [
+    `SessionRunnerModel.ModelUnavailableError: ${catalogFailure('HTTP 404')}`,
+    'model_catalog_unavailable',
+  ],
+  [catalogFailure('HTTP 503'), 'provider_unavailable'],
+  [catalogFailure('HTTP 401'), 'provider_authentication'],
+  [catalogFailure('network'), 'unknown'],
+  ['No model is selected', 'unknown'],
+] as const)('classifies a native no-route failure %s as %s', (message, reason) => {
+  const failure = classifyAssistantFailure(nativeTurnError({ type: 'provider.no-route', message }));
+  expect(failure.reason).toBe(reason);
+  if (reason === 'model_catalog_unavailable') {
+    expect(failure.safeMessage).toBe('The Kilo model catalog could not be loaded');
+    expect(failure.terminalCode).toBeUndefined();
+  }
 });
 
 it('restricts step starts to their message and emits each pending permission once', async () => {

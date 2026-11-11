@@ -22,6 +22,8 @@
     "expired": "Ժամկետանց"
   },
   "common": {
+    "sentenceJoiner": "։ ",
+    "listJoiner": ", ",
     "cancel": "Չեղարկել",
     "done": "Պատրաստ",
     "retry": "Կրկին փորձել",
@@ -227,6 +229,21 @@
     "signInCodeField": "Մուտքի կոդ",
     "or": "կամ"
   },
+  "pendingLink": {
+    "description": "{{email}} հասցեն արդեն օգտագործվում է հաշվի կողմից։ Մուտք գործիր դրա եղանակներից մեկով՝ {{provider}}-ն ավելացնելու համար։",
+    "emailCode": "Ուղարկել ինձ մուտքի կոդ էլ. փոստով",
+    "continueInBrowser": "Շարունակել դիտարկիչում",
+    "startAgain": "Սկսել նորից",
+    "expired": "{{provider}}-ն ավելացնելու այս հարցման ժամկետն անցել է։",
+    "noMethods": "Այս հաշիվը մուտքի այլ եղանակ չունի, ուստի {{provider}}-ն հնարավոր չէ ավելացնել։",
+    "linked": "{{provider}}-ն ավելացվեց քո հաշվին։",
+    "failedExpired": "{{provider}}-ն չավելացվեց, քանի որ հարցման ժամկետն անցել է։",
+    "failedWrongAccount": "{{provider}}-ն չավելացվեց, քանի որ մուտք ես գործել այլ հաշիվ։",
+    "failedAccountAlreadyLinked": "{{provider}}-ն չավելացվեց, քանի որ այն արդեն կապված է այլ հաշվի։",
+    "failedProviderAlreadyLinked": "{{provider}}-ն չավելացվեց, քանի որ քո հաշիվն արդեն ունի այլ {{provider}} մուտք։",
+    "failedLinking": "Չհաջողվեց {{provider}}-ն ավելացնել քո հաշվին։",
+    "notAdded": "Դու մուտք ես գործել։ {{provider}}-ն չավելացվեց քո հաշվին։"
+  },
   "profile": {
     "codeReviewerSubtitle": "PR-ների ավտոմատ ստուգումներ",
     "securityAgentSubtitle": "Գտնել և վերացնել խոցելիությունները",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Թեստային հաշիվ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Կորպորատիվ SSO",
     "passkeysTitle": "Մուտքի բանալիներ",
     "passkeysSubtitle": "Մուտք գործել առանց գաղտնաբառի",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "Կրկին փորձել բեռնել ֆայլերը",
       "filterPlaceholder": "Զտել ֆայլերն ըստ ուղու",
       "viewedCount": "դիտված է {{total}}-ից {{viewed}}-ը",
+      "viewedCount_one": "դիտված է {{total}}-ից {{viewed}}-ը",
+      "viewedCount_other": "դիտված է {{total}}-ից {{viewed}}-ը",
       "viewedOfListed": "ցուցակի {{total}} ֆայլից դիտված է {{viewed}}-ը",
+      "viewedOfListed_one": "ցուցակի {{total}} ֆայլից դիտված է {{viewed}}-ը",
+      "viewedOfListed_other": "ցուցակի {{total}} ֆայլից դիտված է {{viewed}}-ը",
       "loadingFiles": "Բեռնվում է՝ {{total}}-ից {{loaded}}-ը…",
       "failedToLoadAllFiles": "Չհաջողվեց բեռնել բոլոր ֆայլերը։",
       "couldNotLoadMoreFiles": "Չհաջողվեց բեռնել հավելյալ ֆայլերը։",
@@ -1837,7 +1860,7 @@
       "cloningSession": "Նստաշրջանը կլոնավորվում է",
       "couldNotLoadThisSession": "Չհաջողվեց բեռնել այս նստաշրջանը։",
       "cloneFailedRetry": "Չհաջողվեց կլոնավորել այս նստաշրջանը։ Կրկին փորձեք։",
-      "notEnoughCredits": "Cloud Agent-ը գործարկելու համար կրեդիտները բավարար չեն։ Ավելացրեք կրեդիտներ և կրկին փորձեք։",
+      "notEnoughCredits": "Այս հարցման համար կրեդիտները բավարար չեն։ Ավելացրեք կրեդիտներ և կրկին փորձեք։",
       "previousTaskFinishing": "Նախորդ առաջադրանքը դեռ չի ավարտվել։ Մի փոքր սպասեք։",
       "serviceUnavailable": "Ծառայությունն այս պահին հասանելի չէ։ Կրկին փորձեք։",
       "connectionTrouble": "Կապի խնդիր է առաջացել։ Մի փոքր սպասեք և կրկին փորձեք։",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "Ընտրված պրոֆիլ",
       "manualOverrides": "Ձեռքով վերասահմանումներ",
       "openSettingsToReview": "Բացեք Կարգավորումները՝ վերանայելու համար",
-      "profileSelection": "Պրոֆիլի ընտրություն"
+      "profileSelection": "Պրոֆիլի ընտրություն",
+      "profileLayerAccessibility": "{{label}}՝ {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Թարմացվել է {{displayCount}} ֆայլ։",
@@ -1999,6 +2023,8 @@
       "toolList": "ցուցադրել ցանկը",
       "toolPatch": "կիրառել փոփոխությունները",
       "toolTask": "առաջադրանք",
+      "toolSendFile": "Ֆայլն ուղարկվեց",
+      "toolSendFileAction": "ֆայլ ուղարկել",
       "readTodos": "Կարդալ պլանը",
       "updateTodos": "Թարմացնել պլանը",
       "linesBadge": "{{displayCount}} տող",
@@ -2099,7 +2125,21 @@
       "thought": "Միտք",
       "showDetails": "Ցուցադրել մանրամասները",
       "pending": "Սպասում է…",
-      "running": "Կատարվում է…"
+      "running": "Կատարվում է…",
+      "field": {
+        "filePath": "Ֆայլի ուղի",
+        "path": "Ուղի",
+        "offset": "Շեղում",
+        "limit": "Սահմանաչափ",
+        "pattern": "Նախշ",
+        "include": "Ներառում",
+        "patchText": "Կարկատակի տեքստ",
+        "query": "Հարցում",
+        "prompt": "Հուշում",
+        "header": "Վերնագիր",
+        "question": "Հարց",
+        "options": "Ընտրանքներ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Չհաջողվեց ցուցադրել բովանդակությունը։"
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "Զրույցը չափազանց երկար է մոդելի համար։",
       "assistantProviderError": "Մատակարարը սխալ է վերադարձրել։",
       "assistantProviderRefused": "Մատակարարը մերժեց այս հարցումը, և այն հնարավոր չէ կրկին փորձել։",
-      "assistantCreditsRefusal": "Cloud Agent-ը գործարկելու համար կրեդիտները բավարար չեն։",
+      "assistantCreditsRefusal": "Այս հարցման համար կրեդիտները բավարար չեն։",
       "assistantOutputLimit": "Պատասխանը հասել է մոդելի ելքի սահմանին։",
       "assistantStructuredOutput": "Պատասխանը չի համապատասխանում պահանջվող ձևաչափին։",
       "assistantFailed": "Չհաջողվեց ստեղծել պատասխանը։"
@@ -2260,7 +2300,7 @@
       "positionHint": "(1-ը {{displayCount}}-ից)",
       "movedPastPrompt": "Գործակալն արդեն անցել է այս հարցից առաջ։ Երբ նստաշրջանը շարունակվի, այս քարտը կփակվի։",
       "waitingForAnswer": "Գործակալը սպասում է ձեր պատասխանին։ Քանի դեռ այս հարցը բաց է, գործակալին ուղղված ձեր հաղորդագրությունն ուղարկելը կասեցված է։",
-      "waitingForPermission": "Գործակալը սպասում է թույլտվության։ Քանի դեռ այս հարցումը բաց է, գործակալին ուղղված ձեր հաղորդագրությունն ուղարկելը կասեցված է։"
+      "waitingForPermission": "Քանի դեռ այս հարցումը բաց է, գործակալին ուղղված ձեր հաղորդագրությունն ուղարկելը կասեցված է։"
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "Իմ գործակալը",
       "promptPlaceholder": "Դու օգնական ես...",
       "tools": "Գործիքներ",
+      "wholeToolRule": "Այս գործակալը միանգամից մեկ կանոն է կիրառում յուրաքանչյուր գործիքի վրա՝ {{rule}}։ Այս անջատիչները միայն ընթերցման համար են։",
       "visibility": "Տեսանելիություն",
       "visibilityPrimary": "Առաջնային — ցուցադրվում է ընտրիչում",
       "visibilitySubagent": "Ենթագործակալ — կարելի է կանչել միայն ուրիշներից",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "Լռելյայն պրոֆիլներ պահոցների համար",
+      "entryLabel": "Լռելյայն պրոֆիլներ",
       "add": "Ավելացնել լռելյայն պրոֆիլ",
       "empty": "Լռելյայն կարգավորումներ չկան",
       "emptyDescription": "Ավելացրեք լռելյայն պրոֆիլ՝ պահոցում նստաշրջաններ սկսելիս այն ավտոմատ կերպով կիրառելու համար։",
@@ -3775,7 +3817,7 @@
     "scheduledContextHint": "Միացրեք վիճակի պլանավորված արձանագրումն ու վճարովի AI ամփոփումները միայն այս համատեքստի համար։ Ընտրված, զգայուն տեղեկություններից մաքրված հատվածներն ու կառուցվածքային փաստերն ուղարկվում են ձեր մոդելին։ Ամփոփումները կազմվում են հավելվածի այն լեզվով, որը պահպանվում է հաշվետվության կարգավորումները փոփոխելիս։ Վճարները գանձվում են այս համատեքստի հաշվեկշռից։ Ակտիվություն չընտրված պատկերների համար AI չի օգտագործվում։",
     "snapshotSafeguards": "Յուրաքանչյուր ամփոփման ժամանակի և ծախսի սահմանափակումները կիրառվում են յուրաքանչյուր պլանավորված պատկերի համար, ոչ թե որպես օրական բյուջե։",
     "snapshotEstimateInputTooLarge": "Այս պատկերի ապացույցների ծավալը չափազանց մեծ է ընտրված մոդելի համար։",
-    "quietSnapshot": "Այս պատկերի համար նստաշրջանների ակտիվություն չի ընտրվել։ AI մոդելին հարցում չի ուղարկվել, և վճար չի գանձվել։",
+    "quietSnapshot": "Այս պատկերի համար նստաշրջանների ակտիվություն չի ընտրվել։ AI ամփոփում չի պահանջվել, և վճար չի գանձվել։",
     "noEnabledContexts": "Պլանավորված հաշվետվությունների համար միացված համատեքստեր չկան",
     "sourceBlocker": "Նստաշրջանն ուշադրություն է պահանջում",
     "sourceMetadata": "Նստաշրջանի արձանագրված մետատվյալներ"

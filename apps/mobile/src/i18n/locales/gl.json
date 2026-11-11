@@ -22,6 +22,8 @@
     "expired": "Caducado"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Cancelar",
     "done": "Feito",
     "retry": "Tentar de novo",
@@ -227,6 +229,21 @@
     "signInCodeField": "Código de inicio de sesión",
     "or": "ou"
   },
+  "pendingLink": {
+    "description": "Xa hai unha conta que usa {{email}}. Inicia sesión cun dos seus métodos para engadir {{provider}}.",
+    "emailCode": "Enviarme un código de inicio de sesión por correo",
+    "continueInBrowser": "Continuar no navegador",
+    "startAgain": "Comezar de novo",
+    "expired": "Esta solicitude para engadir {{provider}} caducou.",
+    "noMethods": "Esta conta non ten outro método de inicio de sesión, polo que non se pode engadir {{provider}}.",
+    "linked": "Engadiuse {{provider}} á túa conta.",
+    "failedExpired": "Non se engadiu {{provider}} porque a solicitude caducou.",
+    "failedWrongAccount": "Non se engadiu {{provider}} porque iniciaches sesión noutra conta.",
+    "failedAccountAlreadyLinked": "Non se engadiu {{provider}} porque xa está vinculado a outra conta.",
+    "failedProviderAlreadyLinked": "Non se engadiu {{provider}} porque a túa conta xa ten outro inicio de sesión de {{provider}}.",
+    "failedLinking": "Non se puido engadir {{provider}} á túa conta.",
+    "notAdded": "Iniciaches sesión. Non se engadiu {{provider}} á túa conta."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revisións automáticas de PR",
     "securityAgentSubtitle": "Atopar e corrixir vulnerabilidades",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Conta de proba",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO empresarial",
     "passkeysTitle": "Chaves de acceso",
     "passkeysSubtitle": "Inicia sesión sen contrasinal",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "Volver cargar os ficheiros",
       "filterPlaceholder": "Filtrar ficheiros por ruta",
       "viewedCount": "{{viewed}} de {{total}} vistos",
+      "viewedCount_one": "{{viewed}} de {{total}} vistos",
+      "viewedCount_other": "{{viewed}} de {{total}} vistos",
       "viewedOfListed": "{{viewed}} de {{total}} ficheiros da lista vistos",
+      "viewedOfListed_one": "{{viewed}} de {{total}} ficheiros da lista vistos",
+      "viewedOfListed_other": "{{viewed}} de {{total}} ficheiros da lista vistos",
       "loadingFiles": "Cargando {{loaded}} de {{total}}…",
       "failedToLoadAllFiles": "Non se puideron cargar todos os ficheiros.",
       "couldNotLoadMoreFiles": "Non se puideron cargar máis ficheiros.",
@@ -1837,7 +1860,7 @@
       "cloningSession": "Clonando a sesión",
       "couldNotLoadThisSession": "Non se puido cargar esta sesión.",
       "cloneFailedRetry": "Non se puido clonar esta sesión. Téntao de novo.",
-      "notEnoughCredits": "Non tes créditos suficientes para executar Cloud Agent. Engade créditos e téntao de novo.",
+      "notEnoughCredits": "Non tes créditos suficientes para esta solicitude. Engade créditos e téntao de novo.",
       "previousTaskFinishing": "A tarefa anterior aínda está a rematar. Agarda un momento.",
       "serviceUnavailable": "O servizo non está dispoñible agora mesmo. Téntao de novo.",
       "connectionTrouble": "Houbo un problema de conexión. Téntao de novo dentro dun momento.",
@@ -1947,7 +1970,7 @@
       "discardWithUploadsMessage": "Eliminaranse a túa instrución e os ficheiros subidos que aínda non se enviaron nunha mensaxe.",
       "discardFailed": "Non se puido descartar o borrador. Téntao de novo.",
       "remoteHint": "Para executalo no teu computador, inicia Kilo nel e déixao en execución.",
-      "continueFrom": "Continúas a sesión {{title}}.",
+      "continueFrom": "Continúas a sesión «{{title}}».",
       "importingSession": "Importando a sesión",
       "cliCannotContinue": "Este CLI non pode continuar unha sesión. Escolle Cloud Agent ou outro CLI.",
       "importFailed": "Non se puido importar esta sesión.",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "Perfil seleccionado",
       "manualOverrides": "Anulacións manuais",
       "openSettingsToReview": "Abre Configuración para revisar",
-      "profileSelection": "Selección de perfil"
+      "profileSelection": "Selección de perfil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizouse {{displayCount}} ficheiro.",
@@ -1999,6 +2023,8 @@
       "toolList": "listar",
       "toolPatch": "aplicar parche",
       "toolTask": "tarefa",
+      "toolSendFile": "Ficheiro enviado",
+      "toolSendFileAction": "enviar ficheiro",
       "readTodos": "Ler o plan",
       "updateTodos": "Actualizar o plan",
       "linesBadge": "{{displayCount}} liñas",
@@ -2099,7 +2125,21 @@
       "thought": "Razoamento",
       "showDetails": "Mostrar detalles",
       "pending": "Pendente…",
-      "running": "Executando…"
+      "running": "Executando…",
+      "field": {
+        "filePath": "Ruta do ficheiro",
+        "path": "Ruta",
+        "offset": "Desprazamento",
+        "limit": "Límite",
+        "pattern": "Patrón",
+        "include": "Inclusión",
+        "patchText": "Texto do parche",
+        "query": "Consulta",
+        "prompt": "Instrución",
+        "header": "Encabezamento",
+        "question": "Pregunta",
+        "options": "Opcións"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Non se puido mostrar o contido."
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "A conversa é demasiado longa para o modelo.",
       "assistantProviderError": "O provedor devolveu un erro.",
       "assistantProviderRefused": "O provedor rexeitou esta solicitude e non se pode reintentar.",
-      "assistantCreditsRefusal": "Non tes créditos suficientes para executar Cloud Agent.",
+      "assistantCreditsRefusal": "Non tes créditos suficientes para esta solicitude.",
       "assistantOutputLimit": "A resposta alcanzou o límite de saída do modelo.",
       "assistantStructuredOutput": "A resposta non coincidía co formato requirido.",
       "assistantFailed": "Non se puido xerar a resposta."
@@ -2260,7 +2300,7 @@
       "positionHint": "(1 de {{displayCount}})",
       "movedPastPrompt": "O axente xa pasou desta solicitude. Esta tarxeta pecharase cando continúe a sesión.",
       "waitingForAnswer": "O axente agarda a túa resposta. Mentres esta pregunta estea aberta, o envío da túa mensaxe ao axente queda en pausa.",
-      "waitingForPermission": "O axente agarda permiso. Mentres esta solicitude estea aberta, o envío da túa mensaxe ao axente queda en pausa."
+      "waitingForPermission": "Mentres esta solicitude estea aberta, o envío da túa mensaxe ao axente queda en pausa."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3038,7 +3078,7 @@
       "provider": "Detido: erro do provedor",
       "tool": "Detido: erro da ferramenta",
       "cancelled": "Detido: cancelado",
-      "other": "PARADO"
+      "other": "Parado"
     }
   },
   "transcriptionModel": {
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "O meu axente",
       "promptPlaceholder": "Vostede é un...",
       "tools": "Ferramentas",
+      "wholeToolRule": "Este axente aplica unha regra a todas as ferramentas á vez: {{rule}}. Estes interruptores son de só lectura.",
       "visibility": "Visibilidade",
       "visibilityPrimary": "Primario — móstrase no selector",
       "visibilitySubagent": "Subaxente — só se pode chamar desde outros",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "Perfís predeterminados para Repos",
+      "entryLabel": "Perfís predeterminados",
       "add": "Engadir predeterminado",
       "empty": "Non se configuraron valores predeterminados",
       "emptyDescription": "Engade un predeterminado para aplicar automaticamente un perfil ao iniciar sesións para un repositorio.",
@@ -3729,11 +3771,11 @@
     "offline": "Sen conexión · informe gardado",
     "cached": "Informe gardado · non se pode actualizar",
     "window": "{{start}} – {{end}}",
-    "summary": "Resumo con AI",
-    "summaryPending": "O resumo con AI está en curso. Engadirase aquí cando estea listo.",
-    "summaryUnavailable": "Resumo con AI non dispoñible. O teu informe estruturado segue dispoñible.",
-    "summaryCharge": "Cargo de AI: {{cost}}",
-    "summaryChargePending": "Cargo de AI pendente de conciliación",
+    "summary": "Resumo con IA",
+    "summaryPending": "O resumo con IA está en curso. Engadirase aquí cando estea listo.",
+    "summaryUnavailable": "Resumo con IA non dispoñible. O teu informe estruturado segue dispoñible.",
+    "summaryCharge": "Cargo de IA: {{cost}}",
+    "summaryChargePending": "Cargo de IA pendente de conciliación",
     "sources": "Probas e artefactos",
     "timezone": "Fuso horario do informe",
     "deviceTimezone": "Usar o fuso horario do dispositivo",
@@ -3744,7 +3786,7 @@
     "morningEnd": "Informe dispoñible ata",
     "timeHint": "A tarxeta de Inicio volve ao estado en directo cando remata a xanela do informe, mesmo sen conexión.",
     "invalidSchedule": "Escolle un fuso horario válido e unha xanela do informe non baleira.",
-    "notificationsHint": "Unha notificación xenérica por cada informe programado. Independente dos resumos con AI de pago.",
+    "notificationsHint": "Unha notificación xenérica por cada informe programado. Independente dos resumos con IA de pago.",
     "notificationPermission": "Activa as notificacións do dispositivo en $t(common.notifications) para recibir o teu informe.",
     "defaultModel": "Usar o modelo predeterminado de Kilo",
     "duration": "Límite de tempo (minutos)",
@@ -3753,7 +3795,7 @@
     "estimate": "Estimación {{estimate}} · máximo {{maximum}}",
     "estimateUnavailable": "Non hai dispoñible un resumo de pago para estes axustes.",
     "confirmPaid": "Activar os resumos de pago para {{context}}?",
-    "paidDisclosure": "{{estimate}} estimado, ata {{maximum}}, cun límite de {{minutes}} minutos. Cóbrase aínda que a xeración falle.",
+    "paidDisclosure": "{{estimate}} estimado, ata {{maximum}}, cun límite de {{minutes}} min. Cóbrase aínda que a xeración falle.",
     "enable": "Activar resumos de pago",
     "allContexts": "Os informes persoais e da organización mantéñense separados.",
     "emptyHistory": "Non hai informes gardados",
@@ -3769,13 +3811,13 @@
     "capturedAt": "Capturada {{time}}",
     "snapshotHint": "Instantánea do último estado dispoñible das sesións, capturada á hora programada da mañá coa información que se puido obter. As cantidades refírense ás sesións seleccionadas, non a toda a actividade nocturna.",
     "snapshotTruncated": "Omitíronse algunhas sesións ou evidencias para manter esta instantánea dentro dos límites.",
-    "snapshotSummaryFailed": "Fallou o resumo con AI. A túa instantánea estruturada segue dispoñible.",
+    "snapshotSummaryFailed": "Fallou o resumo con IA. A túa instantánea estruturada segue dispoñible.",
     "scheduledContextEnabled": "Informes programados",
     "scheduledContextSettings": "Informes programados · {{context}}",
-    "scheduledContextHint": "Activa a captura programada e os resumos con AI de pago só para este contexto. Envíanse ao teu modelo fragmentos seleccionados cos datos sensibles ocultos e datos estruturados. Os resumos usan o idioma da app gardado cando cambias explicitamente a configuración do informe. Ese idioma non se actualiza automaticamente ao cambiar o idioma da app. Os cargos usan o saldo deste contexto. As instantáneas sen actividade non usan AI.",
+    "scheduledContextHint": "Activa a captura programada e os resumos con IA de pago só para este contexto. Envíanse ao teu modelo fragmentos seleccionados cos datos sensibles ocultos e datos estruturados. Os resumos usan o idioma da app gardado cando actualizas a configuración do informe. Os cargos usan o saldo deste contexto. As instantáneas sen actividade non usan IA.",
     "snapshotSafeguards": "Os límites de tempo e gasto por resumo aplícanse a cada instantánea programada; non son un orzamento diario.",
     "snapshotEstimateInputTooLarge": "Esta instantánea contén demasiadas evidencias para o modelo seleccionado.",
-    "quietSnapshot": "Coa información que se puido obter, non se seleccionou actividade de sesión para esta instantánea. Non se solicitou ningún resumo con AI, non se chamou ao modelo nin se aplicou ningún cargo.",
+    "quietSnapshot": "Non se seleccionou actividade de sesión para esta instantánea. Non se solicitou ningún resumo con IA nin se aplicou ningún cargo.",
     "noEnabledContexts": "Non hai contextos activados para os informes programados",
     "sourceBlocker": "A sesión precisa atención",
     "sourceMetadata": "Metadatos da sesión capturados"

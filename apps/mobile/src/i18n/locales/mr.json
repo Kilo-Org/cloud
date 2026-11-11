@@ -22,6 +22,8 @@
     "expired": "कालबाह्य"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "रद्द करा",
     "done": "झाले",
     "retry": "पुन्हा प्रयत्न करा",
@@ -227,6 +229,21 @@
     "signInCodeField": "साइन-इन कोड",
     "or": "किंवा"
   },
+  "pendingLink": {
+    "description": "{{email}} आधीच एका खात्याद्वारे वापरला जात आहे. {{provider}} जोडण्यासाठी त्या खात्याच्या एका पद्धतीने साइन इन करा.",
+    "emailCode": "मला साइन-इन कोड ईमेल करा",
+    "continueInBrowser": "ब्राउझरमध्ये सुरू ठेवा",
+    "startAgain": "पुन्हा सुरू करा",
+    "expired": "{{provider}} जोडण्याच्या या विनंतीची मुदत संपली आहे.",
+    "noMethods": "या खात्याला दुसरी कोणतीही साइन-इन पद्धत नाही, त्यामुळे {{provider}} जोडता येणार नाही.",
+    "linked": "{{provider}} तुमच्या खात्यात जोडले गेले.",
+    "failedExpired": "विनंतीची मुदत संपल्यामुळे {{provider}} जोडले गेले नाही.",
+    "failedWrongAccount": "तुम्ही वेगळ्या खात्यात साइन इन केल्यामुळे {{provider}} जोडले गेले नाही.",
+    "failedAccountAlreadyLinked": "{{provider}} आधीच दुसऱ्या खात्याशी लिंक असल्यामुळे जोडले गेले नाही.",
+    "failedProviderAlreadyLinked": "तुमच्या खात्यात आधीच वेगळे {{provider}} साइन-इन असल्यामुळे {{provider}} जोडले गेले नाही.",
+    "failedLinking": "{{provider}} तुमच्या खात्यात जोडता आले नाही.",
+    "notAdded": "तुम्ही साइन इन केले आहे. {{provider}} तुमच्या खात्यात जोडले गेले नाही."
+  },
   "profile": {
     "codeReviewerSubtitle": "स्वयंचलित PR पुनरावलोकने",
     "securityAgentSubtitle": "सुरक्षेतील त्रुटी शोधा आणि दुरुस्त करा",
@@ -265,6 +282,8 @@
     "providerTestAccount": "चाचणी खाते",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "एंटरप्राइझ SSO",
     "passkeysTitle": "पासक्या",
     "passkeysSubtitle": "पासवर्डशिवाय साइन इन करा",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "फाइल्स लोड करण्याचा पुन्हा प्रयत्न करा",
       "filterPlaceholder": "फाइलच्या पथानुसार शोध",
       "viewedCount": "{{total}} पैकी {{viewed}} पाहिल्या",
+      "viewedCount_one": "{{total}} पैकी {{viewed}} पाहिल्या",
+      "viewedCount_other": "{{total}} पैकी {{viewed}} पाहिल्या",
       "viewedOfListed": "यादीतील {{total}} फाइल्सपैकी {{viewed}} पाहिल्या",
+      "viewedOfListed_one": "यादीतील {{total}} फाइल्सपैकी {{viewed}} पाहिल्या",
+      "viewedOfListed_other": "यादीतील {{total}} फाइल्सपैकी {{viewed}} पाहिल्या",
       "loadingFiles": "{{total}} पैकी {{loaded}} लोड होत आहेत…",
       "failedToLoadAllFiles": "सर्व फाइल्स लोड करता आल्या नाहीत.",
       "couldNotLoadMoreFiles": "आणखी फाइल्स लोड करता आल्या नाहीत.",
@@ -1837,7 +1860,7 @@
       "cloningSession": "सत्राची प्रत तयार होत आहे",
       "couldNotLoadThisSession": "हे सत्र लोड करता आले नाही.",
       "cloneFailedRetry": "या सत्राची प्रत तयार करता आली नाही. पुन्हा प्रयत्न करा.",
-      "notEnoughCredits": "Cloud Agent चालवण्यासाठी पुरेसे क्रेडिट नाहीत. क्रेडिट जोडून पुन्हा प्रयत्न करा.",
+      "notEnoughCredits": "या विनंतीसाठी पुरेसे क्रेडिट नाहीत. क्रेडिट जोडून पुन्हा प्रयत्न करा.",
       "previousTaskFinishing": "मागील काम अजून पूर्ण झालेले नाही. कृपया थोडा वेळ थांबा.",
       "serviceUnavailable": "सेवा सध्या अनुपलब्ध आहे. पुन्हा प्रयत्न करा.",
       "connectionTrouble": "कनेक्शनमध्ये अडचण आहे. कृपया थोड्या वेळाने पुन्हा प्रयत्न करा.",
@@ -1947,7 +1970,7 @@
       "discardWithUploadsMessage": "तुमचा प्रॉम्प्ट आणि जोडल्या न गेलेल्या अपलोड केलेल्या फाइल्स हटवल्या जातील.",
       "discardFailed": "मसुदा रद्द करता आला नाही. कृपया पुन्हा प्रयत्न करा.",
       "remoteHint": "तुमच्या संगणकावर चालवण्यासाठी तिथे Kilo सुरू करा आणि ते चालू ठेवा.",
-      "continueFrom": "{{title}} हे सत्र पुढे सुरू होत आहे.",
+      "continueFrom": "“{{title}}” हे सत्र पुढे सुरू होत आहे.",
       "importingSession": "सत्र आयात होत आहे",
       "cliCannotContinue": "हे CLI सत्र सुरू ठेवू शकत नाही. Cloud Agent किंवा दुसरे CLI निवडा.",
       "importFailed": "हे सत्र आयात करता आले नाही.",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "प्रोफाइल निवडले",
       "manualOverrides": "मॅन्युअल अधिलिखित",
       "openSettingsToReview": "पुनरावलोकन करण्यासाठी सेटिंग्ज उघडा",
-      "profileSelection": "प्रोफाइल निवड"
+      "profileSelection": "प्रोफाइल निवड",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्ययावत केली.",
@@ -1999,6 +2023,8 @@
       "toolList": "यादी",
       "toolPatch": "पॅच लागू करणे",
       "toolTask": "काम",
+      "toolSendFile": "फाइल पाठवली",
+      "toolSendFileAction": "फाइल पाठवणे",
       "readTodos": "योजना वाचा",
       "updateTodos": "योजना अद्ययावत करा",
       "linesBadge": "{{displayCount}} ओळी",
@@ -2099,7 +2125,21 @@
       "thought": "विचार",
       "showDetails": "तपशील दाखवा",
       "pending": "प्रलंबित…",
-      "running": "चालू आहे…"
+      "running": "चालू आहे…",
+      "field": {
+        "filePath": "फाइल मार्ग",
+        "path": "मार्ग",
+        "offset": "ऑफसेट",
+        "limit": "मर्यादा",
+        "pattern": "नमुना",
+        "include": "समावेश",
+        "patchText": "पॅच मजकूर",
+        "query": "क्वेरी",
+        "prompt": "प्रॉम्प्ट",
+        "header": "शीर्षक",
+        "question": "प्रश्न",
+        "options": "पर्याय"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "मजकूर किंवा इतर सामग्री दाखवता आली नाही."
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "हे संभाषण मॉडेलच्या मर्यादेपेक्षा मोठे आहे.",
       "assistantProviderError": "सेवा पुरवठादाराने त्रुटी दिली.",
       "assistantProviderRefused": "सेवा पुरवठादाराने ही विनंती नाकारली आणि ती पुन्हा प्रयत्न करता येणार नाही.",
-      "assistantCreditsRefusal": "Cloud Agent चालवण्यासाठी पुरेसे क्रेडिट नाहीत.",
+      "assistantCreditsRefusal": "या विनंतीसाठी पुरेसे क्रेडिट नाहीत.",
       "assistantOutputLimit": "प्रतिसाद मॉडेलची आउटपुट मर्यादा गाठली.",
       "assistantStructuredOutput": "प्रतिसाद आवश्यक स्वरूपाशी जुळला नाही.",
       "assistantFailed": "प्रतिसाद तयार करता आला नाही."
@@ -2260,7 +2300,7 @@
       "positionHint": "({{displayCount}} पैकी 1)",
       "movedPastPrompt": "एजंटने हा प्रॉम्प्ट मागे सोडून पुढील काम सुरू केले आहे. सत्र पुढे सुरू झाल्यावर हे कार्ड बंद होईल.",
       "waitingForAnswer": "एजंट तुमच्या उत्तराची वाट पाहत आहे. या प्रश्नाचे उत्तर मिळेपर्यंत तुमचा संदेश एजंटला पाठवणे थांबवले आहे.",
-      "waitingForPermission": "एजंट परवानगीची वाट पाहत आहे. या विनंतीवर निर्णय होईपर्यंत तुमचा संदेश एजंटला पाठवणे थांबवले आहे."
+      "waitingForPermission": "या विनंतीवर निर्णय होईपर्यंत तुमचा संदेश एजंटला पाठवणे थांबवले आहे."
     },
     "childSession": {
       "accessibilityLabel": "एजंट: {{agentName}}, काम: {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "माझा एजंट",
       "promptPlaceholder": "तुम्ही एक...",
       "tools": "साधने",
+      "wholeToolRule": "हा एजंट एकाच वेळी प्रत्येक साधनावर एक नियम लागू करतो: {{rule}}. हे स्विचेस केवळ वाचनासाठी आहेत.",
       "visibility": "दृश्यमानता",
       "visibilityPrimary": "प्राथमिक — पिकरमध्ये दाखवले आहे",
       "visibilitySubagent": "उपएजंट — फक्त इतरांकडून कॉल करण्यायोग्य",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "रेपॉजिटरींसाठी डीफॉल्ट प्रोफाइल",
+      "entryLabel": "मूलभूत प्रोफाइल",
       "add": "डीफॉल्ट जोडा",
       "empty": "कोणतेही डीफॉल्ट कॉन्फिगर केलेले नाहीत",
       "emptyDescription": "रेपॉजिटरीसाठी सत्र सुरू करताना प्रोफाइल स्वयंचलितपणे लागू करण्यासाठी डीफॉल्ट जोडा.",
@@ -3753,7 +3795,7 @@
     "estimate": "अंदाज {{estimate}} · कमाल {{maximum}}",
     "estimateUnavailable": "या सेटिंग्ससाठी सशुल्क सारांश उपलब्ध नाही.",
     "confirmPaid": "{{context}} साठी सशुल्क सारांश सुरू करायचे?",
-    "paidDisclosure": "अंदाजे {{estimate}}, कमाल {{maximum}}, {{minutes}} मिनिटांच्या मर्यादेसह. निर्मिती अयशस्वी झाली तरी शुल्क लागू होते.",
+    "paidDisclosure": "अंदाजे {{estimate}}, कमाल {{maximum}}, {{minutes}} मिनि मर्यादेसह. निर्मिती अयशस्वी झाली तरी शुल्क लागू होते.",
     "enable": "सशुल्क सारांश सुरू करा",
     "allContexts": "वैयक्तिक आणि संस्थेचे आढावे वेगळे ठेवले जातात.",
     "emptyHistory": "जतन केलेले आढावे नाहीत",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "AI सारांश अयशस्वी झाला. तुमचा संरचित स्नॅपशॉट अजूनही उपलब्ध आहे.",
     "scheduledContextEnabled": "नियोजित आढावे",
     "scheduledContextSettings": "नियोजित आढावे · {{context}}",
-    "scheduledContextHint": "फक्त या संदर्भासाठी सत्र क्रियाकलापांचे नियोजित कॅप्चर आणि सशुल्क AI सारांश सुरू करा. निवडक, संवेदनशील तपशील लपवलेले उतारे आणि संरचित तथ्ये तुमच्या मॉडेलला पाठवली जातात. तुम्ही आढावा सेटिंग्ज बदलून जतन करता तेव्हा जतन झालेल्या ॲप भाषेत सारांश तयार होतात. केवळ ॲपची भाषा बदलल्याने सारांशांची जतन केलेली भाषा आपोआप बदलत नाही. शुल्क या संदर्भाच्या शिल्लकमधून आकारले जाते. कोणताही क्रियाकलाप निवडला न गेलेल्या स्नॅपशॉटसाठी AI वापरले जात नाही.",
+    "scheduledContextHint": "फक्त या संदर्भासाठी सत्र क्रियाकलापांचे नियोजित कॅप्चर आणि सशुल्क AI सारांश सुरू करा. निवडक, संवेदनशील तपशील लपवलेले उतारे आणि संरचित तथ्ये तुमच्या मॉडेलला पाठवली जातात. तुम्ही आढावा सेटिंग्ज बदलून जतन करता तेव्हा जतन झालेल्या ॲप भाषेत सारांश तयार होतात. शुल्क या संदर्भाच्या शिल्लकमधून आकारले जाते. कोणताही क्रियाकलाप निवडला न गेलेल्या स्नॅपशॉटसाठी AI वापरले जात नाही.",
     "snapshotSafeguards": "प्रत्येक सारांशासाठीच्या वेळ आणि खर्च मर्यादा प्रत्येक नियोजित स्नॅपशॉटला लागू होतात; हे दैनिक बजेट नाही.",
     "snapshotEstimateInputTooLarge": "या स्नॅपशॉटमधील पुरावे निवडलेल्या मॉडेलसाठी खूप जास्त आहेत.",
-    "quietSnapshot": "या स्नॅपशॉटसाठी कोणताही सत्र क्रियाकलाप निवडला गेला नाही. AI सारांशासाठी मॉडेलला कोणतीही विनंती पाठवली गेली नाही आणि कोणतेही शुल्क आकारले गेले नाही.",
+    "quietSnapshot": "या स्नॅपशॉटसाठी कोणताही सत्र क्रियाकलाप निवडला गेला नाही. AI सारांशाची विनंती केली गेली नाही किंवा कोणतेही शुल्क आकारले गेले नाही.",
     "noEnabledContexts": "नियोजित आढाव्यांसाठी कोणताही संदर्भ सक्षम केलेला नाही",
     "sourceBlocker": "सत्राकडे लक्ष देणे आवश्यक आहे",
     "sourceMetadata": "नोंदवलेला सत्राचा मेटाडेटा"

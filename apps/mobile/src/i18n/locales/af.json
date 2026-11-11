@@ -22,6 +22,8 @@
     "expired": "Verval"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Kanselleer",
     "done": "Klaar",
     "retry": "Probeer weer",
@@ -227,6 +229,21 @@
     "signInCodeField": "Aanmeldkode",
     "or": "of"
   },
+  "pendingLink": {
+    "description": "'n Rekening gebruik reeds {{email}}. Meld aan met een van sy metodes om {{provider}} by te voeg.",
+    "emailCode": "E-pos vir my 'n aanmeldkode",
+    "continueInBrowser": "Gaan voort in die blaaier",
+    "startAgain": "Begin weer",
+    "expired": "Hierdie versoek om {{provider}} by te voeg het verval.",
+    "noMethods": "Hierdie rekening het geen ander aanmeldmetode nie, dus kan {{provider}} nie bygevoeg word nie.",
+    "linked": "{{provider}} is by jou rekening gevoeg.",
+    "failedExpired": "{{provider}} is nie bygevoeg nie omdat die versoek verval het.",
+    "failedWrongAccount": "{{provider}} is nie bygevoeg nie omdat jy by 'n ander rekening aangemeld het.",
+    "failedAccountAlreadyLinked": "{{provider}} is nie bygevoeg nie omdat dit reeds aan 'n ander rekening gekoppel is.",
+    "failedProviderAlreadyLinked": "{{provider}} is nie bygevoeg nie omdat jou rekening reeds 'n ander {{provider}}-aanmelding het.",
+    "failedLinking": "{{provider}} kon nie by jou rekening gevoeg word nie.",
+    "notAdded": "Jy is aangemeld. {{provider}} is nie by jou rekening gevoeg nie."
+  },
   "profile": {
     "codeReviewerSubtitle": "Outomatiese PR-hersienings",
     "securityAgentSubtitle": "Vind en verhelp kwesbaarhede",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Toetsrekening",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Onderneming-SSO",
     "passkeysTitle": "Passkeys",
     "passkeysSubtitle": "Meld aan sonder ’n wagwoord",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "Probeer weer om die lêers te laai",
       "filterPlaceholder": "Lêerpad…",
       "viewedCount": "{{viewed}} van {{total}} bekyk",
+      "viewedCount_one": "{{viewed}} van {{total}} bekyk",
+      "viewedCount_other": "{{viewed}} van {{total}} bekyk",
       "viewedOfListed": "{{viewed}} van {{total}} gelyste lêers bekyk",
+      "viewedOfListed_one": "{{viewed}} van {{total}} gelyste lêers bekyk",
+      "viewedOfListed_other": "{{viewed}} van {{total}} gelyste lêers bekyk",
       "loadingFiles": "Laai {{loaded}} van {{total}}…",
       "failedToLoadAllFiles": "Kon nie al die lêers laai nie.",
       "couldNotLoadMoreFiles": "Kon nie meer lêers laai nie.",
@@ -1837,7 +1860,7 @@
       "cloningSession": "Sessie word gekloon",
       "couldNotLoadThisSession": "Hierdie sessie kon nie gelaai word nie.",
       "cloneFailedRetry": "Hierdie sessie kon nie gekloon word nie. Probeer weer.",
-      "notEnoughCredits": "Jy het nie genoeg krediete om Cloud Agent te gebruik nie. Voeg krediete by en probeer weer.",
+      "notEnoughCredits": "Jy het nie genoeg krediete vir hierdie versoek nie. Voeg krediete by en probeer weer.",
       "previousTaskFinishing": "Die vorige taak word nog afgehandel. Wag asseblief 'n oomblik.",
       "serviceUnavailable": "Die diens is tans onbeskikbaar. Probeer asseblief weer.",
       "connectionTrouble": "Daar is 'n verbindingsprobleem. Probeer asseblief oor 'n oomblik weer.",
@@ -1947,7 +1970,7 @@
       "discardWithUploadsMessage": "Jou opdrag en enige opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal geskrap word.",
       "discardFailed": "Die konsep kon nie weggegooi word nie. Probeer asseblief weer.",
       "remoteHint": "Om op jou rekenaar uit te voer, moet jy Kilo daar begin en laat loop.",
-      "continueFrom": "Die sessie {{title}} word voortgesit.",
+      "continueFrom": "Die sessie “{{title}}” word voortgesit.",
       "importingSession": "Sessie word ingevoer",
       "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortsit nie. Kies Cloud Agent of 'n ander CLI.",
       "importFailed": "Hierdie sessie kon nie ingevoer word nie.",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "Geselekteerde profiel",
       "manualOverrides": "Handmatige oorheersing",
       "openSettingsToReview": "Maak Instellings oop om na te gaan",
-      "profileSelection": "Profielkeuse"
+      "profileSelection": "Profielkeuse",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} lêer is bygewerk.",
@@ -1999,6 +2023,8 @@
       "toolList": "lys",
       "toolPatch": "pas wysiging toe",
       "toolTask": "taak",
+      "toolSendFile": "Lêer gestuur",
+      "toolSendFileAction": "Stuur lêer",
       "readTodos": "Lees plan",
       "updateTodos": "Werk plan by",
       "linesBadge": "{{displayCount}} reëls",
@@ -2099,7 +2125,21 @@
       "thought": "Gedagte",
       "showDetails": "Wys besonderhede",
       "pending": "Hangende…",
-      "running": "Besig…"
+      "running": "Besig…",
+      "field": {
+        "filePath": "Lêerpad",
+        "path": "Pad",
+        "offset": "Afset",
+        "limit": "Limiet",
+        "pattern": "Patroon",
+        "include": "Insluiting",
+        "patchText": "Wysigingsteks",
+        "query": "Soektog",
+        "prompt": "Aanwysing",
+        "header": "Opskrif",
+        "question": "Vraag",
+        "options": "Keuses"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Die inhoud kon nie vertoon word nie."
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "Die gesprek is te lank vir die model.",
       "assistantProviderError": "Die verskaffer het 'n fout teruggestuur.",
       "assistantProviderRefused": "Die verskaffer het die versoek geweier en dit kan nie weer probeer word nie.",
-      "assistantCreditsRefusal": "Jy het nie genoeg krediete om Cloud Agent te gebruik nie.",
+      "assistantCreditsRefusal": "Jy het nie genoeg krediete vir hierdie versoek nie.",
       "assistantOutputLimit": "Die antwoord het die model se afvoerlimiet bereik.",
       "assistantStructuredOutput": "Die antwoord het nie aan die vereiste formaat voldoen nie.",
       "assistantFailed": "Die antwoord het misluk."
@@ -2260,7 +2300,7 @@
       "positionHint": "(1 van {{displayCount}})",
       "movedPastPrompt": "Die agent het reeds met die volgende stap begin. Hierdie kaart sal sluit wanneer die sessie voortgaan.",
       "waitingForAnswer": "Die agent wag op jou antwoord. Jou boodskap aan die agent word teruggehou terwyl hierdie vraag oop is.",
-      "waitingForPermission": "Die agent wag op toestemming. Jou boodskap aan die agent word teruggehou terwyl hierdie versoek oop is."
+      "waitingForPermission": "Jou boodskap aan die agent word teruggehou terwyl hierdie versoek oop is."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3038,7 +3078,7 @@
       "provider": "Gestop: verskafferfout",
       "tool": "Gestop: gereedskapfout",
       "cancelled": "Gestop: gekanselleer",
-      "other": "GESTAAK"
+      "other": "Gestaak"
     }
   },
   "transcriptionModel": {
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "My agent",
       "promptPlaceholder": "Jy is 'n...",
       "tools": "Gereedskap",
+      "wholeToolRule": "Hierdie agent pas een reël gelyktydig op alle gereedskap toe: {{rule}}. Hierdie skakelaars is slegs-lees.",
       "visibility": "Sigbaarheid",
       "visibilityPrimary": "Primêr — gewys in die kieser",
       "visibilitySubagent": "Subagent — slegs oproepbaar vanaf ander",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "Verstekprofiele vir Repos",
+      "entryLabel": "Verstekprofiele",
       "add": "Voeg verstek by",
       "empty": "Geen verstekke opgestel nie",
       "emptyDescription": "Voeg 'n verstek by om 'n profiel outomaties toe te pas wanneer sessies vir 'n repo begin.",
@@ -3753,7 +3795,7 @@
     "estimate": "Skatting {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "’n Betaalde opsomming is nie beskikbaar vir hierdie instellings nie.",
     "confirmPaid": "Aktiveer betaalde opsommings vir {{context}}?",
-    "paidDisclosure": "{{estimate}} geskat, tot {{maximum}}, met 'n limiet van {{minutes}} minute. Heffings geld selfs as generering misluk.",
+    "paidDisclosure": "{{estimate}} geskat, tot {{maximum}}, met 'n limiet van {{minutes}} min. Heffings geld selfs as generering misluk.",
     "enable": "Aktiveer betaalde opsommings",
     "allContexts": "Persoonlike en organisasieverslae bly apart.",
     "emptyHistory": "Geen gestoorde verslae nie",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "AI-opsomming het misluk. Jou gestruktureerde momentopname is steeds beskikbaar.",
     "scheduledContextEnabled": "Geskeduleerde verslae",
     "scheduledContextSettings": "Geskeduleerde verslae · {{context}}",
-    "scheduledContextHint": "Aktiveer geskeduleerde vaslegging en betaalde AI-opsommings slegs vir hierdie konteks. Geselekteerde uittreksels waarvan sensitiewe inligting verberg is en gestruktureerde feite word na jou model gestuur. Opsommings gebruik die apptaal wat gestoor word wanneer jy jou verslaginstellings uitdruklik wysig. Die gestoorde taal word nie outomaties bygewerk wanneer die apptaal verander nie. Heffings gebruik hierdie konteks se saldo. Momentopnames sonder aktiwiteit gebruik nie AI nie.",
+    "scheduledContextHint": "Aktiveer geskeduleerde vaslegging en betaalde AI-opsommings slegs vir hierdie konteks. Geselekteerde uittreksels waarvan sensitiewe inligting verberg is en gestruktureerde feite word na jou model gestuur. Opsommings gebruik die apptaal wat gestoor word wanneer jy jou verslaginstellings bywerk. Heffings gebruik hierdie konteks se saldo. Momentopnames sonder aktiwiteit gebruik nie AI nie.",
     "snapshotSafeguards": "Tyd- en bestedingslimiete per opsomming geld vir elke geskeduleerde momentopname, nie as 'n daaglikse begroting nie.",
     "snapshotEstimateInputTooLarge": "Hierdie momentopname bevat te veel bewyse vir die gekose model.",
-    "quietSnapshot": "Die seleksie is na beste vermoë gedoen, maar geen sessieaktiwiteit is vir hierdie momentopname geselekteer nie. Geen AI-opsomming is aangevra, geen model is aangeroep en geen koste is gehef nie.",
+    "quietSnapshot": "Geen sessieaktiwiteit is vir hierdie momentopname geselekteer nie. Geen AI-opsomming is aangevra of gehef nie.",
     "noEnabledContexts": "Geen kontekste vir geskeduleerde verslae geaktiveer nie",
     "sourceBlocker": "Sessie benodig aandag",
     "sourceMetadata": "Vasgelegde sessiemetadata"

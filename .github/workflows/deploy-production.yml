@@ -60,7 +60,6 @@ jobs:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
-          lfs: true
           ref: ${{ needs.check-changes.outputs.target_sha }}
 
       - name: Setup pnpm
@@ -75,6 +74,9 @@ jobs:
       # The probe imports @kilocode/db and the migrate step runs drizzle-kit from
       # that package, so the database workspace and the root project are enough.
       # Widen this filter when a step in this job imports another workspace.
+      # This job also owns the LFS decision: it builds nothing from apps/web, so
+      # its checkout skips LFS objects. Add `lfs: true` back before a step here
+      # reads a path tracked by Git LFS.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --filter '@kilocode/db...' --filter kilocode-monorepo
 
@@ -147,13 +149,35 @@ jobs:
       AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
+  # Worker change detection reads only the SHAs check-changes publishes, so this
+  # call runs beside the Vercel staging chain instead of after it: the matrix is
+  # ready when the deploy gate below opens. It deploys nothing by itself.
+  detect-workers:
+    needs: check-changes
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    uses: ./.github/workflows/deploy-workers.yml
+    with:
+      base_sha: ${{ needs.check-changes.outputs.base_sha }}
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
+
   deploy-workers:
-    needs: [db-gate, check-changes, stage-app, stage-ai-gateway, promote-app, promote-ai-gateway]
+    needs:
+      [
+        db-gate,
+        check-changes,
+        detect-workers,
+        stage-app,
+        stage-ai-gateway,
+        promote-app,
+        promote-ai-gateway,
+      ]
     if: >-
       ${{
         github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
+        needs.detect-workers.result == 'success' &&
         needs.db-gate.result == 'success' &&
         contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
         contains(fromJSON('["success","skipped"]'), needs.stage-ai-gateway.result) &&
@@ -162,7 +186,8 @@ jobs:
       }}
     uses: ./.github/workflows/deploy-workers.yml
     with:
-      base_sha: ${{ needs.check-changes.outputs.base_sha }}
+      worker_matrix: ${{ needs.detect-workers.outputs.matrix }}
+      deploy_cloud_agent_after_session_ingest: ${{ needs.detect-workers.outputs.deploy-cloud-agent-after-session-ingest }}
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets: inherit
 

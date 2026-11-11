@@ -22,6 +22,8 @@
     "expired": "Nag-expire"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Kanselahin",
     "done": "Tapos",
     "retry": "Subukan muli",
@@ -227,6 +229,21 @@
     "signInCodeField": "Code sa pag-sign in",
     "or": "o"
   },
+  "pendingLink": {
+    "description": "May account na gumagamit ng {{email}}. Mag-sign in gamit ang isa sa mga paraan nito para maidagdag ang {{provider}}.",
+    "emailCode": "I-email sa akin ang code sa pag-sign in",
+    "continueInBrowser": "Magpatuloy sa browser",
+    "startAgain": "Magsimulang muli",
+    "expired": "Nag-expire na ang kahilingang ito na idagdag ang {{provider}}.",
+    "noMethods": "Walang ibang paraan ng pag-sign in ang account na ito, kaya hindi maidaragdag ang {{provider}}.",
+    "linked": "Naidagdag ang {{provider}} sa iyong account.",
+    "failedExpired": "Hindi naidagdag ang {{provider}} dahil nag-expire ang kahilingan.",
+    "failedWrongAccount": "Hindi naidagdag ang {{provider}} dahil nag-sign in ka sa ibang account.",
+    "failedAccountAlreadyLinked": "Hindi naidagdag ang {{provider}} dahil naka-link na ito sa ibang account.",
+    "failedProviderAlreadyLinked": "Hindi naidagdag ang {{provider}} dahil may ibang {{provider}} sign-in na ang iyong account.",
+    "failedLinking": "Hindi maidagdag ang {{provider}} sa iyong account.",
+    "notAdded": "Naka-sign in ka na. Hindi naidagdag ang {{provider}} sa iyong account."
+  },
   "profile": {
     "codeReviewerSubtitle": "Awtomatikong pagsusuri ng PR",
     "securityAgentSubtitle": "Hanapin at ayusin ang mga kahinaan sa seguridad",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Akawnt sa pagsubok",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO para sa negosyo",
     "passkeysTitle": "Mga passkey",
     "passkeysSubtitle": "Mag-sign in nang walang password",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "Subukang i-load muli ang mga file",
       "filterPlaceholder": "Path ng mga file na hahanapin",
       "viewedCount": "{{viewed}} sa {{total}} ang natingnan",
+      "viewedCount_one": "{{viewed}} sa {{total}} ang natingnan",
+      "viewedCount_other": "{{viewed}} sa {{total}} ang natingnan",
       "viewedOfListed": "{{viewed}} sa {{total}} na nakalistang file ang natingnan",
+      "viewedOfListed_one": "{{viewed}} sa {{total}} na nakalistang file ang natingnan",
+      "viewedOfListed_other": "{{viewed}} sa {{total}} na nakalistang file ang natingnan",
       "loadingFiles": "Nilo-load ang {{loaded}} sa {{total}}…",
       "failedToLoadAllFiles": "Hindi na-load ang lahat ng file.",
       "couldNotLoadMoreFiles": "Hindi ma-load ang iba pang file.",
@@ -1353,15 +1376,12 @@
       "repoSummaryOpen": "{{displayCount}} bukas",
       "repoSummaryOpen_one": "{{displayCount}} bukas",
       "repoSummaryOpen_other": "{{displayCount}} bukas",
-      "repoSummaryOpen_zero": "{{displayCount}} bukas",
       "repoSummaryCritical": "{{displayCount}} kritikal",
       "repoSummaryCritical_one": "{{displayCount}} kritikal",
       "repoSummaryCritical_other": "{{displayCount}} kritikal",
-      "repoSummaryCritical_zero": "{{displayCount}} kritikal",
       "repoSummaryHigh": "{{displayCount}} mataas",
       "repoSummaryHigh_one": "{{displayCount}} mataas",
       "repoSummaryHigh_other": "{{displayCount}} mataas",
-      "repoSummaryHigh_zero": "{{displayCount}} mataas",
       "couldNotLoad": "Hindi ma-load ang data ng dashboard.",
       "filterByRepository": "I-filter ayon sa repository",
       "lastSynced": "Huling na-sync {{time}}",
@@ -1393,15 +1413,12 @@
       "breakdownCritical": "{{displayCount}} na kritikal",
       "breakdownCritical_one": "{{displayCount}} na kritikal",
       "breakdownCritical_other": "{{displayCount}} na kritikal",
-      "breakdownCritical_zero": "{{displayCount}} na kritikal",
       "breakdownHigh": "{{displayCount}} na mataas",
       "breakdownHigh_one": "{{displayCount}} na mataas",
       "breakdownHigh_other": "{{displayCount}} na mataas",
-      "breakdownHigh_zero": "{{displayCount}} na mataas",
       "breakdownMediumLow": "{{displayCount}} na katamtaman at mababa",
       "breakdownMediumLow_one": "{{displayCount}} na katamtaman at mababa",
       "breakdownMediumLow_other": "{{displayCount}} na katamtaman at mababa",
-      "breakdownMediumLow_zero": "{{displayCount}} na katamtaman at mababa",
       "dueThisWeek": "Takdang petsa ngayong linggo",
       "dueThisWeekDetail": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
       "dueThisWeekDetail_one": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
@@ -1843,7 +1860,7 @@
       "cloningSession": "Kinokopya ang sesyon",
       "couldNotLoadThisSession": "Hindi ma-load ang sesyong ito.",
       "cloneFailedRetry": "Hindi makopya ang sesyong ito. Subukang muli.",
-      "notEnoughCredits": "Kulang ang kredito para patakbuhin ang Cloud Agent. Magdagdag ng kredito at subukang muli.",
+      "notEnoughCredits": "Kulang ang kredito para sa kahilingang ito. Magdagdag ng kredito at subukang muli.",
       "previousTaskFinishing": "Tinatapos pa ang naunang gawain. Maghintay sandali.",
       "serviceUnavailable": "Hindi magamit ang serbisyo ngayon. Subukang muli.",
       "connectionTrouble": "May problema sa koneksyon. Subukang muli pagkalipas ng ilang sandali.",
@@ -1953,7 +1970,7 @@
       "discardWithUploadsMessage": "Buburahin ang iyong prompt at mga na-upload na file na hindi pa nagagamit.",
       "discardFailed": "Hindi mabura ang burador. Subukang muli.",
       "remoteHint": "Para patakbuhin sa iyong computer, simulan ang Kilo doon at iwanan itong tumatakbo.",
-      "continueFrom": "Ipinagpapatuloy ang {{title}}.",
+      "continueFrom": "Ipinagpapatuloy ang “{{title}}”.",
       "importingSession": "Ini-import ang sesyon",
       "cliCannotContinue": "Hindi kayang magpatuloy ng sesyon ang CLI na ito. Pumili ng Cloud Agent o ibang CLI.",
       "importFailed": "Hindi ma-import ang sesyong ito.",
@@ -1985,7 +2002,8 @@
       "selectedProfile": "Napiling profile",
       "manualOverrides": "Mga manu-manong override",
       "openSettingsToReview": "Buksan ang Mga Setting para suriin",
-      "profileSelection": "Pagpili ng profile"
+      "profileSelection": "Pagpili ng profile",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Na-update ang {{displayCount}} na file.",
@@ -2005,6 +2023,8 @@
       "toolList": "ilista",
       "toolPatch": "ilapat ang pagbabago",
       "toolTask": "gawain",
+      "toolSendFile": "Naipadala ang file",
+      "toolSendFileAction": "Ipadala ang file",
       "readTodos": "Basahin ang plano",
       "updateTodos": "I-update ang plano",
       "linesBadge": "{{displayCount}} na linya",
@@ -2105,7 +2125,21 @@
       "thought": "Naisip",
       "showDetails": "Ipakita ang mga detalye",
       "pending": "Nakabinbin…",
-      "running": "Tumatakbo…"
+      "running": "Tumatakbo…",
+      "field": {
+        "filePath": "Landas ng file",
+        "path": "Landas",
+        "offset": "Offset",
+        "limit": "Hangganan",
+        "pattern": "Padron",
+        "include": "Kasama",
+        "patchText": "Tekstong patch",
+        "query": "Paghahanap",
+        "prompt": "Panuto",
+        "header": "Pamagat",
+        "question": "Tanong",
+        "options": "Pagpipilian"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Hindi maipakita ang nilalaman."
@@ -2121,7 +2155,7 @@
       "assistantContextOverflow": "Masyadong mahaba ang pag-uusap para sa modelo.",
       "assistantProviderError": "Nagbalik ang tagapagbigay ng serbisyo ng error.",
       "assistantProviderRefused": "Tinanggihan ng tagapagbigay ng serbisyo ang kahilingang ito at hindi na ito maaaring muling subukan.",
-      "assistantCreditsRefusal": "Kulang ang kredito para patakbuhin ang Cloud Agent.",
+      "assistantCreditsRefusal": "Kulang ang kredito para sa kahilingang ito.",
       "assistantOutputLimit": "Naabot ng tugon ang limitasyon ng output ng modelo.",
       "assistantStructuredOutput": "Hindi tumugma ang tugon sa kinakailangang format.",
       "assistantFailed": "Nabigo ang pagtugon."
@@ -2266,7 +2300,7 @@
       "positionHint": "(1 sa {{displayCount}})",
       "movedPastPrompt": "Nalampasan na ng ahente ang prompt na ito. Magsasara ang card na ito kapag nagpatuloy ang sesyon.",
       "waitingForAnswer": "Naghihintay ang ahente ng sagot mo. Hindi muna ipapadala ang mensahe mo sa ahente habang bukas ang tanong na ito.",
-      "waitingForPermission": "Naghihintay ang ahente ng pahintulot. Hindi muna ipapadala ang mensahe mo sa ahente habang bukas ang kahilingang ito."
+      "waitingForPermission": "Hindi muna ipapadala ang mensahe mo sa ahente habang bukas ang kahilingang ito."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3044,7 +3078,7 @@
       "provider": "Huminto: error ng provider",
       "tool": "Huminto: error ng tool",
       "cancelled": "Huminto: kinansela",
-      "other": "NAKAHINTO"
+      "other": "Nakahinto"
     }
   },
   "transcriptionModel": {
@@ -3537,6 +3571,7 @@
       "namePlaceholder": "Aking Ahente",
       "promptPlaceholder": "ikaw ay isang...",
       "tools": "Mga gamit",
+      "wholeToolRule": "Naglalapat ang ahenteng ito ng isang panuntunan sa lahat ng gamit nang sabay-sabay: {{rule}}. Ang mga switch na ito ay basahin lamang.",
       "visibility": "Bisibilidad",
       "visibilityPrimary": "Pangunahin — ipinapakita sa picker",
       "visibilitySubagent": "Subagent — matatawag lang mula sa iba",
@@ -3577,7 +3612,8 @@
       "duplicateName": "Mayroon nang command na may ganyang pangalan sa profile na ito"
     },
     "repoBindings": {
-      "title": "Mga Default na Profile para sa Repos",
+      "title": "Mga default na profile para sa Repos",
+      "entryLabel": "Mga default na profile",
       "add": "Magdagdag ng default",
       "empty": "Walang mga default na na-configure",
       "emptyDescription": "Magdagdag ng default para awtomatikong maglapat ng profile kapag nagsisimula ng mga session para sa isang repo.",
@@ -3778,10 +3814,10 @@
     "snapshotSummaryFailed": "Nabigo ang buod ng AI. Available pa rin ang iyong nakaayos na snapshot.",
     "scheduledContextEnabled": "Mga naka-iskedyul na briefing",
     "scheduledContextSettings": "Mga naka-iskedyul na briefing · {{context}}",
-    "scheduledContextHint": "I-enable ang naka-iskedyul na pagtatala at mga bayad na buod ng AI para sa kontekstong ito lamang. Ipinapadala sa iyong model ang mga piniling na-redact na sipi at nakaayos na datos. Ginagamit ng mga buod ang wika ng app na na-save noong huli mong tahasang binago ang mga setting ng briefing. Hindi ito awtomatikong nagbabago kapag binago ang wika ng app. Sinisingil sa balanse ng kontekstong ito. Hindi gumagamit ng AI ang mga snapshot na walang napiling aktibidad.",
+    "scheduledContextHint": "I-enable ang naka-iskedyul na pagtatala at mga bayad na buod ng AI para sa kontekstong ito lamang. Ipinapadala sa iyong model ang mga piniling na-redact na sipi at nakaayos na datos. Ginagamit ng mga buod ang wika ng app na na-save kapag ina-update mo ang mga setting ng briefing. Sinisingil sa balanse ng kontekstong ito. Hindi gumagamit ng AI ang mga snapshot na walang napiling aktibidad.",
     "snapshotSafeguards": "Ang mga limitasyon sa oras at gastos bawat buod ay para sa bawat naka-iskedyul na snapshot, hindi pang-araw-araw na budget.",
     "snapshotEstimateInputTooLarge": "Masyadong maraming ebidensya sa snapshot na ito para sa napiling modelo.",
-    "quietSnapshot": "Walang aktibidad ng session na napili para sa snapshot na ito; maaaring hindi kumpleto ang pagpili. Walang hiniling na buod ng AI, walang tawag sa model, at walang siningil.",
+    "quietSnapshot": "Walang aktibidad ng session na napili para sa snapshot na ito. Walang buod ng AI na hiniling o siningil.",
     "noEnabledContexts": "Walang naka-enable na konteksto para sa mga naka-iskedyul na briefing",
     "sourceBlocker": "Kailangang asikasuhin ang session",
     "sourceMetadata": "Naitalang metadata ng session"

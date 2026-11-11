@@ -22,6 +22,8 @@
     "expired": "Utgånget"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Avbryt",
     "done": "Klar",
     "retry": "Försök igen",
@@ -227,6 +229,21 @@
     "signInCodeField": "Inloggningskod",
     "or": "eller"
   },
+  "pendingLink": {
+    "description": "Det finns redan ett konto som använder {{email}}. Logga in med någon av dess metoder för att lägga till {{provider}}.",
+    "emailCode": "Mejla mig en inloggningskod",
+    "continueInBrowser": "Fortsätt i webbläsaren",
+    "startAgain": "Börja om",
+    "expired": "Den här begäran om att lägga till {{provider}} har upphört att gälla.",
+    "noMethods": "Det här kontot har ingen annan inloggningsmetod, så {{provider}} kan inte läggas till.",
+    "linked": "{{provider}} har lagts till i ditt konto.",
+    "failedExpired": "{{provider}} lades inte till eftersom begäran hade upphört att gälla.",
+    "failedWrongAccount": "{{provider}} lades inte till eftersom du loggade in på ett annat konto.",
+    "failedAccountAlreadyLinked": "{{provider}} lades inte till eftersom det redan är kopplat till ett annat konto.",
+    "failedProviderAlreadyLinked": "{{provider}} lades inte till eftersom ditt konto redan har en annan {{provider}}-inloggning.",
+    "failedLinking": "{{provider}} kunde inte läggas till i ditt konto.",
+    "notAdded": "Du är inloggad. {{provider}} lades inte till i ditt konto."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatiska PR-granskningar",
     "securityAgentSubtitle": "Hitta och åtgärda sårbarheter",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO för företag",
     "passkeysTitle": "Passnycklar",
     "passkeysSubtitle": "Logga in utan lösenord",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "Försök läsa in filerna igen",
       "filterPlaceholder": "Filtrera filer efter sökväg",
       "viewedCount": "{{viewed}} av {{total}} visade",
+      "viewedCount_one": "{{viewed}} av {{total}} visade",
+      "viewedCount_other": "{{viewed}} av {{total}} visade",
       "viewedOfListed": "{{viewed}} av {{total}} listade filer visade",
+      "viewedOfListed_one": "{{viewed}} av {{total}} listade filer visade",
+      "viewedOfListed_other": "{{viewed}} av {{total}} listade filer visade",
       "loadingFiles": "Läser in {{loaded}} av {{total}}…",
       "failedToLoadAllFiles": "Kunde inte läsa in alla filer.",
       "couldNotLoadMoreFiles": "Kunde inte läsa in fler filer.",
@@ -1837,7 +1860,7 @@
       "cloningSession": "Klonar sessionen",
       "couldNotLoadThisSession": "Det gick inte att läsa in den här sessionen",
       "cloneFailedRetry": "Kunde inte klona den här sessionen. Försök igen.",
-      "notEnoughCredits": "Du har inte tillräckligt med krediter för att köra Cloud Agent. Fyll på krediter och försök igen.",
+      "notEnoughCredits": "Du har inte tillräckligt med krediter för den här förfrågan. Fyll på krediter och försök igen.",
       "previousTaskFinishing": "Den föregående uppgiften håller på att avslutas. Vänta en stund.",
       "serviceUnavailable": "Tjänsten är inte tillgänglig just nu. Försök igen.",
       "connectionTrouble": "Det är problem med anslutningen. Försök igen om en stund.",
@@ -1947,7 +1970,7 @@
       "discardWithUploadsMessage": "Din prompt och uppladdade filer som inte har bifogats i skickade meddelanden tas bort.",
       "discardFailed": "Det gick inte att ta bort utkastet. Försök igen.",
       "remoteHint": "För att köra på din dator startar du Kilo där och låter det köras.",
-      "continueFrom": "Sessionen {{title}} fortsätter.",
+      "continueFrom": "Sessionen ”{{title}}” fortsätter.",
       "importingSession": "Importerar sessionen",
       "cliCannotContinue": "Den här CLI-versionen kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI-instans.",
       "importFailed": "Det gick inte att importera den här sessionen.",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "Vald profil",
       "manualOverrides": "Manuella åsidosättningar",
       "openSettingsToReview": "Öppna Inställningar för att granska",
-      "profileSelection": "Profilval"
+      "profileSelection": "Profilval",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil har uppdaterats.",
@@ -1999,6 +2023,8 @@
       "toolList": "upplistning",
       "toolPatch": "ändring",
       "toolTask": "uppgift",
+      "toolSendFile": "Skickad fil",
+      "toolSendFileAction": "Skicka fil",
       "readTodos": "Läs planeringen",
       "updateTodos": "Uppdatera planeringen",
       "linesBadge": "{{displayCount}} rader",
@@ -2099,7 +2125,21 @@
       "thought": "Resonemang",
       "showDetails": "Visa detaljer",
       "pending": "Väntar…",
-      "running": "Körs…"
+      "running": "Körs…",
+      "field": {
+        "filePath": "Filsökväg",
+        "path": "Sökväg",
+        "offset": "Förskjutning",
+        "limit": "Gräns",
+        "pattern": "Mönster",
+        "include": "Inkludering",
+        "patchText": "Patchtext",
+        "query": "Sökfråga",
+        "prompt": "Instruktion",
+        "header": "Rubrik",
+        "question": "Fråga",
+        "options": "Alternativ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Det gick inte att visa innehållet."
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "Konversationen är för lång för modellen.",
       "assistantProviderError": "Leverantören returnerade ett fel.",
       "assistantProviderRefused": "Leverantören avvisade begäran och den kan inte göras om.",
-      "assistantCreditsRefusal": "Du har inte tillräckligt med krediter för att köra Cloud Agent.",
+      "assistantCreditsRefusal": "Du har inte tillräckligt med krediter för den här förfrågan.",
       "assistantOutputLimit": "Svaret nådde modellens utdata-gräns.",
       "assistantStructuredOutput": "Svaret matchade inte det begärda formatet.",
       "assistantFailed": "Det gick inte att generera svaret."
@@ -2260,7 +2300,7 @@
       "positionHint": "(1 av {{displayCount}})",
       "movedPastPrompt": "Agenten har gått vidare från den här förfrågan. Kortet stängs när sessionen fortsätter.",
       "waitingForAnswer": "Agenten väntar på ditt svar. Ditt meddelande till agenten är pausat så länge frågan är öppen.",
-      "waitingForPermission": "Agenten väntar på behörighet. Ditt meddelande till agenten är pausat så länge förfrågan är öppen."
+      "waitingForPermission": "Ditt meddelande till agenten är pausat så länge förfrågan är öppen."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "Min agent",
       "promptPlaceholder": "Du är en...",
       "tools": "Verktyg",
+      "wholeToolRule": "Den här agenten tillämpar en regel på alla verktyg samtidigt: {{rule}}. Dessa reglage är skrivskyddade.",
       "visibility": "Synlighet",
       "visibilityPrimary": "Primär — visas i väljaren",
       "visibilitySubagent": "Subagent — endast anropsbar från andra",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "Standardprofiler för kodarkiv",
+      "entryLabel": "Standardprofiler",
       "add": "Lägg till standard",
       "empty": "Inga standardinställningar konfigurerade",
       "emptyDescription": "Lägg till en standard för att automatiskt tillämpa en profil när du startar sessioner för ett kodarkiv.",
@@ -3753,7 +3795,7 @@
     "estimate": "Uppskattning {{estimate}} · maximalt {{maximum}}",
     "estimateUnavailable": "En betald sammanfattning är inte tillgänglig för dessa inställningar.",
     "confirmPaid": "Aktivera betalda sammanfattningar för {{context}}?",
-    "paidDisclosure": "Uppskattat {{estimate}}, upp till {{maximum}}, med en gräns på {{minutes}} minuter. Avgifter tas ut även om genereringen misslyckas.",
+    "paidDisclosure": "Uppskattat {{estimate}}, upp till {{maximum}}, med en gräns på {{minutes}} min. Avgifter tas ut även om genereringen misslyckas.",
     "enable": "Aktivera betalda sammanfattningar",
     "allContexts": "Personliga rapporter och organisationsrapporter hålls åtskilda.",
     "emptyHistory": "Inga sparade rapporter",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "AI-sammanfattningen misslyckades. Din strukturerade ögonblicksbild finns fortfarande tillgänglig.",
     "scheduledContextEnabled": "Schemalagda rapporter",
     "scheduledContextSettings": "Schemalagda rapporter · {{context}}",
-    "scheduledContextHint": "Aktivera schemalagda ögonblicksbilder och betalda AI-sammanfattningar endast för den här kontexten. Utvalda, maskerade utdrag och strukturerade fakta skickas till din modell. Sammanfattningarna använder det appspråk som sparas när du uttryckligen ändrar rapportinställningarna. Det sparade språket uppdateras inte automatiskt när du byter appspråk. Avgifter dras från den här kontextens saldo. Ögonblicksbilder utan utvald aktivitet använder inte AI.",
+    "scheduledContextHint": "Aktivera schemalagda ögonblicksbilder och betalda AI-sammanfattningar endast för den här kontexten. Utvalda, maskerade utdrag och strukturerade fakta skickas till din modell. Sammanfattningarna använder det appspråk som sparas när du ändrar rapportinställningarna. Avgifter dras från den här kontextens saldo. Ögonblicksbilder utan utvald aktivitet använder inte AI.",
     "snapshotSafeguards": "Tids- och kostnadsgränser per sammanfattning gäller för varje schemalagd ögonblicksbild, inte som en daglig budget.",
     "snapshotEstimateInputTooLarge": "Den här ögonblicksbilden innehåller för mycket underlag för den valda modellen.",
-    "quietSnapshot": "Ingen sessionsaktivitet valdes ut för den här ögonblicksbilden. Urvalet kan vara ofullständigt. Ingen AI-sammanfattning begärdes, inget modellanrop gjordes och ingen avgift togs ut.",
+    "quietSnapshot": "Ingen sessionsaktivitet valdes ut för den här ögonblicksbilden. Ingen AI-sammanfattning begärdes och ingen avgift togs ut.",
     "noEnabledContexts": "Inga kontexter är aktiverade för schemalagda rapporter",
     "sourceBlocker": "Sessionen behöver uppmärksamhet",
     "sourceMetadata": "Insamlad sessionsmetadata"

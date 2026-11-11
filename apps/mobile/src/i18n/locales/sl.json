@@ -22,6 +22,8 @@
     "expired": "Poteklo"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Prekliči",
     "done": "Končano",
     "retry": "Poskusi znova",
@@ -227,6 +229,21 @@
     "signInCodeField": "Prijavna koda",
     "or": "ali"
   },
+  "pendingLink": {
+    "description": "Račun z naslovom {{email}} že obstaja. Prijavi se z enim od njegovih načinov, da dodaš {{provider}}.",
+    "emailCode": "Pošlji mi prijavno kodo po e-pošti",
+    "continueInBrowser": "Nadaljuj v brskalniku",
+    "startAgain": "Začni znova",
+    "expired": "Ta zahteva za dodajanje storitve {{provider}} je potekla.",
+    "noMethods": "Ta račun nima drugega načina prijave, zato storitve {{provider}} ni mogoče dodati.",
+    "linked": "Storitev {{provider}} je bila dodana tvojemu računu.",
+    "failedExpired": "Storitev {{provider}} ni bila dodana, ker je zahteva potekla.",
+    "failedWrongAccount": "Storitev {{provider}} ni bila dodana, ker si se prijavil v drug račun.",
+    "failedAccountAlreadyLinked": "Storitev {{provider}} ni bila dodana, ker je že povezana z drugim računom.",
+    "failedProviderAlreadyLinked": "Storitev {{provider}} ni bila dodana, ker ima tvoj račun že drugo prijavo s storitvijo {{provider}}.",
+    "failedLinking": "Storitve {{provider}} ni bilo mogoče dodati tvojemu računu.",
+    "notAdded": "Prijavljen si. Storitev {{provider}} ni bila dodana tvojemu računu."
+  },
   "profile": {
     "codeReviewerSubtitle": "Samodejni pregledi PR",
     "securityAgentSubtitle": "Poišči in odpravi ranljivosti",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Testni račun",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO za podjetja",
     "passkeysTitle": "Ključi za dostop",
     "passkeysSubtitle": "Prijavi se brez gesla",
@@ -343,7 +362,15 @@
       "retryLoadingFiles": "Poskusi znova naložiti datoteke",
       "filterPlaceholder": "Filter po poti datoteke",
       "viewedCount": "ogledano: {{viewed}} od {{total}}",
+      "viewedCount_one": "ogledano: {{viewed}} od {{total}}",
+      "viewedCount_two": "ogledano: {{viewed}} od {{total}}",
+      "viewedCount_few": "ogledano: {{viewed}} od {{total}}",
+      "viewedCount_other": "ogledano: {{viewed}} od {{total}}",
       "viewedOfListed": "ogledano s seznama: {{viewed}} od {{total}}",
+      "viewedOfListed_one": "ogledano s seznama: {{viewed}} od {{total}}",
+      "viewedOfListed_two": "ogledano s seznama: {{viewed}} od {{total}}",
+      "viewedOfListed_few": "ogledano s seznama: {{viewed}} od {{total}}",
+      "viewedOfListed_other": "ogledano s seznama: {{viewed}} od {{total}}",
       "loadingFiles": "Nalaganje: {{loaded}} od {{total}} …",
       "failedToLoadAllFiles": "Vseh datotek ni bilo mogoče naložiti.",
       "couldNotLoadMoreFiles": "Dodatnih datotek ni bilo mogoče naložiti.",
@@ -1915,7 +1942,7 @@
       "cloningSession": "Kloniranje seje",
       "couldNotLoadThisSession": "Te seje ni bilo mogoče naložiti.",
       "cloneFailedRetry": "Te seje ni bilo mogoče klonirati. Poskusi znova.",
-      "notEnoughCredits": "Za zagon storitve Cloud Agent ni dovolj kreditov. Dodaj kredite in poskusi znova.",
+      "notEnoughCredits": "Za to zahtevo ni dovolj kreditov. Dodaj kredite in poskusi znova.",
       "previousTaskFinishing": "Prejšnja naloga se še zaključuje. Počakaj trenutek.",
       "serviceUnavailable": "Storitev trenutno ni na voljo. Poskusi znova.",
       "connectionTrouble": "Prišlo je do težave s povezavo. Čez trenutek poskusi znova.",
@@ -2025,7 +2052,7 @@
       "discardWithUploadsMessage": "Tvoj poziv in vse naložene datoteke, ki niso priložene poslanim sporočilom, bodo izbrisani.",
       "discardFailed": "Osnutka ni bilo mogoče zavreči. Poskusi znova.",
       "remoteHint": "Za zagon na tvojem računalniku tam zaženi Kilo in ga pusti zagnanega.",
-      "continueFrom": "Nadaljuje se seja {{title}}.",
+      "continueFrom": "Nadaljuje se seja »{{title}}«.",
       "importingSession": "Uvažanje seje",
       "cliCannotContinue": "Ta CLI ne podpira nadaljevanja seje. Izberi Cloud Agent ali drug CLI.",
       "importFailed": "Te seje ni bilo mogoče uvoziti.",
@@ -2057,7 +2084,8 @@
       "selectedProfile": "Izbrani profil",
       "manualOverrides": "Ročne preglasitve",
       "openSettingsToReview": "Odprite nastavitve za pregled",
-      "profileSelection": "Izbira profila"
+      "profileSelection": "Izbira profila",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Posodobljena je {{displayCount}} datoteka.",
@@ -2079,6 +2107,8 @@
       "toolList": "izpiši seznam",
       "toolPatch": "uporabi popravek",
       "toolTask": "naloga",
+      "toolSendFile": "Poslana datoteka",
+      "toolSendFileAction": "pošlji datoteko",
       "readTodos": "Preberi načrt",
       "updateTodos": "Posodobi načrt",
       "linesBadge": "{{displayCount}} vrstic",
@@ -2185,7 +2215,21 @@
       "thought": "Misel",
       "showDetails": "Prikaži podrobnosti",
       "pending": "Čakanje…",
-      "running": "Izvajanje…"
+      "running": "Izvajanje…",
+      "field": {
+        "filePath": "Pot datoteke",
+        "path": "Pot",
+        "offset": "Odmik",
+        "limit": "Omejitev",
+        "pattern": "Vzorec",
+        "include": "Vključitev",
+        "patchText": "Besedilo popravka",
+        "query": "Poizvedba",
+        "prompt": "Navodilo",
+        "header": "Naslov",
+        "question": "Vprašanje",
+        "options": "Možnosti"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Vsebine ni bilo mogoče prikazati."
@@ -2201,7 +2245,7 @@
       "assistantContextOverflow": "Pogovor je predolg za model.",
       "assistantProviderError": "Ponudnik je vrnil napako.",
       "assistantProviderRefused": "Ponudnik je zavrnil to zahtevo in poskusa ni mogoče ponoviti.",
-      "assistantCreditsRefusal": "Za zagon storitve Cloud Agent ni dovolj kreditov.",
+      "assistantCreditsRefusal": "Za to zahtevo ni dovolj kreditov.",
       "assistantOutputLimit": "Odgovor je dosegel omejitev izhoda modela.",
       "assistantStructuredOutput": "Odgovor ni ustrezal zahtevanemu formatu.",
       "assistantFailed": "Odgovora ni bilo mogoče ustvariti."
@@ -2346,7 +2390,7 @@
       "positionHint": "(1 od {{displayCount}})",
       "movedPastPrompt": "Agent je že nadaljeval obdelavo po tem pozivu. Kartica se bo zaprla, ko se seja nadaljuje.",
       "waitingForAnswer": "Agent čaka na tvoj odgovor. Dokler je to vprašanje odprto, pošiljanje tvojega sporočila agentu čaka.",
-      "waitingForPermission": "Agent čaka na dovoljenje. Dokler je ta zahteva odprta, pošiljanje tvojega sporočila agentu čaka."
+      "waitingForPermission": "Dokler je ta zahteva odprta, pošiljanje tvojega sporočila agentu čaka."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3142,7 +3186,7 @@
       "provider": "Ustavljeno: napaka ponudnika",
       "tool": "Ustavljeno: napaka orodja",
       "cancelled": "Ustavljeno: preklicano",
-      "other": "USTAVLJENO"
+      "other": "Ustavljeno"
     }
   },
   "transcriptionModel": {
@@ -3649,6 +3693,7 @@
       "namePlaceholder": "Moj agent",
       "promptPlaceholder": "ti si ...",
       "tools": "Orodja",
+      "wholeToolRule": "Ta agent uporabi eno pravilo za vsa orodja hkrati: {{rule}}. Ta stikala so samo za branje.",
       "visibility": "Vidnost",
       "visibilityPrimary": "Primarno — prikazano v izbirniku",
       "visibilitySubagent": "Subagent — na klic samo od drugih",
@@ -3690,6 +3735,7 @@
     },
     "repoBindings": {
       "title": "Privzeti profili za skladišča",
+      "entryLabel": "Privzeti profili",
       "add": "Dodaj privzeto",
       "empty": "Privzete nastavitve niso konfigurirane",
       "emptyDescription": "Dodajte privzeto za samodejno uporabo profila ob zagonu sej za repo.",
@@ -3898,10 +3944,10 @@
     "snapshotSummaryFailed": "AI povzetek ni uspel. Vaš strukturirani posnetek je še vedno na voljo.",
     "scheduledContextEnabled": "Načrtovana poročila",
     "scheduledContextSettings": "Načrtovana poročila · {{context}}",
-    "scheduledContextHint": "Omogočite načrtovano zajemanje in plačljive AI povzetke samo za ta kontekst. Izbrani izseki s prikritimi občutljivimi podatki in strukturirana dejstva se pošljejo vašemu modelu. Povzetki uporabljajo jezik aplikacije, shranjen ob izrecni posodobitvi nastavitev poročila. Ta jezik se ob spremembi jezika aplikacije ne posodobi samodejno. Stroški bremenijo stanje tega konteksta. Posnetki brez dejavnosti ne uporabljajo AI.",
+    "scheduledContextHint": "Omogočite načrtovano zajemanje in plačljive AI povzetke samo za ta kontekst. Izbrani izseki s prikritimi občutljivimi podatki in strukturirana dejstva se pošljejo vašemu modelu. Povzetki uporabljajo jezik aplikacije, shranjen ob posodobitvi nastavitev poročila. Stroški bremenijo stanje tega konteksta. Posnetki brez dejavnosti ne uporabljajo AI.",
     "snapshotSafeguards": "Časovna omejitev in omejitev porabe na povzetek veljata za vsak načrtovani posnetek, ne kot dnevni proračun.",
     "snapshotEstimateInputTooLarge": "Ta posnetek vsebuje preveč dokaznega gradiva za izbrani model.",
-    "quietSnapshot": "Za ta posnetek ni bila izbrana nobena dejavnost sej. Popolnost izbora ni zagotovljena. AI povzetek ni bil zahtevan ali zaračunan.",
+    "quietSnapshot": "Za ta posnetek ni bila izbrana nobena dejavnost sej. AI povzetek ni bil zahtevan ali zaračunan.",
     "noEnabledContexts": "Za načrtovana poročila ni omogočen noben kontekst",
     "sourceBlocker": "Seja zahteva pozornost",
     "sourceMetadata": "Zajeti metapodatki seje"

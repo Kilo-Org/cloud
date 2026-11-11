@@ -5,6 +5,7 @@ import m0002 from './0002_aspiring_scourge.sql';
 import m0003 from './0003_session_mutation_cursor.sql';
 import m0004 from './0004_history_hydration_stage.sql';
 import m0005 from './0005_native_history_scope.sql';
+import m0006 from './0006_confused_shiva.sql';
 
 export default {
   journal,
@@ -15,5 +16,6 @@ export default {
     m0003,
     m0004,
     m0005,
+    m0006,
   },
 };

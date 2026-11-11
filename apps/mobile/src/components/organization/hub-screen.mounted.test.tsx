@@ -111,7 +111,7 @@ vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.test' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 
 vi.mock('@/lib/format', () => ({
-  formatMoney: (amount: number) => `$${amount}`,
+  formatPrefixedMoney: (amount: number) => `$${amount}`,
   formatNumber: String,
 }));
 

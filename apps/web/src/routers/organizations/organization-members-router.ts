@@ -1,5 +1,7 @@
 import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
 import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
+import { runAfterResponse } from '@/lib/after-response';
+import { cleanupRemovedClaudeProfilesForUser } from '@/lib/claude-billing/delete';
 import {
   updateUserRoleInOrganization,
   addUserToOrganization,
@@ -464,6 +466,11 @@ export const organizationsMembersRouter = createTRPCRouter({
         await invalidateOrganizationSessionAccess(memberId, childOrganizationId).catch(
           () => undefined
         );
+      }
+      if (removed.length > 0) {
+        await runAfterResponse(async () => {
+          await cleanupRemovedClaudeProfilesForUser(memberId).catch(() => undefined);
+        });
       }
 
       if (added.length > 0 || removed.length > 0) {

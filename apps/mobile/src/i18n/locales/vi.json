@@ -22,6 +22,8 @@
     "expired": "Đã hết hạn"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Hủy",
     "done": "Xong",
     "retry": "Thử lại",
@@ -227,6 +229,21 @@
     "pleaseEnterEmail": "Vui lòng nhập địa chỉ email của bạn.",
     "or": "hoặc"
   },
+  "pendingLink": {
+    "description": "Đã có tài khoản sử dụng {{email}}. Hãy đăng nhập bằng một trong các phương thức của tài khoản đó để thêm {{provider}}.",
+    "emailCode": "Gửi mã đăng nhập qua email cho tôi",
+    "continueInBrowser": "Tiếp tục trong trình duyệt",
+    "startAgain": "Bắt đầu lại",
+    "expired": "Yêu cầu thêm {{provider}} này đã hết hạn.",
+    "noMethods": "Tài khoản này không có phương thức đăng nhập nào khác nên không thể thêm {{provider}}.",
+    "linked": "Đã thêm {{provider}} vào tài khoản của bạn.",
+    "failedExpired": "Chưa thêm {{provider}} vì yêu cầu đã hết hạn.",
+    "failedWrongAccount": "Chưa thêm {{provider}} vì bạn đã đăng nhập vào một tài khoản khác.",
+    "failedAccountAlreadyLinked": "Chưa thêm {{provider}} vì nó đã được liên kết với một tài khoản khác.",
+    "failedProviderAlreadyLinked": "Chưa thêm {{provider}} vì tài khoản của bạn đã có một phương thức đăng nhập {{provider}} khác.",
+    "failedLinking": "Không thể thêm {{provider}} vào tài khoản của bạn.",
+    "notAdded": "Bạn đã đăng nhập. Chưa thêm {{provider}} vào tài khoản của bạn."
+  },
   "profile": {
     "codeReviewerSubtitle": "Rà soát PR tự động",
     "securityAgentSubtitle": "Tìm và khắc phục lỗ hổng",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Tài khoản thử nghiệm",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO doanh nghiệp",
     "passkeysTitle": "Khóa truy cập",
     "passkeysSubtitle": "Đăng nhập không cần mật khẩu",
@@ -1299,7 +1318,7 @@
       "cloningSession": "Đang sao chép phiên",
       "couldNotLoadThisSession": "Không thể tải phiên này.",
       "cloneFailedRetry": "Không thể sao chép phiên này. Hãy thử lại.",
-      "notEnoughCredits": "Số dư không đủ để chạy Cloud Agent. Hãy nạp tiền và thử lại.",
+      "notEnoughCredits": "Số dư không đủ cho yêu cầu này. Hãy nạp tiền và thử lại.",
       "previousTaskFinishing": "Tác vụ trước chưa hoàn tất. Vui lòng chờ một chút.",
       "serviceUnavailable": "Dịch vụ hiện không hoạt động. Vui lòng thử lại.",
       "connectionTrouble": "Kết nối gặp sự cố. Vui lòng thử lại sau giây lát.",
@@ -1409,7 +1428,7 @@
       "discardWithUploadsMessage": "Nội dung yêu cầu và các tệp đã tải lên nhưng chưa gắn với tin nhắn đã gửi sẽ bị xóa.",
       "discardFailed": "Không thể hủy bản nháp. Vui lòng thử lại.",
       "remoteHint": "Để chạy trên máy tính của bạn, hãy khởi động Kilo trên đó và để ứng dụng tiếp tục chạy.",
-      "continueFrom": "Đang tiếp tục phiên {{title}}.",
+      "continueFrom": "Đang tiếp tục phiên “{{title}}”.",
       "importingSession": "Đang nhập phiên",
       "cliCannotContinue": "CLI này không hỗ trợ tiếp tục phiên. Hãy chọn Cloud Agent hoặc CLI khác.",
       "importFailed": "Không thể nhập phiên này.",
@@ -1441,7 +1460,8 @@
       "selectedProfile": "Hồ sơ đã chọn",
       "manualOverrides": "Ghi đè thủ công",
       "openSettingsToReview": "Mở Cài đặt để xem lại",
-      "profileSelection": "Lựa chọn hồ sơ"
+      "profileSelection": "Lựa chọn hồ sơ",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Đã cập nhật {{displayCount}} tệp.",
@@ -1461,6 +1481,8 @@
       "toolList": "liệt kê",
       "toolPatch": "áp dụng bản vá",
       "toolTask": "tác vụ",
+      "toolSendFile": "Đã gửi tệp",
+      "toolSendFileAction": "Gửi tệp",
       "readTodos": "Đọc kế hoạch",
       "updateTodos": "Cập nhật kế hoạch",
       "linesBadge": "{{displayCount}} dòng",
@@ -1561,7 +1583,21 @@
       "thought": "Suy luận",
       "showDetails": "Hiển thị chi tiết",
       "pending": "Đang chờ…",
-      "running": "Đang chạy…"
+      "running": "Đang chạy…",
+      "field": {
+        "filePath": "Đường dẫn tệp",
+        "path": "Đường dẫn",
+        "offset": "Dòng bắt đầu",
+        "limit": "Giới hạn",
+        "pattern": "Mẫu",
+        "include": "Bao gồm",
+        "patchText": "Nội dung bản vá",
+        "query": "Truy vấn",
+        "prompt": "Chỉ dẫn",
+        "header": "Tiêu đề",
+        "question": "Câu hỏi",
+        "options": "Tùy chọn"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Không thể hiển thị nội dung."
@@ -1577,7 +1613,7 @@
       "assistantContextOverflow": "Cuộc trò chuyện vượt quá giới hạn độ dài mà mô hình có thể xử lý.",
       "assistantProviderError": "Nhà cung cấp đã trả về lỗi.",
       "assistantProviderRefused": "Nhà cung cấp đã từ chối yêu cầu này và không thể thử lại.",
-      "assistantCreditsRefusal": "Số dư không đủ để chạy Cloud Agent.",
+      "assistantCreditsRefusal": "Số dư không đủ cho yêu cầu này.",
       "assistantOutputLimit": "Phản hồi đã đạt đến giới hạn đầu ra của mô hình.",
       "assistantStructuredOutput": "Phản hồi không đúng định dạng yêu cầu.",
       "assistantFailed": "Không thể tạo phản hồi."
@@ -1722,7 +1758,7 @@
       "positionHint": "(1 trong số {{displayCount}})",
       "movedPastPrompt": "Tác nhân đã chuyển sang bước khác. Thẻ này sẽ đóng khi phiên tiếp tục.",
       "waitingForAnswer": "Tác nhân đang chờ bạn trả lời. Việc gửi tin nhắn cho tác nhân sẽ tạm dừng cho đến khi câu hỏi này được đóng.",
-      "waitingForPermission": "Tác nhân đang chờ được cấp quyền. Việc gửi tin nhắn cho tác nhân sẽ tạm dừng cho đến khi yêu cầu này được đóng."
+      "waitingForPermission": "Việc gửi tin nhắn cho tác nhân sẽ tạm dừng cho đến khi yêu cầu này được đóng."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -2450,7 +2486,11 @@
       "retryLoadingMoreFiles": "Thử tải thêm tệp",
       "title": "Tệp",
       "viewedCount": "Đã xem {{viewed}}/{{total}}",
-      "viewedOfListed": "Đã xem {{viewed}}/{{total}} tệp trong danh sách"
+      "viewedCount_one": "Đã xem {{viewed}}/{{total}}",
+      "viewedCount_other": "Đã xem {{viewed}}/{{total}}",
+      "viewedOfListed": "Đã xem {{viewed}}/{{total}} tệp trong danh sách",
+      "viewedOfListed_one": "Đã xem {{viewed}}/{{total}} tệp trong danh sách",
+      "viewedOfListed_other": "Đã xem {{viewed}}/{{total}} tệp trong danh sách"
     },
     "fileRows": {
       "collapseFile": "Thu gọn tệp",
@@ -3038,7 +3078,7 @@
       "provider": "Đã dừng: lỗi nhà cung cấp",
       "tool": "Đã dừng: lỗi công cụ",
       "cancelled": "Đã dừng: đã hủy",
-      "other": "ĐÃ DỪNG"
+      "other": "Đã dừng"
     }
   },
   "transcriptionModel": {
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "Đại lý của tôi",
       "promptPlaceholder": "Bạn là một...",
       "tools": "Công cụ",
+      "wholeToolRule": "Tác nhân này áp dụng một quy tắc cho mọi công cụ cùng lúc: {{rule}}. Các công tắc này chỉ đọc.",
       "visibility": "Khả năng hiển thị",
       "visibilityPrimary": "Chính — hiển thị trong bộ chọn",
       "visibilitySubagent": "Subagent — chỉ có thể gọi được từ người khác",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "Hồ sơ mặc định cho Repos",
+      "entryLabel": "Hồ sơ mặc định",
       "add": "Thêm mặc định",
       "empty": "Không có cấu hình mặc định",
       "emptyDescription": "Thêm mặc định để tự động áp dụng cấu hình khi bắt đầu phiên cho kho lưu trữ.",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "Tạo tóm tắt AI thất bại. Bản chụp có cấu trúc vẫn khả dụng.",
     "scheduledContextEnabled": "Bản tin theo lịch",
     "scheduledContextSettings": "Bản tin theo lịch · {{context}}",
-    "scheduledContextHint": "Bật ghi lại trạng thái theo lịch và tóm tắt AI trả phí chỉ cho ngữ cảnh này. Các đoạn trích đã chọn và ẩn thông tin nhạy cảm cùng dữ kiện có cấu trúc sẽ được gửi đến mô hình của bạn. Bản tóm tắt dùng ngôn ngữ ứng dụng được lưu khi bạn chủ động cập nhật cài đặt bản tin. Ngôn ngữ này không tự động đồng bộ khi bạn đổi ngôn ngữ ứng dụng. Phí được trừ vào số dư của ngữ cảnh này. Bản chụp không có hoạt động không dùng AI.",
+    "scheduledContextHint": "Bật ghi lại trạng thái theo lịch và tóm tắt AI trả phí chỉ cho ngữ cảnh này. Các đoạn trích đã chọn và ẩn thông tin nhạy cảm cùng dữ kiện có cấu trúc sẽ được gửi đến mô hình của bạn. Bản tóm tắt dùng ngôn ngữ ứng dụng được lưu khi bạn cập nhật cài đặt bản tin. Phí được trừ vào số dư của ngữ cảnh này. Bản chụp không có hoạt động không dùng AI.",
     "snapshotSafeguards": "Giới hạn thời gian và chi phí cho mỗi tóm tắt áp dụng riêng cho từng bản chụp theo lịch, không phải ngân sách hằng ngày.",
     "snapshotEstimateInputTooLarge": "Bản chụp này có quá nhiều dữ liệu minh chứng cho mô hình đã chọn.",
-    "quietSnapshot": "Trong phạm vi dữ liệu thu thập được, không có hoạt động phiên nào được chọn cho bản chụp này. Không gọi mô hình AI để tạo tóm tắt và không tính phí.",
+    "quietSnapshot": "Không có hoạt động phiên nào được chọn cho bản chụp này. Không có tóm tắt AI nào được yêu cầu hay tính phí.",
     "noEnabledContexts": "Chưa bật bản tin theo lịch cho ngữ cảnh nào",
     "sourceBlocker": "Phiên cần được chú ý",
     "sourceMetadata": "Siêu dữ liệu phiên đã ghi lại"

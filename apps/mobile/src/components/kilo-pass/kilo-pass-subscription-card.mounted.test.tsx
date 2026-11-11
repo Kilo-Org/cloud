@@ -68,7 +68,13 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('@/i18n', () => ({
-  i18n: { language: 'en', t: (key: string) => key },
+  i18n: {
+    language: 'en',
+    // The mocked translator echoes a key, except for the sentence joiner: the
+    // catalog value is punctuation, so echoing its key would change the label
+    // under test rather than its separator.
+    t: (key: string) => (key === 'common.sentenceJoiner' ? '. ' : key),
+  },
 }));
 
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

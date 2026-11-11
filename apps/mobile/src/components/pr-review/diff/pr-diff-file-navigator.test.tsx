@@ -10,9 +10,9 @@
 /* eslint-disable max-lines -- cohesive component-test suite for the navigator fetch rules */
 import { createElement, Fragment, type ReactElement } from 'react';
 import { act } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-navigator';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { type ProviderPrRef, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
@@ -809,5 +809,47 @@ describe('PrDiffFileNavigator provider wording', () => {
     const text = renderedText(await mountInScope(GITHUB_REF));
 
     expect(text).toContain("You don't have permission to view this pull request.");
+  });
+});
+
+// The listed-file progress line inflects for the language it renders in, so the
+// caller must hand i18next the count beside the figure the copy interpolates.
+describe('PrDiffFileNavigator listed-file progress', () => {
+  beforeEach(async () => {
+    listQueryResult = {
+      query: {
+        isLoading: false,
+        isFetching: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: fetchNextPageMock,
+        refetch: vi.fn(),
+      },
+      files: [makeFile('src/a.ts')],
+      firstPageErrorState: null,
+      laterPageError: false,
+    };
+    viewedResult = { isViewed: () => true, toggle: vi.fn(() => undefined), isLoading: false };
+    fetchAllResult = {
+      run: fetchAllRunMock,
+      isRunning: false,
+      loadedFiles: 0,
+      totalFiles: null,
+      error: null,
+    };
+    await i18n.changeLanguage('fr');
+  });
+
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('agrees the French participle with the one listed file', async () => {
+    const { renderer } = await renderWithProviders(
+      createElement(PrDiffFileNavigator, { ...BASE_PROPS, changedFiles: 2 })
+    );
+
+    // Truncated: the copy names the listed files instead of the whole set.
+    expect(renderedText(renderer)).toContain('1 sur 1 consulté parmi les fichiers affichés');
   });
 });

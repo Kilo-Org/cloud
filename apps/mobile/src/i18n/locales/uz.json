@@ -22,6 +22,8 @@
     "expired": "Muddati tugagan"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Bekor qilish",
     "done": "Tayyor",
     "retry": "Qayta urinish",
@@ -227,6 +229,21 @@
     "signInCodeField": "Kirish kodi",
     "or": "yoki"
   },
+  "pendingLink": {
+    "description": "{{email}} allaqachon bir hisob tomonidan ishlatilmoqda. {{provider}} qo'shish uchun uning usullaridan biri bilan kiring.",
+    "emailCode": "Kirish kodini elektron pochtamga yuborish",
+    "continueInBrowser": "Brauzerda davom etish",
+    "startAgain": "Qaytadan boshlash",
+    "expired": "{{provider}} qo'shish bo'yicha bu so'rovning muddati tugagan.",
+    "noMethods": "Bu hisobda boshqa kirish usuli yo'q, shuning uchun {{provider}} qo'shib bo'lmaydi.",
+    "linked": "{{provider}} hisobingizga qo'shildi.",
+    "failedExpired": "So'rov muddati tugagani uchun {{provider}} qo'shilmadi.",
+    "failedWrongAccount": "Boshqa hisobga kirganingiz uchun {{provider}} qo'shilmadi.",
+    "failedAccountAlreadyLinked": "{{provider}} allaqachon boshqa hisobga bog'langani uchun qo'shilmadi.",
+    "failedProviderAlreadyLinked": "Hisobingizda allaqachon boshqa {{provider}} orqali kirish mavjudligi uchun {{provider}} qo'shilmadi.",
+    "failedLinking": "{{provider}} hisobingizga qo'shib bo'lmadi.",
+    "notAdded": "Siz tizimga kirdingiz. {{provider}} hisobingizga qo'shilmadi."
+  },
   "profile": {
     "codeReviewerSubtitle": "PR tekshiruvlarini avtomatik bajarish",
     "securityAgentSubtitle": "Zaifliklarni topish va bartaraf etish",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Sinov hisobi",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Korporativ SSO",
     "passkeysTitle": "Kirish kalitlari",
     "passkeysSubtitle": "Parolsiz kiring",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "Fayllarni qayta yuklash",
       "filterPlaceholder": "Fayl yo'li bo'yicha filtr",
       "viewedCount": "{{total}} tadan {{viewed}} tasi ko'rildi",
+      "viewedCount_one": "{{total}} tadan {{viewed}} tasi ko'rildi",
+      "viewedCount_other": "{{total}} tadan {{viewed}} tasi ko'rildi",
       "viewedOfListed": "ro'yxatdagi {{total}} ta fayldan {{viewed}} tasi ko'rildi",
+      "viewedOfListed_one": "ro'yxatdagi {{total}} ta fayldan {{viewed}} tasi ko'rildi",
+      "viewedOfListed_other": "ro'yxatdagi {{total}} ta fayldan {{viewed}} tasi ko'rildi",
       "loadingFiles": "{{total}} tadan {{loaded}} tasi yuklanmoqda…",
       "failedToLoadAllFiles": "Barcha fayllarni yuklab bo'lmadi.",
       "couldNotLoadMoreFiles": "Qolgan fayllarni yuklab bo'lmadi.",
@@ -1837,7 +1860,7 @@
       "cloningSession": "Sessiya klonlanmoqda",
       "couldNotLoadThisSession": "Bu sessiyani yuklab bo'lmadi.",
       "cloneFailedRetry": "Ushbu sessiyani klonlab bo'lmadi. Qayta urinib ko'ring.",
-      "notEnoughCredits": "Cloud Agent xizmatini ishga tushirish uchun kreditlar yetarli emas. Kreditlar qo'shing va qayta urinib ko'ring.",
+      "notEnoughCredits": "Bu so'rov uchun kreditlar yetarli emas. Kreditlar qo'shing va qayta urinib ko'ring.",
       "previousTaskFinishing": "Oldingi vazifa hali yakunlanmoqda. Biroz kuting.",
       "serviceUnavailable": "Xizmat hozir ishlamayapti. Qayta urinib ko'ring.",
       "connectionTrouble": "Ulanishda muammo yuz berdi. Birozdan keyin qayta urinib ko'ring.",
@@ -1947,7 +1970,7 @@
       "discardWithUploadsMessage": "So'rovingiz va hali hech bir xabarga biriktirilmagan yuklangan fayllar o'chiriladi.",
       "discardFailed": "Qoralamani bekor qilib bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "remoteHint": "Kompyuteringizda ishga tushirish uchun Kilo dasturini o'sha kompyuterda ishga tushiring va uni yoniq holatda qoldiring.",
-      "continueFrom": "{{title}} sessiyasi davom ettirilmoqda.",
+      "continueFrom": "“{{title}}” sessiyasi davom ettirilmoqda.",
       "importingSession": "Sessiya import qilinmoqda",
       "cliCannotContinue": "Bu CLI sessiyani davom ettira olmaydi. Cloud Agent xizmatini yoki boshqa CLI dasturini tanlang.",
       "importFailed": "Bu sessiyani import qilib bo'lmadi.",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "Tanlangan profil",
       "manualOverrides": "Qo'lda bekor qilish",
       "openSettingsToReview": "Ko‘rib chiqish uchun Sozlamalarni oching",
-      "profileSelection": "Profil tanlash"
+      "profileSelection": "Profil tanlash",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi.",
@@ -1999,6 +2023,8 @@
       "toolList": "ro'yxatni ko'rsatish",
       "toolPatch": "tuzatish kiritish",
       "toolTask": "vazifa",
+      "toolSendFile": "Fayl yuborildi",
+      "toolSendFileAction": "Fayl yuborish",
       "readTodos": "Rejani o‘qish",
       "updateTodos": "Rejani yangilash",
       "linesBadge": "{{displayCount}} qator",
@@ -2099,7 +2125,21 @@
       "thought": "Fikr",
       "showDetails": "Tafsilotlarni ko'rsatish",
       "pending": "Kutilmoqda…",
-      "running": "Bajarilmoqda…"
+      "running": "Bajarilmoqda…",
+      "field": {
+        "filePath": "Fayl yo'li",
+        "path": "Yo'l",
+        "offset": "Boshlanish",
+        "limit": "Chegara",
+        "pattern": "Shablon",
+        "include": "Kiritish",
+        "patchText": "Yamaq matni",
+        "query": "So'rov",
+        "prompt": "Ko'rsatma",
+        "header": "Sarlavha",
+        "question": "Savol",
+        "options": "Variantlar"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Mazmunni ko'rsatib bo'lmadi."
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "Suhbat model uchun juda uzun.",
       "assistantProviderError": "Provayder xato qaytardi.",
       "assistantProviderRefused": "Provayder bu so'rovni rad etdi va uni qayta urinish mumkin emas.",
-      "assistantCreditsRefusal": "Cloud Agent xizmatini ishga tushirish uchun kreditlar yetarli emas.",
+      "assistantCreditsRefusal": "Bu so'rov uchun kreditlar yetarli emas.",
       "assistantOutputLimit": "Javob modelning chiqish chegarasiga yetdi.",
       "assistantStructuredOutput": "Javob kerakli formatga mos kelmadi.",
       "assistantFailed": "Javobni yaratib bo'lmadi."
@@ -2260,7 +2300,7 @@
       "positionHint": "(1/{{displayCount}})",
       "movedPastPrompt": "Agent bu so'rov bosqichidan o'tdi. Sessiya davom etganda bu kartochka yopiladi.",
       "waitingForAnswer": "Agent javobingizni kutmoqda. Bu savol ochiq turganida agentga xabaringiz yuborilmay turadi.",
-      "waitingForPermission": "Agent ruxsat kutmoqda. Bu so'rov ochiq turganida agentga xabaringiz yuborilmay turadi."
+      "waitingForPermission": "Bu so'rov ochiq turganida agentga xabaringiz yuborilmay turadi."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3038,7 +3078,7 @@
       "provider": "To'xtatildi: provayder xatosi",
       "tool": "To'xtatildi: vosita xatosi",
       "cancelled": "To'xtatildi: bekor qilindi",
-      "other": "TO'XTATILGAN"
+      "other": "To'xtatilgan"
     }
   },
   "transcriptionModel": {
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "Mening agentim",
       "promptPlaceholder": "Siz ...",
       "tools": "Asboblar",
+      "wholeToolRule": "Bu agent bir vaqtning o'zida har bir asbobga bitta qoidani qo'llaydi: {{rule}}. Bu almashtirgichlar faqat o'qish uchun.",
       "visibility": "Ko'rinish",
       "visibilityPrimary": "Asosiy — tanlovchida ko'rsatilgan",
       "visibilitySubagent": "Subagent — faqat boshqalar tomonidan chaqirilishi mumkin",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "Repos uchun standart profillar",
+      "entryLabel": "Standart profillar",
       "add": "Standart qo‘shish",
       "empty": "Hech qanday standart sozlanmagan",
       "emptyDescription": "Repo uchun seanslarni boshlashda profilni avtomatik ravishda qo'llash uchun standartni qo'shing.",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "AI xulosasini yaratib bo‘lmadi. Tuzilgan holat nusxangiz baribir mavjud.",
     "scheduledContextEnabled": "Rejalashtirilgan brifinglar",
     "scheduledContextSettings": "Rejalashtirilgan brifinglar · {{context}}",
-    "scheduledContextHint": "Faqat shu kontekst uchun rejalashtirilgan qayd etish va pullik AI xulosalarini yoqing. Tanlangan, maxfiy ma’lumotlari olib tashlangan parchalar va tuzilgan faktlar modelingizga yuboriladi. Xulosalar brifing sozlamalarini o‘zingiz yangilaganingizda saqlangan ilova tilida tayyorlanadi. Ilova tilini o‘zgartirishning o‘zi xulosalar tilini avtomatik yangilamaydi. To‘lovlar shu kontekst balansidan olinadi. Faoliyat tanlanmagan holat nusxalarida AI ishlatilmaydi.",
+    "scheduledContextHint": "Faqat shu kontekst uchun rejalashtirilgan qayd etish va pullik AI xulosalarini yoqing. Tanlangan, maxfiy ma’lumotlari olib tashlangan parchalar va tuzilgan faktlar modelingizga yuboriladi. Xulosalar brifing sozlamalarini o‘zingiz yangilaganingizda saqlangan ilova tilida tayyorlanadi. To‘lovlar shu kontekst balansidan olinadi. Faoliyat tanlanmagan holat nusxalarida AI ishlatilmaydi.",
     "snapshotSafeguards": "Har bir xulosa uchun vaqt va xarajat cheklovlari har bir rejalashtirilgan holat nusxasiga alohida qo‘llanadi, bu kunlik byudjet emas.",
     "snapshotEstimateInputTooLarge": "Bu holat nusxasidagi dalillar hajmi tanlangan model uchun juda katta.",
-    "quietSnapshot": "Bu holat nusxasi uchun seans faoliyati tanlanmadi. Tanlash mavjud ma’lumotlar asosida imkon qadar amalga oshiriladi. AI xulosasi so‘ralmadi, model chaqirilmadi va to‘lov olinmadi.",
+    "quietSnapshot": "Bu holat nusxasi uchun seans faoliyati tanlanmadi. AI xulosasi so‘ralmadi va to‘lov olinmadi.",
     "noEnabledContexts": "Rejalashtirilgan brifinglar uchun hech bir kontekst yoqilmagan",
     "sourceBlocker": "Seans e’tibor talab qiladi",
     "sourceMetadata": "Qayd etilgan seans metama’lumotlari"

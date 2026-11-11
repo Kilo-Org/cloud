@@ -22,6 +22,8 @@
     "expired": "已过期"
   },
   "common": {
+    "sentenceJoiner": "。",
+    "listJoiner": "、",
     "cancel": "取消",
     "done": "完成",
     "retry": "重试",
@@ -227,6 +229,21 @@
     "pleaseEnterEmail": "请输入邮箱地址。",
     "or": "或"
   },
+  "pendingLink": {
+    "description": "已有账户在使用 {{email}}。请使用该账户的任一登录方式登录，以添加 {{provider}}。",
+    "emailCode": "通过邮件向我发送登录验证码",
+    "continueInBrowser": "在浏览器中继续",
+    "startAgain": "重新开始",
+    "expired": "添加 {{provider}} 的请求已过期。",
+    "noMethods": "此账户没有其他登录方式，因此无法添加 {{provider}}。",
+    "linked": "{{provider}} 已添加到你的账户。",
+    "failedExpired": "请求已过期，未能添加 {{provider}}。",
+    "failedWrongAccount": "你登录了其他账户，未能添加 {{provider}}。",
+    "failedAccountAlreadyLinked": "{{provider}} 已关联到其他账户，未能添加。",
+    "failedProviderAlreadyLinked": "你的账户已有另一个 {{provider}} 登录方式，未能添加 {{provider}}。",
+    "failedLinking": "无法将 {{provider}} 添加到你的账户。",
+    "notAdded": "你已登录，但未能将 {{provider}} 添加到你的账户。"
+  },
   "profile": {
     "codeReviewerSubtitle": "自动 PR 审查",
     "securityAgentSubtitle": "查找并修复漏洞",
@@ -265,6 +282,8 @@
     "providerTestAccount": "测试账户",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "企业 SSO",
     "passkeysTitle": "通行密钥",
     "passkeysSubtitle": "无需密码即可登录",
@@ -1299,7 +1318,7 @@
       "cloningSession": "正在克隆会话",
       "couldNotLoadThisSession": "无法加载此会话",
       "cloneFailedRetry": "无法克隆此会话。请重试。",
-      "notEnoughCredits": "额度不足，无法运行 Cloud Agent。请充值后重试。",
+      "notEnoughCredits": "额度不足，无法处理此请求。请充值后重试。",
       "previousTaskFinishing": "上一个任务正在收尾，请稍等。",
       "serviceUnavailable": "服务当前不可用。请重试。",
       "connectionTrouble": "连接出现问题。请稍后重试。",
@@ -1441,7 +1460,8 @@
       "selectedProfile": "选定的配置文件",
       "manualOverrides": "手动覆盖",
       "openSettingsToReview": "打开设置进行查看",
-      "profileSelection": "配置文件选择"
+      "profileSelection": "配置文件选择",
+      "profileLayerAccessibility": "{{label}}：{{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件。",
@@ -1461,6 +1481,8 @@
       "toolList": "列出目录",
       "toolPatch": "应用补丁",
       "toolTask": "任务",
+      "toolSendFile": "已发送文件",
+      "toolSendFileAction": "发送文件",
       "readTodos": "读取计划",
       "updateTodos": "更新计划",
       "linesBadge": "{{displayCount}} 行",
@@ -1561,7 +1583,21 @@
       "thought": "思考过程",
       "showDetails": "显示详情",
       "pending": "待处理……",
-      "running": "正在运行……"
+      "running": "正在运行……",
+      "field": {
+        "filePath": "文件路径",
+        "path": "路径",
+        "offset": "偏移量",
+        "limit": "上限",
+        "pattern": "模式",
+        "include": "包含",
+        "patchText": "补丁文本",
+        "query": "查询",
+        "prompt": "提示词",
+        "header": "标题",
+        "question": "问题",
+        "options": "选项"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "无法显示内容。"
@@ -1577,7 +1613,7 @@
       "assistantContextOverflow": "对话长度已超出模型的处理范围。",
       "assistantProviderError": "提供商返回了错误。",
       "assistantProviderRefused": "提供商拒绝了该请求，且无法重试。",
-      "assistantCreditsRefusal": "额度不足，无法运行 Cloud Agent。",
+      "assistantCreditsRefusal": "额度不足，无法处理此请求。",
       "assistantOutputLimit": "回复已达到模型的输出上限。",
       "assistantStructuredOutput": "回复与所需格式不匹配。",
       "assistantFailed": "生成回复失败。"
@@ -1722,7 +1758,7 @@
       "positionHint": "（第 1 项，共 {{displayCount}} 项）",
       "movedPastPrompt": "智能体已不再等待此处的输入。会话继续后，此卡片将关闭。",
       "waitingForAnswer": "智能体正在等待你的回答。在你回答此问题前，发给智能体的消息将暂停发送。",
-      "waitingForPermission": "智能体正在等待授权。在你处理此请求前，发给智能体的消息将暂停发送。"
+      "waitingForPermission": "在你处理此请求前，发给智能体的消息将暂停发送。"
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}，{{taskName}}{{modelLabel}}，{{latestActivityLabel}}，{{status}}",
@@ -2450,7 +2486,11 @@
       "retryLoadingMoreFiles": "重新加载更多文件",
       "title": "文件",
       "viewedCount": "已查看 {{viewed}}/{{total}}",
-      "viewedOfListed": "所列文件：已查看 {{viewed}}/{{total}}"
+      "viewedCount_one": "已查看 {{viewed}}/{{total}}",
+      "viewedCount_other": "已查看 {{viewed}}/{{total}}",
+      "viewedOfListed": "所列文件：已查看 {{viewed}}/{{total}}",
+      "viewedOfListed_one": "所列文件：已查看 {{viewed}}/{{total}}",
+      "viewedOfListed_other": "所列文件：已查看 {{viewed}}/{{total}}"
     },
     "fileRows": {
       "collapseFile": "折叠文件",
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "我的代理",
       "promptPlaceholder": "你是一个...",
       "tools": "工具",
+      "wholeToolRule": "此智能体会同时对每个工具应用一条规则：{{rule}}。这些开关为只读状态。",
       "visibility": "可见性",
       "visibilityPrimary": "主代理 — 显示在选择器中",
       "visibilitySubagent": "子代理 — 仅可由其他代理调用",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "仓库的默认配置文件",
+      "entryLabel": "默认配置",
       "add": "添加默认值",
       "empty": "没有配置默认值",
       "emptyDescription": "添加默认值以在启动仓库会话时自动应用配置文件。",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "AI 摘要生成失败。你的结构化快照仍可查看。",
     "scheduledContextEnabled": "定时简报",
     "scheduledContextSettings": "定时简报 · {{context}}",
-    "scheduledContextHint": "仅为此上下文启用定时采集和付费 AI 摘要。经选择和脱敏的摘录及结构化信息将发送给你的模型。摘要使用你明确更改简报偏好设置时保存的应用语言，不会随应用语言的变化自动同步。费用从此上下文的余额中扣除。无活动的快照不使用 AI。",
+    "scheduledContextHint": "仅为此上下文启用定时采集和付费 AI 摘要。经选择和脱敏的摘录及结构化信息将发送给你的模型。摘要使用你更新简报偏好设置时保存的应用语言。费用从此上下文的余额中扣除。无活动的快照不使用 AI。",
     "snapshotSafeguards": "每份摘要的时间和花费保护上限适用于每个定时快照，并非每日预算。",
     "snapshotEstimateInputTooLarge": "此快照的证据量超出所选模型可处理的范围。",
-    "quietSnapshot": "此次快照已尽力筛选，但未选中任何会话活动。未调用 AI 生成摘要，也未产生费用。",
+    "quietSnapshot": "此次快照未选中任何会话活动。未请求 AI 摘要，也未产生费用。",
     "noEnabledContexts": "未为定时简报启用任何上下文",
     "sourceBlocker": "会话需要关注",
     "sourceMetadata": "已采集的会话元数据"

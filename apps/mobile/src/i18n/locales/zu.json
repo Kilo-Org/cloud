@@ -22,6 +22,8 @@
     "expired": "Kuphelelwe yisikhathi"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Khansela",
     "done": "Kwenziwe",
     "retry": "Zama futhi",
@@ -227,6 +229,21 @@
     "signInCodeField": "Ikhodi yokungena",
     "or": "noma"
   },
+  "pendingLink": {
+    "description": "I-akhawunti isivele isebenzisa i-{{email}}. Ngena ngenye yezindlela zayo ukuze wengeze i-{{provider}}.",
+    "emailCode": "Ngithumelele ikhodi yokungena nge-imeyili",
+    "continueInBrowser": "Qhubeka esipheqululini",
+    "startAgain": "Qala futhi",
+    "expired": "Lesi sicelo sokwengeza i-{{provider}} siphelelwe yisikhathi.",
+    "noMethods": "Le akhawunti ayinayo enye indlela yokungena, ngakho i-{{provider}} ayikwazi ukwengezwa.",
+    "linked": "I-{{provider}} yengezwe ku-akhawunti yakho.",
+    "failedExpired": "I-{{provider}} ayizange yengezwe ngoba isicelo siphelelwe yisikhathi.",
+    "failedWrongAccount": "I-{{provider}} ayizange yengezwe ngoba ungene kwenye i-akhawunti.",
+    "failedAccountAlreadyLinked": "I-{{provider}} ayizange yengezwe ngoba isivele ixhunywe kwenye i-akhawunti.",
+    "failedProviderAlreadyLinked": "I-{{provider}} ayizange yengezwe ngoba i-akhawunti yakho isivele inokungena okuhlukile kwe-{{provider}}.",
+    "failedLinking": "I-{{provider}} ayikwazanga ukwengezwa ku-akhawunti yakho.",
+    "notAdded": "Ungenile. I-{{provider}} ayizange yengezwe ku-akhawunti yakho."
+  },
   "profile": {
     "codeReviewerSubtitle": "Ukuhlolwa kwe-PR okuzenzakalelayo",
     "securityAgentSubtitle": "Thola futhi ulungise ubungozi",
@@ -265,6 +282,8 @@
     "providerTestAccount": "I-akhawunti yokuhlola",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO yebhizinisi",
     "passkeysTitle": "Amakhiye okungena",
     "passkeysSubtitle": "Ngena ngaphandle kwephasiwedi",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "Zama futhi ukulayisha amafayela",
       "filterPlaceholder": "Umzila wefayela",
       "viewedCount": "kubukwe angu-{{viewed}} kwangu-{{total}}",
+      "viewedCount_one": "kubukwe angu-{{viewed}} kwangu-{{total}}",
+      "viewedCount_other": "kubukwe angu-{{viewed}} kwangu-{{total}}",
       "viewedOfListed": "kubukwe angu-{{viewed}} kwangu-{{total}} asohlwini",
+      "viewedOfListed_one": "kubukwe angu-{{viewed}} kwangu-{{total}} asohlwini",
+      "viewedOfListed_other": "kubukwe angu-{{viewed}} kwangu-{{total}} asohlwini",
       "loadingFiles": "Kulayishwa angu-{{loaded}} kwangu-{{total}}…",
       "failedToLoadAllFiles": "Asikwazanga ukulayisha wonke amafayela.",
       "couldNotLoadMoreFiles": "Asikwazanga ukulayisha amanye amafayela.",
@@ -1353,15 +1376,12 @@
       "repoSummaryOpen": "{{displayCount}} okungakaxazululwa",
       "repoSummaryOpen_one": "{{displayCount}} okungakaxazululwa",
       "repoSummaryOpen_other": "{{displayCount}} okungakaxazululwa",
-      "repoSummaryOpen_zero": "{{displayCount}} okungakaxazululwa",
       "repoSummaryCritical": "{{displayCount}} okubucayi kakhulu",
       "repoSummaryCritical_one": "{{displayCount}} okubucayi kakhulu",
       "repoSummaryCritical_other": "{{displayCount}} okubucayi kakhulu",
-      "repoSummaryCritical_zero": "{{displayCount}} okubucayi kakhulu",
       "repoSummaryHigh": "{{displayCount}} okunobucayi obuphezulu",
       "repoSummaryHigh_one": "{{displayCount}} okunobucayi obuphezulu",
       "repoSummaryHigh_other": "{{displayCount}} okunobucayi obuphezulu",
-      "repoSummaryHigh_zero": "{{displayCount}} okunobucayi obuphezulu",
       "couldNotLoad": "Asikwazanga ukulayisha idatha yedeshibhodi.",
       "filterByRepository": "Hlunga ngenqolobane yekhodi",
       "lastSynced": "Kuvumelaniswe okokugcina {{time}}",
@@ -1393,15 +1413,12 @@
       "breakdownCritical": "{{displayCount}} okubucayi",
       "breakdownCritical_one": "{{displayCount}} okubucayi",
       "breakdownCritical_other": "{{displayCount}} okubucayi",
-      "breakdownCritical_zero": "{{displayCount}} okubucayi",
       "breakdownHigh": "{{displayCount}} okuphezulu",
       "breakdownHigh_one": "{{displayCount}} okuphezulu",
       "breakdownHigh_other": "{{displayCount}} okuphezulu",
-      "breakdownHigh_zero": "{{displayCount}} okuphezulu",
       "breakdownMediumLow": "{{displayCount}} obumaphakathi nobuphansi",
       "breakdownMediumLow_one": "{{displayCount}} obumaphakathi nobuphansi",
       "breakdownMediumLow_other": "{{displayCount}} obumaphakathi nobuphansi",
-      "breakdownMediumLow_zero": "{{displayCount}} obumaphakathi nobuphansi",
       "dueThisWeek": "Kufanele kwenziwe kuleli sonto",
       "dueThisWeekDetail": "Okungu-{{exploitable}} kulawa kuqinisekiswe ukuthi kungasetshenziswa ekuhlaseleni",
       "dueThisWeekDetail_one": "Okungu-{{exploitable}} kulawa kuqinisekiswe ukuthi kungasetshenziswa ekuhlaseleni",
@@ -1843,7 +1860,7 @@
       "cloningSession": "Iseshini iyakopishwa",
       "couldNotLoadThisSession": "Asikwazanga ukulayisha le seshini.",
       "cloneFailedRetry": "Asikwazanga ukwenza ikhophi yale seshini. Zama futhi.",
-      "notEnoughCredits": "Awekho amakhredithi anele okusebenzisa i-Cloud Agent. Engeza amakhredithi bese uzama futhi.",
+      "notEnoughCredits": "Awekho amakhredithi anele kulesi sicelo. Engeza amakhredithi bese uzama futhi.",
       "previousTaskFinishing": "Umsebenzi wangaphambilini usaphethwa. Sicela ulinde isikhashana.",
       "serviceUnavailable": "Isevisi ayitholakali njengamanje. Sicela uzame futhi.",
       "connectionTrouble": "Kunenkinga yokuxhumana. Sicela uzame futhi ngemva kwesikhashana.",
@@ -1953,7 +1970,7 @@
       "discardWithUploadsMessage": "Isicelo sakho namafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe kuzosuswa.",
       "discardFailed": "Asikwazanga ukulahla okusalungiswa. Sicela uzame futhi.",
       "remoteHint": "Ukuze isebenze kukhompyutha yakho, qalisa i-Kilo lapho bese uyigcina isebenza.",
-      "continueFrom": "Kuqhutshekwa neseshini ethi {{title}}.",
+      "continueFrom": "Kuqhutshekwa neseshini ethi “{{title}}”.",
       "importingSession": "Iseshini iyangeniswa",
       "cliCannotContinue": "Le CLI ayikwazi ukuqhubeka neseshini. Khetha i-Cloud Agent noma enye i-CLI.",
       "importFailed": "Asikwazanga ukungenisa le seshini.",
@@ -1985,7 +2002,8 @@
       "selectedProfile": "Iphrofayili ekhethiwe",
       "manualOverrides": "Ukukhipha mathupha",
       "openSettingsToReview": "Vula Izilungiselelo ukuze ubuyekeze",
-      "profileSelection": "Ukukhetha iphrofayela"
+      "profileSelection": "Ukukhetha iphrofayela",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}.",
@@ -2005,6 +2023,8 @@
       "toolList": "bhala uhlu",
       "toolPatch": "lungisa",
       "toolTask": "umsebenzi",
+      "toolSendFile": "Kuthunyelwe ifayela",
+      "toolSendFileAction": "Thumela ifayela",
       "readTodos": "Funda uhlelo",
       "updateTodos": "Buyekeza uhlelo",
       "linesBadge": "imigqa engu-{{displayCount}}",
@@ -2105,7 +2125,21 @@
       "thought": "Umcabango",
       "showDetails": "Bonisa imininingwane",
       "pending": "Iyalinda…",
-      "running": "Iyasebenza…"
+      "running": "Iyasebenza…",
+      "field": {
+        "filePath": "Indlela yefayela",
+        "path": "Indlela",
+        "offset": "Isiqalo",
+        "limit": "Umkhawulo",
+        "pattern": "Iphethini",
+        "include": "Okufakiwe",
+        "patchText": "Umbhalo wesichibiyelo",
+        "query": "Umbuzo wokusesha",
+        "prompt": "Umyalelo",
+        "header": "Isihloko",
+        "question": "Umbuzo",
+        "options": "Izinketho"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Asikwazanga ukubonisa okuqukethwe."
@@ -2121,7 +2155,7 @@
       "assistantContextOverflow": "Ingxoxo iyinde kakhulu kumodeli.",
       "assistantProviderError": "Umhlinzeki ubuyise iphutha.",
       "assistantProviderRefused": "Umhlinzeki wenqabe lesi sicelo futhi asikwazi ukuphinda sizanywe.",
-      "assistantCreditsRefusal": "Awekho amakhredithi anele okusebenzisa i-Cloud Agent.",
+      "assistantCreditsRefusal": "Awekho amakhredithi anele kulesi sicelo.",
       "assistantOutputLimit": "Impendulo ifinyelele emkhawuleni wokukhipha womodeli.",
       "assistantStructuredOutput": "Impendulo ayihambisani nomumo odingekile.",
       "assistantFailed": "Impendulo yehlulekile."
@@ -2266,7 +2300,7 @@
       "positionHint": "(1 kwangu-{{displayCount}})",
       "movedPastPrompt": "Umenzeli usedlulile kulesi sicelo. Leli khadi lizovaleka lapho iseshini iqhubeka.",
       "waitingForAnswer": "Umenzeli ulinde impendulo yakho. Ukuthunyelwa komlayezo wakho kumenzeli kumisiwe ngenkathi lo mbuzo uvulekile.",
-      "waitingForPermission": "Umenzeli ulinde imvume. Ukuthunyelwa komlayezo wakho kumenzeli kumisiwe ngenkathi lesi sicelo sivulekile."
+      "waitingForPermission": "Ukuthunyelwa komlayezo wakho kumenzeli kumisiwe ngenkathi lesi sicelo sivulekile."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3044,7 +3078,7 @@
       "provider": "Kumisiwe: iphutha lomhlinzeki",
       "tool": "Kumisiwe: iphutha lethuluzi",
       "cancelled": "Kumisiwe: kukhanseliwe",
-      "other": "IMISIWE"
+      "other": "Imisiwe"
     }
   },
   "transcriptionModel": {
@@ -3537,6 +3571,7 @@
       "namePlaceholder": "Umenzeli wami",
       "promptPlaceholder": "Uyi...",
       "tools": "Amathuluzi",
+      "wholeToolRule": "Le ejenti isebenzisa umthetho owodwa kwithuluzi ngalinye ngasikhathi sinye: {{rule}}. Lawa maswishi afundwa kuphela.",
       "visibility": "Ukubonakala",
       "visibilityPrimary": "Okuyinhloko — kukhonjiswe kusikhi",
       "visibilitySubagent": "I-Subagent — itholakala kuphela kwabanye",
@@ -3577,7 +3612,8 @@
       "duplicateName": "Umyalo onaleli gama isivele ukhona kuleli phrofayili"
     },
     "repoBindings": {
-      "title": "Amaphrofayili Azenzakalelayo we-Repos",
+      "title": "Amaphrofayili azenzakalelayo we-Repos",
+      "entryLabel": "Amaphrofayili azenzakalelayo",
       "add": "Engeza okuzenzakalelayo",
       "empty": "Akukho okumisiwe okumisiwe",
       "emptyDescription": "Engeza okuzenzakalelayo ukuze usebenzise ngokuzenzakalelayo iphrofayela lapho uqala izikhathi ze-repo.",
@@ -3778,10 +3814,10 @@
     "snapshotSummaryFailed": "Isifinyezo se-AI sehlulekile. Umbiko wakho wesimo onamaqiniso ahleliwe usatholakala.",
     "scheduledContextEnabled": "Imibiko ehleliwe",
     "scheduledContextSettings": "Imibiko ehleliwe · {{context}}",
-    "scheduledContextHint": "Vula ukuqoqwa kwesimo okuhleliwe nezifinyezo ze-AI ezikhokhelwayo kulo mongo kuphela. Izingcaphuno ezikhethiwe okususwe kuzo imininingwane ebucayi kanye namaqiniso ahleliwe kuthunyelwa kumodeli yakho. Izifinyezo zisebenzisa ulimi lwe-app olulondolozwa kuphela lapho ushintsha izilungiselelo zombiko ngokwakho. Lolu limi olulondoloziwe alushintshi ngokuzenzakalelayo lapho ushintsha ulimi lwe-app. Izindleko zisebenzisa ibhalansi yalo mongo. Imibiko yesimo engenamsebenzi okhethiwe ayisebenzisi i-AI.",
+    "scheduledContextHint": "Vula ukuqoqwa kwesimo okuhleliwe nezifinyezo ze-AI ezikhokhelwayo kulo mongo kuphela. Izingcaphuno ezikhethiwe okususwe kuzo imininingwane ebucayi kanye namaqiniso ahleliwe kuthunyelwa kumodeli yakho. Izifinyezo zisebenzisa ulimi lwe-app olulondolozwa lapho ushintsha izilungiselelo zombiko. Izindleko zisebenzisa ibhalansi yalo mongo. Imibiko yesimo engenamsebenzi okhethiwe ayisebenzisi i-AI.",
     "snapshotSafeguards": "Imikhawulo yesikhathi neyezindleko yesifinyezo ngasinye isebenza embikweni wesimo ngamunye ohleliwe, hhayi njengesabelomali sansuku zonke.",
     "snapshotEstimateInputTooLarge": "Lo mbiko wesimo unobufakazi obuningi kakhulu kunalokho imodeli ekhethiwe engakusingatha.",
-    "quietSnapshot": "Awukho umsebenzi weseshini okhethelwe lo mbiko wesimo ekukhethweni okwenziwe ngokusemandleni. Akucelwanga isifinyezo se-AI, akubizwanga imodeli ye-AI futhi akukho nkokhelo ekhokhisiwe.",
+    "quietSnapshot": "Awukho umsebenzi weseshini okhethelwe lo mbiko wesimo. Akucelwanga isifinyezo se-AI futhi akukho nkokhelo ekhokhisiwe.",
     "noEnabledContexts": "Ayikho imongo evulelwe imibiko ehleliwe",
     "sourceBlocker": "Iseshini idinga ukunakwa",
     "sourceMetadata": "Imethadatha yeseshini eqoqiwe"

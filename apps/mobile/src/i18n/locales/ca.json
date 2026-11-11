@@ -22,6 +22,8 @@
     "expired": "Caducada"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Cancel·la",
     "done": "Fet",
     "retry": "Torna-ho a provar",
@@ -227,6 +229,21 @@
     "signInCodeField": "Codi d'inici de sessió",
     "or": "o"
   },
+  "pendingLink": {
+    "description": "Ja hi ha un compte que utilitza {{email}}. Inicia la sessió amb un dels seus mètodes per afegir {{provider}}.",
+    "emailCode": "Envia'm un codi d'inici de sessió per correu",
+    "continueInBrowser": "Continua al navegador",
+    "startAgain": "Torna a començar",
+    "expired": "Aquesta sol·licitud per afegir {{provider}} ha caducat.",
+    "noMethods": "Aquest compte no té cap altre mètode d'inici de sessió, així que no es pot afegir {{provider}}.",
+    "linked": "S'ha afegit {{provider}} al teu compte.",
+    "failedExpired": "No s'ha afegit {{provider}} perquè la sol·licitud ha caducat.",
+    "failedWrongAccount": "No s'ha afegit {{provider}} perquè has iniciat la sessió en un altre compte.",
+    "failedAccountAlreadyLinked": "No s'ha afegit {{provider}} perquè ja està vinculat a un altre compte.",
+    "failedProviderAlreadyLinked": "No s'ha afegit {{provider}} perquè el teu compte ja té un altre inici de sessió amb {{provider}}.",
+    "failedLinking": "No s'ha pogut afegir {{provider}} al teu compte.",
+    "notAdded": "Has iniciat la sessió. No s'ha afegit {{provider}} al teu compte."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revisions automàtiques de PR",
     "securityAgentSubtitle": "Troba i corregeix vulnerabilitats",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Compte de prova",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO d'empresa",
     "passkeysTitle": "Claus d'accés",
     "passkeysSubtitle": "Inicia la sessió sense contrasenya",
@@ -343,7 +362,13 @@
       "retryLoadingFiles": "Torna a carregar els fitxers",
       "filterPlaceholder": "Ruta dels fitxers",
       "viewedCount": "{{viewed}} de {{total}} vistos",
+      "viewedCount_one": "{{viewed}} de {{total}} vistos",
+      "viewedCount_many": "{{viewed}} de {{total}} vistos",
+      "viewedCount_other": "{{viewed}} de {{total}} vistos",
       "viewedOfListed": "{{viewed}} de {{total}} fitxers de la llista vistos",
+      "viewedOfListed_one": "{{viewed}} de {{total}} fitxers de la llista vistos",
+      "viewedOfListed_many": "{{viewed}} de {{total}} fitxers de la llista vistos",
+      "viewedOfListed_other": "{{viewed}} de {{total}} fitxers de la llista vistos",
       "loadingFiles": "S'estan carregant {{loaded}} de {{total}}…",
       "failedToLoadAllFiles": "No s'han pogut carregar tots els fitxers.",
       "couldNotLoadMoreFiles": "No s'han pogut carregar més fitxers.",
@@ -1876,7 +1901,7 @@
       "cloningSession": "Clonant la sessió…",
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió.",
       "cloneFailedRetry": "No s'ha pogut clonar aquesta sessió. Torna-ho a provar.",
-      "notEnoughCredits": "No tens prou crèdits per executar Cloud Agent. Afegeix crèdits i torna-ho a provar.",
+      "notEnoughCredits": "No tens prou crèdits per a aquesta sol·licitud. Afegeix crèdits i torna-ho a provar.",
       "previousTaskFinishing": "La tasca anterior encara no ha acabat. Espera un moment.",
       "serviceUnavailable": "El servei no està disponible ara mateix. Torna-ho a provar.",
       "connectionTrouble": "Hi ha problemes de connexió. Torna-ho a provar d'aquí a un moment.",
@@ -1986,7 +2011,7 @@
       "discardWithUploadsMessage": "S'eliminaran el teu missatge i els fitxers penjats que no s'hagin adjuntat a missatges enviats.",
       "discardFailed": "No s'ha pogut descartar l'esborrany. Torna-ho a provar.",
       "remoteHint": "Per executar-lo al teu ordinador, inicia Kilo allà i deixa'l en execució.",
-      "continueFrom": "S'està continuant la sessió {{title}}.",
+      "continueFrom": "S'està continuant la sessió «{{title}}».",
       "importingSession": "Important la sessió…",
       "cliCannotContinue": "Aquest CLI no pot continuar una sessió. Tria Cloud Agent o un altre CLI.",
       "importFailed": "No s'ha pogut importar aquesta sessió.",
@@ -2018,7 +2043,8 @@
       "selectedProfile": "Perfil seleccionat",
       "manualOverrides": "Anul·lació manual",
       "openSettingsToReview": "Obriu Configuració per revisar-lo",
-      "profileSelection": "Selecció de perfil"
+      "profileSelection": "Selecció de perfil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "S'ha actualitzat {{displayCount}} fitxer.",
@@ -2039,6 +2065,8 @@
       "toolList": "llista",
       "toolPatch": "aplica un pedaç",
       "toolTask": "tasca",
+      "toolSendFile": "Fitxer enviat",
+      "toolSendFileAction": "envia fitxer",
       "readTodos": "Llegeix el pla",
       "updateTodos": "Actualitza el pla",
       "linesBadge": "{{displayCount}} línies",
@@ -2142,7 +2170,21 @@
       "thought": "Raonament",
       "showDetails": "Mostra els detalls",
       "pending": "Pendent…",
-      "running": "En execució…"
+      "running": "En execució…",
+      "field": {
+        "filePath": "Camí del fitxer",
+        "path": "Camí",
+        "offset": "Desplaçament",
+        "limit": "Límit",
+        "pattern": "Patró",
+        "include": "Inclusió",
+        "patchText": "Text del pedaç",
+        "query": "Consulta",
+        "prompt": "Indicació",
+        "header": "Encapçalament",
+        "question": "Pregunta",
+        "options": "Opcions"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "No s'ha pogut mostrar el contingut."
@@ -2158,7 +2200,7 @@
       "assistantContextOverflow": "La conversa és massa llarga per al model.",
       "assistantProviderError": "El proveïdor ha retornat un error.",
       "assistantProviderRefused": "El proveïdor ha rebutjat aquesta sol·licitud i no es pot tornar a intentar.",
-      "assistantCreditsRefusal": "No tens prou crèdits per executar Cloud Agent.",
+      "assistantCreditsRefusal": "No tens prou crèdits per a aquesta sol·licitud.",
       "assistantOutputLimit": "La resposta ha arribat al límit de sortida del model.",
       "assistantStructuredOutput": "La resposta no coincideix amb el format requerit.",
       "assistantFailed": "No s'ha pogut generar la resposta."
@@ -2303,7 +2345,7 @@
       "positionHint": "(1 de {{displayCount}})",
       "movedPastPrompt": "L'agent ja no espera una resposta a aquesta sol·licitud. Aquesta targeta es tancarà quan la sessió continuï.",
       "waitingForAnswer": "L'agent espera la teva resposta. Mentre la pregunta estigui pendent, l'enviament del teu missatge a l'agent queda en pausa.",
-      "waitingForPermission": "L'agent espera permís per continuar. Mentre la sol·licitud estigui pendent, l'enviament del teu missatge a l'agent queda en pausa."
+      "waitingForPermission": "Mentre la sol·licitud estigui pendent, l'enviament del teu missatge a l'agent queda en pausa."
     },
     "childSession": {
       "accessibilityLabel": "Agent {{agentName}}, tasca {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3090,7 +3132,7 @@
       "provider": "Aturat: error del proveïdor",
       "tool": "Aturat: error de l'eina",
       "cancelled": "Aturat: cancel·lat",
-      "other": "ATURAT"
+      "other": "Aturat"
     }
   },
   "transcriptionModel": {
@@ -3590,6 +3632,7 @@
       "namePlaceholder": "El meu agent",
       "promptPlaceholder": "Ets un...",
       "tools": "Eines",
+      "wholeToolRule": "Aquest agent aplica una regla a cada eina alhora: {{rule}}. Aquests interruptors són de només lectura.",
       "visibility": "Visibilitat",
       "visibilityPrimary": "Principal — es mostra al selector",
       "visibilitySubagent": "Subagent — només es pot trucar des d'altres",
@@ -3631,6 +3674,7 @@
     },
     "repoBindings": {
       "title": "Perfils predeterminats per a Repos",
+      "entryLabel": "Perfils predeterminats",
       "add": "Afegeix per defecte",
       "empty": "No s'ha configurat cap valor predeterminat",
       "emptyDescription": "Afegiu un valor predeterminat per aplicar automàticament un perfil quan inicieu sessions per a un repo.",
@@ -3792,11 +3836,11 @@
     "offline": "Sense connexió · informe desat",
     "cached": "Informe desat · no es pot actualitzar",
     "window": "{{start}} – {{end}}",
-    "summary": "Resum d'AI",
-    "summaryPending": "El resum d'AI està en curs. S'adjuntarà aquí quan estigui llest.",
-    "summaryUnavailable": "El resum d'AI no està disponible. L'informe estructurat continua disponible.",
-    "summaryCharge": "Càrrec d'AI: {{cost}}",
-    "summaryChargePending": "Càrrec d'AI pendent de conciliació",
+    "summary": "Resum d'IA",
+    "summaryPending": "El resum d'IA està en curs. S'adjuntarà aquí quan estigui llest.",
+    "summaryUnavailable": "El resum d'IA no està disponible. L'informe estructurat continua disponible.",
+    "summaryCharge": "Càrrec d'IA: {{cost}}",
+    "summaryChargePending": "Càrrec d'IA pendent de conciliació",
     "sources": "Proves i artefactes",
     "timezone": "Zona horària de l'informe",
     "deviceTimezone": "Usa la zona horària del dispositiu",
@@ -3807,7 +3851,7 @@
     "morningEnd": "Informe disponible fins a les",
     "timeHint": "La targeta d'Inici torna a l'estat en directe quan acaba la finestra de l'informe, fins i tot sense connexió.",
     "invalidSchedule": "Tria una zona horària vàlida i una finestra de l'informe no buida.",
-    "notificationsHint": "Una notificació genèrica per cada informe programat. Independent dels resums d'AI de pagament.",
+    "notificationsHint": "Una notificació genèrica per cada informe programat. Independent dels resums d'IA de pagament.",
     "notificationPermission": "Activa les notificacions del dispositiu a $t(common.notifications) per rebre l'informe.",
     "defaultModel": "Usa el model per defecte de Kilo",
     "duration": "Límit de temps (minuts)",
@@ -3816,7 +3860,7 @@
     "estimate": "Estimació {{estimate}} · màxim {{maximum}}",
     "estimateUnavailable": "No hi ha cap resum de pagament disponible per a aquesta configuració.",
     "confirmPaid": "Vols activar els resums de pagament per a {{context}}?",
-    "paidDisclosure": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} minuts. Els càrrecs s'apliquen encara que la generació falli.",
+    "paidDisclosure": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
     "enable": "Activa els resums de pagament",
     "allContexts": "Els informes personals i d'organització es mantenen separats.",
     "emptyHistory": "No hi ha informes desats",
@@ -3832,13 +3876,13 @@
     "capturedAt": "Capturada {{time}}",
     "snapshotHint": "Instantània de l'últim estat disponible de les sessions, capturada al matí a l'hora programada. Pot ser incompleta. Els recomptes descriuen les sessions seleccionades, no tota l'activitat nocturna.",
     "snapshotTruncated": "S'han omès algunes sessions o proves per limitar la mida d'aquesta instantània.",
-    "snapshotSummaryFailed": "El resum d'AI ha fallat. La instantània estructurada continua disponible.",
+    "snapshotSummaryFailed": "El resum d'IA ha fallat. La instantània estructurada continua disponible.",
     "scheduledContextEnabled": "Informes programats",
     "scheduledContextSettings": "Informes programats · {{context}}",
-    "scheduledContextHint": "Activa la captura programada i els resums d'AI de pagament només per a aquest context. S'envien al teu model fragments seleccionats amb les dades sensibles ocultes i dades estructurades. Els resums usen l'idioma de l'app desat quan canvies explícitament la configuració de l'informe. Aquest idioma no s'actualitza automàticament quan canvies l'idioma de l'app. Els càrrecs usen el saldo d'aquest context. Les instantànies sense activitat no usen AI.",
+    "scheduledContextHint": "Activa la captura programada i els resums d'IA de pagament només per a aquest context. S'envien al teu model fragments seleccionats amb les dades sensibles ocultes i dades estructurades. Els resums usen l'idioma de l'app desat quan actualitzes la configuració de l'informe. Els càrrecs usen el saldo d'aquest context. Les instantànies sense activitat no usen IA.",
     "snapshotSafeguards": "Els límits de temps i despesa per resum s'apliquen a cada instantània programada; no són un pressupost diari.",
     "snapshotEstimateInputTooLarge": "Aquesta instantània conté massa proves per al model seleccionat.",
-    "quietSnapshot": "No s'ha seleccionat cap activitat de sessió per a aquesta instantània. La selecció pot ser incompleta. No s'ha fet cap crida al model ni s'ha cobrat cap resum d'AI.",
+    "quietSnapshot": "No s'ha seleccionat cap activitat de sessió per a aquesta instantània. No s'ha sol·licitat ni s'ha cobrat cap resum d'IA.",
     "noEnabledContexts": "No hi ha cap context activat per als informes programats",
     "sourceBlocker": "La sessió requereix atenció",
     "sourceMetadata": "Metadades de sessió capturades"

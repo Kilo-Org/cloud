@@ -22,6 +22,8 @@
     "expired": "期限切れ"
   },
   "common": {
+    "sentenceJoiner": "。",
+    "listJoiner": "、",
     "cancel": "キャンセル",
     "done": "完了",
     "retry": "再試行",
@@ -227,6 +229,21 @@
     "pleaseEnterEmail": "メールアドレスを入力してください。",
     "or": "または"
   },
+  "pendingLink": {
+    "description": "{{email}} を使用するアカウントがすでにあります。{{provider}} を追加するには、そのアカウントのいずれかの方法でサインインしてください。",
+    "emailCode": "サインインコードをメールで送信",
+    "continueInBrowser": "ブラウザーで続行",
+    "startAgain": "最初からやり直す",
+    "expired": "{{provider}} を追加するこのリクエストは期限切れです。",
+    "noMethods": "このアカウントには他のサインイン方法がないため、{{provider}} を追加できません。",
+    "linked": "{{provider}} がアカウントに追加されました。",
+    "failedExpired": "リクエストの期限が切れたため、{{provider}} は追加されませんでした。",
+    "failedWrongAccount": "別のアカウントにサインインしたため、{{provider}} は追加されませんでした。",
+    "failedAccountAlreadyLinked": "{{provider}} はすでに別のアカウントにリンクされているため、追加されませんでした。",
+    "failedProviderAlreadyLinked": "アカウントにすでに別の {{provider}} サインインがあるため、{{provider}} は追加されませんでした。",
+    "failedLinking": "{{provider}} をアカウントに追加できませんでした。",
+    "notAdded": "サインインしました。{{provider}} はアカウントに追加されませんでした。"
+  },
   "profile": {
     "codeReviewerSubtitle": "PRの自動レビュー",
     "securityAgentSubtitle": "脆弱性を検出して修正",
@@ -265,6 +282,8 @@
     "providerTestAccount": "テストアカウント",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "エンタープライズSSO",
     "passkeysTitle": "パスキー",
     "passkeysSubtitle": "パスワードなしでサインイン",
@@ -1299,7 +1318,7 @@
       "cloningSession": "セッションを複製中",
       "couldNotLoadThisSession": "このセッションを読み込めませんでした。",
       "cloneFailedRetry": "このセッションを複製できませんでした。もう一度お試しください。",
-      "notEnoughCredits": "Cloud Agentを実行するためのクレジットが不足しています。クレジットを追加して、もう一度お試しください。",
+      "notEnoughCredits": "このリクエストに必要なクレジットが不足しています。クレジットを追加して、もう一度お試しください。",
       "previousTaskFinishing": "前のタスクの終了処理中です。少々お待ちください。",
       "serviceUnavailable": "サービスは現在利用できません。もう一度お試しください。",
       "connectionTrouble": "接続に問題があります。しばらくしてから、もう一度お試しください。",
@@ -1409,7 +1428,7 @@
       "discardWithUploadsMessage": "プロンプトと、送信済みメッセージに添付されていないアップロード済みファイルは削除されます。",
       "discardFailed": "下書きを破棄できませんでした。もう一度お試しください。",
       "remoteHint": "お使いのコンピューターで実行するには、そのコンピューターでKiloを起動し、起動したままにしておいてください。",
-      "continueFrom": "{{title}}を続行しています。",
+      "continueFrom": "「{{title}}」を続行しています。",
       "importingSession": "セッションをインポート中",
       "cliCannotContinue": "このCLIではセッションを続行できません。Cloud Agentまたは別のCLIを選択してください。",
       "importFailed": "このセッションをインポートできませんでした。",
@@ -1441,7 +1460,8 @@
       "selectedProfile": "選択したプロフィール",
       "manualOverrides": "手動オーバーライド",
       "openSettingsToReview": "設定を開いて確認してください",
-      "profileSelection": "プロフィールの選択"
+      "profileSelection": "プロフィールの選択",
+      "profileLayerAccessibility": "{{label}}：{{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}件のファイルを更新しました。",
@@ -1461,6 +1481,8 @@
       "toolList": "一覧",
       "toolPatch": "パッチ適用",
       "toolTask": "タスク",
+      "toolSendFile": "ファイルを送信しました",
+      "toolSendFileAction": "ファイルを送信",
       "readTodos": "プランを読み取り",
       "updateTodos": "プランを更新",
       "linesBadge": "{{displayCount}}行",
@@ -1561,7 +1583,21 @@
       "thought": "思考",
       "showDetails": "詳細を表示",
       "pending": "待機中…",
-      "running": "実行中…"
+      "running": "実行中…",
+      "field": {
+        "filePath": "ファイルパス",
+        "path": "パス",
+        "offset": "オフセット",
+        "limit": "上限",
+        "pattern": "パターン",
+        "include": "対象ファイル",
+        "patchText": "パッチ本文",
+        "query": "クエリ",
+        "prompt": "プロンプト",
+        "header": "見出し",
+        "question": "質問",
+        "options": "選択肢"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "コンテンツを表示できませんでした。"
@@ -1577,7 +1613,7 @@
       "assistantContextOverflow": "会話が長すぎてモデルで処理できません。",
       "assistantProviderError": "プロバイダーがエラーを返しました。",
       "assistantProviderRefused": "プロバイダーがこのリクエストを拒否したため、再試行できません。",
-      "assistantCreditsRefusal": "Cloud Agentを実行するためのクレジットが不足しています。",
+      "assistantCreditsRefusal": "このリクエストに必要なクレジットが不足しています。",
       "assistantOutputLimit": "応答がモデルの出力上限に達しました。",
       "assistantStructuredOutput": "応答が必要な形式に一致しませんでした。",
       "assistantFailed": "応答に失敗しました。"
@@ -1722,7 +1758,7 @@
       "positionHint": "（{{displayCount}}件中1件目）",
       "movedPastPrompt": "エージェントはすでにこの確認を終えて、先に進んでいます。セッションが再開すると、このカードは閉じます。",
       "waitingForAnswer": "エージェントが回答を待っています。この質問に回答するまで、エージェントへのメッセージ送信は一時停止します。",
-      "waitingForPermission": "エージェントが許可を待っています。このリクエストに応答するまで、エージェントへのメッセージ送信は一時停止します。"
+      "waitingForPermission": "このリクエストに応答するまで、エージェントへのメッセージ送信は一時停止します。"
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}、{{taskName}}{{modelLabel}}、{{latestActivityLabel}}、{{status}}",
@@ -2450,7 +2486,11 @@
       "retryLoadingMoreFiles": "追加のファイルの読み込みを再試行",
       "title": "ファイル",
       "viewedCount": "{{total}}件中{{viewed}}件を確認済み",
-      "viewedOfListed": "表示中の{{total}}件中{{viewed}}件を確認済み"
+      "viewedCount_one": "{{total}}件中{{viewed}}件を確認済み",
+      "viewedCount_other": "{{total}}件中{{viewed}}件を確認済み",
+      "viewedOfListed": "表示中の{{total}}件中{{viewed}}件を確認済み",
+      "viewedOfListed_one": "表示中の{{total}}件中{{viewed}}件を確認済み",
+      "viewedOfListed_other": "表示中の{{total}}件中{{viewed}}件を確認済み"
     },
     "fileRows": {
       "collapseFile": "ファイルを折りたたむ",
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "私のエージェント",
       "promptPlaceholder": "あなたは...",
       "tools": "ツール",
+      "wholeToolRule": "このエージェントは、すべてのツールに一度に1つのルールを適用します：{{rule}}。これらのスイッチは読み取り専用です。",
       "visibility": "可視性",
       "visibilityPrimary": "プライマリ — ピッカーに表示されます",
       "visibilitySubagent": "サブエージェント — 他からのみ呼び出し可能",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "リポジトリのデフォルトプロフィール",
+      "entryLabel": "デフォルトのプロフィール",
       "add": "デフォルトを追加",
       "empty": "デフォルトは設定されていません",
       "emptyDescription": "リポジトリのセッションを開始するときにプロフィールを自動的に適用するデフォルトを追加します。",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "AI要約に失敗しました。構造化スナップショットは引き続き利用できます。",
     "scheduledContextEnabled": "スケジュールされたブリーフ",
     "scheduledContextSettings": "スケジュールされたブリーフ · {{context}}",
-    "scheduledContextHint": "このコンテキストでのみ、定時のスナップショット取得と有料AI要約を有効にします。選択され、機密情報が除去された抜粋と構造化された事実がモデルに送信されます。要約には、ブリーフィング設定を明示的に更新した時点で保存されたアプリの言語を使用します。アプリの言語を変更しても、自動では反映されません。料金はこのコンテキストの残高から支払われます。アクティビティが選択されなかったスナップショットではAIを使用しません。",
+    "scheduledContextHint": "このコンテキストでのみ、定時のスナップショット取得と有料AI要約を有効にします。選択され、機密情報が除去された抜粋と構造化された事実がモデルに送信されます。要約には、ブリーフィング設定を更新した時点で保存されたアプリの言語を使用します。料金はこのコンテキストの残高から支払われます。アクティビティが選択されなかったスナップショットではAIを使用しません。",
     "snapshotSafeguards": "要約ごとの時間と支出の上限は、スケジュールされた各スナップショットに適用されます。1日の予算ではありません。",
     "snapshotEstimateInputTooLarge": "このスナップショットの根拠データは、選択したモデルで処理できる量を超えています。",
-    "quietSnapshot": "このスナップショットでは、取得可能な情報から可能な範囲で選択を行いましたが、セッションのアクティビティは選択されませんでした。AI要約はリクエストされておらず、モデルの呼び出しや料金の発生もありません。",
+    "quietSnapshot": "このスナップショットでは、セッションのアクティビティは選択されませんでした。AI要約はリクエストされておらず、料金も発生していません。",
     "noEnabledContexts": "スケジュールされたブリーフが有効なコンテキストはありません",
     "sourceBlocker": "セッションに対応が必要",
     "sourceMetadata": "取得したセッションのメタデータ"

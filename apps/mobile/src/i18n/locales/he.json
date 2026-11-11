@@ -22,6 +22,8 @@
     "expired": "פג התוקף"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "ביטול",
     "done": "סיום",
     "retry": "ניסיון חוזר",
@@ -227,6 +229,21 @@
     "pleaseEnterEmail": "הזן את כתובת הדוא״ל שלך.",
     "or": "או"
   },
+  "pendingLink": {
+    "description": "כבר קיים חשבון שמשתמש בכתובת {{email}}. כדי להוסיף את {{provider}}, יש להיכנס באחת משיטות הכניסה שלו.",
+    "emailCode": "שליחת קוד כניסה בדוא״ל",
+    "continueInBrowser": "המשך בדפדפן",
+    "startAgain": "התחלה מחדש",
+    "expired": "תוקף הבקשה להוספת {{provider}} פג.",
+    "noMethods": "לחשבון הזה אין שיטת כניסה אחרת, ולכן אי אפשר להוסיף את {{provider}}.",
+    "linked": "{{provider}} נוסף לחשבון שלך.",
+    "failedExpired": "{{provider}} לא נוסף כי תוקף הבקשה פג.",
+    "failedWrongAccount": "{{provider}} לא נוסף כי נכנסת לחשבון אחר.",
+    "failedAccountAlreadyLinked": "{{provider}} לא נוסף כי הוא כבר מקושר לחשבון אחר.",
+    "failedProviderAlreadyLinked": "{{provider}} לא נוסף כי בחשבון שלך כבר יש כניסה אחרת באמצעות {{provider}}.",
+    "failedLinking": "לא ניתן היה להוסיף את {{provider}} לחשבון שלך.",
+    "notAdded": "נכנסת לחשבון. {{provider}} לא נוסף לחשבון שלך."
+  },
   "profile": {
     "codeReviewerSubtitle": "סקירות PR אוטומטיות",
     "securityAgentSubtitle": "איתור ותיקון של חולשות אבטחה",
@@ -265,6 +282,8 @@
     "providerTestAccount": "חשבון בדיקה",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO ארגוני",
     "passkeysTitle": "מפתחות גישה",
     "passkeysSubtitle": "היכנסו בלי סיסמה",
@@ -1317,7 +1336,7 @@
       "cloningSession": "משכפל סשן…",
       "couldNotLoadThisSession": "לא ניתן היה לטעון את הסשן הזה.",
       "cloneFailedRetry": "לא ניתן היה לשכפל את הסשן הזה. נסה שוב.",
-      "notEnoughCredits": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent. הוסף קרדיטים ונסה שוב.",
+      "notEnoughCredits": "אין מספיק קרדיטים לבקשה הזו. הוסף קרדיטים ונסה שוב.",
       "previousTaskFinishing": "המשימה הקודמת עדיין לא הסתיימה. המתן רגע.",
       "serviceUnavailable": "השירות אינו זמין כרגע. נסה שוב.",
       "connectionTrouble": "יש בעיה בחיבור. נסה שוב בעוד רגע.",
@@ -1427,7 +1446,7 @@
       "discardWithUploadsMessage": "ההנחיה שלך וכל הקבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
       "discardFailed": "לא ניתן היה למחוק את הטיוטה. נסה שוב.",
       "remoteHint": "כדי להריץ במחשב שלך, הפעל את Kilo שם והשאר אותו פעיל.",
-      "continueFrom": "ממשיך את הסשן {{title}}.",
+      "continueFrom": "ממשיך את הסשן ”{{title}}”.",
       "importingSession": "מייבא סשן…",
       "cliCannotContinue": "ה-CLI הזה אינו יכול להמשיך סשן. בחר ב-Cloud Agent או ב-CLI אחר.",
       "importFailed": "לא ניתן היה לייבא את הסשן הזה.",
@@ -1459,7 +1478,8 @@
       "selectedProfile": "פרופיל נבחר",
       "manualOverrides": "עקיפות ידניות",
       "openSettingsToReview": "פתח את ההגדרות כדי לסקור",
-      "profileSelection": "בחירת פרופיל"
+      "profileSelection": "בחירת פרופיל",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "מספר הקבצים שעודכנו הוא {{displayCount}}.",
@@ -1480,6 +1500,8 @@
       "toolList": "הצגת רשימה",
       "toolPatch": "החלת תיקון",
       "toolTask": "משימה",
+      "toolSendFile": "הקובץ נשלח בהצלחה",
+      "toolSendFileAction": "שליחת קובץ",
       "readTodos": "קריאת התוכנית",
       "updateTodos": "עדכון התוכנית",
       "linesBadge": "{{displayCount}} שורות",
@@ -1583,7 +1605,21 @@
       "thought": "מחשבה",
       "showDetails": "הצגת פרטים",
       "pending": "ממתין…",
-      "running": "פועל…"
+      "running": "פועל…",
+      "field": {
+        "filePath": "נתיב קובץ",
+        "path": "נתיב",
+        "offset": "היסט",
+        "limit": "מגבלה",
+        "pattern": "תבנית",
+        "include": "הכללה",
+        "patchText": "טקסט טלאי",
+        "query": "שאילתה",
+        "prompt": "הנחיה",
+        "header": "כותרת",
+        "question": "שאלה",
+        "options": "אפשרויות"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "לא ניתן היה להציג את התוכן."
@@ -1599,7 +1635,7 @@
       "assistantContextOverflow": "השיחה ארוכה מדי עבור המודל.",
       "assistantProviderError": "הספק החזיר שגיאה.",
       "assistantProviderRefused": "הספק סירב לבקשה זו ולא ניתן לנסות אותה שוב.",
-      "assistantCreditsRefusal": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent.",
+      "assistantCreditsRefusal": "אין מספיק קרדיטים לבקשה הזו.",
       "assistantOutputLimit": "התשובה הגיעה למגבלת הפלט של המודל.",
       "assistantStructuredOutput": "התשובה לא התאימה לפורמט הנדרש.",
       "assistantFailed": "יצירת התשובה נכשלה."
@@ -1744,7 +1780,7 @@
       "positionHint": "(1 מתוך {{displayCount}})",
       "movedPastPrompt": "הסוכן כבר עבר לשלב הבא. הכרטיס הזה ייסגר כשהסשן יימשך.",
       "waitingForAnswer": "הסוכן ממתין לתשובה שלך. שליחת ההודעה שלך לסוכן מושהית עד שתענה על השאלה הזו.",
-      "waitingForPermission": "הסוכן ממתין להרשאה. שליחת ההודעה שלך לסוכן מושהית כל עוד הבקשה הזו פתוחה."
+      "waitingForPermission": "שליחת ההודעה שלך לסוכן מושהית כל עוד הבקשה הזו פתוחה."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -2487,7 +2523,13 @@
       "retryLoadingMoreFiles": "ניסיון נוסף לטעינת קבצים נוספים",
       "title": "קבצים",
       "viewedCount": "נצפו {{viewed}} מתוך {{total}}",
-      "viewedOfListed": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה"
+      "viewedCount_one": "נצפו {{viewed}} מתוך {{total}}",
+      "viewedCount_two": "נצפו {{viewed}} מתוך {{total}}",
+      "viewedCount_other": "נצפו {{viewed}} מתוך {{total}}",
+      "viewedOfListed": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה",
+      "viewedOfListed_one": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה",
+      "viewedOfListed_two": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה",
+      "viewedOfListed_other": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה"
     },
     "fileRows": {
       "collapseFile": "כיווץ הקובץ",
@@ -3590,6 +3632,7 @@
       "namePlaceholder": "הסוכן שלי",
       "promptPlaceholder": "אתה...",
       "tools": "כְּלֵי עֲבוֹדָה",
+      "wholeToolRule": "סוֹכֵן זֶה מְיַשֵּׂם כְּלָל אֶחָד עַל כָּל כְּלִי עֲבוֹדָה בְּבַת אַחַת: {{rule}}. הַמְּתָגִים הָאֵלֶּה לִקְרִיאָה בִּלְבַד.",
       "visibility": "רְאוּת",
       "visibilityPrimary": "ראשי — מוצג בבוחר",
       "visibilitySubagent": "סוכן משנה — ניתן להתקשרות מאחרים בלבד",
@@ -3631,6 +3674,7 @@
     },
     "repoBindings": {
       "title": "פרופילי ברירת מחדל עבור Repos",
+      "entryLabel": "פרופילים המוגדרים כברירת מחדל",
       "add": "הוסף ברירת מחדל",
       "empty": "לא הוגדרו ברירת מחדל",
       "emptyDescription": "הוסף ברירת מחדל להחלה אוטומטית של פרופיל בעת תחילת הפעלות עבור ריפו.",
@@ -3816,7 +3860,7 @@
     "estimate": "הערכת עלות {{estimate}} · מקסימום {{maximum}}",
     "estimateUnavailable": "סיכום בתשלום אינו זמין עבור הגדרות אלה.",
     "confirmPaid": "להפעיל סיכומים בתשלום עבור {{context}}?",
-    "paidDisclosure": "הערכה של {{estimate}}, עד {{maximum}}, עם מגבלה של {{minutes}} דקות. החיוב חל גם אם היצירה נכשלת.",
+    "paidDisclosure": "הערכה של {{estimate}}, עד {{maximum}}, עם מגבלה של {{minutes}} דק׳. החיוב חל גם אם היצירה נכשלת.",
     "enable": "הפעלת סיכומים בתשלום",
     "allContexts": "דוחות אישיים ודוחות ארגון נשמרים בנפרד.",
     "emptyHistory": "אין דוחות שמורים",
@@ -3835,10 +3879,10 @@
     "snapshotSummaryFailed": "סיכום ה-AI נכשל. תמונת המצב המובנית עדיין זמינה.",
     "scheduledContextEnabled": "דוחות מתוזמנים",
     "scheduledContextSettings": "דוחות מתוזמנים · {{context}}",
-    "scheduledContextHint": "הפעלת לכידה מתוזמנת וסיכומי AI בתשלום עבור הקשר זה בלבד. קטעים נבחרים ומושחרים ועובדות מובנות נשלחים למודל שלך. הסיכומים משתמשים בשפת האפליקציה שנשמרת רק בעת שינוי מפורש של הגדרות הדוח. שינוי שפת האפליקציה בלבד אינו מעדכן את שפת הסיכומים. החיובים מתבצעים מהיתרה של הקשר זה. בתמונות מצב ללא פעילות אין שימוש ב־AI.",
+    "scheduledContextHint": "הפעלת לכידה מתוזמנת וסיכומי AI בתשלום עבור הקשר זה בלבד. קטעים נבחרים ומושחרים ועובדות מובנות נשלחים למודל שלך. הסיכומים משתמשים בשפת האפליקציה שנשמרת בעת עדכון הגדרות הדוח. החיובים מתבצעים מהיתרה של הקשר זה. בתמונות מצב ללא פעילות אין שימוש ב־AI.",
     "snapshotSafeguards": "מגבלות הזמן וההוצאה לכל סיכום חלות על כל תמונת מצב מתוזמנת בנפרד, ולא כתקציב יומי.",
     "snapshotEstimateInputTooLarge": "תמונת המצב הזו מכילה יותר מדי ראיות עבור המודל שנבחר.",
-    "quietSnapshot": "לא נבחרה פעילות סשנים לתמונת המצב הזו במסגרת בחירה כמיטב האפשר. לא התבקש סיכום AI, לא בוצעה קריאה למודל ולא נגבה תשלום.",
+    "quietSnapshot": "לא נבחרה פעילות סשנים לתמונת המצב הזו. לא התבקש סיכום AI ולא נגבה תשלום.",
     "noEnabledContexts": "אין הקשרים שבהם מופעלים דוחות מתוזמנים",
     "sourceBlocker": "הסשן דורש תשומת לב",
     "sourceMetadata": "מטא־נתונים של הסשן שנלכדו"

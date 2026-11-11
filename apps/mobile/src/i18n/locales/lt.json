@@ -22,6 +22,8 @@
     "expired": "Galiojimas baigėsi"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Atšaukti",
     "done": "Baigti",
     "retry": "Bandyti dar kartą",
@@ -227,6 +229,21 @@
     "signInCodeField": "Prisijungimo kodas",
     "or": "arba"
   },
+  "pendingLink": {
+    "description": "Paskyra su {{email}} jau yra. Prisijunk vienu iš jos būdų, kad pridėtum {{provider}}.",
+    "emailCode": "Atsiųsti man prisijungimo kodą el. paštu",
+    "continueInBrowser": "Tęsti naršyklėje",
+    "startAgain": "Pradėti iš naujo",
+    "expired": "Ši užklausa pridėti {{provider}} nebegalioja.",
+    "noMethods": "Ši paskyra neturi kito prisijungimo būdo, todėl {{provider}} pridėti negalima.",
+    "linked": "{{provider}} pridėtas prie tavo paskyros.",
+    "failedExpired": "{{provider}} nepridėtas, nes užklausa nebegalioja.",
+    "failedWrongAccount": "{{provider}} nepridėtas, nes prisijungei prie kitos paskyros.",
+    "failedAccountAlreadyLinked": "{{provider}} nepridėtas, nes jau susietas su kita paskyra.",
+    "failedProviderAlreadyLinked": "{{provider}} nepridėtas, nes tavo paskyra jau turi kitą {{provider}} prisijungimą.",
+    "failedLinking": "Nepavyko pridėti {{provider}} prie tavo paskyros.",
+    "notAdded": "Esi prisijungęs. {{provider}} nepridėtas prie tavo paskyros."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatinės PR peržiūros",
     "securityAgentSubtitle": "Rasti ir pašalinti pažeidžiamumus",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Bandomoji paskyra",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Įmonės SSO",
     "passkeysTitle": "Priėjimo raktai",
     "passkeysSubtitle": "Prisijunkite be slaptažodžio",
@@ -343,7 +362,15 @@
       "retryLoadingFiles": "Bandyti įkelti failus dar kartą",
       "filterPlaceholder": "Failo kelias",
       "viewedCount": "peržiūrėta {{viewed}} iš {{total}}",
+      "viewedCount_one": "peržiūrėta {{viewed}} iš {{total}}",
+      "viewedCount_few": "peržiūrėta {{viewed}} iš {{total}}",
+      "viewedCount_many": "peržiūrėta {{viewed}} iš {{total}}",
+      "viewedCount_other": "peržiūrėta {{viewed}} iš {{total}}",
       "viewedOfListed": "peržiūrėta {{viewed}} iš {{total}} sąraše esančių failų",
+      "viewedOfListed_one": "peržiūrėta {{viewed}} iš {{total}} sąraše esančių failų",
+      "viewedOfListed_few": "peržiūrėta {{viewed}} iš {{total}} sąraše esančių failų",
+      "viewedOfListed_many": "peržiūrėta {{viewed}} iš {{total}} sąraše esančių failų",
+      "viewedOfListed_other": "peržiūrėta {{viewed}} iš {{total}} sąraše esančių failų",
       "loadingFiles": "Įkeliama {{loaded}} iš {{total}}…",
       "failedToLoadAllFiles": "Nepavyko įkelti visų failų.",
       "couldNotLoadMoreFiles": "Nepavyko įkelti daugiau failų.",
@@ -1915,7 +1942,7 @@
       "cloningSession": "Klonuojama sesija",
       "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos.",
       "cloneFailedRetry": "Nepavyko klonuoti šios sesijos. Bandykite dar kartą.",
-      "notEnoughCredits": "Nepakanka kreditų „Cloud Agent“ paleisti. Papildykite kreditus ir bandykite dar kartą.",
+      "notEnoughCredits": "Nepakanka kreditų šiai užklausai. Papildykite kreditus ir bandykite dar kartą.",
       "previousTaskFinishing": "Ankstesnė užduotis dar nebaigta. Šiek tiek palaukite.",
       "serviceUnavailable": "Paslauga šiuo metu nepasiekiama. Bandykite dar kartą.",
       "connectionTrouble": "Sutriko ryšys. Netrukus bandykite dar kartą.",
@@ -2057,7 +2084,8 @@
       "selectedProfile": "Pasirinktas profilis",
       "manualOverrides": "Rankiniai nepaisymai",
       "openSettingsToReview": "Norėdami peržiūrėti, atidarykite nustatymus",
-      "profileSelection": "Profilio pasirinkimas"
+      "profileSelection": "Profilio pasirinkimas",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujintas {{displayCount}} failas.",
@@ -2079,6 +2107,8 @@
       "toolList": "rodyti sąrašą",
       "toolPatch": "taisyti",
       "toolTask": "užduotis",
+      "toolSendFile": "Išsiųstas failas",
+      "toolSendFileAction": "siųsti failą",
       "readTodos": "Skaityti planą",
       "updateTodos": "Atnaujinti planą",
       "linesBadge": "eil.: {{displayCount}}",
@@ -2185,7 +2215,21 @@
       "thought": "Mintis",
       "showDetails": "Rodyti informaciją",
       "pending": "Laukiama…",
-      "running": "Vykdoma…"
+      "running": "Vykdoma…",
+      "field": {
+        "filePath": "Failo kelias",
+        "path": "Kelias",
+        "offset": "Poslinkis",
+        "limit": "Riba",
+        "pattern": "Šablonas",
+        "include": "Įtraukimas",
+        "patchText": "Pataisos tekstas",
+        "query": "Užklausa",
+        "prompt": "Nurodymas",
+        "header": "Antraštė",
+        "question": "Klausimas",
+        "options": "Parinktys"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nepavyko parodyti turinio."
@@ -2201,7 +2245,7 @@
       "assistantContextOverflow": "Pokalbis per ilgas šiam modeliui.",
       "assistantProviderError": "Teikėjas grąžino klaidą.",
       "assistantProviderRefused": "Teikėjas atmetė šią užklausą, todėl jos pakartoti nebegalima.",
-      "assistantCreditsRefusal": "Nepakanka kreditų „Cloud Agent“ paleisti.",
+      "assistantCreditsRefusal": "Nepakanka kreditų šiai užklausai.",
       "assistantOutputLimit": "Atsakymas pasiekė modelio išvesties limitą.",
       "assistantStructuredOutput": "Atsakymas neatitiko reikalaujamo formato.",
       "assistantFailed": "Nepavyko sugeneruoti atsakymo."
@@ -2346,7 +2390,7 @@
       "positionHint": "(1 iš {{displayCount}})",
       "movedPastPrompt": "Agentas jau perėjo prie kito veiksmo. Ši kortelė užsidarys, kai sesija bus tęsiama.",
       "waitingForAnswer": "Agentas laukia jūsų atsakymo. Kol neatsakysite į šį klausimą, jūsų žinutės siuntimas agentui bus pristabdytas.",
-      "waitingForPermission": "Agentas laukia leidimo. Kol neatsakysite į šį prašymą, jūsų žinutės siuntimas agentui bus pristabdytas."
+      "waitingForPermission": "Kol neatsakysite į šį prašymą, jūsų žinutės siuntimas agentui bus pristabdytas."
     },
     "childSession": {
       "accessibilityLabel": "Agentas {{agentName}}, užduotis: {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3142,7 +3186,7 @@
       "provider": "Sustabdyta: teikėjo klaida",
       "tool": "Sustabdyta: įrankio klaida",
       "cancelled": "Sustabdyta: atšaukta",
-      "other": "SUSTABDYTA"
+      "other": "Sustabdyta"
     }
   },
   "transcriptionModel": {
@@ -3649,6 +3693,7 @@
       "namePlaceholder": "Mano agentas",
       "promptPlaceholder": "Tu esi...",
       "tools": "Įrankiai",
+      "wholeToolRule": "Šis agentas vienu metu taiko vieną taisyklę visiems įrankiams: {{rule}}. Šie jungikliai yra tik skaitomi.",
       "visibility": "Matomumas",
       "visibilityPrimary": "Pagrindinis — rodomas rinkiklyje",
       "visibilitySubagent": "Subagentas — skambinama tik iš kitų",
@@ -3689,7 +3734,8 @@
       "duplicateName": "Komanda tokiu pavadinimu šiame profilyje jau egzistuoja"
     },
     "repoBindings": {
-      "title": "Numatytieji atpirkimo sandorių profiliai",
+      "title": "Numatytieji saugyklų profiliai",
+      "entryLabel": "Numatytieji profiliai",
       "add": "Pridėti numatytąjį",
       "empty": "Jokių numatytųjų sukonfigūruotų",
       "emptyDescription": "Pridėkite numatytąjį nustatymą, kad profilis būtų automatiškai taikomas pradedant atpirkimo seansus.",
@@ -3898,10 +3944,10 @@
     "snapshotSummaryFailed": "AI santraukos sukurti nepavyko. Struktūruota suvestinė vis dar prieinama.",
     "scheduledContextEnabled": "Suplanuotos suvestinės",
     "scheduledContextSettings": "Suplanuotos suvestinės · {{context}}",
-    "scheduledContextHint": "Įjunkite suplanuotą duomenų fiksavimą ir mokamas AI santraukas tik šiam kontekstui. Atrinktos ištraukos su užmaskuota neskelbtina informacija ir struktūruoti faktai siunčiami jūsų modeliui. Santraukoms naudojama programėlės kalba, išsaugota jums pakeitus suvestinės nustatymus. Pakeitus vien programėlės kalbą, santraukų kalba automatiškai neatnaujinama. Mokesčiai nurašomi iš šio konteksto balanso. Suvestinėms be veiklos AI nenaudojamas.",
+    "scheduledContextHint": "Įjunkite suplanuotą duomenų fiksavimą ir mokamas AI santraukas tik šiam kontekstui. Atrinktos ištraukos su užmaskuota neskelbtina informacija ir struktūruoti faktai siunčiami jūsų modeliui. Santraukoms naudojama programėlės kalba, išsaugota jums pakeitus suvestinės nustatymus. Mokesčiai nurašomi iš šio konteksto balanso. Suvestinėms be veiklos AI nenaudojamas.",
     "snapshotSafeguards": "Kiekvienai suplanuotai suvestinei taikomi vienos santraukos laiko ir išlaidų apribojimai, o ne dienos biudžetas.",
     "snapshotEstimateInputTooLarge": "Šioje suvestinėje per daug įrodymų pasirinktam modeliui.",
-    "quietSnapshot": "Pagal turimus duomenis šiai suvestinei nebuvo atrinkta sesijų veiklos. Į AI modelį nesikreipta, AI santrauka neužsakyta ir mokestis netaikytas.",
+    "quietSnapshot": "Šiai suvestinei nebuvo atrinkta sesijų veiklos. AI santrauka neužsakyta ir mokestis netaikytas.",
     "noEnabledContexts": "Nė viename kontekste neįjungtos suplanuotos suvestinės",
     "sourceBlocker": "Sesijai reikia dėmesio",
     "sourceMetadata": "Užfiksuoti sesijos metaduomenys"

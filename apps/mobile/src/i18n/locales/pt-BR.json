@@ -22,6 +22,8 @@
     "expired": "Expirado"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Cancelar",
     "done": "Concluir",
     "retry": "Tentar novamente",
@@ -227,6 +229,21 @@
     "pleaseEnterEmail": "Digite seu endereço de e-mail.",
     "or": "ou"
   },
+  "pendingLink": {
+    "description": "Uma conta já usa {{email}}. Entre com um dos métodos dela para adicionar {{provider}}.",
+    "emailCode": "Enviar um código de login por e-mail",
+    "continueInBrowser": "Continuar no navegador",
+    "startAgain": "Começar de novo",
+    "expired": "Esta solicitação para adicionar {{provider}} expirou.",
+    "noMethods": "Esta conta não tem outro método de login, então não é possível adicionar {{provider}}.",
+    "linked": "{{provider}} foi adicionado à sua conta.",
+    "failedExpired": "{{provider}} não foi adicionado porque a solicitação expirou.",
+    "failedWrongAccount": "{{provider}} não foi adicionado porque você entrou em outra conta.",
+    "failedAccountAlreadyLinked": "{{provider}} não foi adicionado porque já está vinculado a outra conta.",
+    "failedProviderAlreadyLinked": "{{provider}} não foi adicionado porque sua conta já tem outro login do {{provider}}.",
+    "failedLinking": "Não foi possível adicionar {{provider}} à sua conta.",
+    "notAdded": "Você entrou. {{provider}} não foi adicionado à sua conta."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revisões automáticas de PR",
     "securityAgentSubtitle": "Encontrar e corrigir vulnerabilidades",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Conta de teste",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO corporativo",
     "passkeysTitle": "Chaves de acesso",
     "passkeysSubtitle": "Entre sem senha",
@@ -1290,7 +1309,7 @@
       "cloningSession": "Clonando sessão",
       "couldNotLoadThisSession": "Não foi possível carregar esta sessão.",
       "cloneFailedRetry": "Não foi possível clonar esta sessão. Tente novamente.",
-      "notEnoughCredits": "Créditos insuficientes para executar o Cloud Agent. Adicione créditos e tente novamente.",
+      "notEnoughCredits": "Créditos insuficientes para esta solicitação. Adicione créditos e tente novamente.",
       "previousTaskFinishing": "A tarefa anterior ainda está sendo concluída. Aguarde um momento.",
       "serviceUnavailable": "O serviço está indisponível no momento. Tente novamente.",
       "connectionTrouble": "Há um problema de conexão. Tente novamente em instantes.",
@@ -1400,7 +1419,7 @@
       "discardWithUploadsMessage": "Seu prompt e os arquivos enviados ainda não vinculados a uma mensagem serão excluídos.",
       "discardFailed": "Não foi possível descartar o rascunho. Tente novamente.",
       "remoteHint": "Para executar no seu computador, inicie o Kilo nele e mantenha-o em execução.",
-      "continueFrom": "Continuando a sessão {{title}}.",
+      "continueFrom": "Continuando a sessão “{{title}}”.",
       "importingSession": "Importando sessão",
       "cliCannotContinue": "Esta CLI não permite continuar uma sessão. Escolha o Cloud Agent ou outra CLI.",
       "importFailed": "Não foi possível importar esta sessão.",
@@ -1432,7 +1451,8 @@
       "selectedProfile": "Perfil selecionado",
       "manualOverrides": "Substituições manuais",
       "openSettingsToReview": "Abra Configurações para revisar",
-      "profileSelection": "Seleção de perfil"
+      "profileSelection": "Seleção de perfil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} arquivo foi atualizado.",
@@ -1453,6 +1473,8 @@
       "toolList": "listar",
       "toolPatch": "aplicar alterações",
       "toolTask": "tarefa",
+      "toolSendFile": "Arquivo enviado",
+      "toolSendFileAction": "Enviar arquivo",
       "readTodos": "Ler plano",
       "updateTodos": "Atualizar plano",
       "linesBadge": "{{displayCount}} linhas",
@@ -1556,7 +1578,21 @@
       "thought": "Raciocínio",
       "showDetails": "Mostrar detalhes",
       "pending": "Pendente…",
-      "running": "Executando…"
+      "running": "Executando…",
+      "field": {
+        "filePath": "Caminho do arquivo",
+        "path": "Caminho",
+        "offset": "Deslocamento",
+        "limit": "Limite",
+        "pattern": "Padrão",
+        "include": "Inclusão",
+        "patchText": "Texto do patch",
+        "query": "Consulta",
+        "prompt": "Instrução",
+        "header": "Cabeçalho",
+        "question": "Pergunta",
+        "options": "Opções"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Não foi possível exibir o conteúdo."
@@ -1572,7 +1608,7 @@
       "assistantContextOverflow": "A conversa é longa demais para o modelo.",
       "assistantProviderError": "O provedor retornou um erro.",
       "assistantProviderRefused": "O provedor recusou esta solicitação e não é possível tentar novamente.",
-      "assistantCreditsRefusal": "Créditos insuficientes para executar o Cloud Agent.",
+      "assistantCreditsRefusal": "Créditos insuficientes para esta solicitação.",
       "assistantOutputLimit": "A resposta atingiu o limite de saída do modelo.",
       "assistantStructuredOutput": "A resposta não correspondeu ao formato exigido.",
       "assistantFailed": "Não foi possível gerar a resposta."
@@ -1717,7 +1753,7 @@
       "positionHint": "(1 de {{displayCount}})",
       "movedPastPrompt": "O agente já passou desta solicitação. Este cartão será fechado quando a sessão continuar.",
       "waitingForAnswer": "O agente está aguardando sua resposta. O envio da sua mensagem ao agente fica pausado enquanto esta pergunta estiver aberta.",
-      "waitingForPermission": "O agente está aguardando permissão. O envio da sua mensagem ao agente fica pausado enquanto esta solicitação estiver aberta."
+      "waitingForPermission": "O envio da sua mensagem ao agente fica pausado enquanto esta solicitação estiver aberta."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -2493,7 +2529,13 @@
       "retryLoadingMoreFiles": "Tentar carregar mais arquivos novamente",
       "title": "Arquivos",
       "viewedCount": "{{viewed}} de {{total}} visualizados",
-      "viewedOfListed": "{{viewed}} de {{total}} arquivos listados visualizados"
+      "viewedCount_one": "{{viewed}} de {{total}} visualizados",
+      "viewedCount_many": "{{viewed}} de {{total}} visualizados",
+      "viewedCount_other": "{{viewed}} de {{total}} visualizados",
+      "viewedOfListed": "{{viewed}} de {{total}} arquivos listados visualizados",
+      "viewedOfListed_one": "{{viewed}} de {{total}} arquivos listados visualizados",
+      "viewedOfListed_many": "{{viewed}} de {{total}} arquivos listados visualizados",
+      "viewedOfListed_other": "{{viewed}} de {{total}} arquivos listados visualizados"
     },
     "fileRows": {
       "collapseFile": "Recolher arquivo",
@@ -3096,7 +3138,7 @@
       "provider": "Parado: erro do provedor",
       "tool": "Parado: erro da ferramenta",
       "cancelled": "Parado: cancelado",
-      "other": "PARADO"
+      "other": "Parado"
     }
   },
   "transcriptionModel": {
@@ -3596,6 +3638,7 @@
       "namePlaceholder": "Meu agente",
       "promptPlaceholder": "Você é um...",
       "tools": "Ferramentas",
+      "wholeToolRule": "Este agente aplica uma regra a todas as ferramentas de uma vez: {{rule}}. Esses interruptores são somente leitura.",
       "visibility": "Visibilidade",
       "visibilityPrimary": "Primário — mostrado no seletor",
       "visibilitySubagent": "Subagente — só pode ser chamado por outros",
@@ -3637,6 +3680,7 @@
     },
     "repoBindings": {
       "title": "Perfis padrão para repositórios",
+      "entryLabel": "Perfis padrão",
       "add": "Adicionar padrão",
       "empty": "Nenhum padrão configurado",
       "emptyDescription": "Adicione um padrão para aplicar automaticamente um perfil ao iniciar sessões de um repositório.",
@@ -3798,11 +3842,11 @@
     "offline": "Offline · relatório salvo",
     "cached": "Relatório salvo · atualização indisponível",
     "window": "{{start}} – {{end}}",
-    "summary": "Resumo por AI",
-    "summaryPending": "O resumo por AI está em andamento. Ele aparecerá aqui quando estiver pronto.",
-    "summaryUnavailable": "Resumo por AI indisponível. Seu relatório estruturado continua disponível.",
-    "summaryCharge": "AI cobrou {{cost}}",
-    "summaryChargePending": "Cobrança de AI aguardando conciliação",
+    "summary": "Resumo por IA",
+    "summaryPending": "O resumo por IA está em andamento. Ele aparecerá aqui quando estiver pronto.",
+    "summaryUnavailable": "Resumo por IA indisponível. Seu relatório estruturado continua disponível.",
+    "summaryCharge": "IA cobrou {{cost}}",
+    "summaryChargePending": "Cobrança de IA aguardando conciliação",
     "sources": "Evidências e artefatos",
     "timezone": "Fuso horário do relatório",
     "deviceTimezone": "Usar fuso horário do dispositivo",
@@ -3813,7 +3857,7 @@
     "morningEnd": "Relatório disponível até",
     "timeHint": "O cartão da tela inicial volta ao status ao vivo quando a janela do relatório termina, mesmo offline.",
     "invalidSchedule": "Escolha um fuso horário válido e uma janela do relatório não vazia.",
-    "notificationsHint": "Uma notificação genérica por relatório agendado. Independe dos resumos pagos por AI.",
+    "notificationsHint": "Uma notificação genérica por relatório agendado. Independe dos resumos pagos por IA.",
     "notificationPermission": "Ative as notificações do dispositivo em $t(common.notifications) para receber seu relatório.",
     "defaultModel": "Usar o modelo padrão do Kilo",
     "duration": "Limite de tempo (minutos)",
@@ -3822,7 +3866,7 @@
     "estimate": "Estimativa {{estimate}} · máximo de {{maximum}}",
     "estimateUnavailable": "Um resumo pago não está disponível para estas configurações.",
     "confirmPaid": "Ativar resumos pagos para {{context}}?",
-    "paidDisclosure": "{{estimate}} estimado, até {{maximum}}, com limite de {{minutes}} minutos. A cobrança ocorre mesmo se a geração falhar.",
+    "paidDisclosure": "{{estimate}} estimado, até {{maximum}}, com limite de {{minutes}} min. A cobrança ocorre mesmo se a geração falhar.",
     "enable": "Ativar resumos pagos",
     "allContexts": "Relatórios pessoais e da organização ficam separados.",
     "emptyHistory": "Nenhum relatório salvo",
@@ -3838,13 +3882,13 @@
     "capturedAt": "Capturado {{time}}",
     "snapshotHint": "Registro fixo do estado mais recente disponível das sessões, capturado na manhã agendada, sem garantia de cobertura completa. As contagens se referem às sessões selecionadas, não a toda a atividade da noite.",
     "snapshotTruncated": "Algumas sessões ou evidências foram omitidas para limitar o tamanho deste registro.",
-    "snapshotSummaryFailed": "O resumo por AI falhou. Seu registro estruturado continua disponível.",
+    "snapshotSummaryFailed": "O resumo por IA falhou. Seu registro estruturado continua disponível.",
     "scheduledContextEnabled": "Relatórios agendados",
     "scheduledContextSettings": "Relatórios agendados · {{context}}",
-    "scheduledContextHint": "Ative a captura agendada e os resumos pagos por AI apenas para este contexto. Trechos selecionados, com informações sensíveis removidas, e fatos estruturados são enviados ao seu modelo. Os resumos usam o idioma do app salvo quando você altera explicitamente as preferências do relatório. Mudar apenas o idioma do app não atualiza o idioma salvo. As cobranças usam o saldo deste contexto. Registros sem atividade não usam AI.",
+    "scheduledContextHint": "Ative a captura agendada e os resumos pagos por IA apenas para este contexto. Trechos selecionados, com informações sensíveis removidas, e fatos estruturados são enviados ao seu modelo. Os resumos usam o idioma do app salvo quando você atualiza as preferências do relatório. As cobranças usam o saldo deste contexto. Registros sem atividade não usam IA.",
     "snapshotSafeguards": "Os limites de tempo e gasto por resumo se aplicam a cada registro agendado, não são um orçamento diário.",
     "snapshotEstimateInputTooLarge": "Este registro contém evidências demais para o modelo selecionado.",
-    "quietSnapshot": "Nenhuma atividade das sessões foi selecionada para este registro. A seleção não garante cobertura completa. Não houve solicitação de resumo por AI, chamada ao modelo ou cobrança.",
+    "quietSnapshot": "Nenhuma atividade das sessões foi selecionada para este registro. Não houve solicitação de resumo por IA nem cobrança.",
     "noEnabledContexts": "Nenhum contexto ativado para relatórios agendados",
     "sourceBlocker": "A sessão precisa de atenção",
     "sourceMetadata": "Metadados da sessão capturados"

@@ -1,9 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { captureException, captureMessage } from '@sentry/nextjs';
+import { after } from 'next/server';
+import * as sharedUsage from './processUsage.shared';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest, VercelProviderConfig } from './providers/openrouter/types';
 import { createMockUsageContext } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
+import type { Provider } from './providers/types';
+import { createUserOpenRouterProvider } from './providers/definitions/openrouter';
+import { createUserVercelAiGatewayProvider } from './providers/definitions/vercel';
 
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
 // `after()` post-response hook, which only works in a request context. Replace
@@ -22,7 +27,11 @@ const mockedLogMicrodollarUsage = jest.fn(
   async (_stats: MicrodollarUsageStats, _ctx: MicrodollarUsageContext) => null
 );
 const mockedProcessTokenData = jest.fn(
-  async (_stats: MicrodollarUsageStats | null, _ctx: MicrodollarUsageContext) => {}
+  async (
+    _stats: MicrodollarUsageStats | null,
+    _ctx: MicrodollarUsageContext,
+    _servingProvider?: Provider
+  ) => {}
 );
 jest.mock('./processUsage', () => ({
   ...(jest.requireActual('./processUsage') as Record<string, unknown>),
@@ -30,8 +39,11 @@ jest.mock('./processUsage', () => ({
     stats: MicrodollarUsageStats,
     ctx: MicrodollarUsageContext
   ) => mockedLogMicrodollarUsage(stats, ctx),
-  processTokenData: (stats: MicrodollarUsageStats | null, ctx: MicrodollarUsageContext) =>
-    mockedProcessTokenData(stats, ctx),
+  processTokenData: (
+    stats: MicrodollarUsageStats | null,
+    ctx: MicrodollarUsageContext,
+    servingProvider?: Provider
+  ) => mockedProcessTokenData(stats, ctx, servingProvider),
 }));
 
 jest.mock('@sentry/nextjs', () => ({
@@ -39,6 +51,14 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
   captureException: jest.fn(),
 }));
+
+jest.mock('./processUsage.shared', () => {
+  const actual = jest.requireActual<typeof sharedUsage>('./processUsage.shared');
+  return {
+    ...actual,
+    computeOpenRouterCostFields: jest.fn(actual.computeOpenRouterCostFields),
+  };
+});
 
 const mockedErrorExceptInTest = jest.fn();
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
@@ -438,7 +458,133 @@ describe('parseEditUsageFromResponse', () => {
 describe('countAndStoreEmbeddingUsage', () => {
   beforeEach(() => {
     mockedLogMicrodollarUsage.mockClear();
+    mockedProcessTokenData.mockClear();
+    jest.mocked(after).mockClear();
+    jest.mocked(sharedUsage.computeOpenRouterCostFields).mockClear();
+    jest.mocked(captureException).mockClear();
     jest.mocked(captureMessage).mockClear();
+  });
+
+  describe.each(['openrouter', 'vercel'] as const)('%s generation recovery', provider => {
+    const servingProvider =
+      provider === 'openrouter'
+        ? createUserOpenRouterProvider('test-openrouter-key')
+        : createUserVercelAiGatewayProvider('test-vercel-key');
+
+    it.each([
+      { name: 'missing body', body: () => null },
+      { name: 'invalid JSON', body: () => 'invalid JSON' },
+      { name: 'unexpected shape', body: () => '{"usage":[]}' },
+      {
+        name: 'read interruption',
+        body: () =>
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              controller.error(new TypeError('terminated'));
+            },
+          }),
+      },
+    ])(
+      'passes $name to generation accounting with the header id and response status',
+      async ({ body }) => {
+        const context: MicrodollarUsageContext = {
+          ...createMockUsageContext('embedding-user', 'unused@example.com', 0),
+          api_kind: 'embeddings',
+          provider,
+          requested_model: 'test/embedding',
+          status_code: 200,
+          user_byok: true,
+        };
+        countAndStoreEmbeddingUsage(
+          new Response(body(), {
+            status: 202,
+            headers: { 'x-generation-id': 'embedding-generation' },
+          }),
+          context,
+          undefined,
+          servingProvider
+        );
+        await waitForUsageWrite();
+
+        expect(mockedProcessTokenData).toHaveBeenCalledTimes(1);
+        expect(mockedProcessTokenData).toHaveBeenCalledWith(
+          expect.objectContaining({
+            messageId: 'embedding-generation',
+            status_code: 202,
+            hasError: true,
+            model: null,
+            responseContent: '',
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheHitTokens: 0,
+            cacheWriteTokens: 0,
+            cost_mUsd: 0,
+            is_byok: null,
+          }),
+          context,
+          servingProvider
+        );
+        expect(mockedProcessTokenData.mock.calls[0][2]).toBe(servingProvider);
+        expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+        expect(sharedUsage.computeOpenRouterCostFields).not.toHaveBeenCalled();
+      }
+    );
+
+    it('does not swallow generation-accounting failures after parse recovery', async () => {
+      const accountingError = new Error('generation accounting failed');
+      mockedProcessTokenData.mockRejectedValueOnce(accountingError);
+      countAndStoreEmbeddingUsage(
+        new Response('invalid JSON', { headers: { 'x-generation-id': 'embedding-generation' } }),
+        {
+          ...createMockUsageContext('embedding-user', 'unused@example.com', 0),
+          api_kind: 'embeddings',
+          provider,
+        },
+        undefined
+      );
+
+      await expect(jest.mocked(after).mock.calls[0][0]).rejects.toBe(accountingError);
+      expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+    });
+
+    it('keeps successfully parsed embeddings on the direct pricing path', async () => {
+      const context: MicrodollarUsageContext = {
+        ...createMockUsageContext('embedding-user', 'unused@example.com', 0),
+        api_kind: 'embeddings',
+        provider,
+        requested_model: 'test/embedding',
+      };
+      const upstreamCost =
+        provider === 'openrouter'
+          ? { usage: { prompt_tokens: 10, cost: 0.001, is_byok: false } }
+          : {
+              usage: { prompt_tokens: 10 },
+              providerMetadata: { gateway: { cost: '0.001', marketCost: '0.001' } },
+            };
+      countAndStoreEmbeddingUsage(
+        Response.json({ id: 'embedding-body-id', model: 'test/embedding', ...upstreamCost }),
+        context,
+        undefined,
+        servingProvider
+      );
+      await waitForUsageWrite();
+
+      expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+      expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageId: 'embedding-body-id',
+          status_code: 200,
+          hasError: false,
+          inputTokens: 10,
+          outputTokens: 0,
+          cost_mUsd: 1000,
+          market_cost: 1000,
+        }),
+        context
+      );
+      expect(mockedProcessTokenData).not.toHaveBeenCalled();
+      expect(captureException).not.toHaveBeenCalled();
+    });
   });
 
   it.each([400, 429])(
@@ -541,6 +687,62 @@ describe('countAndStoreEmbeddingUsage', () => {
   });
 });
 
+describe.each(['openrouter', 'vercel'] as const)(
+  'countAndStoreTranscriptionUsage %s credentials',
+  provider => {
+    beforeEach(() => {
+      mockedProcessTokenData.mockClear();
+    });
+
+    it.each([
+      { name: 'parse recovery', body: 'invalid JSON', hasError: true, inputTokens: 0 },
+      {
+        name: 'successful parsing',
+        body: JSON.stringify({
+          text: 'transcription',
+          usage: { input_tokens: 10, output_tokens: 4, cost: 0, is_byok: true },
+        }),
+        hasError: false,
+        inputTokens: 10,
+      },
+    ])(
+      'forwards the exact serving provider after $name',
+      async ({ body, hasError, inputTokens }) => {
+        const servingProvider =
+          provider === 'openrouter'
+            ? createUserOpenRouterProvider('test-openrouter-key')
+            : createUserVercelAiGatewayProvider('test-vercel-key');
+        const context: MicrodollarUsageContext = {
+          ...createMockUsageContext('audio-user', 'unused@example.com', 0),
+          api_kind: 'audio_transcriptions',
+          provider,
+          user_byok: true,
+        };
+        countAndStoreTranscriptionUsage(
+          new Response(body, { status: 202, headers: { 'x-generation-id': 'audio-generation' } }),
+          context,
+          undefined,
+          servingProvider
+        );
+        await waitForUsageWrite();
+
+        expect(mockedProcessTokenData).toHaveBeenCalledTimes(1);
+        expect(mockedProcessTokenData).toHaveBeenCalledWith(
+          expect.objectContaining({
+            messageId: 'audio-generation',
+            status_code: 202,
+            hasError,
+            inputTokens,
+          }),
+          context,
+          servingProvider
+        );
+        expect(mockedProcessTokenData.mock.calls[0][2]).toBe(servingProvider);
+      }
+    );
+  }
+);
+
 describe('countAndStoreFimUsage', () => {
   function makeUsageContext(
     overrides: Partial<MicrodollarUsageContext> = {}
@@ -642,18 +844,106 @@ describe('countAndStoreFimUsage', () => {
     expect(stats.market_cost).toBe(325);
   });
 
-  it('reports a malformed successful response instead of rejecting', async () => {
+  it('accounts for a malformed successful response instead of dropping the request', async () => {
     jest.mocked(captureException).mockClear();
     const response = new Response('not JSON');
 
     countAndStoreFimUsage(response, makeUsageContext(), undefined);
     await waitForUsageWrite();
 
-    expect(captureException).toHaveBeenCalledWith(expect.any(SyntaxError), {
-      tags: { source: 'fim_usage_processing' },
-      extra: { statusCode: 200 },
+    expect(captureException).toHaveBeenCalledWith(
+      new Error('Unable to read or parse upstream usage response'),
+      expect.objectContaining({
+        tags: { source: 'usage_response_parsing', api_kind: 'fim_completions' },
+      })
+    );
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ hasError: true, cost_mUsd: 0, status_code: 200 }),
+      expect.anything()
+    );
+  });
+
+  const rootZodIssue = { errorName: 'ZodError', issues: [{ path: '', code: 'invalid_type' }] };
+  it.each([
+    ['not JSON containing private-response-content', { errorName: 'SyntaxError' }],
+    ['null', rootZodIssue],
+    ['false', rootZodIssue],
+    ['[]', rootZodIssue],
+    ['42', rootZodIssue],
+    [
+      '{"usage":{"prompt_tokens":"private-response-content","completion_tokens":1}}',
+      { errorName: 'ZodError', issues: [{ path: 'usage.prompt_tokens', code: 'invalid_type' }] },
+    ],
+    [
+      '{"choices":{"text":"private-response-content"}}',
+      { errorName: 'ZodError', issues: [{ path: 'choices', code: 'invalid_type' }] },
+    ],
+    [
+      '{"choices":[{"delta":[]}]}',
+      { errorName: 'ZodError', issues: [{ path: 'choices.0.delta', code: 'invalid_type' }] },
+    ],
+  ])('retains later FIM usage after a malformed event: %s', async (malformedEvent, readError) => {
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+    countAndStoreFimUsage(
+      new Response(
+        `data: ${malformedEvent}\n\n` +
+          'data: {"id":"fim-recovered","model":"mercury-edit-2","choices":[{"text":"completion"}],"usage":{"prompt_tokens":1000,"completion_tokens":100}}\n\n' +
+          'data: [DONE]\n\n'
+      ),
+      makeUsageContext({ isStreaming: true }),
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hasError: true,
+        messageId: 'fim-recovered',
+        responseContent: 'completion',
+        inputTokens: 1000,
+        outputTokens: 100,
+        cost_mUsd: 325,
+      }),
+      expect.anything()
+    );
+    expect(captureMessage).toHaveBeenCalledTimes(1);
+    expect(captureMessage).toHaveBeenCalledWith('Malformed upstream usage SSE events', {
+      level: 'error',
+      tags: { source: 'usage_stream_parsing' },
+      extra: {
+        messageId: 'fim-recovered',
+        model: 'mercury-edit-2',
+        malformedEventCount: 1,
+        ...readError,
+      },
     });
-    expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+    expect(captureException).not.toHaveBeenCalled();
+    expect(JSON.stringify(jest.mocked(captureMessage).mock.calls)).not.toContain(
+      'private-response-content'
+    );
+  });
+
+  it('does not treat a null stream error as a failure', async () => {
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+    countAndStoreFimUsage(
+      new Response(
+        'data: {"error":null}\n\n' +
+          'data: {}\n\n' +
+          'data: {"id":"fim-ok","model":"mercury-edit-2","error":null,"usage":{"prompt_tokens":1000,"completion_tokens":100},"choices":[]}\n\n'
+      ),
+      makeUsageContext({ isStreaming: true }),
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ hasError: false, cost_mUsd: 325 }),
+      expect.anything()
+    );
+    expect(captureException).not.toHaveBeenCalled();
+    expect(captureMessage).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -866,16 +1156,17 @@ describe.each<{
       const storeUsage =
         apiKind === 'audio_transcriptions' ? mockedProcessTokenData : mockedLogMicrodollarUsage;
       expect(storeUsage).toHaveBeenCalledTimes(3);
-      expect(storeUsage).toHaveBeenLastCalledWith(
+      expect(storeUsage.mock.calls.at(-1)).toEqual([
         expect.objectContaining({ hasError: true, cost_mUsd: 0, status_code: status }),
-        context
-      );
+        context,
+        ...(apiKind === 'audio_transcriptions' ? [undefined] : []),
+      ]);
       expect(captureException).not.toHaveBeenCalled();
       expect(captureMessage).not.toHaveBeenCalled();
     }
   );
 
-  it.each(['missing', 'unreadable'])('does not re-report a %s HTTP error body', async kind => {
+  it.each(['missing', 'unreadable'])('accounts for a %s HTTP error body', async kind => {
     const body =
       kind === 'missing'
         ? null
@@ -895,7 +1186,20 @@ describe.each<{
     );
     await waitForUsageWrite();
 
-    expect(captureException).not.toHaveBeenCalled();
+    const storeUsage =
+      apiKind === 'audio_transcriptions' || apiKind === 'embeddings'
+        ? mockedProcessTokenData
+        : mockedLogMicrodollarUsage;
+    expect(storeUsage.mock.calls[0]).toEqual([
+      expect.objectContaining({ hasError: true, cost_mUsd: 0, status_code: 429 }),
+      expect.anything(),
+      ...(apiKind === 'audio_transcriptions' || apiKind === 'embeddings' ? [undefined] : []),
+    ]);
+    if (apiKind === 'embeddings') expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledWith(
+      new Error('Unable to read or parse upstream usage response'),
+      expect.objectContaining({ tags: { source: 'usage_response_parsing', api_kind: apiKind } })
+    );
     expect(captureMessage).not.toHaveBeenCalled();
   });
 
@@ -911,11 +1215,228 @@ describe.each<{
     );
     await waitForUsageWrite();
 
-    expect(captureMessage).toHaveBeenCalledWith(
-      expect.stringContaining('SUSPICIOUS:'),
-      expect.anything()
+    expect(captureException).toHaveBeenCalledWith(
+      new Error('Unable to read or parse upstream usage response'),
+      expect.objectContaining({ tags: { source: 'usage_response_parsing', api_kind: apiKind } })
     );
+    expect(captureMessage).not.toHaveBeenCalled();
   });
+});
+
+describe.each<{
+  apiKind: MicrodollarUsageContext['api_kind'];
+  countUsage: typeof countAndStoreFimUsage;
+}>([
+  { apiKind: 'fim_completions', countUsage: countAndStoreFimUsage },
+  { apiKind: 'edit_completions', countUsage: countAndStoreEditUsage },
+  { apiKind: 'embeddings', countUsage: countAndStoreEmbeddingUsage },
+  { apiKind: 'audio_transcriptions', countUsage: countAndStoreTranscriptionUsage },
+])('$apiKind usage recovery', ({ apiKind, countUsage }) => {
+  const makeContext = (): MicrodollarUsageContext => ({
+    ...createMockUsageContext('usage-user', 'unused@example.com', 0),
+    api_kind: apiKind,
+    provider: 'inception',
+    status_code: 200,
+    usageId: 'usage-recovery-id',
+    organizationId: 'usage-organization',
+    promptInfo: {
+      system_prompt_prefix: 'private-prompt',
+      user_prompt_prefix: 'private-prompt',
+      system_prompt_length: 14,
+    },
+  });
+
+  const validPayload = {
+    model: 'test/model',
+    text: 'transcription',
+    choices: [{ text: 'completion', message: { content: 'edit' } }],
+    usage: {
+      prompt_tokens: 1000,
+      completion_tokens: 100,
+      input_tokens: 10,
+      output_tokens: 4,
+      cost: 0.001,
+      is_byok: false,
+    },
+    error: null,
+  };
+
+  beforeEach(() => {
+    mockedLogMicrodollarUsage.mockClear();
+    mockedProcessTokenData.mockClear();
+    jest.mocked(after).mockClear();
+    jest.mocked(captureException).mockClear();
+    jest.mocked(captureMessage).mockClear();
+  });
+
+  const rootZodIssue = { errorName: 'ZodError', issues: [{ path: '', code: 'invalid_type' }] };
+  const invalidTokenPath =
+    apiKind === 'audio_transcriptions' ? 'usage.input_tokens' : 'usage.prompt_tokens';
+
+  it.each([
+    { name: 'missing body', body: () => null, error: { errorName: 'Error' } },
+    {
+      name: 'read interruption',
+      body: () =>
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            controller.error(new TypeError('terminated private-response-content'));
+          },
+        }),
+      error: { errorName: 'TypeError' },
+    },
+    {
+      name: 'invalid JSON',
+      body: () => 'invalid JSON private-response-content',
+      error: { errorName: 'SyntaxError' },
+    },
+    { name: 'null', body: () => 'null', error: rootZodIssue },
+    { name: 'array', body: () => '[]', error: rootZodIssue },
+    { name: 'primitive', body: () => '42', error: rootZodIssue },
+    {
+      name: 'unexpected object',
+      body: () => '{"unrecognized":"private-response-content"}',
+      error: { errorName: 'Error' },
+    },
+    {
+      name: 'invalid model type',
+      body: () =>
+        JSON.stringify({ ...validPayload, model: { secret: 'private-response-content' } }),
+      error: { errorName: 'ZodError', issues: [{ path: 'model', code: 'invalid_type' }] },
+    },
+    {
+      name: 'invalid token type',
+      body: () =>
+        JSON.stringify({
+          ...validPayload,
+          usage: {
+            ...validPayload.usage,
+            prompt_tokens: 'private-response-content',
+            input_tokens: 'private-response-content',
+          },
+        }),
+      error: {
+        errorName: 'ZodError',
+        issues: [{ path: invalidTokenPath, code: 'invalid_type' }],
+      },
+    },
+  ])('persists errored usage for $name with sanitized diagnostics', async ({ body, error }) => {
+    const context = makeContext();
+    countUsage(
+      new Response(body(), { headers: { 'x-generation-id': 'generation-recovery' } }),
+      context,
+      undefined
+    );
+    await waitForUsageWrite();
+
+    const storeUsage =
+      apiKind === 'audio_transcriptions' || apiKind === 'embeddings'
+        ? mockedProcessTokenData
+        : mockedLogMicrodollarUsage;
+    expect(storeUsage).toHaveBeenCalledTimes(1);
+    expect(storeUsage.mock.calls[0]).toEqual([
+      expect.objectContaining({
+        messageId: 'generation-recovery',
+        hasError: true,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheHitTokens: 0,
+        cacheWriteTokens: 0,
+        cost_mUsd: 0,
+        status_code: 200,
+      }),
+      context,
+      ...(apiKind === 'audio_transcriptions' || apiKind === 'embeddings' ? [undefined] : []),
+    ]);
+    if (apiKind === 'embeddings') expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(
+      new Error('Unable to read or parse upstream usage response'),
+      {
+        tags: { source: 'usage_response_parsing', api_kind: apiKind },
+        extra: {
+          usageId: 'usage-recovery-id',
+          kiloUserId: context.kiloUserId,
+          organizationId: context.organizationId,
+          provider: 'inception',
+          messageId: 'generation-recovery',
+          ...error,
+        },
+      }
+    );
+    expect(JSON.stringify(jest.mocked(captureException).mock.calls)).not.toContain('private-');
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { id: undefined, expectedId: 'generation-header' },
+    { id: 'generation-body', expectedId: 'generation-body' },
+  ])('uses the generation id $expectedId on successful usage', async ({ id, expectedId }) => {
+    const context = makeContext();
+    countUsage(
+      new Response(JSON.stringify({ ...validPayload, id }), {
+        headers: { 'x-generation-id': 'generation-header' },
+      }),
+      context,
+      undefined
+    );
+    await waitForUsageWrite();
+
+    const storeUsage =
+      apiKind === 'audio_transcriptions' ? mockedProcessTokenData : mockedLogMicrodollarUsage;
+    expect(storeUsage.mock.calls[0]).toEqual([
+      expect.objectContaining({ messageId: expectedId, hasError: false }),
+      context,
+      ...(apiKind === 'audio_transcriptions' ? [undefined] : []),
+    ]);
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('keeps the reported usage of a body without a model', async () => {
+    const context = makeContext();
+    const { model: _model, ...payloadWithoutModel } = validPayload;
+    countUsage(new Response(JSON.stringify(payloadWithoutModel)), context, undefined);
+    await waitForUsageWrite();
+
+    const storeUsage =
+      apiKind === 'audio_transcriptions' ? mockedProcessTokenData : mockedLogMicrodollarUsage;
+    const stats = storeUsage.mock.calls[0]?.[0];
+    expect(stats?.inputTokens).toBeGreaterThan(0);
+    // Transcriptions fall back to the requested model; the others record the missing model as an error.
+    if (apiKind !== 'audio_transcriptions') {
+      expect(stats).toMatchObject({ model: null, hasError: true });
+    }
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('does not recover from persistence failures', async () => {
+    const accountingError = new Error('usage persistence failed');
+    if (apiKind === 'audio_transcriptions') {
+      mockedProcessTokenData.mockRejectedValueOnce(accountingError);
+    } else {
+      mockedLogMicrodollarUsage.mockRejectedValueOnce(accountingError);
+    }
+
+    countUsage(new Response(JSON.stringify(validPayload)), makeContext(), undefined);
+
+    await expect(jest.mocked(after).mock.calls[0][0]).rejects.toBe(accountingError);
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  if (apiKind === 'embeddings' || apiKind === 'audio_transcriptions') {
+    it('does not recover from pricing failures', async () => {
+      const accountingError = new Error('usage pricing failed');
+      jest.mocked(sharedUsage.computeOpenRouterCostFields).mockImplementationOnce(() => {
+        throw accountingError;
+      });
+      countUsage(new Response(JSON.stringify(validPayload)), makeContext(), undefined);
+
+      await expect(jest.mocked(after).mock.calls[0][0]).rejects.toBe(accountingError);
+      expect(captureException).not.toHaveBeenCalled();
+      expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+      expect(mockedProcessTokenData).not.toHaveBeenCalled();
+    });
+  }
 });
 
 describe('countAndStoreEditUsage', () => {
@@ -1044,14 +1565,17 @@ describe('countAndStoreEditUsage', () => {
     expect(stats).toMatchObject({ messageId: 'edit-timed', latency: 300, generation_time: 40 });
   });
 
-  it('does not log usage when the upstream body is missing', async () => {
+  it('logs errored usage when the upstream body is missing', async () => {
     const bodylessResponse = new Response(null, { status: 502 });
 
     countAndStoreEditUsage(bodylessResponse, makeUsageContext({ status_code: 502 }), undefined);
 
     await new Promise(resolve => setImmediate(resolve));
 
-    expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ hasError: true, cost_mUsd: 0, status_code: 502 }),
+      expect.anything()
+    );
   });
 });
 
@@ -1139,6 +1663,22 @@ describe('parseEmbeddingUsageFromResponse', () => {
     const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.inputTokens).toBe(42);
+  });
+
+  it('extracts the inference provider OpenRouter reports', () => {
+    const result = parseEmbeddingUsageFromResponse(
+      makeResponse({ provider: 'OpenAI' }),
+      200,
+      'openrouter'
+    );
+
+    expect(result.inference_provider).toBe('OpenAI');
+  });
+
+  it('sets the inference provider to null when the response has none', () => {
+    const result = parseEmbeddingUsageFromResponse(makeResponse(), 200, 'openrouter');
+
+    expect(result.inference_provider).toBeNull();
   });
 });
 

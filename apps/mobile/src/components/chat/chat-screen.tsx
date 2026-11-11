@@ -28,7 +28,7 @@ import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-st
 import { useTargetSupportsImages } from '@/lib/chat/backend-capabilities';
 import { rememberModelFacts } from '@/lib/chat/layers';
 import { requiresBackendDisclosure } from '@/lib/chat/backend-model-options';
-import { chatTargetKind, resolveChatTarget } from '@/lib/chat/backend-target';
+import { chatTargetKind, CREDITS_FAILURE_KEY, resolveChatTarget } from '@/lib/chat/backend-target';
 import { useLocalModels } from '@/lib/chat/local-models';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { type EffortChoices, effortOfVariant, variantOfEffort } from '@/lib/chat/effort';
@@ -182,8 +182,14 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     selectModel(modelId, null);
   };
 
+  // Where the account buys the credit a refused send needs. Both the failed
+  // question and the row above the composer reach it through this one action.
+  const openCredits = useCallback(() => {
+    router.push('/(app)/credits' as Href);
+  }, [router]);
+
   const messages = asMessages(state);
-  const actions = useChatMessageActions(state, messages, retry);
+  const actions = useChatMessageActions(state, messages, { retry, addCredits: openCredits });
   const { actionsFor } = actions;
   const details = useChatDetails({
     model: state.model === '' ? model : state.model,
@@ -236,8 +242,17 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const transcriptFailure =
     state.status === 'idle' && messages.length === 0 ? state.failureKey : null;
   // A chat that is not one this place may read is not one this place can retry
-  // into: entering it again settles the same state.
-  const retryable = !actions.hasUnanswered && state.failureKey !== CHAT_UNAVAILABLE_KEY;
+  // into: entering it again settles the same state. Neither is a send the
+  // balance refused: a re-send meets the same refusal, so the action that
+  // settles it is Add credits, never a Retry.
+  const creditsRefused = state.failureKey === CREDITS_FAILURE_KEY;
+  const retryable =
+    !actions.hasUnanswered && state.failureKey !== CHAT_UNAVAILABLE_KEY && !creditsRefused;
+  // The refused question's own bubble states the credits cause and carries Add
+  // credits, so the row above the composer does not repeat them. With no
+  // question on screen that row is the only place that can state it, and the
+  // only place that can offer the action.
+  const rowFailureKey = creditsRefused && actions.hasUnanswered ? null : state.failureKey;
 
   function renderTranscript() {
     if (state.status === 'opening') {
@@ -309,12 +324,10 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           <ChatComposerArea
             status={state.status}
             messages={messages}
-            failureKey={state.failureKey}
+            failureKey={rowFailureKey}
             retryable={retryable}
             onRetry={() => void retry()}
-            onAddCredits={() => {
-              router.push('/(app)/credits' as Href);
-            }}
+            onAddCredits={openCredits}
             onSend={handleSend}
             composerControlRef={actions.composerControlRef}
             onStop={handleStop}

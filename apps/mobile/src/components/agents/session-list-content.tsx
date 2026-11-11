@@ -5,7 +5,6 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -368,6 +367,7 @@ export function AgentSessionListContent({
           session={item.session}
           sortBy={SESSION_LIST_SORT}
           sectionTitle={item.sectionTitle}
+          timeZone={item.timeZone}
           live={activeSessionIds.has(item.session.session_id)}
           metaWhileLive
           onPress={() => {
@@ -402,9 +402,14 @@ export function AgentSessionListContent({
   // fresh open whose own load failed shows the retryable error instead of
   // presenting them as loaded (see `selectSessionListContentSurface`).
   // Gated on !isLoading so a cold-open load never flashes this surface.
+  //
+  // None of these bodies carries an entering animation. An entering fade holds
+  // the view at its start value until the animation runs, and a body mounted
+  // during a screen transition can miss that run: its whole area then stays
+  // invisible, which reads as the blank body this screen must never show.
   if (surface.kind === 'full-screen-error') {
     return (
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+      <View className="flex-1">
         {updatingStatus}
         <QueryError
           message={t('common.couldNotLoadSessions')}
@@ -412,7 +417,7 @@ export function AgentSessionListContent({
           isRetrying={isRetrying || errorPullBusy}
           refreshControl={refreshControl}
         />
-      </Animated.View>
+      </View>
     );
   }
 
@@ -421,7 +426,7 @@ export function AgentSessionListContent({
   // so a cold open with an empty cache does not flash before queries settle.
   if (surface.kind === 'history-empty') {
     return (
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+      <View className="flex-1">
         {updatingStatus}
         <BodyEmpty
           kind="no-past-sessions"
@@ -431,7 +436,7 @@ export function AgentSessionListContent({
           onRetry={onRetry}
           refreshControl={refreshControl}
         />
-      </Animated.View>
+      </View>
     );
   }
 
@@ -441,7 +446,7 @@ export function AgentSessionListContent({
   // FlashList empty → populated transition is what mis-lays-out the swap.
   if (surface.listEmpty === 'body-empty' && bodyModel.kind !== 'render-list') {
     return (
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+      <View className="flex-1">
         {updatingStatus}
         <BodyEmpty
           kind={bodyModel.kind}
@@ -454,7 +459,7 @@ export function AgentSessionListContent({
           onRetry={onRetry}
           refreshControl={refreshControl}
         />
-      </Animated.View>
+      </View>
     );
   }
 
@@ -487,6 +492,12 @@ export function AgentSessionListContent({
           extraData={attentionFocusRevision}
           ListFooterComponent={listFooter}
           contentContainerStyle={contentInsetStyle}
+          // The search field above this list holds the keyboard while results
+          // are filtered. With the platform default the list claims that touch
+          // and only closes the keyboard, so a result needed two taps; with
+          // this value the row's own press runs and the list still follows a
+          // drag (see `keyboardDismissMode`).
+          keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}

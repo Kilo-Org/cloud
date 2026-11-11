@@ -84,12 +84,21 @@ export function createKilo2Harness(options: {
       return !(input.sessionId in active);
     });
   }
-  async function compact(input: HarnessSession & { model: string }) {
+  async function compact(input: Parameters<Harness['compact']>[0]) {
     await select(input);
     await options.lifecycle.waitForInterrupt(input.sessionId, input.signal);
     await replaceCloudAgentContext(input);
-    const id = createMessageId();
-    await post(`${kilo2SessionPath(input.sessionId)}/compact`, { id }, input.signal);
+    let outcome: Awaited<ReturnType<Harness['compact']>> = 'executed';
+    try {
+      await post(
+        `${kilo2SessionPath(input.sessionId)}/compact`,
+        { id: input.messageId },
+        input.signal
+      );
+    } catch (error) {
+      if (!(error instanceof Kilo2HttpError && error.status === 409)) throw error;
+      outcome = 'replayed';
+    }
     await post(
       `/api/experimental/session/${encodeURIComponent(input.sessionId)}/wait`,
       undefined,
@@ -97,20 +106,29 @@ export function createKilo2Harness(options: {
     );
     const result = z
       .object({
+        id: z.literal(input.messageId),
         type: z.literal('compaction'),
         status: z.enum(['completed', 'failed']),
-        error: z.object({ message: z.string() }).optional(),
+        error: z.object({ type: z.string().optional(), message: z.string() }).optional(),
       })
       .parse(
-        await api.data(`${kilo2SessionPath(input.sessionId)}/message/${encodeURIComponent(id)}`, {
-          signal: input.signal,
-        })
+        await api.data(
+          `${kilo2SessionPath(input.sessionId)}/message/${encodeURIComponent(input.messageId)}`,
+          { signal: input.signal }
+        )
       );
-    if (result.status === 'failed')
+    // Kilo v2 0.0.0-v2-77 reports an empty compaction with this exact type and message.
+    if (
+      result.status === 'failed' &&
+      !(
+        result.error?.type === 'compaction.unavailable' &&
+        result.error.message === 'Nothing to compact yet'
+      )
+    )
       throw new Error(
         `Kilo v2 compaction failed: ${result.error?.message ?? 'Unknown native failure'}`
       );
-    return true;
+    return outcome;
   }
   async function remove(path: string, signal?: AbortSignal) {
     try {
@@ -200,6 +218,7 @@ export function createKilo2Harness(options: {
     },
   };
   return {
+    supportsHistoryPreload: true,
     async open(input) {
       try {
         const existing = await session(input.sessionId, input.signal);
@@ -250,19 +269,15 @@ export function createKilo2Harness(options: {
       // The native command API has no message id; the command creates its own user message.
       await post(
         `${kilo2SessionPath(input.sessionId)}/command`,
-        { command: input.command, text: input.args ?? '' },
+        { name: input.command, text: input.args ?? '' },
         input.signal
       );
     },
     compact,
     async condense(input) {
       try {
-        const success = await compact(input);
-        return {
-          success,
-          wasAborted: false,
-          ...(success ? {} : { error: 'Kilo v2 compaction failed' }),
-        };
+        await compact({ ...input, messageId: createMessageId() });
+        return { success: true, wasAborted: false };
       } catch (error) {
         return {
           success: false,

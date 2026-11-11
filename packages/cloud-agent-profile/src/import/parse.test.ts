@@ -176,15 +176,28 @@ describe('parseLocalConfigArchive', () => {
     expect(preview.config.skills.length).toBe(51);
   });
 
-  test('rejects an oversized skill companion', () => {
+  test('rejects an oversized skill companion and names the unit it measures', () => {
     const preview = parseFiles({
       'skills/big/SKILL.md': '# Big',
       'skills/big/huge.md': 'c'.repeat(100_001),
     });
     const issue = preview.issues.find(candidate => candidate.code === 'skill-files-invalid');
     expect(issue?.field).toBe('files');
-    expect(issue?.message).toContain('exceeds');
+    expect(issue?.message).toBe('Skill companion file huge.md exceeds 100000 characters');
+    // Both contracts reject the same map; the user sees one problem, not one
+    // row per nested file key.
+    expect(preview.issues.filter(candidate => candidate.category === 'skills')).toHaveLength(1);
     expect(preview.config.skills).toEqual([]);
+  });
+
+  test('describes a schema failure without naming an internal contract', () => {
+    const preview = parseFiles({ 'command/template.md': `---\n---\n${'e'.repeat(100_001)}` });
+
+    const issue = preview.issues.find(candidate => candidate.code === 'command-template-invalid');
+    expect(issue?.message).toBe('Command template exceeds 100000 characters');
+    for (const candidate of preview.issues) {
+      expect(candidate.message).not.toContain('contract:');
+    }
   });
 
   test('reports a skill bundle without a SKILL.md manifest', () => {
@@ -197,6 +210,9 @@ describe('parseLocalConfigArchive', () => {
     const preview = parseFiles({ 'instructions/cloud-agent.md': 'Body' });
     const issue = preview.issues.find(candidate => candidate.code === 'instruction-invalid');
     expect(issue?.field).toBe('name');
+    expect(issue?.path).toBe('instructions/cloud-agent.md');
+    expect(issue?.message).toContain('"cloud-agent"');
+    expect(issue?.message).toContain('instructions/cloud-agent.md');
     expect(issue?.message).toContain('Cloud-Agent');
     expect(preview.config.instructions).toEqual([]);
   });
@@ -204,6 +220,41 @@ describe('parseLocalConfigArchive', () => {
   test('slugifies nested instruction paths into a safe rules filename', () => {
     const preview = parseFiles({ 'instructions/team/style.md': 'Body' });
     expect(preview.config.instructions).toEqual([{ name: 'team-style', content: 'Body' }]);
+  });
+
+  test('imports an instruction file whose name has no ASCII characters', () => {
+    const preview = parseFiles({ 'instructions/使用说明.md': 'Body' });
+    expect(preview.issues).toEqual([]);
+    expect(preview.config.instructions).toEqual([
+      { name: expect.stringMatching(/^instruction-[0-9a-f]{8}$/), content: 'Body' },
+    ]);
+  });
+
+  test('imports accented and ASCII instruction files that used to share one name', () => {
+    const preview = parseFiles({
+      'instructions/café-notes.md': 'Accented body',
+      'instructions/caf-notes.md': 'ASCII body',
+    });
+    expect(preview.issues).toEqual([]);
+    const contents = new Map(
+      preview.config.instructions.map(instruction => [instruction.name, instruction.content])
+    );
+    expect(contents.get('caf-notes')).toBe('ASCII body');
+    const accented = [...contents.keys()].find(name => name !== 'caf-notes');
+    expect(accented).toMatch(/^cafe-notes-[0-9a-f]{8}$/);
+    expect(contents.get(accented ?? '')).toBe('Accented body');
+  });
+
+  test('derives one identity for a non-Latin instruction matched by a directory and a glob', () => {
+    const preview = parseFiles({
+      'kilo.json': JSON.stringify({ instructions: ['instructions/*.md'] }),
+      'instructions/使用说明.md': 'Body',
+    });
+    expect(issueCodes(preview)).not.toContain('duplicate-definition');
+    expect(preview.hasErrors).toBe(false);
+    expect(preview.config.instructions).toEqual([
+      { name: expect.stringMatching(/^instruction-[0-9a-f]{8}$/), content: 'Body' },
+    ]);
   });
 
   test('rejects duplicate definitions with both sources named', () => {
@@ -260,6 +311,43 @@ describe('parseLocalConfigArchive', () => {
     expect(preview.issues.some(issue => issue.code === 'invalid-config-json')).toBe(true);
     expect(preview.config.agents.map(agent => agent.slug)).toEqual(['reviewer']);
     expect(preview.hasErrors).toBe(true);
+  });
+
+  test('names the syntax error and its position instead of a parser code and an offset', () => {
+    const preview = parseFiles({
+      'kilo.json': '{\n  "agent": {\n    "reviewer" {}\n  }\n}',
+      'agent/reviewer.md': 'Review.',
+    });
+
+    const issue = preview.issues.find(candidate => candidate.code === 'invalid-config-json');
+    expect(issue?.message).toBe('Could not parse kilo.json: ColonExpected at line 3, column 16');
+    expect(preview.config.agents.map(agent => agent.slug)).toEqual(['reviewer']);
+  });
+
+  test('points at both lines of a duplicate property', () => {
+    const preview = parseFiles({
+      'kilo.json':
+        '{\n  "agent": {\n    "triage": {"prompt": "a"},\n    "triage": {"prompt": "b"}\n  }\n}',
+    });
+
+    const issue = preview.issues.find(candidate => candidate.code === 'duplicate-definition');
+    expect(issue?.message).toBe(
+      'Duplicate property "agent.triage" at line 3, column 5 and line 4, column 5 in kilo.json; import is ambiguous'
+    );
+    expect(preview.config.agents).toEqual([]);
+  });
+
+  test('positions every duplicate property in a config full of repeats', () => {
+    const lines = ['{'];
+    for (let index = 0; index < 200; index += 1) lines.push('  "agent": {},');
+    lines.push('  "x": 1', '}');
+    const preview = parseFiles({ 'kilo.json': lines.join('\n') });
+
+    const issues = preview.issues.filter(candidate => candidate.code === 'duplicate-definition');
+    expect(issues).toHaveLength(199);
+    expect(issues.at(-1)?.message).toBe(
+      'Duplicate property "agent" at line 2, column 3 and line 201, column 3 in kilo.json; import is ambiguous'
+    );
   });
 
   test('ignores remote instruction URLs and globs that match no files', () => {

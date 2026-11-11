@@ -12,7 +12,6 @@ const emptyFeatures: OrganizationFeatures = {
   experimental_byok: [],
   enkrypt_output_guardrail: [],
   gateway_settings: [],
-  request_logs: [],
 };
 const mockMutate = jest.fn();
 const mockRefetchConfig = jest.fn();
@@ -81,7 +80,6 @@ describe('OrganizationFeaturesContent', () => {
         experimental_byok: [activeId],
         enkrypt_output_guardrail: [],
         gateway_settings: [],
-        request_logs: [],
       },
       isLoading: false,
       error: null,
@@ -155,7 +153,6 @@ describe('OrganizationFeaturesContent', () => {
       experimental_byok: [activeId, unknownId],
       enkrypt_output_guardrail: [activeId],
       gateway_settings: [deletedId, activeId],
-      request_logs: [activeId],
     };
     mockPreviewQuery.data?.push({ id: deletedId, name: 'Deleted organization', isDeleted: true });
     render();
@@ -168,9 +165,11 @@ describe('OrganizationFeaturesContent', () => {
       'Direct Amazon Bedrock and Google Vertex AI BYOK (2)',
       'Enkrypt output guardrails (1)',
       'Gateway settings (2)',
-      'Request logs (1)',
     ]);
-    expect(sections[3].querySelector('a')?.textContent).toBe('Active organization');
+    expect(Array.from(sections[2].querySelectorAll('a')).map(link => link.textContent)).toEqual([
+      'Deleted organization',
+      'Active organization',
+    ]);
     expect(sections[0].querySelector('a')?.textContent).toBe('Active organization');
     expect(sections[0].querySelector('a')?.getAttribute('href')).toBe(
       `/admin/organizations/${activeId}`
@@ -205,7 +204,6 @@ describe('OrganizationFeaturesContent', () => {
       experimental_byok: [deletedId],
       enkrypt_output_guardrail: [deletedId],
       gateway_settings: [deletedId],
-      request_logs: [],
     };
     expect(mockPreviewOptions).toHaveBeenLastCalledWith(input, {
       enabled: true,
@@ -282,7 +280,7 @@ describe('OrganizationFeaturesContent', () => {
       enabled: false,
     });
     expect(Array.from(container.querySelectorAll('section p')).map(p => p.textContent)).toEqual(
-      Array.from({ length: 4 }, () => 'No organizations enabled.')
+      Array.from({ length: 3 }, () => 'No organizations enabled.')
     );
     expect(container.querySelector('[role="status"]')).toBeNull();
     expect(container.querySelector('section li')).toBeNull();

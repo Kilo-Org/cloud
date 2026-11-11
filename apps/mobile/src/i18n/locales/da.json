@@ -22,6 +22,8 @@
     "expired": "Udløbet"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Annuller",
     "done": "Færdig",
     "retry": "Prøv igen",
@@ -227,6 +229,21 @@
     "signInCodeField": "Loginkode",
     "or": "eller"
   },
+  "pendingLink": {
+    "description": "Der findes allerede en konto med {{email}}. Log ind med en af dens metoder for at tilføje {{provider}}.",
+    "emailCode": "Send mig en loginkode på e-mail",
+    "continueInBrowser": "Fortsæt i browseren",
+    "startAgain": "Start forfra",
+    "expired": "Denne anmodning om at tilføje {{provider}} er udløbet.",
+    "noMethods": "Denne konto har ingen anden loginmetode, så {{provider}} kan ikke tilføjes.",
+    "linked": "{{provider}} blev føjet til din konto.",
+    "failedExpired": "{{provider}} blev ikke tilføjet, fordi anmodningen udløb.",
+    "failedWrongAccount": "{{provider}} blev ikke tilføjet, fordi du loggede ind på en anden konto.",
+    "failedAccountAlreadyLinked": "{{provider}} blev ikke tilføjet, fordi det allerede er knyttet til en anden konto.",
+    "failedProviderAlreadyLinked": "{{provider}} blev ikke tilføjet, fordi din konto allerede har et andet {{provider}}-login.",
+    "failedLinking": "{{provider}} kunne ikke føjes til din konto.",
+    "notAdded": "Du er logget ind. {{provider}} blev ikke føjet til din konto."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatiske PR-gennemgange",
     "securityAgentSubtitle": "Find og afhjælp sårbarheder",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO til virksomheder",
     "passkeysTitle": "Adgangsnøgler",
     "passkeysSubtitle": "Log ind uden en adgangskode",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "Prøv at indlæse filer igen",
       "filterPlaceholder": "Filsti",
       "viewedCount": "{{viewed}} af {{total}} gennemset",
+      "viewedCount_one": "{{viewed}} af {{total}} gennemset",
+      "viewedCount_other": "{{viewed}} af {{total}} gennemset",
       "viewedOfListed": "{{viewed}} af {{total}} filer på listen gennemset",
+      "viewedOfListed_one": "{{viewed}} af {{total}} filer på listen gennemset",
+      "viewedOfListed_other": "{{viewed}} af {{total}} filer på listen gennemset",
       "loadingFiles": "Indlæser {{loaded}} af {{total}}…",
       "failedToLoadAllFiles": "Ikke alle filer kunne indlæses.",
       "couldNotLoadMoreFiles": "Flere filer kunne ikke indlæses.",
@@ -1837,7 +1860,7 @@
       "cloningSession": "Kloner session",
       "couldNotLoadThisSession": "Kunne ikke indlæse denne session.",
       "cloneFailedRetry": "Kunne ikke klone denne session. Prøv igen.",
-      "notEnoughCredits": "Du har ikke nok kreditter til at køre Cloud Agent. Tilføj kreditter og prøv igen.",
+      "notEnoughCredits": "Du har ikke nok kreditter til denne anmodning. Tilføj kreditter og prøv igen.",
       "previousTaskFinishing": "Den forrige opgave er ved at blive afsluttet. Vent et øjeblik.",
       "serviceUnavailable": "Tjenesten er ikke tilgængelig lige nu. Prøv igen.",
       "connectionTrouble": "Der er problemer med forbindelsen. Prøv igen om et øjeblik.",
@@ -1947,7 +1970,7 @@
       "discardWithUploadsMessage": "Din forespørgsel og eventuelle uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet.",
       "discardFailed": "Kunne ikke kassere kladden. Prøv igen.",
       "remoteHint": "For at køre på din computer skal du starte Kilo der og lade den køre videre.",
-      "continueFrom": "Sessionen {{title}} fortsættes.",
+      "continueFrom": "Sessionen “{{title}}” fortsættes.",
       "importingSession": "Importerer session",
       "cliCannotContinue": "Denne CLI kan ikke fortsætte en session. Vælg Cloud Agent eller en anden CLI.",
       "importFailed": "Kunne ikke importere denne session.",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "Valgt profil",
       "manualOverrides": "Manuelle tilsidesættelser",
       "openSettingsToReview": "Åbn Indstillinger for at gennemgå",
-      "profileSelection": "Valg af profil"
+      "profileSelection": "Valg af profil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil er opdateret.",
@@ -1999,6 +2023,8 @@
       "toolList": "vis liste",
       "toolPatch": "anvend rettelse",
       "toolTask": "opgave",
+      "toolSendFile": "Sendt fil",
+      "toolSendFileAction": "Send fil",
       "readTodos": "Læs planen",
       "updateTodos": "Opdatér planen",
       "linesBadge": "{{displayCount}} linjer",
@@ -2099,7 +2125,21 @@
       "thought": "Ræsonnement",
       "showDetails": "Vis oplysninger",
       "pending": "Afventer…",
-      "running": "Kører…"
+      "running": "Kører…",
+      "field": {
+        "filePath": "Filsti",
+        "path": "Sti",
+        "offset": "Offset",
+        "limit": "Grænse",
+        "pattern": "Mønster",
+        "include": "Medtag",
+        "patchText": "Rettelsestekst",
+        "query": "Forespørgsel",
+        "prompt": "Instruktion",
+        "header": "Overskrift",
+        "question": "Spørgsmål",
+        "options": "Valgmuligheder"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Kunne ikke vise indholdet."
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "Samtalen er for lang til modellen.",
       "assistantProviderError": "Udbyderen returnerede en fejl.",
       "assistantProviderRefused": "Udbyderen afviste denne anmodning, og den kan ikke forsøges igen.",
-      "assistantCreditsRefusal": "Du har ikke nok kreditter til at køre Cloud Agent.",
+      "assistantCreditsRefusal": "Du har ikke nok kreditter til denne anmodning.",
       "assistantOutputLimit": "Svaret nåede modellens outputgrænse.",
       "assistantStructuredOutput": "Svaret matchede ikke det påkrævede format.",
       "assistantFailed": "Svaret kunne ikke genereres."
@@ -2260,7 +2300,7 @@
       "positionHint": "(1 af {{displayCount}})",
       "movedPastPrompt": "Agenten er gået videre fra denne forespørgsel. Dette kort lukkes, når sessionen fortsætter.",
       "waitingForAnswer": "Agenten venter på dit svar. Mens dette spørgsmål er åbent, er din besked til agenten sat på pause.",
-      "waitingForPermission": "Agenten venter på tilladelse. Mens denne anmodning er åben, er din besked til agenten sat på pause."
+      "waitingForPermission": "Mens denne anmodning er åben, er din besked til agenten sat på pause."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3038,7 +3078,7 @@
       "provider": "Stoppet: udbyderfejl",
       "tool": "Stoppet: værktøjsfejl",
       "cancelled": "Stoppet: annulleret",
-      "other": "STOPPET"
+      "other": "Stoppet"
     }
   },
   "transcriptionModel": {
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "Min agent",
       "promptPlaceholder": "Du er en...",
       "tools": "Værktøjer",
+      "wholeToolRule": "Denne agent anvender én regel på alle værktøjer på én gang: {{rule}}. Disse kontakter er skrivebeskyttede.",
       "visibility": "Sigtbarhed",
       "visibilityPrimary": "Primær — vist i vælgeren",
       "visibilitySubagent": "Subagent — kan kun kaldes fra andre",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "Standardprofiler for Repos",
+      "entryLabel": "Standardprofiler",
       "add": "Tilføj standard",
       "empty": "Ingen standardindstillinger konfigureret",
       "emptyDescription": "Tilføj en standard for automatisk at anvende en profil, når du starter sessioner for en repo.",
@@ -3757,7 +3799,7 @@
     "estimateModelNotAllowed": "Denne model er ikke tilladt her.",
     "estimateSpendLimitTooLow": "Hæv forbrugsgrænsen for at tillade denne opsummering.",
     "confirmPaid": "Slå betalte resuméer til for {{context}}?",
-    "paidDisclosure": "{{estimate}} anslået, op til {{maximum}}, med en grænse på {{minutes}} minutter. Der opkræves betaling, selv hvis genereringen mislykkes.",
+    "paidDisclosure": "{{estimate}} anslået, op til {{maximum}}, med en grænse på {{minutes}} min. Der opkræves betaling, selv hvis genereringen mislykkes.",
     "enable": "Slå betalte resuméer til",
     "allContexts": "Personlige briefinger og organisationsbriefinger holdes adskilt.",
     "emptyHistory": "Ingen gemte briefinger",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "AI-resuméet mislykkedes. Dit strukturerede øjebliksbillede er stadig tilgængeligt.",
     "scheduledContextEnabled": "Planlagte briefinger",
     "scheduledContextSettings": "Planlagte briefinger · {{context}}",
-    "scheduledContextHint": "Slå planlagt lagring og betalte AI-resuméer til for denne kontekst alene. Udvalgte uddrag med følsomme oplysninger fjernet og strukturerede fakta sendes til din model. Resuméer bruger det appsprog, der gemmes, når du udtrykkeligt ændrer briefingindstillingerne. Det gemte sprog opdateres ikke automatisk, når appens sprog ændres. Betalinger trækkes fra denne konteksts saldo. Øjebliksbilleder uden aktivitet bruger ikke AI.",
+    "scheduledContextHint": "Slå planlagt lagring og betalte AI-resuméer til for denne kontekst alene. Udvalgte uddrag med følsomme oplysninger fjernet og strukturerede fakta sendes til din model. Resuméer bruger det appsprog, der gemmes, når du opdaterer briefingindstillingerne. Betalinger trækkes fra denne konteksts saldo. Øjebliksbilleder uden aktivitet bruger ikke AI.",
     "snapshotSafeguards": "Tids- og forbrugsgrænserne pr. resumé gælder for hvert planlagt øjebliksbillede, ikke som et dagligt budget.",
     "snapshotEstimateInputTooLarge": "Dette øjebliksbillede indeholder for meget dokumentation til den valgte model.",
-    "quietSnapshot": "Ingen sessionsaktivitet blev udvalgt til dette øjebliksbillede. Udvælgelsen sker efter bedste evne. Der blev hverken anmodet om et AI-resumé, kaldt en AI-model eller opkrævet betaling.",
+    "quietSnapshot": "Ingen sessionsaktivitet blev udvalgt til dette øjebliksbillede. Der blev hverken anmodet om et AI-resumé eller opkrævet betaling.",
     "noEnabledContexts": "Ingen kontekster er aktiveret for planlagte briefinger",
     "sourceBlocker": "Sessionen kræver opmærksomhed",
     "sourceMetadata": "Gemte sessionsmetadata"

@@ -22,6 +22,8 @@
     "expired": "Süresi doldu"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "İptal",
     "done": "Bitti",
     "retry": "Tekrar dene",
@@ -227,6 +229,21 @@
     "pleaseEnterEmail": "Lütfen e-posta adresini gir.",
     "or": "veya"
   },
+  "pendingLink": {
+    "description": "{{email}} adresini zaten bir hesap kullanıyor. {{provider}} eklemek için bu hesabın yöntemlerinden biriyle oturum aç.",
+    "emailCode": "Bana e-postayla oturum açma kodu gönder",
+    "continueInBrowser": "Tarayıcıda devam et",
+    "startAgain": "Baştan başla",
+    "expired": "{{provider}} ekleme isteğinin süresi doldu.",
+    "noMethods": "Bu hesabın başka bir oturum açma yöntemi olmadığından {{provider}} eklenemiyor.",
+    "linked": "{{provider}} hesabına eklendi.",
+    "failedExpired": "İsteğin süresi dolduğu için {{provider}} eklenmedi.",
+    "failedWrongAccount": "Farklı bir hesapta oturum açtığın için {{provider}} eklenmedi.",
+    "failedAccountAlreadyLinked": "{{provider}} zaten başka bir hesaba bağlı olduğu için eklenmedi.",
+    "failedProviderAlreadyLinked": "Hesabında zaten farklı bir {{provider}} oturum açma yöntemi olduğu için {{provider}} eklenmedi.",
+    "failedLinking": "{{provider}} hesabına eklenemedi.",
+    "notAdded": "Oturum açtın. {{provider}} hesabına eklenmedi."
+  },
   "profile": {
     "codeReviewerSubtitle": "Otomatik PR incelemeleri",
     "securityAgentSubtitle": "Güvenlik açıklarını bul ve gider",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Test hesabı",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Kurumsal SSO",
     "passkeysTitle": "Geçiş anahtarları",
     "passkeysSubtitle": "Parolasız oturum açın",
@@ -1299,7 +1318,7 @@
       "cloningSession": "Oturum kopyalanıyor",
       "couldNotLoadThisSession": "Bu oturum yüklenemedi.",
       "cloneFailedRetry": "Bu oturum kopyalanamadı. Tekrar dene.",
-      "notEnoughCredits": "Cloud Agent'i çalıştırmak için yeterli kredi yok. Kredi ekleyip tekrar dene.",
+      "notEnoughCredits": "Bu istek için yeterli kredi yok. Kredi ekleyip tekrar dene.",
       "previousTaskFinishing": "Önceki görev henüz tamamlanmadı. Biraz bekle.",
       "serviceUnavailable": "Hizmet şu anda kullanılamıyor. Tekrar dene.",
       "connectionTrouble": "Bağlantıda sorun var. Birazdan tekrar dene.",
@@ -1409,7 +1428,7 @@
       "discardWithUploadsMessage": "İstemin ve henüz bir mesaja eklenmemiş tüm yüklemeler silinecek.",
       "discardFailed": "Taslak silinemedi. Tekrar dene.",
       "remoteHint": "Bilgisayarında çalıştırmak için Kilo'yu orada başlat ve çalışır halde bırak.",
-      "continueFrom": "{{title}} oturumuna devam ediliyor.",
+      "continueFrom": "“{{title}}” oturumuna devam ediliyor.",
       "importingSession": "Oturum içe aktarılıyor",
       "cliCannotContinue": "Bu CLI bir oturuma devam etmeyi desteklemiyor. Cloud Agent veya başka bir CLI seç.",
       "importFailed": "Bu oturum içe aktarılamadı.",
@@ -1441,7 +1460,8 @@
       "selectedProfile": "Seçilen profil",
       "manualOverrides": "Manuel geçersiz kılmalar",
       "openSettingsToReview": "İncelemek için Ayarları açın",
-      "profileSelection": "Profil seçimi"
+      "profileSelection": "Profil seçimi",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} dosya güncellendi.",
@@ -1461,6 +1481,8 @@
       "toolList": "listele",
       "toolPatch": "yama uygula",
       "toolTask": "görev",
+      "toolSendFile": "Dosya gönderildi",
+      "toolSendFileAction": "Dosya gönder",
       "readTodos": "Planı oku",
       "updateTodos": "Planı güncelle",
       "linesBadge": "{{displayCount}} satır",
@@ -1561,7 +1583,21 @@
       "thought": "Düşünce",
       "showDetails": "Ayrıntıları göster",
       "pending": "Bekliyor…",
-      "running": "Çalışıyor…"
+      "running": "Çalışıyor…",
+      "field": {
+        "filePath": "Dosya yolu",
+        "path": "Yol",
+        "offset": "Başlangıç",
+        "limit": "Sınır",
+        "pattern": "Desen",
+        "include": "Dosya filtresi",
+        "patchText": "Yama metni",
+        "query": "Sorgu",
+        "prompt": "İstem",
+        "header": "Başlık",
+        "question": "Soru",
+        "options": "Seçenekler"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "İçerik görüntülenemedi."
@@ -1577,7 +1613,7 @@
       "assistantContextOverflow": "Konuşma model için çok uzun.",
       "assistantProviderError": "Sağlayıcı bir hata döndürdü.",
       "assistantProviderRefused": "Sağlayıcı bu isteği reddetti ve istek yeniden denenemez.",
-      "assistantCreditsRefusal": "Cloud Agent'i çalıştırmak için yeterli kredi yok.",
+      "assistantCreditsRefusal": "Bu istek için yeterli kredi yok.",
       "assistantOutputLimit": "Yanıt, modelin çıktı sınırına ulaştı.",
       "assistantStructuredOutput": "Yanıt, gereken biçimle eşleşmedi.",
       "assistantFailed": "Yanıt oluşturulamadı."
@@ -1722,7 +1758,7 @@
       "positionHint": "(1 / {{displayCount}})",
       "movedPastPrompt": "Ajan bu istemi geride bıraktı. Oturum devam ettiğinde bu kart kapanacak.",
       "waitingForAnswer": "Ajan yanıtını bekliyor. Bu soru açıkken ajana göndereceğin mesaj bekletilir.",
-      "waitingForPermission": "Ajan izin bekliyor. Bu istek açıkken ajana göndereceğin mesaj bekletilir."
+      "waitingForPermission": "Bu istek açıkken ajana göndereceğin mesaj bekletilir."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -2450,7 +2486,11 @@
       "retryLoadingMoreFiles": "Daha fazla dosyayı yüklemeyi tekrar dene",
       "title": "Dosyalar",
       "viewedCount": "{{viewed}}/{{total}} görüntülendi",
-      "viewedOfListed": "listelenen dosyalardan {{viewed}}/{{total}} görüntülendi"
+      "viewedCount_one": "{{viewed}}/{{total}} görüntülendi",
+      "viewedCount_other": "{{viewed}}/{{total}} görüntülendi",
+      "viewedOfListed": "listelenen dosyalardan {{viewed}}/{{total}} görüntülendi",
+      "viewedOfListed_one": "listelenen dosyalardan {{viewed}}/{{total}} görüntülendi",
+      "viewedOfListed_other": "listelenen dosyalardan {{viewed}}/{{total}} görüntülendi"
     },
     "fileRows": {
       "collapseFile": "Dosyayı daralt",
@@ -3038,7 +3078,7 @@
       "provider": "Durduruldu: sağlayıcı hatası",
       "tool": "Durduruldu: araç hatası",
       "cancelled": "Durduruldu: iptal edildi",
-      "other": "DURDURULDU"
+      "other": "Durduruldu"
     }
   },
   "transcriptionModel": {
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "Temsilcim",
       "promptPlaceholder": "Sen bir...",
       "tools": "Aletler",
+      "wholeToolRule": "Bu ajan tüm aletlere aynı anda tek bir kural uygular: {{rule}}. Bu anahtarlar salt okunur.",
       "visibility": "Görünürlük",
       "visibilityPrimary": "Birincil — seçicide gösterilir",
       "visibilitySubagent": "Alt temsilci — yalnızca başkaları tarafından aranabilir",
@@ -3571,7 +3612,8 @@
       "duplicateName": "Bu adı kullanan bir komut bu profilde zaten mevcut"
     },
     "repoBindings": {
-      "title": "Depolar için Varsayılan Profiller",
+      "title": "Depolar için varsayılan profiller",
+      "entryLabel": "Varsayılan profiller",
       "add": "Varsayılan ekle",
       "empty": "Varsayılan ayar yapılandırılmadı",
       "emptyDescription": "Bir depo için oturum başlatırken bir profili otomatik olarak uygulamak için bir varsayılan ekleyin.",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "AI özeti başarısız oldu. Yapılandırılmış anlık görüntünüz hâlâ mevcut.",
     "scheduledContextEnabled": "Planlanmış raporlar",
     "scheduledContextSettings": "Planlanmış raporlar · {{context}}",
-    "scheduledContextHint": "Yalnızca bu bağlam için planlanmış kayıtları ve ücretli AI özetlerini etkinleştirin. Seçilmiş, hassas bilgileri gizlenmiş alıntılar ve yapılandırılmış bilgiler modelinize gönderilir. Özetlerde, rapor ayarlarını açıkça değiştirdiğinizde kaydedilen uygulama dili kullanılır; uygulama dilini değiştirmek bu dili otomatik olarak güncellemez. Ücretler bu bağlamın bakiyesinden düşülür. Etkinlik olmayan anlık görüntülerde AI kullanılmaz.",
+    "scheduledContextHint": "Yalnızca bu bağlam için planlanmış kayıtları ve ücretli AI özetlerini etkinleştirin. Seçilmiş, hassas bilgileri gizlenmiş alıntılar ve yapılandırılmış bilgiler modelinize gönderilir. Özetler, rapor ayarlarını güncellediğinizde kaydedilen uygulama dilini kullanır. Ücretler bu bağlamın bakiyesinden düşülür. Etkinlik olmayan anlık görüntülerde AI kullanılmaz.",
     "snapshotSafeguards": "Özet başına süre ve harcama sınırları, planlanmış her anlık görüntü için ayrı ayrı geçerlidir; günlük bütçe değildir.",
     "snapshotEstimateInputTooLarge": "Bu anlık görüntüde seçilen modelin işleyebileceğinden fazla kanıt var.",
-    "quietSnapshot": "Mevcut veriler elverdiğince yapılan seçimde bu anlık görüntü için hiçbir oturum etkinliği seçilmedi. AI özeti istenmedi, model çağrısı yapılmadı ve ücret alınmadı.",
+    "quietSnapshot": "Bu anlık görüntü için hiçbir oturum etkinliği seçilmedi. AI özeti istenmedi ve ücret alınmadı.",
     "noEnabledContexts": "Planlanmış raporlar için etkinleştirilmiş bağlam yok",
     "sourceBlocker": "Oturumla ilgilenilmesi gerekiyor",
     "sourceMetadata": "Kaydedilen oturum meta verileri"

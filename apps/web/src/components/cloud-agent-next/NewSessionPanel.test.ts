@@ -9,7 +9,7 @@ import type { NewSessionPanel as NewSessionPanelComponent } from './NewSessionPa
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
 const mockRouterPush = jest.fn();
-const mockRepositoryQueryOptions = jest.fn<(options: unknown) => void>();
+const mockQueryOptions = jest.fn<(options: unknown) => void>();
 const mockQueryClient = {
   setQueryData: jest.fn(),
   invalidateQueries: jest.fn(),
@@ -65,9 +65,7 @@ let mockEnvironments: EnvironmentSummary[] = [];
 
 function mockQueryResult(options: { __testKind?: string }) {
   const kind = options.__testKind ?? '';
-  if (kind.endsWith('Repositories') || kind.endsWith('bitbucket.getStatus')) {
-    mockRepositoryQueryOptions(options);
-  }
+  mockQueryOptions(options);
   const base = {
     data: undefined as unknown,
     isLoading: false,
@@ -125,6 +123,7 @@ jest.mock('@tanstack/react-query', () => ({
 
 jest.mock('@/lib/trpc/utils', () => ({
   useTRPC: () => mockCreateTrpc(),
+  useRawTRPCClient: () => ({}),
 }));
 
 jest.mock('next/navigation', () => ({
@@ -134,6 +133,7 @@ jest.mock('next/navigation', () => ({
 }));
 
 jest.mock('jotai', () => ({
+  atom: () => ({}),
   useAtom: () => [null, jest.fn()],
   useSetAtom: () => jest.fn(),
 }));
@@ -205,9 +205,8 @@ jest.mock('@kilocode/cloud-agent-sdk/message-id', () => ({
 }));
 
 jest.mock('@/components/SetPageTitle', () => ({ SetPageTitle: () => null }));
-jest.mock('@/components/shared/ModeCombobox', () => ({
-  ModeCombobox: () => null,
-  NEXT_MODE_OPTIONS: [],
+jest.mock('./CloudAgentModeCombobox', () => ({
+  CloudAgentModeCombobox: () => null,
 }));
 jest.mock('@/components/shared/ModelCombobox', () => ({ ModelCombobox: () => null }));
 jest.mock('@/components/shared/VariantCombobox', () => ({ VariantCombobox: () => null }));
@@ -442,7 +441,7 @@ describe.each(scenarios)('$label NewSessionPanel attachment handoff', scenario =
           ? 'organizations.cloudAgentNext'
           : 'cloudAgentNext';
         for (const provider of ['GitHub', 'GitLab']) {
-          expect(mockRepositoryQueryOptions).toHaveBeenCalledWith(
+          expect(mockQueryOptions).toHaveBeenCalledWith(
             expect.objectContaining({
               __testKind: `${repositoryScope}.list${provider}Repositories`,
               staleTime: 15 * 60_000,
@@ -458,7 +457,7 @@ describe.each(scenarios)('$label NewSessionPanel attachment handoff', scenario =
           'cloudAgentNext.listBitbucketRepositories',
           'bitbucket.getStatus',
         ]) {
-          expect(mockRepositoryQueryOptions).toHaveBeenCalledWith(
+          expect(mockQueryOptions).toHaveBeenCalledWith(
             expect.objectContaining({
               __testKind: `organizations.${procedure}`,
               staleTime: 15 * 60_000,
@@ -509,6 +508,47 @@ describe.each(scenarios)('$label NewSessionPanel attachment handoff', scenario =
       }
     }
   );
+});
+
+describe.each(scenarios)('$label NewSessionPanel context layout', scenario => {
+  it('keeps responsive context controls without composer pricing or pricing queries', async () => {
+    jest.clearAllMocks();
+    mockRepositories = [mockRepository];
+    mockEnvironments = [];
+    mockEnvironmentListFailed = false;
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+
+    try {
+      act(() =>
+        root.render(createElement(NewSessionPanel, { organizationId: scenario.organizationId }))
+      );
+      await waitForStartButton(dom.container);
+
+      const environmentButton = Array.from(dom.container.querySelectorAll('button')).find(
+        button => button.textContent === 'Choose test environment'
+      );
+      const setupGroup = environmentButton?.parentElement;
+      const contextRow = setupGroup?.parentElement;
+      const context = contextRow?.parentElement;
+      expect(setupGroup?.classList.contains('min-w-min')).toBe(true);
+      expect(setupGroup?.className).toContain('@xl/context:ml-auto');
+      expect(context?.className).toContain('@container/context');
+      expect(contextRow?.className).toContain('flex-col items-start');
+      expect(contextRow?.className).toContain('@xl/context:flex-row');
+      expect(contextRow?.className).not.toContain('flex-wrap');
+      expect(context?.children).toHaveLength(1);
+      expect(context?.textContent).not.toContain('Compute');
+      expect(mockQueryOptions).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          __testKind: expect.stringMatching(/getSandboxSelectionOptions$|^computeBilling\.rates$/),
+        })
+      );
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  });
 });
 
 describe.each([

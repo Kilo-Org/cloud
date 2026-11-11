@@ -1,6 +1,7 @@
 import type { Part, StoredMessage, ToolPart } from '@/components/cloud-agent-next/types';
 import {
   isAssistantMessage,
+  isCompactionPart,
   isFilePart,
   isPatchPart,
   isReasoningPart,
@@ -56,7 +57,9 @@ export function groupConsecutiveAssistantMessages(messages: StoredMessage[]): St
       lastTurn &&
       lastMessage &&
       isAssistantMessage(lastMessage.info) &&
-      isAssistantMessage(message.info)
+      isAssistantMessage(message.info) &&
+      !lastMessage.parts.some(isCompactionPart) &&
+      !message.parts.some(isCompactionPart)
     ) {
       lastTurn.push(message);
       continue;
@@ -88,6 +91,15 @@ function isHiddenSharedPart(part: Part): boolean {
 
 function isChatPart(part: Part): boolean {
   return isTextPart(part) || isFilePart(part);
+}
+
+const TOOL_FILE_ID_SEPARATOR = '_file_';
+
+/** Native v2 projects files a tool returned as `${toolPartId}_file_${index}` file parts. */
+function producingToolPartId(part: Part): string | undefined {
+  if (!isFilePart(part)) return undefined;
+  const separator = part.id.lastIndexOf(TOOL_FILE_ID_SEPARATOR);
+  return separator > 0 ? part.id.slice(0, separator) : undefined;
 }
 
 function toolDurationMs(part: ToolPart): number | null {
@@ -133,6 +145,10 @@ export function summarizeAgentWork(parts: Part[], working = false): string {
   } else if (tools.length > 1) {
     details.push(`${tools.length} tool calls`);
   }
+  const failedTools = tools.filter(part => part.state.status === 'error');
+  if (failedTools.length > 0) {
+    details.push(`${failedTools.length} failed`);
+  }
   if (reasoning.length > 0) {
     details.push('reasoning');
   }
@@ -168,6 +184,7 @@ export function groupAssistantParts(
   mode: 'shared' | 'live' = 'shared'
 ): SharedTranscriptSegment[] {
   const segments: SharedTranscriptSegment[] = [];
+  const toolSegmentTypes = new Map<string, SharedTranscriptSegment['type']>();
 
   for (const part of parts) {
     if (isHiddenSharedPart(part) && !(mode === 'live' && isSnapshotProgressPart(part))) {
@@ -177,11 +194,13 @@ export function groupAssistantParts(
     const standaloneTool =
       mode === 'live' &&
       isToolPart(part) &&
-      (part.tool === 'question' ||
-        part.tool === 'task' ||
-        part.tool === 'suggest' ||
-        part.state.status === 'error');
-    const type = isChatPart(part) || standaloneTool ? 'chat' : 'agent-work';
+      (part.tool === 'question' || part.tool === 'task' || part.tool === 'suggest');
+    const toolId = producingToolPartId(part);
+    // A tool's returned files stay beside that tool instead of ending its group.
+    const type =
+      (toolId === undefined ? undefined : toolSegmentTypes.get(toolId)) ??
+      (isChatPart(part) || standaloneTool ? 'chat' : 'agent-work');
+    if (isToolPart(part)) toolSegmentTypes.set(part.id, type);
     const last = segments.at(-1);
     if (last?.type === type) {
       last.parts.push(part);

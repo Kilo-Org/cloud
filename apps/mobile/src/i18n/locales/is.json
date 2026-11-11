@@ -22,6 +22,8 @@
     "expired": "Útrunnið"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Hætta við",
     "done": "Lokið",
     "retry": "Reyna aftur",
@@ -227,6 +229,21 @@
     "signInCodeField": "Innskráningarkóði",
     "or": "eða"
   },
+  "pendingLink": {
+    "description": "Reikningur notar nú þegar {{email}}. Skráðu þig inn með einni af aðferðum hans til að bæta {{provider}} við.",
+    "emailCode": "Senda mér innskráningarkóða í tölvupósti",
+    "continueInBrowser": "Halda áfram í vafra",
+    "startAgain": "Byrja aftur",
+    "expired": "Þessi beiðni um að bæta {{provider}} við er útrunnin.",
+    "noMethods": "Þessi reikningur hefur enga aðra innskráningaraðferð, svo ekki er hægt að bæta {{provider}} við.",
+    "linked": "{{provider}} var bætt við reikninginn þinn.",
+    "failedExpired": "{{provider}} var ekki bætt við því beiðnin rann út.",
+    "failedWrongAccount": "{{provider}} var ekki bætt við því þú skráðir þig inn á annan reikning.",
+    "failedAccountAlreadyLinked": "{{provider}} var ekki bætt við því það er nú þegar tengt öðrum reikningi.",
+    "failedProviderAlreadyLinked": "{{provider}} var ekki bætt við því reikningurinn þinn er nú þegar með aðra {{provider}}-innskráningu.",
+    "failedLinking": "Ekki tókst að bæta {{provider}} við reikninginn þinn.",
+    "notAdded": "Innskráning tókst. {{provider}} var ekki bætt við reikninginn þinn."
+  },
   "profile": {
     "codeReviewerSubtitle": "Sjálfvirk yfirferð PR",
     "securityAgentSubtitle": "Finna og laga veikleika",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Prófunarreikningur",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO fyrir fyrirtæki",
     "passkeysTitle": "Aðgangslyklar",
     "passkeysSubtitle": "Skrá sig inn án lykilorðs",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "Reyna aftur að hlaða skrám",
       "filterPlaceholder": "Skráarslóð til að sía eftir",
       "viewedCount": "{{viewed}} af {{total}} skoðaðar",
+      "viewedCount_one": "{{viewed}} af {{total}} skoðaðar",
+      "viewedCount_other": "{{viewed}} af {{total}} skoðaðar",
       "viewedOfListed": "{{viewed}} af {{total}} skrám á listanum skoðaðar",
+      "viewedOfListed_one": "{{viewed}} af {{total}} skrám á listanum skoðaðar",
+      "viewedOfListed_other": "{{viewed}} af {{total}} skrám á listanum skoðaðar",
       "loadingFiles": "Hleð {{loaded}} af {{total}}…",
       "failedToLoadAllFiles": "Ekki tókst að hlaða öllum skrám.",
       "couldNotLoadMoreFiles": "Ekki tókst að hlaða fleiri skrám.",
@@ -1837,7 +1860,7 @@
       "cloningSession": "Klónar lotuna",
       "couldNotLoadThisSession": "Ekki tókst að hlaða þessari lotu.",
       "cloneFailedRetry": "Ekki tókst að klóna þessa lotu. Reyndu aftur.",
-      "notEnoughCredits": "Inneignin nægir ekki til að keyra Cloud Agent. Bættu við inneign og reyndu aftur.",
+      "notEnoughCredits": "Inneignin nægir ekki fyrir þessa beiðni. Bættu við inneign og reyndu aftur.",
       "previousTaskFinishing": "Fyrra verkefninu er ekki alveg lokið. Bíddu augnablik.",
       "serviceUnavailable": "Þjónustan er ekki tiltæk núna. Reyndu aftur.",
       "connectionTrouble": "Vandamál kom upp við tengingu. Reyndu aftur eftir augnablik.",
@@ -1947,7 +1970,7 @@
       "discardWithUploadsMessage": "Skilaboðunum þínum og upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt.",
       "discardFailed": "Ekki tókst að farga drögunum. Reyndu aftur.",
       "remoteHint": "Til að keyra á tölvunni þinni skaltu ræsa Kilo þar og láta það keyra áfram.",
-      "continueFrom": "Haldið er áfram með {{title}}.",
+      "continueFrom": "Haldið er áfram með „{{title}}“.",
       "importingSession": "Flytur lotuna inn",
       "cliCannotContinue": "Þetta CLI getur ekki haldið áfram með lotu. Veldu Cloud Agent eða annað CLI.",
       "importFailed": "Ekki tókst að flytja inn þessa lotu.",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "Valið snið",
       "manualOverrides": "Handvirkar yfirfærslur",
       "openSettingsToReview": "Opnaðu Stillingar til að skoða",
-      "profileSelection": "Prófílval"
+      "profileSelection": "Prófílval",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} skrá var uppfærð.",
@@ -1999,6 +2023,8 @@
       "toolList": "birta lista",
       "toolPatch": "lagfæra",
       "toolTask": "verkefni",
+      "toolSendFile": "Skjal sent",
+      "toolSendFileAction": "senda skjal",
       "readTodos": "Lesa áætlun",
       "updateTodos": "Uppfæra áætlun",
       "linesBadge": "{{displayCount}} línur",
@@ -2099,7 +2125,21 @@
       "thought": "Hugsun",
       "showDetails": "Sýna upplýsingar",
       "pending": "Í bið…",
-      "running": "Í keyrslu…"
+      "running": "Í keyrslu…",
+      "field": {
+        "filePath": "Skráarslóð",
+        "path": "Slóð",
+        "offset": "Hliðrun",
+        "limit": "Hámark",
+        "pattern": "Mynstur",
+        "include": "Innifalið",
+        "patchText": "Breytingatexti",
+        "query": "Fyrirspurn",
+        "prompt": "Fyrirmæli",
+        "header": "Fyrirsögn",
+        "question": "Spurning",
+        "options": "Valkostir"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Ekki tókst að birta efnið."
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "Samtalið er of langt fyrir líkanið.",
       "assistantProviderError": "Veitandinn skilaði villu.",
       "assistantProviderRefused": "Veitandinn hafnaði þessari beiðni og ekki er hægt að reyna aftur.",
-      "assistantCreditsRefusal": "Inneignin nægir ekki til að keyra Cloud Agent.",
+      "assistantCreditsRefusal": "Inneignin nægir ekki fyrir þessa beiðni.",
       "assistantOutputLimit": "Svarið náði úttaksmörkum líkansins.",
       "assistantStructuredOutput": "Svarið samræmist ekki umbeðnu sniði.",
       "assistantFailed": "Ekki tókst að mynda svarið."
@@ -2260,7 +2300,7 @@
       "positionHint": "(1 af {{displayCount}})",
       "movedPastPrompt": "Fulltrúinn hefur þegar haldið áfram frá þessari beiðni. Þetta spjald lokast þegar lotan heldur áfram.",
       "waitingForAnswer": "Fulltrúinn bíður eftir svari frá þér. Skilaboðin þín til fulltrúans bíða á meðan þessi spurning er opin.",
-      "waitingForPermission": "Fulltrúinn bíður eftir heimild. Skilaboðin þín til fulltrúans bíða á meðan þessi beiðni er opin."
+      "waitingForPermission": "Skilaboðin þín til fulltrúans bíða á meðan þessi beiðni er opin."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3038,7 +3078,7 @@
       "provider": "Stöðvað: villa veitanda",
       "tool": "Stöðvað: verkfæravilla",
       "cancelled": "Stöðvað: hætt við",
-      "other": "STÖÐVAÐ"
+      "other": "Stöðvað"
     }
   },
   "transcriptionModel": {
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "Umboðsmaður minn",
       "promptPlaceholder": "Þú ert a...",
       "tools": "Verkfæri",
+      "wholeToolRule": "Þessi agent beitir einni reglu á öll verkfæri í einu: {{rule}}. Þessir rofar eru skrifvarðir.",
       "visibility": "Skyggni",
       "visibilityPrimary": "Aðal — sýnt í veljarann",
       "visibilitySubagent": "Subagent — aðeins hægt að hringja frá öðrum",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "Sjálfgefin snið fyrir geymslur",
+      "entryLabel": "Sjálfgefin snið",
       "add": "Bæta við sjálfgefnu",
       "empty": "Engar sjálfgefnar stillingar",
       "emptyDescription": "Bættu við sjálfgefnu til að nota prófíl sjálfkrafa þegar þú byrjar lotur fyrir geymslu.",
@@ -3753,7 +3795,7 @@
     "estimate": "Áætlun {{estimate}} · hámark {{maximum}}",
     "estimateUnavailable": "Greidd samantekt er ekki tiltæk fyrir þessar stillingar.",
     "confirmPaid": "Virkja greiddar samantektir fyrir {{context}}?",
-    "paidDisclosure": "Áætlað {{estimate}}, allt að {{maximum}}, með {{minutes}} mínútna hámarki. Kostnaður gildir þótt vinnsla mistakist.",
+    "paidDisclosure": "Áætlað {{estimate}}, allt að {{maximum}}, með {{minutes}} mín. hámarki. Kostnaður gildir þótt vinnsla mistakist.",
     "enable": "Virkja greiddar samantektir",
     "allContexts": "Persónuleg yfirlit og yfirlit skipulagsheilda eru aðskilin.",
     "emptyHistory": "Engin vistuð yfirlit",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "AI samantekt mistókst. Skipulagt yfirlit þitt er enn tiltækt.",
     "scheduledContextEnabled": "Áætluð yfirlit",
     "scheduledContextSettings": "Áætluð yfirlit · {{context}}",
-    "scheduledContextHint": "Virkjaðu áætlaða vistun stöðumynda og greiddar AI samantektir eingöngu fyrir þetta samhengi. Valdir útdrættir þar sem viðkvæmar upplýsingar hafa verið fjarlægðar eða faldar og skipulagðar staðreyndir eru sendar til líkansins þíns. Samantektir nota tungumál appsins sem er vistað þegar þú vistar breytingar á stillingum yfirlits. Tungumál samantekta uppfærist ekki sjálfkrafa þegar þú breytir tungumáli appsins. Kostnaður dregst af inneign þessa samhengis. Stöðumyndir án valinnar virkni nota ekki AI.",
+    "scheduledContextHint": "Virkjaðu áætlaða vistun stöðumynda og greiddar AI samantektir eingöngu fyrir þetta samhengi. Valdir útdrættir þar sem viðkvæmar upplýsingar hafa verið fjarlægðar eða faldar og skipulagðar staðreyndir eru sendar til líkansins þíns. Samantektir nota tungumál appsins sem er vistað þegar þú vistar breytingar á stillingum yfirlits. Kostnaður dregst af inneign þessa samhengis. Stöðumyndir án valinnar virkni nota ekki AI.",
     "snapshotSafeguards": "Tíma- og kostnaðarmörk fyrir hverja samantekt gilda um hverja áætlaða stöðumynd, ekki sem dagleg fjárhagsáætlun.",
     "snapshotEstimateInputTooLarge": "Of mikið er af gögnum í þessari stöðumynd fyrir valið líkan.",
-    "quietSnapshot": "Lotuvirkni er valin eftir því sem gögn leyfa. Engin lotuvirkni var valin fyrir þessa stöðumynd. Ekki var kallað á AI líkan og ekkert gjald var tekið fyrir AI samantekt.",
+    "quietSnapshot": "Engin lotuvirkni var valin fyrir þessa stöðumynd. Ekki var óskað eftir AI samantekt og ekkert gjald var tekið fyrir hana.",
     "noEnabledContexts": "Engin samhengi eru virkjuð fyrir áætluð yfirlit",
     "sourceBlocker": "Lota þarfnast athygli",
     "sourceMetadata": "Vistuð lýsigögn lotu"

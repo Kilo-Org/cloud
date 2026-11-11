@@ -22,6 +22,8 @@
     "expired": "Yeroon isaa darbeera"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Dhiisi",
     "done": "Xumurame",
     "retry": "Irra deebi'ii yaali",
@@ -227,6 +229,21 @@
     "signInCodeField": "Koodii seensaa",
     "or": "ykn"
   },
+  "pendingLink": {
+    "description": "Herregni tokko duraanuu {{email}} fayyadama. {{provider}} dabaluuf mala seensaa isaa keessaa tokkoon seeni.",
+    "emailCode": "Koodii seensaa imeeliidhaan naaf ergi",
+    "continueInBrowser": "Biraawzarii keessatti itti fufi",
+    "startAgain": "Irra deebi'ii jalqabi",
+    "expired": "Gaaffiin {{provider}} dabaluu kun yeroon isaa darbeera.",
+    "noMethods": "Herregni kun mala seensaa biraa hin qabu, kanaaf {{provider}} dabaluun hin danda'amu.",
+    "linked": "{{provider}} herrega keetti dabalameera.",
+    "failedExpired": "Gaaffiin yeroon isaa waan darbeef {{provider}} hin dabalamne.",
+    "failedWrongAccount": "Herrega biraatti waan seenteef {{provider}} hin dabalamne.",
+    "failedAccountAlreadyLinked": "{{provider}} duraanuu herrega biraa waliin waan walqabateef hin dabalamne.",
+    "failedProviderAlreadyLinked": "Herregni kee duraanuu seensa {{provider}} biraa waan qabuuf {{provider}} hin dabalamne.",
+    "failedLinking": "{{provider}} herrega keetti dabaluun hin danda'amne.",
+    "notAdded": "Seentee jirta. {{provider}} herrega keetti hin dabalamne."
+  },
   "profile": {
     "codeReviewerSubtitle": "Sakatta'iinsa PR ofumaan raawwatamu",
     "securityAgentSubtitle": "Hanqinoota nageenyaa barbaadiitii sirreessi",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Herrega yaalii",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO dhaabbataa",
     "passkeysTitle": "Furtuu seenii",
     "passkeysSubtitle": "Jecha darbii malee seeni",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "Faayiloota fe'uuf irra deebi'ii yaali",
       "filterPlaceholder": "Karaa faayiliitiin calaluu",
       "viewedCount": "{{total}} keessaa {{viewed}} ilaalaman",
+      "viewedCount_one": "{{total}} keessaa {{viewed}} ilaalaman",
+      "viewedCount_other": "{{total}} keessaa {{viewed}} ilaalaman",
       "viewedOfListed": "Faayiloota tarreeffaman {{total}} keessaa {{viewed}} ilaalaman",
+      "viewedOfListed_one": "Faayiloota tarreeffaman {{total}} keessaa {{viewed}} ilaalaman",
+      "viewedOfListed_other": "Faayiloota tarreeffaman {{total}} keessaa {{viewed}} ilaalaman",
       "loadingFiles": "{{total}} keessaa {{loaded}} fe'amaa jiru…",
       "failedToLoadAllFiles": "Faayiloota hunda fe'uu hin danda'amne.",
       "couldNotLoadMoreFiles": "Faayiloota dabalataa fe'uu hin danda'amne.",
@@ -1837,7 +1860,7 @@
       "cloningSession": "Turtii kopii gochaa jira",
       "couldNotLoadThisSession": "Turtii kana fe'uu hin danda'amne.",
       "cloneFailedRetry": "Turtii kana kopii gochuu hin danda'amne. Deebi'ii yaali.",
-      "notEnoughCredits": "Cloud Agent hojjechiisuuf kiriiditii gahaa hin qabdu. Kiriiditii dabaliitii deebi'ii yaali.",
+      "notEnoughCredits": "Gaaffii kanaaf kiriiditii gahaa hin qabdu. Kiriiditii dabaliitii deebi'ii yaali.",
       "previousTaskFinishing": "Hojiin duraanii amma iyyuu xumuramaa jira. Yeroo muraasa eegi.",
       "serviceUnavailable": "Tajaajilli yeroo ammaa hin argamu. Deebi'ii yaali.",
       "connectionTrouble": "Walqabannaan rakkoo qaba. Yeroo muraasa booda deebi'ii yaali.",
@@ -1947,7 +1970,7 @@
       "discardWithUploadsMessage": "Gaaffiin kee fi faayiloonni ol fe'aman kan ergaa ergametti hin qabachiifamne ni haqamu.",
       "discardFailed": "Wixinee haquu hin danda'amne. Deebi'ii yaali.",
       "remoteHint": "Kompiitara kee irratti hojjechuuf, Kilo baniitii akka itti fufu hafi.",
-      "continueFrom": "{{title}} itti fufaa jira.",
+      "continueFrom": "“{{title}}” itti fufaa jira.",
       "importingSession": "Turtii galchaa jira",
       "cliCannotContinue": "CLI kun turtii itti fufuu hin danda'u. Cloud Agent yookaan CLI biraa filadhu.",
       "importFailed": "Turtii kana galchuu hin danda'amne.",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "Profaayilii filatame",
       "manualOverrides": "Harkaan irra darbuu",
       "openSettingsToReview": "Irra deebi'uuf Sajoo banaa",
-      "profileSelection": "Filannoo piroofaayilii"
+      "profileSelection": "Filannoo piroofaayilii",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Faayiliin {{displayCount}} haaromfameera.",
@@ -1999,6 +2023,8 @@
       "toolList": "tarreessi",
       "toolPatch": "sirreessi",
       "toolTask": "hojii",
+      "toolSendFile": "Faayilii ergame",
+      "toolSendFileAction": "Faayilii ergi",
       "readTodos": "Karoora dubbisi",
       "updateTodos": "Karoora haaromsi",
       "linesBadge": "Sarara {{displayCount}}",
@@ -2099,7 +2125,21 @@
       "thought": "Yaada",
       "showDetails": "Ibsa agarsiisi",
       "pending": "Eegachaa jira…",
-      "running": "Hojjechaa jira…"
+      "running": "Hojjechaa jira…",
+      "field": {
+        "filePath": "Daandii faayilii",
+        "path": "Daandii",
+        "offset": "Lakkoofsa jalqabaa",
+        "limit": "Daangaa",
+        "pattern": "Fakkaataa",
+        "include": "Dabalata",
+        "patchText": "Barreeffama sirreeffamaa",
+        "query": "Gaaffii barbaacha",
+        "prompt": "Qajeelfama",
+        "header": "Mataduree",
+        "question": "Gaaffii",
+        "options": "Filannoo"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Qabiyyee agarsiisuu hin danda'amne."
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "Mariin kun moodelichaaf baay'ee dheeraadha.",
       "assistantProviderError": "Dhiyeessaan dogoggora deebisee.",
       "assistantProviderRefused": "Dhiyeessaan gaaffii kana dideera, kanaaf irra deebi'uun hin danda'amu.",
-      "assistantCreditsRefusal": "Cloud Agent hojjechiisuuf kiriiditii gahaa hin qabdu.",
+      "assistantCreditsRefusal": "Gaaffii kanaaf kiriiditii gahaa hin qabdu.",
       "assistantOutputLimit": "Deebiin daangaa baha moodelichaa ga'e.",
       "assistantStructuredOutput": "Deebiin akkaataa barbaachisu waliin hin wal simane.",
       "assistantFailed": "Deebii kennuun hin milkoofne."
@@ -2260,7 +2300,7 @@
       "positionHint": "({{displayCount}} keessaa 1)",
       "movedPastPrompt": "Ergamaan gaaffii kana irra darbeera. Yeroo turtiin itti fufu kaardiin kun ni cufama.",
       "waitingForAnswer": "Ergamaan deebii kee eegaa jira. Hanga gaaffiin kun banaa jirutti ergaan ergamaaf ergitu ni tura.",
-      "waitingForPermission": "Ergamaan hayyama eegaa jira. Hanga gaaffiin kun banaa jirutti ergaan ergamaaf ergitu ni tura."
+      "waitingForPermission": "Hanga gaaffiin kun banaa jirutti ergaan ergamaaf ergitu ni tura."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3038,7 +3078,7 @@
       "provider": "Dhaabbate: dogoggora dhiyeessaa",
       "tool": "Dhaabbate: dogoggora meeshaa",
       "cancelled": "Dhaabbate: haqame",
-      "other": "DHAABAME"
+      "other": "Dhaabame"
     }
   },
   "transcriptionModel": {
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "Bakka bu'aa koo",
       "promptPlaceholder": "Ati nama ...",
       "tools": "Meeshaalee",
+      "wholeToolRule": "Maajentiin kun seera tokko meeshaalee hunda irratti yeroo tokkotti hojiirra oolcha: {{rule}}. Qalqalloonni kunneen dubbisuu qofa danda'u.",
       "visibility": "Mul’achuu",
       "visibilityPrimary": "Primary — kan agarsiifame picker keessatti",
       "visibilitySubagent": "Subagent — kanneen biroo irraa qofa kan waamamu",
@@ -3571,7 +3612,8 @@
       "duplicateName": "Ajajni maqaa kana qabu durseen profaayilii kana keessaa jira"
     },
     "repoBindings": {
-      "title": "Profaayilota Durtii Repos",
+      "title": "Profaayilota durtii Repos",
+      "entryLabel": "Profaayilota durtii",
       "add": "Durtii itti dabali",
       "empty": "Durtii hin qindaa'e",
       "emptyDescription": "Yeroo turtii repo'f jalqabdu ofumaan piroofaayilii hojii irra oolchuuf durtii dabali.",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "Cuunfaan AI hin milkoofne. Galmeen haalaa qindaa'aan kee ammas ni argama.",
     "scheduledContextEnabled": "Gabaasota saganteeffaman",
     "scheduledContextSettings": "Gabaasota saganteeffaman · {{context}}",
-    "scheduledContextHint": "Haala kana qofaaf galmeessuu saganteeffamee fi cuunfaa AI kaffaltii dandeessisi. Kutaaleen filatamanii fi odeeffannoon iccitii keessaa haqame akkasumas dhugaawwan qindaa'an gara moodeela keetti ergamu. Cuunfaawwan afaan app yeroo ati qindaa'ina gabaasaa ifatti jijjiirtu kuufame fayyadamu. Afaan app jijjiiruun qofti afaan kuufame kana hin jijjiiru. Kaffaltiin haftee haala kanaa fayyadama. Galmeewwan haalaa sochii hin qabne AI hin fayyadaman.",
+    "scheduledContextHint": "Haala kana qofaaf galmeessuu saganteeffamee fi cuunfaa AI kaffaltii dandeessisi. Kutaaleen filatamanii fi odeeffannoon iccitii keessaa haqame akkasumas dhugaawwan qindaa'an gara moodeela keetti ergamu. Cuunfaawwan afaan app yeroo ati qindaa'ina gabaasaa ifatti jijjiirtu kuufame fayyadamu. Kaffaltiin haftee haala kanaa fayyadama. Galmeewwan haalaa sochii hin qabne AI hin fayyadaman.",
     "snapshotSafeguards": "Daangaawwan yeroo fi baasii cuunfaa tokkoof kaa'aman galmee haalaa saganteeffame tokkoon tokkoof hojii irra oolu; baajata guyyaa miti.",
     "snapshotEstimateInputTooLarge": "Galmeen haalaa kun moodeela filatameef ragaa baay'ee qaba.",
-    "quietSnapshot": "Galmee haalaa kanaaf filannoo hanga danda'ametti taasifame keessatti sochiin taa'umsaa hin filatamne. Cuunfaan AI hin gaafatamne; moodeelli AI hin waamamne, kaffaltiinis hin jiru.",
+    "quietSnapshot": "Galmee haalaa kanaaf sochiin taa'umsaa hin filatamne. Cuunfaan AI hin gaafatamne; kaffaltiinis hin jiru.",
     "noEnabledContexts": "Gabaasota saganteeffamaniif haalawwan dandeessifaman hin jiran",
     "sourceBlocker": "Taa'umsi xiyyeeffannoo barbaada",
     "sourceMetadata": "Meetadaataa taa'umsaa galmaa'e"

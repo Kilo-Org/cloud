@@ -4,6 +4,7 @@ import { FULL_COMMIT_HASH, immutableGit, readCommitObject } from './commit-objec
 import type { WrapperCommitCoAuthor } from '../../src/shared/wrapper-bootstrap.js';
 import type { WrapperKiloClient } from './kilo-api.js';
 import { git, getCurrentBranch, hasGitUpstream, logToFile as writeLog } from './utils.js';
+import { createWorktreeGitExecutor, pushFailureReason } from './control/worktree-git-operations.js';
 import { createSecretRedactor } from './redact-output.js';
 
 /** Timeout for local git operations (status, add, commit) */
@@ -88,6 +89,7 @@ function emitCompleted(
     committedAt?: string;
     userMessageId?: string;
     pushStatus?: PushStatus;
+    pushFailure?: 'remote_branch_changed';
     commitMessageTruncated?: true;
   },
   messageId?: string
@@ -178,13 +180,50 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     }
   }
 
-  function completeLocalCommit(message: string): AutoCommitResult {
+  function completeLocalCommit(
+    message: string,
+    pushFailure?: 'remote_branch_changed'
+  ): AutoCommitResult {
     emitCompleted(
       onEvent,
-      { success: true, message, ...evidence, userMessageId, pushStatus },
+      {
+        success: true,
+        message,
+        ...evidence,
+        userMessageId,
+        pushStatus,
+        ...(pushFailure === undefined ? {} : { pushFailure }),
+      },
       messageId
     );
     return { success: true };
+  }
+
+  async function rememberPushedRemote(branch: string, trackingUpstream: boolean): Promise<void> {
+    try {
+      const executor = createWorktreeGitExecutor({
+        directory: workspacePath,
+        ...(env ? { env } : {}),
+      });
+      let remoteBranch = branch;
+      if (trackingUpstream) {
+        const upstream = await executor.exec([
+          'rev-parse',
+          '--abbrev-ref',
+          '--symbolic-full-name',
+          '@{u}',
+        ]);
+        const name = upstream.exitCode === 0 ? upstream.stdout.trim() : '';
+        if (!name.startsWith('origin/')) return;
+        remoteBranch = name.slice('origin/'.length);
+      }
+      await executor.rememberPushedRemote(branch, remoteBranch);
+      logToFile(`auto-commit: recorded last known remote for ${branch}`);
+    } catch {
+      // The push succeeded; a missing durable ref only makes the next Sync
+      // fall back to a merge-base, so this stays best-effort.
+      logToFile('auto-commit: could not record the last known remote');
+    }
   }
 
   try {
@@ -350,13 +389,18 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     if (pushResult.exitCode !== 0) {
       // Push failure is non-fatal — changes are committed locally
       const sanitizedPushError = redact(pushResult.stderr.trim());
+      const failure = pushFailureReason(`${pushResult.stderr}\n${pushResult.stdout}`);
       const msg = `git push failed: ${sanitizedPushError}`;
-      logToFile(`auto-commit: ${msg}`);
+      logToFile(`auto-commit: ${msg}${failure ? ` (${failure})` : ''}`);
       pushStatus =
         pushResult.terminationReason || pushResult.exitCode === 124 ? 'unknown' : 'failed';
-      return completeLocalCommit(`Changes committed (push failed: ${sanitizedPushError})`);
+      return completeLocalCommit(
+        `Changes committed (push failed: ${sanitizedPushError})`,
+        failure ?? undefined
+      );
     }
 
+    await rememberPushedRemote(branch, trackingUpstream);
     logToFile('auto-commit: push command completed');
     logToFile('auto-commit: completed successfully');
     return completeLocalCommit('Changes committed; push command completed');

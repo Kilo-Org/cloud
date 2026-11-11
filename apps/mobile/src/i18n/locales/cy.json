@@ -22,6 +22,8 @@
     "expired": "Wedi dod i ben"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Canslo",
     "done": "Gorffen",
     "retry": "Rhoi cynnig eto",
@@ -227,6 +229,21 @@
     "signInCodeField": "Cod mewngofnodi",
     "or": "neu"
   },
+  "pendingLink": {
+    "description": "Mae cyfrif eisoes yn defnyddio {{email}}. Mewngofnodwch gydag un o'i ddulliau i ychwanegu {{provider}}.",
+    "emailCode": "Anfon cod mewngofnodi ataf drwy e-bost",
+    "continueInBrowser": "Parhau yn y porwr",
+    "startAgain": "Dechrau eto",
+    "expired": "Mae'r cais hwn i ychwanegu {{provider}} wedi dod i ben.",
+    "noMethods": "Does gan y cyfrif hwn ddim dull mewngofnodi arall, felly does dim modd ychwanegu {{provider}}.",
+    "linked": "Cafodd {{provider}} ei ychwanegu at eich cyfrif.",
+    "failedExpired": "Chafodd {{provider}} mo'i ychwanegu oherwydd bod y cais wedi dod i ben.",
+    "failedWrongAccount": "Chafodd {{provider}} mo'i ychwanegu oherwydd i chi fewngofnodi i gyfrif gwahanol.",
+    "failedAccountAlreadyLinked": "Chafodd {{provider}} mo'i ychwanegu oherwydd ei fod eisoes wedi'i gysylltu â chyfrif arall.",
+    "failedProviderAlreadyLinked": "Chafodd {{provider}} mo'i ychwanegu oherwydd bod gan eich cyfrif ddull mewngofnodi {{provider}} gwahanol yn barod.",
+    "failedLinking": "Doedd dim modd ychwanegu {{provider}} at eich cyfrif.",
+    "notAdded": "Rydych chi wedi mewngofnodi. Chafodd {{provider}} mo'i ychwanegu at eich cyfrif."
+  },
   "profile": {
     "codeReviewerSubtitle": "Adolygiadau PR awtomatig",
     "securityAgentSubtitle": "Darganfod a thrwsio gwendidau",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Cyfrif prawf",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO menter",
     "passkeysTitle": "Allweddi mynediad",
     "passkeysSubtitle": "Mewngofnodi heb gyfrinair",
@@ -343,7 +362,19 @@
       "retryLoadingFiles": "Rhoi cynnig eto ar lwytho'r ffeiliau",
       "filterPlaceholder": "Hidlo ffeiliau yn ôl llwybr",
       "viewedCount": "{{viewed}} o {{total}} wedi'u gweld",
+      "viewedCount_zero": "{{viewed}} o {{total}} wedi'u gweld",
+      "viewedCount_one": "{{viewed}} o {{total}} wedi'u gweld",
+      "viewedCount_two": "{{viewed}} o {{total}} wedi'u gweld",
+      "viewedCount_few": "{{viewed}} o {{total}} wedi'u gweld",
+      "viewedCount_many": "{{viewed}} o {{total}} wedi'u gweld",
+      "viewedCount_other": "{{viewed}} o {{total}} wedi'u gweld",
       "viewedOfListed": "{{viewed}} o'r {{total}} o ffeiliau yn y rhestr wedi'u gweld",
+      "viewedOfListed_zero": "{{viewed}} o'r {{total}} o ffeiliau yn y rhestr wedi'u gweld",
+      "viewedOfListed_one": "{{viewed}} o'r {{total}} o ffeiliau yn y rhestr wedi'u gweld",
+      "viewedOfListed_two": "{{viewed}} o'r {{total}} o ffeiliau yn y rhestr wedi'u gweld",
+      "viewedOfListed_few": "{{viewed}} o'r {{total}} o ffeiliau yn y rhestr wedi'u gweld",
+      "viewedOfListed_many": "{{viewed}} o'r {{total}} o ffeiliau yn y rhestr wedi'u gweld",
+      "viewedOfListed_other": "{{viewed}} o'r {{total}} o ffeiliau yn y rhestr wedi'u gweld",
       "loadingFiles": "Yn llwytho {{loaded}} o {{total}}…",
       "failedToLoadAllFiles": "Ni lwyddwyd i lwytho'r holl ffeiliau.",
       "couldNotLoadMoreFiles": "Ni lwyddwyd i lwytho mwy o ffeiliau.",
@@ -1993,7 +2024,7 @@
       "cloningSession": "Yn clonio sesiwn",
       "couldNotLoadThisSession": "Methu llwytho'r sesiwn hon.",
       "cloneFailedRetry": "Methu clonio'r sesiwn hon. Ceisiwch eto.",
-      "notEnoughCredits": "Nid oes digon o gredydau i redeg Cloud Agent. Ychwanegwch gredydau a cheisiwch eto.",
+      "notEnoughCredits": "Nid oes digon o gredydau ar gyfer y cais hwn. Ychwanegwch gredydau a cheisiwch eto.",
       "previousTaskFinishing": "Nid yw'r dasg flaenorol wedi gorffen eto. Arhoswch am eiliad.",
       "serviceUnavailable": "Nid yw'r gwasanaeth ar gael ar hyn o bryd. Ceisiwch eto.",
       "connectionTrouble": "Mae problem gyda'r cysylltiad. Ceisiwch eto ymhen ychydig.",
@@ -2103,7 +2134,7 @@
       "discardWithUploadsMessage": "Bydd eich anogiad ac unrhyw ffeiliau a uwchlwythwyd ond sydd heb eu defnyddio yn cael eu dileu.",
       "discardFailed": "Methu dileu'r drafft. Ceisiwch eto.",
       "remoteHint": "I redeg ar eich cyfrifiadur, dechreuwch Kilo yno a gadewch iddo redeg.",
-      "continueFrom": "Yn parhau â {{title}}.",
+      "continueFrom": "Yn parhau â “{{title}}”.",
       "importingSession": "Yn mewnforio sesiwn",
       "cliCannotContinue": "Ni all y CLI hwn barhau â sesiwn. Dewiswch Cloud Agent neu CLI arall.",
       "importFailed": "Methu mewnforio'r sesiwn hon.",
@@ -2135,7 +2166,8 @@
       "selectedProfile": "Proffil dethol",
       "manualOverrides": "Diystyru â llaw",
       "openSettingsToReview": "Agor Gosodiadau i'w hadolygu",
-      "profileSelection": "Dewis proffil"
+      "profileSelection": "Dewis proffil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Diweddarwyd {{displayCount}} ffeil.",
@@ -2159,6 +2191,8 @@
       "toolList": "rhestru",
       "toolPatch": "clytio",
       "toolTask": "tasg",
+      "toolSendFile": "Anfonwyd ffeil",
+      "toolSendFileAction": "Anfon ffeil",
       "readTodos": "Darllen y cynllun",
       "updateTodos": "Diweddaru'r cynllun",
       "linesBadge": "{{displayCount}} llinell",
@@ -2271,7 +2305,21 @@
       "thought": "Syniad",
       "showDetails": "Dangos manylion",
       "pending": "Yn aros…",
-      "running": "Yn rhedeg…"
+      "running": "Yn rhedeg…",
+      "field": {
+        "filePath": "Llwybr ffeil",
+        "path": "Llwybr",
+        "offset": "Dadleoliad",
+        "limit": "Terfyn",
+        "pattern": "Patrwm",
+        "include": "Cynnwys",
+        "patchText": "Testun clwt",
+        "query": "Ymholiad",
+        "prompt": "Anogiad",
+        "header": "Pennawd",
+        "question": "Cwestiwn",
+        "options": "Opsiynau"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Methu dangos y cynnwys."
@@ -2287,7 +2335,7 @@
       "assistantContextOverflow": "Mae'r sgwrs yn rhy hir i'r model.",
       "assistantProviderError": "Roedd gwall gan y darparwr.",
       "assistantProviderRefused": "Gwrthododd y darparwr y cais ac ni ellir ei ailgynnig.",
-      "assistantCreditsRefusal": "Nid oes digon o gredydau i redeg Cloud Agent.",
+      "assistantCreditsRefusal": "Nid oes digon o gredydau ar gyfer y cais hwn.",
       "assistantOutputLimit": "Cyrhaeddodd yr ymateb derfyn allbwn y model.",
       "assistantStructuredOutput": "Nid oedd yr ymateb yn cyd-fynd â'r fformat gofynnol.",
       "assistantFailed": "Methodd yr ymateb."
@@ -2432,7 +2480,7 @@
       "positionHint": "(1 o {{displayCount}})",
       "movedPastPrompt": "Mae'r asiant wedi symud ymlaen o'r anogiad hwn. Bydd y cerdyn hwn yn cau pan fydd y sesiwn yn parhau.",
       "waitingForAnswer": "Mae'r asiant yn aros am eich ateb. Mae eich neges at yr asiant yn aros tra bo'r cwestiwn hwn ar agor.",
-      "waitingForPermission": "Mae'r asiant yn aros am ganiatâd. Mae eich neges at yr asiant yn aros tra bo'r cais hwn ar agor."
+      "waitingForPermission": "Mae eich neges at yr asiant yn aros tra bo'r cais hwn ar agor."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3246,7 +3294,7 @@
       "provider": "Wedi stopio: gwall darparwr",
       "tool": "Wedi stopio: gwall offeryn",
       "cancelled": "Wedi stopio: wedi canslo",
-      "other": "WEDI STOPIO"
+      "other": "Wedi stopio"
     }
   },
   "transcriptionModel": {
@@ -3767,6 +3815,7 @@
       "namePlaceholder": "Fy Asiant",
       "promptPlaceholder": "Rydych chi'n ...",
       "tools": "Offer",
+      "wholeToolRule": "Mae'r asiant hwn yn cymhwyso un rheol i bob offeryn ar unwaith: {{rule}}. Mae'r switshis hyn yn ddarllen yn unig.",
       "visibility": "Gwelededd",
       "visibilityPrimary": "Cynradd — a ddangosir yn y codwr",
       "visibilitySubagent": "Subagent — dim ond ei alw gan eraill",
@@ -3807,7 +3856,8 @@
       "duplicateName": "Mae gorchymyn gyda'r enw hwn eisoes yn bodoli yn y proffil hwn"
     },
     "repoBindings": {
-      "title": "Proffiliau Rhagosodedig ar gyfer Repos",
+      "title": "Proffiliau rhagosodedig ar gyfer Repos",
+      "entryLabel": "Proffiliau rhagosodedig",
       "add": "Ychwanegu rhagosodiad",
       "empty": "Dim rhagosodiadau wedi'u ffurfweddu",
       "emptyDescription": "Ychwanegu rhagosodiad i gymhwyso proffil yn awtomatig wrth gychwyn sesiynau ar gyfer repo.",
@@ -4009,7 +4059,7 @@
     "estimateModelNotAllowed": "Nid yw'r model hwn yn cael ei ganiatáu yma.",
     "estimateSpendLimitTooLow": "Cynyddwch y terfyn gwariant i ganiatáu'r crynodeb hwn.",
     "confirmPaid": "Galluogi crynodebau taledig ar gyfer {{context}}?",
-    "paidDisclosure": "Amcangyfrif {{estimate}}, hyd at {{maximum}}, gyda therfyn o {{minutes}} munud. Codir tâl hyd yn oed os bydd y creu'n methu.",
+    "paidDisclosure": "Amcangyfrif {{estimate}}, hyd at {{maximum}}, gyda therfyn o {{minutes}} mun. Codir tâl hyd yn oed os bydd y creu'n methu.",
     "enable": "Galluogi crynodebau taledig",
     "allContexts": "Mae briffiau personol a sefydliad yn cael eu cadw ar wahân.",
     "emptyHistory": "Dim briffiau wedi'u cadw",
@@ -4024,10 +4074,10 @@
     "snapshotSummaryFailed": "Methodd y crynodeb AI. Mae eich ciplun strwythuredig yn dal ar gael.",
     "scheduledContextEnabled": "Briffiau a drefnwyd",
     "scheduledContextSettings": "Briffiau a drefnwyd · {{context}}",
-    "scheduledContextHint": "Galluogwch gipio wedi'i amserlennu a chrynodebau AI taledig ar gyfer y cyd-destun hwn yn unig. Anfonir dyfyniadau dethol, gyda gwybodaeth sensitif wedi'i chuddio, a ffeithiau strwythuredig i'ch model. Mae crynodebau'n defnyddio iaith yr ap a gadwyd pan wnaethoch ddiweddaru gosodiadau briff yn benodol. Nid yw'r iaith hon yn newid yn awtomatig pan fydd iaith yr ap yn newid. Codir tâl ar falans y cyd-destun hwn. Nid yw cipluniau tawel yn defnyddio AI.",
+    "scheduledContextHint": "Galluogwch gipio wedi'i amserlennu a chrynodebau AI taledig ar gyfer y cyd-destun hwn yn unig. Anfonir dyfyniadau dethol, gyda gwybodaeth sensitif wedi'i chuddio, a ffeithiau strwythuredig i'ch model. Mae crynodebau'n defnyddio iaith yr ap a gadwyd pan wnaethoch ddiweddaru gosodiadau briff. Codir tâl ar falans y cyd-destun hwn. Nid yw cipluniau tawel yn defnyddio AI.",
     "snapshotSafeguards": "Mae terfynau amser a gwariant fesul crynodeb yn berthnasol i bob ciplun a drefnwyd; nid cyllideb ddyddiol ydynt.",
     "snapshotEstimateInputTooLarge": "Mae gormod o dystiolaeth yn y ciplun hwn ar gyfer y model a ddewiswyd.",
-    "quietSnapshot": "Wrth ddethol hyd eithaf ein gallu, ni ddewiswyd unrhyw weithgarwch sesiwn ar gyfer y ciplun hwn. Ni alwyd model AI, ni ofynnwyd am grynodeb AI ac ni chodwyd tâl.",
+    "quietSnapshot": "Ni ddewiswyd unrhyw weithgarwch sesiwn ar gyfer y ciplun hwn. Ni ofynnwyd am grynodeb AI ac ni chodwyd tâl.",
     "noEnabledContexts": "Dim cyd-destunau wedi'u galluogi ar gyfer briffiau a drefnwyd",
     "sourceBlocker": "Mae angen rhoi sylw i'r sesiwn",
     "sourceMetadata": "Metadata'r sesiwn a gipiwyd"

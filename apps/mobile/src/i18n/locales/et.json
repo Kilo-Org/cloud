@@ -22,6 +22,8 @@
     "expired": "Aegunud"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Tühista",
     "done": "Valmis",
     "retry": "Proovi uuesti",
@@ -227,6 +229,21 @@
     "signInCodeField": "Sisselogimiskood",
     "or": "või"
   },
+  "pendingLink": {
+    "description": "Aadressi {{email}} kasutab juba üks konto. {{provider}} lisamiseks logi sisse mõne selle konto meetodiga.",
+    "emailCode": "Saada mulle sisselogimiskood e-postiga",
+    "continueInBrowser": "Jätka brauseris",
+    "startAgain": "Alusta uuesti",
+    "expired": "See {{provider}} lisamise taotlus on aegunud.",
+    "noMethods": "Sellel kontol pole muud sisselogimismeetodit, seega ei saa {{provider}} lisada.",
+    "linked": "{{provider}} lisati sinu kontole.",
+    "failedExpired": "{{provider}} jäi lisamata, sest taotlus aegus.",
+    "failedWrongAccount": "{{provider}} jäi lisamata, sest logisid sisse teise kontoga.",
+    "failedAccountAlreadyLinked": "{{provider}} jäi lisamata, sest see on juba seotud teise kontoga.",
+    "failedProviderAlreadyLinked": "{{provider}} jäi lisamata, sest sinu kontol on juba teine {{provider}} sisselogimine.",
+    "failedLinking": "{{provider}} ei õnnestunud sinu kontole lisada.",
+    "notAdded": "Oled sisse logitud. {{provider}} jäi sinu kontole lisamata."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automaatsed PR-ülevaatused",
     "securityAgentSubtitle": "Leia ja kõrvalda turvanõrkused",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Testikonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Ettevõtte SSO",
     "passkeysTitle": "Pääsuvõtmed",
     "passkeysSubtitle": "Logi sisse ilma paroolita",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "Proovi failide laadimist uuesti",
       "filterPlaceholder": "Failide otsing tee järgi",
       "viewedCount": "{{viewed}}/{{total}} vaadatud",
+      "viewedCount_one": "{{viewed}}/{{total}} vaadatud",
+      "viewedCount_other": "{{viewed}}/{{total}} vaadatud",
       "viewedOfListed": "Loetletud failidest {{viewed}}/{{total}} vaadatud",
+      "viewedOfListed_one": "Loetletud failidest {{viewed}}/{{total}} vaadatud",
+      "viewedOfListed_other": "Loetletud failidest {{viewed}}/{{total}} vaadatud",
       "loadingFiles": "Laaditakse {{loaded}}/{{total}}…",
       "failedToLoadAllFiles": "Kõiki faile ei õnnestunud laadida.",
       "couldNotLoadMoreFiles": "Lisafaile ei õnnestunud laadida.",
@@ -1837,7 +1860,7 @@
       "cloningSession": "Seanssi kloonitakse",
       "couldNotLoadThisSession": "Seda seanssi ei õnnestunud laadida.",
       "cloneFailedRetry": "Seda seanssi ei õnnestunud kloonida. Proovi uuesti.",
-      "notEnoughCredits": "Cloud Agenti käivitamiseks ei jätku krediiti. Lisa krediiti ja proovi uuesti.",
+      "notEnoughCredits": "Selle päringu jaoks ei jätku krediiti. Lisa krediiti ja proovi uuesti.",
       "previousTaskFinishing": "Eelmine ülesanne pole veel lõppenud. Oota hetk.",
       "serviceUnavailable": "Teenus pole praegu saadaval. Palun proovi uuesti.",
       "connectionTrouble": "Ühendusega on probleem. Proovi hetke pärast uuesti.",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "Valitud profiil",
       "manualOverrides": "Käsitsi alistamised",
       "openSettingsToReview": "Ava ülevaatamiseks Seaded",
-      "profileSelection": "Profiili valik"
+      "profileSelection": "Profiili valik",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Uuendati {{displayCount}} fail.",
@@ -1999,6 +2023,8 @@
       "toolList": "loetle",
       "toolPatch": "rakenda paik",
       "toolTask": "ülesanne",
+      "toolSendFile": "Fail saadetud",
+      "toolSendFileAction": "saada fail",
       "readTodos": "Loe plaani",
       "updateTodos": "Uuenda plaani",
       "linesBadge": "{{displayCount}} rida",
@@ -2099,7 +2125,21 @@
       "thought": "Mõttekäik",
       "showDetails": "Kuva üksikasjad",
       "pending": "Ootel…",
-      "running": "Käimas…"
+      "running": "Käimas…",
+      "field": {
+        "filePath": "Faili tee",
+        "path": "Tee",
+        "offset": "Nihe",
+        "limit": "Ülempiir",
+        "pattern": "Muster",
+        "include": "Kaasatavad failid",
+        "patchText": "Paranduse tekst",
+        "query": "Päring",
+        "prompt": "Viip",
+        "header": "Pealkiri",
+        "question": "Küsimus",
+        "options": "Valikud"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Sisu kuvamine ebaõnnestus."
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "Vestlus on mudeli jaoks liiga pikk.",
       "assistantProviderError": "Pakkuja tagastas vea.",
       "assistantProviderRefused": "Pakkuja keeldus sellest päringust ja seda ei saa uuesti proovida.",
-      "assistantCreditsRefusal": "Cloud Agenti käivitamiseks ei jätku krediiti.",
+      "assistantCreditsRefusal": "Selle päringu jaoks ei jätku krediiti.",
       "assistantOutputLimit": "Vastus jõudis mudeli väljundi piirini.",
       "assistantStructuredOutput": "Vastus ei vastanud nõutud vormingule.",
       "assistantFailed": "Vastuse koostamine ebaõnnestus."
@@ -2260,7 +2300,7 @@
       "positionHint": "(1/{{displayCount}})",
       "movedPastPrompt": "Agent on selle viiba juba läbinud. See kaart sulgub, kui seanss jätkub.",
       "waitingForAnswer": "Agent ootab sinu vastust. Kuni see küsimus on avatud, on sinu sõnumi saatmine agendile peatatud.",
-      "waitingForPermission": "Agent ootab luba. Kuni see taotlus on avatud, on sinu sõnumi saatmine agendile peatatud."
+      "waitingForPermission": "Kuni see taotlus on avatud, on sinu sõnumi saatmine agendile peatatud."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "Minu agent",
       "promptPlaceholder": "Sa oled…",
       "tools": "Tööriistad",
+      "wholeToolRule": "See agent rakendab ühte reeglit korraga kõigile tööriistadele: {{rule}}. Need lülitid on kirjutuskaitstud.",
       "visibility": "Nähtavus",
       "visibilityPrimary": "Esmane — kuvatakse valijas",
       "visibilitySubagent": "Subagent — kutsutav ainult teiste poolt",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "Repode vaikeprofiilid",
+      "entryLabel": "Vaikeprofiilid",
       "add": "Lisa vaikeprofiil",
       "empty": "Ühtegi vaikeprofiili pole seadistatud",
       "emptyDescription": "Lisa vaikeprofiil, mida rakendatakse automaatselt repo seansside alustamisel.",
@@ -3757,7 +3799,7 @@
     "estimateModelNotAllowed": "See mudel pole siin lubatud.",
     "estimateSpendLimitTooLow": "Kulupiirangu tõstmisel saaks selle kokkuvõtte lubada.",
     "confirmPaid": "Kas lubada tasulised kokkuvõtted kontekstis {{context}}?",
-    "paidDisclosure": "Hinnanguliselt {{estimate}}, kuni {{maximum}}, {{minutes}} minuti pikkuse ajapiiranguga. Tasu rakendub ka siis, kui koostamine ebaõnnestub.",
+    "paidDisclosure": "Hinnanguliselt {{estimate}}, kuni {{maximum}}, {{minutes}} min pikkuse ajapiiranguga. Tasu rakendub ka siis, kui koostamine ebaõnnestub.",
     "enable": "Luba tasulised kokkuvõtted",
     "allContexts": "Isiklikud ja organisatsiooni ülevaated hoitakse eraldi.",
     "emptyHistory": "Salvestatud ülevaateid pole",

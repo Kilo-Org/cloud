@@ -1,10 +1,10 @@
 import { Mic, Square } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
-import { type Insets, Pressable } from 'react-native';
+import { type Insets, Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { VOICE_INPUT_LG_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, VOICE_INPUT_LG_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';
@@ -19,6 +19,13 @@ type VoiceInputButtonProps = {
   size?: VoiceInputButtonSize;
   /** Replaces the size's own slop when a neighbour sits closer than it. */
   hitSlop?: Insets;
+  /**
+   * Renders the shared 48dp box on the pressable's own node and keeps the
+   * size's visual circle inside it. A control-size audit reads that node's
+   * rect, so `hitSlop` cannot lift the smaller visual frame above the floor;
+   * the slop is dropped because the box is the whole target.
+   */
+  fullTarget?: boolean;
 };
 
 // Visual class and hitSlop travel as a coupled pair: the tap area is the
@@ -70,6 +77,7 @@ const RESTING_BG = 'bg-secondary';
  */
 export function VoiceInputButton({
   disabled,
+  fullTarget = false,
   hitSlop,
   onPress,
   size,
@@ -83,11 +91,12 @@ export function VoiceInputButton({
   const iconColor = isListeningOrStopping ? colors.destructiveForeground : colors.foreground;
   const restingBg = isListeningOrStopping ? LISTENING_BG : RESTING_BG;
   const sizeStyle = size ? SIZE_STYLES[size] : DEFAULT_STYLE;
-  const containerClass = cn(
-    sizeStyle.className,
-    'items-center justify-center active:opacity-70',
-    restingBg
-  );
+  // The visual stays the size's own frame; `fullTarget` moves it inside the
+  // shared 48dp box the size audit measures.
+  const visualClass = cn(sizeStyle.className, 'items-center justify-center', restingBg);
+  const containerClass = fullTarget
+    ? cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')
+    : cn(visualClass, 'active:opacity-70');
   const renderIcon = (): React.ReactElement => {
     if (showSpinner) {
       return <ActivityIndicator color={iconColor} size="small" />;
@@ -97,6 +106,7 @@ export function VoiceInputButton({
     }
     return <Square color={iconColor} size={ICON_SIZE} />;
   };
+  const icon = renderIcon();
 
   return (
     <Pressable
@@ -105,10 +115,10 @@ export function VoiceInputButton({
       accessibilityState={{ busy: control.busy, disabled: control.disabled }}
       className={containerClass}
       disabled={control.disabled}
-      hitSlop={hitSlop ?? sizeStyle.hitSlop}
+      hitSlop={fullTarget ? undefined : (hitSlop ?? sizeStyle.hitSlop)}
       onPress={onPress}
     >
-      {renderIcon()}
+      {fullTarget ? <View className={visualClass}>{icon}</View> : icon}
     </Pressable>
   );
 }

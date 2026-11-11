@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import React, { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider, skipToken } from '@tanstack/react-query';
+import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
 import type { usePreviewServices as UsePreviewServices } from './use-preview';
 
 type PreviewResult = {
@@ -11,6 +12,9 @@ type PreviewResult = {
 };
 
 const sessionId = 'workspace_00000000-0000-4000-8000-000000000001' as const;
+const worktreeId = 'worktree_00000000-0000-4000-8000-000000000001' as const;
+const sessionTarget = { cloudAgentSessionId: sessionId } satisfies PreviewTarget;
+const worktreeTarget = { worktreeId } satisfies PreviewTarget;
 
 const mockPersonalList = jest.fn<() => Promise<PreviewResult>>();
 const mockOrganizationList = jest.fn<() => Promise<PreviewResult>>();
@@ -97,18 +101,18 @@ describe('usePreviewServices', () => {
   let queryClient: QueryClient;
   let latest: ReturnType<typeof usePreviewServices> | undefined;
 
-  function Harness({ organizationId }: { organizationId?: string }) {
-    latest = usePreviewServices(sessionId, organizationId);
+  function Harness({ target, organizationId }: { target: PreviewTarget; organizationId?: string }) {
+    latest = usePreviewServices(target, organizationId);
     return null;
   }
 
-  function render(organizationId?: string) {
+  function render(target: PreviewTarget, organizationId?: string) {
     act(() =>
       root.render(
         createElement(
           QueryClientProvider,
           { client: queryClient },
-          createElement(Harness, { organizationId })
+          createElement(Harness, { target, organizationId })
         )
       )
     );
@@ -155,14 +159,14 @@ describe('usePreviewServices', () => {
   });
 
   it('uses the personal query with no focus, reconnect or polling refetches', async () => {
-    render(undefined);
+    render(sessionTarget);
     await settle();
 
     expect(mockPersonalList).toHaveBeenCalledTimes(1);
     expect(mockOrganizationList).not.toHaveBeenCalled();
-    expect(mockTrpc.cloudAgentNext.listPreviewServices.queryOptions).toHaveBeenCalledWith({
-      cloudAgentSessionId: sessionId,
-    });
+    expect(mockTrpc.cloudAgentNext.listPreviewServices.queryOptions).toHaveBeenCalledWith(
+      sessionTarget
+    );
     expect(
       mockTrpc.organizations.cloudAgentNext.listPreviewServices.queryOptions
     ).toHaveBeenCalledWith(skipToken);
@@ -180,14 +184,14 @@ describe('usePreviewServices', () => {
   });
 
   it('uses the organization query and skips the personal one when an organization is selected', async () => {
-    render('organization-1');
+    render(sessionTarget, 'organization-1');
     await settle();
 
     expect(mockOrganizationList).toHaveBeenCalledTimes(1);
     expect(mockPersonalList).not.toHaveBeenCalled();
     expect(
       mockTrpc.organizations.cloudAgentNext.listPreviewServices.queryOptions
-    ).toHaveBeenCalledWith({ cloudAgentSessionId: sessionId, organizationId: 'organization-1' });
+    ).toHaveBeenCalledWith({ ...sessionTarget, organizationId: 'organization-1' });
     expect(mockTrpc.cloudAgentNext.listPreviewServices.queryOptions).toHaveBeenCalledWith(
       skipToken
     );
@@ -202,5 +206,27 @@ describe('usePreviewServices', () => {
     });
     expect(options.refetchInterval).toBeFalsy();
     expect(options.queryFn).not.toBe(skipToken);
+  });
+
+  it('forwards a worktree target to personal and organization discovery', async () => {
+    render(worktreeTarget);
+    await settle();
+
+    expect(mockTrpc.cloudAgentNext.listPreviewServices.queryOptions).toHaveBeenCalledWith(
+      worktreeTarget
+    );
+    expect(
+      mockTrpc.organizations.cloudAgentNext.listPreviewServices.queryOptions
+    ).toHaveBeenCalledWith(skipToken);
+
+    render(worktreeTarget, 'organization-1');
+    await settle();
+
+    expect(
+      mockTrpc.organizations.cloudAgentNext.listPreviewServices.queryOptions
+    ).toHaveBeenCalledWith({ ...worktreeTarget, organizationId: 'organization-1' });
+    expect(mockTrpc.cloudAgentNext.listPreviewServices.queryOptions).toHaveBeenCalledWith(
+      skipToken
+    );
   });
 });

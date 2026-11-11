@@ -22,6 +22,8 @@
     "expired": "ໝົດອາຍຸແລ້ວ"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "ຍົກເລີກ",
     "done": "ສຳເລັດ",
     "retry": "ລອງໃໝ່",
@@ -227,6 +229,21 @@
     "signInCodeField": "ລະຫັດເຂົ້າສູ່ລະບົບ",
     "or": "ຫຼື"
   },
+  "pendingLink": {
+    "description": "ມີບັນຊີທີ່ໃຊ້ {{email}} ຢູ່ແລ້ວ. ເຂົ້າສູ່ລະບົບດ້ວຍວິທີໃດໜຶ່ງຂອງບັນຊີນັ້ນເພື່ອເພີ່ມ {{provider}}.",
+    "emailCode": "ສົ່ງລະຫັດເຂົ້າສູ່ລະບົບໃຫ້ຂ້ອຍທາງອີເມວ",
+    "continueInBrowser": "ສືບຕໍ່ໃນບຣາວເຊີ",
+    "startAgain": "ເລີ່ມໃໝ່",
+    "expired": "ຄຳຂໍເພີ່ມ {{provider}} ນີ້ໝົດອາຍຸແລ້ວ.",
+    "noMethods": "ບັນຊີນີ້ບໍ່ມີວິທີເຂົ້າສູ່ລະບົບອື່ນ, ສະນັ້ນຈຶ່ງບໍ່ສາມາດເພີ່ມ {{provider}} ໄດ້.",
+    "linked": "ເພີ່ມ {{provider}} ໃສ່ບັນຊີຂອງທ່ານແລ້ວ.",
+    "failedExpired": "ບໍ່ໄດ້ເພີ່ມ {{provider}} ເພາະຄຳຂໍໝົດອາຍຸແລ້ວ.",
+    "failedWrongAccount": "ບໍ່ໄດ້ເພີ່ມ {{provider}} ເພາະທ່ານເຂົ້າສູ່ລະບົບບັນຊີອື່ນ.",
+    "failedAccountAlreadyLinked": "ບໍ່ໄດ້ເພີ່ມ {{provider}} ເພາະມັນເຊື່ອມຕໍ່ກັບບັນຊີອື່ນຢູ່ແລ້ວ.",
+    "failedProviderAlreadyLinked": "ບໍ່ໄດ້ເພີ່ມ {{provider}} ເພາະບັນຊີຂອງທ່ານມີການເຂົ້າສູ່ລະບົບ {{provider}} ອື່ນຢູ່ແລ້ວ.",
+    "failedLinking": "ບໍ່ສາມາດເພີ່ມ {{provider}} ໃສ່ບັນຊີຂອງທ່ານໄດ້.",
+    "notAdded": "ທ່ານເຂົ້າສູ່ລະບົບແລ້ວ. ບໍ່ໄດ້ເພີ່ມ {{provider}} ໃສ່ບັນຊີຂອງທ່ານ."
+  },
   "profile": {
     "codeReviewerSubtitle": "ການກວດສອບ PR ອັດຕະໂນມັດ",
     "securityAgentSubtitle": "ຊອກຫາ ແລະ ແກ້ໄຂຈຸດອ່ອນດ້ານຄວາມປອດໄພ",
@@ -265,6 +282,8 @@
     "providerTestAccount": "ບັນຊີທົດສອບ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO ສຳລັບອົງກອນ",
     "passkeysTitle": "ກະແຈເຂົ້າ",
     "passkeysSubtitle": "ເຂົ້າສູ່ລະບົບໂດຍບໍ່ມີລະຫັດຜ່ານ",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "ລອງໂຫຼດໄຟລ໌ອີກຄັ້ງ",
       "filterPlaceholder": "ເສັ້ນທາງໄຟລ໌ທີ່ຕ້ອງການກັ່ນຕອງ",
       "viewedCount": "ເບິ່ງແລ້ວ {{viewed}} ຈາກ {{total}}",
+      "viewedCount_one": "ເບິ່ງແລ້ວ {{viewed}} ຈາກ {{total}}",
+      "viewedCount_other": "ເບິ່ງແລ້ວ {{viewed}} ຈາກ {{total}}",
       "viewedOfListed": "ເບິ່ງແລ້ວ {{viewed}} ຈາກ {{total}} ໄຟລ໌ໃນລາຍການ",
+      "viewedOfListed_one": "ເບິ່ງແລ້ວ {{viewed}} ຈາກ {{total}} ໄຟລ໌ໃນລາຍການ",
+      "viewedOfListed_other": "ເບິ່ງແລ້ວ {{viewed}} ຈາກ {{total}} ໄຟລ໌ໃນລາຍການ",
       "loadingFiles": "ກຳລັງໂຫຼດ {{loaded}} ຈາກ {{total}}…",
       "failedToLoadAllFiles": "ບໍ່ສາມາດໂຫຼດໄຟລ໌ໄດ້ຄົບທັງໝົດ.",
       "couldNotLoadMoreFiles": "ບໍ່ສາມາດໂຫຼດໄຟລ໌ເພີ່ມເຕີມໄດ້.",
@@ -1837,7 +1860,7 @@
       "cloningSession": "ກຳລັງສ້າງສຳເນົາເຊດຊັນ",
       "couldNotLoadThisSession": "ບໍ່ສາມາດໂຫຼດເຊດຊັນນີ້ໄດ້.",
       "cloneFailedRetry": "ບໍ່ສາມາດສ້າງສຳເນົາເຊດຊັນນີ້ໄດ້. ລອງໃໝ່.",
-      "notEnoughCredits": "ເຄຣດິດບໍ່ພໍສຳລັບໃຊ້ Cloud Agent. ເຕີມເຄຣດິດແລ້ວລອງໃໝ່.",
+      "notEnoughCredits": "ເຄຣດິດບໍ່ພໍສຳລັບຄຳຂໍນີ້. ເຕີມເຄຣດິດແລ້ວລອງໃໝ່.",
       "previousTaskFinishing": "ວຽກກ່ອນໜ້າກຳລັງຈະສຳເລັດ. ກະລຸນາລໍຖ້າຈັກໜ້ອຍ.",
       "serviceUnavailable": "ຕອນນີ້ຍັງໃຊ້ບໍລິການບໍ່ໄດ້. ກະລຸນາລອງໃໝ່.",
       "connectionTrouble": "ການເຊື່ອມຕໍ່ມີບັນຫາ. ກະລຸນາລໍຖ້າຈັກໜ້ອຍແລ້ວລອງໃໝ່.",
@@ -1947,7 +1970,7 @@
       "discardWithUploadsMessage": "ຂໍ້ຄວາມທີ່ເຈົ້າຮ່າງໄວ້ ແລະໄຟລ໌ທີ່ອັບໂຫຼດໄວ້ແຕ່ຍັງບໍ່ໄດ້ໃຊ້ຈະຖືກລຶບ.",
       "discardFailed": "ບໍ່ສາມາດລຶບຂໍ້ຄວາມຮ່າງໄດ້. ກະລຸນາລອງໃໝ່.",
       "remoteHint": "ເພື່ອຈະເຮັດວຽກເທິງຄອມພິວເຕີຂອງເຈົ້າ, ໃຫ້ເປີດ Kilo ຢູ່ບ່ອນນັ້ນ ແລະເປີດຄ້າງໄວ້ຕໍ່ໄປ.",
-      "continueFrom": "ກຳລັງເຮັດວຽກຕໍ່ຈາກ {{title}}.",
+      "continueFrom": "ກຳລັງເຮັດວຽກຕໍ່ຈາກ “{{title}}”.",
       "importingSession": "ກຳລັງນຳເຂົ້າເຊດຊັນ",
       "cliCannotContinue": "CLI ນີ້ບໍ່ສາມາດເຮັດວຽກຕໍ່ຈາກເຊດຊັນໄດ້. ເລືອກ Cloud Agent ຫຼື CLI ອື່ນ.",
       "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້.",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "ໂປຣໄຟລ໌ທີ່ເລືອກ",
       "manualOverrides": "ການລົບລ້າງດ້ວຍມື",
       "openSettingsToReview": "ເປີດການຕັ້ງຄ່າເພື່ອກວດສອບ",
-      "profileSelection": "ການເລືອກໂປຣໄຟລ໌"
+      "profileSelection": "ການເລືອກໂປຣໄຟລ໌",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "ອັບເດດໄຟລ໌ແລ້ວ {{displayCount}} ໄຟລ໌.",
@@ -1999,6 +2023,8 @@
       "toolList": "ສະແດງລາຍການ",
       "toolPatch": "ແກ້ໄຂ",
       "toolTask": "ວຽກ",
+      "toolSendFile": "ສົ່ງໄຟລ໌ແລ້ວ",
+      "toolSendFileAction": "ສົ່ງໄຟລ໌",
       "readTodos": "ອ່ານແຜນ",
       "updateTodos": "ອັບເດດແຜນ",
       "linesBadge": "{{displayCount}} ບັນທັດ",
@@ -2099,7 +2125,21 @@
       "thought": "ຄວາມຄິດ",
       "showDetails": "ສະແດງລາຍລະອຽດ",
       "pending": "ລໍຖ້າ…",
-      "running": "ກຳລັງເຮັດວຽກ…"
+      "running": "ກຳລັງເຮັດວຽກ…",
+      "field": {
+        "filePath": "ເສັ້ນທາງໄຟລ໌",
+        "path": "ເສັ້ນທາງ",
+        "offset": "ຕຳແໜ່ງ",
+        "limit": "ຂີດຈຳກັດ",
+        "pattern": "ຮູບແບບ",
+        "include": "ລວມ",
+        "patchText": "ຂໍ້ຄວາມແພັດ",
+        "query": "ຄຳຄົ້ນຫາ",
+        "prompt": "ຂໍ້ຄວາມສັ່ງ",
+        "header": "ຫົວຂໍ້",
+        "question": "ຄຳຖາມ",
+        "options": "ຕົວເລືອກ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "ບໍ່ສາມາດສະແດງເນື້ອໃນໄດ້."
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "ການສົນທະນາຍາວເກີນກວ່າທີ່ໂມເດວຈະຮອງຮັບໄດ້.",
       "assistantProviderError": "ຜູ້ໃຫ້ບໍລິການສົ່ງຂໍ້ຜິດພາດກັບມາ.",
       "assistantProviderRefused": "ຜູ້ໃຫ້ບໍລິການໄດ້ປະຕິເສດຄຳຂໍນີ້ ແລະ ບໍ່ສາມາດລອງໃໝ່ໄດ້.",
-      "assistantCreditsRefusal": "ເຄຣດິດບໍ່ພໍສຳລັບໃຊ້ Cloud Agent.",
+      "assistantCreditsRefusal": "ເຄຣດິດບໍ່ພໍສຳລັບຄຳຂໍນີ້.",
       "assistantOutputLimit": "ຄຳຕອບໄດ້ເຖິງຂີດຈຳກັດຜົນຜະລິດຂອງໂມເດວແລ້ວ.",
       "assistantStructuredOutput": "ຄຳຕອບບໍ່ສອດຄ່ອງກັບຮູບແບບທີ່ຕ້ອງການ.",
       "assistantFailed": "ສ້າງຄຳຕອບບໍ່ສຳເລັດ."
@@ -2260,7 +2300,7 @@
       "positionHint": "(1 ຈາກທັງໝົດ {{displayCount}})",
       "movedPastPrompt": "ເອເຈນໄດ້ຜ່ານຄຳຂໍນີ້ໄປແລ້ວ. ແຜງນີ້ຈະປິດເມື່ອເຊດຊັນເຮັດວຽກຕໍ່.",
       "waitingForAnswer": "ເອເຈນກຳລັງລໍຖ້າຄຳຕອບຂອງເຈົ້າ. ການສົ່ງຂໍ້ຄວາມໄປຫາເອເຈນຈະຢຸດຊົ່ວຄາວຈົນກວ່າຈະຕອບຄຳຖາມນີ້.",
-      "waitingForPermission": "ເອເຈນກຳລັງລໍຖ້າການອະນຸຍາດ. ການສົ່ງຂໍ້ຄວາມໄປຫາເອເຈນຈະຢຸດຊົ່ວຄາວຈົນກວ່າຈະຕອບຄຳຂໍນີ້."
+      "waitingForPermission": "ການສົ່ງຂໍ້ຄວາມໄປຫາເອເຈນຈະຢຸດຊົ່ວຄາວຈົນກວ່າຈະຕອບຄຳຂໍນີ້."
     },
     "childSession": {
       "accessibilityLabel": "ເອເຈນ {{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "ຕົວແທນຂອງຂ້ອຍ",
       "promptPlaceholder": "ເຈົ້າເປັນ...",
       "tools": "ເຄື່ອງມື",
+      "wholeToolRule": "ຕົວແທນນີ້ນຳໃຊ້ກົດໜຶ່ງກັບທຸກໆເຄື່ອງມືພ້ອມກັນ: {{rule}}. ສະວິດເຫຼົ່ານີ້ອ່ານໄດ້ຢ່າງດຽວ.",
       "visibility": "ການເບິ່ງເຫັນ",
       "visibilityPrimary": "ປະຖົມ — ສະແດງໃຫ້ເຫັນຢູ່ໃນຕົວເລືອກ",
       "visibilitySubagent": "Subagent — ພຽງແຕ່ສາມາດໂທໄດ້ຈາກຄົນອື່ນ",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "ໂປຣໄຟລ໌ເລີ່ມຕົ້ນສຳລັບ Repos",
+      "entryLabel": "ໂປຣໄຟລ໌ເລີ່ມຕົ້ນ",
       "add": "ເພີ່ມຄ່າເລີ່ມຕົ້ນ",
       "empty": "ບໍ່ມີຄ່າເລີ່ມຕົ້ນທີ່ຖືກຕັ້ງຄ່າ",
       "emptyDescription": "ເພີ່ມຄ່າເລີ່ມຕົ້ນເພື່ອນຳໃຊ້ໂປຣໄຟລ໌ໂດຍອັດຕະໂນມັດເມື່ອເລີ່ມເຊດຊັນສຳລັບ repo.",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "ສະຫຼຸບ AI ລົ້ມເຫຼວ. ບັນທຶກສະຖານະແບບມີໂຄງສ້າງຂອງທ່ານຍັງໃຊ້ໄດ້.",
     "scheduledContextEnabled": "ລາຍງານທີ່ກຳນົດໄວ້",
     "scheduledContextSettings": "ລາຍງານທີ່ກຳນົດໄວ້ · {{context}}",
-    "scheduledContextHint": "ເປີດການບັນທຶກສະຖານະຕາມກຳນົດ ແລະ ສະຫຼຸບ AI ແບບເສຍເງິນ ສະເພາະບໍລິບົດນີ້. ຂໍ້ຄວາມທີ່ເລືອກ ແລະ ປິດບັງຂໍ້ມູນລັບແລ້ວ ພ້ອມຂໍ້ເທັດຈິງແບບມີໂຄງສ້າງ ຈະຖືກສົ່ງໄປຫາໂມເດລຂອງທ່ານ. ສະຫຼຸບຈະໃຊ້ພາສາຂອງແອັບທີ່ບັນທຶກໄວ້ເມື່ອທ່ານປັບປ່ຽນການຕັ້ງຄ່າລາຍງານເທົ່ານັ້ນ, ບໍ່ໄດ້ປ່ຽນຕາມພາສາຂອງແອັບໂດຍອັດຕະໂນມັດ. ຄ່າໃຊ້ຈ່າຍຈະຫັກຈາກຍອດເງິນຂອງບໍລິບົດນີ້. ບັນທຶກສະຖານະທີ່ບໍ່ມີກິດຈະກຳຖືກເລືອກຈະບໍ່ໃຊ້ AI.",
+    "scheduledContextHint": "ເປີດການບັນທຶກສະຖານະຕາມກຳນົດ ແລະ ສະຫຼຸບ AI ແບບເສຍເງິນ ສະເພາະບໍລິບົດນີ້. ຂໍ້ຄວາມທີ່ເລືອກ ແລະ ປິດບັງຂໍ້ມູນລັບແລ້ວ ພ້ອມຂໍ້ເທັດຈິງແບບມີໂຄງສ້າງ ຈະຖືກສົ່ງໄປຫາໂມເດລຂອງທ່ານ. ສະຫຼຸບຈະໃຊ້ພາສາຂອງແອັບທີ່ບັນທຶກໄວ້ເມື່ອທ່ານປັບປ່ຽນການຕັ້ງຄ່າລາຍງານ. ຄ່າໃຊ້ຈ່າຍຈະຫັກຈາກຍອດເງິນຂອງບໍລິບົດນີ້. ບັນທຶກສະຖານະທີ່ບໍ່ມີກິດຈະກຳຈະບໍ່ໃຊ້ AI.",
     "snapshotSafeguards": "ຂີດຈຳກັດເວລາ ແລະ ຄ່າໃຊ້ຈ່າຍຕໍ່ການສະຫຼຸບ ໃຊ້ກັບບັນທຶກສະຖານະຕາມກຳນົດແຕ່ລະຄັ້ງ, ບໍ່ແມ່ນງົບປະມານລາຍວັນ.",
     "snapshotEstimateInputTooLarge": "ບັນທຶກສະຖານະນີ້ມີຫຼັກຖານຫຼາຍເກີນໄປສຳລັບໂມເດລທີ່ເລືອກ.",
-    "quietSnapshot": "ການຄັດເລືອກເທົ່າທີ່ເກັບໄດ້ບໍ່ໄດ້ເລືອກກິດຈະກຳຂອງເຊສຊັນໃດໄວ້ໃນບັນທຶກສະຖານະນີ້. ບໍ່ໄດ້ເອີ້ນໃຊ້ໂມເດລເພື່ອຂໍສະຫຼຸບ AI ແລະ ບໍ່ມີການຄິດຄ່າໃຊ້ຈ່າຍ.",
+    "quietSnapshot": "ບໍ່ມີກິດຈະກຳຂອງເຊສຊັນໃດທີ່ຖືກເລືອກສຳລັບບັນທຶກສະຖານະນີ້. ບໍ່ມີການຮ້ອງຂໍ ຫຼື ຄິດຄ່າໃຊ້ຈ່າຍສຳລັບສະຫຼຸບ AI.",
     "noEnabledContexts": "ບໍ່ມີບໍລິບົດທີ່ເປີດໃຊ້ລາຍງານທີ່ກຳນົດໄວ້",
     "sourceBlocker": "ເຊສຊັນຕ້ອງການການເອົາໃຈໃສ່",
     "sourceMetadata": "ຂໍ້ມູນເມຕາຂອງເຊສຊັນທີ່ບັນທຶກໄວ້"

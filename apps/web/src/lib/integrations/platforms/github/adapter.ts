@@ -8,6 +8,7 @@ import type { InstallationToken } from '@/lib/integrations/core/types';
 import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants';
 import { type GitHubAppType, getGitHubAppCredentials } from './app-selector';
 import { isGitHubOwnerName, isGitHubRepositoryName } from './repository-coordinates';
+import { lastLinkedPage } from './link-header';
 import { assertGitHubInstallationRuntimeAuthorized } from '../../github/runtime-authorization';
 
 export type { GitHubAppType } from './app-selector';
@@ -639,7 +640,7 @@ async function scanPRIssueComments(
   };
 
   const firstResponse = await octokit.issues.listComments({ ...base, page: 1 });
-  const lastPage = lastIssueCommentPage(firstResponse.headers.link);
+  const lastPage = lastLinkedPage(firstResponse.headers.link) ?? 1;
   const comments: PRIssueComment[] = [...firstResponse.data];
 
   if (lastPage <= MAX_KILO_REVIEW_COMMENT_PAGES) {
@@ -664,21 +665,6 @@ async function scanPRIssueComments(
   }
 
   return { comments, reachedScanLimit: true };
-}
-
-/**
- * Reads the `rel="last"` page number from a `Link` response header.
- */
-function lastIssueCommentPage(linkHeader: string | undefined): number {
-  if (!linkHeader) return 1;
-
-  for (const segment of linkHeader.split(',')) {
-    if (!segment.includes('rel="last"')) continue;
-    const page = segment.match(/[?&]page=(\d+)/);
-    if (page) return Number(page[1]);
-  }
-
-  return 1;
 }
 
 /**
@@ -1129,9 +1115,13 @@ export type AssociatedPullRequest = {
   /** Branch the PR was opened from, as reported by GitHub. */
   headRef?: string;
   baseSha?: string;
+  /** Branch the PR targets, as reported by GitHub. */
   baseRef?: string;
   mergeable?: boolean | null;
   mergeableState?: string | null;
+  stackNumber?: number | null;
+  stackPosition?: number | null;
+  stackSize?: number | null;
   /**
    * SHAs of the PR's commits. Populated only when the caller passes
    * `includeCommits` and the session SHA is not already the PR head. `undefined`
@@ -1358,6 +1348,11 @@ export async function fetchPullRequestByNumber(params: {
       }
     }
 
+    const stack = (
+      pr as typeof pr & {
+        stack?: { number?: number | null; position?: number | null; size?: number | null } | null;
+      }
+    ).stack;
     return {
       number: pr.number,
       htmlUrl: pr.html_url,
@@ -1373,6 +1368,9 @@ export async function fetchPullRequestByNumber(params: {
       baseRef: pr.base.ref,
       mergeable: pr.mergeable,
       mergeableState: pr.mergeable_state,
+      stackNumber: stack?.number ?? null,
+      stackPosition: stack?.position ?? null,
+      stackSize: stack?.size ?? null,
       ...(commitShas ? { commitShas } : {}),
     };
   } catch (error) {

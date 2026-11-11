@@ -22,6 +22,8 @@
     "expired": "Verlopen"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Annuleren",
     "done": "Klaar",
     "retry": "Opnieuw proberen",
@@ -227,6 +229,21 @@
     "pleaseEnterEmail": "Voer je e-mailadres in.",
     "or": "of"
   },
+  "pendingLink": {
+    "description": "Er is al een account dat {{email}} gebruikt. Meld je aan met een van de methoden van dat account om {{provider}} toe te voegen.",
+    "emailCode": "Aanmeldcode naar mijn e-mail sturen",
+    "continueInBrowser": "Doorgaan in de browser",
+    "startAgain": "Opnieuw beginnen",
+    "expired": "Dit verzoek om {{provider}} toe te voegen is verlopen.",
+    "noMethods": "Dit account heeft geen andere aanmeldmethode, dus {{provider}} kan niet worden toegevoegd.",
+    "linked": "{{provider}} is toegevoegd aan je account.",
+    "failedExpired": "{{provider}} is niet toegevoegd omdat het verzoek is verlopen.",
+    "failedWrongAccount": "{{provider}} is niet toegevoegd omdat je bij een ander account bent aangemeld.",
+    "failedAccountAlreadyLinked": "{{provider}} is niet toegevoegd omdat het al aan een ander account is gekoppeld.",
+    "failedProviderAlreadyLinked": "{{provider}} is niet toegevoegd omdat je account al een andere {{provider}}-aanmelding heeft.",
+    "failedLinking": "{{provider}} kon niet aan je account worden toegevoegd.",
+    "notAdded": "Je bent aangemeld. {{provider}} is niet aan je account toegevoegd."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatische PR-beoordelingen",
     "securityAgentSubtitle": "Kwetsbaarheden vinden en verhelpen",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Testaccount",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO voor bedrijven",
     "passkeysTitle": "Passkeys",
     "passkeysSubtitle": "Aanmelden zonder wachtwoord",
@@ -1299,7 +1318,7 @@
       "cloningSession": "Sessie klonen…",
       "couldNotLoadThisSession": "Deze sessie kon niet worden geladen.",
       "cloneFailedRetry": "Deze sessie kon niet worden gekloond. Probeer het opnieuw.",
-      "notEnoughCredits": "Je hebt onvoldoende tegoed om Cloud Agent te starten. Vul je tegoed aan en probeer het opnieuw.",
+      "notEnoughCredits": "Je hebt onvoldoende tegoed voor dit verzoek. Vul je tegoed aan en probeer het opnieuw.",
       "previousTaskFinishing": "De vorige taak wordt nog afgerond. Wacht even.",
       "serviceUnavailable": "De service is momenteel niet beschikbaar. Probeer het opnieuw.",
       "connectionTrouble": "Er is een verbindingsprobleem. Probeer het zo opnieuw.",
@@ -1409,7 +1428,7 @@
       "discardWithUploadsMessage": "Je prompt en alle uploads die nog niet zijn gebruikt, worden verwijderd.",
       "discardFailed": "Het concept kon niet worden verwijderd. Probeer het opnieuw.",
       "remoteHint": "Om op je computer uit te voeren, start je Kilo daar en laat je het draaien.",
-      "continueFrom": "Je gaat verder met {{title}}.",
+      "continueFrom": "Je gaat verder met ‘{{title}}’.",
       "importingSession": "Sessie importeren…",
       "cliCannotContinue": "Deze CLI kan geen sessie voortzetten. Kies Cloud Agent of een andere CLI.",
       "importFailed": "Deze sessie kon niet worden geïmporteerd.",
@@ -1441,7 +1460,8 @@
       "selectedProfile": "Geselecteerd profiel",
       "manualOverrides": "Handmatige overschrijvingen",
       "openSettingsToReview": "Open Instellingen om te bekijken",
-      "profileSelection": "Profiel selectie"
+      "profileSelection": "Profiel selectie",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Er is {{displayCount}} bestand bijgewerkt.",
@@ -1461,6 +1481,8 @@
       "toolList": "inhoud weergeven",
       "toolPatch": "wijzigingen toepassen",
       "toolTask": "taak",
+      "toolSendFile": "Bestand verzonden",
+      "toolSendFileAction": "Bestand verzenden",
       "readTodos": "Planning lezen",
       "updateTodos": "Planning bijwerken",
       "linesBadge": "{{displayCount}} regels",
@@ -1561,7 +1583,21 @@
       "thought": "Gedachtegang",
       "showDetails": "Details tonen",
       "pending": "In afwachting…",
-      "running": "Bezig…"
+      "running": "Bezig…",
+      "field": {
+        "filePath": "Bestandspad",
+        "path": "Pad",
+        "offset": "Startregel",
+        "limit": "Limiet",
+        "pattern": "Patroon",
+        "include": "Bestandsfilter",
+        "patchText": "Wijzigingstekst",
+        "query": "Zoekopdracht",
+        "prompt": "Instructie",
+        "header": "Kop",
+        "question": "Vraag",
+        "options": "Opties"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "De inhoud kon niet worden weergegeven."
@@ -1577,7 +1613,7 @@
       "assistantContextOverflow": "Het gesprek is te lang voor het model.",
       "assistantProviderError": "De aanbieder heeft een fout geretourneerd.",
       "assistantProviderRefused": "De aanbieder heeft dit verzoek afgewezen en het kan niet opnieuw worden geprobeerd.",
-      "assistantCreditsRefusal": "Je hebt onvoldoende tegoed om Cloud Agent te starten.",
+      "assistantCreditsRefusal": "Je hebt onvoldoende tegoed voor dit verzoek.",
       "assistantOutputLimit": "Het antwoord bereikte de uitvoerlimiet van het model.",
       "assistantStructuredOutput": "Het antwoord voldeed niet aan het vereiste formaat.",
       "assistantFailed": "Het genereren van het antwoord is mislukt."
@@ -1722,7 +1758,7 @@
       "positionHint": "(1 van {{displayCount}})",
       "movedPastPrompt": "De agent is al verdergegaan. Deze kaart sluit zodra de sessie verdergaat.",
       "waitingForAnswer": "De agent wacht op je antwoord. Zolang je deze vraag niet beantwoordt, wordt je bericht aan de agent niet verzonden.",
-      "waitingForPermission": "De agent wacht op toestemming. Zolang je niet op dit verzoek reageert, wordt je bericht aan de agent niet verzonden."
+      "waitingForPermission": "Zolang je niet op dit verzoek reageert, wordt je bericht aan de agent niet verzonden."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -2450,7 +2486,11 @@
       "retryLoadingMoreFiles": "Meer bestanden opnieuw proberen te laden",
       "title": "Bestanden",
       "viewedCount": "{{viewed}} van {{total}} bekeken",
-      "viewedOfListed": "{{viewed}} van de {{total}} bestanden in de lijst bekeken"
+      "viewedCount_one": "{{viewed}} van {{total}} bekeken",
+      "viewedCount_other": "{{viewed}} van {{total}} bekeken",
+      "viewedOfListed": "{{viewed}} van de {{total}} bestanden in de lijst bekeken",
+      "viewedOfListed_one": "{{viewed}} van de {{total}} bestanden in de lijst bekeken",
+      "viewedOfListed_other": "{{viewed}} van de {{total}} bestanden in de lijst bekeken"
     },
     "fileRows": {
       "collapseFile": "Bestand inklappen",
@@ -3038,7 +3078,7 @@
       "provider": "Gestopt: providerfout",
       "tool": "Gestopt: toolfout",
       "cancelled": "Gestopt: geannuleerd",
-      "other": "GESTOPT"
+      "other": "Gestopt"
     }
   },
   "transcriptionModel": {
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "Mijn agent",
       "promptPlaceholder": "Je bent een...",
       "tools": "Hulpmiddelen",
+      "wholeToolRule": "Deze agent past in één keer één regel toe op alle hulpmiddelen: {{rule}}. Deze schakelaars zijn alleen-lezen.",
       "visibility": "Zichtbaarheid",
       "visibilityPrimary": "Primair — weergegeven in de kiezer",
       "visibilitySubagent": "Subagent — alleen opvraagbaar door anderen",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "Standaardprofielen voor repo's",
+      "entryLabel": "Standaardprofielen",
       "add": "Standaard toevoegen",
       "empty": "Geen standaardinstellingen geconfigureerd",
       "emptyDescription": "Voeg een standaard toe om automatisch een profiel toe te passen bij het starten van sessies voor een opslagplaats.",
@@ -3753,7 +3795,7 @@
     "estimate": "Schatting {{estimate}} · maximaal {{maximum}}",
     "estimateUnavailable": "Er is geen betaalde samenvatting beschikbaar voor deze instellingen.",
     "confirmPaid": "Betaalde samenvattingen inschakelen voor {{context}}?",
-    "paidDisclosure": "Geschat {{estimate}}, maximaal {{maximum}}, met een limiet van {{minutes}} minuten. Kosten gelden ook als het genereren mislukt.",
+    "paidDisclosure": "Geschat {{estimate}}, maximaal {{maximum}}, met een limiet van {{minutes}} min. Kosten gelden ook als het genereren mislukt.",
     "enable": "Betaalde samenvattingen inschakelen",
     "allContexts": "Persoonlijke en organisatiebriefings blijven gescheiden.",
     "emptyHistory": "Geen opgeslagen briefings",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "AI-samenvatting mislukt. Je gestructureerde momentopname is nog steeds beschikbaar.",
     "scheduledContextEnabled": "Geplande briefings",
     "scheduledContextSettings": "Geplande briefings · {{context}}",
-    "scheduledContextHint": "Schakel geplande vastlegging en betaalde AI-samenvattingen in voor alleen deze context. Geselecteerde fragmenten waaruit gevoelige gegevens zijn verwijderd en gestructureerde feiten worden naar je model gestuurd. Samenvattingen gebruiken de apptaal die wordt opgeslagen wanneer je de briefinginstellingen expliciet wijzigt. Deze opgeslagen taal verandert niet automatisch mee als je de apptaal wijzigt. Kosten gaan van het saldo van deze context af. Momentopnamen zonder activiteit gebruiken geen AI.",
+    "scheduledContextHint": "Schakel geplande vastlegging en betaalde AI-samenvattingen in voor alleen deze context. Geselecteerde fragmenten waaruit gevoelige gegevens zijn verwijderd en gestructureerde feiten worden naar je model gestuurd. Samenvattingen gebruiken de apptaal die wordt opgeslagen wanneer je de briefinginstellingen wijzigt. Kosten gaan van het saldo van deze context af. Momentopnamen zonder activiteit gebruiken geen AI.",
     "snapshotSafeguards": "De tijd- en uitgavenlimieten per samenvatting gelden voor elke geplande momentopname, niet als dagbudget.",
     "snapshotEstimateInputTooLarge": "Deze momentopname bevat te veel bewijsmateriaal voor het geselecteerde model.",
-    "quietSnapshot": "Voor deze momentopname is geen sessieactiviteit geselecteerd. De selectie is zo goed mogelijk uitgevoerd op basis van de beschikbare gegevens. Er is geen AI-model aangeroepen en er zijn geen AI-kosten in rekening gebracht.",
+    "quietSnapshot": "Voor deze momentopname is geen sessieactiviteit geselecteerd. Er is geen AI-samenvatting aangevraagd of in rekening gebracht.",
     "noEnabledContexts": "Geen contexten ingeschakeld voor geplande briefings",
     "sourceBlocker": "Sessie heeft aandacht nodig",
     "sourceMetadata": "Vastgelegde sessiemetadata"

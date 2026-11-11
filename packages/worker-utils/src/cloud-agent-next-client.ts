@@ -12,6 +12,7 @@ import {
   CODE_REVIEW_TERMINAL_REASONS,
   type CodeReviewTerminalReason as CloudAgentTerminalReason,
 } from '@kilocode/db/schema-types';
+import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import type { EgressMode } from './egress-allowlist.js';
 import type { SandboxAllocationInput } from './sandbox-allocation.js';
 import {
@@ -91,6 +92,7 @@ export type CloudAgentPrepareSessionInput = {
 export type CloudAgentPrepareSessionOutput = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
+  worktreeId?: CloudAgentWorktreeId;
   /** `true` when the response replays an already-settled create for the same `operationKey`. */
   replayed?: boolean;
 };

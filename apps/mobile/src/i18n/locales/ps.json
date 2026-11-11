@@ -22,6 +22,8 @@
     "expired": "مهلت یې تېر شو"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": "، ",
     "cancel": "لغوه کړئ",
     "done": "بشپړ شو",
     "retry": "بیا هڅه وکړئ",
@@ -227,6 +229,21 @@
     "signInCodeField": "د ننوتلو کوډ",
     "or": "یا"
   },
+  "pendingLink": {
+    "description": "یو حساب دمخه {{email}} کاروي. د {{provider}} د زیاتولو لپاره د هغه له یوې طریقې سره ننوځئ.",
+    "emailCode": "ما ته د ننوتلو کوډ په برېښنالیک کې راولېږئ",
+    "continueInBrowser": "په براوزر کې دوام ورکړئ",
+    "startAgain": "له سره پیل کړئ",
+    "expired": "د {{provider}} د زیاتولو دا غوښتنه پای ته رسېدلې ده.",
+    "noMethods": "دا حساب د ننوتلو بله طریقه نه لري، نو {{provider}} نشي زیاتېدای.",
+    "linked": "{{provider}} ستاسو حساب ته زیات شو.",
+    "failedExpired": "{{provider}} زیات نه شو ځکه چې غوښتنه پای ته ورسېده.",
+    "failedWrongAccount": "{{provider}} زیات نه شو ځکه چې تاسو بل حساب ته ننوتلي یاست.",
+    "failedAccountAlreadyLinked": "{{provider}} زیات نه شو ځکه چې دمخه له بل حساب سره تړل شوی دی.",
+    "failedProviderAlreadyLinked": "{{provider}} زیات نه شو ځکه چې ستاسو حساب دمخه د {{provider}} بل ننوتل لري.",
+    "failedLinking": "{{provider}} ستاسو حساب ته زیات نه شو.",
+    "notAdded": "تاسو ننوتلي یاست. {{provider}} ستاسو حساب ته زیات نه شو."
+  },
   "profile": {
     "codeReviewerSubtitle": "د PR اوتومات بیاکتنې",
     "securityAgentSubtitle": "زیانمنتیاوې ومومئ او حل کړئ",
@@ -265,6 +282,8 @@
     "providerTestAccount": "د ازموینې حساب",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "سازماني SSO",
     "passkeysTitle": "د ننوتلو کیلي",
     "passkeysSubtitle": "پرته له پټنوم ننوځئ",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "د فایلونو د بارولو بیا هڅه وکړئ",
       "filterPlaceholder": "د فایلونو د لارې له مخې چاڼ",
       "viewedCount": "له {{total}} څخه {{viewed}} لیدل شوي",
+      "viewedCount_one": "له {{total}} څخه {{viewed}} لیدل شوي",
+      "viewedCount_other": "له {{total}} څخه {{viewed}} لیدل شوي",
       "viewedOfListed": "په لړلیک کې له {{total}} فایلونو څخه {{viewed}} لیدل شوي",
+      "viewedOfListed_one": "په لړلیک کې له {{total}} فایلونو څخه {{viewed}} لیدل شوي",
+      "viewedOfListed_other": "په لړلیک کې له {{total}} فایلونو څخه {{viewed}} لیدل شوي",
       "loadingFiles": "له {{total}} څخه {{loaded}} بارېږي…",
       "failedToLoadAllFiles": "ټول فایلونه بار نه شول.",
       "couldNotLoadMoreFiles": "نور فایلونه بار نه شول.",
@@ -1837,7 +1860,7 @@
       "cloningSession": "د ناستې کاپي جوړېږي",
       "couldNotLoadThisSession": "دا ناسته بار نه شوه.",
       "cloneFailedRetry": "د دې ناستې کاپي جوړه نه شوه. بیا هڅه وکړئ.",
-      "notEnoughCredits": "د Cloud Agent چلولو لپاره کافي کریډیټ نشته. کریډیټ زیات کړئ او بیا هڅه وکړئ.",
+      "notEnoughCredits": "د دې غوښتنې لپاره کافي کریډیټ نشته. کریډیټ زیات کړئ او بیا هڅه وکړئ.",
       "previousTaskFinishing": "مخکینۍ دنده لا د بشپړېدو په حال کې ده. یوه شېبه صبر وکړئ.",
       "serviceUnavailable": "خدمت اوس د لاسرسي وړ نه دی. بیا هڅه وکړئ.",
       "connectionTrouble": "په اړیکه کې ستونزه ده. یوه شېبه وروسته بیا هڅه وکړئ.",
@@ -1947,7 +1970,7 @@
       "discardWithUploadsMessage": "ستاسو پرامپټ او هغه پورته شوي فایلونه به ړنګ شي چې له لېږل شویو پیغامونو سره ضمیمه نه دي.",
       "discardFailed": "مسوده ړنګه نه شوه. بیا هڅه وکړئ.",
       "remoteHint": "په خپل کمپیوټر کې چلېدلو لپاره، هلته Kilo پیل کړئ او روان یې پرېږدئ.",
-      "continueFrom": "د {{title}} ناستې دوام روان دی.",
+      "continueFrom": "د «{{title}}» ناستې دوام روان دی.",
       "importingSession": "ناسته واردېږي",
       "cliCannotContinue": "دا CLI ناستې ته دوام نه شي ورکولی. Cloud Agent یا بل CLI غوره کړئ.",
       "importFailed": "دا ناسته وارده نه شوه.",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "ټاکل شوی پروفایل",
       "manualOverrides": "لاسي اوورډونه",
       "openSettingsToReview": "د بیاکتنې لپاره تنظیمات خلاص کړئ",
-      "profileSelection": "د پروفایل انتخاب"
+      "profileSelection": "د پروفایل انتخاب",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل تازه شو.",
@@ -1999,6 +2023,8 @@
       "toolList": "لېست کول",
       "toolPatch": "سمون پلي کول",
       "toolTask": "دنده",
+      "toolSendFile": "فایل ولېږل شو",
+      "toolSendFileAction": "فایل لېږل",
       "readTodos": "پلان ولولئ",
       "updateTodos": "پلان تازه کړئ",
       "linesBadge": "{{displayCount}} کرښې",
@@ -2099,7 +2125,21 @@
       "thought": "فکر",
       "showDetails": "جزیات وښیئ",
       "pending": "په تمه…",
-      "running": "روان…"
+      "running": "روان…",
+      "field": {
+        "filePath": "د فایل لار",
+        "path": "لار",
+        "offset": "افسیټ",
+        "limit": "حد",
+        "pattern": "نمونه",
+        "include": "شمول",
+        "patchText": "د پیچ متن",
+        "query": "لټون",
+        "prompt": "لارښوونه",
+        "header": "سرلیک",
+        "question": "پوښتنه",
+        "options": "اختیارونه"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "منځپانګه ونه ښودل شوه."
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "خبرې اترې د ماډل لپاره ډېرې اوږدې دي.",
       "assistantProviderError": "چمتو کوونکي تېروتنه راستونه کړه.",
       "assistantProviderRefused": "چمتو کوونکي دا غوښتنه رد کړه او بیا هڅه نشي کېدای.",
-      "assistantCreditsRefusal": "د Cloud Agent چلولو لپاره کافي کریډیټ نشته.",
+      "assistantCreditsRefusal": "د دې غوښتنې لپاره کافي کریډیټ نشته.",
       "assistantOutputLimit": "ځواب د ماډل د وتلو حد ته ورسېد.",
       "assistantStructuredOutput": "ځواب له اړین فورمټ سره سمون نه درلود.",
       "assistantFailed": "ځواب ناکام شو."
@@ -2260,7 +2300,7 @@
       "positionHint": "(له {{displayCount}} څخه ۱)",
       "movedPastPrompt": "ایجنټ له دې پرامپټ څخه تېر شوی دی. کله چې ناسته دوام وکړي، دا کارت به وتړل شي.",
       "waitingForAnswer": "ایجنټ ستاسو ځواب ته په تمه دی. تر هغه چې دا پوښتنه خلاصه وي، ایجنټ ته ستاسو د پیغام لېږل ځنډول شوي دي.",
-      "waitingForPermission": "ایجنټ اجازې ته په تمه دی. تر هغه چې دا غوښتنه خلاصه وي، ایجنټ ته ستاسو د پیغام لېږل ځنډول شوي دي."
+      "waitingForPermission": "تر هغه چې دا غوښتنه خلاصه وي، ایجنټ ته ستاسو د پیغام لېږل ځنډول شوي دي."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}، {{taskName}}{{modelLabel}}، {{latestActivityLabel}}، {{status}}",
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "زما اجنټ",
       "promptPlaceholder": "تاسو یو...",
       "tools": "وسیلې",
+      "wholeToolRule": "دا اجنټ په یو وخت کې پر هرې وسیلې یوه قاعده پلي کوي: {{rule}}. دا سویچونه یوازې د لوستلو وړ دي.",
       "visibility": "لید",
       "visibilityPrimary": "لومړني — په غوره کونکي کې ښودل شوي",
       "visibilitySubagent": "فرعي اجنټ — یوازې د نورو څخه د غوښتنې وړ",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "د زېرمتونونو لپاره ډیفالټ پروفایلونه",
+      "entryLabel": "ډیفالټ پروفایلونه",
       "add": "ډیفالټ اضافه کړئ",
       "empty": "هیڅ ډیفالټ نه دی ترتیب شوی",
       "emptyDescription": "د زېرمتون لپاره ناستې پیل کولو پرمهال په اتوماتيک ډول پروفایل پلي کولو لپاره ډیفالټ اضافه کړئ.",
@@ -3753,7 +3795,7 @@
     "estimate": "اټکل {{estimate}} · تر ټولو زیات {{maximum}}",
     "estimateUnavailable": "د دې ترتیباتو لپاره تادیه شوی لنډیز شتون نلري.",
     "confirmPaid": "د {{context}} لپاره تادیه شوي لنډیزونه فعال کړئ؟",
-    "paidDisclosure": "{{estimate}} اټکل شوی، تر {{maximum}} پورې، د {{minutes}} دقیقو حد سره. لګښت حتی د جوړونې د ناکامۍ په صورت کې هم پلي کېږي.",
+    "paidDisclosure": "{{estimate}} اټکل شوی، تر {{maximum}} پورې، د {{minutes}} دقیقه حد سره. لګښت حتی د جوړونې د ناکامۍ په صورت کې هم پلي کېږي.",
     "enable": "تادیه شوي لنډیزونه فعال کړئ",
     "allContexts": "شخصي او سازماني راپورونه جلا پاتې کېږي.",
     "emptyHistory": "هېڅ خوندي شوي راپورونه نشته",

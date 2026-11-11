@@ -22,6 +22,8 @@
     "expired": "Utløpt"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Avbryt",
     "done": "Ferdig",
     "retry": "Prøv igjen",
@@ -227,6 +229,21 @@
     "signInCodeField": "Innloggingskode",
     "or": "eller"
   },
+  "pendingLink": {
+    "description": "En konto bruker allerede {{email}}. Logg inn med en av metodene for kontoen for å legge til {{provider}}.",
+    "emailCode": "Send meg en innloggingskode på e-post",
+    "continueInBrowser": "Fortsett i nettleseren",
+    "startAgain": "Start på nytt",
+    "expired": "Denne forespørselen om å legge til {{provider}} er utløpt.",
+    "noMethods": "Denne kontoen har ingen annen innloggingsmetode, så {{provider}} kan ikke legges til.",
+    "linked": "{{provider}} ble lagt til i kontoen din.",
+    "failedExpired": "{{provider}} ble ikke lagt til fordi forespørselen utløp.",
+    "failedWrongAccount": "{{provider}} ble ikke lagt til fordi du logget inn på en annen konto.",
+    "failedAccountAlreadyLinked": "{{provider}} ble ikke lagt til fordi den allerede er koblet til en annen konto.",
+    "failedProviderAlreadyLinked": "{{provider}} ble ikke lagt til fordi kontoen din allerede har en annen {{provider}}-innlogging.",
+    "failedLinking": "{{provider}} kunne ikke legges til i kontoen din.",
+    "notAdded": "Du er logget inn. {{provider}} ble ikke lagt til i kontoen din."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatiske PR-gjennomganger",
     "securityAgentSubtitle": "Finn og utbedre sårbarheter",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO for bedrifter",
     "passkeysTitle": "Passnøkler",
     "passkeysSubtitle": "Logg inn uten passord",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "Prøv å laste inn filene på nytt",
       "filterPlaceholder": "Filtrer etter filsti",
       "viewedCount": "{{viewed}} av {{total}} gjennomgått",
+      "viewedCount_one": "{{viewed}} av {{total}} gjennomgått",
+      "viewedCount_other": "{{viewed}} av {{total}} gjennomgått",
       "viewedOfListed": "{{viewed}} av {{total}} filer i listen gjennomgått",
+      "viewedOfListed_one": "{{viewed}} av {{total}} filer i listen gjennomgått",
+      "viewedOfListed_other": "{{viewed}} av {{total}} filer i listen gjennomgått",
       "loadingFiles": "Laster inn {{loaded}} av {{total}}…",
       "failedToLoadAllFiles": "Kunne ikke laste inn alle filene.",
       "couldNotLoadMoreFiles": "Kunne ikke laste inn flere filer.",
@@ -1837,7 +1860,7 @@
       "cloningSession": "Kloner økten",
       "couldNotLoadThisSession": "Kunne ikke laste inn denne økten.",
       "cloneFailedRetry": "Kunne ikke klone denne økten. Prøv igjen.",
-      "notEnoughCredits": "Du har ikke nok kreditter til å kjøre Cloud Agent. Fyll på kreditter og prøv igjen.",
+      "notEnoughCredits": "Du har ikke nok kreditter til denne forespørselen. Fyll på kreditter og prøv igjen.",
       "previousTaskFinishing": "Den forrige oppgaven er ikke helt avsluttet ennå. Vent et øyeblikk.",
       "serviceUnavailable": "Tjenesten er utilgjengelig akkurat nå. Prøv igjen.",
       "connectionTrouble": "Det er problemer med tilkoblingen. Prøv igjen om et øyeblikk.",
@@ -1947,7 +1970,7 @@
       "discardWithUploadsMessage": "Instruksjonen din og opplastede filer som ikke er vedlagt sendte meldinger, blir slettet.",
       "discardFailed": "Kunne ikke forkaste utkastet. Prøv igjen.",
       "remoteHint": "For å kjøre økten på datamaskinen din, må du starte Kilo der og la den fortsette å kjøre.",
-      "continueFrom": "Fortsetter økten {{title}}.",
+      "continueFrom": "Fortsetter økten «{{title}}».",
       "importingSession": "Importerer økten",
       "cliCannotContinue": "Denne CLI-en kan ikke fortsette en økt. Velg Cloud Agent eller en annen CLI.",
       "importFailed": "Kunne ikke importere denne økten.",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "Valgt profil",
       "manualOverrides": "Manuelle overstyringer",
       "openSettingsToReview": "Åpne Innstillinger for å se gjennom",
-      "profileSelection": "Valg av profil"
+      "profileSelection": "Valg av profil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil er oppdatert.",
@@ -1999,6 +2023,8 @@
       "toolList": "list opp",
       "toolPatch": "bruk endringer",
       "toolTask": "oppgave",
+      "toolSendFile": "Sendte fil",
+      "toolSendFileAction": "send fil",
       "readTodos": "Les planen",
       "updateTodos": "Oppdater planen",
       "linesBadge": "{{displayCount}} linjer",
@@ -2099,7 +2125,21 @@
       "thought": "Resonnement",
       "showDetails": "Vis detaljer",
       "pending": "Venter…",
-      "running": "Kjører…"
+      "running": "Kjører…",
+      "field": {
+        "filePath": "Filsti",
+        "path": "Sti",
+        "offset": "Forskyvning",
+        "limit": "Grense",
+        "pattern": "Mønster",
+        "include": "Inkludering",
+        "patchText": "Endringstekst",
+        "query": "Søk",
+        "prompt": "Instruks",
+        "header": "Overskrift",
+        "question": "Spørsmål",
+        "options": "Alternativer"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Kunne ikke vise innholdet."
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "Samtalen er for lang for modellen.",
       "assistantProviderError": "Leverandøren returnerte en feil.",
       "assistantProviderRefused": "Leverandøren avviste denne forespørselen, og den kan ikke gjentas.",
-      "assistantCreditsRefusal": "Du har ikke nok kreditter til å kjøre Cloud Agent.",
+      "assistantCreditsRefusal": "Du har ikke nok kreditter til denne forespørselen.",
       "assistantOutputLimit": "Svaret nådde utdatagrensen til modellen.",
       "assistantStructuredOutput": "Svaret samsvarte ikke med det påkrevde formatet.",
       "assistantFailed": "Svaret kunne ikke genereres."
@@ -2260,7 +2300,7 @@
       "positionHint": "(1 av {{displayCount}})",
       "movedPastPrompt": "Agenten har gått videre fra denne forespørselen. Kortet lukkes når økten fortsetter.",
       "waitingForAnswer": "Agenten venter på svaret ditt. Mens dette spørsmålet er åpent, er meldingen din til agenten satt på pause.",
-      "waitingForPermission": "Agenten venter på tillatelse. Mens denne forespørselen er åpen, er meldingen din til agenten satt på pause."
+      "waitingForPermission": "Mens denne forespørselen er åpen, er meldingen din til agenten satt på pause."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3038,7 +3078,7 @@
       "provider": "Stoppet: leverandørfeil",
       "tool": "Stoppet: verktøyfeil",
       "cancelled": "Stoppet: avbrutt",
-      "other": "STOPPET"
+      "other": "Stoppet"
     }
   },
   "transcriptionModel": {
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "Agenten min",
       "promptPlaceholder": "Du er en...",
       "tools": "Verktøy",
+      "wholeToolRule": "Denne agenten bruker én regel på alle verktøy samtidig: {{rule}}. Disse bryterne er skrivebeskyttede.",
       "visibility": "Synlighet",
       "visibilityPrimary": "Primær — vist i velgeren",
       "visibilitySubagent": "Subagent — kan kun ringes opp fra andre",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "Standardprofiler for Repos",
+      "entryLabel": "Standardprofiler",
       "add": "Legg til standard",
       "empty": "Ingen standardinnstillinger er konfigurert",
       "emptyDescription": "Legg til en standard for automatisk å bruke en profil når du starter økter for en repo.",
@@ -3753,7 +3795,7 @@
     "estimate": "Estimat {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "En betalt oppsummering er ikke tilgjengelig for disse innstillingene.",
     "confirmPaid": "Slå på betalte sammendrag for {{context}}?",
-    "paidDisclosure": "Anslått {{estimate}}, opptil {{maximum}}, med en grense på {{minutes}} minutter. Kostnader påløper selv om genereringen mislykkes.",
+    "paidDisclosure": "Anslått {{estimate}}, opptil {{maximum}}, med en grense på {{minutes}} min. Kostnader påløper selv om genereringen mislykkes.",
     "enable": "Slå på betalte sammendrag",
     "allContexts": "Personlige briefer og organisasjonsbriefer holdes atskilt.",
     "emptyHistory": "Ingen lagrede briefer",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "AI-sammendraget mislyktes. Det strukturerte øyeblikksbildet er fortsatt tilgjengelig.",
     "scheduledContextEnabled": "Planlagte briefer",
     "scheduledContextSettings": "Planlagte briefer · {{context}}",
-    "scheduledContextHint": "Slå på planlagt lagring av øyeblikksbilder og betalte AI-sammendrag kun for denne konteksten. Utvalgte, sladdede utdrag og strukturerte fakta sendes til modellen din. Sammendrag bruker appens språk som lagres når du eksplisitt endrer brief-innstillingene. Språket for sammendrag oppdateres ikke automatisk når du endrer appens språk. Kostnader trekkes fra denne kontekstens saldo. Øyeblikksbilder uten aktivitet bruker ikke AI.",
+    "scheduledContextHint": "Slå på planlagt lagring av øyeblikksbilder og betalte AI-sammendrag kun for denne konteksten. Utvalgte, sladdede utdrag og strukturerte fakta sendes til modellen din. Sammendrag bruker appens språk som lagres når du oppdaterer brief-innstillingene. Kostnader trekkes fra denne kontekstens saldo. Øyeblikksbilder uten aktivitet bruker ikke AI.",
     "snapshotSafeguards": "Tids- og forbruksgrensene per sammendrag gjelder for hvert planlagte øyeblikksbilde, ikke som et dagsbudsjett.",
     "snapshotEstimateInputTooLarge": "Dette øyeblikksbildet har for mye kildemateriale for den valgte modellen.",
-    "quietSnapshot": "Ingen øktaktivitet ble valgt ut til dette øyeblikksbildet. Utvalget kan være ufullstendig. Ingen AI-modell ble kalt, og ingen kostnader for AI-sammendrag påløp.",
+    "quietSnapshot": "Ingen øktaktivitet ble valgt ut til dette øyeblikksbildet. Ingen AI-sammendrag ble forespurt eller belastet.",
     "noEnabledContexts": "Ingen kontekster er aktivert for planlagte briefer",
     "sourceBlocker": "Økten krever oppmerksomhet",
     "sourceMetadata": "Lagrede øktmetadata"

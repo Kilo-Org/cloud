@@ -5,11 +5,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { BYOKApiKeyResponse } from '@/lib/byok/types';
-import {
-  BYOKKeysManager,
-  getStructuredCredentialKind,
-  VERCEL_BYOK_PROVIDER_NAMES,
-} from './BYOKKeysManager';
+import { VERCEL_BYOK_PROVIDER_NAMES } from '@/lib/byok/provider-names';
+import { BYOKKeysManager, getStructuredCredentialKind } from './BYOKKeysManager';
 
 type ListInput = { organizationId?: string };
 type ReorderInput = ListInput & { keyIds: string[] };

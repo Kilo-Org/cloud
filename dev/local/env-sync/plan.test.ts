@@ -785,8 +785,6 @@ test('points the local auto routing worker at the local gateway and seeds its se
         NEXTAUTH_SECRET_PROD: 'local-nextauth-secret',
         INTERNAL_API_SECRET_PROD: 'local-internal-secret',
         AUTO_ROUTING_DECISION_SECRET_PROD: 'local-decision-secret',
-        AUTO_ROUTING_UPSTASH_REDIS_REST_URL_PROD: `http://localhost:${getService('redis-http').port}`,
-        AUTO_ROUTING_UPSTASH_REDIS_REST_READONLY_TOKEN_PROD: 'example_token',
       });
     });
   } finally {
@@ -1108,4 +1106,26 @@ test('emits only localhost origins for ORIGINS keys when lanIp is unset', () => 
   const nextjsPort = getService('nextjs').port;
   const cloudAgentPort = getService('cloud-agent-next').port;
   assert.equal(value, `http://localhost:${nextjsPort},http://localhost:${cloudAgentPort}`);
+});
+
+test('generates the meter alert URL from the local web service', () => {
+  const meterDir = 'services/container-usage-meter';
+  const example = fs.readFileSync(path.resolve(meterDir, '.dev.vars.example'), 'utf8');
+  const repo = createRepo({
+    '.env.local': '',
+    [`${meterDir}/package.json`]: JSON.stringify({ scripts: { dev: 'wrangler dev' } }),
+    [`${meterDir}/wrangler.jsonc`]:
+      '{ "vars": { "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai" } }',
+    [`${meterDir}/.dev.vars.example`]: example,
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['container-usage-meter']));
+    const content = plan.devVarsChanges[0]?.newFileContent;
+    assert.ok(
+      content?.includes(`KILOCODE_BACKEND_BASE_URL=http://localhost:${getService('nextjs').port}`)
+    );
+    assert.ok(!content?.includes('https://api.kilo.ai'));
+  } finally {
+    repo.cleanup();
+  }
 });

@@ -2,6 +2,7 @@ import { Validator, type OutputUnit, type SchemaDraft } from '@cfworker/json-sch
 import { ORGANIZATION_ID_HEADER } from './auth';
 import { isGuardedRow } from './search';
 import {
+  cloudAgentAuthorityInputSchema,
   cloudAgentAuthorityProcedureKind,
   validateCloudAgentAuthorityRequest,
 } from '../../../packages/worker-utils/src/cloud-agent-authority';
@@ -461,7 +462,13 @@ export async function callCatalogEndpoint(options: {
       { path }
     );
   }
-  assertInputMatchesSchema(row, path, input);
+  const inputRow = options.auth.cloudAgentAuthority
+    ? {
+        ...row,
+        inputSchema: cloudAgentAuthorityInputSchema(options.auth.cloudAgentAuthority, path),
+      }
+    : row;
+  assertInputMatchesSchema(inputRow, path, input);
   return forwardCatalogCall({
     row,
     input,

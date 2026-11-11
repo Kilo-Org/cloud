@@ -22,6 +22,8 @@
     "expired": "Skaduar"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Anulo",
     "done": "U krye",
     "retry": "Riprovo",
@@ -227,6 +229,21 @@
     "signInCodeField": "Kodi i hyrjes",
     "or": "ose"
   },
+  "pendingLink": {
+    "description": "Një llogari e përdor tashmë {{email}}. Hyr me një nga metodat e saj për të shtuar {{provider}}.",
+    "emailCode": "Më dërgo me email një kod hyrjeje",
+    "continueInBrowser": "Vazhdo në shfletues",
+    "startAgain": "Fillo nga e para",
+    "expired": "Kjo kërkesë për të shtuar {{provider}} ka skaduar.",
+    "noMethods": "Kjo llogari nuk ka metodë tjetër hyrjeje, prandaj {{provider}} nuk mund të shtohet.",
+    "linked": "{{provider}} u shtua në llogarinë tënde.",
+    "failedExpired": "{{provider}} nuk u shtua sepse kërkesa skadoi.",
+    "failedWrongAccount": "{{provider}} nuk u shtua sepse hyre në një llogari tjetër.",
+    "failedAccountAlreadyLinked": "{{provider}} nuk u shtua sepse është lidhur tashmë me një llogari tjetër.",
+    "failedProviderAlreadyLinked": "{{provider}} nuk u shtua sepse llogaria jote ka tashmë një hyrje tjetër me {{provider}}.",
+    "failedLinking": "{{provider}} nuk mund të shtohej në llogarinë tënde.",
+    "notAdded": "Ke hyrë. {{provider}} nuk u shtua në llogarinë tënde."
+  },
   "profile": {
     "codeReviewerSubtitle": "Rishikime automatike të PR",
     "securityAgentSubtitle": "Gjej dhe korrigjo cenueshmëritë",
@@ -265,6 +282,8 @@
     "providerTestAccount": "Llogari testimi",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO për ndërmarrje",
     "passkeysTitle": "Çelësat e hyrjes",
     "passkeysSubtitle": "Hyr pa fjalëkalim",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "Riprovo ngarkimin e skedarëve",
       "filterPlaceholder": "Filtrim sipas shtegut të skedarit",
       "viewedCount": "{{viewed}} nga {{total}} të parë",
+      "viewedCount_one": "{{viewed}} nga {{total}} të parë",
+      "viewedCount_other": "{{viewed}} nga {{total}} të parë",
       "viewedOfListed": "{{viewed}} nga {{total}} skedarët e listuar janë parë",
+      "viewedOfListed_one": "{{viewed}} nga {{total}} skedarët e listuar janë parë",
+      "viewedOfListed_other": "{{viewed}} nga {{total}} skedarët e listuar janë parë",
       "loadingFiles": "Po ngarkohen {{loaded}} nga {{total}}…",
       "failedToLoadAllFiles": "Nuk u ngarkuan të gjithë skedarët.",
       "couldNotLoadMoreFiles": "Nuk u ngarkuan më shumë skedarë.",
@@ -1837,7 +1860,7 @@
       "cloningSession": "Duke klonuar seancën",
       "couldNotLoadThisSession": "Nuk u ngarkua kjo seancë.",
       "cloneFailedRetry": "Nuk u klonua kjo seancë. Provo përsëri.",
-      "notEnoughCredits": "Nuk ke mjaft kredite për të ekzekutuar Cloud Agent. Shto kredite dhe provo përsëri.",
+      "notEnoughCredits": "Nuk ke mjaft kredite për këtë kërkesë. Shto kredite dhe provo përsëri.",
       "previousTaskFinishing": "Detyra e mëparshme nuk ka përfunduar ende. Prit pak.",
       "serviceUnavailable": "Shërbimi nuk është i disponueshëm për momentin. Provo përsëri.",
       "connectionTrouble": "Ka një problem me lidhjen. Provo përsëri pas pak.",
@@ -1947,7 +1970,7 @@
       "discardWithUploadsMessage": "Kërkesa jote dhe skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen.",
       "discardFailed": "Nuk u fshi drafti. Provo përsëri.",
       "remoteHint": "Për ta ekzekutuar në kompjuterin tënd, nis Kilo aty dhe lëre të funksionojë.",
-      "continueFrom": "Po vazhdon seanca {{title}}.",
+      "continueFrom": "Po vazhdon seanca «{{title}}».",
       "importingSession": "Duke importuar seancën",
       "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidh Cloud Agent ose një CLI tjetër.",
       "importFailed": "Nuk u arrit të importohej kjo seancë.",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "Profili i zgjedhur",
       "manualOverrides": "Anulimet manuale",
       "openSettingsToReview": "Hapni Cilësimet për t'i rishikuar",
-      "profileSelection": "Zgjedhja e profilit"
+      "profileSelection": "Zgjedhja e profilit",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar.",
@@ -1999,6 +2023,8 @@
       "toolList": "listo",
       "toolPatch": "zbato ndryshimet",
       "toolTask": "detyrë",
+      "toolSendFile": "Dërgoi skedarin",
+      "toolSendFileAction": "Dërgo skedarin",
       "readTodos": "Lexo planin",
       "updateTodos": "Përditëso planin",
       "linesBadge": "{{displayCount}} rreshta",
@@ -2099,7 +2125,21 @@
       "thought": "Mendimi",
       "showDetails": "Shfaq detajet",
       "pending": "Në pritje…",
-      "running": "Duke u ekzekutuar…"
+      "running": "Duke u ekzekutuar…",
+      "field": {
+        "filePath": "Shtegu i skedarit",
+        "path": "Shtegu",
+        "offset": "Zhvendosja",
+        "limit": "Kufiri",
+        "pattern": "Modeli",
+        "include": "Përfshirja",
+        "patchText": "Teksti i arnës",
+        "query": "Kërkimi",
+        "prompt": "Udhëzimi",
+        "header": "Titulli",
+        "question": "Pyetja",
+        "options": "Opsionet"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nuk u shfaq përmbajtja."
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "Biseda është shumë e gjatë për modelin.",
       "assistantProviderError": "Ofruesi ktheu një gabim.",
       "assistantProviderRefused": "Ofruesi e refuzoi këtë kërkesë dhe ajo nuk mund të riprovohet.",
-      "assistantCreditsRefusal": "Nuk ke mjaft kredite për të ekzekutuar Cloud Agent.",
+      "assistantCreditsRefusal": "Nuk ke mjaft kredite për këtë kërkesë.",
       "assistantOutputLimit": "Përgjigja arriti kufirin e daljes së modelit.",
       "assistantStructuredOutput": "Përgjigja nuk përputhej me formatin e kërkuar.",
       "assistantFailed": "Gjenerimi i përgjigjes dështoi."
@@ -2260,7 +2300,7 @@
       "positionHint": "(1 nga {{displayCount}})",
       "movedPastPrompt": "Agjenti e ka kaluar këtë kërkesë. Kjo kartë do të mbyllet kur të vazhdojë seanca.",
       "waitingForAnswer": "Agjenti po pret përgjigjen tënde. Derisa t'i përgjigjesh kësaj pyetjeje, mesazhi yt për agjentin mbetet në pritje.",
-      "waitingForPermission": "Agjenti po pret lejen. Derisa të vendosësh për këtë kërkesë, mesazhi yt për agjentin mbetet në pritje."
+      "waitingForPermission": "Derisa të vendosësh për këtë kërkesë, mesazhi yt për agjentin mbetet në pritje."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3038,7 +3078,7 @@
       "provider": "U ndal: gabim ofruesi",
       "tool": "U ndal: gabim mjeti",
       "cancelled": "U ndal: anuluar",
-      "other": "U NDAL"
+      "other": "U ndal"
     }
   },
   "transcriptionModel": {
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "Agjenti im",
       "promptPlaceholder": "Ju jeni një...",
       "tools": "Mjetet",
+      "wholeToolRule": "Ky agjent zbaton një rregull për të gjitha mjetet njëherësh: {{rule}}. Këto ndërprerës janë vetëm për lexim.",
       "visibility": "Dukshmëria",
       "visibilityPrimary": "Primar — tregohet në zgjedhës",
       "visibilitySubagent": "Subagent — i thirrur vetëm nga të tjerët",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "Profilet e parazgjedhura për repos",
+      "entryLabel": "Profilet e paravendosura",
       "add": "Shto parazgjedhje",
       "empty": "Asnjë parazgjedhje nuk është konfiguruar",
       "emptyDescription": "Shto një parazgjedhje për të aplikuar automatikisht një profil kur nis seancat për një depo.",
@@ -3753,7 +3795,7 @@
     "estimate": "Vlerësimi {{estimate}} · maksimumi {{maximum}}",
     "estimateUnavailable": "Një përmbledhje me pagesë nuk është e disponueshme për këto rregullime.",
     "confirmPaid": "Të aktivizohen përmbledhjet me pagesë për {{context}}?",
-    "paidDisclosure": "{{estimate}} e vlerësuar, deri në {{maximum}}, me kufi {{minutes}} minuta. Tarifat zbatohen edhe nëse gjenerimi dështon.",
+    "paidDisclosure": "{{estimate}} e vlerësuar, deri në {{maximum}}, me kufi {{minutes}} min. Tarifat zbatohen edhe nëse gjenerimi dështon.",
     "enable": "Aktivizo përmbledhjet me pagesë",
     "allContexts": "Raportet personale dhe të organizatës mbahen të ndara.",
     "emptyHistory": "Nuk ka raporte të ruajtura",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "Përmbledhja AI dështoi. Pamja jote e strukturuar e çastit mbetet e disponueshme.",
     "scheduledContextEnabled": "Raporte të planifikuara",
     "scheduledContextSettings": "Raporte të planifikuara · {{context}}",
-    "scheduledContextHint": "Aktivizo regjistrimin e planifikuar dhe përmbledhjet AI me pagesë vetëm për këtë kontekst. Fragmente të zgjedhura me të dhënat e ndjeshme të fshehura dhe fakte të strukturuara dërgohen te modeli yt. Përmbledhjet përdorin gjuhën e aplikacionit që ruhet vetëm kur ndryshon shprehimisht cilësimet e raportit. Kjo gjuhë nuk përditësohet automatikisht kur ndryshon gjuhën e aplikacionit. Tarifat përdorin balancën e këtij konteksti. Pamjet e çastit pa aktivitet nuk përdorin AI.",
+    "scheduledContextHint": "Aktivizo regjistrimin e planifikuar dhe përmbledhjet AI me pagesë vetëm për këtë kontekst. Fragmente të zgjedhura me të dhënat e ndjeshme të fshehura dhe fakte të strukturuara dërgohen te modeli yt. Përmbledhjet përdorin gjuhën e aplikacionit që ruhet kur përditëson cilësimet e raportit. Tarifat përdorin balancën e këtij konteksti. Pamjet e çastit pa aktivitet nuk përdorin AI.",
     "snapshotSafeguards": "Kufijtë e kohës dhe shpenzimit për përmbledhje zbatohen për çdo pamje të planifikuar të çastit, jo si buxhet ditor.",
     "snapshotEstimateInputTooLarge": "Kjo pamje e çastit përmban tepër prova për modelin e zgjedhur.",
-    "quietSnapshot": "Me aq të dhëna sa mund të mblidheshin, nuk u zgjodh asnjë aktivitet seance për këtë pamje të çastit. Nuk u kërkua përmbledhje AI, nuk u thirr modeli dhe nuk u aplikua asnjë tarifë.",
+    "quietSnapshot": "Nuk u zgjodh asnjë aktivitet seance për këtë pamje të çastit. Nuk u kërkua përmbledhje AI dhe nuk u aplikua asnjë tarifë.",
     "noEnabledContexts": "Asnjë kontekst i aktivizuar për raportet e planifikuara",
     "sourceBlocker": "Seanca kërkon vëmendje",
     "sourceMetadata": "Metatëdhënat e regjistruara të seancës"

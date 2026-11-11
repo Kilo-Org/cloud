@@ -14,8 +14,12 @@ const workspace = (name, dir, dependencies = {}) => ({ name, dir, manifest: { de
 const items = [
   workspace('@kilocode/db', 'packages/db'),
   workspace('@kilocode/trpc', 'packages/trpc', { '@kilocode/db': 'workspace:*' }),
+  workspace('@kilocode/harness-sdk', 'packages/harness-sdk'),
   workspace('web', 'apps/web', { '@kilocode/db': 'workspace:*' }),
-  workspace('kilo-app', 'apps/mobile', { '@kilocode/trpc': 'workspace:*' }),
+  workspace('kilo-app', 'apps/mobile', {
+    '@kilocode/trpc': 'workspace:*',
+    '@kilocode/harness-sdk': 'workspace:*',
+  }),
   workspace('agent', 'services/agent'),
   workspace('agent-wrapper', 'services/agent/wrapper'),
   workspace('leaf', 'services/leaf'),
@@ -102,14 +106,10 @@ test('an unattributable or global change selects everything', () => {
     'unknown/file.ts',
     '.github/workflows/ci.yml',
     'scripts/affected-workspaces.mjs',
-    '.github/actions/trpc-declarations/action.yml',
-    '.github/actions/harness-sdk-build/action.yml',
+    'scripts/changed-dependencies.mjs',
     '.github/actions/ttsc-plugin-cache/action.yml',
-    'scripts/trpc-declaration-key.mjs',
-    'scripts/harness-sdk-build-key.mjs',
     'scripts/ttsc-plugin-key.mjs',
     'scripts/build-key-inputs.mjs',
-    'patches/a.patch',
   ]) {
     const result = select([file]);
     assert.equal(result.full, true, file);
@@ -117,6 +117,53 @@ test('an unattributable or global change selects everything', () => {
     assert.deepEqual(result.full_checks, ['lint', 'typecheck'], file);
   }
   assert.equal(select(['<no base revision>']).full, true);
+});
+
+test('a single-package build action selects its package and that package readers', () => {
+  for (const file of [
+    '.github/actions/trpc-declarations/action.yml',
+    'scripts/trpc-declaration-key.mjs',
+  ]) {
+    assert.deepEqual(select([file]), {
+      full: false,
+      reasons: [],
+      full_checks: [],
+      dirs: ['apps/mobile', 'packages/trpc'],
+      packages: ['@kilocode/trpc', 'kilo-app'],
+      ...noTests,
+    });
+  }
+  for (const file of [
+    '.github/actions/harness-sdk-build/action.yml',
+    '.github/actions/harness-sdk-build/step.sh',
+    'scripts/harness-sdk-build-key.mjs',
+  ]) {
+    assert.deepEqual(select([file]).dirs, ['apps/mobile', 'packages/harness-sdk'], file);
+  }
+  // The trpc rows run only on a full check, so the key change starts no
+  // typecheck row; the rest lint group still covers every workspace it lints.
+  assert.deepEqual(selectGroups(select(['scripts/trpc-declaration-key.mjs'])), {
+    typecheck_groups: [],
+    lint_groups: ['rest'],
+  });
+});
+
+test('an action no table attributes stays global', () => {
+  for (const file of [
+    '.github/actions/pnpm-store/action.yml',
+    '.github/actions/pnpm-store/cleanup/cleanup.cjs',
+    '.github/actions/brand-new-action/action.yml',
+  ]) {
+    assert.equal(select([file]).full, true, file);
+  }
+  // A global path in the same diff keeps the whole selection full.
+  assert.equal(
+    select([
+      '.github/actions/trpc-declarations/action.yml',
+      '.github/actions/pnpm-store/action.yml',
+    ]).full,
+    true
+  );
 });
 
 test('a check script change runs only that check everywhere', () => {
@@ -310,6 +357,53 @@ test('dependency manifest changes select the workspaces whose dependencies chang
     'kilo-app',
     'web',
   ]);
+});
+
+test('a dependency patch selects the workspaces that carry it', () => {
+  // scripts/changed-dependencies.mjs reports the importers whose resolved
+  // closure holds the patched selector, and the walk below adds their readers.
+  assert.deepEqual(select(['patches/router@1.0.0.patch'], ['apps/mobile']), {
+    full: false,
+    reasons: [],
+    full_checks: [],
+    dirs: ['apps/mobile'],
+    packages: ['kilo-app'],
+    ...noTests,
+  });
+  assert.deepEqual(select(['patches/parser@1.0.0.patch'], ['packages/db']).packages, [
+    '@kilocode/db',
+    '@kilocode/trpc',
+    'kilo-app',
+    'web',
+  ]);
+});
+
+test('a patch that no workspace resolves keeps the selection full', () => {
+  for (const dependencyDirs of [[], ['*'], ['.']]) {
+    const result = select(['patches/root-only@1.0.0.patch'], dependencyDirs);
+    assert.equal(result.full, true, dependencyDirs.join() || 'no consumer');
+    assert.equal(result.dirs.length, items.length, dependencyDirs.join());
+  }
+  // A manifest with no attributed workspace is still a narrow selection: only a
+  // patch needs a consumer to be attributable.
+  assert.equal(select(['pnpm-workspace.yaml'], []).full, false);
+});
+
+test('a workspace test that reads a dependency input runs its tests alone', () => {
+  // The release-age policy guard test reads the root workspace file as data, so
+  // it runs even though the change selects no check for any workspace.
+  const read = [['apps/mobile/src/lib/policy.test.ts', 'pnpm-workspace.yaml', true]];
+  const result = selectAffected({
+    items,
+    changedFiles: ['pnpm-workspace.yaml'],
+    dependencyDirs: [],
+    references: read,
+  });
+  assert.equal(result.full, false);
+  assert.deepEqual(result.dirs, []);
+  assert.deepEqual(result.test_only_dirs, ['apps/mobile']);
+  assert.deepEqual(result.test_only_packages, ['kilo-app']);
+  assert.deepEqual(selectGroups(result), { typecheck_groups: [], lint_groups: [] });
 });
 
 test('documents and neutral root locations are the shared neutral set', () => {

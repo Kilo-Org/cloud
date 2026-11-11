@@ -22,6 +22,8 @@
     "expired": "만료됨"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "취소",
     "done": "완료",
     "retry": "다시 시도",
@@ -227,6 +229,21 @@
     "pleaseEnterEmail": "이메일 주소를 입력하세요.",
     "or": "또는"
   },
+  "pendingLink": {
+    "description": "{{email}}을(를) 이미 사용하는 계정이 있습니다. {{provider}}을(를) 추가하려면 해당 계정의 로그인 방법 중 하나로 로그인하세요.",
+    "emailCode": "이메일로 로그인 코드 받기",
+    "continueInBrowser": "브라우저에서 계속하기",
+    "startAgain": "다시 시작",
+    "expired": "{{provider}} 추가 요청이 만료되었습니다.",
+    "noMethods": "이 계정에는 다른 로그인 방법이 없어 {{provider}}을(를) 추가할 수 없습니다.",
+    "linked": "{{provider}}이(가) 계정에 추가되었습니다.",
+    "failedExpired": "요청이 만료되어 {{provider}}을(를) 추가하지 못했습니다.",
+    "failedWrongAccount": "다른 계정으로 로그인하여 {{provider}}을(를) 추가하지 못했습니다.",
+    "failedAccountAlreadyLinked": "{{provider}}이(가) 이미 다른 계정에 연결되어 있어 추가하지 못했습니다.",
+    "failedProviderAlreadyLinked": "계정에 이미 다른 {{provider}} 로그인이 있어 {{provider}}을(를) 추가하지 못했습니다.",
+    "failedLinking": "{{provider}}을(를) 계정에 추가할 수 없습니다.",
+    "notAdded": "로그인되었습니다. {{provider}}이(가) 계정에 추가되지 않았습니다."
+  },
   "profile": {
     "codeReviewerSubtitle": "자동 PR 리뷰",
     "securityAgentSubtitle": "취약점 탐지 및 해결",
@@ -265,6 +282,8 @@
     "providerTestAccount": "테스트 계정",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "엔터프라이즈 SSO",
     "passkeysTitle": "패스키",
     "passkeysSubtitle": "비밀번호 없이 로그인",
@@ -1299,7 +1318,7 @@
       "cloningSession": "세션 복제 중",
       "couldNotLoadThisSession": "이 세션을 불러오지 못했습니다.",
       "cloneFailedRetry": "이 세션을 복제하지 못했습니다. 다시 시도하세요.",
-      "notEnoughCredits": "Cloud Agent를 실행할 크레딧이 부족합니다. 크레딧을 충전하고 다시 시도하세요.",
+      "notEnoughCredits": "이 요청을 처리할 크레딧이 부족합니다. 크레딧을 충전하고 다시 시도하세요.",
       "previousTaskFinishing": "이전 작업을 아직 마무리하는 중입니다. 잠시 기다려 주세요.",
       "serviceUnavailable": "현재 서비스를 사용할 수 없습니다. 다시 시도하세요.",
       "connectionTrouble": "연결 문제가 발생했습니다. 잠시 후 다시 시도하세요.",
@@ -1409,7 +1428,7 @@
       "discardWithUploadsMessage": "프롬프트와 보낸 메시지에 첨부되지 않은 모든 업로드 파일이 삭제됩니다.",
       "discardFailed": "초안을 삭제할 수 없습니다. 다시 시도하세요.",
       "remoteHint": "컴퓨터에서 실행하려면 그 컴퓨터에서 Kilo를 시작하고 계속 실행해 두세요.",
-      "continueFrom": "{{title}} 세션을 이어서 진행합니다.",
+      "continueFrom": "“{{title}}” 세션을 이어서 진행합니다.",
       "importingSession": "세션 가져오는 중",
       "cliCannotContinue": "이 CLI에서는 세션을 이어서 진행할 수 없습니다. Cloud Agent 또는 다른 CLI를 선택하세요.",
       "importFailed": "이 세션을 가져올 수 없습니다.",
@@ -1441,7 +1460,8 @@
       "selectedProfile": "선택한 프로필",
       "manualOverrides": "수동 재정의",
       "openSettingsToReview": "설정을 열어 검토하세요.",
-      "profileSelection": "프로필 선택"
+      "profileSelection": "프로필 선택",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "파일 {{displayCount}}개를 업데이트했습니다.",
@@ -1461,6 +1481,8 @@
       "toolList": "목록 보기",
       "toolPatch": "패치",
       "toolTask": "작업",
+      "toolSendFile": "파일 전송함",
+      "toolSendFileAction": "파일 전송",
       "readTodos": "플랜 읽기",
       "updateTodos": "플랜 업데이트",
       "linesBadge": "{{displayCount}}줄",
@@ -1561,7 +1583,21 @@
       "thought": "추론 내용",
       "showDetails": "세부 정보 표시",
       "pending": "대기 중…",
-      "running": "실행 중…"
+      "running": "실행 중…",
+      "field": {
+        "filePath": "파일 경로",
+        "path": "경로",
+        "offset": "시작 줄",
+        "limit": "최대",
+        "pattern": "패턴",
+        "include": "포함",
+        "patchText": "패치 내용",
+        "query": "검색어",
+        "prompt": "프롬프트",
+        "header": "머리글",
+        "question": "질문",
+        "options": "선택지"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "내용을 표시하지 못했습니다."
@@ -1577,7 +1613,7 @@
       "assistantContextOverflow": "대화가 너무 길어 모델이 처리할 수 없습니다.",
       "assistantProviderError": "제공업체가 오류를 반환했습니다.",
       "assistantProviderRefused": "제공업체가 이 요청을 거부했으며 다시 시도할 수 없습니다.",
-      "assistantCreditsRefusal": "Cloud Agent를 실행할 크레딧이 부족합니다.",
+      "assistantCreditsRefusal": "이 요청을 처리할 크레딧이 부족합니다.",
       "assistantOutputLimit": "응답이 모델의 출력 한도에 도달했습니다.",
       "assistantStructuredOutput": "응답이 필요한 형식과 일치하지 않습니다.",
       "assistantFailed": "응답을 생성하지 못했습니다."
@@ -1722,7 +1758,7 @@
       "positionHint": "({{displayCount}}개 중 첫 번째)",
       "movedPastPrompt": "에이전트가 이미 이 요청을 넘어 다음 단계로 진행했습니다. 세션이 계속되면 이 카드가 닫힙니다.",
       "waitingForAnswer": "에이전트가 답변을 기다리고 있습니다. 이 질문에 답변할 때까지 에이전트에게 보내는 메시지의 전송이 일시 중지됩니다.",
-      "waitingForPermission": "에이전트가 권한 승인을 기다리고 있습니다. 이 요청에 응답할 때까지 에이전트에게 보내는 메시지의 전송이 일시 중지됩니다."
+      "waitingForPermission": "이 요청에 응답할 때까지 에이전트에게 보내는 메시지의 전송이 일시 중지됩니다."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, 작업: {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -2450,7 +2486,11 @@
       "retryLoadingMoreFiles": "파일 더 불러오기 다시 시도",
       "title": "파일",
       "viewedCount": "{{total}}개 중 {{viewed}}개 확인함",
-      "viewedOfListed": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함"
+      "viewedCount_one": "{{total}}개 중 {{viewed}}개 확인함",
+      "viewedCount_other": "{{total}}개 중 {{viewed}}개 확인함",
+      "viewedOfListed": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함",
+      "viewedOfListed_one": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함",
+      "viewedOfListed_other": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함"
     },
     "fileRows": {
       "collapseFile": "파일 접기",
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "내 에이전트",
       "promptPlaceholder": "당신은 ...",
       "tools": "도구",
+      "wholeToolRule": "이 에이전트는 모든 도구에 한 번에 하나의 규칙을 적용합니다: {{rule}}. 이 스위치는 읽기 전용입니다.",
       "visibility": "시계",
       "visibilityPrimary": "기본 — 선택기에 표시됨",
       "visibilitySubagent": "하위 에이전트 — 다른 사람에게서만 호출 가능",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "저장소의 기본 프로필",
+      "entryLabel": "기본 프로필",
       "add": "기본값 추가",
       "empty": "구성된 기본값이 없습니다.",
       "emptyDescription": "저장소에 대한 세션을 시작할 때 프로필을 자동으로 적용하려면 기본값을 추가하세요.",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "AI 요약에 실패했습니다. 구조화된 스냅샷은 계속 확인할 수 있습니다.",
     "scheduledContextEnabled": "예약된 브리핑",
     "scheduledContextSettings": "예약된 브리핑 · {{context}}",
-    "scheduledContextHint": "이 컨텍스트에만 예약 캡처와 유료 AI 요약을 사용하세요. 선택된 발췌문에서 민감한 정보를 가린 내용과 구조화된 정보가 모델에 전송됩니다. 요약은 브리핑 설정을 명시적으로 변경할 때 저장된 앱 언어를 사용합니다. 앱 언어만 변경해도 요약 언어가 자동으로 바뀌지는 않습니다. 요금은 이 컨텍스트의 잔액에서 차감됩니다. 선택된 활동이 없는 스냅샷은 AI를 사용하지 않습니다.",
+    "scheduledContextHint": "이 컨텍스트에만 예약 캡처와 유료 AI 요약을 사용하세요. 선택된 발췌문에서 민감한 정보를 가린 내용과 구조화된 정보가 모델에 전송됩니다. 요약은 브리핑 설정을 업데이트할 때 저장된 앱 언어를 사용합니다. 요금은 이 컨텍스트의 잔액에서 차감됩니다. 선택된 활동이 없는 스냅샷은 AI를 사용하지 않습니다.",
     "snapshotSafeguards": "요약별 시간 및 지출 안전 한도는 각 예약된 스냅샷에 적용되며, 일일 예산이 아닙니다.",
     "snapshotEstimateInputTooLarge": "이 스냅샷의 근거 자료가 선택한 모델이 처리하기에 너무 많습니다.",
-    "quietSnapshot": "확인 가능한 범위에서 세션 활동을 선택했으나, 이 스냅샷에 포함된 활동은 없습니다. AI 모델 호출이나 요약 요청은 없었으며, 요금도 부과되지 않았습니다.",
+    "quietSnapshot": "이 스냅샷에 대해 선택된 세션 활동이 없습니다. AI 요약이 요청되거나 요금이 부과되지 않았습니다.",
     "noEnabledContexts": "예약된 브리핑이 활성화된 컨텍스트 없음",
     "sourceBlocker": "확인이 필요한 세션",
     "sourceMetadata": "캡처된 세션 메타데이터"

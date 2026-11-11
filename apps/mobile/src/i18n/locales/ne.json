@@ -22,6 +22,8 @@
     "expired": "म्याद सकियो"
   },
   "common": {
+    "sentenceJoiner": "। ",
+    "listJoiner": ", ",
     "cancel": "रद्द गर्नुहोस्",
     "done": "सम्पन्न",
     "retry": "फेरि प्रयास गर्नुहोस्",
@@ -227,6 +229,21 @@
     "signInCodeField": "साइन इन कोड",
     "or": "वा"
   },
+  "pendingLink": {
+    "description": "{{email}} पहिले नै एउटा खाताले प्रयोग गरिरहेको छ। {{provider}} थप्न त्यसको कुनै एक विधिबाट साइन इन गर्नुहोस्।",
+    "emailCode": "मलाई इमेलमा साइन इन कोड पठाउनुहोस्",
+    "continueInBrowser": "ब्राउजरमा जारी राख्नुहोस्",
+    "startAgain": "फेरि सुरु गर्नुहोस्",
+    "expired": "{{provider}} थप्ने यो अनुरोधको म्याद सकियो।",
+    "noMethods": "यो खातामा साइन इन गर्ने अर्को विधि छैन, त्यसैले {{provider}} थप्न सकिँदैन।",
+    "linked": "{{provider}} तपाईंको खातामा थपियो।",
+    "failedExpired": "अनुरोधको म्याद सकिएकाले {{provider}} थपिएन।",
+    "failedWrongAccount": "तपाईंले अर्कै खातामा साइन इन गर्नुभएकाले {{provider}} थपिएन।",
+    "failedAccountAlreadyLinked": "{{provider}} पहिले नै अर्को खातासँग जोडिएकाले थपिएन।",
+    "failedProviderAlreadyLinked": "तपाईंको खातामा पहिले नै फरक {{provider}} साइन इन भएकाले {{provider}} थपिएन।",
+    "failedLinking": "{{provider}} तपाईंको खातामा थप्न सकिएन।",
+    "notAdded": "तपाईं साइन इन हुनुभएको छ। {{provider}} तपाईंको खातामा थपिएन।"
+  },
   "profile": {
     "codeReviewerSubtitle": "स्वचालित PR समीक्षाहरू",
     "securityAgentSubtitle": "सुरक्षा कमजोरीहरू पत्ता लगाएर समाधान गर्नुहोस्",
@@ -265,6 +282,8 @@
     "providerTestAccount": "परीक्षण खाता",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "उद्यम SSO",
     "passkeysTitle": "पासकीहरू",
     "passkeysSubtitle": "पासवर्ड बिना साइन इन गर्नुहोस्",
@@ -343,7 +362,11 @@
       "retryLoadingFiles": "फाइलहरू लोड गर्न पुनः प्रयास गर्नुहोस्",
       "filterPlaceholder": "फाइल पथअनुसार फिल्टर",
       "viewedCount": "{{total}} मध्ये {{viewed}} हेरियो",
+      "viewedCount_one": "{{total}} मध्ये {{viewed}} हेरियो",
+      "viewedCount_other": "{{total}} मध्ये {{viewed}} हेरियो",
       "viewedOfListed": "सूचीका {{total}} फाइलमध्ये {{viewed}} हेरियो",
+      "viewedOfListed_one": "सूचीका {{total}} फाइलमध्ये {{viewed}} हेरियो",
+      "viewedOfListed_other": "सूचीका {{total}} फाइलमध्ये {{viewed}} हेरियो",
       "loadingFiles": "{{total}} मध्ये {{loaded}} लोड गर्दै…",
       "failedToLoadAllFiles": "सबै फाइलहरू लोड गर्न सकिएन।",
       "couldNotLoadMoreFiles": "थप फाइलहरू लोड गर्न सकिएन।",
@@ -1837,7 +1860,7 @@
       "cloningSession": "सत्रको प्रतिलिपि बनाउँदै",
       "couldNotLoadThisSession": "यो सत्र लोड गर्न सकिएन।",
       "cloneFailedRetry": "यो सत्रको प्रतिलिपि बनाउन सकिएन। फेरि प्रयास गर्नुहोस्।",
-      "notEnoughCredits": "Cloud Agent चलाउन पर्याप्त क्रेडिट छैन। क्रेडिट थपेर फेरि प्रयास गर्नुहोस्।",
+      "notEnoughCredits": "यो अनुरोधका लागि पर्याप्त क्रेडिट छैन। क्रेडिट थपेर फेरि प्रयास गर्नुहोस्।",
       "previousTaskFinishing": "अघिल्लो काम सकिन बाँकी छ। केही बेर पर्खनुहोस्।",
       "serviceUnavailable": "सेवा अहिले उपलब्ध छैन। फेरि प्रयास गर्नुहोस्।",
       "connectionTrouble": "जडानमा समस्या छ। केही बेरपछि फेरि प्रयास गर्नुहोस्।",
@@ -1947,7 +1970,7 @@
       "discardWithUploadsMessage": "तपाईंको प्रम्प्ट र कुनै सन्देशमा संलग्न नभएका अपलोड गरिएका फाइलहरू मेटिनेछन्।",
       "discardFailed": "मस्यौदा मेट्न सकिएन। फेरि प्रयास गर्नुहोस्।",
       "remoteHint": "तपाईंको कम्प्युटरमा चलाउन त्यहाँ Kilo सुरु गर्नुहोस् र यसलाई चालु राख्नुहोस्।",
-      "continueFrom": "{{title}} जारी राखिँदैछ।",
+      "continueFrom": "“{{title}}” जारी राखिँदैछ।",
       "importingSession": "सत्र आयात गर्दै",
       "cliCannotContinue": "यो CLI ले सत्र जारी राख्न सक्दैन। Cloud Agent वा अर्को CLI छान्नुहोस्।",
       "importFailed": "यो सत्र आयात गर्न सकिएन।",
@@ -1979,7 +2002,8 @@
       "selectedProfile": "चयन गरिएको प्रोफाइल",
       "manualOverrides": "म्यानुअल ओभरराइडहरू",
       "openSettingsToReview": "समीक्षा गर्न सेटिङहरू खोल्नुहोस्",
-      "profileSelection": "प्रोफाइल चयन"
+      "profileSelection": "प्रोफाइल चयन",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्यावधिक गरियो।",
@@ -1999,6 +2023,8 @@
       "toolList": "सूची देखाउनुहोस्",
       "toolPatch": "संशोधन लागू गर्नुहोस्",
       "toolTask": "कार्य",
+      "toolSendFile": "फाइल पठाइयो",
+      "toolSendFileAction": "फाइल पठाउनुहोस्",
       "readTodos": "योजना पढ्नुहोस्",
       "updateTodos": "योजना अद्यावधिक गर्नुहोस्",
       "linesBadge": "{{displayCount}} पङ्क्ति",
@@ -2099,7 +2125,21 @@
       "thought": "विचार",
       "showDetails": "विवरण देखाउनुहोस्",
       "pending": "पर्खाइमा…",
-      "running": "चलिरहेको…"
+      "running": "चलिरहेको…",
+      "field": {
+        "filePath": "फाइल पथ",
+        "path": "पथ",
+        "offset": "अफसेट",
+        "limit": "सीमा",
+        "pattern": "ढाँचा",
+        "include": "समावेश",
+        "patchText": "प्याच पाठ",
+        "query": "क्वेरी",
+        "prompt": "निर्देश",
+        "header": "शीर्षक",
+        "question": "प्रश्न",
+        "options": "विकल्पहरू"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "सामग्री देखाउन सकिएन।"
@@ -2115,7 +2155,7 @@
       "assistantContextOverflow": "कुराकानी मोडेलका लागि धेरै लामो छ।",
       "assistantProviderError": "प्रदायकले त्रुटि फर्कायो।",
       "assistantProviderRefused": "प्रदायकले यो अनुरोध अस्वीकार गर्‍यो र यसलाई फेरि प्रयास गर्न सकिँदैन।",
-      "assistantCreditsRefusal": "Cloud Agent चलाउन पर्याप्त क्रेडिट छैन।",
+      "assistantCreditsRefusal": "यो अनुरोधका लागि पर्याप्त क्रेडिट छैन।",
       "assistantOutputLimit": "उत्तर मोडेलको आउटपुट सीमामा पुग्यो।",
       "assistantStructuredOutput": "उत्तर अपेक्षित ढाँचासँग मिलेन।",
       "assistantFailed": "उत्तर दिन सकिएन।"
@@ -2260,7 +2300,7 @@
       "positionHint": "({{displayCount}} मध्ये 1)",
       "movedPastPrompt": "एजेन्ट यो प्रम्प्टभन्दा अगाडि बढिसकेको छ। सत्र जारी हुँदा यो कार्ड बन्द हुनेछ।",
       "waitingForAnswer": "एजेन्ट तपाईंको उत्तरको पर्खाइमा छ। यो प्रश्न खुला रहँदासम्म एजेन्टलाई तपाईंको सन्देश पठाउन रोकिएको छ।",
-      "waitingForPermission": "एजेन्ट अनुमतिको पर्खाइमा छ। यो अनुरोध खुला रहँदासम्म एजेन्टलाई तपाईंको सन्देश पठाउन रोकिएको छ।"
+      "waitingForPermission": "यो अनुरोध खुला रहँदासम्म एजेन्टलाई तपाईंको सन्देश पठाउन रोकिएको छ।"
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3531,6 +3571,7 @@
       "namePlaceholder": "मेरो एजेन्ट",
       "promptPlaceholder": "तिमी एक...",
       "tools": "उपकरणहरू",
+      "wholeToolRule": "यो एजेन्टले एकैचोटि हरेक उपकरणमा एउटै नियम लागू गर्छ: {{rule}}। यी स्विचहरू पढ्नका लागि मात्र हुन्।",
       "visibility": "दृश्यता",
       "visibilityPrimary": "प्राथमिक — पिकरमा देखाइएको छ",
       "visibilitySubagent": "Subagent — अरूबाट मात्र कल गर्न मिल्ने",
@@ -3572,6 +3613,7 @@
     },
     "repoBindings": {
       "title": "रिपोसका लागि पूर्वनिर्धारित प्रोफाइलहरू",
+      "entryLabel": "पूर्वनिर्धारित प्रोफाइलहरू",
       "add": "पूर्वनिर्धारित थप्नुहोस्",
       "empty": "कुनै पूर्वनिर्धारित कन्फिगर गरिएको छैन",
       "emptyDescription": "रिपोको लागि सत्रहरू सुरु गर्दा स्वचालित रूपमा प्रोफाइल लागू गर्न पूर्वनिर्धारित थप्नुहोस्।",
@@ -3772,10 +3814,10 @@
     "snapshotSummaryFailed": "AI सारांश असफल भयो। तपाईंको संरचित स्न्यापशट अझै उपलब्ध छ।",
     "scheduledContextEnabled": "निर्धारित ब्रिफिङहरू",
     "scheduledContextSettings": "निर्धारित ब्रिफिङहरू · {{context}}",
-    "scheduledContextHint": "यो सन्दर्भका लागि मात्र निर्धारित सङ्कलन र सशुल्क AI सारांशहरू सक्षम गर्नुहोस्। छानिएका, गोप्य विवरण हटाइएका अंशहरू र संरचित तथ्यहरू तपाईंको मोडेललाई पठाइन्छन्। सारांशहरूले तपाईंले ब्रिफिङ सेटिङहरू परिवर्तन गरी सेभ गर्दा सेभ भएको एप भाषा प्रयोग गर्छन्। एपको भाषा मात्र परिवर्तन गर्दा सारांशको भाषा स्वतः परिवर्तन हुँदैन। शुल्क यो सन्दर्भको ब्यालेन्सबाट काटिन्छ। कुनै गतिविधि नछानिएका स्न्यापशटहरूले AI प्रयोग गर्दैनन्।",
+    "scheduledContextHint": "यो सन्दर्भका लागि मात्र निर्धारित सङ्कलन र सशुल्क AI सारांशहरू सक्षम गर्नुहोस्। छानिएका, गोप्य विवरण हटाइएका अंशहरू र संरचित तथ्यहरू तपाईंको मोडेललाई पठाइन्छन्। सारांशहरूले तपाईंले ब्रिफिङ सेटिङहरू परिवर्तन गरी सेभ गर्दा सेभ भएको एप भाषा प्रयोग गर्छन्। शुल्क यो सन्दर्भको ब्यालेन्सबाट काटिन्छ। कुनै गतिविधि नछानिएका स्न्यापशटहरूले AI प्रयोग गर्दैनन्।",
     "snapshotSafeguards": "प्रति-सारांश समय र खर्च सीमाहरू प्रत्येक निर्धारित स्न्यापशटमा लागू हुन्छन्, दैनिक बजेटका रूपमा होइन।",
     "snapshotEstimateInputTooLarge": "यो स्न्यापशटमा छानिएको मोडेलले सम्हाल्न सक्नेभन्दा बढी प्रमाणहरू छन्।",
-    "quietSnapshot": "यो स्न्यापशटका लागि उपलब्ध सत्र गतिविधि सकेसम्म समेट्ने प्रयास गरियो, तर कुनै गतिविधि छानिएन। AI सारांशका लागि मोडेललाई कुनै अनुरोध पठाइएन र कुनै शुल्क लागेन।",
+    "quietSnapshot": "यो स्न्यापशटका लागि कुनै सत्र गतिविधि छानिएन। कुनै AI सारांश अनुरोध गरिएन र शुल्क लागेन।",
     "noEnabledContexts": "निर्धारित ब्रिफिङहरूका लागि कुनै सन्दर्भ सक्षम गरिएको छैन",
     "sourceBlocker": "सत्रमा ध्यान दिन आवश्यक छ",
     "sourceMetadata": "सङ्कलित सत्र मेटाडाटा"

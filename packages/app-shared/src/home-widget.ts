@@ -114,14 +114,6 @@ function refreshInterval(snapshot: GlanceableAgentsSnapshot): number {
     : QUIET_REFRESH_MS;
 }
 
-/**
- * Code points that occupy no display width: directional marks and embeddings, the invisible
- * operators, and the zero-width space. ZWNJ and ZWJ stay, because they join the glyphs of
- * Persian and Indic words and of emoji sequences.
- */
-const NON_PRINTING_TITLE_CHARACTERS =
-  /[\u061c\u200b\u200e\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/g;
-
 /** ISO 8601 form of a row time, or null when it does not parse. */
 function isoTime(value: string | undefined | null): string | null {
   const at = timestampMs(value);
@@ -129,9 +121,7 @@ function isoTime(value: string | undefined | null): string | null {
 }
 
 function safeTitle(value: string | undefined | null): string {
-  const title = sessionDisplayLine(value ?? '')
-    .replace(NON_PRINTING_TITLE_CHARACTERS, '')
-    .trim();
+  const title = sessionDisplayLine(value ?? '').trim();
   return sessionLiveCut(title, HOME_WIDGET_TITLE_LIMIT);
 }
 

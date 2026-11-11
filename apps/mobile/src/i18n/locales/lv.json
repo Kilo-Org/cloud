@@ -4131,7 +4131,8 @@
       "duplicateName": "Komanda ar šādu nosaukumu šajā profilā jau pastāv"
     },
     "repoBindings": {
-      "title": "Atpirkšanas darījumu noklusējuma profili",
+      "title": "Noklusējuma profili repozitorijiem",
+      "entryLabel": "Noklusējuma profili",
       "add": "Pievienot noklusējumu",
       "empty": "Nav konfigurēti noklusējuma iestatījumi",
       "emptyDescription": "Pievienojiet noklusējuma iestatījumu, lai automātiski lietotu profilu, sākot repo sesijas.",

@@ -4069,7 +4069,8 @@
       "duplicateName": "Arahan dengan nama ini telah wujud dalam profil ini"
     },
     "repoBindings": {
-      "title": "Profil Lalai untuk Repos",
+      "title": "Profil lalai untuk Repos",
+      "entryLabel": "Profil lalai",
       "add": "Tambah lalai",
       "empty": "Tiada lalai dikonfigurasikan",
       "emptyDescription": "Tambahkan lalai untuk menggunakan profil secara automatik apabila memulakan sesi untuk repo.",

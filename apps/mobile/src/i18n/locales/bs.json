@@ -4132,6 +4132,7 @@
     },
     "repoBindings": {
       "title": "Zadani profili za Repos",
+      "entryLabel": "Zadani profili",
       "add": "Dodaj zadano",
       "empty": "Nema konfiguriranih zadanih postavki",
       "emptyDescription": "Dodajte zadano za automatsku primjenu profila pri pokretanju sesija za repo.",

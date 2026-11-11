@@ -4194,6 +4194,7 @@
     },
     "repoBindings": {
       "title": "Predvolené profily pre úložiská",
+      "entryLabel": "Predvolené profily",
       "add": "Pridať predvolené",
       "empty": "Nie sú nakonfigurované žiadne predvolené hodnoty",
       "emptyDescription": "Pridajte predvolené nastavenie na automatické použitie profilu pri spustení relácií pre repo.",

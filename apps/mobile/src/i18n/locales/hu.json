@@ -4070,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Alapértelmezett profilok adattárakhoz",
+      "entryLabel": "Alapértelmezett profilok",
       "add": "Alapértelmezés hozzáadása",
       "empty": "Nincsenek beállított alapértelmezett profilok",
       "emptyDescription": "Adjon hozzá egy alapértelmezett profilt, amely automatikusan alkalmazza a profilt az adattár munkameneteinek indításakor.",

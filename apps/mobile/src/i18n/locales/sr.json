@@ -4132,6 +4132,7 @@
     },
     "repoBindings": {
       "title": "Podrazumevani profili za Repos",
+      "entryLabel": "Podrazumevani profili",
       "add": "Dodaj podrazumevano",
       "empty": "Nema konfigurisanih podrazumevanih vrednosti",
       "emptyDescription": "Dodajte podrazumevano za automatsku primenu profila pri pokretanju sesija za repo.",

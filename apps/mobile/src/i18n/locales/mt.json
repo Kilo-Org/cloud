@@ -4256,6 +4256,7 @@
     },
     "repoBindings": {
       "title": "Profili default għal Repos",
+      "entryLabel": "Profili default",
       "add": "Żid default",
       "empty": "Ebda defaults konfigurati",
       "emptyDescription": "Żid default biex tapplika profil awtomatikament meta tibda sessjonijiet għal repo.",

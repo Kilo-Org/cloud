@@ -4075,7 +4075,8 @@
       "duplicateName": "Umyalo onaleli gama isivele ukhona kuleli phrofayili"
     },
     "repoBindings": {
-      "title": "Amaphrofayili Azenzakalelayo we-Repos",
+      "title": "Amaphrofayili azenzakalelayo we-Repos",
+      "entryLabel": "Amaphrofayili azenzakalelayo",
       "add": "Engeza okuzenzakalelayo",
       "empty": "Akukho okumisiwe okumisiwe",
       "emptyDescription": "Engeza okuzenzakalelayo ukuze usebenzise ngokuzenzakalelayo iphrofayela lapho uqala izikhathi ze-repo.",

@@ -4070,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Koodivarastojen oletusprofiilit",
+      "entryLabel": "Profiilin oletukset",
       "add": "Lisää oletusprofiili",
       "empty": "Ei määritettyjä oletusprofiileja",
       "emptyDescription": "Lisää oletusprofiili, joka ottaa profiilin käyttöön automaattisesti, kun koodivarastolle aloitetaan istuntoja.",

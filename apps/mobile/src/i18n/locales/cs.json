@@ -4194,6 +4194,7 @@
     },
     "repoBindings": {
       "title": "Výchozí profily pro úložiště",
+      "entryLabel": "Výchozí profily",
       "add": "Přidat výchozí",
       "empty": "Nejsou nakonfigurována žádná výchozí nastavení",
       "emptyDescription": "Přidejte výchozí nastavení pro automatické použití profilu při zahájení relací pro repo.",

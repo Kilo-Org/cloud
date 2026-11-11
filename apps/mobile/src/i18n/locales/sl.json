@@ -4194,6 +4194,7 @@
     },
     "repoBindings": {
       "title": "Privzeti profili za skladišča",
+      "entryLabel": "Privzeti profili",
       "add": "Dodaj privzeto",
       "empty": "Privzete nastavitve niso konfigurirane",
       "emptyDescription": "Dodajte privzeto za samodejno uporabo profila ob zagonu sej za repo.",

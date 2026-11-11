@@ -4070,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Repode vaikeprofiilid",
+      "entryLabel": "Vaikeprofiilid",
       "add": "Lisa vaikeprofiil",
       "empty": "Ühtegi vaikeprofiili pole seadistatud",
       "emptyDescription": "Lisa vaikeprofiil, mida rakendatakse automaatselt repo seansside alustamisel.",

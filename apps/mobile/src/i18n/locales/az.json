@@ -4070,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Repos üçün defolt profillər",
+      "entryLabel": "Defolt profillər",
       "add": "Defolt əlavə edin",
       "empty": "Defolt konfiqurasiya edilməyib",
       "emptyDescription": "Repo üçün sessiyalara başladıqda profili avtomatik tətbiq etmək üçün defolt əlavə edin.",

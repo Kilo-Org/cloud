@@ -4070,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Perfís predeterminados para Repos",
+      "entryLabel": "Perfís predeterminados",
       "add": "Engadir predeterminado",
       "empty": "Non se configuraron valores predeterminados",
       "emptyDescription": "Engade un predeterminado para aplicar automaticamente un perfil ao iniciar sesións para un repositorio.",

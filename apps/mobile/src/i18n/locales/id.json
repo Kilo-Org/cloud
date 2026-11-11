@@ -4069,7 +4069,8 @@
       "duplicateName": "Nama itu sudah digunakan oleh perintah lain di profil ini"
     },
     "repoBindings": {
-      "title": "Profil Default untuk Repo",
+      "title": "Profil default untuk Repo",
+      "entryLabel": "Profil bawaan",
       "add": "Tambahkan bawaan",
       "empty": "Tidak ada konfigurasi default",
       "emptyDescription": "Tambahkan default untuk menerapkan profil secara otomatis saat memulai sesi untuk repo.",

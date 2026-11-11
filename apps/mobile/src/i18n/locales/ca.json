@@ -4132,6 +4132,7 @@
     },
     "repoBindings": {
       "title": "Perfils predeterminats per a Repos",
+      "entryLabel": "Perfils predeterminats",
       "add": "Afegeix per defecte",
       "empty": "No s'ha configurat cap valor predeterminat",
       "emptyDescription": "Afegiu un valor predeterminat per aplicar automàticament un perfil quan inicieu sessions per a un repo.",

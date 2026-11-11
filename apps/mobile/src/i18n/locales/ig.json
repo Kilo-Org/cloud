@@ -4070,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Profaịlụ ndabara maka ebe nchekwa",
+      "entryLabel": "Profaịlụ ndabara",
       "add": "Tinye ndabara",
       "empty": "Ọ nweghị ndabara ahaziri",
       "emptyDescription": "Tinye ndabara ka itinye profaịlụ na-akpaghị aka mgbe ịmalite nnọkọ maka repo.",

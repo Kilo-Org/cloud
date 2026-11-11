@@ -4070,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Standardprofiler för kodarkiv",
+      "entryLabel": "Standardprofiler",
       "add": "Lägg till standard",
       "empty": "Inga standardinställningar konfigurerade",
       "emptyDescription": "Lägg till en standard för att automatiskt tillämpa en profil när du startar sessioner för ett kodarkiv.",

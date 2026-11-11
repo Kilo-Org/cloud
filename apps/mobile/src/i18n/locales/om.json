@@ -4069,7 +4069,8 @@
       "duplicateName": "Ajajni maqaa kana qabu durseen profaayilii kana keessaa jira"
     },
     "repoBindings": {
-      "title": "Profaayilota Durtii Repos",
+      "title": "Profaayilota durtii Repos",
+      "entryLabel": "Profaayilota durtii",
       "add": "Durtii itti dabali",
       "empty": "Durtii hin qindaa'e",
       "emptyDescription": "Yeroo turtii repo'f jalqabdu ofumaan piroofaayilii hojii irra oolchuuf durtii dabali.",

@@ -4070,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Hồ sơ mặc định cho Repos",
+      "entryLabel": "Hồ sơ mặc định",
       "add": "Thêm mặc định",
       "empty": "Không có cấu hình mặc định",
       "emptyDescription": "Thêm mặc định để tự động áp dụng cấu hình khi bắt đầu phiên cho kho lưu trữ.",

@@ -4132,6 +4132,7 @@
     },
     "repoBindings": {
       "title": "Profiluri implicite pentru Repos",
+      "entryLabel": "Profiluri implicite",
       "add": "Adăugați implicit",
       "empty": "Nu sunt configurate implicite",
       "emptyDescription": "Adăugați o valoare prestabilită pentru a aplica automat un profil la pornirea sesiunilor pentru un depozit.",

@@ -300,10 +300,15 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       {/* The picker is a line action: its box cancels its layout height and
           overflows the eyebrow's line instead of lifting the row to its own
           height, which centred the eyebrow in the box and opened the gap to
-          the credits card to twice the other sections' gap to their rows. */}
+          the credits card to twice the other sections' gap to their rows. The
+          row pads by the overflow (7) plus the box's hit slop (9) and cancels
+          that padding with the same negative margin, so the row keeps its
+          layout height and the whole reach stays inside the row: RN drops
+          touches outside the parent, which is the rule the balance block's
+          failed state follows. */}
       <View
         className={cn(
-          'gap-3',
+          'gap-3 py-[16px] -my-[16px]',
           narrow ? 'flex-col items-stretch' : 'flex-row items-center justify-between'
         )}
       >

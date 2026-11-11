@@ -1347,6 +1347,12 @@ describe('CreditsCard credits header', () => {
     );
     expect(String(picker.props.className)).toContain(LINE_ACTION_BOX_CLASS);
     expect(picker.props.hitSlop).toEqual(LINE_ACTION_HIT_SLOP);
+    // RN drops touches outside the parent row, so the row pads by the box's
+    // overflow (7dp) plus the slop (9dp) and cancels the padding with the same
+    // negative margin: the whole target stays inside the row, and the row keeps
+    // the layout height of the eyebrow line.
+    expect(headerClasses(renderer)).toContain('py-[16px]');
+    expect(headerClasses(renderer)).toContain('-my-[16px]');
     unmount();
   });
 });

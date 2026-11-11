@@ -127,6 +127,16 @@ function isExpectedStatus(status: number, trpc: TrpcErrorContext): boolean {
   );
 }
 
+/**
+ * True when a status is an expected answer for a response that carries no tRPC
+ * error code, such as a plain fetch of an app endpoint: the same policy as
+ * {@link isExpectedStatus}, so a caller that classifies a non-tRPC response
+ * shares this set instead of naming statuses of its own.
+ */
+export function isExpectedHttpStatus(status: number): boolean {
+  return isExpectedStatus(status, {});
+}
+
 /** The `scheme://host[:port]` prefix of an absolute URL. */
 const URL_ORIGIN_PREFIX_PATTERN = /^[a-z][\da-z+.-]*:\/\/[^/]*/iu;
 

@@ -59,6 +59,7 @@ describe.each(['compact', 'full'] as const)('CloudAgentModeCombobox (%s)', varia
     for (const label of ['Plan', 'Debug', 'Orchestrator', 'Ask']) {
       expect(html).not.toContain(`>${label}<`);
     }
+    expect(html).not.toContain('Could not load mode preferences');
   });
 
   it('keeps modes with model overrides or an explicit disable: false', () => {
@@ -77,10 +78,11 @@ describe.each(['compact', 'full'] as const)('CloudAgentModeCombobox (%s)', varia
 
   it('reflects saved visibility changes without replacing the selected mode', () => {
     expect(render()).toContain('>Plan<');
-    mockAgents = { plan: { disable: true } };
+    mockAgents = { plan: { disable: true }, debug: { disable: true } };
     const html = render('plan');
-    expect(html).not.toContain('>Plan<');
-    expect(html).toContain('>plan<');
+    expect(html.match(/>Plan</g)).toHaveLength(2);
+    expect(html).not.toContain('>plan<');
+    expect(html).not.toContain('>Debug<');
     mockAgents = {};
     expect(render()).toContain('>Plan<');
   });
@@ -92,6 +94,7 @@ describe.each(['compact', 'full'] as const)('CloudAgentModeCombobox (%s)', varia
     const html = render();
     expect(html).not.toContain('>Plan<');
     expect(html).not.toContain('>Reviewer<');
+    expect(html).not.toContain('Could not load mode preferences');
   });
 
   it('offers only Code and custom modes when preferences fail to load', () => {
@@ -104,6 +107,17 @@ describe.each(['compact', 'full'] as const)('CloudAgentModeCombobox (%s)', varia
     for (const label of ['Plan', 'Debug', 'Orchestrator', 'Ask']) {
       expect(html).not.toContain(`>${label}<`);
     }
+    expect(html).toContain('Could not load mode preferences. Refresh to try again.');
+  });
+
+  it('keeps the selected built-in label when preferences fail to load', () => {
+    mockAgents = undefined;
+    mockIsError = true;
+
+    const html = render('plan');
+    expect(html.match(/>Plan</g)).toHaveLength(2);
+    expect(html).not.toContain('>plan<');
+    expect(html).not.toContain('>Debug<');
   });
 
   it('keeps cached visibility preferences when a refresh fails', () => {
@@ -115,6 +129,7 @@ describe.each(['compact', 'full'] as const)('CloudAgentModeCombobox (%s)', varia
     for (const label of ['Code', 'Debug', 'Orchestrator', 'Ask', 'Reviewer']) {
       expect(html).toContain(`>${label}<`);
     }
+    expect(html).not.toContain('Could not load mode preferences');
   });
 
   it('restores default modes when preferences recover with no overrides', () => {
@@ -128,5 +143,6 @@ describe.each(['compact', 'full'] as const)('CloudAgentModeCombobox (%s)', varia
     for (const label of ['Code', 'Plan', 'Debug', 'Orchestrator', 'Ask']) {
       expect(html).toContain(`>${label}<`);
     }
+    expect(html).not.toContain('Could not load mode preferences');
   });
 });

@@ -18,6 +18,7 @@ const sharedAssociation = {
   },
   organizationDeletedAt: null,
   userRecordId: null,
+  userBlockedAt: null,
   userBlockedReason: null,
 };
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({

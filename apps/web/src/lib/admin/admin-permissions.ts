@@ -2,6 +2,7 @@ import 'server-only';
 
 import { eq } from 'drizzle-orm';
 import { kilocode_users, type User } from '@kilocode/db/schema';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 
 export function userIsSuperadmin(user: User): boolean {
@@ -30,7 +31,11 @@ export async function currentUserHasPermission(
     return false;
   }
 
-  return currentUser.blocked_reason === null && hasPermission(currentUser);
+  if (isBlockedAccount(currentUser)) {
+    return false;
+  }
+
+  return hasPermission(currentUser);
 }
 
 export function canCurrentUserViewSessions(kiloUserId: string): Promise<boolean> {

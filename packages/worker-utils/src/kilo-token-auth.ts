@@ -15,7 +15,8 @@ export type KiloSecretBinding = {
   get(): Promise<string | null>;
 };
 
-export type KiloUserPepperResult = { pepper: string | null; blockedReason: string | null };
+/** Account availability: a block recorded in either column makes the account blocked. */
+export type KiloUserPepperResult = { pepper: string | null; blocked: boolean };
 
 export type GetKiloUserPepper = (
   connectionString: string,
@@ -40,6 +41,7 @@ export async function findKiloUserPepper(
   const rows = await db
     .select({
       api_token_pepper: kilocode_users.api_token_pepper,
+      blocked_at: kilocode_users.blocked_at,
       blocked_reason: kilocode_users.blocked_reason,
     })
     .from(kilocode_users)
@@ -47,7 +49,10 @@ export async function findKiloUserPepper(
     .limit(1);
   const row = rows[0];
   if (!row) return undefined;
-  return { pepper: row.api_token_pepper ?? null, blockedReason: row.blocked_reason };
+  return {
+    pepper: row.api_token_pepper ?? null,
+    blocked: Boolean(row.blocked_at || row.blocked_reason),
+  };
 }
 
 /**
@@ -105,7 +110,7 @@ export async function verifyKiloBearerAgainstCurrentPepper(
     return null;
   }
 
-  if (result.blockedReason !== null && !params.allowBlocked) {
+  if (result.blocked && !params.allowBlocked) {
     return null;
   }
 

@@ -286,7 +286,7 @@ export function CreditPurchaseScreen() {
                     {/* Only a real store price takes the trailing slot, and it
                         keeps its full width: the title yields instead, so the
                         price a user pays is never truncated. */}
-                    {pack.displayPrice !== null && (
+                    {hasStorePrice && (
                       <Text className="shrink-0 text-base font-semibold text-foreground tabular-nums">
                         {pack.displayPrice}
                       </Text>

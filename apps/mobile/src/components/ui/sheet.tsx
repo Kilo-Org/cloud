@@ -222,6 +222,14 @@ export function Sheet({
       enablePanDownToClose
       dismissGestures={dismissGestures}
       contentOwnsTopInset={contentOwnsTopInset}
+      // A sheet whose one detent is the whole window keeps that height from the
+      // surface's first measure. Android sizes the surface to the React content
+      // hosted in it, and React attaches that content into the sheet's own window
+      // a frame or more after the sheet presents, so the surface measured the drag
+      // handle alone: the sheet opened at that height and then jumped to the window
+      // when the content landed, in the middle of its opening animation. A partial
+      // detent stays content-sized.
+      contentFillsHeight={snapPoints?.length === 1 && snapPoints[0] === '100%'}
       // The iOS sheet draws the dimmed backdrop through its presentation, so the
       // app's view tree cannot see that tap: the library reports it and this
       // wrapper answers it the way Android Back is answered, `onRequestDismiss`

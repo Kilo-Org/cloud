@@ -2315,7 +2315,7 @@
       "cloningSession": "Ana yin kwafin zaman",
       "couldNotLoadThisSession": "An kasa loda wannan zaman.",
       "cloneFailedRetry": "An kasa yin kwafin wannan zaman. Sake gwadawa.",
-      "notEnoughCredits": "Kuɗin amfani ba su isa gudanar da Cloud Agent ba. Ƙara kuɗin amfani ka sake gwadawa.",
+      "notEnoughCredits": "Kuɗin amfani ba su isa don wannan buƙata ba. Ƙara kuɗin amfani ka sake gwadawa.",
       "previousTaskFinishing": "Ba a gama aikin da ya gabata ba tukuna. Jira ɗan lokaci.",
       "serviceUnavailable": "Ba a samun sabis ɗin a yanzu. Sake gwadawa.",
       "connectionTrouble": "An samu matsalar haɗi. Sake gwadawa bayan ɗan lokaci.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Tattaunawar ta yi tsawo fiye da abin da samfurin zai iya karɓa.",
       "assistantProviderError": "Mai ba da sabis ya mayar da kuskure.",
       "assistantProviderRefused": "Mai ba da sabis ya ƙi wannan buƙatar, kuma ba za a iya sake gwadawa ba.",
-      "assistantCreditsRefusal": "Kuɗin amfani ba su isa gudanar da Cloud Agent ba.",
+      "assistantCreditsRefusal": "Kuɗin amfani ba su isa don wannan buƙata ba.",
       "assistantOutputLimit": "Amsar ta kai iyakar fitar da samfurin.",
       "assistantStructuredOutput": "Amsar ba ta dace da tsarin da ake buƙata ba.",
       "assistantFailed": "An kasa samar da amsar."

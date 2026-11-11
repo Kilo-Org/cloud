@@ -1355,10 +1355,20 @@ describe.each([
     'returns the structured %s token failure without a token or capability',
     async (status, reason) => {
       serviceMocks.getTokenForRepo.mockRejectedValueOnce(
-        new GitHubTokenGenerationError(status, reason)
+        new GitHubTokenGenerationError(
+          status,
+          reason,
+          status === 404 ? 'installation_token_http404' : undefined
+        )
       );
 
-      await expect(createService()[method](params)).resolves.toEqual({ success: false, reason });
+      await expect(createService()[method](params)).resolves.toEqual({
+        success: false,
+        reason,
+        ...(method !== 'getTokenForRepo' && status === 404
+          ? { rejectionProvenance: 'installation_token_http404' }
+          : {}),
+      });
       expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
       expect(serviceMocks.getToken).not.toHaveBeenCalled();
       expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
@@ -1374,7 +1384,16 @@ describe.each([
     serviceMocks.findInstallationId.mockResolvedValue({ success: false, reason });
     serviceMocks.findManagedInstallationForRepo.mockResolvedValue({ success: false, reason });
 
-    await expect(createService()[method](params)).resolves.toEqual({ success: false, reason });
+    await expect(createService()[method](params)).resolves.toEqual({
+      success: false,
+      reason,
+      ...(method !== 'getTokenForRepo' && reason === 'no_installation_found'
+        ? { rejectionProvenance: 'managed_lookup_miss' }
+        : {}),
+    });
+    expect(serviceMocks.findManagedInstallationForRepo).toHaveBeenCalledTimes(
+      method === 'getTokenForRepo' ? 0 : reason === 'no_installation_found' ? 2 : 1
+    );
     expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
     expect(serviceMocks.getToken).not.toHaveBeenCalled();
     expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
@@ -1391,6 +1410,26 @@ describe.each([
     expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
     expect(serviceMocks.getToken).not.toHaveBeenCalled();
     expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('retains final ambiguity without attempting login repair', async () => {
+    serviceMocks.findInstallationId.mockResolvedValue({
+      success: false,
+      reason: 'ambiguous_installation',
+    });
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValue({
+      success: false,
+      reason: 'ambiguous_installation',
+    });
+    await expect(createService()[method](params)).resolves.toEqual({
+      success: false,
+      reason: 'no_installation_found',
+      ...(method !== 'getTokenForRepo'
+        ? { rejectionProvenance: 'ambiguous_eligible_installations' }
+        : {}),
+    });
+    expect(serviceMocks.findRefreshCandidates).not.toHaveBeenCalled();
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
   });
 
   it.each([403, 429, 500, undefined])(

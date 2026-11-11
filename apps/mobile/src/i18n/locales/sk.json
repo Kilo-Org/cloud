@@ -2399,7 +2399,7 @@
       "cloningSession": "Klonuje sa relácia",
       "couldNotLoadThisSession": "Túto reláciu sa nepodarilo načítať.",
       "cloneFailedRetry": "Túto reláciu sa nepodarilo naklonovať. Skús to znova.",
-      "notEnoughCredits": "Na spustenie služby Cloud Agent nemáš dosť kreditov. Doplň kredity a skús to znova.",
+      "notEnoughCredits": "Na túto požiadavku nemáš dosť kreditov. Doplň kredity a skús to znova.",
       "previousTaskFinishing": "Predchádzajúca úloha sa ešte dokončuje. Chvíľu počkaj.",
       "serviceUnavailable": "Služba je momentálne nedostupná. Skús to znova.",
       "connectionTrouble": "Vyskytol sa problém s pripojením. Skús to znova o chvíľu.",
@@ -2701,7 +2701,7 @@
       "assistantContextOverflow": "Konverzácia je pre model príliš dlhá.",
       "assistantProviderError": "Poskytovateľ vrátil chybu.",
       "assistantProviderRefused": "Poskytovateľ túto požiadavku odmietol a nemožno ju zopakovať.",
-      "assistantCreditsRefusal": "Na spustenie služby Cloud Agent nemáš dosť kreditov.",
+      "assistantCreditsRefusal": "Na túto požiadavku nemáš dosť kreditov.",
       "assistantOutputLimit": "Odpoveď dosiahla limit výstupu modelu.",
       "assistantStructuredOutput": "Odpoveď nezodpovedala požadovanému formátu.",
       "assistantFailed": "Odpoveď sa nepodarilo vytvoriť."

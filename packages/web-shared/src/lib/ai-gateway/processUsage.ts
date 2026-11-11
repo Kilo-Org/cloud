@@ -112,7 +112,7 @@ import {
 } from '@kilocode/web-shared/lib/bouncer/client';
 import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox';
 import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
-import type { BouncerUsageEventEnqueue, UsageRecordRequest } from '@kilocode/usage-contracts';
+import type { BouncerUsageEventEnqueue, LlmUsageQueueMessage } from '@kilocode/usage-contracts';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 
 const posthogClient = PostHogClient();
@@ -403,7 +403,7 @@ function reportPublisherNotConfigured(usageId: string): void {
 }
 
 async function enqueueUsageWithinLifetime(
-  payload: UsageRecordRequest
+  payload: LlmUsageQueueMessage
 ): Promise<UsageEnqueueOutcome> {
   const start = Promise.withResolvers<boolean>();
   const publication = start.promise.then(async (registered): Promise<UsageEnqueueOutcome> => {
@@ -458,7 +458,7 @@ async function logMicrodollarUsageWithTransport(
   const contextInfo = extractUsageContextInfo(usageContext);
   const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo);
 
-  const payload: UsageRecordRequest = {
+  const payload: LlmUsageQueueMessage = {
     core,
     metadata,
     prior_microdollar_usage: usageContext.prior_microdollar_usage,
@@ -1359,9 +1359,18 @@ export function countAndStoreUsage(
   }
 
   metadataCapture?.waitFor(usageStatsPromise);
-  return usageStatsPromise.then(usageStats =>
-    processTokenData(usageStats, usageContext, servingProvider)
-  );
+  const statsPromise = usageStatsPromise.then(usageStats => {
+    if (usageStats) {
+      usageStats.inference_provider ??= servingProvider?.inferenceProviderId ?? null;
+    }
+    return usageStats;
+  });
+  return {
+    statsPromise,
+    usagePromise: statsPromise.then(usageStats =>
+      processTokenData(usageStats, usageContext, servingProvider)
+    ),
+  };
 }
 
 export function processOpenRouterUsage(

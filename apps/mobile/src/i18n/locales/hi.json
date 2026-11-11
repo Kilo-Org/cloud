@@ -1783,7 +1783,7 @@
       "cloningSession": "सत्र क्लोन किया जा रहा है",
       "couldNotLoadThisSession": "यह सत्र लोड नहीं हो सका।",
       "cloneFailedRetry": "यह सत्र क्लोन नहीं हो सका। फिर से कोशिश करें।",
-      "notEnoughCredits": "Cloud Agent चलाने के लिए पर्याप्त क्रेडिट नहीं हैं। क्रेडिट जोड़ें और फिर से कोशिश करें।",
+      "notEnoughCredits": "इस अनुरोध के लिए पर्याप्त क्रेडिट नहीं हैं। क्रेडिट जोड़ें और फिर से कोशिश करें।",
       "previousTaskFinishing": "पिछला कार्य अभी पूरा हो रहा है। कृपया थोड़ा इंतज़ार करें।",
       "serviceUnavailable": "सेवा अभी उपलब्ध नहीं है। कृपया फिर से कोशिश करें।",
       "connectionTrouble": "कनेक्शन में समस्या है। कृपया थोड़ी देर बाद फिर से कोशिश करें।",
@@ -2048,7 +2048,7 @@
       "assistantContextOverflow": "मॉडल के लिए बातचीत बहुत लंबी है।",
       "assistantProviderError": "प्रदाता ने एक त्रुटि लौटाई।",
       "assistantProviderRefused": "प्रदाता ने इस अनुरोध को अस्वीकार कर दिया और इसे दोबारा आज़माया नहीं जा सकता।",
-      "assistantCreditsRefusal": "Cloud Agent चलाने के लिए पर्याप्त क्रेडिट नहीं हैं।",
+      "assistantCreditsRefusal": "इस अनुरोध के लिए पर्याप्त क्रेडिट नहीं हैं।",
       "assistantOutputLimit": "उत्तर मॉडल की आउटपुट सीमा तक पहुँच गया।",
       "assistantStructuredOutput": "उत्तर आवश्यक फ़ॉर्मैट से मेल नहीं खाता।",
       "assistantFailed": "उत्तर नहीं मिल सका।"

@@ -2315,7 +2315,7 @@
       "cloningSession": "د ناستې کاپي جوړېږي",
       "couldNotLoadThisSession": "دا ناسته بار نه شوه.",
       "cloneFailedRetry": "د دې ناستې کاپي جوړه نه شوه. بیا هڅه وکړئ.",
-      "notEnoughCredits": "د Cloud Agent چلولو لپاره کافي کریډیټ نشته. کریډیټ زیات کړئ او بیا هڅه وکړئ.",
+      "notEnoughCredits": "د دې غوښتنې لپاره کافي کریډیټ نشته. کریډیټ زیات کړئ او بیا هڅه وکړئ.",
       "previousTaskFinishing": "مخکینۍ دنده لا د بشپړېدو په حال کې ده. یوه شېبه صبر وکړئ.",
       "serviceUnavailable": "خدمت اوس د لاسرسي وړ نه دی. بیا هڅه وکړئ.",
       "connectionTrouble": "په اړیکه کې ستونزه ده. یوه شېبه وروسته بیا هڅه وکړئ.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "خبرې اترې د ماډل لپاره ډېرې اوږدې دي.",
       "assistantProviderError": "چمتو کوونکي تېروتنه راستونه کړه.",
       "assistantProviderRefused": "چمتو کوونکي دا غوښتنه رد کړه او بیا هڅه نشي کېدای.",
-      "assistantCreditsRefusal": "د Cloud Agent چلولو لپاره کافي کریډیټ نشته.",
+      "assistantCreditsRefusal": "د دې غوښتنې لپاره کافي کریډیټ نشته.",
       "assistantOutputLimit": "ځواب د ماډل د وتلو حد ته ورسېد.",
       "assistantStructuredOutput": "ځواب له اړین فورمټ سره سمون نه درلود.",
       "assistantFailed": "ځواب ناکام شو."

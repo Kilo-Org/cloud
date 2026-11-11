@@ -472,6 +472,105 @@ describe('trigger sandbox allocation routes', () => {
   });
 });
 
+describe('trigger environment selection routes', () => {
+  const environmentId = '11111111-1111-4111-8111-111111111111';
+  const cloudAgentInput = {
+    githubRepo: 'owner/repo',
+    mode: 'code',
+    model: 'openai/gpt-4.1',
+    promptTemplate: 'Process {{body}}',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('accepts a UUID environment id or null on create and update', () => {
+    expect(TriggerConfigInput.safeParse({ ...cloudAgentInput, environmentId }).success).toBe(true);
+    expect(TriggerConfigInput.safeParse({ ...cloudAgentInput, environmentId: null }).success).toBe(
+      true
+    );
+    expect(
+      TriggerConfigInput.safeParse({ ...cloudAgentInput, environmentId: 'invalid' }).success
+    ).toBe(false);
+    expect(TriggerConfigUpdateInput.safeParse({ environmentId }).success).toBe(true);
+    expect(TriggerConfigUpdateInput.safeParse({ environmentId: null }).success).toBe(true);
+    expect(TriggerConfigUpdateInput.safeParse({ environmentId: 'invalid' }).success).toBe(false);
+  });
+
+  it('passes the environment selection through trigger creation', async () => {
+    const { configure, env } = createRouteHarness(null);
+
+    const response = await requestTrigger(env, 'POST', {
+      ...cloudAgentInput,
+      environmentId,
+    });
+
+    expect(response.status).toBe(201);
+    expect(configure).toHaveBeenCalledWith(
+      NAMESPACE,
+      TRIGGER_ID,
+      expect.objectContaining({ environmentId })
+    );
+  });
+
+  it.each([{ environmentId }, { environmentId: null }])(
+    'passes %o through trigger updates',
+    async updates => {
+      const { env, updateConfig } = createRouteHarness(existingConfig('cloud_agent'));
+
+      const response = await requestTrigger(env, 'PUT', updates);
+
+      expect(response.status).toBe(200);
+      expect(updateConfig).toHaveBeenCalledWith(updates);
+    }
+  );
+
+  it('rejects environment selection for KiloClaw creation', async () => {
+    const { configure, env } = createRouteHarness(null);
+
+    const response = await requestTrigger(env, 'POST', {
+      targetType: 'kiloclaw_chat',
+      kiloclawInstanceId: '5d08c60b-7755-4dd3-b3fc-7ae96bf50e22',
+      promptTemplate: 'Process {{body}}',
+      environmentId,
+    });
+
+    expect(response.status).toBe(400);
+    expect(configure).not.toHaveBeenCalled();
+  });
+
+  it('accepts a null environment for KiloClaw creation and updates', async () => {
+    const create = createRouteHarness(null);
+    const response = await requestTrigger(create.env, 'POST', {
+      targetType: 'kiloclaw_chat',
+      kiloclawInstanceId: '5d08c60b-7755-4dd3-b3fc-7ae96bf50e22',
+      promptTemplate: 'Process {{body}}',
+      environmentId: null,
+    });
+    expect(response.status).toBe(201);
+    expect(create.configure).toHaveBeenCalledWith(
+      NAMESPACE,
+      TRIGGER_ID,
+      expect.objectContaining({ environmentId: null })
+    );
+
+    const update = createRouteHarness(existingConfig('kiloclaw_chat'));
+    const updated = await requestTrigger(update.env, 'PUT', { environmentId: null });
+    expect(updated.status).toBe(200);
+    expect(update.updateConfig).toHaveBeenCalledWith({ environmentId: null });
+  });
+
+  it('rejects environment selection for stored KiloClaw triggers', async () => {
+    const { env, updateConfig } = createRouteHarness(existingConfig('kiloclaw_chat'));
+
+    const response = await requestTrigger(env, 'PUT', { environmentId });
+
+    expect(response.status).toBe(400);
+    expect(updateConfig).not.toHaveBeenCalled();
+  });
+});
+
 describe('scheduled trigger invocation routes', () => {
   it('uses the decoded OAuth namespace and invokes without accepting configuration', async () => {
     const oauthUserId = 'oauth/google:101043560986948156510';

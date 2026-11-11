@@ -2315,7 +2315,7 @@
       "cloningSession": "Сессия көшірмесі жасалуда",
       "couldNotLoadThisSession": "Бұл сессияны жүктеу мүмкін болмады.",
       "cloneFailedRetry": "Бұл сессияның көшірмесін жасау мүмкін болмады. Қайталап көріңіз.",
-      "notEnoughCredits": "Cloud Agent қызметін іске қосуға кредит жеткіліксіз. Кредит қосып, қайталап көріңіз.",
+      "notEnoughCredits": "Бұл сұрауға кредит жеткіліксіз. Кредит қосып, қайталап көріңіз.",
       "previousTaskFinishing": "Алдыңғы тапсырма әлі аяқталуда. Сәл күте тұрыңыз.",
       "serviceUnavailable": "Қызмет қазір қолжетімсіз. Қайталап көріңіз.",
       "connectionTrouble": "Байланыста ақау бар. Сәлден кейін қайталап көріңіз.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Сөйлесу көлемі модельдің шегінен асты.",
       "assistantProviderError": "Провайдер қате қайтарды.",
       "assistantProviderRefused": "Провайдер бұл сұрауды қабылдамады және оны қайталау мүмкін емес.",
-      "assistantCreditsRefusal": "Cloud Agent қызметін іске қосуға кредит жеткіліксіз.",
+      "assistantCreditsRefusal": "Бұл сұрауға кредит жеткіліксіз.",
       "assistantOutputLimit": "Жауап модельдің шығыс шегіне жетті.",
       "assistantStructuredOutput": "Жауап қажетті форматқа сәйкес келмеді.",
       "assistantFailed": "Жауапты жасау мүмкін болмады."

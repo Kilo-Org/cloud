@@ -2315,7 +2315,7 @@
       "cloningSession": "سیشن کی نقل بن رہی ہے",
       "couldNotLoadThisSession": "یہ سیشن لوڈ نہیں ہو سکا۔",
       "cloneFailedRetry": "اس سیشن کی نقل نہیں بن سکی۔ دوبارہ کوشش کریں۔",
-      "notEnoughCredits": "Cloud Agent چلانے کے لیے کافی کریڈٹس نہیں ہیں۔ کریڈٹس شامل کریں اور دوبارہ کوشش کریں۔",
+      "notEnoughCredits": "اس درخواست کے لیے کافی کریڈٹس نہیں ہیں۔ کریڈٹس شامل کریں اور دوبارہ کوشش کریں۔",
       "previousTaskFinishing": "پچھلا کام ابھی مکمل ہو رہا ہے۔ براہ کرم ایک لمحہ انتظار کریں۔",
       "serviceUnavailable": "سروس اس وقت دستیاب نہیں ہے۔ براہ کرم دوبارہ کوشش کریں۔",
       "connectionTrouble": "کنکشن میں مسئلہ ہے۔ کچھ دیر بعد دوبارہ کوشش کریں۔",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "گفتگو ماڈل کے لیے بہت طویل ہے۔",
       "assistantProviderError": "فراہم کنندہ نے ایک خرابی واپس کی۔",
       "assistantProviderRefused": "فراہم کنندہ نے یہ درخواست مسترد کر دی اور اس پر دوبارہ کوشش نہیں کی جا سکتی۔",
-      "assistantCreditsRefusal": "Cloud Agent چلانے کے لیے کافی کریڈٹس نہیں ہیں۔",
+      "assistantCreditsRefusal": "اس درخواست کے لیے کافی کریڈٹس نہیں ہیں۔",
       "assistantOutputLimit": "جواب ماڈل کی آؤٹ پٹ حد تک پہنچ گیا۔",
       "assistantStructuredOutput": "جواب مطلوبہ فارمیٹ سے مطابقت نہیں رکھتا۔",
       "assistantFailed": "جواب تیار نہیں ہو سکا۔"

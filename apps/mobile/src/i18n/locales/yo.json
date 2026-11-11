@@ -2315,7 +2315,7 @@
       "cloningSession": "Ń ṣe àdàkọ ìgbà iṣẹ́",
       "couldNotLoadThisSession": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",
       "cloneFailedRetry": "A kò lè ṣe àdàkọ ìgbà iṣẹ́ yìí. Gbìyànjú lẹ́ẹ̀kan sí i.",
-      "notEnoughCredits": "Kirẹ́dítì kò tó láti lo Cloud Agent. Fi kirẹ́dítì kún un kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
+      "notEnoughCredits": "Kirẹ́dítì kò tó fún ìbéèrè yìí. Fi kirẹ́dítì kún un kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
       "previousTaskFinishing": "Iṣẹ́ tó ṣáájú kò tíì parí. Jọ̀wọ́ dúró díẹ̀.",
       "serviceUnavailable": "Iṣẹ́ náà kò sí lárọ̀ọ́wọ́tó báyìí. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "connectionTrouble": "Ìṣòro wà pẹ̀lú àsopọ̀. Jọ̀wọ́ dúró díẹ̀ kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Ìjíròrò náà gùn ju ohun tí àwòṣe náà lè gbà lọ.",
       "assistantProviderError": "Olùpèsè náà da àṣìṣe padà.",
       "assistantProviderRefused": "Olùpèsè náà kọ ìbéèrè náà, a kò sì lè tún gbìyànjú rẹ̀.",
-      "assistantCreditsRefusal": "Kirẹ́dítì kò tó láti lo Cloud Agent.",
+      "assistantCreditsRefusal": "Kirẹ́dítì kò tó fún ìbéèrè yìí.",
       "assistantOutputLimit": "Ìdáhùn náà dé ààlà ìjade ti àwòṣe náà.",
       "assistantStructuredOutput": "Ìdáhùn náà kò bá àgbékalẹ̀ tí a fẹ́ mu.",
       "assistantFailed": "Ìdáhùn náà kùnà."

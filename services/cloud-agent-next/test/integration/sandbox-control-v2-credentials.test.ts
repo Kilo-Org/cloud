@@ -16,7 +16,11 @@ import {
   CONTROL_DIAGNOSTIC_STRING_CHARSET,
   CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH,
 } from '../../src/sandbox-control/diagnostics.js';
-import { createGrantDiagnostic } from '../../src/sandbox-control/grant-diagnostic.js';
+import {
+  createGrantDiagnostic,
+  pickGrantDiagnosticFields,
+  type GrantDiagnosticSnapshot,
+} from '../../src/sandbox-control/grant-diagnostic.js';
 import migrations from '../../src/control-plane/sandbox/drizzle/migrations.js';
 import {
   routes as routesTable,
@@ -2942,6 +2946,74 @@ function failedAttemptId(view: ControlPlaneRouteView): string {
 }
 
 describe('SandboxControlV2 cold grant rejection diagnostics', () => {
+  it('rechecks provenance at the final log picker and does not attach it to another decision', () => {
+    for (const provenance of [
+      'synthetic-private-value',
+      { token: 'synthetic-secret' },
+      null,
+      404,
+    ]) {
+      expect(
+        pickGrantDiagnosticFields({
+          grantPhase: 'broker_issuance',
+          grantFailureReason: 'no_installation_found',
+          grantRejectionProvenance: provenance,
+        } as GrantDiagnosticSnapshot)
+      ).not.toHaveProperty('grantRejectionProvenance');
+    }
+    expect(
+      pickGrantDiagnosticFields({
+        grantPhase: 'broker_authorization',
+        grantFailureReason: 'no_installation_found',
+        grantRejectionProvenance: 'managed_lookup_miss',
+      })
+    ).not.toHaveProperty('grantRejectionProvenance');
+  });
+
+  it.each([
+    'managed_lookup_miss',
+    'ambiguous_eligible_installations',
+    'installation_token_http404',
+    undefined,
+    'secret-repository-name',
+    { token: 'secret-token' },
+    404,
+  ])('retains only closed final broker provenance: %j', async rejectionProvenance => {
+    const broker = createGrantBroker();
+    broker.service.issueGitHubSessionCapability = async () => {
+      broker.calls.github += 1;
+      return { success: false, reason: 'no_installation_found', rejectionProvenance } as never;
+    };
+    const stub = await setup(createFakeProvider());
+    await installGrantBroker(stub, broker.service);
+    const capture = captureRouteFailed();
+    const view = await stub.prepare(prepareInput(SESSION));
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+    expect(view).toEqual({
+      state: 'failed',
+      attemptId: expect.any(String),
+      reason: 'workspace_setup_failed',
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      grantPhase: 'broker_issuance',
+      grantFailureReason: 'no_installation_found',
+    });
+    if (typeof rejectionProvenance === 'string' && !rejectionProvenance.startsWith('secret')) {
+      expect(events[0]?.grantRejectionProvenance).toBe(rejectionProvenance);
+    } else {
+      expect(events[0]).not.toHaveProperty('grantRejectionProvenance');
+    }
+    expect(broker.calls).toEqual({ github: 1, gitlab: 0, authorize: 0 });
+    const serialized = JSON.stringify(events[0]);
+    expect(serialized.length).toBeLessThanOrEqual(2048);
+    expect(serialized).not.toContain('secret-');
+    const row = await readRouteRow(stub, SESSION);
+    expect(row?.state).toBe('failed');
+    expect(row?.attempt_deadline_at).toBe(0);
+  });
+
   it('fails the route when the native containers namespace is unbound', async () => {
     const provider = createFakeProvider();
     const broker = createGrantBroker();

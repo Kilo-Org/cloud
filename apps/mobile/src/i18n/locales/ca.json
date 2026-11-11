@@ -2357,7 +2357,7 @@
       "cloningSession": "Clonant la sessió…",
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió.",
       "cloneFailedRetry": "No s'ha pogut clonar aquesta sessió. Torna-ho a provar.",
-      "notEnoughCredits": "No tens prou crèdits per executar Cloud Agent. Afegeix crèdits i torna-ho a provar.",
+      "notEnoughCredits": "No tens prou crèdits per a aquesta sol·licitud. Afegeix crèdits i torna-ho a provar.",
       "previousTaskFinishing": "La tasca anterior encara no ha acabat. Espera un moment.",
       "serviceUnavailable": "El servei no està disponible ara mateix. Torna-ho a provar.",
       "connectionTrouble": "Hi ha problemes de connexió. Torna-ho a provar d'aquí a un moment.",
@@ -2655,7 +2655,7 @@
       "assistantContextOverflow": "La conversa és massa llarga per al model.",
       "assistantProviderError": "El proveïdor ha retornat un error.",
       "assistantProviderRefused": "El proveïdor ha rebutjat aquesta sol·licitud i no es pot tornar a intentar.",
-      "assistantCreditsRefusal": "No tens prou crèdits per executar Cloud Agent.",
+      "assistantCreditsRefusal": "No tens prou crèdits per a aquesta sol·licitud.",
       "assistantOutputLimit": "La resposta ha arribat al límit de sortida del model.",
       "assistantStructuredOutput": "La resposta no coincideix amb el format requerit.",
       "assistantFailed": "No s'ha pogut generar la resposta."

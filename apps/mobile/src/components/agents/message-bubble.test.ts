@@ -119,13 +119,13 @@ vi.mock('./chat-markdown-text', () => ({
   ChatMarkdownText: () => null,
 }));
 vi.mock('./compaction-separator', () => ({
-  CompactionSeparator: () => null,
+  CompactionSeparator: 'CompactionSeparator',
 }));
 vi.mock('./file-part-renderer', () => ({
   FilePartRenderer: () => null,
 }));
 vi.mock('./part-renderer', () => ({
-  PartRenderer: () => null,
+  PartRenderer: 'PartRenderer',
 }));
 vi.mock('./tool-run-rows', () => ({
   CondensedToolRunRow: 'CondensedToolRunRow',
@@ -147,6 +147,49 @@ vi.mock('./use-message-copy', () => ({
 }));
 
 const BADGE_CLASS = 'flex-row items-center gap-1 self-end pr-1';
+
+describe('MessageBubble compaction', () => {
+  it.each([true, false])(
+    'passes live state %s to the compaction-only separator',
+    async isStreaming => {
+      const message = assistantMessage('compaction');
+      message.parts = [
+        {
+          id: 'part',
+          sessionID: 'ses_1',
+          messageID: 'compaction',
+          type: 'compaction',
+          auto: false,
+        },
+      ];
+      const { MessageBubble } = await import('./message-bubble');
+      // eslint-disable-next-line new-cap -- Inspect the component's unrendered tree.
+      const tree = MessageBubble.type({
+        message,
+        isLastAssistantMessage: true,
+        isSessionStreaming: isStreaming,
+      });
+      expect(findElementByType(tree, 'CompactionSeparator')?.props.info).toBe(message.info);
+      expect(findElementByType(tree, 'CompactionSeparator')?.props.isStreaming).toBe(isStreaming);
+    }
+  );
+
+  it('passes assistant status to parts in a mixed message', async () => {
+    const message = assistantMessage('compaction');
+    message.parts = [
+      { id: 'part', sessionID: 'ses_1', messageID: 'compaction', type: 'compaction', auto: false },
+      {
+        id: 'text',
+        sessionID: 'ses_1',
+        messageID: 'compaction',
+        type: 'text',
+        text: 'Other content',
+      },
+    ];
+    const tree = await renderBubble(message);
+    expect(findElementByType(tree, 'PartRenderer')?.props.messageInfo).toBe(message.info);
+  });
+});
 
 describe('MessageBubble queued badge', () => {
   it('renders the Queued badge visible when deliveryState is queued', async () => {
@@ -563,7 +606,7 @@ describe('MessageBubble failure footer', () => {
     );
 
     expect(findText(tree, t => t === 'Response failed')).toBe(true);
-    expect(findText(tree, t => t === 'Not enough credits to run Cloud Agent.')).toBe(true);
+    expect(findText(tree, t => t === 'Not enough credits for this request.')).toBe(true);
 
     const addCredits = findElementByType(
       tree,

@@ -10,6 +10,9 @@ import { withPlatformRepositoryMode } from '@/lib/code-reviews/core/repository-m
 
 type AgentConfigOwner = { type: 'org'; id: string } | { type: 'user'; id: string };
 
+/** One stored agent configuration row, as the reader below returns it. */
+export type AgentConfigRow = typeof agent_configs.$inferSelect;
+
 type AgentConfigUpsertOptions = {
   preserveCodeReviewFeatureSettings?: boolean;
 };

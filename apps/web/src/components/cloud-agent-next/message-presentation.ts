@@ -4,7 +4,7 @@ import type {
   SessionStatusIndicator,
 } from '@kilocode/cloud-agent-sdk';
 import type { Part, StoredMessage, ToolPart } from './types';
-import { isAssistantMessage, shouldRenderReasoningPart } from './types';
+import { isAssistantMessage, isCompactionPart, shouldRenderReasoningPart } from './types';
 
 export function groupConversationMessages(
   messages: StoredMessage[],
@@ -22,6 +22,8 @@ export function groupConversationMessages(
       previous &&
       isAssistantMessage(previous.info) &&
       isAssistantMessage(message.info) &&
+      !previous.parts.some(isCompactionPart) &&
+      !message.parts.some(isCompactionPart) &&
       previous.info.sessionID === message.info.sessionID &&
       // A native turn can answer a Kilo-written prompt that the live feed never shows.
       // Only a prompt present in the transcript starts a new turn.

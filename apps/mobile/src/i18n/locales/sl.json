@@ -2399,7 +2399,7 @@
       "cloningSession": "Kloniranje seje",
       "couldNotLoadThisSession": "Te seje ni bilo mogoče naložiti.",
       "cloneFailedRetry": "Te seje ni bilo mogoče klonirati. Poskusi znova.",
-      "notEnoughCredits": "Za zagon storitve Cloud Agent ni dovolj kreditov. Dodaj kredite in poskusi znova.",
+      "notEnoughCredits": "Za to zahtevo ni dovolj kreditov. Dodaj kredite in poskusi znova.",
       "previousTaskFinishing": "Prejšnja naloga se še zaključuje. Počakaj trenutek.",
       "serviceUnavailable": "Storitev trenutno ni na voljo. Poskusi znova.",
       "connectionTrouble": "Prišlo je do težave s povezavo. Čez trenutek poskusi znova.",
@@ -2701,7 +2701,7 @@
       "assistantContextOverflow": "Pogovor je predolg za model.",
       "assistantProviderError": "Ponudnik je vrnil napako.",
       "assistantProviderRefused": "Ponudnik je zavrnil to zahtevo in poskusa ni mogoče ponoviti.",
-      "assistantCreditsRefusal": "Za zagon storitve Cloud Agent ni dovolj kreditov.",
+      "assistantCreditsRefusal": "Za to zahtevo ni dovolj kreditov.",
       "assistantOutputLimit": "Odgovor je dosegel omejitev izhoda modela.",
       "assistantStructuredOutput": "Odgovor ni ustrezal zahtevanemu formatu.",
       "assistantFailed": "Odgovora ni bilo mogoče ustvariti."

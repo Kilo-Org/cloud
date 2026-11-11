@@ -2321,7 +2321,7 @@
       "cloningSession": "Kinokopya ang sesyon",
       "couldNotLoadThisSession": "Hindi ma-load ang sesyong ito.",
       "cloneFailedRetry": "Hindi makopya ang sesyong ito. Subukang muli.",
-      "notEnoughCredits": "Kulang ang kredito para patakbuhin ang Cloud Agent. Magdagdag ng kredito at subukang muli.",
+      "notEnoughCredits": "Kulang ang kredito para sa kahilingang ito. Magdagdag ng kredito at subukang muli.",
       "previousTaskFinishing": "Tinatapos pa ang naunang gawain. Maghintay sandali.",
       "serviceUnavailable": "Hindi magamit ang serbisyo ngayon. Subukang muli.",
       "connectionTrouble": "May problema sa koneksyon. Subukang muli pagkalipas ng ilang sandali.",
@@ -2615,7 +2615,7 @@
       "assistantContextOverflow": "Masyadong mahaba ang pag-uusap para sa modelo.",
       "assistantProviderError": "Nagbalik ang tagapagbigay ng serbisyo ng error.",
       "assistantProviderRefused": "Tinanggihan ng tagapagbigay ng serbisyo ang kahilingang ito at hindi na ito maaaring muling subukan.",
-      "assistantCreditsRefusal": "Kulang ang kredito para patakbuhin ang Cloud Agent.",
+      "assistantCreditsRefusal": "Kulang ang kredito para sa kahilingang ito.",
       "assistantOutputLimit": "Naabot ng tugon ang limitasyon ng output ng modelo.",
       "assistantStructuredOutput": "Hindi tumugma ang tugon sa kinakailangang format.",
       "assistantFailed": "Nabigo ang pagtugon."

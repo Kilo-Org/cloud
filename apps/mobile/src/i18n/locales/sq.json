@@ -2315,7 +2315,7 @@
       "cloningSession": "Duke klonuar seancën",
       "couldNotLoadThisSession": "Nuk u ngarkua kjo seancë.",
       "cloneFailedRetry": "Nuk u klonua kjo seancë. Provo përsëri.",
-      "notEnoughCredits": "Nuk ke mjaft kredite për të ekzekutuar Cloud Agent. Shto kredite dhe provo përsëri.",
+      "notEnoughCredits": "Nuk ke mjaft kredite për këtë kërkesë. Shto kredite dhe provo përsëri.",
       "previousTaskFinishing": "Detyra e mëparshme nuk ka përfunduar ende. Prit pak.",
       "serviceUnavailable": "Shërbimi nuk është i disponueshëm për momentin. Provo përsëri.",
       "connectionTrouble": "Ka një problem me lidhjen. Provo përsëri pas pak.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Biseda është shumë e gjatë për modelin.",
       "assistantProviderError": "Ofruesi ktheu një gabim.",
       "assistantProviderRefused": "Ofruesi e refuzoi këtë kërkesë dhe ajo nuk mund të riprovohet.",
-      "assistantCreditsRefusal": "Nuk ke mjaft kredite për të ekzekutuar Cloud Agent.",
+      "assistantCreditsRefusal": "Nuk ke mjaft kredite për këtë kërkesë.",
       "assistantOutputLimit": "Përgjigja arriti kufirin e daljes së modelit.",
       "assistantStructuredOutput": "Përgjigja nuk përputhej me formatin e kërkuar.",
       "assistantFailed": "Gjenerimi i përgjigjes dështoi."

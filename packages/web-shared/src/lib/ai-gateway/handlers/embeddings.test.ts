@@ -14,6 +14,10 @@ import {
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { countAndStoreEmbeddingUsage } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import {
+  emitApiMetricsForResponse,
+  emitGatewayApiMetrics,
+} from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { decide, type DecideResponse } from '@kilocode/web-shared/lib/bouncer/client';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { captureException } from '@sentry/nextjs';
@@ -48,6 +52,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVerc
 jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers'),
   countAndStoreEmbeddingUsage: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
+  emitApiMetricsForResponse: jest.fn(),
+  emitGatewayApiMetrics: jest.fn(),
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
@@ -114,6 +122,10 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       isFree: false,
     });
     mockedMapModelIdToVercel.mockResolvedValue(model);
+    jest.mocked(countAndStoreEmbeddingUsage).mockReturnValue({
+      statsPromise: Promise.resolve(null),
+      usagePromise: Promise.resolve(null),
+    });
     mockedFetch.mockResolvedValue(
       new Response(JSON.stringify({ object: 'list', data: [] }), {
         status: 200,
@@ -185,15 +197,48 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
 
   it('forwards personal request privacy with other provider fields', async () => {
     const provider = { data_collection: 'deny', zdr: true, only: ['openai'], sort: 'latency' };
+    const upstreamResponse = new Response(JSON.stringify({ object: 'list', data: [] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+    const cloneSpy = jest.spyOn(upstreamResponse, 'clone');
+    mockedFetch.mockResolvedValue(upstreamResponse);
     const { handleEmbeddingsRequest } = await import('./embeddings');
     const response = await handleEmbeddingsRequest(makeRequest({ provider }));
 
     expect(response.status).toBe(200);
     expect(getUpstreamBody().provider).toEqual(provider);
+    expect(cloneSpy).toHaveBeenCalledTimes(1);
+    expect(countAndStoreEmbeddingUsage).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[0]).toBe(
+      cloneSpy.mock.results[0]?.value
+    );
+    expect(emitApiMetricsForResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 200 }),
+      expect.any(Promise),
+      expect.any(Number)
+    );
+    expect(emitGatewayApiMetrics).not.toHaveBeenCalled();
     expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1]).toMatchObject({
       is_free: false,
       user_byok: false,
     });
+  });
+
+  it('emits gateway metrics before accounting a platform-funded upstream error', async () => {
+    mockedFetch.mockResolvedValue(
+      Response.json({ error: 'Upstream request failed' }, { status: 402 })
+    );
+
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(makeRequest());
+
+    expect(response.status).toBe(503);
+    expect(countAndStoreEmbeddingUsage).not.toHaveBeenCalled();
+    expect(emitApiMetricsForResponse).not.toHaveBeenCalled();
+    expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 402, completeRequestMs: expect.any(Number) })
+    );
   });
 
   it.each([undefined, { only: ['openai'] }])(

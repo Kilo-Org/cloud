@@ -2321,7 +2321,7 @@
       "cloningSession": "در حال کپی کردن نشست",
       "couldNotLoadThisSession": "بارگذاری این نشست ممکن نشد.",
       "cloneFailedRetry": "کپی کردن این نشست ممکن نشد. دوباره تلاش کنید.",
-      "notEnoughCredits": "اعتبار کافی برای اجرای Cloud Agent وجود ندارد. اعتبار اضافه کنید و دوباره تلاش کنید.",
+      "notEnoughCredits": "اعتبار کافی برای این درخواست وجود ندارد. اعتبار اضافه کنید و دوباره تلاش کنید.",
       "previousTaskFinishing": "کار قبلی هنوز تمام نشده است. لطفاً کمی صبر کنید.",
       "serviceUnavailable": "سرویس در حال حاضر در دسترس نیست. لطفاً دوباره تلاش کنید.",
       "connectionTrouble": "اتصال با مشکل روبه‌رو شده است. لطفاً کمی بعد دوباره تلاش کنید.",
@@ -2615,7 +2615,7 @@
       "assistantContextOverflow": "گفت‌وگو برای این مدل بیش از حد طولانی است.",
       "assistantProviderError": "ارائه‌دهنده خطا برگرداند.",
       "assistantProviderRefused": "ارائه‌دهنده این درخواست را رد کرد و تلاش دوباره ممکن نیست.",
-      "assistantCreditsRefusal": "اعتبار کافی برای اجرای Cloud Agent وجود ندارد.",
+      "assistantCreditsRefusal": "اعتبار کافی برای این درخواست وجود ندارد.",
       "assistantOutputLimit": "پاسخ به محدودیت خروجی مدل رسید.",
       "assistantStructuredOutput": "پاسخ با قالب مورد نیاز مطابقت نداشت.",
       "assistantFailed": "تولید پاسخ ناموفق بود."

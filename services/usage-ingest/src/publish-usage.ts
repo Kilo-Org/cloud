@@ -1,6 +1,10 @@
 import { timingSafeEqual } from '@kilocode/encryption';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
-import { UsageRecordRequestSchema, type UsageQueueMessage } from '@kilocode/usage-contracts';
+import {
+  UsageRecordRequestSchema,
+  type LlmUsageQueueMessage,
+  type UsageQueueMessage,
+} from '@kilocode/usage-contracts';
 import { logSafely, queueMetrics } from './diagnostics';
 import { handlePublishEnkryptUsage } from './publish-enkrypt-usage';
 import { schemaRejectionDetails } from './rejection-diagnostics';
@@ -124,7 +128,9 @@ async function handlePublishUsage(
   const sendStartedAt = performance.now();
   let sendPromise: Promise<unknown>;
   try {
-    sendPromise = env.USAGE_INGEST_QUEUE.send(result.data, { contentType: 'json' });
+    sendPromise = env.USAGE_INGEST_QUEUE.send(result.data satisfies LlmUsageQueueMessage, {
+      contentType: 'json',
+    });
   } catch {
     logSafely('warn', () => ({
       event: 'usage_ingest_enqueue',

@@ -6,9 +6,10 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, isNotNull, sql } from 'drizzle-orm';
-import { DEFAULT_GITLAB_INSTANCE_URL } from './gitlab-constants.js';
-import { parseGitLabCloneUrl } from './gitlab-url.js';
-export { isValidGitLabRepositoryUrl, normalizeGitLabInstanceUrl } from './gitlab-url.js';
+import {
+  DEFAULT_GITLAB_INSTANCE_URL,
+  parseGitLabCloneUrl,
+} from '@kilocode/worker-utils/gitlab-url';
 
 export type GitLabLookupParams = {
   userId: string;

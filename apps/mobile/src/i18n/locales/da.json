@@ -2315,7 +2315,7 @@
       "cloningSession": "Kloner session",
       "couldNotLoadThisSession": "Kunne ikke indlæse denne session.",
       "cloneFailedRetry": "Kunne ikke klone denne session. Prøv igen.",
-      "notEnoughCredits": "Du har ikke nok kreditter til at køre Cloud Agent. Tilføj kreditter og prøv igen.",
+      "notEnoughCredits": "Du har ikke nok kreditter til denne anmodning. Tilføj kreditter og prøv igen.",
       "previousTaskFinishing": "Den forrige opgave er ved at blive afsluttet. Vent et øjeblik.",
       "serviceUnavailable": "Tjenesten er ikke tilgængelig lige nu. Prøv igen.",
       "connectionTrouble": "Der er problemer med forbindelsen. Prøv igen om et øjeblik.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Samtalen er for lang til modellen.",
       "assistantProviderError": "Udbyderen returnerede en fejl.",
       "assistantProviderRefused": "Udbyderen afviste denne anmodning, og den kan ikke forsøges igen.",
-      "assistantCreditsRefusal": "Du har ikke nok kreditter til at køre Cloud Agent.",
+      "assistantCreditsRefusal": "Du har ikke nok kreditter til denne anmodning.",
       "assistantOutputLimit": "Svaret nåede modellens outputgrænse.",
       "assistantStructuredOutput": "Svaret matchede ikke det påkrævede format.",
       "assistantFailed": "Svaret kunne ikke genereres."

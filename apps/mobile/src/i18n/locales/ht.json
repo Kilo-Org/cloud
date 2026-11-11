@@ -2315,7 +2315,7 @@
       "cloningSession": "Ap klone sesyon an",
       "couldNotLoadThisSession": "Nou pa t ka chaje sesyon sa a.",
       "cloneFailedRetry": "Nou pa t ka klone sesyon sa a. Eseye ankò.",
-      "notEnoughCredits": "Pa gen ase kredi pou fè Cloud Agent fonksyone. Ajoute kredi epi eseye ankò.",
+      "notEnoughCredits": "Pa gen ase kredi pou demann sa a. Ajoute kredi epi eseye ankò.",
       "previousTaskFinishing": "Travay anvan an poko fini. Tanpri tann yon ti moman.",
       "serviceUnavailable": "Sèvis la pa disponib kounye a. Tanpri eseye ankò.",
       "connectionTrouble": "Gen yon pwoblèm koneksyon. Tanpri eseye ankò nan yon ti moman.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Konvèsasyon an twò long pou modèl la.",
       "assistantProviderError": "Founisè a retounen yon erè.",
       "assistantProviderRefused": "Founisè a rejte demann lan epi li pa ka reeseye.",
-      "assistantCreditsRefusal": "Pa gen ase kredi pou fè Cloud Agent fonksyone.",
+      "assistantCreditsRefusal": "Pa gen ase kredi pou demann sa a.",
       "assistantOutputLimit": "Repons lan rive limit sòti modèl la.",
       "assistantStructuredOutput": "Repons lan pa t koresponn ak fòma ki obligatwa a.",
       "assistantFailed": "Repons lan echwe."

@@ -5,11 +5,11 @@ import { cn } from '@/lib/utils';
  * Styles for the context row under the new-session composer. One group draws a single border
  * around adjacent segments: repository with its stack base, and environment with profile.
  * The group's direct children must be the segments; dialogs and popovers render in portals.
- * Groups and segments keep their automatic minimum width, so a squeezed segment keeps its icons
+ * Groups keep their minimum content width, so a squeezed segment keeps its icons
  * and buttons visible. Put shrinkable text in `SegmentText`.
  */
 export const contextGroupClassName =
-  'inline-flex h-7 max-w-full items-stretch divide-x divide-border/50 overflow-hidden rounded-md border border-border/50 bg-muted/30 text-xs';
+  'inline-flex h-7 min-w-min max-w-full items-stretch divide-x divide-border/50 overflow-hidden rounded-md border border-border/50 bg-muted/30 text-xs';
 
 export const contextSegmentClassName = 'inline-flex items-center gap-1.5 whitespace-nowrap px-2';
 

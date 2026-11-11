@@ -2483,7 +2483,7 @@
       "cloningSession": "Yn clonio sesiwn",
       "couldNotLoadThisSession": "Methu llwytho'r sesiwn hon.",
       "cloneFailedRetry": "Methu clonio'r sesiwn hon. Ceisiwch eto.",
-      "notEnoughCredits": "Nid oes digon o gredydau i redeg Cloud Agent. Ychwanegwch gredydau a cheisiwch eto.",
+      "notEnoughCredits": "Nid oes digon o gredydau ar gyfer y cais hwn. Ychwanegwch gredydau a cheisiwch eto.",
       "previousTaskFinishing": "Nid yw'r dasg flaenorol wedi gorffen eto. Arhoswch am eiliad.",
       "serviceUnavailable": "Nid yw'r gwasanaeth ar gael ar hyn o bryd. Ceisiwch eto.",
       "connectionTrouble": "Mae problem gyda'r cysylltiad. Ceisiwch eto ymhen ychydig.",
@@ -2793,7 +2793,7 @@
       "assistantContextOverflow": "Mae'r sgwrs yn rhy hir i'r model.",
       "assistantProviderError": "Roedd gwall gan y darparwr.",
       "assistantProviderRefused": "Gwrthododd y darparwr y cais ac ni ellir ei ailgynnig.",
-      "assistantCreditsRefusal": "Nid oes digon o gredydau i redeg Cloud Agent.",
+      "assistantCreditsRefusal": "Nid oes digon o gredydau ar gyfer y cais hwn.",
       "assistantOutputLimit": "Cyrhaeddodd yr ymateb derfyn allbwn y model.",
       "assistantStructuredOutput": "Nid oedd yr ymateb yn cyd-fynd â'r fformat gofynnol.",
       "assistantFailed": "Methodd yr ymateb."

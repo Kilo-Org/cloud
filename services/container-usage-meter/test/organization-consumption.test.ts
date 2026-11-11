@@ -289,20 +289,26 @@ describe('native organization compute accounting', () => {
   );
 
   it.each([
-    { parentStatus: 'active', billingMode: 'shadow' },
-    { parentStatus: 'past_due', billingMode: 'shadow' },
-    { parentStatus: 'trialing', billingMode: 'paid' },
-    { parentStatus: 'ended', billingMode: 'paid' },
-    { parentStatus: null, billingMode: 'paid' },
+    { parentStatus: 'active', parentDeleted: false, billingMode: 'shadow' },
+    { parentStatus: 'past_due', parentDeleted: false, billingMode: 'shadow' },
+    { parentStatus: 'trialing', parentDeleted: false, billingMode: 'paid' },
+    { parentStatus: 'ended', parentDeleted: false, billingMode: 'paid' },
+    { parentStatus: null, parentDeleted: false, billingMode: 'paid' },
+    { parentStatus: 'active', parentDeleted: true, billingMode: 'paid' },
+    { parentStatus: 'past_due', parentDeleted: true, billingMode: 'paid' },
   ])(
-    'uses $billingMode billing for a child org whose parent seat status is $parentStatus',
-    async ({ parentStatus, billingMode }) => {
+    'uses $billingMode billing for a child org whose parent seat status is $parentStatus (deleted: $parentDeleted)',
+    async ({ parentStatus, parentDeleted, billingMode }) => {
       const f = await fixture();
       f.config.cloudAgentOrgIds = new Set(['*']);
       f.config.warnRemainingMicrodollars = 5_000_000;
       const parentOrgId = crypto.randomUUID();
       parentOrgIds.push(parentOrgId);
-      await client.db.insert(organizations).values({ id: parentOrgId, name: 'Compute parent' });
+      await client.db.insert(organizations).values({
+        id: parentOrgId,
+        name: 'Compute parent',
+        deleted_at: parentDeleted ? new Date(f.start - 86_400_000).toISOString() : null,
+      });
       await client.db
         .update(organizations)
         .set({ parent_organization_id: parentOrgId })
@@ -327,6 +333,7 @@ describe('native organization compute accounting', () => {
       });
       const charged = billingMode === 'paid';
       expect((await f.payer()).microdollars_used).toBe(charged ? 3_000_000 : 0);
+      expect(await f.usage()).toBe(charged ? 3_000_000 : undefined);
       const charges = await client.db
         .select()
         .from(compute_usage_charge)

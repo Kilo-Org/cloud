@@ -26,6 +26,10 @@ import {
 } from '@kilocode/worker-utils/account-access';
 import { recordOrganizationConsumption } from '@kilocode/worker-utils/organization-consumption';
 import {
+  parentOrganizationJoinCondition,
+  parentOrganizationsTable,
+} from '@kilocode/worker-utils/organization-membership';
+import {
   billingModeFor,
   MINIMUM_REMAINING_MICRODOLLARS,
   SHADOW_ONLY_BILLING_CONFIG,
@@ -422,15 +426,16 @@ async function hasPayingSeatSubscription(
 }
 
 // Child organizations have no subscription of their own; they inherit the
-// parent's. The hierarchy is one level deep, so only the direct parent counts.
+// live parent's. The hierarchy is one level deep, so only the direct parent counts.
 async function isPayingOrganizationOrChild(
   tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
   organizationId: string
 ): Promise<boolean> {
   if (await hasPayingSeatSubscription(tx, organizationId)) return true;
   const [organization] = await tx
-    .select({ parentId: organizations.parent_organization_id })
+    .select({ parentId: parentOrganizationsTable.id })
     .from(organizations)
+    .innerJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
     .where(eq(organizations.id, organizationId))
     .limit(1);
   return organization?.parentId ? hasPayingSeatSubscription(tx, organization.parentId) : false;

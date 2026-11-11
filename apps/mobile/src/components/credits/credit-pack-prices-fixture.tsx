@@ -92,8 +92,12 @@ function fixtureResponse(value: unknown): Response {
 
 function listings(state: CreditPackPricesFixtureState): StoreCreditProductListing[] {
   const priced = state === 'priced' ? backends.products : backends.products.slice(0, 3);
+  // The join key differs per store, so each listing carries the id of the
+  // storefront the app reports. A Play id would join to nothing on the other
+  // store, and the state would silently render as store-unavailable.
+  const idKey = getCreditStorefront() === 'play' ? 'googleProductId' : 'appleProductId';
   return priced.map(product => ({
-    id: product.googleProductId,
+    id: product[idKey],
     displayPrice: PLAY_PRICES[backends.products.indexOf(product)] ?? '',
   }));
 }
@@ -142,9 +146,9 @@ function createFixtureClient() {
 }
 
 /**
- * The key is the state: opening the other state's link repaints this route with
- * a new parameter and React reuses the mounted tree, so the seed written for
- * the first state would otherwise stay in the cache the second state reads.
+ * The cache is seeded during the first render of the subtree that reads it, and
+ * that subtree owns the only client this cache has, so no mounted component
+ * observes the write.
  */
 function SeededScreen({ state }: { state: CreditPackPricesFixtureState }) {
   const trpc = useTRPC();
@@ -169,12 +173,26 @@ function SeededScreen({ state }: { state: CreditPackPricesFixtureState }) {
   return <CreditPurchaseScreen />;
 }
 
-export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixtureState }) {
-  const queryClient = useMemo(
-    () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
-    []
+/**
+ * Mounted once per state: opening the other state's link repaints the route with
+ * a new parameter, and React reuses the mounted tree. A fresh cache and client
+ * per state keep the first state's answer out of the cache the second one reads.
+ */
+function FixtureSession({ state }: { state: CreditPackPricesFixtureState }) {
+  const [queryClient] = useState(
+    () => new QueryClient({ defaultOptions: { queries: { retry: false } } })
   );
   const trpcClient = useMemo(() => createFixtureClient(), []);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+        <SeededScreen state={state} />
+      </TRPCProvider>
+    </QueryClientProvider>
+  );
+}
+
+export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixtureState }) {
   const store = useMemo<CreditNativeIapContextValue>(
     () => ({
       connected: true,
@@ -201,12 +219,8 @@ export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixt
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
-        <CreditNativeIapContext.Provider value={store}>
-          <SeededScreen key={state} state={state} />
-        </CreditNativeIapContext.Provider>
-      </TRPCProvider>
-    </QueryClientProvider>
+    <CreditNativeIapContext.Provider value={store}>
+      <FixtureSession key={state} state={state} />
+    </CreditNativeIapContext.Provider>
   );
 }

@@ -652,7 +652,8 @@ describe('CreditPurchaseScreen', () => {
       await settleTimers(() => allText(renderer).includes('$10.99'));
 
       // The store drops while the prices are cached, so the bounded wait fires
-      // and every row reads Price unavailable.
+      // and the card above is the only visible statement: no row repeats it,
+      // and each row keeps the reason in its accessibilityLabel.
       owner.connected = false;
       await act(async () => {
         update();
@@ -749,9 +750,16 @@ describe('CreditPurchaseScreen', () => {
       'Price unavailable',
       'Credits purchased through the App Store do not expire.',
     ]);
-    // The status never shares the title's line, so the title keeps one line.
-    expect(String(unpriced[1]?.props.className)).toContain('mt-1');
-    expect(String(unpriced[1]?.props.className)).toContain('text-sm');
+    // The status never shares the title's line, and its slot keeps its height
+    // whether or not it holds a status, so a row that gains or loses one never
+    // moves the rows below. The title row is the only flex-row in the row.
+    const statusSlot = unpriced[1]?.parent;
+    expect(String(statusSlot?.props.className)).toContain('mt-1');
+    expect(String(statusSlot?.props.className)).toContain('min-h-5');
+    expect(String(statusSlot?.parent?.props.className)).not.toContain('flex-row');
+    // The priced row reserves the same slot, empty.
+    const pricedTexts = priced.map(node => node.props.children);
+    expect(pricedTexts).not.toContain('Price unavailable');
     unmount();
   });
 

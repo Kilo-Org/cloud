@@ -16,7 +16,7 @@ jest.mock('./openrouter', () => ({
 }));
 jest.mock('./vercel', () => ({
   ...jest.requireActual('./vercel'),
-  isVercelModel: jest.fn(),
+  isValidVercelModelId: jest.fn(),
 }));
 jest.mock('./preferred-provider-order-config', () => ({
   getPreferredProviderOrderConfig: jest.fn(),
@@ -46,7 +46,7 @@ import {
 } from './gateway-models-cache';
 import { getRawOpenRouterModels } from './openrouter';
 import { getPreferredProviderOrderConfig } from './preferred-provider-order-config';
-import { isVercelModel } from './vercel';
+import { isValidVercelModelId } from './vercel';
 import { upstreamRequest } from './upstream-request';
 import { sendUpstreamAttempt } from './upstream-attempt';
 
@@ -205,7 +205,7 @@ describe('upstream model catalog validation', () => {
   vercelModels.delete('openai/gpt-4o');
 
   function catalogCheck(providerId: 'openrouter' | 'vercel') {
-    return jest.mocked(providerId === 'vercel' ? isVercelModel : isValidOpenRouterModelId);
+    return jest.mocked(providerId === 'vercel' ? isValidVercelModelId : isValidOpenRouterModelId);
   }
 
   beforeEach(() => {
@@ -213,8 +213,8 @@ describe('upstream model catalog validation', () => {
     jest
       .mocked(isValidOpenRouterModelId)
       .mockImplementation(async model => canonicalModels.has(model));
-    jest.mocked(isVercelModel).mockReset();
-    jest.mocked(isVercelModel).mockImplementation(async model => vercelModels.has(model));
+    jest.mocked(isValidVercelModelId).mockReset();
+    jest.mocked(isValidVercelModelId).mockImplementation(async model => vercelModels.has(model));
     jest.mocked(applyProviderSpecificLogic).mockReset();
     jest.mocked(upstreamRequest).mockReset();
     jest.mocked(upstreamRequest).mockResolvedValue({
@@ -332,7 +332,7 @@ describe('upstream model catalog validation', () => {
       vercelModels.delete('openai/gpt-4o');
 
       expect(result.type).toBe('success');
-      expect(jest.mocked(isVercelModel).mock.calls).toEqual([[requestedModel]]);
+      expect(jest.mocked(isValidVercelModelId).mock.calls).toEqual([[requestedModel]]);
       expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
       expect(upstreamRequest).toHaveBeenCalledTimes(1);
       expect(upstreamRequest).toHaveBeenCalledWith(
@@ -345,7 +345,7 @@ describe('upstream model catalog validation', () => {
     '%s skips catalog validation for the auto small free model',
     async providerId => {
       jest.mocked(isValidOpenRouterModelId).mockResolvedValue(false);
-      jest.mocked(isVercelModel).mockResolvedValue(false);
+      jest.mocked(isValidVercelModelId).mockResolvedValue(false);
       const result = await attempt({
         providerId,
         requestedModel: AUTO_SMALL_TARGET_MODELS.free,
@@ -354,7 +354,7 @@ describe('upstream model catalog validation', () => {
 
       expect(result.type).toBe('success');
       expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
-      expect(isVercelModel).not.toHaveBeenCalled();
+      expect(isValidVercelModelId).not.toHaveBeenCalled();
       expect(upstreamRequest).toHaveBeenCalledTimes(1);
       expect(upstreamRequest).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -386,7 +386,7 @@ describe('upstream model catalog validation', () => {
 
       expect(result.type).toBe('success');
       expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
-      expect(isVercelModel).not.toHaveBeenCalled();
+      expect(isValidVercelModelId).not.toHaveBeenCalled();
       expect(upstreamRequest).toHaveBeenCalledTimes(1);
     }
   );

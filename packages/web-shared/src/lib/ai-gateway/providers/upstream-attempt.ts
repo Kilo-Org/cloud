@@ -35,7 +35,7 @@ import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/
 import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { isVercelModel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import { isValidVercelModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
@@ -78,7 +78,7 @@ async function gatewayServesModel(provider: Provider, requestedModel: string) {
     case 'openrouter':
       return isValidOpenRouterModelId(requestedModel);
     case 'vercel':
-      return isVercelModel(requestedModel);
+      return isValidVercelModelId(requestedModel);
     default:
       return true;
   }

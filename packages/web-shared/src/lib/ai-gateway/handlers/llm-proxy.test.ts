@@ -2245,7 +2245,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
     'returns 404 when the %s model id is unknown',
     async providerType => {
       mockedIsValidOpenRouterModelId.mockResolvedValue(false);
-      mockedGetVercelModels.mockResolvedValue(new Set());
+      mockedGetVercelModels.mockResolvedValue(new Set(['vendor/other-model']));
       mockedGetProvider.mockResolvedValue({
         kind: 'provider',
         provider: { ...provider, type: providerType },

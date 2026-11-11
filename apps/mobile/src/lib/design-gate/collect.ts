@@ -20,6 +20,13 @@ export type ProbeNode = Readonly<{
   rect: Rect;
   layoutRect: Rect;
   owners?: readonly string[];
+  /**
+   * The route file of the screen that renders the node, relative to the app
+   * directory (`./(app)/(tabs)/history.tsx`). A route component names itself after
+   * its file, so the screen that owns a node stays readable where the owner chain
+   * is cut. The design gate reads the focused screen from it.
+   */
+  screen?: string;
   text?: string;
   testID?: string;
   label?: string;
@@ -37,14 +44,13 @@ const ELEMENT_NODE = 1;
 const COMPOSITE_TAGS = new Set([0, 1, 11, 14, 15]);
 const OWNER_LIMIT = 6;
 /**
- * How many ancestors the route lookup inspects. A pushed route's `Route(...)`
- * owner sits deeper than the naming budget above, so the nearest one is always
- * named even when the rest of the chain is cut: the design gate reads the route
- * from it, and without it a screen on a pushed route could not be told apart
- * from the tab behind it.
+ * A route component names itself `<Name>(<contextKey>)` in development, and the
+ * context key is the route's file below the app directory. Screens nest, so the
+ * nearest such name is the screen a node sits in, and the whole path of that
+ * screen is what a route name alone cannot give: the navigator's own name for a
+ * route is relative to the navigator.
  */
-const ROUTE_OWNER_SCAN = 40;
-const ROUTE_OWNER = /^Route\(.+\)$/;
+const SCREEN_OWNER = /\((\..+\.[jt]sx?)\)$/;
 const PRESS_HANDLERS = ['onClick', 'onPress'] as const;
 const STYLE_KEYS = [
   'alignItems',
@@ -106,31 +112,34 @@ function compositeName(fiber: unknown): string | undefined {
   );
 }
 
-function owners(fiber: unknown): readonly string[] | undefined {
+type Ancestry = Readonly<{ owners?: readonly string[]; screen?: string }>;
+
+/**
+ * The owner names of a node and the screen that renders it, from one walk up the
+ * fiber chain. The walk stops once the naming budget is spent and the screen is
+ * known, so a node inside a screen reads a few ancestors and a node outside every
+ * screen, such as the root chrome, is the only one that walks the whole chain.
+ */
+function ancestry(fiber: unknown): Ancestry {
   const names: string[] = [];
-  let route: string | undefined = undefined;
-  let scanned = 0;
+  let screen: string | undefined = undefined;
   let current = field(fiber, 'return');
-  while (current !== undefined && current !== null && scanned < ROUTE_OWNER_SCAN) {
+  while (current !== undefined && current !== null) {
     const tag = field(current, 'tag');
     const name =
       typeof tag === 'number' && COMPOSITE_TAGS.has(tag) ? compositeName(current) : undefined;
     if (name !== undefined) {
-      if (route === undefined && ROUTE_OWNER.test(name)) {
-        route = name;
-      }
+      screen ??= SCREEN_OWNER.exec(name)?.[1];
       if (names.length < OWNER_LIMIT && names.at(-1) !== name) {
         names.push(name);
       }
+      if (names.length >= OWNER_LIMIT && screen !== undefined) {
+        break;
+      }
     }
-    scanned += 1;
     current = field(current, 'return');
   }
-  // The nearest route owner is what tells screens apart, so it survives the cut.
-  if (route !== undefined && !names.includes(route)) {
-    names.push(route);
-  }
-  return names.length > 0 ? names : undefined;
+  return { owners: names.length > 0 ? names : undefined, screen };
 }
 
 function insets(value: unknown): Insets | undefined {
@@ -178,6 +187,7 @@ function describe(element: Element, parent: number, viewport: Offset): ProbeNode
   const props = field(fiber, 'memoizedProps');
   const tag = element.tagName.replace(/^RN:/, '');
   const lines = finite(field(props, 'numberOfLines'));
+  const chain = ancestry(fiber);
   return {
     parent,
     tag,
@@ -188,7 +198,8 @@ function describe(element: Element, parent: number, viewport: Offset): ProbeNode
       round(layout.width),
       round(layout.height),
     ],
-    owners: owners(fiber),
+    owners: chain.owners,
+    screen: chain.screen,
     text: renderedText(tag, element, props),
     testID: text(field(props, 'testID')) ?? text(field(props, 'nativeID')),
     label: text(field(props, 'accessibilityLabel')) ?? text(field(props, 'aria-label')),

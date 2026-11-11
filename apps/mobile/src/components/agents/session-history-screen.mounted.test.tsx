@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+import { SessionListTouchGate } from '@/components/session-list-touch-gate';
 import { i18n } from '@/i18n';
 import {
   type StoredSession,
@@ -12,6 +13,10 @@ import {
   type useAgentSessionSearch,
   type useRecentAgentRepositories,
 } from '@/lib/hooks/use-agent-sessions';
+import {
+  __resetSessionListTouchGateForTests,
+  isSessionListTouchHeld,
+} from '@/lib/session-list-touch-gate';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 import type * as PlatformFilterModule from './platform-filter-modal';
 import { AGENT_SESSION_NAV_GUARD_MS } from './agent-session-nav-guard';
@@ -433,6 +438,7 @@ describe('SessionHistoryScreen', () => {
     });
     mountedRenderers.length = 0;
     appState.listeners.clear();
+    __resetSessionListTouchGateForTests();
     vi.restoreAllMocks();
   });
 
@@ -744,6 +750,38 @@ describe('SessionHistoryScreen', () => {
     expect(storedSessionIds(renderer)).toEqual(['code-cloud']);
     expect(historyHeaderActions(renderer).activeFilterCount).toBe(2);
     expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
+  });
+
+  it('holds the list through the body swap after Clear search so a row cannot take the press that follows', async () => {
+    listState.storedSessions = sessions;
+    listState.isSearching = true;
+    const queryClient = createTestQueryClient();
+    const renderer = await renderScreen(queryClient);
+    const gateProps = renderer.root
+      .findByType(SessionListTouchGate)
+      .findByType('View' as unknown as React.ElementType).props as {
+      onStartShouldSetResponderCapture: () => boolean;
+    };
+    expect(gateProps.onStartShouldSetResponderCapture()).toBe(false);
+
+    act(() => {
+      (findNodeByType(renderer, 'AgentSessionListContent').props.onClearQuery as () => void)();
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(SessionHistoryScreen)
+        )
+      );
+    });
+
+    // The clear swaps the empty state for the rows in the same commit, so the
+    // row now under the finger is a target for the next touch; the gate claims
+    // that touch instead of delivering it to the row.
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isSearching).toBe(false);
+    expect(storedSessionIds(renderer)).toEqual(['workflow', 'code-cloud', 'code-cli', 'other']);
+    expect(isSessionListTouchHeld()).toBe(true);
+    expect(gateProps.onStartShouldSetResponderCapture()).toBe(true);
   });
 
   it.each([false, true])(

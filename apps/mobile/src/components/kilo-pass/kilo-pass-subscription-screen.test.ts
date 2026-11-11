@@ -119,14 +119,12 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
-  it('unavailable: a lapsed pass states that the pass ended, then the unavailability', async () => {
+  it('unavailable: a lapsed pass states that the pass ended', async () => {
     mocks.presentation.data = { kind: 'unavailable', statusClass: 'terminal', webUrl: null };
     const renderer = await renderScreen();
     const emptyState = nodesOfType(renderer, 'EmptyState')[0];
     expect(emptyState?.props.title).toBe('Not available right now');
-    expect(emptyState?.props.description).toBe(
-      'Your Kilo Pass has ended. Kilo Pass purchase is not available right now.'
-    );
+    expect(emptyState?.props.description).toBe('Your Kilo Pass has ended.');
     renderer.unmount();
   });
 

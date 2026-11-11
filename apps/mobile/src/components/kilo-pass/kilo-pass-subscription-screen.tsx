@@ -109,14 +109,6 @@ function KiloPassUnavailableScreen({ presentation }: PresentationProps) {
   const router = useRouter();
 
   if (presentation.kind === 'unavailable') {
-    // The ended fact plus the unavailability sentence. Each catalog holds its own
-    // sentence once, so the two compose here rather than one spelling the other;
-    // they already carry their terminal punctuation, so the separator is a space
-    // and not the locale's `sentenceJoiner`, which would add a second period.
-    const description =
-      presentation.statusClass === 'terminal'
-        ? [t('kiloPass.purchaseUnavailableEnded'), t('kiloPass.purchaseUnavailable')].join(' ')
-        : undefined;
     return (
       <KiloPassFrame>
         {/* This screen owns the body below the header, so the state centres in
@@ -127,9 +119,14 @@ function KiloPassUnavailableScreen({ presentation }: PresentationProps) {
             placement="static"
             icon={Crown}
             title={t('kiloPass.purchaseUnavailableTitle')}
-            // The plain kind has nothing the title does not say, and the state's
-            // own guide forbids a description that restates it.
-            description={description}
+            // Only a pass the server reports as ended has something the title does
+            // not say; the plain kind would restate the title, which the state's
+            // own guide forbids.
+            description={
+              presentation.statusClass === 'terminal'
+                ? t('kiloPass.purchaseUnavailableEnded')
+                : undefined
+            }
             action={
               <Button
                 accessibilityLabel={t('credits.title')}

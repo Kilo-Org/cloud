@@ -81,7 +81,7 @@ describe('useSessionListAutoScroll viewport resize', () => {
     vi.useRealTimers();
   });
 
-  it('re-pins the tail when the fixed status row shrinks the list inside the streaming follow window', () => {
+  it('re-pins the tail when the fixed status row shrinks the list inside the streaming follow window', async () => {
     // Reproduces the session-answered defect: the working indicator / session
     // status row lives outside the list, so mounting it shrinks the viewport
     // while the offset stays put. The resize lands inside the 150ms
@@ -92,23 +92,31 @@ describe('useSessionListAutoScroll viewport resize', () => {
     const { scrollToEnd, api } = mountAutoScroll(1);
 
     // The first layout records the pre-resize viewport height.
-    act(() => {
+    await act(async () => {
       api.handleListLayout(layoutEvent(600));
+      await Promise.resolve();
     });
     closeProgrammaticScrollWindow();
+    await act(async () => {
+      await Promise.resolve();
+    });
     scrollToEnd.mockClear();
 
     // A streamed row grows the content and starts a follow scroll.
-    act(() => {
+    await act(async () => {
       api.handleContentSizeChange(400, 2000);
+      await Promise.resolve();
     });
     expect(scrollToEnd).toHaveBeenCalledTimes(1);
 
     scrollToEnd.mockClear();
 
     // Inside that window the status row mounts and the list gets shorter.
-    act(() => {
+    // The correction is coalesced to the task, so the resize and any content
+    // change it carries land as one scroll.
+    await act(async () => {
       api.handleListLayout(layoutEvent(500));
+      await Promise.resolve();
     });
 
     expect(scrollToEnd).toHaveBeenCalledTimes(1);

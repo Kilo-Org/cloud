@@ -16,6 +16,7 @@ import {
   shouldScheduleSessionAutoScroll,
 } from '@/components/agents/use-session-auto-scroll-state';
 import { useMotionPolicy } from '@/lib/a11y/motion';
+import { createTaskCoalescer } from '@/lib/task-coalescer';
 
 type UseSessionListAutoScrollParams = {
   itemCount: number;
@@ -135,6 +136,8 @@ export function useSessionListAutoScroll<ItemT>({
       autoScrollResetTimeoutRef.current = null;
     }, 150);
   }, [clearAutoScrollResetTimeout]);
+
+  const tailRepin = useRef(createTaskCoalescer()).current;
 
   // Animated scroll for the user-initiated "scroll to bottom" button.
   // Intentionally does NOT set `isAutoScrollingRef`: that flag suppresses
@@ -386,12 +389,14 @@ export function useSessionListAutoScroll<ItemT>({
           isUserScrolling: isUserScrollingRef.current,
           shouldAutoScroll: shouldAutoScrollRef.current,
           didContentHeightChange,
-        })
+        }) &&
+        // The queued correction lands the tail on this geometry too.
+        !tailRepin.isPending()
       ) {
         scrollToLatestMessage();
       }
     },
-    [scrollToLatestMessage]
+    [scrollToLatestMessage, tailRepin]
   );
 
   const handleListLayout = useCallback(
@@ -414,7 +419,7 @@ export function useSessionListAutoScroll<ItemT>({
           didViewportHeightChange,
         })
       ) {
-        scrollToLatestMessage();
+        tailRepin.schedule(scrollToLatestMessage);
         return;
       }
       if (
@@ -427,7 +432,7 @@ export function useSessionListAutoScroll<ItemT>({
         scheduleScrollToLatestMessage();
       }
     },
-    [scheduleScrollToLatestMessage, scrollToLatestMessage]
+    [scheduleScrollToLatestMessage, scrollToLatestMessage, tailRepin]
   );
 
   return {

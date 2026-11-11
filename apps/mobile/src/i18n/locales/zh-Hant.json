@@ -2219,7 +2219,7 @@
       "positionHint": "（第 1 個，共 {{displayCount}} 個）",
       "movedPastPrompt": "智慧代理已不再等待回應此提示。工作階段繼續時，此卡片會關閉。",
       "waitingForAnswer": "智慧代理正在等待你的答案。在你回答問題前，傳給智慧代理的訊息會暫停傳送。",
-      "waitingForPermission": "智慧代理正在等待授權。在你回應此請求前，傳給智慧代理的訊息會暫停傳送。"
+      "waitingForPermission": "在你回應此請求前，傳給智慧代理的訊息會暫停傳送。"
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}，{{taskName}}{{modelLabel}}，{{latestActivityLabel}}，{{status}}",

@@ -2895,7 +2895,7 @@
       "positionHint": "(1 minn {{displayCount}})",
       "movedPastPrompt": "L-aġent diġà għadda għal wara din l-istruzzjoni. Din il-karta se tingħalaq meta s-sessjoni tkompli.",
       "waitingForAnswer": "L-aġent qed jistenna t-tweġiba tiegħek. Il-messaġġ tiegħek lill-aġent jibqa' jistenna sakemm twieġeb din il-mistoqsija.",
-      "waitingForPermission": "L-aġent qed jistenna l-permess. Il-messaġġ tiegħek lill-aġent jibqa' jistenna sakemm tiddeċiedi dwar din it-talba."
+      "waitingForPermission": "Il-messaġġ tiegħek lill-aġent jibqa' jistenna sakemm tiddeċiedi dwar din it-talba."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

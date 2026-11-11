@@ -2757,7 +2757,7 @@
       "positionHint": "(١ لە {{displayCount}})",
       "movedPastPrompt": "ئەجێنتەکە ئەم داواکارییەی تێپەڕاندووە. کاتێک سێشنەکە بەردەوام دەبێت، ئەم کارتە دادەخرێت.",
       "waitingForAnswer": "ئەجێنتەکە چاوەڕوانی وەڵامی تۆیە. تا ئەم پرسیارە کراوەیە، ناردنی پەیامەکەت بۆ ئەجێنتەکە ڕاگیراوە.",
-      "waitingForPermission": "ئەجێنتەکە چاوەڕوانی مۆڵەتە. تا ئەم داواکارییە کراوەیە، ناردنی پەیامەکەت بۆ ئەجێنتەکە ڕاگیراوە."
+      "waitingForPermission": "تا ئەم داواکارییە کراوەیە، ناردنی پەیامەکەت بۆ ئەجێنتەکە ڕاگیراوە."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}، {{taskName}}{{modelLabel}}، {{latestActivityLabel}}، {{status}}",

@@ -2219,7 +2219,7 @@
       "positionHint": "({{displayCount}}개 중 첫 번째)",
       "movedPastPrompt": "에이전트가 이미 이 요청을 넘어 다음 단계로 진행했습니다. 세션이 계속되면 이 카드가 닫힙니다.",
       "waitingForAnswer": "에이전트가 답변을 기다리고 있습니다. 이 질문에 답변할 때까지 에이전트에게 보내는 메시지의 전송이 일시 중지됩니다.",
-      "waitingForPermission": "에이전트가 권한 승인을 기다리고 있습니다. 이 요청에 응답할 때까지 에이전트에게 보내는 메시지의 전송이 일시 중지됩니다."
+      "waitingForPermission": "이 요청에 응답할 때까지 에이전트에게 보내는 메시지의 전송이 일시 중지됩니다."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, 작업: {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

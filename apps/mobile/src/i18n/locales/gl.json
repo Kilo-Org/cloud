@@ -2757,7 +2757,7 @@
       "positionHint": "(1 de {{displayCount}})",
       "movedPastPrompt": "O axente xa pasou desta solicitude. Esta tarxeta pecharase cando continúe a sesión.",
       "waitingForAnswer": "O axente agarda a túa resposta. Mentres esta pregunta estea aberta, o envío da túa mensaxe ao axente queda en pausa.",
-      "waitingForPermission": "O axente agarda permiso. Mentres esta solicitude estea aberta, o envío da túa mensaxe ao axente queda en pausa."
+      "waitingForPermission": "Mentres esta solicitude estea aberta, o envío da túa mensaxe ao axente queda en pausa."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

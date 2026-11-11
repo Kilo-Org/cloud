@@ -2757,7 +2757,7 @@
       "positionHint": "(1 av {{displayCount}})",
       "movedPastPrompt": "Agenten har gått vidare från den här förfrågan. Kortet stängs när sessionen fortsätter.",
       "waitingForAnswer": "Agenten väntar på ditt svar. Ditt meddelande till agenten är pausat så länge frågan är öppen.",
-      "waitingForPermission": "Agenten väntar på behörighet. Ditt meddelande till agenten är pausat så länge förfrågan är öppen."
+      "waitingForPermission": "Ditt meddelande till agenten är pausat så länge förfrågan är öppen."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

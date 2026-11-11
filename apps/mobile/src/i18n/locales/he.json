@@ -2244,7 +2244,7 @@
       "positionHint": "(1 מתוך {{displayCount}})",
       "movedPastPrompt": "הסוכן כבר עבר לשלב הבא. הכרטיס הזה ייסגר כשהסשן יימשך.",
       "waitingForAnswer": "הסוכן ממתין לתשובה שלך. שליחת ההודעה שלך לסוכן מושהית עד שתענה על השאלה הזו.",
-      "waitingForPermission": "הסוכן ממתין להרשאה. שליחת ההודעה שלך לסוכן מושהית כל עוד הבקשה הזו פתוחה."
+      "waitingForPermission": "שליחת ההודעה שלך לסוכן מושהית כל עוד הבקשה הזו פתוחה."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

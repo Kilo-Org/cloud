@@ -2757,7 +2757,7 @@
       "positionHint": "({{displayCount}} मध्ये 1)",
       "movedPastPrompt": "एजेन्ट यो प्रम्प्टभन्दा अगाडि बढिसकेको छ। सत्र जारी हुँदा यो कार्ड बन्द हुनेछ।",
       "waitingForAnswer": "एजेन्ट तपाईंको उत्तरको पर्खाइमा छ। यो प्रश्न खुला रहँदासम्म एजेन्टलाई तपाईंको सन्देश पठाउन रोकिएको छ।",
-      "waitingForPermission": "एजेन्ट अनुमतिको पर्खाइमा छ। यो अनुरोध खुला रहँदासम्म एजेन्टलाई तपाईंको सन्देश पठाउन रोकिएको छ।"
+      "waitingForPermission": "यो अनुरोध खुला रहँदासम्म एजेन्टलाई तपाईंको सन्देश पठाउन रोकिएको छ।"
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

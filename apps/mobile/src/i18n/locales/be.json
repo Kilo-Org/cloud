@@ -2849,7 +2849,7 @@
       "positionHint": "(1 з {{displayCount}})",
       "movedPastPrompt": "Агент ужо перайшоў да наступнага кроку. Гэтая картка закрыецца, калі сеанс працягнецца.",
       "waitingForAnswer": "Агент чакае вашага адказу. Пакуль пытанне адкрытае, адпраўка вашага паведамлення агенту прыпыненая.",
-      "waitingForPermission": "Агент чакае дазволу. Пакуль запыт адкрыты, адпраўка вашага паведамлення агенту прыпыненая."
+      "waitingForPermission": "Пакуль запыт адкрыты, адпраўка вашага паведамлення агенту прыпыненая."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

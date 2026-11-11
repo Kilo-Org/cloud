@@ -2757,7 +2757,7 @@
       "positionHint": "(1 daripada {{displayCount}})",
       "movedPastPrompt": "Ejen telah melepasi gesaan ini. Kad ini akan ditutup apabila sesi diteruskan.",
       "waitingForAnswer": "Ejen sedang menunggu jawapan anda. Penghantaran mesej anda kepada ejen dijeda selagi soalan ini belum dijawab.",
-      "waitingForPermission": "Ejen sedang menunggu kebenaran. Penghantaran mesej anda kepada ejen dijeda selagi permintaan ini belum dijawab."
+      "waitingForPermission": "Penghantaran mesej anda kepada ejen dijeda selagi permintaan ini belum dijawab."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

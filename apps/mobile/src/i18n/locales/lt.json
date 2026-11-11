@@ -2849,7 +2849,7 @@
       "positionHint": "(1 iš {{displayCount}})",
       "movedPastPrompt": "Agentas jau perėjo prie kito veiksmo. Ši kortelė užsidarys, kai sesija bus tęsiama.",
       "waitingForAnswer": "Agentas laukia jūsų atsakymo. Kol neatsakysite į šį klausimą, jūsų žinutės siuntimas agentui bus pristabdytas.",
-      "waitingForPermission": "Agentas laukia leidimo. Kol neatsakysite į šį prašymą, jūsų žinutės siuntimas agentui bus pristabdytas."
+      "waitingForPermission": "Kol neatsakysite į šį prašymą, jūsų žinutės siuntimas agentui bus pristabdytas."
     },
     "childSession": {
       "accessibilityLabel": "Agentas {{agentName}}, užduotis: {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

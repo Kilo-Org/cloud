@@ -2757,7 +2757,7 @@
       "positionHint": "(1/{{displayCount}})",
       "movedPastPrompt": "Agent bu so'rov bosqichidan o'tdi. Sessiya davom etganda bu kartochka yopiladi.",
       "waitingForAnswer": "Agent javobingizni kutmoqda. Bu savol ochiq turganida agentga xabaringiz yuborilmay turadi.",
-      "waitingForPermission": "Agent ruxsat kutmoqda. Bu so'rov ochiq turganida agentga xabaringiz yuborilmay turadi."
+      "waitingForPermission": "Bu so'rov ochiq turganida agentga xabaringiz yuborilmay turadi."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

@@ -2757,7 +2757,7 @@
       "positionHint": "(1 af {{displayCount}})",
       "movedPastPrompt": "Agenten er gået videre fra denne forespørgsel. Dette kort lukkes, når sessionen fortsætter.",
       "waitingForAnswer": "Agenten venter på dit svar. Mens dette spørgsmål er åbent, er din besked til agenten sat på pause.",
-      "waitingForPermission": "Agenten venter på tilladelse. Mens denne anmodning er åben, er din besked til agenten sat på pause."
+      "waitingForPermission": "Mens denne anmodning er åben, er din besked til agenten sat på pause."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

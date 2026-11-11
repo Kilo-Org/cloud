@@ -2219,7 +2219,7 @@
       "positionHint": "(1 von {{displayCount}})",
       "movedPastPrompt": "Der Agent hat diese Anfrage bereits hinter sich gelassen. Diese Karte wird geschlossen, sobald die Sitzung fortgesetzt wird.",
       "waitingForAnswer": "Der Agent wartet auf deine Antwort. Solange diese Frage offen ist, wird deine Nachricht an den Agenten zurückgehalten.",
-      "waitingForPermission": "Der Agent wartet auf eine Berechtigung. Solange diese Anfrage offen ist, wird deine Nachricht an den Agenten zurückgehalten."
+      "waitingForPermission": "Solange diese Anfrage offen ist, wird deine Nachricht an den Agenten zurückgehalten."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

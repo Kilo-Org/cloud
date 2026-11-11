@@ -2757,7 +2757,7 @@
       "positionHint": "(1 / {{displayCount}})",
       "movedPastPrompt": "Agenteak eskaera hau atzean utzi du. Txartel hau saioak aurrera egiten duenean itxiko da.",
       "waitingForAnswer": "Agentea zure erantzunaren zain dago. Galdera hau irekita dagoen bitartean, agenteari bidali nahi diozun mezua zain geratuko da.",
-      "waitingForPermission": "Agentea baimenaren zain dago. Eskaera hau irekita dagoen bitartean, agenteari bidali nahi diozun mezua zain geratuko da."
+      "waitingForPermission": "Eskaera hau irekita dagoen bitartean, agenteari bidali nahi diozun mezua zain geratuko da."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

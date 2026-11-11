@@ -2757,7 +2757,7 @@
       "positionHint": "(1 sou {{displayCount}})",
       "movedPastPrompt": "Ajan an deja pase etap demann sa a. Kat sa a ap fèmen lè sesyon an kontinye.",
       "waitingForAnswer": "Ajan an ap tann repons ou a. Pandan kesyon sa a louvri, mesaj ou pou ajan an rete annatant.",
-      "waitingForPermission": "Ajan an ap tann pèmisyon. Pandan demann sa a louvri, mesaj ou pou ajan an rete annatant."
+      "waitingForPermission": "Pandan demann sa a louvri, mesaj ou pou ajan an rete annatant."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

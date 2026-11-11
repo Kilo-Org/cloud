@@ -2757,7 +2757,7 @@
       "positionHint": "(1/{{displayCount}})",
       "movedPastPrompt": "Agent on selle viiba juba läbinud. See kaart sulgub, kui seanss jätkub.",
       "waitingForAnswer": "Agent ootab sinu vastust. Kuni see küsimus on avatud, on sinu sõnumi saatmine agendile peatatud.",
-      "waitingForPermission": "Agent ootab luba. Kuni see taotlus on avatud, on sinu sõnumi saatmine agendile peatatud."
+      "waitingForPermission": "Kuni see taotlus on avatud, on sinu sõnumi saatmine agendile peatatud."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

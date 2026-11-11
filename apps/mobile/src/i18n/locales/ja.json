@@ -2219,7 +2219,7 @@
       "positionHint": "（{{displayCount}}件中1件目）",
       "movedPastPrompt": "エージェントはすでにこの確認を終えて、先に進んでいます。セッションが再開すると、このカードは閉じます。",
       "waitingForAnswer": "エージェントが回答を待っています。この質問に回答するまで、エージェントへのメッセージ送信は一時停止します。",
-      "waitingForPermission": "エージェントが許可を待っています。このリクエストに応答するまで、エージェントへのメッセージ送信は一時停止します。"
+      "waitingForPermission": "このリクエストに応答するまで、エージェントへのメッセージ送信は一時停止します。"
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}、{{taskName}}{{modelLabel}}、{{latestActivityLabel}}、{{status}}",

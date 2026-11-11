@@ -2757,7 +2757,7 @@
       "positionHint": "(1 amin'ny {{displayCount}})",
       "movedPastPrompt": "Efa nihoatra ity fangatahana ity ny mpanampy. Hikatona ity karatra ity rehefa mitohy ny fotoam-piasana.",
       "waitingForAnswer": "Miandry ny valinteninao ny mpanampy. Miato ny fandefasana ny hafatrao ho azy raha mbola misokatra ity fanontaniana ity.",
-      "waitingForPermission": "Miandry alalana ny mpanampy. Miato ny fandefasana ny hafatrao ho azy raha mbola misokatra ity fangatahana ity."
+      "waitingForPermission": "Miato ny fandefasana ny hafatrao ho azy raha mbola misokatra ity fangatahana ity."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

@@ -2269,7 +2269,7 @@
       "positionHint": "(1 z {{displayCount}})",
       "movedPastPrompt": "Agent nie czeka już na odpowiedź na ten komunikat. Ta karta zamknie się po wznowieniu sesji.",
       "waitingForAnswer": "Agent czeka na twoją odpowiedź. Wysyłanie wiadomości do agenta jest wstrzymane, dopóki nie odpowiesz na to pytanie.",
-      "waitingForPermission": "Agent czeka na zgodę. Wysyłanie wiadomości do agenta jest wstrzymane, dopóki nie odpowiesz na tę prośbę."
+      "waitingForPermission": "Wysyłanie wiadomości do agenta jest wstrzymane, dopóki nie odpowiesz na tę prośbę."
     },
     "childSession": {
       "accessibilityLabel": "Agent {{agentName}}, zadanie {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

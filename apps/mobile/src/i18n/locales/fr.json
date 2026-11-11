@@ -2143,7 +2143,7 @@
       "positionHint": "(1 sur {{displayCount}})",
       "movedPastPrompt": "L'agent est passé à l'étape suivante. Cette carte se fermera à la reprise de la session.",
       "waitingForAnswer": "L'agent attend votre réponse. Tant que cette question reste ouverte, votre message à l'agent est en attente.",
-      "waitingForPermission": "L'agent attend une autorisation. Tant que cette demande reste ouverte, votre message à l'agent est en attente."
+      "waitingForPermission": "Tant que cette demande reste ouverte, votre message à l'agent est en attente."
     },
     "childSession": {
       "accessibilityLabel": "Agent : {{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

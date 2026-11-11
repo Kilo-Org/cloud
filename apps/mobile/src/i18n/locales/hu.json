@@ -2757,7 +2757,7 @@
       "positionHint": "(1., összesen {{displayCount}})",
       "movedPastPrompt": "Az ügynök már továbblépett erről a kérésről. A kártya bezárul, amikor a munkamenet folytatódik.",
       "waitingForAnswer": "Az ügynök a válaszodra vár. Amíg nem válaszolsz erre a kérdésre, az ügynöknek szánt üzeneted küldése szünetel.",
-      "waitingForPermission": "Az ügynök engedélyre vár. Amíg nem döntesz erről a kérésről, az ügynöknek szánt üzeneted küldése szünetel."
+      "waitingForPermission": "Amíg nem döntesz erről a kérésről, az ügynöknek szánt üzeneted küldése szünetel."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

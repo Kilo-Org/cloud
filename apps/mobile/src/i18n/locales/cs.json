@@ -2849,7 +2849,7 @@
       "positionHint": "(1 z {{displayCount}})",
       "movedPastPrompt": "Agent už na tuto výzvu nečeká. Karta se zavře, až bude relace pokračovat.",
       "waitingForAnswer": "Agent čeká na vaši odpověď. Dokud na otázku neodpovíte, odeslání vaší zprávy agentovi je pozastavené.",
-      "waitingForPermission": "Agent čeká na oprávnění. Dokud o žádosti nerozhodnete, odeslání vaší zprávy agentovi je pozastavené."
+      "waitingForPermission": "Dokud o žádosti nerozhodnete, odeslání vaší zprávy agentovi je pozastavené."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

@@ -2803,7 +2803,7 @@
       "positionHint": "(1 no {{displayCount}})",
       "movedPastPrompt": "Aģents jau ir pārgājis pie nākamā soļa. Šī kartīte aizvērsies, kad sesija turpināsies.",
       "waitingForAnswer": "Aģents gaida tavu atbildi. Kamēr šis jautājums ir atvērts, ziņojuma nosūtīšana aģentam ir apturēta.",
-      "waitingForPermission": "Aģents gaida atļauju. Kamēr šis pieprasījums ir atvērts, ziņojuma nosūtīšana aģentam ir apturēta."
+      "waitingForPermission": "Kamēr šis pieprasījums ir atvērts, ziņojuma nosūtīšana aģentam ir apturēta."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

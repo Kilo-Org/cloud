@@ -2219,7 +2219,7 @@
       "positionHint": "（第 1 项，共 {{displayCount}} 项）",
       "movedPastPrompt": "智能体已不再等待此处的输入。会话继续后，此卡片将关闭。",
       "waitingForAnswer": "智能体正在等待你的回答。在你回答此问题前，发给智能体的消息将暂停发送。",
-      "waitingForPermission": "智能体正在等待授权。在你处理此请求前，发给智能体的消息将暂停发送。"
+      "waitingForPermission": "在你处理此请求前，发给智能体的消息将暂停发送。"
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}，{{taskName}}{{modelLabel}}，{{latestActivityLabel}}，{{status}}",

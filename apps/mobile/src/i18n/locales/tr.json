@@ -2219,7 +2219,7 @@
       "positionHint": "(1 / {{displayCount}})",
       "movedPastPrompt": "Ajan bu istemi geride bıraktı. Oturum devam ettiğinde bu kart kapanacak.",
       "waitingForAnswer": "Ajan yanıtını bekliyor. Bu soru açıkken ajana göndereceğin mesaj bekletilir.",
-      "waitingForPermission": "Ajan izin bekliyor. Bu istek açıkken ajana göndereceğin mesaj bekletilir."
+      "waitingForPermission": "Bu istek açıkken ajana göndereceğin mesaj bekletilir."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

@@ -2219,7 +2219,7 @@
       "positionHint": "(1 van {{displayCount}})",
       "movedPastPrompt": "De agent is al verdergegaan. Deze kaart sluit zodra de sessie verdergaat.",
       "waitingForAnswer": "De agent wacht op je antwoord. Zolang je deze vraag niet beantwoordt, wordt je bericht aan de agent niet verzonden.",
-      "waitingForPermission": "De agent wacht op toestemming. Zolang je niet op dit verzoek reageert, wordt je bericht aan de agent niet verzonden."
+      "waitingForPermission": "Zolang je niet op dit verzoek reageert, wordt je bericht aan de agent niet verzonden."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

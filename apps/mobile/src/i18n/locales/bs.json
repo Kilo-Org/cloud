@@ -2803,7 +2803,7 @@
       "positionHint": "(1 od {{displayCount}})",
       "movedPastPrompt": "Agent je nastavio dalje nakon ovog upita. Ova kartica će se zatvoriti kada se sesija nastavi.",
       "waitingForAnswer": "Agent čeka tvoj odgovor. Dok je ovo pitanje otvoreno, slanje tvoje poruke agentu je na čekanju.",
-      "waitingForPermission": "Agent čeka dozvolu. Dok je ovaj zahtjev otvoren, slanje tvoje poruke agentu je na čekanju."
+      "waitingForPermission": "Dok je ovaj zahtjev otvoren, slanje tvoje poruke agentu je na čekanju."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

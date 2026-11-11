@@ -314,7 +314,7 @@ describe('Claude customer-billed routing', () => {
 
     expect(result).toEqual({
       kind: 'reconnect',
-      message: expect.stringContaining('is no longer available'),
+      message: expect.stringContaining('is no longer a member'),
     });
     expect(getGrantedClaudeBillingConnection).toHaveBeenCalledTimes(1);
     expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();

@@ -32,7 +32,7 @@ export const CLAUDE_BILLING_REQUIRED_MESSAGE =
  * instead of losing it.
  */
 export const CLAUDE_BILLING_RECONNECT_MESSAGE =
-  'The person who linked Claude billing for this organization is no longer available, so shared services cannot bill through it.';
+  'The person who linked Claude billing for this organization is no longer a member, so shared services cannot bill through it.';
 
 const ANTHROPIC_VERSION = '2023-06-01';
 /** Marks a request as authenticated by an OAuth token rather than an API key. */

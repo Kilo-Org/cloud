@@ -22,6 +22,8 @@
     "expired": "Utgånget"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Avbryt",
     "done": "Klar",
     "retry": "Försök igen",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Vald profil",
       "manualOverrides": "Manuella åsidosättningar",
       "openSettingsToReview": "Öppna Inställningar för att granska",
-      "profileSelection": "Profilval"
+      "profileSelection": "Profilval",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil har uppdaterats.",

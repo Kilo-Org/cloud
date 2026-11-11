@@ -22,6 +22,8 @@
     "expired": "Ժամկետանց"
   },
   "common": {
+    "sentenceJoiner": "։ ",
+    "listJoiner": ", ",
     "cancel": "Չեղարկել",
     "done": "Պատրաստ",
     "retry": "Կրկին փորձել",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Ընտրված պրոֆիլ",
       "manualOverrides": "Ձեռքով վերասահմանումներ",
       "openSettingsToReview": "Բացեք Կարգավորումները՝ վերանայելու համար",
-      "profileSelection": "Պրոֆիլի ընտրություն"
+      "profileSelection": "Պրոֆիլի ընտրություն",
+      "profileLayerAccessibility": "{{label}}՝ {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Թարմացվել է {{displayCount}} ֆայլ։",

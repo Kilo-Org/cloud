@@ -22,6 +22,8 @@
     "expired": "Skaduar"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Anulo",
     "done": "U krye",
     "retry": "Riprovo",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Profili i zgjedhur",
       "manualOverrides": "Anulimet manuale",
       "openSettingsToReview": "Hapni Cilësimet për t'i rishikuar",
-      "profileSelection": "Zgjedhja e profilit"
+      "profileSelection": "Zgjedhja e profilit",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar.",

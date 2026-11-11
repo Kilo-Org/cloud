@@ -22,6 +22,8 @@
     "expired": "Wedi dod i ben"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Canslo",
     "done": "Gorffen",
     "retry": "Rhoi cynnig eto",
@@ -2625,7 +2627,8 @@
       "selectedProfile": "Proffil dethol",
       "manualOverrides": "Diystyru â llaw",
       "openSettingsToReview": "Agor Gosodiadau i'w hadolygu",
-      "profileSelection": "Dewis proffil"
+      "profileSelection": "Dewis proffil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Diweddarwyd {{displayCount}} ffeil.",

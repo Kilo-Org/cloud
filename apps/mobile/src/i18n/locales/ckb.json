@@ -22,6 +22,8 @@
     "expired": "بەسەرچوو"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": "، ",
     "cancel": "هەڵبوەشێنەوە",
     "done": "تەواو",
     "retry": "دووبارە هەوڵدانەوە",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "پرۆفایلی هەڵبژێردراو",
       "manualOverrides": "سەرپێچیکردنی دەستی",
       "openSettingsToReview": "ڕێکخستنەکان بکەرەوە بۆ پێداچوونەوە",
-      "profileSelection": "هەڵبژاردنی پڕۆفایلی"
+      "profileSelection": "هەڵبژاردنی پڕۆفایلی",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} پەڕگە نوێ کرایەوە.",

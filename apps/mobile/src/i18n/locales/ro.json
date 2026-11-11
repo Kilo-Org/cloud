@@ -22,6 +22,8 @@
     "expired": "Expirat"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Anulează",
     "done": "Gata",
     "retry": "Reîncearcă",
@@ -2499,7 +2501,8 @@
       "selectedProfile": "Profilul selectat",
       "manualOverrides": "Anulări manuale",
       "openSettingsToReview": "Deschide Setări pentru a revizui",
-      "profileSelection": "Selectarea profilului"
+      "profileSelection": "Selectarea profilului",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "S-a actualizat {{displayCount}} fișier.",

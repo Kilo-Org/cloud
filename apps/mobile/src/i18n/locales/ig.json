@@ -22,6 +22,8 @@
     "expired": "Oge agwụla"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Kagbuo",
     "done": "Emechara",
     "retry": "Nwaa ọzọ",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "profaịlụ ahọpụtara",
       "manualOverrides": "Mgbanwe aka",
       "openSettingsToReview": "Mepee Ntọala ka ịlele",
-      "profileSelection": "Nhọrọ profaịlụ"
+      "profileSelection": "Nhọrọ profaịlụ",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Emelitere faịlụ {{displayCount}}.",

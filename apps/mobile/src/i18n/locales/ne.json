@@ -22,6 +22,8 @@
     "expired": "म्याद सकियो"
   },
   "common": {
+    "sentenceJoiner": "। ",
+    "listJoiner": ", ",
     "cancel": "रद्द गर्नुहोस्",
     "done": "सम्पन्न",
     "retry": "फेरि प्रयास गर्नुहोस्",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "चयन गरिएको प्रोफाइल",
       "manualOverrides": "म्यानुअल ओभरराइडहरू",
       "openSettingsToReview": "समीक्षा गर्न सेटिङहरू खोल्नुहोस्",
-      "profileSelection": "प्रोफाइल चयन"
+      "profileSelection": "प्रोफाइल चयन",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्यावधिक गरियो।",

@@ -22,6 +22,8 @@
     "expired": "Хугацаа нь дууссан"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Цуцлах",
     "done": "Болсон",
     "retry": "Дахин оролдох",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Сонгосон профайл",
       "manualOverrides": "Гараар хүчингүй болгох",
       "openSettingsToReview": "Хянахын тулд Тохиргоог нээнэ үү",
-      "profileSelection": "Профайлын сонголт"
+      "profileSelection": "Профайлын сонголт",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файлыг шинэчиллээ.",

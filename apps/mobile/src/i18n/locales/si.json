@@ -22,6 +22,8 @@
     "expired": "කල් ඉකුත් වී ඇත"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "අවලංගු කරන්න",
     "done": "අවසන්",
     "retry": "නැවත උත්සාහ කරන්න",
@@ -2463,7 +2465,8 @@
       "selectedProfile": "තෝරාගත් පැතිකඩ",
       "manualOverrides": "අතින් අභිබවා යයි",
       "openSettingsToReview": "සමාලෝචනය කිරීමට සැකසීම් විවෘත කරන්න",
-      "profileSelection": "පැතිකඩ තේරීම"
+      "profileSelection": "පැතිකඩ තේරීම",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "ගොනු {{displayCount}} ක් යාවත්කාලීන කර ඇත.",

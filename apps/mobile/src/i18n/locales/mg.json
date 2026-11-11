@@ -22,6 +22,8 @@
     "expired": "Lany fe-potoana"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Foano",
     "done": "Vita",
     "retry": "Andramo indray",
@@ -2463,7 +2465,8 @@
       "selectedProfile": "mombamomba voafantina",
       "manualOverrides": "Manoloana ny manual",
       "openSettingsToReview": "Sokafy ny Settings handinihana",
-      "profileSelection": "Fifidianana mombamomba"
+      "profileSelection": "Fifidianana mombamomba",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Nohavaozina ny rakitra {{displayCount}}.",

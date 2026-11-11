@@ -22,6 +22,8 @@
     "expired": "Мерзімі өтті"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Болдырмау",
     "done": "Дайын",
     "retry": "Қайталап көру",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Таңдалған профиль",
       "manualOverrides": "Қолмен қайта анықтау",
       "openSettingsToReview": "Қарап шығу үшін Параметрлерді ашыңыз",
-      "profileSelection": "Профиль таңдау"
+      "profileSelection": "Профиль таңдау",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл жаңартылды.",

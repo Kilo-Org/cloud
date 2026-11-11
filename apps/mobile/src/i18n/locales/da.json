@@ -22,6 +22,8 @@
     "expired": "Udløbet"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Annuller",
     "done": "Færdig",
     "retry": "Prøv igen",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Valgt profil",
       "manualOverrides": "Manuelle tilsidesættelser",
       "openSettingsToReview": "Åbn Indstillinger for at gennemgå",
-      "profileSelection": "Valg af profil"
+      "profileSelection": "Valg af profil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil er opdateret.",

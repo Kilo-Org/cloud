@@ -22,6 +22,8 @@
     "expired": "Isteklo"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Odustani",
     "done": "Gotovo",
     "retry": "Pokušaj ponovno",
@@ -2499,7 +2501,8 @@
       "selectedProfile": "Odabrani profil",
       "manualOverrides": "Ručna nadjačavanja",
       "openSettingsToReview": "Otvorite Postavke za pregled",
-      "profileSelection": "Izbor profila"
+      "profileSelection": "Izbor profila",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirana je {{displayCount}} datoteka.",

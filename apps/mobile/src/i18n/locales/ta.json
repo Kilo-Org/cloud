@@ -22,6 +22,8 @@
     "expired": "காலாவதியானது"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "ரத்து செய்யவும்",
     "done": "முடிந்தது",
     "retry": "மீண்டும் முயற்சிக்கவும்",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "தேர்ந்தெடுக்கப்பட்ட சுயவிவரம்",
       "manualOverrides": "கைமுறை மேலெழுதுகிறது",
       "openSettingsToReview": "மதிப்பாய்வு செய்ய அமைப்புகளைத் திறக்கவும்",
-      "profileSelection": "சுயவிவரத் தேர்வு"
+      "profileSelection": "சுயவிவரத் தேர்வு",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} கோப்பு புதுப்பிக்கப்பட்டது.",

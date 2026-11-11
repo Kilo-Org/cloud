@@ -22,6 +22,8 @@
     "expired": "Έληξε"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Ακύρωση",
     "done": "Τέλος",
     "retry": "Νέα προσπάθεια",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Επιλεγμένο προφίλ",
       "manualOverrides": "Χειροκίνητες παρακάμψεις",
       "openSettingsToReview": "Άνοιξε τις Ρυθμίσεις για έλεγχο",
-      "profileSelection": "Επιλογή προφίλ"
+      "profileSelection": "Επιλογή προφίλ",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ενημερώθηκε {{displayCount}} αρχείο.",

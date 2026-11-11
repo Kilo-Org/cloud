@@ -22,6 +22,8 @@
     "expired": "ਮਿਆਦ ਪੁੱਗ ਗਈ"
   },
   "common": {
+    "sentenceJoiner": "। ",
+    "listJoiner": ", ",
     "cancel": "ਰੱਦ ਕਰੋ",
     "done": "ਹੋ ਗਿਆ",
     "retry": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
@@ -2463,7 +2465,8 @@
       "selectedProfile": "ਚੁਣਿਆ ਗਿਆ ਪ੍ਰੋਫਾਈਲ",
       "manualOverrides": "ਮੈਨੁਅਲ ਓਵਰਰਾਈਡ",
       "openSettingsToReview": "ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਸੈਟਿੰਗਾਂ ਖੋਲ੍ਹੋ",
-      "profileSelection": "ਪ੍ਰੋਫਾਈਲ ਦੀ ਚੋਣ"
+      "profileSelection": "ਪ੍ਰੋਫਾਈਲ ਦੀ ਚੋਣ",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ਫਾਈਲ ਅੱਪਡੇਟ ਕੀਤੀ ਗਈ ਹੈ।",

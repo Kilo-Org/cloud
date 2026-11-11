@@ -22,6 +22,8 @@
     "expired": "期限切れ"
   },
   "common": {
+    "sentenceJoiner": "。",
+    "listJoiner": "、",
     "cancel": "キャンセル",
     "done": "完了",
     "retry": "再試行",
@@ -1919,7 +1921,8 @@
       "selectedProfile": "選択したプロフィール",
       "manualOverrides": "手動オーバーライド",
       "openSettingsToReview": "設定を開いて確認してください",
-      "profileSelection": "プロフィールの選択"
+      "profileSelection": "プロフィールの選択",
+      "profileLayerAccessibility": "{{label}}：{{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}件のファイルを更新しました。",

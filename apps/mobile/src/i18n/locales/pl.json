@@ -22,6 +22,8 @@
     "expired": "Wygasło"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Anuluj",
     "done": "Gotowe",
     "retry": "Spróbuj ponownie",
@@ -1961,7 +1963,8 @@
       "selectedProfile": "Wybrany profil",
       "manualOverrides": "Ręczne nadpisania",
       "openSettingsToReview": "Otwórz Ustawienia, aby sprawdzić",
-      "profileSelection": "Wybór profilu"
+      "profileSelection": "Wybór profilu",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Zaktualizowano {{displayCount}} plik.",

@@ -375,7 +375,7 @@ export function selectRemoteRowSpokenMeta(params: {
       composeActiveSessionSpokenMeta(params.costSpoken, params.timeSpoken),
     ].filter(Boolean);
     // Intl unit lists still add a conjunction in Arabic; the outer label owns its connector.
-    return parts.join(', ') || null;
+    return parts.join(i18n.t('common.listJoiner')) || null;
   }
   if (params.scheduled) {
     return params.scheduledWake;

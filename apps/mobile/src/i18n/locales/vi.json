@@ -22,6 +22,8 @@
     "expired": "Đã hết hạn"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Hủy",
     "done": "Xong",
     "retry": "Thử lại",
@@ -1919,7 +1921,8 @@
       "selectedProfile": "Hồ sơ đã chọn",
       "manualOverrides": "Ghi đè thủ công",
       "openSettingsToReview": "Mở Cài đặt để xem lại",
-      "profileSelection": "Lựa chọn hồ sơ"
+      "profileSelection": "Lựa chọn hồ sơ",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Đã cập nhật {{displayCount}} tệp.",

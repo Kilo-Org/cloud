@@ -22,6 +22,8 @@
     "expired": "میعاد ختم ہو گئی"
   },
   "common": {
+    "sentenceJoiner": "۔ ",
+    "listJoiner": "، ",
     "cancel": "منسوخ کریں",
     "done": "ہو گیا",
     "retry": "دوبارہ کوشش کریں",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "منتخب پروفائل",
       "manualOverrides": "دستی اوور رائیڈز",
       "openSettingsToReview": "جائزہ لینے کے لیے ترتیبات کھولیں۔",
-      "profileSelection": "پروفائل کا انتخاب"
+      "profileSelection": "پروفائل کا انتخاب",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فائل اپ ڈیٹ ہو گئی ہے۔",

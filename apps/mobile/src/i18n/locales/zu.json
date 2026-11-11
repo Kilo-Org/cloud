@@ -22,6 +22,8 @@
     "expired": "Kuphelelwe yisikhathi"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Khansela",
     "done": "Kwenziwe",
     "retry": "Zama futhi",
@@ -2463,7 +2465,8 @@
       "selectedProfile": "Iphrofayili ekhethiwe",
       "manualOverrides": "Ukukhipha mathupha",
       "openSettingsToReview": "Vula Izilungiselelo ukuze ubuyekeze",
-      "profileSelection": "Ukukhetha iphrofayela"
+      "profileSelection": "Ukukhetha iphrofayela",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}.",

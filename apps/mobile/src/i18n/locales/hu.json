@@ -22,6 +22,8 @@
     "expired": "Lejárt"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Mégse",
     "done": "Kész",
     "retry": "Újrapróbálkozás",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Kiválasztott profil",
       "manualOverrides": "Kézi felülírások",
       "openSettingsToReview": "Nyisd meg a Beállításokat az áttekintéshez",
-      "profileSelection": "Profil kiválasztása"
+      "profileSelection": "Profil kiválasztása",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fájl frissült.",

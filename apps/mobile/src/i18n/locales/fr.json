@@ -22,6 +22,8 @@
     "expired": "Expirée"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Annuler",
     "done": "Terminé",
     "retry": "Réessayer",
@@ -1845,7 +1847,8 @@
       "selectedProfile": "Profil sélectionné",
       "manualOverrides": "Remplacements manuels",
       "openSettingsToReview": "Ouvrez les paramètres pour vérifier",
-      "profileSelection": "Sélection de profil"
+      "profileSelection": "Sélection de profil",
+      "profileLayerAccessibility": "{{label}} : {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fichier mis à jour.",

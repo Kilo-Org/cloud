@@ -22,6 +22,8 @@
     "expired": "Verval"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Kanselleer",
     "done": "Klaar",
     "retry": "Probeer weer",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Geselekteerde profiel",
       "manualOverrides": "Handmatige oorheersing",
       "openSettingsToReview": "Maak Instellings oop om na te gaan",
-      "profileSelection": "Profielkeuse"
+      "profileSelection": "Profielkeuse",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} lêer is bygewerk.",

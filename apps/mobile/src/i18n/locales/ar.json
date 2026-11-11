@@ -22,6 +22,8 @@
     "expired": "انتهت الصلاحية"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": "، ",
     "cancel": "إلغاء",
     "done": "تم",
     "retry": "إعادة المحاولة",
@@ -2003,7 +2005,8 @@
       "selectedProfile": "الملف الشخصي المحدد",
       "manualOverrides": "التجاوزات اليدوية",
       "openSettingsToReview": "افتح الإعدادات للمراجعة",
-      "profileSelection": "اختيار الملف الشخصي"
+      "profileSelection": "اختيار الملف الشخصي",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "تم تحديث ملف واحد.",

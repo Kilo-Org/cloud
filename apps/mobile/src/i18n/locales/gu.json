@@ -22,6 +22,8 @@
     "expired": "સમયસીમા સમાપ્ત"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "રદ કરો",
     "done": "પૂર્ણ",
     "retry": "ફરી પ્રયાસ કરો",
@@ -2463,7 +2465,8 @@
       "selectedProfile": "પસંદ કરેલ પ્રોફાઇલ",
       "manualOverrides": "મેન્યુઅલ ઓવરરાઇડ",
       "openSettingsToReview": "સમીક્ષા કરવા માટે સેટિંગ્સ ખોલો",
-      "profileSelection": "પ્રોફાઇલ પસંદગી"
+      "profileSelection": "પ્રોફાઇલ પસંદગી",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ફાઇલ અપડેટ થઈ.",

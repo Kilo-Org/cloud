@@ -22,6 +22,8 @@
     "expired": "గడువు ముగిసింది"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "రద్దు చేయండి",
     "done": "పూర్తయింది",
     "retry": "మళ్లీ ప్రయత్నించండి",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "ఎంచుకున్న ప్రొఫైల్",
       "manualOverrides": "మాన్యువల్ ఓవర్‌రైడ్‌లు",
       "openSettingsToReview": "సమీక్షించడానికి సెట్టింగ్‌లను తెరవండి",
-      "profileSelection": "ప్రొఫైల్ ఎంపిక"
+      "profileSelection": "ప్రొఫైల్ ఎంపిక",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ఫైల్‌ను నవీకరించాము.",

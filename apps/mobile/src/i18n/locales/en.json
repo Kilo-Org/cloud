@@ -89,6 +89,8 @@
     "expired": "Expired"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Cancel",
     "done": "Done",
     "retry": "Retry",
@@ -2524,7 +2526,8 @@
       "selectedProfile": "Selected profile",
       "manualOverrides": "Manual overrides",
       "openSettingsToReview": "Open Settings to review",
-      "profileSelection": "Profile selection"
+      "profileSelection": "Profile selection",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Updated {{displayCount}} file",

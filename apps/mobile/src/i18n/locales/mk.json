@@ -22,6 +22,8 @@
     "expired": "Истечено"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Откажи",
     "done": "Готово",
     "retry": "Обиди се повторно",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Избран профил",
       "manualOverrides": "Рачно отфрлања",
       "openSettingsToReview": "Отворете Поставки за прегледување",
-      "profileSelection": "Избор на профил"
+      "profileSelection": "Избор на профил",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ажурирана е {{displayCount}} датотека.",

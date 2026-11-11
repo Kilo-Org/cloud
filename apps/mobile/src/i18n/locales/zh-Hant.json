@@ -22,6 +22,8 @@
     "expired": "已過期"
   },
   "common": {
+    "sentenceJoiner": "。",
+    "listJoiner": "、",
     "cancel": "取消",
     "done": "完成",
     "retry": "再試一次",
@@ -1919,7 +1921,8 @@
       "selectedProfile": "選定的個人資料",
       "manualOverrides": "手動超控",
       "openSettingsToReview": "打開設定進行查看",
-      "profileSelection": "型材選擇"
+      "profileSelection": "型材選擇",
+      "profileLayerAccessibility": "{{label}}：{{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 個檔案。",

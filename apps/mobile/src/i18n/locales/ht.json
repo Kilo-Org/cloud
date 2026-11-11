@@ -22,6 +22,8 @@
     "expired": "Ekspire"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Anile",
     "done": "Fèt",
     "retry": "Eseye ankò",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Chwazi pwofil la",
       "manualOverrides": "Manyèl overrides",
       "openSettingsToReview": "Louvri Anviwònman pou revize",
-      "profileSelection": "Seleksyon pwofil"
+      "profileSelection": "Seleksyon pwofil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Nou mete {{displayCount}} fichye ajou.",

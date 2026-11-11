@@ -22,6 +22,8 @@
     "expired": "Lokaci ya ƙare"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Soke",
     "done": "An gama",
     "retry": "Sake gwadawa",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Bayanan martaba da aka zaɓa",
       "manualOverrides": "Hannu ya soke",
       "openSettingsToReview": "Bude Saituna don dubawa",
-      "profileSelection": "Zaɓin bayanin martaba"
+      "profileSelection": "Zaɓin bayanin martaba",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta fayil {{displayCount}}.",

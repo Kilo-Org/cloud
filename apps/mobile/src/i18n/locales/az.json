@@ -22,6 +22,8 @@
     "expired": "Müddəti bitib"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Ləğv et",
     "done": "Hazır",
     "retry": "Yenidən cəhd et",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Seçilmiş profil",
       "manualOverrides": "Əl ilə ləğvlər",
       "openSettingsToReview": "Nəzərdən keçirmək üçün Parametrləri açın",
-      "profileSelection": "Profil seçimi"
+      "profileSelection": "Profil seçimi",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl yeniləndi.",

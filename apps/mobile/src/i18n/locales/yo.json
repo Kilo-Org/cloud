@@ -22,6 +22,8 @@
     "expired": "Àkókò ti kọjá"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Fagilé",
     "done": "Ó ti tán",
     "retry": "Tún gbìyànjú",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Profaili ti o yan",
       "manualOverrides": "Afowoyi danu",
       "openSettingsToReview": "Ṣii Eto lati ṣe ayẹwo",
-      "profileSelection": "Aṣayan profaili"
+      "profileSelection": "Aṣayan profaili",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "A ti ṣe ìmúdójúìwọ̀n fáìlì {{displayCount}}.",

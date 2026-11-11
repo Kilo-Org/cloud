@@ -22,6 +22,8 @@
     "expired": "Waqtigiisu dhacay"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Jooji",
     "done": "Dhammaystiran",
     "retry": "Mar kale isku day",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "profile la doortay",
       "manualOverrides": "Buug-gudbiyeedka",
       "openSettingsToReview": "Fur Settings si aad dib ugu eegto",
-      "profileSelection": "Doorashada astaanta"
+      "profileSelection": "Doorashada astaanta",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl ayaa la cusboonaysiiyay.",

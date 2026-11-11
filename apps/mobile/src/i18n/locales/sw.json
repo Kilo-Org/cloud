@@ -22,6 +22,8 @@
     "expired": "Muda wake umeisha"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Ghairi",
     "done": "Nimemaliza",
     "retry": "Jaribu tena",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Wasifu uliochaguliwa",
       "manualOverrides": "Ubatilishaji wa mikono",
       "openSettingsToReview": "Fungua Mipangilio ili kukagua",
-      "profileSelection": "Uteuzi wa wasifu"
+      "profileSelection": "Uteuzi wa wasifu",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Faili {{displayCount}} imesasishwa.",

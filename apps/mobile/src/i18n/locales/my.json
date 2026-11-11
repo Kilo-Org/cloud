@@ -22,6 +22,8 @@
     "expired": "သက်တမ်းကုန်ပြီ"
   },
   "common": {
+    "sentenceJoiner": "။ ",
+    "listJoiner": "၊ ",
     "cancel": "ပယ်ဖျက်ပါ",
     "done": "ပြီးပါပြီ",
     "retry": "ထပ်စမ်းပါ",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "ရွေးချယ်ထားသော ပရိုဖိုင်",
       "manualOverrides": "လူကိုယ်တိုင် အစားထိုးမှုများ",
       "openSettingsToReview": "ပြန်လည်သုံးသပ်ရန် ဆက်တင်များကိုဖွင့်ပါ။",
-      "profileSelection": "ပရိုဖိုင်ရွေးချယ်မှု"
+      "profileSelection": "ပရိုဖိုင်ရွေးချယ်မှု",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "ဖိုင် {{displayCount}} ခုကို ပြင်ဆင်ပြီးပါပြီ။",

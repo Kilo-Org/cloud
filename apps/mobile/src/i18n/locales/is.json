@@ -22,6 +22,8 @@
     "expired": "Útrunnið"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Hætta við",
     "done": "Lokið",
     "retry": "Reyna aftur",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Valið snið",
       "manualOverrides": "Handvirkar yfirfærslur",
       "openSettingsToReview": "Opnaðu Stillingar til að skoða",
-      "profileSelection": "Prófílval"
+      "profileSelection": "Prófílval",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} skrá var uppfærð.",

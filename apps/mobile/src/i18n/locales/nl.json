@@ -22,6 +22,8 @@
     "expired": "Verlopen"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Annuleren",
     "done": "Klaar",
     "retry": "Opnieuw proberen",
@@ -1919,7 +1921,8 @@
       "selectedProfile": "Geselecteerd profiel",
       "manualOverrides": "Handmatige overschrijvingen",
       "openSettingsToReview": "Open Instellingen om te bekijken",
-      "profileSelection": "Profiel selectie"
+      "profileSelection": "Profiel selectie",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Er is {{displayCount}} bestand bijgewerkt.",

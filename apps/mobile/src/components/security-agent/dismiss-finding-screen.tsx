@@ -16,6 +16,7 @@ import { Text } from '@/components/ui/text';
 import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
 import { isSecuritySyncRetryable, securityMutationCopyKey } from '@/lib/security-agent-ledger';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
+import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -43,13 +44,14 @@ type DismissFindingScreenProps = {
 
 function DismissFindingSkeleton() {
   const { t } = useTranslation();
+  const modalTopInset = useFormSheetHeaderTopInset();
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
         className="px-6"
         title={t('securityAgent.dismiss.title')}
         modal
-        modalTopInset="bottom-form-sheet"
+        modalTopInset={modalTopInset}
       />
       <View className="gap-6 px-6 pt-4">
         {/* The identity card: p-3 plus a title line and the two meta lines. */}
@@ -66,6 +68,9 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  // This header is inside a formSheet route: the sheet edge owns the top
+  // clearance unless the sheet is the stack's first screen.
+  const modalTopInset = useFormSheetHeaderTopInset();
   const capability = useSecurityAgentCapability(scope);
   const findingQuery = useSecurityFinding(scope, findingId);
   const [reason, setReason] = useState<DismissReason | null>(null);
@@ -152,7 +157,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           className="px-6"
           title={t('securityAgent.dismiss.title')}
           modal
-          modalTopInset="bottom-form-sheet"
+          modalTopInset={modalTopInset}
         />
         <EmptyState
           icon={ShieldOff}
@@ -170,7 +175,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           className="px-6"
           title={t('securityAgent.dismiss.title')}
           modal
-          modalTopInset="bottom-form-sheet"
+          modalTopInset={modalTopInset}
         />
         <QueryError
           message={t('securityAgent.dismiss.couldNotLoad')}
@@ -187,7 +192,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           className="px-6"
           title={t('securityAgent.dismiss.title')}
           modal
-          modalTopInset="bottom-form-sheet"
+          modalTopInset={modalTopInset}
         />
         <QueryError
           message={t('securityAgent.dismiss.couldNotCheckPermissions')}
@@ -215,7 +220,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           className="px-6"
           title={t('securityAgent.dismiss.title')}
           modal
-          modalTopInset="bottom-form-sheet"
+          modalTopInset={modalTopInset}
         />
         <EmptyState
           icon={ShieldOff}
@@ -233,7 +238,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           className="px-6"
           title={t('securityAgent.dismiss.title')}
           modal
-          modalTopInset="bottom-form-sheet"
+          modalTopInset={modalTopInset}
         />
         <EmptyState
           icon={ShieldOff}
@@ -254,7 +259,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         className="px-6"
         title={t('securityAgent.dismiss.title')}
         modal
-        modalTopInset="bottom-form-sheet"
+        modalTopInset={modalTopInset}
       />
       <ScrollView
         className="flex-1"

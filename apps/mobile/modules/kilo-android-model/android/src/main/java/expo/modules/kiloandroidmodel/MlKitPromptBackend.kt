@@ -33,16 +33,8 @@ internal class MlKitPromptBackend : PromptBackend {
   override suspend fun availability(): Map<String, Any> {
     val status = model.checkStatus()
     val name = statusName(status)
-    // Unavailable devices have no model identity or budget to advertise.
     if (status == FeatureStatus.UNAVAILABLE) {
-      return mapOf(
-        "status" to name,
-        "reason" to "model_unavailable",
-        "modelId" to "",
-        "contextWindow" to 0,
-        "maxOutputTokens" to 0,
-        "systemInstructions" to false
-      )
+      return unavailableAvailability("model_unavailable", name)
     }
     val metadata = mutableMapOf<String, Any>(
       "modelId" to "",
@@ -239,13 +231,14 @@ internal class MlKitPromptBackend : PromptBackend {
     else -> "unavailable"
   }
 
-  private companion object {
+  internal companion object {
     // Public Prompt guide: input must be under 4000, output range is 1..4096.
     // https://developers.google.com/ml-kit/genai/prompt/android/get-started
-    const val MAX_INPUT_TOKENS = 3999
+    private const val MAX_INPUT_TOKENS = 3999
+    // The request parser in PromptBackend.kt bounds maxTokens with this one value.
     const val MAX_OUTPUT_TOKENS = 4096
     // beta2 GenerateContentRequest.Builder takes at most one ImagePart. Multiple
     // images in one request need beta3 (release notes, July 14, 2026).
-    const val MAX_IMAGES = 1
+    private const val MAX_IMAGES = 1
   }
 }

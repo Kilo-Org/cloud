@@ -11,6 +11,22 @@ internal interface PromptBackend {
 
 internal class ModelFailure(val reason: String) : Exception(reason)
 
+/**
+ * The availability payload of a provider that cannot serve a request: no model
+ * identity and no budget to advertise, only [reason] and the reported [status].
+ */
+internal fun unavailableAvailability(
+  reason: String,
+  status: String = "unavailable"
+): Map<String, Any> = mapOf(
+  "status" to status,
+  "reason" to reason,
+  "modelId" to "",
+  "contextWindow" to 0,
+  "maxOutputTokens" to 0,
+  "systemInstructions" to false
+)
+
 /** A base64 image as JavaScript sends it. The backend decodes it off the main thread. */
 internal data class ModelImage(val media: String, val data: String)
 
@@ -39,7 +55,10 @@ internal data class ModelRequest(
       }
       val tokens = (value["maxTokens"] as? Number)?.toDouble()
         ?: throw ModelFailure("invalid_request")
-      if (!tokens.isFinite() || tokens < 1 || tokens > 4096 || tokens % 1.0 != 0.0) {
+      // The backend that serves the request owns the output range it advertises.
+      if (!tokens.isFinite() || tokens < 1 || tokens % 1.0 != 0.0 ||
+        tokens > MlKitPromptBackend.MAX_OUTPUT_TOKENS
+      ) {
         throw ModelFailure("invalid_max_tokens")
       }
       return ModelRequest(system, messages, tokens.toInt())

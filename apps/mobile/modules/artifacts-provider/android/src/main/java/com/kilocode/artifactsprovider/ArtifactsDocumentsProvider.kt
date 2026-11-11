@@ -245,9 +245,6 @@ class ArtifactsDocumentsProvider : DocumentsProvider() {
    * a file id may carry path segments.
    */
   private fun safeDocumentId(candidate: String, allowSlashes: Boolean): String? {
-    if (candidate.isEmpty() || candidate.startsWith('/') || candidate.endsWith('/')) {
-      return null
-    }
     if (!allowSlashes && candidate.contains('/')) {
       return null
     }

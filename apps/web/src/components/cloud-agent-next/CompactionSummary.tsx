@@ -13,7 +13,7 @@ export function CompactionSummary({ text }: { text?: string }) {
         chat.
       </p>
       {text ? (
-        <Collapsible defaultOpen className="border-border rounded-md border">
+        <Collapsible className="border-border rounded-md border">
           <div className="flex items-center pr-2">
             <CollapsibleTrigger className="group hover:bg-muted/40 focus-visible:ring-ring flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-2 text-left text-sm focus-visible:ring-2 focus-visible:outline-none">
               <ChevronDown

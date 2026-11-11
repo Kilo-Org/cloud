@@ -792,6 +792,14 @@ export async function describeClaudeBillingSharing(
   return { shareableLinks, sharedWith };
 }
 
+/**
+ * Clears the grants a deleted person held. The organization's shared-services
+ * connection and its grant stay when the connector is erased: the connection
+ * belongs to the organization, and the row keeps `created_by` as the record of
+ * who linked it until an organization owner reconnects it. Routing and the
+ * billing card report that connection as requiring a reconnect while its
+ * connector is gone.
+ */
 export async function removeUserClaudeBillingGrants(
   userId: string,
   onDb: WriteDatabase

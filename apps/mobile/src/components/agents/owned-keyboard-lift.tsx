@@ -1,24 +1,60 @@
 import { type ReactNode, useCallback, useState } from 'react';
-import { type LayoutChangeEvent, View } from 'react-native';
+import { type LayoutChangeEvent, useWindowDimensions, View } from 'react-native';
 
 import { MIN_BODY_VIEWPORT } from '@/lib/body-viewport';
+
+/**
+ * The frame height the lift last measured, and the window it was measured in.
+ *
+ * The height alone cannot bound the pad: a rotation replaces the window with a
+ * shorter one, and the frame's new height arrives from a layout pass that runs
+ * after the first post-rotation render. A height measured in the previous
+ * window therefore says nothing about the room this window leaves.
+ */
+export type LiftFrameMeasurement = {
+  /** The body frame's laid-out height, in points. */
+  height: number;
+  /** The window height the frame was laid out in. */
+  windowHeight: number;
+};
 
 /**
  * The pad the body frame takes for `occlusion`: the whole band while the frame
  * can afford it, and never more than the room that keeps `MIN_BODY_VIEWPORT`.
  *
- * `frameHeight` is the frame's own laid-out height, `null` before the first
- * measurement. A pad is inside that frame, so measuring it cannot feed back
- * into the value being clamped.
+ * `measured` is `null` before the first layout, and holds the window it belongs
+ * to after it. A pad is inside that frame, so measuring it cannot feed back into
+ * the value being clamped.
+ *
+ * Three cases, in order:
+ *
+ * - No keyboard band: nothing to reserve.
+ * - No measurement yet: reserve the whole band. The frame has not been laid out
+ *   in any window, so there is no room to compare against, and the band the
+ *   keyboard just raised is the current window's own.
+ * - A measurement from another window: release the band for this render. The
+ *   height it carries belongs to a window this screen no longer has, and a band
+ *   taller than the new frame fills the body — the list then draws nothing at
+ *   all, with no rows, skeleton, empty state or error. The layout pass that
+ *   follows reports the new height, and the next render clamps against it, so
+ *   the body shows its rows for the frame between, with the lowest points under
+ *   the keyboard until the pad returns.
  */
-export function clampLiftPad(occlusion: number, frameHeight: number | null): number {
+export function clampLiftPad(
+  occlusion: number,
+  measured: LiftFrameMeasurement | null,
+  windowHeight: number
+): number {
   if (occlusion <= 0) {
     return 0;
   }
-  if (frameHeight === null) {
+  if (measured === null) {
     return occlusion;
   }
-  return Math.min(occlusion, Math.max(0, frameHeight - MIN_BODY_VIEWPORT));
+  if (measured.windowHeight !== windowHeight) {
+    return 0;
+  }
+  return Math.min(occlusion, Math.max(0, measured.height - MIN_BODY_VIEWPORT));
 }
 
 type LayoutHandler = (event: LayoutChangeEvent) => void;
@@ -50,16 +86,25 @@ type OwnedKeyboardLiftProps = {
  * landscape window is shorter than its own portrait keyboard. An unclamped pad
  * then fills the whole body and the list renders nothing, with no rows,
  * skeleton, empty state or error to explain it. The clamp keeps
- * `MIN_BODY_VIEWPORT` points of body until a fresh keyboard height arrives (see
- * `@/lib/body-viewport`).
+ * `MIN_BODY_VIEWPORT` points of body, and drops a measurement taken in another
+ * window rather than trusting it for the render the rotation produces (see
+ * `@/lib/body-viewport` and `clampLiftPad`).
  */
 export function useKeyboardLiftPad(occlusion: number): KeyboardLiftFrame {
-  const [frameHeight, setFrameHeight] = useState<number | null>(null);
-  const handleLayout = useCallback((event: LayoutChangeEvent) => {
-    const { height } = event.nativeEvent.layout;
-    setFrameHeight(previous => (previous === height ? previous : height));
-  }, []);
-  return { pad: clampLiftPad(occlusion, frameHeight), handleLayout };
+  const { height: windowHeight } = useWindowDimensions();
+  const [measured, setMeasured] = useState<LiftFrameMeasurement | null>(null);
+  const handleLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const { height } = event.nativeEvent.layout;
+      setMeasured(previous =>
+        previous?.height === height && previous.windowHeight === windowHeight
+          ? previous
+          : { height, windowHeight }
+      );
+    },
+    [windowHeight]
+  );
+  return { pad: clampLiftPad(occlusion, measured, windowHeight), handleLayout };
 }
 
 /**

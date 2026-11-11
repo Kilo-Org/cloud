@@ -120,7 +120,10 @@ the property it last applied stays on the native view). The pad never takes more
 it is clamped so a minimum viewport survives (`MIN_BODY_VIEWPORT` in `@/lib/body-viewport`, the same floor
 `TabScreenScrollView` applies to its frame), because a keyboard height belongs to the window it was measured in
 and a rotation replaces that window with a much shorter one — an unclamped pad then fills the body and the list
-renders nothing, with no rows, skeleton, empty state or error. `useKeyboardState` is the app's one keyboard-height read.
+renders nothing, with no rows, skeleton, empty state or error. The clamp measures the body frame and keys that
+measurement to `useWindowDimensions().height`: the layout pass that reports a new frame runs after the first
+render a rotation produces, so a frame measured in the previous window is released for that render instead of
+being trusted. `useKeyboardState` is the app's one keyboard-height read.
 The conversation list follows the newest message when its viewport shrinks; it must not add a second keyboard inset.
 A surface whose content
 pads the platform's bottom inset itself passes `keyboardVerticalOffset={keyboardInsetOffset(bottom)}`

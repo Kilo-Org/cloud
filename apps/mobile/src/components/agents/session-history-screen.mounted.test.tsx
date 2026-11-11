@@ -95,6 +95,28 @@ const keyboardState = vi.hoisted(() => {
 
 const focusState = vi.hoisted(() => ({ current: true as boolean }));
 
+// The window the screen is laid out in. A rotation replaces it, and the lift
+// must not reuse a frame height it measured in the previous one.
+const windowState = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  const state = {
+    snapshot: { width: 402, height: 874, scale: 3, fontScale: 1 },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    set: (height: number, width: number) => {
+      state.snapshot = { width, height, scale: 3, fontScale: 1 };
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+  };
+  return state;
+});
+
 // The screen reads the keyboard from `react-native-keyboard-controller`'s
 // provider, so this suite drives that store: a lift is only observable when the
 // keyboard it owns is actually up.
@@ -138,17 +160,30 @@ const focusCallbacks = vi.hoisted(() => ({
 const handleRefetchSpy = vi.hoisted(() => vi.fn());
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
 
-vi.mock('react-native', () => ({
-  View: 'View',
-  Modal: 'Modal',
-  Pressable: 'Pressable',
-  ScrollView: 'ScrollView',
-  Platform: platformState,
-  Keyboard: { dismiss: vi.fn(), addListener: keyboardState.addListener },
-  KeyboardAvoidingView: 'KeyboardAvoidingView',
-  AppState: { addEventListener: appState.addEventListener },
-  ActivityIndicator: 'ActivityIndicator',
-}));
+vi.mock('react-native', async () => {
+  // `vi.mock` factories are hoisted above the file's static imports, so `react`
+  // must be pulled in here.
+  const React = await import('react');
+  return {
+    View: 'View',
+    Modal: 'Modal',
+    Pressable: 'Pressable',
+    ScrollView: 'ScrollView',
+    Platform: platformState,
+    Keyboard: { dismiss: vi.fn(), addListener: keyboardState.addListener },
+    KeyboardAvoidingView: 'KeyboardAvoidingView',
+    AppState: { addEventListener: appState.addEventListener },
+    ActivityIndicator: 'ActivityIndicator',
+    // The real hook re-renders on a window change; a rotation test needs that,
+    // and a snapshot object must keep its identity between calls.
+    useWindowDimensions: () =>
+      React.useSyncExternalStore(
+        windowState.subscribe,
+        () => windowState.snapshot,
+        () => windowState.snapshot
+      ),
+  };
+});
 // The modal mock below still loads the real module through `importOriginal`,
 // which imports `react-native-safe-area-context`; that package's `react-native`
 // entry points at its untranspiled `src/` TypeScript, which vitest cannot parse,
@@ -420,6 +455,7 @@ describe('SessionHistoryScreen', () => {
     readFilterRecord.mockReset();
     readFilterRecord.mockResolvedValue(null);
     focusState.current = true;
+    windowState.set(874, 402);
     focusCallbacks.current = new Set();
     handleRefetchSpy.mockClear();
     handleRefetchSpy.mockResolvedValue(undefined);
@@ -1095,6 +1131,37 @@ describe('SessionHistoryScreen', () => {
     });
 
     expect(liftPad(renderer)).toBe(253 - MIN_BODY_VIEWPORT);
+    expect(findNodeByType(renderer, 'AgentSessionListContent')).toBeDefined();
+  });
+
+  // The rotation render runs before the new layout pass reports the landscape
+  // frame, so the pad must not reuse the portrait measurement: 336 points of pad
+  // inside a 298-point frame fills the body for that frame.
+  it('releases the stale portrait frame for the render a rotation produces', async () => {
+    listState.storedSessions = [{ session_id: 'stored-1', organization_id: null }];
+    const renderer = await renderScreen();
+    const searchHeader = findNodeByType(renderer, 'SessionListSearchHeader');
+
+    act(() => {
+      (searchHeader.props.onFocus as () => void)();
+    });
+    act(() => {
+      keyboardLift.setHeight(336);
+    });
+    act(() => {
+      (
+        renderer.root.findByType(OwnedKeyboardLift).findByType('View').props.onLayout as (event: {
+          nativeEvent: { layout: { height: number } };
+        }) => void
+      )({ nativeEvent: { layout: { height: 708 } } });
+    });
+    expect(liftPad(renderer)).toBe(336);
+
+    act(() => {
+      windowState.set(402, 874);
+    });
+
+    expect(liftPad(renderer)).toBe(0);
     expect(findNodeByType(renderer, 'AgentSessionListContent')).toBeDefined();
   });
 

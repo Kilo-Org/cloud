@@ -122,7 +122,7 @@ type ChatSidebarProps = {
   workspaceOrder?: WorkspaceOrder;
   workspaceRowsTruncated?: boolean;
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
-  onDeleteWorktree?: (worktreeId: string) => void;
+  onDeleteWorktree?: (worktreeId: string, name: string) => void;
   deletingWorktreeIds?: readonly string[];
   isDeletionInProgress?: boolean;
   isInSheet?: boolean;
@@ -400,7 +400,7 @@ function WorktreeGroupRow({
   onOpenWorktree: (group: SidebarWorktreeGroup) => void;
   onCreateWorktreeChat?: (sourceKiloSessionId: string) => void;
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
-  onDeleteWorktree?: (worktreeId: string) => void;
+  onDeleteWorktree?: (worktreeId: string, name: string) => void;
   onNewStackedWorkspace?: (
     group: SidebarWorktreeGroup,
     source?: { branch: string; repository: string } | null
@@ -759,7 +759,7 @@ function WorktreeGroupRow({
                         <DropdownMenuItem
                           variant="destructive"
                           disabled={isDeletionInProgress}
-                          onSelect={() => onDeleteWorktree(group.worktreeId)}
+                          onSelect={() => onDeleteWorktree(group.worktreeId, worktreeLabel)}
                         >
                           <Trash2 className="h-4 w-4" />
                           Delete worktree

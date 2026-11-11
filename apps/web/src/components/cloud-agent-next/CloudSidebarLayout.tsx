@@ -310,7 +310,10 @@ function CloudSidebarLayoutContent({
   const [composerFocusRequest, setComposerFocusRequest] = useState<ComposerFocusRequest | null>(
     null
   );
-  const [worktreePendingDeletion, setWorktreePendingDeletion] = useState<string>();
+  const [worktreePendingDeletion, setWorktreePendingDeletion] = useState<{
+    worktreeId: string;
+    name: string;
+  }>();
   const [deletingWorktreeIds, setDeletingWorktreeIds] = useState<ReadonlySet<string>>(
     () => new Set()
   );
@@ -974,8 +977,12 @@ function CloudSidebarLayoutContent({
     [organizationId, queryClient, renameWorktree, trpc]
   );
 
+  const handleRequestWorktreeDelete = useCallback((worktreeId: string, name: string) => {
+    setWorktreePendingDeletion({ worktreeId, name });
+  }, []);
+
   const handleConfirmWorktreeDelete = useCallback(() => {
-    const worktreeId = worktreePendingDeletion;
+    const worktreeId = worktreePendingDeletion?.worktreeId;
     if (
       !worktreeId ||
       deletingWorktreeIds.has(worktreeId) ||
@@ -1038,7 +1045,8 @@ function CloudSidebarLayoutContent({
   const stackedChildCount = useMemo(
     () =>
       worktreePendingDeletion
-        ? workspaceRows.filter(row => row.parentWorktreeId === worktreePendingDeletion).length
+        ? workspaceRows.filter(row => row.parentWorktreeId === worktreePendingDeletion.worktreeId)
+            .length
         : 0,
     [workspaceRows, worktreePendingDeletion]
   );
@@ -1115,7 +1123,7 @@ function CloudSidebarLayoutContent({
               workspaceRowsTruncated={workspaceRowsTruncated}
               isLoading={isLoadingSessions}
               onRenameWorktree={handleRenameWorktree}
-              onDeleteWorktree={setWorktreePendingDeletion}
+              onDeleteWorktree={handleRequestWorktreeDelete}
               deletingWorktreeIds={deletingWorktreeIdList}
               onCreateWorktreeChat={handleCreateWorktreeChat}
               isInSheet
@@ -1158,7 +1166,7 @@ function CloudSidebarLayoutContent({
             workspaceRowsTruncated={workspaceRowsTruncated}
             isLoading={isLoadingSessions}
             onRenameWorktree={handleRenameWorktree}
-            onDeleteWorktree={setWorktreePendingDeletion}
+            onDeleteWorktree={handleRequestWorktreeDelete}
             deletingWorktreeIds={deletingWorktreeIdList}
             onCreateWorktreeChat={handleCreateWorktreeChat}
             activeSessions={activeSessions}
@@ -1199,7 +1207,9 @@ function CloudSidebarLayoutContent({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete worktree?</AlertDialogTitle>
+            <AlertDialogTitle className="wrap-anywhere">
+              Delete worktree “{worktreePendingDeletion?.name}”?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               This permanently deletes every chat and the worktree’s files, stops its running work,
               and cleans up its sandbox resources. Other worktrees are not affected.

@@ -229,6 +229,21 @@
     "signInCodeField": "Kôd za prijavu",
     "or": "ili"
   },
+  "pendingLink": {
+    "description": "Račun s adresom {{email}} već postoji. Prijavi se jednim od njegovih načina da dodaš {{provider}}.",
+    "emailCode": "Pošalji mi kôd za prijavu e-poštom",
+    "continueInBrowser": "Nastavi u pregledniku",
+    "startAgain": "Počni ispočetka",
+    "expired": "Ovaj zahtjev za dodavanje usluge {{provider}} je istekao.",
+    "noMethods": "Ovaj račun nema drugi način prijave pa se {{provider}} ne može dodati.",
+    "linked": "{{provider}} je dodan tvom računu.",
+    "failedExpired": "{{provider}} nije dodan jer je zahtjev istekao.",
+    "failedWrongAccount": "{{provider}} nije dodan jer si se prijavio u drugi račun.",
+    "failedAccountAlreadyLinked": "{{provider}} nije dodan jer je već povezan s drugim računom.",
+    "failedProviderAlreadyLinked": "{{provider}} nije dodan jer tvoj račun već ima drugu prijavu putem usluge {{provider}}.",
+    "failedLinking": "{{provider}} nije moguće dodati tvom računu.",
+    "notAdded": "Prijavljen si. {{provider}} nije dodan tvom računu."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatski pregledi PR-ova",
     "securityAgentSubtitle": "Pronađi i otkloni ranjivosti",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Testni račun",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Poslovni SSO",
     "passkeysTitle": "Pristupni ključevi",
     "passkeysSubtitle": "Prijavi se bez lozinke",
@@ -2340,7 +2357,7 @@
       "cloningSession": "Kloniranje sesije",
       "couldNotLoadThisSession": "Nije moguće učitati ovu sesiju.",
       "cloneFailedRetry": "Nije moguće klonirati ovu sesiju. Pokušaj ponovno.",
-      "notEnoughCredits": "Nema dovoljno kredita za pokretanje agenta Cloud Agent. Dodaj kredite i pokušaj ponovno.",
+      "notEnoughCredits": "Nema dovoljno kredita za ovaj zahtjev. Dodaj kredite i pokušaj ponovno.",
       "previousTaskFinishing": "Prethodni se zadatak još dovršava. Pričekaj trenutak.",
       "serviceUnavailable": "Usluga trenutačno nije dostupna. Pokušaj ponovno.",
       "connectionTrouble": "Došlo je do problema s vezom. Pokušaj ponovno za trenutak.",
@@ -2450,7 +2467,7 @@
       "discardWithUploadsMessage": "Tvoj upit i sve prenesene datoteke koje nisu priložene poslanim porukama bit će izbrisani.",
       "discardFailed": "Nije moguće odbaciti nacrt. Pokušaj ponovno.",
       "remoteHint": "Za pokretanje na tvom računalu pokreni Kilo tamo i ostavi ga da radi.",
-      "continueFrom": "Nastavlja se sesija {{title}}.",
+      "continueFrom": "Nastavlja se sesija „{{title}}”.",
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberi Cloud Agent ili drugi CLI.",
       "importFailed": "Uvoz ove sesije nije uspio.",
@@ -2503,6 +2520,8 @@
       "toolList": "prikaži popis",
       "toolPatch": "primijeni izmjene",
       "toolTask": "zadatak",
+      "toolSendFile": "Poslana datoteka",
+      "toolSendFileAction": "pošalji datoteku",
       "readTodos": "Pročitaj plan",
       "updateTodos": "Ažuriraj plan",
       "linesBadge": "redaka: {{displayCount}}",
@@ -2606,7 +2625,21 @@
       "thought": "Misao",
       "showDetails": "Prikaži pojedinosti",
       "pending": "Na čekanju…",
-      "running": "Izvođenje…"
+      "running": "Izvođenje…",
+      "field": {
+        "filePath": "Putanja datoteke",
+        "path": "Putanja",
+        "offset": "Pomak",
+        "limit": "Ograničenje",
+        "pattern": "Uzorak",
+        "include": "Uključivanje",
+        "patchText": "Tekst zakrpe",
+        "query": "Upit",
+        "prompt": "Uputa",
+        "header": "Naslov",
+        "question": "Pitanje",
+        "options": "Mogućnosti"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Prikaz sadržaja nije uspio."
@@ -2622,7 +2655,7 @@
       "assistantContextOverflow": "Razgovor je predug za model.",
       "assistantProviderError": "Pružatelj je vratio pogrešku.",
       "assistantProviderRefused": "Pružatelj je odbio ovaj zahtjev i nije ga moguće ponovno pokušati.",
-      "assistantCreditsRefusal": "Nema dovoljno kredita za pokretanje agenta Cloud Agent.",
+      "assistantCreditsRefusal": "Nema dovoljno kredita za ovaj zahtjev.",
       "assistantOutputLimit": "Odgovor je dosegao ograničenje izlaza modela.",
       "assistantStructuredOutput": "Odgovor nije odgovarao potrebnom formatu.",
       "assistantFailed": "Generiranje odgovora nije uspjelo."
@@ -3858,7 +3891,7 @@
     "reasoningEffort": {
       "modelFlag": "Ovaj model podržava intenzitet razmišljanja"
     },
-    "creditsRequired": "Nema dovoljno kredita za slanje ove poruke. Dodajte kredite i pokušajte ponovno."
+    "creditsRequired": "Nema dovoljno kredita za slanje ove poruke."
   },
   "settingsTools": {
     "confirmTitle": "Potvrditi ovu promjenu?"
@@ -4057,6 +4090,7 @@
       "namePlaceholder": "Moj agent",
       "promptPlaceholder": "ti si...",
       "tools": "Alati",
+      "wholeToolRule": "Ovaj agent primjenjuje jedno pravilo na sve alate odjednom: {{rule}}. Ovi su prekidači samo za čitanje.",
       "visibility": "Vidljivost",
       "visibilityPrimary": "Primarno — prikazano u alatu za odabir",
       "visibilitySubagent": "Subagent — samo poziv od drugih",
@@ -4098,6 +4132,7 @@
     },
     "repoBindings": {
       "title": "Zadani profili za Repos",
+      "entryLabel": "Zadani profili",
       "add": "Dodaj zadano",
       "empty": "Nisu konfigurirane zadane postavke",
       "emptyDescription": "Dodajte zadanu postavku za automatsku primjenu profila prilikom pokretanja sesija za repo.",
@@ -4309,5 +4344,8 @@
     "noEnabledContexts": "Nijedan kontekst nije omogućen za zakazana izvješća",
     "sourceBlocker": "Sesija zahtijeva pozornost",
     "sourceMetadata": "Zabilježeni metapodaci sesije"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nije moguće otvoriti ovaj rezultat pretrage"
   }
 }

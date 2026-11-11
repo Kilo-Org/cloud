@@ -229,6 +229,21 @@
     "signInCodeField": "Cod mewngofnodi",
     "or": "neu"
   },
+  "pendingLink": {
+    "description": "Mae cyfrif eisoes yn defnyddio {{email}}. Mewngofnodwch gydag un o'i ddulliau i ychwanegu {{provider}}.",
+    "emailCode": "Anfon cod mewngofnodi ataf drwy e-bost",
+    "continueInBrowser": "Parhau yn y porwr",
+    "startAgain": "Dechrau eto",
+    "expired": "Mae'r cais hwn i ychwanegu {{provider}} wedi dod i ben.",
+    "noMethods": "Does gan y cyfrif hwn ddim dull mewngofnodi arall, felly does dim modd ychwanegu {{provider}}.",
+    "linked": "Cafodd {{provider}} ei ychwanegu at eich cyfrif.",
+    "failedExpired": "Chafodd {{provider}} mo'i ychwanegu oherwydd bod y cais wedi dod i ben.",
+    "failedWrongAccount": "Chafodd {{provider}} mo'i ychwanegu oherwydd i chi fewngofnodi i gyfrif gwahanol.",
+    "failedAccountAlreadyLinked": "Chafodd {{provider}} mo'i ychwanegu oherwydd ei fod eisoes wedi'i gysylltu â chyfrif arall.",
+    "failedProviderAlreadyLinked": "Chafodd {{provider}} mo'i ychwanegu oherwydd bod gan eich cyfrif ddull mewngofnodi {{provider}} gwahanol yn barod.",
+    "failedLinking": "Doedd dim modd ychwanegu {{provider}} at eich cyfrif.",
+    "notAdded": "Rydych chi wedi mewngofnodi. Chafodd {{provider}} mo'i ychwanegu at eich cyfrif."
+  },
   "profile": {
     "codeReviewerSubtitle": "Adolygiadau PR awtomatig",
     "securityAgentSubtitle": "Darganfod a thrwsio gwendidau",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Cyfrif prawf",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO menter",
     "passkeysTitle": "Allweddi mynediad",
     "passkeysSubtitle": "Mewngofnodi heb gyfrinair",
@@ -2466,7 +2483,7 @@
       "cloningSession": "Yn clonio sesiwn",
       "couldNotLoadThisSession": "Methu llwytho'r sesiwn hon.",
       "cloneFailedRetry": "Methu clonio'r sesiwn hon. Ceisiwch eto.",
-      "notEnoughCredits": "Nid oes digon o gredydau i redeg Cloud Agent. Ychwanegwch gredydau a cheisiwch eto.",
+      "notEnoughCredits": "Nid oes digon o gredydau ar gyfer y cais hwn. Ychwanegwch gredydau a cheisiwch eto.",
       "previousTaskFinishing": "Nid yw'r dasg flaenorol wedi gorffen eto. Arhoswch am eiliad.",
       "serviceUnavailable": "Nid yw'r gwasanaeth ar gael ar hyn o bryd. Ceisiwch eto.",
       "connectionTrouble": "Mae problem gyda'r cysylltiad. Ceisiwch eto ymhen ychydig.",
@@ -2576,7 +2593,7 @@
       "discardWithUploadsMessage": "Bydd eich anogiad ac unrhyw ffeiliau a uwchlwythwyd ond sydd heb eu defnyddio yn cael eu dileu.",
       "discardFailed": "Methu dileu'r drafft. Ceisiwch eto.",
       "remoteHint": "I redeg ar eich cyfrifiadur, dechreuwch Kilo yno a gadewch iddo redeg.",
-      "continueFrom": "Yn parhau â {{title}}.",
+      "continueFrom": "Yn parhau â “{{title}}”.",
       "importingSession": "Yn mewnforio sesiwn",
       "cliCannotContinue": "Ni all y CLI hwn barhau â sesiwn. Dewiswch Cloud Agent neu CLI arall.",
       "importFailed": "Methu mewnforio'r sesiwn hon.",
@@ -2632,6 +2649,8 @@
       "toolList": "rhestru",
       "toolPatch": "clytio",
       "toolTask": "tasg",
+      "toolSendFile": "Anfonwyd ffeil",
+      "toolSendFileAction": "Anfon ffeil",
       "readTodos": "Darllen y cynllun",
       "updateTodos": "Diweddaru'r cynllun",
       "linesBadge": "{{displayCount}} llinell",
@@ -2744,7 +2763,21 @@
       "thought": "Syniad",
       "showDetails": "Dangos manylion",
       "pending": "Yn aros…",
-      "running": "Yn rhedeg…"
+      "running": "Yn rhedeg…",
+      "field": {
+        "filePath": "Llwybr ffeil",
+        "path": "Llwybr",
+        "offset": "Dadleoliad",
+        "limit": "Terfyn",
+        "pattern": "Patrwm",
+        "include": "Cynnwys",
+        "patchText": "Testun clwt",
+        "query": "Ymholiad",
+        "prompt": "Anogiad",
+        "header": "Pennawd",
+        "question": "Cwestiwn",
+        "options": "Opsiynau"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Methu dangos y cynnwys."
@@ -2760,7 +2793,7 @@
       "assistantContextOverflow": "Mae'r sgwrs yn rhy hir i'r model.",
       "assistantProviderError": "Roedd gwall gan y darparwr.",
       "assistantProviderRefused": "Gwrthododd y darparwr y cais ac ni ellir ei ailgynnig.",
-      "assistantCreditsRefusal": "Nid oes digon o gredydau i redeg Cloud Agent.",
+      "assistantCreditsRefusal": "Nid oes digon o gredydau ar gyfer y cais hwn.",
       "assistantOutputLimit": "Cyrhaeddodd yr ymateb derfyn allbwn y model.",
       "assistantStructuredOutput": "Nid oedd yr ymateb yn cyd-fynd â'r fformat gofynnol.",
       "assistantFailed": "Methodd yr ymateb."
@@ -4026,7 +4059,7 @@
     "reasoningEffort": {
       "modelFlag": "Mae'r model hwn yn cefnogi ymdrech feddwl"
     },
-    "creditsRequired": "Dim digon o gredydau i anfon y neges hon. Ychwanegwch gredydau a rhowch gynnig arall arni."
+    "creditsRequired": "Dim digon o gredydau i anfon y neges hon."
   },
   "settingsTools": {
     "confirmTitle": "Cadarnhau'r newid hwn?"
@@ -4243,6 +4276,7 @@
       "namePlaceholder": "Fy Asiant",
       "promptPlaceholder": "Rydych chi'n ...",
       "tools": "Offer",
+      "wholeToolRule": "Mae'r asiant hwn yn cymhwyso un rheol i bob offeryn ar unwaith: {{rule}}. Mae'r switshis hyn yn ddarllen yn unig.",
       "visibility": "Gwelededd",
       "visibilityPrimary": "Cynradd — a ddangosir yn y codwr",
       "visibilitySubagent": "Subagent — dim ond ei alw gan eraill",
@@ -4283,7 +4317,8 @@
       "duplicateName": "Mae gorchymyn gyda'r enw hwn eisoes yn bodoli yn y proffil hwn"
     },
     "repoBindings": {
-      "title": "Proffiliau Rhagosodedig ar gyfer Repos",
+      "title": "Proffiliau rhagosodedig ar gyfer Repos",
+      "entryLabel": "Proffiliau rhagosodedig",
       "add": "Ychwanegu rhagosodiad",
       "empty": "Dim rhagosodiadau wedi'u ffurfweddu",
       "emptyDescription": "Ychwanegu rhagosodiad i gymhwyso proffil yn awtomatig wrth gychwyn sesiynau ar gyfer repo.",
@@ -4507,5 +4542,8 @@
     "noEnabledContexts": "Dim cyd-destunau wedi'u galluogi ar gyfer briffiau a drefnwyd",
     "sourceBlocker": "Mae angen rhoi sylw i'r sesiwn",
     "sourceMetadata": "Metadata'r sesiwn a gipiwyd"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ni lwyddwyd i agor canlyniad chwilio hwn"
   }
 }

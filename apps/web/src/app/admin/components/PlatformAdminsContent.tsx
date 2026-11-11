@@ -622,7 +622,7 @@ export function PlatformAdminsContent() {
                     className="text-muted-foreground text-sm"
                   >
                     Can export logged API requests and responses of opted-in accounts and
-                    organizations.
+                    organizations, and provider metadata of any account or organization.
                   </p>
                 </div>
                 <Label

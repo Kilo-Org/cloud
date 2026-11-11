@@ -229,6 +229,21 @@
     "signInCodeField": "Loginkode",
     "or": "eller"
   },
+  "pendingLink": {
+    "description": "Der findes allerede en konto med {{email}}. Log ind med en af dens metoder for at tilføje {{provider}}.",
+    "emailCode": "Send mig en loginkode på e-mail",
+    "continueInBrowser": "Fortsæt i browseren",
+    "startAgain": "Start forfra",
+    "expired": "Denne anmodning om at tilføje {{provider}} er udløbet.",
+    "noMethods": "Denne konto har ingen anden loginmetode, så {{provider}} kan ikke tilføjes.",
+    "linked": "{{provider}} blev føjet til din konto.",
+    "failedExpired": "{{provider}} blev ikke tilføjet, fordi anmodningen udløb.",
+    "failedWrongAccount": "{{provider}} blev ikke tilføjet, fordi du loggede ind på en anden konto.",
+    "failedAccountAlreadyLinked": "{{provider}} blev ikke tilføjet, fordi det allerede er knyttet til en anden konto.",
+    "failedProviderAlreadyLinked": "{{provider}} blev ikke tilføjet, fordi din konto allerede har et andet {{provider}}-login.",
+    "failedLinking": "{{provider}} kunne ikke føjes til din konto.",
+    "notAdded": "Du er logget ind. {{provider}} blev ikke føjet til din konto."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatiske PR-gennemgange",
     "securityAgentSubtitle": "Find og afhjælp sårbarheder",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO til virksomheder",
     "passkeysTitle": "Adgangsnøgler",
     "passkeysSubtitle": "Log ind uden en adgangskode",
@@ -2298,7 +2315,7 @@
       "cloningSession": "Kloner session",
       "couldNotLoadThisSession": "Kunne ikke indlæse denne session.",
       "cloneFailedRetry": "Kunne ikke klone denne session. Prøv igen.",
-      "notEnoughCredits": "Du har ikke nok kreditter til at køre Cloud Agent. Tilføj kreditter og prøv igen.",
+      "notEnoughCredits": "Du har ikke nok kreditter til denne anmodning. Tilføj kreditter og prøv igen.",
       "previousTaskFinishing": "Den forrige opgave er ved at blive afsluttet. Vent et øjeblik.",
       "serviceUnavailable": "Tjenesten er ikke tilgængelig lige nu. Prøv igen.",
       "connectionTrouble": "Der er problemer med forbindelsen. Prøv igen om et øjeblik.",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Din forespørgsel og eventuelle uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet.",
       "discardFailed": "Kunne ikke kassere kladden. Prøv igen.",
       "remoteHint": "For at køre på din computer skal du starte Kilo der og lade den køre videre.",
-      "continueFrom": "Sessionen {{title}} fortsættes.",
+      "continueFrom": "Sessionen “{{title}}” fortsættes.",
       "importingSession": "Importerer session",
       "cliCannotContinue": "Denne CLI kan ikke fortsætte en session. Vælg Cloud Agent eller en anden CLI.",
       "importFailed": "Kunne ikke importere denne session.",
@@ -2460,6 +2477,8 @@
       "toolList": "vis liste",
       "toolPatch": "anvend rettelse",
       "toolTask": "opgave",
+      "toolSendFile": "Sendt fil",
+      "toolSendFileAction": "Send fil",
       "readTodos": "Læs planen",
       "updateTodos": "Opdatér planen",
       "linesBadge": "{{displayCount}} linjer",
@@ -2560,7 +2579,21 @@
       "thought": "Ræsonnement",
       "showDetails": "Vis oplysninger",
       "pending": "Afventer…",
-      "running": "Kører…"
+      "running": "Kører…",
+      "field": {
+        "filePath": "Filsti",
+        "path": "Sti",
+        "offset": "Offset",
+        "limit": "Grænse",
+        "pattern": "Mønster",
+        "include": "Medtag",
+        "patchText": "Rettelsestekst",
+        "query": "Forespørgsel",
+        "prompt": "Instruktion",
+        "header": "Overskrift",
+        "question": "Spørgsmål",
+        "options": "Valgmuligheder"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Kunne ikke vise indholdet."
@@ -2576,7 +2609,7 @@
       "assistantContextOverflow": "Samtalen er for lang til modellen.",
       "assistantProviderError": "Udbyderen returnerede en fejl.",
       "assistantProviderRefused": "Udbyderen afviste denne anmodning, og den kan ikke forsøges igen.",
-      "assistantCreditsRefusal": "Du har ikke nok kreditter til at køre Cloud Agent.",
+      "assistantCreditsRefusal": "Du har ikke nok kreditter til denne anmodning.",
       "assistantOutputLimit": "Svaret nåede modellens outputgrænse.",
       "assistantStructuredOutput": "Svaret matchede ikke det påkrævede format.",
       "assistantFailed": "Svaret kunne ikke genereres."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Denne model understøtter ræsonnementsniveau"
     },
-    "creditsRequired": "Ikke nok kreditter til at sende denne besked. Tilføj kreditter, og prøv igen."
+    "creditsRequired": "Ikke nok kreditter til at sende denne besked."
   },
   "settingsTools": {
     "confirmTitle": "Bekræft denne ændring?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Min agent",
       "promptPlaceholder": "Du er en...",
       "tools": "Værktøjer",
+      "wholeToolRule": "Denne agent anvender én regel på alle værktøjer på én gang: {{rule}}. Disse kontakter er skrivebeskyttede.",
       "visibility": "Sigtbarhed",
       "visibilityPrimary": "Primær — vist i vælgeren",
       "visibilitySubagent": "Subagent — kan kun kaldes fra andre",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Standardprofiler for Repos",
+      "entryLabel": "Standardprofiler",
       "add": "Tilføj standard",
       "empty": "Ingen standardindstillinger konfigureret",
       "emptyDescription": "Tilføj en standard for automatisk at anvende en profil, når du starter sessioner for en repo.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Ingen kontekster er aktiveret for planlagte briefinger",
     "sourceBlocker": "Sessionen kræver opmærksomhed",
     "sourceMetadata": "Gemte sessionsmetadata"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Kunne ikke åbne dette søgeresultat"
   }
 }

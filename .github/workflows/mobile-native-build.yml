@@ -64,8 +64,9 @@ jobs:
 
       # The hash steps run tsx over the local dev/local scripts and let
       # @expo/fingerprint read the Expo config from apps/mobile, so they need the
-      # root project and the mobile app, not the whole workspace. Both build jobs
-      # wait behind this one, so a filtered install here releases them sooner.
+      # root project and the mobile app, not the whole workspace. Everything
+      # downstream waits behind this job, so a filtered install here releases it
+      # sooner.
       # The hash must stay identical to the one a build job recomputes after its
       # recursive install, or the artifact name matches no build.
       - name: Install root and mobile dependencies
@@ -85,8 +86,118 @@ jobs:
           echo "android_hash=$android_hash" >> "$GITHUB_OUTPUT"
           pnpm exec tsx dev/local/mobile-native-gate.ts "$ios_hash" "$android_hash"
 
-  ios:
+  # One harness SDK build per run. Both platform jobs need
+  # packages/harness-sdk/dist and start together after the gate, so running the
+  # action in each made a dist cache miss pay the typia compile twice and raced
+  # both jobs to save the one key, because actions/cache saves at the end of a
+  # job: the loser only logged "Unable to reserve cache". Here the action runs
+  # once and both builds download the tree it produced. The dist is a TypeScript
+  # emit, so the Linux build serves the macOS job.
+  #
+  # The job runs only when a platform job will. The gate already clears a
+  # platform whose artifact another run published, so a run with both cleared
+  # must not pay an install and a build for nobody.
+  prepare-harness-sdk:
     needs: gate
+    if: needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      # No lfs: the harness SDK build reads the root install and its own
+      # sources, and this matches the job in kilo-app CI and ci.yml that saves
+      # the dist cache key this job restores.
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      # The shared store keeps installs warm when a pull request changes the
+      # lockfile; a lockfile-keyed setup-node cache misses and downloads every
+      # package from the registry.
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      # Only the harness SDK's dependency closure and the root project are
+      # installed, as in the kilo-app CI producer above. The composite action
+      # below builds `@kilocode/harness-sdk` alone, and that package has no
+      # workspace dependency. Widen the filter when a step here imports a
+      # workspace outside the closure.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter '@kilocode/harness-sdk...' --filter kilocode-monorepo
+
+      - name: Restore or build the harness SDK
+        uses: ./.github/actions/harness-sdk-build
+
+      # A directory path makes the directory the artifact root, so a consumer
+      # that unpacks into packages/harness-sdk/dist gets the tree the build
+      # wrote, with no extra path segment.
+      - name: Upload the harness SDK build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: harness-sdk-dist
+          path: packages/harness-sdk/dist
+          retention-days: 1
+          if-no-files-found: error
+
+  # One tRPC declaration build per run, for the same reason as the harness SDK
+  # above: both platform jobs need packages/trpc/dist and start together after
+  # the gate, so running the action in each made a cache miss compile the same
+  # declaration program twice and race both jobs to save the one key. The cache
+  # stays here, which is also the entry ci.yml's and kilo-app CI's producers
+  # write; both platform jobs download this job's artifact instead of building.
+  #
+  # The filtered install matches those two producers: the action builds
+  # `@kilocode/trpc` alone, but its declaration program also reads web-shared
+  # and apps/web sources through their path aliases.
+  #
+  # The job runs only when a platform job will: the gate clears a platform whose
+  # artifact another run already published, so a run with both cleared pays no
+  # install and no build for nobody.
+  prepare-trpc:
+    needs: gate
+    if: needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      # No lfs, like the harness SDK producer and the two other declaration
+      # producers whose cache key this job restores.
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter '@kilocode/trpc...' --filter 'web...' --filter kilocode-monorepo
+
+      - name: Restore or build tRPC declarations
+        uses: ./.github/actions/trpc-declarations
+
+      # A directory path makes the directory the artifact root, so a consumer
+      # that unpacks into packages/trpc/dist gets the tree the build wrote. A
+      # hit that restored nothing must fail here, not in a consumer.
+      - name: Upload the tRPC declarations
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
+          retention-days: 1
+          if-no-files-found: error
+
+  ios:
+    needs: [gate, prepare-harness-sdk, prepare-trpc]
     if: needs.gate.outputs.need_ios == 'true'
     runs-on: macos-26
     timeout-minutes: 90
@@ -132,13 +243,19 @@ jobs:
         if: steps.published.outputs.published != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Restore or build tRPC declarations
+      - name: Download the tRPC declarations
         if: steps.published.outputs.published != 'true'
-        uses: ./.github/actions/trpc-declarations
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
 
-      - name: Restore or build the harness SDK
+      - name: Download the harness SDK build
         if: steps.published.outputs.published != 'true'
-        uses: ./.github/actions/harness-sdk-build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: harness-sdk-dist
+          path: packages/harness-sdk/dist
 
       # A consumer computes the hash on macOS; the gate computed it on
       # Linux. A mismatch would publish an artifact nobody can ever find,
@@ -201,7 +318,7 @@ jobs:
           if-no-files-found: error
 
   android:
-    needs: gate
+    needs: [gate, prepare-harness-sdk, prepare-trpc]
     if: needs.gate.outputs.need_android == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -246,13 +363,19 @@ jobs:
         if: steps.published.outputs.published != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Restore or build tRPC declarations
+      - name: Download the tRPC declarations
         if: steps.published.outputs.published != 'true'
-        uses: ./.github/actions/trpc-declarations
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: trpc-declarations
+          path: packages/trpc/dist
 
-      - name: Restore or build the harness SDK
+      - name: Download the harness SDK build
         if: steps.published.outputs.published != 'true'
-        uses: ./.github/actions/harness-sdk-build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: harness-sdk-dist
+          path: packages/harness-sdk/dist
 
       - name: Expo prebuild
         if: steps.published.outputs.published != 'true'

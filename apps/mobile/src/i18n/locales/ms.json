@@ -229,6 +229,21 @@
     "signInCodeField": "Kod log masuk",
     "or": "atau"
   },
+  "pendingLink": {
+    "description": "Sebuah akaun sudah menggunakan {{email}}. Log masuk dengan salah satu kaedahnya untuk menambah {{provider}}.",
+    "emailCode": "E-melkan saya kod log masuk",
+    "continueInBrowser": "Teruskan dalam penyemak imbas",
+    "startAgain": "Mulakan semula",
+    "expired": "Permintaan untuk menambah {{provider}} ini telah tamat tempoh.",
+    "noMethods": "Akaun ini tiada kaedah log masuk lain, jadi {{provider}} tidak dapat ditambah.",
+    "linked": "{{provider}} telah ditambah pada akaun anda.",
+    "failedExpired": "{{provider}} tidak ditambah kerana permintaan telah tamat tempoh.",
+    "failedWrongAccount": "{{provider}} tidak ditambah kerana anda log masuk ke akaun lain.",
+    "failedAccountAlreadyLinked": "{{provider}} tidak ditambah kerana ia sudah dipautkan ke akaun lain.",
+    "failedProviderAlreadyLinked": "{{provider}} tidak ditambah kerana akaun anda sudah mempunyai log masuk {{provider}} yang lain.",
+    "failedLinking": "{{provider}} tidak dapat ditambah pada akaun anda.",
+    "notAdded": "Anda telah log masuk. {{provider}} tidak ditambah pada akaun anda."
+  },
   "profile": {
     "codeReviewerSubtitle": "Semakan PR automatik",
     "securityAgentSubtitle": "Cari dan baiki kelemahan",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Akaun ujian",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO perusahaan",
     "passkeysTitle": "Kunci laluan",
     "passkeysSubtitle": "Log masuk tanpa kata laluan",
@@ -2298,7 +2315,7 @@
       "cloningSession": "Mengklon sesi",
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini.",
       "cloneFailedRetry": "Tidak dapat mengklon sesi ini. Cuba semula.",
-      "notEnoughCredits": "Kredit tidak mencukupi untuk menjalankan Cloud Agent. Tambah kredit dan cuba semula.",
+      "notEnoughCredits": "Kredit tidak mencukupi untuk permintaan ini. Tambah kredit dan cuba semula.",
       "previousTaskFinishing": "Tugasan sebelumnya masih dalam proses penyelesaian. Sila tunggu sebentar.",
       "serviceUnavailable": "Perkhidmatan tidak tersedia buat masa ini. Sila cuba semula.",
       "connectionTrouble": "Sambungan bermasalah. Sila cuba semula sebentar lagi.",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Gesaan anda dan fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam.",
       "discardFailed": "Tidak dapat membuang draf. Sila cuba semula.",
       "remoteHint": "Untuk dijalankan pada komputer anda, mulakan Kilo di sana dan biarkan ia terus berjalan.",
-      "continueFrom": "Sesi {{title}} diteruskan.",
+      "continueFrom": "Sesi “{{title}}” diteruskan.",
       "importingSession": "Mengimport sesi",
       "cliCannotContinue": "CLI ini tidak dapat meneruskan sesi. Pilih Cloud Agent atau CLI lain.",
       "importFailed": "Tidak dapat mengimport sesi ini.",
@@ -2460,6 +2477,8 @@
       "toolList": "senaraikan",
       "toolPatch": "tampal",
       "toolTask": "tugasan",
+      "toolSendFile": "Fail telah dihantar",
+      "toolSendFileAction": "Hantar fail",
       "readTodos": "Baca pelan",
       "updateTodos": "Kemas kini pelan",
       "linesBadge": "{{displayCount}} baris",
@@ -2560,7 +2579,21 @@
       "thought": "Pemikiran",
       "showDetails": "Paparkan butiran",
       "pending": "Menunggu…",
-      "running": "Sedang berjalan…"
+      "running": "Sedang berjalan…",
+      "field": {
+        "filePath": "Laluan fail",
+        "path": "Laluan",
+        "offset": "Ofset",
+        "limit": "Had",
+        "pattern": "Corak",
+        "include": "Sertakan",
+        "patchText": "Teks tampalan",
+        "query": "Pertanyaan",
+        "prompt": "Gesaan",
+        "header": "Pengepala",
+        "question": "Soalan",
+        "options": "Pilihan"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Gagal memaparkan kandungan."
@@ -2576,7 +2609,7 @@
       "assistantContextOverflow": "Perbualan terlalu panjang untuk model.",
       "assistantProviderError": "Penyedia mengembalikan ralat.",
       "assistantProviderRefused": "Penyedia menolak permintaan ini dan ia tidak boleh dicuba semula.",
-      "assistantCreditsRefusal": "Kredit tidak mencukupi untuk menjalankan Cloud Agent.",
+      "assistantCreditsRefusal": "Kredit tidak mencukupi untuk permintaan ini.",
       "assistantOutputLimit": "Respons mencapai had output model.",
       "assistantStructuredOutput": "Respons tidak sepadan dengan format yang diperlukan.",
       "assistantFailed": "Respons gagal."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Model ini menyokong tahap pemikiran"
     },
-    "creditsRequired": "Kredit tidak mencukupi untuk menghantar mesej ini. Tambah kredit dan cuba lagi."
+    "creditsRequired": "Kredit tidak mencukupi untuk menghantar mesej ini."
   },
   "settingsTools": {
     "confirmTitle": "Sahkan perubahan ini?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Ejen saya",
       "promptPlaceholder": "Anda seorang...",
       "tools": "Alatan",
+      "wholeToolRule": "Ejen ini menggunakan satu peraturan pada setiap alat sekali gus: {{rule}}. Suis ini adalah baca sahaja.",
       "visibility": "Keterlihatan",
       "visibilityPrimary": "Utama — ditunjukkan dalam pemilih",
       "visibilitySubagent": "Subagen — hanya boleh dipanggil daripada orang lain",
@@ -4035,7 +4069,8 @@
       "duplicateName": "Arahan dengan nama ini telah wujud dalam profil ini"
     },
     "repoBindings": {
-      "title": "Profil Lalai untuk Repos",
+      "title": "Profil lalai untuk Repos",
+      "entryLabel": "Profil lalai",
       "add": "Tambah lalai",
       "empty": "Tiada lalai dikonfigurasikan",
       "emptyDescription": "Tambahkan lalai untuk menggunakan profil secara automatik apabila memulakan sesi untuk repo.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Tiada konteks didayakan untuk laporan berjadual",
     "sourceBlocker": "Sesi memerlukan perhatian",
     "sourceMetadata": "Metadata sesi yang dirakam"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Tidak dapat membuka hasil carian ini"
   }
 }

@@ -229,6 +229,21 @@
     "signInCodeField": "Přihlašovací kód",
     "or": "nebo"
   },
+  "pendingLink": {
+    "description": "Účet s e-mailem {{email}} už existuje. Pro přidání {{provider}} se přihlaste některou z jeho metod.",
+    "emailCode": "Poslat mi přihlašovací kód e-mailem",
+    "continueInBrowser": "Pokračovat v prohlížeči",
+    "startAgain": "Začít znovu",
+    "expired": "Platnost žádosti o přidání {{provider}} vypršela.",
+    "noMethods": "Tento účet nemá žádnou jinou metodu přihlášení, takže {{provider}} nelze přidat.",
+    "linked": "{{provider}} byl přidán k vašemu účtu.",
+    "failedExpired": "{{provider}} nebyl přidán, protože platnost žádosti vypršela.",
+    "failedWrongAccount": "{{provider}} nebyl přidán, protože jste se přihlásili k jinému účtu.",
+    "failedAccountAlreadyLinked": "{{provider}} nebyl přidán, protože už je propojen s jiným účtem.",
+    "failedProviderAlreadyLinked": "{{provider}} nebyl přidán, protože váš účet už má jiné přihlášení přes {{provider}}.",
+    "failedLinking": "{{provider}} se nepodařilo přidat k vašemu účtu.",
+    "notAdded": "Jste přihlášeni. {{provider}} nebyl přidán k vašemu účtu."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatické kontroly PR",
     "securityAgentSubtitle": "Vyhledávat a odstraňovat zranitelnosti",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Testovací účet",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Podnikové SSO",
     "passkeysTitle": "Přístupové klíče",
     "passkeysSubtitle": "Přihlaste se bez hesla",
@@ -2382,7 +2399,7 @@
       "cloningSession": "Klonování relace",
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst.",
       "cloneFailedRetry": "Tuto relaci se nepodařilo klonovat. Zkuste to znovu.",
-      "notEnoughCredits": "Nemáte dost kreditů ke spuštění služby Cloud Agent. Dobijte si kredity a zkuste to znovu.",
+      "notEnoughCredits": "Nemáte dost kreditů pro tento požadavek. Dobijte si kredity a zkuste to znovu.",
       "previousTaskFinishing": "Předchozí úkol se ještě dokončuje. Chvíli prosím počkejte.",
       "serviceUnavailable": "Služba je právě nedostupná. Zkuste to prosím znovu.",
       "connectionTrouble": "Došlo k problému s připojením. Zkuste to prosím za chvíli znovu.",
@@ -2492,7 +2509,7 @@
       "discardWithUploadsMessage": "Vaše zadání a všechny nahrané soubory nepřipojené k odeslaným zprávám se smažou.",
       "discardFailed": "Koncept se nepodařilo zahodit. Zkuste to znovu.",
       "remoteHint": "Pokud chcete relaci spustit na svém počítači, spusťte tam Kilo a nechte jej spuštěné.",
-      "continueFrom": "Pokračujete v relaci {{title}}.",
+      "continueFrom": "Pokračujete v relaci „{{title}}“.",
       "importingSession": "Import relace",
       "cliCannotContinue": "Toto CLI nepodporuje pokračování v relaci. Vyberte službu Cloud Agent nebo jiné CLI.",
       "importFailed": "Tuto relaci se nepodařilo importovat.",
@@ -2546,6 +2563,8 @@
       "toolList": "výpis",
       "toolPatch": "úprava",
       "toolTask": "úkol",
+      "toolSendFile": "Odeslaný soubor",
+      "toolSendFileAction": "odesílání souboru",
       "readTodos": "Přečíst plán",
       "updateTodos": "Aktualizovat plán",
       "linesBadge": "řádky: {{displayCount}}",
@@ -2652,7 +2671,21 @@
       "thought": "Úvaha",
       "showDetails": "Zobrazit podrobnosti",
       "pending": "Čeká…",
-      "running": "Běží…"
+      "running": "Běží…",
+      "field": {
+        "filePath": "Souborová cesta",
+        "path": "Cesta",
+        "offset": "Posun",
+        "limit": "Limit",
+        "pattern": "Vzor",
+        "include": "Zahrnutí",
+        "patchText": "Text záplaty",
+        "query": "Dotaz",
+        "prompt": "Pokyn",
+        "header": "Nadpis",
+        "question": "Otázka",
+        "options": "Možnosti"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Obsah se nepodařilo zobrazit."
@@ -2668,7 +2701,7 @@
       "assistantContextOverflow": "Konverzace je pro model příliš dlouhá.",
       "assistantProviderError": "Poskytovatel vrátil chybu.",
       "assistantProviderRefused": "Poskytovatel tento požadavek odmítl a nelze jej znovu odeslat.",
-      "assistantCreditsRefusal": "Nemáte dost kreditů ke spuštění služby Cloud Agent.",
+      "assistantCreditsRefusal": "Nemáte dost kreditů pro tento požadavek.",
       "assistantOutputLimit": "Odpověď dosáhla limitu výstupu modelu.",
       "assistantStructuredOutput": "Odpověď neodpovídala požadovanému formátu.",
       "assistantFailed": "Odpověď se nepodařilo vytvořit."
@@ -3914,7 +3947,7 @@
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje úroveň uvažování"
     },
-    "creditsRequired": "Nedostatek kreditů k odeslání této zprávy. Dobijte kredity a zkuste to znovu."
+    "creditsRequired": "Nedostatek kreditů k odeslání této zprávy."
   },
   "settingsTools": {
     "confirmTitle": "Potvrdit tuto změnu?"
@@ -4119,6 +4152,7 @@
       "namePlaceholder": "Můj agent",
       "promptPlaceholder": "ty jsi...",
       "tools": "Nástroje",
+      "wholeToolRule": "Tento agent aplikuje jedno pravidlo na všechny nástroje najednou: {{rule}}. Tyto přepínače jsou pouze pro čtení.",
       "visibility": "Viditelnost",
       "visibilityPrimary": "Primární — zobrazí se ve výběru",
       "visibilitySubagent": "Subagent — lze volat pouze od ostatních",
@@ -4160,6 +4194,7 @@
     },
     "repoBindings": {
       "title": "Výchozí profily pro úložiště",
+      "entryLabel": "Výchozí profily",
       "add": "Přidat výchozí",
       "empty": "Nejsou nakonfigurována žádná výchozí nastavení",
       "emptyDescription": "Přidejte výchozí nastavení pro automatické použití profilu při zahájení relací pro repo.",
@@ -4375,5 +4410,8 @@
     "noEnabledContexts": "Pro naplánované přehledy nejsou povoleny žádné kontexty",
     "sourceBlocker": "Relace vyžaduje pozornost",
     "sourceMetadata": "Zachycená metadata relace"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nepodařilo se otevřít tento výsledek hledání"
   }
 }

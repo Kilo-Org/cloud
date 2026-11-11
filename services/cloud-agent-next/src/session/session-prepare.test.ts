@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import { createHash } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
+import { generateBranchSlugFromSeed } from '@kilocode/worker-utils/deployment-slug';
 import {
   createRuntimeAuthorization,
   sealRuntimeAuthorization,
@@ -683,6 +684,20 @@ describe('explicit sandbox session creation', () => {
       orchestrator: { disable: true },
       compaction: { model: 'blocked/model', variant: 'high' },
     });
+  });
+
+  it('seeds split registration from the session ID when there is no worktree', async () => {
+    const doStub = makeDoStub();
+    await registerNewSession(
+      requestForPreset('cloudflare-containers-standard-3'),
+      selectedContext(doStub)
+    );
+    const expectedBranch = `kilo/${await generateBranchSlugFromSeed(WORKSPACE_SESSION_ID)}`;
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ gitBranch: expectedBranch })
+    );
+    expect(createdMetadata(doStub)?.workspace?.branchName).toBe(expectedBranch);
+    expect(createdMetadata(doStub)?.workspace?.worktreeId).toBeUndefined();
   });
 
   it.each([undefined, 'unrestricted', 'allowlist'] as const)(
@@ -2641,6 +2656,24 @@ describe('explicit sandbox session creation', () => {
 });
 
 describe('sessionCreateIntentFingerprint', () => {
+  it('distinguishes the stack parent, base branch, and resolved base commit', async () => {
+    const repository = {
+      type: 'github' as const,
+      repo: 'acme/repo',
+      baseBranch: 'feature/parent',
+      baseSha: 'a'.repeat(40),
+    };
+    const base = makeRequest({ parentWorktreeId: 'worktree_parent', repository });
+    const fingerprint = await sessionCreateIntentFingerprint(base);
+    const alternatives: SessionCreateRequest[] = [
+      { ...base, parentWorktreeId: 'worktree_other' },
+      { ...base, repository: { ...repository, baseBranch: 'feature/other' } },
+      { ...base, repository: { ...repository, baseSha: 'b'.repeat(40) } },
+    ];
+    for (const changed of alternatives) {
+      expect(await sessionCreateIntentFingerprint(changed)).not.toBe(fingerprint);
+    }
+  });
   it('changes when resolved runtime instructions change', async () => {
     const base = makeRequest({
       profile: { resolved: { runtimeInstructions: [{ name: 'repo-rules', content: 'v1' }] } },
@@ -2933,6 +2966,7 @@ describe('createSessionWithLedger admission ladder', () => {
       });
 
       const result = await runCreate(ctx, request);
+      expect(result.worktreeId).toBe(WORKTREE_ID);
 
       expect(createCliSessionMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -2941,6 +2975,7 @@ describe('createSessionWithLedger admission ladder', () => {
           kiloUserId: USER_ID,
           createdOnPlatform: 'cloud-agent-web',
           gitUrl: 'https://github.com/acme/repo',
+          gitBranch: 'main',
           cloudAgentWorktreeId: WORKTREE_ID,
           cloudAgentWorktreeLocation: {
             sandboxId: PLACED_SANDBOX_ID,
@@ -2954,6 +2989,7 @@ describe('createSessionWithLedger admission ladder', () => {
           finalization,
           workspace: expect.objectContaining({
             worktreeId: WORKTREE_ID,
+            branchName: 'main',
             workspacePath: `/workspace/${USER_ID}/worktrees/${WORKTREE_ID}`,
             sandboxId: PLACED_SANDBOX_ID,
             sandboxKind: PLACED_SANDBOX_DECISION.sandboxKind,
@@ -2976,6 +3012,7 @@ describe('createSessionWithLedger admission ladder', () => {
       expect(result).toEqual({
         cloudAgentSessionId: WORKSPACE_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
+        worktreeId: WORKTREE_ID,
       });
     }
   );
@@ -3045,6 +3082,7 @@ describe('createSessionWithLedger admission ladder', () => {
         cloudAgentSessionId: WORKSPACE_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
         replayed: true,
+        ...(worktreeEnabled === true ? { worktreeId: WORKTREE_ID } : {}),
       });
       expect(recordOperationProgressMock).not.toHaveBeenCalled();
       expect(settleOperationMock).not.toHaveBeenCalled();
@@ -3561,6 +3599,7 @@ describe('createSessionWithLedger admission ladder', () => {
     expect(recordOperationProgressMock).toHaveBeenNthCalledWith(1, expect.any(Object), ROW_ID, {
       cloudAgentSessionId: CONTROL_CLOUD_AGENT_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
+      generatedBranch: `kilo/${await generateBranchSlugFromSeed(CONTROL_CLOUD_AGENT_SESSION_ID)}`,
       initialMessageId: INITIAL_MESSAGE_ID,
       [SESSION_CREATE_WORKTREE_ENABLED_KEY]: false,
       [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
@@ -4303,6 +4342,7 @@ describe('createSessionWithLedger admission ladder', () => {
     await expect(runCreate(makeContext(doStub), request)).resolves.toEqual({
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
       replayed: true,
     });
     expect(doStub.recordCloudAgentChildSession).toHaveBeenCalledWith({
@@ -4426,6 +4466,7 @@ describe('createSessionWithLedger admission ladder', () => {
     await expect(runCreate(ctx, scopedChildRequest())).resolves.toEqual({
       cloudAgentSessionId: SANDBOX_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
+      worktreeId: expectedWorktreeId,
     });
 
     expect(recordOperationProgressMock).toHaveBeenCalledWith(
@@ -4484,6 +4525,7 @@ describe('createSessionWithLedger admission ladder', () => {
     await expect(runCreate(ctx, input)).resolves.toEqual({
       cloudAgentSessionId: SANDBOX_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
+      worktreeId: `worktree_${SANDBOX_SESSION_ID.slice('workspace_'.length)}`,
       replayed: true,
     });
 
@@ -5526,6 +5568,131 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
     };
   }
 
+  it.each(
+    [false, true].flatMap(clone =>
+      [false, true].flatMap(ownershipExists =>
+        [undefined, 'release/1'].map(branch => ({ clone, ownershipExists, branch }))
+      )
+    )
+  )(
+    'preserves the registered branch on retry (clone=$clone, ownership=$ownershipExists, upstream=$branch)',
+    async ({ clone, ownershipExists, branch }) => {
+      const input = request({
+        repository: { type: 'github', repo: 'acme/repo', branch },
+        ...(clone
+          ? {
+              initialTurn: undefined,
+              clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+              options: {
+                operationKey: OPERATION_KEY,
+                createdOnPlatform: 'cloud-agent-web',
+                clientProvenance: 'agent-manager',
+                workspaceContinuation: true,
+              },
+            }
+          : {}),
+      });
+      const stub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+      const ctx = context(stub);
+      const register = clone
+        ? stub.registerSessionFromMetadata
+        : stub.createSessionWithInitialAdmission;
+      register.mockRejectedValueOnce(new Error('registration response lost'));
+      createCliSessionMock.mockResolvedValue({ status: 'ready' });
+
+      await expect(runCreate(ctx, input)).rejects.toThrow('registration response lost');
+      const progress = Object.assign(
+        {},
+        ...recordOperationProgressMock.mock.calls.map(call => call[2])
+      );
+      const generatedBranch = `kilo/${await generateBranchSlugFromSeed(WORKTREE_ID)}`;
+      expect(progress.generatedBranch).toBe(generatedBranch);
+      const expectedBranch = branch ?? generatedBranch;
+      expect(createdMetadata(stub)?.workspace?.branchName).toBe(expectedBranch);
+      expect(createCliSessionMock).toHaveBeenCalledWith(
+        expect.objectContaining({ gitBranch: expectedBranch })
+      );
+
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_reconcile_pending',
+        row: makeLedgerRow({ status: 'reconcile_pending', canonical_result: progress }),
+      });
+      getPgDbMock.mockReturnValue(
+        makeDb([ownershipExists ? [ownershipRow()] : [], [{ email: 'test@example.com' }]])
+      );
+      await expect(runCreate(ctx, input)).resolves.toMatchObject({ replayed: true });
+
+      expect(register.mock.calls.map(([arg]) => arg.metadata.workspace.branchName)).toEqual([
+        expectedBranch,
+        expectedBranch,
+      ]);
+      expect(createCliSessionMock).toHaveBeenCalledTimes(ownershipExists ? 1 : 2);
+      for (const [ownership] of createCliSessionMock.mock.calls) {
+        expect(ownership.gitBranch).toBe(expectedBranch);
+      }
+      expect(generateSessionIdMock).toHaveBeenCalledOnce();
+      expect(deleteCliSessionMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(
+    [false, true].flatMap(clone =>
+      [false, true].flatMap(ownershipExists =>
+        ['takeover', 'duplicate_reconcile_pending'].map(admission => ({
+          clone,
+          ownershipExists,
+          admission,
+        }))
+      )
+    )
+  )(
+    'restores the recorded branch across generator changes (clone=$clone, ownership=$ownershipExists, admission=$admission)',
+    async ({ clone, ownershipExists, admission }) => {
+      const input = request({
+        ...(clone
+          ? {
+              initialTurn: undefined,
+              clone: { cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' },
+              options: {
+                operationKey: OPERATION_KEY,
+                createdOnPlatform: 'cloud-agent-web',
+                clientProvenance: 'agent-manager',
+                workspaceContinuation: true,
+              },
+            }
+          : {}),
+      });
+      const generatedBranch = 'kilo/from-original-deployment';
+      expect(generatedBranch).not.toBe(`kilo/${await generateBranchSlugFromSeed(WORKTREE_ID)}`);
+      const progress = await canonicalProgress(input, {
+        generatedBranch,
+        [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
+      });
+      admitOperationMock.mockResolvedValueOnce({
+        admission,
+        row: makeLedgerRow({ status: 'reconcile_pending', canonical_result: progress }),
+      });
+      getPgDbMock.mockReturnValue(
+        makeDb([ownershipExists ? [ownershipRow()] : [], [{ email: 'test@example.com' }]])
+      );
+      createCliSessionMock.mockResolvedValue({ status: 'ready' });
+      const stub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+
+      await expect(runCreate(context(stub), input)).resolves.toMatchObject({ replayed: true });
+
+      expect(createdMetadata(stub)?.workspace).toMatchObject({
+        branchName: generatedBranch,
+      });
+      expect(createCliSessionMock).toHaveBeenCalledTimes(ownershipExists ? 0 : 1);
+      if (!ownershipExists) {
+        expect(createCliSessionMock).toHaveBeenCalledWith(
+          expect.objectContaining({ gitBranch: generatedBranch })
+        );
+      }
+      expect(generateSessionIdMock).not.toHaveBeenCalled();
+    }
+  );
+
   it.each([false, true])(
     'restores modern authorization after a lost ownership response (registered=%s)',
     async registered => {
@@ -5742,6 +5909,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
     await expect(runCreate(ctx, input)).resolves.toEqual({
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
       replayed: true,
     });
 
@@ -5806,6 +5974,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       expect(result).toEqual({
         cloudAgentSessionId: WORKSPACE_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
+        worktreeId: WORKTREE_ID,
         replayed: true,
       });
       expect(createCliSessionMock).toHaveBeenCalledTimes(1);
@@ -5976,6 +6145,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
     await expect(runCreate(ctx, input)).resolves.toEqual({
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
       replayed: true,
     });
 
@@ -6052,6 +6222,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       ).resolves.toEqual({
         cloudAgentSessionId: WORKSPACE_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
+        worktreeId: WORKTREE_ID,
         replayed: true,
       });
 
@@ -6223,6 +6394,7 @@ describe('createSessionWithLedger worktree and ownership reconciliation', () => 
       await expect(runCreate(ctx, input)).resolves.toEqual({
         cloudAgentSessionId: WORKSPACE_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
+        worktreeId: WORKTREE_ID,
         replayed: true,
       });
 
@@ -7304,6 +7476,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
       [SESSION_CREATE_WORKTREE_ENABLED_KEY]: false,
       [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
       createIntentFingerprint: await sessionCreateIntentFingerprint(request),
+      generatedBranch: `kilo/${await generateBranchSlugFromSeed(CONTROL_CLOUD_AGENT_SESSION_ID)}`,
       sandboxAllocation: 'vercel-small',
     });
     expect(getControlSession).toHaveBeenCalledOnce();
@@ -7998,6 +8171,7 @@ describe('createSessionWithLedger clone reconciliation', () => {
         kiloUserId: USER_ID,
         createdOnPlatform: 'cloud-agent',
         gitUrl: 'https://github.com/acme/repo',
+        gitBranch: `kilo/${await generateBranchSlugFromSeed(SANDBOX_SESSION_ID)}`,
         cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID,
       })
     );
@@ -8021,6 +8195,13 @@ describe('createSessionWithLedger clone reconciliation', () => {
     expect(createdMetadata(doStub)?.clone).toEqual({
       cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID,
     });
+    expect(createdMetadata(doStub)?.workspace?.branchName).toBe(
+      `kilo/${await generateBranchSlugFromSeed(SANDBOX_SESSION_ID)}`
+    );
+    expect(createCliSessionMock.mock.calls.map(([input]) => input.gitBranch)).toEqual([
+      createdMetadata(doStub)?.workspace?.branchName,
+      createdMetadata(doStub)?.workspace?.branchName,
+    ]);
   });
 
   it('surfaces SERVICE_UNAVAILABLE session_clone_unavailable when the resume ingest sends no acknowledgement', async () => {

@@ -142,6 +142,11 @@ export function getPartDetailTitle(part: Part): PartDetailTitle {
   }
   if (isToolPart(part)) {
     const display = getToolDisplay(part);
+    // The sheet body shows the subtitle itself (the file chip names the sent
+    // file), so the header keeps the bare label instead of repeating it.
+    if (display.headerTitleOnly === true) {
+      return { prefix: null, text: display.title, translatable: false };
+    }
     // A bash/task call whose `description` is the empty string projects an
     // empty subtitle, and an empty header tells the user nothing about the
     // call; fall back to the tool title the row's prefix would have shown.

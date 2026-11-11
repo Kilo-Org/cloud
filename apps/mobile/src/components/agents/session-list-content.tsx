@@ -368,6 +368,7 @@ export function AgentSessionListContent({
           session={item.session}
           sortBy={SESSION_LIST_SORT}
           sectionTitle={item.sectionTitle}
+          timeZone={item.timeZone}
           live={activeSessionIds.has(item.session.session_id)}
           metaWhileLive
           onPress={() => {

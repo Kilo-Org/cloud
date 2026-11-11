@@ -13,10 +13,8 @@ import {
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
-import {
-  getOpenRouterModelsMetadataFromDatabase,
-  type StoredModelMap,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { replacedChargedAnswer } from '@kilocode/web-shared/lib/ai-gateway/replaced-answer-header';
 import {
   getRawOpenRouterModels,
@@ -246,7 +244,7 @@ async function briefingPriceRates(
 ): Promise<TextPricingRates & { reasoning: boolean }> {
   const extra = pickerExtraModel(model);
   const [endpointsMetadata, preferredProviderOrderConfig, customPricingConfig] = await Promise.all([
-    getOpenRouterModelsMetadataFromDatabase().catch((): StoredModelMap => ({})),
+    getOpenRouterModelsMetadataFromDatabase().catch((): GatewayModelMap => ({})),
     getPreferredProviderOrderConfig(),
     getCustomPricingConfig(),
   ]);

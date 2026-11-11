@@ -49,6 +49,12 @@ import {
   isNativeTokenAddressRateLimited,
   isNativeTokenUserRateLimited,
 } from '@/lib/auth/native-token-rate-limit';
+import {
+  createPendingLinkForDifferentOAuth,
+  resolvePendingLinkForUser,
+  summarizePendingLink,
+  type PendingLinkResult,
+} from '@/lib/auth/pending-link';
 import { captureMessage } from '@sentry/nextjs';
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
@@ -79,7 +85,30 @@ function eligibilityResponse(
  * A refused user settlement. An unavailable signup is retryable (503); a step-up names the
  * sign-in methods that can finish the signup.
  */
-function settlementFailureResponse(failure: Extract<CreateOrUpdateUserResult, { success: false }>) {
+async function settlementFailureResponse(
+  failure: Extract<CreateOrUpdateUserResult, { success: false }>,
+  args?: CreateOrUpdateUserArgs
+) {
+  if (failure.error === 'DIFFERENT-OAUTH' && args) {
+    const created = await createPendingLinkForDifferentOAuth(args, failure);
+    if (created) {
+      const summary = await summarizePendingLink(created.pendingLink);
+      return NextResponse.json(
+        {
+          error: failure.error,
+          pendingLink: {
+            token: created.secret,
+            provider: summary.provider,
+            email: summary.email,
+            methods: summary.methods,
+            emailCode: summary.emailCode,
+            expiresAt: summary.expiresAt,
+          },
+        },
+        { status: 403 }
+      );
+    }
+  }
   if (failure.error === 'SIGNUP-STEP-UP') {
     return NextResponse.json({ error: failure.error, methods: failure.methods }, { status: 403 });
   }
@@ -132,11 +161,25 @@ async function checkExistingProviderAccount(
  * refresh pair. The response shape stays the same, and the credential carries
  * the device session resolved by the caller.
  */
-function legacyTokenResponse(params: { user: User; deviceSessionId: string; created: boolean }) {
+function legacyTokenResponse(params: {
+  user: User;
+  deviceSessionId: string;
+  created: boolean;
+  pendingLink?: PendingLinkResult;
+}) {
   captureMessage('native_token_legacy_long_lived_count: 1');
   const token = generateApiToken(params.user, { deviceSessionId: params.deviceSessionId });
-  return NextResponse.json({ token, created: params.created }, { status: 200 });
+  return NextResponse.json(
+    {
+      token,
+      created: params.created,
+      ...(params.pendingLink ? { pendingLink: params.pendingLink } : {}),
+    },
+    { status: 200 }
+  );
 }
+
+const pendingLinkTokenSchema = z.string().trim().min(1).max(512).optional();
 
 const requestSchema = z.discriminatedUnion('provider', [
   z.object({
@@ -146,6 +189,7 @@ const requestSchema = z.discriminatedUnion('provider', [
     nonce: z.string().optional(),
     supportsRefresh: z.boolean().optional(),
     admission: z.unknown().optional(),
+    pendingLinkToken: pendingLinkTokenSchema,
   }),
   z.object({
     provider: z.literal('google'),
@@ -154,6 +198,7 @@ const requestSchema = z.discriminatedUnion('provider', [
     googleClientId: z.string().optional(),
     supportsRefresh: z.boolean().optional(),
     admission: z.unknown().optional(),
+    pendingLinkToken: pendingLinkTokenSchema,
   }),
   z.object({
     provider: z.literal('email'),
@@ -162,6 +207,7 @@ const requestSchema = z.discriminatedUnion('provider', [
     challengeId: z.string().uuid().optional(),
     supportsRefresh: z.boolean().optional(),
     admission: z.unknown().optional(),
+    pendingLinkToken: pendingLinkTokenSchema,
   }),
   z.object({
     // A passkey ticket is minted by the passkey authenticate route after the
@@ -169,6 +215,7 @@ const requestSchema = z.discriminatedUnion('provider', [
     provider: z.literal('passkey'),
     ticket: z.string(),
     supportsRefresh: z.boolean().optional(),
+    pendingLinkToken: pendingLinkTokenSchema,
   }),
 ]);
 
@@ -290,6 +337,8 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       return rateLimited;
     }
 
+    const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
+
     if (data.supportsRefresh) {
       const sid = await createDeviceSession({
         userId: user.id,
@@ -302,6 +351,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
           refreshToken: pair.refreshToken,
           expiresIn: pair.expiresIn,
           created: false,
+          ...(pendingLink ? { pendingLink } : {}),
         },
         { status: 200 }
       );
@@ -314,6 +364,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         userAgent: request.headers.get('user-agent') ?? undefined,
       }),
       created: false,
+      ...(pendingLink ? { pendingLink } : {}),
     });
   }
 
@@ -468,7 +519,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       );
       if (!result.success) {
         phase = 'release';
-        return settlementFailureResponse(result);
+        return settlementFailureResponse(result, args);
       }
 
       if (result.user.blocked_reason) {
@@ -573,6 +624,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       if (result.deferredSignInEvent) {
         posthogClient.capture(result.deferredSignInEvent);
       }
+      const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, result.user.id);
 
       if (preparedCredentials) {
         return NextResponse.json(
@@ -581,6 +633,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
             refreshToken: preparedCredentials.refreshToken,
             expiresIn: preparedCredentials.expiresIn,
             created: result.isNew,
+            ...(pendingLink ? { pendingLink } : {}),
           },
           { status: 200 }
         );
@@ -590,6 +643,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         user: result.user,
         deviceSessionId: preparedSessionId,
         created: result.isNew,
+        ...(pendingLink ? { pendingLink } : {}),
       });
     } catch (error) {
       // Nothing was delivered, so nothing minted for this request stays usable.
@@ -617,7 +671,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     verifyNewAccountAdmission
   );
   if (!result.success) {
-    return settlementFailureResponse(result);
+    return settlementFailureResponse(result, args);
   }
 
   if (result.user.blocked_reason) {
@@ -690,6 +744,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   if (result.deferredSignInEvent) {
     posthogClient.capture(result.deferredSignInEvent);
   }
+  const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, result.user.id);
 
   if (refreshCredentials) {
     return NextResponse.json(
@@ -698,6 +753,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         refreshToken: refreshCredentials.refreshToken,
         expiresIn: refreshCredentials.expiresIn,
         created: result.isNew,
+        ...(pendingLink ? { pendingLink } : {}),
       },
       { status: 200 }
     );
@@ -717,6 +773,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         refreshToken: pair.refreshToken,
         expiresIn: pair.expiresIn,
         created: result.isNew,
+        ...(pendingLink ? { pendingLink } : {}),
       },
       { status: 200 }
     );
@@ -731,5 +788,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         userAgent: request.headers.get('user-agent') ?? undefined,
       })),
     created: result.isNew,
+    ...(pendingLink ? { pendingLink } : {}),
   });
 });

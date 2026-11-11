@@ -30,6 +30,7 @@ import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pas
 import { mapGooglePlayKiloPassPurchase } from './google-play-verifier';
 import {
   completeStoreKiloPassPurchase,
+  type CompleteStoreKiloPassPurchaseResult,
   type ValidatedStoreKiloPassPurchase,
 } from './store-subscription-completion';
 
@@ -685,7 +686,7 @@ describe('completeStoreKiloPassPurchase', () => {
     });
   });
 
-  it('serializes concurrent same-key completions behind the ledger lease', async () => {
+  it('completes concurrent same-key completions once', async () => {
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
     const purchase = applePurchase();
 
@@ -693,17 +694,23 @@ describe('completeStoreKiloPassPurchase', () => {
       Array.from({ length: 4 }, () => completeStoreKiloPassPurchase({ user, purchase }))
     );
 
-    const fulfilled = results.filter(result => result.status === 'fulfilled');
-    const rejected = results.filter(result => result.status === 'rejected');
-    expect(fulfilled).toHaveLength(1);
-    expect(rejected).toHaveLength(3);
-    // The losers see the live admitted lease and conflict, never re-executing.
-    for (const result of rejected) {
-      expect((result.reason as Error).message).toBe('operation_in_progress');
-    }
-
-    const winner = fulfilled[0] as PromiseFulfilledResult<{ subscriptionId: string }>;
+    // A caller that admits while the winner holds the lease conflicts; one that
+    // admits after the winner settled replays the stored result. Neither runs
+    // the completion again, so timing only decides which of the two it gets.
+    const completions = results.filter(
+      result => result.status === 'fulfilled' && !result.value.alreadyProcessed
+    );
+    expect(completions).toHaveLength(1);
+    const winner = completions[0] as PromiseFulfilledResult<{ subscriptionId: string }>;
     const subscriptionId = winner.value.subscriptionId;
+    for (const result of results) {
+      if (result === winner) continue;
+      if (result.status === 'rejected') {
+        expect((result.reason as Error).message).toBe('operation_in_progress');
+      } else {
+        expect(result.value).toMatchObject({ subscriptionId, alreadyProcessed: true });
+      }
+    }
 
     const subscriptions = await db
       .select()
@@ -738,6 +745,72 @@ describe('completeStoreKiloPassPurchase', () => {
       .from(kilo_pass_issuance_items)
       .where(eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuances[0]?.id ?? ''));
     expect(items).toHaveLength(1);
+  });
+
+  it('rejects same-key completions while the admitted completion holds the lease', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const purchase = applePurchase();
+    const readLedgerRows = () =>
+      db
+        .select({ status: operation_ledgers.status })
+        .from(operation_ledgers)
+        .where(
+          and(
+            eq(operation_ledgers.kilo_user_id, user.id),
+            eq(operation_ledgers.domain, 'purchase'),
+            eq(operation_ledgers.operation_key, purchase.providerTransactionId)
+          )
+        );
+
+    // Holding the user row keeps the admitted completion waiting on its user
+    // lock, inside the lease, until this transaction ends. `no key update`
+    // still lets the ledger insert reference the user row.
+    let first: Promise<CompleteStoreKiloPassPurchaseResult> | undefined;
+    const contenders = await db.transaction(async tx => {
+      await tx
+        .select({ id: kilocode_users.id })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, user.id))
+        .for('no key update');
+      first = completeStoreKiloPassPurchase({ user, purchase });
+      for (let attempt = 0; (await readLedgerRows()).length === 0; attempt++) {
+        if (attempt >= 5_000) throw new Error('The first completion was never admitted');
+      }
+      return Promise.allSettled(
+        Array.from({ length: 3 }, () => completeStoreKiloPassPurchase({ user, purchase }))
+      );
+    });
+
+    for (const result of contenders) {
+      expect(result.status).toBe('rejected');
+      if (result.status === 'rejected') {
+        expect((result.reason as Error).message).toBe('operation_in_progress');
+      }
+    }
+
+    const completed = await first;
+    expect(completed).toMatchObject({ alreadyProcessed: false });
+    expect(await readLedgerRows()).toEqual([{ status: 'completed' }]);
+    expect(await completeStoreKiloPassPurchase({ user, purchase })).toMatchObject({
+      subscriptionId: completed?.subscriptionId,
+      alreadyProcessed: true,
+    });
+
+    const storePurchases = await db
+      .select()
+      .from(kilo_pass_store_purchases)
+      .where(
+        and(
+          eq(kilo_pass_store_purchases.payment_provider, purchase.paymentProvider),
+          eq(kilo_pass_store_purchases.provider_transaction_id, purchase.providerTransactionId)
+        )
+      );
+    expect(storePurchases).toHaveLength(1);
+    const issuances = await db
+      .select()
+      .from(kilo_pass_issuances)
+      .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, completed?.subscriptionId ?? ''));
+    expect(issuances).toHaveLength(1);
   });
 
   it('rejects concurrent different provider subscriptions for the same user', async () => {

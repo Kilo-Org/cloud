@@ -82,13 +82,10 @@ export function PreparationDrawer({
 function PreparationTimeline({ attempt }: { attempt: PreparationAttempt }) {
   const phaseSteps = attempt.steps.filter(step => step.kind === 'phase');
   const commands = attempt.steps.filter(step => step.kind === 'setup_command');
-  const setupPhaseIds = new Set(
-    phaseSteps.filter(step => step.key === 'setup_commands').map(step => step.id)
-  );
+  const phaseIds = new Set(phaseSteps.map(step => step.id));
+  const hasLegacySetupPhase = phaseSteps.some(step => step.key === 'setup_commands');
   const standaloneCommands = commands.filter(command =>
-    command.parentStepId === undefined
-      ? setupPhaseIds.size === 0
-      : !setupPhaseIds.has(command.parentStepId)
+    command.parentStepId === undefined ? !hasLegacySetupPhase : !phaseIds.has(command.parentStepId)
   );
   // A failed command card displays attempt.safeError as its fallback, and a
   // failed phase row displays its own safeError inline — only surface the

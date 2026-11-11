@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "請輸入你的電子郵件地址。",
     "or": "或"
   },
+  "pendingLink": {
+    "description": "已有帳戶使用 {{email}}。請使用該帳戶的其中一種方式登入，以新增 {{provider}}。",
+    "emailCode": "以電子郵件傳送登入驗證碼給我",
+    "continueInBrowser": "在瀏覽器中繼續",
+    "startAgain": "重新開始",
+    "expired": "這個新增 {{provider}} 的要求已過期。",
+    "noMethods": "這個帳戶沒有其他登入方式，因此無法新增 {{provider}}。",
+    "linked": "已將 {{provider}} 新增至你的帳戶。",
+    "failedExpired": "要求已過期，因此未新增 {{provider}}。",
+    "failedWrongAccount": "你登入了其他帳戶，因此未新增 {{provider}}。",
+    "failedAccountAlreadyLinked": "{{provider}} 已連結至其他帳戶，因此未新增。",
+    "failedProviderAlreadyLinked": "你的帳戶已有其他 {{provider}} 登入方式，因此未新增 {{provider}}。",
+    "failedLinking": "無法將 {{provider}} 新增至你的帳戶。",
+    "notAdded": "你已登入。{{provider}} 未新增至你的帳戶。"
+  },
   "profile": {
     "codeReviewerSubtitle": "自動 PR 審查",
     "securityAgentSubtitle": "尋找並修復漏洞",
@@ -267,6 +282,8 @@
     "providerTestAccount": "測試帳戶",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "企業 SSO",
     "passkeysTitle": "通行密鑰",
     "passkeysSubtitle": "無需密碼即可登入",
@@ -1760,7 +1777,7 @@
       "cloningSession": "複製工作階段中",
       "couldNotLoadThisSession": "無法載入此工作階段。",
       "cloneFailedRetry": "無法複製此工作階段。請再試一次。",
-      "notEnoughCredits": "點數不足，無法執行 Cloud Agent。請加值後再試一次。",
+      "notEnoughCredits": "點數不足，無法執行此請求。請加值後再試一次。",
       "previousTaskFinishing": "上一個任務仍在收尾。請稍候。",
       "serviceUnavailable": "服務目前無法使用。請再試一次。",
       "connectionTrouble": "連線發生問題。請稍後再試一次。",
@@ -1870,7 +1887,7 @@
       "discardWithUploadsMessage": "你輸入的提示詞與尚未附加至已傳送訊息的上傳檔案都會刪除。",
       "discardFailed": "無法捨棄草稿。請再試一次。",
       "remoteHint": "若要在你的電腦上執行，請在該電腦上啟動 Kilo 並讓它保持執行。",
-      "continueFrom": "正在接續 {{title}}。",
+      "continueFrom": "正在接續「{{title}}」。",
       "importingSession": "匯入工作階段中",
       "cliCannotContinue": "此 CLI 無法繼續工作階段。請選擇 Cloud Agent 或其他 CLI。",
       "importFailed": "無法匯入此工作階段。",
@@ -1922,6 +1939,8 @@
       "toolList": "列出",
       "toolPatch": "套用修補",
       "toolTask": "任務",
+      "toolSendFile": "已傳送檔案",
+      "toolSendFileAction": "傳送檔案",
       "readTodos": "讀取計畫",
       "updateTodos": "更新計畫",
       "linesBadge": "{{displayCount}} 行",
@@ -2022,7 +2041,21 @@
       "thought": "思考內容",
       "showDetails": "顯示詳細資料",
       "pending": "待處理…",
-      "running": "執行中…"
+      "running": "執行中…",
+      "field": {
+        "filePath": "檔案路徑",
+        "path": "路徑",
+        "offset": "偏移",
+        "limit": "上限",
+        "pattern": "模式",
+        "include": "包含",
+        "patchText": "修補文字",
+        "query": "查詢",
+        "prompt": "提示詞",
+        "header": "標題",
+        "question": "問題",
+        "options": "選項"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "無法顯示內容。"
@@ -2038,7 +2071,7 @@
       "assistantContextOverflow": "對話長度超出模型可處理的範圍。",
       "assistantProviderError": "供應商傳回錯誤。",
       "assistantProviderRefused": "供應商拒絕了此請求，且無法重試。",
-      "assistantCreditsRefusal": "點數不足，無法執行 Cloud Agent。",
+      "assistantCreditsRefusal": "點數不足，無法執行此請求。",
       "assistantOutputLimit": "回覆已達到模型的輸出上限。",
       "assistantStructuredOutput": "回覆與所需格式不符。",
       "assistantFailed": "回覆失敗。"
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "此模型支援思考程度"
     },
-    "creditsRequired": "點數不足，無法傳送此訊息。請加值點數後再試一次。"
+    "creditsRequired": "點數不足，無法傳送此訊息。"
   },
   "settingsTools": {
     "confirmTitle": "確認此變更？"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "我的代理",
       "promptPlaceholder": "你是一個...",
       "tools": "工具",
+      "wholeToolRule": "此代理會一次將一條規則套用到所有工具：{{rule}}。這些開關為唯讀。",
       "visibility": "可見性",
       "visibilityPrimary": "主要 — 顯示在選擇器中",
       "visibilitySubagent": "子代理程式 — 只能從其他人調用",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "倉庫的預設設定檔",
+      "entryLabel": "預設設定檔",
       "add": "新增預設值",
       "empty": "沒有配置預設值",
       "emptyDescription": "新增預設值以在啟動儲存庫會話時自動套用設定檔。",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "未為任何情境啟用排定的簡報",
     "sourceBlocker": "工作階段需要留意",
     "sourceMetadata": "已擷取的工作階段中繼資料"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "無法開啟此搜尋結果"
   }
 }

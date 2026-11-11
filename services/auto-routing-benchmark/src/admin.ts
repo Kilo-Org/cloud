@@ -99,6 +99,9 @@ function requestRouter(c: Context<HonoEnv>) {
 }
 
 export function registerAdminRoutes(app: Hono<HonoEnv>): void {
+  // Every /admin/* route below requires the worker-wide authMiddleware
+  // (./auth), which src/index.ts mounts with app.use('*', ...) before it calls
+  // registerAdminRoutes(app). Keep the registration in that order.
   app.use('/admin/*', async (c, next) => {
     const router = AutoRouterSchema.safeParse(c.req.query('router') ?? DEFAULT_AUTO_ROUTER);
     if (!router.success) return c.json({ error: 'Invalid router' }, 400);

@@ -1,13 +1,14 @@
 import * as z from 'zod';
+import { overLimitMessage, overTotalMessage } from './limit-copy';
 
 export const MAX_PROFILE_SKILLS = 50;
 export const MAX_SKILL_NAME_LENGTH = 100;
-export const MAX_SKILL_MARKDOWN_LENGTH = 100_000; // ~100 KB
+export const MAX_SKILL_MARKDOWN_LENGTH = 100_000;
 export const MAX_SKILL_DESCRIPTION_LENGTH = 2000;
 /** Companion-file limits for multi-file skills (SKILL.md itself is stored in raw_markdown). */
 export const MAX_SKILL_COMPANION_FILES = 40;
-export const MAX_SKILL_COMPANION_FILE_SIZE = 100_000; // ~100 KB per file
-export const MAX_SKILL_COMPANION_FILES_TOTAL = 500_000; // ~500 KB across all companion files
+export const MAX_SKILL_COMPANION_FILE_SIZE = 100_000;
+export const MAX_SKILL_COMPANION_FILES_TOTAL = 500_000;
 export const MAX_SKILL_COMPANION_PATH_LENGTH = 200;
 
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
@@ -64,7 +65,7 @@ export const skillFilesSchema = z
       if (content.length > MAX_SKILL_COMPANION_FILE_SIZE) {
         ctx.addIssue({
           code: 'custom',
-          message: `Skill companion file ${path} exceeds ${MAX_SKILL_COMPANION_FILE_SIZE} bytes`,
+          message: overLimitMessage(`Skill companion file ${path}`, MAX_SKILL_COMPANION_FILE_SIZE),
         });
         return;
       }
@@ -73,7 +74,7 @@ export const skillFilesSchema = z
     if (total > MAX_SKILL_COMPANION_FILES_TOTAL) {
       ctx.addIssue({
         code: 'custom',
-        message: `Skill companion files total ${total} bytes, exceeds ${MAX_SKILL_COMPANION_FILES_TOTAL}`,
+        message: overTotalMessage('Skill companion files', total, MAX_SKILL_COMPANION_FILES_TOTAL),
       });
     }
   });
@@ -85,7 +86,7 @@ export const skillCustomInputSchema = z.object({
   rawMarkdown: z
     .string()
     .min(1)
-    .max(MAX_SKILL_MARKDOWN_LENGTH, `Skill markdown exceeds ${MAX_SKILL_MARKDOWN_LENGTH} bytes`),
+    .max(MAX_SKILL_MARKDOWN_LENGTH, overLimitMessage('Skill markdown', MAX_SKILL_MARKDOWN_LENGTH)),
   files: skillFilesSchema.optional(),
   enabled: z.boolean().optional(),
 });
@@ -97,7 +98,7 @@ export const skillUpdateInputSchema = z.object({
   rawMarkdown: z
     .string()
     .min(1)
-    .max(MAX_SKILL_MARKDOWN_LENGTH, `Skill markdown exceeds ${MAX_SKILL_MARKDOWN_LENGTH} bytes`)
+    .max(MAX_SKILL_MARKDOWN_LENGTH, overLimitMessage('Skill markdown', MAX_SKILL_MARKDOWN_LENGTH))
     .optional(),
   files: skillFilesSchema.optional(),
   enabled: z.boolean().optional(),

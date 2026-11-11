@@ -229,6 +229,21 @@
     "signInCodeField": "Aanmeldkode",
     "or": "of"
   },
+  "pendingLink": {
+    "description": "'n Rekening gebruik reeds {{email}}. Meld aan met een van sy metodes om {{provider}} by te voeg.",
+    "emailCode": "E-pos vir my 'n aanmeldkode",
+    "continueInBrowser": "Gaan voort in die blaaier",
+    "startAgain": "Begin weer",
+    "expired": "Hierdie versoek om {{provider}} by te voeg het verval.",
+    "noMethods": "Hierdie rekening het geen ander aanmeldmetode nie, dus kan {{provider}} nie bygevoeg word nie.",
+    "linked": "{{provider}} is by jou rekening gevoeg.",
+    "failedExpired": "{{provider}} is nie bygevoeg nie omdat die versoek verval het.",
+    "failedWrongAccount": "{{provider}} is nie bygevoeg nie omdat jy by 'n ander rekening aangemeld het.",
+    "failedAccountAlreadyLinked": "{{provider}} is nie bygevoeg nie omdat dit reeds aan 'n ander rekening gekoppel is.",
+    "failedProviderAlreadyLinked": "{{provider}} is nie bygevoeg nie omdat jou rekening reeds 'n ander {{provider}}-aanmelding het.",
+    "failedLinking": "{{provider}} kon nie by jou rekening gevoeg word nie.",
+    "notAdded": "Jy is aangemeld. {{provider}} is nie by jou rekening gevoeg nie."
+  },
   "profile": {
     "codeReviewerSubtitle": "Outomatiese PR-hersienings",
     "securityAgentSubtitle": "Vind en verhelp kwesbaarhede",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Toetsrekening",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Onderneming-SSO",
     "passkeysTitle": "Passkeys",
     "passkeysSubtitle": "Meld aan sonder ’n wagwoord",
@@ -2298,7 +2315,7 @@
       "cloningSession": "Sessie word gekloon",
       "couldNotLoadThisSession": "Hierdie sessie kon nie gelaai word nie.",
       "cloneFailedRetry": "Hierdie sessie kon nie gekloon word nie. Probeer weer.",
-      "notEnoughCredits": "Jy het nie genoeg krediete om Cloud Agent te gebruik nie. Voeg krediete by en probeer weer.",
+      "notEnoughCredits": "Jy het nie genoeg krediete vir hierdie versoek nie. Voeg krediete by en probeer weer.",
       "previousTaskFinishing": "Die vorige taak word nog afgehandel. Wag asseblief 'n oomblik.",
       "serviceUnavailable": "Die diens is tans onbeskikbaar. Probeer asseblief weer.",
       "connectionTrouble": "Daar is 'n verbindingsprobleem. Probeer asseblief oor 'n oomblik weer.",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Jou opdrag en enige opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal geskrap word.",
       "discardFailed": "Die konsep kon nie weggegooi word nie. Probeer asseblief weer.",
       "remoteHint": "Om op jou rekenaar uit te voer, moet jy Kilo daar begin en laat loop.",
-      "continueFrom": "Die sessie {{title}} word voortgesit.",
+      "continueFrom": "Die sessie “{{title}}” word voortgesit.",
       "importingSession": "Sessie word ingevoer",
       "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortsit nie. Kies Cloud Agent of 'n ander CLI.",
       "importFailed": "Hierdie sessie kon nie ingevoer word nie.",
@@ -2460,6 +2477,8 @@
       "toolList": "lys",
       "toolPatch": "pas wysiging toe",
       "toolTask": "taak",
+      "toolSendFile": "Lêer gestuur",
+      "toolSendFileAction": "Stuur lêer",
       "readTodos": "Lees plan",
       "updateTodos": "Werk plan by",
       "linesBadge": "{{displayCount}} reëls",
@@ -2560,7 +2579,21 @@
       "thought": "Gedagte",
       "showDetails": "Wys besonderhede",
       "pending": "Hangende…",
-      "running": "Besig…"
+      "running": "Besig…",
+      "field": {
+        "filePath": "Lêerpad",
+        "path": "Pad",
+        "offset": "Afset",
+        "limit": "Limiet",
+        "pattern": "Patroon",
+        "include": "Insluiting",
+        "patchText": "Wysigingsteks",
+        "query": "Soektog",
+        "prompt": "Aanwysing",
+        "header": "Opskrif",
+        "question": "Vraag",
+        "options": "Keuses"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Die inhoud kon nie vertoon word nie."
@@ -2576,7 +2609,7 @@
       "assistantContextOverflow": "Die gesprek is te lank vir die model.",
       "assistantProviderError": "Die verskaffer het 'n fout teruggestuur.",
       "assistantProviderRefused": "Die verskaffer het die versoek geweier en dit kan nie weer probeer word nie.",
-      "assistantCreditsRefusal": "Jy het nie genoeg krediete om Cloud Agent te gebruik nie.",
+      "assistantCreditsRefusal": "Jy het nie genoeg krediete vir hierdie versoek nie.",
       "assistantOutputLimit": "Die antwoord het die model se afvoerlimiet bereik.",
       "assistantStructuredOutput": "Die antwoord het nie aan die vereiste formaat voldoen nie.",
       "assistantFailed": "Die antwoord het misluk."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Hierdie model ondersteun denkinspanning"
     },
-    "creditsRequired": "Nie genoeg krediete om hierdie boodskap te stuur nie. Voeg krediete by en probeer weer."
+    "creditsRequired": "Nie genoeg krediete om hierdie boodskap te stuur nie."
   },
   "settingsTools": {
     "confirmTitle": "Bevestig hierdie verandering?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "My agent",
       "promptPlaceholder": "Jy is 'n...",
       "tools": "Gereedskap",
+      "wholeToolRule": "Hierdie agent pas een reël gelyktydig op alle gereedskap toe: {{rule}}. Hierdie skakelaars is slegs-lees.",
       "visibility": "Sigbaarheid",
       "visibilityPrimary": "Primêr — gewys in die kieser",
       "visibilitySubagent": "Subagent — slegs oproepbaar vanaf ander",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Verstekprofiele vir Repos",
+      "entryLabel": "Verstekprofiele",
       "add": "Voeg verstek by",
       "empty": "Geen verstekke opgestel nie",
       "emptyDescription": "Voeg 'n verstek by om 'n profiel outomaties toe te pas wanneer sessies vir 'n repo begin.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Geen kontekste vir geskeduleerde verslae geaktiveer nie",
     "sourceBlocker": "Sessie benodig aandag",
     "sourceMetadata": "Vasgelegde sessiemetadata"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Kon nie hierdie soektogresultaat oopmaak nie"
   }
 }

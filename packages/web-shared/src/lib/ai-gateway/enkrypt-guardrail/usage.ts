@@ -1,25 +1,33 @@
 import 'server-only';
 
 import { randomUUID } from 'crypto';
-import { eq } from 'drizzle-orm';
+import { after } from 'next/server';
+import { eq, inArray } from 'drizzle-orm';
 import {
   api_kind,
   enkrypt_usage,
   enkrypt_usage_decision,
+  enkrypt_usage_detector,
   enkrypt_usage_guardrail,
 } from '@kilocode/db/schema';
 import type {
+  EnkryptDetectorId,
   EnkryptGuardrailApiKind,
   EnkryptGuardrailDecision,
   EnkryptGuardrailDirection,
 } from '@kilocode/db/schema-types';
-import { db, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
+import { ENKRYPT_USAGE_QUEUE_ENABLED } from '@kilocode/web-shared/lib/config.server';
+import { db, isUSRegion, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import {
   scheduleOrganizationLowBalanceAlert,
   scheduleOrganizationUsageAutoTopUp,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { recordEnkryptUsageInPrimaryRegion } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-primary-region';
+import {
+  enqueueEnkryptUsage,
+  type UsageEnqueueOutcome,
+} from '@kilocode/web-shared/lib/ai-gateway/usage-publisher';
 import type {
   EnkryptUsageWrite,
   EnkryptUsageWriteInput,
@@ -42,6 +50,11 @@ export type EnkryptGuardrailCall = {
   decision: EnkryptGuardrailDecision;
   /** Enkrypt's `X-Enkrypt-Credits-Cost` header, or null when the call returned none. */
   creditsCost: number | null;
+  /**
+   * The detectors that fired on this call, blocking or log-only. A log-only detection is an
+   * `allowed` call with detectors here.
+   */
+  detectorsFired?: EnkryptDetectorId[];
 };
 
 export type EnkryptUsageRecord = EnkryptGuardrailCall & {
@@ -57,22 +70,83 @@ export function enkryptCreditsToMicrodollars(creditsCost: number | null): number
 }
 
 /**
- * In a US region the write is handed to Frankfurt, next to the primary, so its transaction neither
- * pays cross-region round trips nor holds a primary pool connection for them. A failed handoff
- * falls back to a local write; the usage id makes a repeated delivery a no-op. Gateway callers must
- * defer it with `after()`.
+ * With `ENKRYPT_USAGE_QUEUE_ENABLED`, the write goes only to the usage queue, in every region, like
+ * queued LLM accounting: it is written directly only when nothing was sent, and is dropped after a
+ * failed send because the queue may already hold it.
+ *
+ * Otherwise, in a US region the write is handed to Frankfurt, next to the primary, so its
+ * transaction neither pays cross-region round trips nor holds a primary pool connection for them.
+ * A failed handoff falls back to a local write; the usage id makes a repeated delivery a no-op.
+ * Gateway callers must defer it with `after()`.
  */
 export async function recordEnkryptUsage(usageRecord: EnkryptUsageRecord): Promise<void> {
-  const { guardrail = 'input', ...call } = usageRecord;
+  const { guardrail = 'input', detectorsFired = [], ...call } = usageRecord;
+  const [firstDetector, ...otherDetectors] = detectorsFired;
   const usageWrite: EnkryptUsageWriteInput = {
     ...call,
-    // Input calls omit the field, so a web app deployed before it still accepts them.
+    // Input calls and calls without a detection omit these fields, so a web app deployed before
+    // them still accepts the write.
     ...(guardrail === 'output' ? { guardrail } : {}),
+    ...(firstDetector ? { detectorsFired: [firstDetector, ...otherDetectors] } : {}),
     id: randomUUID(),
     occurredAt: new Date().toISOString(),
   };
+  if (ENKRYPT_USAGE_QUEUE_ENABLED) {
+    const outcome = await enqueueWithinRequestLifetime(usageWrite);
+    if (outcome.kind === 'accepted') return;
+    if (!NOTHING_SENT_REASONS.has(outcome.reason)) {
+      console.error('[enkrypt-guardrail] usage queue publication failed; record dropped', {
+        usage_id: usageWrite.id,
+        reason: outcome.reason,
+        ...('errorName' in outcome && { error_name: outcome.errorName }),
+      });
+      return;
+    }
+  }
   if (isUSRegion() && (await recordEnkryptUsageInPrimaryRegion(usageWrite))) return;
   await recordEnkryptUsageLocally({ ...usageWrite, guardrail });
+}
+
+const NOTHING_SENT_REASONS: ReadonlySet<string> = new Set([
+  'publisher_not_configured',
+  'registration_failed',
+]);
+
+type PublicationOutcome =
+  | UsageEnqueueOutcome
+  | { kind: 'unavailable'; reason: 'unexpected_rejection'; errorName: string };
+
+/**
+ * The publisher reports every transport failure as an outcome, so a rejection is unexpected and may
+ * follow a send; it takes the same drop path, keeping only the error's name.
+ */
+function unexpectedRejection(error: unknown): PublicationOutcome {
+  return {
+    kind: 'unavailable',
+    reason: 'unexpected_rejection',
+    errorName: error instanceof Error ? error.name : typeof error,
+  };
+}
+
+/** Without a request lifetime the publication would not be kept alive, so it is never started. */
+async function enqueueWithinRequestLifetime(
+  usageWrite: EnkryptUsageWriteInput
+): Promise<PublicationOutcome> {
+  const registered = Promise.withResolvers<void>();
+  const publication = registered.promise
+    .then(() => enqueueEnkryptUsage(usageWrite))
+    .catch(unexpectedRejection);
+  try {
+    after(publication);
+  } catch (error) {
+    console.warn('[enkrypt-guardrail] usage queue has no request lifetime; writing directly', {
+      usage_id: usageWrite.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { kind: 'unavailable', reason: 'registration_failed' };
+  }
+  registered.resolve();
+  return publication;
 }
 
 /**
@@ -90,6 +164,37 @@ async function lookupId(
   const [concurrent] = await select();
   if (!concurrent) throw new Error('Enkrypt usage lookup resolution failed');
   return concurrent.id;
+}
+
+/**
+ * The lookup ids of the detectors, in their order, inserting the new ones. An insert that conflicts
+ * with a concurrent one waits for it, so reading again afterwards finds every detector. New
+ * detectors are inserted sorted, so concurrent inserts of the same detectors cannot deadlock.
+ */
+async function detectorIds(
+  tx: DrizzleTransaction,
+  detectors: readonly EnkryptDetectorId[]
+): Promise<number[]> {
+  const select = () =>
+    tx
+      .select({ id: enkrypt_usage_detector.detector_id, detector: enkrypt_usage_detector.detector })
+      .from(enkrypt_usage_detector)
+      .where(inArray(enkrypt_usage_detector.detector, [...detectors]));
+  const distinct = [...new Set(detectors)].sort();
+  let rows = await select();
+  if (rows.length < distinct.length) {
+    await tx
+      .insert(enkrypt_usage_detector)
+      .values(distinct.map(detector => ({ detector })))
+      .onConflictDoNothing({ target: enkrypt_usage_detector.detector });
+    rows = await select();
+  }
+  const ids = new Map(rows.map(row => [row.detector, row.id]));
+  return detectors.map(detector => {
+    const id = ids.get(detector);
+    if (id === undefined) throw new Error('Enkrypt usage detector lookup resolution failed');
+    return id;
+  });
 }
 
 /**
@@ -145,6 +250,9 @@ export async function recordEnkryptUsageLocally(
           .onConflictDoNothing({ target: enkrypt_usage_guardrail.guardrail })
           .returning({ id: enkrypt_usage_guardrail.guardrail_id })
     );
+    const firedDetectorIds = usageWrite.detectorsFired?.length
+      ? await detectorIds(tx, usageWrite.detectorsFired)
+      : null;
 
     const [inserted] = await tx
       .insert(enkrypt_usage)
@@ -160,6 +268,7 @@ export async function recordEnkryptUsageLocally(
         charged_microdollars: chargedMicrodollars,
         added_latency_ms: usageWrite.addedLatencyMs,
         guardrail_id: guardrailId,
+        fired_detector_ids: firedDetectorIds,
         created_at: occurredAt,
       })
       .onConflictDoNothing({ target: [enkrypt_usage.id, enkrypt_usage.created_at] })

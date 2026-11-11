@@ -17,6 +17,9 @@ import { parseTimestamp, timeAgo } from '@/lib/utils';
 export type SessionSection = {
   title: string;
   data: StoredSession[];
+  /** The zone this section's day boundary was computed in, so a row under it
+   * names the same day the heading does. */
+  timeZone: string;
 };
 
 /** Platform buckets offered by the session filters, in display order. */
@@ -196,50 +199,6 @@ function clockTime(timestamp: string | null | undefined): string | null {
  */
 export function formatScheduledWake(at: string): string | null {
   return clockTime(at);
-}
-
-/**
- * Time meta for one session row: the label the row draws, plus the clock time
- * when the relative label was replaced because it restated the row's section.
- */
-type SessionRowTimeMeta = {
-  visible: string;
-  /** The clock time that replaced the relative label, or `null` when it stands. */
-  clock: string | null;
-};
-
-/**
- * Time meta for a session row that sits under a date section heading.
- *
- * `formatMeta` renders the relative day word, and in the Yesterday section that
- * word is the heading directly above the row (`YESTERDAY` under `YESTERDAY`),
- * so the row restated its own section. When the two strings match — the same
- * locale-folded text on screen, not a bucket rule — the row shows the clock
- * time of its own timestamp instead. Every other heading (Today, a weekday,
- * Older) never matches the relative label it renders, so those rows keep it.
- *
- * `clock` is the replacement when one was made, so the spoken label says the
- * same clock time instead of repeating the section, and `null` when the
- * relative label stands. `nowMs` is the caller's sampled clock, as in
- * {@link formatMeta}.
- */
-export function sectionAwareTimeMeta(
-  timestamp: string | null | undefined,
-  sectionTitle: string | null | undefined,
-  nowMs?: number
-): SessionRowTimeMeta {
-  const relative = formatMeta(timestamp, nowMs);
-  if (!sectionTitle || relative === '') {
-    return { visible: relative, clock: null };
-  }
-  if (
-    relative.toLocaleLowerCase(i18n.language) !==
-    sectionTitle.trim().toLocaleLowerCase(i18n.language)
-  ) {
-    return { visible: relative, clock: null };
-  }
-  const clock = clockTime(timestamp);
-  return clock === null ? { visible: relative, clock: null } : { visible: clock, clock };
 }
 
 /**

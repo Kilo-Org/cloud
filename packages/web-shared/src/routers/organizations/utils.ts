@@ -26,6 +26,7 @@ import {
   type OrganizationAccess,
   type SupportDecision,
   type SupportActionClass,
+  type SupportAccessReason,
   type SupportContext,
   type SupportSurface,
 } from '@kilocode/web-shared/lib/admin/support-access';
@@ -297,14 +298,6 @@ function supportActionIdFor(
   return key;
 }
 
-type SupportAccessReason =
-  | 'support_grant_required'
-  | 'support_grant_expired'
-  | 'support_grant_revoked'
-  | 'support_access_not_allowlisted'
-  | 'support_access_action_class'
-  | 'support_grant_lookup_failed';
-
 function supportAccessReasonFor(params: {
   decision: SupportDecision | null;
   grantStatus: 'expired' | 'revoked' | null;
@@ -482,7 +475,8 @@ export async function resolveOrganizationAccess(
       await recordSupportWriteUse({
         grantId: evaluation.access.grantId,
         actorKiloUserId: ctx.user.id,
-        organizationId,
+        grantOrganizationId: evaluation.access.inheritedFromOrganizationId ?? organizationId,
+        targetOrganizationId: organizationId,
         supportActionId: evaluation.access.supportActionId,
       });
     }
@@ -495,6 +489,7 @@ export async function resolveOrganizationAccess(
       supportGrantId: evaluation.grantId,
       supportActionId,
       inventoryId: evaluation.access.inventoryId,
+      supportInheritedFromOrganizationId: evaluation.access.inheritedFromOrganizationId,
     });
     return evaluation.access;
   }
@@ -519,11 +514,25 @@ export async function resolveOrganizationAccess(
     supportGrantId: evaluation.grantId,
     supportActionId,
     inventoryId: null,
+    supportInheritedFromOrganizationId: evaluation.inheritedFromOrganizationId,
   });
   throw deniedAccessError({
     decision: evaluation.decision,
     grantStatus,
   });
+}
+
+/**
+ * The role the resolved access stands in for on the current procedure. A support
+ * grant stands in for its allowlist entry's role. Reads the access a procedure
+ * middleware already resolved, so a resolver that varies its response by role
+ * does not resolve, audit, or deny a second time.
+ */
+export function organizationAccessRole(
+  ctx: TRPCContext,
+  access: OrganizationAccess
+): OrganizationRole {
+  return access.kind === 'support' ? supportRoleForCurrentSurface(ctx, access) : access.role;
 }
 
 /**
@@ -537,10 +546,7 @@ export async function ensureOrganizationAccess(
   roles?: OrganizationRole[]
 ): Promise<OrganizationRole> {
   const access = await resolveOrganizationAccess(ctx, organizationId, { roles });
-  const role =
-    access.kind === 'member' || access.kind === 'legacy_admin'
-      ? access.role
-      : supportRoleForCurrentSurface(ctx, access);
+  const role = organizationAccessRole(ctx, access);
   if (roles && roles.length > 0 && !roles.includes(role)) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',

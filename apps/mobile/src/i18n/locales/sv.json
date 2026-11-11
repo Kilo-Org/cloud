@@ -229,6 +229,21 @@
     "signInCodeField": "Inloggningskod",
     "or": "eller"
   },
+  "pendingLink": {
+    "description": "Det finns redan ett konto som använder {{email}}. Logga in med någon av dess metoder för att lägga till {{provider}}.",
+    "emailCode": "Mejla mig en inloggningskod",
+    "continueInBrowser": "Fortsätt i webbläsaren",
+    "startAgain": "Börja om",
+    "expired": "Den här begäran om att lägga till {{provider}} har upphört att gälla.",
+    "noMethods": "Det här kontot har ingen annan inloggningsmetod, så {{provider}} kan inte läggas till.",
+    "linked": "{{provider}} har lagts till i ditt konto.",
+    "failedExpired": "{{provider}} lades inte till eftersom begäran hade upphört att gälla.",
+    "failedWrongAccount": "{{provider}} lades inte till eftersom du loggade in på ett annat konto.",
+    "failedAccountAlreadyLinked": "{{provider}} lades inte till eftersom det redan är kopplat till ett annat konto.",
+    "failedProviderAlreadyLinked": "{{provider}} lades inte till eftersom ditt konto redan har en annan {{provider}}-inloggning.",
+    "failedLinking": "{{provider}} kunde inte läggas till i ditt konto.",
+    "notAdded": "Du är inloggad. {{provider}} lades inte till i ditt konto."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatiska PR-granskningar",
     "securityAgentSubtitle": "Hitta och åtgärda sårbarheter",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO för företag",
     "passkeysTitle": "Passnycklar",
     "passkeysSubtitle": "Logga in utan lösenord",
@@ -2298,7 +2315,7 @@
       "cloningSession": "Klonar sessionen",
       "couldNotLoadThisSession": "Det gick inte att läsa in den här sessionen",
       "cloneFailedRetry": "Kunde inte klona den här sessionen. Försök igen.",
-      "notEnoughCredits": "Du har inte tillräckligt med krediter för att köra Cloud Agent. Fyll på krediter och försök igen.",
+      "notEnoughCredits": "Du har inte tillräckligt med krediter för den här förfrågan. Fyll på krediter och försök igen.",
       "previousTaskFinishing": "Den föregående uppgiften håller på att avslutas. Vänta en stund.",
       "serviceUnavailable": "Tjänsten är inte tillgänglig just nu. Försök igen.",
       "connectionTrouble": "Det är problem med anslutningen. Försök igen om en stund.",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Din prompt och uppladdade filer som inte har bifogats i skickade meddelanden tas bort.",
       "discardFailed": "Det gick inte att ta bort utkastet. Försök igen.",
       "remoteHint": "För att köra på din dator startar du Kilo där och låter det köras.",
-      "continueFrom": "Sessionen {{title}} fortsätter.",
+      "continueFrom": "Sessionen ”{{title}}” fortsätter.",
       "importingSession": "Importerar sessionen",
       "cliCannotContinue": "Den här CLI-versionen kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI-instans.",
       "importFailed": "Det gick inte att importera den här sessionen.",
@@ -2460,6 +2477,8 @@
       "toolList": "upplistning",
       "toolPatch": "ändring",
       "toolTask": "uppgift",
+      "toolSendFile": "Skickad fil",
+      "toolSendFileAction": "Skicka fil",
       "readTodos": "Läs planeringen",
       "updateTodos": "Uppdatera planeringen",
       "linesBadge": "{{displayCount}} rader",
@@ -2560,7 +2579,21 @@
       "thought": "Resonemang",
       "showDetails": "Visa detaljer",
       "pending": "Väntar…",
-      "running": "Körs…"
+      "running": "Körs…",
+      "field": {
+        "filePath": "Filsökväg",
+        "path": "Sökväg",
+        "offset": "Förskjutning",
+        "limit": "Gräns",
+        "pattern": "Mönster",
+        "include": "Inkludering",
+        "patchText": "Patchtext",
+        "query": "Sökfråga",
+        "prompt": "Instruktion",
+        "header": "Rubrik",
+        "question": "Fråga",
+        "options": "Alternativ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Det gick inte att visa innehållet."
@@ -2576,7 +2609,7 @@
       "assistantContextOverflow": "Konversationen är för lång för modellen.",
       "assistantProviderError": "Leverantören returnerade ett fel.",
       "assistantProviderRefused": "Leverantören avvisade begäran och den kan inte göras om.",
-      "assistantCreditsRefusal": "Du har inte tillräckligt med krediter för att köra Cloud Agent.",
+      "assistantCreditsRefusal": "Du har inte tillräckligt med krediter för den här förfrågan.",
       "assistantOutputLimit": "Svaret nådde modellens utdata-gräns.",
       "assistantStructuredOutput": "Svaret matchade inte det begärda formatet.",
       "assistantFailed": "Det gick inte att generera svaret."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Den här modellen stöder resonemangsnivå"
     },
-    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet. Fyll på krediter och försök igen."
+    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet."
   },
   "settingsTools": {
     "confirmTitle": "Bekräfta denna ändring?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Min agent",
       "promptPlaceholder": "Du är en...",
       "tools": "Verktyg",
+      "wholeToolRule": "Den här agenten tillämpar en regel på alla verktyg samtidigt: {{rule}}. Dessa reglage är skrivskyddade.",
       "visibility": "Synlighet",
       "visibilityPrimary": "Primär — visas i väljaren",
       "visibilitySubagent": "Subagent — endast anropsbar från andra",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Standardprofiler för kodarkiv",
+      "entryLabel": "Standardprofiler",
       "add": "Lägg till standard",
       "empty": "Inga standardinställningar konfigurerade",
       "emptyDescription": "Lägg till en standard för att automatiskt tillämpa en profil när du startar sessioner för ett kodarkiv.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Inga kontexter är aktiverade för schemalagda rapporter",
     "sourceBlocker": "Sessionen behöver uppmärksamhet",
     "sourceMetadata": "Insamlad sessionsmetadata"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Kunde inte öppna det här sökresultatet"
   }
 }

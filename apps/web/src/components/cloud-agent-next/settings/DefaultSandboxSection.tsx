@@ -32,9 +32,9 @@ export function DefaultSandboxSection({ organizationId, settings }: DefaultSandb
     <section aria-labelledby={headingId} className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-1.5">
-          <h3 id={headingId} className="text-sm font-medium">
+          <h4 id={headingId} className="text-sm font-medium">
             Default sandbox
-          </h3>
+          </h4>
           {canChoose && <SandboxRulesHint />}
         </div>
         <p className="text-muted-foreground text-xs">
@@ -50,6 +50,7 @@ export function DefaultSandboxSection({ organizationId, settings }: DefaultSandb
         unavailableReason={settings.contextUnavailableReason}
         noneLabel="Platform default"
         noneDescription={describeDefaultSandbox(settings.capabilities.defaultDestination)}
+        noneDestination={settings.capabilities.defaultDestination}
         labelledBy={headingId}
         disabled={!settings.canManage || setContextAllocation.isPending}
         onChange={allocation =>

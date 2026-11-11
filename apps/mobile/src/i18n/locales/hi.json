@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "कृपया अपना ईमेल पता दर्ज करें।",
     "or": "या"
   },
+  "pendingLink": {
+    "description": "{{email}} पहले से एक खाते में इस्तेमाल हो रहा है। {{provider}} जोड़ने के लिए उस खाते के किसी तरीके से साइन इन करें।",
+    "emailCode": "मुझे ईमेल से साइन-इन कोड भेजें",
+    "continueInBrowser": "ब्राउज़र में जारी रखें",
+    "startAgain": "फिर से शुरू करें",
+    "expired": "{{provider}} जोड़ने का यह अनुरोध समाप्त हो गया है।",
+    "noMethods": "इस खाते में साइन इन करने का कोई और तरीका नहीं है, इसलिए {{provider}} नहीं जोड़ा जा सकता।",
+    "linked": "{{provider}} आपके खाते में जोड़ दिया गया।",
+    "failedExpired": "{{provider}} नहीं जोड़ा गया क्योंकि अनुरोध समाप्त हो गया।",
+    "failedWrongAccount": "{{provider}} नहीं जोड़ा गया क्योंकि आपने किसी दूसरे खाते में साइन इन किया।",
+    "failedAccountAlreadyLinked": "{{provider}} नहीं जोड़ा गया क्योंकि यह पहले से किसी दूसरे खाते से लिंक है।",
+    "failedProviderAlreadyLinked": "{{provider}} नहीं जोड़ा गया क्योंकि आपके खाते में पहले से कोई दूसरा {{provider}} साइन-इन है।",
+    "failedLinking": "{{provider}} आपके खाते में नहीं जोड़ा जा सका।",
+    "notAdded": "आपने साइन इन कर लिया है। {{provider}} आपके खाते में नहीं जोड़ा गया।"
+  },
   "profile": {
     "codeReviewerSubtitle": "स्वचालित PR समीक्षाएँ",
     "securityAgentSubtitle": "सुरक्षा की कमियाँ खोजें और ठीक करें",
@@ -267,6 +282,8 @@
     "providerTestAccount": "परीक्षण खाता",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "एंटरप्राइज़ SSO",
     "passkeysTitle": "पासकी",
     "passkeysSubtitle": "बिना पासवर्ड साइन इन करें",
@@ -1766,7 +1783,7 @@
       "cloningSession": "सत्र क्लोन किया जा रहा है",
       "couldNotLoadThisSession": "यह सत्र लोड नहीं हो सका।",
       "cloneFailedRetry": "यह सत्र क्लोन नहीं हो सका। फिर से कोशिश करें।",
-      "notEnoughCredits": "Cloud Agent चलाने के लिए पर्याप्त क्रेडिट नहीं हैं। क्रेडिट जोड़ें और फिर से कोशिश करें।",
+      "notEnoughCredits": "इस अनुरोध के लिए पर्याप्त क्रेडिट नहीं हैं। क्रेडिट जोड़ें और फिर से कोशिश करें।",
       "previousTaskFinishing": "पिछला कार्य अभी पूरा हो रहा है। कृपया थोड़ा इंतज़ार करें।",
       "serviceUnavailable": "सेवा अभी उपलब्ध नहीं है। कृपया फिर से कोशिश करें।",
       "connectionTrouble": "कनेक्शन में समस्या है। कृपया थोड़ी देर बाद फिर से कोशिश करें।",
@@ -1876,7 +1893,7 @@
       "discardWithUploadsMessage": "आपका प्रॉम्प्ट और अपलोड की गई ऐसी फ़ाइलें हटा दी जाएँगी जो किसी भेजे गए संदेश से जुड़ी नहीं हैं।",
       "discardFailed": "ड्राफ़्ट हटाया नहीं जा सका। कृपया फिर से कोशिश करें।",
       "remoteHint": "अपने कंप्यूटर पर चलाने के लिए, वहाँ Kilo शुरू करें और उसे चालू छोड़ दें।",
-      "continueFrom": "{{title}} जारी रखा जा रहा है।",
+      "continueFrom": "“{{title}}” जारी रखा जा रहा है।",
       "importingSession": "सत्र आयात किया जा रहा है",
       "cliCannotContinue": "यह CLI सत्र जारी नहीं रख सकता। Cloud Agent या कोई अन्य CLI चुनें।",
       "importFailed": "यह सत्र आयात नहीं हो सका।",
@@ -1889,7 +1906,6 @@
       "defaultProfileResolvesTo": "वर्तमान में {{name}} पर सेट",
       "defaultProfileResolvesToAccessibility": "डिफ़ॉल्ट प्रोफ़ाइल: {{name}}",
       "manageProfiles": "प्रोफ़ाइल प्रबंधित करें",
-
       "advancedConfig": "उन्नत विन्यास",
       "advancedConfigDescription": "यह इस सत्र पर लागू होता है। प्रोफ़ाइल के रूप में सहेजने पर यह अगली बार के लिए रहता है।",
       "saveAsProfile": "प्रोफ़ाइल के रूप में सहेजें",
@@ -2002,7 +2018,21 @@
       "thought": "विचार",
       "showDetails": "विवरण दिखाएँ",
       "pending": "लंबित…",
-      "running": "चल रहा है…"
+      "running": "चल रहा है…",
+      "field": {
+        "filePath": "फ़ाइल पथ",
+        "path": "पथ",
+        "offset": "ऑफ़सेट",
+        "limit": "सीमा",
+        "pattern": "पैटर्न",
+        "include": "समावेश",
+        "patchText": "संशोधन पाठ",
+        "query": "क्वेरी",
+        "prompt": "प्रॉम्प्ट",
+        "header": "शीर्षक",
+        "question": "प्रश्न",
+        "options": "विकल्प"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "सामग्री दिखाई नहीं जा सकी।"
@@ -2018,7 +2048,7 @@
       "assistantContextOverflow": "मॉडल के लिए बातचीत बहुत लंबी है।",
       "assistantProviderError": "प्रदाता ने एक त्रुटि लौटाई।",
       "assistantProviderRefused": "प्रदाता ने इस अनुरोध को अस्वीकार कर दिया और इसे दोबारा आज़माया नहीं जा सकता।",
-      "assistantCreditsRefusal": "Cloud Agent चलाने के लिए पर्याप्त क्रेडिट नहीं हैं।",
+      "assistantCreditsRefusal": "इस अनुरोध के लिए पर्याप्त क्रेडिट नहीं हैं।",
       "assistantOutputLimit": "उत्तर मॉडल की आउटपुट सीमा तक पहुँच गया।",
       "assistantStructuredOutput": "उत्तर आवश्यक फ़ॉर्मैट से मेल नहीं खाता।",
       "assistantFailed": "उत्तर नहीं मिल सका।"
@@ -2391,6 +2421,8 @@
       "toolList": "सूची दिखाएँ",
       "toolPatch": "पैच लागू करें",
       "toolTask": "कार्य",
+      "toolSendFile": "फ़ाइल भेजी",
+      "toolSendFileAction": "फ़ाइल भेजें",
       "readTodos": "प्लान पढ़ें",
       "updateTodos": "प्लान अपडेट करें",
       "linesBadge": "{{displayCount}} पंक्तियाँ",
@@ -3809,7 +3841,7 @@
     "reasoningEffort": {
       "modelFlag": "यह मॉडल सोचने के स्तर का समर्थन करता है"
     },
-    "creditsRequired": "यह संदेश भेजने के लिए पर्याप्त क्रेडिट नहीं है। क्रेडिट जोड़ें और फिर से कोशिश करें।"
+    "creditsRequired": "यह संदेश भेजने के लिए पर्याप्त क्रेडिट नहीं है।"
   },
   "settingsTools": {
     "confirmTitle": "यह बदलाव पुष्टि करें?"
@@ -4002,6 +4034,7 @@
       "namePlaceholder": "मेरा एजेंट",
       "promptPlaceholder": "तुम एक ...",
       "tools": "औजार",
+      "wholeToolRule": "यह एजेंट एक साथ सभी औजारों पर एक नियम लागू करता है: {{rule}}। ये स्विच केवल-पढ़ने योग्य हैं।",
       "visibility": "दृश्यता",
       "visibilityPrimary": "प्राथमिक — पिकर में दिखाया गया है",
       "visibilitySubagent": "सबएजेंट — केवल दूसरों से कॉल करने योग्य",
@@ -4043,6 +4076,7 @@
     },
     "repoBindings": {
       "title": "रिपोज़ के लिए डिफ़ॉल्ट प्रोफ़ाइल",
+      "entryLabel": "डिफ़ॉल्ट प्रोफ़ाइल",
       "add": "डिफ़ॉल्ट जोड़ें",
       "empty": "कोई डिफ़ॉल्ट कॉन्फ़िगर नहीं किया गया",
       "emptyDescription": "रेपो के लिए सत्र शुरू करते समय प्रोफ़ाइल को स्वचालित रूप से लागू करने के लिए एक डिफ़ॉल्ट जोड़ें।",
@@ -4250,5 +4284,8 @@
     "noEnabledContexts": "निर्धारित ब्रीफ़िंग के लिए कोई संदर्भ चालू नहीं है",
     "sourceBlocker": "सत्र पर ध्यान देने की ज़रूरत है",
     "sourceMetadata": "कैप्चर किया गया सत्र मेटाडेटा"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "यह खोज परिणाम खोला नहीं जा सका"
   }
 }

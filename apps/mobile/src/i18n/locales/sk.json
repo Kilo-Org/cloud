@@ -229,6 +229,21 @@
     "signInCodeField": "Prihlasovací kód",
     "or": "alebo"
   },
+  "pendingLink": {
+    "description": "E-mail {{email}} už používa iný účet. Ak chcete pridať {{provider}}, prihláste sa jedným z jeho spôsobov prihlásenia.",
+    "emailCode": "Poslať mi prihlasovací kód e-mailom",
+    "continueInBrowser": "Pokračovať v prehliadači",
+    "startAgain": "Začať znova",
+    "expired": "Platnosť tejto žiadosti o pridanie {{provider}} vypršala.",
+    "noMethods": "Tento účet nemá iný spôsob prihlásenia, preto nie je možné pridať {{provider}}.",
+    "linked": "{{provider}} bol pridaný do vášho účtu.",
+    "failedExpired": "{{provider}} nebol pridaný, pretože platnosť žiadosti vypršala.",
+    "failedWrongAccount": "{{provider}} nebol pridaný, pretože ste sa prihlásili do iného účtu.",
+    "failedAccountAlreadyLinked": "{{provider}} nebol pridaný, pretože je už prepojený s iným účtom.",
+    "failedProviderAlreadyLinked": "{{provider}} nebol pridaný, pretože váš účet už má iné prihlásenie cez {{provider}}.",
+    "failedLinking": "{{provider}} sa nepodarilo pridať do vášho účtu.",
+    "notAdded": "Ste prihlásený. {{provider}} nebol pridaný do vášho účtu."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatické kontroly PR",
     "securityAgentSubtitle": "Vyhľadávať a odstraňovať zraniteľnosti",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Testovací účet",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Podnikové SSO",
     "passkeysTitle": "Prístupové kľúče",
     "passkeysSubtitle": "Prihláste sa bez hesla",
@@ -2382,7 +2399,7 @@
       "cloningSession": "Klonuje sa relácia",
       "couldNotLoadThisSession": "Túto reláciu sa nepodarilo načítať.",
       "cloneFailedRetry": "Túto reláciu sa nepodarilo naklonovať. Skús to znova.",
-      "notEnoughCredits": "Na spustenie služby Cloud Agent nemáš dosť kreditov. Doplň kredity a skús to znova.",
+      "notEnoughCredits": "Na túto požiadavku nemáš dosť kreditov. Doplň kredity a skús to znova.",
       "previousTaskFinishing": "Predchádzajúca úloha sa ešte dokončuje. Chvíľu počkaj.",
       "serviceUnavailable": "Služba je momentálne nedostupná. Skús to znova.",
       "connectionTrouble": "Vyskytol sa problém s pripojením. Skús to znova o chvíľu.",
@@ -2492,7 +2509,7 @@
       "discardWithUploadsMessage": "Tvoje zadanie a všetky nahrané súbory nepriložené k odoslaným správam sa odstránia.",
       "discardFailed": "Koncept sa nepodarilo zahodiť. Skús to znova.",
       "remoteHint": "Na spustenie vo svojom počítači tam spusti Kilo a nechaj ho spustené.",
-      "continueFrom": "Pokračuje sa v relácii {{title}}.",
+      "continueFrom": "Pokračuje sa v relácii „{{title}}“.",
       "importingSession": "Importuje sa relácia",
       "cliCannotContinue": "Táto verzia CLI nepodporuje pokračovanie v relácii. Vyber službu Cloud Agent alebo inú inštanciu CLI.",
       "importFailed": "Túto reláciu sa nepodarilo importovať.",
@@ -2546,6 +2563,8 @@
       "toolList": "zobraziť zoznam",
       "toolPatch": "použiť záplatu",
       "toolTask": "úloha",
+      "toolSendFile": "Odoslaný súbor",
+      "toolSendFileAction": "odoslať súbor",
       "readTodos": "Prečítať plán",
       "updateTodos": "Aktualizovať plán",
       "linesBadge": "riadky: {{displayCount}}",
@@ -2652,7 +2671,21 @@
       "thought": "Uvažovanie",
       "showDetails": "Zobraziť podrobnosti",
       "pending": "Čaká sa…",
-      "running": "Beží…"
+      "running": "Beží…",
+      "field": {
+        "filePath": "Cesta k súboru",
+        "path": "Cesta",
+        "offset": "Posun",
+        "limit": "Limit",
+        "pattern": "Vzor",
+        "include": "Zahrnutie",
+        "patchText": "Text záplaty",
+        "query": "Dopyt",
+        "prompt": "Pokyn",
+        "header": "Nadpis",
+        "question": "Otázka",
+        "options": "Možnosti"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Obsah sa nepodarilo zobraziť."
@@ -2668,7 +2701,7 @@
       "assistantContextOverflow": "Konverzácia je pre model príliš dlhá.",
       "assistantProviderError": "Poskytovateľ vrátil chybu.",
       "assistantProviderRefused": "Poskytovateľ túto požiadavku odmietol a nemožno ju zopakovať.",
-      "assistantCreditsRefusal": "Na spustenie služby Cloud Agent nemáš dosť kreditov.",
+      "assistantCreditsRefusal": "Na túto požiadavku nemáš dosť kreditov.",
       "assistantOutputLimit": "Odpoveď dosiahla limit výstupu modelu.",
       "assistantStructuredOutput": "Odpoveď nezodpovedala požadovanému formátu.",
       "assistantFailed": "Odpoveď sa nepodarilo vytvoriť."
@@ -3914,7 +3947,7 @@
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje intenzitu uvažovania"
     },
-    "creditsRequired": "Na odoslanie tejto správy nemáte dostatok kreditov. Dopĺňte kredity a skúste to znova."
+    "creditsRequired": "Na odoslanie tejto správy nemáte dostatok kreditov."
   },
   "settingsTools": {
     "confirmTitle": "Potvrdiť túto zmenu?"
@@ -4119,6 +4152,7 @@
       "namePlaceholder": "Môj agent",
       "promptPlaceholder": "Ty si...",
       "tools": "Nástroje",
+      "wholeToolRule": "Tento agent uplatňuje jedno pravidlo na všetky nástroje naraz: {{rule}}. Tieto prepínače sú iba na čítanie.",
       "visibility": "Viditeľnosť",
       "visibilityPrimary": "Primárne — zobrazí sa vo výbere",
       "visibilitySubagent": "Subagent — volateľný iba od ostatných",
@@ -4160,6 +4194,7 @@
     },
     "repoBindings": {
       "title": "Predvolené profily pre úložiská",
+      "entryLabel": "Predvolené profily",
       "add": "Pridať predvolené",
       "empty": "Nie sú nakonfigurované žiadne predvolené hodnoty",
       "emptyDescription": "Pridajte predvolené nastavenie na automatické použitie profilu pri spustení relácií pre repo.",
@@ -4375,5 +4410,8 @@
     "noEnabledContexts": "Pre naplánované prehľady nie sú povolené žiadne kontexty",
     "sourceBlocker": "Relácia si vyžaduje pozornosť",
     "sourceMetadata": "Zachytené metadáta relácie"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nepodarilo sa otvoriť tento výsledok vyhľadávania"
   }
 }

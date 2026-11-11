@@ -15,8 +15,11 @@ import android.app.appsearch.SearchSpec
 import android.app.appsearch.SetSchemaRequest
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Process
+import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.appsearch.app.AppSearchBatchResult as JetpackBatchResult
@@ -43,6 +46,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.security.MessageDigest
 import java.util.function.Consumer
+import kotlin.math.abs
 
 private const val NAMESPACE = "kilo"
 private const val TAG = "KiloSystemSearch"
@@ -50,6 +54,20 @@ private const val SCHEMA_TYPE = "KiloSystemSearchEntity"
 private const val DATABASE_NAME = "kilo-system-search"
 private const val PREFERENCES_NAME = "kilo-system-search"
 private const val PENDING_ROUTE_KEY = "kilo-system-search-pending-route"
+private const val PENDING_ROUTE_WRITTEN_AT_KEY = "kilo-system-search-pending-route-written-at"
+private const val PENDING_ROUTE_WRITTEN_WALL_KEY = "kilo-system-search-pending-route-written-wall"
+private const val PENDING_ROUTE_BOOT_AT_KEY = "kilo-system-search-pending-route-boot-at"
+
+// Two instants that name the same boot agree exactly; this tolerance only
+// absorbs the milliseconds a wall-clock correction moves one of them by.
+private const val BOOT_INSTANT_MATCH_MS = 1_000L
+
+// How long a picked tap may wait for its resolution. The slot outlives the
+// process, and a tap that could not be resolved is kept for a retry, so without
+// a bound an identifier could stay here across restarts and open a screen long
+// after the reader tapped it. A retry within minutes is the case the retention
+// exists for; anything older is treated as no tap at all.
+private const val PENDING_ROUTE_MAX_AGE_MS = 5 * 60 * 1000L
 private const val PROPERTY_ID = "id"
 private const val PROPERTY_TITLE = "title"
 private const val PROPERTY_DESCRIPTION = "description"
@@ -65,6 +83,12 @@ private const val TIMEOUT_MESSAGE = "The system search index did not respond."
 // The iOS module rejects a timed-out index call with the same code, so
 // JavaScript can tell an index that did not answer from a call that failed.
 private const val TIMEOUT_CODE = "ERR_SYSTEM_SEARCH_TIMEOUT"
+
+// A picked identifier that could not be resolved because the index could not be
+// read. Its own code, not a null answer, so JavaScript can tell "the tap could
+// not be opened yet" from "nothing was tapped" and keep the tap for a retry.
+private const val UNRESOLVED_CODE = "ERR_SYSTEM_SEARCH_UNRESOLVED"
+private const val UNRESOLVED_MESSAGE = "The system search index could not resolve this result."
 
 /**
  * One indexed entity, as JavaScript hands it across.
@@ -101,6 +125,12 @@ private data class StoredDocument(
 )
 
 /**
+ * The single-shot slot's contents: the picked identifier, and whether an
+ * earlier process wrote it.
+ */
+private data class PendingRoute(val identifier: String, val fromEarlierProcess: Boolean)
+
+/**
  * The subset of an AppSearch session this module uses, so the platform store
  * (API 31+) and the Jetpack local store (below 31) can both back it.
  */
@@ -135,6 +165,11 @@ class KiloSystemSearchModule : Module() {
   // The launching Intent is the tap on a cold start, and it is delivered once:
   // every later delivery comes from `OnNewIntent` instead.
   private var launchIntentRead = false
+
+  // When this process started, on the boot-relative clock the slot's arrival is
+  // recorded with. A slot older than this came from an earlier process, so the
+  // tap that launched this one is the newer of the two.
+  private val processStartedAt = Process.getStartElapsedRealtime()
 
   // Serializes the single-shot slot's write against its read-and-clear: the
   // write runs on the main thread that delivers the Intent, the read on the
@@ -183,34 +218,60 @@ class KiloSystemSearchModule : Module() {
   }
 
   /**
-   * The route of the last search result the user opened, read and cleared in
-   * one step, or null when there is none.
+   * The route of the last search result the user opened, or null when there is
+   * none.
    *
    * Resolving the identifier reads the index, so it runs here — on the module
    * queue, because this is an `AsyncFunction` — rather than on the main thread
    * that delivers `OnNewIntent` or the JavaScript thread that consumes the
    * slot.
    *
+   * The picked identifier is consumed only once its resolution is known to have
+   * succeeded: a read that fails rejects this call and leaves the slot — and
+   * the launch Intent — untouched, so the caller can retry the same tap
+   * instead of losing it. A resolution that answers null (the index does not
+   * hold the identifier) is a finished refusal, so that tap is still consumed.
+   *
    * A tap that launched this process has no event to announce — JavaScript is
    * still booting — so the launch Intent is read here, on the first consume and
    * only once.
+   *
+   * A slot written before this process started was left by an earlier process,
+   * so the tap that launched this process is the newer request: the launch tap
+   * is resolved and the leftover is dropped, rather than resolving an old
+   * identifier first and opening its screen on a launch the reader made for
+   * something else.
    */
   private fun consumePendingRoute(): String? {
-    val identifier = readAndClearPendingRoute() ?: takeLaunchIdentifier() ?: return null
-    return resolveRoute(identifier)
+    val pending = readPendingRoute()
+    val launchIdentifier = readLaunchIdentifier()
+    val leftover = pending?.takeIf { launchIdentifier != null && it.fromEarlierProcess }
+    leftover?.let { clearPendingRoute(it.identifier) }
+    val slot = if (leftover == null) pending else null
+    val identifier = slot?.identifier ?: launchIdentifier ?: return null
+    val route = resolveRoute(identifier)
+    if (slot != null) {
+      clearPendingRoute(slot.identifier)
+    } else {
+      launchIntentRead = true
+    }
+    return route
   }
 
-  /** The identifier of the launch Intent, taken once, or null when it is not ours. */
-  private fun takeLaunchIdentifier(): String? {
+  /**
+   * The identifier of the launch Intent, or null when it is not ours.
+   *
+   * The Intent is read again on every consume until it is marked read, and it
+   * is marked read only after its resolution succeeded: on a cold start
+   * `currentActivity` can still be null when JavaScript makes its first
+   * consume, and giving up then would forfeit the launch tap for the rest of
+   * the process's life.
+   */
+  private fun readLaunchIdentifier(): String? {
     if (launchIntentRead) {
       return null
     }
-    // Read it through the activity, and only mark it read once one exists: on a
-    // cold start `currentActivity` can still be null when JavaScript makes its
-    // first consume, and giving up then would forfeit the launch tap for the
-    // rest of the process's life.
     val intent = appContext.currentActivity?.intent ?: return null
-    launchIntentRead = true
     return pickedIdentifier(intent)
   }
 
@@ -269,16 +330,17 @@ class KiloSystemSearchModule : Module() {
   private fun resolveRoute(identifier: String): String? {
     val stored = try {
       backend.stored()
-    } catch (error: Exception) {
+    } catch (error: Throwable) {
       // Fail closed: the index is the only authority on which identifiers are
       // ours, and `kiloapp://` is also the scheme the app's ordinary deep links
       // use. Without the read there is no evidence this Intent came from our
       // index, so the identifier is refused rather than opened as a search tap.
       // The JavaScript allowlist only checks a route shape; it cannot prove the
-      // Intent originated here. Report the read failure so the dropped tap is
-      // not silent.
+      // Intent originated here. Every read failure is reported with one code —
+      // the store's own exceptions and its timeout alike — so the app can tell
+      // it from "nothing was tapped" and offer the tap again.
       Log.w(TAG, "Could not read the system search index to resolve a picked result.", error)
-      return null
+      throw CodedException(UNRESOLVED_CODE, UNRESOLVED_MESSAGE, error)
     }
     if (identifier.startsWith(APP_SCHEME_PREFIX)) {
       return identifier.takeIf { link -> stored.any { it.route == link } }
@@ -304,40 +366,95 @@ class KiloSystemSearchModule : Module() {
 
   /**
    * Writes the single-shot slot; false when there is no context to write it in.
-   * The slot carries the identifier exactly as the platform handed it back.
+   * The slot carries the identifier exactly as the platform handed it back,
+   * with the clocks the age check below needs, so a tap that outlives its
+   * welcome can be dropped instead of opening a screen long after the reader
+   * tapped it.
    *
    * Runs on the main thread that delivers `OnNewIntent`, which is why it shares
-   * `pendingRouteLock` with the read-and-clear below.
+   * `pendingRouteLock` with the read and the clear below.
    */
   private fun writePendingRoute(identifier: String): Boolean {
     val context = appContext.reactContext ?: return false
+    val uptime = SystemClock.elapsedRealtime()
+    val wall = System.currentTimeMillis()
     synchronized(pendingRouteLock) {
       context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
         .edit()
         .putString(PENDING_ROUTE_KEY, identifier)
+        .putLong(PENDING_ROUTE_WRITTEN_AT_KEY, uptime)
+        .putLong(PENDING_ROUTE_WRITTEN_WALL_KEY, wall)
+        .putLong(PENDING_ROUTE_BOOT_AT_KEY, wall - uptime)
         .apply()
     }
     return true
   }
 
   /**
-   * The slot's identifier, read and cleared as one step on the module queue.
+   * The slot's contents, without clearing them, or null when the slot is empty
+   * or its tap has waited past `PENDING_ROUTE_MAX_AGE_MS`.
    *
    * The write above happens on the main thread and `SharedPreferences` has no
-   * read-and-clear operation, so the get and the remove are made atomic under
-   * `pendingRouteLock`: otherwise a tap written between them is removed without
-   * ever being resolved, and that tap never navigates.
+   * read-and-clear operation, so this read shares `pendingRouteLock` with it.
+   * The slot is cleared only after the identifier resolved (see
+   * `clearPendingRoute`), because resolving it reads the index and a failure
+   * there must leave the tap for a retry.
+   *
+   * The age is measured on the boot-relative clock, which is monotonic but
+   * restarts at zero on a reboot while the slot survives it. Only a write from
+   * the same boot can be compared with it, and the boot instant recorded with
+   * the slot is what decides that. Across a reboot the wall clock is the only
+   * reference that spans both, so it measures the age then; a slot whose
+   * wall-clock age is negative or too large, and one written before this
+   * version recorded a boot instant, counts as expired.
    */
-  private fun readAndClearPendingRoute(): String? {
+  private fun readPendingRoute(): PendingRoute? {
     val context = appContext.reactContext ?: return null
     val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     return synchronized(pendingRouteLock) {
       val identifier = preferences.getString(PENDING_ROUTE_KEY, null) ?: return@synchronized null
-      preferences.edit().remove(PENDING_ROUTE_KEY).apply()
-      identifier
+      val writtenUptime = preferences.getLong(PENDING_ROUTE_WRITTEN_AT_KEY, 0L)
+      val writtenWall = preferences.getLong(PENDING_ROUTE_WRITTEN_WALL_KEY, 0L)
+      val writtenBootAt = preferences.getLong(PENDING_ROUTE_BOOT_AT_KEY, 0L)
+      val uptime = SystemClock.elapsedRealtime()
+      val wall = System.currentTimeMillis()
+      val sameBoot = abs(wall - uptime - writtenBootAt) <= BOOT_INSTANT_MATCH_MS
+      val age = if (sameBoot) uptime - writtenUptime else wall - writtenWall
+      if (age < 0 || age > PENDING_ROUTE_MAX_AGE_MS) {
+        preferences.edit().removePendingRoute().apply()
+        Log.w(TAG, "Dropped a picked result the index could not resolve in time.")
+        return@synchronized null
+      }
+      PendingRoute(identifier, fromEarlierProcess = !sameBoot || writtenUptime < processStartedAt)
+    }
+  }
+
+  /**
+   * Clears the slot when it still holds the identifier that was just resolved.
+   *
+   * The check and the remove are atomic under `pendingRouteLock`: a tap written
+   * while the index read was in flight holds a newer identifier and must
+   * survive, where an unconditional remove would discard it and that tap would
+   * never navigate.
+   */
+  private fun clearPendingRoute(identifier: String) {
+    val context = appContext.reactContext ?: return
+    val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+    synchronized(pendingRouteLock) {
+      if (preferences.getString(PENDING_ROUTE_KEY, null) != identifier) {
+        return@synchronized
+      }
+      preferences.edit().removePendingRoute().apply()
     }
   }
 }
+
+/** Removes every field the slot is written with, as one edit. */
+private fun SharedPreferences.Editor.removePendingRoute() = this
+  .remove(PENDING_ROUTE_KEY)
+  .remove(PENDING_ROUTE_WRITTEN_AT_KEY)
+  .remove(PENDING_ROUTE_WRITTEN_WALL_KEY)
+  .remove(PENDING_ROUTE_BOOT_AT_KEY)
 
 private fun toIndexedDocument(record: SystemSearchRecord) = IndexedDocument(
   id = record.id,

@@ -229,6 +229,21 @@
     "signInCodeField": "Код за влизане",
     "or": "или"
   },
+  "pendingLink": {
+    "description": "Вече има акаунт с {{email}}. Влез с някой от неговите методи, за да добавиш {{provider}}.",
+    "emailCode": "Изпрати ми код за влизане по имейл",
+    "continueInBrowser": "Продължи в браузъра",
+    "startAgain": "Започни отначало",
+    "expired": "Тази заявка за добавяне на {{provider}} е изтекла.",
+    "noMethods": "Този акаунт няма друг метод за влизане, затова {{provider}} не може да бъде добавен.",
+    "linked": "{{provider}} беше добавен към акаунта ти.",
+    "failedExpired": "{{provider}} не беше добавен, защото заявката изтече.",
+    "failedWrongAccount": "{{provider}} не беше добавен, защото влезе в друг акаунт.",
+    "failedAccountAlreadyLinked": "{{provider}} не беше добавен, защото вече е свързан с друг акаунт.",
+    "failedProviderAlreadyLinked": "{{provider}} не беше добавен, защото акаунтът ти вече има друго влизане с {{provider}}.",
+    "failedLinking": "{{provider}} не можа да бъде добавен към акаунта ти.",
+    "notAdded": "Влязъл си. {{provider}} не беше добавен към акаунта ти."
+  },
   "profile": {
     "codeReviewerSubtitle": "Автоматични прегледи на PR",
     "securityAgentSubtitle": "Откривай и отстранявай уязвимости",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Тестов акаунт",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Корпоративно SSO",
     "passkeysTitle": "Ключове за достъп",
     "passkeysSubtitle": "Влезте без парола",
@@ -2298,7 +2315,7 @@
       "cloningSession": "Клониране на сесия",
       "couldNotLoadThisSession": "Не успяхме да заредим тази сесия.",
       "cloneFailedRetry": "Не успяхме да клонираме тази сесия. Опитай отново.",
-      "notEnoughCredits": "Нямаш достатъчно кредити за стартиране на Cloud Agent. Добави кредити и опитай отново.",
+      "notEnoughCredits": "Нямаш достатъчно кредити за тази заявка. Добави кредити и опитай отново.",
       "previousTaskFinishing": "Предишната задача още не е приключила. Изчакай малко.",
       "serviceUnavailable": "Услугата в момента е недостъпна. Опитай отново.",
       "connectionTrouble": "Има проблем с връзката. Опитай отново след малко.",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Подканата ти и всички качени файлове, които не са прикачени към изпратени съобщения, ще бъдат изтрити.",
       "discardFailed": "Не успяхме да изтрием черновата. Опитай отново.",
       "remoteHint": "За да се изпълни на компютъра ти, стартирай Kilo там и го остави да работи.",
-      "continueFrom": "Продължаваш сесията {{title}}.",
+      "continueFrom": "Продължаваш сесията „{{title}}“.",
       "importingSession": "Импортиране на сесията",
       "cliCannotContinue": "Този CLI не може да продължи сесия. Избери Cloud Agent или друг CLI.",
       "importFailed": "Тази сесия не можа да бъде импортирана.",
@@ -2460,6 +2477,8 @@
       "toolList": "изброяване",
       "toolPatch": "прилагане на корекция",
       "toolTask": "задача",
+      "toolSendFile": "Изпратен файл",
+      "toolSendFileAction": "Изпращане на файл",
       "readTodos": "Прочети плана",
       "updateTodos": "Актуализирай плана",
       "linesBadge": "{{displayCount}} реда",
@@ -2560,7 +2579,21 @@
       "thought": "Разсъждения",
       "showDetails": "Покажи подробностите",
       "pending": "В изчакване…",
-      "running": "В изпълнение…"
+      "running": "В изпълнение…",
+      "field": {
+        "filePath": "Файлов път",
+        "path": "Път",
+        "offset": "Отместване",
+        "limit": "Ограничение",
+        "pattern": "Шаблон",
+        "include": "Включване",
+        "patchText": "Корекционен текст",
+        "query": "Заявка",
+        "prompt": "Инструкция",
+        "header": "Заглавие",
+        "question": "Въпрос",
+        "options": "Опции"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Не успяхме да покажем съдържанието."
@@ -2576,7 +2609,7 @@
       "assistantContextOverflow": "Разговорът е твърде дълъг за модела.",
       "assistantProviderError": "Доставчикът върна грешка.",
       "assistantProviderRefused": "Доставчикът отказа тази заявка и тя не може да бъде повторена.",
-      "assistantCreditsRefusal": "Нямаш достатъчно кредити за стартиране на Cloud Agent.",
+      "assistantCreditsRefusal": "Нямаш достатъчно кредити за тази заявка.",
       "assistantOutputLimit": "Отговорът достигна ограничението за изходни данни на модела.",
       "assistantStructuredOutput": "Отговорът не съответства на изисквания формат.",
       "assistantFailed": "Не успяхме да генерираме отговор."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Този модел поддържа усилие за разсъждение"
     },
-    "creditsRequired": "Нямате достатъчно кредити, за да изпратите това съобщение. Добавете кредити и опитайте отново."
+    "creditsRequired": "Нямате достатъчно кредити, за да изпратите това съобщение."
   },
   "settingsTools": {
     "confirmTitle": "Да се потвърди ли тази промяна?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Моят агент",
       "promptPlaceholder": "ти си...",
       "tools": "Инструменти",
+      "wholeToolRule": "Този агент прилага едно правило към всеки инструмент наведнъж: {{rule}}. Тези превключватели са само за четене.",
       "visibility": "Видимост",
       "visibilityPrimary": "Основен — показва се в инструмента за избор",
       "visibilitySubagent": "Субагент — може да се извиква само от други",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Профили по подразбиране за Repos",
+      "entryLabel": "Профили по подразбиране",
       "add": "Добавете по подразбиране",
       "empty": "Няма конфигурирани настройки по подразбиране",
       "emptyDescription": "Добавете настройка по подразбиране за автоматично прилагане на профил при стартиране на сесии за репо.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Няма включени контексти за планирани брифинги",
     "sourceBlocker": "Сесията изисква внимание",
     "sourceMetadata": "Запазени метаданни за сесията"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Не можахме да отворим този резултат от търсенето"
   }
 }

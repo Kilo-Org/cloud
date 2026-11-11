@@ -1,4 +1,5 @@
 import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
+import type { RuntimeProxyAttestationAudience } from '@kilocode/worker-utils/runtime-proxy-attestation';
 
 export type RuntimeCredentialProxyTargets = {
   backendBaseUrl: string;
@@ -94,9 +95,17 @@ function isAllowedBackendRoute(
   );
 }
 
-function isAllowedProviderRoute(method: string, path: string): boolean {
+function isAllowedProviderRoute(
+  method: string,
+  path: string,
+  organizationId: string | undefined
+): boolean {
   if (path === '/models') return method === 'GET';
   if (path === '/models/validate') return method === 'POST';
+  if (method === 'GET') {
+    const match = /^\/organizations\/([A-Za-z0-9._-]+)\/models$/.exec(path);
+    return match !== null && organizationId !== undefined && match[1] === organizationId;
+  }
   return (
     method === 'POST' &&
     [
@@ -110,14 +119,38 @@ function isAllowedProviderRoute(method: string, path: string): boolean {
   );
 }
 
-function logicalProviderPath(pathname: string): string | null {
+const ORGANIZATION_MODEL_CATALOG_PATH =
+  /^\/api\/(?:openrouter|gateway)\/(?:api\/)?organizations\/[A-Za-z0-9._-]+\/models$/;
+
+/**
+ * The attestation plane that authenticates the upstream endpoint, which is not
+ * always the plane of the upstream host. The gateway app serves the
+ * organization model catalog with the shared web (kilo-api) tRPC context, so a
+ * provider-facade request to it must carry a kilo-api attestation.
+ */
+export function runtimeProxyAttestationAudience(
+  route: RuntimeCredentialProxyRoute,
+  pathname: string
+): RuntimeProxyAttestationAudience {
+  if (route === 'backend') return 'kilo-api';
+  if (route === 'ingest') return 'session-ingest';
+  if (route === 'provider' && ORGANIZATION_MODEL_CATALOG_PATH.test(pathname)) return 'kilo-api';
+  return 'kilo-gateway';
+}
+
+function logicalProviderPath(pathname: string, organizationId: string | undefined): string | null {
   const prefix = ['/api/openrouter', '/api/gateway'].find(value =>
     pathname.startsWith(`${value}/`)
   );
   if (!prefix) return null;
-  const path = pathname.slice(prefix.length);
+  // Kilo v1 appends /api/organizations/<org> to its configured provider base.
+  // Normalize that catalog alias before applying the same session-org allowlist.
+  const path = pathname.slice(prefix.length).replace(/^\/api\/organizations\//, '/organizations/');
   if (path.startsWith('/v1/') && prefix !== '/api/gateway') return null;
-  return isAllowedProviderRoute('GET', path) || isAllowedProviderRoute('POST', path) ? path : null;
+  return isAllowedProviderRoute('GET', path, organizationId) ||
+    isAllowedProviderRoute('POST', path, organizationId)
+    ? path
+    : null;
 }
 
 export const EXA_PROXY_PATHS = [
@@ -400,8 +433,8 @@ export function resolveRuntimeCredentialProxyRoute(
     return targetUrl(input.targets.backendBaseUrl, path, input.search);
   }
   if (input.route === 'provider') {
-    const logicalPath = logicalProviderPath(path);
-    if (logicalPath && isAllowedProviderRoute(input.method, logicalPath)) {
+    const logicalPath = logicalProviderPath(path, input.organizationId);
+    if (logicalPath && isAllowedProviderRoute(input.method, logicalPath, input.organizationId)) {
       return providerTargetUrl(input.targets.providerBaseUrl, logicalPath, input.search);
     }
   }

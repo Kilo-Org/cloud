@@ -3,7 +3,7 @@ import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudfla
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import { routes as sandboxRoutes } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import type {
@@ -22,10 +22,11 @@ import {
 } from '../../src/persistence/session-metadata.js';
 import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
+import type { PublishCloudAgentSessionStatusParams } from '@kilocode/session-ingest-contracts';
 import {
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import { waitFor } from './wait-for.js';
@@ -176,7 +177,7 @@ async function installSandbox(
   await runInDurableObject(sandboxStub, async instance => {
     await instance.getAllocationState();
     // Isolated sessions address their containment namespace by `ses-` prefix.
-    installFakeCredentialEnv(instance.env, broker, {
+    installFakeSandboxEnv(instance, broker, {
       SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
@@ -221,6 +222,7 @@ async function readRegistration(stub: DurableObjectStub<SandboxSessionV2>): Prom
 
 const GENERATED_TITLE_AI_CALLS_KEY = 'test:generated-title:ai-calls';
 const GENERATED_TITLE_PERSISTS_KEY = 'test:generated-title:persists';
+const LIST_STATUS_PUBLISHES_KEY = 'test:list-status:publishes';
 
 type GeneratedTitleAiInput = {
   messages?: unknown;
@@ -244,6 +246,7 @@ async function installGeneratedTitleFakes(
   await runInDurableObject(stub, async (instance, state) => {
     await state.storage.put(GENERATED_TITLE_AI_CALLS_KEY, []);
     await state.storage.put(GENERATED_TITLE_PERSISTS_KEY, []);
+    await state.storage.put(LIST_STATUS_PUBLISHES_KEY, []);
     const AI = {
       async run(model: string, input: GeneratedTitleAiInput) {
         const calls =
@@ -255,6 +258,13 @@ async function installGeneratedTitleFakes(
       },
     };
     const SESSION_INGEST = {
+      async publishCloudAgentSessionStatus(update: PublishCloudAgentSessionStatusParams) {
+        const updates =
+          (await state.storage.get<PublishCloudAgentSessionStatusParams[]>(
+            LIST_STATUS_PUBLISHES_KEY
+          )) ?? [];
+        await state.storage.put(LIST_STATUS_PUBLISHES_KEY, [...updates, update]);
+      },
       async canGenerateTitleForCloudAgent() {
         return true;
       },
@@ -292,6 +302,7 @@ async function readGeneratedTitlePersists(
 }
 
 type GeneratedTitleSession = {
+  peer: FakeSandboxPeer;
   stub: DurableObjectStub<SandboxSessionV2>;
   sessionId: string;
   kiloId: string;
@@ -312,6 +323,7 @@ async function setupGeneratedTitleSession(
   });
   await installGeneratedTitleFakes(stub, options);
   return {
+    peer,
     stub,
     sessionId,
     kiloId,
@@ -321,10 +333,294 @@ async function setupGeneratedTitleSession(
 }
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await reset();
 });
 
 describe('SandboxSessionV2 worker RPC surface', () => {
+  it('publishes background status for preparation, input waits, answers, completion, and failure without a chat socket', async () => {
+    const { stub, peer, sessionId, kiloId, sessionMetadata, sandboxSelection } =
+      await setupGeneratedTitleSession();
+    const readPublished = () =>
+      runInDurableObject(
+        stub,
+        async (_instance, state) =>
+          (await state.storage.get<PublishCloudAgentSessionStatusParams[]>(
+            LIST_STATUS_PUBLISHES_KEY
+          )) ?? []
+      );
+    const expectStatus = (status: string) =>
+      waitFor(async () => {
+        expect((await readPublished()).at(-1)).toMatchObject({
+          sessionId: kiloId,
+          cloudAgentSessionId: sessionId,
+          kiloUserId: USER_ID,
+          status,
+        });
+      });
+    const firstMessage = messageId();
+    await stub.createSessionWithInitialAdmission({
+      metadata: sessionMetadata,
+      sandboxSelection,
+      message: promptPayload(firstMessage),
+    });
+    await expectStatus('busy');
+    peer.prepareView = peer.view('ready');
+    await stub.onRoute(peer.view('ready'));
+    await stub.onEvents({
+      events: [
+        { type: 'session.status', properties: { sessionID: kiloId, status: { type: 'busy' } } },
+      ],
+    });
+    await stub.onEvents({
+      events: [
+        {
+          type: 'question.asked',
+          properties: { id: 'question-1', sessionID: kiloId, questions: [] },
+        },
+      ],
+    });
+    await expectStatus('question');
+    await stub.answer({
+      sessionId,
+      reply: { action: 'answer', questionId: 'question-1', answers: [['continue']] },
+    });
+    await expectStatus('busy');
+    await stub.onEvents({
+      events: [{ type: 'permission.asked', properties: { id: 'permission-1', sessionID: kiloId } }],
+    });
+    await expectStatus('permission');
+    await stub.onEvents({
+      events: [
+        {
+          type: 'permission.replied',
+          properties: { requestID: 'permission-1', sessionID: kiloId },
+        },
+      ],
+    });
+    await expectStatus('busy');
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: firstMessage });
+    await expectStatus('idle');
+    const secondMessage = messageId();
+    await stub.send(promptPayload(secondMessage));
+    await expectStatus('busy');
+    await stub.onOutcome({
+      sessionId,
+      status: 'failed',
+      reason: 'no_progress',
+      lastMessageId: secondMessage,
+    });
+    await expectStatus('failed');
+    await stub.send(promptPayload(messageId()));
+    await expectStatus('busy');
+    await stub.stop();
+    await expectStatus('idle');
+    const updates = await readPublished();
+    expect(updates[0]?.status).toBe('busy');
+    expect(
+      updates.every(
+        (update, index) => index === 0 || update.transitionId > updates[index - 1].transitionId
+      )
+    ).toBe(true);
+  });
+
+  it('does not publish idle for registration alone, but still publishes autonomous native work', async () => {
+    const { stub, kiloId, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();
+    await stub.registerSessionFromMetadata({ metadata: sessionMetadata, sandboxSelection });
+    expect(
+      await runInDurableObject(stub, (_instance, state) => state.storage.get('session_list_status'))
+    ).toBeUndefined();
+    await stub.onEvents({
+      events: [
+        { type: 'session.status', properties: { sessionID: kiloId, status: { type: 'busy' } } },
+      ],
+    });
+    await waitFor(async () => {
+      const updates = await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get<PublishCloudAgentSessionStatusParams[]>(LIST_STATUS_PUBLISHES_KEY)
+      );
+      expect(updates?.map(update => update.status)).toEqual(['busy']);
+    });
+  });
+
+  it('repairs malformed status storage without failing admission or losing the execution alarm', async () => {
+    const { stub, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();
+    await stub.registerSessionFromMetadata({ metadata: sessionMetadata, sandboxSelection });
+    await runInDurableObject(stub, (_instance, state) =>
+      state.storage.put('session_list_status', { old: 'invalid' })
+    );
+    await expect(stub.send(promptPayload(messageId()))).resolves.toEqual({ type: 'ok' });
+    await waitFor(async () => {
+      const updates = await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get<PublishCloudAgentSessionStatusParams[]>(LIST_STATUS_PUBLISHES_KEY)
+      );
+      expect(updates?.at(-1)?.status).toBe('busy');
+    });
+    expect(
+      await runInDurableObject(stub, (_instance, state) => state.storage.getAlarm())
+    ).not.toBeNull();
+  });
+
+  it('does not replace committed event results or original task errors when final alarm maintenance fails', async () => {
+    const { stub, kiloId, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();
+    await stub.registerSessionFromMetadata({ metadata: sessionMetadata, sandboxSelection });
+    await runInDurableObject(stub, async instance => {
+      Object.assign(instance, {
+        armAlarm: async () => {
+          throw new Error('alarm unavailable');
+        },
+      });
+      await expect(
+        instance.onEvents({
+          events: [
+            { type: 'session.status', properties: { sessionID: kiloId, status: { type: 'busy' } } },
+          ],
+        })
+      ).resolves.toBeUndefined();
+      expect((await instance.getSession()).type).toBe('found');
+      Object.assign(instance, {
+        persistMessages: async () => {
+          throw new Error('original message persistence error');
+        },
+      });
+      await expect(instance.send(promptPayload(messageId()))).rejects.toThrow(
+        'original message persistence error'
+      );
+    });
+  });
+
+  it('keeps execution backstops armed when writing the status projection fails', async () => {
+    const { stub, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();
+    await stub.registerSessionFromMetadata({ metadata: sessionMetadata, sandboxSelection });
+    await runInDurableObject(stub, async (instance, state) => {
+      Object.assign(instance, {
+        listStatusOutbox: {
+          record: () => {
+            throw new Error('metadata storage unavailable');
+          },
+          nextDueAt: () => null,
+        },
+      });
+      await expect(instance.send(promptPayload(messageId()))).resolves.toEqual({ type: 'ok' });
+      expect(await state.storage.getAlarm()).not.toBeNull();
+    });
+  });
+
+  it('serializes publication alarm re-arming behind an in-flight answer', async () => {
+    const { stub, peer, sessionId, kiloId, sessionMetadata, sandboxSelection } =
+      await setupGeneratedTitleSession();
+    peer.prepareView = peer.view('ready');
+    await stub.createSessionWithInitialAdmission({
+      metadata: sessionMetadata,
+      sandboxSelection,
+      message: promptPayload(messageId()),
+    });
+    await waitFor(async () => {
+      const pending = await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get<{ dueAt: number | null }>('session_list_status')
+      );
+      expect(pending?.dueAt).toBeNull();
+    });
+    await runInDurableObject(stub, async (instance, state) => {
+      const publication = Promise.withResolvers<void>();
+      const publicationStarted = Promise.withResolvers<void>();
+      const answering = Promise.withResolvers<void>();
+      const answerStarted = Promise.withResolvers<void>();
+      let alarmWrites = 0;
+      Object.assign(instance.env.SESSION_INGEST, {
+        publishCloudAgentSessionStatus: async () => {
+          publicationStarted.resolve();
+          await publication.promise;
+        },
+      });
+      const setAlarm = state.storage.setAlarm.bind(state.storage);
+      vi.spyOn(state.storage, 'setAlarm').mockImplementation(async at => {
+        alarmWrites += 1;
+        await setAlarm(at);
+      });
+      peer.answer = async () => {
+        answerStarted.resolve();
+        await answering.promise;
+        return 'sent';
+      };
+      await instance.onEvents({
+        events: [
+          {
+            type: 'question.asked',
+            properties: { id: 'question-lock', sessionID: kiloId, questions: [] },
+          },
+        ],
+      });
+      await publicationStarted.promise;
+      const answer = instance.answer({
+        sessionId,
+        reply: { action: 'answer', questionId: 'question-lock', answers: [['continue']] },
+      });
+      try {
+        await answerStarted.promise;
+        const before = alarmWrites;
+        publication.resolve();
+        await waitFor(() => {
+          expect(
+            state.storage.kv.get<{ dueAt: number | null }>('session_list_status')?.dueAt
+          ).toBeNull();
+        });
+        expect(alarmWrites).toBe(before);
+      } finally {
+        publication.resolve();
+        answering.resolve();
+        await answer;
+      }
+      await instance.onEvents({
+        events: [
+          { type: 'session.status', properties: { sessionID: kiloId, status: { type: 'busy' } } },
+        ],
+      });
+      expect(alarmWrites).toBeGreaterThan(0);
+    });
+  });
+
+  it('retains a failed status publication for alarm delivery without failing admission', async () => {
+    const { stub, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance.env.SESSION_INGEST, {
+        publishCloudAgentSessionStatus: async () => {
+          throw new Error('metadata unavailable');
+        },
+      });
+    });
+    await expect(
+      stub.createSessionWithInitialAdmission({
+        metadata: sessionMetadata,
+        sandboxSelection,
+        message: promptPayload(messageId()),
+      })
+    ).resolves.toMatchObject({ success: true });
+    await waitFor(async () => {
+      const pending = await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get<{ dueAt: number }>('session_list_status')
+      );
+      expect(pending?.dueAt).toBeGreaterThan(Date.now());
+    });
+    await evictAllDurableObjects();
+    await installGeneratedTitleFakes(stub);
+    await runInDurableObject(stub, async (instance, state) => {
+      const pending = await state.storage.get<{
+        update: PublishCloudAgentSessionStatusParams;
+        dueAt: number;
+      }>('session_list_status');
+      if (pending === undefined) throw new Error('Expected a durable status obligation');
+      await state.storage.put('session_list_status', { ...pending, dueAt: Date.now() - 1 });
+      await instance.alarm();
+    });
+    await waitFor(async () => {
+      const updates = await runInDurableObject(stub, (_instance, state) =>
+        state.storage.get<PublishCloudAgentSessionStatusParams[]>(LIST_STATUS_PUBLISHES_KEY)
+      );
+      expect(updates?.at(-1)?.status).toBe('busy');
+    });
+  });
+
   it.each(
     ([undefined, 'unrestricted', 'allowlist'] as const).flatMap(egressMode =>
       [undefined, false, true].map(egressAudit => ({ egressMode, egressAudit }))

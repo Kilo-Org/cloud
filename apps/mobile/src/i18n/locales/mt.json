@@ -229,6 +229,21 @@
     "signInCodeField": "Kodiċi tad-dħul",
     "or": "jew"
   },
+  "pendingLink": {
+    "description": "Diġà hemm kont li juża {{email}}. Idħol b'wieħed mill-metodi tiegħu biex iżżid {{provider}}.",
+    "emailCode": "Ibagħtli kodiċi tad-dħul bl-email",
+    "continueInBrowser": "Kompli fil-browser",
+    "startAgain": "Erġa' ibda",
+    "expired": "Din it-talba biex jiżdied {{provider}} skadiet.",
+    "noMethods": "Dan il-kont m'għandux metodu ieħor tad-dħul, għalhekk {{provider}} ma jistax jiżdied.",
+    "linked": "{{provider}} żdied mal-kont tiegħek.",
+    "failedExpired": "{{provider}} ma żdiedx għax it-talba skadiet.",
+    "failedWrongAccount": "{{provider}} ma żdiedx għax dħalt f'kont differenti.",
+    "failedAccountAlreadyLinked": "{{provider}} ma żdiedx għax diġà marbut ma' kont ieħor.",
+    "failedProviderAlreadyLinked": "{{provider}} ma żdiedx għax il-kont tiegħek diġà għandu dħul ieħor b'{{provider}}.",
+    "failedLinking": "{{provider}} ma setax jiżdied mal-kont tiegħek.",
+    "notAdded": "Dħalt. {{provider}} ma żdiedx mal-kont tiegħek."
+  },
   "profile": {
     "codeReviewerSubtitle": "Reviżjonijiet awtomatiċi tal-PR",
     "securityAgentSubtitle": "Sib u rrimedja l-vulnerabbiltajiet",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Kont tat-test",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO tal-intrapriża",
     "passkeysTitle": "Ċwievet tal-aċċess",
     "passkeysSubtitle": "Idħol mingħajr password",
@@ -2424,7 +2441,7 @@
       "cloningSession": "Qed tiġi kklonjata s-sessjoni",
       "couldNotLoadThisSession": "Ma setgħetx titgħabba din is-sessjoni.",
       "cloneFailedRetry": "Ma setgħetx tiġi kklonjata din is-sessjoni. Erġa' pprova.",
-      "notEnoughCredits": "M'għandekx biżżejjed krediti biex tħaddem Cloud Agent. Żid krediti u erġa' pprova.",
+      "notEnoughCredits": "M'għandekx biżżejjed krediti għal din it-talba. Żid krediti u erġa' pprova.",
       "previousTaskFinishing": "Il-kompitu ta' qabel għadu qed jitlesta. Stenna ftit.",
       "serviceUnavailable": "Is-servizz mhux disponibbli bħalissa. Erġa' pprova.",
       "connectionTrouble": "Hemm problema bil-konnessjoni. Erġa' pprova ftit ieħor.",
@@ -2534,7 +2551,7 @@
       "discardWithUploadsMessage": "L-istruzzjoni tiegħek u kull fajl imtella' li għadu mhux mehmuż ma' messaġġ mibgħut se jitħassru.",
       "discardFailed": "Ma setax jitwarrab l-abbozz. Erġa' pprova.",
       "remoteHint": "Biex taħdem fuq il-kompjuter tiegħek, ibda Kilo hemm u ħallih jaħdem.",
-      "continueFrom": "Qed tkompli s-sessjoni {{title}}.",
+      "continueFrom": "Qed tkompli s-sessjoni “{{title}}”.",
       "importingSession": "Qed tiġi importata s-sessjoni",
       "cliCannotContinue": "Dan il-CLI ma jistax ikompli sessjoni. Agħżel Cloud Agent jew CLI ieħor.",
       "importFailed": "Ma setgħetx tiġi importata din is-sessjoni.",
@@ -2589,6 +2606,8 @@
       "toolList": "elenka",
       "toolPatch": "applika bidliet",
       "toolTask": "kompitu",
+      "toolSendFile": "Fajl mibgħut",
+      "toolSendFileAction": "ibgħat il-fajl",
       "readTodos": "Aqra l-pjan",
       "updateTodos": "Aġġorna l-pjan",
       "linesBadge": "{{displayCount}} linji",
@@ -2698,7 +2717,21 @@
       "thought": "Ħsieb",
       "showDetails": "Uri d-dettalji",
       "pending": "Pendenti…",
-      "running": "Qed jaħdem…"
+      "running": "Qed jaħdem…",
+      "field": {
+        "filePath": "Mogħdija tal-fajl",
+        "path": "Mogħdija",
+        "offset": "Bidu",
+        "limit": "Limitu",
+        "pattern": "Mudell",
+        "include": "Inklużjoni",
+        "patchText": "Test tal-patċ",
+        "query": "Tfittxija",
+        "prompt": "Istruzzjoni",
+        "header": "Titolu",
+        "question": "Mistoqsija",
+        "options": "Għażliet"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Ma setax jintwera l-kontenut."
@@ -2714,7 +2747,7 @@
       "assistantContextOverflow": "Il-konversazzjoni hija twila wisq għall-mudell.",
       "assistantProviderError": "Il-fornitur rritorna żball.",
       "assistantProviderRefused": "Il-fornitur ċaħad din it-talba u ma tistax terġa' tiġi pruvata.",
-      "assistantCreditsRefusal": "M'għandekx biżżejjed krediti biex tħaddem Cloud Agent.",
+      "assistantCreditsRefusal": "M'għandekx biżżejjed krediti għal din it-talba.",
       "assistantOutputLimit": "It-tweġiba laħqet il-limitu ta' output tal-mudell.",
       "assistantStructuredOutput": "It-tweġiba ma kinitx konformi mal-format meħtieġ.",
       "assistantFailed": "It-tweġiba falliet."
@@ -3970,7 +4003,7 @@
     "reasoningEffort": {
       "modelFlag": "Dan il-mudell jappoġġa sforz ta' ħsieb"
     },
-    "creditsRequired": "M'hemmx biżżejjed krediti biex tibgħat dan il-messaġġ. Żid krediti u erġa' pprova."
+    "creditsRequired": "M'hemmx biżżejjed krediti biex tibgħat dan il-messaġġ."
   },
   "settingsTools": {
     "confirmTitle": "Tikkonferma din il-bidla?"
@@ -4181,6 +4214,7 @@
       "namePlaceholder": "L-aġent tiegħi",
       "promptPlaceholder": "Int...",
       "tools": "Għodda",
+      "wholeToolRule": "Dan l-aġent japplika regola waħda għal kull għodda fl-istess ħin: {{rule}}. Dawn l-iswiċċijiet huma biss għall-qari.",
       "visibility": "Viżibilità",
       "visibilityPrimary": "Primarja — muri fil-picker",
       "visibilitySubagent": "Subaġent — jissejjaħ biss minn oħrajn",
@@ -4222,6 +4256,7 @@
     },
     "repoBindings": {
       "title": "Profili default għal Repos",
+      "entryLabel": "Profili default",
       "add": "Żid default",
       "empty": "Ebda defaults konfigurati",
       "emptyDescription": "Żid default biex tapplika profil awtomatikament meta tibda sessjonijiet għal repo.",
@@ -4441,5 +4476,8 @@
     "noEnabledContexts": "L-ebda kuntest mixgħul għall-briefings skedati",
     "sourceBlocker": "Is-sessjoni teħtieġ attenzjoni",
     "sourceMetadata": "Metadata maqbuda tas-sessjoni"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ma stajniex niftħu dan ir-riżultat tat-tfittxija"
   }
 }

@@ -13,6 +13,7 @@ import { createSessionTerminalHandlers } from './router/handlers/session-termina
 import { createSessionStartHandlers } from './router/handlers/session-start.js';
 import { createSessionSendHandlers } from './router/handlers/session-send.js';
 import { createSessionWorktreeHandlers } from './router/handlers/session-worktree.js';
+import { createSessionRecoveryHandlers } from './router/handlers/session-recovery.js';
 import { createHostedWorkspaceMutationHandlers } from './router/handlers/hosted-workspace-mutations.js';
 import { createHostedWorkspaceProfileHandlers } from './router/handlers/hosted-workspace-profiles.js';
 import { createHostedWorkspaceContinuationHandlers } from './router/handlers/hosted-workspace-continuation.js';
@@ -20,8 +21,10 @@ import { deleteWorktree } from './router/handlers/worktree-deletion.js';
 import { createSessionWorktreeChangesHandlers } from './router/handlers/session-worktree-changes.js';
 import { createSessionEgressAuditHandlers } from './router/handlers/session-egress-audit.js';
 import { listChildSessions } from './router/handlers/list-child-sessions.js';
+import { createSessionWorktreeGitHandlers } from './router/handlers/session-worktree-git.js';
 import { getSandboxSelectionOptions } from './router/handlers/sandbox-selection.js';
 import { getPreviewOptions } from './router/handlers/preview-options.js';
+import { listPreviewServices } from './router/handlers/preview-services.js';
 import { listHostedSessions } from './router/handlers/hosted-session-list.js';
 import {
   getHostedWorkspace,
@@ -42,6 +45,7 @@ export const appRouter = router({
   deleteWorktree,
   getSandboxSelectionOptions,
   getPreviewOptions,
+  listPreviewServices,
   listHostedSessions,
   listChildSessions,
   listHostedWorkspaces,
@@ -60,11 +64,13 @@ export const appRouter = router({
   ...createSessionStartHandlers(),
   ...createSessionSendHandlers(),
   ...createSessionWorktreeHandlers(),
+  ...createSessionRecoveryHandlers(),
   ...createHostedWorkspaceMutationHandlers(),
   ...createHostedWorkspaceProfileHandlers(),
   ...createHostedWorkspaceContinuationHandlers(),
   ...createSessionWorktreeChangesHandlers(),
   ...createSessionEgressAuditHandlers(),
+  ...createSessionWorktreeGitHandlers(),
 });
 
 export type AppRouter = typeof appRouter;

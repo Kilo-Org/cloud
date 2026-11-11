@@ -262,6 +262,8 @@ export type PreparationStepSnapshot = {
   completedAt?: number | undefined;
   revision: number;
   latestDetail?: string | undefined;
+  /** Capture time of the selected snapshot, in Unix epoch milliseconds. */
+  snapshotCapturedAt?: number | undefined;
   safeError?: string | undefined;
   command?: string | undefined;
   commandIndex?: number | undefined;

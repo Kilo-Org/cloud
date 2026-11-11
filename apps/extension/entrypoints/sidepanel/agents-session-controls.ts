@@ -6,6 +6,7 @@ import type {
   RemoteModelCatalogV1,
   RemoteModelOverride,
   RemoteModelState,
+  SessionConfig,
 } from '@kilocode/cloud-agent-sdk';
 import { CLI_CATALOG_ID_PREFIX } from '@/src/shared/model-picker-rows';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
@@ -130,6 +131,7 @@ export const selectSessionModelPicker = ({
   remoteModelOverride,
   remoteModelState,
   sessionModel,
+  sessionConfig,
 }: {
   activeSessionType: ActiveSessionType | null;
   cloudOverride: { readonly model: string } | null;
@@ -138,6 +140,7 @@ export const selectSessionModelPicker = ({
   remoteModelOverride: RemoteModelOverride | null;
   remoteModelState: RemoteModelState;
   sessionModel: string | null | undefined;
+  sessionConfig?: Pick<SessionConfig, 'mode' | 'runtimeAgents'> | null;
 }): SessionModelPicker => {
   if (activeSessionType === 'remote') {
     const { catalog } = remoteModelState;
@@ -180,10 +183,14 @@ export const selectSessionModelPicker = ({
   }
 
   if (activeSessionType === 'cloud-agent') {
+    const pinnedModel = sessionConfig?.runtimeAgents
+      ?.find(agent => agent.slug === sessionConfig.mode)
+      ?.model?.trim();
+    const hasPinnedModel = pinnedModel !== undefined && pinnedModel.length > 0;
     return {
-      disabledReason: undefined,
+      disabledReason: hasPinnedModel ? 'Model set by agent' : undefined,
       options: gatewayModels,
-      selectedId: cloudOverride?.model ?? sessionModel ?? '',
+      selectedId: hasPinnedModel ? pinnedModel : (cloudOverride?.model ?? sessionModel ?? ''),
       target: 'cloud-agent',
     };
   }

@@ -32,17 +32,15 @@ const DNS_LOOKUP_ATTEMPTS = 2;
 const DNS_RETRY_DELAY_MS = 100;
 const DNS_LOOKUP_TIMEOUT_MS = 2_000;
 /**
- * Server-side cap on one shared resolution. It must outlast the caller deadline,
- * so a caller that gives up cannot restart the lookup its successor reuses. A
- * resolution that settles releases its entry at once; this only bounds an entry
- * whose lookup never settles.
+ * Server-side cap on one shared resolution. It is longer than the caller
+ * deadline, so validations of one host keep sharing one lookup. A resolution
+ * that settles releases its entry at once; this deadline bounds the entry.
  */
 const DNS_LOOKUP_SETTLE_DEADLINE_MS = 30_000;
 /**
  * Process-wide ceiling on system lookups whose resolver has not settled.
- * `dns.lookup` runs getaddrinfo on the libuv threadpool, which it shares with
- * the process's other pooled I/O, so the gateway starts a bounded number of them
- * and reports the retryable lookup failure for the rest.
+ * `dns.lookup` runs getaddrinfo on the libuv threadpool, so the gateway starts a
+ * bounded number of them and reports the retryable lookup failure for the rest.
  */
 const DNS_LOOKUPS_MAX_OUTSTANDING = 2;
 const publicHostnameExpiresAt = new Map<string, number>();
@@ -50,19 +48,23 @@ const publicHostnameExpiresAt = new Map<string, number>();
  * Resolutions in flight, keyed by normalized hostname. A validation reuses the
  * entry for its host while that lookup is pending, or until the settle deadline
  * stops new validations from reusing it. Removal only stops the reuse; the
- * lookup itself keeps its capacity until it settles, which the outstanding
- * counter tracks. Callers that already hold the promise keep it, with their own
- * signal and deadline.
+ * outstanding counter follows the resolver call itself. Callers that already
+ * hold the promise keep it, with their own signal and deadline.
  */
 const inFlightHostnameResolutions = new Map<string, Promise<string[]>>();
 /**
  * System lookups the process started and whose resolver has not settled yet.
- * `dns.lookup` cannot be cancelled, so this count only falls when getaddrinfo
- * returns. The settle deadline can drop a map entry that no validation may
- * reuse any more, but it does not free this capacity: the lookup still holds its
- * thread-pool slot.
+ * The count falls when getaddrinfo returns. The settle deadline can drop a map
+ * entry that no validation may reuse any more; capacity belongs to the resolver
+ * call itself.
  */
 let outstandingSystemLookups = 0;
+/**
+ * The one retry that follows a failed shared resolution. Keyed by that
+ * resolution, not by hostname, so every caller that observed the failure
+ * awaits the same lookup after the failed attempt has left the in-flight map.
+ */
+const retryAfterFailedResolution = new WeakMap<Promise<string[]>, Promise<string[]>>();
 
 const REJECTION_MESSAGES = {
   invalid_url: 'The upstream provider URL is not a valid URL.',
@@ -129,33 +131,31 @@ function forgetInFlightResolution(hostname: string, resolution: Promise<string[]
 }
 
 /**
- * Returns the resolution already in flight for `hostname`, or starts one.
- * Returns null without starting a lookup when the process already has
- * `DNS_LOOKUPS_MAX_OUTSTANDING` lookups whose resolver has not settled. The
- * entry stays recorded until the resolution settles or the settle deadline
- * passes, whichever comes first. Every validation of the same host that starts
- * in that window awaits that one resolution. Each caller applies its own signal
- * and deadline to the promise it receives.
+ * Starts one system lookup for `hostname` through `run` and records its entry
+ * and its place in the process-wide limit. Returns null without running
+ * anything when the process already has `DNS_LOOKUPS_MAX_OUTSTANDING` lookups
+ * whose resolver has not settled.
  *
- * Capacity is separate from the entry: a lookup that outlives its entry still
- * counts against the limit until its resolver settles.
+ * The entry stays recorded until the resolution settles or the settle deadline
+ * passes, whichever comes first. Every validation of the same host that starts
+ * in that window awaits that one resolution. Capacity is separate from the
+ * entry: a lookup that outlives its entry still counts against the limit until
+ * its resolver settles.
  */
-function resolveSharedHostAddresses(
+function startSharedResolution(
   hostname: string,
-  resolveHostAddresses: ResolveHostAddresses
+  run: () => Promise<string[]>
 ): Promise<string[]> | null {
-  const pending = inFlightHostnameResolutions.get(hostname);
-  if (pending) return pending;
   if (outstandingSystemLookups >= DNS_LOOKUPS_MAX_OUTSTANDING) return null;
 
-  const resolution = Promise.resolve().then(() => resolveHostAddresses(hostname));
+  const resolution = Promise.resolve().then(run);
   outstandingSystemLookups += 1;
   inFlightHostnameResolutions.set(hostname, resolution);
   const forget = () => forgetInFlightResolution(hostname, resolution);
   // `dns.lookup` cannot be cancelled, so a stalled lookup can outlive every
   // caller and holds its worker until getaddrinfo returns. Keep the entry for a
-  // server-side cap that outlasts the caller deadline, so repeated validations
-  // of the same host reuse the one lookup instead of queuing another.
+  // server-side cap longer than the caller deadline, so every validation of the
+  // host shares the one lookup.
   const settleDeadline = setTimeout(forget, DNS_LOOKUP_SETTLE_DEADLINE_MS);
   settleDeadline.unref?.();
   const forgetSettled = () => {
@@ -165,6 +165,20 @@ function resolveSharedHostAddresses(
   };
   void resolution.then(forgetSettled, forgetSettled);
   return resolution;
+}
+
+/**
+ * Returns the resolution already in flight for `hostname`, or starts one.
+ * Returns null without starting a lookup when the process limit is full. Each
+ * caller applies its own signal and deadline to the promise it receives.
+ */
+function resolveSharedHostAddresses(
+  hostname: string,
+  resolveHostAddresses: ResolveHostAddresses
+): Promise<string[]> | null {
+  const pending = inFlightHostnameResolutions.get(hostname);
+  if (pending) return pending;
+  return startSharedResolution(hostname, () => resolveHostAddresses(hostname));
 }
 
 /**
@@ -182,31 +196,56 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 }
 
 /**
+ * The shared retry for `failed`. Every caller that observed that resolution
+ * gets this promise, so a caller that resumes after the retry has settled does
+ * not start another lookup. A caller that arrives while the retry is still
+ * pending joins it through the in-flight map. Returns null without starting a
+ * lookup when every place in the process limit is taken.
+ */
+function sharedRetry(
+  hostname: string,
+  resolveHostAddresses: ResolveHostAddresses,
+  failed: Promise<string[]>
+): Promise<string[]> | null {
+  const existing = retryAfterFailedResolution.get(failed);
+  if (existing) return existing;
+
+  const current = inFlightHostnameResolutions.get(hostname);
+  if (current !== undefined && current !== failed) return current;
+
+  const retry = startSharedResolution(hostname, () => {
+    const delay = Promise.withResolvers<void>();
+    setTimeout(delay.resolve, DNS_RETRY_DELAY_MS);
+    return delay.promise.then(() => resolveHostAddresses(hostname));
+  });
+  if (!retry) return null;
+  retryAfterFailedResolution.set(failed, retry);
+  return retry;
+}
+
+/**
  * One retry absorbs a transient resolver failure such as `EAI_AGAIN`. Each
  * attempt has its own deadline, and a resolver that does not answer within it
  * ends the validation in `dns_lookup_failed`. An abort of `signal` (client
  * disconnect or the request budget) rejects at once with its reason.
  *
- * Both attempts resolve through `resolveSharedHostAddresses`, so they start a
- * system lookup only when no other validation already awaits one for the host.
- * A caller deadline ends only this caller's wait; the shared entry stays for the
- * validations that follow.
+ * Both attempts resolve through `resolveSharedHostAddresses`, so every
+ * validation of a host shares its one system lookup. Each caller applies its own
+ * signal and deadline to the promise it receives, and the entry stays for the
+ * validations that follow. A caller that observed a failed resolution awaits the
+ * shared retry of it, so every such caller shares one retry.
  */
 async function resolveWithRetry(
   hostname: string,
   resolveHostAddresses: ResolveHostAddresses,
   signal: AbortSignal | undefined
 ): Promise<string[] | null> {
+  signal?.throwIfAborted();
+  let shared = resolveSharedHostAddresses(hostname, resolveHostAddresses);
   for (let attempt = 0; attempt < DNS_LOOKUP_ATTEMPTS; attempt += 1) {
-    if (attempt > 0) {
-      const delay = new Promise(resolve => setTimeout(resolve, DNS_RETRY_DELAY_MS));
-      await (signal ? untilAborted(delay, signal) : delay);
-    }
-    signal?.throwIfAborted();
     const deadline = AbortSignal.timeout(DNS_LOOKUP_TIMEOUT_MS);
-    const shared = resolveSharedHostAddresses(hostname, resolveHostAddresses);
-    // The process already runs the maximum number of system lookups: report the
-    // retryable failure now instead of queueing another blocking one.
+    // The process already runs the maximum number of system lookups, so this
+    // validation reports the retryable failure at once.
     if (!shared) return null;
     try {
       const addresses = await untilAborted(
@@ -218,19 +257,22 @@ async function resolveWithRetry(
       if (signal?.aborted) throw signal.reason;
       // A resolution that reaches this caller's deadline ends this validation
       // here; the caller reports the retryable `dns_lookup_failed` outcome. The
-      // entry stays, so a later validation reuses the one lookup that is still
-      // pending instead of starting a second blocking one.
+      // entry stays, so a later validation reuses the lookup that is still
+      // pending.
       if (deadline.aborted) return null;
       // A resolution that finished with a transient failure is retried; the
       // caller reports dns_lookup_failed once attempts run out.
     }
+    if (attempt + 1 >= DNS_LOOKUP_ATTEMPTS) return null;
+    signal?.throwIfAborted();
+    shared = sharedRetry(hostname, resolveHostAddresses, shared);
   }
   return null;
 }
 
 /**
- * Test hook. Also resets the outstanding-lookup accounting: a lookup a test
- * leaves stalled never settles, and nothing else releases its capacity.
+ * Test hook. Also resets the outstanding-lookup accounting, which a resolver
+ * that a test leaves pending keeps.
  */
 export function clearUpstreamUrlPolicyCache(): void {
   publicHostnameExpiresAt.clear();

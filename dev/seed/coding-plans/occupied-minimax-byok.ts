@@ -1,8 +1,8 @@
 import { byok_api_keys } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 
-import { encryptCredential, requireEncryptionKey } from '../lib/byok';
-import { getSeedDb } from '../lib/db';
+import { createByokEnvelope } from '../lib/byok';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import type { SeedResult } from '../index';
 
 const PROVIDER_ID = 'minimax';
@@ -43,6 +43,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error(`Unknown arguments: ${unknownOptions.join(' ')}`);
   }
   const isEnabled = !options.includes('--disabled');
+  assertLocalSeedDatabase('coding-plans:occupied-minimax-byok');
   const db = getSeedDb();
   const [existing] = await db
     .select({ id: byok_api_keys.id })
@@ -53,13 +54,19 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('User already has a MiniMax BYOK key. Use a new test user.');
   }
 
+  const keyId = crypto.randomUUID();
+  const envelope = await createByokEnvelope(
+    { key_id: keyId, owner_type: 'user', owner_id: userId, provider_id: PROVIDER_ID },
+    `${KEY_PREFIX}:${scenario}`
+  );
   const [inserted] = await db
     .insert(byok_api_keys)
     .values({
+      id: keyId,
       kilo_user_id: userId,
       organization_id: null,
       provider_id: PROVIDER_ID,
-      encrypted_api_key: encryptCredential(`${KEY_PREFIX}:${scenario}`, requireEncryptionKey()),
+      encrypted_api_key_envelope: envelope,
       management_source: 'user',
       created_by: userId,
       is_enabled: isEnabled,

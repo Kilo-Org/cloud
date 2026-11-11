@@ -129,14 +129,14 @@ afterEach(() => {
 });
 
 describe('byok kms client', () => {
-  test('returns null when the service is not configured', async () => {
+  test('refuses to encrypt when the service is not configured', async () => {
     delete process.env.BYOK_KMS_SERVICE_URL;
     const { fakeFetch } = installFakeKms();
 
-    expect(getByokKmsClientConfig()).toBeNull();
+    expect(() => getByokKmsClientConfig()).toThrow('BYOK_KMS_SERVICE_URL is required');
     await expect(
       encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
-    ).resolves.toBeNull();
+    ).rejects.toThrow('BYOK_KMS_SERVICE_URL is required');
     expect(fakeFetch).not.toHaveBeenCalled();
   });
 
@@ -176,7 +176,6 @@ describe('byok kms client', () => {
     const { calls } = installFakeKms();
 
     const dataKey = await createByokDataKey({ context, actorUserId });
-    if (!dataKey) throw new Error('expected data key');
     expect(calls).toHaveLength(1);
     expect(JSON.parse(String(calls[0].init.body))).toEqual({
       ...context,
@@ -193,7 +192,9 @@ describe('byok kms client', () => {
     delete process.env.BYOK_KMS_SERVICE_URL;
     const { fakeFetch } = installFakeKms();
 
-    await expect(createByokDataKey({ context, actorUserId })).resolves.toBeNull();
+    await expect(createByokDataKey({ context, actorUserId })).rejects.toThrow(
+      'BYOK_KMS_SERVICE_URL is required'
+    );
     expect(fakeFetch).not.toHaveBeenCalled();
   });
 
@@ -210,7 +211,6 @@ describe('byok kms client', () => {
       context: orgContext,
       actorUserId,
     });
-    if (!envelope) throw new Error('expected envelope');
 
     await expect(decryptByokEnvelope(envelope, orgContext)).resolves.toBe('sk-secret');
 
@@ -232,7 +232,6 @@ describe('byok kms client', () => {
   test('never sends the BYOK key or its envelope ciphertext to the service', async () => {
     const { calls } = installFakeKms();
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
     await decryptByokEnvelope(envelope, context);
 
     for (const call of calls) {
@@ -245,7 +244,6 @@ describe('byok kms client', () => {
   test('fails to decrypt with a mismatched context', async () => {
     installFakeKms();
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
 
     await expect(
       decryptByokEnvelope(envelope, { ...context, provider_id: 'openai' })
@@ -255,7 +253,6 @@ describe('byok kms client', () => {
   test('fails to decrypt when the key id differs from the one the data key was created for', async () => {
     installFakeKms();
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
 
     await expect(decryptByokEnvelope(envelope, { ...context, key_id: 'key-9' })).rejects.toThrow(
       'status 400'
@@ -495,7 +492,6 @@ describe('byok kms client', () => {
   test('envelope decrypt fails when the service is not configured', async () => {
     installFakeKms();
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
     delete process.env.BYOK_KMS_SERVICE_URL;
 
     await expect(decryptByokEnvelope(envelope, context)).rejects.toThrow('BYOK_KMS_SERVICE_URL');
@@ -504,7 +500,6 @@ describe('byok kms client', () => {
   test('stored envelope is decryptable with the data key returned by the service', async () => {
     const { fakeFetch } = installFakeKms();
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
 
     const response = await fakeFetch('http://kms.test/decrypt', {
       method: 'POST',
@@ -526,7 +521,6 @@ describe('byok data key cache', () => {
 
   async function storedEnvelope(apiKey = 'sk-secret') {
     const envelope = await encryptByokForStorage({ apiKey, context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
     return envelope;
   }
 

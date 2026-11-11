@@ -1,4 +1,5 @@
 import type { Part, SessionSnapshot } from './types';
+import { projectKilo2ShellNotification } from './kilo2-shell-notification';
 import {
   kilo2FileContentSchema,
   kilo2PartId,
@@ -116,7 +117,8 @@ export function readKilo2Messages(
     });
   };
   let parentID = '';
-  for (const message of messages) {
+  for (const nativeMessage of messages) {
+    const message = projectKilo2ShellNotification(nativeMessage);
     const base = { id: message.id, sessionID: session.id };
     const model = message.model ?? session.model;
     const agent = message.agent ?? session.agent ?? 'build';
@@ -129,6 +131,7 @@ export function readKilo2Messages(
           time: message.time,
           agent,
           model: { providerID: model?.providerID ?? 'kilo', modelID: model?.id ?? '' },
+          ...(model?.variant === undefined ? {} : { variant: model.variant }),
         },
         parts: [
           {
@@ -163,14 +166,21 @@ export function readKilo2Messages(
       });
       continue;
     }
-    const compaction = message.type === 'compaction' && message.status === 'completed';
+    const compaction = message.type === 'compaction';
     if (message.type !== 'assistant' && !compaction) continue;
+    const compactionEnded =
+      compaction && (message.status === 'completed' || message.status === 'failed');
+    const error =
+      message.error ??
+      (compaction && message.status === 'failed'
+        ? { type: 'unknown', message: 'Context compaction failed' }
+        : undefined);
     const info: SessionSnapshot['messages'][number]['info'] = {
       ...base,
       role: 'assistant',
       time: {
         created: message.time.created,
-        ...(compaction || message.time.completed !== undefined
+        ...(compactionEnded || message.time.completed !== undefined
           ? { completed: message.time.completed ?? message.time.created }
           : {}),
       },
@@ -179,17 +189,18 @@ export function readKilo2Messages(
       mode: agent,
       modelID: model?.id ?? '',
       providerID: model?.providerID ?? 'kilo',
+      ...(model?.variant === undefined ? {} : { variant: model.variant }),
       path: { cwd: session.location.directory, root: session.location.directory },
       cost: message.cost ?? 0,
       tokens: message.tokens ?? { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
       ...(message.finish ? { finish: message.finish } : {}),
       ...(compaction ? { summary: true } : {}),
       // A stopped turn is an interruption, not a failure, as v1 reports it.
-      ...(message.error
+      ...(error
         ? {
             error: {
-              name: message.error.type === 'aborted' ? 'MessageAbortedError' : 'UnknownError',
-              data: { message: message.error.message },
+              name: error.type === 'aborted' ? 'MessageAbortedError' : 'UnknownError',
+              data: { message: error.message },
             } as const,
           }
         : {}),
@@ -200,8 +211,9 @@ export function readKilo2Messages(
         id: kilo2PartId(message.id, 0),
         messageID: message.id,
         sessionID: session.id,
-        type: 'text',
-        text: message.summary ?? '',
+        // Native summary bytes stay in the canonical message, not in the chat.
+        type: 'compaction',
+        auto: message['reason'] === 'auto',
       });
     const offset = compaction ? 1 : 0;
     for (const [index, item] of (message.content ?? []).entries()) {

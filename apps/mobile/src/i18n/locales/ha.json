@@ -229,6 +229,21 @@
     "signInCodeField": "Lambar shiga",
     "or": "ko"
   },
+  "pendingLink": {
+    "description": "Wani asusu yana amfani da {{email}} tuni. Shiga da ɗaya daga cikin hanyoyinsa domin ƙara {{provider}}.",
+    "emailCode": "Aiko mini lambar shiga ta imel",
+    "continueInBrowser": "Ci gaba a burauza",
+    "startAgain": "Sake farawa",
+    "expired": "Wannan buƙatar ƙara {{provider}} ta ƙare.",
+    "noMethods": "Wannan asusun ba shi da wata hanyar shiga, don haka ba za a iya ƙara {{provider}} ba.",
+    "linked": "An ƙara {{provider}} zuwa asusunka.",
+    "failedExpired": "Ba a ƙara {{provider}} ba saboda buƙatar ta ƙare.",
+    "failedWrongAccount": "Ba a ƙara {{provider}} ba saboda ka shiga wani asusu daban.",
+    "failedAccountAlreadyLinked": "Ba a ƙara {{provider}} ba saboda an riga an haɗa shi da wani asusu.",
+    "failedProviderAlreadyLinked": "Ba a ƙara {{provider}} ba saboda asusunka yana da wata shigar {{provider}} daban tuni.",
+    "failedLinking": "An kasa ƙara {{provider}} zuwa asusunka.",
+    "notAdded": "Ka shiga. Ba a ƙara {{provider}} zuwa asusunka ba."
+  },
   "profile": {
     "codeReviewerSubtitle": "Bitar PR ta atomatik",
     "securityAgentSubtitle": "Nemo raunin tsaro ka gyara su",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Asusun gwaji",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO na kamfani",
     "passkeysTitle": "Maɓallan shiga",
     "passkeysSubtitle": "Shiga ba tare da kalmar sirri ba",
@@ -2298,7 +2315,7 @@
       "cloningSession": "Ana yin kwafin zaman",
       "couldNotLoadThisSession": "An kasa loda wannan zaman.",
       "cloneFailedRetry": "An kasa yin kwafin wannan zaman. Sake gwadawa.",
-      "notEnoughCredits": "Kuɗin amfani ba su isa gudanar da Cloud Agent ba. Ƙara kuɗin amfani ka sake gwadawa.",
+      "notEnoughCredits": "Kuɗin amfani ba su isa don wannan buƙata ba. Ƙara kuɗin amfani ka sake gwadawa.",
       "previousTaskFinishing": "Ba a gama aikin da ya gabata ba tukuna. Jira ɗan lokaci.",
       "serviceUnavailable": "Ba a samun sabis ɗin a yanzu. Sake gwadawa.",
       "connectionTrouble": "An samu matsalar haɗi. Sake gwadawa bayan ɗan lokaci.",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Za a share umarnin aikinka da duk fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba.",
       "discardFailed": "An kasa watsar da daftarin. Sake gwadawa.",
       "remoteHint": "Don gudanar da aiki a kwamfutarka, fara Kilo a can ka bar shi yana aiki.",
-      "continueFrom": "Ana ci gaba da {{title}}.",
+      "continueFrom": "Ana ci gaba da “{{title}}”.",
       "importingSession": "Ana shigo da zaman",
       "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zaman ba. Zaɓi Cloud Agent ko wani CLI.",
       "importFailed": "An kasa shigo da wannan zaman.",
@@ -2460,6 +2477,8 @@
       "toolList": "jera",
       "toolPatch": "gyara",
       "toolTask": "aiki",
+      "toolSendFile": "An aika fayil",
+      "toolSendFileAction": "aika fayil",
       "readTodos": "Karanta tsari",
       "updateTodos": "Sabunta tsari",
       "linesBadge": "layuka {{displayCount}}",
@@ -2560,7 +2579,21 @@
       "thought": "Tunani",
       "showDetails": "Nuna cikakkun bayanai",
       "pending": "Yana jira…",
-      "running": "Yana gudana…"
+      "running": "Yana gudana…",
+      "field": {
+        "filePath": "Hanyar fayil",
+        "path": "Hanya",
+        "offset": "Matsayi",
+        "limit": "Iyaka",
+        "pattern": "Tsari",
+        "include": "Haɗawa",
+        "patchText": "Rubutun gyara",
+        "query": "Bincike",
+        "prompt": "Umarni",
+        "header": "Kanun",
+        "question": "Tambaya",
+        "options": "Zaɓuɓɓuka"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "An kasa nuna abubuwan da ke ciki."
@@ -2576,7 +2609,7 @@
       "assistantContextOverflow": "Tattaunawar ta yi tsawo fiye da abin da samfurin zai iya karɓa.",
       "assistantProviderError": "Mai ba da sabis ya mayar da kuskure.",
       "assistantProviderRefused": "Mai ba da sabis ya ƙi wannan buƙatar, kuma ba za a iya sake gwadawa ba.",
-      "assistantCreditsRefusal": "Kuɗin amfani ba su isa gudanar da Cloud Agent ba.",
+      "assistantCreditsRefusal": "Kuɗin amfani ba su isa don wannan buƙata ba.",
       "assistantOutputLimit": "Amsar ta kai iyakar fitar da samfurin.",
       "assistantStructuredOutput": "Amsar ba ta dace da tsarin da ake buƙata ba.",
       "assistantFailed": "An kasa samar da amsar."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Wannan samfurin yana goyon bayan matakin tunani"
     },
-    "creditsRequired": "Kuɗin amfani bai isa don aika wannan saƙon ba. Ƙara kuɗin amfani ka sake gwadawa."
+    "creditsRequired": "Kuɗin amfani bai isa don aika wannan saƙon ba."
   },
   "settingsTools": {
     "confirmTitle": "A tabbatar da wannan canji?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Wakilina",
       "promptPlaceholder": "Kai mataimaki ne...",
       "tools": "Kayan aiki",
+      "wholeToolRule": "Wannan wakili yana amfani da doka ɗaya ga kowane kayan aiki a lokaci ɗaya: {{rule}}. Waɗannan maɓallan karantawa kawai ne.",
       "visibility": "Ganuwa",
       "visibilityPrimary": "Na farko — wanda aka nuna a cikin mai ɗaukar hoto",
       "visibilitySubagent": "Subagent — kawai kira daga wasu",
@@ -4035,7 +4069,8 @@
       "duplicateName": "Umarni mai wannan sunan ya riga ya kasance a cikin wannan bayanan martaba"
     },
     "repoBindings": {
-      "title": "Tsoffin Bayanan martaba don Repos",
+      "title": "Tsoffin bayanan martaba don Repos",
+      "entryLabel": "Tsoffin bayanan martaba",
       "add": "Ƙara tsoho",
       "empty": "Ba a saita abubuwan da suka dace ba",
       "emptyDescription": "Ƙara tsoho don amfani da bayanin martaba ta atomatik lokacin fara zama don repo.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Babu mahallin da aka kunna rahotannin da aka tsara a cikinsa",
     "sourceBlocker": "Zaman aiki yana buƙatar kulawa",
     "sourceMetadata": "Bayanan metadata na zaman aiki da aka adana"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Ba a iya buɗe wannan sakamakon binciken ba"
   }
 }

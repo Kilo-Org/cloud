@@ -229,6 +229,21 @@
     "signInCodeField": "کد ورود",
     "or": "یا"
   },
+  "pendingLink": {
+    "description": "حسابی از قبل از {{email}} استفاده می‌کند. برای افزودن {{provider}} با یکی از روش‌های ورود آن وارد شوید.",
+    "emailCode": "کد ورود را برایم ایمیل کنید",
+    "continueInBrowser": "ادامه در مرورگر",
+    "startAgain": "شروع دوباره",
+    "expired": "مهلت این درخواست برای افزودن {{provider}} تمام شده است.",
+    "noMethods": "این حساب روش ورود دیگری ندارد، بنابراین {{provider}} را نمی‌توان افزود.",
+    "linked": "{{provider}} به حساب شما افزوده شد.",
+    "failedExpired": "{{provider}} افزوده نشد، چون مهلت درخواست تمام شده بود.",
+    "failedWrongAccount": "{{provider}} افزوده نشد، چون به حساب دیگری وارد شدید.",
+    "failedAccountAlreadyLinked": "{{provider}} افزوده نشد، چون از قبل به حساب دیگری پیوند داده شده است.",
+    "failedProviderAlreadyLinked": "{{provider}} افزوده نشد، چون حساب شما از قبل ورود دیگری با {{provider}} دارد.",
+    "failedLinking": "افزودن {{provider}} به حساب شما ممکن نشد.",
+    "notAdded": "وارد شده‌اید. {{provider}} به حساب شما افزوده نشد."
+  },
   "profile": {
     "codeReviewerSubtitle": "بازبینی خودکار PR",
     "securityAgentSubtitle": "یافتن و رفع آسیب‌پذیری‌ها",
@@ -267,6 +282,8 @@
     "providerTestAccount": "حساب آزمایشی",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO سازمانی",
     "passkeysTitle": "کلیدهای عبور",
     "passkeysSubtitle": "بدون گذرواژه وارد شوید",
@@ -2304,7 +2321,7 @@
       "cloningSession": "در حال کپی کردن نشست",
       "couldNotLoadThisSession": "بارگذاری این نشست ممکن نشد.",
       "cloneFailedRetry": "کپی کردن این نشست ممکن نشد. دوباره تلاش کنید.",
-      "notEnoughCredits": "اعتبار کافی برای اجرای Cloud Agent وجود ندارد. اعتبار اضافه کنید و دوباره تلاش کنید.",
+      "notEnoughCredits": "اعتبار کافی برای این درخواست وجود ندارد. اعتبار اضافه کنید و دوباره تلاش کنید.",
       "previousTaskFinishing": "کار قبلی هنوز تمام نشده است. لطفاً کمی صبر کنید.",
       "serviceUnavailable": "سرویس در حال حاضر در دسترس نیست. لطفاً دوباره تلاش کنید.",
       "connectionTrouble": "اتصال با مشکل روبه‌رو شده است. لطفاً کمی بعد دوباره تلاش کنید.",
@@ -2414,7 +2431,7 @@
       "discardWithUploadsMessage": "متن پیام شما و فایل‌های آپلودشده‌ای که به هیچ پیام ارسالی پیوست نشده‌اند، حذف می‌شوند.",
       "discardFailed": "حذف پیش‌نویس ممکن نشد. لطفاً دوباره تلاش کنید.",
       "remoteHint": "برای اجرا روی رایانهٔ خودتان، Kilo را آن‌جا اجرا کنید و آن را در حال اجرا بگذارید.",
-      "continueFrom": "نشست {{title}} را ادامه می‌دهید.",
+      "continueFrom": "نشست «{{title}}» را ادامه می‌دهید.",
       "importingSession": "در حال وارد کردن نشست",
       "cliCannotContinue": "این CLI نمی‌تواند یک نشست را ادامه دهد. Cloud Agent یا CLI دیگری را انتخاب کنید.",
       "importFailed": "وارد کردن این نشست ممکن نشد.",
@@ -2466,6 +2483,8 @@
       "toolList": "فهرست کردن",
       "toolPatch": "اعمال وصله",
       "toolTask": "وظیفه",
+      "toolSendFile": "فایل ارسال شد",
+      "toolSendFileAction": "ارسال فایل",
       "readTodos": "خواندن طرح",
       "updateTodos": "به‌روزرسانی طرح",
       "linesBadge": "{{displayCount}} خط",
@@ -2566,7 +2585,21 @@
       "thought": "تفکر",
       "showDetails": "نمایش جزئیات",
       "pending": "در انتظار…",
-      "running": "در حال اجرا…"
+      "running": "در حال اجرا…",
+      "field": {
+        "filePath": "مسیر فایل",
+        "path": "مسیر",
+        "offset": "خط شروع",
+        "limit": "محدودیت",
+        "pattern": "الگو",
+        "include": "شامل",
+        "patchText": "متن وصله",
+        "query": "پرس‌وجو",
+        "prompt": "دستورالعمل",
+        "header": "عنوان",
+        "question": "پرسش",
+        "options": "گزینه‌ها"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "نمایش محتوا ممکن نشد."
@@ -2582,7 +2615,7 @@
       "assistantContextOverflow": "گفت‌وگو برای این مدل بیش از حد طولانی است.",
       "assistantProviderError": "ارائه‌دهنده خطا برگرداند.",
       "assistantProviderRefused": "ارائه‌دهنده این درخواست را رد کرد و تلاش دوباره ممکن نیست.",
-      "assistantCreditsRefusal": "اعتبار کافی برای اجرای Cloud Agent وجود ندارد.",
+      "assistantCreditsRefusal": "اعتبار کافی برای این درخواست وجود ندارد.",
       "assistantOutputLimit": "پاسخ به محدودیت خروجی مدل رسید.",
       "assistantStructuredOutput": "پاسخ با قالب مورد نیاز مطابقت نداشت.",
       "assistantFailed": "تولید پاسخ ناموفق بود."
@@ -3808,7 +3841,7 @@
     "reasoningEffort": {
       "modelFlag": "این مدل از میزان تفکر پشتیبانی می‌کند"
     },
-    "creditsRequired": "اعتبار کافی برای ارسال این پیام وجود ندارد. اعتبار اضافه کنید و دوباره امتحان کنید."
+    "creditsRequired": "اعتبار کافی برای ارسال این پیام وجود ندارد."
   },
   "settingsTools": {
     "confirmTitle": "این تغییر تأیید شود؟"
@@ -4001,6 +4034,7 @@
       "namePlaceholder": "نماینده من",
       "promptPlaceholder": "شما یک ...",
       "tools": "ابزار",
+      "wholeToolRule": "این عامل یک قاعده را به‌طور همزمان به همهٔ ابزارها اعمال می‌کند: {{rule}}. این کلیدها فقط‌خواندنی هستند.",
       "visibility": "دید",
       "visibilityPrimary": "اولیه — در انتخابگر نشان داده شده است",
       "visibilitySubagent": "Subagent — فقط از دیگران قابل تماس است",
@@ -4042,6 +4076,7 @@
     },
     "repoBindings": {
       "title": "نمایه های پیش فرض برای مخازن",
+      "entryLabel": "نمایه‌های پیش‌فرض",
       "add": "پیش فرض را اضافه کنید",
       "empty": "هیچ پیش فرضی پیکربندی نشده است",
       "emptyDescription": "یک پیش‌فرض اضافه کنید تا به‌طور خودکار یک نمایه هنگام شروع جلسات برای مخزن اعمال شود.",
@@ -4249,5 +4284,8 @@
     "noEnabledContexts": "هیچ بخشی برای گزارش‌های زمان‌بندی‌شده فعال نیست",
     "sourceBlocker": "جلسه به توجه نیاز دارد",
     "sourceMetadata": "فراداده‌های ثبت‌شدهٔ جلسه"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "باز کردن این نتیجه جست‌وجو ممکن نشد"
   }
 }

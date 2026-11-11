@@ -421,13 +421,13 @@ describe('sessionStatusErrorMessage', () => {
     ['Unauthorized: Unauthorized', 'The response failed.'],
     [
       'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
-      'Not enough credits to run Cloud Agent. Add credits and try again.',
+      'Not enough credits for this request. Add credits and try again.',
     ],
     // The DO's safe projection is the producer for a real credits failure; it
     // writes the phrase lowercase.
     [
       'Assistant request failed: insufficient credits',
-      'Not enough credits to run Cloud Agent. Add credits and try again.',
+      'Not enough credits for this request. Add credits and try again.',
     ],
     // Both SDK status strings for a failed delivery reach the delivery copy:
     // session-manager's exhaustion indicator and the cloud status written for
@@ -456,7 +456,7 @@ describe('sessionStatusErrorMessage', () => {
     [
       'insufficient-credits',
       'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
-      'Not enough credits to run Cloud Agent. Add credits and try again.',
+      'Not enough credits for this request. Add credits and try again.',
     ],
     [
       'previous-task-in-progress',
@@ -576,7 +576,7 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
 
   // An agent-execution delivery failure renders the assistant-failure title
   // (message-failure-state.ts), so the status line must not state the same
-  // failure a second time in either of its two copies.
+  // failure a second time in any of its copies.
   const executionFailure: MessageFailure = {
     kind: 'delivery',
     side: 'assistant',

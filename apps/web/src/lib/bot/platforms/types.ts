@@ -48,8 +48,10 @@ export type BotPlatform = {
    * created. GitHub checks that the triggering account can write to the
    * conversation's repository. Slack and Linear have no repository of their
    * own in the thread; the tool that starts a Cloud Agent session authorizes
-   * any repository it names against the requesting account. Platforms without
-   * this hook allow every message.
+   * any repository it names against the requesting account, for GitHub
+   * through the requesting account's write permission and for GitLab through
+   * the write access the requesting account's own GitLab connection holds on
+   * the project. Platforms without this hook allow every message.
    */
   authorizeBotActions?(params: {
     thread: Thread;

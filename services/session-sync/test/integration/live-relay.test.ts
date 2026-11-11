@@ -103,6 +103,33 @@ function setSocketExpiry(instance: unknown, state: DurableObjectState, exp: numb
   }
 }
 
+const socketAttachmentSchema = z
+  .object({
+    ticket: z.object({ role: z.string() }).passthrough(),
+    subscribed: z.boolean(),
+  })
+  .passthrough();
+type SocketAttachment = z.infer<typeof socketAttachmentSchema>;
+
+function relaySocket(
+  state: DurableObjectState,
+  keep: (attachment: SocketAttachment) => boolean
+): WebSocket {
+  const server = state
+    .getWebSockets()
+    .find(ws => keep(socketAttachmentSchema.parse(ws.deserializeAttachment())));
+  if (!server) throw new Error('Missing relay socket');
+  return server;
+}
+
+/** Records the text frames the relay hands to one server-side socket. */
+function captureRelaySend(server: WebSocket, frames: string[]): void {
+  vi.spyOn(server, 'send').mockImplementation(raw => {
+    if (typeof raw !== 'string') throw new Error('Relay sent a binary frame');
+    frames.push(raw);
+  });
+}
+
 async function setup() {
   const principal = personal(`relay-${crypto.randomUUID()}`);
   const sessionID = newSessionID();
@@ -297,6 +324,159 @@ it('bounds replay by bytes and requests a sync reset for evicted events', async 
   });
   viewer.ws.send(JSON.stringify({ type: 'subscribe', afterSeq: 0 }));
   expect((await viewer.next('reset_required')).body).toMatchObject({ seq: 20 });
+});
+
+it('coalesces a repeated subscribe to the entries a socket has not received', async () => {
+  const fixture = await setup();
+  const runner = await fixture.connect('runner');
+  const viewer = await fixture.connect('viewer');
+  await subscribe(viewer);
+  for (const type of ['one', 'two', 'three', 'four']) {
+    runner.ws.send(JSON.stringify({ channel: 'events', type, body: type }));
+    expect(await viewer.next(type)).toMatchObject({ seq: expect.any(Number) });
+  }
+  const repeat = await runInDurableObject(fixture.stub, async (instance, state) => {
+    const relay = instance as unknown as {
+      sweep: () => void;
+      notifyWatch: (ticket: unknown) => Promise<void>;
+    };
+    const sweeping = vi.spyOn(relay, 'sweep');
+    const watching = vi.spyOn(relay, 'notifyWatch');
+    const server = relaySocket(state, saved => saved.ticket.role === 'viewer' && saved.subscribed);
+    const frames: string[] = [];
+    captureRelaySend(server, frames);
+    try {
+      await instance.webSocketMessage(server, JSON.stringify({ type: 'subscribe', afterSeq: 0 }));
+      const sent = frames.map(frame => envelopeSchema.parse(JSON.parse(frame)));
+      return {
+        frames: sent.map(envelope => envelope.type),
+        body: sent.at(-1)?.body,
+        sweeps: sweeping.mock.calls.length,
+        watches: watching.mock.calls.length,
+      };
+    } finally {
+      vi.mocked(server.send).mockRestore();
+      sweeping.mockRestore();
+      watching.mockRestore();
+    }
+  });
+  expect(repeat).toEqual({
+    frames: ['subscribed'],
+    body: { seq: 4, cursor: 4 },
+    sweeps: 0,
+    watches: 0,
+  });
+  runner.ws.send(JSON.stringify({ channel: 'events', type: 'five', body: 5 }));
+  expect((await viewer.next('five')).seq).toBe(5);
+  const afterLive = await runInDurableObject(fixture.stub, async (instance, state) => {
+    const server = relaySocket(state, saved => saved.ticket.role === 'viewer' && saved.subscribed);
+    const frames: string[] = [];
+    captureRelaySend(server, frames);
+    try {
+      await instance.webSocketMessage(server, JSON.stringify({ type: 'subscribe', afterSeq: 0 }));
+      const sent = frames.map(frame => envelopeSchema.parse(JSON.parse(frame)));
+      // Private relay state holds the delivered position this test needs to check.
+      const relay = instance as unknown as { delivered: WeakMap<WebSocket, number> };
+      return {
+        frames: sent.map(envelope => envelope.type),
+        body: sent.at(-1)?.body,
+        delivered: relay.delivered.get(server),
+        attachmentKeys: Object.keys(
+          z.record(z.string(), z.unknown()).parse(server.deserializeAttachment())
+        ).sort(),
+      };
+    } finally {
+      vi.mocked(server.send).mockRestore();
+    }
+  });
+  expect(afterLive).toEqual({
+    frames: ['subscribed'],
+    body: { seq: 5, cursor: 5 },
+    delivered: 5,
+    // The persisted attachment keeps the previous release's shape, so a rollback can still parse it.
+    attachmentKeys: ['closed', 'reauthNotified', 'subscribed', 'ticket'],
+  });
+  await fixture.connect('viewer');
+  const catchUp = await runInDurableObject(fixture.stub, async (instance, state) => {
+    const server = relaySocket(state, saved => saved.ticket.role === 'viewer' && !saved.subscribed);
+    const frames: string[] = [];
+    captureRelaySend(server, frames);
+    try {
+      await instance.webSocketMessage(server, JSON.stringify({ type: 'subscribe', afterSeq: 3 }));
+      return frames.map(frame => envelopeSchema.parse(JSON.parse(frame)).type);
+    } finally {
+      vi.mocked(server.send).mockRestore();
+    }
+  });
+  expect(catchUp).toEqual(['four', 'five', 'subscribed']);
+});
+
+it('resumes a reconstructed subscribed socket from its valid cursor without a persisted position', async () => {
+  const fixture = await setup();
+  const runner = await fixture.connect('runner');
+  const viewer = await fixture.connect('viewer');
+  await subscribe(viewer);
+  for (const type of ['one', 'two', 'three']) {
+    runner.ws.send(JSON.stringify({ channel: 'events', type, body: type }));
+    await viewer.next(type);
+  }
+  const resumed = await runInDurableObject(fixture.stub, async (_instance, state) => {
+    const initialize = vi.spyOn(state, 'blockConcurrencyWhile');
+    try {
+      const restored = new SessionRelayDO(state, testEnv);
+      const initialization = initialize.mock.results.at(-1);
+      if (initialization?.type !== 'return')
+        throw new Error('Relay initialization was not captured');
+      await initialization.value;
+      // Reconstruction starts the replay floor at the stored sequence ceiling.
+      const floor =
+        drizzle(state.storage, { logger: false })
+          .select()
+          .from(relayState)
+          .where(eq(relayState.id, 1))
+          .get()?.seq ?? 0;
+      const viewerServer = relaySocket(state, saved => saved.ticket.role === 'viewer');
+      const runnerServer = relaySocket(state, saved => saved.ticket.role === 'runner');
+      const frames: string[] = [];
+      captureRelaySend(viewerServer, frames);
+      const sent = () => frames.splice(0).map(frame => envelopeSchema.parse(JSON.parse(frame)));
+      try {
+        await restored.webSocketMessage(
+          viewerServer,
+          JSON.stringify({ type: 'subscribe', afterSeq: floor })
+        );
+        const atFloor = sent().map(envelope => ({ type: envelope.type, body: envelope.body }));
+        await restored.webSocketMessage(
+          runnerServer,
+          JSON.stringify({ channel: 'events', type: 'four', body: 4 })
+        );
+        await restored.webSocketMessage(
+          runnerServer,
+          JSON.stringify({ channel: 'events', type: 'five', body: 5 })
+        );
+        const live = sent().map(envelope => ({ type: envelope.type, seq: envelope.seq }));
+        await restored.webSocketMessage(
+          viewerServer,
+          JSON.stringify({ type: 'subscribe', afterSeq: 3 })
+        );
+        const belowFloor = sent().map(envelope => envelope.type);
+        return { floor, atFloor, live, belowFloor };
+      } finally {
+        vi.mocked(viewerServer.send).mockRestore();
+      }
+    } finally {
+      initialize.mockRestore();
+    }
+  });
+  expect(resumed.floor).toBeGreaterThan(3);
+  expect(resumed.atFloor).toEqual([
+    { type: 'subscribed', body: { seq: resumed.floor, cursor: resumed.floor } },
+  ]);
+  expect(resumed.live).toEqual([
+    { type: 'four', seq: resumed.floor + 1 },
+    { type: 'five', seq: resumed.floor + 2 },
+  ]);
+  expect(resumed.belowFloor).toEqual(['reset_required']);
 });
 
 it('queues HTTP and socket commands together, delivers in order, dedupes, and removes payloads on ack', async () => {
@@ -1317,11 +1497,15 @@ it('contains a failed raw replay send, closes that viewer, and still schedules c
     JSON.stringify({ channel: 'events', type: 'replay-fixture', body: { text: 'opaque' } })
   );
   await viewer.next('replay-fixture');
-  const closed = whenClosed(viewer.ws);
+  const replay = await fixture.connect('viewer');
+  const closed = whenClosed(replay.ws);
   await runInDurableObject(fixture.stub, async (instance, state) => {
     const server = state.getWebSockets().find(ws => {
-      const saved = ws.deserializeAttachment() as { ticket: { role: string } };
-      return saved.ticket.role === 'viewer';
+      const saved = ws.deserializeAttachment() as {
+        ticket: { role: string };
+        subscribed: boolean;
+      };
+      return saved.ticket.role === 'viewer' && !saved.subscribed;
     });
     if (!server) throw new Error('Missing replay viewer socket');
     const relay = instance as unknown as { schedule: () => Promise<void> };
@@ -1333,6 +1517,7 @@ it('contains a failed raw replay send, closes that viewer, and still schedules c
       await expect(
         instance.webSocketMessage(server, JSON.stringify({ type: 'subscribe', afterSeq: 0 }))
       ).resolves.toBeUndefined();
+      expect(sending).toHaveBeenCalled();
       expect(scheduling).toHaveBeenCalled();
     } finally {
       sending.mockRestore();

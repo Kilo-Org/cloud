@@ -14,6 +14,7 @@ import {
 } from '../../../src/shared/control-plane-protocol.js';
 import type { ExecResult, ProcessOptions } from '../utils.js';
 import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
+import { prepareRoots } from './workspace-roots.js';
 import type { WorkspaceStamp } from './workspace-stamp.js';
 
 /**
@@ -231,7 +232,7 @@ const GITLAB_ALIAS = `kcp1.${Buffer.from('sandbox-1').toString('base64url')}.git
 const MANAGED_GITHUB_OPTION = 'http.https://github.com/.proactiveAuth=basic';
 
 describe('preparing a route with several git roots', () => {
-  it('clones every root with its own url and branch, sets up once at the cwd, and stamps each root', async () => {
+  it('clones every root with its own url and branch, skips environment build commands, and stamps each root', async () => {
     const harness = rootsHarness();
     const spec = rootSpec();
 
@@ -255,7 +256,7 @@ describe('preparing a route with several git roots', () => {
       'feature/web',
       'origin/feature/web',
     ]);
-    expect(harness.setups).toEqual([{ command: 'npm install', directory: CWD }]);
+    expect(harness.setups).toEqual([]);
     expect(progressDetails(harness.frames, 'clone')).toEqual([
       'acme/api: Cloning repository',
       'acme/web: Cloning repository',
@@ -289,7 +290,7 @@ describe('preparing a route with several git roots', () => {
     expect(second.frames.at(-1)).toMatchObject({ type: 'session.ready', workspace: 'same' });
   });
 
-  it('prepares again, setup included, when one root has no matching stamp', async () => {
+  it('prepares again when one root has no matching stamp', async () => {
     const harness = rootsHarness({
       repos: [API, WEB],
       stamps: { [API]: { allocationId: 'alloc-current', commit: 'c' } },
@@ -301,7 +302,7 @@ describe('preparing a route with several git roots', () => {
     expect(harness.clones()).toEqual([]);
     expect(harness.callsAt(API, 'checkout')).toEqual([]);
     expect(harness.callsAt(WEB, 'checkout')).not.toEqual([]);
-    expect(harness.setups).toEqual([{ command: 'npm install', directory: CWD }]);
+    expect(harness.setups).toEqual([]);
     expect(harness.stamps.get(WEB)).toEqual({
       allocationId: 'alloc-current',
       commit: 'commit-web',
@@ -635,7 +636,7 @@ describe('preparing a route with several git roots', () => {
     await retry.manager.prepare(rootSpec());
 
     expect(retry.clones()).toEqual([{ url: WEB_URL, directory: WEB }]);
-    expect(retry.setups).toEqual([{ command: 'npm install', directory: CWD }]);
+    expect(retry.setups).toEqual([]);
     expect([...retry.stamps.keys()]).toEqual([API, WEB]);
     expect(retry.frames.at(-1)).toMatchObject({ type: 'session.ready', workspace: 'cloned' });
   });
@@ -653,7 +654,7 @@ describe('preparing a route with one git root', () => {
     await harness.manager.prepare(spec);
 
     expect(harness.clones()).toEqual([{ url: API_URL, directory: '/workspace/app' }]);
-    expect(harness.setups).toEqual([{ command: 'npm install', directory: '/workspace/app' }]);
+    expect(harness.setups).toEqual([]);
     expect([...harness.stamps.keys()]).toEqual(['/workspace/app']);
   });
 
@@ -675,7 +676,7 @@ describe('preparing a route with one git root', () => {
     await harness.manager.prepare(spec);
 
     expect(harness.clones()).toEqual([{ url: API_URL, directory: API }]);
-    expect(harness.setups).toEqual([{ command: 'npm install', directory: API }]);
+    expect(harness.setups).toEqual([]);
     expect([...harness.stamps.keys()]).toEqual([API]);
     // The route names one repository, so its name adds nothing to the phase
     // progress: the step's own message names the work.
@@ -749,6 +750,7 @@ describe('preparing real repositories in two roots', () => {
         directory: cwd,
         git: { url: apiUrl, platform: 'github' },
         setupCommands: [`pwd >> '${marker}'`],
+        environmentSetupCommandCount: 0,
         roots: [
           {
             directory: apiDir,
@@ -840,5 +842,25 @@ describe('preparing real repositories in two roots', () => {
     } finally {
       await fs.rm(base, { recursive: true, force: true });
     }
+  });
+});
+
+describe('narrowing a route to its roots', () => {
+  it('applies a stacked base only to the root that carries it', () => {
+    const baseSha = 'a'.repeat(40);
+    const [api, web] = rootSpec().roots ?? [];
+    if (api === undefined || web === undefined) throw new Error('missing roots');
+    const roots = prepareRoots(
+      rootSpec({
+        baseBranch: 'feature/parent',
+        baseSha,
+        roots: [{ ...api, baseBranch: 'feature/parent', baseSha }, web],
+      }),
+      undefined
+    );
+    expect(roots.map(root => [root.spec.baseBranch, root.spec.baseSha])).toEqual([
+      ['feature/parent', baseSha],
+      [undefined, undefined],
+    ]);
   });
 });

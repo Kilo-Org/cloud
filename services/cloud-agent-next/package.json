@@ -67,7 +67,7 @@
   },
   "devDependencies": {
     "@cloudflare/containers": "0.3.7",
-    "@cloudflare/vitest-pool-workers": "0.18.6",
+    "@cloudflare/vitest-plugin": "1.6.0",
     "@kilocode/sdk": "7.8.17",
     "@types/jsonwebtoken": "catalog:",
     "@types/node": "catalog:",
@@ -78,7 +78,7 @@
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "wrangler": "catalog:",
+    "wrangler": "4.158.0",
     "ws": "^8.18.0",
     "aws4fetch": "catalog:"
   }

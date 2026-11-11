@@ -1,5 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
-import { getEffectiveProviderPrivacy, providerPrivacySchema } from './provider-privacy';
+import {
+  getEffectiveProviderPrivacy,
+  providerPreferencesSchema,
+  providerPrivacySchema,
+} from './provider-privacy';
 import type { OpenRouterProviderConfig } from './providers/openrouter/types';
 
 describe('getEffectiveProviderPrivacy', () => {
@@ -84,5 +88,46 @@ describe('providerPrivacySchema', () => {
         api_key: 'untrusted-client-key',
       })
     ).toEqual({ data_collection: 'deny', zdr: true });
+  });
+});
+
+describe('providerPreferencesSchema', () => {
+  it.each([
+    {},
+    { only: ['openai'], ignore: ['azure'], order: ['openai', 'anthropic'] },
+    { only: [], ignore: [], order: [] },
+    { only: null, ignore: null, order: null },
+    {
+      only: ['openai'],
+      data_collection: 'deny',
+      zdr: true,
+      sort: 'latency',
+      require_parameters: true,
+      allow_fallbacks: false,
+      max_price: { prompt: 1, completion: 2 },
+      future_option: { enabled: true },
+    },
+  ])('accepts valid provider preferences: %j', provider => {
+    expect(providerPreferencesSchema.safeParse(provider).success).toBe(true);
+  });
+
+  it.each([
+    null,
+    [],
+    'openai',
+    { only: [['openai']] },
+    { only: 'openai' },
+    { only: { openai: true } },
+    { only: [1] },
+    { only: [null] },
+    { ignore: [['azure']] },
+    { ignore: 'azure' },
+    { ignore: [{ id: 'azure' }] },
+    { order: [['openai']] },
+    { order: 'openai' },
+    { order: [true] },
+    { zdr: 'true' },
+  ])('rejects malformed provider preferences: %j', provider => {
+    expect(providerPreferencesSchema.safeParse(provider).success).toBe(false);
   });
 });

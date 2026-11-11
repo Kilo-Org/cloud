@@ -229,6 +229,21 @@
     "signInCodeField": "Код уваходу",
     "or": "або"
   },
+  "pendingLink": {
+    "description": "Уліковы запіс з {{email}} ужо існуе. Увайдзіце адным з яго спосабаў, каб дадаць {{provider}}.",
+    "emailCode": "Даслаць мне код уваходу па электроннай пошце",
+    "continueInBrowser": "Працягнуць у браўзеры",
+    "startAgain": "Пачаць нанова",
+    "expired": "Тэрмін дзеяння гэтага запыту на даданне {{provider}} скончыўся.",
+    "noMethods": "У гэтага ўліковага запісу няма іншага спосабу ўваходу, таму {{provider}} нельга дадаць.",
+    "linked": "{{provider}} дададзены да вашага ўліковага запісу.",
+    "failedExpired": "{{provider}} не дададзены, бо тэрмін дзеяння запыту скончыўся.",
+    "failedWrongAccount": "{{provider}} не дададзены, бо вы ўвайшлі ў іншы ўліковы запіс.",
+    "failedAccountAlreadyLinked": "{{provider}} не дададзены, бо ён ужо звязаны з іншым уліковым запісам.",
+    "failedProviderAlreadyLinked": "{{provider}} не дададзены, бо ў вашым уліковым запісе ўжо ёсць іншы ўваход праз {{provider}}.",
+    "failedLinking": "Не ўдалося дадаць {{provider}} да вашага ўліковага запісу.",
+    "notAdded": "Вы ўвайшлі. {{provider}} не дададзены да вашага ўліковага запісу."
+  },
   "profile": {
     "codeReviewerSubtitle": "Аўтаматычныя праверкі PR",
     "securityAgentSubtitle": "Знаходзіць і ліквідаваць уразлівасці",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Тэставы ўліковы запіс",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Карпаратыўны SSO",
     "passkeysTitle": "Ключы доступу",
     "passkeysSubtitle": "Увайсці без пароля",
@@ -2382,7 +2399,7 @@
       "cloningSession": "Кланаванне сеанса",
       "couldNotLoadThisSession": "Не ўдалося загрузіць гэты сеанс.",
       "cloneFailedRetry": "Не ўдалося кланаваць гэты сеанс. Паспрабуйце яшчэ раз.",
-      "notEnoughCredits": "Недастаткова крэдытаў для запуску Cloud Agent. Папоўніце баланс і паспрабуйце яшчэ раз.",
+      "notEnoughCredits": "Недастаткова крэдытаў для гэтага запыту. Папоўніце баланс і паспрабуйце яшчэ раз.",
       "previousTaskFinishing": "Папярэдняя задача яшчэ завяршаецца. Крыху пачакайце.",
       "serviceUnavailable": "Сэрвіс зараз недаступны. Паспрабуйце яшчэ раз.",
       "connectionTrouble": "Узнікла праблема з падключэннем. Крыху пачакайце і паспрабуйце яшчэ раз.",
@@ -2546,6 +2563,8 @@
       "toolList": "спіс файлаў",
       "toolPatch": "выпраўленне",
       "toolTask": "задача",
+      "toolSendFile": "Дасланы файл",
+      "toolSendFileAction": "Дасыланне файла",
       "readTodos": "Прачытаць план",
       "updateTodos": "Абнавіць план",
       "linesBadge": "радкоў: {{displayCount}}",
@@ -2652,7 +2671,21 @@
       "thought": "Развагі",
       "showDetails": "Паказаць падрабязнасці",
       "pending": "У чаканні…",
-      "running": "Выконваецца…"
+      "running": "Выконваецца…",
+      "field": {
+        "filePath": "Шлях файла",
+        "path": "Шлях",
+        "offset": "Зрух",
+        "limit": "Абмежаванне",
+        "pattern": "Узор",
+        "include": "Уключэнне",
+        "patchText": "Тэкст латкі",
+        "query": "Запыт",
+        "prompt": "Інструкцыя",
+        "header": "Загаловак",
+        "question": "Пытанне",
+        "options": "Варыянты"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Не ўдалося адлюстраваць змесціва."
@@ -2668,7 +2701,7 @@
       "assistantContextOverflow": "Размова занадта доўгая для мадэлі.",
       "assistantProviderError": "Пастаўшчык вярнуў памылку.",
       "assistantProviderRefused": "Пастаўшчык адхіліў гэты запыт, і яго нельга паўтарыць.",
-      "assistantCreditsRefusal": "Недастаткова крэдытаў для запуску Cloud Agent.",
+      "assistantCreditsRefusal": "Недастаткова крэдытаў для гэтага запыту.",
       "assistantOutputLimit": "Адказ дасягнуў максімальнай даўжыні вываду мадэлі.",
       "assistantStructuredOutput": "Адказ не адпавядае патрабаванаму фармату.",
       "assistantFailed": "Не ўдалося стварыць адказ."
@@ -3914,7 +3947,7 @@
     "reasoningEffort": {
       "modelFlag": "Гэтая мадэль падтрымлівае ўзровень разважанняў"
     },
-    "creditsRequired": "Недастаткова крэдытаў для адпраўкі гэтага паведамлення. Папоўніце баланс і паспрабуйце зноў."
+    "creditsRequired": "Недастаткова крэдытаў для адпраўкі гэтага паведамлення."
   },
   "settingsTools": {
     "confirmTitle": "Пацвердзіць гэта змяненне?"
@@ -4119,6 +4152,7 @@
       "namePlaceholder": "Мой агент",
       "promptPlaceholder": "Вы...",
       "tools": "інструменты",
+      "wholeToolRule": "Гэты агент прымяняе адно правіла да ўсіх інструментаў адначасова: {{rule}}. Гэтыя перамыкачы даступныя толькі для чытання.",
       "visibility": "Бачнасць",
       "visibilityPrimary": "Асноўны — паказваецца ў выбары",
       "visibilitySubagent": "Субагент — можна выклікаць толькі ад іншых",
@@ -4160,6 +4194,7 @@
     },
     "repoBindings": {
       "title": "Профілі па змаўчанні для рэпазітараў",
+      "entryLabel": "Профілі па змаўчанні",
       "add": "Дадаць па змаўчанні",
       "empty": "Стандартныя параметры не настроены",
       "emptyDescription": "Дадайце стандартнае для аўтаматычнага прымянення профілю пры запуску сеансаў для рэпазітара.",
@@ -4375,5 +4410,8 @@
     "noEnabledContexts": "Няма ўключаных кантэкстаў для запланаваных зводак",
     "sourceBlocker": "Сеанс патрабуе ўвагі",
     "sourceMetadata": "Зафіксаваныя метаданыя сеанса"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Не атрымалася адкрыць гэты вынік пошуку"
   }
 }

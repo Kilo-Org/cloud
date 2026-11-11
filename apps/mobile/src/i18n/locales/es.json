@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "Introduce tu correo electrónico.",
     "or": "o"
   },
+  "pendingLink": {
+    "description": "Ya hay una cuenta que usa {{email}}. Inicia sesión con uno de sus métodos para añadir {{provider}}.",
+    "emailCode": "Enviarme un código de inicio de sesión por correo",
+    "continueInBrowser": "Continuar en el navegador",
+    "startAgain": "Empezar de nuevo",
+    "expired": "Esta solicitud para añadir {{provider}} ha caducado.",
+    "noMethods": "Esta cuenta no tiene otro método de inicio de sesión, así que no se puede añadir {{provider}}.",
+    "linked": "{{provider}} se añadió a tu cuenta.",
+    "failedExpired": "No se añadió {{provider}} porque la solicitud caducó.",
+    "failedWrongAccount": "No se añadió {{provider}} porque iniciaste sesión en otra cuenta.",
+    "failedAccountAlreadyLinked": "No se añadió {{provider}} porque ya está vinculado a otra cuenta.",
+    "failedProviderAlreadyLinked": "No se añadió {{provider}} porque tu cuenta ya tiene otro inicio de sesión de {{provider}}.",
+    "failedLinking": "No se pudo añadir {{provider}} a tu cuenta.",
+    "notAdded": "Has iniciado sesión. No se añadió {{provider}} a tu cuenta."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revisiones automáticas de PR",
     "securityAgentSubtitle": "Encontrar y corregir vulnerabilidades",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Cuenta de prueba",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO empresarial",
     "passkeysTitle": "Claves de acceso",
     "passkeysSubtitle": "Inicia sesión sin contraseña",
@@ -1781,7 +1798,7 @@
       "cloningSession": "Clonando sesión",
       "couldNotLoadThisSession": "No se pudo cargar esta sesión.",
       "cloneFailedRetry": "No se pudo clonar esta sesión. Inténtalo de nuevo.",
-      "notEnoughCredits": "No hay suficientes créditos para ejecutar Cloud Agent. Añade créditos e inténtalo de nuevo.",
+      "notEnoughCredits": "No hay suficientes créditos para esta solicitud. Añade créditos e inténtalo de nuevo.",
       "previousTaskFinishing": "La tarea anterior aún no ha terminado. Espera un momento.",
       "serviceUnavailable": "El servicio no está disponible en este momento. Inténtalo de nuevo.",
       "connectionTrouble": "Hay un problema de conexión. Inténtalo de nuevo en un momento.",
@@ -1891,7 +1908,7 @@
       "discardWithUploadsMessage": "Se eliminarán tus instrucciones y los archivos subidos que no estén adjuntos a mensajes enviados.",
       "discardFailed": "No se pudo descartar el borrador. Inténtalo de nuevo.",
       "remoteHint": "Para ejecutarlo en tu ordenador, inicia Kilo allí y déjalo en marcha.",
-      "continueFrom": "Se está continuando la sesión {{title}}.",
+      "continueFrom": "Se está continuando la sesión «{{title}}».",
       "importingSession": "Importando sesión",
       "cliCannotContinue": "Esta CLI no puede continuar una sesión. Elige Cloud Agent u otra CLI.",
       "importFailed": "No se pudo importar esta sesión.",
@@ -1944,6 +1961,8 @@
       "toolList": "listar",
       "toolPatch": "aplicar parche",
       "toolTask": "tarea",
+      "toolSendFile": "Archivo enviado",
+      "toolSendFileAction": "enviar archivo",
       "readTodos": "Leer plan",
       "updateTodos": "Actualizar plan",
       "linesBadge": "{{displayCount}} líneas",
@@ -2047,7 +2066,21 @@
       "thought": "Razonamiento",
       "showDetails": "Mostrar detalles",
       "pending": "Pendiente…",
-      "running": "En ejecución…"
+      "running": "En ejecución…",
+      "field": {
+        "filePath": "Ruta de archivo",
+        "path": "Ruta",
+        "offset": "Desplazamiento",
+        "limit": "Límite",
+        "pattern": "Patrón",
+        "include": "Incluir",
+        "patchText": "Texto del parche",
+        "query": "Consulta",
+        "prompt": "Indicación",
+        "header": "Encabezado",
+        "question": "Pregunta",
+        "options": "Opciones"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "No se pudo mostrar el contenido."
@@ -2063,7 +2096,7 @@
       "assistantContextOverflow": "La conversación es demasiado larga para el modelo.",
       "assistantProviderError": "El proveedor devolvió un error.",
       "assistantProviderRefused": "El proveedor rechazó esta solicitud y no se puede reintentar.",
-      "assistantCreditsRefusal": "No hay suficientes créditos para ejecutar Cloud Agent.",
+      "assistantCreditsRefusal": "No hay suficientes créditos para esta solicitud.",
       "assistantOutputLimit": "La respuesta alcanzó el límite de salida del modelo.",
       "assistantStructuredOutput": "La respuesta no coincidió con el formato requerido.",
       "assistantFailed": "No se pudo generar la respuesta."
@@ -3858,7 +3891,7 @@
     "reasoningEffort": {
       "modelFlag": "Este modelo admite esfuerzo de razonamiento"
     },
-    "creditsRequired": "No hay suficientes créditos para enviar este mensaje. Añade créditos y vuelve a intentarlo."
+    "creditsRequired": "No hay suficientes créditos para enviar este mensaje."
   },
   "settingsTools": {
     "confirmTitle": "¿Confirmar este cambio?"
@@ -4057,6 +4090,7 @@
       "namePlaceholder": "mi agente",
       "promptPlaceholder": "Eres un...",
       "tools": "Herramientas",
+      "wholeToolRule": "Este agente aplica una regla a todas las herramientas a la vez: {{rule}}. Estos interruptores son de solo lectura.",
       "visibility": "Visibilidad",
       "visibilityPrimary": "Primario — se muestra en el selector",
       "visibilitySubagent": "Subagente — solo puede ser invocado por otros",
@@ -4098,6 +4132,7 @@
     },
     "repoBindings": {
       "title": "Perfiles predeterminados para repositorios",
+      "entryLabel": "Perfiles predeterminados",
       "add": "Agregar valor predeterminado",
       "empty": "No hay valores predeterminados configurados",
       "emptyDescription": "Agregue un valor predeterminado para aplicar automáticamente un perfil al iniciar sesiones para un repositorio.",
@@ -4309,5 +4344,8 @@
     "noEnabledContexts": "No hay contextos activados para los informes programados",
     "sourceBlocker": "La sesión necesita atención",
     "sourceMetadata": "Metadatos de la sesión capturados"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "No se pudo abrir este resultado de búsqueda"
   }
 }

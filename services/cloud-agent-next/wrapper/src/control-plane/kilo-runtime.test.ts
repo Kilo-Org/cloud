@@ -12,6 +12,10 @@ import { createTurnManager } from './turn.js';
 import { SESSION_SNAPSHOT_INTERVAL_MS } from './runtime-activity.js';
 import type { ControlPlaneWrapperFrame } from '../../../src/shared/control-plane-protocol.js';
 import {
+  GH_STACK_EXTENSION_NAME,
+  GH_STACK_EXTENSIONS_ROOT,
+} from '../../../src/shared/runtime-distribution.js';
+import {
   cleanupStaleKiloPidfiles,
   createKiloRuntime,
   createKiloRuntimes,
@@ -279,10 +283,53 @@ describe('prepareKiloFilesystem', () => {
       expect(rules).toContain('# Cloud Agent Environment');
       expect(rules).toContain('Port 3000 is used by the sandbox itself.');
       expect(rules).toContain('no more than 3 minutes 30 seconds');
+      expect(rules).toContain('## Stacked Workspaces and Pull Requests');
+      expect(rules).toContain('an internet search is not needed');
+      expect(rules).toContain('**New stacked workspace**');
+      expect(rules).toContain('gh pr create --base <parent-branch>');
+      expect(rules).toContain('Do not rewrite or push parent or sibling branches.');
       expect(
         await fsp.readFile(path.join(home, '.local', 'share', 'kilo', 'auth.json'), 'utf8')
       ).toBe('{"kilo":{}}');
       expect((await fsp.stat(directory)).isDirectory()).toBe(true);
+    } finally {
+      await fsp.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('links the image-baked gh-stack extension into the runtime HOME', async () => {
+    const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-prepare-'));
+    try {
+      const home = path.join(root, 'home');
+      const dataHome = path.join(home, '.local', 'share');
+      await prepareKiloFilesystem(
+        { HOME: home, XDG_DATA_HOME: dataHome },
+        path.join(root, 'worktree')
+      );
+      const link = path.join(dataHome, 'gh', 'extensions', GH_STACK_EXTENSION_NAME);
+      expect((await fsp.lstat(link)).isSymbolicLink()).toBe(true);
+      expect(await fsp.readlink(link)).toBe(
+        path.join(GH_STACK_EXTENSIONS_ROOT, GH_STACK_EXTENSION_NAME)
+      );
+    } finally {
+      await fsp.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('leaves an existing gh-stack extension link untouched', async () => {
+    const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-prepare-'));
+    try {
+      const home = path.join(root, 'home');
+      const dataHome = path.join(home, '.local', 'share');
+      const extensions = path.join(dataHome, 'gh', 'extensions');
+      await fsp.mkdir(extensions, { recursive: true });
+      const link = path.join(extensions, GH_STACK_EXTENSION_NAME);
+      await fsp.symlink(path.join(root, 'custom-extension'), link, 'dir');
+      await prepareKiloFilesystem(
+        { HOME: home, XDG_DATA_HOME: dataHome },
+        path.join(root, 'worktree')
+      );
+      expect(await fsp.readlink(link)).toBe(path.join(root, 'custom-extension'));
     } finally {
       await fsp.rm(root, { recursive: true, force: true });
     }

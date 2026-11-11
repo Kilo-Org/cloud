@@ -331,15 +331,6 @@ function ProfileListItem({
           </span>
           {isEffectiveDefault && <Star className="text-primary h-3 w-3 shrink-0 fill-current" />}
         </div>
-        <div className="text-muted-foreground shrink-0 whitespace-nowrap text-[10px]">
-          {[
-            profile.varCount > 0 && `${profile.varCount}v`,
-            profile.mcpServerCount > 0 && `${profile.mcpServerCount}m`,
-            profile.skillCount > 0 && `${profile.skillCount}s`,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </div>
       </div>
     </button>
   );

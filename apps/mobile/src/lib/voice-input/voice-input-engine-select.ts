@@ -54,6 +54,11 @@ export function createSelectingVoiceInputNative(
           forward('transcribing', null);
         }
       }),
+      engine.addListener('progress', () => {
+        if (active === name) {
+          forward('progress', null);
+        }
+      }),
       engine.addListener('result', event => {
         if (active === name) {
           forward('result', event);

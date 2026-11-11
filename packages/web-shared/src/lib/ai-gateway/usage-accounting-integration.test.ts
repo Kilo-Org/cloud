@@ -1010,7 +1010,30 @@ describe('gateway accounting integration', () => {
       expect(sent[0].core.cache_discount).toBe(0);
       expect(sent[0].metadata.market_cost).toBe(1234);
       expect(sent[0].metadata.is_free).toBe(!byok);
+      expect(sent[0].metadata.is_user_byok).toBe(byok);
       expect(writer).not.toHaveBeenCalled();
+    }
+  );
+
+  test.each(['openai-chatgpt', 'claude-billing'] as const)(
+    'processTokenData logs %s billing as user BYOK while preserving costs',
+    async provider => {
+      configureQueueEnvironment();
+      const lifecycle = requestLifetime();
+      const record = await lifecycle.run(() =>
+        processTokenData({ ...stats }, { ...context, provider })
+      );
+      lifecycle.close();
+      await lifecycle.drain();
+
+      expect(record?.status).toBe('queued');
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toMatchObject({
+        core: { provider, cost: 0, cache_discount: 0 },
+        metadata: { is_user_byok: true, is_free: false, market_cost: 1234 },
+      });
+      expect(writer).not.toHaveBeenCalled();
+      expect(lifecycle.errors).toEqual([]);
     }
   );
 

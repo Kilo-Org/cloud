@@ -229,6 +229,21 @@
     "signInCodeField": "Giriş kodu",
     "or": "və ya"
   },
+  "pendingLink": {
+    "description": "{{email}} artıq bir hesabda istifadə olunur. {{provider}} əlavə etmək üçün həmin hesabın giriş üsullarından biri ilə daxil ol.",
+    "emailCode": "Mənə e-poçtla giriş kodu göndər",
+    "continueInBrowser": "Brauzerdə davam et",
+    "startAgain": "Yenidən başla",
+    "expired": "{{provider}} əlavə etmək sorğusunun vaxtı bitib.",
+    "noMethods": "Bu hesabın başqa giriş üsulu yoxdur, ona görə {{provider}} əlavə edilə bilməz.",
+    "linked": "{{provider}} hesabına əlavə edildi.",
+    "failedExpired": "Sorğunun vaxtı bitdiyi üçün {{provider}} əlavə edilmədi.",
+    "failedWrongAccount": "Başqa hesaba daxil olduğun üçün {{provider}} əlavə edilmədi.",
+    "failedAccountAlreadyLinked": "{{provider}} artıq başqa hesaba bağlı olduğu üçün əlavə edilmədi.",
+    "failedProviderAlreadyLinked": "Hesabında artıq başqa {{provider}} girişi olduğu üçün {{provider}} əlavə edilmədi.",
+    "failedLinking": "{{provider}} hesabına əlavə edilə bilmədi.",
+    "notAdded": "Daxil olmusan. {{provider}} hesabına əlavə edilmədi."
+  },
   "profile": {
     "codeReviewerSubtitle": "Avtomatik PR yoxlamaları",
     "securityAgentSubtitle": "Təhlükəsizlik boşluqlarını tap və aradan qaldır",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Sınaq hesabı",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Korporativ SSO",
     "passkeysTitle": "Giriş açarları",
     "passkeysSubtitle": "Şifrəsiz daxil ol",
@@ -2298,7 +2315,7 @@
       "cloningSession": "Sessiya klonlanır",
       "couldNotLoadThisSession": "Bu sessiyanı yükləmək mümkün olmadı.",
       "cloneFailedRetry": "Bu sessiyanı klonlamaq mümkün olmadı. Yenidən cəhd et.",
-      "notEnoughCredits": "Cloud Agent-i işə salmaq üçün kifayət qədər kredit yoxdur. Kredit əlavə et və yenidən cəhd et.",
+      "notEnoughCredits": "Bu sorğu üçün kifayət qədər kredit yoxdur. Kredit əlavə et və yenidən cəhd et.",
       "previousTaskFinishing": "Əvvəlki tapşırıq hələ tamamlanmayıb. Bir az gözlə.",
       "serviceUnavailable": "Xidmət hazırda əlçatan deyil. Yenidən cəhd et.",
       "connectionTrouble": "Bağlantıda problem var. Bir az sonra yenidən cəhd et.",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Sorğun və heç bir mesaja əlavə edilməmiş yüklənən fayllar silinəcək.",
       "discardFailed": "Qaralamanı silmək mümkün olmadı. Yenidən cəhd et.",
       "remoteHint": "Seansın kompüterində işləməsi üçün Kilonu orada başlat və işlək vəziyyətdə saxla.",
-      "continueFrom": "{{title}} davam etdirilir.",
+      "continueFrom": "“{{title}}” davam etdirilir.",
       "importingSession": "Sessiya idxal olunur",
       "cliCannotContinue": "Bu CLI sessiyanı davam etdirə bilmir. Cloud Agent və ya başqa CLI seç.",
       "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı.",
@@ -2460,6 +2477,8 @@
       "toolList": "siyahıla",
       "toolPatch": "düzəliş et",
       "toolTask": "tapşırıq",
+      "toolSendFile": "Fayl göndərildi",
+      "toolSendFileAction": "Fayl göndər",
       "readTodos": "Planı oxu",
       "updateTodos": "Planı yenilə",
       "linesBadge": "{{displayCount}} sətir",
@@ -2560,7 +2579,21 @@
       "thought": "Düşüncə",
       "showDetails": "Təfərrüatları göstər",
       "pending": "Gözlənilir…",
-      "running": "İşləyir…"
+      "running": "İşləyir…",
+      "field": {
+        "filePath": "Fayl yolu",
+        "path": "Yol",
+        "offset": "Başlanğıc",
+        "limit": "Məhdudiyyət",
+        "pattern": "Nümunə",
+        "include": "Daxiletmə",
+        "patchText": "Yamaq mətni",
+        "query": "Sorğu",
+        "prompt": "Təlimat",
+        "header": "Başlıq",
+        "question": "Sual",
+        "options": "Seçimlər"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Məzmunu göstərmək mümkün olmadı."
@@ -2576,7 +2609,7 @@
       "assistantContextOverflow": "Söhbət model üçün çox uzundur.",
       "assistantProviderError": "Təminatçı xəta qaytardı.",
       "assistantProviderRefused": "Təminatçı bu sorğunu rədd etdi və təkrar cəhd mümkün deyil.",
-      "assistantCreditsRefusal": "Cloud Agent-i işə salmaq üçün kifayət qədər kredit yoxdur.",
+      "assistantCreditsRefusal": "Bu sorğu üçün kifayət qədər kredit yoxdur.",
       "assistantOutputLimit": "Cavab modelin çıxış həddinə çatdı.",
       "assistantStructuredOutput": "Cavab tələb olunan formatla uyğun gəlmədi.",
       "assistantFailed": "Cavabı yaratmaq mümkün olmadı."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Bu model düşünmə səviyyəsini dəstəkləyir"
     },
-    "creditsRequired": "Bu mesajı göndərmək üçün kifayət qədər kredit yoxdur. Kredit əlavə edin və yenidən cəhd edin."
+    "creditsRequired": "Bu mesajı göndərmək üçün kifayət qədər kredit yoxdur."
   },
   "settingsTools": {
     "confirmTitle": "Bu dəyişiklik təsdiqlənsin?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Mənim Agentim",
       "promptPlaceholder": "Siz bir...",
       "tools": "Alətlər",
+      "wholeToolRule": "Bu agent bütün alətlərə eyni anda bir qayda tətbiq edir: {{rule}}. Bu keçidlər yalnız oxunaqlıdır.",
       "visibility": "Görünüş",
       "visibilityPrimary": "Əsas — seçicidə göstərilir",
       "visibilitySubagent": "Subagent — yalnız başqalarından zəng etmək olar",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Repos üçün defolt profillər",
+      "entryLabel": "Defolt profillər",
       "add": "Defolt əlavə edin",
       "empty": "Defolt konfiqurasiya edilməyib",
       "emptyDescription": "Repo üçün sessiyalara başladıqda profili avtomatik tətbiq etmək üçün defolt əlavə edin.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Planlaşdırılmış hesabatlar üçün heç bir kontekst aktiv deyil",
     "sourceBlocker": "Sessiyaya diqqət yetirilməlidir",
     "sourceMetadata": "Qeydə alınmış sessiya metaməlumatları"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Bu axtarış nəticəsi açılmadı"
   }
 }

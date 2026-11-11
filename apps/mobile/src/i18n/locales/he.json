@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "הזן את כתובת הדוא״ל שלך.",
     "or": "או"
   },
+  "pendingLink": {
+    "description": "כבר קיים חשבון שמשתמש בכתובת {{email}}. כדי להוסיף את {{provider}}, יש להיכנס באחת משיטות הכניסה שלו.",
+    "emailCode": "שליחת קוד כניסה בדוא״ל",
+    "continueInBrowser": "המשך בדפדפן",
+    "startAgain": "התחלה מחדש",
+    "expired": "תוקף הבקשה להוספת {{provider}} פג.",
+    "noMethods": "לחשבון הזה אין שיטת כניסה אחרת, ולכן אי אפשר להוסיף את {{provider}}.",
+    "linked": "{{provider}} נוסף לחשבון שלך.",
+    "failedExpired": "{{provider}} לא נוסף כי תוקף הבקשה פג.",
+    "failedWrongAccount": "{{provider}} לא נוסף כי נכנסת לחשבון אחר.",
+    "failedAccountAlreadyLinked": "{{provider}} לא נוסף כי הוא כבר מקושר לחשבון אחר.",
+    "failedProviderAlreadyLinked": "{{provider}} לא נוסף כי בחשבון שלך כבר יש כניסה אחרת באמצעות {{provider}}.",
+    "failedLinking": "לא ניתן היה להוסיף את {{provider}} לחשבון שלך.",
+    "notAdded": "נכנסת לחשבון. {{provider}} לא נוסף לחשבון שלך."
+  },
   "profile": {
     "codeReviewerSubtitle": "סקירות PR אוטומטיות",
     "securityAgentSubtitle": "איתור ותיקון של חולשות אבטחה",
@@ -267,6 +282,8 @@
     "providerTestAccount": "חשבון בדיקה",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO ארגוני",
     "passkeysTitle": "מפתחות גישה",
     "passkeysSubtitle": "היכנסו בלי סיסמה",
@@ -1781,7 +1798,7 @@
       "cloningSession": "משכפל סשן…",
       "couldNotLoadThisSession": "לא ניתן היה לטעון את הסשן הזה.",
       "cloneFailedRetry": "לא ניתן היה לשכפל את הסשן הזה. נסה שוב.",
-      "notEnoughCredits": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent. הוסף קרדיטים ונסה שוב.",
+      "notEnoughCredits": "אין מספיק קרדיטים לבקשה הזו. הוסף קרדיטים ונסה שוב.",
       "previousTaskFinishing": "המשימה הקודמת עדיין לא הסתיימה. המתן רגע.",
       "serviceUnavailable": "השירות אינו זמין כרגע. נסה שוב.",
       "connectionTrouble": "יש בעיה בחיבור. נסה שוב בעוד רגע.",
@@ -1891,7 +1908,7 @@
       "discardWithUploadsMessage": "ההנחיה שלך וכל הקבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
       "discardFailed": "לא ניתן היה למחוק את הטיוטה. נסה שוב.",
       "remoteHint": "כדי להריץ במחשב שלך, הפעל את Kilo שם והשאר אותו פעיל.",
-      "continueFrom": "ממשיך את הסשן {{title}}.",
+      "continueFrom": "ממשיך את הסשן ”{{title}}”.",
       "importingSession": "מייבא סשן…",
       "cliCannotContinue": "ה-CLI הזה אינו יכול להמשיך סשן. בחר ב-Cloud Agent או ב-CLI אחר.",
       "importFailed": "לא ניתן היה לייבא את הסשן הזה.",
@@ -1944,6 +1961,8 @@
       "toolList": "הצגת רשימה",
       "toolPatch": "החלת תיקון",
       "toolTask": "משימה",
+      "toolSendFile": "הקובץ נשלח בהצלחה",
+      "toolSendFileAction": "שליחת קובץ",
       "readTodos": "קריאת התוכנית",
       "updateTodos": "עדכון התוכנית",
       "linesBadge": "{{displayCount}} שורות",
@@ -2047,7 +2066,21 @@
       "thought": "מחשבה",
       "showDetails": "הצגת פרטים",
       "pending": "ממתין…",
-      "running": "פועל…"
+      "running": "פועל…",
+      "field": {
+        "filePath": "נתיב קובץ",
+        "path": "נתיב",
+        "offset": "היסט",
+        "limit": "מגבלה",
+        "pattern": "תבנית",
+        "include": "הכללה",
+        "patchText": "טקסט טלאי",
+        "query": "שאילתה",
+        "prompt": "הנחיה",
+        "header": "כותרת",
+        "question": "שאלה",
+        "options": "אפשרויות"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "לא ניתן היה להציג את התוכן."
@@ -2063,7 +2096,7 @@
       "assistantContextOverflow": "השיחה ארוכה מדי עבור המודל.",
       "assistantProviderError": "הספק החזיר שגיאה.",
       "assistantProviderRefused": "הספק סירב לבקשה זו ולא ניתן לנסות אותה שוב.",
-      "assistantCreditsRefusal": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent.",
+      "assistantCreditsRefusal": "אין מספיק קרדיטים לבקשה הזו.",
       "assistantOutputLimit": "התשובה הגיעה למגבלת הפלט של המודל.",
       "assistantStructuredOutput": "התשובה לא התאימה לפורמט הנדרש.",
       "assistantFailed": "יצירת התשובה נכשלה."
@@ -3858,7 +3891,7 @@
     "reasoningEffort": {
       "modelFlag": "המודל הזה תומך במאמץ חשיבה"
     },
-    "creditsRequired": "אין מספיק קרדיטים לשליחת ההודעה הזו. הוסף קרדיטים ונסה שוב."
+    "creditsRequired": "אין מספיק קרדיטים לשליחת ההודעה הזו."
   },
   "settingsTools": {
     "confirmTitle": "לאשר את השינוי הזה?"
@@ -4057,6 +4090,7 @@
       "namePlaceholder": "הסוכן שלי",
       "promptPlaceholder": "אתה...",
       "tools": "כְּלֵי עֲבוֹדָה",
+      "wholeToolRule": "סוֹכֵן זֶה מְיַשֵּׂם כְּלָל אֶחָד עַל כָּל כְּלִי עֲבוֹדָה בְּבַת אַחַת: {{rule}}. הַמְּתָגִים הָאֵלֶּה לִקְרִיאָה בִּלְבַד.",
       "visibility": "רְאוּת",
       "visibilityPrimary": "ראשי — מוצג בבוחר",
       "visibilitySubagent": "סוכן משנה — ניתן להתקשרות מאחרים בלבד",
@@ -4098,6 +4132,7 @@
     },
     "repoBindings": {
       "title": "פרופילי ברירת מחדל עבור Repos",
+      "entryLabel": "פרופילים המוגדרים כברירת מחדל",
       "add": "הוסף ברירת מחדל",
       "empty": "לא הוגדרו ברירת מחדל",
       "emptyDescription": "הוסף ברירת מחדל להחלה אוטומטית של פרופיל בעת תחילת הפעלות עבור ריפו.",
@@ -4309,5 +4344,8 @@
     "noEnabledContexts": "אין הקשרים שבהם מופעלים דוחות מתוזמנים",
     "sourceBlocker": "הסשן דורש תשומת לב",
     "sourceMetadata": "מטא־נתונים של הסשן שנלכדו"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "לא ניתן היה לפתוח את תוצאת החיפוש הזו"
   }
 }

@@ -18,7 +18,6 @@ export default function PersonalBYOKPage() {
   return (
     <PageLayout title="Bring Your Own Key">
       <div className="space-y-4">
-        <ClaudeBillingCard />
         {chatGptEnabled === true ? (
           <OpenAiChatGptCard />
         ) : chatGptEnabled === undefined ? (
@@ -26,6 +25,7 @@ export default function PersonalBYOKPage() {
           // list does not shift when the card appears.
           <OpenAiChatGptCardView status={undefined} />
         ) : null}
+        <ClaudeBillingCard />
         <BYOKKeysManager />
       </div>
     </PageLayout>

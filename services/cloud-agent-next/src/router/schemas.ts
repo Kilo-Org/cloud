@@ -6,6 +6,7 @@ import {
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   clientKiloSessionIdSchema,
+  cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
 import { worktreeFileQuerySchema } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
@@ -61,6 +62,23 @@ export {
 };
 
 export const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
+
+/** A resolved git commit: SHA-1 (40) or SHA-256 (64) lowercase hex. */
+export const commitShaSchema = z
+  .string()
+  .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/, 'Expected a 40 or 64 character hex commit SHA');
+
+const StackedWorkspaceFields = {
+  baseBranch: branchNameSchema
+    .optional()
+    .describe('Branch the new working branch is created from and the pull request base'),
+  baseSha: commitShaSchema
+    .optional()
+    .describe('Exact commit the new working branch starts from, resolved server-side'),
+  parentWorktreeId: cloudAgentWorktreeIdSchema
+    .optional()
+    .describe('Parent worktree this workspace is stacked on'),
+};
 
 const ManagedSandboxAllocationInput = sandboxAllocationInputSchema.transform((request, ctx) => {
   const allocation = getSandboxAllocation(request);
@@ -573,6 +591,7 @@ const PrepareSessionSharedFields = {
   upstreamBranch: branchNameSchema
     .optional()
     .describe('Optional upstream branch to checkout during session initialization'),
+  ...StackedWorkspaceFields,
   autoCommit: z
     .boolean()
     .optional()
@@ -713,6 +732,27 @@ export const PrepareSessionInput = z
     path: ['githubRepo'],
   })
   .superRefine((data, ctx) => {
+    if (data.baseBranch !== undefined && data.upstreamBranch !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['baseBranch'],
+        message: 'baseBranch cannot be combined with upstreamBranch',
+      });
+    }
+    if (data.baseSha !== undefined && data.baseBranch === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['baseSha'],
+        message: 'baseSha requires baseBranch',
+      });
+    }
+    if (data.parentWorktreeId !== undefined && data.baseBranch === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['parentWorktreeId'],
+        message: 'parentWorktreeId requires baseBranch',
+      });
+    }
     if (data.sandboxAllocation !== undefined && data.devcontainer) {
       ctx.addIssue({
         code: 'custom',
@@ -835,6 +875,9 @@ export const PrepareSessionInput = z
 export const PrepareSessionOutput = z.object({
   cloudAgentSessionId: z.string().describe('The generated cloud-agent session ID'),
   kiloSessionId: z.string().describe('The Kilo CLI session ID'),
+  worktreeId: cloudAgentWorktreeIdSchema
+    .optional()
+    .describe('Use this ID to stack another worker workspace on this session.'),
   replayed: z
     .boolean()
     .optional()
@@ -971,6 +1014,7 @@ export const StartSessionInput = z
       })
       .optional(),
     repository: RepositoryInputSchema,
+    ...StackedWorkspaceFields,
     profile: ProfileInputSchema,
     runtime: egressPolicySchema
       .safeExtend({
@@ -990,7 +1034,30 @@ export const StartSessionInput = z
     message: 'appendSystemPrompt is required when mode is custom',
     path: ['agent', 'mode'],
   })
-  .superRefine(validateModeAgainstInlineRuntimeAgentsGrouped);
+  .superRefine(validateModeAgainstInlineRuntimeAgentsGrouped)
+  .superRefine((data, ctx) => {
+    if (data.baseBranch !== undefined && data.repository.branch !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['baseBranch'],
+        message: 'baseBranch cannot be combined with repository.branch',
+      });
+    }
+    if (data.baseSha !== undefined && data.baseBranch === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['baseSha'],
+        message: 'baseSha requires baseBranch',
+      });
+    }
+    if (data.parentWorktreeId !== undefined && data.baseBranch === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['parentWorktreeId'],
+        message: 'parentWorktreeId requires baseBranch',
+      });
+    }
+  });
 
 /** Output schema for the `start` endpoint. */
 export const StartSessionOutput = z.object({
@@ -1090,11 +1157,39 @@ export const WorktreeFileInput = worktreeFileQuerySchema.extend({
   cloudAgentSessionId: sessionIdSchema,
 });
 
+export const SyncWorktreeBranchInput = z
+  .object({
+    cloudAgentSessionId: sessionIdSchema,
+    baseBranch: branchNameSchema.optional(),
+    upstreamSha: commitShaSchema.optional(),
+  })
+  .strict();
+
+export const RestackWorktreeBranchInput = z
+  .object({
+    cloudAgentSessionId: sessionIdSchema,
+    baseBranch: branchNameSchema.optional(),
+    upstreamSha: commitShaSchema.optional(),
+  })
+  .strict();
+
+export const AdoptWorktreeBaseInput = z
+  .object({
+    cloudAgentSessionId: sessionIdSchema,
+    expectedWorktreeId: cloudAgentWorktreeIdSchema,
+    baseBranch: branchNameSchema,
+    baseSha: commitShaSchema,
+  })
+  .strict();
+
+export const AdoptWorktreeBaseOutput = z.object({ success: z.literal(true) }).strict();
+
 export {
   getWorktreeChangesOutputSchema as GetWorktreeChangesOutput,
   getWorktreeFileOutputSchema as GetWorktreeFileOutput,
   refreshWorktreeChangesOutputSchema as RefreshWorktreeChangesOutput,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+export { worktreeBranchOperationResultSchema as WorktreeBranchOperationOutput } from '../shared/worktree-git-operations.js';
 
 /** Customer-safe, no-wake compute billing status for an existing session. */
 export const GetComputeBillingStatusOutput = z.object({
@@ -1230,6 +1325,18 @@ export const GetSessionOutput = z.object({
   githubRepo: z.string().optional().describe('GitHub repository in org/repo format'),
   gitUrl: z.string().optional().describe('Generic git URL'),
   platform: z.enum(['github', 'gitlab', 'bitbucket']).optional().describe('Git platform type'),
+  githubIntegrationId: z
+    .string()
+    .optional()
+    .describe('GitHub integration ID selected for this repository (no credentials)'),
+  bitbucketWorkspaceUuid: z
+    .string()
+    .optional()
+    .describe('Bitbucket workspace UUID selected for this repository'),
+  bitbucketRepositoryUuid: z
+    .string()
+    .optional()
+    .describe('Bitbucket repository UUID selected for this repository'),
 
   prompt: z.string().optional().describe('Task prompt'),
   mode: z.string().optional().describe('Execution mode (built-in or custom slug)'),

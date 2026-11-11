@@ -372,6 +372,10 @@ as registration retries; an already-created session adopts that admission instea
 Lowered quotas do not reject an existing admission or a lease that stays equal or shrinks.
 Admission denial returns nonretryable `tenant_budget_exceeded` (413) with
 `error.details.sessions` and `error.details.bytes` containing the configured limits.
+A denied first registration of a new session removes its intent, its wakeup, and its
+creator index entry before it answers, so a refused identifier leaves no admission
+residue for the alarm to retry. An unconfirmed refusal cleanup keeps the intent, and
+that alarm removes the remaining index entry.
 
 ### Account erasure and idle retention
 
@@ -572,7 +576,15 @@ Runner input: `{channel:"events",type,body?}` (missing body defaults to null). T
 `{type:"subscribe",afterSeq}`. Available events replay in order; a gap, expired
 tail, unknown future cursor, or lost ring produces `reset_required` and pauses
 event delivery. Refetch the durable snapshot, then explicitly resubscribe from
-the supplied boundary.
+the supplied boundary. A socket that is already subscribed replays only the
+entries above the highest sequence it has received, so a repeated `subscribe`
+sends the `subscribed` control frame alone; a client that needs an earlier
+cursor reconnects instead. The `subscribed` body is `{seq,cursor}`: `seq` is the
+current event sequence and `cursor` is the position the replay continued from,
+so a client can detect that its requested cursor was advanced. The received
+position is held in memory only and is not written to the socket attachment:
+after hibernation the replay floor already starts at the stored sequence
+ceiling, so a persisted position could never change replay.
 The `hello` control frame includes the current event sequence, runner connectivity,
 ticket lifetime, and a jittered `reconnectAfterMs`.
 

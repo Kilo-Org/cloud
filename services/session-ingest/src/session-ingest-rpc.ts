@@ -34,6 +34,8 @@ import {
 import { queryAccessibleKiloSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import {
   createSessionForCloudAgentSchema,
+  publishCloudAgentSessionStatusSchema,
+  type PublishCloudAgentSessionStatusParams,
   cloudAgentSessionIdSchema,
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeDeletionManifestSchema,
@@ -128,6 +130,7 @@ import {
 } from './services/hosted-workspace-session';
 import { clearSessionLocalState } from './services/session-local-state';
 import { applyReportedSessionTitle, reportSessionTitleSchema } from './services/session-title';
+import { applyMetadataChanges } from './ingest/metadata';
 
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
@@ -583,6 +586,24 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     const existing = rows[0];
     if (!existing) return 'missing';
     return destinationIdentityConflicts(existing, parsed) ? 'conflict' : 'matching';
+  }
+
+  async publishCloudAgentSessionStatus(
+    params: PublishCloudAgentSessionStatusParams
+  ): Promise<void> {
+    const input = publishCloudAgentSessionStatusSchema.parse(params);
+    await applyMetadataChanges(
+      this.env,
+      input.kiloUserId,
+      input.sessionId,
+      new Map([
+        ['status', input.status],
+        ['statusOccurredAt', input.occurredAt],
+        ['statusTransitionId', input.transitionId],
+      ]),
+      this.ctx,
+      input.cloudAgentSessionId
+    );
   }
 
   async setGeneratedTitleForCloudAgent(params: {

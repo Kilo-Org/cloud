@@ -229,6 +229,21 @@
     "signInCodeField": "Kirjautumiskoodi",
     "or": "tai"
   },
+  "pendingLink": {
+    "description": "Sähköpostiosoite {{email}} on jo käytössä toisella tilillä. Lisää {{provider}} kirjautumalla jollakin sen kirjautumistavoista.",
+    "emailCode": "Lähetä minulle kirjautumiskoodi sähköpostiin",
+    "continueInBrowser": "Jatka selaimessa",
+    "startAgain": "Aloita alusta",
+    "expired": "Tämä pyyntö lisätä {{provider}} on vanhentunut.",
+    "noMethods": "Tällä tilillä ei ole muuta kirjautumistapaa, joten {{provider}}-palvelua ei voi lisätä.",
+    "linked": "{{provider}} lisättiin tiliisi.",
+    "failedExpired": "{{provider}}-palvelua ei lisätty, koska pyyntö vanheni.",
+    "failedWrongAccount": "{{provider}}-palvelua ei lisätty, koska kirjauduit eri tilille.",
+    "failedAccountAlreadyLinked": "{{provider}}-palvelua ei lisätty, koska se on jo yhdistetty toiseen tiliin.",
+    "failedProviderAlreadyLinked": "{{provider}}-palvelua ei lisätty, koska tililläsi on jo toinen {{provider}}-kirjautuminen.",
+    "failedLinking": "{{provider}}-palvelua ei voitu lisätä tiliisi.",
+    "notAdded": "Olet kirjautunut sisään. {{provider}}-palvelua ei lisätty tiliisi."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automaattiset PR-katselmoinnit",
     "securityAgentSubtitle": "Etsi ja korjaa haavoittuvuuksia",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Testitili",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Yrityksen SSO",
     "passkeysTitle": "Pääsyavaimet",
     "passkeysSubtitle": "Kirjaudu ilman salasanaa",
@@ -2298,7 +2315,7 @@
       "cloningSession": "Kloonataan istuntoa",
       "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",
       "cloneFailedRetry": "Tätä istuntoa ei voitu kloonata. Yritä uudelleen.",
-      "notEnoughCredits": "Krediitit eivät riitä Cloud Agentin käyttämiseen. Lisää krediittejä ja yritä uudelleen.",
+      "notEnoughCredits": "Krediitit eivät riitä tähän pyyntöön. Lisää krediittejä ja yritä uudelleen.",
       "previousTaskFinishing": "Edellistä tehtävää viimeistellään vielä. Odota hetki.",
       "serviceUnavailable": "Palvelu ei ole tällä hetkellä käytettävissä. Yritä uudelleen.",
       "connectionTrouble": "Yhteydessä on ongelma. Yritä uudelleen hetken kuluttua.",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Kehotteesi ja palvelimelle siirretyt tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan.",
       "discardFailed": "Luonnosta ei voitu hylätä. Yritä uudelleen.",
       "remoteHint": "Käynnistä Kilo tietokoneellasi ja jätä se käyntiin.",
-      "continueFrom": "Jatketaan istuntoa: {{title}}.",
+      "continueFrom": "Jatketaan istuntoa: ”{{title}}”.",
       "importingSession": "Tuodaan istuntoa",
       "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",
       "importFailed": "Tätä istuntoa ei voitu tuoda.",
@@ -2460,6 +2477,8 @@
       "toolList": "luettele",
       "toolPatch": "korjaus",
       "toolTask": "tehtävä",
+      "toolSendFile": "Lähetetty tiedosto",
+      "toolSendFileAction": "Lähetä tiedosto",
       "readTodos": "Lue suunnitelma",
       "updateTodos": "Päivitä suunnitelma",
       "linesBadge": "{{displayCount}} riviä",
@@ -2560,7 +2579,21 @@
       "thought": "Päättely",
       "showDetails": "Näytä tiedot",
       "pending": "Odotetaan…",
-      "running": "Käynnissä…"
+      "running": "Käynnissä…",
+      "field": {
+        "filePath": "Tiedostopolku",
+        "path": "Polku",
+        "offset": "Siirtymä",
+        "limit": "Yläraja",
+        "pattern": "Kuvio",
+        "include": "Sisällytettävät",
+        "patchText": "Korjausteksti",
+        "query": "Hakukysely",
+        "prompt": "Kehote",
+        "header": "Otsikko",
+        "question": "Kysymys",
+        "options": "Vaihtoehdot"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Sisällön näyttäminen epäonnistui."
@@ -2576,7 +2609,7 @@
       "assistantContextOverflow": "Keskustelu on liian pitkä mallille.",
       "assistantProviderError": "Palveluntarjoaja palautti virheen.",
       "assistantProviderRefused": "Palveluntarjoaja hylkäsi tämän pyynnön, eikä sitä voi yrittää uudelleen.",
-      "assistantCreditsRefusal": "Krediitit eivät riitä Cloud Agentin käyttämiseen.",
+      "assistantCreditsRefusal": "Krediitit eivät riitä tähän pyyntöön.",
       "assistantOutputLimit": "Vastaus saavutti mallin tulostusrajan.",
       "assistantStructuredOutput": "Vastaus ei vastannut vaadittua muotoa.",
       "assistantFailed": "Vastauksen tuottaminen epäonnistui."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Tämä malli tukee päättelyn tasoa"
     },
-    "creditsRequired": "Krediitit eivät riitä tämän viestin lähettämiseen – lisää krediittejä ja yritä uudelleen."
+    "creditsRequired": "Krediitit eivät riitä tämän viestin lähettämiseen."
   },
   "settingsTools": {
     "confirmTitle": "Vahvistetaanko tämä muutos?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Agenttini",
       "promptPlaceholder": "Olet...",
       "tools": "Työkalut",
+      "wholeToolRule": "Tämä agentti soveltaa yhtä sääntöä kaikkiin työkaluihin kerralla: {{rule}}. Nämä kytkimet ovat vain luku -tilassa.",
       "visibility": "Näkyvyys",
       "visibilityPrimary": "Ensisijainen — näkyy valitsimessa",
       "visibilitySubagent": "Aliagentti — vain muiden kutsuttavissa",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Koodivarastojen oletusprofiilit",
+      "entryLabel": "Profiilin oletukset",
       "add": "Lisää oletusprofiili",
       "empty": "Ei määritettyjä oletusprofiileja",
       "emptyDescription": "Lisää oletusprofiili, joka ottaa profiilin käyttöön automaattisesti, kun koodivarastolle aloitetaan istuntoja.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Ajastetut katsaukset eivät ole käytössä missään kontekstissa",
     "sourceBlocker": "Istunto vaatii huomiota",
     "sourceMetadata": "Tallennetut istunnon metatiedot"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Tämän hakutuloksen avaaminen epäonnistui"
   }
 }

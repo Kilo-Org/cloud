@@ -98,19 +98,12 @@ export default function RequestLoggingOptInsContent() {
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <div>
-        <h1 className="type-title">Request Logging Opt-ins</h1>
-        <p className="text-muted-foreground mt-1 type-body">
-          Enable AI gateway request and response logging for a specific account or organization.
-        </p>
-      </div>
-
       <Card>
         <CardHeader>
-          <CardTitle>Create opt-in</CardTitle>
+          <CardTitle>Enable request logging</CardTitle>
           <CardDescription>
-            Logging may capture customer prompts and model responses. Add a clear support or
-            investigation reason. Maximum 10 active opt-ins.
+            Logs gateway requests and responses for an account or organization, including customer
+            prompts. Add a clear support or investigation reason.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -208,12 +201,11 @@ export default function RequestLoggingOptInsContent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Opt-ins</CardTitle>
+          <CardTitle>Request logging opt-ins</CardTitle>
           <CardDescription>
-            Requests are logged only when the account or organization is opted in. Errors-only
-            opt-ins log responses with an upstream status of 400 or higher, a response read error,
-            or invalid tool call arguments. When both an account and its organization match, the
-            broader opt-in wins.
+            Errors-only opt-ins log responses with status 400 or higher, a response read error,
+            invalid tool call arguments, or a guardrail rejection. When an account and its
+            organization both match, the broader opt-in wins.
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">

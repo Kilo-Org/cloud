@@ -186,8 +186,24 @@ vi.mock('@/lib/a11y/motion', () => ({
   }),
   selectReducedMotionEntrance: <T>(_reducedMotion: boolean, entrance: T) => entrance,
 }));
+const screenSideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 16 }),
+  useSafeAreaInsets: () => ({
+    top: 0,
+    bottom: 16,
+    left: screenSideInsets.left,
+    right: screenSideInsets.right,
+  }),
+}));
+// The on-screen entity publisher reaches the app-action bridge, which imports
+// the root `expo` entry and does not parse under the node test environment.
+vi.mock('@/lib/app-actions/native-bridge', () => ({
+  setNativeVisibleSession: vi.fn(() => Promise.resolve()),
+}));
+// The publisher reads the privacy lock's status; outside a provider it would
+// throw, and the status is not the subject of these assertions.
+vi.mock('@/lib/app-unlock-context', () => ({
+  useAppUnlock: () => ({ status: 'unlocked' }),
 }));
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
@@ -4742,6 +4758,32 @@ describe('session detail read-only composer', () => {
     expect(renderedText(continueControl)).toContain(
       i18n.t('agentChat.session.continueInNewSession')
     );
+  });
+
+  it('keeps the continue section inside the landscape side insets', async () => {
+    screenSideInsets.left = 47;
+    screenSideInsets.right = 59;
+    onTestFinished(() => {
+      screenSideInsets.left = 0;
+      screenSideInsets.right = 0;
+    });
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    // The bar keeps its own full-bleed background, so the padding lands on the
+    // content wrapper around the control rather than on the bar.
+    const paddedContent = continueControl.parent?.parent;
+    expect(paddedContent?.props.style).toEqual({ paddingLeft: 47, paddingRight: 59 });
+    if (paddedContent == null) {
+      throw new Error('the continue control has no side-inset wrapper');
+    }
+    const controlLabels = paddedContent
+      .findAll(node => Object.is(node.type, 'Button'))
+      .map(node => node.props.accessibilityLabel);
+    expect(controlLabels).toContain(i18n.t('agentChat.session.continueInNewSession'));
   });
 
   // The transcript paints a skeleton until its rows stop measuring. The chrome

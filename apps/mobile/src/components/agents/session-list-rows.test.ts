@@ -13,8 +13,8 @@ function session(id: string): StoredSession {
   return { session_id: id } as unknown as StoredSession;
 }
 
-function section(title: string, ids: string[]): SessionSection {
-  return { title, data: ids.map(id => session(id)) };
+function section(title: string, ids: string[], timeZone = 'UTC'): SessionSection {
+  return { title, data: ids.map(id => session(id)), timeZone };
 }
 
 function titles(rows: readonly SessionListRow[]): string[] {
@@ -99,7 +99,7 @@ describe('flattenSessionSections', () => {
   it('does not mutate the input sections or their sessions', () => {
     const first = section('Today', ['a', 'b']);
     const sections = [first];
-    const snapshot = { title: first.title, data: [...first.data] };
+    const snapshot = { title: first.title, data: [...first.data], timeZone: first.timeZone };
     flattenSessionSections(sections);
     expect(sections).toHaveLength(1);
     expect(sections[0]).toBe(first);

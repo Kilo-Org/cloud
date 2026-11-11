@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { formatPrefixedUsd } from '@/lib/format';
+import { formatPrefixedMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -140,10 +140,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // locale's number formatter, and the formatter's own minus sign stays in
   // front of the symbol: a balance can be negative, and "-$5.00" is the
   // figure a reader expects, not "$-5.00".
-  const amountText = formatPrefixedUsd(balanceDollars, i18n.language, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  const amountText = formatPrefixedMoney(balanceDollars, i18n.language);
   // A read that has not answered yet is pending without fetching while the
   // owner is still unresolved (the balance query is gated on the identity), so
   // `balanceLoading` (isLoading) is false while `balance` is still undefined.
@@ -263,7 +260,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     selectedOrgId == null ? (
       <View className="max-w-full flex-row flex-wrap items-center justify-end gap-2">
         <AddCreditsButton
-          className="h-auto min-h-11 max-w-full py-2"
+          className="h-auto max-w-full py-2"
           onPress={() => {
             router.push('/(app)/credits' as Href);
           }}

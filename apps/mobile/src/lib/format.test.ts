@@ -14,6 +14,7 @@ import {
   formatList,
   formatMoney,
   formatNumber,
+  formatPrefixedMoney,
   formatPrefixedUsd,
   normalizeLocalizedNumber,
   parseLocalizedNumber,
@@ -52,6 +53,31 @@ describe('formatMoney', () => {
   it('uses Portugal rules for Portuguese and Brazil rules for Brazilian Portuguese', () => {
     expect(formatMoney(1234.5, 'pt')).toMatch(/^1234,50[\s\u00A0\u202F]+\$$/);
     expect(formatMoney(1234.5, 'pt-BR')).toMatch(/^\$[\s\u00A0\u202F]*1\.234,50$/);
+  });
+});
+
+describe('formatPrefixedMoney', () => {
+  it('leads the symbol in every locale, with that locale’s digits and separators', () => {
+    expect(formatPrefixedMoney(1234.5, 'en-US')).toBe('$1,234.50');
+    // German writes the same group and decimal separators it writes for the
+    // locale money pattern; only the symbol's side changed.
+    expect(formatPrefixedMoney(1234.5, 'de-DE')).toBe('$1.234,50');
+  });
+
+  it('pins two fraction digits on a whole amount', () => {
+    expect(formatPrefixedMoney(7, 'en-US')).toBe('$7.00');
+    expect(formatPrefixedMoney(0, 'de-DE')).toBe('$0,00');
+  });
+
+  it('puts the locale’s minus sign in front of the symbol', () => {
+    expect(formatPrefixedMoney(-5, 'en-US')).toBe('-$5.00');
+    expect(formatPrefixedMoney(-5, 'sv').startsWith('\u2212$')).toBe(true);
+  });
+
+  it('writes the symbol first and no separating space in a right-to-left language', () => {
+    const ar = formatPrefixedMoney(1234.5, 'ar');
+    expect(ar.startsWith('$')).toBe(true);
+    expect(ar).not.toContain('\u00A0');
   });
 });
 

@@ -1,11 +1,16 @@
 import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
+import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import type { User } from '@kilocode/db/schema';
-import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  emitApiMetricsForResponse,
+  emitGatewayApiMetrics,
+} from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { countAndStoreTranscriptionUsage } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
@@ -36,6 +41,7 @@ jest.mock(
 );
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
+  emitGatewayApiMetrics: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/is-free-model') as Record<
@@ -141,6 +147,10 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     globalThis.fetch = mockedFetch;
     mockedIsFreeModel.mockReturnValue(false);
     mockedIsAutoTopUpInFlight.mockResolvedValue(false);
+    jest.mocked(countAndStoreTranscriptionUsage).mockReturnValue({
+      statsPromise: Promise.resolve(null),
+      usagePromise: Promise.resolve(null),
+    });
   });
 
   afterAll(() => {
@@ -167,9 +177,10 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
   });
 
   it('answers anonymous callers the same for a custom LLM as for an unknown id', async () => {
+    const unauthorized = new Response('unauthorized', { status: 401 });
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
-      authFailedResponse: new Response('unauthorized', { status: 401 }),
+      authFailedResponse: unauthorized,
       organizationId: undefined,
     } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
     await insertCustomLlmForTest('acme/transcribe-custom-model');
@@ -183,9 +194,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
         )
       );
 
-      expect(customResponse.status).toBe(401);
-      expect(unknownResponse.status).toBe(401);
-      expect(await customResponse.json()).toEqual(await unknownResponse.json());
+      expect(customResponse).toBe(unauthorized);
+      expect(unknownResponse).toBe(unauthorized);
       expect(mockedFetch).not.toHaveBeenCalled();
     } finally {
       await deleteCustomLlmForTest('acme/transcribe-custom-model');
@@ -194,13 +204,13 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
   it('proxies transcription requests to OpenRouter', async () => {
     setUserAuth();
-    mockedFetch.mockResolvedValue(
-      makeUpstreamResponse({
-        text: 'hello world',
-        model: 'openai/gpt-4o-mini-transcribe',
-        usage: { cost: 0.00002, is_byok: false, input_tokens: 10, output_tokens: 4 },
-      })
-    );
+    const upstreamResponse = makeUpstreamResponse({
+      text: 'hello world',
+      model: 'openai/gpt-4o-mini-transcribe',
+      usage: { cost: 0.00002, is_byok: false, input_tokens: 10, output_tokens: 4 },
+    });
+    const cloneSpy = jest.spyOn(upstreamResponse, 'clone');
+    mockedFetch.mockResolvedValue(upstreamResponse);
 
     const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
     const response = await handleAudioTranscriptionsRequest(
@@ -231,9 +241,40 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(upstream.input_audio).toEqual({ data: 'UklGRiQA', format: 'wav' });
     expect(upstream.safety_identifier).toBeTruthy();
     expect(upstream.user).toBe(upstream.safety_identifier);
+    expect(cloneSpy).toHaveBeenCalledTimes(1);
+    expect(countAndStoreTranscriptionUsage).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(countAndStoreTranscriptionUsage).mock.calls[0]?.[0]).toBe(
+      cloneSpy.mock.results[0]?.value
+    );
+    expect(mockedEmitApiMetricsForResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 200 }),
+      expect.any(Promise),
+      expect.any(Number)
+    );
+    expect(emitGatewayApiMetrics).not.toHaveBeenCalled();
     expect(mockedEmitApiMetricsForResponse.mock.calls[0]?.[0]).not.toMatchObject({
       feature: 'vscode-extension',
     });
+  });
+
+  it('emits gateway metrics before accounting a platform-funded upstream error', async () => {
+    setUserAuth();
+    mockedFetch.mockResolvedValue(makeUpstreamResponse({ error: 'Upstream request failed' }, 402));
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(countAndStoreTranscriptionUsage).not.toHaveBeenCalled();
+    expect(mockedEmitApiMetricsForResponse).not.toHaveBeenCalled();
+    expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 402, completeRequestMs: expect.any(Number) })
+    );
   });
 
   it('forwards the organization data collection policy on JSON requests', async () => {
@@ -359,30 +400,33 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     }
   );
 
-  it('rejects malformed request provider privacy on JSON requests', async () => {
-    setUserAuth();
-    mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance: 1000,
-      settings: {
-        provider_allow_list: ['openai'],
-        model_deny_list: [],
-        data_collection: 'allow',
-      } satisfies OrganizationSettings,
-      plan: 'enterprise',
-    });
+  it.each([{ data_collection: 'invalid' }, { only: [['openai']] }, { ignore: 'azure' }])(
+    'rejects malformed request provider preferences on JSON requests: %j',
+    async provider => {
+      setUserAuth();
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: {
+          provider_allow_list: ['openai'],
+          model_deny_list: [],
+          data_collection: 'allow',
+        } satisfies OrganizationSettings,
+        plan: 'enterprise',
+      });
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
-    const response = await handleAudioTranscriptionsRequest(
-      makeRequest({
-        model: 'openai/gpt-4o-mini-transcribe',
-        input_audio: { data: 'UklGRiQA', format: 'wav' },
-        provider: { data_collection: 'invalid' },
-      }) as never
-    );
+      const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+      const response = await handleAudioTranscriptionsRequest(
+        makeRequest({
+          model: 'openai/gpt-4o-mini-transcribe',
+          input_audio: { data: 'UklGRiQA', format: 'wav' },
+          provider,
+        }) as never
+      );
 
-    expect(response.status).toBe(400);
-    expect(mockedFetch).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(400);
+      expect(mockedFetch).not.toHaveBeenCalled();
+    }
+  );
 
   it('rejects malformed transcription bodies before proxying without reporting to Sentry', async () => {
     setUserAuth();
@@ -450,6 +494,36 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(response.status).toBe(401);
     expect(response.headers.get('WWW-Authenticate')).toBe('Bearer error="invalid_token"');
     await expect(response.json()).resolves.toMatchObject({ error: { code: INVALID_TOKEN_CODE } });
+    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('returns the authorization response for a refused account', async () => {
+    const authFailedResponse = NextResponse.json(
+      { success: false as const, error: 'Access denied (R1)' },
+      { status: 403 }
+    );
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse,
+      authorizationRefused: true,
+      organizationId: undefined,
+    });
+
+    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const response = await handleAudioTranscriptionsRequest(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response).toBe(authFailedResponse);
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: 'Access denied (R1)',
+    });
     expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
   });

@@ -100,22 +100,38 @@ export type SnapshotCompatibility = {
   runtimeAbi: string;
 };
 
-/** Only split-image snapshots with a downloaded runtime can serve sessions. */
+/** How a published snapshot's base image relates to the image a session would use now. */
+export type SnapshotImageCompatibility = 'current' | 'previous' | 'incompatible';
+
+/**
+ * Only split-image snapshots with a downloaded runtime can serve sessions. A
+ * runtime ABI change is always incompatible. A snapshot from an earlier base
+ * image stays usable while its replacement builds: the disk restore does not
+ * use the old image and the current runtime is installed over it, so only the
+ * base userspace and installed tools differ.
+ */
+export function snapshotImageCompatibility(
+  published: PublishedSnapshot,
+  current: SnapshotCompatibility
+): SnapshotImageCompatibility {
+  if (published.runtimeAbi !== current.runtimeAbi || published.runtimeRelease === null) {
+    return 'incompatible';
+  }
+  if (current.baseImage === null || published.baseImage === current.baseImage) return 'current';
+  return 'previous';
+}
+
 export function compatibleWith(
   published: PublishedSnapshot,
   current: SnapshotCompatibility
 ): boolean {
-  return (
-    published.runtimeAbi === current.runtimeAbi &&
-    published.runtimeRelease !== null &&
-    (current.baseImage === null || published.baseImage === current.baseImage)
-  );
+  return snapshotImageCompatibility(published, current) !== 'incompatible';
 }
 
 /** Why a snapshot is not used for a session, or `eligible`. */
 export type SnapshotEligibility =
   | { eligible: true; stale: false }
-  | { eligible: true; stale: true; staleReason: 'revision' | 'age' }
+  | { eligible: true; stale: true; staleReason: 'revision' | 'age' | 'image' }
   | {
       eligible: false;
       reason: 'missing' | 'scope_mismatch' | 'incompatible' | 'newer_than_session' | 'expired';
@@ -125,8 +141,9 @@ export type SnapshotEligibility =
  * Whether a session admitted at `reference` may start from `published`. An
  * older revision or an age-stale snapshot stays usable while its replacement
  * builds; a newer one must not introduce later setup into an older session.
- * A snapshot for another base image or runtime ABI is incompatible. Instance
- * size and runtime release are not part of compatibility.
+ * A snapshot for an earlier base image stays usable until it expires, and
+ * another runtime ABI is always incompatible. Instance size and
+ * runtime release are not part of compatibility.
  */
 export function snapshotEligibility(
   published: PublishedSnapshot | null,
@@ -138,12 +155,16 @@ export function snapshotEligibility(
   if (!sameEnvironmentScope(published, reference)) {
     return { eligible: false, reason: 'scope_mismatch' };
   }
-  if (!compatibleWith(published, current)) return { eligible: false, reason: 'incompatible' };
+  const image = snapshotImageCompatibility(published, current);
+  if (image === 'incompatible') return { eligible: false, reason: 'incompatible' };
   if (published.revision > reference.configurationRevision) {
     return { eligible: false, reason: 'newer_than_session' };
   }
   if (now - published.capturedAt >= SNAPSHOT_ELIGIBLE_LIFETIME_MS) {
     return { eligible: false, reason: 'expired' };
+  }
+  if (image === 'previous') {
+    return { eligible: true, stale: true, staleReason: 'image' };
   }
   if (published.revision < reference.configurationRevision) {
     return { eligible: true, stale: true, staleReason: 'revision' };
@@ -162,7 +183,7 @@ export function replacementNeeded(
   current: SnapshotCompatibility
 ): boolean {
   if (published === null || published.revision !== revision) return true;
-  if (!compatibleWith(published, current)) return true;
+  if (snapshotImageCompatibility(published, current) !== 'current') return true;
   return now - published.capturedAt >= SNAPSHOT_STALE_AFTER_MS;
 }
 
@@ -196,8 +217,9 @@ export function automaticAdmission(
   return now >= retryAt ? { admit: true } : { admit: false, retryAt };
 }
 
-/** Builder failure reasons that count toward automatic backoff; admission refusals do not. */
+/** Builder failures and container-cap refusals count toward automatic backoff; other admission refusals do not. */
 export const COUNTED_FAILURE_REASONS: ReadonlySet<string> = new Set([
+  'container_limit_reached',
   'clone_failed',
   'setup_failed',
   'setup_timeout',

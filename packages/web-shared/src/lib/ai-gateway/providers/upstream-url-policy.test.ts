@@ -171,7 +171,7 @@ describe('findUpstreamUrlViolation', () => {
     expect(performance.now() - startedAt).toBeLessThan(3_000);
   }, 10_000);
 
-  it('submits one lookup for a host that does not answer across several caller deadlines', async () => {
+  it('submits one lookup across several caller deadlines', async () => {
     const resolve = neverResolves();
 
     const verdicts: Array<string | null> = [];
@@ -219,8 +219,8 @@ describe('findUpstreamUrlViolation', () => {
       expect(first.resolveHostAddresses).toHaveBeenCalledTimes(1);
       expect(second.resolveHostAddresses).toHaveBeenCalledTimes(1);
 
-      // The settle deadline stops further reuse of the two entries, but the
-      // resolvers hold their capacity until they settle.
+      // The settle deadline stops further reuse of the two entries, and each
+      // resolver keeps its place in the limit until it settles.
       await jest.advanceTimersByTimeAsync(30_000);
 
       await expect(check('https://c.example.com/v1', third)).resolves.toBe('dns_lookup_failed');
@@ -253,8 +253,7 @@ describe('findUpstreamUrlViolation', () => {
     controller.abort(reason);
     await expect(aborted).rejects.toBe(reason);
 
-    // The next validation waits on the lookup that is still pending instead of
-    // starting a second blocking one.
+    // The next validation waits on the same pending lookup.
     const next = check('https://stalled.example.com/v1', resolveHostAddresses);
     await after(10);
     expect(resolveHostAddresses).toHaveBeenCalledTimes(1);
@@ -263,7 +262,7 @@ describe('findUpstreamUrlViolation', () => {
     await expect(next).resolves.toBeNull();
   });
 
-  it('keeps one lookup when a stalled resolution settles after its callers gave up', async () => {
+  it('keeps one lookup when a resolution settles after its callers finished', async () => {
     const stalled = Promise.withResolvers<string[]>();
     const resolve = jest.fn((_hostname: string): Promise<string[]> => stalled.promise);
 
@@ -271,7 +270,7 @@ describe('findUpstreamUrlViolation', () => {
       'dns_lookup_failed'
     );
 
-    // The next validation waits on the same pending lookup, not a new one.
+    // The next validation waits on the same pending lookup.
     const second = check('https://stalled.example.com/v1', resolve);
     await after(10);
     expect(resolve).toHaveBeenCalledTimes(1);

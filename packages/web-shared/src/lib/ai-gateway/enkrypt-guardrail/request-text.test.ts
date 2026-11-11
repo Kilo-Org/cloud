@@ -15,7 +15,7 @@ function request(kind: GatewayRequest['kind'], body: Record<string, unknown>): G
 function render(gatewayRequest: GatewayRequest) {
   const parts = extractRequestParts(gatewayRequest);
   return {
-    tools: joinSegments(parts.tools.map(renderSegment)),
+    tools: joinSegments(parts.tools.flatMap(tool => tool.segments).map(renderSegment)),
     system: joinSegments(parts.system.map(renderSegment)),
     conversation: joinSegments(parts.conversation.map(renderSegment)),
   };
@@ -863,8 +863,8 @@ describe('same-header merging', () => {
         })
       ).tools
     ).toEqual([
-      { header: 'tool definition: a', body: 'first' },
-      { header: 'tool definition: a', body: 'second' },
+      { kind: 'tool', name: 'a', segments: [{ header: 'tool definition: a', body: 'first' }] },
+      { kind: 'tool', name: 'a', segments: [{ header: 'tool definition: a', body: 'second' }] },
     ]);
   });
 });
@@ -1505,8 +1505,16 @@ describe('segment boundaries', () => {
       )
     ).toEqual({
       tools: [
-        { header: 'tool definition: read', body: '{"type":"object"}' },
-        { header: 'response format', body: 'answer' },
+        {
+          kind: 'tool',
+          name: 'read',
+          segments: [{ header: 'tool definition: read', body: '{"type":"object"}' }],
+        },
+        {
+          kind: 'response_format',
+          name: null,
+          segments: [{ header: 'response format', body: 'answer' }],
+        },
       ],
       system: [{ header: 'system', body: 'system prompt' }],
       conversation: [
@@ -1673,5 +1681,313 @@ describe('typed block and item coverage', () => {
     ['responses', { input: [{ type: 'future_item', name: 'a' }] }, 'future_item'],
   ] as const)('scans text fields of unrecognized %s types', (kind, body, header) => {
     expect(render(request(kind, body)).conversation).toBe(seg(header, 'a'));
+  });
+});
+
+describe('per-tool entries', () => {
+  it('returns one entry per chat tool, custom tool, and legacy function', () => {
+    expect(
+      extractRequestParts(
+        request('chat_completions', {
+          tools: [
+            {
+              type: 'function',
+              function: {
+                name: 'read',
+                description: 'Read a file',
+                parameters: { type: 'object' },
+              },
+            },
+            {
+              type: 'custom',
+              custom: {
+                name: 'patch',
+                description: 'Apply a patch',
+                format: {
+                  type: 'grammar',
+                  grammar: { syntax: 'lark', definition: 'start: "x"' },
+                },
+              },
+            },
+          ],
+          functions: [
+            { name: 'legacy', description: 'Old function', parameters: { type: 'object' } },
+          ],
+        })
+      ).tools
+    ).toEqual([
+      {
+        kind: 'tool',
+        name: 'read',
+        segments: [{ header: 'tool definition: read', body: 'Read a file\n\n{"type":"object"}' }],
+      },
+      {
+        kind: 'tool',
+        name: 'patch',
+        segments: [{ header: 'tool definition: patch', body: 'Apply a patch\n\nstart: "x"' }],
+      },
+      {
+        kind: 'tool',
+        name: 'legacy',
+        segments: [
+          { header: 'tool definition: legacy', body: 'Old function\n\n{"type":"object"}' },
+        ],
+      },
+    ]);
+  });
+
+  it('returns one entry per Anthropic tool', () => {
+    expect(
+      extractRequestParts(
+        request('messages', {
+          tools: [
+            { name: 'read', description: 'Read a file', input_schema: { type: 'object' } },
+            { name: 'lookup', input_schema: { type: 'object' }, input_examples: [{ q: 'x' }] },
+          ],
+        })
+      ).tools
+    ).toEqual([
+      {
+        kind: 'tool',
+        name: 'read',
+        segments: [{ header: 'tool definition: read', body: 'Read a file\n\n{"type":"object"}' }],
+      },
+      {
+        kind: 'tool',
+        name: 'lookup',
+        segments: [
+          {
+            header: 'tool definition: lookup',
+            body: '{"type":"object"}\n\n[{"q":"x"}]',
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('returns one entry per Responses function, custom, tool search, and MCP tool', () => {
+    expect(
+      extractRequestParts(
+        request('responses', {
+          tools: [
+            {
+              type: 'function',
+              name: 'read',
+              description: 'Read a file',
+              parameters: { type: 'object' },
+            },
+            {
+              type: 'custom',
+              name: 'patch',
+              description: 'Apply a patch',
+              format: { type: 'grammar', syntax: 'lark', definition: 'start: "x"' },
+            },
+            { type: 'tool_search', description: 'Find tools', parameters: { type: 'object' } },
+            { type: 'mcp', server_label: 'remote', server_description: 'Remote tools' },
+          ],
+        })
+      ).tools
+    ).toEqual([
+      {
+        kind: 'tool',
+        name: 'read',
+        segments: [{ header: 'tool definition: read', body: 'Read a file\n\n{"type":"object"}' }],
+      },
+      {
+        kind: 'tool',
+        name: 'patch',
+        segments: [{ header: 'tool definition: patch', body: 'Apply a patch\n\nstart: "x"' }],
+      },
+      {
+        kind: 'tool',
+        name: 'tool_search',
+        segments: [
+          { header: 'tool definition: tool_search', body: 'Find tools\n\n{"type":"object"}' },
+        ],
+      },
+      {
+        kind: 'tool',
+        name: 'MCP server remote',
+        segments: [{ header: 'tool definition: MCP server remote', body: 'Remote tools' }],
+      },
+    ]);
+  });
+
+  it('gives an unrecognized tool type a null name', () => {
+    expect(
+      extractRequestParts(
+        request('responses', { tools: [{ type: 'future_tool', description: 'Future' }] })
+      ).tools
+    ).toEqual([
+      {
+        kind: 'tool',
+        name: null,
+        segments: [{ header: 'tool definition future_tool', body: 'Future' }],
+      },
+    ]);
+  });
+
+  it('flattens Responses namespace tools into one entry for the namespace and one per nested tool', () => {
+    expect(
+      extractRequestParts(
+        request('responses', {
+          tools: [
+            {
+              type: 'namespace',
+              name: 'space',
+              description: 'Space tools',
+              tools: [
+                { type: 'function', name: 'a', description: 'First' },
+                { type: 'function', name: 'b', parameters: { type: 'object' } },
+                { type: 'web_search' },
+              ],
+            },
+            {
+              type: 'namespace',
+              name: 'empty',
+              tools: [{ type: 'function', name: 'c', description: 'Third' }],
+            },
+          ],
+        })
+      ).tools
+    ).toEqual([
+      {
+        kind: 'tool',
+        name: 'space',
+        segments: [{ header: 'tool definition: space', body: 'Space tools' }],
+      },
+      {
+        kind: 'tool',
+        name: 'a',
+        segments: [{ header: 'tool definition: a', body: 'First' }],
+      },
+      {
+        kind: 'tool',
+        name: 'b',
+        segments: [{ header: 'tool definition: b', body: '{"type":"object"}' }],
+      },
+      {
+        kind: 'tool',
+        name: 'c',
+        segments: [{ header: 'tool definition: c', body: 'Third' }],
+      },
+    ]);
+  });
+
+  it('produces no entry for tools with no model-visible text', () => {
+    expect(
+      extractRequestParts(
+        request('responses', {
+          tools: [{ type: 'web_search' }, { type: 'code_interpreter', container: {} }],
+        })
+      ).tools
+    ).toEqual([]);
+    expect(
+      extractRequestParts(
+        request('chat_completions', {
+          tools: [{ type: 'function', function: { name: 'bare' } }],
+        })
+      ).tools
+    ).toEqual([]);
+    expect(
+      extractRequestParts(
+        request('messages', {
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        })
+      ).tools
+    ).toEqual([]);
+  });
+
+  it.each([
+    [
+      'chat_completions',
+      {
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'answer', description: 'Answer shape', schema: { type: 'object' } },
+        },
+      },
+    ],
+    ['messages', { output_format: { type: 'json_schema', schema: { type: 'object' } } }],
+    [
+      'messages',
+      { output_config: { format: { type: 'json_schema', schema: { type: 'object' } } } },
+    ],
+    [
+      'responses',
+      {
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'answer',
+            description: 'Answer shape',
+            schema: { type: 'object' },
+          },
+        },
+      },
+    ],
+  ] as const)('returns the %s response format as one response_format entry', (kind, body) => {
+    const [first, ...rest] = extractRequestParts(request(kind, { ...body, messages: [] })).tools;
+    expect(rest).toEqual([]);
+    expect(first).toEqual({
+      kind: 'response_format',
+      name: null,
+      segments: [
+        {
+          header: 'response format',
+          body:
+            kind === 'chat_completions' || kind === 'responses'
+              ? 'answer\n\nAnswer shape\n\n{"type":"object"}'
+              : '{"type":"object"}',
+        },
+      ],
+    });
+  });
+
+  it('combines Anthropic output_format and output_config.format into one response_format entry', () => {
+    expect(
+      extractRequestParts(
+        request('messages', {
+          output_format: { type: 'json_schema', schema: { type: 'string' } },
+          output_config: { format: { type: 'json_schema', schema: { type: 'number' } } },
+        })
+      ).tools
+    ).toEqual([
+      {
+        kind: 'response_format',
+        name: null,
+        segments: [{ header: 'response format', body: '{"type":"string"}\n\n{"type":"number"}' }],
+      },
+    ]);
+  });
+
+  it('produces no response_format entry when there is no format', () => {
+    expect(
+      extractRequestParts(
+        request('chat_completions', { response_format: { type: 'text' }, messages: [] })
+      ).tools
+    ).toEqual([]);
+    expect(
+      extractRequestParts(request('messages', { output_config: { effort: 'low' }, messages: [] }))
+        .tools
+    ).toEqual([]);
+    expect(
+      extractRequestParts(request('responses', { text: { format: { type: 'text' } } })).tools
+    ).toEqual([]);
+  });
+
+  it('keeps tool entries ahead of the response format entry', () => {
+    expect(
+      extractRequestParts(
+        request('chat_completions', {
+          tools: [{ type: 'function', function: { name: 'read', parameters: { type: 'object' } } }],
+          response_format: { type: 'json_schema', json_schema: { name: 'answer' } },
+          messages: [],
+        })
+      ).tools.map(tool => [tool.kind, tool.name])
+    ).toEqual([
+      ['tool', 'read'],
+      ['response_format', null],
+    ]);
   });
 });

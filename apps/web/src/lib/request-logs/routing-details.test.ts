@@ -104,6 +104,66 @@ describe('parseRoutingDetails', () => {
     expect(parsed?.result).toEqual(expectedResult);
   });
 
+  test('returns an aggregated tools scan with its flagged tools and round-trips it', () => {
+    const toolsScan = {
+      scan: 'blocking',
+      part: 'tools',
+      detectors_enabled: ['injection_attack'],
+      detectors_blocking: ['injection_attack'],
+      verdict_cache: 'hit',
+      total_characters: 320,
+      cached_characters: 120,
+      scanned_characters: 200,
+      decision: 'blocked',
+      error: null,
+      detectors_fired: ['injection_attack'],
+      attempts: 1,
+      credits_cost: 2,
+      latency_ms: 85,
+      verdict_cache_write: 'written',
+      tools_total: 3,
+      tools_cached: 1,
+      tools_scanned: 2,
+      tools_flagged: 1,
+      flagged_tools: [
+        { kind: 'tool', name: 'read', detectors_fired: ['injection_attack'], error: null },
+      ],
+    };
+    const record = JSON.parse(productionRecord) as Record<string, unknown>;
+    const body = JSON.stringify({
+      ...record,
+      enkrypt: { ...expectedEnkrypt, scans: [toolsScan] },
+    });
+
+    const parsed = parseRoutingDetails(body);
+
+    expect(parsed?.enkrypt?.scans).toEqual([toolsScan]);
+    expect(parsed?.enkrypt?.verdict).toBe('block');
+    expect(parseRoutingDetails(JSON.stringify(parsed))).toEqual(parsed);
+    expect(parsed?.enkrypt?.scans[0]).toEqual(toolsScan);
+  });
+
+  test('drops a tools scan in the per-part shape from before tools were aggregated', () => {
+    const record = JSON.parse(productionRecord) as Record<string, unknown>;
+    const scan = {
+      ...expectedEnkrypt.scans[0],
+      part: 'tools',
+      total_characters: 320,
+      total_segments: 3,
+      cached_characters: 120,
+      cached_segments: 1,
+      omitted_attachments: 0,
+      scanned_characters: 200,
+    };
+
+    const parsed = parseRoutingDetails(
+      JSON.stringify({ ...record, enkrypt: { ...expectedEnkrypt, scans: [scan] } })
+    );
+
+    expect(parsed?.enkrypt).toBeNull();
+    expect(parsed?.result).toEqual(expectedResult);
+  });
+
   test('strips provider response and client session identifiers from the output', () => {
     const serialized = JSON.stringify(parseRoutingDetails(productionRecord));
 

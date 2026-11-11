@@ -7,10 +7,12 @@ import {
   responseBlockMessage,
   SCAN_TOO_LARGE_MESSAGES,
   scanRequest,
+  scanTooLargeMessage,
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
   type EnkryptUnavailableReason,
 } from './detect';
+import { createEnkryptCallLimiter, type EnkryptCallLimiter } from './call-limiter';
 import { MAX_ENKRYPT_CREDITS_PER_CALL } from './usage-write';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 
@@ -554,7 +556,6 @@ describe('scanRequest', () => {
     });
 
     it.each([
-      ['tools', 'tool definitions', 'Reduce the enabled tools or MCP servers'],
       ['system', 'system prompt', 'Shorten the system prompt'],
       ['conversation', 'new conversation text', 'Compact or prune earlier conversation history'],
       ['response', 'model output', 'Ask for a shorter response'],
@@ -576,6 +577,28 @@ describe('scanRequest', () => {
         decision: 'error_fail_closed',
         error: 'request_too_large',
         scanned_characters: ENKRYPT_MAX_SCAN_CHARACTERS + 1,
+      });
+      expect(dependencies.fetch).not.toHaveBeenCalled();
+    });
+
+    it('names the oversized tool definition', async () => {
+      const dependencies = deps(async () => detectResponse({ summary: {} }));
+      const coverage = {
+        ...makeScan().coverage,
+        part: 'tools',
+        tool: { kind: 'tool', name: 'read_file' },
+      } as const;
+
+      const result = await scanRequest(makeScan({ text, coverage }), dependencies);
+
+      expect(result.verdict).toEqual({ action: 'block', message: scanTooLargeMessage(coverage) });
+      expect(result.verdict).toMatchObject({
+        message: expect.stringContaining('the definition of the tool "read_file" is longer'),
+      });
+      expect(result.report).toMatchObject({
+        part: 'tools',
+        decision: 'error_fail_closed',
+        error: 'request_too_large',
       });
       expect(dependencies.fetch).not.toHaveBeenCalled();
     });
@@ -1042,6 +1065,266 @@ describe('scanRequest', () => {
       expect(dependencies.fetch).not.toHaveBeenCalled();
     });
   });
+
+  describe('with a shared deadline', () => {
+    it('uses the given deadline instead of starting its own timeout', async () => {
+      const timeout = jest.spyOn(AbortSignal, 'timeout');
+      const deadline = new AbortController();
+      const dependencies = deps(
+        (_input, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
+              once: true,
+            });
+            deadline.abort();
+          }),
+        { timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS, deadline: deadline.signal }
+      );
+
+      const result = await scanRequest(makeScan(), dependencies);
+
+      expect(timeout).not.toHaveBeenCalled();
+      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'timeout' });
+      expect(result.usageRecords).toEqual([expect.objectContaining({ decision: 'error' })]);
+      expect(result.report).toMatchObject({ error: 'timeout', attempts: 1 });
+    });
+
+    it('does not retry after the deadline passed', async () => {
+      const deadline = new AbortController();
+      const dependencies = deps(
+        async () => {
+          deadline.abort();
+          return detectResponse({ summary: {} }, { status: 503 });
+        },
+        { deadline: deadline.signal }
+      );
+
+      const result = await scanRequest(makeScan(), dependencies);
+
+      expect(dependencies.fetch).toHaveBeenCalledTimes(1);
+      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'transient' });
+    });
+  });
+
+  describe('with a call limiter', () => {
+    /** Wraps a real limiter, recording each acquire and release. */
+    function recordingLimiter(
+      events: string[],
+      limiter: EnkryptCallLimiter = createEnkryptCallLimiter()
+    ): EnkryptCallLimiter {
+      return {
+        async acquire(priority, signal) {
+          events.push(`acquire:${priority}`);
+          const slot = await limiter.acquire(priority, signal);
+          return (
+            slot &&
+            (() => {
+              events.push('release');
+              slot();
+            })
+          );
+        },
+      };
+    }
+
+    async function flush() {
+      await new Promise(resolve => setImmediate(resolve));
+    }
+
+    it('holds a slot for each attempt, retry included, and releases it after each', async () => {
+      const events: string[] = [];
+      const responses = [
+        detectResponse({ summary: {} }, { status: 503 }),
+        detectResponse({ summary: {} }),
+      ];
+      const dependencies = deps(
+        async () => {
+          events.push('fetch');
+          return responses.shift() ?? Response.error();
+        },
+        { limiter: recordingLimiter(events) }
+      );
+
+      const result = await scanRequest(makeScan(), dependencies);
+
+      expect(result.verdict).toEqual({ action: 'allow' });
+      expect(events).toEqual([
+        'acquire:blocking',
+        'fetch',
+        'release',
+        'acquire:blocking',
+        'fetch',
+        'release',
+      ]);
+    });
+
+    it('asks for a log-only slot for a log-only scan', async () => {
+      const events: string[] = [];
+
+      await scanRequest(
+        makeScan({
+          config: {
+            status: 'ready',
+            detectors: { pii: { enabled: true, entities: ['secrets'] } },
+            blockingDetectors: [],
+          },
+        }),
+        deps(async () => detectResponse({ summary: {} }), { limiter: recordingLimiter(events) })
+      );
+
+      expect(events).toEqual(['acquire:log_only', 'release']);
+    });
+
+    it('releases the slot when the fetch rejects', async () => {
+      const events: string[] = [];
+      const dependencies = deps(
+        async () => {
+          events.push('fetch');
+          throw new TypeError('fetch failed');
+        },
+        { limiter: recordingLimiter(events) }
+      );
+
+      const result = await scanRequest(makeScan(), dependencies);
+
+      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'transient' });
+      expect(events).toEqual([
+        'acquire:blocking',
+        'fetch',
+        'release',
+        'acquire:blocking',
+        'fetch',
+        'release',
+      ]);
+    });
+
+    it('releases the slot when the attempt throws unexpectedly', async () => {
+      const events: string[] = [];
+      const dependencies = deps(async () => detectResponse({ summary: {} }), {
+        limiter: recordingLimiter(events),
+        requestLog: {
+          guardrail: 'input',
+          capture: () => {
+            throw new Error('capture failed');
+          },
+        },
+      });
+
+      await expect(scanRequest(makeScan(), dependencies)).rejects.toThrow('capture failed');
+      expect(events).toEqual(['acquire:blocking', 'release']);
+    });
+
+    it.each([
+      [
+        'the deadline passes',
+        'timeout',
+        { action: 'unavailable', reason: 'timeout' },
+        'error_fail_closed',
+      ],
+      [
+        'the client disconnects',
+        'client_aborted',
+        { action: 'unavailable', reason: 'failed' },
+        'client_aborted',
+      ],
+    ] as const)(
+      'fails without a call or usage when %s while waiting for a slot',
+      async (_name, error, verdict, decision) => {
+        const limiter = createEnkryptCallLimiter(1);
+        const holder = await limiter.acquire('blocking', new AbortController().signal);
+        const deadline = new AbortController();
+        const client = new AbortController();
+        const dependencies = deps(async () => detectResponse({ summary: {} }), {
+          limiter,
+          deadline: deadline.signal,
+          signal: client.signal,
+        });
+
+        const pending = scanRequest(makeScan(), dependencies);
+        await flush();
+        (error === 'timeout' ? deadline : client).abort();
+        const result = await pending;
+
+        expect(result.verdict).toEqual(verdict);
+        expect(result.usageRecords).toEqual([]);
+        expect(result.report).toMatchObject({ decision, error, attempts: 0, credits_cost: null });
+        expect(dependencies.fetch).not.toHaveBeenCalled();
+        // The abandoned wait took no slot.
+        holder?.();
+        expect(await limiter.acquire('blocking', new AbortController().signal)).not.toBeNull();
+      }
+    );
+
+    it('keeps the first attempt’s usage when the retry runs out of time waiting for a slot', async () => {
+      const limiter = createEnkryptCallLimiter(1);
+      const deadline = new AbortController();
+      const other = Promise.withResolvers<void>();
+      const dependencies = deps(
+        async () => {
+          // Another call queues while this attempt holds the only slot, so it gets the slot next.
+          void limiter.acquire('blocking', new AbortController().signal).then(async slot => {
+            await other.promise;
+            slot?.();
+          });
+          return detectResponse({ summary: {} }, { status: 503, credits: '1' });
+        },
+        { limiter, deadline: deadline.signal }
+      );
+
+      const pending = scanRequest(makeScan(), dependencies);
+      await flush();
+      deadline.abort();
+      const result = await pending;
+      other.resolve();
+
+      expect(dependencies.fetch).toHaveBeenCalledTimes(1);
+      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'timeout' });
+      expect(result.usageRecords).toEqual([
+        expect.objectContaining({ decision: 'error', creditsCost: 1 }),
+      ]);
+      expect(result.report).toMatchObject({ error: 'timeout', attempts: 1, credits_cost: 1 });
+    });
+
+    it('starts a second scan’s call only after the first scan’s call finished with one slot', async () => {
+      const limiter = createEnkryptCallLimiter(1);
+      const responses = [
+        Promise.withResolvers<Response>(),
+        Promise.withResolvers<Response>(),
+      ] as const;
+      let inFlight = 0;
+      let maxInFlight = 0;
+      let calls = 0;
+      const dependencies = deps(
+        async () => {
+          const response = responses[calls++];
+          if (!response) throw new Error('unexpected call');
+          inFlight++;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          try {
+            return await response.promise;
+          } finally {
+            inFlight--;
+          }
+        },
+        { limiter }
+      );
+
+      const first = scanRequest(makeScan(), dependencies);
+      const second = scanRequest(makeScan({ text: 'other output' }), dependencies);
+      await flush();
+      expect(calls).toBe(1);
+
+      responses[0].resolve(detectResponse({ summary: {} }));
+      expect((await first).verdict).toEqual({ action: 'allow' });
+      await flush();
+      expect(calls).toBe(2);
+      responses[1].resolve(detectResponse({ summary: {} }));
+      expect((await second).verdict).toEqual({ action: 'allow' });
+      expect(maxInFlight).toBe(1);
+      expect(JSON.parse(String(fetchCalls(dependencies)[1][1].body)).text).toBe('other output');
+    });
+  });
+
   describe('a log-only scan', () => {
     const logOnlyConfig = {
       status: 'ready',
@@ -1150,6 +1433,59 @@ describe('scanRequest', () => {
       );
     });
   });
+});
+
+describe('scanTooLargeMessage', () => {
+  const coverage = { part: 'tools' } as const;
+
+  it('names the tool whose definition is too large', () => {
+    const message = scanTooLargeMessage({ ...coverage, tool: { kind: 'tool', name: 'read_file' } });
+
+    expect(message).toContain('cannot scan a tool definition longer than 100,000 characters');
+    expect(message).toContain('the definition of the tool "read_file" is longer');
+    expect(message).toContain('Disable that tool or the MCP server providing it');
+    expect(message).toContain('Retrying the unchanged request will not help.');
+  });
+
+  it.each([
+    ['a tool without a name', { kind: 'tool', name: null }],
+    ['a tool with an empty name', { kind: 'tool', name: '' }],
+    ['no tool', undefined],
+  ] as const)('refers to an unnamed tool definition for %s', (_name, tool) => {
+    const message = scanTooLargeMessage({ ...coverage, tool });
+
+    expect(message).toContain('and a tool definition is longer');
+    expect(message).not.toContain('"');
+  });
+
+  it('words a response format on its own', () => {
+    const message = scanTooLargeMessage({
+      ...coverage,
+      tool: { kind: 'response_format', name: null },
+    });
+
+    expect(message).toContain('cannot scan a response format longer than 100,000 characters');
+    expect(message).toContain('Shorten the response format schema');
+    expect(message).not.toContain('tool');
+  });
+
+  it('replaces control characters in the tool name and caps its length', () => {
+    const name = `evil\n\u0007tool${'x'.repeat(200)}`;
+
+    const message = scanTooLargeMessage({ ...coverage, tool: { kind: 'tool', name } });
+
+    const quoted = /the definition of the tool "([^"]*)"/.exec(message)?.[1];
+    expect(quoted).toBe(`evil  tool${'x'.repeat(90)}`);
+    expect(quoted).toHaveLength(100);
+    expect(message).not.toMatch(/\p{Cc}/u);
+  });
+
+  it.each(['system', 'conversation', 'response'] as const)(
+    'uses the fixed message for the %s',
+    part => {
+      expect(scanTooLargeMessage({ part })).toBe(SCAN_TOO_LARGE_MESSAGES[part]);
+    }
+  );
 });
 
 describe('responseBlockMessage', () => {

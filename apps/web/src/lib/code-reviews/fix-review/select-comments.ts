@@ -200,24 +200,34 @@ async function readReviewComments(
   target: FixReviewTarget
 ): Promise<FixReviewCommentListing> {
   const { owner, repo, pullNumber } = target;
-  const readPage = (page: number) =>
+  const readPage = (page: number, perPage = COMMENTS_PAGE_SIZE) =>
     octokit.pulls.listReviewComments({
       owner,
       repo,
       pull_number: pullNumber,
-      per_page: COMMENTS_PAGE_SIZE,
+      per_page: perPage,
       page,
     });
 
   const firstPage = await readPage(1);
-  const lastPage = lastLinkedPage(firstPage.headers.link);
-  const firstPageToRead = Math.max(1, lastPage - FIX_REVIEW_COMMENTS_MAX_PAGES + 1);
+  let lastPage = lastLinkedPage(firstPage.headers.link);
+  let listedCount: number | null = null;
+  if (lastPage === null && firstPage.headers.link !== undefined) {
+    // The header names pages but no last page. One row per page makes the last
+    // page number the comment count, so the read still starts at the newest
+    // page instead of keeping the oldest one.
+    const oneRow = await readPage(1, 1);
+    listedCount = lastLinkedPage(oneRow.headers.link) ?? oneRow.data.length;
+    lastPage = Math.max(1, Math.ceil(listedCount / COMMENTS_PAGE_SIZE));
+  }
+  const pageCount = lastPage ?? 1;
+  const firstPageToRead = Math.max(1, pageCount - FIX_REVIEW_COMMENTS_MAX_PAGES + 1);
   const pages: FixReviewComment[][] = [];
   let bodyLength = 0;
   let lastPageCount = 0;
-  for (let page = lastPage; page >= firstPageToRead; page -= 1) {
+  for (let page = pageCount; page >= firstPageToRead; page -= 1) {
     const data = page === 1 ? firstPage.data : (await readPage(page)).data;
-    if (page === lastPage) lastPageCount = data.length;
+    if (page === pageCount) lastPageCount = data.length;
     pages.push(
       data.map(comment => ({
         id: comment.id,
@@ -238,7 +248,7 @@ async function readReviewComments(
   // from its end, so an omitted comment is always an older one.
   pages.reverse();
   const comments = pages.flat();
-  const total = COMMENTS_PAGE_SIZE * (lastPage - 1) + lastPageCount;
+  const total = listedCount ?? COMMENTS_PAGE_SIZE * (pageCount - 1) + lastPageCount;
   return { comments, unreadCount: Math.max(0, total - comments.length) };
 }
 

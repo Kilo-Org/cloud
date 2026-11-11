@@ -150,6 +150,39 @@ describe('createFixReviewCommentClient', () => {
     expect(listing.comments.at(-1)?.id).toBe(totalPages * 100);
   });
 
+  it('finds the newest page when the header names no last page', async () => {
+    const totalComments = 150;
+    const body = 'x'.repeat(FIX_REVIEW_COMMENTS_TOTAL_BODY_MAX_LENGTH / 50);
+    const commentPage = (page: number, size: number) =>
+      Array.from({ length: size }, (_, index) => ({
+        id: (page - 1) * 100 + index + 1,
+        path: 'src/file.ts',
+        line: index + 1,
+        body,
+        user: { login: 'reviewer', id: 1, type: 'User' },
+      }));
+    const pageOf = (call: FetchCall) => Number(new URL(call.url).searchParams.get('page'));
+    const sizeOf = (call: FetchCall) => {
+      const url = new URL(call.url);
+      if (url.searchParams.get('per_page') === '1') return 1;
+      return Number(url.searchParams.get('page')) === 2 ? 50 : 100;
+    };
+    const { octokit, calls } = octokitWithFetch(
+      call => commentPage(pageOf(call), sizeOf(call)),
+      call =>
+        new URL(call.url).searchParams.get('per_page') === '1'
+          ? reviewCommentsLink(1, totalComments)
+          : '<https://api.github.com/repositories/1/pulls/7/comments?per_page=100&page=2>; rel="next"'
+    );
+
+    const listing = await createFixReviewCommentClient(octokit, TARGET).listComments();
+
+    expect(listing.comments).toHaveLength(50);
+    expect(listing.unreadCount).toBe(totalComments - listing.comments.length);
+    expect(listing.comments.at(-1)?.id).toBe(totalComments);
+    expect(calls).toHaveLength(3);
+  });
+
   it('reads a long review thread to its last page before deciding it is answered', async () => {
     const { octokit, calls } = octokitWithFetch(call => {
       if (call.query?.includes('FixReviewThreadComments')) {

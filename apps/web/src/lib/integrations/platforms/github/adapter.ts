@@ -640,7 +640,7 @@ async function scanPRIssueComments(
   };
 
   const firstResponse = await octokit.issues.listComments({ ...base, page: 1 });
-  const lastPage = lastLinkedPage(firstResponse.headers.link);
+  const lastPage = lastLinkedPage(firstResponse.headers.link) ?? 1;
   const comments: PRIssueComment[] = [...firstResponse.data];
 
   if (lastPage <= MAX_KILO_REVIEW_COMMENT_PAGES) {

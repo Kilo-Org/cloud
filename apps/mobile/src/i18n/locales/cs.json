@@ -3648,7 +3648,7 @@
       "provider": "Zastaveno: chyba poskytovatele",
       "tool": "Zastaveno: chyba nástroje",
       "cancelled": "Zastaveno: zrušeno",
-      "other": "ZASTAVENO"
+      "other": "Zastaveno"
     }
   },
   "transcriptionModel": {

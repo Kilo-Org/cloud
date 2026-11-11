@@ -3538,7 +3538,7 @@
       "provider": "Stoppet: leverandørfeil",
       "tool": "Stoppet: verktøyfeil",
       "cancelled": "Stoppet: avbrutt",
-      "other": "STOPPET"
+      "other": "Stoppet"
     }
   },
   "transcriptionModel": {

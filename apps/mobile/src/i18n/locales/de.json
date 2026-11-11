@@ -3538,7 +3538,7 @@
       "provider": "Gestoppt: Anbieterfehler",
       "tool": "Gestoppt: Werkzeugfehler",
       "cancelled": "Gestoppt: abgebrochen",
-      "other": "GESTOPPT"
+      "other": "Gestoppt"
     }
   },
   "transcriptionModel": {

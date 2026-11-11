@@ -310,10 +310,9 @@ function CloudSidebarLayoutContent({
   const [composerFocusRequest, setComposerFocusRequest] = useState<ComposerFocusRequest | null>(
     null
   );
-  const [worktreePendingDeletion, setWorktreePendingDeletion] = useState<{
-    worktreeId: string;
-    name: string;
-  }>();
+  const [worktreePendingDeletion, setWorktreePendingDeletion] = useState<string>();
+  // Keep the display name through the dialog's close animation.
+  const [worktreeDeletionName, setWorktreeDeletionName] = useState('');
   const [deletingWorktreeIds, setDeletingWorktreeIds] = useState<ReadonlySet<string>>(
     () => new Set()
   );
@@ -978,11 +977,12 @@ function CloudSidebarLayoutContent({
   );
 
   const handleRequestWorktreeDelete = useCallback((worktreeId: string, name: string) => {
-    setWorktreePendingDeletion({ worktreeId, name });
+    setWorktreePendingDeletion(worktreeId);
+    setWorktreeDeletionName(name);
   }, []);
 
   const handleConfirmWorktreeDelete = useCallback(() => {
-    const worktreeId = worktreePendingDeletion?.worktreeId;
+    const worktreeId = worktreePendingDeletion;
     if (
       !worktreeId ||
       deletingWorktreeIds.has(worktreeId) ||
@@ -1045,8 +1045,7 @@ function CloudSidebarLayoutContent({
   const stackedChildCount = useMemo(
     () =>
       worktreePendingDeletion
-        ? workspaceRows.filter(row => row.parentWorktreeId === worktreePendingDeletion.worktreeId)
-            .length
+        ? workspaceRows.filter(row => row.parentWorktreeId === worktreePendingDeletion).length
         : 0,
     [workspaceRows, worktreePendingDeletion]
   );
@@ -1208,7 +1207,7 @@ function CloudSidebarLayoutContent({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="wrap-anywhere">
-              Delete worktree “{worktreePendingDeletion?.name}”?
+              Delete worktree “{worktreeDeletionName}”?
             </AlertDialogTitle>
             <AlertDialogDescription>
               This permanently deletes every chat and the worktree’s files, stops its running work,

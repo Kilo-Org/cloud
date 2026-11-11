@@ -5,11 +5,6 @@ import { resolve } from 'path';
 import NextBundleAnalyzer from '@next/bundle-analyzer';
 import { buildAiGatewayRewrites } from './ai-gateway-rewrites.mjs';
 
-// TEMPORARY CI PROBE: this line exists only to make the production build fail
-// on one pull-request commit, so the required check's handling of a failed
-// build can be observed. The next commit removes it.
-throw new Error('ci probe: the production build fails on purpose on this commit');
-
 const withBundleAnalyzer = NextBundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
 });

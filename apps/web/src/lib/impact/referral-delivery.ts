@@ -3,6 +3,7 @@ import 'server-only';
 import { and, asc, eq, inArray, lte, or, sql } from 'drizzle-orm';
 
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   isImpactConfigured,
   sendImpactConversionPayload,
@@ -53,6 +54,15 @@ const REDEEMABLE_KILO_PASS_REWARD_STATUSES: ImpactReferralRewardStatus[] = [
 function isRedeemableReferralRewardStatus(status: ImpactReferralRewardStatus): boolean {
   return REDEEMABLE_KILO_PASS_REWARD_STATUSES.includes(status);
 }
+
+/**
+ * A blocked redemption is terminal and non-retryable, so the payout stops until
+ * someone acts. Report it to Sentry with non-sensitive identifiers only.
+ */
+const logBlockedRewardRedemption = sentryLogger(
+  'impact_advocate_reward_redemption_blocked',
+  'error'
+);
 
 export type ImpactConversionReportDispatchSummary = {
   claimed: number;
@@ -444,20 +454,18 @@ async function dispatchImpactAdvocateRewardRedemptionById(
         state: ImpactAdvocateRewardRedemptionState.Failed,
         attempt_count: attemptCount,
         next_retry_at: null,
+        response_status_code: null,
         redeem_response_payload: {
           error: reward ? 'referral_reward_not_redeemable' : 'referral_reward_not_found',
           rewardStatus: reward?.status ?? null,
         } satisfies Record<string, unknown>,
       })
       .where(eq(impact_advocate_reward_redemptions.id, redemption.id));
-    console.error(
-      '[impact-referrals] Impact Advocate reward redemption blocked by the local reward status',
-      {
-        redemptionId: redemption.id,
-        rewardId: redemption.reward_id,
-        rewardStatus: reward?.status ?? null,
-      }
-    );
+    logBlockedRewardRedemption('impact_advocate_reward_redeem_stopped_by_local_state', {
+      redemptionId: redemption.id,
+      rewardId: redemption.reward_id,
+      rewardStatus: reward?.status ?? null,
+    });
     return 'failed';
   }
 

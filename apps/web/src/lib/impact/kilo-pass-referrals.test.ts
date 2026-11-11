@@ -917,7 +917,6 @@ describe('Kilo Pass Impact referral conversions', () => {
   });
 
   test('queued reward redemptions stop when the linked reward is no longer redeemable', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     const blockedStatuses: ImpactReferralRewardStatus[] = [
       ImpactReferralRewardStatus.Canceled,
       ImpactReferralRewardStatus.Expired,
@@ -937,6 +936,10 @@ describe('Kilo Pass Impact referral conversions', () => {
         .update(impact_referral_rewards)
         .set({ status })
         .where(eq(impact_referral_rewards.id, rewardId));
+      await db
+        .update(impact_advocate_reward_redemptions)
+        .set({ response_status_code: 503 })
+        .where(eq(impact_advocate_reward_redemptions.reward_id, rewardId));
       queued.push({ rewardId, status });
     }
 
@@ -954,19 +957,37 @@ describe('Kilo Pass Impact referral conversions', () => {
           reward_id: entry.rewardId,
           state: ImpactAdvocateRewardRedemptionState.Failed,
           next_retry_at: null,
+          response_status_code: null,
           redeem_response_payload: {
             error: 'referral_reward_not_redeemable',
             rewardStatus: entry.status,
           },
         })
       );
+      expect(mockCaptureMessage).toHaveBeenCalledWith(
+        'impact_advocate_reward_redeem_stopped_by_local_state',
+        expect.objectContaining({
+          level: 'error',
+          tags: { source: 'impact_advocate_reward_redemption_blocked' },
+          extra: {
+            args: [
+              expect.objectContaining({
+                rewardId: entry.rewardId,
+                rewardStatus: entry.status,
+              }),
+            ],
+          },
+        })
+      );
     }
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(4);
+    expect(JSON.stringify(mockCaptureMessage.mock.calls)).not.toContain('@example.com');
 
     const retrySummary = await dispatchQueuedImpactAdvocateRewardRedemptions();
 
     expect(retrySummary).toEqual({ claimed: 0, redeemed: 0, retried: 0, failed: 0 });
     expect(mockSendImpactAdvocateRewardLookupPayload).not.toHaveBeenCalled();
-    consoleErrorSpy.mockRestore();
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(4);
   });
 
   test('an applied reward redemption reaches Impact', async () => {
@@ -987,7 +1008,6 @@ describe('Kilo Pass Impact referral conversions', () => {
   });
 
   test('a redemption whose reward row is gone fails without an Impact call', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     const { rewardIds } = await seedKiloPassReferralRewardsForAdversePayment({
       statuses: [ImpactReferralRewardStatus.Pending],
     });
@@ -1008,10 +1028,21 @@ describe('Kilo Pass Impact referral conversions', () => {
       expect.objectContaining({
         reward_id: rewardId,
         state: ImpactAdvocateRewardRedemptionState.Failed,
+        response_status_code: null,
         redeem_response_payload: { error: 'referral_reward_not_found', rewardStatus: null },
       })
     );
-    consoleErrorSpy.mockRestore();
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      'impact_advocate_reward_redeem_stopped_by_local_state',
+      expect.objectContaining({
+        level: 'error',
+        tags: { source: 'impact_advocate_reward_redemption_blocked' },
+        extra: {
+          args: [expect.objectContaining({ rewardId, rewardStatus: null })],
+        },
+      })
+    );
   });
 
   test('expires stale pending and earned Kilo Pass referral rewards independently of issuance', async () => {

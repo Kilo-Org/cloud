@@ -2099,7 +2099,7 @@ describe('logMicrodollarUsage', () => {
           ? events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')
           : JSON.stringify(response);
 
-        const result = await countAndStoreUsage(
+        const accounting = countAndStoreUsage(
           new Response(body),
           {
             ...createBaseUsageContext(user),
@@ -2111,7 +2111,9 @@ describe('logMicrodollarUsage', () => {
           },
           undefined,
           { ...OPENROUTER, type: 'direct-byok', inferenceProviderId: 'neuralwatt' }
-        ).usagePromise;
+        );
+        expect((await accounting.statsPromise)?.inference_provider).toBe('neuralwatt');
+        const result = await accounting.usagePromise;
 
         assert(result);
         const usageRecord = await db.query.microdollar_usage.findFirst({

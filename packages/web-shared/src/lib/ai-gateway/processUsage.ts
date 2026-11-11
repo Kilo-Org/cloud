@@ -1359,9 +1359,15 @@ export function countAndStoreUsage(
   }
 
   metadataCapture?.waitFor(usageStatsPromise);
+  const statsPromise = usageStatsPromise.then(usageStats => {
+    if (usageStats) {
+      usageStats.inference_provider ??= servingProvider?.inferenceProviderId ?? null;
+    }
+    return usageStats;
+  });
   return {
-    statsPromise: usageStatsPromise,
-    usagePromise: usageStatsPromise.then(usageStats =>
+    statsPromise,
+    usagePromise: statsPromise.then(usageStats =>
       processTokenData(usageStats, usageContext, servingProvider)
     ),
   };

@@ -615,7 +615,9 @@ type SessionManager = {
    * Drop the oldest loaded older-page(s) from local storage while the retained
    * root transcript exceeds `RETAINED_MESSAGE_WINDOW`. Pops the oldest stack
    * entry, deletes its messages, restores the pre-page cursor, and re-arms
-   * `hasOlderMessages`. Child rows in the shared storage do not count toward
+   * `hasOlderMessages` from that cursor. A terminal older-page latch and its
+   * banner go with the rewind, because the restored cursor points at a page
+   * that already loaded. Child rows in the shared storage do not count toward
    * the window. No-op below the window or with an empty stack. Never trims
    * the initial bounded page (it is not on the stack).
    */

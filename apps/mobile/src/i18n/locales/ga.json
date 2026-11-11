@@ -4214,6 +4214,7 @@
       "namePlaceholder": "Mo Ghníomhaire",
       "promptPlaceholder": "Is duine thú...",
       "tools": "Uirlisí",
+      "wholeToolRule": "Cuireann an gníomhaire seo riail amháin i bhfeidhm ar gach uirlis ag an am céanna: {{rule}}. Tá na lasca seo inléite amháin.",
       "visibility": "Infheictheacht",
       "visibilityPrimary": "Bunscoile — a thaispeántar sa roghnóir",
       "visibilitySubagent": "Fo-ghníomhaire — inghlaoite ó dhaoine eile amháin",

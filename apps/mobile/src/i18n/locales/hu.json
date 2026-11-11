@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Ügynököm",
       "promptPlaceholder": "Ön egy...",
       "tools": "Eszközök",
+      "wholeToolRule": "Ez az ügynök egyszerre egy szabályt alkalmaz minden eszközre: {{rule}}. Ezek a kapcsolók csak olvashatók.",
       "visibility": "Láthatóság",
       "visibilityPrimary": "Elsődleges — a választóban látható",
       "visibilitySubagent": "Alügynök — csak másoktól hívható",

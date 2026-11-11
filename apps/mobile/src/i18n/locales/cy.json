@@ -4276,6 +4276,7 @@
       "namePlaceholder": "Fy Asiant",
       "promptPlaceholder": "Rydych chi'n ...",
       "tools": "Offer",
+      "wholeToolRule": "Mae'r asiant hwn yn cymhwyso un rheol i bob offeryn ar unwaith: {{rule}}. Mae'r switshis hyn yn ddarllen yn unig.",
       "visibility": "Gwelededd",
       "visibilityPrimary": "Cynradd — a ddangosir yn y codwr",
       "visibilitySubagent": "Subagent — dim ond ei alw gan eraill",

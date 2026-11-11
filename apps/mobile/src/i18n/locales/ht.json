@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Ajan mwen an",
       "promptPlaceholder": "Ou se yon...",
       "tools": "Zouti",
+      "wholeToolRule": "Ajan sa a aplike yon sèl règ sou chak zouti an menm tan: {{rule}}. Switch sa yo se lekti sèlman.",
       "visibility": "Vizibilite",
       "visibilityPrimary": "Prensipal — yo montre nan seleksyon an",
       "visibilitySubagent": "Subagent — sèlman rele nan men lòt moun",

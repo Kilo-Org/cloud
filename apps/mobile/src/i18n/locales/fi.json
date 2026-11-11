@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Agenttini",
       "promptPlaceholder": "Olet...",
       "tools": "Työkalut",
+      "wholeToolRule": "Tämä agentti soveltaa yhtä sääntöä kaikkiin työkaluihin kerralla: {{rule}}. Nämä kytkimet ovat vain luku -tilassa.",
       "visibility": "Näkyvyys",
       "visibilityPrimary": "Ensisijainen — näkyy valitsimessa",
       "visibilitySubagent": "Aliagentti — vain muiden kutsuttavissa",

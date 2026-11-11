@@ -4096,6 +4096,7 @@
       "namePlaceholder": "Meu agente",
       "promptPlaceholder": "Você é um...",
       "tools": "Ferramentas",
+      "wholeToolRule": "Este agente aplica uma regra a todas as ferramentas de uma vez: {{rule}}. Esses interruptores são somente leitura.",
       "visibility": "Visibilidade",
       "visibilityPrimary": "Primário — mostrado no seletor",
       "visibilitySubagent": "Subagente — só pode ser chamado por outros",

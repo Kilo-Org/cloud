@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Aṣoju mi",
       "promptPlaceholder": "Iwọ jẹ ...",
       "tools": "Awọn irinṣẹ",
+      "wholeToolRule": "Aṣojú yìí ń lo òfin kan sí gbogbo irinṣẹ lẹ́ẹ̀kan náà: {{rule}}. Àwọn swíṣì wọ̀nyí kìkì fún kíkà nìkan.",
       "visibility": "Hihan",
       "visibilityPrimary": "Alakoko — ti o han ni oluka",
       "visibilitySubagent": "Subagent — nikan callable lati elomiran",

@@ -4034,6 +4034,7 @@
       "namePlaceholder": "আমার এজেন্ট",
       "promptPlaceholder": "আপনি একটি...",
       "tools": "টুলস",
+      "wholeToolRule": "এই এজেন্ট একবারে প্রতিটি টুলে একটি নিয়ম প্রয়োগ করে: {{rule}}। এই সুইচগুলো শুধুমাত্র পাঠযোগ্য।",
       "visibility": "দৃশ্যমানতা",
       "visibilityPrimary": "প্রাথমিক — পিকারে দেখানো হয়েছে",
       "visibilitySubagent": "Subagent — শুধুমাত্র অন্যদের থেকে কলযোগ্য",

@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Agen saya",
       "promptPlaceholder": "Anda adalah ...",
       "tools": "Peralatan",
+      "wholeToolRule": "Agen ini menerapkan satu aturan ke setiap Peralatan sekaligus: {{rule}}. Sakelar ini bersifat hanya-baca.",
       "visibility": "Visibilitas",
       "visibilityPrimary": "Utama — ditampilkan di alat pilih",
       "visibilitySubagent": "Subagen — hanya dapat dihubungi dari orang lain",

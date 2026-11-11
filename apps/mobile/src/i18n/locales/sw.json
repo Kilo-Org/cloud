@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Wakala Wangu",
       "promptPlaceholder": "Wewe ni...",
       "tools": "Zana",
+      "wholeToolRule": "Wakala huyu hutumia kanuni moja kwa kila zana kwa wakati mmoja: {{rule}}. Swichi hizi ni za kusoma tu.",
       "visibility": "Mwonekano",
       "visibilityPrimary": "Msingi — imeonyeshwa kwenye kiteua",
       "visibilitySubagent": "Subagent — inaitwa tu kutoka kwa wengine",

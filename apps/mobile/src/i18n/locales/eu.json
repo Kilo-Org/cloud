@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Nire agentea",
       "promptPlaceholder": "bat zara...",
       "tools": "Tresnak",
+      "wholeToolRule": "Agente honek arau bakar bat aplikatzen die tresna guztiei aldi berean: {{rule}}. Etengailu hauek irakurtzeko soilik dira.",
       "visibility": "Ikusgarritasuna",
       "visibilityPrimary": "Lehen mailakoa — hautatzailean agertzen da",
       "visibilitySubagent": "Azpi-agentea — besteengandik bakarrik dei daiteke",

@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Min agent",
       "promptPlaceholder": "Du er en...",
       "tools": "Værktøjer",
+      "wholeToolRule": "Denne agent anvender én regel på alle værktøjer på én gang: {{rule}}. Disse kontakter er skrivebeskyttede.",
       "visibility": "Sigtbarhed",
       "visibilityPrimary": "Primær — vist i vælgeren",
       "visibilitySubagent": "Subagent — kan kun kaldes fra andre",

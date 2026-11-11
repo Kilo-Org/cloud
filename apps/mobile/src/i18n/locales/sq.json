@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Agjenti im",
       "promptPlaceholder": "Ju jeni një...",
       "tools": "Mjetet",
+      "wholeToolRule": "Ky agjent zbaton një rregull për të gjitha mjetet njëherësh: {{rule}}. Këto ndërprerës janë vetëm për lexim.",
       "visibility": "Dukshmëria",
       "visibilityPrimary": "Primar — tregohet në zgjedhës",
       "visibilitySubagent": "Subagent — i thirrur vetëm nga të tjerët",

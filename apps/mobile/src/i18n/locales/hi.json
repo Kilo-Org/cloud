@@ -4035,6 +4035,7 @@
       "namePlaceholder": "मेरा एजेंट",
       "promptPlaceholder": "तुम एक ...",
       "tools": "औजार",
+      "wholeToolRule": "यह एजेंट एक साथ सभी औजारों पर एक नियम लागू करता है: {{rule}}। ये स्विच केवल-पढ़ने योग्य हैं।",
       "visibility": "दृश्यता",
       "visibilityPrimary": "प्राथमिक — पिकर में दिखाया गया है",
       "visibilitySubagent": "सबएजेंट — केवल दूसरों से कॉल करने योग्य",

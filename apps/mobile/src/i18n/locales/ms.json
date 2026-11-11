@@ -4028,6 +4028,7 @@
       "namePlaceholder": "Ejen saya",
       "promptPlaceholder": "Anda seorang...",
       "tools": "Alatan",
+      "wholeToolRule": "Ejen ini menggunakan satu peraturan pada setiap alat sekali gus: {{rule}}. Suis ini adalah baca sahaja.",
       "visibility": "Keterlihatan",
       "visibilityPrimary": "Utama — ditunjukkan dalam pemilih",
       "visibilitySubagent": "Subagen — hanya boleh dipanggil daripada orang lain",

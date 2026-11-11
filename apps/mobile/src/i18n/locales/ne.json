@@ -4028,6 +4028,7 @@
       "namePlaceholder": "मेरो एजेन्ट",
       "promptPlaceholder": "तिमी एक...",
       "tools": "उपकरणहरू",
+      "wholeToolRule": "यो एजेन्टले एकैचोटि हरेक उपकरणमा एउटै नियम लागू गर्छ: {{rule}}। यी स्विचहरू पढ्नका लागि मात्र हुन्।",
       "visibility": "दृश्यता",
       "visibilityPrimary": "प्राथमिक — पिकरमा देखाइएको छ",
       "visibilitySubagent": "Subagent — अरूबाट मात्र कल गर्न मिल्ने",

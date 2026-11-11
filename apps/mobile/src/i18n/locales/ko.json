@@ -4028,6 +4028,7 @@
       "namePlaceholder": "내 에이전트",
       "promptPlaceholder": "당신은 ...",
       "tools": "도구",
+      "wholeToolRule": "이 에이전트는 모든 도구에 한 번에 하나의 규칙을 적용합니다: {{rule}}. 이 스위치는 읽기 전용입니다.",
       "visibility": "시계",
       "visibilityPrimary": "기본 — 선택기에 표시됨",
       "visibilitySubagent": "하위 에이전트 — 다른 사람에게서만 호출 가능",

@@ -45,6 +45,26 @@ function firstCasedLetter(value: string): string | undefined {
   return undefined;
 }
 
+/**
+ * True when a lowercase letter sits immediately before an uppercase one, the
+ * shape a value takes when only its first letter was raised out of a full
+ * capitals label (`GeStoppt`). German capitalizes its nouns, so a capital
+ * after a space or a colon is grammatical and only this in-word sequence is
+ * the defect.
+ */
+function hasInteriorCapital(value: string): boolean {
+  const isLower = (letter: string) =>
+    letter === letter.toLocaleLowerCase('en') && letter !== letter.toLocaleUpperCase('en');
+  const isUpper = (letter: string) =>
+    letter === letter.toLocaleUpperCase('en') && letter !== letter.toLocaleLowerCase('en');
+  for (let index = 1; index < value.length; index += 1) {
+    if (isLower(value.charAt(index - 1)) && isUpper(value.charAt(index))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 describe('glanceable failure copy', () => {
   it('keeps the English failure labels in sentence case', () => {
     for (const kind of FAILURE_KINDS) {
@@ -76,6 +96,10 @@ describe('glanceable failure copy', () => {
           expect(text, `${tag} glanceable.failure.${kind} must start with a capital letter`).toBe(
             text.replace(firstCased, firstCased.toLocaleUpperCase(tag))
           );
+          expect(
+            hasInteriorCapital(text),
+            `${tag} glanceable.failure.${kind} raises only its first letter`
+          ).toBe(false);
         }
       }
     }

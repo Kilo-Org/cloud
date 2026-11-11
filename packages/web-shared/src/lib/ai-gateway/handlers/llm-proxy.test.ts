@@ -6,7 +6,10 @@ import { eq } from 'drizzle-orm';
 import { agent_briefing_snapshots, api_request_log, type User } from '@kilocode/db/schema';
 import { BRIEFING_SETTLEMENT_HEADER } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import { REPLACED_ANSWER_HEADER } from '@kilocode/web-shared/lib/ai-gateway/replaced-answer-header';
-import type { UsageAccountingResult } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import type {
+  MicrodollarUsageStats,
+  UsageAccountingResult,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import jwt from 'jsonwebtoken';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -344,7 +347,8 @@ const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage)
 function usageAccountingResult(
   usagePromise: Promise<UsageAccountingResult | null> = Promise.resolve(null)
 ) {
-  return { statsPromise: Promise.resolve(null), usagePromise };
+  // Metrics are mocked, so the parsed stats never need to settle.
+  return { statsPromise: new Promise<MicrodollarUsageStats>(() => {}), usagePromise };
 }
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
 const mockedFetchCustomRouterDecision = jest.mocked(fetchCustomRouterDecision);

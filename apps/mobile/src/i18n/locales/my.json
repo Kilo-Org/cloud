@@ -363,7 +363,11 @@
       "retryLoadingFiles": "ဖိုင်များကို ပြန်ရယူပါ",
       "filterPlaceholder": "စစ်ထုတ်လိုသော ဖိုင်လမ်းကြောင်း",
       "viewedCount": "{{total}} ခုအနက် {{viewed}} ခု ကြည့်ပြီး",
+      "viewedCount_one": "{{total}} ခုအနက် {{viewed}} ခု ကြည့်ပြီး",
+      "viewedCount_other": "{{total}} ခုအနက် {{viewed}} ခု ကြည့်ပြီး",
       "viewedOfListed": "စာရင်းပါဖိုင် {{total}} ခုအနက် {{viewed}} ခု ကြည့်ပြီး",
+      "viewedOfListed_one": "စာရင်းပါဖိုင် {{total}} ခုအနက် {{viewed}} ခု ကြည့်ပြီး",
+      "viewedOfListed_other": "စာရင်းပါဖိုင် {{total}} ခုအနက် {{viewed}} ခု ကြည့်ပြီး",
       "loadingFiles": "{{total}} ခုအနက် {{loaded}} ခု ရယူနေသည်…",
       "failedToLoadAllFiles": "ဖိုင်အားလုံးကို ရယူ၍မရပါ။",
       "couldNotLoadMoreFiles": "နောက်ထပ်ဖိုင်များကို ရယူ၍မရပါ။",
@@ -695,7 +699,7 @@
       "continueInPersonal": "ကိုယ်ပိုင်အကောင့်ဖြင့် ဆက်လုပ်ရန်"
     },
     "composer": {
-      "commentBodyPlaceholder": "မှတ်ချက်အကြောင်းအရာ",
+      "commentBodyPlaceholder": "သင့်မှတ်ချက်",
       "commentBody": "မှတ်ချက်အကြောင်းအရာ",
       "commentNow": "ယခု မှတ်ချက်ပေးပါ",
       "addToReview": "သုံးသပ်မှုတွင် ထည့်ပါ",

@@ -363,7 +363,11 @@
       "retryLoadingFiles": "ფაილების ჩატვირთვის ხელახლა ცდა",
       "filterPlaceholder": "ფილტრი ფაილის მისამართით",
       "viewedCount": "ნანახია {{total}}-დან {{viewed}}",
+      "viewedCount_one": "ნანახია {{total}}-დან {{viewed}}",
+      "viewedCount_other": "ნანახია {{total}}-დან {{viewed}}",
       "viewedOfListed": "სიაში მოცემული {{total}} ფაილიდან ნანახია {{viewed}}",
+      "viewedOfListed_one": "სიაში მოცემული {{total}} ფაილიდან ნანახია {{viewed}}",
+      "viewedOfListed_other": "სიაში მოცემული {{total}} ფაილიდან ნანახია {{viewed}}",
       "loadingFiles": "იტვირთება {{total}}-დან {{loaded}}…",
       "failedToLoadAllFiles": "ყველა ფაილის ჩატვირთვა ვერ მოხერხდა.",
       "couldNotLoadMoreFiles": "დამატებითი ფაილების ჩატვირთვა ვერ მოხერხდა.",
@@ -695,7 +699,7 @@
       "continueInPersonal": "გაგრძელება პირად ანგარიშზე"
     },
     "composer": {
-      "commentBodyPlaceholder": "კომენტარის ტექსტი",
+      "commentBodyPlaceholder": "შენი კომენტარი",
       "commentBody": "კომენტარის ტექსტი",
       "commentNow": "კომენტარის ახლავე გამოქვეყნება",
       "addToReview": "განხილვაში დამატება",

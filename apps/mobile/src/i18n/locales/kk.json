@@ -363,7 +363,11 @@
       "retryLoadingFiles": "Файлдарды қайта жүктеу",
       "filterPlaceholder": "Файл жолы бойынша сүзу",
       "viewedCount": "{{viewed}}/{{total}} қаралды",
+      "viewedCount_one": "{{viewed}}/{{total}} қаралды",
+      "viewedCount_other": "{{viewed}}/{{total}} қаралды",
       "viewedOfListed": "Тізімдегі файлдардың {{viewed}}/{{total}} қаралды",
+      "viewedOfListed_one": "Тізімдегі файлдардың {{viewed}}/{{total}} қаралды",
+      "viewedOfListed_other": "Тізімдегі файлдардың {{viewed}}/{{total}} қаралды",
       "loadingFiles": "Жүктелуде: {{loaded}}/{{total}}…",
       "failedToLoadAllFiles": "Барлық файлдарды жүктеу мүмкін болмады.",
       "couldNotLoadMoreFiles": "Қосымша файлдарды жүктеу мүмкін болмады.",
@@ -695,7 +699,7 @@
       "continueInPersonal": "Жеке парақшада жалғастыру"
     },
     "composer": {
-      "commentBodyPlaceholder": "Пікір мәтіні",
+      "commentBodyPlaceholder": "Сіздің пікіріңіз",
       "commentBody": "Пікір мәтіні",
       "commentNow": "Қазір пікір қалдыру",
       "addToReview": "Кодты тексеруге қосу",

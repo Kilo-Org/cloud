@@ -9,7 +9,14 @@ import {
   type EnkryptGuardrailScanResult,
   type EnkryptScanCoverage,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
-import { joinRequestSegments } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
+import {
+  joinSegments,
+  renderSegment,
+  SEGMENT_SEPARATOR,
+  segmentHeaderLine,
+  type RequestScanParts,
+  type RequestSegment,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import type { EnkryptGuardrailReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -22,15 +29,18 @@ export const ENKRYPT_VERDICT_CACHE_ENABLED = true;
  * results are parsed or which detections block, so entries written by older code stop matching.
  * Extraction changes already change the hashed segments.
  */
-const VERDICT_CACHE_VERSION = 2;
+const VERDICT_CACHE_VERSION = 3;
 
 export const ENKRYPT_VERDICT_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 /**
- * Already-scanned text sent ahead of the uncached suffix, so content split across the boundary is
- * still scanned together. Context-dependent detection further back is not re-evaluated.
+ * Already-scanned conversation text sent ahead of the uncached suffix, so content split across the
+ * boundary is still scanned together. Context-dependent detection further back is not re-evaluated.
  */
-export const ENKRYPT_SCAN_OVERLAP_CHARACTERS = 2_000;
+export const ENKRYPT_SCAN_OVERLAP_CHARACTERS = 4_000;
+
+/** Precedes the overlap when earlier conversation text is left out of a scan. */
+export const OMITTED_CONVERSATION_MARKER = '[earlier conversation omitted]';
 
 /**
  * Bounds the lookup. Cached prefixes are earlier requests of the same conversation, which end near
@@ -60,8 +70,10 @@ export type EnkryptVerdictCacheStore = {
 };
 
 export type EnkryptGuardrailRequest = Omit<EnkryptGuardrailScan, 'text' | 'coverage'> & {
-  segments: string[];
+  parts: RequestScanParts;
 };
+
+type RequestPart = keyof RequestScanParts;
 
 export type EnkryptCachedScanResult = Omit<EnkryptGuardrailScanResult, 'report'> & {
   /** Null when no scan ran. */
@@ -83,21 +95,22 @@ function configHash(config: ReadyConfig): Buffer {
 }
 
 /**
- * One key per segment, each covering the exact ordered content up to and including that segment:
- * `h_0` hashes the scope, and `h_i = sha256(h_{i-1} || length || segment_i)`. Editing, removing,
- * or reordering any segment changes the keys of every later one, so a client that rewrites history
- * never inherits an earlier verdict. Segments are hashed as UTF-16 code units to stay exact for
- * lone surrogates, which UTF-8 would replace.
+ * One key per segment, each covering the exact ordered content of the part up to and including
+ * that segment: `h_0` hashes the scope, and `h_i = sha256(h_{i-1} || length || segment_i)`.
+ * Editing, removing, or reordering any segment changes the keys of every later one, so a client
+ * that rewrites history never inherits an earlier verdict. Segments are hashed as UTF-16 code units
+ * to stay exact for lone surrogates, which UTF-8 would replace.
  *
- * The scope includes the user, so scan latency cannot reveal whether another member of the
- * organization sent the same content.
+ * The scope includes the part and the user, so scan latency cannot reveal whether another member
+ * of the organization sent the same content.
  */
 export function verdictCacheKeys(
   { organizationId, kiloUserId }: Pick<EnkryptGuardrailRequest, 'organizationId' | 'kiloUserId'>,
   config: ReadyConfig,
+  part: RequestPart,
   segments: string[]
 ): string[] {
-  const keyPrefix = `enkrypt-guardrail:verdict:v${VERDICT_CACHE_VERSION}:${organizationId}:`;
+  const keyPrefix = `enkrypt-guardrail:verdict:v${VERDICT_CACHE_VERSION}:${organizationId}:${part}:`;
   let chain = createHash('sha256')
     .update(`${keyPrefix}${kiloUserId.length}:`)
     .update(kiloUserId, 'utf16le')
@@ -113,13 +126,17 @@ export function verdictCacheKeys(
   });
 }
 
+/**
+ * The longest cached prefix among the keys from `firstProbed` on. Only the conversation is
+ * matched by prefix; tool definitions and the system prompt probe only their full key.
+ */
 async function cachedPrefix(
   organizationId: string,
   keys: string[],
+  firstProbed: number,
   config: ReadyConfig,
   store: EnkryptVerdictCacheStore
 ): Promise<{ cachedSegments: number; verdict: EnkryptVerdictCacheEntry['verdict'] } | 'error'> {
-  const firstProbed = Math.max(0, keys.length - MAX_PROBED_PREFIXES);
   try {
     const values = await store.mget(keys.slice(firstProbed));
     let cachedSegments = 0;
@@ -159,10 +176,47 @@ function isLowSurrogate(codeUnit: number): boolean {
   return codeUnit >= 0xdc00 && codeUnit <= 0xdfff;
 }
 
-/** Never starts between the two halves of a surrogate pair. */
-function overlapStart(text: string, cachedCharacters: number): number {
-  const start = Math.max(0, cachedCharacters - ENKRYPT_SCAN_OVERLAP_CHARACTERS);
-  return start > 0 && isLowSurrogate(text.charCodeAt(start)) ? start - 1 : start;
+/** The last `length` characters, never starting between the two halves of a surrogate pair. */
+function tail(text: string, length: number): string {
+  const start = Math.max(0, text.length - length);
+  return text.slice(isLowSurrogate(text.charCodeAt(start)) ? start + 1 : start);
+}
+
+/**
+ * The uncached conversation segments, preceded by up to `ENKRYPT_SCAN_OVERLAP_CHARACTERS` of the
+ * cached ones. A segment cut by the overlap keeps its header, marked as missing its beginning, and
+ * `OMITTED_CONVERSATION_MARKER` leads when any earlier text is left out.
+ */
+export function conversationScanText(
+  segments: RequestSegment[],
+  rendered: string[],
+  cachedSegments: number
+): string {
+  if (cachedSegments === segments.length) return '';
+  const overlap: string[] = [];
+  let remaining = ENKRYPT_SCAN_OVERLAP_CHARACTERS;
+  let index = cachedSegments;
+  while (index > 0 && remaining > 0) {
+    const segment = segments[index - 1];
+    const text = rendered[index - 1];
+    if (!segment || text === undefined) break;
+    // The budget counts the body: a body that fits is kept whole, even when its header does not.
+    if (text.length > remaining && (segment.body === null || segment.body.length > remaining)) {
+      if (segment.body !== null) {
+        const header = segmentHeaderLine(`${segment.header}, beginning omitted`);
+        overlap.unshift(`${header}\n${tail(segment.body, remaining)}`);
+      }
+      break;
+    }
+    overlap.unshift(text);
+    remaining -= text.length + SEGMENT_SEPARATOR.length;
+    index--;
+  }
+  return joinSegments([
+    ...(index > 0 ? [OMITTED_CONVERSATION_MARKER] : []),
+    ...overlap,
+    ...rendered.slice(cachedSegments),
+  ]);
 }
 
 /**
@@ -178,22 +232,28 @@ function isCacheableAllow({ verdict, report, usageRecords }: EnkryptGuardrailSca
 }
 
 /**
- * Scans only the part of the request that no earlier allowed request with the same scope covered,
- * plus an overlap. A cached block rejects requests retaining that prefix. A cache failure scans
- * the request in full, so it never lets unscanned content through. A failed blocking scan is never
- * cached; see `isCacheableAllow` for log-only scans.
+ * Scans one part of the request. The conversation is scanned only from where no earlier allowed
+ * request with the same scope covered it, plus an overlap; tool definitions and the system prompt
+ * are skipped only when the whole of them was allowed before. A cached block rejects requests retaining that content. A cache
+ * failure scans the part in full, so it never lets unscanned content through. A failed blocking
+ * scan is never cached; see `isCacheableAllow` for log-only scans.
  */
-export async function scanRequestWithVerdictCache(
-  { segments, ...request }: EnkryptGuardrailRequest,
+async function scanPartWithVerdictCache(
+  part: RequestPart,
+  segments: RequestSegment[],
+  request: Omit<EnkryptGuardrailRequest, 'parts'>,
   deps: EnkryptDetectDependencies & { store: EnkryptVerdictCacheStore | null }
 ): Promise<EnkryptCachedScanResult> {
-  const text = joinRequestSegments(segments);
+  const rendered = segments.map(renderSegment);
+  const text = joinSegments(rendered);
   const uncached: EnkryptScanCoverage = {
+    part,
     cache: 'off',
     totalCharacters: text.length,
     totalSegments: segments.length,
     cachedCharacters: 0,
     cachedSegments: 0,
+    omittedAttachments: segments.filter(segment => segment.body === null).length,
   };
   const { config } = request;
   if (!deps.store || config.status !== 'ready' || segments.length === 0) {
@@ -201,11 +261,12 @@ export async function scanRequestWithVerdictCache(
     return { ...result, cacheEntry: null };
   }
 
-  const keys = verdictCacheKeys(request, config, segments);
-  const lookup = await cachedPrefix(request.organizationId, keys, config, deps.store);
+  const keys = verdictCacheKeys(request, config, part, rendered);
+  const firstProbed =
+    part === 'conversation' ? Math.max(0, keys.length - MAX_PROBED_PREFIXES) : keys.length - 1;
+  const lookup = await cachedPrefix(request.organizationId, keys, firstProbed, config, deps.store);
   const cachedSegments = lookup === 'error' ? 0 : lookup.cachedSegments;
-  const cachedCharacters = joinRequestSegments(segments.slice(0, cachedSegments)).length;
-  const fullyCached = cachedSegments === segments.length;
+  const cachedCharacters = joinSegments(rendered.slice(0, cachedSegments)).length;
   const coverage: EnkryptScanCoverage = {
     ...uncached,
     cache: lookup === 'error' ? 'error' : cachedSegments > 0 ? 'hit' : 'miss',
@@ -215,6 +276,7 @@ export async function scanRequestWithVerdictCache(
   if (lookup !== 'error' && lookup.verdict !== 'allow') {
     const report: EnkryptGuardrailScanResult['report'] = {
       scan: 'blocking',
+      part,
       detectors_enabled: ENKRYPT_DETECTOR_IDS.filter(id => config.detectors[id] !== undefined),
       detectors_blocking: config.blockingDetectors,
       verdict_cache: 'hit',
@@ -222,6 +284,7 @@ export async function scanRequestWithVerdictCache(
       total_segments: segments.length,
       cached_characters: cachedCharacters,
       cached_segments: cachedSegments,
+      omitted_attachments: coverage.omittedAttachments,
       scanned_characters: 0,
       decision: 'blocked',
       error: null,
@@ -244,7 +307,13 @@ export async function scanRequestWithVerdictCache(
       cacheEntry: null,
     };
   }
-  const scannedText = fullyCached ? '' : text.slice(overlapStart(text, cachedCharacters));
+  const fullyCached = cachedSegments === segments.length;
+  const scannedText =
+    part === 'conversation'
+      ? conversationScanText(segments, rendered, cachedSegments)
+      : fullyCached
+        ? ''
+        : text;
 
   const result = await scanRequest({ ...request, text: scannedText, coverage }, deps);
   const key = keys.at(-1);
@@ -265,6 +334,24 @@ export async function scanRequestWithVerdictCache(
     }
   }
   return { ...result, cacheEntry };
+}
+
+const REQUEST_PARTS: readonly RequestPart[] = ['tools', 'system', 'conversation'];
+
+/**
+ * Scans the request's tool definitions and system prompt, when it has any, and its conversation in
+ * concurrent Enkrypt calls, each with its own verdict cache entries. Returns one result per scanned
+ * part, in `REQUEST_PARTS` order.
+ */
+export async function scanRequestWithVerdictCache(
+  { parts, ...request }: EnkryptGuardrailRequest,
+  deps: EnkryptDetectDependencies & { store: EnkryptVerdictCacheStore | null }
+): Promise<EnkryptCachedScanResult[]> {
+  return Promise.all(
+    REQUEST_PARTS.filter(part => part === 'conversation' || parts[part].length > 0).map(part =>
+      scanPartWithVerdictCache(part, parts[part], request, deps)
+    )
+  );
 }
 
 export async function rememberRequestVerdict(

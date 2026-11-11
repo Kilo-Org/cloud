@@ -363,7 +363,11 @@
       "retryLoadingFiles": "Faylları yükləməyə yenidən cəhd et",
       "filterPlaceholder": "Fayl yoluna görə filtr",
       "viewedCount": "baxılıb: {{viewed}} / {{total}}",
+      "viewedCount_one": "baxılıb: {{viewed}} / {{total}}",
+      "viewedCount_other": "baxılıb: {{viewed}} / {{total}}",
       "viewedOfListed": "siyahıdakı fayllardan baxılanlar: {{viewed}} / {{total}}",
+      "viewedOfListed_one": "siyahıdakı fayllardan baxılanlar: {{viewed}} / {{total}}",
+      "viewedOfListed_other": "siyahıdakı fayllardan baxılanlar: {{viewed}} / {{total}}",
       "loadingFiles": "{{loaded}} / {{total}} yüklənir…",
       "failedToLoadAllFiles": "Bütün faylları yükləmək mümkün olmadı.",
       "couldNotLoadMoreFiles": "Əlavə faylları yükləmək mümkün olmadı.",
@@ -695,7 +699,7 @@
       "continueInPersonal": "Şəxsi hesabda davam et"
     },
     "composer": {
-      "commentBodyPlaceholder": "Şərh mətni",
+      "commentBodyPlaceholder": "Sənin şərhin",
       "commentBody": "Şərh mətni",
       "commentNow": "İndi şərh yaz",
       "addToReview": "Kod baxışına əlavə et",

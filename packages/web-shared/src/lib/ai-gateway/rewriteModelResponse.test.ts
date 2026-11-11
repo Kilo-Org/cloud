@@ -3134,6 +3134,7 @@ describe('api_request_log storage', () => {
       {
         guardrail: 'input',
         scan: 'blocking',
+        part: 'conversation',
         request: {
           text: 'hello',
           detectors: { injection_attack: { enabled: true, need_explanation: false } },
@@ -3146,6 +3147,7 @@ describe('api_request_log storage', () => {
       {
         guardrail: 'output',
         scan: 'log_only',
+        part: 'response',
         request: {
           text: 'hello back',
           detectors: { pii: { enabled: true, entities: ['secrets'] } },

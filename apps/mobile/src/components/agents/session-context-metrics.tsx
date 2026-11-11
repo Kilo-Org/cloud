@@ -46,21 +46,29 @@ const RING_SIZE = 28;
 const RING_STROKE = 3;
 
 /**
- * The two value slots keep one width in every pill state: a placeholder row, a
- * dash and a settled value all occupy the same box, so the row keeps its width
- * while usage and cost arrive. The row is the trailing end of the header, so a
- * row that grew or shrank would move the whole trailing cluster, including the
- * Follow control beside it. The percentage slot holds the widest reading
- * (`100%`); the cost slot holds the widest badge the pill shows
- * (`$0.0031`). A longer cost truncates to one line inside its slot.
+ * The two value slots keep one width in every pill state: a placeholder, a dash
+ * and a settled value all occupy the same box, so the row keeps its width while
+ * usage and cost arrive. The row ends the trailing cluster, so a row that grew
+ * or shrank would move the whole trailing cluster, including the Follow control
+ * beside it.
+ *
+ * The width comes from an invisible copy of the widest value each slot can
+ * show rather than from a fixed size: a dp width would hold the reading at the
+ * default font scale only and truncate it as the reader's text grows. The cost
+ * badge reaches `$0.0031` at four decimals and `$999.99` at two, both seven
+ * characters, so the sizer covers every form the formatter emits. Both strings
+ * are layout measurements and never reach a reader.
  */
-const PRIMARY_SLOT_CLASS = 'w-8 text-center';
-const COST_SLOT_CLASS = 'w-12 text-center';
+const WIDEST_PERCENTAGE = '100%';
+const WIDEST_COST = '$0.0031';
+const VALUE_SLOT_CLASS = 'min-w-0 shrink items-center justify-center';
+const VALUE_TEXT_CLASS = 'text-xs tabular-nums';
+const VALUE_OVERLAY_CLASS = 'absolute inset-0 items-center justify-center';
 
 /**
  * Full-bleed box over the value row that centres the loading bar in it. The row
- * keeps a fixed width, and its height follows the font scale, so the bar takes
- * those instead of a fixed size of its own.
+ * is sized by its own text, so its width and height follow the font scale; the
+ * bar takes those instead of a fixed size of its own.
  */
 const LOADING_BAR_OVERLAY = {
   position: 'absolute',
@@ -124,49 +132,62 @@ export function SessionContextMetrics({
   const pillClassName =
     'h-[44px] shrink min-w-0 flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
 
-  // Both value slots keep one width in every pill state: the placeholder row, an
-  // unresolved dash and a settled value all occupy the same box, so the row keeps
-  // its width while usage and cost arrive. The row ends the trailing cluster, so
-  // a row that grew or shrank would move the Follow control beside it.
-  // A slot with nothing to paint keeps its dash but paints it invisible, so no
-  // dash stands in for a value that has not arrived. The cost is the only
-  // unbounded text here, and it truncates to one line inside its slot.
+  // A slot with nothing to paint shows only its invisible sizer, so no dash
+  // stands in for a value that has not arrived while the row keeps its width.
+  // The loading state already paints the whole row invisible under its bar.
   const costLabel = content.costSlot === 'label' && content.secondary !== null;
   const costText = content.secondary ?? UNKNOWN_WINDOW_LABEL;
-  // The loading state already paints the whole row invisible under its bar.
   const costUnresolved = content.costSlot === 'none';
 
   const primarySlot = (
-    <Text
-      numberOfLines={1}
-      className={cn(
-        'min-w-0 shrink text-xs font-semibold tabular-nums',
-        PRIMARY_SLOT_CLASS,
-        toneTextClass(content.tone),
-        content.primary === null && 'opacity-0'
-      )}
-      {...(content.primary === null
-        ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
-        : {})}
-    >
-      {content.primary ?? UNKNOWN_WINDOW_LABEL}
-    </Text>
+    <View className={VALUE_SLOT_CLASS}>
+      <Text
+        numberOfLines={1}
+        className={cn(VALUE_TEXT_CLASS, 'font-semibold opacity-0')}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        {/* oxlint-disable-next-line no-literal-copy/no-literal-copy -- layout measurement, never read */}
+        {WIDEST_PERCENTAGE}
+      </Text>
+      {content.primary !== null ? (
+        <View className={VALUE_OVERLAY_CLASS}>
+          <Text
+            numberOfLines={1}
+            className={cn(VALUE_TEXT_CLASS, 'font-semibold', toneTextClass(content.tone))}
+          >
+            {content.primary}
+          </Text>
+        </View>
+      ) : null}
+    </View>
   );
 
   const costSlot = (
-    <Text
-      numberOfLines={1}
-      className={cn(
-        'min-w-0 shrink text-xs tabular-nums text-muted-foreground',
-        COST_SLOT_CLASS,
-        costUnresolved && 'opacity-0'
-      )}
-      {...(costLabel
-        ? {}
-        : { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const })}
-    >
-      {costLabel ? isolateLtrBidiText(costText) : costText}
-    </Text>
+    <View className={VALUE_SLOT_CLASS}>
+      <Text
+        numberOfLines={1}
+        className={cn(VALUE_TEXT_CLASS, 'text-muted-foreground opacity-0')}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        {/* oxlint-disable-next-line no-literal-copy/no-literal-copy -- layout measurement, never read */}
+        {WIDEST_COST}
+      </Text>
+      {costLabel || !costUnresolved ? (
+        <View className={VALUE_OVERLAY_CLASS}>
+          <Text
+            numberOfLines={1}
+            className={cn(VALUE_TEXT_CLASS, 'text-muted-foreground')}
+            {...(costLabel
+              ? {}
+              : { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const })}
+          >
+            {costLabel ? isolateLtrBidiText(costText) : costText}
+          </Text>
+        </View>
+      ) : null}
+    </View>
   );
 
   // While the session still resolves, the row's two dashes keep their layout and
@@ -188,7 +209,7 @@ export function SessionContextMetrics({
       <View className="min-w-0 shrink">
         <View
           className={cn(
-            'min-w-0 shrink flex-row items-baseline gap-1',
+            'min-w-0 shrink flex-row items-center gap-1',
             valueRowLoading && 'opacity-0'
           )}
           {...(valueRowLoading

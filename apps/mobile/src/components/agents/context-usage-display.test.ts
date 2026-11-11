@@ -264,9 +264,9 @@ describe('getHeaderPillContent', () => {
 
   it('shows cost only, not interactive, arc 0 when transcript exists without context', () => {
     expect(pill({ totalCostMicrodollars: 80_000, hasMessages: true })).toEqual({
-      primary: '$0.08',
-      secondary: null,
-      costSlot: 'none',
+      primary: null,
+      secondary: '$0.08',
+      costSlot: 'label',
       tone: 'neutral',
       arcFraction: 0,
       interactive: false,
@@ -598,6 +598,10 @@ describe('pure integration fallback', () => {
     const result = pill({ totalCostMicrodollars: 80_000, hasMessages: true });
     expect(result.interactive).toBe(false);
     expect(result.arcFraction).toBe(0);
-    expect(result.primary).toBe('$0.08');
+    // The cost takes the cost slot, which holds the widest badge; the
+    // percentage slot stays reserved and empty.
+    expect(result.primary).toBeNull();
+    expect(result.secondary).toBe('$0.08');
+    expect(result.costSlot).toBe('label');
   });
 });

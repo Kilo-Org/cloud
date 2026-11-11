@@ -1587,15 +1587,21 @@ describe('session detail header right cluster', () => {
     priced.info = { ...priced.info, sessionID: ROOT_ID, cost: 1234.56 };
     const { renderer } = await mountDetails([priced]);
     const expected = formatSessionCostBadge(1234.56 * 1_000_000);
-    expect(expected).not.toBeNull();
+    if (expected === null) {
+      throw new Error('expected a formatted cost badge');
+    }
     const metrics = renderer.root.findByProps({ testID: 'session-context-metrics' });
     const cost = metrics.find(
       node =>
         Object.is(node.type, 'Text') &&
-        node.children.some(child => typeof child === 'string' && child === expected)
+        node.children.some(child => typeof child === 'string' && child.includes(expected))
     );
     expect(cost.props.numberOfLines).toBe(1);
-    expect(cost.props.className).toContain('shrink');
+    // The value sits in a slot sized by the widest badge and shrinks with the
+    // pill, so a longer total truncates inside the pill instead of crossing it.
+    const slot = cost.parent?.parent;
+    expect(slot?.props.className).toContain('shrink');
+    expect(slot?.props.className).toContain('min-w-0');
   });
 });
 

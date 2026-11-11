@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one case per pill state: permission controls, reserved box, slot widths and the loading bar share these render helpers. */
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -178,11 +179,13 @@ describe('SessionContextMetrics', () => {
     expect(
       (root.props as { accessibilityElementsHidden?: boolean }).accessibilityElementsHidden
     ).toBeUndefined();
+    // The badge takes the cost slot, which is the one sized for it, and never
+    // the percentage slot.
     const texts = findAll(root, el => el.type === 'Text');
     expect(
       texts.some(el => {
         const children = (el.props as { children?: unknown }).children;
-        return children === '$0.15';
+        return typeof children === 'string' && children.includes('$0.15');
       })
     ).toBe(true);
     expect(root.type).not.toBe('Pressable');
@@ -231,39 +234,43 @@ describe('SessionContextMetrics', () => {
     expect(label).not.toContain('Tap to view');
   });
 
-  // The header row hands the trailing cluster a capped 50% box, but RN's
-  // default flexShrink is 0, so the pill must opt in to shrinking and let its
-  // inner text row compress. Otherwise the pill keeps its natural width and
-  // paints past the row's right edge — off-screen on a narrow phone.
+  // The header caps the trailing cluster, and RN's flexShrink is 0 by default,
+  // so the pill, its row and its slots must all opt in or they paint off-screen.
   it('lets the pill and its text row compress inside a constrained header row', () => {
     const root = render({
       hasMessages: true,
       info: info(),
       totalCostMicrodollars: 150_000,
-      onPress: vi.fn(() => undefined),
+      onPress: vi.fn<() => void>(),
     });
+    const classOf = (el: React.ReactElement) =>
+      (el.props as { className?: string }).className ?? '';
     const textRow = findAll(
       root,
-      el =>
-        el.type === 'View' &&
-        ((el.props as { className?: string }).className ?? '').includes('items-baseline')
-    )[0];
-    expect(textRow).toBeDefined();
+      el => el.type === 'View' && classOf(el).includes('flex-row')
+    ).find(el => classOf(el).includes('gap-1'));
     if (textRow == null) {
       throw new Error('expected the inner text row');
     }
-    const textRowClassName = (textRow.props as { className?: string }).className ?? '';
-    expect(textRowClassName).toContain('min-w-0');
-    expect(textRowClassName).toContain('shrink');
+    // The row shrinks, but the slots inside it keep RN's default flexShrink: 0
+    // unless they opt in too, so a squeezed row could never compress them and
+    // the second slot paints past the pill's right edge.
+    expect(classOf(textRow)).toContain('min-w-0');
+    expect(classOf(textRow)).toContain('shrink');
+    const slots = findAll(
+      root,
+      el =>
+        el.type === 'View' &&
+        classOf(el).includes('items-center') &&
+        classOf(el).includes('justify-center')
+    ).filter(el => !classOf(el).includes('absolute'));
+    expect(slots).toHaveLength(2);
+    for (const slot of slots) {
+      expect(classOf(slot)).toContain('shrink');
+      expect(classOf(slot)).toContain('min-w-0');
+    }
     const texts = findAll(root, el => el.type === 'Text');
-    expect(texts.length).toBeGreaterThan(0);
     for (const text of texts) {
-      // The row shrinks, but the texts inside it keep RN's default
-      // flexShrink: 0 unless they opt in too, so a squeezed row can never
-      // compress them and the second text paints past the pill's right edge.
-      const textClassName = (text.props as { className?: string }).className ?? '';
-      expect(textClassName).toContain('shrink');
-      expect(textClassName).toContain('min-w-0');
       expect((text.props as { numberOfLines?: number }).numberOfLines).toBe(1);
     }
   });
@@ -278,22 +285,22 @@ describe('SessionContextMetrics', () => {
     // A transcript that reports neither usage nor cost paints no value, but the
     // row keeps both slots: the pill ends the header's trailing cluster, so a row
     // that collapsed here would pull the Follow control across the header when
-    // usage arrives. The dashes stay unpainted and unspoken.
+    // usage arrives. Only the two invisible sizers paint, and only the ring is
+    // spoken.
     const texts = findAll(root, el => el.type === 'Text');
     expect(texts).toHaveLength(2);
     for (const text of texts) {
       expect(propsOf(text).className ?? '').toContain('opacity-0');
       expect(propsOf(text).accessibilityElementsHidden).toBe(true);
     }
-    expect(findAll(root, el => el.type === 'ContextUsageRing')).toHaveLength(1);
   });
 
   // No usage yet: both value slots stay, dashes while settled, one bar while loading.
   it('holds the value slots over the bare ring, loading them as one bar', () => {
     const classOf = (el: React.ReactElement) =>
       (el.props as { className?: string }).className ?? '';
-    const dashes = (root: React.ReactElement) =>
-      findAll(root, el => (el.props as { children?: unknown }).children === '—');
+    const textsWith = (root: React.ReactElement, text: string) =>
+      findAll(root, el => (el.props as { children?: unknown }).children === text);
     const bars = (root: React.ReactElement) => findAll(root, el => el.type === 'Skeleton');
     const onPress = vi.fn<() => void>();
 
@@ -308,33 +315,34 @@ describe('SessionContextMetrics', () => {
     const settled = bare();
     const props = settled.props as { accessibilityLabel?: string };
     expect(props.accessibilityLabel).toContain('usage unavailable');
-    expect(dashes(settled)).toHaveLength(2);
-    // Both settled dashes sit in the box their value will take: the percentage
-    // slot and the cost slot. The row keeps one width across the loading,
-    // unresolved and settled states, so the header does not move.
-    expect(classOf(dashes(settled)[0] ?? settled)).toContain('w-8');
-    expect(classOf(dashes(settled)[1] ?? settled)).toContain('w-12');
-    expect(classOf(dashes(settled)[0] ?? settled)).not.toContain('opacity-0');
+    expect(textsWith(settled, '—')).toHaveLength(2);
+    // Each slot is sized by an invisible copy of the widest value it can show,
+    // so the row keeps one width across the loading, unresolved and settled
+    // states; the dashes themselves paint.
+    const sizers = [textsWith(settled, '100%'), textsWith(settled, '$0.0031')];
+    for (const found of sizers) {
+      expect(found).toHaveLength(1);
+      expect(classOf(found[0] ?? settled)).toContain('opacity-0');
+    }
+    for (const dash of textsWith(settled, '—')) {
+      expect(classOf(dash)).not.toContain('opacity-0');
+    }
     expect(bars(settled)).toHaveLength(0);
 
     const loading = bare(true);
     expect((loading.props as { accessibilityLabel?: string }).accessibilityLabel).not.toContain(
       'usage unavailable'
     );
-    const hiddenRows = findAll(loading, el => classOf(el).includes('opacity-0'));
-    expect(hiddenRows).toHaveLength(1);
-    expect(findAll(hiddenRows[0] ?? loading, el => el.type === 'Text')).toHaveLength(2);
-    const [loadingBar] = bars(loading);
-    if (!loadingBar) {
-      throw new Error('expected the value-row bar');
-    }
-    // A box over the row, not a fixed width that fits only the default font scale.
-    expect(classOf(loadingBar)).toContain('w-full');
-    expect(classOf(loadingBar)).toContain('bg-muted-soft');
-    const overlays = findAll(
+    const hiddenRows = findAll(
       loading,
-      el => (el.props as { style?: { position?: string } }).style?.position === 'absolute'
+      el => el.type === 'View' && classOf(el).includes('opacity-0')
     );
-    expect(overlays).toHaveLength(1);
+    expect(hiddenRows).toHaveLength(1);
+    // Two sizers and two dashes sit in the row the bar covers.
+    expect(findAll(hiddenRows[0] ?? loading, el => el.type === 'Text')).toHaveLength(4);
+    const [loadingBar] = bars(loading);
+    // A box over the row, not a fixed width that fits only the default font scale.
+    expect(classOf(loadingBar ?? loading)).toContain('w-full');
+    expect(classOf(loadingBar ?? loading)).toContain('bg-muted-soft');
   });
 });

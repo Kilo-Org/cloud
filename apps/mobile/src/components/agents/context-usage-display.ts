@@ -164,13 +164,15 @@ export function getHeaderPillContent({
     };
   }
   // A transcript without usage. The pill keeps the track-only ring and, when
-  // this screen already knows it, the session's cost, and never a dash standing
-  // in for a value that has not arrived; only the dash above, for usage without
-  // a context window, is a real value.
+  // this screen already knows it, the session's cost — in the cost slot, where
+  // the badge has the width it needs; the percentage slot stays reserved and
+  // unpainted. It never paints a dash standing in for a value that has not
+  // arrived; only the dash above, for usage without a context window, is a real
+  // value.
   return {
-    primary: costText,
-    secondary: null,
-    costSlot: 'none',
+    primary: null,
+    secondary: costText,
+    costSlot: costText === null ? 'none' : 'label',
     tone: 'neutral',
     arcFraction: 0,
     interactive: false,

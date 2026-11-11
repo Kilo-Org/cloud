@@ -1315,6 +1315,107 @@ describe('logMicrodollarUsage', () => {
     }
   );
 
+  describe('served model recovery', () => {
+    const generationModel = 'anthropic/claude-3-7-sonnet-20250219';
+    const responseAlias = 'anthropic/claude-3.7-sonnet';
+    const requestedModel = 'openrouter/free';
+
+    test.each([
+      {
+        name: 'recovers the generation model when the response model is missing',
+        responseModel: undefined,
+        generationModel,
+        expectedModel: generationModel,
+      },
+      {
+        name: 'recovers the generation model when the response model is null',
+        responseModel: null,
+        generationModel,
+        expectedModel: generationModel,
+      },
+      {
+        name: 'recovers the generation model when the response model is empty',
+        responseModel: '',
+        generationModel,
+        expectedModel: generationModel,
+      },
+      {
+        name: 'prefers the response alias over the dated generation model',
+        responseModel: responseAlias,
+        generationModel,
+        expectedModel: responseAlias,
+      },
+      {
+        name: 'falls back to the requested model when the generation model is empty',
+        responseModel: null,
+        generationModel: '',
+        expectedModel: requestedModel,
+      },
+      {
+        name: 'falls back to the requested model when the generation lookup fails',
+        responseModel: null,
+        generationModel: undefined,
+        expectedModel: requestedModel,
+      },
+    ])('$name', async ({ responseModel, generationModel, expectedModel }) => {
+      const user = await insertTestUser();
+      const messageId = `gen-model-recovery-${crypto.randomUUID()}`;
+      jest.mocked(fetchGeneration).mockReset();
+      jest.mocked(fetchGeneration).mockResolvedValueOnce(
+        generationModel === undefined
+          ? undefined
+          : {
+              data: {
+                id: messageId,
+                model: generationModel,
+                provider_name: 'Amazon Bedrock',
+                is_byok: false,
+                total_cost: 0,
+                created_at: new Date().toISOString(),
+                origin: '',
+                usage: 0,
+                native_tokens_prompt: 10,
+                native_tokens_completion: 2,
+              },
+            }
+      );
+
+      const result = await countAndStoreUsage(
+        new Response(
+          JSON.stringify({
+            id: messageId,
+            model: responseModel,
+            choices: [{ message: { content: 'Test response' }, finish_reason: 'stop' }],
+            usage: {
+              cost: 0,
+              is_byok: false,
+              prompt_tokens: 10,
+              completion_tokens: 2,
+              total_tokens: 12,
+            },
+          }),
+          { headers: { 'content-type': 'application/json' } }
+        ),
+        { ...createBaseUsageContext(user), requested_model: requestedModel, isStreaming: false },
+        undefined
+      ).usagePromise;
+
+      assert(result);
+      expect(fetchGeneration).toHaveBeenCalledTimes(1);
+      expect(fetchGeneration).toHaveBeenCalledWith(messageId, OPENROUTER);
+      const usage = await db.query.microdollar_usage.findFirst({
+        where: eq(microdollar_usage.id, result.usageId),
+      });
+      expect(usage).toMatchObject({
+        model: expectedModel,
+        requested_model: requestedModel,
+      });
+      if (generationModel !== undefined) {
+        expect(usage?.inference_provider).toBe('Amazon Bedrock');
+      }
+    });
+  });
+
   async function waitForExpectation(expectation: () => Promise<void>): Promise<void> {
     const deadline = Date.now() + 2000;
     let lastError: unknown;

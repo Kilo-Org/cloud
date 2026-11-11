@@ -2,7 +2,6 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { AppState, Keyboard, Pressable, View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,6 +35,7 @@ import {
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
+import { OwnedKeyboardLift } from '@/components/agents/owned-keyboard-lift';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { IconButton } from '@/components/ui/icon-button';
@@ -410,6 +410,10 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
         getItemType={() => 'session'}
         style={rowsInsets.frame}
         contentContainerStyle={rowsInsets.content}
+        // Same contract as the history list: the compact search field above
+        // this list holds the keyboard, and a row must answer the first tap
+        // instead of the list consuming it to close the keyboard.
+        keyboardShouldPersistTaps="handled"
         refreshControl={rowsControl}
         maintainVisibleContentPosition={{ autoscrollToTopThreshold: 10 }}
       />
@@ -500,11 +504,9 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
           />
         ) : null}
         {/* Android runs edge-to-edge and never resizes the window for the IME,
-            so the keyboard is cleared natively: `KeyboardProvider` measures the
-            IME and this view lifts by the overlap it reports. */}
-        <KeyboardAvoidingView className="flex-1" behavior="padding" enabled={keyboard.owned}>
-          {region}
-        </KeyboardAvoidingView>
+            so the body clears the IME natively: the shared lift pads by the
+            keyboard this screen's own field raised. */}
+        <OwnedKeyboardLift occlusion={keyboard.occlusion}>{region}</OwnedKeyboardLift>
         {/* Empty content owns its creation action; the no-match body owns the band. */}
         {showFab && <SessionListFab organizationId={organizationId} style={fabStyle} />}
         <SessionFilterModal

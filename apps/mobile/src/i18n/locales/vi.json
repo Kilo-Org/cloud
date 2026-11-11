@@ -22,6 +22,8 @@
     "expired": "Đã hết hạn"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Hủy",
     "done": "Xong",
     "retry": "Thử lại",
@@ -1919,7 +1921,8 @@
       "selectedProfile": "Hồ sơ đã chọn",
       "manualOverrides": "Ghi đè thủ công",
       "openSettingsToReview": "Mở Cài đặt để xem lại",
-      "profileSelection": "Lựa chọn hồ sơ"
+      "profileSelection": "Lựa chọn hồ sơ",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Đã cập nhật {{displayCount}} tệp.",
@@ -2216,7 +2219,7 @@
       "positionHint": "(1 trong số {{displayCount}})",
       "movedPastPrompt": "Tác nhân đã chuyển sang bước khác. Thẻ này sẽ đóng khi phiên tiếp tục.",
       "waitingForAnswer": "Tác nhân đang chờ bạn trả lời. Việc gửi tin nhắn cho tác nhân sẽ tạm dừng cho đến khi câu hỏi này được đóng.",
-      "waitingForPermission": "Tác nhân đang chờ được cấp quyền. Việc gửi tin nhắn cho tác nhân sẽ tạm dừng cho đến khi yêu cầu này được đóng."
+      "waitingForPermission": "Việc gửi tin nhắn cho tác nhân sẽ tạm dừng cho đến khi yêu cầu này được đóng."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -2947,7 +2950,11 @@
       "retryLoadingMoreFiles": "Thử tải thêm tệp",
       "title": "Tệp",
       "viewedCount": "Đã xem {{viewed}}/{{total}}",
-      "viewedOfListed": "Đã xem {{viewed}}/{{total}} tệp trong danh sách"
+      "viewedCount_one": "Đã xem {{viewed}}/{{total}}",
+      "viewedCount_other": "Đã xem {{viewed}}/{{total}}",
+      "viewedOfListed": "Đã xem {{viewed}}/{{total}} tệp trong danh sách",
+      "viewedOfListed_one": "Đã xem {{viewed}}/{{total}} tệp trong danh sách",
+      "viewedOfListed_other": "Đã xem {{viewed}}/{{total}} tệp trong danh sách"
     },
     "fileRows": {
       "collapseFile": "Thu gọn tệp",
@@ -3535,7 +3542,7 @@
       "provider": "Đã dừng: lỗi nhà cung cấp",
       "tool": "Đã dừng: lỗi công cụ",
       "cancelled": "Đã dừng: đã hủy",
-      "other": "ĐÃ DỪNG"
+      "other": "Đã dừng"
     }
   },
   "transcriptionModel": {
@@ -4271,10 +4278,10 @@
     "snapshotSummaryFailed": "Tạo tóm tắt AI thất bại. Bản chụp có cấu trúc vẫn khả dụng.",
     "scheduledContextEnabled": "Bản tin theo lịch",
     "scheduledContextSettings": "Bản tin theo lịch · {{context}}",
-    "scheduledContextHint": "Bật ghi lại trạng thái theo lịch và tóm tắt AI trả phí chỉ cho ngữ cảnh này. Các đoạn trích đã chọn và ẩn thông tin nhạy cảm cùng dữ kiện có cấu trúc sẽ được gửi đến mô hình của bạn. Bản tóm tắt dùng ngôn ngữ ứng dụng được lưu khi bạn chủ động cập nhật cài đặt bản tin. Ngôn ngữ này không tự động đồng bộ khi bạn đổi ngôn ngữ ứng dụng. Phí được trừ vào số dư của ngữ cảnh này. Bản chụp không có hoạt động không dùng AI.",
+    "scheduledContextHint": "Bật ghi lại trạng thái theo lịch và tóm tắt AI trả phí chỉ cho ngữ cảnh này. Các đoạn trích đã chọn và ẩn thông tin nhạy cảm cùng dữ kiện có cấu trúc sẽ được gửi đến mô hình của bạn. Bản tóm tắt dùng ngôn ngữ ứng dụng được lưu khi bạn cập nhật cài đặt bản tin. Phí được trừ vào số dư của ngữ cảnh này. Bản chụp không có hoạt động không dùng AI.",
     "snapshotSafeguards": "Giới hạn thời gian và chi phí cho mỗi tóm tắt áp dụng riêng cho từng bản chụp theo lịch, không phải ngân sách hằng ngày.",
     "snapshotEstimateInputTooLarge": "Bản chụp này có quá nhiều dữ liệu minh chứng cho mô hình đã chọn.",
-    "quietSnapshot": "Trong phạm vi dữ liệu thu thập được, không có hoạt động phiên nào được chọn cho bản chụp này. Không gọi mô hình AI để tạo tóm tắt và không tính phí.",
+    "quietSnapshot": "Không có hoạt động phiên nào được chọn cho bản chụp này. Không có tóm tắt AI nào được yêu cầu hay tính phí.",
     "noEnabledContexts": "Chưa bật bản tin theo lịch cho ngữ cảnh nào",
     "sourceBlocker": "Phiên cần được chú ý",
     "sourceMetadata": "Siêu dữ liệu phiên đã ghi lại"

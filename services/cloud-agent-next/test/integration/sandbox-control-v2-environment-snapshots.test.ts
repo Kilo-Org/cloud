@@ -230,10 +230,6 @@ async function setup(
       NEXTAUTH_SECRET: WORKER_SECRET,
       // Credential grants require the runtime proxy facade, independent of local settings.
       WORKER_URL: 'https://worker.example.com',
-      // These tests use fake providers, independently of local runtime deployment settings.
-      RUNTIME_STARTUP_MODE: 'preinstalled',
-      NATIVE_RUNTIME_IMAGE: 'all-in-one',
-      RUNTIME_RELEASE_DESCRIPTOR: undefined,
       ...extraEnv,
     });
     peer.runtimeProxyForSession = createRuntimeProxyMintingPeer(instance.env, sessionId => {
@@ -364,8 +360,8 @@ describe('environment snapshot launch', () => {
     const { wrapper, allocationId } = await connect(sandboxId, provider, 2);
 
     expect(provider.launchOptions).toEqual([
-      { snapshot: SNAPSHOT, nativeImage: 'all-in-one' },
-      { snapshot: SNAPSHOT, nativeImage: 'all-in-one' },
+      { snapshot: SNAPSHOT, nativeImage: 'runtime-free' },
+      { snapshot: SNAPSHOT, nativeImage: 'runtime-free' },
     ]);
     expect(provider.launchRefs[1]).toBe(provider.launchRefs[0]);
     expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
@@ -374,7 +370,7 @@ describe('environment snapshot launch', () => {
     await prepareFrameOf(wrapper);
     expect(await readLaunchRecord(stub)).toEqual({
       allocationId,
-      startupMode: 'preinstalled',
+      startupMode: 'downloaded',
       startSource: 'repository',
       confirmed: true,
     });
@@ -465,7 +461,7 @@ describe('environment snapshot launch', () => {
     const { wrapper } = await connect('sbx__env_launch_selected', provider);
     const frame = await prepareFrameOf(wrapper);
 
-    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT, nativeImage: 'all-in-one' }]);
+    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT, nativeImage: 'runtime-free' }]);
     expect(lookups.lookups).toEqual([{ reference: REFERENCE, actorUserId: 'user_123' }]);
     expect(frame.spec.capture).toBeUndefined();
     expect(frame.spec).not.toHaveProperty('environment');
@@ -516,7 +512,7 @@ describe('environment snapshot launch', () => {
     const { wrapper } = await connect(sandboxId, provider);
     const frame = await prepareFrameOf(wrapper);
 
-    expect(provider.launchOptions).toEqual([{ nativeImage: 'all-in-one' }]);
+    expect(provider.launchOptions).toEqual([{ nativeImage: 'runtime-free' }]);
     expect(lookups.lookups).toEqual([]);
     expect(frame.spec.capture).toBeUndefined();
   });
@@ -609,7 +605,7 @@ describe('environment snapshot launch', () => {
 
     await connect('sbx__repo_launch_keep', provider);
 
-    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT, nativeImage: 'all-in-one' }]);
+    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT, nativeImage: 'runtime-free' }]);
   });
 
   it('does not carry a previous confirmation onto a launch that never connects', async () => {
@@ -665,7 +661,7 @@ describe('environment snapshot launch', () => {
     provider.launchHold = false;
     await releaseHeld(stub, () => provider.releaseStop());
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
-    expect(provider.launchOptions[1]).toEqual({ snapshot: SNAPSHOT, nativeImage: 'all-in-one' });
+    expect(provider.launchOptions[1]).toEqual({ snapshot: SNAPSHOT, nativeImage: 'runtime-free' });
   });
 
   it('marks the launch confirmed only for the allocation whose wrapper connected', async () => {

@@ -11,6 +11,7 @@ import {
   type CollaboratorPermission,
   type GitHubAppType,
 } from '@/lib/integrations/platforms/github/adapter';
+import { lastLinkedPage } from '@/lib/integrations/platforms/github/link-header';
 import {
   getGitHubUserAccessToken,
   type GitHubUserAccessTokenConnected,
@@ -32,8 +33,14 @@ export const FIX_REVIEW_COMMENT_BODY_MAX_LENGTH = 4_000;
 export const FIX_REVIEW_MAX_COMMENTS = 20;
 export const FIX_REVIEW_TOTAL_BODY_MAX_LENGTH = 40_000;
 const COMMENTS_PAGE_SIZE = 100;
+/** Review-comment pages, 100 comments each, that one submission may read. */
+export const FIX_REVIEW_COMMENTS_MAX_PAGES = 20;
+/** Comment text that one submission may hold while it reads the comment pages. */
+export const FIX_REVIEW_COMMENTS_TOTAL_BODY_MAX_LENGTH = 400_000;
 const REVIEW_THREADS_MAX_PAGES = 20;
 const THREAD_COMMENTS_MAX_PAGES = 20;
+/** Author permission lookups that one submission may keep in flight. */
+export const FIX_REVIEW_PERMISSION_LOOKUP_CONCURRENCY = 4;
 
 function isGitHubAuthenticationRejection(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'status' in error && error.status === 401;
@@ -158,8 +165,15 @@ export type FixReviewTarget = {
   pullNumber: number;
 };
 
+export type FixReviewCommentListing = {
+  /** The pull request's review comments within the read bounds, oldest first. */
+  comments: FixReviewComment[];
+  /** Review comments the read bounds kept out of the listing. */
+  unreadCount: number;
+};
+
 export type FixReviewCommentClient = {
-  listComments: () => Promise<FixReviewComment[]>;
+  listComments: () => Promise<FixReviewCommentListing>;
   lookupPermission: (login: string) => Promise<CollaboratorPermission | null>;
   listSettledCommentIds: (prAuthor: string) => Promise<ReadonlySet<number>>;
 };
@@ -172,6 +186,89 @@ function splitRepositoryFullName(repositoryFullName: string): { owner: string; r
   return { owner, repo };
 }
 
+/**
+ * Reads the pull request's review comments within a fixed page budget and a
+ * fixed text budget.
+ *
+ * The newest comments are the ones a run was started for, so a pull request
+ * with more pages than the budget is read from its last page down and its older
+ * comments are reported as unread. The last page is read first, so the number
+ * of comments the read skipped is known without reading the skipped pages. A
+ * response that does not state its last page in either form is an error: the
+ * caller refuses a session whose comment count cannot be established.
+ */
+async function readReviewComments(
+  octokit: Octokit,
+  target: FixReviewTarget
+): Promise<FixReviewCommentListing> {
+  const { owner, repo, pullNumber } = target;
+  const readPage = (page: number, perPage = COMMENTS_PAGE_SIZE) =>
+    octokit.pulls.listReviewComments({
+      owner,
+      repo,
+      pull_number: pullNumber,
+      per_page: perPage,
+      page,
+    });
+
+  const firstPage = await readPage(1);
+  let lastPage = lastLinkedPage(firstPage.headers.link);
+  let listedCount: number | null = null;
+  if (lastPage === null && firstPage.headers.link !== undefined) {
+    // The header names pages but no last page. One row per page makes the last
+    // page number the comment count, so the read still starts at the newest
+    // page instead of keeping the oldest one.
+    const oneRow = await readPage(1, 1);
+    const probedLastPage = lastLinkedPage(oneRow.headers.link);
+    if (probedLastPage === null) {
+      throw new Error('GitHub did not report the last page of the review comments');
+    }
+    listedCount = probedLastPage;
+    lastPage = Math.max(1, Math.ceil(listedCount / COMMENTS_PAGE_SIZE));
+  } else if (
+    lastPage === null &&
+    firstPage.headers.link === undefined &&
+    firstPage.data.length === COMMENTS_PAGE_SIZE
+  ) {
+    // This first page states no next page, so read the next page once: the
+    // list ends there only when that page is empty.
+    const nextPage = await readPage(2);
+    if (nextPage.data.length > 0) {
+      throw new Error('GitHub did not report the last page of the review comments');
+    }
+  }
+  const pageCount = lastPage ?? 1;
+  const firstPageToRead = Math.max(1, pageCount - FIX_REVIEW_COMMENTS_MAX_PAGES + 1);
+  const pages: FixReviewComment[][] = [];
+  let bodyLength = 0;
+  let lastPageCount = 0;
+  for (let page = pageCount; page >= firstPageToRead; page -= 1) {
+    const data = page === 1 ? firstPage.data : (await readPage(page)).data;
+    if (page === pageCount) lastPageCount = data.length;
+    pages.push(
+      data.map(comment => ({
+        id: comment.id,
+        inReplyToId: comment.in_reply_to_id ?? null,
+        authorLogin: comment.user?.login ?? '',
+        authorType: comment.user?.type ?? '',
+        authorId: comment.user?.id ?? null,
+        path: comment.path,
+        line: comment.line ?? null,
+        body: comment.body,
+      }))
+    );
+    bodyLength += data.reduce((total, comment) => total + comment.body.length, 0);
+    if (bodyLength >= FIX_REVIEW_COMMENTS_TOTAL_BODY_MAX_LENGTH) break;
+  }
+
+  // Restore the provider's oldest-first order, which the prompt budget reads
+  // from its end, so an omitted comment is always an older one.
+  pages.reverse();
+  const comments = pages.flat();
+  const total = listedCount ?? COMMENTS_PAGE_SIZE * (pageCount - 1) + lastPageCount;
+  return { comments, unreadCount: Math.max(0, total - comments.length) };
+}
+
 export function createFixReviewCommentClient(
   octokit: Octokit,
   target: FixReviewTarget
@@ -179,31 +276,7 @@ export function createFixReviewCommentClient(
   const { owner, repo, pullNumber } = target;
 
   return {
-    async listComments() {
-      const comments: FixReviewComment[] = [];
-      for (let page = 1; ; page += 1) {
-        const { data } = await octokit.pulls.listReviewComments({
-          owner,
-          repo,
-          pull_number: pullNumber,
-          per_page: COMMENTS_PAGE_SIZE,
-          page,
-        });
-        for (const comment of data) {
-          comments.push({
-            id: comment.id,
-            inReplyToId: comment.in_reply_to_id ?? null,
-            authorLogin: comment.user?.login ?? '',
-            authorType: comment.user?.type ?? '',
-            authorId: comment.user?.id ?? null,
-            path: comment.path,
-            line: comment.line ?? null,
-            body: comment.body,
-          });
-        }
-        if (data.length < COMMENTS_PAGE_SIZE) return comments;
-      }
-    },
+    listComments: () => readReviewComments(octokit, target),
 
     async lookupPermission(login) {
       try {
@@ -339,8 +412,49 @@ function isInitiatorAuthor(
   if (initiator.githubUserId !== null && comment.authorId !== null) {
     return String(comment.authorId) === initiator.githubUserId;
   }
-  const loginKey = comment.authorLogin.trim().toLowerCase();
-  return loginKey.length > 0 && loginKey === initiator.login.trim().toLowerCase();
+  const key = loginKey(comment.authorLogin);
+  return key.length > 0 && key === loginKey(initiator.login);
+}
+
+/**
+ * A comment needs no repository permission lookup when Kilo's review bot or the
+ * account that started the run wrote it.
+ */
+function needsPermissionLookup(
+  comment: FixReviewComment,
+  initiator: FixReviewInitiatorIdentity | null
+): boolean {
+  if (
+    isKiloReviewBotAuthor({
+      login: comment.authorLogin,
+      type: comment.authorType,
+      id: comment.authorId,
+    })
+  ) {
+    return false;
+  }
+  return !isInitiatorAuthor(comment, initiator);
+}
+
+function loginKey(login: string): string {
+  return login.trim().toLowerCase();
+}
+
+/** Runs `visit` over the items with at most `limit` calls in flight. */
+async function eachWithinConcurrency<T>(
+  items: readonly T[],
+  limit: number,
+  visit: (item: T) => Promise<void>
+): Promise<void> {
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const item = items[nextIndex];
+      nextIndex += 1;
+      await visit(item);
+    }
+  });
+  await Promise.all(workers);
 }
 
 export async function selectFixReviewComments(input: {
@@ -349,41 +463,37 @@ export async function selectFixReviewComments(input: {
   settledCommentIds: ReadonlySet<number>;
   lookupPermission: (login: string) => Promise<CollaboratorPermission | null>;
 }): Promise<FixReviewComment[]> {
-  const permissionByLogin = new Map<string, Promise<CollaboratorPermission | null>>();
-
-  async function isAuthorized(comment: FixReviewComment): Promise<boolean> {
-    if (
-      isKiloReviewBotAuthor({
-        login: comment.authorLogin,
-        type: comment.authorType,
-        id: comment.authorId,
-      })
-    ) {
-      return true;
-    }
-    if (isInitiatorAuthor(comment, input.initiator)) return true;
-
-    const loginKey = comment.authorLogin.trim().toLowerCase();
-    if (loginKey.length === 0) return false;
-
-    let permission = permissionByLogin.get(loginKey);
-    if (!permission) {
-      permission = input.lookupPermission(comment.authorLogin);
-      permissionByLogin.set(loginKey, permission);
-    }
-    const resolved = await permission;
-    return resolved === 'admin' || resolved === 'write';
-  }
-
   // Only top-level comments can ask for a change. Replies carry the discussion
   // around one, including the replies the fix session writes itself.
   const candidates = input.comments.filter(
     comment => comment.inReplyToId === null && !input.settledCommentIds.has(comment.id)
   );
-  const authorization = await Promise.all(candidates.map(comment => isAuthorized(comment)));
+
+  // One lookup per distinct login, in the order the logins first appear, and
+  // never more of them in flight than the fixed limit: the lookup runs with the
+  // credential that serves every user of the installation.
+  const loginByKey = new Map<string, string>();
+  for (const comment of candidates) {
+    if (!needsPermissionLookup(comment, input.initiator)) continue;
+    const key = loginKey(comment.authorLogin);
+    if (key.length === 0 || loginByKey.has(key)) continue;
+    loginByKey.set(key, comment.authorLogin);
+  }
+  const permissionByKey = new Map<string, CollaboratorPermission | null>();
+  await eachWithinConcurrency(
+    [...loginByKey],
+    FIX_REVIEW_PERMISSION_LOOKUP_CONCURRENCY,
+    async ([key, login]) => {
+      permissionByKey.set(key, await input.lookupPermission(login));
+    }
+  );
 
   return candidates
-    .filter((_, index) => authorization[index])
+    .filter(comment => {
+      if (!needsPermissionLookup(comment, input.initiator)) return true;
+      const permission = permissionByKey.get(loginKey(comment.authorLogin));
+      return permission === 'admin' || permission === 'write';
+    })
     .map(comment => ({
       ...comment,
       body:
@@ -492,7 +602,10 @@ async function resolveCommentClient(input: {
 
 export type FixReviewSelection = {
   comments: FixReviewComment[];
-  /** Selected comments beyond the prompt budget, reported to the user. */
+  /**
+   * Comments left out of the prompt: those the read bounds did not fetch and
+   * those beyond the prompt budget, reported to the user.
+   */
   omittedCount: number;
 };
 
@@ -521,19 +634,19 @@ export async function selectFixReviewCommentsForReview(input: {
   });
 
   try {
-    const [comments, settledCommentIds] = await Promise.all([
+    const [listing, settledCommentIds] = await Promise.all([
       client.listComments(),
       client.listSettledCommentIds(input.prAuthor),
     ]);
 
     const selected = await selectFixReviewComments({
-      comments,
+      comments: listing.comments,
       initiator,
       settledCommentIds,
       lookupPermission: login => client.lookupPermission(login),
     });
 
-    return selectWithinPromptBudget(selected);
+    return selectWithinPromptBudget(selected, listing.unreadCount);
   } catch (error) {
     if (userCredential?.refreshSupported !== false) throw error;
     if (isGitHubAuthenticationRejection(error)) {
@@ -553,8 +666,12 @@ export async function selectFixReviewCommentsForReview(input: {
 /**
  * The newest comments are the ones a run was started for, so they are kept
  * first; the oldest are reported as omitted instead of crowding the prompt.
+ * Comments the read bounds did not fetch are omitted too.
  */
-function selectWithinPromptBudget(selected: readonly FixReviewComment[]): FixReviewSelection {
+function selectWithinPromptBudget(
+  selected: readonly FixReviewComment[],
+  unreadCount: number
+): FixReviewSelection {
   const kept: FixReviewComment[] = [];
   let budget = FIX_REVIEW_TOTAL_BODY_MAX_LENGTH;
   for (
@@ -568,5 +685,5 @@ function selectWithinPromptBudget(selected: readonly FixReviewComment[]): FixRev
     budget -= comment.body.length;
   }
   kept.reverse();
-  return { comments: kept, omittedCount: selected.length - kept.length };
+  return { comments: kept, omittedCount: unreadCount + selected.length - kept.length };
 }

@@ -22,6 +22,8 @@
     "expired": "Termiņš beidzies"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Atcelt",
     "done": "Gatavs",
     "retry": "Mēģināt vēlreiz",
@@ -361,7 +363,13 @@
       "retryLoadingFiles": "Mēģināt ielādēt failus vēlreiz",
       "filterPlaceholder": "Faila ceļš",
       "viewedCount": "apskatīti {{viewed}} no {{total}}",
+      "viewedCount_zero": "apskatīti {{viewed}} no {{total}}",
+      "viewedCount_one": "apskatīti {{viewed}} no {{total}}",
+      "viewedCount_other": "apskatīti {{viewed}} no {{total}}",
       "viewedOfListed": "apskatīti {{viewed}} no {{total}} saraksta failiem",
+      "viewedOfListed_zero": "apskatīti {{viewed}} no {{total}} saraksta failiem",
+      "viewedOfListed_one": "apskatīti {{viewed}} no {{total}} saraksta failiem",
+      "viewedOfListed_other": "apskatīti {{viewed}} no {{total}} saraksta failiem",
       "loadingFiles": "Ielādē failus: {{loaded}} no {{total}}…",
       "failedToLoadAllFiles": "Neizdevās ielādēt visus failus.",
       "couldNotLoadMoreFiles": "Neizdevās ielādēt papildu failus.",
@@ -2499,7 +2507,8 @@
       "selectedProfile": "Izvēlētais profils",
       "manualOverrides": "Manuāla ignorēšana",
       "openSettingsToReview": "Lai pārskatītu, atveriet iestatījumus",
-      "profileSelection": "Profila izvēle"
+      "profileSelection": "Profila izvēle",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Atjaunināts {{displayCount}} fails.",
@@ -2800,7 +2809,7 @@
       "positionHint": "(1 no {{displayCount}})",
       "movedPastPrompt": "Aģents jau ir pārgājis pie nākamā soļa. Šī kartīte aizvērsies, kad sesija turpināsies.",
       "waitingForAnswer": "Aģents gaida tavu atbildi. Kamēr šis jautājums ir atvērts, ziņojuma nosūtīšana aģentam ir apturēta.",
-      "waitingForPermission": "Aģents gaida atļauju. Kamēr šis pieprasījums ir atvērts, ziņojuma nosūtīšana aģentam ir apturēta."
+      "waitingForPermission": "Kamēr šis pieprasījums ir atvērts, ziņojuma nosūtīšana aģentam ir apturēta."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3590,7 +3599,7 @@
       "provider": "Apturēts: pakalpojuma sniedzēja kļūda",
       "tool": "Apturēts: rīka kļūda",
       "cancelled": "Apturēts: atcelts",
-      "other": "APTURĒTS"
+      "other": "Apturēts"
     }
   },
   "transcriptionModel": {
@@ -4318,7 +4327,7 @@
     "estimate": "Novērtējums {{estimate}} · maksimums {{maximum}}",
     "estimateUnavailable": "Apmaksāts kopsavilkums šiem iestatījumiem nav pieejams.",
     "confirmPaid": "Iespējot maksas kopsavilkumus kontekstam {{context}}?",
-    "paidDisclosure": "Aplēse {{estimate}}, līdz {{maximum}}, ar {{minutes}} minūšu ierobežojumu. Maksa tiek piemērota arī tad, ja ģenerēšana neizdodas.",
+    "paidDisclosure": "Aplēse {{estimate}}, līdz {{maximum}}, ar {{minutes}} min ierobežojumu. Maksa tiek piemērota arī tad, ja ģenerēšana neizdodas.",
     "enable": "Iespējot maksas kopsavilkumus",
     "allContexts": "Personīgās un organizācijas atskaites tiek glabātas atsevišķi.",
     "emptyHistory": "Nav saglabātu atskaišu",
@@ -4337,10 +4346,10 @@
     "snapshotSummaryFailed": "AI kopsavilkums neizdevās. Jūsu strukturētais momentuzņēmums joprojām ir pieejams.",
     "scheduledContextEnabled": "Plānotās atskaites",
     "scheduledContextSettings": "Plānotās atskaites · {{context}}",
-    "scheduledContextHint": "Iespējojiet plānotu stāvokļa fiksēšanu un maksas AI kopsavilkumus tikai šim kontekstam. Atlasīti fragmenti ar aizklātu sensitīvo informāciju un strukturēti fakti tiek nosūtīti jūsu modelim. Kopsavilkumiem tiek izmantota lietotnes valoda, kas tiek saglabāta tikai tad, kad maināt atskaites iestatījumus. Mainot tikai lietotnes valodu, saglabātā valoda automātiski nemainās. Maksa tiek ņemta no šī konteksta bilances. Momentuzņēmumiem bez aktivitātes AI netiek izmantots.",
+    "scheduledContextHint": "Iespējojiet plānotu stāvokļa fiksēšanu un maksas AI kopsavilkumus tikai šim kontekstam. Atlasīti fragmenti ar aizklātu sensitīvo informāciju un strukturēti fakti tiek nosūtīti jūsu modelim. Kopsavilkumiem tiek izmantota lietotnes valoda, kas tiek saglabāta, kad maināt atskaites iestatījumus. Maksa tiek ņemta no šī konteksta bilances. Momentuzņēmumiem bez aktivitātes AI netiek izmantots.",
     "snapshotSafeguards": "Kopsavilkuma laika un izdevumu ierobežojumi attiecas uz katru plānoto momentuzņēmumu, nevis dienas budžetu.",
     "snapshotEstimateInputTooLarge": "Šajā momentuzņēmumā ir pārāk daudz pierādījumu izvēlētajam modelim.",
-    "quietSnapshot": "Šim momentuzņēmumam netika atlasīta sesiju aktivitāte. Atlase var būt nepilnīga. AI kopsavilkums netika pieprasīts, un maksa netika piemērota.",
+    "quietSnapshot": "Šim momentuzņēmumam netika atlasīta sesiju aktivitāte. AI kopsavilkums netika pieprasīts, un maksa netika piemērota.",
     "noEnabledContexts": "Plānotajām atskaitēm nav iespējots neviens konteksts",
     "sourceBlocker": "Sesijai jāpievērš uzmanība",
     "sourceMetadata": "Fiksētie sesijas metadati"

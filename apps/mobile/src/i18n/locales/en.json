@@ -89,6 +89,8 @@
     "expired": "Expired"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Cancel",
     "done": "Done",
     "retry": "Retry",
@@ -427,8 +429,12 @@
       "couldNotLoadFiles": "Couldn't load files",
       "retryLoadingFiles": "Retry loading files",
       "filterPlaceholder": "Filter files by path",
+      "viewedCount_one": "{{viewed}} of {{total}} viewed",
       "viewedCount": "{{viewed}} of {{total}} viewed",
+      "viewedCount_other": "{{viewed}} of {{total}} viewed",
+      "viewedOfListed_one": "{{viewed}} of {{total}} viewed of listed files",
       "viewedOfListed": "{{viewed}} of {{total}} viewed of listed files",
+      "viewedOfListed_other": "{{viewed}} of {{total}} viewed of listed files",
       "loadingFiles": "Loading {{loaded}} of {{total}}…",
       "failedToLoadAllFiles": "Failed to load all files",
       "couldNotLoadMoreFiles": "Couldn't load more files",
@@ -2524,7 +2530,8 @@
       "selectedProfile": "Selected profile",
       "manualOverrides": "Manual overrides",
       "openSettingsToReview": "Open Settings to review",
-      "profileSelection": "Profile selection"
+      "profileSelection": "Profile selection",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Updated {{displayCount}} file",
@@ -2840,7 +2847,7 @@
       "positionHint": "(1 of {{displayCount}})",
       "movedPastPrompt": "The agent has moved past this prompt. This card will close when the session continues.",
       "waitingForAnswer": "The agent is waiting for your answer. While this question is open, your message to the agent is paused.",
-      "waitingForPermission": "The agent is waiting for permission. While this request is open, your message to the agent is paused."
+      "waitingForPermission": "While this request is open, your message to the agent is paused."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

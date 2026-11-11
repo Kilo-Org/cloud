@@ -22,6 +22,8 @@
     "expired": "Àkókò ti kọjá"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Fagilé",
     "done": "Ó ti tán",
     "retry": "Tún gbìyànjú",
@@ -361,7 +363,11 @@
       "retryLoadingFiles": "Tún gbìyànjú láti ṣàkójọ àwọn fáìlì",
       "filterPlaceholder": "Ọ̀nà fáìlì láti fi ṣàyọ̀",
       "viewedCount": "a ti wo {{viewed}} nínú {{total}}",
+      "viewedCount_one": "a ti wo {{viewed}} nínú {{total}}",
+      "viewedCount_other": "a ti wo {{viewed}} nínú {{total}}",
       "viewedOfListed": "a ti wo {{viewed}} nínú fáìlì {{total}} tó wà nínú àkójọ",
+      "viewedOfListed_one": "a ti wo {{viewed}} nínú fáìlì {{total}} tó wà nínú àkójọ",
+      "viewedOfListed_other": "a ti wo {{viewed}} nínú fáìlì {{total}} tó wà nínú àkójọ",
       "loadingFiles": "Ń ṣàkójọ {{loaded}} nínú {{total}}…",
       "failedToLoadAllFiles": "A kò lè ṣàkójọ gbogbo àwọn fáìlì.",
       "couldNotLoadMoreFiles": "A kò lè ṣàkójọ àwọn fáìlì sí i.",
@@ -2457,7 +2463,8 @@
       "selectedProfile": "Profaili ti o yan",
       "manualOverrides": "Afowoyi danu",
       "openSettingsToReview": "Ṣii Eto lati ṣe ayẹwo",
-      "profileSelection": "Aṣayan profaili"
+      "profileSelection": "Aṣayan profaili",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "A ti ṣe ìmúdójúìwọ̀n fáìlì {{displayCount}}.",
@@ -2754,7 +2761,7 @@
       "positionHint": "(1 nínú {{displayCount}})",
       "movedPastPrompt": "Aṣojú ti kọjá ọ̀rọ̀ ìtọ́ni yìí. Káàdì yìí yóò pa dé nígbà tí ìgbà iṣẹ́ bá tẹ̀síwájú.",
       "waitingForAnswer": "Aṣojú ń dúró de ìdáhùn rẹ. Bí ìbéèrè yìí ṣe ṣì ṣí sílẹ̀, a ti dá ìfiránṣẹ́ rẹ sí aṣojú dúró.",
-      "waitingForPermission": "Aṣojú ń dúró de ìyọ̀ǹda. Bí ìbéèrè yìí ṣe ṣì ṣí sílẹ̀, a ti dá ìfiránṣẹ́ rẹ sí aṣojú dúró."
+      "waitingForPermission": "Bí ìbéèrè yìí ṣe ṣì ṣí sílẹ̀, a ti dá ìfiránṣẹ́ rẹ sí aṣojú dúró."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3535,7 +3542,7 @@
       "provider": "Ó dúró: àṣìṣe olùpèsè",
       "tool": "Ó dúró: àṣìṣe irinṣẹ́",
       "cancelled": "Ó dúró: a fagilé",
-      "other": "TI DÚRÓ"
+      "other": "Ti dúró"
     }
   },
   "transcriptionModel": {
@@ -4271,10 +4278,10 @@
     "snapshotSummaryFailed": "Àkópọ̀ AI kùnà. Àkọsílẹ̀ ipò onílànà rẹ ṣì wà.",
     "scheduledContextEnabled": "Àwọn ìròyìn tí a ṣètò",
     "scheduledContextSettings": "Àwọn ìròyìn tí a ṣètò · {{context}}",
-    "scheduledContextHint": "Mú gbígba àkọsílẹ̀ ipò ní àkókò tí a ṣètò àti àkópọ̀ AI olówó ṣiṣẹ́ fún àyíká yìí nìkan. A ń fi àwọn àyọkà tí a yàn, tí a sì ti yọ ìsọfúnni àṣírí kúrò nínú wọn, àti òtítọ́ onílànà ránṣẹ́ sí àwòṣe rẹ. Àwọn àkópọ̀ ń lo èdè app tí a fi pamọ́ nígbà tí o bá yí ètò ìròyìn padà fúnra rẹ. Yíyí èdè app padà nìkan kì í yí èdè tí a fi pamọ́ yìí padà. Owó ń wá láti inú ìyókù àyíká yìí. Àwọn àkọsílẹ̀ ipò tí kò ní ìṣe kì í lo AI.",
+    "scheduledContextHint": "Mú gbígba àkọsílẹ̀ ipò ní àkókò tí a ṣètò àti àkópọ̀ AI olówó ṣiṣẹ́ fún àyíká yìí nìkan. A ń fi àwọn àyọkà tí a yàn, tí a sì ti yọ ìsọfúnni àṣírí kúrò nínú wọn, àti òtítọ́ onílànà ránṣẹ́ sí àwòṣe rẹ. Àwọn àkópọ̀ ń lo èdè app tí a fi pamọ́ nígbà tí o bá yí ètò ìròyìn padà fúnra rẹ. Owó ń wá láti inú ìyókù àyíká yìí. Àwọn àkọsílẹ̀ ipò tí kò ní ìṣe kì í lo AI.",
     "snapshotSafeguards": "Òpin àkókò àti ìnáwó fún àkópọ̀ kọ̀ọ̀kan kan àkọsílẹ̀ ipò kọ̀ọ̀kan tí a ṣètò, kì í ṣe ìnáwó ojoojúmọ́.",
     "snapshotEstimateInputTooLarge": "Ẹ̀rí nínú àkọsílẹ̀ ipò yìí pọ̀ ju ohun tí àwòṣe tí a yàn lè lò lọ.",
-    "quietSnapshot": "Bí ẹ̀rí tó wà ṣe gbà, kò sí ìṣe ìgbà iṣẹ́ tí a yàn fún àkọsílẹ̀ ipò yìí. A kò béèrè fún àkópọ̀ AI, a kò pe àwòṣe AI, a kò sì gba owó.",
+    "quietSnapshot": "Kò sí ìṣe ìgbà iṣẹ́ tí a yàn fún àkọsílẹ̀ ipò yìí. A kò béèrè fún àkópọ̀ AI, a kò sì gba owó.",
     "noEnabledContexts": "Kò sí àyíká tí a ti mú ṣiṣẹ́ fún àwọn ìròyìn tí a ṣètò",
     "sourceBlocker": "Ìgbà iṣẹ́ nílò àfiyèsí",
     "sourceMetadata": "Ìsọfúnni àpèjúwe ìgbà iṣẹ́ tí a gbà sílẹ̀"

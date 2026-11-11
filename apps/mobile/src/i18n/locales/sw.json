@@ -22,6 +22,8 @@
     "expired": "Muda wake umeisha"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Ghairi",
     "done": "Nimemaliza",
     "retry": "Jaribu tena",
@@ -361,7 +363,11 @@
       "retryLoadingFiles": "Jaribu tena kupakia faili",
       "filterPlaceholder": "Njia ya faili ya kuchujia",
       "viewedCount": "{{viewed}} kati ya {{total}} zimeangaliwa",
+      "viewedCount_one": "{{viewed}} kati ya {{total}} zimeangaliwa",
+      "viewedCount_other": "{{viewed}} kati ya {{total}} zimeangaliwa",
       "viewedOfListed": "faili {{viewed}} kati ya {{total}} zilizoorodheshwa zimeangaliwa",
+      "viewedOfListed_one": "faili {{viewed}} kati ya {{total}} zilizoorodheshwa zimeangaliwa",
+      "viewedOfListed_other": "faili {{viewed}} kati ya {{total}} zilizoorodheshwa zimeangaliwa",
       "loadingFiles": "Inapakia {{loaded}} kati ya {{total}}…",
       "failedToLoadAllFiles": "Imeshindikana kupakia faili zote.",
       "couldNotLoadMoreFiles": "Imeshindikana kupakia faili zaidi.",
@@ -2457,7 +2463,8 @@
       "selectedProfile": "Wasifu uliochaguliwa",
       "manualOverrides": "Ubatilishaji wa mikono",
       "openSettingsToReview": "Fungua Mipangilio ili kukagua",
-      "profileSelection": "Uteuzi wa wasifu"
+      "profileSelection": "Uteuzi wa wasifu",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Faili {{displayCount}} imesasishwa.",
@@ -2754,7 +2761,7 @@
       "positionHint": "(1 kati ya {{displayCount}})",
       "movedPastPrompt": "Wakala ameshapita ombi hili. Kadi hii itafungwa kikao kitakapoendelea.",
       "waitingForAnswer": "Wakala anasubiri jibu lako. Ujumbe wako kwa wakala unasubiri hadi swali hili lijibiwe au lirukwe.",
-      "waitingForPermission": "Wakala anasubiri ruhusa. Ujumbe wako kwa wakala unasubiri hadi uamue kuhusu ombi hili."
+      "waitingForPermission": "Ujumbe wako kwa wakala unasubiri hadi uamue kuhusu ombi hili."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3535,7 +3542,7 @@
       "provider": "Imesimama: hitilafu ya mtoa huduma",
       "tool": "Imesimama: hitilafu ya zana",
       "cancelled": "Imesimama: imeghairiwa",
-      "other": "IMESIMAMA"
+      "other": "Imesimama"
     }
   },
   "transcriptionModel": {
@@ -4271,10 +4278,10 @@
     "snapshotSummaryFailed": "Muhtasari wa AI umeshindwa. Rekodi yako ya hali yenye taarifa zilizopangwa bado inapatikana.",
     "scheduledContextEnabled": "Ripoti zilizoratibiwa",
     "scheduledContextSettings": "Ripoti zilizoratibiwa · {{context}}",
-    "scheduledContextHint": "Washa uhifadhi wa hali kwa ratiba na mihtasari ya AI ya kulipia kwa muktadha huu tu. Dondoo zilizochaguliwa, ambazo taarifa nyeti zimefichwa, pamoja na taarifa zilizopangwa hutumwa kwa modeli yako. Mihtasari hutumia lugha ya programu iliyohifadhiwa unapobadilisha mipangilio ya ripoti mwenyewe. Kubadilisha lugha ya programu pekee hakusasishi lugha hiyo iliyohifadhiwa. Malipo hutumia salio la muktadha huu. Rekodi za hali zisizo na shughuli hazitumii AI.",
+    "scheduledContextHint": "Washa uhifadhi wa hali kwa ratiba na mihtasari ya AI ya kulipia kwa muktadha huu tu. Dondoo zilizochaguliwa, ambazo taarifa nyeti zimefichwa, pamoja na taarifa zilizopangwa hutumwa kwa modeli yako. Mihtasari hutumia lugha ya programu iliyohifadhiwa unapobadilisha mipangilio ya ripoti. Malipo hutumia salio la muktadha huu. Rekodi za hali zisizo na shughuli hazitumii AI.",
     "snapshotSafeguards": "Vikomo vya muda na matumizi kwa kila muhtasari hutumika kwa kila rekodi ya hali iliyoratibiwa, si bajeti ya kila siku.",
     "snapshotEstimateInputTooLarge": "Rekodi hii ya hali ina ushahidi mwingi mno kwa modeli iliyochaguliwa.",
-    "quietSnapshot": "Uteuzi hufanywa kadiri inavyowezekana. Hakuna shughuli za vipindi zilizochaguliwa kwa rekodi hii ya hali. Hakuna muhtasari wa AI ulioombwa, modeli ya AI iliyoitwa, wala malipo yaliyotozwa.",
+    "quietSnapshot": "Hakuna shughuli za vipindi zilizochaguliwa kwa rekodi hii ya hali. Hakuna muhtasari wa AI ulioombwa wala malipo yaliyotozwa.",
     "noEnabledContexts": "Hakuna miktadha iliyowezeshwa kwa ripoti zilizoratibiwa",
     "sourceBlocker": "Kipindi kinahitaji kushughulikiwa",
     "sourceMetadata": "Metadata za kipindi zilizohifadhiwa"

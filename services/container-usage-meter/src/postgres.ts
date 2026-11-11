@@ -5,10 +5,12 @@ import {
   container_usage_segment,
   getWorkerDb,
   kilocode_users,
+  organization_seats_purchases,
   organizations,
   type WorkerDb,
 } from '@kilocode/db';
-import { and, eq, gt, lt, ne, sql } from 'drizzle-orm';
+import { getOrganizationTrialEndDate } from '@kilocode/organization-entitlement';
+import { and, desc, eq, gt, lt, ne, sql } from 'drizzle-orm';
 import type {
   RecordHeartbeatInput,
   RecordStartFailureCode,
@@ -24,6 +26,10 @@ import {
   organizationMemberBalance,
 } from '@kilocode/worker-utils/account-access';
 import { recordOrganizationConsumption } from '@kilocode/worker-utils/organization-consumption';
+import {
+  parentOrganizationJoinCondition,
+  parentOrganizationsTable,
+} from '@kilocode/worker-utils/organization-membership';
 import {
   billingModeFor,
   MINIMUM_REMAINING_MICRODOLLARS,
@@ -405,6 +411,70 @@ async function recoverMissingInterval(
   return existing;
 }
 
+// Enterprise contracts can lock in prices, so enterprise organizations are not
+// charged until their contract is reviewed and the organization is enrolled by
+// ID. Enterprise trials that have not started paying are still charged. Child
+// organizations use their live parent's plan, trial and subscription. The
+// hierarchy is one level deep.
+async function isUnreviewedEnterpriseOrganization(
+  tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
+  organizationId: string,
+  now: Date
+): Promise<boolean> {
+  const [row] = await tx
+    .select({
+      id: organizations.id,
+      plan: organizations.plan,
+      freeTrialEndAt: organizations.free_trial_end_at,
+      createdAt: organizations.created_at,
+      parentId: parentOrganizationsTable.id,
+      parentPlan: parentOrganizationsTable.plan,
+      parentFreeTrialEndAt: parentOrganizationsTable.free_trial_end_at,
+      parentCreatedAt: parentOrganizationsTable.created_at,
+    })
+    .from(organizations)
+    .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  if (!row) return false;
+  if (row.plan !== 'enterprise' && row.parentPlan !== 'enterprise') return false;
+  const owner =
+    row.parentId && row.parentCreatedAt
+      ? {
+          id: row.parentId,
+          freeTrialEndAt: row.parentFreeTrialEndAt,
+          createdAt: row.parentCreatedAt,
+        }
+      : row;
+  if (getOrganizationTrialEndDate(owner.freeTrialEndAt, owner.createdAt) <= now) return true;
+
+  // A child organization can also hold its own subscription.
+  if (await hasStartedPayingForSeats(tx, row.id)) return true;
+  return owner.id !== row.id && hasStartedPayingForSeats(tx, owner.id);
+}
+
+// Unlike PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES in
+// @kilocode/organization-entitlement, this excludes `trialing`: a trialing
+// subscription has not started paying, so it remains billable.
+const STARTED_PAYING_SEAT_SUBSCRIPTION_STATUSES: ReadonlySet<string> = new Set([
+  'active',
+  'past_due',
+]);
+
+async function hasStartedPayingForSeats(
+  tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
+  organizationId: string
+): Promise<boolean> {
+  // Read the latest event, not any historical active subscription.
+  const [purchase] = await tx
+    .select({ status: organization_seats_purchases.subscription_status })
+    .from(organization_seats_purchases)
+    .where(eq(organization_seats_purchases.organization_id, organizationId))
+    .orderBy(desc(organization_seats_purchases.created_at))
+    .limit(1);
+  return purchase !== undefined && STARTED_PAYING_SEAT_SUBSCRIPTION_STATUSES.has(purchase.status);
+}
+
 export async function applyStart(
   env: Cloudflare.Env,
   input: RecordStartInput,
@@ -477,7 +547,16 @@ export async function applyStartWithDb(
       };
     }
 
-    const billingMode = billingModeFor(billingConfig, input.service, input.subject);
+    let billingMode = billingModeFor(billingConfig, input.service, input.subject);
+    if (
+      billingMode === 'paid' &&
+      input.service.startsWith('cloud-agent-next-') &&
+      input.subject.type === 'org' &&
+      !billingConfig.cloudAgentOrgIds.has(input.subject.id) &&
+      (await isUnreviewedEnterpriseOrganization(tx, input.subject.id, new Date(receivedAtMs)))
+    ) {
+      billingMode = 'shadow';
+    }
     const [open] = await tx
       .select()
       .from(container_usage_interval)

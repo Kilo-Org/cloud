@@ -164,22 +164,18 @@ export async function withSavedSandboxAllocation(
 /**
  * A V2 environment keeps every repository in one workspace and gives each
  * repository its own contained capability, so it needs an isolated Cloudflare
- * sandbox and a contained credential grant. A session that cannot have both
- * fails before it registers, with the reason. `allocation` is the one the
- * session will use, and `undefined` is the default isolated sandbox.
+ * sandbox that can hold several repositories. Every new session already has a
+ * contained credential grant, because containment is mandatory, so this check
+ * covers the sandbox alone. A session whose allocation cannot hold several
+ * repositories fails before it registers, with the reason. `allocation` is the
+ * one the session will use, and `undefined` is the default isolated sandbox.
  */
 export function assertEnvironmentSupportsSandbox(input: {
   environment: EnvironmentRequest;
   allocation: SandboxAllocation | undefined;
-  contained: boolean;
 }): void {
   if (!isMultiRepositoryEnvironment(input.environment)) return;
   const reject = (message: string) => new TRPCError({ code: 'BAD_REQUEST', message });
-  if (!input.contained) {
-    throw reject(
-      'A multi-repository environment needs contained credentials, which are off for this deployment'
-    );
-  }
   const { allocation } = input;
   if (allocation !== undefined && !allocationSupportsMultiRepository(allocation)) {
     throw reject(

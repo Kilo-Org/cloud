@@ -22,6 +22,8 @@
     "expired": "Ekspire"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Anile",
     "done": "Fèt",
     "retry": "Eseye ankò",
@@ -361,7 +363,11 @@
       "retryLoadingFiles": "Eseye chaje fichye yo ankò",
       "filterPlaceholder": "Chemen fichye pou filtre",
       "viewedCount": "{{viewed}} sou {{total}} deja wè",
+      "viewedCount_one": "{{viewed}} sou {{total}} deja wè",
+      "viewedCount_other": "{{viewed}} sou {{total}} deja wè",
       "viewedOfListed": "{{viewed}} sou {{total}} fichye nan lis la deja wè",
+      "viewedOfListed_one": "{{viewed}} sou {{total}} fichye nan lis la deja wè",
+      "viewedOfListed_other": "{{viewed}} sou {{total}} fichye nan lis la deja wè",
       "loadingFiles": "Ap chaje {{loaded}} sou {{total}}…",
       "failedToLoadAllFiles": "Pa t ka chaje tout fichye yo.",
       "couldNotLoadMoreFiles": "Pa t ka chaje plis fichye.",
@@ -2457,7 +2463,8 @@
       "selectedProfile": "Chwazi pwofil la",
       "manualOverrides": "Manyèl overrides",
       "openSettingsToReview": "Louvri Anviwònman pou revize",
-      "profileSelection": "Seleksyon pwofil"
+      "profileSelection": "Seleksyon pwofil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Nou mete {{displayCount}} fichye ajou.",
@@ -2754,7 +2761,7 @@
       "positionHint": "(1 sou {{displayCount}})",
       "movedPastPrompt": "Ajan an deja pase etap demann sa a. Kat sa a ap fèmen lè sesyon an kontinye.",
       "waitingForAnswer": "Ajan an ap tann repons ou a. Pandan kesyon sa a louvri, mesaj ou pou ajan an rete annatant.",
-      "waitingForPermission": "Ajan an ap tann pèmisyon. Pandan demann sa a louvri, mesaj ou pou ajan an rete annatant."
+      "waitingForPermission": "Pandan demann sa a louvri, mesaj ou pou ajan an rete annatant."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -3535,7 +3542,7 @@
       "provider": "Sispann: erè founisè",
       "tool": "Sispann: erè zouti",
       "cancelled": "Sispann: anile",
-      "other": "SISPANN"
+      "other": "Sispann"
     }
   },
   "transcriptionModel": {
@@ -4271,10 +4278,10 @@
     "snapshotSummaryFailed": "Rezime AI a echwe. Apèsi estriktire ou a toujou disponib.",
     "scheduledContextEnabled": "Rapò pwograme",
     "scheduledContextSettings": "Rapò pwograme · {{context}}",
-    "scheduledContextHint": "Aktive anrejistreman pwograme ak rezime AI peye pou kontèks sa a sèlman. Yo voye ekstrè yo chwazi, apre yo fin retire enfòmasyon sansib yo, ansanm ak fè estriktire bay modèl ou a. Rezime yo sèvi ak lang aplikasyon an ki anrejistre lè ou chanje paramèt rapò yo ou menm. Lang sa a pa mete ajou otomatikman lè ou chanje lang aplikasyon an. Frè yo soti nan balans kontèks sa a. Apèsi san aktivite yo pa sèvi ak AI.",
+    "scheduledContextHint": "Aktive anrejistreman pwograme ak rezime AI peye pou kontèks sa a sèlman. Yo voye ekstrè yo chwazi, apre yo fin retire enfòmasyon sansib yo, ansanm ak fè estriktire bay modèl ou a. Rezime yo sèvi ak lang aplikasyon an ki anrejistre lè ou chanje paramèt rapò yo ou menm. Frè yo soti nan balans kontèks sa a. Apèsi san aktivite yo pa sèvi ak AI.",
     "snapshotSafeguards": "Limit tan ak depans pou chak rezime aplike pou chak apèsi pwograme, se pa yon bidjè chak jou.",
     "snapshotEstimateInputTooLarge": "Apèsi sa a gen twòp prèv pou modèl ou chwazi a.",
-    "quietSnapshot": "Yo pa t chwazi okenn aktivite sesyon pou apèsi sa a nan seleksyon ki fèt nan mezi sa posib la. Yo pa t rele okenn modèl AI pou fè yon rezime, epi yo pa t chaje okenn frè.",
+    "quietSnapshot": "Yo pa t chwazi okenn aktivite sesyon pou apèsi sa a. Yo pa t mande ni chaje okenn rezime AI.",
     "noEnabledContexts": "Pa gen kontèks ki aktive pou rapò pwograme yo",
     "sourceBlocker": "Sesyon an bezwen atansyon",
     "sourceMetadata": "Metadone sesyon an ki anrejistre"

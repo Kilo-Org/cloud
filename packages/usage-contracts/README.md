@@ -24,7 +24,10 @@ idempotency key, so every resend must reuse them.
 unknown keys, accepts any GUID as `organizationId`, and defaults an omitted
 `guardrail` to `input` so older senders stay compatible. Senders omit
 `detectorsFired` when no detector fired, so only writes with a detection need a
-writer that knows the field. `id` and `occurredAt`
+writer that knows the field. `scannedCharacters` and `totalCharacters` are
+optional so writes from older senders stay valid. A sender that includes them
+on every write must deploy only after the writer and the usage-ingest Worker
+accept them. `id` and `occurredAt`
 are the writer's idempotency key. Its enum literals are checked against the
 database types in `usage-record-contract-alignment.ts`.
 

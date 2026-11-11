@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server';
+import jwt from 'jsonwebtoken';
+import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 import { getProfileOrganizations } from '@kilocode/web-shared/lib/organizations/organizations';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/server';
@@ -28,9 +30,10 @@ const mockedFindUserById = jest.mocked(findUserById);
 const mockedIsUserBlacklistedByDomain = jest.mocked(isUserBlacklistedByDomain);
 const mockedGetProfileOrganizations = jest.mocked(getProfileOrganizations);
 
+const NEXTAUTH_TEST_SECRET = 'synthetic-pages-auth-exchange-secret';
 const NOW = new Date('2026-03-01T12:00:00.000Z');
-const PAGES = 'https://pages.kiloapps.io';
-const PAGES_DEV = 'https://pages-dev.kiloapps.io';
+const PAGES = 'pages';
+const PAGES_DEV = 'pages-dev';
 const SECRET = 'p'.repeat(40);
 const DEV_SECRET = 'd'.repeat(40);
 const STATE = 'S'.repeat(43);
@@ -50,8 +53,37 @@ function exchange(body: unknown, secret: string | null = SECRET, authorization?:
     })
   );
 }
-const codeFor = (origin = PAGES, state = STATE) =>
-  createPagesAuthCode({ userId: 'user-1', origin, state });
+const codeFor = (audience = PAGES, state = STATE) =>
+  createPagesAuthCode({ userId: 'user-1', audience, state });
+
+function tokenFor(
+  options: {
+    audience?: string;
+    secret?: string;
+    purpose?: 'delegated-workload' | 'device-access';
+    pepper?: string;
+    extra?: Record<string, unknown>;
+    issuedAt?: number;
+    lifetime?: number;
+    env?: string;
+  } = {}
+) {
+  const issuedAt = options.issuedAt ?? Math.floor(NOW.getTime() / 1000);
+  const payload = buildModernKiloTokenPayload({
+    userId: 'user-1',
+    pepper: options.pepper,
+    env: options.env ?? process.env.NODE_ENV,
+    audience: options.audience ?? 'pages',
+    issuedAt,
+    expiresAt: issuedAt + (options.lifetime ?? 300),
+    tokenPurpose: options.purpose ?? 'delegated-workload',
+    credentialExchange: false,
+    extra: options.extra,
+  });
+  return jwt.sign(payload, options.secret ?? NEXTAUTH_TEST_SECRET, {
+    algorithm: 'HS256',
+  });
+}
 
 describe('POST /api/pages-auth/exchange', () => {
   beforeEach(() => {
@@ -73,7 +105,11 @@ describe('POST /api/pages-auth/exchange', () => {
   });
 
   test('answers with who signed in, and nothing else about them', async () => {
-    const response = await exchange({ code: codeFor(), origin: PAGES, state: STATE });
+    const response = await exchange({
+      code: codeFor(),
+      audience: PAGES,
+      state: STATE,
+    });
 
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
@@ -92,7 +128,7 @@ describe('POST /api/pages-auth/exchange', () => {
     ['a wrong secret', 'q'.repeat(40)],
     ["another deployment's secret", DEV_SECRET],
   ])('refuses a caller with %s before looking anyone up', async (_name, secret) => {
-    const response = await exchange({ code: codeFor(), origin: PAGES, state: STATE }, secret);
+    const response = await exchange({ code: codeFor(), audience: PAGES, state: STATE }, secret);
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: 'invalid_client' });
@@ -104,7 +140,7 @@ describe('POST /api/pages-auth/exchange', () => {
     ['an uppercase scheme', `BEARER ${SECRET}`],
     ['space around the credential', `  Bearer   ${SECRET}  `],
   ])('reads a bearer credential sent with %s', async (_name, authorization) => {
-    const body = { code: codeFor(), origin: PAGES, state: STATE };
+    const body = { code: codeFor(), audience: PAGES, state: STATE };
     const response = await exchange(body, null, authorization);
 
     expect(response.status).toBe(200);
@@ -115,7 +151,7 @@ describe('POST /api/pages-auth/exchange', () => {
     ['no scheme', SECRET],
     ['a scheme and nothing else', 'Bearer '],
   ])('refuses a credential sent with %s', async (_name, authorization) => {
-    const body = { code: codeFor(), origin: PAGES, state: STATE };
+    const body = { code: codeFor(), audience: PAGES, state: STATE };
     const response = await exchange(body, null, authorization);
 
     expect(response.status).toBe(401);
@@ -123,16 +159,24 @@ describe('POST /api/pages-auth/exchange', () => {
     expect(mockedFindUserById).not.toHaveBeenCalled();
   });
 
-  test('refuses an origin that is not a deployment, whatever it presents', async () => {
-    const origin = 'https://evil.example';
-    const response = await exchange({ code: codeFor(origin), origin, state: STATE });
+  test('refuses an audience that is not a deployment, whatever it presents', async () => {
+    const audience = 'kilo-api';
+    const response = await exchange({
+      code: codeFor(audience),
+      audience,
+      state: STATE,
+    });
 
     expect(response.status).toBe(401);
     expect(mockedFindUserById).not.toHaveBeenCalled();
   });
 
   test('refuses a code minted for another deployment', async () => {
-    const response = await exchange({ code: codeFor(PAGES_DEV), origin: PAGES, state: STATE });
+    const response = await exchange({
+      code: codeFor(PAGES_DEV),
+      audience: PAGES,
+      state: STATE,
+    });
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: 'invalid_code' });
@@ -140,7 +184,11 @@ describe('POST /api/pages-auth/exchange', () => {
   });
 
   test('refuses a code presented with another state', async () => {
-    const response = await exchange({ code: codeFor(), origin: PAGES, state: 'T'.repeat(43) });
+    const response = await exchange({
+      code: codeFor(),
+      audience: PAGES,
+      state: 'T'.repeat(43),
+    });
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: 'invalid_code' });
@@ -151,7 +199,7 @@ describe('POST /api/pages-auth/exchange', () => {
     const code = codeFor();
     jest.setSystemTime(new Date(NOW.getTime() + 61_000));
 
-    const response = await exchange({ code, origin: PAGES, state: STATE });
+    const response = await exchange({ code, audience: PAGES, state: STATE });
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: 'invalid_code' });
@@ -162,7 +210,11 @@ describe('POST /api/pages-auth/exchange', () => {
     const tampered = code.slice(0, -1) + (code.at(-1) === 'a' ? 'b' : 'a');
 
     for (const candidate of [tampered, createDeviceAuthViewerToken('ABCD-EFGH', 'user-1')]) {
-      const response = await exchange({ code: candidate, origin: PAGES, state: STATE });
+      const response = await exchange({
+        code: candidate,
+        audience: PAGES,
+        state: STATE,
+      });
       expect(response.status).toBe(400);
       expect(await response.json()).toEqual({ error: 'invalid_code' });
     }
@@ -171,17 +223,29 @@ describe('POST /api/pages-auth/exchange', () => {
 
   test('refuses an account that is gone, blocked, or on a blacklisted domain', async () => {
     mockedFindUserById.mockResolvedValueOnce(undefined);
-    const gone = await exchange({ code: codeFor(), origin: PAGES, state: STATE });
+    const gone = await exchange({
+      code: codeFor(),
+      audience: PAGES,
+      state: STATE,
+    });
 
     mockedFindUserById.mockResolvedValueOnce({
       id: 'user-1',
       google_user_name: 'Ada Lovelace',
       blocked_reason: 'abuse',
     } as never);
-    const blocked = await exchange({ code: codeFor(), origin: PAGES, state: STATE });
+    const blocked = await exchange({
+      code: codeFor(),
+      audience: PAGES,
+      state: STATE,
+    });
 
     mockedIsUserBlacklistedByDomain.mockResolvedValueOnce(true);
-    const blacklisted = await exchange({ code: codeFor(), origin: PAGES, state: STATE });
+    const blacklisted = await exchange({
+      code: codeFor(),
+      audience: PAGES,
+      state: STATE,
+    });
     expect(mockedIsUserBlacklistedByDomain).toHaveBeenCalledWith(
       expect.objectContaining({ google_user_email: 'ada@kilo.test' })
     );
@@ -202,7 +266,7 @@ describe('POST /api/pages-auth/exchange', () => {
       blocked_reason: null,
     } as never);
 
-    const response = await exchange({ code: codeFor(), origin: PAGES, state: STATE });
+    const response = await exchange({ code: codeFor(), audience: PAGES, state: STATE });
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'account_unavailable' });
@@ -211,14 +275,190 @@ describe('POST /api/pages-auth/exchange', () => {
 
   test.each([
     ['a body that is not JSON', 'not json'],
-    ['no code', { origin: PAGES, state: STATE }],
-    ['no origin', { code: 'a.b', state: STATE }],
-    ['no state', { code: 'a.b', origin: PAGES }],
-    ['a state of the wrong shape', { code: 'a.b', origin: PAGES, state: 'short' }],
+    ['no code', { audience: PAGES, state: STATE }],
+    ['no audience', { code: 'a.b', state: STATE }],
+    ['no state', { code: 'a.b', audience: PAGES }],
+    ['a state of the wrong shape', { code: 'a.b', audience: PAGES, state: 'short' }],
   ])('refuses %s', async (_name, body) => {
     const response = await exchange(body);
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: 'invalid_request' });
+  });
+
+  describe('token flow', () => {
+    test('answers with the person a token for the deployment names', async () => {
+      const response = await exchange(
+        { token: tokenFor({ audience: 'pages-dev' }), audience: PAGES_DEV },
+        DEV_SECRET
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(await response.json()).toEqual({
+        user: { id: 'user-1', name: 'Ada Lovelace' },
+        organizations,
+      });
+      expect(mockedFindUserById).toHaveBeenCalledWith('user-1');
+      expect(mockedGetProfileOrganizations).toHaveBeenCalledWith('user-1', {
+        excludeAccessBlocked: true,
+      });
+    });
+
+    test('accepts a production token at the production deployment', async () => {
+      const response = await exchange({ token: tokenFor(), audience: PAGES });
+      expect(response.status).toBe(200);
+    });
+
+    test.each([
+      ['a dev token at production', tokenFor({ audience: 'pages-dev' }), PAGES, SECRET],
+      ['a production token at dev', tokenFor({ audience: 'pages' }), PAGES_DEV, DEV_SECRET],
+    ])('refuses %s', async (_name, token, audience, secret) => {
+      const response = await exchange({ token, audience }, secret);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'invalid_token' });
+      expect(mockedFindUserById).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ['no credential', null],
+      ['a wrong secret', 'q'.repeat(40)],
+      ["another deployment's secret", DEV_SECRET],
+    ])('refuses a caller with %s before verifying the token', async (_name, secret) => {
+      // A malformed token would be a 400 if it were looked at.
+      const response = await exchange({ token: 'not-a-jwt', audience: PAGES }, secret);
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'invalid_client' });
+      expect(mockedFindUserById).not.toHaveBeenCalled();
+    });
+
+    test('refuses an audience that is not a deployment', async () => {
+      const audience = 'kilo-api';
+      const response = await exchange({ token: tokenFor(), audience });
+
+      expect(response.status).toBe(401);
+      expect(mockedFindUserById).not.toHaveBeenCalled();
+    });
+
+    test('refuses an expired token', async () => {
+      const token = tokenFor();
+      jest.setSystemTime(new Date(NOW.getTime() + 301_000));
+
+      const response = await exchange({ token, audience: PAGES });
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'invalid_token' });
+    });
+
+    test('refuses a token issued in the future', async () => {
+      const token = tokenFor({
+        issuedAt: Math.floor(NOW.getTime() / 1000) + 3600,
+      });
+      const response = await exchange({ token, audience: PAGES });
+      expect(response.status).toBe(400);
+    });
+
+    test('refuses a tampered token and one signed with another secret', async () => {
+      const token = tokenFor();
+      const tampered = token.slice(0, -1) + (token.at(-1) === 'a' ? 'b' : 'a');
+
+      for (const candidate of [tampered, tokenFor({ secret: 'z'.repeat(40) }), 'not-a-jwt']) {
+        const response = await exchange({ token: candidate, audience: PAGES });
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ error: 'invalid_token' });
+      }
+      expect(mockedFindUserById).not.toHaveBeenCalled();
+    });
+
+    test.each(['kilo-gateway', 'kilo-api', 'ai-attribution'])(
+      'refuses a token for the %s audience',
+      async audience => {
+        const response = await exchange({
+          token: tokenFor({ audience }),
+          audience: PAGES,
+        });
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ error: 'invalid_token' });
+        expect(mockedFindUserById).not.toHaveBeenCalled();
+      }
+    );
+
+    test('refuses a device-auth viewer token and a sign-in code', async () => {
+      for (const candidate of [createDeviceAuthViewerToken('ABCD-EFGH', 'user-1'), codeFor()]) {
+        const response = await exchange({ token: candidate, audience: PAGES });
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ error: 'invalid_token' });
+      }
+      expect(mockedFindUserById).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ['another purpose', { purpose: 'device-access' as const }],
+      ['a pepper', { pepper: 'pepper' }],
+      ['organization claims', { extra: { organizationId: 'org-1', organizationRole: 'owner' } }],
+      ['organization memberships', { extra: { orgMemberships: [{ orgId: 'o', role: 'member' }] } }],
+      ['a token source', { extra: { tokenSource: 'harness' } }],
+      ['another environment', { env: 'elsewhere' }],
+    ] as const)('refuses a token with %s', async (_name, options) => {
+      const response = await exchange({
+        token: tokenFor(options),
+        audience: PAGES,
+      });
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'invalid_token' });
+      expect(mockedFindUserById).not.toHaveBeenCalled();
+    });
+
+    test('refuses an account that is gone, blocked, or on a blacklisted domain', async () => {
+      mockedFindUserById.mockResolvedValueOnce(undefined);
+      const gone = await exchange({ token: tokenFor(), audience: PAGES });
+
+      mockedFindUserById.mockResolvedValueOnce({
+        id: 'user-1',
+        google_user_name: 'Ada Lovelace',
+        blocked_reason: 'abuse',
+      } as never);
+      const blocked = await exchange({ token: tokenFor(), audience: PAGES });
+
+      mockedIsUserBlacklistedByDomain.mockResolvedValueOnce(true);
+      const blacklisted = await exchange({
+        token: tokenFor(),
+        audience: PAGES,
+      });
+
+      for (const response of [gone, blocked, blacklisted]) {
+        expect(response.status).toBe(403);
+        expect(await response.json()).toEqual({ error: 'account_unavailable' });
+      }
+      expect(mockedGetProfileOrganizations).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      [
+        'both a code and a token',
+        () => ({
+          code: codeFor(),
+          token: tokenFor(),
+          audience: PAGES,
+          state: STATE,
+        }),
+      ],
+      [
+        'a token and a state without a code',
+        () => ({ token: tokenFor(), audience: PAGES, state: STATE }),
+      ],
+      ['neither a code nor a token', () => ({ audience: PAGES })],
+      ['an empty token', () => ({ token: '', audience: PAGES })],
+      ['a token that is not a string', () => ({ token: 1, audience: PAGES })],
+    ])('refuses a body with %s', async (_name, body) => {
+      const response = await exchange(body());
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'invalid_request' });
+    });
   });
 });

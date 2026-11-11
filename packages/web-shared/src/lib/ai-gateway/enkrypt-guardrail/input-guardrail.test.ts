@@ -128,6 +128,8 @@ function call(overrides: Partial<EnkryptGuardrailCall> = {}): EnkryptGuardrailCa
     apiKind: scan.apiKind,
     decision: 'allowed',
     creditsCost: 3,
+    scannedCharacters: 2_400,
+    totalCharacters: 10_000,
     ...overrides,
   };
 }

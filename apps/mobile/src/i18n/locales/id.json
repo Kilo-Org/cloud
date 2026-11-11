@@ -22,6 +22,8 @@
     "expired": "Kedaluwarsa"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Batal",
     "done": "Selesai",
     "retry": "Coba lagi",
@@ -1919,7 +1921,8 @@
       "selectedProfile": "Profil yang dipilih",
       "manualOverrides": "Penggantian manual",
       "openSettingsToReview": "Buka Pengaturan untuk meninjau",
-      "profileSelection": "Pemilihan profil"
+      "profileSelection": "Pemilihan profil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} berkas telah diperbarui.",
@@ -2216,7 +2219,7 @@
       "positionHint": "(1 dari {{displayCount}})",
       "movedPastPrompt": "Agen telah melewati permintaan ini. Kartu ini akan ditutup saat sesi berlanjut.",
       "waitingForAnswer": "Agen sedang menunggu jawabanmu. Pengiriman pesanmu ke agen ditunda selama pertanyaan ini masih terbuka.",
-      "waitingForPermission": "Agen sedang menunggu izin. Pengiriman pesanmu ke agen ditunda selama permintaan ini masih terbuka."
+      "waitingForPermission": "Pengiriman pesanmu ke agen ditunda selama permintaan ini masih terbuka."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -2947,7 +2950,11 @@
       "retryLoadingMoreFiles": "Coba muat file lainnya lagi",
       "title": "Berkas",
       "viewedCount": "{{viewed}} dari {{total}} sudah dilihat",
-      "viewedOfListed": "{{viewed}} dari {{total}} file dalam daftar sudah dilihat"
+      "viewedCount_one": "{{viewed}} dari {{total}} sudah dilihat",
+      "viewedCount_other": "{{viewed}} dari {{total}} sudah dilihat",
+      "viewedOfListed": "{{viewed}} dari {{total}} file dalam daftar sudah dilihat",
+      "viewedOfListed_one": "{{viewed}} dari {{total}} file dalam daftar sudah dilihat",
+      "viewedOfListed_other": "{{viewed}} dari {{total}} file dalam daftar sudah dilihat"
     },
     "fileRows": {
       "collapseFile": "Ciutkan file",
@@ -3535,7 +3542,7 @@
       "provider": "Berhenti: kesalahan penyedia",
       "tool": "Berhenti: kesalahan alat",
       "cancelled": "Berhenti: dibatalkan",
-      "other": "BERHENTI"
+      "other": "Berhenti"
     }
   },
   "transcriptionModel": {
@@ -4271,10 +4278,10 @@
     "snapshotSummaryFailed": "Ringkasan AI gagal. Cuplikan terstruktur Anda tetap tersedia.",
     "scheduledContextEnabled": "Laporan terjadwal",
     "scheduledContextSettings": "Laporan terjadwal · {{context}}",
-    "scheduledContextHint": "Aktifkan perekaman terjadwal dan ringkasan AI berbayar hanya untuk konteks ini. Kutipan terpilih yang informasi sensitifnya telah disamarkan dan fakta terstruktur dikirim ke model Anda. Ringkasan menggunakan bahasa aplikasi yang disimpan hanya saat Anda secara eksplisit mengubah pengaturan laporan, bukan diperbarui otomatis saat bahasa aplikasi berubah. Biaya menggunakan saldo konteks ini. Cuplikan tanpa aktivitas tidak menggunakan AI.",
+    "scheduledContextHint": "Aktifkan perekaman terjadwal dan ringkasan AI berbayar hanya untuk konteks ini. Kutipan terpilih yang informasi sensitifnya telah disamarkan dan fakta terstruktur dikirim ke model Anda. Ringkasan menggunakan bahasa aplikasi yang disimpan saat Anda memperbarui pengaturan laporan. Biaya menggunakan saldo konteks ini. Cuplikan tanpa aktivitas tidak menggunakan AI.",
     "snapshotSafeguards": "Batas waktu dan biaya per ringkasan berlaku untuk setiap cuplikan terjadwal, bukan sebagai anggaran harian.",
     "snapshotEstimateInputTooLarge": "Cuplikan ini berisi terlalu banyak bukti untuk model yang dipilih.",
-    "quietSnapshot": "Tidak ada aktivitas sesi yang terpilih untuk cuplikan ini berdasarkan data yang tersedia. Tidak ada ringkasan AI yang diminta, model yang dipanggil, atau biaya AI yang dikenakan.",
+    "quietSnapshot": "Tidak ada aktivitas sesi yang terpilih untuk cuplikan ini. Tidak ada ringkasan AI yang diminta atau biaya AI yang dikenakan.",
     "noEnabledContexts": "Tidak ada konteks yang diaktifkan untuk laporan terjadwal",
     "sourceBlocker": "Sesi memerlukan perhatian",
     "sourceMetadata": "Metadata sesi yang direkam"

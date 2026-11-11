@@ -11137,6 +11137,35 @@
     ],
     "searchBlob": "computeBilling.rates Get the current compute pricing rates used to bill usage. computebilling rates"
   },
+  "computeBilling.sessionCharges": {
+    "path": "computeBilling.sessionCharges",
+    "kind": "query",
+    "summary": "Get recorded compute charges for an owned cloud agent session in its personal or organization billing context. When scope is 'workspace', the total covers the shared sandbox across all chats and restarts in that workspace; do not add sibling chat totals together. Only scope 'session' returns a single session's charges.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "computebilling",
+      "sessioncharges",
+      "cloudagentsessionid",
+      "organizationid"
+    ],
+    "searchBlob": "computeBilling.sessionCharges Get recorded compute charges for an owned cloud agent session in its personal or organization billing context. When scope is 'workspace', the total covers the shared sandbox across all chats and restarts in that workspace; do not add sibling chat totals together. Only scope 'session' returns a single session's charges. computebilling sessioncharges cloudagentsessionid organizationid cloudAgentSessionId organizationId"
+  },
   "credits.completeAppStorePurchase": {
     "path": "credits.completeAppStorePurchase",
     "kind": "mutation",

@@ -22,6 +22,8 @@
     "expired": "مهلت یې تېر شو"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": "، ",
     "cancel": "لغوه کړئ",
     "done": "بشپړ شو",
     "retry": "بیا هڅه وکړئ",
@@ -361,7 +363,11 @@
       "retryLoadingFiles": "د فایلونو د بارولو بیا هڅه وکړئ",
       "filterPlaceholder": "د فایلونو د لارې له مخې چاڼ",
       "viewedCount": "له {{total}} څخه {{viewed}} لیدل شوي",
+      "viewedCount_one": "له {{total}} څخه {{viewed}} لیدل شوي",
+      "viewedCount_other": "له {{total}} څخه {{viewed}} لیدل شوي",
       "viewedOfListed": "په لړلیک کې له {{total}} فایلونو څخه {{viewed}} لیدل شوي",
+      "viewedOfListed_one": "په لړلیک کې له {{total}} فایلونو څخه {{viewed}} لیدل شوي",
+      "viewedOfListed_other": "په لړلیک کې له {{total}} فایلونو څخه {{viewed}} لیدل شوي",
       "loadingFiles": "له {{total}} څخه {{loaded}} بارېږي…",
       "failedToLoadAllFiles": "ټول فایلونه بار نه شول.",
       "couldNotLoadMoreFiles": "نور فایلونه بار نه شول.",
@@ -2457,7 +2463,8 @@
       "selectedProfile": "ټاکل شوی پروفایل",
       "manualOverrides": "لاسي اوورډونه",
       "openSettingsToReview": "د بیاکتنې لپاره تنظیمات خلاص کړئ",
-      "profileSelection": "د پروفایل انتخاب"
+      "profileSelection": "د پروفایل انتخاب",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل تازه شو.",
@@ -2754,7 +2761,7 @@
       "positionHint": "(له {{displayCount}} څخه ۱)",
       "movedPastPrompt": "ایجنټ له دې پرامپټ څخه تېر شوی دی. کله چې ناسته دوام وکړي، دا کارت به وتړل شي.",
       "waitingForAnswer": "ایجنټ ستاسو ځواب ته په تمه دی. تر هغه چې دا پوښتنه خلاصه وي، ایجنټ ته ستاسو د پیغام لېږل ځنډول شوي دي.",
-      "waitingForPermission": "ایجنټ اجازې ته په تمه دی. تر هغه چې دا غوښتنه خلاصه وي، ایجنټ ته ستاسو د پیغام لېږل ځنډول شوي دي."
+      "waitingForPermission": "تر هغه چې دا غوښتنه خلاصه وي، ایجنټ ته ستاسو د پیغام لېږل ځنډول شوي دي."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}، {{taskName}}{{modelLabel}}، {{latestActivityLabel}}، {{status}}",
@@ -4252,7 +4259,7 @@
     "estimate": "اټکل {{estimate}} · تر ټولو زیات {{maximum}}",
     "estimateUnavailable": "د دې ترتیباتو لپاره تادیه شوی لنډیز شتون نلري.",
     "confirmPaid": "د {{context}} لپاره تادیه شوي لنډیزونه فعال کړئ؟",
-    "paidDisclosure": "{{estimate}} اټکل شوی، تر {{maximum}} پورې، د {{minutes}} دقیقو حد سره. لګښت حتی د جوړونې د ناکامۍ په صورت کې هم پلي کېږي.",
+    "paidDisclosure": "{{estimate}} اټکل شوی، تر {{maximum}} پورې، د {{minutes}} دقیقه حد سره. لګښت حتی د جوړونې د ناکامۍ په صورت کې هم پلي کېږي.",
     "enable": "تادیه شوي لنډیزونه فعال کړئ",
     "allContexts": "شخصي او سازماني راپورونه جلا پاتې کېږي.",
     "emptyHistory": "هېڅ خوندي شوي راپورونه نشته",

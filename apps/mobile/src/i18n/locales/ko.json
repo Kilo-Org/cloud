@@ -22,6 +22,8 @@
     "expired": "만료됨"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "취소",
     "done": "완료",
     "retry": "다시 시도",
@@ -1919,7 +1921,8 @@
       "selectedProfile": "선택한 프로필",
       "manualOverrides": "수동 재정의",
       "openSettingsToReview": "설정을 열어 검토하세요.",
-      "profileSelection": "프로필 선택"
+      "profileSelection": "프로필 선택",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "파일 {{displayCount}}개를 업데이트했습니다.",
@@ -2216,7 +2219,7 @@
       "positionHint": "({{displayCount}}개 중 첫 번째)",
       "movedPastPrompt": "에이전트가 이미 이 요청을 넘어 다음 단계로 진행했습니다. 세션이 계속되면 이 카드가 닫힙니다.",
       "waitingForAnswer": "에이전트가 답변을 기다리고 있습니다. 이 질문에 답변할 때까지 에이전트에게 보내는 메시지의 전송이 일시 중지됩니다.",
-      "waitingForPermission": "에이전트가 권한 승인을 기다리고 있습니다. 이 요청에 응답할 때까지 에이전트에게 보내는 메시지의 전송이 일시 중지됩니다."
+      "waitingForPermission": "이 요청에 응답할 때까지 에이전트에게 보내는 메시지의 전송이 일시 중지됩니다."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, 작업: {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -2947,7 +2950,11 @@
       "retryLoadingMoreFiles": "파일 더 불러오기 다시 시도",
       "title": "파일",
       "viewedCount": "{{total}}개 중 {{viewed}}개 확인함",
-      "viewedOfListed": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함"
+      "viewedCount_one": "{{total}}개 중 {{viewed}}개 확인함",
+      "viewedCount_other": "{{total}}개 중 {{viewed}}개 확인함",
+      "viewedOfListed": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함",
+      "viewedOfListed_one": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함",
+      "viewedOfListed_other": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함"
     },
     "fileRows": {
       "collapseFile": "파일 접기",
@@ -4271,10 +4278,10 @@
     "snapshotSummaryFailed": "AI 요약에 실패했습니다. 구조화된 스냅샷은 계속 확인할 수 있습니다.",
     "scheduledContextEnabled": "예약된 브리핑",
     "scheduledContextSettings": "예약된 브리핑 · {{context}}",
-    "scheduledContextHint": "이 컨텍스트에만 예약 캡처와 유료 AI 요약을 사용하세요. 선택된 발췌문에서 민감한 정보를 가린 내용과 구조화된 정보가 모델에 전송됩니다. 요약은 브리핑 설정을 명시적으로 변경할 때 저장된 앱 언어를 사용합니다. 앱 언어만 변경해도 요약 언어가 자동으로 바뀌지는 않습니다. 요금은 이 컨텍스트의 잔액에서 차감됩니다. 선택된 활동이 없는 스냅샷은 AI를 사용하지 않습니다.",
+    "scheduledContextHint": "이 컨텍스트에만 예약 캡처와 유료 AI 요약을 사용하세요. 선택된 발췌문에서 민감한 정보를 가린 내용과 구조화된 정보가 모델에 전송됩니다. 요약은 브리핑 설정을 업데이트할 때 저장된 앱 언어를 사용합니다. 요금은 이 컨텍스트의 잔액에서 차감됩니다. 선택된 활동이 없는 스냅샷은 AI를 사용하지 않습니다.",
     "snapshotSafeguards": "요약별 시간 및 지출 안전 한도는 각 예약된 스냅샷에 적용되며, 일일 예산이 아닙니다.",
     "snapshotEstimateInputTooLarge": "이 스냅샷의 근거 자료가 선택한 모델이 처리하기에 너무 많습니다.",
-    "quietSnapshot": "확인 가능한 범위에서 세션 활동을 선택했으나, 이 스냅샷에 포함된 활동은 없습니다. AI 모델 호출이나 요약 요청은 없었으며, 요금도 부과되지 않았습니다.",
+    "quietSnapshot": "이 스냅샷에 대해 선택된 세션 활동이 없습니다. AI 요약이 요청되거나 요금이 부과되지 않았습니다.",
     "noEnabledContexts": "예약된 브리핑이 활성화된 컨텍스트 없음",
     "sourceBlocker": "확인이 필요한 세션",
     "sourceMetadata": "캡처된 세션 메타데이터"

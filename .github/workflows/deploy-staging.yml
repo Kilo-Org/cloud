@@ -57,7 +57,6 @@ jobs:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
-          lfs: true
           ref: ${{ needs.check-changes.outputs.target_sha }}
 
       - name: Setup pnpm
@@ -72,6 +71,9 @@ jobs:
       # The probe imports @kilocode/db and the migrate step runs drizzle-kit from
       # that package, so the database workspace and the root project are enough.
       # Widen this filter when a step in this job imports another workspace.
+      # This job also owns the LFS decision: it builds nothing from apps/web, so
+      # its checkout skips LFS objects. Add `lfs: true` back before a step here
+      # reads a path tracked by Git LFS.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --filter '@kilocode/db...' --filter kilocode-monorepo
 
@@ -81,8 +83,19 @@ jobs:
       - name: Run Drizzle migrations
         run: NODE_ENV=production pnpm run drizzle migrate
 
+  # Both Vercel staging deploys start as soon as check-changes publishes the
+  # SHAs, beside the database gate, which is how deploy-production.yml already
+  # starts its stage jobs. A custom environment cannot separate the build from
+  # the traffic switch: `vercel deploy --target=staging` publishes at build
+  # success, vercel@59.5.0 rejects `--skip-domain` for any target other than
+  # production, and its only promote path targets production. So staging code can
+  # become reachable while db-gate is still migrating. The measured deploy runs
+  # far longer than the gate, so the gate normally finishes first; the window
+  # exists only while a migration outlasts the deploy, bounded by the gate's
+  # timeout. A failed migration still fails db-gate, which stops the Worker
+  # deploy and the release record below.
   deploy-app:
-    needs: [check-changes, db-gate]
+    needs: check-changes
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
@@ -94,7 +107,7 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
   deploy-ai-gateway:
-    needs: [check-changes, db-gate]
+    needs: check-changes
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
@@ -118,8 +131,11 @@ jobs:
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
       target_environment: staging
 
+  # The Worker deploy waits for the gate and the matrix above; the two Vercel
+  # staging deploys start earlier, beside the gate. record-deployment still
+  # requires every one of the three.
   deploy-workers:
-    needs: [check-changes, db-gate, deploy-app, deploy-ai-gateway, detect-workers]
+    needs: [check-changes, db-gate, detect-workers]
     # Guard: this workflow_dispatch is reachable from a fork, and the reusable
     # workflow inherits repo secrets. Only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'

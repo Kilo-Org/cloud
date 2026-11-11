@@ -151,6 +151,39 @@ describe('selectMessageFailure', () => {
       expect(result?.canCopy).toBe(true);
     });
 
+    it('states the balance that refused the send, with Add credits and no Retry', () => {
+      const result = selectMessageFailure({
+        info: userInfo(),
+        deliveryState: { status: 'failed', error: '', reason: 'credits' },
+      });
+      expect(result).not.toBeNull();
+      expect(result?.kind).toBe('delivery');
+      // The send never left, so the statement sits under the person's own bubble.
+      expect(result?.side).toBe('user');
+      expect(result?.error).toBe(true);
+      expect(result?.title).toBe('Not enough credits to send this message.');
+      // The action under it carries the recovery; a detail line would repeat the
+      // cause the title already names.
+      expect(result?.detailKey).toBeNull();
+      expect(result?.detail).toBeNull();
+      expect(result?.copyDetail).toBe('');
+      // A re-send meets the same balance, so the row offers the action that
+      // settles it instead of a Retry.
+      expect(result?.canRetry).toBe(false);
+      expect(result?.canAddCredits).toBe(true);
+      expect(result?.canCopy).toBe(true);
+    });
+
+    it('offers Add credits on a refused send even where a re-send is impossible', () => {
+      const result = selectMessageFailure({
+        info: userInfo(),
+        deliveryState: { status: 'failed', error: '', reason: 'credits' },
+        retryAvailable: false,
+      });
+      expect(result?.canRetry).toBe(false);
+      expect(result?.canAddCredits).toBe(true);
+    });
+
     it('exposes no copy detail when the delivery failure carries no transport text', () => {
       const result = selectMessageFailure({
         info: userInfo(),

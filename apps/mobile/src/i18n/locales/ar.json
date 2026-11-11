@@ -22,6 +22,8 @@
     "expired": "انتهت الصلاحية"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": "، ",
     "cancel": "إلغاء",
     "done": "تم",
     "retry": "إعادة المحاولة",
@@ -2003,7 +2005,8 @@
       "selectedProfile": "الملف الشخصي المحدد",
       "manualOverrides": "التجاوزات اليدوية",
       "openSettingsToReview": "افتح الإعدادات للمراجعة",
-      "profileSelection": "اختيار الملف الشخصي"
+      "profileSelection": "اختيار الملف الشخصي",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "تم تحديث ملف واحد.",
@@ -2316,7 +2319,7 @@
       "positionHint": "(1 من {{displayCount}})",
       "movedPastPrompt": "تجاوز الوكيل هذا الطلب. ستُغلق هذه البطاقة عند استئناف الجلسة.",
       "waitingForAnswer": "الوكيل في انتظار إجابتك. يبقى إرسال رسالتك إلى الوكيل متوقفًا مؤقتًا ما دام هذا السؤال مفتوحًا.",
-      "waitingForPermission": "الوكيل في انتظار الإذن. يبقى إرسال رسالتك إلى الوكيل متوقفًا مؤقتًا ما دام هذا الطلب مفتوحًا."
+      "waitingForPermission": "يبقى إرسال رسالتك إلى الوكيل متوقفًا مؤقتًا ما دام هذا الطلب مفتوحًا."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}، {{taskName}}{{modelLabel}}، {{latestActivityLabel}}، {{status}}",
@@ -3107,7 +3110,19 @@
       "retryLoadingMoreFiles": "إعادة محاولة تحميل المزيد من الملفات",
       "title": "الملفات",
       "viewedCount": "تم الاطلاع على {{viewed}} من {{total}}",
-      "viewedOfListed": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات"
+      "viewedCount_zero": "تم الاطلاع على {{viewed}} من {{total}}",
+      "viewedCount_one": "تم الاطلاع على {{viewed}} من {{total}}",
+      "viewedCount_two": "تم الاطلاع على {{viewed}} من {{total}}",
+      "viewedCount_few": "تم الاطلاع على {{viewed}} من {{total}}",
+      "viewedCount_many": "تم الاطلاع على {{viewed}} من {{total}}",
+      "viewedCount_other": "تم الاطلاع على {{viewed}} من {{total}}",
+      "viewedOfListed": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات",
+      "viewedOfListed_zero": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات",
+      "viewedOfListed_one": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات",
+      "viewedOfListed_two": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات",
+      "viewedOfListed_few": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات",
+      "viewedOfListed_many": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات",
+      "viewedOfListed_other": "تم الاطلاع على {{viewed}} من أصل {{total}} ضمن قائمة الملفات"
     },
     "fileRows": {
       "collapseFile": "طي الملف",
@@ -4516,7 +4531,7 @@
     "estimate": "التقدير {{estimate}} · الحد الأقصى {{maximum}}",
     "estimateUnavailable": "الملخص المدفوع غير متاح لهذه الإعدادات.",
     "confirmPaid": "تفعيل الملخصات المدفوعة لـ {{context}}؟",
-    "paidDisclosure": "التكلفة المقدّرة {{estimate}}، وحتى {{maximum}}، بحد زمني {{minutes}} دقيقة. تُطبّق الرسوم حتى إذا فشل الإنشاء.",
+    "paidDisclosure": "التكلفة المقدّرة {{estimate}}، وحتى {{maximum}}، بحد زمني {{minutes}} د. تُطبّق الرسوم حتى إذا فشل الإنشاء.",
     "enable": "تفعيل الملخصات المدفوعة",
     "allContexts": "تبقى التقارير الشخصية وتقارير المؤسسة منفصلة.",
     "emptyHistory": "لا توجد تقارير محفوظة",
@@ -4535,10 +4550,10 @@
     "snapshotSummaryFailed": "فشل ملخص AI. لا تزال لقطتك المنظّمة متاحة.",
     "scheduledContextEnabled": "التقارير المجدولة",
     "scheduledContextSettings": "التقارير المجدولة · {{context}}",
-    "scheduledContextHint": "فعّل الالتقاط المجدول وملخصات AI المدفوعة لهذا السياق فقط. تُرسل مقتطفات مختارة حُجبت منها المعلومات الحساسة وحقائق منظّمة إلى نموذجك. تستخدم الملخصات لغة التطبيق المحفوظة عند تحديثك إعدادات التقرير صراحةً، ولا تتغير لغة الملخصات تلقائيًا عند تغيير لغة التطبيق. تُخصم الرسوم من رصيد هذا السياق. لا يُستخدم AI في اللقطات الخالية من النشاط.",
+    "scheduledContextHint": "فعّل الالتقاط المجدول وملخصات AI المدفوعة لهذا السياق فقط. تُرسل مقتطفات مختارة حُجبت منها المعلومات الحساسة وحقائق منظّمة إلى نموذجك. تستخدم الملخصات لغة التطبيق المحفوظة عند تحديثك إعدادات التقرير. تُخصم الرسوم من رصيد هذا السياق. لا يُستخدم AI في اللقطات الخالية من النشاط.",
     "snapshotSafeguards": "تُطبّق حدود الوقت والإنفاق لكل ملخص على كل لقطة مجدولة، وليست ميزانية يومية.",
     "snapshotEstimateInputTooLarge": "تحتوي هذه اللقطة على أدلة أكثر مما يمكن للنموذج المحدد استيعابه.",
-    "quietSnapshot": "لم يُختَر أي نشاط للجلسات لهذه اللقطة؛ فالاختيار يتم حسب المتاح. لم يُطلب أي ملخص AI أو يُستدعَ أي نموذج، ولم تُفرض أي رسوم.",
+    "quietSnapshot": "لم يُختَر أي نشاط للجلسات لهذه اللقطة. لم يُطلب أي ملخص AI ولم تُفرض أي رسوم.",
     "noEnabledContexts": "لا توجد سياقات مفعّلة للتقارير المجدولة",
     "sourceBlocker": "الجلسة تحتاج إلى اهتمام",
     "sourceMetadata": "البيانات الوصفية الملتقطة للجلسة"

@@ -8,6 +8,7 @@ import type * as MotionContextModule from '@/lib/a11y/motion-context';
 import type * as PlatformFilterModule from './platform-filter-modal';
 import type * as TextModule from '@/components/ui/text';
 import { AgentSessionListScreen } from './session-list-screen';
+import { OwnedKeyboardLift } from './owned-keyboard-lift';
 import { RowsRefreshControl } from './rows-refresh-control';
 import { FAB_MARGIN, FAB_SIZE } from './session-list-content';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
@@ -433,6 +434,21 @@ function requireNode(type: string) {
     throw new Error(`Missing node: ${type}`);
   }
   return result;
+}
+function liftNode() {
+  return root().findByType(OwnedKeyboardLift);
+}
+/** The pad the lift writes on the body frame; 0 is the full height. */
+function liftPad() {
+  const style: unknown = liftNode().findByType('View').props.style;
+  if (typeof style !== 'object' || style === null || !('paddingBottom' in style)) {
+    throw new TypeError('The keyboard lift wrote no paddingBottom');
+  }
+  const pad: unknown = style.paddingBottom;
+  if (typeof pad !== 'number') {
+    throw new TypeError('The keyboard lift wrote a non-numeric paddingBottom');
+  }
+  return pad;
 }
 function text() {
   return nodes('Text')
@@ -1390,12 +1406,12 @@ describe('AgentSessionListScreen live filtering', () => {
     state.live.activeSessions = [row];
     await renderScreen();
     const searchHeader = openSearch();
-    const container = requireNode('KeyboardAvoidingView');
+    const container = liftNode();
     act(() => {
       (searchHeader.props.onBlur as (() => void) | undefined)?.();
     });
     expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
-    expect(requireNode('KeyboardAvoidingView')).toBe(container);
+    expect(liftNode()).toBe(container);
     expect(searchHeader.props.hasText).toBe(false);
   });
 
@@ -1505,28 +1521,31 @@ describe('AgentSessionListScreen live filtering', () => {
       (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
     });
 
-    // iOS: the native container owns the lift, so the centered no-match body is
+    // iOS: the lift owns the keyboard band, so the centered no-match body is
     // inside it and re-measures against the viewport it shrinks.
-    const container = requireNode('KeyboardAvoidingView');
-    expect(container.props.behavior).toBe('padding');
+    const container = liftNode();
+    expect(liftPad()).toBe(0);
     expect(descendantsOf(container, 'CenteredState')).toHaveLength(1);
-    expect(nodes('KeyboardAvoidingView')).toHaveLength(1);
+    expect(root().findAllByType(OwnedKeyboardLift)).toHaveLength(1);
+    act(() => {
+      showKeyboard(320);
+    });
+    expect(liftPad()).toBe(320);
 
     // Android: edge-to-edge never resizes the window for the IME either, and the
-    // same native container owns the lift. The tree carries no JS padding, so
-    // the body stays inside the one container instead of a per-platform fork.
+    // same lift owns the band. The tree carries no second per-platform fork.
     state.platform.OS = 'android';
     await renderScreen();
     act(() => {
       showKeyboard(320);
     });
-    const androidContainer = requireNode('KeyboardAvoidingView');
-    expect(androidContainer.props.behavior).toBe('padding');
+    const androidContainer = liftNode();
+    expect(liftPad()).toBe(320);
     expect(descendantsOf(androidContainer, 'CenteredState')).toHaveLength(1);
-    expect(nodes('KeyboardAvoidingView')).toHaveLength(1);
+    expect(root().findAllByType(OwnedKeyboardLift)).toHaveLength(1);
   });
 
-  it('lets the native container own keyboard clearance without changing the search surface', async () => {
+  it('lets the keyboard lift clear the body without changing the search surface', async () => {
     state.platform.OS = 'android';
     state.live.activeSessions = [row];
     await renderScreen();
@@ -1534,7 +1553,7 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
     });
-    const container = requireNode('KeyboardAvoidingView');
+    const container = liftNode();
     const emptyState = root().findByType(EmptyState);
     for (const height of [320, 100, 0]) {
       act(() => {
@@ -1544,7 +1563,8 @@ describe('AgentSessionListScreen live filtering', () => {
           hideKeyboard();
         }
       });
-      expect(requireNode('KeyboardAvoidingView')).toBe(container);
+      expect(liftNode()).toBe(container);
+      expect(liftPad()).toBe(height);
       expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
       expect(root().findByType(EmptyState)).toBe(emptyState);
       expect(surfaceBottomInset()).toBe(state.tabBarHeight);
@@ -1579,20 +1599,20 @@ describe('AgentSessionListScreen live filtering', () => {
     state.live.activeSessions = [row];
     await renderScreen();
     const listStyle = () => nodes('FlashList')[0]?.props.style as { marginBottom: number };
-    // Keyboard down the native container lifts nothing and the frame ends at the
-    // tab bar: the FAB clearance rides on the content, not the frame.
-    expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
+    // Keyboard down the lift pads nothing and the frame ends at the tab bar:
+    // the FAB clearance rides on the content, not the frame.
+    expect(liftPad()).toBe(0);
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
 
     openSearch();
     act(() => {
       showKeyboard(320);
     });
-    // The native container owns the whole IME lift, so the frame adds nothing and
-    // the viewport ends at the IME's top edge instead of a whole keyboard height
+    // The lift owns the whole IME band, so the frame adds nothing and the
+    // viewport ends at the IME's top edge instead of a whole keyboard height
     // above it. The IME is taller than the FAB band, so the frame contributes
     // nothing.
-    expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
+    expect(liftPad()).toBe(320);
     expect(listStyle()).toEqual({ marginBottom: 0 });
 
     act(() => {
@@ -1618,10 +1638,10 @@ describe('AgentSessionListScreen live filtering', () => {
       showKeyboard(100);
     });
     expect(surfaceBottomInset()).toBe(fabBand);
-    // The rows list cannot: the native container lifts the IME's 100 and the
-    // frame adds the rest of the FAB band, so a shorter frame never parks rows
-    // under the button.
-    expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
+    // The rows list cannot: the lift pads the IME's 100 and the frame adds the
+    // rest of the FAB band, so a shorter frame never parks rows under the
+    // button.
+    expect(liftPad()).toBe(100);
     expect(listStyle()).toEqual({ marginBottom: fabBand - 100 });
 
     act(() => {
@@ -1642,7 +1662,7 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       showKeyboard(320);
     });
-    expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(false);
+    expect(liftPad()).toBe(0);
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
 
     act(() => {
@@ -1652,7 +1672,7 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       showKeyboard(320);
     });
-    expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(true);
+    expect(liftPad()).toBe(320);
     expect(listStyle()).toEqual({ marginBottom: 0 });
 
     // Android Back hides the IME while the field keeps focus; a tap on the
@@ -1660,15 +1680,17 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       hideKeyboard();
     });
+    expect(liftPad()).toBe(0);
     act(() => {
       showKeyboard(320);
     });
+    expect(liftPad()).toBe(320);
     expect(listStyle()).toEqual({ marginBottom: 0 });
 
     act(() => {
       (requireNode('SessionListSearchHeader').props.onBlur as () => void)();
     });
-    expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(false);
+    expect(liftPad()).toBe(0);
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
   });
 
@@ -1774,11 +1796,11 @@ describe('AgentSessionListScreen live filtering', () => {
       ).toEqual(step.ids);
       expect(nodes('ScrollView')).toHaveLength(0);
       expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
-      const rows = descendantsOf(requireNode('KeyboardAvoidingView'), 'FlashList');
+      const rows = descendantsOf(liftNode(), 'FlashList');
       expect(rows).toHaveLength(1);
       // The body wrapper that measures the list's available height is the
       // `onLayout` view the rows list hangs from (see `useAgentsListChrome`).
-      const wrapper = descendantsOf(requireNode('KeyboardAvoidingView'), 'View').find(
+      const wrapper = descendantsOf(liftNode(), 'View').find(
         node =>
           typeof node.props.onLayout === 'function' && descendantsOf(node, 'FlashList').length === 1
       );

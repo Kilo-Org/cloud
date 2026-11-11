@@ -122,6 +122,7 @@ type OwnerOutcome =
   | { kind: 'exhausted' }
   | { kind: 'error'; error: unknown; mismatch: boolean };
 
+/** Retains legacy shared-sandbox cleanup safety; new features target exclusive sandbox ownership. */
 export async function reconcileSandboxReferences(
   env: Env,
   params: CanDestroyCloudAgentWorktreeSandboxParams,

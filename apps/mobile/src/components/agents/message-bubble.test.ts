@@ -1,14 +1,11 @@
 /* eslint-disable max-lines -- Queued-badge, delivery, and a11y seams share the direct-invocation MessageBubble harness. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  type MessageDeliveryState,
-  type StoredMessage,
-  type ToolPart,
-} from '@kilocode/cloud-agent-sdk';
+import { type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import type * as React from 'react';
 
 import type * as PartTypes from './part-types';
+import { type MessageDeliveryStatement } from './message-failure-state';
 import {
   assistantMessage,
   findElementByType,
@@ -290,7 +287,7 @@ describe('MessageBubble failed delivery state', () => {
 async function renderBubbleWithHandlers(
   message: StoredMessage,
   props: {
-    deliveryState?: MessageDeliveryState;
+    deliveryState?: MessageDeliveryStatement;
     onRetryMessage?: (m: StoredMessage) => void;
     onAddCredits?: () => void;
     retryAvailable?: boolean;
@@ -488,6 +485,40 @@ describe('MessageBubble failure footer', () => {
       String(executionFooter?.props.className),
     ];
     expect(footerClasses.filter(name => /\btext-(start|end)\b/.test(name))).toEqual([]);
+  });
+
+  it('states a refused send under the person’s bubble with Add credits and no Retry', async () => {
+    const onAddCredits = vi.fn<() => void>();
+    const tree = await renderBubbleWithHandlers(userMessage('m-credits'), {
+      deliveryState: { status: 'failed', error: '', reason: 'credits' },
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      onAddCredits,
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+
+    expect(findText(tree, t => t === 'Not enough credits to send this message.')).toBe(true);
+    // The cause is the whole statement: neither the generic title line nor the
+    // agent-failure line repeats or contradicts it.
+    expect(findText(tree, t => t === 'Response failed')).toBe(false);
+    expect(findText(tree, t => t === 'The agent could not run this message.')).toBe(false);
+    // The send never left, so the statement sits in the bubble's own column.
+    expect(String(footerOf(tree)?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px] items-end');
+    const addCredits = findElementByType(
+      tree,
+      'Button',
+      p => p.accessibilityLabel === 'Add credits'
+    );
+    if (!addCredits) {
+      throw new Error('the footer drew no Add credits button');
+    }
+    (addCredits.props.onPress as () => void)();
+    expect(onAddCredits).toHaveBeenCalledTimes(1);
+    // A re-send meets the same balance, so the only other action keeps the
+    // words for the send that follows the purchase.
+    expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
+    expect(
+      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Copy to composer')
+    ).not.toBeNull();
   });
 
   it('renders only the failure footer when the user text sanitizes to empty', async () => {
@@ -1220,16 +1251,124 @@ describe('MessageBubble row rhythm', () => {
   // user wrapper carries the same py-1, so user/assistant boundaries keep the
   // rhythm. One value, three class assertions.
   it('applies the uniform row-rhythm class contract', async () => {
-    const assistantTree = await renderBubble(assistantMessageWithText('rhythm-a'));
-    const parts = findElementByType(assistantTree, 'View', p => p.className === 'gap-2');
-    expect(parts).not.toBeNull();
+    // The wrapper is drawn for a row with a visible part, so the text part has
+    // to be visible: install the real predicate rather than the file's default
+    // "no text part renders" stub.
+    const actual = await vi.importActual<typeof PartTypes>('./part-types');
+    const { isTextPart } = await import('./part-types');
+    vi.mocked(isTextPart).mockImplementation(actual.isTextPart);
+    try {
+      const assistantTree = await renderBubble(assistantMessageWithText('rhythm-a'));
+      const parts = findElementByType(assistantTree, 'View', p => p.className === 'gap-2');
+      expect(parts).not.toBeNull();
 
-    const assistantPressable = pressableProps(assistantTree);
-    expect(assistantPressable?.className).toBe('px-4 py-1');
+      const assistantPressable = pressableProps(assistantTree);
+      expect(assistantPressable?.className).toBe('px-4 py-1');
 
-    const userTree = await renderBubble(userMessage('rhythm-b'));
-    const userPressable = pressableProps(userTree);
-    expect(userPressable?.className).toBe('px-4 py-1');
+      const userTree = await renderBubble(userMessage('rhythm-b'));
+      const userPressable = pressableProps(userTree);
+      expect(userPressable?.className).toBe('px-4 py-1');
+    } finally {
+      vi.mocked(isTextPart).mockReturnValue(false);
+    }
+  });
+});
+
+describe('MessageBubble rows with nothing to draw', () => {
+  // The transcript keeps a message item while a live turn streams its parts in,
+  // so a row can exist with no visible part. Its wrapper carries the row's
+  // padding and the long-press surface, so drawing it around nothing left an
+  // empty interactive strip in the transcript (and an invisible focus stop in
+  // the accessibility tree).
+  it('draws no pressable for a user row with no parts', async () => {
+    const message = userMessage('m-empty-user');
+    message.parts = [];
+
+    const tree = await renderBubble(message);
+
+    expect(pressableProps(tree)).toBeNull();
+    expect(countElementsByType(tree, 'Pressable')).toBe(0);
+  });
+
+  it('draws no pressable for an assistant row with no parts', async () => {
+    const tree = await renderBubble(assistantMessage('m-empty-assistant'));
+
+    expect(pressableProps(tree)).toBeNull();
+    expect(findElementByType(tree, 'View', p => p.className === 'gap-2')).toBeNull();
+  });
+
+  it('draws no pressable for a row whose only text part is blank', async () => {
+    const actual = await vi.importActual<typeof PartTypes>('./part-types');
+    const { isTextPart } = await import('./part-types');
+    vi.mocked(isTextPart).mockImplementation(actual.isTextPart);
+    try {
+      const message = assistantMessage('m-blank-part');
+      message.parts = [
+        {
+          id: 'm-blank-part-text',
+          sessionID: 'ses_1',
+          messageID: 'm-blank-part',
+          type: 'text',
+          text: '   \n ',
+        },
+      ];
+
+      const tree = await renderBubble(message);
+
+      expect(pressableProps(tree)).toBeNull();
+    } finally {
+      vi.mocked(isTextPart).mockReturnValue(false);
+    }
+  });
+
+  it('draws no pressable for a row whose only part is the synthetic routing context', async () => {
+    // The server prepends this wrapper to every prompt. The bubble renders
+    // human text only, so a row that carries nothing else draws no bubble, and
+    // the wrapper drawn around it would be the same empty strip.
+    const message = userMessage('m-context-only');
+    message.parts = [
+      {
+        id: 'm-context-only-context',
+        sessionID: 'ses_1',
+        messageID: 'm-context-only',
+        type: 'text',
+        text: '<cloud-agent-context session-id="workspace_123" />',
+        synthetic: true,
+      },
+    ];
+
+    const tree = await renderBubble(message);
+
+    expect(pressableProps(tree)).toBeNull();
+  });
+
+  it('keeps the failure footer on a user row with no parts', async () => {
+    const message = userMessage('m-empty-failed');
+    message.parts = [];
+
+    const tree = await renderBubbleWithHandlers(message, {
+      deliveryState: { status: 'failed', error: 'boom', reason: 'exhausted' },
+      onRetryMessage: vi.fn<(m: StoredMessage) => void>(),
+    });
+
+    // The footer is the failed turn's status, not its content: it stays, and
+    // the row draws no wrapper above it.
+    expect(pressableProps(tree)).toBeNull();
+    expect(footerOf(tree)).not.toBeNull();
+    expect(findText(tree, t => t === 'Message not sent')).toBe(true);
+    expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).not.toBeNull();
+  });
+
+  it('keeps the queued row wrapper while an empty row holds its badge slot', async () => {
+    const message = userMessage('m-empty-held');
+    message.parts = [];
+
+    const tree = await renderBubble(message, { status: 'queued' }, true);
+
+    // The held slot reserves the badge's height for layout stability as the
+    // message dequeues, so the row keeps drawing its wrapper.
+    expect(pressableProps(tree)?.className).toBe('px-4 py-1');
+    expect(findText(tree, t => t === 'Queued')).toBe(true);
   });
 });
 

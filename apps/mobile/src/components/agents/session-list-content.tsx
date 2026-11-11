@@ -88,8 +88,6 @@ type AgentSessionListContentProps = {
   onClearQuery: () => void;
   /** The no-history body's next step: open the new-session composer. */
   onCreateSession: () => void;
-  /** Placement-memory identity for this list's body states. */
-  stateKey?: string;
 };
 
 export function AgentSessionListContent({
@@ -114,7 +112,6 @@ export function AgentSessionListContent({
   searchQuery,
   onClearQuery,
   onCreateSession,
-  stateKey,
 }: Readonly<AgentSessionListContentProps>) {
   const listRef = useRef<FlashListRef<SessionListRow>>(null);
   useScrollToTop(listRef);
@@ -433,7 +430,6 @@ export function AgentSessionListContent({
         {updatingStatus}
         <BodyEmpty
           kind="no-past-sessions"
-          stateKey={stateKey}
           isSearching={isSearching}
           clearQueryAction={clearQueryAction}
           createSessionAction={createSessionAction}
@@ -454,7 +450,6 @@ export function AgentSessionListContent({
         {updatingStatus}
         <BodyEmpty
           kind={bodyModel.kind}
-          stateKey={stateKey}
           isSearching={isSearching}
           secondaryAction={
             bodyModel.kind === 'query-error-empty' ? bodyModel.secondaryAction : undefined

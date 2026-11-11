@@ -22,9 +22,6 @@ vi.mock('@/components/ui/button', () => ({
 vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
-vi.mock('@/components/ui/accessible-status', () => ({
-  AccessibleStatus: 'AccessibleStatus',
-}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#999999' }),
 }));
@@ -73,39 +70,5 @@ describe('BodyEmpty mounted', () => {
     expect(findHost(renderer.root, 'ClearQueryCTA')).toHaveLength(0);
     // The History icon identifies this state.
     expect(findHost(renderer.root, 'History')).toHaveLength(1);
-  });
-
-  it('names each body state for placement memory', async () => {
-    // These bodies swap in place on one screen: clearing a no-match search hands
-    // over to the no-past-sessions body. A shared identity would make the state
-    // that mounts second paint its first frame at the previous one's size.
-    const body = async (kind: BodyEmptyProps['kind']) => {
-      const renderer = await renderBody({
-        kind,
-        stateKey: 'session-history',
-        isSearching: true,
-        clearQueryAction: createElement('ClearQueryCTA'),
-        onRetry: vi.fn(() => undefined),
-      });
-      const state = findHost(renderer.root, 'CenteredState')[0];
-      const stateKey: unknown = state === undefined ? null : state.props.stateKey;
-      renderer.unmount();
-      return stateKey;
-    };
-
-    // Sequential on purpose: each render owns its own act().
-    const noPastSessions = await body('no-past-sessions');
-    const filteredEmpty = await body('filtered-empty');
-    const queryErrorEmpty = await body('query-error-empty');
-
-    expect({
-      'no-past-sessions': noPastSessions,
-      'filtered-empty': filteredEmpty,
-      'query-error-empty': queryErrorEmpty,
-    }).toEqual({
-      'no-past-sessions': 'session-history:no-past-sessions',
-      'filtered-empty': 'session-history:filtered-empty',
-      'query-error-empty': 'session-history:query-error-empty',
-    });
   });
 });

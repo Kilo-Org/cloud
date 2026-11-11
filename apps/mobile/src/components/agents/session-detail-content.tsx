@@ -2900,7 +2900,7 @@ export function SessionDetailContent({
         detail: terminalError.detail,
       });
       return (
-        <CenteredState stateKey="session-detail:terminal-error">
+        <CenteredState>
           <View className="items-center gap-3 px-6">
             <QueryError
               variant={terminalError.variant}
@@ -2947,7 +2947,7 @@ export function SessionDetailContent({
       // the same flex-1 region (CenteredState) so the header and composer do
       // not move, and give the user the only useful action: retry.
       return (
-        <CenteredState stateKey="session-detail:slow">
+        <CenteredState>
           <View className="items-center gap-3 px-6">
             <Text className="text-center text-sm text-muted-foreground">
               {t('common.takingLonger')}
@@ -2974,7 +2974,7 @@ export function SessionDetailContent({
     if (transcriptView !== 'list') {
       if (transcriptView === 'status' && statusIndicator !== null) {
         return (
-          <CenteredState stateKey="session-detail:status">
+          <CenteredState>
             <View className="items-center px-6">
               <SessionStatusIndicator indicator={statusIndicator} />
             </View>
@@ -2989,7 +2989,6 @@ export function SessionDetailContent({
         // the action-less empty state below.
         return (
           <EmptyState
-            stateKey="session-detail:older-error"
             icon={MessageSquare}
             title={t('agentChat.session.emptyTitle')}
             description={
@@ -3019,7 +3018,6 @@ export function SessionDetailContent({
       }
       return (
         <EmptyState
-          stateKey="session-detail:empty"
           icon={MessageSquare}
           title={
             isReadOnly

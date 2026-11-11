@@ -19,11 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { SearchX } from '@/components/ui/icons';
 
-import {
-  _resetRememberedSurfaceForTests,
-  CenteredState,
-  CONTENT_MEASURE_FALLBACK_MS,
-} from './centered-state';
+import { CenteredState } from './centered-state';
 import { type useStateSurface } from './centered-state-surface';
 import { EmptyState } from './empty-state';
 import { InvalidRouteState } from './invalid-route-state';
@@ -158,7 +154,6 @@ function expectPainted(mounted: { content: () => ViewProps }) {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  _resetRememberedSurfaceForTests();
   native.surface = {
     frame: { top: 0, bottom: 500 },
     bounds: { top: 0, bottom: 500 },
@@ -304,21 +299,19 @@ describe('CenteredState measurements', () => {
     mounted.unmount();
   });
 
-  it('keeps a revealed state on screen and ignores stale geometry after the surface changes', async () => {
+  it('keeps a revealed state on screen and drops stale geometry after the surface changes', async () => {
     const mounted = await mount();
     mounted.settle();
     act(() => {
       mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
     });
     expect(mounted.scroll().contentContainerStyle).toMatchObject({ minHeight: 340 });
-    const placed = mounted.scroll().contentContainerStyle;
     const stale = native.measurements.splice(0);
     native.surface.frame = { top: 300, bottom: 800 };
     mounted.rerender();
-    // The state keeps the placement it painted at: a surface that changed under
-    // it never blanks the body and never re-centres it on the way.
+    // The band moved under the state: it still paints, at the pending
+    // placement, while it waits for a measurement of the new band.
     expectPainted(mounted);
-    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     act(() => {
       for (const onMeasure of stale) {
         onMeasure(0, 80, 400, 340);
@@ -326,7 +319,7 @@ describe('CenteredState measurements', () => {
     });
     // A viewport measured against the old frame is not reused for the new one.
     expectPainted(mounted);
-    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
+    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
     mounted.settle(380, 340);
     expectPainted(mounted);
     expect(mounted.scroll().contentContainerStyle).toEqual({
@@ -377,7 +370,7 @@ describe('CenteredState measurements', () => {
     mounted.unmount();
   });
 
-  it('keeps the painted state visible while the surface re-measures', async () => {
+  it('keeps the state painted while the surface re-measures', async () => {
     const mounted = await mount();
     mounted.settle();
     expectPainted(mounted);
@@ -385,19 +378,19 @@ describe('CenteredState measurements', () => {
     const frame = native.surface.frame;
     native.surface.frame = null;
     mounted.rerender();
-    // The band it painted against is the band it still has: the placement stays
-    // instead of dropping to the pending centering and lifting back.
+    // The band is unknown for a moment: the state still paints, at the pending
+    // placement, instead of disappearing from the body.
     expectPainted(mounted);
-    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
+    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
     native.surface.frame = frame;
     mounted.rerender();
+    mounted.settle();
     expectPainted(mounted);
     expect(mounted.scroll().contentContainerStyle).toEqual(placed);
-    // An unreadable re-measure never drops a painted state back to the pending
-    // centering: the placement it already carries is the placement it keeps.
+    // An unreadable re-measure leaves the state painted at the pending
+    // placement; the next readable measurement places it again.
     mounted.settle(0, 0);
     expectPainted(mounted);
-    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     act(() => {
       mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
     });
@@ -444,167 +437,6 @@ describe('CenteredState first-frame paint', () => {
       paddingBottom: 16,
     });
     mounted.unmount();
-  });
-
-  it('holds a first-ever mount back only until its content measures', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    try {
-      // Nothing to remember and no content size yet: painting now would place
-      // the body at the pending centering and lift it when the size lands. The
-      // hold is one layout pass, and the timer bounds it if none arrives.
-      const mounted = await renderWithProviders(
-        <CenteredState testID="state">{null}</CenteredState>
-      );
-      const content = () =>
-        mounted.renderer.root.findByProps({ testID: 'state-content' }).props as ViewProps;
-      expect(content().className).toContain('opacity-0');
-      await act(async () => {
-        vi.advanceTimersByTime(CONTENT_MEASURE_FALLBACK_MS);
-        await Promise.resolve();
-      });
-      expect(content().className).not.toContain('opacity-0');
-      mounted.unmount();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('places a returning state with the band it last painted against', async () => {
-    // A pushed screen unpublishes its surface for the length of the transition.
-    // The state must paint where it will be measured, not at the pending
-    // centering and then lift ~39 dp to it.
-    const first = await mount();
-    first.settle();
-    const placed = first.scroll().contentContainerStyle;
-    first.unmount();
-
-    native.surface = {
-      ...native.surface,
-      frame: null,
-      bounds: null,
-    };
-    const returning = await mount();
-    // The first paint is the remembered one; settling measures the same band, so
-    // an implementation that ignored the memory would still match afterwards.
-    expect(returning.scroll().contentContainerStyle).toEqual(placed);
-    returning.settle();
-    expect(returning.scroll().contentContainerStyle).toEqual(placed);
-    returning.unmount();
-  });
-
-  it('places a returning state before its content lays out', async () => {
-    const first = await mount();
-    first.settle();
-    const placed = first.scroll().contentContainerStyle;
-    first.unmount();
-
-    native.surface = {
-      ...native.surface,
-      frame: null,
-      bounds: null,
-    };
-    // No content layout yet: the remembered size stands in, so the first frame
-    // is already the measured placement instead of the pending centering.
-    const returned = await renderWithProviders(
-      <CenteredState testID="state">{null}</CenteredState>
-    );
-    const scroll = () => returned.renderer.root.findByType(ScrollView).props as ScrollViewProps;
-    act(() => {
-      for (const onMeasure of native.measurements.splice(0)) {
-        onMeasure(0, 80, 400, 340);
-      }
-    });
-    expect(scroll().contentContainerStyle).toEqual(placed);
-    returned.unmount();
-  });
-
-  it('remembers one placement per state, not one per surface', async () => {
-    // A tab's empty body and a pushed screen's body share one surface and one
-    // default testID. The second state must not be placed with the first one's
-    // memory: the history body would paint about 29 dp off its own centre.
-    const tabState = await mount();
-    tabState.settle();
-    tabState.unmount();
-
-    native.surface = {
-      ...native.surface,
-      frame: null,
-      bounds: null,
-    };
-    // Its own content has not laid out and it has no memory of its own, so it
-    // falls back instead of borrowing the other state's placement.
-    const otherState = await renderWithProviders(
-      <CenteredState testID="state" stateKey="other-screen">
-        {null}
-      </CenteredState>
-    );
-    const scroll = () => otherState.renderer.root.findByType(ScrollView).props as ScrollViewProps;
-    act(() => {
-      for (const onMeasure of native.measurements.splice(0)) {
-        onMeasure(0, 80, 400, 340);
-      }
-    });
-    expect(scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
-    otherState.unmount();
-  });
-
-  it('places each named empty state by its own identity', async () => {
-    // A surface that swaps one centred empty state for another names each one,
-    // so the body that mounts second never paints at the first one's size.
-    const first = await renderWithProviders(
-      <EmptyState
-        icon={SearchX}
-        stateKey="swap:first"
-        title="No matches"
-        description="Try another term"
-      />
-    );
-    const content = first.renderer.root.findByProps({ testID: 'centered-state-content' })
-      .props as ViewProps;
-    act(() => {
-      content.onLayout?.(contentLayout as LayoutChangeEvent);
-    });
-    act(() => {
-      for (const onMeasure of native.measurements.splice(0)) {
-        onMeasure(0, 80, 400, 340);
-      }
-    });
-    const placed = (first.renderer.root.findByType(ScrollView).props as ScrollViewProps)
-      .contentContainerStyle;
-    expect(placed).not.toEqual(UNPLACED_FALLBACK_STYLE);
-    first.unmount();
-
-    native.surface = { ...native.surface, frame: null, bounds: null };
-    // Its own identity returns with no size measured yet: it still paints at
-    // the placement it remembered.
-    const returning = await renderWithProviders(
-      <EmptyState
-        icon={SearchX}
-        stateKey="swap:first"
-        title="No matches"
-        description="Try another term"
-      />
-    );
-    expect(
-      (returning.renderer.root.findByType(ScrollView).props as ScrollViewProps)
-        .contentContainerStyle
-    ).toEqual(placed);
-    returning.unmount();
-
-    // The other state of the pair has no placement of its own yet, so it falls
-    // back instead of borrowing the first one's.
-    const second = await renderWithProviders(
-      <EmptyState
-        icon={SearchX}
-        stateKey="swap:second"
-        title="No past sessions"
-        description="Completed sessions appear here."
-      />
-    );
-    expect(
-      (second.renderer.root.findByType(ScrollView).props as ScrollViewProps).contentContainerStyle
-    ).toEqual(UNPLACED_FALLBACK_STYLE);
-    second.unmount();
   });
 
   it('reserves the surface bottom band once while the layout measurement is pending', async () => {

@@ -9,10 +9,10 @@ import { Skeleton } from '@/components/ui/skeleton';
  * its header and the state that arrives keeps the same shape.
  *
  * It centers itself instead of going through `CenteredState`: that component
- * places a data state against the band its surface reports, and holds the
- * state for one bounded layout pass while its own size lands on a first-ever
- * mount. A placeholder has the opposite requirement: it is the only thing on
- * screen while the status is unknown, so it paints from the first frame at a
+ * places a data state against the band its surface reports and the size its
+ * own content reports, so its placement settles one layout pass later. A
+ * placeholder has the opposite requirement: it is the only thing on screen
+ * while the status is unknown, so it paints from the first frame at a
  * placement that needs no measurement.
  */
 export function ManualReviewSkeleton() {

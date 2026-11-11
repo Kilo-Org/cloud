@@ -1,12 +1,4 @@
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type ReactNode, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
   PixelRatio,
@@ -40,62 +32,26 @@ type CenteredStateProps = {
    */
   contentContainerClassName?: string;
   testID?: string;
-  /**
-   * Identity of this state for placement memory. Two states can share one
-   * surface and the default testID — a tab's empty body and a pushed screen's —
-   * and each must remember its own placement, not the other's.
-   */
-  stateKey?: string;
   refreshControl?: ScrollViewProps['refreshControl'];
 };
 
 type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
 
 /**
- * The placement a state last painted at. Keyed by route and state, because one
- * surface carries several states — a tab's empty body and a pushed screen's —
- * and a returning screen must not inherit the other one's size.
- */
-type RememberedPlacement = {
-  windowWidth: number;
-  windowHeight: number;
-  /** The surface the band belongs to; a sheet's band is not the screen's. */
-  register: (() => () => void) | undefined;
-  style: { minHeight: number; paddingTop: number; paddingBottom: number };
-};
-
-const REMEMBERED_PLACEMENT_LIMIT = 64;
-/**
- * Upper bound on hiding content that has not reported its own size yet. It
- * covers one layout pass on a first-ever mount; a view that never reports a
- * size must not stay invisible.
- */
-export const CONTENT_MEASURE_FALLBACK_MS = 200;
-const rememberedPlacements = new Map<string, RememberedPlacement>();
-
-/** Test-only: drop the remembered placements so a suite starts from a cold mount. */
-export function _resetRememberedSurfaceForTests(): void {
-  rememberedPlacements.clear();
-}
-
-/**
  * Centered data state (empty, status, error) inside the band a screen surface
  * reserves.
  *
- * The state paints on its first frame, and that placement is final: a surface
- * that has not measured yet — a screen coming back from a pushed route, the tab
- * bar's own layout pass — carries the remembered placement of the same state on
- * the same route, so the first frame is already the measured one. A hidden data
- * state is a blank body, which reads as a broken screen and outlasts the
- * measurement on a slow device; a first frame at the pending centering lifts
- * about 39 dp when the measurement lands, which is a layout shift.
+ * The state paints from its first frame: a hidden data state is a blank body,
+ * which reads as a broken screen. The first frame sits at the pending placement
+ * — centered in the band the surface reports, or in the window minus the
+ * reservation the caller already knows — and the measured placement replaces it
+ * once the surface and the content have reported their sizes.
  */
 export function CenteredState({
   children,
   className,
   contentContainerClassName,
   testID = 'centered-state',
-  stateKey,
   refreshControl,
 }: CenteredStateProps) {
   const surface = useStateSurface();
@@ -126,7 +82,6 @@ export function CenteredState({
   const requestRef = useRef(0);
   const [viewport, setViewport] = useState<MeasuredViewport | null>(null);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
-  const [contentMeasured, setContentMeasured] = useState(false);
 
   const register = surface?.register;
   useLayoutEffect(() => register?.(), [register]);
@@ -199,7 +154,6 @@ export function CenteredState({
 
   const measureContent = useCallback((event: LayoutChangeEvent) => {
     setContentHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
-    setContentMeasured(true);
   }, []);
   const layout = useMemo(() => {
     // The stored viewport carries the band it was measured against, and the
@@ -235,40 +189,6 @@ export function CenteredState({
     topInset,
     viewport,
   ]);
-  const placementKey = stateKey ?? testID;
-  const remembered = rememberedPlacements.get(placementKey);
-  const rememberedStyle =
-    remembered !== undefined &&
-    remembered.windowWidth === windowSize.width &&
-    remembered.windowHeight === windowSize.height &&
-    remembered.register === surface?.register
-      ? remembered.style
-      : null;
-  // Remember the placement this state painted at, so its next mount paints
-  // there directly. A route change or a window change makes it stale, and the
-  // entries are capped so a session cannot grow the map without bound.
-  useLayoutEffect(() => {
-    if (layout === undefined) {
-      return;
-    }
-    rememberedPlacements.delete(placementKey);
-    rememberedPlacements.set(placementKey, {
-      windowWidth: windowSize.width,
-      windowHeight: windowSize.height,
-      register: surface?.register,
-      style: {
-        minHeight: layout.minHeight,
-        paddingTop: layout.paddingTop,
-        paddingBottom: layout.paddingBottom,
-      },
-    });
-    if (rememberedPlacements.size > REMEMBERED_PLACEMENT_LIMIT) {
-      const oldest = rememberedPlacements.keys().next().value;
-      if (oldest !== undefined) {
-        rememberedPlacements.delete(oldest);
-      }
-    }
-  }, [layout, placementKey, surface?.register, windowSize.width, windowSize.height]);
   // While the measured layout is pending, the fallback must still keep the band
   // the surface reserved (the fixed tab bar) free: without it the body centers
   // in the full viewport, which runs under the bar, and the bar clips the
@@ -277,31 +197,13 @@ export function CenteredState({
   // twice and pushes the body above the centre of the visible area.
   const bottomReservation = surface?.bottomReservation ?? 0;
   const contentStyle = useMemo(() => {
-    const style = layout ??
-      rememberedStyle ?? {
-        justifyContent: 'center' as const,
-        paddingTop: 16,
-        paddingBottom: 16 + bottomReservation,
-      };
-    return { flexGrow: 1, ...style };
-  }, [bottomReservation, layout, rememberedStyle]);
-
-  // A first-ever mount has no remembered placement and no content size yet:
-  // painting at the pending centering and then lifting to the measured one is a
-  // visible shift, so the content waits for its own layout callback. A returning
-  // state already knows both and never waits.
-  const unplaced = rememberedStyle === null && !contentMeasured;
-  useEffect(() => {
-    if (!unplaced) {
-      return undefined;
-    }
-    const timer = setTimeout(() => {
-      setContentMeasured(true);
-    }, CONTENT_MEASURE_FALLBACK_MS);
-    return () => {
-      clearTimeout(timer);
+    const style = layout ?? {
+      justifyContent: 'center' as const,
+      paddingTop: 16,
+      paddingBottom: 16 + bottomReservation,
     };
-  }, [unplaced]);
+    return { flexGrow: 1, ...style };
+  }, [bottomReservation, layout]);
 
   if (!surface) {
     throw new Error('CenteredState requires a StateSurface');
@@ -321,11 +223,9 @@ export function CenteredState({
         keyboardShouldPersistTaps="handled"
       >
         <View
-          className={cn('w-full', contentContainerClassName, unplaced && 'opacity-0')}
+          className={cn('w-full', contentContainerClassName)}
           testID={testID ? `${testID}-content` : undefined}
           onLayout={measureContent}
-          accessibilityElementsHidden={unplaced}
-          importantForAccessibility={unplaced ? 'no-hide-descendants' : 'auto'}
         >
           {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}
           {children}

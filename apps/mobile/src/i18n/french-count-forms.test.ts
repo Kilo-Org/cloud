@@ -113,6 +113,8 @@ describe('catalogs with no zero category', () => {
 
   it('renders a zero count with the wording its one form carries', async () => {
     for (const tag of tags) {
+      // One instance holds one language at a time, so the catalogs load in sequence.
+      // eslint-disable-next-line no-await-in-loop
       await i18n.changeLanguage(tag);
       for (const family of families) {
         expect(i18n.t(family, { count: 0, displayCount: 'N' })).toBe(

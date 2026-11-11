@@ -130,14 +130,16 @@ function ScanCard({ scan }: { scan: Scan }) {
           ...(scan.part === 'conversation'
             ? [
                 {
+                  label: 'Characters cached',
+                  value: `${formatCount(scan.cached_characters)} of ${formatCount(scan.total_characters)}`,
+                },
+                {
                   label: 'Segments cached',
                   value: `${formatCount(scan.cached_segments)} of ${formatCount(scan.total_segments)}`,
                 },
+                { label: 'Attachments omitted', value: formatCount(scan.omitted_attachments) },
               ]
             : []),
-          ...(scan.part === 'response'
-            ? []
-            : [{ label: 'Attachments omitted', value: formatCount(scan.omitted_attachments) }]),
           {
             label: 'Enkrypt calls',
             value: formatCount(scan.attempts),

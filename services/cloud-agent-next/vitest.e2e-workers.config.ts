@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { cloudflareTest } from '@cloudflare/vitest-plugin';
 import { defineConfig } from 'vitest/config';
+import { binaryAsArrayBuffer } from './test/plugins/binary-as-arraybuffer.js';
 
 // e2e-surface tests in the real Workers runtime (Miniflare). This is a separate
 // config from `vitest.workers.config.ts`: it exercises the real `src/e2e-entry.ts`
@@ -21,6 +22,7 @@ process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE ??= databas
 
 export default defineConfig({
   plugins: [
+    binaryAsArrayBuffer,
     {
       name: 'fix-pg-cjs-dependencies',
       enforce: 'pre',

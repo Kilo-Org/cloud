@@ -425,10 +425,6 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     screenTexts(dump) !== beforeTexts ||
     (dump.env.screen !== undefined && dump.env.screen !== beforeScreen) ||
     (beforeRoute === linkRoute && dump.env.route.split('?')[0] === linkRoute);
-  await ctx.probe.startSampling(
-    SAMPLE_INTERVAL_MS,
-    ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + 2 * LOADING_SETTLE_TIMEOUT_MS
-  );
   await ctx.probe.openLink(target.link);
   // A cold screen paints its own loading placeholder and holds it still, so a
   // settle loop would measure the placeholder. Wait for it to clear first, and
@@ -454,6 +450,15 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
     if (!opened(settled.dump)) unopened = await ctx.probe.lastOutcome();
   }
+  // Sampling dumps the whole screen on the JS thread every tick, which competes
+  // with the session hydration the placeholder wait is waiting for: held until
+  // that wait returns, a cold screen cleared in a fraction of the time it took
+  // while sampling was already running. The observation window it serves starts
+  // here anyway.
+  await ctx.probe.startSampling(
+    SAMPLE_INTERVAL_MS,
+    ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + 2 * LOADING_SETTLE_TIMEOUT_MS
+  );
   const { samples, truncated } = await ctx.probe.stopSampling();
   if (truncated) {
     ctx.log(

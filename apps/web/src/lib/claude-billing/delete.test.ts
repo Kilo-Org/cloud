@@ -14,7 +14,12 @@ import {
   shareClaudeBillingConnection,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
-import { ClaudeProfileDeletionError, deleteUserClaudeProfiles } from './delete';
+import {
+  ClaudeProfileDeletionError,
+  cleanupRemovedClaudeProfilesForUser,
+  deleteUserClaudeProfiles,
+  retireUnreferencedClaudeBillingPayer,
+} from './delete';
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -149,5 +154,29 @@ describe('Personal Claude profile erasure', () => {
     expect(
       await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
     ).toMatchObject({ user_profile_id: `uprof_${user.id}` });
+  });
+
+  it('retires an unshared removed payer profile and cleans up deferred removed rows', async () => {
+    const user = await connectedUser();
+    const unreferenced = await removeClaudeBillingGrant({ kind: 'personal', kiloUserId: user.id });
+    if (!unreferenced) throw new Error('Expected unreferenced payer');
+
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('{}', { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ type: 'user_profile_deleted' }), { status: 200 })
+      );
+
+    await expect(retireUnreferencedClaudeBillingPayer(unreferenced)).rejects.toMatchObject({
+      retryable: true,
+    });
+    expect(
+      await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
+    ).toMatchObject({ id: unreferenced.id, status: 'removed' });
+
+    await cleanupRemovedClaudeProfilesForUser(user.id);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })).toBeNull();
   });
 });

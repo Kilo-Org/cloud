@@ -36,6 +36,8 @@ function status(state: ClaudeBillingStatus['state']): ClaudeBillingStatus {
     providerName: CLAUDE_BILLING_PROVIDER_NAME,
     canManage: true,
     canSharePersonal: false,
+    shareableLinks: [],
+    sharedWith: [],
   };
 }
 
@@ -95,5 +97,73 @@ describe('ClaudeBillingCardView', () => {
       })
     );
     expect(html).toContain(title);
+  });
+
+  it('offers an organization link on an unlinked personal card', () => {
+    const rendered = buttons({
+      status: {
+        ...status('not_connected'),
+        shareableLinks: [
+          {
+            payerId: '00000000-0000-4000-8000-000000000001',
+            source: {
+              organizationId: '00000000-0000-4000-8000-000000000010',
+              scope: 'shared_services',
+            },
+            label: 'Acme (shared services)',
+            connectedAt: '2026-09-16T12:00:00.000Z',
+          },
+        ],
+      },
+      scope: 'personal',
+      onShare: () => undefined,
+    });
+    expect(rendered.map(button => button.textContent)).toEqual([
+      'Use Claude link from Acme (shared services)',
+    ]);
+  });
+
+  it('renders a link selector when multiple Claude accounts are available', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ClaudeBillingCardView, {
+        status: {
+          ...status('not_connected'),
+          shareableLinks: [
+            {
+              payerId: '00000000-0000-4000-8000-000000000001',
+              source: { organizationId: '00000000-0000-4000-8000-000000000010' },
+              label: 'Acme (member)',
+              connectedAt: '2026-09-16T12:00:00.000Z',
+            },
+            {
+              payerId: '00000000-0000-4000-8000-000000000002',
+              source: {},
+              label: 'Personal account',
+              connectedAt: '2026-09-16T12:00:00.000Z',
+            },
+          ],
+        },
+        scope: 'shared_services',
+        onConnect: () => undefined,
+        onShare: () => undefined,
+      })
+    );
+    const doc = parseHTML(html).document;
+    const selectTrigger = doc.querySelector('[aria-label="Existing Claude link"]');
+    expect(selectTrigger?.textContent).toContain('Acme (member)');
+    expect(html).toContain('Use selected Claude link');
+  });
+
+  it('displays shared scopes on a connected card', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ClaudeBillingCardView, {
+        status: {
+          ...status('connected'),
+          sharedWith: ['Personal account', 'Acme (shared services)'],
+        },
+        scope: 'member',
+      })
+    );
+    expect(html).toContain('Shared with Personal account, Acme (shared services).');
   });
 });

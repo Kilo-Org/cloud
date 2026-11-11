@@ -888,7 +888,7 @@
   },
   "codeReviewer": {
     "focusAreas": {
-      "title": "Points à vérifier",
+      "title": "Domaines d'analyse",
       "hint": "Ne sélectionnez aucun domaine pour tout examiner."
     },
     "gate": {
@@ -900,7 +900,7 @@
     },
     "instructions": {
       "title": "Instructions personnalisées",
-      "deprecation": "La suppression des instructions personnalisées est prévue. Déplacez ces consignes dans un fichier REVIEW.md de votre dépôt.",
+      "deprecation": "L'obsolescence des instructions personnalisées est prévue. Déplacez plutôt ces consignes dans un fichier REVIEW.md de votre dépôt.",
       "placeholder": "ex. : respecter nos conventions de gestion des erreurs…",
       "clearTitle": "Supprimer les instructions personnalisées ?",
       "clearMessage": "L'enregistrement d'un champ vide supprime les instructions personnalisées stockées pour ce réviseur."
@@ -1088,10 +1088,10 @@
     "webhookSetup": "La configuration du webhook est incomplète.",
     "webhookSetupDescription": "Certains dépôts risquent de ne pas bénéficier des revues automatiques.",
     "decision": {
-      "block": "Bloquer",
+      "block": "Bloqué",
       "noDecision": "Aucune décision",
       "noResult": "Aucun résultat",
-      "pass": "Réussite"
+      "pass": "Validé"
     },
     "overview": {
       "allAreas": "Tous les domaines",
@@ -1133,7 +1133,7 @@
         "description": "L'agent de revue de code a été désactivé, car cette organisation GitHub utilise une liste d'adresses IP autorisées qui bloque Kilo. Contactez {{supportEmail}} pour obtenir de l'aide, puis réactivez l'agent de revue de code."
       },
       "gitlabProjectAccessRequired": {
-        "description": "L'agent de revue de code a été désactivé, car Kilo ne peut pas créer de jeton d'accès au projet GitLab. Accordez le rôle de responsable du projet ou activez les jetons d'accès au projet, puis réactivez l'agent de revue de code.",
+        "description": "L'agent de revue de code a été désactivé, car Kilo ne peut pas créer de jeton d'accès au projet GitLab. Accordez le rôle Chargé de maintenance ou activez les jetons d'accès au projet, puis réactivez l'agent de revue de code.",
         "recoveryLabel": "Mettre à jour l'intégration GitLab"
       },
       "byokInvalidKey": {
@@ -1142,7 +1142,7 @@
       },
       "selectedModelUnavailable": {
         "description": "L'agent de revue de code a été désactivé, car le modèle sélectionné n'est pas disponible pour les sessions d'agent cloud. Choisissez un modèle disponible, puis réactivez l'agent de revue de code.",
-        "recoveryLabel": "Modifier les paramètres de l'agent de revue de code"
+        "recoveryLabel": "Mettre à jour les paramètres de l'agent de revue de code"
       },
       "repeatedRepositoryCloneTimeout": {
         "description": "L'agent de revue de code a été désactivé après trois tentatives de clonage du dépôt ayant dépassé le délai imparti aujourd'hui. Contactez {{supportEmail}} pour obtenir de l'aide, puis réactivez l'agent de revue de code."
@@ -2754,8 +2754,8 @@
       "accountMismatchMessage": "Cette connexion a été lancée depuis Kilo App avec un autre compte. Connectez-vous sur le site avec ce compte ou recommencez depuis l'application.",
       "cannotCompleteTitle": "Impossible de terminer l'installation",
       "notAdminMessage": "Seul un administrateur GitHub de ce compte peut le connecter. Demandez à un administrateur de l'organisation d'installer Kilo.",
-      "alreadyClaimedMessage": "Cette installation GitHub est déjà liée à un autre compte Kilo. Déconnectez-la d'abord depuis cet autre compte.",
-      "installationUnavailableMessage": "Cette installation de GitHub App est suspendue ou n'est plus disponible. Restaurez-la ou réinstallez-la dans GitHub, puis réessayez.",
+      "alreadyClaimedMessage": "Cette installation de l'application GitHub est déjà liée à un autre compte Kilo. Déconnectez-la d'abord depuis cet autre compte.",
+      "installationUnavailableMessage": "Cette installation d'application GitHub est suspendue ou n'est plus disponible. Restaurez-la ou réinstallez-la dans GitHub, puis réessayez.",
       "multipleInstallationsMessage": "Cette organisation Kilo ne peut actuellement connecter qu'une seule organisation GitHub.",
       "didNotCompleteTitle": "Installation non terminée",
       "didNotCompleteMessage": "L'installation de l'application GitHub n'a pas été terminée. Réessayez depuis l'application."
@@ -3910,7 +3910,7 @@
       "promptRequired": "Démarrer un agent nécessite une consigne. Ajoutez une consigne et relancez-le.",
       "repositoryRequired": "Démarrer un agent nécessite un dépôt. Ouvrez Kilo et choisissez-en un, puis relancez-le.",
       "repositoryUnknown": "Kilo ne reconnaît pas {{repository}} comme un dépôt GitHub ou GitLab. Choisissez un autre dépôt dans Kilo.",
-      "repositoryUnsupported": "{{repository}} est un dépôt Bitbucket — Démarrer un agent ne peut pas encore l'utiliser. Choisissez un autre dépôt dans Kilo."
+      "repositoryUnsupported": "{{repository}} est un dépôt Bitbucket — l'action « Démarrer un agent » ne peut pas encore l'utiliser. Choisissez un autre dépôt dans Kilo."
     }
   },
   "launcher": {

@@ -27,8 +27,14 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
   const refused = error !== null && isTerminalTrpcCode(readTrpcErrorField(error, 'code'));
   // `refetch` is stable across renders, so this awaitable form is too: a caller
   // that must sequence a gated read after it can keep it in a dependency list.
+  //
+  // It answers the user id the attempt produced, not merely that the attempt
+  // finished: React Query resolves `refetch` with a result rather than
+  // rejecting, so a caller that only awaited this could not tell an answer from
+  // a repeat failure and would start the reads this id gates with no id.
   const refetchAsync = useCallback(async () => {
-    await refetch();
+    const result = await refetch();
+    return result.data?.id;
   }, [refetch]);
 
   return {

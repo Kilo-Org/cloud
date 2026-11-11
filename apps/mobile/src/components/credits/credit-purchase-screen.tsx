@@ -27,8 +27,9 @@ import { openExternalUrl } from '@/lib/external-link';
 import { formatPrefixedMoney } from '@/lib/format';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { getStoreLegalLinks } from '@/lib/iap/legal-links';
-import { useTRPC } from '@/lib/trpc';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
+import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 import { useCreditNativeIap } from './credit-native-iap-owner';
 import { CreditExpiryNote } from './credit-expiry-note';
@@ -76,9 +77,16 @@ export function CreditPurchaseScreen() {
   const balanceQuery = useQuery({
     ...trpc.user.getContextBalance.queryOptions({}),
     placeholderData: keepPreviousData,
+    // The card holds a slot for each of these reads, so each must answer or
+    // fail: a paused read on the default network mode would leave a skeleton in
+    // place for as long as the device reports itself offline.
+    ...SETTLE_WHILE_OFFLINE,
   });
   const refetchBalance = balanceQuery.refetch;
-  const creditBlocksQuery = useQuery(trpc.user.getCreditBlocks.queryOptions({}));
+  const creditBlocksQuery = useQuery({
+    ...trpc.user.getCreditBlocks.queryOptions({}),
+    ...SETTLE_WHILE_OFFLINE,
+  });
 
   // The amount here is the same one the Profile credits card masks, so the
   // same preference rules this screen. Until the disk read settles the choice
@@ -154,6 +162,27 @@ export function CreditPurchaseScreen() {
     );
   };
 
+  const renderExpirySlot = () => {
+    // A failed read is not "no expiring credits": the slot states that the
+    // expiry is unknown, using the same copy the Profile credits card shows,
+    // and keeps its reserved height either way.
+    if (creditBlocksQuery.isError) {
+      return (
+        <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
+      );
+    }
+    if (creditBlocksQuery.isPending) {
+      return <Skeleton className="h-3 w-40 max-w-full rounded" />;
+    }
+    return (
+      <CreditExpiryNote
+        creditBlocks={creditBlocksQuery.data.creditBlocks}
+        hiddenAmount={hideBalanceAmount ? HIDDEN_BALANCE : undefined}
+        emptyMessage={t('credits.noExpiringCredits')}
+      />
+    );
+  };
+
   return (
     <View className="flex-1 bg-background" testID="credit-purchase-screen">
       <ScreenHeader title={t('credits.title')} modal />
@@ -174,17 +203,7 @@ export function CreditPurchaseScreen() {
               {t('profile.credits')}
             </Text>
             <View className="mt-1 min-h-11 justify-center">{renderBalanceValue()}</View>
-            <View className="mt-1 min-h-8 justify-center">
-              {creditBlocksQuery.isPending ? (
-                <Skeleton className="h-3 w-40 max-w-full rounded" />
-              ) : (
-                <CreditExpiryNote
-                  creditBlocks={creditBlocksQuery.data?.creditBlocks ?? []}
-                  hiddenAmount={hideBalanceAmount ? HIDDEN_BALANCE : undefined}
-                  emptyMessage={t('credits.noExpiringCredits')}
-                />
-              )}
-            </View>
+            <View className="mt-1 min-h-8 justify-center">{renderExpirySlot()}</View>
           </View>
 
           {/* The description and the store's legal links sit above the pack

@@ -83,7 +83,13 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   // read is the one state where nothing settles and no retry exists yet. It is
   // reported to the screen as its own retryable failure rather than as a blank
   // list, which is what an operator saw when the read timed out.
-  const identityFailed = userId == null && (identity.isError || identity.isUnreachable);
+  //
+  // Only the settled failure counts. `isUnreachable` also covers an attempt
+  // that has not answered yet, so using it would paint this card over a read
+  // that then succeeds — a false error, and movement on the screen this change
+  // exists to hold still. The read settles while offline by policy, so it
+  // either answers or fails.
+  const identityFailed = userId == null && identity.isError;
   const [retryingIdentity, setRetryingIdentity] = useState(false);
   const [storeErrorMessage, setStoreErrorMessage] = useState<string | null>(null);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
@@ -173,13 +179,17 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
 
   // One press recovers both surfaces: the identity read first, because it gates
   // both catalogue reads, then the store prices the answered catalogue asks
-  // for. Awaiting the identity read is what keeps the store call from running
-  // against the user id the failed read never produced.
+  // for. The identity read answers the id it produced, so a repeat failure
+  // leaves the store read alone: a manual refetch bypasses `enabled`, and
+  // running it with no user id would paint prices or a second banner beside
+  // this card.
   const retryIdentity = useCallback(async () => {
     setRetryingIdentity(true);
     try {
-      await refetchIdentity();
-      await refetch();
+      const answeredUserId = await refetchIdentity();
+      if (answeredUserId !== undefined) {
+        await refetch();
+      }
     } finally {
       setRetryingIdentity(false);
     }

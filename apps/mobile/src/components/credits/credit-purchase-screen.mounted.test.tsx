@@ -873,8 +873,11 @@ describe('CreditPurchaseScreen', () => {
     // it must not keep a store spinner running either: an offline cold start is
     // exactly the case where the store has not connected.
     identity.userId = undefined;
-    identity.isUnreachable = true;
+    identity.isError = true;
     owner.connected = false;
+    // The store read must not start for a retry that answers no identity: a
+    // manual refetch bypasses the query's own gate.
+    identity.refetchAsync.mockResolvedValue(undefined);
 
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => allText(renderer).includes('Check your connection and try again.'));
@@ -894,6 +897,8 @@ describe('CreditPurchaseScreen', () => {
       await Promise.resolve();
     });
     expect(identity.refetchAsync).toHaveBeenCalledTimes(1);
+    // A repeat failure leaves the store read alone.
+    expect(owner.fetchStoreProducts).not.toHaveBeenCalled();
     unmount();
   });
 

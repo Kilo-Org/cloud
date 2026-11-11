@@ -156,25 +156,14 @@ describe('useCurrentUserId', () => {
     });
   });
 
-  it('answers the awaitable retry only after the read has run', async () => {
-    // A caller that starts a gated read from this retry must not start it
-    // before the identity read answered, so the promise settles on the read.
-    const read = Promise.withResolvers<undefined>();
-    query.refetch.mockReturnValue(read.promise);
+  it('answers the awaitable retry with the identity the read produced', async () => {
+    // React Query resolves `refetch` with a result rather than rejecting, so a
+    // caller cannot treat a finished attempt as an answer: this form hands back
+    // the user id, and a repeat failure yields undefined.
+    query.refetch.mockResolvedValue({ data: { id: 'user-1', email: 'user@example.com' } });
+    await expect(useCurrentUserId().refetchAsync()).resolves.toBe('user-1');
 
-    const retrying = useCurrentUserId().refetchAsync();
-    let settled = false;
-    const markSettled = async (): Promise<void> => {
-      await retrying;
-      settled = true;
-    };
-    const settling = markSettled();
-
-    expect(query.refetch).toHaveBeenCalledTimes(1);
-    expect(settled).toBe(false);
-
-    read.resolve(undefined);
-    await settling;
-    expect(settled).toBe(true);
+    query.refetch.mockResolvedValue({ data: undefined });
+    await expect(useCurrentUserId().refetchAsync()).resolves.toBeUndefined();
   });
 });

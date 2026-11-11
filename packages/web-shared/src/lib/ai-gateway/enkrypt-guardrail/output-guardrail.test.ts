@@ -213,6 +213,8 @@ function usageRecord(overrides: Record<string, unknown>) {
     sessionId: 'ses_output',
     apiKind: 'chat_completions',
     guardrail: 'output',
+    scannedCharacters: MODEL_OUTPUT.length,
+    totalCharacters: MODEL_OUTPUT.length,
     ...overrides,
   };
 }

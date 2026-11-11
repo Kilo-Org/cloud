@@ -26,7 +26,7 @@ import type { PublishCloudAgentSessionStatusParams } from '@kilocode/session-ing
 import {
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import { waitFor } from './wait-for.js';
@@ -177,7 +177,7 @@ async function installSandbox(
   await runInDurableObject(sandboxStub, async instance => {
     await instance.getAllocationState();
     // Isolated sessions address their containment namespace by `ses-` prefix.
-    installFakeCredentialEnv(instance.env, broker, {
+    installFakeSandboxEnv(instance, broker, {
       SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',

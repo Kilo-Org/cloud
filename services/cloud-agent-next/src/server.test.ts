@@ -2056,6 +2056,130 @@ describe('server /internal/streams/close', () => {
     expect(closeOrgStreams).toHaveBeenCalledWith('org_1');
   });
 
+  it('keeps closing other sessions when one close fails', async () => {
+    const env = createEnv();
+    const closeOrgStreams = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Durable Object unavailable'))
+      .mockResolvedValueOnce(1);
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ closeOrgStreams });
+    const firstSessionId = 'workspace_cccccccc-cccc-cccc-cccc-cccccccccccc';
+    const secondSessionId = 'workspace_dddddddd-dddd-dddd-dddd-dddddddddddd';
+
+    getPgDbMock.mockReturnValue({
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () => [
+            { cloudAgentSessionId: firstSessionId },
+            { cloudAgentSessionId: secondSessionId },
+          ]),
+        })),
+      })),
+    });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/streams/close', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify({ userId: 'usr_removed', organizationId: 'org_1' }),
+      }),
+      env
+    );
+
+    // The removal itself already succeeded; a failed close for one session must
+    // not skip the remaining sessions of the same member.
+    expect(response.status).toBe(204);
+    expect(closeOrgStreams).toHaveBeenCalledTimes(2);
+  });
+
+  it('starts every matching close before waiting for one to finish', async () => {
+    const env = createEnv();
+    const firstClose = Promise.withResolvers<number>();
+    const closeOrgStreams = vi
+      .fn()
+      .mockReturnValueOnce(firstClose.promise)
+      .mockResolvedValueOnce(1);
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ closeOrgStreams });
+
+    getPgDbMock.mockReturnValue({
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () => [
+            { cloudAgentSessionId: 'workspace_eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' },
+            { cloudAgentSessionId: 'workspace_ffffffff-ffff-ffff-ffff-ffffffffffff' },
+          ]),
+        })),
+      })),
+    });
+
+    const responsePromise = fetchWorker(
+      new Request('http://worker.test/internal/streams/close', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify({ userId: 'usr_removed', organizationId: 'org_1' }),
+      }),
+      env
+    );
+
+    // The first close never settles until it is released, so a second call can
+    // arrive only when the handler does not wait for the first one.
+    await vi.waitFor(() => expect(closeOrgStreams).toHaveBeenCalledTimes(2));
+    firstClose.resolve(1);
+
+    expect((await responsePromise).status).toBe(204);
+  });
+
+  it('holds the ninth close until the first wave of eight finishes', async () => {
+    const env = createEnv();
+    const heldCloses = Array.from({ length: 8 }, () => Promise.withResolvers<number>());
+    const closeOrgStreams = vi.fn();
+    for (const held of heldCloses) closeOrgStreams.mockReturnValueOnce(held.promise);
+    closeOrgStreams.mockResolvedValue(1);
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ closeOrgStreams });
+
+    getPgDbMock.mockReturnValue({
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () =>
+            Array.from({ length: 9 }, (_, index) => ({
+              cloudAgentSessionId: `workspace_0000000${index}-0000-0000-0000-00000000000${index}`,
+            }))
+          ),
+        })),
+      })),
+    });
+
+    const responsePromise = fetchWorker(
+      new Request('http://worker.test/internal/streams/close', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify({ userId: 'usr_removed', organizationId: 'org_1' }),
+      }),
+      env
+    );
+
+    // The first eight closes never settle, so the request holds its wave and
+    // the ninth session waits for it.
+    await vi.waitFor(() => expect(closeOrgStreams).toHaveBeenCalledTimes(8));
+    expect(closeOrgStreams).toHaveBeenCalledTimes(8);
+    for (const held of heldCloses) held.resolve(1);
+
+    expect((await responsePromise).status).toBe(204);
+    expect(closeOrgStreams).toHaveBeenCalledTimes(9);
+  });
+
   it('skips rows that do not name a control session', async () => {
     const env = createEnv();
     const closeOrgStreams = vi.fn().mockResolvedValue(0);

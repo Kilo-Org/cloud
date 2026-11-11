@@ -68,6 +68,31 @@ describe('control-plane preparation attempt budget', () => {
   });
 });
 
+describe('control-plane external-work bounds', () => {
+  it('bounds the membership read inside one grant issuance and keeps it real', () => {
+    const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '10' });
+    const readMs = CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadMs;
+
+    // The read happens inside the bounded grant issuance, so a slow database
+    // must not consume more of that bound than one round trip.
+    expect(readMs).toBeLessThan(CONTROL_PLANE_TIMERS.sandbox.providerStopAttemptMs);
+    // Scaling it down would turn a slow read into a deny in a local run.
+    expect(scaled.sandbox.organizationMembershipReadMs).toBe(readMs);
+    expect(scaled.sandbox.organizationMembershipReadAttempts).toBe(
+      CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadAttempts
+    );
+    expect(scaled.sandbox.organizationMembershipReadRetryMs).toBe(
+      CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadRetryMs
+    );
+    // Every attempt of one issuance, timeouts and waits, still fits its bound.
+    const issuanceMs =
+      CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadAttempts * readMs +
+      (CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadAttempts - 1) *
+        CONTROL_PLANE_TIMERS.sandbox.organizationMembershipReadRetryMs;
+    expect(issuanceMs).toBeLessThan(CONTROL_PLANE_TIMERS.sandbox.providerStopAttemptMs);
+  });
+});
+
 describe('sandbox idle policy for route origins', () => {
   it('keeps the interactive window for a sandbox without routes', () => {
     expect(sandboxIdlePolicyForOrigins([])).toBe('interactive');

@@ -8,20 +8,20 @@ images from the catalog. Manual mode, descriptor, cohort or image drift fails be
 
 | Mode | Native image | Deployment reference |
 |---|---|---|
-| preinstalled | all-in-one | `Dockerfile.containers` and pinned build variables |
-| downloaded | all-in-one | `Dockerfile.containers`, exact-SHA runtime descriptor |
 | downloaded | runtime-free | Separate `runtime-free` named image with verified immutable base digest, exact-SHA runtime descriptor |
 
-The runtime-free/preinstalled pair is invalid in the shared configuration schema and the Worker.
-Downloaded startup supports native Cloudflare Containers and BYOC Vercel. Preinstalled is the native default.
+New allocations support only downloaded startup on the runtime-free image, on native Cloudflare
+Containers and BYOC Vercel. Preinstalled and all-in-one deployment selections are rejected. Missing
+runtime descriptors fail configuration preflight instead of falling back to a baked runtime.
+Persisted allocation readers still recognize historical startup modes and image identities; running
+allocations are not rewritten. Retired SDK provider pins cannot create a new allocation.
 
 BYOC Vercel uses its customer-owned snapshot as the base. The snapshot setup provides the fixed Node
 path and Bun version required by the bootstrap. `src/shared/runtime-toolchain.ts` pins every base tool
 (`bun`, `rg`, `gh`, `glab`, `pnpm`, `kilo`) to a release archive or registry tarball whose SHA-256 sits
-next to `RUNTIME_DISTRIBUTION`. The operator build installs the whole set; the Durable Object build
-installs `bun` and the Kilo CLI. Both install from those pins, check the downloaded bytes before
-unpacking or installing, and re-check the tools they installed by exact version and digest before the
-snapshot is created or accepted.
+next to `RUNTIME_DISTRIBUTION`. The Durable Object build installs `bun` and the Kilo CLI from those pins,
+checks the downloaded bytes before unpacking or installing, and re-checks the tools it installed by exact
+version and digest before the snapshot is created or accepted.
 Downloaded startup installs the selected immutable CLI
 and control release as root. The base digest covers the ABI, Node major, Bun, and base setup commands;
 CLI and wrapper changes do not change that digest or require a new snapshot. Existing allocations keep
@@ -54,43 +54,24 @@ The lifecycle is implemented by the
 [upgrade status projection](../../../apps/web/src/lib/cloud-agent-next/vercel-compute-status.ts).
 Check these consumers when deciding whether a future base change requires a coordinated cutover.
 
-The standalone operator harness is a separate provider qualification path:
-`pnpm --filter cloud-agent-next snapshot:vercel build --output <accepted-config.json>`, then
-`pnpm --filter cloud-agent-next snapshot:vercel acceptance --snapshot-id <snapshot-id> --build-id <build-id>`.
-It requires `VERCEL_TOKEN`, `VERCEL_TEAM_ID` and `VERCEL_PROJECT_ID` (environment or service `.dev.vars`;
-team/project may instead be explicit arguments). These commands call the real Vercel API and create
-billable builder/child sandboxes and a retained snapshot. Accepted config JSON is output, not an
-activation of a BYOC connection; it does not update the owner's stored snapshot or digest.
-Do not use the harness as a substitute for an owner's in-app upgrade. Before any authorized live
-qualification, verify the token's actual account, team/project and billing scope; a local command or
-test label alone does not establish isolation. A local provider stand-in proves execution of the
-builder and child scripts, not acceptance by Vercel or activation for a real owner.
+The old `snapshot:vercel` operator harness and its baked-runtime manifest helpers are retired. Use the
+owner's authenticated in-app upgrade for base snapshot creation and validation. Before any authorized
+live qualification, verify the credential's account, team/project and billing scope. Local unit/provider
+fixtures do not prove acceptance by Vercel or activation for a real owner.
 
-A downloaded target can optionally scope its startup to an `interactiveOrgIds` list, rendered as
-`RUNTIME_INTERACTIVE_ORG_IDS`. No current target sets this restriction, so new native and BYOC Vercel
-allocations use downloaded startup for every organization and personal account, including code reviews.
-SDK pins always stay preinstalled.
-
-When a list is configured, a new allocation selects downloaded startup only when all its preparing
-routes belong to one listed organization, whatever their origin (web, webhook, Slack and other
-automation). Native allocations must also be isolated; Vercel allocations use the same organization
-rule. Other organizations, personal sessions, legacy native sandboxes that are not isolated, and missing or mixed route
-identities then retain preinstalled startup on `app`. These identity values are rollout metadata,
-not an authorization boundary.
-
-The renderer retains `app` alongside `runtime-free`; the allocation's selected startup mode and image
-are used together, including snapshot fallback. Existing allocations keep their running image and mode.
-An absent `interactiveOrgIds` means deployment-wide startup selection; an empty catalog list is
-rejected. A complete rollback must change the downloaded default; see Rollback below.
+All new native and BYOC Vercel allocations download the runtime, including organization and personal
+accounts and code reviews. The old `interactiveOrgIds` / `RUNTIME_INTERACTIVE_ORG_IDS` rollout gate
+is rejected, not a path back to preinstalled startup. The renderer emits only the `runtime-free` image.
 
 ### Kilo v2 harness
 
 A downloaded target can also name `kilo2: { orgIds }`. Without it, new sandboxes select v1.
 A sandbox's first allocation selects v2 only when every preparing route has the
 worker-owned `billingOrigin: cloud-agent-web`. Its downloaded start must also pass the organization
-rule above for the `kilo2.orgIds` list. Code reviews, desktop, Agent Manager and other origins stay on v1, including
+rule for the `kilo2.orgIds` list: all preparing routes belong to one listed organization, and native
+allocations are isolated. Code reviews, desktop, Agent Manager and other origins stay on v1, including
 routes with a missing origin and sandboxes with mixed origins. This origin restriction applies only
-to v2 selection; downloaded v1 startup keeps its existing organization rule. A client-supplied
+to v2 selection; downloaded v1 startup is available to every account. A client-supplied
 `createdOnPlatform` cannot select v2. Existing routes without a stored `billingOrigin` select v1.
 The checked-in catalog enables this rule only for organization
 `9d278969-5453-4ae3-a51f-a8d2274a7b56` after deployment.
@@ -100,11 +81,9 @@ before this record existed stays on v1. The harness is stored after startup pref
 checks, before provider creation. A failed preflight does not fix the harness for later attempts.
 Changing the v2 organization list affects only sandboxes without a stored harness.
 
-Existing v2 sandboxes cannot move back to v1. Removing the v2 release, selecting preinstalled mode,
-or excluding their organizations from downloaded startup prevents their next allocation with
-`invalid_configuration`. Recovery of existing v2 sessions after these changes is unsupported.
-New sandboxes select v1 and can start under the rollback configuration. To keep existing v2
-sessions recoverable, retain downloaded startup, their organization scope, and the v2 release.
+Existing v2 sandboxes cannot move back to v1. Removing the v2 release prevents their next allocation
+with `invalid_configuration`. To keep existing v2 sessions recoverable, retain the v2 release.
+Changing the organization scope only affects new sandbox harness selection.
 
 Each publication packages the pinned v1 and v2 CLIs (`PINNED_CLIS` in
 `scripts/runtime-cli-artifact.ts`) with the same control payload. It verifies both on the base and
@@ -121,8 +100,7 @@ authorization is still required. Personal-owned Bitbucket environments cannot bu
 managed Bitbucket repository access requires an organization. Personal GitHub and GitLab environments
 are supported.
 Builds require a downloaded runtime-free deployment and a published runtime release. Existing
-all-in-one environment snapshots are incompatible and trigger replacement builds. Sessions on `app`
-start from the image instead of restoring split-image snapshots. Runtime-only updates retain snapshot
+all-in-one environment snapshots are incompatible and trigger replacement builds. Runtime-only updates retain snapshot
 compatibility when the runtime-free base image and ABI stay unchanged.
 
 ## Deployment and qualification
@@ -139,8 +117,8 @@ still running on a retired sandbox class. The new Worker cannot stop, inspect or
 reclaim an instance through a binding it no longer has.
 
 1. Provision publication through the process in [runtime-publication.md](runtime-publication.md).
-   Verify that a main CI run with a downloaded catalog entry publishes the exact-SHA handoff, and that
-   a preinstalled-only catalog skips publication. Failed CI, PR, fork and merge-group runs must not
+   Verify that a main CI run publishes the exact-SHA handoff and rejects retired catalog selections.
+   Failed CI, PR, fork and merge-group runs must not
    publish. Repeat successful publication and confirm identical retained objects.
 2. Runtime-free relies on B1 ([PR #7914](https://github.com/Kilo-Org/cloud/pull/7914)): a running
    container captures under its start image. B1 is merged into main, and its regression test runs
@@ -157,10 +135,12 @@ Wrangler deployment:
     SOURCE_SHA=$(git rev-parse HEAD)
     pnpm exec tsx scripts/prepare-runtime-deploy.ts production "$SOURCE_SHA"
 
-The generated wrangler.runtime-generated.json stays ignored. Preinstalled preparation requires no runtime
-bucket or registry credentials. Downloaded preparation needs the approved read credentials and exact-SHA
+The generated wrangler.runtime-generated.json stays ignored. Preparation needs the approved read credentials and exact-SHA
 handoff. Inspect the generated image reference and vars before an approved deployment. The existing
 Worker workflow consumes that exact generated config.
+
+The package no longer exposes a raw `deploy` script. Use the prepared deployment command from the
+approved workflow; raw `wrangler deploy` does not load the verified generated configuration.
 
 ## Required provider evidence
 
@@ -189,27 +169,27 @@ Provider metadata retention remains unmeasured until the approved real-provider 
 
 ## Rollback
 
-Use the current compatible Worker build with a reviewed catalog change. Image rollback changes
-runtime-free to all-in-one while mode stays downloaded. Mode rollback then selects preinstalled/all-in-one.
-For a complete rollback across all targets, set `runtime-targets.json` to:
-
-```json
-{
-  "default": { "mode": "preinstalled", "image": "all-in-one" },
-  "targets": {}
-}
-```
-
-Removing a production override does not roll back a downloaded default. A production-only rollback
-requires an explicit production override selecting preinstalled/all-in-one.
-The renderer applies each change to new allocations. It does not rewrite existing allocations or their
-deadlines. Do not deploy an older Worker that cannot read stored startup modes. A production mode
-rollback omits the deployment-injected `RUNTIME_RELEASE_BUCKET` binding; existing baseline bindings,
-such as development's, remain. A downloaded allocation still bootstrapping without the binding gets
-503 for artifact reads and remains subject to the existing bounded startup recovery.
-
+Roll back by selecting a previously verified source SHA and its retained runtime handoff/base digest.
+Do not change the catalog to preinstalled or all-in-one; those selections are no longer accepted.
 Keep earlier descriptors, payloads, handoffs and image digests. Do not delete snapshots or publication
-objects during rollback. A mode change uses a separate repository snapshot namespace.
+objects during rollback. Existing allocations retain their mode, image and deadlines. Keep the runtime
+bucket binding available for allocations that are still bootstrapping, and do not deploy a Worker that
+cannot read historical allocation state.
+
+## Local development
+
+`pnpm dev` and `pnpm start` publish the freshly built wrapper and pinned CLIs into local Wrangler R2,
+then pass their descriptor hashes to Wrangler. The local Worker uses `.wrangler/state` persistence and
+the same runtime-free image/download bootstrap as production. No remote publication credentials or
+deployment are required. CLI tarballs are cached in that local bucket; wrapper changes publish new
+content-addressed payloads on restart. The first start requires npm registry access, Bun and Docker.
+The pinned runtime is linux/amd64; ARM Docker hosts require amd64 emulation.
+The launcher defaults to `--env dev` and rejects other environments, so execution and publication
+always select the same local bucket configuration.
+
+The local HTTP E2E profile uses the same startup script and R2 persistence. Deployed E2E rendering
+requires `wrangler.runtime-generated.json` from exact-SHA preparation, including its verified image,
+runtime bucket and descriptor. It never falls back to building a baked runtime image.
 
 ## Evidence available before approval
 

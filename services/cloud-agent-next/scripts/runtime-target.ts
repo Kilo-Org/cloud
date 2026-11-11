@@ -59,19 +59,15 @@ export function validateRuntimeTarget(config: unknown, environment: string) {
   )
     throw new Error('Runtime configuration drift: startup settings belong in runtime-targets.json');
   const native = target.containers?.find(container => container.class_name === 'SandboxContainers');
-  if (!native?.images?.app) throw new Error('Runtime target lacks its native app image');
-  if (native.images['runtime-free'] !== undefined)
-    throw new Error(
-      'Runtime configuration drift: runtime-free image belongs in runtime-targets.json'
-    );
+  if (!native?.images?.['runtime-free'])
+    throw new Error('Runtime target lacks its runtime-free image');
   const image = z
     .object({
-      dockerfile: z.literal('./Dockerfile.containers'),
-      build_vars: z.record(z.string(), z.string()).optional(),
+      dockerfile: z.literal('./Dockerfile.containers.runtime-free'),
     })
     .strict()
-    .safeParse(native.images.app);
-  if (!image.success)
+    .safeParse(native.images['runtime-free']);
+  if (!image.success || Object.keys(native.images).length !== 1)
     throw new Error(
       'Runtime configuration drift: native image must be rendered from runtime-targets.json'
     );
@@ -117,33 +113,27 @@ export function renderRuntimeTarget(input: {
     RUNTIME_STARTUP_MODE: startup.mode,
     NATIVE_RUNTIME_IMAGE: startup.image,
   };
-  if (startup.mode === 'downloaded') {
-    if (startup.interactiveOrgIds !== undefined)
-      target.vars.RUNTIME_INTERACTIVE_ORG_IDS = startup.interactiveOrgIds.join(',');
-    const release = input.release;
-    if (!release) throw new Error('Downloaded target requires a verified runtime handoff');
-    if (startup.kilo2 !== undefined) {
-      if (release.kilo2DescriptorSha256 === undefined)
-        throw new Error('Kilo v2 target requires a verified Kilo v2 runtime handoff');
-      target.vars.RUNTIME_KILO2_ORG_IDS = startup.kilo2.orgIds.join(',');
-      target.vars.RUNTIME_RELEASE_DESCRIPTOR_KILO2 = z
-        .string()
-        .regex(/^[a-f0-9]{64}$/)
-        .parse(release.kilo2DescriptorSha256);
-    }
-    target.r2_buckets = runtimeBucketBindings(target.r2_buckets, release.bucket);
-    target.vars.RUNTIME_RELEASE_DESCRIPTOR = z
+  const release = input.release;
+  if (!release) throw new Error('Downloaded target requires a verified runtime handoff');
+  if (startup.kilo2 !== undefined) {
+    if (release.kilo2DescriptorSha256 === undefined)
+      throw new Error('Kilo v2 target requires a verified Kilo v2 runtime handoff');
+    target.vars.RUNTIME_KILO2_ORG_IDS = startup.kilo2.orgIds.join(',');
+    target.vars.RUNTIME_RELEASE_DESCRIPTOR_KILO2 = z
       .string()
       .regex(/^[a-f0-9]{64}$/)
-      .parse(release.descriptorSha256);
-    if (startup.image === 'runtime-free') {
-      const digest = z
-        .string()
-        .regex(/^registry\.cloudflare\.com\/[a-f0-9]{32}\/kilo-runtime-base@sha256:[a-f0-9]{64}$/)
-        .parse(release.baseImage);
-      native.images = { ...native.images, 'runtime-free': { image: digest } };
-    }
+      .parse(release.kilo2DescriptorSha256);
   }
+  target.r2_buckets = runtimeBucketBindings(target.r2_buckets, release.bucket);
+  target.vars.RUNTIME_RELEASE_DESCRIPTOR = z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .parse(release.descriptorSha256);
+  const digest = z
+    .string()
+    .regex(/^registry\.cloudflare\.com\/[a-f0-9]{32}\/kilo-runtime-base@sha256:[a-f0-9]{64}$/)
+    .parse(release.baseImage);
+  native.images = { 'runtime-free': { image: digest } };
   if (input.environment !== 'production') root.env = { ...root.env, [input.environment]: target };
   return root;
 }

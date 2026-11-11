@@ -291,10 +291,18 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         setAvailableWidth(event.nativeEvent.layout.width);
       }}
     >
+      {/* The row and the picker both carry a literal 44dp box: the app's
+          `min-h-11` compiles to about 38.5pt, short of DESIGN.md's 44pt target.
+          The picker's own box therefore holds the whole touch target inside the
+          row's bounds, because RN drops touches outside every ancestor and a
+          shorter row would clip it. Both children align to the row's bottom
+          instead of its centre, which puts the eyebrow on the picker's line and
+          keeps the gap to the credits card at the gap the section headers below
+          keep to their first rows. */}
       <View
         className={cn(
-          'min-h-11 gap-3',
-          narrow ? 'flex-col items-stretch' : 'flex-row items-center justify-between'
+          'min-h-[44px] gap-3',
+          narrow ? 'flex-col items-stretch' : 'flex-row items-end justify-between'
         )}
       >
         <Text variant="small" className="shrink uppercase tracking-wide text-muted-foreground">
@@ -303,14 +311,14 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         {canPickContext && (
           <Pressable
             className={cn(
-              'min-h-11 min-w-0 flex-row items-center gap-1 active:opacity-70',
+              // A short account or org name must still carry a 44pt target.
+              'min-h-[44px] min-w-[44px] flex-row items-end gap-1 active:opacity-70',
               narrow ? 'max-w-full justify-start' : 'max-w-[65%] shrink justify-end'
             )}
             onPress={openPicker}
             accessibilityRole="button"
             accessibilityLabel={selectedLabel}
             accessibilityHint={t('profile.selectAccount')}
-            hitSlop={8}
           >
             <Text
               className="min-w-0 shrink text-xs font-medium text-muted-foreground"

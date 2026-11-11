@@ -17,7 +17,10 @@ import type {
 } from '../../src/sandbox-control/provider.js';
 import { verifySandboxLaunchCredential } from '../../src/sandbox-control/credential.js';
 import { resolveSecret } from '../../src/auth.js';
-import { readRepositoryLaunch } from '../../src/control-plane/sandbox/repository-launch.js';
+import {
+  readRepositoryLaunch,
+  recordRepositoryLaunch,
+} from '../../src/control-plane/sandbox/repository-launch.js';
 import type { StartupFailureCode } from '../../src/sandbox-control/startup-failure.js';
 import { RUNTIME_BASE_ABI } from '../../src/sandbox-control/runtime-release.js';
 import { downloadedStartup } from '../../src/sandbox-control/downloaded-startup.js';
@@ -39,7 +42,6 @@ const SESSION = 'workspace_11111111-1111-1111-1111-111111111111';
 const TARGET_ORG = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 const OTHER_ORG = '11111111-1111-4111-8111-111111111111';
 const scopedEnv = {
-  RUNTIME_INTERACTIVE_ORG_IDS: TARGET_ORG,
   NATIVE_RUNTIME_IMAGE: 'runtime-free',
 };
 const SCOPED_SANDBOX = `sbx-${'1'.repeat(48)}`;
@@ -166,7 +168,7 @@ function configureHarness(
     WORKER_URL: 'https://worker.test',
     SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
     RUNTIME_STARTUP_MODE: 'downloaded',
-    NATIVE_RUNTIME_IMAGE: 'all-in-one',
+    NATIVE_RUNTIME_IMAGE: 'runtime-free',
     RUNTIME_RELEASE_DESCRIPTOR: descriptor,
     RUNTIME_RELEASE_BUCKET: {
       async head() {
@@ -386,7 +388,7 @@ describe('downloaded startup in the allocation owner', () => {
     ).toBe(false);
     expect(await h.stub.getAllocationState()).toEqual(state);
   });
-  it('passes the scoped native image and downloaded command to the target cohort', async () => {
+  it('passes the runtime-free image and downloaded command to native allocations', async () => {
     const h = await setup(SCOPED_SANDBOX, {}, scopedEnv);
     await prepare(h, {
       orgId: TARGET_ORG,
@@ -398,7 +400,7 @@ describe('downloaded startup in the allocation owner', () => {
     expect(startup.options?.nativeImage).toBe('runtime-free');
     expect(startup.command.argv.some(value => value.includes('https://worker.test'))).toBe(true);
   });
-  it('keeps an excluded cohort on the baseline without reading the descriptor or artifacts', async () => {
+  it('downloads runtime artifacts for organizations outside the former cohort', async () => {
     let artifactReads = 0;
     const h = await setup(
       EXCLUDED_SANDBOX,
@@ -418,11 +420,11 @@ describe('downloaded startup in the allocation owner', () => {
       createdOnPlatform: 'cloud-agent-web',
       sandboxKind: 'isolated',
     });
-    await waitFor(async () => expect((await record(h))?.startupMode).toBe('preinstalled'));
+    await waitFor(async () => expect((await record(h))?.startupMode).toBe('downloaded'));
     const startup = h.provider.launches[0]!;
-    expect(startup.options?.nativeImage).toBe('all-in-one');
-    expect(startup.command.argv.some(value => value.includes('https://worker.test'))).toBe(false);
-    expect(artifactReads).toBe(0);
+    expect(startup.options?.nativeImage).toBe('runtime-free');
+    expect(startup.command.argv.some(value => value.includes('https://worker.test'))).toBe(true);
+    expect(artifactReads).toBeGreaterThan(0);
   });
   it.each([
     { label: 'non-web', createdOnPlatform: 'cloud-agent', sandboxId: NON_WEB_SANDBOX },
@@ -579,16 +581,6 @@ describe('downloaded startup in the allocation owner', () => {
         env: { RUNTIME_KILO2_ORG_IDS: '', RUNTIME_RELEASE_DESCRIPTOR_KILO2: '' },
         startupMode: 'downloaded',
       },
-      {
-        name: 'preinstalled mode',
-        env: { RUNTIME_STARTUP_MODE: 'preinstalled', NATIVE_RUNTIME_IMAGE: 'all-in-one' },
-        startupMode: 'preinstalled',
-      },
-      {
-        name: 'narrowed downloaded scope',
-        env: { RUNTIME_INTERACTIVE_ORG_IDS: OTHER_ORG },
-        startupMode: 'preinstalled',
-      },
     ])('starts a new v1 sandbox after rollback to $name', async rollback => {
       const h = await setup(KILO2_SANDBOX, {}, { ...kilo2Env, ...rollback.env });
       await prepare(h, isolatedTarget);
@@ -597,27 +589,51 @@ describe('downloaded startup in the allocation owner', () => {
         expect(await state.storage.get('runtime_harness')).toBe('kilo');
       });
     });
-  });
-  it('keeps a live allocation mode and deadlines across deployment configuration changes and reconstruction', async () => {
-    const h = await setup('sbx__runtime_existing');
-    await runInDurableObject(h.stub, instance => {
-      instance.env.RUNTIME_STARTUP_MODE = undefined;
+    it.each([
+      { name: 'preinstalled mode', env: { RUNTIME_STARTUP_MODE: 'preinstalled' } },
+      { name: 'all-in-one image', env: { NATIVE_RUNTIME_IMAGE: 'all-in-one' } },
+      { name: 'retired cohort setting', env: { RUNTIME_INTERACTIVE_ORG_IDS: OTHER_ORG } },
+    ])('rejects $name before allocating instead of rolling back', async ({ env }) => {
+      const h = await setup(KILO2_SANDBOX, {}, { ...kilo2Env, ...env });
+      await requestPrepare(h, isolatedTarget);
+      await waitFor(() =>
+        expect(h.peer.routeUpdatesFor(SESSION)).toContainEqual(
+          expect.objectContaining({ state: 'failed', reason: 'invalid_configuration' })
+        )
+      );
+      expect(h.provider.calls.create).toBe(0);
+      expect(h.provider.launches).toHaveLength(0);
+      expect(await record(h)).toBeUndefined();
     });
-    await prepare(h);
-    await waitFor(async () => expect((await h.stub.getAllocationState()).kind).toBe('starting'));
-    const before = await h.stub.getAllocationState();
-    expect((await record(h))?.startupMode).toBe('preinstalled');
-    await runInDurableObject(h.stub, instance => {
-      instance.env.RUNTIME_STARTUP_MODE = 'downloaded';
-      instance.env.NATIVE_RUNTIME_IMAGE = 'runtime-free';
-      instance.env.RUNTIME_INTERACTIVE_ORG_IDS = TARGET_ORG;
-    });
-    const calls = { ...h.provider.calls };
-    await evictAllDurableObjects();
-    const rebuilt = namespace.getByName(h.id);
-    expect(await rebuilt.getAllocationState()).toEqual(before);
-    await rebuilt.getStatusSnapshot();
-    expect(h.provider.calls).toEqual(calls);
-    expect((await record(h))?.startupMode).toBe('preinstalled');
   });
+  it.each(['downloaded', 'preinstalled', undefined] as const)(
+    'keeps persisted mode %s and live allocation deadlines across configuration changes and reconstruction',
+    async startupMode => {
+      const h = await setup('sbx__runtime_existing');
+      await runInDurableObject(h.stub, instance => {
+        instance.env.RUNTIME_STARTUP_MODE = undefined;
+      });
+      await prepare(h);
+      await waitFor(async () => expect((await h.stub.getAllocationState()).kind).toBe('starting'));
+      await runInDurableObject(h.stub, async (_instance, state) => {
+        const launch = await readRepositoryLaunch(state.storage);
+        if (!launch) throw new Error('Missing persisted launch fixture');
+        await recordRepositoryLaunch(state.storage, { ...launch, startupMode });
+      });
+      const before = await h.stub.getAllocationState();
+      expect((await record(h))?.startupMode).toBe(startupMode);
+      await runInDurableObject(h.stub, instance => {
+        instance.env.RUNTIME_STARTUP_MODE = 'preinstalled';
+        instance.env.NATIVE_RUNTIME_IMAGE = 'all-in-one';
+        instance.env.RUNTIME_INTERACTIVE_ORG_IDS = TARGET_ORG;
+      });
+      const calls = { ...h.provider.calls };
+      await evictAllDurableObjects();
+      const rebuilt = namespace.getByName(h.id);
+      expect(await rebuilt.getAllocationState()).toEqual(before);
+      await rebuilt.getStatusSnapshot();
+      expect(h.provider.calls).toEqual(calls);
+      expect((await record(h))?.startupMode).toBe(startupMode);
+    }
+  );
 });

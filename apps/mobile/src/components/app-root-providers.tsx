@@ -62,9 +62,10 @@ export function AppRootProviders({
       <GestureHandlerRootView className="flex-1 bg-background">
         {/* `react-native-keyboard-controller` measures the keyboard once in native
           code and hands the height and the insets to every consumer. The app's
-          keyboard surfaces — `KeyboardAvoidingView` on the session, history,
-          quick-chat and detail screens — read it from here instead of listening
-          to React Native's keyboard events. */}
+          keyboard surfaces — `KeyboardAvoidingView` on the session, quick-chat
+          and detail screens, and the shared owned-keyboard lift on the Agents
+          list and history — read it from here instead of listening to React
+          Native's keyboard events. */}
         <KeyboardMotionProvider>
           <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
             <QueryClientProvider client={queryClient}>

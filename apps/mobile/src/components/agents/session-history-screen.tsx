@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Keyboard, View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useNavigation } from 'expo-router';
 
@@ -15,6 +14,7 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
 import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
+import { OwnedKeyboardLift } from '@/components/agents/owned-keyboard-lift';
 import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
 import { SESSION_FILTERS_KEY } from '@/lib/storage-keys';
@@ -266,9 +266,7 @@ export function SessionHistoryScreen() {
           />
         }
       />
-      <KeyboardAvoidingView className="flex-1" behavior="padding" enabled={keyboard.owned}>
-        {sessionListBody}
-      </KeyboardAvoidingView>
+      <OwnedKeyboardLift occlusion={keyboard.occlusion}>{sessionListBody}</OwnedKeyboardLift>
       <SessionFilterModal
         visible={showFilterModal}
         selectedPlatforms={platformFilter}

@@ -2990,7 +2990,13 @@
       "retryLoadingMoreFiles": "Volver a cargar más archivos",
       "title": "Archivos",
       "viewedCount": "{{viewed}} de {{total}} vistos",
-      "viewedOfListed": "{{viewed}} de {{total}} archivos de la lista vistos"
+      "viewedCount_one": "{{viewed}} de {{total}} vistos",
+      "viewedCount_many": "{{viewed}} de {{total}} vistos",
+      "viewedCount_other": "{{viewed}} de {{total}} vistos",
+      "viewedOfListed": "{{viewed}} de {{total}} archivos de la lista vistos",
+      "viewedOfListed_one": "{{viewed}} de {{total}} archivos de la lista vistos",
+      "viewedOfListed_many": "{{viewed}} de {{total}} archivos de la lista vistos",
+      "viewedOfListed_other": "{{viewed}} de {{total}} archivos de la lista vistos"
     },
     "fileRows": {
       "collapseFile": "Contraer archivo",

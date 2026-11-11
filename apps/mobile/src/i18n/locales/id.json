@@ -2950,7 +2950,11 @@
       "retryLoadingMoreFiles": "Coba muat file lainnya lagi",
       "title": "Berkas",
       "viewedCount": "{{viewed}} dari {{total}} sudah dilihat",
-      "viewedOfListed": "{{viewed}} dari {{total}} file dalam daftar sudah dilihat"
+      "viewedCount_one": "{{viewed}} dari {{total}} sudah dilihat",
+      "viewedCount_other": "{{viewed}} dari {{total}} sudah dilihat",
+      "viewedOfListed": "{{viewed}} dari {{total}} file dalam daftar sudah dilihat",
+      "viewedOfListed_one": "{{viewed}} dari {{total}} file dalam daftar sudah dilihat",
+      "viewedOfListed_other": "{{viewed}} dari {{total}} file dalam daftar sudah dilihat"
     },
     "fileRows": {
       "collapseFile": "Ciutkan file",

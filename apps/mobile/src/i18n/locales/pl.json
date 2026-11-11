@@ -3030,7 +3030,15 @@
       "retryLoadingMoreFiles": "Ponów wczytywanie kolejnych plików",
       "title": "Pliki",
       "viewedCount": "przejrzano {{viewed}} z {{total}}",
-      "viewedOfListed": "przejrzano {{viewed}} z {{total}} plików na liście"
+      "viewedCount_one": "przejrzano {{viewed}} z {{total}}",
+      "viewedCount_few": "przejrzano {{viewed}} z {{total}}",
+      "viewedCount_many": "przejrzano {{viewed}} z {{total}}",
+      "viewedCount_other": "przejrzano {{viewed}} z {{total}}",
+      "viewedOfListed": "przejrzano {{viewed}} z {{total}} plików na liście",
+      "viewedOfListed_one": "przejrzano {{viewed}} z {{total}} plików na liście",
+      "viewedOfListed_few": "przejrzano {{viewed}} z {{total}} plików na liście",
+      "viewedOfListed_many": "przejrzano {{viewed}} z {{total}} plików na liście",
+      "viewedOfListed_other": "przejrzano {{viewed}} z {{total}} plików na liście"
     },
     "fileRows": {
       "collapseFile": "Zwiń plik",

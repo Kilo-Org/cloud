@@ -2950,7 +2950,11 @@
       "retryLoadingMoreFiles": "追加のファイルの読み込みを再試行",
       "title": "ファイル",
       "viewedCount": "{{total}}件中{{viewed}}件を確認済み",
-      "viewedOfListed": "表示中の{{total}}件中{{viewed}}件を確認済み"
+      "viewedCount_one": "{{total}}件中{{viewed}}件を確認済み",
+      "viewedCount_other": "{{total}}件中{{viewed}}件を確認済み",
+      "viewedOfListed": "表示中の{{total}}件中{{viewed}}件を確認済み",
+      "viewedOfListed_one": "表示中の{{total}}件中{{viewed}}件を確認済み",
+      "viewedOfListed_other": "表示中の{{total}}件中{{viewed}}件を確認済み"
     },
     "fileRows": {
       "collapseFile": "ファイルを折りたたむ",

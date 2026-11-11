@@ -251,7 +251,7 @@ export function createKilo2Harness(options: {
       // The native command API has no message id; the command creates its own user message.
       await post(
         `${kilo2SessionPath(input.sessionId)}/command`,
-        { command: input.command, text: input.args ?? '' },
+        { name: input.command, text: input.args ?? '' },
         input.signal
       );
     },

@@ -1468,6 +1468,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
     },
 
     observeKiloEvent(event: KiloFeedEvent): void {
+      if (event.type === 'command.updated' && event.runtimeKey) {
+        void publishCommandsForRuntimeKey(event.runtimeKey);
+        return;
+      }
       observeFeed(
         event,
         eventKiloSessionId(event.properties),

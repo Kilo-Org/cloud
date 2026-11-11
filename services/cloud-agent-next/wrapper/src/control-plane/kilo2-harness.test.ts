@@ -74,7 +74,7 @@ describe('Kilo v2 harness MCP refresh', () => {
         `/api/experimental/session/${sessionId}/instructions/entries/cloud-agent-context`,
         { value: '' },
       ],
-      [`/api/session/${sessionId}/command`, { command: 'review', text: 'src/app.ts' }],
+      [`/api/session/${sessionId}/command`, { name: 'review', text: 'src/app.ts' }],
     ]);
   });
 

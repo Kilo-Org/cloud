@@ -2333,8 +2333,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         if (event.type === 'commands.available') {
           await handleCommandsAvailable(event.properties, {
             setAvailableCommands: async commands => {
-              this.availableCommands = commands;
               await this.ctx.storage.put(AVAILABLE_COMMANDS_KEY, commands);
+              this.availableCommands = commands;
+              this.emitSynthetic('commands.available', commands, 'commands-available');
             },
             logger: {
               info: message => logger.withFields({ sessionId: this.sessionId }).info(message),

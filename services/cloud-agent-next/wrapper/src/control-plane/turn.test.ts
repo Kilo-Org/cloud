@@ -728,6 +728,23 @@ describe('turn manager submission', () => {
       { name: 'compact', description: 'Compact the conversation' },
     ]);
   });
+
+  it('refreshes command catalogs for the changed runtime, including sibling chats', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.registerRoute(routeSpec({ sessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' }));
+    h.registerRoute(routeSpec({ sessionId: 'workspace_other', directory: '/workspace/other' }));
+    h.manager.observeKiloEvent(kiloEvent('command.updated', {}, runtimeKey(routeSpec())));
+    await settle();
+    const catalogs = h.frames.flatMap(frame =>
+      frame.type === 'session.events' &&
+      frame.events.some(event => event.type === 'commands.available')
+        ? [frame.sessionId]
+        : []
+    );
+    expect(catalogs.sort()).toEqual([SESSION_ID, 'workspace_sibling'].sort());
+    expect(outcomeFrames(h.frames)).toEqual([]);
+  });
 });
 
 describe('serialized command delivery wait', () => {

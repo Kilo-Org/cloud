@@ -39,21 +39,6 @@ import { CreditExpiryNote } from './credit-expiry-note';
 const PACK_SKELETON_ROWS = 4;
 
 /**
- * The footer's gap between its own lines, in dp: `pt-4` at NativeWind's 14dp
- * rem.
- */
-const FOOTER_GAP_DP = 14;
-
-/**
- * Pulls the legal-link row's own slack back out of the layout. Each link box
- * reserves a 48dp target around a 14dp line, so the row's inner gutter is 17dp
- * on each side; the footer removes the extra 3dp so the links sit the same gap
- * from the description as the description sits from the divider. The box keeps
- * its full audited height — only the space around it shrinks.
- */
-const LEGAL_LINK_ROW_STYLE = { marginVertical: -(17 - FOOTER_GAP_DP) };
-
-/**
  * One-off credit packs bought with the store's own purchase sheet.
  *
  * The stores sell fixed SKUs, not an arbitrary amount, so the catalog is the
@@ -361,17 +346,18 @@ export function CreditPurchaseScreen() {
           the scroll is pushed by every one of those swaps. Pinned below the
           scroll, the copy holds its place in every state and every locale.
 
-          The two gaps around the legal links are the same as the gap above the
-          description: each link's box reserves a 48dp target around a 14dp
-          line, so the row pulls its own 3dp of slack back out of the layout
-          and the ink keeps the footer's gap. The box keeps its full audited
-          height, because the pull is the row's. */}
+          `pt-[17px]` is the gap the legal boxes already leave around their own
+          ink: each box reserves a 48dp target around a 14dp line, so 17dp sits
+          above and below the link text by construction. Matching that number
+          above the description gives the footer one rhythm — divider,
+          description, links — with no margin pulled through a neighbouring
+          frame, and the boxes keep their full audited height. */}
       <View
-        className="border-t border-border px-5 pt-4"
+        className="border-t border-border px-5 pt-[17px]"
         style={{ paddingBottom: Math.max(bottomInset, 16) }}
       >
         <Text className="text-xs text-muted-foreground">{t('credits.description')}</Text>
-        <View className={LEGAL_LINK_ROW_CLASS} style={LEGAL_LINK_ROW_STYLE}>
+        <View className={LEGAL_LINK_ROW_CLASS}>
           <Pressable
             accessibilityRole="link"
             className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}

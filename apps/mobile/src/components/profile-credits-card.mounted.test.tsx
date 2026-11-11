@@ -1333,17 +1333,18 @@ describe('CreditsCard credits header', () => {
   it('keeps the header on the eyebrow line with the picker target inside the row', async () => {
     const { renderer, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
 
-    // The row keeps its 44dp height, so the picker's own box carries the whole
-    // touch target inside the row's bounds: RN drops touches outside every
-    // ancestor, and a shorter row would clip it. Both children align to the
-    // row's bottom, which puts the eyebrow on the picker's line and closes the
-    // gap to the credits card to the section headers' own gap.
-    expect(headerClasses(renderer)).toContain('min-h-11');
+    // The row and the picker both carry a literal 44dp box, so the picker's
+    // whole touch target stays inside the row's bounds: RN drops touches
+    // outside every ancestor, and a shorter row would clip it. Both children
+    // align to the row's bottom, which puts the eyebrow on the picker's line and
+    // closes the gap to the credits card to the section headers' own gap. The
+    // literal is used because the app's `min-h-11` compiles to about 38.5pt.
+    expect(headerClasses(renderer)).toContain('min-h-[44px]');
     expect(headerClasses(renderer)).toContain('items-end');
     const picker = renderer.root.find(
       node => Object.is(node.type, Pressable) && node.props.accessibilityHint === 'Select account'
     );
-    expect(String(picker.props.className)).toContain('min-h-11');
+    expect(String(picker.props.className)).toContain('min-h-[44px]');
     expect(String(picker.props.className)).toContain('items-end');
     expect(picker.props.hitSlop).toBeUndefined();
     unmount();

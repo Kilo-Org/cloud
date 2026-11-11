@@ -362,8 +362,8 @@ export function ScreenHeader({
   // status bar and corner pad added on top of the standard gap; one that
   // presents below it (a native sheet) reports nothing here, so the header keeps
   // its grabber clearance and never pads twice. A pinned header is always the
-  // window's own surface.
-  const surfaceTopClearance = useSheetHeaderTopClearance(modal ? modalTopInset : 'always');
+  // window's own surface and reads no sheet clearance at all.
+  const surfaceTopClearance = useSheetHeaderTopClearance(modal ? modalTopInset : undefined);
   const baseTopPadding = modal
     ? Math.max(MODAL_HEADER_TOP_PADDING, surfaceTopClearance + HEADER_TOP_GAP)
     : insets.top + HEADER_TOP_GAP;

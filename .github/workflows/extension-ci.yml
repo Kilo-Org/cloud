@@ -255,13 +255,12 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      # Only the extension's dependency closure and the root project are
-      # installed: the bundle below resolves the extension, the two workspace
-      # packages it imports and the root project's tooling, and no source under
-      # apps/web. Widen the filter when a step here imports a workspace outside
-      # the closure.
+      # The whole workspace is installed here on purpose. The Playwright suite
+      # sets this job's duration, and the install is under a tenth of it, so a
+      # closure install cannot save a tenth of this job's wall time. Measured on
+      # this workflow; revisit when the install, not the suite, dominates a shard.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --filter 'kilo-extension...' --filter kilocode-monorepo
+        run: pnpm install --frozen-lockfile
 
       # Builds the bundle the shard loads, with the analytics key the analytics
       # specs need at build time. A build failure fails this shard before the

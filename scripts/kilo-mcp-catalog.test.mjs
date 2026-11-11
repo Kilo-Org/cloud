@@ -53,6 +53,13 @@ const kiloVersionCommand = [
 const kiloCachePath = '${{ runner.temp }}/kilo-cli';
 const kiloCacheKey =
   '${{ runner.os }}-${{ runner.arch }}-kilo-cli-${{ steps.kilo_cli_version.outputs.version }}';
+// Only the main-branch job writes the tree. A save from a pull_request run is
+// scoped to that pull request, so the PR job would upload it once per
+// catalog-relevant PR and no other run could restore that copy.
+const kiloCacheSave = 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7';
+const kiloCacheRestore = 'actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7';
+// Matches either coordinate, for mutations that target the step by name.
+const kiloCacheAnyAction = step => (step.uses ?? '').startsWith('actions/cache');
 const kiloInstallCommand = [
   'set -euo pipefail',
   'echo "$KILO_CLI_PREFIX/bin" >> "$GITHUB_PATH"',
@@ -144,9 +151,10 @@ function findStep(job, predicate, what) {
  * The dump shells out to `kilo run`, so both catalog jobs need the published
  * CLI. Each one resolves the version it installs, restores that version's tree
  * from a cache keyed on it, and reaches the registry only on a miss, a version
- * mismatch, or a tree the binary cannot start from.
+ * mismatch, or a tree the binary cannot start from. Only the main-branch job
+ * saves the tree; the PR job restores the entry main wrote and saves nothing.
  */
-function assertKiloCliSteps(job, gate, jobName) {
+function assertKiloCliSteps(job, gate, jobName, cacheAction) {
   const resolve = findStep(
     job,
     step => step.run === kiloVersionCommand,
@@ -170,7 +178,7 @@ function assertKiloCliSteps(job, gate, jobName) {
 
   const restore = findStep(
     job,
-    step => step.uses === 'actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7',
+    step => step.uses === cacheAction,
     'restores the cached Kilo CLI tree'
   );
   assert.equal(
@@ -225,6 +233,31 @@ function assertKiloCliSteps(job, gate, jobName) {
   );
 
   return install;
+}
+
+/**
+ * The Kilo CLI tree has exactly one writer. A cache entry saved by a
+ * pull_request run is scoped to that pull request, so a PR-side save uploads
+ * the tree once per catalog-relevant PR and no other run can restore that copy;
+ * the entry every PR restores is the one the main-branch job saves. This
+ * mirrors .github/actions/ttsc-plugin-cache/action.yml, which restores in the
+ * consumer and leaves the save to the populating job.
+ */
+function assertSingleKiloCliCacheWriter(workflow) {
+  const writers = [];
+  for (const [jobName, job] of Object.entries(workflow.jobs)) {
+    for (const step of job.steps ?? []) {
+      const uses = step.uses ?? '';
+      if (!/^actions\/cache(\/save)?@/.test(uses)) continue;
+      if (!(step.with?.path ?? '').includes('kilo-cli')) continue;
+      writers.push(`${jobName}: ${step.name}`);
+    }
+  }
+  assert.deepEqual(
+    writers,
+    [`${mergeJobName}: Restore Kilo CLI`],
+    `the main-branch job is the only writer of the Kilo CLI tree; a pull_request save is scoped to that PR and every PR restores the main-branch entry`
+  );
 }
 
 /**
@@ -457,7 +490,7 @@ function validate(workflow) {
     /MCP_CATALOG_KILO_AUTH|KILO_AUTH_CONTENT/,
     'PR dump must not use the personal CLI credential'
   );
-  assertKiloCliSteps(pr, changeGate, 'PR job');
+  assertKiloCliSteps(pr, changeGate, 'PR job', kiloCacheRestore);
   assertPnpmStoreSteps(pr, changeGate, 'PR job');
 
   // One install pass covers the wiring check and the dump. Splitting it back
@@ -620,7 +653,8 @@ function validate(workflow) {
     /MCP_CATALOG_KILO_AUTH|KILO_AUTH_CONTENT/,
     'merge dump must not use the personal CLI credential'
   );
-  assertKiloCliSteps(merge, mergeChangeGate, 'merge job');
+  assertKiloCliSteps(merge, mergeChangeGate, 'merge job', kiloCacheSave);
+  assertSingleKiloCliCacheWriter(workflow);
   assertPnpmStoreSteps(merge, mergeChangeGate, 'merge job');
   const mergeSkill = findStep(
     merge,
@@ -791,8 +825,21 @@ for (const [name, defect] of [
   ],
   [
     'Kilo CLI cache removed from the merge job',
-    workflow =>
-      dropStep(workflow, mergeJobName, step => (step.uses ?? '').startsWith('actions/cache@')),
+    workflow => dropStep(workflow, mergeJobName, step => step.uses === kiloCacheSave),
+  ],
+  [
+    'Kilo CLI cache saved by the PR job',
+    workflow => {
+      const step = workflow.jobs[prJobName].steps.find(item => item.uses === kiloCacheRestore);
+      step.uses = kiloCacheSave;
+    },
+  ],
+  [
+    'Kilo CLI cache written only by the PR job',
+    workflow => {
+      const step = workflow.jobs[mergeJobName].steps.find(item => item.uses === kiloCacheSave);
+      step.uses = kiloCacheRestore;
+    },
   ],
   [
     'Kilo CLI version resolution may stall the job',
@@ -805,7 +852,7 @@ for (const [name, defect] of [
     'Kilo CLI cache key without the resolved version',
     workflow => {
       const step = workflow.jobs[prJobName].steps.find(item =>
-        (item.uses ?? '').startsWith('actions/cache@')
+        kiloCacheAnyAction(item)
       );
       step.with.key = '${{ runner.os }}-${{ runner.arch }}-kilo-cli';
     },
@@ -814,7 +861,7 @@ for (const [name, defect] of [
     'Kilo CLI cache restore may fail the job',
     workflow => {
       const step = workflow.jobs[prJobName].steps.find(item =>
-        (item.uses ?? '').startsWith('actions/cache@')
+        kiloCacheAnyAction(item)
       );
       delete step['continue-on-error'];
     },
@@ -823,7 +870,7 @@ for (const [name, defect] of [
     'Kilo CLI cache restored before the version is resolved',
     workflow => {
       const steps = workflow.jobs[prJobName].steps;
-      const restoreIndex = steps.findIndex(item => (item.uses ?? '').startsWith('actions/cache@'));
+      const restoreIndex = steps.findIndex(item => kiloCacheAnyAction(item));
       const [restore] = steps.splice(restoreIndex, 1);
       steps.unshift(restore);
     },

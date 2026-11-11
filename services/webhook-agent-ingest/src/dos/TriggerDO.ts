@@ -57,6 +57,7 @@ export const TriggerConfig = z.object({
   model: z.string().nullable().optional(),
   variant: z.string().optional(),
   sandboxAllocation: sandboxAllocationSchema.optional(),
+  environmentId: z.string().uuid().nullable().optional(),
   promptTemplate: z.string(),
   profileId: z.string().nullable().optional(),
   bodySchema: webhookBodySchema.nullable().optional(),
@@ -111,6 +112,7 @@ type ConfigureInput = {
   model?: string;
   variant?: string;
   sandboxAllocation?: SandboxAllocation;
+  environmentId?: string | null;
   promptTemplate: string;
   profileId?: string | null;
   bodySchema?: WebhookBodySchema | null;
@@ -132,6 +134,7 @@ type UpdateConfigInput = {
   model?: string;
   variant?: string | null;
   sandboxAllocation?: SandboxAllocation | null;
+  environmentId?: string | null;
   promptTemplate?: string;
   isActive?: boolean;
   profileId?: string | null;
@@ -171,6 +174,16 @@ export class TriggerDO extends DurableObject<Env> {
       .parse(configOverrides.sandboxAllocation);
     if (sandboxAllocation !== undefined && targetType === 'kiloclaw_chat') {
       throw new Error('Sandbox allocation is only supported for cloud agent triggers');
+    }
+
+    const environmentId = z
+      .string()
+      .uuid()
+      .nullable()
+      .optional()
+      .parse(configOverrides.environmentId);
+    if (environmentId != null && targetType === 'kiloclaw_chat') {
+      throw new Error('Environment selection is only supported for Cloud Agent triggers');
     }
 
     const bodySchema = webhookBodySchema.nullish().parse(configOverrides.bodySchema);
@@ -217,6 +230,7 @@ export class TriggerDO extends DurableObject<Env> {
       model: configOverrides.model ?? null,
       variant: configOverrides.variant,
       sandboxAllocation,
+      environmentId: environmentId ?? null,
       promptTemplate: configOverrides.promptTemplate,
       profileId: configOverrides.profileId ?? null,
       bodySchema: bodySchema ?? null,
@@ -244,6 +258,7 @@ export class TriggerDO extends DurableObject<Env> {
       model: config.model ?? null,
       variant: config.variant ?? null,
       sandbox_allocation: config.sandboxAllocation ?? null,
+      environment_id: config.environmentId ?? null,
       prompt_template: config.promptTemplate,
       profile_id: config.profileId ?? null,
       body_schema: config.bodySchema ?? null,
@@ -319,6 +334,7 @@ export class TriggerDO extends DurableObject<Env> {
       model: record.model ?? null,
       variant: record.variant ?? undefined,
       sandboxAllocation: parseSandboxAllocation(record.sandbox_allocation),
+      environmentId: record.environment_id ?? null,
       promptTemplate: record.prompt_template,
       profileId: record.profile_id ?? null,
       bodySchema:
@@ -374,6 +390,16 @@ export class TriggerDO extends DurableObject<Env> {
       throw new Error('Sandbox allocation is only supported for cloud agent triggers');
     }
 
+    const environmentIdUpdate = z
+      .string()
+      .uuid()
+      .nullable()
+      .optional()
+      .parse(updates.environmentId);
+    if (environmentIdUpdate != null && existingConfig.targetType === 'kiloclaw_chat') {
+      throw new Error('Environment selection is only supported for Cloud Agent triggers');
+    }
+
     const resolveNullable = <T>(
       update: T | null | undefined,
       existing: T | undefined
@@ -397,6 +423,8 @@ export class TriggerDO extends DurableObject<Env> {
       model: updates.model ?? existingConfig.model,
       variant: resolveNullable(updates.variant, existingConfig.variant),
       sandboxAllocation: resolveNullable(sandboxAllocationUpdate, existingConfig.sandboxAllocation),
+      environmentId:
+        environmentIdUpdate === undefined ? existingConfig.environmentId : environmentIdUpdate,
       promptTemplate: updates.promptTemplate ?? existingConfig.promptTemplate,
       isActive: updates.isActive ?? existingConfig.isActive,
       profileId: updates.profileId === undefined ? existingConfig.profileId : updates.profileId,
@@ -419,6 +447,7 @@ export class TriggerDO extends DurableObject<Env> {
         model: updatedConfig.model,
         variant: updatedConfig.variant ?? null,
         sandbox_allocation: updatedConfig.sandboxAllocation ?? null,
+        environment_id: updatedConfig.environmentId ?? null,
         prompt_template: updatedConfig.promptTemplate,
         is_active: updatedConfig.isActive ? 1 : 0,
         profile_id: updatedConfig.profileId,

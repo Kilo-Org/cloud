@@ -10,6 +10,7 @@ const updateMutation = jest.fn<(input: unknown) => Promise<unknown>>();
 const invokeTrigger = jest.fn<(triggerId: string) => Promise<unknown>>();
 const invalidateQueries = jest.fn();
 const refetchTrigger = jest.fn();
+const savedEnvironmentId = '00000000-0000-4000-8000-000000000006';
 
 jest.mock('@/components/webhook-triggers/TriggerForm', () => ({
   TriggerForm: (props: TriggerFormProps) => {
@@ -35,6 +36,7 @@ jest.mock('@tanstack/react-query', () => ({
           model: 'alpha',
           promptTemplate: 'Saved prompt',
           profileId: 'profile-1',
+          environmentId: savedEnvironmentId,
           isActive: true,
           targetType: 'cloud_agent',
           canEdit: true,
@@ -242,5 +244,48 @@ describe('EditWebhookTriggerContent save and invoke', () => {
     });
     expect(updateMutation).toHaveBeenCalledTimes(3);
     expect(invokeTrigger).toHaveBeenCalledTimes(2);
+  });
+
+  it('initializes the saved environment and forwards changes, clears, and omissions', async () => {
+    updateMutation.mockResolvedValue(undefined);
+    await render();
+
+    expect(formProps?.initialData?.environmentId).toBe(savedEnvironmentId);
+    const onSubmit = formProps?.onSubmit;
+    if (!onSubmit) throw new Error('submit callback missing');
+
+    await act(async () => {
+      await onSubmit({ ...data, environmentId: savedEnvironmentId });
+    });
+    expect(updateMutation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ environmentId: savedEnvironmentId })
+    );
+
+    await act(async () => {
+      await onSubmit({ ...data, environmentId: null });
+    });
+    expect(updateMutation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ environmentId: null })
+    );
+
+    await act(async () => {
+      await onSubmit({ ...data, environmentId: undefined });
+    });
+    const [omitted] = updateMutation.mock.calls.at(-1) ?? [];
+    expect((omitted as { environmentId?: string | null }).environmentId).toBeUndefined();
+  });
+
+  it('forwards a selected environment when saving and invoking', async () => {
+    updateMutation.mockResolvedValue(undefined);
+    const onSaveAndInvoke = await render();
+
+    await act(async () => {
+      await onSaveAndInvoke({ ...data, environmentId: savedEnvironmentId });
+    });
+
+    expect(updateMutation).toHaveBeenCalledWith(
+      expect.objectContaining({ environmentId: savedEnvironmentId })
+    );
+    expect(invokeTrigger).toHaveBeenCalledWith('daily-report');
   });
 });

@@ -75,8 +75,8 @@ const responseOutputItemSchema = z
   })
   .refine(item => item.type !== 'message' || item.content !== undefined);
 
+// Upstream error bodies carry no model; they are recorded as errors, not parse failures.
 const responseBodySchema = responseSchema.extend({
-  model: z.string(),
   output: z.array(responseOutputItemSchema).nullish(),
 });
 
@@ -172,7 +172,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
         error: json.error,
         usesUserCredentials,
         logContext: { provider, inference_provider, messageId, model },
-        sentryExtra: { json: payload, event },
+        sentryExtra: { kiloUserId, provider, messageId, model },
       });
     }
 
@@ -258,7 +258,7 @@ export function parseResponsesMicrodollarUsageFromString(
   const coreProps = {
     messageId: responseJson.id ?? null,
     hasError: !responseJson.model || statusCode >= 400 || responseJson.status !== 'completed',
-    model: responseJson.model,
+    model: responseJson.model ?? null,
     responseContent: responseJson.output ? extractResponseContent(responseJson.output) : '',
     inference_provider,
     upstream_id: extractVercelUpstreamId(providerMetadata),

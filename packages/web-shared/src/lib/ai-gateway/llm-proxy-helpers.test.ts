@@ -863,16 +863,26 @@ describe('countAndStoreFimUsage', () => {
     );
   });
 
+  const rootZodIssue = { errorName: 'ZodError', issues: [{ path: '', code: 'invalid_type' }] };
   it.each([
-    'not JSON containing private-response-content',
-    'null',
-    'false',
-    '[]',
-    '42',
-    '{"usage":{"prompt_tokens":"private-response-content","completion_tokens":1}}',
-    '{"choices":{"text":"private-response-content"}}',
-    '{"choices":[{"delta":[]}]}',
-  ])('retains later FIM usage after a malformed event: %s', async malformedEvent => {
+    ['not JSON containing private-response-content', { errorName: 'SyntaxError' }],
+    ['null', rootZodIssue],
+    ['false', rootZodIssue],
+    ['[]', rootZodIssue],
+    ['42', rootZodIssue],
+    [
+      '{"usage":{"prompt_tokens":"private-response-content","completion_tokens":1}}',
+      { errorName: 'ZodError', issues: [{ path: 'usage.prompt_tokens', code: 'invalid_type' }] },
+    ],
+    [
+      '{"choices":{"text":"private-response-content"}}',
+      { errorName: 'ZodError', issues: [{ path: 'choices', code: 'invalid_type' }] },
+    ],
+    [
+      '{"choices":[{"delta":[]}]}',
+      { errorName: 'ZodError', issues: [{ path: 'choices.0.delta', code: 'invalid_type' }] },
+    ],
+  ])('retains later FIM usage after a malformed event: %s', async (malformedEvent, readError) => {
     jest.mocked(captureException).mockClear();
     jest.mocked(captureMessage).mockClear();
     countAndStoreFimUsage(
@@ -901,7 +911,12 @@ describe('countAndStoreFimUsage', () => {
     expect(captureMessage).toHaveBeenCalledWith('Malformed upstream usage SSE events', {
       level: 'error',
       tags: { source: 'usage_stream_parsing' },
-      extra: { messageId: 'fim-recovered', model: 'mercury-edit-2', malformedEventCount: 1 },
+      extra: {
+        messageId: 'fim-recovered',
+        model: 'mercury-edit-2',
+        malformedEventCount: 1,
+        ...readError,
+      },
     });
     expect(captureException).not.toHaveBeenCalled();
     expect(JSON.stringify(jest.mocked(captureMessage).mock.calls)).not.toContain(
@@ -1254,8 +1269,12 @@ describe.each<{
     jest.mocked(captureMessage).mockClear();
   });
 
+  const rootZodIssue = { errorName: 'ZodError', issues: [{ path: '', code: 'invalid_type' }] };
+  const invalidTokenPath =
+    apiKind === 'audio_transcriptions' ? 'usage.input_tokens' : 'usage.prompt_tokens';
+
   it.each([
-    { name: 'missing body', body: () => null },
+    { name: 'missing body', body: () => null, error: { errorName: 'Error' } },
     {
       name: 'read interruption',
       body: () =>
@@ -1264,16 +1283,26 @@ describe.each<{
             controller.error(new TypeError('terminated private-response-content'));
           },
         }),
+      error: { errorName: 'TypeError' },
     },
-    { name: 'invalid JSON', body: () => 'invalid JSON private-response-content' },
-    { name: 'null', body: () => 'null' },
-    { name: 'array', body: () => '[]' },
-    { name: 'primitive', body: () => '42' },
-    { name: 'unexpected object', body: () => '{"unrecognized":"private-response-content"}' },
+    {
+      name: 'invalid JSON',
+      body: () => 'invalid JSON private-response-content',
+      error: { errorName: 'SyntaxError' },
+    },
+    { name: 'null', body: () => 'null', error: rootZodIssue },
+    { name: 'array', body: () => '[]', error: rootZodIssue },
+    { name: 'primitive', body: () => '42', error: rootZodIssue },
+    {
+      name: 'unexpected object',
+      body: () => '{"unrecognized":"private-response-content"}',
+      error: { errorName: 'Error' },
+    },
     {
       name: 'invalid model type',
       body: () =>
         JSON.stringify({ ...validPayload, model: { secret: 'private-response-content' } }),
+      error: { errorName: 'ZodError', issues: [{ path: 'model', code: 'invalid_type' }] },
     },
     {
       name: 'invalid token type',
@@ -1286,8 +1315,12 @@ describe.each<{
             input_tokens: 'private-response-content',
           },
         }),
+      error: {
+        errorName: 'ZodError',
+        issues: [{ path: invalidTokenPath, code: 'invalid_type' }],
+      },
     },
-  ])('persists errored usage for $name with sanitized diagnostics', async ({ body }) => {
+  ])('persists errored usage for $name with sanitized diagnostics', async ({ body, error }) => {
     const context = makeContext();
     countUsage(
       new Response(body(), { headers: { 'x-generation-id': 'generation-recovery' } }),
@@ -1327,6 +1360,7 @@ describe.each<{
           organizationId: context.organizationId,
           provider: 'inception',
           messageId: 'generation-recovery',
+          ...error,
         },
       }
     );
@@ -1355,6 +1389,23 @@ describe.each<{
       context,
       ...(apiKind === 'audio_transcriptions' ? [undefined] : []),
     ]);
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('keeps the reported usage of a body without a model', async () => {
+    const context = makeContext();
+    const { model: _model, ...payloadWithoutModel } = validPayload;
+    countUsage(new Response(JSON.stringify(payloadWithoutModel)), context, undefined);
+    await waitForUsageWrite();
+
+    const storeUsage =
+      apiKind === 'audio_transcriptions' ? mockedProcessTokenData : mockedLogMicrodollarUsage;
+    const stats = storeUsage.mock.calls[0]?.[0];
+    expect(stats?.inputTokens).toBeGreaterThan(0);
+    // Transcriptions fall back to the requested model; the others record the missing model as an error.
+    if (apiKind !== 'audio_transcriptions') {
+      expect(stats).toMatchObject({ model: null, hasError: true });
+    }
     expect(captureException).not.toHaveBeenCalled();
   });
 

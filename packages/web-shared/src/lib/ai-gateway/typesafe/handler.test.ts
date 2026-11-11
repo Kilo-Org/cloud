@@ -943,13 +943,13 @@ describe('handleSystemOneRequest', () => {
   );
 
   it.each([
-    { bodyFailure: 'invalid JSON', recovered: false },
-    { bodyFailure: 'invalid JSON', recovered: true },
-    { bodyFailure: 'read failure', recovered: false },
-    { bodyFailure: 'read failure', recovered: true },
+    { bodyFailure: 'invalid JSON', recovered: false, readError: { errorName: 'SyntaxError' } },
+    { bodyFailure: 'invalid JSON', recovered: true, readError: { errorName: 'SyntaxError' } },
+    { bodyFailure: 'read failure', recovered: false, readError: { errorName: 'Error' } },
+    { bodyFailure: 'read failure', recovered: true, readError: { errorName: 'Error' } },
   ])(
     'reconciles an unreadable $bodyFailure response using its header id (recovered: $recovered)',
-    async ({ bodyFailure, recovered }) => {
+    async ({ bodyFailure, recovered, readError }) => {
       mockMeteredClock();
       const messageId = 'gen-systemone-header';
       const body =
@@ -1015,6 +1015,7 @@ describe('handleSystemOneRequest', () => {
             organizationId: undefined,
             provider: 'openrouter',
             messageId,
+            ...readError,
           },
         }
       );
@@ -1022,56 +1023,81 @@ describe('handleSystemOneRequest', () => {
     }
   );
 
+  const rootZodIssue = { errorName: 'ZodError', issues: [{ path: '', code: 'invalid_type' }] };
   it.each([
-    null,
-    7,
-    [],
-    { answers: 'private answer' },
-    { ...upstreamBody, id: undefined, usage: 'private usage' },
-  ])('records malformed response %j using its header id and upstream status', async body => {
-    mockMeteredClock();
-    setAuth('org-123');
-    mockedFetch.mockResolvedValue(
-      Response.json(body, {
-        status: 202,
-        headers: { 'x-generation-id': 'gen-malformed-header' },
-      })
-    );
-
-    expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
-
-    await runAfter();
-    expect(fetchGeneration).toHaveBeenCalledWith('gen-malformed-header', OPENROUTER);
-    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledTimes(1);
-    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
-      expect.objectContaining({
-        messageId: 'gen-malformed-header',
-        model: TYPESAFE_MODEL,
-        hasError: true,
-        status_code: 202,
-        cost_mUsd: 0,
-        market_cost: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        latency: METERED_LATENCY_MS,
-      }),
-      expect.objectContaining({ status_code: 202, ttfb_ms: METERED_LATENCY_MS })
-    );
-    expect(captureException).toHaveBeenCalledTimes(1);
-    expect(captureException).toHaveBeenCalledWith(
-      new Error('Unable to read or parse upstream usage response'),
+    [null, rootZodIssue],
+    [7, rootZodIssue],
+    [[], rootZodIssue],
+    [
+      { answers: 'private answer' },
       {
-        tags: { source: 'usage_response_parsing', api_kind: 'systemone' },
-        extra: {
-          usageId: undefined,
-          kiloUserId: user.id,
-          organizationId: 'org-123',
-          provider: 'openrouter',
+        errorName: 'ZodError',
+        issues: [
+          { path: 'id', code: 'invalid_type' },
+          { path: 'model', code: 'invalid_type' },
+          { path: 'answers', code: 'invalid_type' },
+          { path: 'usage', code: 'invalid_type' },
+        ],
+      },
+    ],
+    [
+      { ...upstreamBody, id: undefined, usage: 'private usage' },
+      {
+        errorName: 'ZodError',
+        issues: [
+          { path: 'id', code: 'invalid_type' },
+          { path: 'usage', code: 'invalid_type' },
+        ],
+      },
+    ],
+  ])(
+    'records malformed response %j using its header id and upstream status',
+    async (body, readError) => {
+      mockMeteredClock();
+      setAuth('org-123');
+      mockedFetch.mockResolvedValue(
+        Response.json(body, {
+          status: 202,
+          headers: { 'x-generation-id': 'gen-malformed-header' },
+        })
+      );
+
+      expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
+
+      await runAfter();
+      expect(fetchGeneration).toHaveBeenCalledWith('gen-malformed-header', OPENROUTER);
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledTimes(1);
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({
           messageId: 'gen-malformed-header',
-        },
-      }
-    );
-  });
+          model: TYPESAFE_MODEL,
+          hasError: true,
+          status_code: 202,
+          cost_mUsd: 0,
+          market_cost: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          latency: METERED_LATENCY_MS,
+        }),
+        expect.objectContaining({ status_code: 202, ttfb_ms: METERED_LATENCY_MS })
+      );
+      expect(captureException).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(
+        new Error('Unable to read or parse upstream usage response'),
+        {
+          tags: { source: 'usage_response_parsing', api_kind: 'systemone' },
+          extra: {
+            usageId: undefined,
+            kiloUserId: user.id,
+            organizationId: 'org-123',
+            provider: 'openrouter',
+            messageId: 'gen-malformed-header',
+            ...readError,
+          },
+        }
+      );
+    }
+  );
 
   it('records a duration-bound attempt row when the upstream call times out', async () => {
     mockedFetch.mockRejectedValue(

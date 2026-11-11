@@ -309,13 +309,38 @@ export function getUpstreamBodyTermination(error: unknown): 'timeout' | 'disconn
   return causeCode === 'UND_ERR_BODY_TIMEOUT' ? 'timeout' : 'disconnect';
 }
 
+/** A body read that stopped because the client left, a timeout fired, or the upstream connection broke. */
 export function isResponseInterruptedError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null || !('name' in error)) return false;
   return (
+    error.name === 'AbortError' ||
     error.name === 'ResponseAborted' ||
     error.name === 'TimeoutError' ||
     getUpstreamBodyTermination(error) !== null
   );
+}
+
+/**
+ * Identifies why usage could not be read without the error message, which for
+ * `JSON.parse` quotes the upstream body.
+ */
+function describeUsageReadError(error: unknown) {
+  if (error instanceof z.ZodError) {
+    return {
+      errorName: 'ZodError',
+      issues: error.issues.map(issue => ({
+        path: issue.path.map(String).join('.'),
+        code: issue.code,
+      })),
+    };
+  }
+  // Duck-typed because undici's body errors may come from another realm.
+  const hasName =
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    typeof error.name === 'string';
+  return { errorName: hasName ? error.name : typeof error };
 }
 
 const ACCOUNT_ERROR_CODES = new Set<unknown>([401, 402, 403, '401', '402', '403']);
@@ -390,18 +415,21 @@ export async function parseUsageWithRecovery(
     if (!stats) throw new Error('Missing usage response body');
     stats.messageId ??= response.headers.get('x-generation-id');
     return stats;
-  } catch {
+  } catch (error) {
     const messageId = response.headers.get('x-generation-id');
-    captureException(new Error('Unable to read or parse upstream usage response'), {
-      tags: { source: 'usage_response_parsing', api_kind: context.api_kind },
-      extra: {
-        usageId: context.usageId,
-        kiloUserId: context.kiloUserId,
-        organizationId: context.organizationId,
-        provider: context.provider,
-        messageId,
-      },
-    });
+    if (!isResponseInterruptedError(error)) {
+      captureException(new Error('Unable to read or parse upstream usage response'), {
+        tags: { source: 'usage_response_parsing', api_kind: context.api_kind },
+        extra: {
+          usageId: context.usageId,
+          kiloUserId: context.kiloUserId,
+          organizationId: context.organizationId,
+          provider: context.provider,
+          messageId,
+          ...describeUsageReadError(error),
+        },
+      });
+    }
     const contentType = response.headers.get('content-type');
     return {
       messageId,
@@ -488,12 +516,14 @@ export async function drainSseStream(
   const eventTimer = createChunkTimer();
   const chunkTimer = createChunkTimer();
   let malformedEventCount = 0;
+  let firstMalformedEventError: unknown;
   const sseStreamParser = createParser({
     onEvent(event) {
       eventTimer.markChunk();
       try {
         onEvent(event);
-      } catch {
+      } catch (error) {
+        if (malformedEventCount === 0) firstMalformedEventError = error;
         malformedEventCount++;
       }
     },
@@ -516,10 +546,12 @@ export async function drainSseStream(
   } catch (error) {
     errorExceptInTest('[processUsage] treating stream processing error as aborted', error);
     wasAborted = true;
-    captureException(new Error('Unable to read upstream usage stream'), {
-      tags: { source: 'usage_stream_parsing' },
-      extra: getIds?.(),
-    });
+    if (!isResponseInterruptedError(error)) {
+      captureException(new Error('Unable to read upstream usage stream'), {
+        tags: { source: 'usage_stream_parsing' },
+        extra: { ...getIds?.(), ...describeUsageReadError(error) },
+      });
+    }
   } finally {
     if (!reachedEof) {
       // A tee's cancellation waits for its sibling; accounting must not wait for it.
@@ -532,7 +564,11 @@ export async function drainSseStream(
     captureMessage('Malformed upstream usage SSE events', {
       level: 'error',
       tags: { source: 'usage_stream_parsing' },
-      extra: { ...getIds?.(), malformedEventCount },
+      extra: {
+        ...getIds?.(),
+        malformedEventCount,
+        ...describeUsageReadError(firstMalformedEventError),
+      },
     });
   }
   const timer = eventTimer.receivedChunk() ? eventTimer : chunkTimer;

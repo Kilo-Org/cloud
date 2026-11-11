@@ -41,12 +41,10 @@ const messageSchema = z.object({
   provider: z.string().nullish(),
 });
 
-const messageEventSchema = z
-  .object({
-    type: z.string(),
-    error: upstreamStreamErrorSchema.nullish(),
-  })
-  .passthrough();
+const messageEventSchema = z.looseObject({
+  type: z.string(),
+  error: upstreamStreamErrorSchema.nullish(),
+});
 
 const contentDeltaSchema = z
   .object({ type: z.string(), text: z.string().optional() })
@@ -58,7 +56,9 @@ const messageDeltaSchema = z.object({
   provider_metadata: vercelProviderMetadataSchema.nullish(),
 });
 
+// Upstream error bodies carry no model; they are recorded as errors, not parse failures.
 const messageResponseSchema = messageSchema.extend({
+  model: z.string().nullish(),
   stop_reason: z.unknown().optional(),
   content: z
     .array(
@@ -180,7 +180,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
         error: json.error,
         usesUserCredentials,
         logContext: { provider, inference_provider, messageId, model },
-        sentryExtra: { json: payload, event },
+        sentryExtra: { kiloUserId, provider, messageId, model },
       });
       return;
     }
@@ -280,7 +280,7 @@ export function parseMessagesMicrodollarUsageFromString(
   const coreProps = {
     messageId: responseJson.id ?? null,
     hasError: !responseJson.model || statusCode >= 400 || isErrorFinishReason(finish_reason),
-    model: getVercelResolvedModel(providerMetadata) ?? responseJson.model,
+    model: getVercelResolvedModel(providerMetadata) ?? responseJson.model ?? null,
     responseContent,
     inference_provider,
     upstream_id: extractVercelUpstreamId(providerMetadata),

@@ -50,14 +50,6 @@ export type VercelProviderMetaData = {
   };
 };
 
-export type MaybeHasVercelProviderMetaData = {
-  choices?: {
-    message?: {
-      provider_metadata?: VercelProviderMetaData;
-    };
-  }[];
-};
-
 export type MaybeHasVercelProviderMetaDataChunk = {
   choices?: {
     delta?: { provider_metadata?: VercelProviderMetaData };
@@ -303,11 +295,4 @@ export type UsageMetaData = {
   is_free: boolean | null;
   abuse_delay: number | null;
   abuse_downgraded_from: string | null;
-};
-
-export type OpenRouterError = {
-  message: string;
-  code: number | string;
-  metadata?: Record<string, unknown>;
-  provider_name?: string;
 };

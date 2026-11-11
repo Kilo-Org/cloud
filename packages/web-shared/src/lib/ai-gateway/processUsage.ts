@@ -1579,13 +1579,13 @@ export function parseMicrodollarUsageFromString(
   const rawJson: unknown = JSON.parse(fullResponse);
   metadataCapture?.captureVercelMetadata(rawJson);
   const responseJson = chatUsageResponseSchema.parse(rawJson);
-  const choice = responseJson?.choices?.[0];
-  const vercelProviderMetadata = choice?.message?.provider_metadata ?? null;
+  const choice = responseJson.choices?.[0];
+  const vercelProviderMetadata = choice?.message.provider_metadata ?? null;
 
   if (
     providerReportsIsByok(provider) &&
-    responseJson?.usage?.is_byok == null &&
-    responseJson?.usage?.cost
+    responseJson.usage?.is_byok == null &&
+    responseJson.usage?.cost
   ) {
     captureException(new Error('SUSPICIOUS: is_byok is null'), {
       tags: { source: 'string_processing' },
@@ -1595,16 +1595,16 @@ export function parseMicrodollarUsageFromString(
   const finish_reason = choice?.finish_reason ?? null;
   const coreProps = {
     kiloUserId,
-    messageId: responseJson?.id ?? null,
+    messageId: responseJson.id ?? null,
     hasError:
       !responseJson.model ||
       responseJson.error != null ||
       statusCode >= 400 ||
       isErrorFinishReason(finish_reason),
-    model: responseJson?.model ?? null,
+    model: responseJson.model ?? null,
     responseContent: choice?.message.content ?? '',
     inference_provider:
-      responseJson?.provider ?? vercelProviderMetadata?.gateway?.routing?.finalProvider ?? null,
+      responseJson.provider ?? vercelProviderMetadata?.gateway?.routing?.finalProvider ?? null,
     upstream_id: extractVercelUpstreamId(vercelProviderMetadata),
     finish_reason,
     latency: null,
@@ -1616,7 +1616,7 @@ export function parseMicrodollarUsageFromString(
   };
 
   const costs = processOpenRouterUsage(
-    responseJson?.usage,
+    responseJson.usage,
     coreProps,
     provider,
     vercelProviderMetadata

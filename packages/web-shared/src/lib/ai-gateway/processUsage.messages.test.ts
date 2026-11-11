@@ -726,7 +726,6 @@ describe('parseMessagesMicrodollarUsageFromString validation', () => {
     'null',
     '42',
     '[]',
-    '{}',
     '{"model":42}',
     '{"model":"model","usage":{"input_tokens":"invalid"}}',
     '{"model":"model","content":{}}',
@@ -734,6 +733,23 @@ describe('parseMessagesMicrodollarUsageFromString validation', () => {
     '{"model":"model","provider_metadata":{"gateway":{"routing":{"modelAttempts":{}}}}}',
   ])('rejects malformed nonstream response %s', response => {
     expect(() => parseMessagesMicrodollarUsageFromString(response, 200, 'openrouter')).toThrow();
+  });
+
+  test('records an upstream error body without a model as an error', () => {
+    const result = parseMessagesMicrodollarUsageFromString(
+      '{"type":"error","error":{"type":"rate_limit_error","message":"Rate limited"}}',
+      429,
+      'openrouter'
+    );
+
+    expect(result).toMatchObject({
+      model: null,
+      hasError: true,
+      status_code: 429,
+      inputTokens: 0,
+      outputTokens: 0,
+      cost_mUsd: 0,
+    });
   });
 
   test('keeps usage when stop_reason is not a string', () => {

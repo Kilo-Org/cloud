@@ -126,7 +126,12 @@ describe('drainSseStream', () => {
     expect(captureMessage).toHaveBeenCalledWith('Malformed upstream usage SSE events', {
       level: 'error',
       tags: { source: 'usage_stream_parsing' },
-      extra: { usageId: 'usage-id', messageId: 'message-id', malformedEventCount: 2 },
+      extra: {
+        usageId: 'usage-id',
+        messageId: 'message-id',
+        malformedEventCount: 2,
+        errorName: 'Error',
+      },
     });
     expect(captureException).not.toHaveBeenCalled();
 
@@ -168,17 +173,41 @@ describe('drainSseStream', () => {
       expect.objectContaining({ message: 'Unable to read upstream usage stream' }),
       {
         tags: { source: 'usage_stream_parsing' },
-        extra: { usageId: 'usage-id', messageId: 'message-id' },
+        extra: { usageId: 'usage-id', messageId: 'message-id', errorName: 'Error' },
       }
     );
     expect(captureMessage).toHaveBeenCalledWith('Malformed upstream usage SSE events', {
       level: 'error',
       tags: { source: 'usage_stream_parsing' },
-      extra: { usageId: 'usage-id', messageId: 'message-id', malformedEventCount: 1 },
+      extra: {
+        usageId: 'usage-id',
+        messageId: 'message-id',
+        malformedEventCount: 1,
+        errorName: 'Error',
+      },
     });
 
     stream.getReader().releaseLock();
   });
+
+  test.each(['AbortError', 'ResponseAborted', 'TimeoutError'])(
+    'treats a %s read failure as aborted without reporting it',
+    async name => {
+      jest.mocked(captureException).mockClear();
+      const error = new Error('interrupted');
+      error.name = name;
+
+      const result = await drainSseStream(
+        bodyArrivingAt([[100, 'data: {}\n\n']], error),
+        () => undefined,
+        { end: jest.fn() } as unknown as Span,
+        0
+      );
+
+      expect(result.wasAborted).toBe(true);
+      expect(captureException).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('parseUsageWithRecovery', () => {
@@ -280,6 +309,7 @@ describe('parseUsageWithRecovery', () => {
           organizationId: 'organization-id',
           provider: 'openrouter',
           messageId: 'header-message-id',
+          errorName: 'Error',
         },
       }
     );

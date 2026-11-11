@@ -468,17 +468,36 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
   });
 
   test.each([
-    ['malformed JSON', 'private response content {', true],
-    ['null payload', 'null', true],
-    ['invalid choices', '{"choices":{}}', true],
+    ['malformed JSON', 'private response content {', true, { errorName: 'SyntaxError' }],
+    [
+      'null payload',
+      'null',
+      true,
+      { errorName: 'ZodError', issues: [{ path: '', code: 'invalid_type' }] },
+    ],
+    [
+      'invalid choices',
+      '{"choices":{}}',
+      true,
+      { errorName: 'ZodError', issues: [{ path: 'choices', code: 'invalid_type' }] },
+    ],
     [
       'invalid nested content',
       '{"choices":[{"delta":{"content":{"secret":"private content"}}}]}',
       true,
+      {
+        errorName: 'ZodError',
+        issues: [{ path: 'choices.0.delta.content', code: 'invalid_type' }],
+      },
     ],
-    ['invalid usage', '{"usage":{"prompt_tokens":"private token value"}}', true],
-    ['null error', '{"error":null}', false],
-  ] as const)('retains later chat usage after %s', async (_name, payload, hasError) => {
+    [
+      'invalid usage',
+      '{"usage":{"prompt_tokens":"private token value"}}',
+      true,
+      { errorName: 'ZodError', issues: [{ path: 'usage.prompt_tokens', code: 'invalid_type' }] },
+    ],
+    ['null error', '{"error":null}', false, undefined],
+  ] as const)('retains later chat usage after %s', async (_name, payload, hasError, readError) => {
     jest.mocked(captureMessage).mockClear();
     jest.mocked(captureException).mockClear();
     const initialChunk = {
@@ -537,6 +556,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
           messageId: 'gen-recovered-chat',
           model: 'test-model',
           malformedEventCount: 1,
+          ...readError,
         },
       });
     } else {
@@ -1012,122 +1032,145 @@ describe('logMicrodollarUsage', () => {
         mockedReportUsageEvent.mockClear();
       });
 
+      const nestedShapeIssuePath = {
+        chat_completions: 'choices.0.message.content',
+        messages: 'content.0.text',
+        responses: 'output.0.content',
+      }[apiKind];
+
       test.each([
-        'ResponseAborted',
-        'TimeoutError',
-        'undici terminated',
-        'cross-realm undici terminated',
-        'malformed JSON',
-        'unexpected nested shape',
-        'missing body',
-      ])('records a zero-cost error row and Bouncer event for %s', async failure => {
-        const user = await insertTestUser({ microdollars_used: 1000 });
-        const usageId = crypto.randomUUID();
-        const messageId = `gen-${usageId}`;
-        const streamError =
-          failure === 'undici terminated'
-            ? new TypeError('terminated', {
-                cause: Object.assign(new Error('private upstream error content'), {
-                  code: 'UND_ERR_SOCKET',
-                }),
-              })
-            : failure === 'cross-realm undici terminated'
-              ? {
-                  name: 'TypeError',
-                  message: 'terminated',
-                  cause: { code: 'UND_ERR_SOCKET', message: 'private upstream error content' },
-                }
-              : Object.assign(new Error('private upstream error content'), { name: failure });
-        const invalidNestedResponse = {
-          chat_completions: { choices: [{ message: { content: { secret: 'private content' } } }] },
-          messages: { content: [{ type: 'text', text: { secret: 'private content' } }] },
-          responses: { output: [{ type: 'message', content: { secret: 'private content' } }] },
-        }[apiKind];
-        const body =
-          failure === 'missing body'
-            ? null
-            : failure === 'malformed JSON'
-              ? 'private malformed response content {'
-              : failure === 'unexpected nested shape'
-                ? JSON.stringify({ model: 'test-model', ...invalidNestedResponse })
-                : new ReadableStream<Uint8Array>({
-                    start(controller) {
-                      controller.error(streamError);
-                    },
-                  });
-        const response = new Response(body, {
-          status: 202,
-          headers: { 'content-type': 'application/json', 'x-generation-id': messageId },
-        });
-        const usageContext: MicrodollarUsageContext = {
-          ...createBaseUsageContext(user),
-          usageId,
-          api_kind: apiKind,
-          isStreaming: false,
-          bouncer: {
-            requestId: usageId,
-            occurredAt: new Date(),
-            accountId: `user:${user.id}`,
-            clientIp: null,
-            clientAttributed: true,
-            requestedLogprobs: false,
-            samples: null,
-            promptSimHash: null,
-          },
-        };
-
-        const result = await countAndStoreUsage(response, usageContext, undefined).usagePromise;
-
-        expect(result).toMatchObject({ usageId });
-        const usageRecords = await db.query.microdollar_usage.findMany({
-          where: eq(microdollar_usage.kilo_user_id, user.id),
-        });
-        expect(usageRecords).toEqual([
-          expect.objectContaining({
-            id: usageId,
-            cost: 0,
-            input_tokens: 0,
-            output_tokens: 0,
-            has_error: true,
-            model: usageContext.requested_model,
-          }),
-        ]);
-        const metadata = await db.query.microdollar_usage_metadata.findFirst({
-          where: eq(microdollar_usage_metadata.id, usageId),
-        });
-        expect(metadata).toMatchObject({
-          message_id: messageId,
-          status_code: 202,
-        });
-        expect((await findUserById(user.id))?.microdollars_used).toBe(1000);
-        expect(fetchGeneration).toHaveBeenCalledTimes(1);
-        expect(fetchGeneration).toHaveBeenCalledWith(messageId, expect.anything());
-        expect(mockedReportUsageEvent).toHaveBeenCalledTimes(1);
-        expect(mockedReportUsageEvent).toHaveBeenCalledWith(
-          expect.objectContaining({
-            requestId: usageId,
-            accountId: `user:${user.id}`,
-            apiKind,
-            costMicrodollars: 0,
-            inputTokens: 0,
-            outputTokens: 0,
-          })
-        );
-        expect(captureException).toHaveBeenCalledTimes(1);
-        expect(captureException).toHaveBeenCalledWith(
-          new Error('Unable to read or parse upstream usage response'),
+        ['ResponseAborted', false, undefined],
+        ['TimeoutError', false, undefined],
+        ['undici terminated', false, undefined],
+        ['cross-realm undici terminated', false, undefined],
+        ['malformed JSON', true, { errorName: 'SyntaxError' }],
+        [
+          'unexpected nested shape',
+          true,
           {
-            tags: { source: 'usage_response_parsing', api_kind: apiKind },
-            extra: {
-              usageId,
-              kiloUserId: user.id,
-              organizationId: undefined,
-              provider: 'openrouter',
-              messageId,
+            errorName: 'ZodError',
+            issues: [{ path: nestedShapeIssuePath, code: 'invalid_type' }],
+          },
+        ],
+        ['missing body', true, { errorName: 'Error' }],
+      ] as const)(
+        'records a zero-cost error row and Bouncer event for %s',
+        async (failure, reportsToSentry, readError) => {
+          const user = await insertTestUser({ microdollars_used: 1000 });
+          const usageId = crypto.randomUUID();
+          const messageId = `gen-${usageId}`;
+          const streamError =
+            failure === 'undici terminated'
+              ? new TypeError('terminated', {
+                  cause: Object.assign(new Error('private upstream error content'), {
+                    code: 'UND_ERR_SOCKET',
+                  }),
+                })
+              : failure === 'cross-realm undici terminated'
+                ? {
+                    name: 'TypeError',
+                    message: 'terminated',
+                    cause: { code: 'UND_ERR_SOCKET', message: 'private upstream error content' },
+                  }
+                : Object.assign(new Error('private upstream error content'), { name: failure });
+          const invalidNestedResponse = {
+            chat_completions: {
+              choices: [{ message: { content: { secret: 'private content' } } }],
             },
+            messages: { content: [{ type: 'text', text: { secret: 'private content' } }] },
+            responses: { output: [{ type: 'message', content: { secret: 'private content' } }] },
+          }[apiKind];
+          const body =
+            failure === 'missing body'
+              ? null
+              : failure === 'malformed JSON'
+                ? 'private malformed response content {'
+                : failure === 'unexpected nested shape'
+                  ? JSON.stringify({ model: 'test-model', ...invalidNestedResponse })
+                  : new ReadableStream<Uint8Array>({
+                      start(controller) {
+                        controller.error(streamError);
+                      },
+                    });
+          const response = new Response(body, {
+            status: 202,
+            headers: { 'content-type': 'application/json', 'x-generation-id': messageId },
+          });
+          const usageContext: MicrodollarUsageContext = {
+            ...createBaseUsageContext(user),
+            usageId,
+            api_kind: apiKind,
+            isStreaming: false,
+            bouncer: {
+              requestId: usageId,
+              occurredAt: new Date(),
+              accountId: `user:${user.id}`,
+              clientIp: null,
+              clientAttributed: true,
+              requestedLogprobs: false,
+              samples: null,
+              promptSimHash: null,
+            },
+          };
+
+          const result = await countAndStoreUsage(response, usageContext, undefined).usagePromise;
+
+          expect(result).toMatchObject({ usageId });
+          const usageRecords = await db.query.microdollar_usage.findMany({
+            where: eq(microdollar_usage.kilo_user_id, user.id),
+          });
+          expect(usageRecords).toEqual([
+            expect.objectContaining({
+              id: usageId,
+              cost: 0,
+              input_tokens: 0,
+              output_tokens: 0,
+              has_error: true,
+              model: usageContext.requested_model,
+            }),
+          ]);
+          const metadata = await db.query.microdollar_usage_metadata.findFirst({
+            where: eq(microdollar_usage_metadata.id, usageId),
+          });
+          expect(metadata).toMatchObject({
+            message_id: messageId,
+            status_code: 202,
+          });
+          expect((await findUserById(user.id))?.microdollars_used).toBe(1000);
+          expect(fetchGeneration).toHaveBeenCalledTimes(1);
+          expect(fetchGeneration).toHaveBeenCalledWith(messageId, expect.anything());
+          expect(mockedReportUsageEvent).toHaveBeenCalledTimes(1);
+          expect(mockedReportUsageEvent).toHaveBeenCalledWith(
+            expect.objectContaining({
+              requestId: usageId,
+              accountId: `user:${user.id}`,
+              apiKind,
+              costMicrodollars: 0,
+              inputTokens: 0,
+              outputTokens: 0,
+            })
+          );
+          if (reportsToSentry) {
+            expect(captureException).toHaveBeenCalledTimes(1);
+            expect(captureException).toHaveBeenCalledWith(
+              new Error('Unable to read or parse upstream usage response'),
+              {
+                tags: { source: 'usage_response_parsing', api_kind: apiKind },
+                extra: {
+                  usageId,
+                  kiloUserId: user.id,
+                  organizationId: undefined,
+                  provider: 'openrouter',
+                  messageId,
+                  ...readError,
+                },
+              }
+            );
+          } else {
+            expect(captureException).not.toHaveBeenCalled();
           }
-        );
-      });
+        }
+      );
 
       test.each(['openrouter', 'vercel'] as const)(
         'recovers paid %s generation usage from the header after a parse failure',

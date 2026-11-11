@@ -1036,19 +1036,6 @@ export type FimUsage = {
   total_tokens: number;
 };
 
-export type MistralFimCompletion = {
-  id: string;
-  object: 'fim.completion';
-  model: string;
-  usage: FimUsage;
-  created: number;
-  choices: Array<{
-    index: number;
-    text: string;
-    finish_reason: string;
-  }>;
-};
-
 const fimUsageSchema = z.object({
   prompt_tokens: z.number(),
   completion_tokens: z.number(),
@@ -1172,7 +1159,7 @@ async function parseMistralFimUsageFromStream(
         error: json.error,
         usesUserCredentials,
         logContext: { provider, messageId: json.id ?? messageId, model: json.model ?? model },
-        sentryExtra: { json, event },
+        sentryExtra: { provider, messageId: json.id ?? messageId, model: json.model ?? model },
       });
     }
 
@@ -1348,7 +1335,7 @@ function extractEditUsage(
   provider: ProviderType,
   statusCode: number
 ): MicrodollarUsageStats {
-  if (!json.model && !json.error && statusCode < 400) {
+  if (!json.model && !json.error && !json.usage && statusCode < 400) {
     throw new Error('Unexpected edit response');
   }
   const usage = json.usage;
@@ -1486,7 +1473,7 @@ function extractEmbeddingUsage(
   json: z.infer<typeof embeddingResponseSchema>,
   statusCode: number
 ): MicrodollarUsageStats {
-  if (json.model == null && !json.error && statusCode < 400) {
+  if (json.model == null && !json.error && !json.usage && statusCode < 400) {
     throw new Error('Unexpected embedding response');
   }
   const usage = json.usage;

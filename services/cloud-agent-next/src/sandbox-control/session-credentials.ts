@@ -1039,6 +1039,7 @@ function preparedPayload(input: {
       scopeId: grant.scopeId,
       token: kiloToken,
       targets: grant.kilo.targets,
+      ...(grant.orgId ? { organizationId: grant.orgId } : {}),
     },
   };
 }

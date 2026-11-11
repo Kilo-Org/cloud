@@ -1,7 +1,7 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
-import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { createTRPCClient, httpLink } from '@trpc/client';
-import { useEffect, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
   joinStoreCreditProducts,
@@ -68,6 +68,18 @@ const creditBlocks: RouterOutputs['user']['getCreditBlocks'] = {
   autoTopUpEnabled: false,
 };
 
+const meResponse: RouterOutputs['user']['getMe'] = {
+  success: true,
+  id: 'credits-price-fixture',
+  email: 'credits-price@example.com',
+  isAdmin: false,
+};
+
+const balanceResponse: RouterOutputs['user']['getContextBalance'] = {
+  balance: 0,
+  isDepleted: true,
+};
+
 const FIXTURE_URL = 'http://credits-pack-prices-fixture.invalid/api/trpc';
 
 function fixtureResponse(value: unknown): Response {
@@ -130,28 +142,27 @@ function createFixtureClient() {
 }
 
 /**
- * Seeds the reads the screen and the store hook use, then mounts the screen.
+ * Fills every cache entry the screen reads, then mounts it.
  *
- * The screen reserves skeleton rows while its store loader runs, so a capture
- * started on that first paint measures the rows arriving rather than the row
- * layout. Seeding the same cache entries the screen reads makes its first paint
- * the state under test; a later background read replaces them with identical
- * data and moves nothing.
+ * The screen reserves skeleton rows and a balance placeholder while its reads
+ * are pending, so a capture started on a screen that mounts with empty caches
+ * measures that content arriving rather than the row layout. The entries are
+ * written in a state initializer, which runs during the first render: the first
+ * paint is already the state under test, and a later background read replaces
+ * each entry with identical data and moves nothing.
  */
 function SeededScreen({ state }: { state: CreditPackPricesFixtureState }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const me = useQuery(trpc.user.getMe.queryOptions());
-  const balance = useQuery(trpc.user.getContextBalance.queryOptions({}));
-  const blocks = useQuery(trpc.user.getCreditBlocks.queryOptions({}));
-  const userId = me.data?.id;
-
-  useEffect(() => {
-    if (userId === undefined) {
-      return;
-    }
+  useState(() => {
+    const me = trpc.user.getMe.queryOptions();
+    queryClient.setQueryData(me.queryKey, meResponse);
+    const balance = trpc.user.getContextBalance.queryOptions({});
+    queryClient.setQueryData(balance.queryKey, balanceResponse);
+    const blocks = trpc.user.getCreditBlocks.queryOptions({});
+    queryClient.setQueryData(blocks.queryKey, creditBlocks);
     queryClient.setQueryData(
-      creditStoreProductsKey(userId),
+      creditStoreProductsKey(meResponse.id),
       joinStoreCreditProducts({
         appAccountToken: backends.appAccountToken,
         backendProducts: backends.products,
@@ -159,11 +170,7 @@ function SeededScreen({ state }: { state: CreditPackPricesFixtureState }) {
         storefront: getCreditStorefront(),
       })
     );
-  }, [queryClient, state, userId]);
-
-  if (userId === undefined || !balance.isSuccess || !blocks.isSuccess) {
-    return null;
-  }
+  });
   return <CreditPurchaseScreen />;
 }
 

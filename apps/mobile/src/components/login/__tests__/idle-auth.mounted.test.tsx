@@ -13,13 +13,14 @@ import {
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
   INLINE_LINK_FACING_HIT_SLOP_DP,
+  INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP,
   INLINE_LINK_LINE_GAP_CLASS,
   INLINE_LINK_LINE_GAP_DP,
   INLINE_LINK_OUTER_HIT_SLOP_DP,
+  INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP,
   INLINE_LINK_ROW_CLASS,
   INLINE_LINK_ROW_MARGIN_DP,
   INLINE_LINK_SENTENCE_LINE_DP,
-  INLINE_LINK_VERTICAL_HIT_SLOP_DP,
   MIN_TAP_TARGET_DP,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
@@ -206,9 +207,11 @@ function linkEdge(label: string | undefined): 'start' | 'end' {
 
 /**
  * The per-side slop the legal link at one end of the sentence must render. The
- * facing side (4dp) points at the connector, the outer side (12dp) reaches over
- * plain prose, and the two still add to the 44pt target from the 28dp audit
- * floor. The sentence is LTR in this suite's native mock.
+ * facing side points at the connector (4dp) or, vertically, at the line the
+ * neighbour can occupy below it (0dp); the outer side reaches over plain prose
+ * (12dp) and past the row's own line (16dp). Each axis still adds to the 44pt
+ * target from the 28dp audit floor. The sentence is LTR in this suite's native
+ * mock.
  */
 function expectedLinkSlop(edge: 'start' | 'end'): {
   top: number;
@@ -217,8 +220,14 @@ function expectedLinkSlop(edge: 'start' | 'end'): {
   right: number;
 } {
   return {
-    top: INLINE_LINK_VERTICAL_HIT_SLOP_DP,
-    bottom: INLINE_LINK_VERTICAL_HIT_SLOP_DP,
+    top:
+      edge === 'start'
+        ? INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP
+        : INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP,
+    bottom:
+      edge === 'start'
+        ? INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP
+        : INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP,
     left: edge === 'start' ? INLINE_LINK_OUTER_HIT_SLOP_DP : INLINE_LINK_FACING_HIT_SLOP_DP,
     right: edge === 'start' ? INLINE_LINK_FACING_HIT_SLOP_DP : INLINE_LINK_OUTER_HIT_SLOP_DP,
   };
@@ -1314,25 +1323,29 @@ describe('IdleAuth layout repairs', () => {
   it('keeps each legal link touch region inside the row gutter, clear of the Continue button', async () => {
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
 
-    // A link's 44pt vertical region reaches (28 - 17.5) / 2 + 8 = 13.25dp past
-    // the text line it sits on. The screen's `gap-3` gutter to the Continue
-    // button above the row (and the ghost button below) is 10.5dp — 2.75dp
-    // short — so the legal row carries its own margin and the free space is
-    // 10.5 + 5 = 15.5dp each side. Without that clearance the region started
-    // 4.5dp inside the Continue button and a tap on the button's bottom strip
-    // opened the link instead of sending the code (the earlier mis-routed-tap
-    // finding).
+    // Each legal link keeps its whole 44pt vertical reach on the far side of the
+    // sentence line (the facing side belongs to the neighbour's line), so a
+    // link's region reaches (28 - 17.5) / 2 + 16 = 21.25dp past that line. The
+    // screen's `gap-3` gutter to the Continue button above the row (and the
+    // ghost button below) is 10.5dp, so the legal row carries its own margin and
+    // the free space is 10.5 + 11 = 21.5dp each side. Without that clearance the
+    // region covered the Continue button's bottom strip and a tap there opened
+    // the link instead of sending the code (the earlier mis-routed-tap finding).
     expect(INLINE_LINK_ROW_CLASS).toBe(
       `my-[${INLINE_LINK_ROW_MARGIN_DP}px] ${INLINE_LINK_LINE_GAP_CLASS}`
     );
-    // A wrapped sentence line gets more than the box's per-side overflow, or
-    // the box on the next line enters the prose above it (a pt-BR gate run
-    // measured 6.9dp of that collision on the old 14dp line).
+    // Two link boxes on adjacent wrapped lines: the gap beats both overflows
+    // together, and the two facing reaches (which sit on top of those overflows)
+    // still stop short of each other inside it.
     const overflowDp = (MIN_TAP_TARGET_DP - INLINE_LINK_SENTENCE_LINE_DP) / 2;
-    expect(INLINE_LINK_LINE_GAP_DP).toBeGreaterThan(overflowDp);
-    const gutterDp = 10.5 + INLINE_LINK_ROW_MARGIN_DP;
-    expect(overflowDp + INLINE_LINK_VERTICAL_HIT_SLOP_DP).toBeLessThanOrEqual(gutterDp);
     expect(overflowDp).toBe(5.25);
+    expect(INLINE_LINK_LINE_GAP_DP).toBeGreaterThan(2 * overflowDp);
+    expect(2 * (overflowDp + INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP)).toBeLessThan(
+      INLINE_LINK_LINE_GAP_DP
+    );
+    // The far reach is what the screen gutter and the row's margin have to hold.
+    const gutterDp = 10.5 + INLINE_LINK_ROW_MARGIN_DP;
+    expect(overflowDp + INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP).toBeLessThanOrEqual(gutterDp);
 
     const row = renderer.root.find(
       n =>
@@ -1349,10 +1362,11 @@ describe('IdleAuth layout repairs', () => {
         left: number;
         right: number;
       };
-      expect(slop.top).toBe(INLINE_LINK_VERTICAL_HIT_SLOP_DP);
-      expect(slop.bottom).toBe(INLINE_LINK_VERTICAL_HIT_SLOP_DP);
-      expect(overflowDp + slop.top).toBeLessThanOrEqual(gutterDp);
-      expect(overflowDp + slop.bottom).toBeLessThanOrEqual(gutterDp);
+      // The side that points at the other link's line carries no reach; the far
+      // side carries all of it, and the row's gutter has to hold it.
+      expect(Math.min(slop.top, slop.bottom)).toBe(INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP);
+      expect(Math.max(slop.top, slop.bottom)).toBe(INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP);
+      expect(overflowDp + Math.max(slop.top, slop.bottom)).toBeLessThanOrEqual(gutterDp);
       // The region the gutter bounds is still the full design target.
       const box = boxDp(link.props.className as string);
       expect(box.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);

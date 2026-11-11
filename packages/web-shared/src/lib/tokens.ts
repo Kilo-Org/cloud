@@ -445,6 +445,9 @@ export function generateWorkflowGatewayToken(
   }
 ): string {
   const expiresIn = Math.min(options.expiresIn ?? ONE_HOUR_IN_SECONDS, ONE_HOUR_IN_SECONDS);
+  if (expiresIn <= 0) {
+    throw new Error('Workflow gateway token expiry must be positive');
+  }
   if (!isResourceTokenIssuanceEnabled('workflow-gateway')) {
     // The audience-less payload keeps its compatibility shape. The one-hour
     // bound and the organization claim apply to both payloads.
@@ -456,9 +459,6 @@ export function generateWorkflowGatewayToken(
   }
   if (user.api_token_pepper !== null && !user.api_token_pepper) {
     throw new Error('Workflow gateway tokens require a current user pepper');
-  }
-  if (expiresIn <= 0) {
-    throw new Error('Workflow gateway token expiry must be positive');
   }
   const issuedAt = Math.floor(Date.now() / 1000);
   const payload = buildModernKiloTokenPayload({

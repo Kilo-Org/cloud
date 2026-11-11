@@ -179,7 +179,7 @@ This PR does not retire legacy native exchange, shorten user credentials, change
 
 Workflow issuance reads the existing primary user pepper, including explicit `null`, without initializing or rotating it. Modern workflow tokens retain their audience, purpose, exchange restrictions, and bounded lifetime. This requires no migration and must not reset already initialized peppers; genuine pepper rotation continues to revoke previously issued credentials.
 
-The gateway credential issued for a queued workflow is limited to one hour, and it carries the caller's organization, in both issuance modes. Its compatibility shape omits the audience for receivers that require that shape.
+The gateway credential issued for a queued workflow is limited to one hour, and it carries the caller's organization, in both issuance modes. A requested lifetime that is not positive is rejected in both modes. Its compatibility shape omits the audience for receivers that require that shape.
 
 Discord session operations use `generateCloudAgentWorkflowToken` for the installation's
 acting user, with the installation's organization scope and a one-hour lifetime.

@@ -126,3 +126,19 @@ it.each([
     expect(gateway.exp! - gateway.iat!).toBe(expectedLifetime);
   }
 );
+
+it.each([false, true])(
+  'rejects a nonpositive gateway lifetime in both issuance modes (modern: %s)',
+  modern => {
+    if (modern) {
+      process.env[master] = 'true';
+      process.env[families['workflow-gateway']] = 'true';
+    }
+    const user = { id: 'oauth/nonpositive', api_token_pepper: 'nonpositive-pepper' } as User;
+    for (const expiresIn of [0, -60]) {
+      expect(() =>
+        generateWorkflowGatewayToken(user, { tokenSource: 'reviewer', expiresIn })
+      ).toThrow('Workflow gateway token expiry must be positive');
+    }
+  }
+);

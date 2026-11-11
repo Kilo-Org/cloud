@@ -62,6 +62,7 @@ const SENT_TO_LABELS: Record<string, string> = {
 const REJECTED_RESULT_LABELS: Record<string, string> = {
   'chatgpt-reconnect': 'Rejected: the ChatGPT connection must be reconnected',
   'claude-billing-unavailable': 'Rejected: Claude organization billing is unavailable',
+  'claude-billing-reconnect': 'Rejected: the Claude organization link must be reconnected',
   'custom-llm-unavailable': 'Rejected: the promotional model is unavailable',
   'direct-byok-catalog-only': 'Rejected: the key only serves Kilo catalog model IDs',
 };

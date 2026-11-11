@@ -107,6 +107,9 @@ function outcomeMessage(outcome: string, scope: ClaudeBillingScope, connected: b
 }
 
 function refusalMessage(status: ClaudeBillingStatus) {
+  if (status.state === 'reconnect_required') {
+    return 'The person who linked Claude billing for this organization is no longer a member. An organization owner must reconnect Claude billing before Kilo shared services can bill this organization again.';
+  }
   if (status.state === 'billing_unavailable') {
     return 'Claude billing is unavailable. The link may have ended, the Claude organization may be ineligible, or Kilo may have an authentication problem. Check Claude Console, link it again if needed, or contact Kilo support.';
   }
@@ -152,7 +155,9 @@ export function ClaudeBillingCardView({
 }: ClaudeBillingCardViewProps) {
   const copy = SCOPE_COPY[scope];
   const refusal = status ? refusalMessage(status) : null;
-  const connected = status?.state === 'connected' || status?.state === 'billing_unavailable';
+  const reconnectRequired = status?.state === 'reconnect_required';
+  const connected =
+    status?.state === 'connected' || status?.state === 'billing_unavailable' || reconnectRequired;
   const shareableLinks = !connected && status ? status.shareableLinks : [];
   const [selectedPayerId, setSelectedPayerId] = useState<string | null>(null);
   const selectedShareLink =
@@ -165,6 +170,8 @@ export function ClaudeBillingCardView({
           <Skeleton className="h-5 w-20" />
         ) : status.state === 'connected' ? (
           <Badge variant="new">Linked</Badge>
+        ) : status.state === 'reconnect_required' ? (
+          <Badge variant="destructive">Reconnect required</Badge>
         ) : status.state === 'billing_unavailable' ? (
           <Badge variant="destructive">Billing unavailable</Badge>
         ) : null}
@@ -218,9 +225,11 @@ export function ClaudeBillingCardView({
                     <ClaudeLogo />
                     {connecting
                       ? 'Redirecting to Claude…'
-                      : connected
-                        ? 'Link your Claude organization again'
-                        : 'Link your Claude organization'}
+                      : reconnectRequired
+                        ? 'Reconnect Claude billing'
+                        : connected
+                          ? 'Link your Claude organization again'
+                          : 'Link your Claude organization'}
                   </Button>
                 ) : null}
                 {onShare && selectedShareLink ? (

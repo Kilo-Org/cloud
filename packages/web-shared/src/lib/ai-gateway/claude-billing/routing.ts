@@ -14,9 +14,9 @@ import {
 } from '@kilocode/web-shared/lib/auth/claude/config';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
-import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { ClaudeBillingOwner } from './store';
+import { resolveClaudeBillingConnector } from './connector';
 import { getAuthoritativeClaudeBillingState, type ClaudeBillingPayerState } from './payer-state';
 import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 
@@ -25,6 +25,14 @@ export { CLAUDE_BILLING_PROVIDER_ID } from './provider-id';
 
 export const CLAUDE_BILLING_REQUIRED_MESSAGE =
   'Your Claude organization link cannot bill right now. An owner or admin can link it again, or check it at https://platform.claude.com/connected-platforms.';
+
+/**
+ * Shown when the person who linked an organization's shared-services connection
+ * is gone. The connection belongs to the organization, so an owner reconnects it
+ * instead of losing it.
+ */
+export const CLAUDE_BILLING_RECONNECT_MESSAGE =
+  'The person who linked Claude billing for this organization is no longer available, so shared services cannot bill through it.';
 
 const ANTHROPIC_VERSION = '2023-06-01';
 /** Marks a request as authenticated by an OAuth token rather than an API key. */
@@ -48,7 +56,13 @@ export type ClaudeBillingRoutingInput = {
 export type ClaudeBillingRoutingResult =
   | { kind: 'provider'; provider: Provider; userByok: null; skipBalanceCheck: true }
   /** The owner has a connection that cannot bill. Never serve it another way. */
-  | { kind: 'unavailable'; message: string; retryable?: boolean };
+  | { kind: 'unavailable'; message: string; retryable?: boolean }
+  /**
+   * The organization's shared-services connection was linked by a person who is
+   * gone, so it can no longer be gated. Never serve it another way, and never
+   * retry: only an organization owner reconnecting it changes the outcome.
+   */
+  | { kind: 'reconnect'; message: string };
 
 /**
  * The connections a request may use, in order. A member's own request in an
@@ -74,19 +88,24 @@ function ownerCandidates(input: ClaudeBillingRoutingInput): ClaudeBillingOwner[]
 }
 
 /**
- * The email the release flag is checked against. A person's own connection is
- * gated on the person making the request. A shared-services connection is
- * gated on the person who linked it last, because a service run's caller is a
- * bot that no release flag covers. The previous web app release does not report
- * that person, so the requester stands in, as it did there.
+ * The flag check for a connection, or the reconnect requirement when a
+ * shared-services connection's connector is gone. A person's own connection is
+ * gated on the person making the request. A shared-services connection is gated
+ * on the person who linked it last, because a service run's caller is a bot that
+ * no release flag covers. The previous web app release does not report that
+ * person, so the requester stands in, as it did there.
  */
 async function gateEmail(
   input: ClaudeBillingRoutingInput,
   owner: ClaudeBillingOwner,
   connection: ClaudeBillingPayerState
-): Promise<string | null> {
-  if (owner.kind !== 'shared_services' || !connection.created_by) return input.requesterEmail;
-  return (await findUserById(connection.created_by, readDb))?.google_user_email ?? null;
+): Promise<{ kind: 'email'; email: string | null } | { kind: 'connector-gone' }> {
+  if (owner.kind !== 'shared_services' || !connection.created_by) {
+    return { kind: 'email', email: input.requesterEmail };
+  }
+  const connector = await resolveClaudeBillingConnector(connection.created_by, readDb);
+  if (connector.kind === 'gone') return { kind: 'connector-gone' };
+  return { kind: 'email', email: connector.kind === 'present' ? connector.email : null };
 }
 
 /** Billing connections serve the Messages API and Anthropic's OpenAI-compatible endpoint. */
@@ -192,8 +211,11 @@ export async function checkClaudeBilling(
       return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
     }
     if (connection.status !== ClaudeBillingConnectionStatus.Connected) continue;
-    const email = await gateEmail(input, owner, connection);
-    if (!email || !(await isClaudePlatformOAuthEnabled(email))) {
+    const gate = await gateEmail(input, owner, connection);
+    if (gate.kind === 'connector-gone') {
+      return { kind: 'reconnect', message: CLAUDE_BILLING_RECONNECT_MESSAGE };
+    }
+    if (!gate.email || !(await isClaudePlatformOAuthEnabled(gate.email))) {
       return {
         kind: 'unavailable',
         message:

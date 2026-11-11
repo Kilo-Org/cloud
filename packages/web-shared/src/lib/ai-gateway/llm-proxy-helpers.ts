@@ -576,6 +576,19 @@ export function claudeBillingUnavailableResponse(message: string, retryable = fa
   );
 }
 
+/**
+ * Returned when the organization's shared-services Claude connection was linked
+ * by a person who is gone. Only an organization owner can reconnect it, so the
+ * request fails instead of moving to another billing path, and no retry helps.
+ */
+export function claudeBillingReconnectResponse(message: string) {
+  const error = `${message} An organization owner must reconnect Claude billing at ${APP_URL}/byok.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { status: 400 }
+  );
+}
+
 export function modelDoesNotExistOnOpenRouterResponse(model: string) {
   const error =
     `The requested model '${model}' does not exist. ` +

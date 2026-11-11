@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
+import { cloudflareTest } from '@cloudflare/vitest-plugin';
 import { defineConfig } from 'vitest/config';
 import { binaryAsArrayBuffer } from './test/plugins/binary-as-arraybuffer.js';
 

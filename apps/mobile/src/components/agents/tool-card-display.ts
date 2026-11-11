@@ -18,7 +18,7 @@ export type ToolDisplay = {
   /**
    * Whether the shown label (`subtitle ?? title`) carries tool content worth
    * translating. The fallback labels are already-localized UI copy (`read`,
-   * `searching the web`, `Read plan`); sending those to the gateway would
+   * `searching online`, `Read plan`); sending those to the gateway would
    * translate text that is already in the app language, so the transcript row
    * skips them.
    */
@@ -85,6 +85,32 @@ function searchToolDisplay(
     title: label,
     subtitle: search ? truncateText(search, 60) : label,
     translatable: Boolean(search),
+  };
+}
+
+/**
+ * The row a call gets when its own body has no dedicated presentation: the
+ * state title or argument summary the tool reported, under `title`.
+ */
+function summaryToolDisplay(
+  part: ToolPart,
+  title: string,
+  status: ToolPart['state']['status']
+): ToolDisplay {
+  const stateTitle = status === 'running' || status === 'completed' ? part.state.title : undefined;
+  const detail = buildToolDetailSummary(part);
+  const summary = detail.name === part.tool ? detail.summary : undefined;
+  return {
+    title,
+    subtitle:
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- a whitespace-only state title must fall through to the projected name; ?? would keep it
+      stateTitle?.trim() || (summary !== undefined ? truncateText(summary, 60) : detail.name),
+    // The state title and the projected argument summary are agent prose.
+    // A known-tool label (`Publish Image`) is raw English app copy with no
+    // catalog, so it must reach the gateway like agent prose; a raw tool id
+    // or an `mcp` `server/tool` identifier is an id and stays out, like the
+    // already-localized fallback labels above.
+    translatable: Boolean(stateTitle?.trim()) || summary !== undefined || detail.nameIsLabel,
   };
 }
 
@@ -315,23 +341,31 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
           status !== 'error' && !dismissed && suggestionText !== '' && suggestionText !== title,
       };
     }
+    case 'browser_open':
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolBrowser'), status);
+    case 'notebook_read':
+    case 'notebook_edit':
+    case 'notebook_execute':
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolNotebook'), status);
+    case 'board_read':
+    case 'board_post':
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolBoard'), status);
+    case 'lsp':
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolLsp'), status);
+    case 'recall':
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolRecall'), status);
+    case 'repo_clone':
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolRepoClone'), status);
+    case 'repo_overview':
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolRepoOverview'), status);
+    case 'semantic_search':
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolSemanticSearch'), status);
+    case 'skill':
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolSkill'), status);
+    case 'question':
+      return summaryToolDisplay(part, i18n.t('agentChat.toolCard.toolQuestion'), status);
     default: {
-      const stateTitle =
-        status === 'running' || status === 'completed' ? part.state.title : undefined;
-      const detail = buildToolDetailSummary(part);
-      const summary = detail.name === part.tool ? detail.summary : undefined;
-      return {
-        title: part.tool,
-        subtitle:
-          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- a whitespace-only state title must fall through to the projected name; ?? would keep it
-          stateTitle?.trim() || (summary !== undefined ? truncateText(summary, 60) : detail.name),
-        // The state title and the projected argument summary are agent prose.
-        // A known-tool label (`Publish Image`) is raw English app copy with no
-        // catalog, so it must reach the gateway like agent prose; a raw tool id
-        // or an `mcp` `server/tool` identifier is an id and stays out, like the
-        // already-localized fallback labels above.
-        translatable: Boolean(stateTitle?.trim()) || summary !== undefined || detail.nameIsLabel,
-      };
+      return summaryToolDisplay(part, part.tool, status);
     }
   }
 }

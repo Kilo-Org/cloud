@@ -403,7 +403,7 @@ describe('getToolDisplay mapping', () => {
           })
         )
       )
-    ).toEqual({ title: 'question', subtitle: 'Which fields should the sheet show?' });
+    ).toEqual({ title: 'asking you questions', subtitle: 'Which fields should the sheet show?' });
   });
 
   it('uses the running/completed state title for the generic subtitle', () => {

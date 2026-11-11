@@ -85,7 +85,7 @@
       "body": "Le redémarrage précédemment prévu a été annulé."
     },
     "versionChangeNotice": {
-      "title": "Mise à niveau imminente de {{instanceName}}",
+      "title": "Mise à niveau imminente pour {{instanceName}}",
       "bodyWithTag": "Mise à niveau vers {{targetImageTag}} à {{when}}.",
       "bodyWithoutTag": "Mise à niveau prévue à {{when}}."
     },

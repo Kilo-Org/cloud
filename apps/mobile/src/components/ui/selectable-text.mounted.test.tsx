@@ -92,4 +92,25 @@ describe('SelectableText mounted', () => {
     // Same reference, so the mono block height pin stays wired to real layout.
     expect(findTextInput(renderer)?.props.onLayout).toBe(sentinelOnLayout);
   });
+
+  it('forwards the caller style to the TextInput host beside the class string', async () => {
+    const style = { direction: 'ltr', writingDirection: 'ltr', textAlign: 'right' } as const;
+    const holder: { current?: TestRenderer.ReactTestRenderer } = { current: undefined };
+    await act(async () => {
+      await Promise.resolve();
+      // eslint-disable-next-line react/no-children-prop -- tsgo requires `children` in the props object, not the third argument.
+      holder.current = TestRenderer.create(
+        createElement(SelectableText, { children: 'الجلسة', style })
+      );
+    });
+    const renderer = holder.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+
+    const input = findTextInput(renderer);
+    expect(input?.props.style).toEqual(style);
+    // The class string still compiles the shared text treatment.
+    expect(input?.props.className).toContain('font-medium');
+  });
 });

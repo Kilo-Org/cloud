@@ -43,6 +43,17 @@ type DatabaseClient = typeof db | DrizzleTransaction;
 
 const IMPACT_ADVOCATE_KILO_PASS_REWARD_UNIT = 'Kilo Pass Bonus Credits';
 
+/** Local reward statuses that can still be fulfilled, so Impact reporting may follow. */
+const REDEEMABLE_KILO_PASS_REWARD_STATUSES: ImpactReferralRewardStatus[] = [
+  ImpactReferralRewardStatus.Pending,
+  ImpactReferralRewardStatus.Earned,
+  ImpactReferralRewardStatus.Applied,
+];
+
+function isRedeemableReferralRewardStatus(status: ImpactReferralRewardStatus): boolean {
+  return REDEEMABLE_KILO_PASS_REWARD_STATUSES.includes(status);
+}
+
 export type ImpactConversionReportDispatchSummary = {
   claimed: number;
   delivered: number;
@@ -255,9 +266,7 @@ export async function queueImpactAdvocateRewardRedemption(params: {
   const isRedeemableKiloPassReward =
     reward.product === ImpactReferralProduct.KiloPass &&
     reward.rewardKind === ImpactReferralRewardKind.KiloPassBonus &&
-    (reward.status === ImpactReferralRewardStatus.Pending ||
-      reward.status === ImpactReferralRewardStatus.Earned ||
-      reward.status === ImpactReferralRewardStatus.Applied) &&
+    isRedeemableReferralRewardStatus(reward.status) &&
     reward.rewardAmountUsd !== null &&
     reward.rewardAmountUsd > 0;
 
@@ -424,6 +433,34 @@ async function dispatchImpactAdvocateRewardRedemptionById(
     return 'failed';
   }
 
+  const reward = await db.query.impact_referral_rewards.findFirst({
+    where: eq(impact_referral_rewards.id, redemption.reward_id),
+    columns: { id: true, status: true },
+  });
+  if (!reward || !isRedeemableReferralRewardStatus(reward.status)) {
+    await db
+      .update(impact_advocate_reward_redemptions)
+      .set({
+        state: ImpactAdvocateRewardRedemptionState.Failed,
+        attempt_count: attemptCount,
+        next_retry_at: null,
+        redeem_response_payload: {
+          error: reward ? 'referral_reward_not_redeemable' : 'referral_reward_not_found',
+          rewardStatus: reward?.status ?? null,
+        } satisfies Record<string, unknown>,
+      })
+      .where(eq(impact_advocate_reward_redemptions.id, redemption.id));
+    console.error(
+      '[impact-referrals] Impact Advocate reward redemption blocked by the local reward status',
+      {
+        redemptionId: redemption.id,
+        rewardId: redemption.reward_id,
+        rewardStatus: reward?.status ?? null,
+      }
+    );
+    return 'failed';
+  }
+
   const advocateScope = { programKey: redemption.request_payload.programKey };
 
   const lookupResult = await sendImpactAdvocateRewardLookupPayload(
@@ -530,11 +567,7 @@ async function queueMissingImpactAdvocateRewardRedemptions(limit: number): Promi
       and(
         eq(impact_referral_rewards.product, ImpactReferralProduct.KiloPass),
         eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloPassBonus),
-        inArray(impact_referral_rewards.status, [
-          ImpactReferralRewardStatus.Pending,
-          ImpactReferralRewardStatus.Earned,
-          ImpactReferralRewardStatus.Applied,
-        ]),
+        inArray(impact_referral_rewards.status, REDEEMABLE_KILO_PASS_REWARD_STATUSES),
         sql`${impact_referral_rewards.reward_amount_usd} > 0`,
         sql`NOT EXISTS (
           SELECT 1

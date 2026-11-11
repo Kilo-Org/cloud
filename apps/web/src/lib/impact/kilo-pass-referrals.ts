@@ -4,6 +4,7 @@ import { addMonths } from 'date-fns';
 import { and, asc, count, eq, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { IMPACT_ACTION_TRACKER_IDS, buildSalePayload, hashEmailForImpact } from '@/lib/impact';
 import { resolveWinningAttributionTouch } from '@/lib/impact/referral-attribution';
 import {
@@ -77,6 +78,12 @@ function referralDisqualificationReason(reason: string): string {
 function getAdversePaymentReason(reason: AdverseReferralPaymentReason): string {
   return `referral_payment_${reason}`;
 }
+
+/** Rules 161 and 163: report adverse payments that reach applied rewards. */
+const logAppliedRewardsNeedingReview = sentryLogger(
+  'impact_referral_adverse_payment_applied_rewards',
+  'error'
+);
 
 function buildImpactReferralId(touch: ImpactAttributionTouch): string | null {
   return touch.rs_code?.trim() || touch.opaque_tracking_value?.trim() || null;
@@ -340,7 +347,7 @@ export async function markPersonalKiloPassReferralPaymentAdverse(params: {
   const reviewReason = getAdversePaymentReason(params.reason);
   const occurredAt = params.occurredAt.toISOString();
 
-  return await db.transaction(async tx => {
+  const result = await db.transaction(async tx => {
     const conversion = await tx.query.impact_referral_conversions.findFirst({
       where: and(
         eq(impact_referral_conversions.product, ImpactReferralProduct.KiloPass),
@@ -352,10 +359,13 @@ export async function markPersonalKiloPassReferralPaymentAdverse(params: {
 
     if (!conversion) {
       return {
-        conversionId: null,
-        canceledRewards: 0,
-        reviewRequiredRewards: 0,
-      } satisfies KiloPassAdverseReferralPaymentSummary;
+        summary: {
+          conversionId: null,
+          canceledRewards: 0,
+          reviewRequiredRewards: 0,
+        } satisfies KiloPassAdverseReferralPaymentSummary,
+        reviewRequiredRewardIds: [],
+      };
     }
 
     const canceledRewards = await tx
@@ -398,11 +408,25 @@ export async function markPersonalKiloPassReferralPaymentAdverse(params: {
       .returning({ id: impact_referral_rewards.id });
 
     return {
-      conversionId: conversion.id,
-      canceledRewards: canceledRewards.length,
-      reviewRequiredRewards: reviewRequiredRewards.length,
-    } satisfies KiloPassAdverseReferralPaymentSummary;
+      summary: {
+        conversionId: conversion.id,
+        canceledRewards: canceledRewards.length,
+        reviewRequiredRewards: reviewRequiredRewards.length,
+      } satisfies KiloPassAdverseReferralPaymentSummary,
+      reviewRequiredRewardIds: reviewRequiredRewards.map(reward => reward.id),
+    };
   });
+
+  if (result.reviewRequiredRewardIds.length > 0) {
+    logAppliedRewardsNeedingReview('kilo_pass_referral_applied_rewards_need_review', {
+      conversionId: result.summary.conversionId,
+      rewardIds: result.reviewRequiredRewardIds,
+      paymentProvider,
+      reason: params.reason,
+    });
+  }
+
+  return result.summary;
 }
 
 export async function processPersonalKiloPassStripePaidConversion(params: {

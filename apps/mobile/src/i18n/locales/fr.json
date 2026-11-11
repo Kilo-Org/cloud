@@ -3632,7 +3632,7 @@
       "description": "Envoyez un message pour discuter avec un modèle."
     },
     "list": {
-      "loadFailed": "Impossible de charger l'historique de la conversation.",
+      "loadFailed": "Impossible de charger l'historique des discussions.",
       "new": "Nouvelle discussion",
       "deleteTitle": "Supprimer cette discussion ?"
     },
@@ -3657,7 +3657,7 @@
     },
     "webSearch": {
       "title": "Rechercher sur le web",
-      "description": "Autorisez ce chat à rechercher des informations récentes via votre compte Kilo. Les recherches utilisent votre quota mensuel de recherches.",
+      "description": "Autorisez cette discussion à rechercher des informations récentes via votre compte Kilo. Les recherches utilisent votre quota mensuel de recherches.",
       "allowanceExhausted": "Vos recherches web gratuites de ce mois sont épuisées. Ajoutez des crédits pour rechercher à nouveau."
     },
     "mcp": {
@@ -3676,7 +3676,7 @@
       "unauthorizedDescription": "Reconnectez-vous pour utiliser les outils Kilo dans cette discussion.",
       "unavailable": "Les outils Kilo ne sont pas disponibles",
       "unavailableDescription": "Le serveur Kilo n'est pas disponible pour ce compte.",
-      "sheetTitle": "Outils de chat",
+      "sheetTitle": "Outils de discussion",
       "addServerTitle": "Ajouter un serveur MCP",
       "editServerTitle": "Modifier ce serveur MCP",
       "fieldName": "Nom affiché",
@@ -3689,10 +3689,10 @@
       "deleteServerA11y": "Supprimer le serveur : {{name}}",
       "retryServerA11y": "Réessayer ce serveur : {{name}}",
       "deleteTitle": "Supprimer ce serveur ?",
-      "deleteMessage": "Ses outils quittent toutes les conversations.",
-      "kiloBuiltIn": "Intégré. Activez-le ou désactivez-le pour cette conversation ; il ne peut être ni modifié ni supprimé.",
+      "deleteMessage": "Ses outils quittent toutes les discussions.",
+      "kiloBuiltIn": "Intégré. Activez-le ou désactivez-le pour cette discussion ; il ne peut être ni modifié ni supprimé.",
       "serversEmptyTitle": "Aucun serveur distant pour l'instant",
-      "serversEmptyDescription": "Ajoutez-en un pour proposer ses outils dans vos conversations.",
+      "serversEmptyDescription": "Ajoutez-en un pour proposer ses outils dans vos discussions.",
       "settingsToolsTitle": "Autoriser Kilo à modifier les réglages de l'application",
       "settingsToolsSubtitle": "S'applique au thème, à la langue, aux notifications, aux modèles et au reste des Préférences.",
       "settingsToolsOn": "Activé — les outils de réglages sont envoyés au modèle",
@@ -3723,7 +3723,7 @@
     },
     "backends": {
       "title": "Services de discussion",
-      "providersTitle": "Fournisseurs de chat",
+      "providersTitle": "Fournisseurs de discussion",
       "cloud": "Dans le nuage",
       "cloudModel": "Modèle : {{model}}",
       "cloudUnavailable": "Les modèles Kilo ne sont pas disponibles pour le moment. Vérifiez votre connexion.",
@@ -3776,8 +3776,8 @@
       "httpTitle": "Utiliser une connexion HTTP locale non sécurisée ?",
       "httpMessage": "Les invites, les réponses, les clés API et les en-têtes personnalisés envoyés à {{endpoint}} ne seront pas chiffrés. D'autres appareils du réseau pourraient les lire ou les modifier. HTTP n'est autorisé que pour les points de terminaison sur l'interface de bouclage ou sur un réseau local privé ; les redirections sont bloquées. Continuez uniquement si vous faites confiance à ce point de terminaison local et à ce réseau.",
       "allowHttp": "Autoriser HTTP en local",
-      "switchTitle": "Envoyer cette conversation à un autre service ?",
-      "switchMessage": "Passer à {{name}} envoie les invites et le contexte de cette conversation à ce service. Continuez uniquement si vous lui faites confiance.",
+      "switchTitle": "Envoyer cette discussion à un autre service ?",
+      "switchMessage": "Passer à {{name}} envoie les invites et le contexte de cette discussion à ce service. Continuez uniquement si vous lui faites confiance.",
       "switchConfirm": "Changer de service",
       "deleteTitle": "Supprimer ce service de discussion ?",
       "deleteMessage": "Supprimer {{name}} et ses identifiants d'authentification enregistrés ? Les discussions utilisant ce service devront utiliser un nouveau service pour pouvoir continuer.",
@@ -3785,7 +3785,7 @@
     },
     "gguf": {
       "title": "Modèles téléchargeables",
-      "help": "Téléchargez un modèle ouvert et exécutez-le sur ce téléphone avec llama.cpp. Vos requêtes et les réponses restent sur l'appareil. Les modèles sont volumineux, utilisez donc le Wi-Fi.",
+      "help": "Téléchargez un modèle ouvert et exécutez-le sur ce téléphone avec llama.cpp. Vos invites et les réponses restent sur l'appareil. Les modèles sont volumineux, utilisez donc le Wi-Fi.",
       "download": "Télécharger le modèle",
       "pause": "Mettre en pause le téléchargement",
       "resume": "Reprendre le téléchargement",
@@ -3800,7 +3800,7 @@
       "advanced": "Avancé",
       "localPurpose": "Fonctionne sur cet appareil avec llama.cpp. Les invites et les réponses restent sur l'appareil.",
       "deleteTitle": "Supprimer ce modèle ?",
-      "deleteMessage": "Supprimer {{name}} de cet appareil ? Les conversations qui l'utilisent ont besoin d'un autre modèle avant de pouvoir continuer.",
+      "deleteMessage": "Supprimer {{name}} de cet appareil ? Les discussions qui l'utilisent ont besoin d'un autre modèle avant de pouvoir continuer.",
       "errors": {
         "invalidUrl": "Saisissez un lien valide.",
         "insecureUrl": "Utilisez un lien HTTPS. Les modèles ne peuvent pas être téléchargés via HTTP.",
@@ -3826,7 +3826,7 @@
       "noFitsDescription": "Les modèles plus volumineux se trouvent dans l'onglet $t(common.all).",
       "fit": {
         "fits": "Compatible",
-        "tight": "Juste",
+        "tight": "Tout juste",
         "tooLarge": "Trop volumineux",
         "noStorage": "Stockage insuffisant",
         "unknown": "Compatibilité inconnue"
@@ -3856,16 +3856,16 @@
       "loadingModel": "Chargement des détails du modèle",
       "couldNotLoadModel": "Impossible de charger ce modèle",
       "noFiles": "Aucun fichier exécutable par cette application",
-      "noFilesDescription": "Cette application exécute les modèles constitués d'un seul fichier GGUF.",
+      "noFilesDescription": "Cette application exécute les modèles constitués d'un seul fichier GGUF complet, et ce dépôt n'en propose aucun.",
       "tooLargeTitle": "Ce modèle risque de ne pas fonctionner",
       "tooLargeMessage": "{{name}} nécessite probablement plus de mémoire que cet appareil n'en dispose. L'application peut se fermer pendant que le modèle répond. Le télécharger quand même ?",
       "downloadAnyway": "Télécharger quand même"
     },
     "localModels": {
       "title": "Modèles sur l'appareil",
-      "help": "Les modèles sur l'appareil s'exécutent sur ce téléphone. Vos requêtes et les réponses restent sur l'appareil.",
+      "help": "Les modèles sur l'appareil s'exécutent sur ce téléphone. Vos invites et les réponses restent sur l'appareil.",
       "switchTitle": "Passer à un modèle sur l'appareil ?",
-      "switchMessage": "Si vous passez à {{name}}, les invites et le contexte de cette conversation seront traités sur ce téléphone, et non sur un serveur distant.",
+      "switchMessage": "Si vous passez à {{name}}, les invites et le contexte de cette discussion seront traités sur ce téléphone, et non sur un serveur distant.",
       "switchConfirm": "Changer de modèle",
       "systemPurpose": "Le modèle intégré au système de cet appareil. Il s'exécute sur l'appareil.",
       "apple": "Apple Intelligence (sur l'appareil)",

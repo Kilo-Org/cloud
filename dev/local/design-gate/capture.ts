@@ -84,8 +84,11 @@ const RELOAD_QUIET_MS = 1_000;
 const RELOAD_QUIET_TIMEOUT_MS = 10_000;
 const IN_APP_SAMPLING_SLACK_MS = 10_000;
 // A screen that paints its loading placeholder gets this long to replace it
-// with content before the sample is reported as unsettled.
+// with content before the capture reports the placeholder it measured.
 const LOADING_SETTLE_TIMEOUT_MS = 30_000;
+// The deep link must land before its placeholder can be judged. A link that
+// never lands is the navigation retry's business, not the loading wait's.
+const LOADING_ARRIVAL_TIMEOUT_MS = 10_000;
 // The iOS dev client re-downloads the bundle through the SSH tunnel after a reload.
 const RELOAD_WAIT_MS = 150_000;
 const RTL_LANGUAGE = 'ar';
@@ -98,7 +101,17 @@ export type Sampled = {
   settled: boolean;
   elapsedMs: number;
   alignment?: CaptureAlignment;
+  /** The measured tree still paints its loading placeholder after the wait. */
+  loading?: true;
 };
+
+/**
+ * The result of waiting for a target's loading placeholder.
+ *
+ * `observed` is true only when the target itself painted a placeholder, so a
+ * caller never reports one it did not see.
+ */
+export type LoadingWait = { cleared: boolean; observed: boolean; elapsedMs: number };
 
 /**
  * The placeholders a screen paints while its own content is still loading.
@@ -106,11 +119,10 @@ export type Sampled = {
  * A loading layout holds still, so a settle loop that only compares two dumps
  * accepts it and the capture measures the skeleton instead of the screen. The
  * app marks these nodes with a `-skeleton` test ID or a `Skeleton` owner, so a
- * settled sample must contain none of them.
+ * sample that still contains one is reported as a loading capture.
  */
 const LOADING_TEST_ID = /(?:^|-)skeleton$/u;
 const LOADING_OWNERS: Readonly<Record<string, true>> = {
-  SessionDetailSkeleton: true,
   SessionReadOnlyFooterPlaceholder: true,
   SessionSkeletonMessages: true,
   Skeleton: true,
@@ -153,25 +165,32 @@ export async function sampleUntilSettled(
  * Wait for a screen that is painting its own loading placeholder to finish.
  *
  * Only the screen the link opened is judged: the wait starts once `arrived`
- * reports one of the dumps. The wait is bounded, so a placeholder that outlives
- * it is reported as unsettled rather than measured as the screen.
+ * reports one of the dumps, and a link that never lands releases the wait at
+ * the arrival bound. `observed` reports whether the target painted a
+ * placeholder at all, so a caller never claims one it did not see.
  */
 export async function waitForLoadingPlaceholder(
   probe: Pick<ProbeClient, 'dump'>,
   clock: Clock,
   arrived: (dump: ProbeDump) => boolean = () => true,
-  timeoutMs = LOADING_SETTLE_TIMEOUT_MS
-): Promise<{ cleared: boolean; elapsedMs: number }> {
+  timeoutMs = LOADING_SETTLE_TIMEOUT_MS,
+  arrivalMs = LOADING_ARRIVAL_TIMEOUT_MS
+): Promise<LoadingWait> {
   const started = clock.now();
   let onTarget = false;
+  let observed = false;
   for (;;) {
     const dump = await probe.dump();
     onTarget ||= arrived(dump);
-    if (onTarget && !loadingPlaceholder(normalize(dump))) {
-      return { cleared: true, elapsedMs: clock.now() - started };
-    }
     const elapsedMs = clock.now() - started;
-    if (elapsedMs >= timeoutMs) return { cleared: false, elapsedMs };
+    if (!onTarget) {
+      if (elapsedMs >= arrivalMs) return { cleared: false, observed, elapsedMs };
+    } else if (!loadingPlaceholder(normalize(dump))) {
+      return { cleared: true, observed, elapsedMs };
+    } else {
+      observed = true;
+      if (elapsedMs >= timeoutMs) return { cleared: false, observed, elapsedMs };
+    }
     await clock.sleep(SAMPLE_INTERVAL_MS);
   }
 }
@@ -265,6 +284,15 @@ export function screenFindings(args: {
           target: args.target,
           dump: args.dump,
           elapsedMs: args.sampled.elapsedMs,
+        })
+      );
+    }
+    if (args.sampled.loading === true) {
+      findings.push(
+        loadingPlaceholderFinding({
+          cell: args.cell,
+          target: args.target,
+          dump: args.dump,
         })
       );
     }
@@ -395,22 +423,28 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     (beforeRoute === linkRoute && dump.env.route.split('?')[0] === linkRoute);
   await ctx.probe.startSampling(
     SAMPLE_INTERVAL_MS,
-    ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + LOADING_SETTLE_TIMEOUT_MS
+    ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + 2 * LOADING_SETTLE_TIMEOUT_MS
   );
   await ctx.probe.openLink(target.link);
   // A cold screen paints its own loading placeholder and holds it still, so a
-  // settle loop would measure the placeholder. Wait for it to clear first.
-  const loadingWait = await waitForLoadingPlaceholder(ctx.probe, ctx.clock, opened);
-  if (!loadingWait.cleared) {
-    ctx.log(
-      `design-gate: ${target.id} still paints its loading placeholder after ${loadingWait.elapsedMs}ms`
-    );
-  }
+  // settle loop would measure the placeholder. Wait for it to clear first, and
+  // never claim a placeholder the target did not paint.
+  const waitForPlaceholder = async (): Promise<void> => {
+    const wait = await waitForLoadingPlaceholder(ctx.probe, ctx.clock, opened);
+    if (!wait.cleared && wait.observed) {
+      ctx.log(
+        `design-gate: ${target.id} still paints its loading placeholder after ${wait.elapsedMs}ms`
+      );
+    }
+  };
+  await waitForPlaceholder();
   let settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
   let unopened: string | undefined;
   if (!opened(settled.dump)) {
     ctx.log(`design-gate: ${target.id} did not change the screen; opening the link again`);
     await ctx.probe.openLink(target.link);
+    // The retry opens the same cold screen, so it gets the same wait.
+    await waitForPlaceholder();
     settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
     if (!opened(settled.dump)) unopened = await ctx.probe.lastOutcome();
   }
@@ -453,12 +487,10 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     dump,
     timeline: expandSamples(samples),
     alignment,
-    // A screen that still paints its loading placeholder is never the settled
-    // screen the target describes, whatever the settle loop saw before it.
-    settled:
-      settled.settled &&
-      !loadingPlaceholder(normalize(dump)) &&
-      layoutSignature(settled.dump) === layoutSignature(dump),
+    // The measured tree is the screen only if its own loading placeholder is
+    // gone; a target whose state is its loading state reports that separately.
+    settled: settled.settled && layoutSignature(settled.dump) === layoutSignature(dump),
+    ...(loadingPlaceholder(normalize(dump)) ? { loading: true as const } : {}),
   };
   writeJson(files.absolute(files.capture), alignment);
   const screen: Screen = {
@@ -532,6 +564,32 @@ export function unsettledFinding(args: {
     message:
       `The screen kept changing for ${args.elapsedMs} ms and its frames describe more than one ` +
       'layout; layout rules were skipped for this screen.',
+  };
+}
+
+/**
+ * The measured tree is a loading state, not the content the target describes.
+ * The capture names it instead of rejecting the run, because a target whose own
+ * state is its loading state measures exactly this tree.
+ */
+export function loadingPlaceholderFinding(args: {
+  cell: string;
+  target: string;
+  dump: ProbeDump;
+}): Finding {
+  return {
+    rule: 'loading-placeholder',
+    severity: 'warning',
+    cell: args.cell,
+    target: args.target,
+    element: rootRef(args.dump),
+    measured: LOADING_SETTLE_TIMEOUT_MS,
+    expected: 'the target screen after its loading placeholder clears',
+    unit: 'ms',
+    message:
+      `The measured tree still paints the screen's loading placeholder ${LOADING_SETTLE_TIMEOUT_MS} ms ` +
+      'after the link opened. If this target measures a loading state, that placeholder is its ' +
+      'screen; otherwise the capture measured the placeholder instead of the content it describes.',
   };
 }
 

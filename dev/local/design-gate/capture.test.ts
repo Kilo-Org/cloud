@@ -240,6 +240,7 @@ test('waitForLoadingPlaceholder waits for the screen the link opened and its pla
     dump => dump.env.route !== '/'
   );
   assert.equal(waited.cleared, true);
+  assert.equal(waited.observed, true);
   assert.equal(index, 4);
 });
 
@@ -259,7 +260,53 @@ test('waitForLoadingPlaceholder reports a placeholder that outlives its budget',
     1_000
   );
   assert.equal(waited.cleared, false);
+  assert.equal(waited.observed, true);
   assert.ok(waited.elapsedMs >= 1_000);
+});
+
+test('waitForLoadingPlaceholder releases a link that never lands without claiming a placeholder', async () => {
+  const clock = fakeClock();
+  const skeleton = dumpWith({ route: '/elsewhere' });
+  skeleton.nodes.push({
+    parent: 0,
+    tag: 'View',
+    rect: [0, 0, 10, 10],
+    owners: ['View', 'Skeleton'],
+  });
+  const waited = await waitForLoadingPlaceholder(
+    { dump: async () => skeleton },
+    clock,
+    () => false,
+    30_000,
+    1_000
+  );
+  // A placeholder on another screen is not this target's state.
+  assert.equal(waited.cleared, false);
+  assert.equal(waited.observed, false);
+  assert.ok(waited.elapsedMs >= 1_000 && waited.elapsedMs < 5_000);
+});
+
+test('a measured loading placeholder is named instead of escaping as content', () => {
+  const dump = dumpWith();
+  dump.nodes.push({
+    parent: 0,
+    tag: 'View',
+    rect: [0, 0, 10, 10],
+    owners: ['View', 'Skeleton'],
+  });
+  const findings = screenFindings({
+    cell: 'base',
+    target: 'session',
+    dump,
+    tree: normalize(dump),
+    sampled: { dump, timeline: [dump, dump, dump], settled: true, elapsedMs: 2_500, loading: true },
+  });
+  assert.deepEqual(
+    findings.map(finding => finding.rule),
+    ['loading-placeholder']
+  );
+  assert.equal(findings[0]?.severity, 'warning');
+  assert.match(findings[0]?.message ?? '', /loading placeholder/);
 });
 
 type ProbeState = {

@@ -6,10 +6,12 @@ import test from 'node:test';
 
 import {
   linkPath,
+  loadingPlaceholder,
   runMatrix,
   sampleUntilSettled,
   screenFindings,
   screenIdentity,
+  waitForLoadingPlaceholder,
   waitForStableLayout,
   type CaptureContext,
   type Clock,
@@ -190,6 +192,109 @@ test('sampleUntilSettled gives up after 8 s', async () => {
   const sampled = await sampleUntilSettled({ dump: async () => dumpWith({ y: y++ }) }, clock);
   assert.equal(sampled.settled, false);
   assert.ok(sampled.elapsedMs >= 8_000 && sampled.elapsedMs < 8_200);
+});
+
+test('loadingPlaceholder recognizes a skeleton test ID and a skeleton owner', () => {
+  assert.equal(loadingPlaceholder(normalize(dumpWith())), false);
+  const byTestID = dumpWith();
+  byTestID.nodes.push({
+    parent: 0,
+    tag: 'View',
+    rect: [0, 0, 10, 10],
+    testID: 'session-row-skeleton',
+  });
+  assert.equal(loadingPlaceholder(normalize(byTestID)), true);
+  const byOwner = dumpWith();
+  byOwner.nodes.push({
+    parent: 0,
+    tag: 'View',
+    rect: [0, 0, 10, 10],
+    owners: ['View', 'SessionSkeletonMessages'],
+  });
+  assert.equal(loadingPlaceholder(normalize(byOwner)), true);
+  // A test ID that only ends in letters does not name a placeholder.
+  const unrelated = dumpWith();
+  unrelated.nodes.push({ parent: 0, tag: 'View', rect: [0, 0, 10, 10], testID: 'skeletons' });
+  assert.equal(loadingPlaceholder(normalize(unrelated)), false);
+});
+
+test('waitForLoadingPlaceholder waits for the screen the link opened and its placeholder to clear', async () => {
+  const clock = fakeClock();
+  const skeleton = dumpWith({ text: 'Loading', route: '/session' });
+  skeleton.nodes.push({
+    parent: 0,
+    tag: 'View',
+    rect: [0, 0, 10, 10],
+    owners: ['View', 'SessionSkeletonMessages'],
+  });
+  const states = [
+    dumpWith({ route: '/' }),
+    skeleton,
+    skeleton,
+    dumpWith({ text: 'Card', route: '/session' }),
+  ];
+  let index = 0;
+  const waited = await waitForLoadingPlaceholder(
+    { dump: async () => states[Math.min(index++, states.length - 1)] },
+    clock,
+    dump => dump.env.route !== '/'
+  );
+  assert.equal(waited.cleared, true);
+  assert.equal(index, 4);
+});
+
+test('waitForLoadingPlaceholder reports a placeholder that outlives its budget', async () => {
+  const clock = fakeClock();
+  const skeleton = dumpWith();
+  skeleton.nodes.push({
+    parent: 0,
+    tag: 'View',
+    rect: [0, 0, 10, 10],
+    owners: ['View', 'Skeleton'],
+  });
+  const waited = await waitForLoadingPlaceholder(
+    { dump: async () => skeleton },
+    clock,
+    () => true,
+    1_000
+  );
+  assert.equal(waited.cleared, false);
+  assert.ok(waited.elapsedMs >= 1_000);
+});
+
+test('an unsettled capture from a loading placeholder names that cause', () => {
+  const dump = dumpWith();
+  const blocked = screenFindings({
+    cell: 'base',
+    target: 'loading',
+    dump,
+    tree: normalize(dump),
+    sampled: {
+      dump,
+      timeline: [dump, dump, dump],
+      settled: false,
+      elapsedMs: 12_000,
+      blockedBy: 'loading-placeholder',
+    },
+  });
+  assert.deepEqual(
+    blocked.map(finding => finding.rule),
+    ['unsettled']
+  );
+  assert.match(blocked[0]?.message ?? '', /still paints its loading placeholder/u);
+  const changing = screenFindings({
+    cell: 'base',
+    target: 'moving',
+    dump,
+    tree: normalize(dump),
+    sampled: {
+      dump,
+      timeline: [dumpWith({ y: 50 }), dump],
+      settled: false,
+      elapsedMs: 12_000,
+    },
+  });
+  assert.match(changing[0]?.message ?? '', /kept changing/u);
 });
 
 type ProbeState = {

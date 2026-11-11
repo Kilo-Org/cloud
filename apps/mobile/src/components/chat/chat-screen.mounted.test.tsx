@@ -942,7 +942,9 @@ describe('message actions', () => {
   it('keeps the balance cause on a question a later send pushed out of the slot', async () => {
     state.status = 'idle';
     state.asked = 'second question';
-    state.failureKey = CREDITS_FAILURE_KEY;
+    /* The slot holds a different failure, as a tool-set move that failed after
+       an answer would leave it: the kept bubble must read its own record. */
+    state.failureKey = 'modelChat.backends.deletedBackend';
     state.displaced = [
       {
         id: 'k1',
@@ -973,7 +975,12 @@ describe('message actions', () => {
     });
     expect(router.push).toHaveBeenCalledWith('/(app)/credits');
     expect(state.retry).not.toHaveBeenCalled();
-    expect(bubbleFor(tree, 's1:asked').deliveryState).toEqual(kept.deliveryState);
+    // The slot's own question keeps the cause its own failure has.
+    expect(bubbleFor(tree, 's1:asked').deliveryState).toEqual({
+      status: 'failed',
+      error: '',
+      reason: 'execution',
+    });
   });
 
   it('reads a kept question the person stopped as interrupted', async () => {

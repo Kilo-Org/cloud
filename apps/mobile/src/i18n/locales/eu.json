@@ -2315,7 +2315,7 @@
       "cloningSession": "Saioa klonatzen",
       "couldNotLoadThisSession": "Ezin izan da saio hau kargatu.",
       "cloneFailedRetry": "Ezin izan da saio hau klonatu. Saiatu berriro.",
-      "notEnoughCredits": "Ez dago nahikoa kreditu Cloud Agent exekutatzeko. Gehitu kredituak eta saiatu berriro.",
+      "notEnoughCredits": "Ez dago nahikoa kreditu eskaera honetarako. Gehitu kredituak eta saiatu berriro.",
       "previousTaskFinishing": "Aurreko zeregina oraindik amaitzen ari da. Itxaron pixka bat.",
       "serviceUnavailable": "Zerbitzua ez dago eskuragarri oraintxe. Saiatu berriro.",
       "connectionTrouble": "Konexio-arazo bat dago. Saiatu berriro une bat barru.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Elkarrizketa luzeegia da modeloarentzat.",
       "assistantProviderError": "Hornitzaileak errore bat itzuli du.",
       "assistantProviderRefused": "Hornitzaileak eskaera hau baztertu du eta ezin da berriro saiatu.",
-      "assistantCreditsRefusal": "Ez dago nahikoa kreditu Cloud Agent exekutatzeko.",
+      "assistantCreditsRefusal": "Ez dago nahikoa kreditu eskaera honetarako.",
       "assistantOutputLimit": "Erantzunak modeloaren irteera-mugara iritsi da.",
       "assistantStructuredOutput": "Erantzunak ez zetorren bat eskatutako formatuarekin.",
       "assistantFailed": "Erantzunak huts egin du."

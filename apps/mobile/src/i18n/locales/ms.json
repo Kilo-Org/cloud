@@ -2315,7 +2315,7 @@
       "cloningSession": "Mengklon sesi",
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini.",
       "cloneFailedRetry": "Tidak dapat mengklon sesi ini. Cuba semula.",
-      "notEnoughCredits": "Kredit tidak mencukupi untuk menjalankan Cloud Agent. Tambah kredit dan cuba semula.",
+      "notEnoughCredits": "Kredit tidak mencukupi untuk permintaan ini. Tambah kredit dan cuba semula.",
       "previousTaskFinishing": "Tugasan sebelumnya masih dalam proses penyelesaian. Sila tunggu sebentar.",
       "serviceUnavailable": "Perkhidmatan tidak tersedia buat masa ini. Sila cuba semula.",
       "connectionTrouble": "Sambungan bermasalah. Sila cuba semula sebentar lagi.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Perbualan terlalu panjang untuk model.",
       "assistantProviderError": "Penyedia mengembalikan ralat.",
       "assistantProviderRefused": "Penyedia menolak permintaan ini dan ia tidak boleh dicuba semula.",
-      "assistantCreditsRefusal": "Kredit tidak mencukupi untuk menjalankan Cloud Agent.",
+      "assistantCreditsRefusal": "Kredit tidak mencukupi untuk permintaan ini.",
       "assistantOutputLimit": "Respons mencapai had output model.",
       "assistantStructuredOutput": "Respons tidak sepadan dengan format yang diperlukan.",
       "assistantFailed": "Respons gagal."

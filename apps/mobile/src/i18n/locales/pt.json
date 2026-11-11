@@ -2363,7 +2363,7 @@
       "cloningSession": "A clonar a sessão",
       "couldNotLoadThisSession": "Não foi possível carregar esta sessão.",
       "cloneFailedRetry": "Não foi possível clonar esta sessão. Tente novamente.",
-      "notEnoughCredits": "Créditos insuficientes para executar o Cloud Agent. Adicione créditos e tente novamente.",
+      "notEnoughCredits": "Créditos insuficientes para este pedido. Adicione créditos e tente novamente.",
       "previousTaskFinishing": "A tarefa anterior ainda está a terminar. Aguarde um momento.",
       "serviceUnavailable": "O serviço está indisponível neste momento. Tente novamente.",
       "connectionTrouble": "Há um problema de ligação. Tente novamente dentro de instantes.",
@@ -2661,7 +2661,7 @@
       "assistantContextOverflow": "A conversa é demasiado longa para o modelo.",
       "assistantProviderError": "O fornecedor devolveu um erro.",
       "assistantProviderRefused": "O fornecedor rejeitou este pedido e não é possível repeti-lo.",
-      "assistantCreditsRefusal": "Créditos insuficientes para executar o Cloud Agent.",
+      "assistantCreditsRefusal": "Créditos insuficientes para este pedido.",
       "assistantOutputLimit": "A resposta atingiu o limite de saída do modelo.",
       "assistantStructuredOutput": "A resposta não correspondeu ao formato exigido.",
       "assistantFailed": "A resposta falhou."

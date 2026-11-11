@@ -1798,7 +1798,7 @@
       "cloningSession": "משכפל סשן…",
       "couldNotLoadThisSession": "לא ניתן היה לטעון את הסשן הזה.",
       "cloneFailedRetry": "לא ניתן היה לשכפל את הסשן הזה. נסה שוב.",
-      "notEnoughCredits": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent. הוסף קרדיטים ונסה שוב.",
+      "notEnoughCredits": "אין מספיק קרדיטים לבקשה הזו. הוסף קרדיטים ונסה שוב.",
       "previousTaskFinishing": "המשימה הקודמת עדיין לא הסתיימה. המתן רגע.",
       "serviceUnavailable": "השירות אינו זמין כרגע. נסה שוב.",
       "connectionTrouble": "יש בעיה בחיבור. נסה שוב בעוד רגע.",
@@ -2096,7 +2096,7 @@
       "assistantContextOverflow": "השיחה ארוכה מדי עבור המודל.",
       "assistantProviderError": "הספק החזיר שגיאה.",
       "assistantProviderRefused": "הספק סירב לבקשה זו ולא ניתן לנסות אותה שוב.",
-      "assistantCreditsRefusal": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent.",
+      "assistantCreditsRefusal": "אין מספיק קרדיטים לבקשה הזו.",
       "assistantOutputLimit": "התשובה הגיעה למגבלת הפלט של המודל.",
       "assistantStructuredOutput": "התשובה לא התאימה לפורמט הנדרש.",
       "assistantFailed": "יצירת התשובה נכשלה."

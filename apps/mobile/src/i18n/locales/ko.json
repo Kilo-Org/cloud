@@ -1777,7 +1777,7 @@
       "cloningSession": "세션 복제 중",
       "couldNotLoadThisSession": "이 세션을 불러오지 못했습니다.",
       "cloneFailedRetry": "이 세션을 복제하지 못했습니다. 다시 시도하세요.",
-      "notEnoughCredits": "Cloud Agent를 실행할 크레딧이 부족합니다. 크레딧을 충전하고 다시 시도하세요.",
+      "notEnoughCredits": "이 요청을 처리할 크레딧이 부족합니다. 크레딧을 충전하고 다시 시도하세요.",
       "previousTaskFinishing": "이전 작업을 아직 마무리하는 중입니다. 잠시 기다려 주세요.",
       "serviceUnavailable": "현재 서비스를 사용할 수 없습니다. 다시 시도하세요.",
       "connectionTrouble": "연결 문제가 발생했습니다. 잠시 후 다시 시도하세요.",
@@ -2071,7 +2071,7 @@
       "assistantContextOverflow": "대화가 너무 길어 모델이 처리할 수 없습니다.",
       "assistantProviderError": "제공업체가 오류를 반환했습니다.",
       "assistantProviderRefused": "제공업체가 이 요청을 거부했으며 다시 시도할 수 없습니다.",
-      "assistantCreditsRefusal": "Cloud Agent를 실행할 크레딧이 부족합니다.",
+      "assistantCreditsRefusal": "이 요청을 처리할 크레딧이 부족합니다.",
       "assistantOutputLimit": "응답이 모델의 출력 한도에 도달했습니다.",
       "assistantStructuredOutput": "응답이 필요한 형식과 일치하지 않습니다.",
       "assistantFailed": "응답을 생성하지 못했습니다."

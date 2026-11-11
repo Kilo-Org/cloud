@@ -2399,7 +2399,7 @@
       "cloningSession": "Klonuojama sesija",
       "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos.",
       "cloneFailedRetry": "Nepavyko klonuoti šios sesijos. Bandykite dar kartą.",
-      "notEnoughCredits": "Nepakanka kreditų „Cloud Agent“ paleisti. Papildykite kreditus ir bandykite dar kartą.",
+      "notEnoughCredits": "Nepakanka kreditų šiai užklausai. Papildykite kreditus ir bandykite dar kartą.",
       "previousTaskFinishing": "Ankstesnė užduotis dar nebaigta. Šiek tiek palaukite.",
       "serviceUnavailable": "Paslauga šiuo metu nepasiekiama. Bandykite dar kartą.",
       "connectionTrouble": "Sutriko ryšys. Netrukus bandykite dar kartą.",
@@ -2701,7 +2701,7 @@
       "assistantContextOverflow": "Pokalbis per ilgas šiam modeliui.",
       "assistantProviderError": "Teikėjas grąžino klaidą.",
       "assistantProviderRefused": "Teikėjas atmetė šią užklausą, todėl jos pakartoti nebegalima.",
-      "assistantCreditsRefusal": "Nepakanka kreditų „Cloud Agent“ paleisti.",
+      "assistantCreditsRefusal": "Nepakanka kreditų šiai užklausai.",
       "assistantOutputLimit": "Atsakymas pasiekė modelio išvesties limitą.",
       "assistantStructuredOutput": "Atsakymas neatitiko reikalaujamo formato.",
       "assistantFailed": "Nepavyko sugeneruoti atsakymo."

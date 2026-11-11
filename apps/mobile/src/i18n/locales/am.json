@@ -2321,7 +2321,7 @@
       "cloningSession": "የክፍለ ጊዜውን ቅጂ በመፍጠር ላይ",
       "couldNotLoadThisSession": "ይህን ክፍለ ጊዜ መጫን አልተቻለም።",
       "cloneFailedRetry": "የዚህን ክፍለ ጊዜ ቅጂ መፍጠር አልተቻለም። እንደገና ይሞክሩ።",
-      "notEnoughCredits": "Cloud Agentን ለማስኬድ በቂ ክሬዲት የለዎትም። ክሬዲት ጨምረው እንደገና ይሞክሩ።",
+      "notEnoughCredits": "ለዚህ ጥያቄ በቂ ክሬዲት የለዎትም። ክሬዲት ጨምረው እንደገና ይሞክሩ።",
       "previousTaskFinishing": "ያለፈው ተግባር ገና አልተጠናቀቀም። እባክዎ ትንሽ ይጠብቁ።",
       "serviceUnavailable": "አገልግሎቱ አሁን አይገኝም። እባክዎ እንደገና ይሞክሩ።",
       "connectionTrouble": "የግንኙነት ችግር አለ። እባክዎ ትንሽ ቆይተው እንደገና ይሞክሩ።",
@@ -2615,7 +2615,7 @@
       "assistantContextOverflow": "ውይይቱ ለሞዴሉ በጣም ረጅም ነው።",
       "assistantProviderError": "አቅራቢው ስህተት መልሷል።",
       "assistantProviderRefused": "አቅራቢው ይህን ጥያቄ ውድቅ አድርጓል፤ እንደገና ማሞከርም አይቻልም።",
-      "assistantCreditsRefusal": "Cloud Agentን ለማስኬድ በቂ ክሬዲት የለዎትም።",
+      "assistantCreditsRefusal": "ለዚህ ጥያቄ በቂ ክሬዲት የለዎትም።",
       "assistantOutputLimit": "ምላሹ የሞዴሉን የውጤት ገደብ ደርሷል።",
       "assistantStructuredOutput": "ምላሹ ከተጠየቀው ቅርጸት ጋር አልተመሳሰለም።",
       "assistantFailed": "ምላሹ አልተሳካም።"

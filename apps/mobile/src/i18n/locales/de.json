@@ -1777,7 +1777,7 @@
       "cloningSession": "Sitzung wird geklont",
       "couldNotLoadThisSession": "Diese Sitzung konnte nicht geladen werden.",
       "cloneFailedRetry": "Diese Sitzung konnte nicht geklont werden. Versuche es erneut.",
-      "notEnoughCredits": "Dein Guthaben reicht nicht aus, um Cloud Agent auszuführen. Lade Guthaben auf und versuche es erneut.",
+      "notEnoughCredits": "Dein Guthaben reicht für diese Anfrage nicht aus. Lade Guthaben auf und versuche es erneut.",
       "previousTaskFinishing": "Die vorherige Aufgabe wird noch abgeschlossen. Bitte warte einen Moment.",
       "serviceUnavailable": "Der Dienst ist gerade nicht verfügbar. Bitte versuche es erneut.",
       "connectionTrouble": "Es gibt ein Verbindungsproblem. Bitte versuche es gleich noch einmal.",
@@ -2071,7 +2071,7 @@
       "assistantContextOverflow": "Die Unterhaltung ist zu lang für das Modell.",
       "assistantProviderError": "Der Anbieter hat einen Fehler zurückgegeben.",
       "assistantProviderRefused": "Der Anbieter hat diese Anfrage abgelehnt; ein erneuter Versuch ist nicht möglich.",
-      "assistantCreditsRefusal": "Dein Guthaben reicht nicht aus, um Cloud Agent auszuführen.",
+      "assistantCreditsRefusal": "Dein Guthaben reicht für diese Anfrage nicht aus.",
       "assistantOutputLimit": "Die Antwort hat das Ausgabelimit des Modells erreicht.",
       "assistantStructuredOutput": "Die Antwort entsprach nicht dem erforderlichen Format.",
       "assistantFailed": "Die Antwort konnte nicht erstellt werden."

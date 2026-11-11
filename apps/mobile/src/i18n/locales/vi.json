@@ -1777,7 +1777,7 @@
       "cloningSession": "Đang sao chép phiên",
       "couldNotLoadThisSession": "Không thể tải phiên này.",
       "cloneFailedRetry": "Không thể sao chép phiên này. Hãy thử lại.",
-      "notEnoughCredits": "Số dư không đủ để chạy Cloud Agent. Hãy nạp tiền và thử lại.",
+      "notEnoughCredits": "Số dư không đủ cho yêu cầu này. Hãy nạp tiền và thử lại.",
       "previousTaskFinishing": "Tác vụ trước chưa hoàn tất. Vui lòng chờ một chút.",
       "serviceUnavailable": "Dịch vụ hiện không hoạt động. Vui lòng thử lại.",
       "connectionTrouble": "Kết nối gặp sự cố. Vui lòng thử lại sau giây lát.",
@@ -2071,7 +2071,7 @@
       "assistantContextOverflow": "Cuộc trò chuyện vượt quá giới hạn độ dài mà mô hình có thể xử lý.",
       "assistantProviderError": "Nhà cung cấp đã trả về lỗi.",
       "assistantProviderRefused": "Nhà cung cấp đã từ chối yêu cầu này và không thể thử lại.",
-      "assistantCreditsRefusal": "Số dư không đủ để chạy Cloud Agent.",
+      "assistantCreditsRefusal": "Số dư không đủ cho yêu cầu này.",
       "assistantOutputLimit": "Phản hồi đã đạt đến giới hạn đầu ra của mô hình.",
       "assistantStructuredOutput": "Phản hồi không đúng định dạng yêu cầu.",
       "assistantFailed": "Không thể tạo phản hồi."

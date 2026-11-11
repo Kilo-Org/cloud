@@ -2315,7 +2315,7 @@
       "cloningSession": "Na-emepụta oyiri nnọkọ",
       "couldNotLoadThisSession": "Enweghị ike ibudata nnọkọ a.",
       "cloneFailedRetry": "Enweghị ike ịmepụta oyiri nnọkọ a. Nwaa ọzọ.",
-      "notEnoughCredits": "Ego ojiji ezughị iji rụọ ọrụ na Cloud Agent. Tinye ego ojiji ma nwaa ọzọ.",
+      "notEnoughCredits": "Ego ojiji ezughị maka arịrịọ a. Tinye ego ojiji ma nwaa ọzọ.",
       "previousTaskFinishing": "Ọrụ gara aga ka na-agwụcha. Biko chere obere oge.",
       "serviceUnavailable": "Ọrụ ahụ adịghị ugbu a. Biko nwaa ọzọ.",
       "connectionTrouble": "Enwere nsogbu njikọ. Biko chere obere oge ma nwaa ọzọ.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Mkparịta ụka ahụ toro ogologo karịa ihe ihe nlereanya ahụ nwere ike ịnabata.",
       "assistantProviderError": "Onye na-enye ọrụ zaghachiri na njehie.",
       "assistantProviderRefused": "Onye na-enye ọrụ jụrụ arịrịọ a ma enweghị ike ịnwale ya ọzọ.",
-      "assistantCreditsRefusal": "Ego ojiji ezughị iji rụọ ọrụ na Cloud Agent.",
+      "assistantCreditsRefusal": "Ego ojiji ezughị maka arịrịọ a.",
       "assistantOutputLimit": "Nzaghachi ahụ ruru oke mmepụta nke ihe nlereanya ahụ.",
       "assistantStructuredOutput": "Nzaghachi ahụ adabaghị n'usoro a chọrọ.",
       "assistantFailed": "Nzaghachi ahụ agaghị nke ọma."

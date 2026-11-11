@@ -2321,7 +2321,7 @@
       "cloningSession": "Mamorona dika mitovy amin'ny fotoam-piasana",
       "couldNotLoadThisSession": "Tsy voaray ity fotoam-piasana ity.",
       "cloneFailedRetry": "Tsy nahomby ny famoronana dika mitovy amin'ity fotoam-piasana ity. Andramo indray.",
-      "notEnoughCredits": "Tsy ampy ny kireditra hampandehanana ny Cloud Agent. Ampio kireditra ary andramo indray.",
+      "notEnoughCredits": "Tsy ampy ny kireditra ho an'ity fangatahana ity. Ampio kireditra ary andramo indray.",
       "previousTaskFinishing": "Mbola eo am-pamaranana ny asa teo aloha. Andraso kely azafady.",
       "serviceUnavailable": "Tsy azo ampiasaina izao ny tolotra. Andramo indray azafady.",
       "connectionTrouble": "Misy olana amin'ny fifandraisana. Andramo indray rehefa afaka kelikely.",
@@ -2615,7 +2615,7 @@
       "assistantContextOverflow": "Lava loatra ny resaka ho an'ny modely.",
       "assistantProviderError": "Namaly diso ny mpamatsy.",
       "assistantProviderRefused": "Nolavin'ny mpamatsy ity fangatahana ity ary tsy azo averina intsony.",
-      "assistantCreditsRefusal": "Tsy ampy ny kireditra hampandehanana ny Cloud Agent.",
+      "assistantCreditsRefusal": "Tsy ampy ny kireditra ho an'ity fangatahana ity.",
       "assistantOutputLimit": "Tonga tamin'ny fetran'ny valian'ny modely ny famaliana.",
       "assistantStructuredOutput": "Tsy nifanaraka tamin'ny endrika takiana ny famaliana.",
       "assistantFailed": "Tsy nahomby ny famaliana."

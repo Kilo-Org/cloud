@@ -1777,7 +1777,7 @@
       "cloningSession": "Oturum kopyalanıyor",
       "couldNotLoadThisSession": "Bu oturum yüklenemedi.",
       "cloneFailedRetry": "Bu oturum kopyalanamadı. Tekrar dene.",
-      "notEnoughCredits": "Cloud Agent'i çalıştırmak için yeterli kredi yok. Kredi ekleyip tekrar dene.",
+      "notEnoughCredits": "Bu istek için yeterli kredi yok. Kredi ekleyip tekrar dene.",
       "previousTaskFinishing": "Önceki görev henüz tamamlanmadı. Biraz bekle.",
       "serviceUnavailable": "Hizmet şu anda kullanılamıyor. Tekrar dene.",
       "connectionTrouble": "Bağlantıda sorun var. Birazdan tekrar dene.",
@@ -2071,7 +2071,7 @@
       "assistantContextOverflow": "Konuşma model için çok uzun.",
       "assistantProviderError": "Sağlayıcı bir hata döndürdü.",
       "assistantProviderRefused": "Sağlayıcı bu isteği reddetti ve istek yeniden denenemez.",
-      "assistantCreditsRefusal": "Cloud Agent'i çalıştırmak için yeterli kredi yok.",
+      "assistantCreditsRefusal": "Bu istek için yeterli kredi yok.",
       "assistantOutputLimit": "Yanıt, modelin çıktı sınırına ulaştı.",
       "assistantStructuredOutput": "Yanıt, gereken biçimle eşleşmedi.",
       "assistantFailed": "Yanıt oluşturulamadı."

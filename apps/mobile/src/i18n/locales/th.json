@@ -2315,7 +2315,7 @@
       "cloningSession": "กำลังคัดลอกเซสชัน",
       "couldNotLoadThisSession": "ไม่สามารถโหลดเซสชันนี้ได้",
       "cloneFailedRetry": "ไม่สามารถคัดลอกเซสชันนี้ได้ ลองอีกครั้ง",
-      "notEnoughCredits": "เครดิตไม่เพียงพอที่จะใช้ Cloud Agent เติมเครดิตแล้วลองอีกครั้ง",
+      "notEnoughCredits": "เครดิตไม่เพียงพอสำหรับคำขอนี้ เติมเครดิตแล้วลองอีกครั้ง",
       "previousTaskFinishing": "งานก่อนหน้ากำลังจะเสร็จ กรุณารอสักครู่",
       "serviceUnavailable": "ขณะนี้บริการไม่พร้อมใช้งาน กรุณาลองอีกครั้ง",
       "connectionTrouble": "เกิดปัญหาในการเชื่อมต่อ กรุณารอสักครู่แล้วลองอีกครั้ง",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "การสนทนายาวเกินไปสำหรับโมเดล",
       "assistantProviderError": "ผู้ให้บริการส่งกลับข้อผิดพลาด",
       "assistantProviderRefused": "ผู้ให้บริการปฏิเสธคำขอนี้และไม่สามารถลองใหม่ได้",
-      "assistantCreditsRefusal": "เครดิตไม่เพียงพอที่จะใช้ Cloud Agent",
+      "assistantCreditsRefusal": "เครดิตไม่เพียงพอสำหรับคำขอนี้",
       "assistantOutputLimit": "คำตอบเข้าถึงขีดจำกัดผลลัพธ์ของโมเดล",
       "assistantStructuredOutput": "คำตอบไม่ตรงกับรูปแบบที่กำหนด",
       "assistantFailed": "สร้างคำตอบไม่สำเร็จ"

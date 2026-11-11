@@ -1861,7 +1861,7 @@
       "cloningSession": "جارٍ استنساخ الجلسة",
       "couldNotLoadThisSession": "تعذّر تحميل هذه الجلسة.",
       "cloneFailedRetry": "تعذّر استنساخ هذه الجلسة. حاول مرة أخرى.",
-      "notEnoughCredits": "رصيدك غير كافٍ لتشغيل Cloud Agent. اشحن رصيدك وحاول مرة أخرى.",
+      "notEnoughCredits": "رصيدك غير كافٍ لهذا الطلب. اشحن رصيدك وحاول مرة أخرى.",
       "previousTaskFinishing": "لم تنتهِ المهمة السابقة بعد. انتظر لحظة.",
       "serviceUnavailable": "الخدمة غير متاحة الآن. حاول مرة أخرى.",
       "connectionTrouble": "هناك مشكلة في الاتصال. حاول مرة أخرى بعد لحظة.",
@@ -2171,7 +2171,7 @@
       "assistantContextOverflow": "المحادثة أطول من أن يستوعبها النموذج.",
       "assistantProviderError": "أعاد المزود رسالة خطأ.",
       "assistantProviderRefused": "رفض المزود هذا الطلب ولا يمكن إعادة المحاولة.",
-      "assistantCreditsRefusal": "رصيدك غير كافٍ لتشغيل Cloud Agent.",
+      "assistantCreditsRefusal": "رصيدك غير كافٍ لهذا الطلب.",
       "assistantOutputLimit": "وصل الرد إلى حدّ الإخراج الأقصى للنموذج.",
       "assistantStructuredOutput": "لم يتطابق الرد مع التنسيق المطلوب.",
       "assistantFailed": "تعذّر إنشاء الرد."

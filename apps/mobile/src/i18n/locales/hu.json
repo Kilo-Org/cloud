@@ -2315,7 +2315,7 @@
       "cloningSession": "Munkamenet klónozása…",
       "couldNotLoadThisSession": "Nem sikerült betölteni ezt a munkamenetet.",
       "cloneFailedRetry": "Nem sikerült klónozni ezt a munkamenetet. Próbáld újra.",
-      "notEnoughCredits": "Nincs elég kredit a Cloud Agent futtatásához. Töltsd fel az egyenleged, és próbáld újra.",
+      "notEnoughCredits": "Nincs elég kredit ehhez a kéréshez. Töltsd fel az egyenleged, és próbáld újra.",
       "previousTaskFinishing": "Az előző feladat még nem fejeződött be. Várj egy kicsit.",
       "serviceUnavailable": "A szolgáltatás jelenleg nem érhető el. Próbáld újra.",
       "connectionTrouble": "Hiba történt a kapcsolódáskor. Próbáld újra egy kicsit később.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "A beszélgetés túl hosszú a modell számára.",
       "assistantProviderError": "A szolgáltató hibát adott vissza.",
       "assistantProviderRefused": "A szolgáltató elutasította ezt a kérést, ezért nem lehet újrapróbálni.",
-      "assistantCreditsRefusal": "Nincs elég kredit a Cloud Agent futtatásához.",
+      "assistantCreditsRefusal": "Nincs elég kredit ehhez a kéréshez.",
       "assistantOutputLimit": "A válasz elérte a modell kimeneti korlátját.",
       "assistantStructuredOutput": "A válasz nem felelt meg a szükséges formátumnak.",
       "assistantFailed": "Nem sikerült létrehozni a választ."

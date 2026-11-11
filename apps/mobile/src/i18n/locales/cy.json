@@ -2649,6 +2649,8 @@
       "toolList": "rhestru",
       "toolPatch": "clytio",
       "toolTask": "tasg",
+      "toolSendFile": "Anfonwyd ffeil",
+      "toolSendFileAction": "Anfon ffeil",
       "readTodos": "Darllen y cynllun",
       "updateTodos": "Diweddaru'r cynllun",
       "linesBadge": "{{displayCount}} llinell",

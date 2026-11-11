@@ -2483,6 +2483,8 @@
       "toolList": "তালিকা দেখা",
       "toolPatch": "পরিবর্তন প্রয়োগ",
       "toolTask": "কাজ",
+      "toolSendFile": "ফাইল পাঠানো হয়েছে",
+      "toolSendFileAction": "ফাইল পাঠান",
       "readTodos": "প্ল্যান পড়ুন",
       "updateTodos": "প্ল্যান আপডেট করুন",
       "linesBadge": "{{displayCount}}টি লাইন",

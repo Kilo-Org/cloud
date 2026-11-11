@@ -2477,6 +2477,8 @@
       "toolList": "upplistning",
       "toolPatch": "ändring",
       "toolTask": "uppgift",
+      "toolSendFile": "Skickad fil",
+      "toolSendFileAction": "Skicka fil",
       "readTodos": "Läs planeringen",
       "updateTodos": "Uppdatera planeringen",
       "linesBadge": "{{displayCount}} rader",

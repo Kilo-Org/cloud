@@ -2477,6 +2477,8 @@
       "toolList": "listar",
       "toolPatch": "aplicar parche",
       "toolTask": "tarefa",
+      "toolSendFile": "Ficheiro enviado",
+      "toolSendFileAction": "enviar ficheiro",
       "readTodos": "Ler o plan",
       "updateTodos": "Actualizar o plan",
       "linesBadge": "{{displayCount}} liñas",

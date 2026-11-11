@@ -2477,6 +2477,8 @@
       "toolList": "لېست کول",
       "toolPatch": "سمون پلي کول",
       "toolTask": "دنده",
+      "toolSendFile": "فایل ولېږل شو",
+      "toolSendFileAction": "فایل لېږل",
       "readTodos": "پلان ولولئ",
       "updateTodos": "پلان تازه کړئ",
       "linesBadge": "{{displayCount}} کرښې",

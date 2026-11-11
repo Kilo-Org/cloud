@@ -2477,6 +2477,8 @@
       "toolList": "siyahıla",
       "toolPatch": "düzəliş et",
       "toolTask": "tapşırıq",
+      "toolSendFile": "Fayl göndərildi",
+      "toolSendFileAction": "Fayl göndər",
       "readTodos": "Planı oxu",
       "updateTodos": "Planı yenilə",
       "linesBadge": "{{displayCount}} sətir",

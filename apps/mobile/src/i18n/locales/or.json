@@ -2477,6 +2477,8 @@
       "toolList": "ତାଲିକା",
       "toolPatch": "ପ୍ୟାଚ୍",
       "toolTask": "କାର୍ଯ୍ୟ",
+      "toolSendFile": "ଫାଇଲ ପଠାଗଲା",
+      "toolSendFileAction": "ଫାଇଲ ପଠାଇବା",
       "readTodos": "ଯୋଜନା ପଢ଼ନ୍ତୁ",
       "updateTodos": "ଯୋଜନା ଅଦ୍ୟତନ କରନ୍ତୁ",
       "linesBadge": "{{displayCount}}ଟି ଧାଡ଼ି",

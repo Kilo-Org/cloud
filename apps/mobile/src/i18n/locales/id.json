@@ -1939,6 +1939,8 @@
       "toolList": "tampilkan daftar",
       "toolPatch": "tambal",
       "toolTask": "tugas",
+      "toolSendFile": "File terkirim",
+      "toolSendFileAction": "kirim file",
       "readTodos": "Baca rencana",
       "updateTodos": "Perbarui rencana",
       "linesBadge": "{{displayCount}} baris",

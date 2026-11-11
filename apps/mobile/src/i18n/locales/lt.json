@@ -2563,6 +2563,8 @@
       "toolList": "rodyti sąrašą",
       "toolPatch": "taisyti",
       "toolTask": "užduotis",
+      "toolSendFile": "Išsiųstas failas",
+      "toolSendFileAction": "siųsti failą",
       "readTodos": "Skaityti planą",
       "updateTodos": "Atnaujinti planą",
       "linesBadge": "eil.: {{displayCount}}",

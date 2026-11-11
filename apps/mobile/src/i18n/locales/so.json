@@ -2477,6 +2477,8 @@
       "toolList": "tax",
       "toolPatch": "wax ka beddel",
       "toolTask": "hawsha",
+      "toolSendFile": "Fayl la diray",
+      "toolSendFileAction": "dir",
       "readTodos": "Akhri qorshaha",
       "updateTodos": "Cusboonaysii qorshaha",
       "linesBadge": "{{displayCount}} sadar",

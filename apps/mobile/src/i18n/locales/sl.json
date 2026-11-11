@@ -2563,6 +2563,8 @@
       "toolList": "izpiši seznam",
       "toolPatch": "uporabi popravek",
       "toolTask": "naloga",
+      "toolSendFile": "Poslana datoteka",
+      "toolSendFileAction": "pošlji datoteko",
       "readTodos": "Preberi načrt",
       "updateTodos": "Posodobi načrt",
       "linesBadge": "{{displayCount}} vrstic",

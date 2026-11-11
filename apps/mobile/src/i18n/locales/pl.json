@@ -1983,6 +1983,8 @@
       "toolList": "lista plików",
       "toolPatch": "poprawka",
       "toolTask": "zadanie",
+      "toolSendFile": "Wysłano plik",
+      "toolSendFileAction": "wysyłanie pliku",
       "readTodos": "Odczytaj plan",
       "updateTodos": "Zaktualizuj plan",
       "linesBadge": "wiersze: {{displayCount}}",

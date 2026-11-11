@@ -1961,6 +1961,8 @@
       "toolList": "listar",
       "toolPatch": "aplicar parche",
       "toolTask": "tarea",
+      "toolSendFile": "Archivo enviado",
+      "toolSendFileAction": "enviar archivo",
       "readTodos": "Leer plan",
       "updateTodos": "Actualizar plan",
       "linesBadge": "{{displayCount}} líneas",

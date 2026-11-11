@@ -2520,6 +2520,8 @@
       "toolList": "llista",
       "toolPatch": "aplica un pedaç",
       "toolTask": "tasca",
+      "toolSendFile": "Fitxer enviat",
+      "toolSendFileAction": "envia fitxer",
       "readTodos": "Llegeix el pla",
       "updateTodos": "Actualitza el pla",
       "linesBadge": "{{displayCount}} línies",

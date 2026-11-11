@@ -22,11 +22,21 @@ function changing(fill: number): () => PaintState {
 
 describe('design gate sampler', () => {
   it('collapses consecutive identical states into one sample with a repeat count', () => {
-    const sampler = createSampler(() => dump('/same', 10));
-    sampler.start(10_000, 10_000);
-    const samples = sampler.stop();
-    expect(samples).toHaveLength(1);
-    expect(samples[0]?.repeat).toBe(1);
+    vi.useFakeTimers();
+    try {
+      const sampler = createSampler(() => dump('/same', 10));
+      sampler.start(10, 60_000);
+      for (let tick = 0; tick < 3; tick += 1) {
+        vi.advanceTimersByTime(10);
+      }
+      const samples = sampler.stop();
+      expect(samples).toHaveLength(1);
+      // Four ticks saw the same state, so the retained sample carries them all.
+      expect(samples[0]?.repeat).toBe(4);
+      expect(sampler.truncated()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('retains the newest states and reports truncation instead of growing without bound', () => {

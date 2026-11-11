@@ -1,6 +1,7 @@
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
+import { z } from 'zod';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
@@ -8,15 +9,83 @@ import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers
 import type {
   JustTheCostsUsageStats,
   MicrodollarUsageContext,
+  MicrodollarUsageStats,
   NotYetCostedUsageStats,
   VercelProviderAttempt,
   VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 
+export const vercelProviderMetadataSchema = z.looseObject({
+  gateway: z
+    .looseObject({
+      cost: z.string().optional(),
+      marketCost: z.string().optional(),
+      routing: z
+        .looseObject({
+          canonicalSlug: z.string().optional(),
+          finalProvider: z.string().optional(),
+          modelAttempts: z
+            .array(
+              z.looseObject({
+                canonicalSlug: z.string().optional(),
+                success: z.boolean().optional(),
+                providerAttempts: z
+                  .array(
+                    z.looseObject({
+                      provider: z.string().optional(),
+                      credentialType: z.string().optional(),
+                      success: z.boolean().optional(),
+                      providerRequestId: z.string().optional(),
+                      providerResponseId: z.string().optional(),
+                    })
+                  )
+                  .optional(),
+              })
+            )
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+export const usageCostSchema = z.object({
+  cost: z.number().nullish(),
+  is_byok: z.boolean().nullish(),
+  cost_details: z.object({ upstream_inference_cost: z.number().nullish() }).nullish(),
+});
+
+/** A typed content part, such as a text block or delta, whose `textType` parts must carry text. */
+export function contentPartSchema(textType: string) {
+  return z
+    .looseObject({ type: z.string(), text: z.string().optional() })
+    .refine(part => part.type !== textType || part.text !== undefined);
+}
+
+export const upstreamStreamErrorSchema = z.object({
+  message: z.string().nullish(),
+  code: z.union([z.number(), z.string()]).nullish(),
+  type: z.string().nullish(),
+  error_type: z.string().nullish(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const openRouterUsageSchema = usageCostSchema.extend({
+  prompt_tokens: z.number().nullish(),
+  completion_tokens: z.number().nullish(),
+  prompt_tokens_details: z
+    .object({
+      cached_tokens: z.number().nullish(),
+      cache_write_tokens: z.number().nullish(),
+      cache_creation_input_tokens: z.number().nullish(),
+    })
+    .nullish(),
+});
+
 type OpenRouterCostFields = {
-  cost?: number;
+  cost?: number | null;
   is_byok?: boolean | null;
-  cost_details?: { upstream_inference_cost?: number | null };
+  cost_details?: { upstream_inference_cost?: number | null } | null;
 };
 
 function byokFee_USD(provider: ProviderType, upstreamInferenceCost_USD: number) {
@@ -247,13 +316,69 @@ export function getUpstreamBodyTermination(error: unknown): 'timeout' | 'disconn
   return causeCode === 'UND_ERR_BODY_TIMEOUT' ? 'timeout' : 'disconnect';
 }
 
+/** A body read that stopped because the client left, a timeout fired, or the upstream connection broke. */
 export function isResponseInterruptedError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null || !('name' in error)) return false;
   return (
+    error.name === 'AbortError' ||
     error.name === 'ResponseAborted' ||
     error.name === 'TimeoutError' ||
     getUpstreamBodyTermination(error) !== null
   );
+}
+
+/**
+ * The longest model name that an error report keeps. A requested model comes
+ * from the client request, so a report bounds it instead of trusting it.
+ */
+export const REPORTED_MODEL_MAX_LENGTH = 200;
+
+/**
+ * The usage-context fields that an error report may carry. `Pick` narrows the
+ * return type, so a context field added later is not attached by default. The
+ * report must not throw, so a missing requested model becomes null.
+ */
+export function usageContextReportFields(usageContext: MicrodollarUsageContext): Pick<
+  MicrodollarUsageContext,
+  'provider' | 'api_kind' | 'isStreaming'
+> & {
+  requested_model: string | null;
+  status_code: MicrodollarUsageContext['status_code'];
+} {
+  const requestedModel: unknown = usageContext.requested_model;
+  return {
+    provider: usageContext.provider,
+    api_kind: usageContext.api_kind,
+    requested_model:
+      typeof requestedModel === 'string'
+        ? requestedModel.slice(0, REPORTED_MODEL_MAX_LENGTH)
+        : null,
+    status_code: usageContext.status_code,
+    isStreaming: usageContext.isStreaming,
+  };
+}
+
+/**
+ * Identifies why usage could not be read without the error message, which for
+ * `JSON.parse` quotes the upstream body.
+ */
+function describeUsageReadError(error: unknown) {
+  if (error instanceof z.ZodError) {
+    return {
+      errorName: 'ZodError',
+      issues: error.issues.map(issue => ({
+        path: issue.path.map(String).join('.'),
+        code: issue.code,
+      })),
+    };
+  }
+  // Duck-typed because undici's body errors may come from another realm.
+  const hasName =
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    typeof error.name === 'string';
+  return { errorName: hasName ? error.name : typeof error };
 }
 
 const ACCOUNT_ERROR_CODES = new Set<unknown>([401, 402, 403, '401', '402', '403']);
@@ -282,45 +407,6 @@ function isAccountError(error: UpstreamStreamError): boolean {
     ACCOUNT_ERROR_TYPES.has(error.error_type) ||
     ACCOUNT_ERROR_TYPES.has(error.metadata?.error_type)
   );
-}
-
-/**
- * The longest model name that an error report keeps. The requested model comes
- * from the client request, so a report bounds it instead of trusting its length.
- */
-export const REPORTED_MODEL_MAX_LENGTH = 200;
-
-/**
- * The usage-context fields that an error report may carry. Pick narrows the
- * return type, so a new context field is not attached by default. The report
- * must not throw, so a missing requested model becomes null.
- */
-export function usageContextReportFields(usageContext: MicrodollarUsageContext): Pick<
-  MicrodollarUsageContext,
-  'provider' | 'api_kind' | 'status_code' | 'isStreaming'
-> & {
-  requested_model: string | null;
-} {
-  const requestedModel: unknown = usageContext.requested_model;
-  return {
-    provider: usageContext.provider,
-    api_kind: usageContext.api_kind,
-    requested_model:
-      typeof requestedModel === 'string'
-        ? requestedModel.slice(0, REPORTED_MODEL_MAX_LENGTH)
-        : null,
-    status_code: usageContext.status_code,
-    isStreaming: usageContext.isStreaming,
-  };
-}
-
-/**
- * The stream-event fields that an error report may carry. `data` is the upstream
- * payload, which can repeat model output, so only the event name and the payload
- * length are reported.
- */
-export function streamEventReportFields(event: EventSourceMessage) {
-  return { event_type: event.event ?? null, data_length: event.data.length };
 }
 
 /**
@@ -356,6 +442,58 @@ export function reportUpstreamStreamError(params: {
 }
 
 export type ResponseTiming = Pick<NotYetCostedUsageStats, 'latency' | 'generation_time'>;
+
+export async function parseUsageWithRecovery(
+  response: Response,
+  context: MicrodollarUsageContext,
+  parse: () => MicrodollarUsageStats | null | Promise<MicrodollarUsageStats | null>
+): Promise<MicrodollarUsageStats> {
+  try {
+    const stats = await parse();
+    if (!stats) throw new Error('Missing usage response body');
+    stats.messageId ??= response.headers.get('x-generation-id');
+    return stats;
+  } catch (error) {
+    const messageId = response.headers.get('x-generation-id');
+    if (!isResponseInterruptedError(error)) {
+      captureException(new Error('Unable to read or parse upstream usage response'), {
+        tags: { source: 'usage_response_parsing', api_kind: context.api_kind },
+        extra: {
+          usageId: context.usageId,
+          kiloUserId: context.kiloUserId,
+          organizationId: context.organizationId,
+          provider: context.provider,
+          messageId,
+          ...describeUsageReadError(error),
+        },
+      });
+    }
+    const contentType = response.headers.get('content-type');
+    return {
+      messageId,
+      model: null,
+      responseContent: '',
+      hasError: true,
+      inference_provider: null,
+      upstream_id: null,
+      finish_reason: null,
+      latency: null,
+      moderation_latency: null,
+      generation_time: null,
+      streamed: contentType?.includes('application/json')
+        ? false
+        : contentType?.includes('text/event-stream') || context.isStreaming,
+      cancelled: null,
+      status_code: response.status,
+      cost_mUsd: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheWriteTokens: 0,
+      cacheHitTokens: 0,
+      is_byok: null,
+    };
+  }
+}
 
 /**
  * Records when the first and final chunks of an upstream response arrive. The
@@ -396,7 +534,7 @@ const isWhitespace = (text: string) => text.trim() === '';
 
 /**
  * Drains an SSE response body, calling `onEvent` for each parsed event. Handles
- * stream processing failures gracefully and always releases the reader lock and
+ * stream processing failures gracefully and always cleans up the reader and
  * ends `streamProcessingSpan`.
  *
  * Each SSE event is a chunk for the response timing, so keep-alive comments such
@@ -404,29 +542,41 @@ const isWhitespace = (text: string) => text.trim() === '';
  * body without any event, such as a JSON error, is timed by its non-whitespace
  * chunks instead.
  *
- * `wasAborted` is `true` if the stream was aborted before completion.
+ * Malformed events are skipped so later events can still supply usage.
  */
 export async function drainSseStream(
   stream: ReadableStream<Uint8Array>,
   onEvent: (event: EventSourceMessage) => void,
   streamProcessingSpan: Span,
-  requestStartedAt: number | undefined
-): Promise<{ wasAborted: boolean; timing: ResponseTiming }> {
+  requestStartedAt: number | undefined,
+  getIds?: () => Record<string, string | null | undefined>
+): Promise<{ wasAborted: boolean; malformedEventCount: number; timing: ResponseTiming }> {
   const eventTimer = createChunkTimer();
   const chunkTimer = createChunkTimer();
+  let malformedEventCount = 0;
+  let firstMalformedEventError: unknown;
   const sseStreamParser = createParser({
     onEvent(event) {
       eventTimer.markChunk();
-      onEvent(event);
+      try {
+        onEvent(event);
+      } catch (error) {
+        if (malformedEventCount === 0) firstMalformedEventError = error;
+        malformedEventCount++;
+      }
     },
   });
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let wasAborted = false;
+  let reachedEof = false;
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        reachedEof = true;
+        break;
+      }
       const text = decoder.decode(value, { stream: true });
       if (!isWhitespace(text)) chunkTimer.markChunk();
       sseStreamParser.feed(text);
@@ -434,12 +584,33 @@ export async function drainSseStream(
   } catch (error) {
     errorExceptInTest('[processUsage] treating stream processing error as aborted', error);
     wasAborted = true;
+    if (!isResponseInterruptedError(error)) {
+      captureException(new Error('Unable to read upstream usage stream'), {
+        tags: { source: 'usage_stream_parsing' },
+        extra: { ...getIds?.(), ...describeUsageReadError(error) },
+      });
+    }
   } finally {
+    if (!reachedEof) {
+      // A tee's cancellation waits for its sibling; accounting must not wait for it.
+      void reader.cancel().catch(() => undefined);
+    }
     reader.releaseLock();
     streamProcessingSpan.end();
   }
+  if (malformedEventCount > 0) {
+    captureMessage('Malformed upstream usage SSE events', {
+      level: 'error',
+      tags: { source: 'usage_stream_parsing' },
+      extra: {
+        ...getIds?.(),
+        malformedEventCount,
+        ...describeUsageReadError(firstMalformedEventError),
+      },
+    });
+  }
   const timer = eventTimer.receivedChunk() ? eventTimer : chunkTimer;
-  return { wasAborted, timing: timer.timing(requestStartedAt) };
+  return { wasAborted, malformedEventCount, timing: timer.timing(requestStartedAt) };
 }
 
 /**

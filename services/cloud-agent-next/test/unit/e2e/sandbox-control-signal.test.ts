@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CONTROL_PLANE_WRAPPER_BASENAME,
+  containerProcessEnvironment,
   isControlWrapperArgv,
   isLiveProcessState,
   processStateFromStat,
@@ -100,5 +101,25 @@ describe('process liveness from /proc/<pid>/stat', () => {
     expect(isLiveProcessState('Z')).toBe(false);
     expect(isLiveProcessState('X')).toBe(false);
     expect(isLiveProcessState(null)).toBe(false);
+  });
+});
+
+describe('containerProcessEnvironment', () => {
+  it('reads KILO_RUNTIME_HARNESS from the exact requested process', async () => {
+    const calls: string[][] = [];
+    const execute: DockerCommandExecutor = async args => {
+      calls.push(args);
+      return {
+        stdout: JSON.stringify({
+          environment: { KILO_RUNTIME_HARNESS: 'kilo2', KILO_SERVER_PASSWORD: 'secret' },
+        }),
+      };
+    };
+
+    await expect(containerProcessEnvironment('container-1', 4242, execute)).resolves.toEqual({
+      KILO_RUNTIME_HARNESS: 'kilo2',
+      KILO_SERVER_PASSWORD: 'secret',
+    });
+    expect(calls).toEqual([['exec', 'container-1', 'bun', '-e', expect.any(String), '4242']]);
   });
 });

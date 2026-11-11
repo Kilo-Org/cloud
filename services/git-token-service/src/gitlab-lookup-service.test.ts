@@ -1,8 +1,8 @@
 import { getWorkerDb } from '@kilocode/db/client';
 import { describe, expect, it } from 'vitest';
+import { isValidGitLabRepositoryUrl } from '@kilocode/worker-utils/gitlab-url';
 import {
   buildAuthorizedGitLabIntegrationQuery,
-  isValidGitLabRepositoryUrl,
   matchGitLabRepositoryToIntegration,
   type AuthorizedGitLabIntegration,
 } from './gitlab-lookup-service.js';

@@ -127,7 +127,6 @@ import {
   STARTUP_FAILURES,
   type StartupFailureCode,
 } from '../../sandbox-control/startup-failure.js';
-import { preinstalledStartup } from '../../sandbox-control/preinstalled-startup.js';
 import type { GrantDiagnostic } from '../../sandbox-control/grant-diagnostic.js';
 import {
   hasRuntimeCredentialProxy,
@@ -411,7 +410,9 @@ import {
   worktreeSubscriberKey,
   type SharedWorktreeChangesInput,
 } from './worktree-changes.js';
-import { serveHistoryPage, type HistoryPageSession } from './history-pages.js';
+import { serveHistoryPage, serveRecentHistory, type HistoryPageSession } from './history-pages.js';
+import { createWorkspaceHistoryReader, readWorkspaceHistorySessions } from './workspace-history.js';
+import { getPgDb } from '../../db/pg.js';
 import type {
   GetWorktreeChangesOutput,
   GetWorktreeFileOutput,
@@ -925,6 +926,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private workspaceSnapshotCapturePending = false;
   /** Earliest retry per grant scope after a failed renewal; in memory, so eviction retries once. */
   private readonly credentialRenewalRetryAt: CredentialRenewalRetries = new Map();
+  private readonly workspaceHistoryReaders = new WeakMap<
+    WebSocket,
+    ReturnType<typeof createWorkspaceHistoryReader>
+  >();
   /**
    * Notification factory for the V2 Session DO. The default resolves the
    * `ownerId:sessionId` name through the shared binding accessor; tests inject a
@@ -5106,21 +5111,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const selection = selectStartup(this.env, pin.provider, cohort, harness);
         const createDeadline =
           state.createDeadlineAt ?? Date.now() + this.sandboxTimers().providerCreateMs;
-        const startupCommand =
-          selection.mode === 'preinstalled'
-            ? preinstalledStartup()
-            : await withTimeout(
-                downloadedStartup({
-                  env: this.env,
-                  descriptor: selection.descriptor,
-                  harness,
-                  sandboxId: this.sandboxId,
-                  allocationId,
-                  deadlineAt: createDeadline + this.sandboxTimers().wrapperFirstConnectMs,
-                }),
-                remainingMs(createDeadline),
-                'Runtime preflight timed out'
-              );
+        const startupCommand = await withTimeout(
+          downloadedStartup({
+            env: this.env,
+            descriptor: selection.descriptor,
+            harness,
+            sandboxId: this.sandboxId,
+            allocationId,
+            deadlineAt: createDeadline + this.sandboxTimers().wrapperFirstConnectMs,
+          }),
+          remainingMs(createDeadline),
+          'Runtime preflight timed out'
+        );
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
         if (pin.billing) await assertContainerAccountAvailable(this.env, pin.billing);
         const intent: ProviderCreateIntent = {
@@ -6561,6 +6563,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
       case 'events_dropped':
         if (current) this.notifications.wrapperDropped(frame.dropped);
         return;
+      case 'history.recent':
+        if (current)
+          this.ctx.waitUntil(
+            serveRecentHistory({
+              frame,
+              readRoute: sessionId => readRoute(this.db, sessionId),
+              readRecent: route => this.workspaceHistoryReader(ws).readRecent(route),
+              send: result => this.trySendFrame(ws, result),
+            })
+          );
+        return;
       case 'history.page':
         // Off the serial queue: a Session DO read must not hold other frames.
         if (current)
@@ -6568,6 +6581,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
             serveHistoryPage({
               frame,
               readRoute: sessionId => readRoute(this.db, sessionId),
+              authorizeWorkspaceSession: (route, target) =>
+                withTimeout(
+                  this.workspaceHistoryReader(ws).authorize(route, target),
+                  10_000,
+                  'Workspace history authorization timed out'
+                ),
               session: async sessionId => {
                 const owner = await this.requireOwner();
                 return owner === null ? null : this.sessionPeerFor(owner, sessionId);
@@ -6579,6 +6598,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
       default:
         return;
     }
+  }
+
+  private workspaceHistoryReader(ws: WebSocket) {
+    let reader = this.workspaceHistoryReaders.get(ws);
+    if (!reader) {
+      reader = createWorkspaceHistoryReader((route, target) =>
+        readWorkspaceHistorySessions(getPgDb(this.env), route, target)
+      );
+      this.workspaceHistoryReaders.set(ws, reader);
+    }
+    return reader;
   }
 
   private releaseBoundSockets(ws: WebSocket, allocationId: string): void {

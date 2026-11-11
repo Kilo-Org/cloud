@@ -9143,6 +9143,17 @@
     ],
     "searchBlob": "cloudAgentSettings.get Get the Cloud Agent settings for the user or organization, including the context sandbox allocation, per-repository profile allocations, and which sandbox options are available. cloudagentsettings get organizationid organizationId"
   },
+  "cloudAgentSettings.getBuiltinAgents": {
+    "path": "cloudAgentSettings.getBuiltinAgents",
+    "kind": "query",
+    "summary": "Get the current user's personal built-in agent settings, including disabled modes and per-agent model overrides.",
+    "inputSchema": {},
+    "tags": [
+      "cloudagentsettings",
+      "getbuiltinagents"
+    ],
+    "searchBlob": "cloudAgentSettings.getBuiltinAgents Get the current user's personal built-in agent settings, including disabled modes and per-agent model overrides. cloudagentsettings getbuiltinagents"
+  },
   "cloudAgentSettings.getWorkspaceOrder": {
     "path": "cloudAgentSettings.getWorkspaceOrder",
     "kind": "query",
@@ -11125,6 +11136,35 @@
       "rates"
     ],
     "searchBlob": "computeBilling.rates Get the current compute pricing rates used to bill usage. computebilling rates"
+  },
+  "computeBilling.sessionCharges": {
+    "path": "computeBilling.sessionCharges",
+    "kind": "query",
+    "summary": "Get recorded compute charges for an owned cloud agent session in its personal or organization billing context. When scope is 'workspace', the total covers the shared sandbox across all chats and restarts in that workspace; do not add sibling chat totals together. Only scope 'session' returns a single session's charges.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "computebilling",
+      "sessioncharges",
+      "cloudagentsessionid",
+      "organizationid"
+    ],
+    "searchBlob": "computeBilling.sessionCharges Get recorded compute charges for an owned cloud agent session in its personal or organization billing context. When scope is 'workspace', the total covers the shared sandbox across all chats and restarts in that workspace; do not add sibling chat totals together. Only scope 'session' returns a single session's charges. computebilling sessioncharges cloudagentsessionid organizationid cloudAgentSessionId organizationId"
   },
   "credits.completeAppStorePurchase": {
     "path": "credits.completeAppStorePurchase",
@@ -38005,6 +38045,18 @@
             "vercel-large"
           ]
         },
+        "environmentId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "profileId": {
           "anyOf": [
             {
@@ -38089,6 +38141,7 @@
       "model",
       "variant",
       "sandboxallocation",
+      "environmentid",
       "profileid",
       "bodyschema",
       "prompttemplate",
@@ -38099,7 +38152,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation profileid bodyschema prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation profileId bodySchema promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation environmentid profileid bodyschema prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation environmentId profileId bodySchema promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
   },
   "webhookTriggers.delete": {
     "path": "webhookTriggers.delete",
@@ -38375,6 +38428,18 @@
             }
           ]
         },
+        "environmentId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "promptTemplate": {
           "type": "string",
           "minLength": 1,
@@ -38464,6 +38529,7 @@
       "model",
       "variant",
       "sandboxallocation",
+      "environmentid",
       "prompttemplate",
       "profileid",
       "bodyschema",
@@ -38474,7 +38540,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid mode model variant sandboxallocation prompttemplate profileid bodyschema autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId mode model variant sandboxAllocation promptTemplate profileId bodySchema autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid mode model variant sandboxallocation environmentid prompttemplate profileid bodyschema autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId mode model variant sandboxAllocation environmentId promptTemplate profileId bodySchema autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
   },
   "workspaceFolders.create": {
     "path": "workspaceFolders.create",

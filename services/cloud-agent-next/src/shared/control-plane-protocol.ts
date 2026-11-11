@@ -1572,6 +1572,23 @@ const controlPlaneHistoryPageFrameSchema = z
     sessionId: z.string().min(1),
     kiloSessionId: z.string().min(1),
     cursor: z.string().min(1).max(2048).optional(),
+    /** Hosted route authorizing a history-only read of a sibling workspace chat. */
+    workspaceSessionId: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const WORKSPACE_HISTORY_PRELOAD_LIMIT = 5;
+export const workspaceHistorySessionsSchema = z
+  .array(z.object({ sessionId: z.string().min(1), kiloSessionId: z.string().min(1) }).strict())
+  .max(WORKSPACE_HISTORY_PRELOAD_LIMIT);
+export type WorkspaceHistorySession = z.infer<typeof workspaceHistorySessionsSchema>[number];
+
+/** Wrapper -> Sandbox DO: recent root chats in the hosted route's workspace. */
+const controlPlaneHistoryRecentFrameSchema = z
+  .object({
+    type: z.literal('history.recent'),
+    requestId: z.string().min(1).max(128),
+    sessionId: z.string().min(1),
   })
   .strict();
 
@@ -1631,6 +1648,7 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlanePreviewListFrameSchema,
   controlPlanePreviewResultFrameSchema,
   controlPlaneHistoryPageFrameSchema,
+  controlPlaneHistoryRecentFrameSchema,
   controlPlaneHistoryResultFrameSchema,
 ]);
 
@@ -1728,5 +1746,6 @@ export type ControlPlaneKiloResultFrame = z.infer<typeof controlPlaneKiloResultF
 export type ControlPlanePreviewListFrame = z.infer<typeof controlPlanePreviewListFrameSchema>;
 export type ControlPlanePreviewResultFrame = z.infer<typeof controlPlanePreviewResultFrameSchema>;
 export type ControlPlaneHistoryPageFrame = z.infer<typeof controlPlaneHistoryPageFrameSchema>;
+export type ControlPlaneHistoryRecentFrame = z.infer<typeof controlPlaneHistoryRecentFrameSchema>;
 export type ControlPlaneHistoryResultFrame = z.infer<typeof controlPlaneHistoryResultFrameSchema>;
 export type ControlPlaneWrapperFrame = z.infer<typeof controlPlaneWrapperFrameSchema>;

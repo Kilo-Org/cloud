@@ -1,7 +1,8 @@
 import type { OpenAI } from 'openai';
 import type { EventSourceMessage } from 'eventsource-parser';
-import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
+import { captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
+import { z } from 'zod';
 import { sentryRootSpan } from '../getRootSpan';
 import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
@@ -13,39 +14,66 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { GatewayResponsesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
+  contentPartSchema,
   drainSseStream,
   extractVercelUpstreamId,
   reportUpstreamStreamError,
   selectUsageCostFields,
-  streamEventReportFields,
+  upstreamStreamErrorSchema,
+  usageCostSchema,
+  vercelProviderMetadataSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 
-// OpenRouter adds cost fields to the standard Responses API usage object.
-// ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
-type ResponsesApiUsage = OpenAI.Responses.ResponseUsage & {
-  cost?: number;
-  is_byok?: boolean | null;
-  cost_details?: { upstream_inference_cost: number };
-};
+const responsesUsageSchema = usageCostSchema.extend({
+  input_tokens: z.number().nullish(),
+  output_tokens: z.number().nullish(),
+  input_tokens_details: z
+    .object({ cached_tokens: z.number().nullish(), cache_write_tokens: z.number().nullish() })
+    .nullish(),
+});
 
-type MaybeHasVercelProviderMetadata = {
-  provider_metadata?: VercelProviderMetaData;
-};
+type ResponsesApiUsage = z.infer<typeof responsesUsageSchema>;
 
-type ResponsesApiResponse = OpenAI.Responses.Response &
-  MaybeHasVercelProviderMetadata & {
-    // OpenRouter may return a top-level usage with cost fields
-    usage?: ResponsesApiUsage | null;
-  };
+const responseSchema = z.object({
+  id: z.string().nullish(),
+  model: z.string().nullish(),
+  usage: responsesUsageSchema.nullish(),
+  provider_metadata: vercelProviderMetadataSchema.nullish(),
+  status: z.unknown().optional(),
+});
 
-type ResponsesApiStreamEvent = {
-  type: string;
-  delta?: string;
-  response?: ResponsesApiResponse;
-  error?: { message: string; code: string };
-};
+const responseEventSchema = z
+  .object({
+    type: z.string(),
+    delta: z.unknown().optional(),
+    response: responseSchema.nullish(),
+    error: upstreamStreamErrorSchema.nullish(),
+  })
+  .refine(
+    event =>
+      ![
+        'response.created',
+        'response.in_progress',
+        'response.completed',
+        'response.failed',
+        'response.incomplete',
+        'response.queued',
+      ].includes(event.type) || event.response != null
+  );
+
+const responseOutputItemSchema = z
+  .object({
+    type: z.string(),
+    content: z.array(contentPartSchema('output_text')).optional(),
+  })
+  .refine(item => item.type !== 'message' || item.content !== undefined);
+
+// Upstream error bodies carry no model; they are recorded as errors, not parse failures.
+const responseBodySchema = responseSchema.extend({
+  output: z.array(responseOutputItemSchema).nullish(),
+});
 
 export function processResponsesApiUsage(
   usage: ResponsesApiUsage | null | undefined,
@@ -69,13 +97,11 @@ export function processResponsesApiUsage(
   return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, ...costs };
 }
 
-function extractResponseContent(output: OpenAI.Responses.ResponseOutputItem[]): string {
+function extractResponseContent(output: z.infer<typeof responseOutputItemSchema>[]): string {
   return output
     .flatMap(item =>
       item.type === 'message'
-        ? item.content
-            .filter((c): c is OpenAI.Responses.ResponseOutputText => c.type === 'output_text')
-            .map(c => c.text)
+        ? (item.content ?? []).filter(c => c.type === 'output_text').map(c => c.text)
         : []
     )
     .join('');
@@ -110,7 +136,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
   let usage: ResponsesApiUsage | null = null;
   let providerMetadata: VercelProviderMetaData | null = null;
   let inference_provider: string | null = null;
-  let finish_reason: string | null = null;
+  let finish_reason: unknown = null;
 
   const onEvent = (event: EventSourceMessage) => {
     if (!firstTokenReceived) {
@@ -127,19 +153,13 @@ export async function parseResponsesMicrodollarUsageFromStream(
       return;
     }
 
-    const json = JSON.parse(event.data) as ResponsesApiStreamEvent;
-
-    if (!json) {
-      captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
-        extra: streamEventReportFields(event),
-      });
-      return;
-    }
+    const payload: unknown = JSON.parse(event.data);
+    metadataCapture?.captureVercelMetadata(payload);
+    const json = responseEventSchema.parse(payload);
 
     const eventProviderMetadata = json.response?.provider_metadata;
-    metadataCapture?.captureVercelMetadata(json);
 
-    if ('error' in json && json.error) {
+    if (json.error != null) {
       reportedError = true;
       reportUpstreamStreamError({
         label: 'Responses API error',
@@ -147,12 +167,13 @@ export async function parseResponsesMicrodollarUsageFromStream(
         error: json.error,
         usesUserCredentials,
         logContext: { provider, inference_provider, messageId, model },
-        sentryExtra: { json, event },
+        sentryExtra: { kiloUserId, provider, messageId, model },
       });
     }
 
-    if (json.type === 'response.output_text.delta' && json.delta) {
-      responseContent += json.delta;
+    if (json.type === 'response.output_text.delta') {
+      const delta = z.string().parse(json.delta);
+      if (delta) responseContent += delta;
     }
 
     // Extract metadata whenever json.response is present so that aborted
@@ -163,7 +184,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
       messageId = response.id ?? messageId;
       model = response.model ?? model;
       if (response.usage) {
-        usage = response.usage as ResponsesApiUsage;
+        usage = response.usage;
       }
       if (eventProviderMetadata) {
         providerMetadata = eventProviderMetadata;
@@ -178,11 +199,12 @@ export async function parseResponsesMicrodollarUsageFromStream(
     }
   };
 
-  const { wasAborted, timing } = await drainSseStream(
+  const { wasAborted, malformedEventCount, timing } = await drainSseStream(
     stream,
     onEvent,
     streamProcessingSpan,
-    requestStartedAt
+    requestStartedAt,
+    () => ({ kiloUserId, provider, messageId, model })
   );
 
   if (!reportedError && !usage) {
@@ -195,7 +217,8 @@ export async function parseResponsesMicrodollarUsageFromStream(
 
   const coreProps = {
     messageId,
-    hasError: reportedError || wasAborted || isErrorFinishReason(finish_reason),
+    hasError:
+      reportedError || wasAborted || malformedEventCount > 0 || isErrorFinishReason(finish_reason),
     model,
     responseContent,
     inference_provider,
@@ -219,21 +242,22 @@ export function parseResponsesMicrodollarUsageFromString(
   provider: ProviderType,
   metadataCapture?: AiProviderMetadataCapture
 ): MicrodollarUsageStats {
-  const responseJson = JSON.parse(fullResponse) as ResponsesApiResponse | null;
-  const usage = responseJson?.usage;
-  const providerMetadata = responseJson?.provider_metadata ?? null;
-  metadataCapture?.captureVercelMetadata(responseJson);
+  const payload: unknown = JSON.parse(fullResponse);
+  metadataCapture?.captureVercelMetadata(payload);
+  const responseJson = responseBodySchema.parse(payload);
+  const usage = responseJson.usage;
+  const providerMetadata = responseJson.provider_metadata ?? null;
 
   const inference_provider = providerMetadata?.gateway?.routing?.finalProvider ?? null;
 
   const coreProps = {
-    messageId: responseJson?.id ?? null,
-    hasError: !responseJson?.model || statusCode >= 400 || responseJson?.status !== 'completed',
-    model: responseJson?.model ?? null,
-    responseContent: responseJson?.output ? extractResponseContent(responseJson.output) : '',
+    messageId: responseJson.id ?? null,
+    hasError: !responseJson.model || statusCode >= 400 || responseJson.status !== 'completed',
+    model: responseJson.model ?? null,
+    responseContent: responseJson.output ? extractResponseContent(responseJson.output) : '',
     inference_provider,
     upstream_id: extractVercelUpstreamId(providerMetadata),
-    finish_reason: responseJson?.status ?? null,
+    finish_reason: responseJson.status ?? null,
     latency: null,
     moderation_latency: null,
     generation_time: null,

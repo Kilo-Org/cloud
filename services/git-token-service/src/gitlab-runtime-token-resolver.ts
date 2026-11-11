@@ -1,7 +1,7 @@
 import * as z from 'zod';
+import { isValidGitLabRepositoryUrl } from '@kilocode/worker-utils/gitlab-url';
 import type { GitLabCredentialBroker } from './gitlab-credential-broker.js';
 import {
-  isValidGitLabRepositoryUrl,
   matchGitLabRepositoryToIntegration,
   type GitLabLookupService,
   type GitLabRepositoryMatch,

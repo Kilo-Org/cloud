@@ -16,7 +16,7 @@ import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
 import { createTimer } from '@kilocode/web-shared/lib/timer';
-import type { OpenAI } from 'openai';
+import { z } from 'zod';
 import type { EventSourceMessage } from 'eventsource-parser';
 import type {
   OpenRouterChatCompletionRequest,
@@ -55,17 +55,12 @@ import {
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type {
   BalanceUpdateResult,
-  ChatCompletionChunk,
   CoreUsageWithMetaData,
   JustTheCostsUsageStats,
-  MaybeHasOpenRouterUsage,
-  MaybeHasVercelProviderMetaData,
   Message,
   MicrodollarUsageContext,
   MicrodollarUsageStats,
   NotYetCostedUsageStats,
-  OpenRouterError,
-  OpenRouterUsage,
   PromptInfo,
   UsageMetaData,
   UsageRecordInsertResult,
@@ -92,14 +87,17 @@ import {
   computeOpenRouterCostFields,
   providerReportsIsByok,
   drainSseStream,
+  contentPartSchema,
   extractVercelIsByok,
   extractVercelUpstreamId,
-  isResponseInterruptedError,
-  REPORTED_MODEL_MAX_LENGTH,
+  parseUsageWithRecovery,
   reportUpstreamStreamError,
   readResponseText,
-  streamEventReportFields,
+  REPORTED_MODEL_MAX_LENGTH,
   usageContextReportFields,
+  openRouterUsageSchema,
+  upstreamStreamErrorSchema,
+  vercelProviderMetadataSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
@@ -115,20 +113,18 @@ import {
 } from '@kilocode/web-shared/lib/bouncer/client';
 import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox';
 import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
-import type { BouncerUsageEventEnqueue, UsageRecordRequest } from '@kilocode/usage-contracts';
+import type { BouncerUsageEventEnqueue, LlmUsageQueueMessage } from '@kilocode/usage-contracts';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 
 const posthogClient = PostHogClient();
 
 /**
- * The only request field a prompt-extraction failure reports. The body is
- * untrusted here, because a malformed one is what threw, so the model is read
+ * The request fields a prompt-extraction failure reports. The body is untrusted
+ * at this point, because a malformed one is what threw, so the model is read
  * through a runtime type check and its length is bounded.
  */
 function promptExtractionReportFields(body: unknown) {
-  if (typeof body !== 'object' || body === null || !('model' in body)) {
-    return {};
-  }
+  if (typeof body !== 'object' || body === null || !('model' in body)) return {};
   const { model } = body;
   return typeof model === 'string' ? { model: model.slice(0, REPORTED_MODEL_MAX_LENGTH) } : {};
 }
@@ -419,7 +415,7 @@ function reportPublisherNotConfigured(usageId: string): void {
 }
 
 async function enqueueUsageWithinLifetime(
-  payload: UsageRecordRequest
+  payload: LlmUsageQueueMessage
 ): Promise<UsageEnqueueOutcome> {
   const start = Promise.withResolvers<boolean>();
   const publication = start.promise.then(async (registered): Promise<UsageEnqueueOutcome> => {
@@ -474,7 +470,7 @@ async function logMicrodollarUsageWithTransport(
   const contextInfo = extractUsageContextInfo(usageContext);
   const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo);
 
-  const payload: UsageRecordRequest = {
+  const payload: LlmUsageQueueMessage = {
     core,
     metadata,
     prior_microdollar_usage: usageContext.prior_microdollar_usage,
@@ -1292,14 +1288,9 @@ export function countAndStoreUsage(
   const parseResponseText = async (
     body: ReadableStream<Uint8Array>,
     parse: (content: string) => MicrodollarUsageStats
-  ): Promise<MicrodollarUsageStats | null> => {
-    try {
-      const { text, timing } = await readResponseText(body, requestStartedAt);
-      return { ...parse(text), ...timing };
-    } catch (error) {
-      if (isResponseInterruptedError(error)) return null;
-      throw error;
-    }
+  ): Promise<MicrodollarUsageStats> => {
+    const { text, timing } = await readResponseText(body, requestStartedAt);
+    return { ...parse(text), ...timing };
   };
 
   const usesUserCredentials =
@@ -1374,11 +1365,14 @@ export function countAndStoreUsage(
     }
   }
 
-  metadataCapture?.waitFor(usageStatsPromise);
-  const statsPromise = usageStatsPromise.then(usageStats => {
-    if (usageStats) {
-      usageStats.inference_provider ??= servingProvider?.inferenceProviderId ?? null;
-    }
+  const recoveredUsageStats = parseUsageWithRecovery(
+    clonedReponse,
+    usageContext,
+    () => usageStatsPromise
+  );
+  metadataCapture?.waitFor(recoveredUsageStats);
+  const statsPromise = recoveredUsageStats.then(usageStats => {
+    usageStats.inference_provider ??= servingProvider?.inferenceProviderId ?? null;
     return usageStats;
   });
   return {
@@ -1390,7 +1384,7 @@ export function countAndStoreUsage(
 }
 
 export function processOpenRouterUsage(
-  usage: OpenRouterUsage | null | undefined,
+  usage: z.infer<typeof openRouterUsageSchema> | null | undefined,
   coreProps: NotYetCostedUsageStats,
   provider: ProviderType,
   vercelProviderMetadata?: VercelProviderMetaData | null
@@ -1417,6 +1411,50 @@ export function processOpenRouterUsage(
     is_byok: is_byok ?? extractVercelIsByok(vercelProviderMetadata?.gateway),
   };
 }
+
+const chatUsageFieldsSchema = z.looseObject({
+  id: z.string().nullish(),
+  model: z.string().nullish(),
+  provider: z.string().nullish(),
+  usage: openRouterUsageSchema.nullish(),
+  error: upstreamStreamErrorSchema.nullish(),
+});
+
+// Reasoning models such as Mistral's send content as `text` and `thinking` chunks.
+const chatMessageSchema = z.looseObject({
+  content: z.union([z.string(), z.array(contentPartSchema('text'))]).nullish(),
+  provider_metadata: vercelProviderMetadataSchema.nullish(),
+});
+
+function chatContentText(content: z.infer<typeof chatMessageSchema>['content']): string {
+  if (typeof content === 'string') return content;
+  return (content ?? [])
+    .filter(chunk => chunk.type === 'text')
+    .map(chunk => chunk.text)
+    .join('');
+}
+
+const chatUsageChunkSchema = chatUsageFieldsSchema.extend({
+  choices: z
+    .array(
+      z.looseObject({
+        delta: chatMessageSchema.nullish(),
+        finish_reason: z.unknown().optional(),
+      })
+    )
+    .nullish(),
+});
+
+const chatUsageResponseSchema = chatUsageFieldsSchema.extend({
+  choices: z
+    .array(
+      z.looseObject({
+        message: chatMessageSchema,
+        finish_reason: z.unknown().optional(),
+      })
+    )
+    .nullish(),
+});
 
 export async function parseMicrodollarUsageFromStream(
   stream: ReadableStream<Uint8Array>,
@@ -1446,9 +1484,9 @@ export async function parseMicrodollarUsageFromStream(
   let effectiveStatusCode = statusCode;
   const startedAt = performance.now();
   let firstTokenReceived = false;
-  let usage: OpenRouterUsage | null = null;
+  let usage: z.infer<typeof openRouterUsageSchema> | null = null;
   let inference_provider: string | null = null;
-  let finish_reason: string | null = null;
+  let finish_reason: unknown = null;
   let vercelProviderMetadata: VercelProviderMetaData | null = null;
 
   const onEvent = (event: EventSourceMessage) => {
@@ -1466,21 +1504,15 @@ export async function parseMicrodollarUsageFromStream(
       return;
     }
 
-    const json = JSON.parse(event.data) as ChatCompletionChunk;
-
-    if (!json) {
-      captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
-        extra: streamEventReportFields(event),
-      });
-      return;
-    }
+    const rawJson: unknown = JSON.parse(event.data);
+    metadataCapture?.captureVercelMetadata(rawJson);
+    const json = chatUsageChunkSchema.parse(rawJson);
 
     const choice = json.choices?.[0];
     const chunkProviderMetadata = choice?.delta?.provider_metadata;
-    metadataCapture?.captureVercelMetadata(json);
 
-    if ('error' in json) {
-      const error = json.error as OpenRouterError;
+    if (json.error != null) {
+      const error = json.error;
       reportedError = true;
       if (typeof error.code === 'number') {
         effectiveStatusCode = error.code;
@@ -1496,7 +1528,12 @@ export async function parseMicrodollarUsageFromStream(
           messageId: json.id ?? messageId,
           model: json.model ?? model,
         },
-        sentryExtra: { json, event },
+        sentryExtra: {
+          kiloUserId,
+          provider,
+          messageId: json.id ?? messageId,
+          model: json.model ?? model,
+        },
       });
     }
 
@@ -1510,17 +1547,15 @@ export async function parseMicrodollarUsageFromStream(
       json.provider ?? chunkProviderMetadata?.gateway?.routing?.finalProvider ?? inference_provider;
     finish_reason = choice?.finish_reason ?? finish_reason;
 
-    const contentDelta = choice?.delta?.content;
-    if (contentDelta) {
-      responseContent += contentDelta;
-    }
+    responseContent += chatContentText(choice?.delta?.content);
   };
 
-  const { wasAborted, timing } = await drainSseStream(
+  const { wasAborted, malformedEventCount, timing } = await drainSseStream(
     stream,
     onEvent,
     streamProcessingSpan,
-    requestStartedAt
+    requestStartedAt,
+    () => ({ kiloUserId, provider, messageId, model })
   );
 
   if (!reportedError && !usage) {
@@ -1534,7 +1569,8 @@ export async function parseMicrodollarUsageFromStream(
   const coreProps = {
     kiloUserId,
     messageId,
-    hasError: reportedError || wasAborted || isErrorFinishReason(finish_reason),
+    hasError:
+      reportedError || wasAborted || malformedEventCount > 0 || isErrorFinishReason(finish_reason),
     model,
     responseContent,
     inference_provider,
@@ -1560,34 +1596,35 @@ export function parseMicrodollarUsageFromString(
   provider: ProviderType,
   metadataCapture?: AiProviderMetadataCapture
 ): MicrodollarUsageStats {
-  const responseJson = JSON.parse(fullResponse) as
-    | (OpenAI.Chat.Completions.ChatCompletion &
-        MaybeHasOpenRouterUsage &
-        MaybeHasVercelProviderMetaData)
-    | null;
-  const choice = responseJson?.choices?.[0];
-  const vercelProviderMetadata = choice?.message?.provider_metadata ?? null;
-  metadataCapture?.captureVercelMetadata(responseJson);
+  const rawJson: unknown = JSON.parse(fullResponse);
+  metadataCapture?.captureVercelMetadata(rawJson);
+  const responseJson = chatUsageResponseSchema.parse(rawJson);
+  const choice = responseJson.choices?.[0];
+  const vercelProviderMetadata = choice?.message.provider_metadata ?? null;
 
   if (
     providerReportsIsByok(provider) &&
-    responseJson?.usage?.is_byok == null &&
-    responseJson?.usage?.cost
+    responseJson.usage?.is_byok == null &&
+    responseJson.usage?.cost
   ) {
     captureException(new Error('SUSPICIOUS: is_byok is null'), {
       tags: { source: 'string_processing' },
-      extra: { provider, model: responseJson?.model ?? null, status_code: statusCode },
+      extra: { kiloUserId, provider, messageId: responseJson.id, model: responseJson.model },
     });
   }
   const finish_reason = choice?.finish_reason ?? null;
   const coreProps = {
     kiloUserId,
-    messageId: responseJson?.id ?? null,
-    hasError: !responseJson?.model || statusCode >= 400 || isErrorFinishReason(finish_reason),
-    model: responseJson?.model ?? null,
-    responseContent: choice?.message.content ?? '',
+    messageId: responseJson.id ?? null,
+    hasError:
+      !responseJson.model ||
+      responseJson.error != null ||
+      statusCode >= 400 ||
+      isErrorFinishReason(finish_reason),
+    model: responseJson.model ?? null,
+    responseContent: chatContentText(choice?.message.content),
     inference_provider:
-      responseJson?.provider ?? vercelProviderMetadata?.gateway?.routing?.finalProvider ?? null,
+      responseJson.provider ?? vercelProviderMetadata?.gateway?.routing?.finalProvider ?? null,
     upstream_id: extractVercelUpstreamId(vercelProviderMetadata),
     finish_reason,
     latency: null,
@@ -1599,7 +1636,7 @@ export function parseMicrodollarUsageFromString(
   };
 
   const costs = processOpenRouterUsage(
-    responseJson?.usage,
+    responseJson.usage,
     coreProps,
     provider,
     vercelProviderMetadata

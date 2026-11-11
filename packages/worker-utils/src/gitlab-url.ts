@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { DEFAULT_GITLAB_INSTANCE_URL } from './gitlab-constants.js';
+
+export const DEFAULT_GITLAB_INSTANCE_URL = 'https://gitlab.com';
 
 export const GitLabProjectPathSchema = z
   .string()

@@ -11,7 +11,7 @@ import {
   type GitLabCredentialOwner,
   type GitLabOAuthCredentialRow,
 } from '@kilocode/worker-utils/gitlab-credential';
-import { normalizeGitLabInstanceUrl } from './gitlab-url.js';
+import { normalizeGitLabInstanceUrl } from '@kilocode/worker-utils/gitlab-url';
 import type { GitLabCredentialCrypto } from './gitlab-credential-crypto.js';
 
 export type GitLabCredentialActor = { userId: string; orgId?: string };

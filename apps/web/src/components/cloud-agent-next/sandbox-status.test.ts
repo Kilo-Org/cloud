@@ -7,6 +7,7 @@ import {
   observeSandboxStatus,
   sandboxStatusPresentation,
   sandboxTypeCapacity,
+  sandboxComputeInstance,
 } from './sandbox-status';
 import { formatSandboxCapacity } from './sandbox-selection';
 
@@ -47,6 +48,48 @@ const eligible = {
   isReadOnly: false,
   fetchedSessionData: { kiloSessionId, cloudAgentSessionId: sessionId, organizationId: null },
 };
+
+describe('observed sandbox compute pricing', () => {
+  it.each([
+    ['containers-standard-3', 'standard-3'],
+    ['containers-standard-4', 'standard-4'],
+  ] as const)('prices only the observed %s allocation', (sandboxType, expected) => {
+    expect(
+      sandboxComputeInstance({
+        ...snapshot,
+        provider: 'Cloudflare Containers',
+        runtime: { ...runtime, sandboxType },
+      })
+    ).toBe(expected);
+  });
+
+  it.each(['Vercel', 'Cloudflare', 'Unknown'] as const)(
+    'does not show Kilo container rates for %s',
+    provider => {
+      expect(
+        sandboxComputeInstance({
+          ...snapshot,
+          provider,
+          runtime: { ...runtime, sandboxType: 'containers-standard-3' },
+        })
+      ).toBeNull();
+    }
+  );
+
+  it.each([
+    undefined,
+    null,
+    {},
+    snapshot,
+    {
+      ...snapshot,
+      provider: 'Cloudflare Containers',
+      runtime,
+    },
+  ])('does not guess a rate for missing or unsupported runtime metadata: %j', data => {
+    expect(sandboxComputeInstance(data)).toBeNull();
+  });
+});
 
 describe('sandbox status eligibility', () => {
   it('requires a resolved owned workspace in the exact route scope', () => {

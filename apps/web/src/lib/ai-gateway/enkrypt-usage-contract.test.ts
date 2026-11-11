@@ -55,6 +55,8 @@ async function usageRecordForNewOrganization(
     apiKind: 'messages',
     decision: 'blocked',
     creditsCost: 7,
+    scannedCharacters: 2_400,
+    totalCharacters: 10_000,
     addedLatencyMs: 212,
     ...overrides,
   };
@@ -95,6 +97,8 @@ async function ledgerRows(organizationId: string) {
     addedLatencyMs: row.added_latency_ms,
     guardrail,
     detectorsFired: row.fired_detector_ids?.map(id => detectorById.get(id)) ?? null,
+    scannedCharacters: row.scanned_characters,
+    totalCharacters: row.total_characters,
   }));
 }
 
@@ -125,6 +129,8 @@ async function expectWrittenOnceAndReplayedAsDuplicate(usageWrite: EnkryptUsageW
       addedLatencyMs: usageWrite.addedLatencyMs,
       guardrail: usageWrite.guardrail,
       detectorsFired: usageWrite.detectorsFired ?? null,
+      scannedCharacters: usageWrite.scannedCharacters ?? null,
+      totalCharacters: usageWrite.totalCharacters ?? null,
     },
   ]);
   expect(await microdollarsUsed(usageWrite.organizationId)).toBe(charged);

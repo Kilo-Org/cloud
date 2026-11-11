@@ -2315,7 +2315,7 @@
       "cloningSession": "Клониране на сесия",
       "couldNotLoadThisSession": "Не успяхме да заредим тази сесия.",
       "cloneFailedRetry": "Не успяхме да клонираме тази сесия. Опитай отново.",
-      "notEnoughCredits": "Нямаш достатъчно кредити за стартиране на Cloud Agent. Добави кредити и опитай отново.",
+      "notEnoughCredits": "Нямаш достатъчно кредити за тази заявка. Добави кредити и опитай отново.",
       "previousTaskFinishing": "Предишната задача още не е приключила. Изчакай малко.",
       "serviceUnavailable": "Услугата в момента е недостъпна. Опитай отново.",
       "connectionTrouble": "Има проблем с връзката. Опитай отново след малко.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Разговорът е твърде дълъг за модела.",
       "assistantProviderError": "Доставчикът върна грешка.",
       "assistantProviderRefused": "Доставчикът отказа тази заявка и тя не може да бъде повторена.",
-      "assistantCreditsRefusal": "Нямаш достатъчно кредити за стартиране на Cloud Agent.",
+      "assistantCreditsRefusal": "Нямаш достатъчно кредити за тази заявка.",
       "assistantOutputLimit": "Отговорът достигна ограничението за изходни данни на модела.",
       "assistantStructuredOutput": "Отговорът не съответства на изисквания формат.",
       "assistantFailed": "Не успяхме да генерираме отговор."

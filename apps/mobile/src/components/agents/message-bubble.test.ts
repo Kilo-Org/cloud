@@ -563,7 +563,7 @@ describe('MessageBubble failure footer', () => {
     );
 
     expect(findText(tree, t => t === 'Response failed')).toBe(true);
-    expect(findText(tree, t => t === 'Not enough credits to run Cloud Agent.')).toBe(true);
+    expect(findText(tree, t => t === 'Not enough credits for this request.')).toBe(true);
 
     const addCredits = findElementByType(
       tree,

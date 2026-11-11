@@ -2315,7 +2315,7 @@
       "cloningSession": "Kalfadhiga waa la nuqulayaa",
       "couldNotLoadThisSession": "Kalfadhigan lama soo shubi karin.",
       "cloneFailedRetry": "Kalfadhigan nuqul lagama samayn karin. Mar kale isku day.",
-      "notEnoughCredits": "Lacagta isticmaalka kuma filna socodsiinta Cloud Agent. Lacag ku dar oo mar kale isku day.",
+      "notEnoughCredits": "Lacagta isticmaalka kuma filna codsigan. Lacag ku dar oo mar kale isku day.",
       "previousTaskFinishing": "Hawshii hore weli waa la dhammaystirayaa. Fadlan wax yar sug.",
       "serviceUnavailable": "Adeegga hadda lama heli karo. Fadlan mar kale isku day.",
       "connectionTrouble": "Xiriirka ayaa cilad leh. Fadlan wax yar ka dib mar kale isku day.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Wadahadalku aad buu ugu dheer yahay moodeelka.",
       "assistantProviderError": "Bixiyaha ayaa cillad ku soo celiyay.",
       "assistantProviderRefused": "Bixiyaha ayaa diiday codsigan, dibna looma dayi karo.",
-      "assistantCreditsRefusal": "Lacagta isticmaalka kuma filna socodsiinta Cloud Agent.",
+      "assistantCreditsRefusal": "Lacagta isticmaalka kuma filna codsigan.",
       "assistantOutputLimit": "Jawaabtu waxay gaartay xadka wax-soo-saarka moodeelka.",
       "assistantStructuredOutput": "Jawaabtu ma ahayn qaabka loo baahnaa.",
       "assistantFailed": "Jawaabtu way fashilantay."

@@ -1819,7 +1819,7 @@
       "cloningSession": "Klonowanie sesji",
       "couldNotLoadThisSession": "Nie udało się wczytać tej sesji.",
       "cloneFailedRetry": "Nie udało się sklonować tej sesji. Spróbuj ponownie.",
-      "notEnoughCredits": "Brakuje środków na uruchomienie Cloud Agent. Doładuj konto i spróbuj ponownie.",
+      "notEnoughCredits": "Brakuje środków na to żądanie. Doładuj konto i spróbuj ponownie.",
       "previousTaskFinishing": "Trwa kończenie poprzedniego zadania. Poczekaj chwilę.",
       "serviceUnavailable": "Usługa jest teraz niedostępna. Spróbuj ponownie.",
       "connectionTrouble": "Problem z połączeniem. Spróbuj ponownie za chwilę.",
@@ -2121,7 +2121,7 @@
       "assistantContextOverflow": "Rozmowa jest zbyt długa dla modelu.",
       "assistantProviderError": "Dostawca zwrócił błąd.",
       "assistantProviderRefused": "Dostawca odrzucił to żądanie i nie można go ponowić.",
-      "assistantCreditsRefusal": "Brakuje środków na uruchomienie Cloud Agent.",
+      "assistantCreditsRefusal": "Brakuje środków na to żądanie.",
       "assistantOutputLimit": "Odpowiedź osiągnęła limit wyjścia modelu.",
       "assistantStructuredOutput": "Odpowiedź nie była zgodna z wymaganym formatem.",
       "assistantFailed": "Nie udało się wygenerować odpowiedzi."

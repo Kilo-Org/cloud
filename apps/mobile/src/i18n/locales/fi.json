@@ -2315,7 +2315,7 @@
       "cloningSession": "Kloonataan istuntoa",
       "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",
       "cloneFailedRetry": "Tätä istuntoa ei voitu kloonata. Yritä uudelleen.",
-      "notEnoughCredits": "Krediitit eivät riitä Cloud Agentin käyttämiseen. Lisää krediittejä ja yritä uudelleen.",
+      "notEnoughCredits": "Krediitit eivät riitä tähän pyyntöön. Lisää krediittejä ja yritä uudelleen.",
       "previousTaskFinishing": "Edellistä tehtävää viimeistellään vielä. Odota hetki.",
       "serviceUnavailable": "Palvelu ei ole tällä hetkellä käytettävissä. Yritä uudelleen.",
       "connectionTrouble": "Yhteydessä on ongelma. Yritä uudelleen hetken kuluttua.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Keskustelu on liian pitkä mallille.",
       "assistantProviderError": "Palveluntarjoaja palautti virheen.",
       "assistantProviderRefused": "Palveluntarjoaja hylkäsi tämän pyynnön, eikä sitä voi yrittää uudelleen.",
-      "assistantCreditsRefusal": "Krediitit eivät riitä Cloud Agentin käyttämiseen.",
+      "assistantCreditsRefusal": "Krediitit eivät riitä tähän pyyntöön.",
       "assistantOutputLimit": "Vastaus saavutti mallin tulostusrajan.",
       "assistantStructuredOutput": "Vastaus ei vastannut vaadittua muotoa.",
       "assistantFailed": "Vastauksen tuottaminen epäonnistui."

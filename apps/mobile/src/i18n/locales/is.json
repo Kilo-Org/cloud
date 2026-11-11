@@ -2315,7 +2315,7 @@
       "cloningSession": "Klónar lotuna",
       "couldNotLoadThisSession": "Ekki tókst að hlaða þessari lotu.",
       "cloneFailedRetry": "Ekki tókst að klóna þessa lotu. Reyndu aftur.",
-      "notEnoughCredits": "Inneignin nægir ekki til að keyra Cloud Agent. Bættu við inneign og reyndu aftur.",
+      "notEnoughCredits": "Inneignin nægir ekki fyrir þessa beiðni. Bættu við inneign og reyndu aftur.",
       "previousTaskFinishing": "Fyrra verkefninu er ekki alveg lokið. Bíddu augnablik.",
       "serviceUnavailable": "Þjónustan er ekki tiltæk núna. Reyndu aftur.",
       "connectionTrouble": "Vandamál kom upp við tengingu. Reyndu aftur eftir augnablik.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Samtalið er of langt fyrir líkanið.",
       "assistantProviderError": "Veitandinn skilaði villu.",
       "assistantProviderRefused": "Veitandinn hafnaði þessari beiðni og ekki er hægt að reyna aftur.",
-      "assistantCreditsRefusal": "Inneignin nægir ekki til að keyra Cloud Agent.",
+      "assistantCreditsRefusal": "Inneignin nægir ekki fyrir þessa beiðni.",
       "assistantOutputLimit": "Svarið náði úttaksmörkum líkansins.",
       "assistantStructuredOutput": "Svarið samræmist ekki umbeðnu sniði.",
       "assistantFailed": "Ekki tókst að mynda svarið."

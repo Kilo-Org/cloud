@@ -2441,7 +2441,7 @@
       "cloningSession": "Ag clónáil an tseisiúin",
       "couldNotLoadThisSession": "Níorbh fhéidir an seisiún seo a lódáil.",
       "cloneFailedRetry": "Níorbh fhéidir an seisiún seo a chlónáil. Bain triail as arís.",
-      "notEnoughCredits": "Níl go leor creidmheasanna agat chun Cloud Agent a rith. Cuir creidmheasanna leis agus bain triail as arís.",
+      "notEnoughCredits": "Níl go leor creidmheasanna agat don iarratas seo. Cuir creidmheasanna leis agus bain triail as arís.",
       "previousTaskFinishing": "Níl an tasc roimhe seo críochnaithe fós. Fan nóiméad, le do thoil.",
       "serviceUnavailable": "Níl an tseirbhís ar fáil faoi láthair. Bain triail as arís le do thoil.",
       "connectionTrouble": "Tá fadhb leis an nasc. Bain triail eile as i gceann nóiméid.",
@@ -2747,7 +2747,7 @@
       "assistantContextOverflow": "Tá an comhrá rófhada don tsamhail.",
       "assistantProviderError": "Chuir an soláthraí earráid ar ais.",
       "assistantProviderRefused": "Dhiúltaigh an soláthraí don iarratas seo agus ní féidir é a ath-thriail.",
-      "assistantCreditsRefusal": "Níl go leor creidmheasanna agat chun Cloud Agent a rith.",
+      "assistantCreditsRefusal": "Níl go leor creidmheasanna agat don iarratas seo.",
       "assistantOutputLimit": "Shroicheadh an teorainn aschuir den tsamhail.",
       "assistantStructuredOutput": "Ní raibh an freagra ag teacht leis an bhformáid riachtanach.",
       "assistantFailed": "Theip ar an bhfreagra."

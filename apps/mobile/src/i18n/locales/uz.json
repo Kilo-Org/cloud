@@ -2315,7 +2315,7 @@
       "cloningSession": "Sessiya klonlanmoqda",
       "couldNotLoadThisSession": "Bu sessiyani yuklab bo'lmadi.",
       "cloneFailedRetry": "Ushbu sessiyani klonlab bo'lmadi. Qayta urinib ko'ring.",
-      "notEnoughCredits": "Cloud Agent xizmatini ishga tushirish uchun kreditlar yetarli emas. Kreditlar qo'shing va qayta urinib ko'ring.",
+      "notEnoughCredits": "Bu so'rov uchun kreditlar yetarli emas. Kreditlar qo'shing va qayta urinib ko'ring.",
       "previousTaskFinishing": "Oldingi vazifa hali yakunlanmoqda. Biroz kuting.",
       "serviceUnavailable": "Xizmat hozir ishlamayapti. Qayta urinib ko'ring.",
       "connectionTrouble": "Ulanishda muammo yuz berdi. Birozdan keyin qayta urinib ko'ring.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Suhbat model uchun juda uzun.",
       "assistantProviderError": "Provayder xato qaytardi.",
       "assistantProviderRefused": "Provayder bu so'rovni rad etdi va uni qayta urinish mumkin emas.",
-      "assistantCreditsRefusal": "Cloud Agent xizmatini ishga tushirish uchun kreditlar yetarli emas.",
+      "assistantCreditsRefusal": "Bu so'rov uchun kreditlar yetarli emas.",
       "assistantOutputLimit": "Javob modelning chiqish chegarasiga yetdi.",
       "assistantStructuredOutput": "Javob kerakli formatga mos kelmadi.",
       "assistantFailed": "Javobni yaratib bo'lmadi."

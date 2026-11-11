@@ -2315,7 +2315,7 @@
       "cloningSession": "Клонирање на сесијата",
       "couldNotLoadThisSession": "Не успеа вчитувањето на оваа сесија.",
       "cloneFailedRetry": "Не успеа клонирањето на оваа сесија. Обиди се повторно.",
-      "notEnoughCredits": "Немаш доволно кредити за да го стартуваш Cloud Agent. Додај кредити и обиди се повторно.",
+      "notEnoughCredits": "Немаш доволно кредити за ова барање. Додај кредити и обиди се повторно.",
       "previousTaskFinishing": "Претходната задача сè уште се завршува. Почекај малку.",
       "serviceUnavailable": "Услугата во моментов не е достапна. Обиди се повторно.",
       "connectionTrouble": "Има проблем со врската. Обиди се повторно за кратко.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Разговорот е премногу долг за моделот.",
       "assistantProviderError": "Давателот врати грешка.",
       "assistantProviderRefused": "Давателот го одби барањето и тоа не може да се повтори.",
-      "assistantCreditsRefusal": "Немаш доволно кредити за да го стартуваш Cloud Agent.",
+      "assistantCreditsRefusal": "Немаш доволно кредити за ова барање.",
       "assistantOutputLimit": "Одговорот го достигна ограничувањето за излез на моделот.",
       "assistantStructuredOutput": "Одговорот не се совпаѓаше со бараниот формат.",
       "assistantFailed": "Не успеа создавањето на одговорот."

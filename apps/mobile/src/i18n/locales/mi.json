@@ -2315,7 +2315,7 @@
       "cloningSession": "Kei te tārua i te wātū",
       "couldNotLoadThisSession": "Kāore i taea te uta i tēnei wātū.",
       "cloneFailedRetry": "Kāore i taea te tārua i tēnei wātū. Whakamātau anō.",
-      "notEnoughCredits": "Kāore e rahi ana ngā moni tōmua hei whakahaere i a Cloud Agent. Tāpirihia he moni tōmua, kātahi ka whakamātau anō.",
+      "notEnoughCredits": "Kāore e rahi ana ngā moni tōmua hei whakahaere i tēnei tono. Tāpirihia he moni tōmua, kātahi ka whakamātau anō.",
       "previousTaskFinishing": "Kei te whakaoti tonu i te mahi o mua. Tatari mō tētahi wā poto.",
       "serviceUnavailable": "Kāore te ratonga e wātea ana ināianei. Whakamātau anō.",
       "connectionTrouble": "He raruraru kei te hononga. Whakamātau anō ā muri tata nei.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "He roa rawa te kōrerorero mō te tauira.",
       "assistantProviderError": "I whakahoki te kaiwhakarato i tētahi hapa.",
       "assistantProviderRefused": "I whakakāhoretia tēnei tono e te kaiwhakarato, ā, kāore e taea te whakamātau anō.",
-      "assistantCreditsRefusal": "Kāore e rahi ana ngā moni tōmua hei whakahaere i a Cloud Agent.",
+      "assistantCreditsRefusal": "Kāore e rahi ana ngā moni tōmua hei whakahaere i tēnei tono.",
       "assistantOutputLimit": "Tae rawa atu te whakautu ki te roa tōpū o ngā putanga a te tauira.",
       "assistantStructuredOutput": "Kāore te whakautu i te rite ki te hōputu e hiahiatia ana.",
       "assistantFailed": "I rahua te whakautu."

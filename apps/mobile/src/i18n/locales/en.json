@@ -2382,7 +2382,7 @@
       "cloningSession": "Cloning session",
       "couldNotLoadThisSession": "Couldn't load this session",
       "cloneFailedRetry": "Couldn't clone this session. Try again.",
-      "notEnoughCredits": "Not enough credits to run Cloud Agent. Add credits and try again.",
+      "notEnoughCredits": "Not enough credits for this request. Add credits and try again.",
       "previousTaskFinishing": "The previous task is still finishing. Please wait a moment.",
       "serviceUnavailable": "The service is unavailable right now. Please try again.",
       "connectionTrouble": "Connection trouble. Please retry in a moment.",
@@ -2687,7 +2687,7 @@
       "assistantContextOverflow": "The conversation is too long for the model.",
       "assistantProviderError": "The provider returned an error.",
       "assistantProviderRefused": "The provider refused this request and it cannot be retried.",
-      "assistantCreditsRefusal": "Not enough credits to run Cloud Agent.",
+      "assistantCreditsRefusal": "Not enough credits for this request.",
       "assistantOutputLimit": "The response reached the model's output limit.",
       "assistantStructuredOutput": "The response did not match the required format.",
       "assistantFailed": "The response failed."

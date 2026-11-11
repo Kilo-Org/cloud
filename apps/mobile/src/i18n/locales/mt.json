@@ -2441,7 +2441,7 @@
       "cloningSession": "Qed tiġi kklonjata s-sessjoni",
       "couldNotLoadThisSession": "Ma setgħetx titgħabba din is-sessjoni.",
       "cloneFailedRetry": "Ma setgħetx tiġi kklonjata din is-sessjoni. Erġa' pprova.",
-      "notEnoughCredits": "M'għandekx biżżejjed krediti biex tħaddem Cloud Agent. Żid krediti u erġa' pprova.",
+      "notEnoughCredits": "M'għandekx biżżejjed krediti għal din it-talba. Żid krediti u erġa' pprova.",
       "previousTaskFinishing": "Il-kompitu ta' qabel għadu qed jitlesta. Stenna ftit.",
       "serviceUnavailable": "Is-servizz mhux disponibbli bħalissa. Erġa' pprova.",
       "connectionTrouble": "Hemm problema bil-konnessjoni. Erġa' pprova ftit ieħor.",
@@ -2747,7 +2747,7 @@
       "assistantContextOverflow": "Il-konversazzjoni hija twila wisq għall-mudell.",
       "assistantProviderError": "Il-fornitur rritorna żball.",
       "assistantProviderRefused": "Il-fornitur ċaħad din it-talba u ma tistax terġa' tiġi pruvata.",
-      "assistantCreditsRefusal": "M'għandekx biżżejjed krediti biex tħaddem Cloud Agent.",
+      "assistantCreditsRefusal": "M'għandekx biżżejjed krediti għal din it-talba.",
       "assistantOutputLimit": "It-tweġiba laħqet il-limitu ta' output tal-mudell.",
       "assistantStructuredOutput": "It-tweġiba ma kinitx konformi mal-format meħtieġ.",
       "assistantFailed": "It-tweġiba falliet."

@@ -1819,7 +1819,7 @@
       "cloningSession": "Клонування сеансу",
       "couldNotLoadThisSession": "Не вдалося завантажити цей сеанс.",
       "cloneFailedRetry": "Не вдалося клонувати цей сеанс. Спробуйте ще раз.",
-      "notEnoughCredits": "Недостатньо кредитів для запуску Cloud Agent. Поповніть баланс і спробуйте ще раз.",
+      "notEnoughCredits": "Недостатньо кредитів для цього запиту. Поповніть баланс і спробуйте ще раз.",
       "previousTaskFinishing": "Попереднє завдання ще не завершено. Зачекайте трохи.",
       "serviceUnavailable": "Сервіс зараз недоступний. Спробуйте ще раз.",
       "connectionTrouble": "Виникли проблеми зі з'єднанням. Спробуйте ще раз трохи згодом.",
@@ -2121,7 +2121,7 @@
       "assistantContextOverflow": "Розмова занадто довга для моделі.",
       "assistantProviderError": "Постачальник повернув помилку.",
       "assistantProviderRefused": "Постачальник відхилив цей запит, і його не можна повторити.",
-      "assistantCreditsRefusal": "Недостатньо кредитів для запуску Cloud Agent.",
+      "assistantCreditsRefusal": "Недостатньо кредитів для цього запиту.",
       "assistantOutputLimit": "Відповідь досягла ліміту вихідних даних моделі.",
       "assistantStructuredOutput": "Відповідь не відповідає потрібному формату.",
       "assistantFailed": "Не вдалося сформувати відповідь."

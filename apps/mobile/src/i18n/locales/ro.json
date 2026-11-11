@@ -2357,7 +2357,7 @@
       "cloningSession": "Se clonează sesiunea",
       "couldNotLoadThisSession": "Nu s-a putut încărca această sesiune.",
       "cloneFailedRetry": "Nu s-a putut clona această sesiune. Încearcă din nou.",
-      "notEnoughCredits": "Nu ai suficiente credite pentru a rula Cloud Agent. Adaugă credite și încearcă din nou.",
+      "notEnoughCredits": "Nu ai suficiente credite pentru această solicitare. Adaugă credite și încearcă din nou.",
       "previousTaskFinishing": "Sarcina anterioară este în curs de finalizare. Așteaptă puțin.",
       "serviceUnavailable": "Serviciul nu este disponibil momentan. Încearcă din nou.",
       "connectionTrouble": "Există o problemă de conexiune. Încearcă din nou peste puțin timp.",
@@ -2655,7 +2655,7 @@
       "assistantContextOverflow": "Conversația este prea lungă pentru model.",
       "assistantProviderError": "Furnizorul a returnat o eroare.",
       "assistantProviderRefused": "Furnizorul a refuzat această cerere și nu poate fi reîncercată.",
-      "assistantCreditsRefusal": "Nu ai suficiente credite pentru a rula Cloud Agent.",
+      "assistantCreditsRefusal": "Nu ai suficiente credite pentru această solicitare.",
       "assistantOutputLimit": "Răspunsul a atins limita de ieșire a modelului.",
       "assistantStructuredOutput": "Răspunsul nu a corespuns formatului cerut.",
       "assistantFailed": "Generarea răspunsului a eșuat."

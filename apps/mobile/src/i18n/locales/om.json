@@ -2315,7 +2315,7 @@
       "cloningSession": "Turtii kopii gochaa jira",
       "couldNotLoadThisSession": "Turtii kana fe'uu hin danda'amne.",
       "cloneFailedRetry": "Turtii kana kopii gochuu hin danda'amne. Deebi'ii yaali.",
-      "notEnoughCredits": "Cloud Agent hojjechiisuuf kiriiditii gahaa hin qabdu. Kiriiditii dabaliitii deebi'ii yaali.",
+      "notEnoughCredits": "Gaaffii kanaaf kiriiditii gahaa hin qabdu. Kiriiditii dabaliitii deebi'ii yaali.",
       "previousTaskFinishing": "Hojiin duraanii amma iyyuu xumuramaa jira. Yeroo muraasa eegi.",
       "serviceUnavailable": "Tajaajilli yeroo ammaa hin argamu. Deebi'ii yaali.",
       "connectionTrouble": "Walqabannaan rakkoo qaba. Yeroo muraasa booda deebi'ii yaali.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Mariin kun moodelichaaf baay'ee dheeraadha.",
       "assistantProviderError": "Dhiyeessaan dogoggora deebisee.",
       "assistantProviderRefused": "Dhiyeessaan gaaffii kana dideera, kanaaf irra deebi'uun hin danda'amu.",
-      "assistantCreditsRefusal": "Cloud Agent hojjechiisuuf kiriiditii gahaa hin qabdu.",
+      "assistantCreditsRefusal": "Gaaffii kanaaf kiriiditii gahaa hin qabdu.",
       "assistantOutputLimit": "Deebiin daangaa baha moodelichaa ga'e.",
       "assistantStructuredOutput": "Deebiin akkaataa barbaachisu waliin hin wal simane.",
       "assistantFailed": "Deebii kennuun hin milkoofne."

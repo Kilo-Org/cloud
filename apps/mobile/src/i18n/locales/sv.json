@@ -2315,7 +2315,7 @@
       "cloningSession": "Klonar sessionen",
       "couldNotLoadThisSession": "Det gick inte att läsa in den här sessionen",
       "cloneFailedRetry": "Kunde inte klona den här sessionen. Försök igen.",
-      "notEnoughCredits": "Du har inte tillräckligt med krediter för att köra Cloud Agent. Fyll på krediter och försök igen.",
+      "notEnoughCredits": "Du har inte tillräckligt med krediter för den här förfrågan. Fyll på krediter och försök igen.",
       "previousTaskFinishing": "Den föregående uppgiften håller på att avslutas. Vänta en stund.",
       "serviceUnavailable": "Tjänsten är inte tillgänglig just nu. Försök igen.",
       "connectionTrouble": "Det är problem med anslutningen. Försök igen om en stund.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Konversationen är för lång för modellen.",
       "assistantProviderError": "Leverantören returnerade ett fel.",
       "assistantProviderRefused": "Leverantören avvisade begäran och den kan inte göras om.",
-      "assistantCreditsRefusal": "Du har inte tillräckligt med krediter för att köra Cloud Agent.",
+      "assistantCreditsRefusal": "Du har inte tillräckligt med krediter för den här förfrågan.",
       "assistantOutputLimit": "Svaret nådde modellens utdata-gräns.",
       "assistantStructuredOutput": "Svaret matchade inte det begärda formatet.",
       "assistantFailed": "Det gick inte att generera svaret."

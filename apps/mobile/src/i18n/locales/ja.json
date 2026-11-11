@@ -1777,7 +1777,7 @@
       "cloningSession": "セッションを複製中",
       "couldNotLoadThisSession": "このセッションを読み込めませんでした。",
       "cloneFailedRetry": "このセッションを複製できませんでした。もう一度お試しください。",
-      "notEnoughCredits": "Cloud Agentを実行するためのクレジットが不足しています。クレジットを追加して、もう一度お試しください。",
+      "notEnoughCredits": "このリクエストに必要なクレジットが不足しています。クレジットを追加して、もう一度お試しください。",
       "previousTaskFinishing": "前のタスクの終了処理中です。少々お待ちください。",
       "serviceUnavailable": "サービスは現在利用できません。もう一度お試しください。",
       "connectionTrouble": "接続に問題があります。しばらくしてから、もう一度お試しください。",
@@ -2071,7 +2071,7 @@
       "assistantContextOverflow": "会話が長すぎてモデルで処理できません。",
       "assistantProviderError": "プロバイダーがエラーを返しました。",
       "assistantProviderRefused": "プロバイダーがこのリクエストを拒否したため、再試行できません。",
-      "assistantCreditsRefusal": "Cloud Agentを実行するためのクレジットが不足しています。",
+      "assistantCreditsRefusal": "このリクエストに必要なクレジットが不足しています。",
       "assistantOutputLimit": "応答がモデルの出力上限に達しました。",
       "assistantStructuredOutput": "応答が必要な形式に一致しませんでした。",
       "assistantFailed": "応答に失敗しました。"

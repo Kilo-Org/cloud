@@ -2315,7 +2315,7 @@
       "cloningSession": "Inanakili kikao",
       "couldNotLoadThisSession": "Imeshindikana kupakia kikao hiki.",
       "cloneFailedRetry": "Imeshindikana kunakili kikao hiki. Jaribu tena.",
-      "notEnoughCredits": "Salio halitoshi kuendesha Cloud Agent. Ongeza salio na ujaribu tena.",
+      "notEnoughCredits": "Salio halitoshi kwa ombi hili. Ongeza salio na ujaribu tena.",
       "previousTaskFinishing": "Kazi iliyotangulia bado inakamilika. Tafadhali subiri kidogo.",
       "serviceUnavailable": "Huduma haipatikani sasa hivi. Tafadhali jaribu tena.",
       "connectionTrouble": "Kuna tatizo la muunganisho. Tafadhali jaribu tena baada ya muda mfupi.",
@@ -2609,7 +2609,7 @@
       "assistantContextOverflow": "Mazungumzo ni marefu mno kwa modeli.",
       "assistantProviderError": "Mtoa huduma alirudisha kosa.",
       "assistantProviderRefused": "Mtoa huduma alikataa ombi hili na haliwezi kujaribiwa tena.",
-      "assistantCreditsRefusal": "Salio halitoshi kuendesha Cloud Agent.",
+      "assistantCreditsRefusal": "Salio halitoshi kwa ombi hili.",
       "assistantOutputLimit": "Jibu lilifikisha kikomo cha matokeo ya modeli.",
       "assistantStructuredOutput": "Jibu halikulingana na muundo unaohitajika.",
       "assistantFailed": "Imeshindikana kutoa jibu."

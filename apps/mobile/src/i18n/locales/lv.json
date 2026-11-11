@@ -2357,7 +2357,7 @@
       "cloningSession": "Klonē sesiju…",
       "couldNotLoadThisSession": "Neizdevās ielādēt šo sesiju.",
       "cloneFailedRetry": "Neizdevās klonēt šo sesiju. Mēģini vēlreiz.",
-      "notEnoughCredits": "Nepietiek kredītu, lai palaistu Cloud Agent. Papildini kredītus un mēģini vēlreiz.",
+      "notEnoughCredits": "Nepietiek kredītu šim pieprasījumam. Papildini kredītus un mēģini vēlreiz.",
       "previousTaskFinishing": "Iepriekšējā uzdevuma izpilde vēl nav beigusies. Lūdzu, nedaudz uzgaidi.",
       "serviceUnavailable": "Pakalpojums šobrīd nav pieejams. Lūdzu, mēģini vēlreiz.",
       "connectionTrouble": "Savienojuma problēma. Lūdzu, mēģini vēlreiz pēc mirkļa.",
@@ -2655,7 +2655,7 @@
       "assistantContextOverflow": "Saruna modelim ir pārāk gara.",
       "assistantProviderError": "Pakalpojumu sniedzējs atgrieza kļūdu.",
       "assistantProviderRefused": "Pakalpojumu sniedzējs noraidīja šo pieprasījumu, un to nevar atkārtot.",
-      "assistantCreditsRefusal": "Nepietiek kredītu, lai palaistu Cloud Agent.",
+      "assistantCreditsRefusal": "Nepietiek kredītu šim pieprasījumam.",
       "assistantOutputLimit": "Atbilde sasniedza modeļa izvades ierobežojumu.",
       "assistantStructuredOutput": "Atbilde neatbilda pieprasītajam formātam.",
       "assistantFailed": "Neizdevās sagatavot atbildi."

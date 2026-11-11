@@ -229,6 +229,21 @@
     "signInCodeField": "ସାଇନ୍ ଇନ୍ କୋଡ୍",
     "or": "କିମ୍ବା"
   },
+  "pendingLink": {
+    "description": "{{email}} ପୂର୍ବରୁ ଏକ ଆକାଉଣ୍ଟ ବ୍ୟବହାର କରୁଛି। {{provider}} ଯୋଡ଼ିବା ପାଇଁ ଏହାର ଗୋଟିଏ ପଦ୍ଧତିରେ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।",
+    "emailCode": "ମୋତେ ସାଇନ୍ ଇନ୍ କୋଡ୍ ଇମେଲ୍ କରନ୍ତୁ",
+    "continueInBrowser": "ବ୍ରାଉଜରରେ ଜାରି ରଖନ୍ତୁ",
+    "startAgain": "ପୁଣି ଆରମ୍ଭ କରନ୍ତୁ",
+    "expired": "{{provider}} ଯୋଡ଼ିବାର ଏହି ଅନୁରୋଧର ମିଆଦ ଶେଷ ହୋଇଛି।",
+    "noMethods": "ଏହି ଆକାଉଣ୍ଟର ଅନ୍ୟ କୌଣସି ସାଇନ୍ ଇନ୍ ପଦ୍ଧତି ନାହିଁ, ତେଣୁ {{provider}} ଯୋଡ଼ାଯାଇପାରିବ ନାହିଁ।",
+    "linked": "{{provider}} ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ଯୋଡ଼ାଗଲା।",
+    "failedExpired": "ଅନୁରୋଧର ମିଆଦ ଶେଷ ହୋଇଥିବାରୁ {{provider}} ଯୋଡ଼ାଗଲା ନାହିଁ।",
+    "failedWrongAccount": "ଆପଣ ଏକ ଭିନ୍ନ ଆକାଉଣ୍ଟରେ ସାଇନ୍ ଇନ୍ କରିଥିବାରୁ {{provider}} ଯୋଡ଼ାଗଲା ନାହିଁ।",
+    "failedAccountAlreadyLinked": "{{provider}} ପୂର୍ବରୁ ଅନ୍ୟ ଏକ ଆକାଉଣ୍ଟ ସହ ଲିଙ୍କ୍ ହୋଇଥିବାରୁ ଯୋଡ଼ାଗଲା ନାହିଁ।",
+    "failedProviderAlreadyLinked": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ପୂର୍ବରୁ ଏକ ଭିନ୍ନ {{provider}} ସାଇନ୍ ଇନ୍ ଥିବାରୁ {{provider}} ଯୋଡ଼ାଗଲା ନାହିଁ।",
+    "failedLinking": "{{provider}} ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ଯୋଡ଼ାଯାଇପାରିଲା ନାହିଁ।",
+    "notAdded": "ଆପଣ ସାଇନ୍ ଇନ୍ କରିଛନ୍ତି। {{provider}} ଆପଣଙ୍କ ଆକାଉଣ୍ଟରେ ଯୋଡ଼ାଗଲା ନାହିଁ।"
+  },
   "profile": {
     "codeReviewerSubtitle": "ସ୍ୱୟଂଚାଳିତ PR ସମୀକ୍ଷା",
     "securityAgentSubtitle": "ସୁରକ୍ଷା ଦୁର୍ବଳତା ଖୋଜି ସୁଧାରନ୍ତୁ",
@@ -248,6 +263,7 @@
     "confirmDeletion": "ବିଲୋପ ନିଶ୍ଚିତ କରନ୍ତୁ",
     "credits": "କ୍ରେଡିଟ୍",
     "failedToLoadBalance": "ବ୍ୟାଲାନ୍ସ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବାକୁ ଟାପ୍ କରନ୍ତୁ।",
+    "balanceLoadFailed": "ବ୍ୟାଲାନ୍ସ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
     "hideBalance": "ବ୍ୟାଲାନ୍ସ ଲୁଚାନ୍ତୁ",
     "showBalance": "ବ୍ୟାଲାନ୍ସ ଦେଖାନ୍ତୁ",
     "balanceHidden": "ବ୍ୟାଲାନ୍ସ ଲୁଚିଛି",
@@ -266,6 +282,8 @@
     "providerTestAccount": "ପରୀକ୍ଷଣ ଆକାଉଣ୍ଟ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "ଏଣ୍ଟରପ୍ରାଇଜ୍ SSO",
     "passkeysTitle": "ପାସକି",
     "passkeysSubtitle": "ପାସୱାର୍ଡ ବିନା ସାଇନ୍ ଇନ୍ କରନ୍ତୁ",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟରେ କୌଣସି ଫାଇଲ୍ ପରିବର୍ତ୍ତନ ନାହିଁ।",
     "fileList": {
       "openNavigator": "ଫାଇଲ୍ ତାଲିକା ଖୋଲନ୍ତୁ",
-      "filesViewed": "ଫାଇଲ୍ · {{total}} ମଧ୍ୟରୁ {{viewed}} ଦେଖିସାରିଛନ୍ତି",
       "listed": "(ତାଲିକାଭୁକ୍ତ)",
       "layout": "ବିନ୍ୟାସ",
       "unified": "ଏକାଠି",
@@ -2298,7 +2315,7 @@
       "cloningSession": "ସେସନର ନକଲ ତିଆରି ହେଉଛି",
       "couldNotLoadThisSession": "ଏହି ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "cloneFailedRetry": "ଏହି ସେସନର ନକଲ ତିଆରି ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-      "notEnoughCredits": "Cloud Agent ଚଲାଇବାକୁ ପର୍ଯ୍ୟାପ୍ତ କ୍ରେଡିଟ୍ ନାହିଁ। କ୍ରେଡିଟ୍ ଯୋଡ଼ି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "notEnoughCredits": "ଏହି ଅନୁରୋଧ ପାଇଁ ପର୍ଯ୍ୟାପ୍ତ କ୍ରେଡିଟ୍ ନାହିଁ। କ୍ରେଡିଟ୍ ଯୋଡ଼ି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "previousTaskFinishing": "ପୂର୍ବ କାମ ଏଯାଏଁ ସରିନାହିଁ। କିଛି ସମୟ ଅପେକ୍ଷା କରନ୍ତୁ।",
       "serviceUnavailable": "ସେବା ଏବେ ଉପଲବ୍ଧ ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "connectionTrouble": "ସଂଯୋଗରେ ସମସ୍ୟା ହୋଇଛି। ଦୟାକରି କିଛି ସମୟ ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "ଆପଣଙ୍କ ପ୍ରମ୍ପ୍ଟ ଏବଂ କୌଣସି ପଠାଯାଇଥିବା ବାର୍ତ୍ତାରେ ଯୋଡ଼ା ହୋଇନଥିବା ଅପଲୋଡ୍ ଫାଇଲ୍ ହଟିଯିବ।",
       "discardFailed": "ଡ୍ରାଫ୍ଟ ହଟାଇ ହେଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "remoteHint": "ଆପଣଙ୍କ କମ୍ପ୍ୟୁଟରରେ ଚଲାଇବା ପାଇଁ, ସେଠାରେ Kilo ଆରମ୍ଭ କରନ୍ତୁ ଏବଂ ଏହାକୁ ଚାଲିବା ଅବସ୍ଥାରେ ଛାଡ଼ି ଦିଅନ୍ତୁ।",
-      "continueFrom": "{{title}} ଜାରି ରଖାଯାଉଛି।",
+      "continueFrom": "“{{title}}” ଜାରି ରଖାଯାଉଛି।",
       "importingSession": "ସେସନ୍ ଆମଦାନି ହେଉଛି",
       "cliCannotContinue": "ଏହି CLI ସେସନ୍ ଜାରି ରଖିପାରିବ ନାହିଁ। Cloud Agent କିମ୍ବା ଅନ୍ୟ ଏକ CLI ବାଛନ୍ତୁ।",
       "importFailed": "ଏହି ସେସନ୍ ଆମଦାନି ହୋଇପାରିଲା ନାହିଁ।",
@@ -2460,6 +2477,8 @@
       "toolList": "ତାଲିକା",
       "toolPatch": "ପ୍ୟାଚ୍",
       "toolTask": "କାର୍ଯ୍ୟ",
+      "toolSendFile": "ଫାଇଲ ପଠାଗଲା",
+      "toolSendFileAction": "ଫାଇଲ ପଠାଇବା",
       "readTodos": "ଯୋଜନା ପଢ଼ନ୍ତୁ",
       "updateTodos": "ଯୋଜନା ଅଦ୍ୟତନ କରନ୍ତୁ",
       "linesBadge": "{{displayCount}}ଟି ଧାଡ଼ି",
@@ -2560,7 +2579,21 @@
       "thought": "ଚିନ୍ତନ",
       "showDetails": "ବିବରଣୀ ଦେଖାନ୍ତୁ",
       "pending": "ଅପେକ୍ଷାରେ…",
-      "running": "ଚାଲୁଛି…"
+      "running": "ଚାଲୁଛି…",
+      "field": {
+        "filePath": "ଫାଇଲ୍ ପଥ",
+        "path": "ପଥ",
+        "offset": "ଅଫସେଟ୍",
+        "limit": "ସୀମା",
+        "pattern": "ପାଟର୍ନ",
+        "include": "ଅନ୍ତର୍ଭୁକ୍ତ",
+        "patchText": "ପ୍ୟାଚ୍ ପାଠ୍ୟ",
+        "query": "ଅନୁସନ୍ଧାନ",
+        "prompt": "ପ୍ରମ୍ପଟ୍",
+        "header": "ଶୀର୍ଷକ",
+        "question": "ପ୍ରଶ୍ନ",
+        "options": "ବିକଳ୍ପ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "ବିଷୟବସ୍ତୁ ଦେଖାଇ ହେଲା ନାହିଁ।"
@@ -2576,7 +2609,7 @@
       "assistantContextOverflow": "ବାର୍ତ୍ତାଳାପ ମଡେଲ୍ ପାଇଁ ଅତ୍ୟଧିକ ଲମ୍ବା ହୋଇଗଲାଣି।",
       "assistantProviderError": "ସେବା ପ୍ରଦାନକାରୀ ଏକ ତ୍ରୁଟି ଫେରାଇଲେ।",
       "assistantProviderRefused": "ସେବା ପ୍ରଦାନକାରୀ ଏହି ଅନୁରୋଧକୁ ଅସ୍ୱୀକାର କଲେ ଏବଂ ଏହା ପୁନଃଚେଷ୍ଟା କରାଯାଇପାରିବ ନାହିଁ।",
-      "assistantCreditsRefusal": "Cloud Agent ଚଲାଇବାକୁ ପର୍ଯ୍ୟାପ୍ତ କ୍ରେଡିଟ୍ ନାହିଁ।",
+      "assistantCreditsRefusal": "ଏହି ଅନୁରୋଧ ପାଇଁ ପର୍ଯ୍ୟାପ୍ତ କ୍ରେଡିଟ୍ ନାହିଁ।",
       "assistantOutputLimit": "ଉତ୍ତର ମଡେଲ୍ର ଆଉଟପୁଟ୍ ସୀମାରେ ପହଞ୍ଚିଲା।",
       "assistantStructuredOutput": "ଉତ୍ତର ଆବଶ୍ୟକ ଫର୍ମାଟ୍ ସହିତ ମେଳ ହେଲା ନାହିଁ।",
       "assistantFailed": "ଉତ୍ତର ଦେବାରେ ବିଫଳ ହେଲା।"
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "ଏହି ମଡେଲ୍ ଚିନ୍ତନର ମାତ୍ରାକୁ ସମର୍ଥନ କରେ"
     },
-    "creditsRequired": "ଏହି ମେସେଜ୍ ପଠାଇବା ପାଇଁ ଯଥେଷ୍ଟ କ୍ରେଡିଟ୍ ନାହିଁ। କ୍ରେଡିଟ୍ ଯୋଡ଼ି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+    "creditsRequired": "ଏହି ମେସେଜ୍ ପଠାଇବା ପାଇଁ ଯଥେଷ୍ଟ କ୍ରେଡିଟ୍ ନାହିଁ।"
   },
   "settingsTools": {
     "confirmTitle": "ଏହି ପରିବର୍ତ୍ତନ ନିଶ୍ଚିତ କରିବେ?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "ମୋର ଏଜେଣ୍ଟ",
       "promptPlaceholder": "ତୁମେ ଏକ ...",
       "tools": "ସାଧନଗୁଡ଼ିକ।",
+      "wholeToolRule": "ଏହି ଏଜେଣ୍ଟ ଏକସାଥେ ପ୍ରତ୍ୟେକ ସାଧନ ଉପରେ ଗୋଟିଏ ନିୟମ ପ୍ରୟୋଗ କରେ: {{rule}}। ଏହି ସୁଇଚଗୁଡ଼ିକ କେବଳ ପଠନଯୋଗ୍ୟ।",
       "visibility": "ଦୃଶ୍ୟମାନତା।",
       "visibilityPrimary": "ପ୍ରାଥମିକ — ପିକଚରରେ ଦର୍ଶାଯାଇଛି।",
       "visibilitySubagent": "ସବଜେଣ୍ଟ୍ — କେବଳ ଅନ୍ୟମାନଙ୍କଠାରୁ କଲ୍ ଯୋଗ୍ୟ।",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "ରେପୋ ପାଇଁ ଡିଫଲ୍ଟ ପ୍ରୋଫାଇଲ୍।",
+      "entryLabel": "ଡିଫଲ୍ଟ ପ୍ରୋଫାଇଲ୍",
       "add": "ଡିଫଲ୍ଟ ଯୋଡନ୍ତୁ।",
       "empty": "କୌଣସି ଡିଫଲ୍ଟ ବିନ୍ୟାସ ହୋଇନାହିଁ।",
       "emptyDescription": "ଏକ ରେପୋ ପାଇଁ ଅଧିବେଶନ ଆରମ୍ଭ କରିବା ସମୟରେ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ଏକ ପ୍ରୋଫାଇଲ୍ ପ୍ରୟୋଗ କରିବାକୁ ଏକ ଡିଫଲ୍ଟ ଯୋଡନ୍ତୁ।",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "ଅନୁସୂଚିତ ରିପୋର୍ଟ ପାଇଁ କୌଣସି ପ୍ରସଙ୍ଗ ସକ୍ଷମ ହୋଇନାହିଁ",
     "sourceBlocker": "ସେସନ୍ ପ୍ରତି ଧ୍ୟାନ ଦେବା ଆବଶ୍ୟକ",
     "sourceMetadata": "ସଂରକ୍ଷିତ ସେସନ୍ ମେଟାଡାଟା"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "ଏହି ଖୋଜା ଫଳାଫଳ ଖୋଲିହେଲା ନାହିଁ"
   }
 }

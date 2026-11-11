@@ -4,13 +4,12 @@ import * as Sentry from '@sentry/nextjs';
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import pLimit from 'p-limit';
-import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import {
   createdOnPlatformForFilter,
-  sidebarFolderListInput,
   sidebarListInput,
+  sidebarWorkspaceListInput,
   workspaceFoldersQueryKey,
   worktreeDetailsBatches,
 } from '../hooks/sidebar-queries';
@@ -69,7 +68,7 @@ async function prefetchSidebar(
     gitUrl: projectFilter.length > 0 ? projectFilter : undefined,
   };
   const foldersOptions = trpc.workspaceFolders.list.queryOptions({ organizationId });
-  const [list, folders] = await Promise.all([
+  const [list] = await Promise.all([
     queryClient.query(
       trpc.cliSessionsV2.list.queryOptions(sidebarListInput({ updatedSince, ...filters }))
     ),
@@ -77,24 +76,15 @@ async function prefetchSidebar(
       ...foldersOptions,
       queryKey: workspaceFoldersQueryKey(foldersOptions.queryKey, userId),
     }),
+    queryClient.prefetchInfiniteQuery(
+      trpc.cliSessionsV2.listWorkspaces.infiniteQueryOptions(sidebarWorkspaceListInput(filters), {
+        getNextPageParam: lastPage => lastPage.nextCursor ?? undefined,
+      })
+    ),
+    queryClient.query(trpc.cloudAgentSettings.getWorkspaceOrder.queryOptions()),
   ]);
-  const folderWorktreeIds = new Set(folders.folders.flatMap(folder => folder.worktreeIds));
   const limit = pLimit(4);
-  const folderLists = await Promise.all(
-    [...folderWorktreeIds].flatMap(id => {
-      const parsed = cloudAgentWorktreeIdSchema.safeParse(id);
-      if (!parsed.success) return [];
-      return [
-        limit(() => {
-          if (Date.now() >= deadlineAt) return undefined;
-          return queryClient.query(
-            trpc.cliSessionsV2.list.queryOptions(sidebarFolderListInput(parsed.data, filters))
-          );
-        }),
-      ];
-    })
-  );
-  const sessions = [list, ...folderLists].flatMap(result => result?.cliSessions ?? []);
+  const sessions = list?.cliSessions ?? [];
   await Promise.all(
     worktreeDetailsBatches(sessions.map(session => session.cloud_agent_worktree_id)).map(
       worktreeIds =>

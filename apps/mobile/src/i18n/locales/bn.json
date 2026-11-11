@@ -229,6 +229,21 @@
     "signInCodeField": "সাইন-ইন কোড",
     "or": "বা"
   },
+  "pendingLink": {
+    "description": "{{email}} ইতিমধ্যে একটি অ্যাকাউন্টে ব্যবহৃত হচ্ছে। {{provider}} যোগ করতে সেটির কোনো একটি পদ্ধতিতে সাইন ইন করুন।",
+    "emailCode": "আমাকে একটি সাইন-ইন কোড ইমেল করুন",
+    "continueInBrowser": "ব্রাউজারে চালিয়ে যান",
+    "startAgain": "আবার শুরু করুন",
+    "expired": "{{provider}} যোগ করার এই অনুরোধের মেয়াদ শেষ হয়ে গেছে।",
+    "noMethods": "এই অ্যাকাউন্টে সাইন ইন করার অন্য কোনো পদ্ধতি নেই, তাই {{provider}} যোগ করা যাবে না।",
+    "linked": "{{provider}} আপনার অ্যাকাউন্টে যোগ করা হয়েছে।",
+    "failedExpired": "অনুরোধের মেয়াদ শেষ হয়ে যাওয়ায় {{provider}} যোগ করা হয়নি।",
+    "failedWrongAccount": "আপনি অন্য একটি অ্যাকাউন্টে সাইন ইন করেছেন, তাই {{provider}} যোগ করা হয়নি।",
+    "failedAccountAlreadyLinked": "{{provider}} ইতিমধ্যে অন্য একটি অ্যাকাউন্টের সঙ্গে লিংক করা আছে, তাই এটি যোগ করা হয়নি।",
+    "failedProviderAlreadyLinked": "আপনার অ্যাকাউন্টে ইতিমধ্যে একটি ভিন্ন {{provider}} সাইন-ইন আছে, তাই {{provider}} যোগ করা হয়নি।",
+    "failedLinking": "{{provider}} আপনার অ্যাকাউন্টে যোগ করা যায়নি।",
+    "notAdded": "আপনি সাইন ইন করেছেন। {{provider}} আপনার অ্যাকাউন্টে যোগ করা হয়নি।"
+  },
   "profile": {
     "codeReviewerSubtitle": "স্বয়ংক্রিয় PR রিভিউ",
     "securityAgentSubtitle": "নিরাপত্তার দুর্বলতা খুঁজে ঠিক করুন",
@@ -248,6 +263,7 @@
     "confirmDeletion": "মুছে ফেলা নিশ্চিত করুন",
     "credits": "ক্রেডিট",
     "failedToLoadBalance": "ব্যালেন্স লোড করা যায়নি। আবার চেষ্টা করতে ট্যাপ করুন।",
+    "balanceLoadFailed": "ব্যালেন্স লোড করা যায়নি",
     "hideBalance": "ব্যালেন্স লুকান",
     "showBalance": "ব্যালেন্স দেখান",
     "balanceHidden": "ব্যালেন্স লুকানো আছে",
@@ -266,6 +282,8 @@
     "providerTestAccount": "পরীক্ষার অ্যাকাউন্ট",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "এন্টারপ্রাইজ SSO",
     "passkeysTitle": "পাসকি",
     "passkeysSubtitle": "পাসওয়ার্ড ছাড়াই সাইন ইন করুন",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "এই পুল রিকোয়েস্টে কোনো ফাইলে পরিবর্তন করা হয়নি।",
     "fileList": {
       "openNavigator": "ফাইল নেভিগেটর খুলুন",
-      "filesViewed": "ফাইল · {{total}}টির মধ্যে {{viewed}}টি দেখা হয়েছে",
       "listed": "(তালিকাভুক্ত)",
       "layout": "বিন্যাস",
       "unified": "একত্রে",
@@ -2304,7 +2321,7 @@
       "cloningSession": "সেশন ক্লোন হচ্ছে",
       "couldNotLoadThisSession": "এই সেশনটি লোড করা যায়নি।",
       "cloneFailedRetry": "এই সেশনটি ক্লোন করা যায়নি। আবার চেষ্টা করুন।",
-      "notEnoughCredits": "Cloud Agent চালানোর জন্য পর্যাপ্ত ক্রেডিট নেই। ক্রেডিট যোগ করে আবার চেষ্টা করুন।",
+      "notEnoughCredits": "এই অনুরোধের জন্য পর্যাপ্ত ক্রেডিট নেই। ক্রেডিট যোগ করে আবার চেষ্টা করুন।",
       "previousTaskFinishing": "আগের কাজটি শেষ হতে আরও কিছু সময় লাগছে। একটু অপেক্ষা করুন।",
       "serviceUnavailable": "সেবাটি এখন পাওয়া যাচ্ছে না। আবার চেষ্টা করুন।",
       "connectionTrouble": "সংযোগে সমস্যা হয়েছে। কিছুক্ষণ পরে আবার চেষ্টা করুন।",
@@ -2414,7 +2431,7 @@
       "discardWithUploadsMessage": "আপনার প্রম্পট এবং আপলোড করা কিন্তু কোনো বার্তায় ব্যবহার না করা ফাইলগুলো মুছে ফেলা হবে।",
       "discardFailed": "খসড়াটি বাতিল করা যায়নি। আবার চেষ্টা করুন।",
       "remoteHint": "আপনার কম্পিউটারে চালানোর জন্য সেখানে Kilo চালু করুন এবং চালু অবস্থায় রেখে দিন।",
-      "continueFrom": "{{title}} চালিয়ে যাওয়া হচ্ছে।",
+      "continueFrom": "“{{title}}” চালিয়ে যাওয়া হচ্ছে।",
       "importingSession": "সেশন ইমপোর্ট হচ্ছে",
       "cliCannotContinue": "এই CLI দিয়ে আগের সেশন চালিয়ে যাওয়া যায় না। Cloud Agent বা অন্য একটি CLI বেছে নিন।",
       "importFailed": "এই সেশনটি ইমপোর্ট করা যায়নি।",
@@ -2466,6 +2483,8 @@
       "toolList": "তালিকা দেখা",
       "toolPatch": "পরিবর্তন প্রয়োগ",
       "toolTask": "কাজ",
+      "toolSendFile": "ফাইল পাঠানো হয়েছে",
+      "toolSendFileAction": "ফাইল পাঠান",
       "readTodos": "প্ল্যান পড়ুন",
       "updateTodos": "প্ল্যান আপডেট করুন",
       "linesBadge": "{{displayCount}}টি লাইন",
@@ -2566,7 +2585,21 @@
       "thought": "চিন্তাভাবনা",
       "showDetails": "বিস্তারিত দেখান",
       "pending": "অপেক্ষমাণ…",
-      "running": "চলছে…"
+      "running": "চলছে…",
+      "field": {
+        "filePath": "ফাইল পাথ",
+        "path": "পাথ",
+        "offset": "অফসেট",
+        "limit": "সীমা",
+        "pattern": "প্যাটার্ন",
+        "include": "অন্তর্ভুক্তি",
+        "patchText": "প্যাচ পাঠ্য",
+        "query": "অনুসন্ধান",
+        "prompt": "নির্দেশনা",
+        "header": "শিরোনাম",
+        "question": "প্রশ্ন",
+        "options": "বিকল্প"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "বিষয়বস্তু দেখানো যায়নি।"
@@ -2582,7 +2615,7 @@
       "assistantContextOverflow": "কথোপকথনটি মডেলের জন্য খুব দীর্ঘ।",
       "assistantProviderError": "প্রোভাইডার একটি ত্রুটি ফেরত দিয়েছে।",
       "assistantProviderRefused": "প্রোভাইডার এই অনুরোধটি প্রত্যাখ্যান করেছে এবং এটি আবার চেষ্টা করা যাবে না।",
-      "assistantCreditsRefusal": "Cloud Agent চালানোর জন্য পর্যাপ্ত ক্রেডিট নেই।",
+      "assistantCreditsRefusal": "এই অনুরোধের জন্য পর্যাপ্ত ক্রেডিট নেই।",
       "assistantOutputLimit": "উত্তরটি মডেলের সর্বোচ্চ আউটপুট সীমায় পৌঁছেছে।",
       "assistantStructuredOutput": "উত্তরটি প্রয়োজনীয় ফরম্যাটের সঙ্গে মেলেনি।",
       "assistantFailed": "উত্তর তৈরি করা যায়নি।"
@@ -3808,7 +3841,7 @@
     "reasoningEffort": {
       "modelFlag": "এই মডেল চিন্তার মাত্রা সমর্থন করে"
     },
-    "creditsRequired": "এই বার্তা পাঠানোর জন্য পর্যাপ্ত ক্রেডিট নেই। ক্রেডিট যোগ করে আবার চেষ্টা করুন।"
+    "creditsRequired": "এই বার্তা পাঠানোর জন্য পর্যাপ্ত ক্রেডিট নেই।"
   },
   "settingsTools": {
     "confirmTitle": "এই পরিবর্তন নিশ্চিত করবেন?"
@@ -4001,6 +4034,7 @@
       "namePlaceholder": "আমার এজেন্ট",
       "promptPlaceholder": "আপনি একটি...",
       "tools": "টুলস",
+      "wholeToolRule": "এই এজেন্ট একবারে প্রতিটি টুলে একটি নিয়ম প্রয়োগ করে: {{rule}}। এই সুইচগুলো শুধুমাত্র পাঠযোগ্য।",
       "visibility": "দৃশ্যমানতা",
       "visibilityPrimary": "প্রাথমিক — পিকারে দেখানো হয়েছে",
       "visibilitySubagent": "Subagent — শুধুমাত্র অন্যদের থেকে কলযোগ্য",
@@ -4042,6 +4076,7 @@
     },
     "repoBindings": {
       "title": "Repos এর জন্য ডিফল্ট প্রোফাইল",
+      "entryLabel": "ডিফল্ট প্রোফাইল",
       "add": "ডিফল্ট যোগ করুন",
       "empty": "কোন ডিফল্ট কনফিগার করা",
       "emptyDescription": "একটি রেপোর জন্য সেশন শুরু করার সময় স্বয়ংক্রিয়ভাবে একটি প্রোফাইল প্রয়োগ করতে একটি ডিফল্ট যোগ করুন।",
@@ -4249,5 +4284,8 @@
     "noEnabledContexts": "নির্ধারিত ব্রিফিংয়ের জন্য কোনো কনটেক্সট চালু নেই",
     "sourceBlocker": "সেশনে মনোযোগ দেওয়া প্রয়োজন",
     "sourceMetadata": "সংরক্ষিত সেশন মেটাডেটা"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "এই অনুসন্ধানের ফলাফল খোলা যায়নি"
   }
 }

@@ -228,6 +228,12 @@ async function settleTimers(predicate: () => boolean, attempts = 20): Promise<vo
 
 // ── Tests ────────────────────────────────────────────────────────────
 
+/**
+ * A pack row's credit amount keeps its own left-to-right run, so its symbol
+ * cannot move behind the number in a right-to-left paragraph.
+ */
+const packAmount = (amount: string): string => `\u2066${amount}\u2069`;
+
 describe('CreditPurchaseScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -260,13 +266,13 @@ describe('CreditPurchaseScreen', () => {
     expect(
       rows.map(row => (row.props as { accessibilityLabel: string }).accessibilityLabel)
     ).toEqual([
-      'Add $10.00 of credits, $10.99, Credits purchased through the App Store do not expire.',
-      'Add $50.00 of credits, $54.99, Credits purchased through the App Store do not expire.',
-      'Add $100.00 of credits, $109.99, Credits purchased through the App Store do not expire.',
-      'Add $500.00 of credits, $549.99, Credits purchased through the App Store do not expire.',
+      `Add ${packAmount('$10.00')} of credits, $10.99, Credits purchased through the App Store do not expire.`,
+      `Add ${packAmount('$50.00')} of credits, $54.99, Credits purchased through the App Store do not expire.`,
+      `Add ${packAmount('$100.00')} of credits, $109.99, Credits purchased through the App Store do not expire.`,
+      `Add ${packAmount('$500.00')} of credits, $549.99, Credits purchased through the App Store do not expire.`,
     ]);
-    expect(allText(renderer)).toContain('Add $10.00 of credits');
-    expect(allText(renderer)).toContain('Add $500.00 of credits');
+    expect(allText(renderer)).toContain(`Add ${packAmount('$10.00')} of credits`);
+    expect(allText(renderer)).toContain(`Add ${packAmount('$500.00')} of credits`);
     expect(allText(renderer)).toContain('$10.99');
     expect(allText(renderer)).toContain('$549.99');
     expect(rows.every(row => (row.props as { disabled?: boolean }).disabled === false)).toBe(true);
@@ -312,15 +318,16 @@ describe('CreditPurchaseScreen', () => {
       { balance_mUsd: 500_000_000, expiry_date: null },
     ];
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
-    await waitFor(() => allText(renderer).includes('$10.00 in credits expires'));
-    expect(allText(renderer)).not.toContain('$60.00 in credits');
-    expect(allText(renderer)).not.toContain('bonus credits');
-    // The zone marker carries a bidi isolate and a no-break space on the date;
-    // this assertion is about the sentence, not that carriage.
-    const readable = allText(renderer)
-      .replaceAll(/[\u2068\u2069]/g, '')
-      .replaceAll('\u00A0', ' ');
-    expect(readable).toContain('(UTC). Credits with the earliest expiry are used first.');
+    // The amount and the zone marker carry bidi isolates and the date a no-break
+    // space; these assertions are about the sentence, not that carriage.
+    const readable = () =>
+      allText(renderer)
+        .replaceAll(/[\u2066\u2068\u2069]/g, '')
+        .replaceAll('\u00A0', ' ');
+    await waitFor(() => readable().includes('$10.00 in credits expires'));
+    expect(readable()).not.toContain('$60.00 in credits');
+    expect(readable()).not.toContain('bonus credits');
+    expect(readable()).toContain('(UTC). Credits with the earliest expiry are used first.');
     unmount();
   });
 
@@ -342,7 +349,7 @@ describe('CreditPurchaseScreen', () => {
     expect(masked).toHaveLength(1);
     // The pack rows are catalog prices, not this account's amount, so the
     // preference leaves them alone.
-    expect(text).toContain('Add $10.00 of credits');
+    expect(text).toContain(`Add ${packAmount('$10.00')} of credits`);
     unmount();
   });
 
@@ -369,7 +376,7 @@ describe('CreditPurchaseScreen', () => {
     const amount = renderer.root.find(
       node => String(node.type) === 'Text' && node.props.accessibilityLabel === '$1,234.00'
     );
-    expect(amount.props.children).toBe('$1,234.00');
+    expect(amount.props.children).toBe('\u2066$1,234.00\u2069');
     expect(
       renderer.root.findAll(
         node => String(node.type) === 'Text' && node.props.accessibilityLabel === 'Balance hidden'
@@ -679,7 +686,7 @@ describe('CreditPurchaseScreen', () => {
     expect(
       rows.map(row => (row.props as { accessibilityLabel: string }).accessibilityLabel)
     ).toContain(
-      'Add $500.00 of credits, Price unavailable, Credits purchased through the App Store do not expire.'
+      `Add ${packAmount('$500.00')} of credits, Price unavailable, Credits purchased through the App Store do not expire.`
     );
     expect(allText(renderer)).toContain('Price unavailable');
     unmount();
@@ -751,7 +758,7 @@ describe('CreditPurchaseScreen', () => {
     expect(
       (busyRow?.props as { accessibilityLabel?: string } | undefined)?.accessibilityLabel
     ).toBe(
-      'Add $10.00 of credits, Completing purchase, Credits purchased through the App Store do not expire.'
+      `Add ${packAmount('$10.00')} of credits, Completing purchase, Credits purchased through the App Store do not expire.`
     );
     expect(
       rows.every(

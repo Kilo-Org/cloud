@@ -17,7 +17,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq, ilike, inArray, or } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import {
   createSeedSeatSubscription,
   createSeedStripeCustomer,
@@ -306,6 +306,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   if (suppliedSeatSubscriptionId && !suppliedSeatSubscriptionId.startsWith('sub_')) {
     throw new Error('--seat-subscription-id must start with sub_');
   }
+
+  assertLocalSeedDatabase('app:kilo-pass-orgs');
 
   console.log('Resetting the Kilo Pass organization fixture...');
   await cleanup();

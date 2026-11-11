@@ -1,6 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
+import {
+  device_auth_requests,
+  device_sessions,
+  kilocode_users,
+  pending_auth_links,
+} from '@kilocode/db/schema';
 import { and, eq, gt, sql } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import {
@@ -20,7 +25,10 @@ import {
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
   DEVICE_AUTH_PENDING_LOCK_WAIT_MS,
   DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE,
+  DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE,
+  getDeviceAuthPendingLink,
 } from './device-auth';
+import { createPendingLink } from '@/lib/auth/pending-link';
 import { issueSessionCredentials } from '@/lib/auth/device-sessions';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 
@@ -831,6 +839,77 @@ describe('Device Auth', () => {
       const retry = await consumeDeviceAuthByDeviceCode(deviceCode);
       expect(retry.status).toBe('approved');
       expect(retry.token).toBeDefined();
+    });
+
+    test('requires an explicit pending link choice and clears the link when declined', async () => {
+      const { secret } = await createPendingLink({
+        kiloUserId: testUserId,
+        kind: 'existing_account',
+        identity: {
+          google_user_email: testUserEmail,
+          google_user_name: 'Test User',
+          google_user_image_url: '',
+          hosted_domain: '@@github@@',
+          provider: 'github',
+          provider_account_id: 'github-device-consent',
+          display_name: 'octocat',
+        },
+        emailCodeAllowed: true,
+      });
+      const { userCode } = await createDeviceAuthRequest({ pendingLinkToken: secret });
+
+      await expect(getDeviceAuthPendingLink(userCode)).resolves.toEqual({
+        provider: 'github',
+        email: testUserEmail,
+        displayName: 'octocat',
+      });
+      await expect(approveDeviceAuthRequest(userCode, testUserId)).rejects.toThrow(
+        DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE
+      );
+
+      await approveDeviceAuthRequest(userCode, testUserId, { addPendingLink: false });
+      const request = await getDeviceAuthRequest(userCode);
+      expect(request?.status).toBe('approved');
+      expect(request?.pending_link_secret_hash).toBeNull();
+    });
+
+    test('completes the pending link only after credential issuance succeeds', async () => {
+      const { secret, pendingLink } = await createPendingLink({
+        kiloUserId: testUserId,
+        kind: 'existing_account',
+        identity: {
+          google_user_email: testUserEmail,
+          google_user_name: 'Test User',
+          google_user_image_url: '',
+          hosted_domain: '@@github@@',
+          provider: 'github',
+          provider_account_id: 'github-device-after-issuance',
+          display_name: null,
+        },
+        emailCodeAllowed: true,
+      });
+      const { userCode, deviceCode } = await createDeviceAuthRequest({
+        pendingLinkToken: secret,
+      });
+      await approveDeviceAuthRequest(userCode, testUserId, { addPendingLink: true });
+
+      mockedIssueSessionCredentials.mockRejectedValueOnce(new Error('issuance failed'));
+      await expect(
+        consumeDeviceAuthByDeviceCode(deviceCode, { supportsRefresh: true })
+      ).rejects.toThrow('issuance failed');
+
+      const [pendingRow] = await db
+        .select()
+        .from(pending_auth_links)
+        .where(eq(pending_auth_links.id, pendingLink.id));
+      expect(pendingRow.consumed_at).toBeNull();
+
+      mockedIssueSessionCredentials.mockImplementation((...args: any[]) =>
+        (_realIssueSessionCredentials as any)(...args)
+      );
+      const retry = await consumeDeviceAuthByDeviceCode(deviceCode, { supportsRefresh: true });
+      expect(retry.status).toBe('approved');
+      expect(retry.pendingLink).toEqual({ status: 'linked', provider: 'github' });
     });
 
     test('manually restored approved row is redeemable again', async () => {

@@ -6,6 +6,7 @@ import {
   cleanupRetryDelay,
   replacementNeeded,
   snapshotEligibility,
+  snapshotImageCompatibility,
   type PublishedSnapshot,
 } from './policy.js';
 import type { SessionEnvironmentReference } from './reference.js';
@@ -213,16 +214,35 @@ describe('snapshotEligibility', () => {
     });
   });
 
-  it('treats another base image or runtime ABI as incompatible and asks for a replacement', () => {
+  it.each([
+    { name: 'a recent', capturedAt: NOW - HOUR },
+    { name: 'an older', capturedAt: NOW - SNAPSHOT_STALE_AFTER_MS + HOUR },
+  ])('uses $name earlier-image snapshot and asks for a replacement', ({ capturedAt }) => {
     const otherImage = { ...CURRENT, baseImage: 'registry.example/app:2' };
-    expect(snapshotEligibility(published(), REFERENCE, NOW, otherImage)).toEqual({
-      eligible: false,
-      reason: 'incompatible',
+    const previous = published({ capturedAt });
+    expect(snapshotEligibility(previous, REFERENCE, NOW, otherImage)).toEqual({
+      eligible: true,
+      stale: true,
+      staleReason: 'image',
     });
-    expect(replacementNeeded(published(), 2, NOW, otherImage)).toBe(true);
+    expect(replacementNeeded(previous, 2, NOW, otherImage)).toBe(true);
+    expect(snapshotImageCompatibility(previous, otherImage)).toBe('previous');
+  });
+
+  it('expires an earlier-image snapshot only at the eligible lifetime', () => {
+    const otherImage = { ...CURRENT, baseImage: 'registry.example/app:2' };
+    const previous = published({ capturedAt: NOW - SNAPSHOT_ELIGIBLE_LIFETIME_MS });
+    expect(snapshotEligibility(previous, REFERENCE, NOW, otherImage)).toEqual({
+      eligible: false,
+      reason: 'expired',
+    });
+  });
+
+  it('treats another runtime ABI as incompatible and asks for a replacement', () => {
     expect(
       snapshotEligibility(published(), REFERENCE, NOW, { ...CURRENT, runtimeAbi: 'abi-2' })
     ).toEqual({ eligible: false, reason: 'incompatible' });
+    expect(replacementNeeded(published(), 2, NOW, { ...CURRENT, runtimeAbi: 'abi-2' })).toBe(true);
   });
 
   it('leaves the image check to the container when the current image is unknown', () => {

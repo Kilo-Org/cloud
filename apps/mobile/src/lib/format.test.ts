@@ -14,6 +14,8 @@ import {
   formatList,
   formatMoney,
   formatNumber,
+  formatPrefixedMoney,
+  formatPrefixedUsd,
   normalizeLocalizedNumber,
   parseLocalizedNumber,
 } from './format';
@@ -30,9 +32,52 @@ describe('formatMoney', () => {
     expect(de).not.toBe(en);
   });
 
+  it("leads the prefixed amount with the symbol and the locale's own sign", () => {
+    expect(
+      formatPrefixedUsd(1234.5, 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    ).toBe('$1,234.50');
+    expect(formatPrefixedUsd(1234.5, 'en-US')).toBe('$1,234.5');
+    expect(
+      formatPrefixedUsd(-5, 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    ).toBe('-$5.00');
+    // Several languages write a different minus glyph; the sign is the
+    // formatter's own part, not ASCII.
+    expect(formatPrefixedUsd(-5, 'sv')[0]).toBe('\u2212');
+    // A right-to-left language keeps the digits of its own formatter and no
+    // separating space between the symbol and the number.
+    const ar = formatPrefixedUsd(0, 'ar');
+    expect(ar.startsWith('$')).toBe(true);
+    expect(ar).not.toContain('\u00A0');
+  });
+
   it('uses Portugal rules for Portuguese and Brazil rules for Brazilian Portuguese', () => {
     expect(formatMoney(1234.5, 'pt')).toMatch(/^1234,50[\s\u00A0\u202F]+\$$/);
     expect(formatMoney(1234.5, 'pt-BR')).toMatch(/^\$[\s\u00A0\u202F]*1\.234,50$/);
+  });
+});
+
+describe('formatPrefixedMoney', () => {
+  it('leads the symbol in every locale, with that locale’s digits and separators', () => {
+    expect(formatPrefixedMoney(1234.5, 'en-US')).toBe('$1,234.50');
+    // German writes the same group and decimal separators it writes for the
+    // locale money pattern; only the symbol's side changed.
+    expect(formatPrefixedMoney(1234.5, 'de-DE')).toBe('$1.234,50');
+  });
+
+  it('pins two fraction digits on a whole amount', () => {
+    expect(formatPrefixedMoney(7, 'en-US')).toBe('$7.00');
+    expect(formatPrefixedMoney(0, 'de-DE')).toBe('$0,00');
+  });
+
+  it('puts the locale’s minus sign in front of the symbol', () => {
+    expect(formatPrefixedMoney(-5, 'en-US')).toBe('-$5.00');
+    expect(formatPrefixedMoney(-5, 'sv').startsWith('\u2212$')).toBe(true);
+  });
+
+  it('writes the symbol first and no separating space in a right-to-left language', () => {
+    const ar = formatPrefixedMoney(1234.5, 'ar');
+    expect(ar.startsWith('$')).toBe(true);
+    expect(ar).not.toContain('\u00A0');
   });
 });
 

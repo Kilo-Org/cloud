@@ -11,11 +11,7 @@ import {
   type HomeWidgetResponse,
   type HomeWidgetSessionRow,
 } from '@kilocode/app-shared/home-widget';
-import {
-  cli_sessions_v2,
-  github_branch_pull_requests,
-  user_activity_tokens,
-} from '@kilocode/db/schema';
+import { cli_sessions_v2, user_activity_tokens } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { SESSION_LIVE_ACTIVITY_MAX_AGE_MS } from '@kilocode/notifications/schemas';
 import {
@@ -26,7 +22,7 @@ import { and, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 
 import { type ActiveSession, listActiveSessions } from '@/lib/active-sessions-list';
 import { readCloudAgentWidgetApprovalKey } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { sessionPrJoinPredicate } from '@/routers/cli-sessions-v2-router';
+import { sessionAssociatedPr } from '@/lib/session-associated-pr';
 
 type HomeWidgetScope = { userId: string; organizationId: string | null };
 
@@ -238,10 +234,11 @@ async function readSessionCards(
             prVerifiedAt: cli_sessions_v2.pr_link_verified_at,
             // Null when no verified link joins a cache row, or the cache has
             // not synced the pull request yet.
-            prState: github_branch_pull_requests.pr_state,
+            prState: sessionAssociatedPr.pr_state,
+            prFromWorkspace: sessionAssociatedPr.pr_from_workspace,
           })
           .from(cli_sessions_v2)
-          .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
+          .leftJoinLateral(sessionAssociatedPr, sql`true`)
           .where(
             and(
               inArray(cli_sessions_v2.session_id, ids),
@@ -266,7 +263,7 @@ async function readSessionCards(
       const prOpened =
         row?.associatedPr === undefined
           ? isSessionCardPrOpened({
-              verified: (kept?.prVerifiedAt ?? null) !== null,
+              verified: (kept?.prVerifiedAt ?? null) !== null || kept?.prFromWorkspace === true,
               state: kept?.prState ?? null,
             })
           : isSessionCardPrOpened({ verified: true, state: row.associatedPr.state });

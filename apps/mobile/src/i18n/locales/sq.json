@@ -229,6 +229,21 @@
     "signInCodeField": "Kodi i hyrjes",
     "or": "ose"
   },
+  "pendingLink": {
+    "description": "Një llogari e përdor tashmë {{email}}. Hyr me një nga metodat e saj për të shtuar {{provider}}.",
+    "emailCode": "Më dërgo me email një kod hyrjeje",
+    "continueInBrowser": "Vazhdo në shfletues",
+    "startAgain": "Fillo nga e para",
+    "expired": "Kjo kërkesë për të shtuar {{provider}} ka skaduar.",
+    "noMethods": "Kjo llogari nuk ka metodë tjetër hyrjeje, prandaj {{provider}} nuk mund të shtohet.",
+    "linked": "{{provider}} u shtua në llogarinë tënde.",
+    "failedExpired": "{{provider}} nuk u shtua sepse kërkesa skadoi.",
+    "failedWrongAccount": "{{provider}} nuk u shtua sepse hyre në një llogari tjetër.",
+    "failedAccountAlreadyLinked": "{{provider}} nuk u shtua sepse është lidhur tashmë me një llogari tjetër.",
+    "failedProviderAlreadyLinked": "{{provider}} nuk u shtua sepse llogaria jote ka tashmë një hyrje tjetër me {{provider}}.",
+    "failedLinking": "{{provider}} nuk mund të shtohej në llogarinë tënde.",
+    "notAdded": "Ke hyrë. {{provider}} nuk u shtua në llogarinë tënde."
+  },
   "profile": {
     "codeReviewerSubtitle": "Rishikime automatike të PR",
     "securityAgentSubtitle": "Gjej dhe korrigjo cenueshmëritë",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Konfirmo fshirjen",
     "credits": "Kreditet",
     "failedToLoadBalance": "Nuk u ngarkua gjendja. Prek për të provuar përsëri.",
+    "balanceLoadFailed": "Nuk u ngarkua gjendja",
     "hideBalance": "Fshih gjendjen",
     "showBalance": "Shfaq gjendjen",
     "balanceHidden": "Gjendja është e fshehur",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Llogari testimi",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO për ndërmarrje",
     "passkeysTitle": "Çelësat e hyrjes",
     "passkeysSubtitle": "Hyr pa fjalëkalim",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Kjo kërkesë për bashkim nuk përmban ndryshime në skedarë.",
     "fileList": {
       "openNavigator": "Hap shfletuesin e skedarëve",
-      "filesViewed": "Skedarë · {{viewed}} nga {{total}} të parë",
       "listed": "(të listuar)",
       "layout": "Paraqitja",
       "unified": "E bashkuar",
@@ -2298,7 +2315,7 @@
       "cloningSession": "Duke klonuar seancën",
       "couldNotLoadThisSession": "Nuk u ngarkua kjo seancë.",
       "cloneFailedRetry": "Nuk u klonua kjo seancë. Provo përsëri.",
-      "notEnoughCredits": "Nuk ke mjaft kredite për të ekzekutuar Cloud Agent. Shto kredite dhe provo përsëri.",
+      "notEnoughCredits": "Nuk ke mjaft kredite për këtë kërkesë. Shto kredite dhe provo përsëri.",
       "previousTaskFinishing": "Detyra e mëparshme nuk ka përfunduar ende. Prit pak.",
       "serviceUnavailable": "Shërbimi nuk është i disponueshëm për momentin. Provo përsëri.",
       "connectionTrouble": "Ka një problem me lidhjen. Provo përsëri pas pak.",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Kërkesa jote dhe skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen.",
       "discardFailed": "Nuk u fshi drafti. Provo përsëri.",
       "remoteHint": "Për ta ekzekutuar në kompjuterin tënd, nis Kilo aty dhe lëre të funksionojë.",
-      "continueFrom": "Po vazhdon seanca {{title}}.",
+      "continueFrom": "Po vazhdon seanca «{{title}}».",
       "importingSession": "Duke importuar seancën",
       "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidh Cloud Agent ose një CLI tjetër.",
       "importFailed": "Nuk u arrit të importohej kjo seancë.",
@@ -2460,6 +2477,8 @@
       "toolList": "listo",
       "toolPatch": "zbato ndryshimet",
       "toolTask": "detyrë",
+      "toolSendFile": "Dërgoi skedarin",
+      "toolSendFileAction": "Dërgo skedarin",
       "readTodos": "Lexo planin",
       "updateTodos": "Përditëso planin",
       "linesBadge": "{{displayCount}} rreshta",
@@ -2560,7 +2579,21 @@
       "thought": "Mendimi",
       "showDetails": "Shfaq detajet",
       "pending": "Në pritje…",
-      "running": "Duke u ekzekutuar…"
+      "running": "Duke u ekzekutuar…",
+      "field": {
+        "filePath": "Shtegu i skedarit",
+        "path": "Shtegu",
+        "offset": "Zhvendosja",
+        "limit": "Kufiri",
+        "pattern": "Modeli",
+        "include": "Përfshirja",
+        "patchText": "Teksti i arnës",
+        "query": "Kërkimi",
+        "prompt": "Udhëzimi",
+        "header": "Titulli",
+        "question": "Pyetja",
+        "options": "Opsionet"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nuk u shfaq përmbajtja."
@@ -2576,7 +2609,7 @@
       "assistantContextOverflow": "Biseda është shumë e gjatë për modelin.",
       "assistantProviderError": "Ofruesi ktheu një gabim.",
       "assistantProviderRefused": "Ofruesi e refuzoi këtë kërkesë dhe ajo nuk mund të riprovohet.",
-      "assistantCreditsRefusal": "Nuk ke mjaft kredite për të ekzekutuar Cloud Agent.",
+      "assistantCreditsRefusal": "Nuk ke mjaft kredite për këtë kërkesë.",
       "assistantOutputLimit": "Përgjigja arriti kufirin e daljes së modelit.",
       "assistantStructuredOutput": "Përgjigja nuk përputhej me formatin e kërkuar.",
       "assistantFailed": "Gjenerimi i përgjigjes dështoi."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Ky model mbështet nivelin e arsyetimit"
     },
-    "creditsRequired": "Nuk ka kredi të mjaftueshme për të dërguar këtë mesazh. Shto kredite dhe provo sërish."
+    "creditsRequired": "Nuk ka kredi të mjaftueshme për të dërguar këtë mesazh."
   },
   "settingsTools": {
     "confirmTitle": "Të konfirmohet ky ndryshim?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Agjenti im",
       "promptPlaceholder": "Ju jeni një...",
       "tools": "Mjetet",
+      "wholeToolRule": "Ky agjent zbaton një rregull për të gjitha mjetet njëherësh: {{rule}}. Këto ndërprerës janë vetëm për lexim.",
       "visibility": "Dukshmëria",
       "visibilityPrimary": "Primar — tregohet në zgjedhës",
       "visibilitySubagent": "Subagent — i thirrur vetëm nga të tjerët",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Profilet e parazgjedhura për repos",
+      "entryLabel": "Profilet e paravendosura",
       "add": "Shto parazgjedhje",
       "empty": "Asnjë parazgjedhje nuk është konfiguruar",
       "emptyDescription": "Shto një parazgjedhje për të aplikuar automatikisht një profil kur nis seancat për një depo.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Asnjë kontekst i aktivizuar për raportet e planifikuara",
     "sourceBlocker": "Seanca kërkon vëmendje",
     "sourceMetadata": "Metatëdhënat e regjistruara të seancës"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nuk u hap dot ky rezultat kërkimi"
   }
 }

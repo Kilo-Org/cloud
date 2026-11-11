@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  GH_STACK_INSTALL_PATH,
   GIT_CREDENTIAL_HELPER,
   RUNTIME_DISTRIBUTION,
   RUNTIME_REQUIRED_BINARIES,
@@ -22,6 +23,8 @@ describe('runtime distribution contract', () => {
       pnpm: '12.14.0',
       glab: '1.124.0',
       gh: '2.103.3',
+      ghStack: '0.3.0',
+      ghStackSha256: '957e822cfa7e435cd84a297cd96c419b58e51e3ac58be249762c24bd9e45099b',
     });
   });
 
@@ -85,6 +88,9 @@ describe('runtime distribution contract', () => {
     }
     expect(script).toContain('grep -oE');
     expect(script).not.toContain('grep -qF');
+    expect(script).toContain(
+      `test "$(sha256sum '${GH_STACK_INSTALL_PATH}' | cut -d' ' -f1)" = '${RUNTIME_DISTRIBUTION.ghStackSha256}'`
+    );
     for (const binary of RUNTIME_REQUIRED_BINARIES) {
       expect(script).toContain(`command -v ${binary} >/dev/null`);
     }

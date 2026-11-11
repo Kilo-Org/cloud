@@ -18,18 +18,26 @@ import { and, eq } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import {
   cli_sessions_v2,
+  user_deletion_requests,
+  user_deletion_steps,
   type UserDeletionRequest,
   type UserDeletionStep,
 } from '@kilocode/db/schema';
 import {
   UserDeletionCloudSubjectResolution,
+  UserDeletionRequestStatus,
   UserDeletionStepKey,
   UserDeletionStepStatus,
   type UserDeletionTaskProgress,
 } from '@kilocode/db/schema-types';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
+import {
+  USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+  USER_DELETION_RESOURCE_BATCH_SIZE,
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
+import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
+import { runClaimedDeletionTask } from '@/lib/user/deletion-queue/deletion-task-runner';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
 import { handleCliV2Sessions } from '@/lib/user/deletion-queue/handlers/cli-v2';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -316,6 +324,177 @@ describe('handleCliV2Sessions', () => {
       progress: { ...SYNC_ERASURE_PROGRESS, processed_count: 1 },
     });
     expect(await remainingSessionIds(user.id)).toEqual([keepId]);
+  });
+
+  it('retries with session_worktree_deleting when the worktree guard refuses the whole batch', async () => {
+    const user = await insertTestUser();
+    const sessionIds = [newSessionId('wta'), newSessionId('wtb')];
+    for (const sessionId of sessionIds) {
+      await insertSession(user.id, sessionId);
+    }
+    mockDeletionFetch(async () => worktreeDeletingResponse());
+
+    const outcome = await handleCliV2Sessions({
+      request: { user_id: user.id } as UserDeletionRequest,
+      step: runningStep(),
+      context: handlerContext(),
+    });
+
+    expect(outcome).toEqual({
+      kind: 'retry',
+      errorCode: 'session_worktree_deleting',
+      httpStatusClass: '4xx',
+      progress: SYNC_ERASURE_PROGRESS,
+    });
+    expect(await remainingSessionIds(user.id)).toEqual([...sessionIds].sort());
+  });
+
+  it('continues when the worktree guard refuses part of a batch and its siblings are deleted', async () => {
+    const user = await insertTestUser();
+    const refusedId = newSessionId('refused');
+    const dropId = newSessionId('drop');
+    await insertSession(user.id, refusedId);
+    await insertSession(user.id, dropId);
+
+    mockDeletionFetch(async input => {
+      const sessionId = sessionIdFromUrl(input);
+      if (sessionId === refusedId) return worktreeDeletingResponse();
+      await deleteSessionRow(user.id, sessionId);
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    });
+
+    const outcome = await handleCliV2Sessions({
+      request: { user_id: user.id } as UserDeletionRequest,
+      step: runningStep(),
+      context: handlerContext(),
+    });
+
+    expect(outcome).toEqual({
+      kind: 'continue',
+      progress: { ...SYNC_ERASURE_PROGRESS, processed_count: 1 },
+    });
+    expect(await remainingSessionIds(user.id)).toEqual([refusedId]);
+  });
+
+  it('continues when a worktree refusal shares a batch with another conflict', async () => {
+    const user = await insertTestUser();
+    const refusedId = newSessionId('refused');
+    const racingId = newSessionId('racing');
+    await insertSession(user.id, refusedId);
+    await insertSession(user.id, racingId);
+
+    mockDeletionFetch(async input =>
+      sessionIdFromUrl(input) === refusedId
+        ? worktreeDeletingResponse()
+        : new Response(JSON.stringify({ success: false, error: 'session_not_leaf' }), {
+            status: 409,
+          })
+    );
+
+    const outcome = await handleCliV2Sessions({
+      request: { user_id: user.id } as UserDeletionRequest,
+      step: runningStep(),
+      context: handlerContext(),
+    });
+
+    expect(outcome).toEqual({ kind: 'continue', progress: SYNC_ERASURE_PROGRESS });
+  });
+
+  it('keeps earlier batches counted when a later batch is wholly refused by the worktree guard', async () => {
+    const user = await insertTestUser();
+    for (let index = 0; index < USER_DELETION_RESOURCE_BATCH_SIZE; index += 1) {
+      await insertSession(user.id, newSessionId(`a${index}`));
+    }
+    const refusedId = newSessionId('z');
+    await insertSession(user.id, refusedId);
+
+    mockDeletionFetch(async input => {
+      const sessionId = sessionIdFromUrl(input);
+      if (sessionId === refusedId) return worktreeDeletingResponse();
+      await deleteSessionRow(user.id, sessionId);
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    });
+
+    const outcome = await handleCliV2Sessions({
+      request: { user_id: user.id } as UserDeletionRequest,
+      step: runningStep(),
+      context: handlerContext(),
+    });
+
+    expect(outcome).toEqual({
+      kind: 'retry',
+      errorCode: 'session_worktree_deleting',
+      httpStatusClass: '4xx',
+      progress: { ...SYNC_ERASURE_PROGRESS, processed_count: USER_DELETION_RESOURCE_BATCH_SIZE },
+    });
+    expect(await remainingSessionIds(user.id)).toEqual([refusedId]);
+  });
+
+  it('moves the step to attention after repeated worktree refusals through the task runner', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser({
+      google_user_email: `cli-v2-worktree-${crypto.randomUUID()}@example.com`,
+    });
+    const sessionId = newSessionId('stalled');
+    await insertSession(user.id, sessionId);
+    mockDeletionFetch(async () => worktreeDeletingResponse());
+
+    const [enqueued] = await enqueueUserDeletionTargets({
+      actor: { kiloUserId: admin.id },
+      targets: [{ email: user.google_user_email, trustedUserId: user.id }],
+    });
+    if (enqueued.status !== 'enqueued') throw new Error('expected enqueued');
+    await db
+      .update(user_deletion_requests)
+      .set({ status: UserDeletionRequestStatus.InProgress })
+      .where(eq(user_deletion_requests.id, enqueued.requestId));
+    const stepWhere = and(
+      eq(user_deletion_steps.request_id, enqueued.requestId),
+      eq(user_deletion_steps.step_key, UserDeletionStepKey.CliV2Sessions)
+    );
+
+    const observed: Array<{ status: string; window: number; errorCode: string | null }> = [];
+    for (let attempt = 1; attempt <= USER_DELETION_MAX_ORDINARY_ATTEMPTS; attempt += 1) {
+      const claimToken = crypto.randomUUID();
+      const [claimed] = await db
+        .update(user_deletion_steps)
+        .set({
+          status: UserDeletionStepStatus.Running,
+          claim_token: claimToken,
+          claimed_until: new Date(Date.now() + 60_000).toISOString(),
+        })
+        .where(stepWhere)
+        .returning();
+      if (!claimed) throw new Error('expected claimed step');
+
+      const result = await runClaimedDeletionTask({
+        stepId: claimed.id,
+        claimToken,
+        deadlineAt: Date.now() + 60_000,
+      });
+      expect(result.kind).toBe('applied');
+
+      const [persisted] = await db.select().from(user_deletion_steps).where(stepWhere);
+      observed.push({
+        status: persisted.status,
+        window: persisted.window_attempt_count,
+        errorCode: persisted.last_error_code,
+      });
+    }
+
+    expect(observed).toEqual(
+      Array.from({ length: USER_DELETION_MAX_ORDINARY_ATTEMPTS }, (_, index) => ({
+        status:
+          index + 1 < USER_DELETION_MAX_ORDINARY_ATTEMPTS
+            ? UserDeletionStepStatus.RetryWait
+            : UserDeletionStepStatus.NeedsAttention,
+        window: index + 1,
+        errorCode: 'session_worktree_deleting',
+      }))
+    );
+    const [finalStep] = await db.select().from(user_deletion_steps).where(stepWhere);
+    expect(finalStep.progress_json).toEqual(SYNC_ERASURE_PROGRESS);
+    expect(await remainingSessionIds(user.id)).toEqual([sessionId]);
   });
 
   it('stops starting another batch when the cron reserve is gone', async () => {
@@ -614,5 +793,11 @@ function mockDeletionFetch(ingest?: typeof fetch) {
     if (String(input).startsWith(SYNC_BASE)) return new Response(null, { status: 202 });
     if (!ingest) throw new Error(`unexpected fetch ${String(input)}`);
     return ingest(input, init);
+  });
+}
+
+function worktreeDeletingResponse(): Response {
+  return new Response(JSON.stringify({ success: false, error: 'worktree_deleting' }), {
+    status: 409,
   });
 }

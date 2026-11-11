@@ -1,15 +1,18 @@
 import {
-  MAX_SNAPSHOT_START_FAILURES,
-  SNAPSHOT_START_FAILURES_KEY,
-  parseSnapshotStartFailures,
-  recordSnapshotStartFailure,
+  classifySnapshotStartFailure,
+  type SnapshotStartFailureReason,
 } from './snapshot-start-failures.js';
+import { billingFailureFromAdmission } from '../billing-failure.js';
 import { getBillingContext } from '@kilocode/container-usage';
 import { withTimeout } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
+import { containerCapacityEnforced } from '../container-concurrency.js';
 import { billingHeartbeatSeconds } from '../container-usage.js';
 import { resolveControlPlaneTimers } from '../shared/control-plane-timers.js';
 import { logger } from '../logger.js';
+import type { BillingStopDetails } from '../metered-billing-lifecycle.js';
+import { getSandboxControlStub } from '../sandbox-control/stub.js';
+import { withDORetry } from '../utils/do-retry.js';
 import {
   CONTROL_PROCESS_MATCH,
   CONTROL_WRAPPER_LOG_PATH,
@@ -113,6 +116,7 @@ export type ContainersLaunchResult = {
   started: boolean;
   startSource: ContainersStartSource;
   snapshotFailed?: true;
+  snapshotFailureReason?: SnapshotStartFailureReason;
 };
 
 export type ContainersObservation = {
@@ -156,7 +160,10 @@ type ResolvedStart = NativeStartPlan & {
 };
 
 /** A start that did not reach its main process, reported to the caller instead of thrown. */
-type StartFailure = { snapshotFailed: true };
+type StartFailure = {
+  snapshotFailed: true;
+  snapshotFailureReason: SnapshotStartFailureReason;
+};
 
 type DelayedSchedule<T> = {
   taskId: string;
@@ -580,14 +587,6 @@ export class SandboxContainers extends DurableObject<Env> {
     mainProcess: NativeMainProcess,
     allowSnapshot: boolean
   ): Promise<ResolvedStart> {
-    const failures =
-      input.snapshot === undefined
-        ? []
-        : parseSnapshotStartFailures(await this.ctx.storage.get(SNAPSHOT_START_FAILURES_KEY));
-    const snapshotRejected =
-      input.snapshot !== undefined &&
-      (failures.find(record => record.snapshotId === input.snapshot?.snapshotId)?.failures ?? 0) >=
-        MAX_SNAPSHOT_START_FAILURES;
     const plan = planNativeStart(
       {
         image: this.containerImage(input.nativeImage ?? 'all-in-one'),
@@ -602,9 +601,8 @@ export class SandboxContainers extends DurableObject<Env> {
         command: input.command,
         ...(input.snapshot === undefined ? {} : { snapshot: input.snapshot }),
       },
-      allowSnapshot && !snapshotRejected
+      allowSnapshot
     );
-    if (snapshotRejected) plan.reason = 'restore_failures';
     logControlDiagnostic('snapshot_lookup', {
       sandboxId: this.sandboxNameForLog(),
       source: plan.source,
@@ -624,10 +622,11 @@ export class SandboxContainers extends DurableObject<Env> {
   }
 
   /**
-   * Run one physical start. A failed snapshot start is reported, not thrown, so
-   * the caller can retry the same allocation from the image once. A runtime
-   * installer that exited with a typed code is reported the same way, so the
-   * provider maps it to its reason. Every other failure throws.
+   * Run one physical start. A failed snapshot start is reported with its reason
+   * so the Sandbox DO can retry the same artifact or fail the route; it is never
+   * retried from the image here. The reason is classified from the error text
+   * only: a container that stops before confirming the main process carries no
+   * exit code, so it is reported as transient. Every other failure throws.
    */
   private async runStart(
     start: ResolvedStart,
@@ -638,20 +637,14 @@ export class SandboxContainers extends DurableObject<Env> {
       return null;
     } catch (error) {
       if (start.source === 'repository' && start.snapshotId !== null) {
-        const failures = parseSnapshotStartFailures(
-          await this.ctx.storage.get(SNAPSHOT_START_FAILURES_KEY)
-        );
-        await this.ctx.storage.put(
-          SNAPSHOT_START_FAILURES_KEY,
-          recordSnapshotStartFailure(failures, start.snapshotId)
-        );
+        const snapshotFailureReason = classifySnapshotStartFailure(error);
         logControlDiagnostic('snapshot_start_failed', {
           sandboxId: this.sandboxNameForLog(),
-          reason: 'repository_start_failed',
+          reason: snapshotFailureReason,
           errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
           cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
         });
-        return { snapshotFailed: true };
+        return { snapshotFailed: true, snapshotFailureReason };
       }
       throw error;
     }
@@ -794,10 +787,11 @@ export class SandboxContainers extends DurableObject<Env> {
     if (!container || typeof container.destroy !== 'function') {
       throw new Error('Native container destruction is unavailable');
     }
+    const stoppedAtMs = container.running ? Date.now() : undefined;
     await container.destroy();
     const record = await this.readRecord();
     await this.writeRecord(this.terminalRecord(record));
-    await this.settleBillingAtStop(record);
+    await this.settleBillingAtStop(record, stoppedAtMs);
   }
 
   async getBillingRuntimeStatus() {
@@ -1369,6 +1363,7 @@ export class SandboxContainers extends DurableObject<Env> {
       return stopPath('no_container_not_started', 'terminal');
     }
     const destroyStartedAt = Date.now();
+    const stoppedAtMs = container.running ? destroyStartedAt : undefined;
     try {
       await withTimeout(container.destroy(), DESTROY_TIMEOUT_MS, 'container destroy timed out');
     } catch (error) {
@@ -1383,7 +1378,7 @@ export class SandboxContainers extends DurableObject<Env> {
     }
     const current = await this.readRecord();
     await this.writeRecord(this.terminalRecord(current));
-    await this.settleBillingAtStop(current);
+    await this.settleBillingAtStop(current, stoppedAtMs);
     return stopPath('destroyed', 'terminal', { destroyMs: Date.now() - destroyStartedAt });
   }
 
@@ -1660,16 +1655,54 @@ export class SandboxContainers extends DurableObject<Env> {
     await this.activateBillingIfRunning(container, record);
   }
 
-  private async settleBillingAtStop(record: ContainersRecord): Promise<void> {
+  private async settleBillingAtStop(record: ContainersRecord, stoppedAtMs?: number): Promise<void> {
     const billing = this.billingForRecord(record);
     if (!billing) return;
-    await billing.onContainerStopped({ reason: 'runtime_signal' });
+    await billing.onContainerStopped({ reason: 'runtime_signal', stoppedAtMs });
   }
 
-  private async stopBillingContainer(): Promise<void> {
+  private async stopBillingContainer(budget?: BillingStopDetails): Promise<void> {
     const record = await this.readRecord();
-    if (record.allocationRef === null) return;
-    await this.stop(record.allocationRef);
+    if (record.allocationRef === null) {
+      logger.warn('Native billing stop has no allocation');
+      return;
+    }
+    const context = await getBillingContext(this.ctx.storage);
+    if (!context) {
+      logger
+        .withFields({ allocationRef: record.allocationRef })
+        .warn('Native billing stop has no billing context');
+      return;
+    }
+    const request = {
+      allocationRef: record.allocationRef,
+      billingFailure: billingFailureFromAdmission(context.subject, {
+        code:
+          budget?.code === 'INSUFFICIENT_CREDITS' ? 'insufficient_credits' : 'meter_unavailable',
+        remainingMicrodollars: budget?.remainingMicrodollars,
+        minimumRequiredMicrodollars: budget?.minimumRequiredMicrodollars,
+      }),
+    };
+    this.ctx.waitUntil(
+      Promise.resolve()
+        .then(() =>
+          withDORetry(
+            () => getSandboxControlStub(this.env, context.instanceId),
+            stub => stub.requestBillingStop(request),
+            'requestNativeBillingStop'
+          )
+        )
+        .then(async owned => {
+          if (!owned && (await this.stop(request.allocationRef)) === 'retryable') {
+            throw new Error('Native billing stop remained retryable');
+          }
+        })
+        .catch(error => {
+          logger
+            .withFields({ errorName: error instanceof Error ? error.name : 'UnknownError' })
+            .warn('Native billing stop notification failed');
+        })
+    );
   }
 
   private async destroyBillingContainer(): Promise<void> {
@@ -1685,9 +1718,10 @@ export class SandboxContainers extends DurableObject<Env> {
       container: this,
       storage: this.ctx.storage,
       meter: this.env.CONTAINER_USAGE_METER,
+      enforceContainerCapacity: containerCapacityEnforced(this.env),
       heartbeatSeconds: billingHeartbeatSeconds(this.env.CONTAINER_BILLING_HEARTBEAT_SECONDS),
       isContainerRunning: () => this.ctx.container?.running === true,
-      stopContainer: () => this.stopBillingContainer(),
+      stopContainer: budget => this.stopBillingContainer(budget),
       destroyContainer: () => this.destroyBillingContainer(),
       durableObjectId: this.ctx.id.toString(),
       waitUntil: promise => this.ctx.waitUntil(promise),

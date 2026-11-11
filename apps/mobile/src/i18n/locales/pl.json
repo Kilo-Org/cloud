@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "Wpisz swój adres e-mail.",
     "or": "lub"
   },
+  "pendingLink": {
+    "description": "Konto z adresem {{email}} już istnieje. Zaloguj się jedną z jego metod, aby dodać {{provider}}.",
+    "emailCode": "Wyślij mi kod logowania e-mailem",
+    "continueInBrowser": "Kontynuuj w przeglądarce",
+    "startAgain": "Zacznij od nowa",
+    "expired": "Ta prośba o dodanie {{provider}} wygasła.",
+    "noMethods": "To konto nie ma innej metody logowania, więc nie można dodać {{provider}}.",
+    "linked": "Dodano {{provider}} do Twojego konta.",
+    "failedExpired": "Nie dodano {{provider}}, ponieważ prośba wygasła.",
+    "failedWrongAccount": "Nie dodano {{provider}}, ponieważ zalogowano się na inne konto.",
+    "failedAccountAlreadyLinked": "Nie dodano {{provider}}, ponieważ jest już połączony z innym kontem.",
+    "failedProviderAlreadyLinked": "Nie dodano {{provider}}, ponieważ Twoje konto ma już inne logowanie przez {{provider}}.",
+    "failedLinking": "Nie udało się dodać {{provider}} do Twojego konta.",
+    "notAdded": "Zalogowano. Nie dodano {{provider}} do Twojego konta."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatyczne przeglądy PR",
     "securityAgentSubtitle": "Znajduj i usuwaj luki w zabezpieczeniach",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Potwierdź usunięcie",
     "credits": "Środki",
     "failedToLoadBalance": "Nie udało się wczytać salda. Dotknij, aby spróbować ponownie.",
+    "balanceLoadFailed": "Nie udało się wczytać salda",
     "hideBalance": "Ukryj saldo",
     "showBalance": "Pokaż saldo",
     "balanceHidden": "Saldo ukryte",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Konto testowe",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO dla firm",
     "passkeysTitle": "Klucze dostępu",
     "passkeysSubtitle": "Zaloguj się bez hasła",
@@ -1801,7 +1819,7 @@
       "cloningSession": "Klonowanie sesji",
       "couldNotLoadThisSession": "Nie udało się wczytać tej sesji.",
       "cloneFailedRetry": "Nie udało się sklonować tej sesji. Spróbuj ponownie.",
-      "notEnoughCredits": "Brakuje środków na uruchomienie Cloud Agent. Doładuj konto i spróbuj ponownie.",
+      "notEnoughCredits": "Brakuje środków na to żądanie. Doładuj konto i spróbuj ponownie.",
       "previousTaskFinishing": "Trwa kończenie poprzedniego zadania. Poczekaj chwilę.",
       "serviceUnavailable": "Usługa jest teraz niedostępna. Spróbuj ponownie.",
       "connectionTrouble": "Problem z połączeniem. Spróbuj ponownie za chwilę.",
@@ -1911,7 +1929,7 @@
       "discardWithUploadsMessage": "Twoje polecenie i wszystkie przesłane pliki niedołączone do wysłanych wiadomości zostaną usunięte.",
       "discardFailed": "Nie udało się odrzucić szkicu. Spróbuj ponownie.",
       "remoteHint": "Aby uruchomić sesję na swoim komputerze, uruchom na nim Kilo i pozostaw je uruchomione.",
-      "continueFrom": "Kontynuujesz sesję {{title}}.",
+      "continueFrom": "Kontynuujesz sesję „{{title}}”.",
       "importingSession": "Importowanie sesji",
       "cliCannotContinue": "Ta instancja CLI nie obsługuje kontynuowania sesji. Wybierz Cloud Agent lub inną instancję CLI.",
       "importFailed": "Nie udało się zaimportować tej sesji.",
@@ -1965,6 +1983,8 @@
       "toolList": "lista plików",
       "toolPatch": "poprawka",
       "toolTask": "zadanie",
+      "toolSendFile": "Wysłano plik",
+      "toolSendFileAction": "wysyłanie pliku",
       "readTodos": "Odczytaj plan",
       "updateTodos": "Zaktualizuj plan",
       "linesBadge": "wiersze: {{displayCount}}",
@@ -2071,7 +2091,21 @@
       "thought": "Tok rozumowania",
       "showDetails": "Pokaż szczegóły",
       "pending": "Oczekiwanie…",
-      "running": "Wykonywanie…"
+      "running": "Wykonywanie…",
+      "field": {
+        "filePath": "Ścieżka pliku",
+        "path": "Ścieżka",
+        "offset": "Przesunięcie",
+        "limit": "Limit",
+        "pattern": "Wzorzec",
+        "include": "Filtr plików",
+        "patchText": "Tekst łatki",
+        "query": "Zapytanie",
+        "prompt": "Instrukcja",
+        "header": "Nagłówek",
+        "question": "Pytanie",
+        "options": "Opcje"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nie udało się wyświetlić treści."
@@ -2087,7 +2121,7 @@
       "assistantContextOverflow": "Rozmowa jest zbyt długa dla modelu.",
       "assistantProviderError": "Dostawca zwrócił błąd.",
       "assistantProviderRefused": "Dostawca odrzucił to żądanie i nie można go ponowić.",
-      "assistantCreditsRefusal": "Brakuje środków na uruchomienie Cloud Agent.",
+      "assistantCreditsRefusal": "Brakuje środków na to żądanie.",
       "assistantOutputLimit": "Odpowiedź osiągnęła limit wyjścia modelu.",
       "assistantStructuredOutput": "Odpowiedź nie była zgodna z wymaganym formatem.",
       "assistantFailed": "Nie udało się wygenerować odpowiedzi."
@@ -2971,7 +3005,6 @@
     },
     "fileList": {
       "filesList": "Lista plików",
-      "filesViewed": "Pliki · przejrzano {{viewed}} z {{total}}",
       "layout": "Układ",
       "listed": "(z listy)",
       "loadingFiles": "Wczytywanie plików",
@@ -3914,7 +3947,7 @@
     "reasoningEffort": {
       "modelFlag": "Ten model obsługuje poziom rozumowania"
     },
-    "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość. Doładuj konto i spróbuj ponownie."
+    "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość."
   },
   "settingsTools": {
     "confirmTitle": "Potwierdzić tę zmianę?"
@@ -4119,6 +4152,7 @@
       "namePlaceholder": "Mój agent",
       "promptPlaceholder": "Jesteś...",
       "tools": "Narzędzia",
+      "wholeToolRule": "Ten agent stosuje jedną regułę do wszystkich narzędzi jednocześnie: {{rule}}. Te przełączniki są tylko do odczytu.",
       "visibility": "Widoczność",
       "visibilityPrimary": "Podstawowy — pokazany w selektorze",
       "visibilitySubagent": "Subagent — można go wywołać tylko od innych osób",
@@ -4160,6 +4194,7 @@
     },
     "repoBindings": {
       "title": "Domyślne profile dla repozytoriów",
+      "entryLabel": "Profile domyślne",
       "add": "Dodaj domyślne",
       "empty": "Nie skonfigurowano żadnych ustawień domyślnych",
       "emptyDescription": "Dodaj ustawienie domyślne, aby automatycznie stosować profil podczas rozpoczynania sesji dla repozytorium.",
@@ -4375,5 +4410,8 @@
     "noEnabledContexts": "Brak kontekstów z włączonymi zaplanowanymi raportami",
     "sourceBlocker": "Sesja wymaga uwagi",
     "sourceMetadata": "Zapisane metadane sesji"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nie udało się otworzyć tego wyniku wyszukiwania"
   }
 }

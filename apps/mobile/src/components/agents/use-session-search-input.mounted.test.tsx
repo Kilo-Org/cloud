@@ -198,4 +198,35 @@ describe('useSessionSearchInput visible text', () => {
     expect(hook().hasText).toBe(false);
     expect(hook().searchQuery).toBe('');
   });
+
+  it('commits a restored whitespace-only draft as no search and keeps the spaces visible', () => {
+    const renderer = mount({ userId: 'u1', restoredQuery: null, restoreSettled: false });
+    act(() => {
+      renderer.update(
+        createElement(Probe, { userId: 'u1', restoredQuery: '     ', restoreSettled: true })
+      );
+    });
+
+    // Typing five spaces commits '' and lists every session; the restored
+    // draft must commit the same query, or the list reads as empty while the
+    // field looks blank.
+    expect(hook().searchQuery).toBe('');
+    expect(input.mounts.at(-1)?.defaultValue).toBe('     ');
+    expect(hook().hasText).toBe(true);
+    expect(hook().awaitingCommit).toBe(false);
+  });
+
+  it('commits a restored padded draft as its trimmed term and keeps the padding visible', () => {
+    const renderer = mount({ userId: 'u1', restoredQuery: null, restoreSettled: false });
+    act(() => {
+      renderer.update(
+        createElement(Probe, { userId: 'u1', restoredQuery: '  alpha ', restoreSettled: true })
+      );
+    });
+
+    expect(hook().searchQuery).toBe('alpha');
+    expect(input.mounts.at(-1)?.defaultValue).toBe('  alpha ');
+    expect(hook().hasText).toBe(true);
+    expect(hook().awaitingCommit).toBe(false);
+  });
 });

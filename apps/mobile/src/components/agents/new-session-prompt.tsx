@@ -593,7 +593,6 @@ export function NewSessionPrompt({
                 <Pressable
                   onPress={handleInsertNewline}
                   disabled={control.draftMutationLocked}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   accessibilityRole="button"
                   accessibilityLabel={t('agentChat.composer.insertNewline')}
                   accessibilityState={{ disabled: control.draftMutationLocked }}

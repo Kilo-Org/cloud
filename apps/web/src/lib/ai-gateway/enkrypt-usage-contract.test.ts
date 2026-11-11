@@ -9,7 +9,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-primary-r
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { enkrypt_usage, enkrypt_usage_guardrail, organizations } from '@kilocode/db/schema';
+import {
+  enkrypt_usage,
+  enkrypt_usage_detector,
+  enkrypt_usage_guardrail,
+  organizations,
+} from '@kilocode/db/schema';
 import {
   EnkryptUsageWriteSchema,
   type EnkryptUsageWrite,
@@ -77,6 +82,8 @@ async function ledgerRows(organizationId: string) {
       eq(enkrypt_usage_guardrail.guardrail_id, enkrypt_usage.guardrail_id)
     )
     .where(eq(enkrypt_usage.organization_id, organizationId));
+  const detectors = await db.select().from(enkrypt_usage_detector);
+  const detectorById = new Map(detectors.map(each => [each.detector_id, each.detector]));
   return rows.map(({ row, guardrail }) => ({
     id: row.id,
     occurredAt: new Date(row.created_at).toISOString(),
@@ -87,6 +94,7 @@ async function ledgerRows(organizationId: string) {
     chargedMicrodollars: row.charged_microdollars,
     addedLatencyMs: row.added_latency_ms,
     guardrail,
+    detectorsFired: row.fired_detector_ids?.map(id => detectorById.get(id)) ?? null,
   }));
 }
 
@@ -116,6 +124,7 @@ async function expectWrittenOnceAndReplayedAsDuplicate(usageWrite: EnkryptUsageW
       chargedMicrodollars: charged,
       addedLatencyMs: usageWrite.addedLatencyMs,
       guardrail: usageWrite.guardrail,
+      detectorsFired: usageWrite.detectorsFired ?? null,
     },
   ]);
   expect(await microdollarsUsed(usageWrite.organizationId)).toBe(charged);
@@ -150,6 +159,36 @@ describe('Enkrypt usage write across gateway, contract and writer', () => {
     expect(writeInput).not.toHaveProperty('guardrail');
     const usageWrite = parseWireCopy(writeInput);
     expect(usageWrite).toStrictEqual({ ...writeInput, guardrail: 'input' });
+
+    await expectWrittenOnceAndReplayedAsDuplicate(usageWrite);
+  });
+
+  test('carries the detectors of a log-only detection into the ledger row', async () => {
+    const usageRecord = await usageRecordForNewOrganization({
+      decision: 'allowed',
+      detectorsFired: ['pii', 'toxicity'],
+    });
+
+    const writeInput = await writeInputFromGateway(usageRecord);
+
+    expect(writeInput).toStrictEqual({
+      ...usageRecord,
+      id: expect.any(String),
+      occurredAt: expect.any(String),
+    });
+    const usageWrite = parseWireCopy(writeInput);
+    expect(usageWrite).toStrictEqual({ ...writeInput, guardrail: 'input' });
+
+    await expectWrittenOnceAndReplayedAsDuplicate(usageWrite);
+  });
+
+  test('omits an empty detector list, so an older writer still accepts the write', async () => {
+    const usageRecord = await usageRecordForNewOrganization({ detectorsFired: [] });
+
+    const writeInput = await writeInputFromGateway(usageRecord);
+
+    expect(writeInput).not.toHaveProperty('detectorsFired');
+    const usageWrite = parseWireCopy(writeInput);
 
     await expectWrittenOnceAndReplayedAsDuplicate(usageWrite);
   });

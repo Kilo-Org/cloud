@@ -229,6 +229,21 @@
     "signInCodeField": "Prisijungimo kodas",
     "or": "arba"
   },
+  "pendingLink": {
+    "description": "Paskyra su {{email}} jau yra. Prisijunk vienu iš jos būdų, kad pridėtum {{provider}}.",
+    "emailCode": "Atsiųsti man prisijungimo kodą el. paštu",
+    "continueInBrowser": "Tęsti naršyklėje",
+    "startAgain": "Pradėti iš naujo",
+    "expired": "Ši užklausa pridėti {{provider}} nebegalioja.",
+    "noMethods": "Ši paskyra neturi kito prisijungimo būdo, todėl {{provider}} pridėti negalima.",
+    "linked": "{{provider}} pridėtas prie tavo paskyros.",
+    "failedExpired": "{{provider}} nepridėtas, nes užklausa nebegalioja.",
+    "failedWrongAccount": "{{provider}} nepridėtas, nes prisijungei prie kitos paskyros.",
+    "failedAccountAlreadyLinked": "{{provider}} nepridėtas, nes jau susietas su kita paskyra.",
+    "failedProviderAlreadyLinked": "{{provider}} nepridėtas, nes tavo paskyra jau turi kitą {{provider}} prisijungimą.",
+    "failedLinking": "Nepavyko pridėti {{provider}} prie tavo paskyros.",
+    "notAdded": "Esi prisijungęs. {{provider}} nepridėtas prie tavo paskyros."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatinės PR peržiūros",
     "securityAgentSubtitle": "Rasti ir pašalinti pažeidžiamumus",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Patvirtinti ištrynimą",
     "credits": "Kreditai",
     "failedToLoadBalance": "Nepavyko įkelti likučio. Bakstelėkite, kad bandytumėte dar kartą.",
+    "balanceLoadFailed": "Nepavyko įkelti likučio",
     "hideBalance": "Slėpti likutį",
     "showBalance": "Rodyti likutį",
     "balanceHidden": "Likutis paslėptas",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Bandomoji paskyra",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Įmonės SSO",
     "passkeysTitle": "Priėjimo raktai",
     "passkeysSubtitle": "Prisijunkite be slaptažodžio",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Šioje pakeitimų užklausoje nėra failų pakeitimų.",
     "fileList": {
       "openNavigator": "Atidaryti failų naršyklę",
-      "filesViewed": "Failai · peržiūrėta {{viewed}} iš {{total}}",
       "listed": "(sąraše)",
       "layout": "Išdėstymas",
       "unified": "Bendras",
@@ -2382,7 +2399,7 @@
       "cloningSession": "Klonuojama sesija",
       "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos.",
       "cloneFailedRetry": "Nepavyko klonuoti šios sesijos. Bandykite dar kartą.",
-      "notEnoughCredits": "Nepakanka kreditų „Cloud Agent“ paleisti. Papildykite kreditus ir bandykite dar kartą.",
+      "notEnoughCredits": "Nepakanka kreditų šiai užklausai. Papildykite kreditus ir bandykite dar kartą.",
       "previousTaskFinishing": "Ankstesnė užduotis dar nebaigta. Šiek tiek palaukite.",
       "serviceUnavailable": "Paslauga šiuo metu nepasiekiama. Bandykite dar kartą.",
       "connectionTrouble": "Sutriko ryšys. Netrukus bandykite dar kartą.",
@@ -2546,6 +2563,8 @@
       "toolList": "rodyti sąrašą",
       "toolPatch": "taisyti",
       "toolTask": "užduotis",
+      "toolSendFile": "Išsiųstas failas",
+      "toolSendFileAction": "siųsti failą",
       "readTodos": "Skaityti planą",
       "updateTodos": "Atnaujinti planą",
       "linesBadge": "eil.: {{displayCount}}",
@@ -2652,7 +2671,21 @@
       "thought": "Mintis",
       "showDetails": "Rodyti informaciją",
       "pending": "Laukiama…",
-      "running": "Vykdoma…"
+      "running": "Vykdoma…",
+      "field": {
+        "filePath": "Failo kelias",
+        "path": "Kelias",
+        "offset": "Poslinkis",
+        "limit": "Riba",
+        "pattern": "Šablonas",
+        "include": "Įtraukimas",
+        "patchText": "Pataisos tekstas",
+        "query": "Užklausa",
+        "prompt": "Nurodymas",
+        "header": "Antraštė",
+        "question": "Klausimas",
+        "options": "Parinktys"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nepavyko parodyti turinio."
@@ -2668,7 +2701,7 @@
       "assistantContextOverflow": "Pokalbis per ilgas šiam modeliui.",
       "assistantProviderError": "Teikėjas grąžino klaidą.",
       "assistantProviderRefused": "Teikėjas atmetė šią užklausą, todėl jos pakartoti nebegalima.",
-      "assistantCreditsRefusal": "Nepakanka kreditų „Cloud Agent“ paleisti.",
+      "assistantCreditsRefusal": "Nepakanka kreditų šiai užklausai.",
       "assistantOutputLimit": "Atsakymas pasiekė modelio išvesties limitą.",
       "assistantStructuredOutput": "Atsakymas neatitiko reikalaujamo formato.",
       "assistantFailed": "Nepavyko sugeneruoti atsakymo."
@@ -3914,7 +3947,7 @@
     "reasoningEffort": {
       "modelFlag": "Šis modelis palaiko mąstymo intensyvumą"
     },
-    "creditsRequired": "Nepakanka kreditų šiai žinutei išsiųsti. Papildykite kreditų ir bandykite dar kartą."
+    "creditsRequired": "Nepakanka kreditų šiai žinutei išsiųsti."
   },
   "settingsTools": {
     "confirmTitle": "Patvirtinti šį pakeitimą?"
@@ -4119,6 +4152,7 @@
       "namePlaceholder": "Mano agentas",
       "promptPlaceholder": "Tu esi...",
       "tools": "Įrankiai",
+      "wholeToolRule": "Šis agentas vienu metu taiko vieną taisyklę visiems įrankiams: {{rule}}. Šie jungikliai yra tik skaitomi.",
       "visibility": "Matomumas",
       "visibilityPrimary": "Pagrindinis — rodomas rinkiklyje",
       "visibilitySubagent": "Subagentas — skambinama tik iš kitų",
@@ -4159,7 +4193,8 @@
       "duplicateName": "Komanda tokiu pavadinimu šiame profilyje jau egzistuoja"
     },
     "repoBindings": {
-      "title": "Numatytieji atpirkimo sandorių profiliai",
+      "title": "Numatytieji saugyklų profiliai",
+      "entryLabel": "Numatytieji profiliai",
       "add": "Pridėti numatytąjį",
       "empty": "Jokių numatytųjų sukonfigūruotų",
       "emptyDescription": "Pridėkite numatytąjį nustatymą, kad profilis būtų automatiškai taikomas pradedant atpirkimo seansus.",
@@ -4375,5 +4410,8 @@
     "noEnabledContexts": "Nė viename kontekste neįjungtos suplanuotos suvestinės",
     "sourceBlocker": "Sesijai reikia dėmesio",
     "sourceMetadata": "Užfiksuoti sesijos metaduomenys"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nepavyko atidaryti šio paieškos rezultato"
   }
 }

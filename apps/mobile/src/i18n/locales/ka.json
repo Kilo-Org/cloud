@@ -229,6 +229,21 @@
     "signInCodeField": "შესვლის კოდი",
     "or": "ან"
   },
+  "pendingLink": {
+    "description": "{{email}} უკვე გამოიყენება ანგარიშის მიერ. {{provider}}-ის დასამატებლად შედი მისი ერთ-ერთი მეთოდით.",
+    "emailCode": "შესვლის კოდის გამოგზავნა ელფოსტით",
+    "continueInBrowser": "ბრაუზერში გაგრძელება",
+    "startAgain": "თავიდან დაწყება",
+    "expired": "{{provider}}-ის დამატების ეს მოთხოვნა ვადაგასულია.",
+    "noMethods": "ამ ანგარიშს შესვლის სხვა მეთოდი არ აქვს, ამიტომ {{provider}}-ის დამატება შეუძლებელია.",
+    "linked": "{{provider}} დაემატა შენს ანგარიშს.",
+    "failedExpired": "{{provider}} არ დაემატა, რადგან მოთხოვნას ვადა გაუვიდა.",
+    "failedWrongAccount": "{{provider}} არ დაემატა, რადგან სხვა ანგარიშში შეხვედი.",
+    "failedAccountAlreadyLinked": "{{provider}} არ დაემატა, რადგან ის უკვე დაკავშირებულია სხვა ანგარიშთან.",
+    "failedProviderAlreadyLinked": "{{provider}} არ დაემატა, რადგან შენს ანგარიშს უკვე აქვს სხვა {{provider}}-ით შესვლა.",
+    "failedLinking": "{{provider}}-ის დამატება შენს ანგარიშზე ვერ მოხერხდა.",
+    "notAdded": "შესული ხარ. {{provider}} არ დაემატა შენს ანგარიშს."
+  },
   "profile": {
     "codeReviewerSubtitle": "PR-ების ავტომატური შემოწმება",
     "securityAgentSubtitle": "მოწყვლადობების პოვნა და აღმოფხვრა",
@@ -248,6 +263,7 @@
     "confirmDeletion": "წაშლის დადასტურება",
     "credits": "კრედიტები",
     "failedToLoadBalance": "ბალანსის ჩატვირთვა ვერ მოხერხდა. ხელახლა ჩასატვირთად შეეხეთ.",
+    "balanceLoadFailed": "ბალანსის ჩატვირთვა ვერ მოხერხდა",
     "hideBalance": "ბალანსის დამალვა",
     "showBalance": "ბალანსის ჩვენება",
     "balanceHidden": "ბალანსი დამალულია",
@@ -266,6 +282,8 @@
     "providerTestAccount": "სატესტო ანგარიში",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "კორპორაციული SSO",
     "passkeysTitle": "წვდომის გასაღებები",
     "passkeysSubtitle": "შესვლა პაროლის გარეშე",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "ამ შერწყმის მოთხოვნაში ფაილები არ შეცვლილა.",
     "fileList": {
       "openNavigator": "ფაილების ნავიგატორის გახსნა",
-      "filesViewed": "ფაილები · ნანახია {{total}}-დან {{viewed}}",
       "listed": "(ჩამოთვლილი)",
       "layout": "განლაგება",
       "unified": "გაერთიანებული",
@@ -2298,7 +2315,7 @@
       "cloningSession": "სესია კლონირდება…",
       "couldNotLoadThisSession": "ამ სესიის ჩატვირთვა ვერ მოხერხდა.",
       "cloneFailedRetry": "ამ სესიის კლონირება ვერ მოხერხდა. სცადეთ ხელახლა.",
-      "notEnoughCredits": "Cloud Agent-ის გასაშვებად კრედიტები საკმარისი არ არის. დაამატეთ კრედიტები და სცადეთ ხელახლა.",
+      "notEnoughCredits": "ამ მოთხოვნისთვის კრედიტები საკმარისი არ არის. დაამატეთ კრედიტები და სცადეთ ხელახლა.",
       "previousTaskFinishing": "წინა დავალების დასრულება ჯერ კიდევ მიმდინარეობს. ცოტა ხანს დაელოდეთ.",
       "serviceUnavailable": "სერვისი ახლა მიუწვდომელია. სცადეთ ხელახლა.",
       "connectionTrouble": "კავშირის პრობლემა წარმოიშვა. ცოტა ხანში სცადეთ ხელახლა.",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "თქვენი მოთხოვნა და ატვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება.",
       "discardFailed": "მონახაზის წაშლა ვერ მოხერხდა. სცადეთ ხელახლა.",
       "remoteHint": "თქვენს კომპიუტერზე გასაშვებლად გაუშვით Kilo იქ და დატოვეთ გაშვებული.",
-      "continueFrom": "გრძელდება სესია: {{title}}.",
+      "continueFrom": "გრძელდება სესია: „{{title}}“.",
       "importingSession": "სესიის იმპორტი მიმდინარეობს…",
       "cliCannotContinue": "ამ CLI-ს სესიის გაგრძელება არ შეუძლია. აირჩიეთ Cloud Agent ან სხვა CLI.",
       "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა.",
@@ -2460,6 +2477,8 @@
       "toolList": "ჩამოთვლა",
       "toolPatch": "ცვლილებების შეტანა",
       "toolTask": "დავალება",
+      "toolSendFile": "ფაილი გაიგზავნა",
+      "toolSendFileAction": "ფაილის გაგზავნა",
       "readTodos": "გეგმის წაკითხვა",
       "updateTodos": "გეგმის განახლება",
       "linesBadge": "{{displayCount}} სტრიქონი",
@@ -2560,7 +2579,21 @@
       "thought": "მსჯელობა",
       "showDetails": "დეტალების ჩვენება",
       "pending": "მოლოდინში…",
-      "running": "მიმდინარეობს…"
+      "running": "მიმდინარეობს…",
+      "field": {
+        "filePath": "ფაილის გზა",
+        "path": "გზა",
+        "offset": "გადახრა",
+        "limit": "შეზღუდვა",
+        "pattern": "ნიმუში",
+        "include": "ჩართვა",
+        "patchText": "შესწორების ტექსტი",
+        "query": "მოთხოვნა",
+        "prompt": "მითითება",
+        "header": "სათაური",
+        "question": "კითხვა",
+        "options": "ვარიანტები"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "შიგთავსის ჩვენება ვერ მოხერხდა."
@@ -2576,7 +2609,7 @@
       "assistantContextOverflow": "საუბარი ძალიან გრძელია ამ მოდელისთვის.",
       "assistantProviderError": "პროვაიდერმა შეცდომა დააბრუნა.",
       "assistantProviderRefused": "პროვაიდერმა უარყო ეს მოთხოვნა და მისი განმეორებითი ცდა შეუძლებელია.",
-      "assistantCreditsRefusal": "Cloud Agent-ის გასაშვებად კრედიტები საკმარისი არ არის.",
+      "assistantCreditsRefusal": "ამ მოთხოვნისთვის კრედიტები საკმარისი არ არის.",
       "assistantOutputLimit": "პასუხმა მოდელის გამოტანის ლიმიტს მიაღწია.",
       "assistantStructuredOutput": "პასუხი არ შეესაბამება საჭირო ფორმატს.",
       "assistantFailed": "პასუხის შექმნა ვერ მოხერხდა."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "ეს მოდელი მხარს უჭერს მსჯელობის ინტენსივობას"
     },
-    "creditsRequired": "ამ მესიჯის გასაგზავნად საკმარისი კრედიტები არ გაქვთ. დაამატეთ კრედიტები და სცადეთ ხელახლა."
+    "creditsRequired": "ამ მესიჯის გასაგზავნად საკმარისი კრედიტები არ გაქვთ."
   },
   "settingsTools": {
     "confirmTitle": "დავადასტუროთ ეს ცვლილება?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "ჩემი აგენტი",
       "promptPlaceholder": "შენ ხარ...",
       "tools": "ხელსაწყოები",
+      "wholeToolRule": "ეს აგენტი ერთდროულად ყველა ხელსაწყოზე ერთ წესს იყენებს: {{rule}}. ეს გადამრთველები მხოლოდ წაკითხვადია.",
       "visibility": "ხილვადობა",
       "visibilityPrimary": "პირველადი — ნაჩვენებია ამომრჩეველში",
       "visibilitySubagent": "სუბაგენტი — გამოძახება შესაძლებელია მხოლოდ სხვებისგან",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "ნაგულისხმევი პროფილები რეპოსთვის",
+      "entryLabel": "ნაგულისხმევი პროფილები",
       "add": "ნაგულისხმევი დამატება",
       "empty": "ნაგულისხმევი კონფიგურაცია არ არის",
       "emptyDescription": "დაამატეთ ნაგულისხმევი პროფილის ავტომატურად გამოსაყენებლად რეპოს სესიების დაწყებისას.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "დაგეგმილი ანგარიშებისთვის არცერთი კონტექსტი არ არის ჩართული",
     "sourceBlocker": "სესია ყურადღებას საჭიროებს",
     "sourceMetadata": "დაფიქსირებული სესიის მეტამონაცემები"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "ამ ძიების შედეგის გახსნა ვერ მოხერხდა"
   }
 }

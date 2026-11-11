@@ -229,6 +229,21 @@
     "signInCodeField": "Kaody fidirana",
     "or": "na"
   },
+  "pendingLink": {
+    "description": "Misy kaonty efa mampiasa {{email}}. Midira amin'ny iray amin'ireo fomba fidirany mba hanampiana {{provider}}.",
+    "emailCode": "Alefaso amin'ny mailaka ho ahy ny kaody fidirana",
+    "continueInBrowser": "Tohizo ao amin'ny mpitety tranonkala",
+    "startAgain": "Avereno atomboka",
+    "expired": "Lany daty ity fangatahana hanampy {{provider}} ity.",
+    "noMethods": "Tsy manana fomba fidirana hafa ity kaonty ity, ka tsy azo ampiana {{provider}}.",
+    "linked": "Nampiana tao amin'ny kaontinao {{provider}}.",
+    "failedExpired": "Tsy nampiana {{provider}} satria lany daty ny fangatahana.",
+    "failedWrongAccount": "Tsy nampiana {{provider}} satria niditra tamin'ny kaonty hafa ianao.",
+    "failedAccountAlreadyLinked": "Tsy nampiana {{provider}} satria efa mifandray amin'ny kaonty hafa izy.",
+    "failedProviderAlreadyLinked": "Tsy nampiana {{provider}} satria efa manana fidirana {{provider}} hafa ny kaontinao.",
+    "failedLinking": "Tsy afaka nampiana tao amin'ny kaontinao {{provider}}.",
+    "notAdded": "Tafiditra ianao. Tsy nampiana tao amin'ny kaontinao {{provider}}."
+  },
   "profile": {
     "codeReviewerSubtitle": "Fandinihana PR mandeha ho azy",
     "securityAgentSubtitle": "Tadiavo sy ahitsio ny fahalemena ara-piarovana",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Hamarino ny famafana",
     "credits": "Kireditra",
     "failedToLoadBalance": "Tsy voaray ny ambim-bola. Tsindrio hanandramana indray.",
+    "balanceLoadFailed": "Tsy voaray ny ambim-bola",
     "hideBalance": "Afeno ny ambim-bola",
     "showBalance": "Aseho ny ambim-bola",
     "balanceHidden": "Voafeno ny ambim-bola",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Kaonty fitsapana",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO an'orinasa",
     "passkeysTitle": "Fanalahidin'ny fidirana",
     "passkeysSubtitle": "Midira tsy misy tenimiafina",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Tsy misy rakitra novaina ao amin'ity fangatahana fampiraisana ity.",
     "fileList": {
       "openNavigator": "Sokafy ny fitetezana rakitra",
-      "filesViewed": "Rakitra · {{viewed}} amin'ny {{total}} voajery",
       "listed": "(voatanisa)",
       "layout": "Fandaminana",
       "unified": "Mitambatra",
@@ -2304,7 +2321,7 @@
       "cloningSession": "Mamorona dika mitovy amin'ny fotoam-piasana",
       "couldNotLoadThisSession": "Tsy voaray ity fotoam-piasana ity.",
       "cloneFailedRetry": "Tsy nahomby ny famoronana dika mitovy amin'ity fotoam-piasana ity. Andramo indray.",
-      "notEnoughCredits": "Tsy ampy ny kireditra hampandehanana ny Cloud Agent. Ampio kireditra ary andramo indray.",
+      "notEnoughCredits": "Tsy ampy ny kireditra ho an'ity fangatahana ity. Ampio kireditra ary andramo indray.",
       "previousTaskFinishing": "Mbola eo am-pamaranana ny asa teo aloha. Andraso kely azafady.",
       "serviceUnavailable": "Tsy azo ampiasaina izao ny tolotra. Andramo indray azafady.",
       "connectionTrouble": "Misy olana amin'ny fifandraisana. Andramo indray rehefa afaka kelikely.",
@@ -2414,7 +2431,7 @@
       "discardWithUploadsMessage": "Hofafana ny toromarikanao sy ny rakitra nampakarina nefa mbola tsy nampiarahina tamin'ny hafatra nalefa.",
       "discardFailed": "Tsy nahomby ny fanariana ny volavola. Andramo indray azafady.",
       "remoteHint": "Mba hampandehanana azy amin'ny solosainao dia alefaso an'i Kilo any amin'ilay solosaina ary avelao hitohy ny fiasany.",
-      "continueFrom": "Mitohy ny {{title}}.",
+      "continueFrom": "Mitohy ny «{{title}}».",
       "importingSession": "Manafatra fotoam-piasana",
       "cliCannotContinue": "Tsy afaka manohy fotoam-piasana ity CLI ity. Safidio ny Cloud Agent na CLI hafa.",
       "importFailed": "Tsy nahomby ny fanafarana ity fotoam-piasana ity.",
@@ -2466,6 +2483,8 @@
       "toolList": "tanisao",
       "toolPatch": "ahitsio",
       "toolTask": "asa",
+      "toolSendFile": "Rakitra nalefa",
+      "toolSendFileAction": "Alefa ny rakitra",
       "readTodos": "Vakio ny drafitra",
       "updateTodos": "Havaozy ny drafitra",
       "linesBadge": "Andalana {{displayCount}}",
@@ -2566,7 +2585,21 @@
       "thought": "Eritreritra",
       "showDetails": "Asehoy ny antsipiriany",
       "pending": "Miandry…",
-      "running": "Mandeha…"
+      "running": "Mandeha…",
+      "field": {
+        "filePath": "Lalan-drakitra",
+        "path": "Lalana",
+        "offset": "Fanombohana",
+        "limit": "Fetra",
+        "pattern": "Lamina",
+        "include": "Fampidirana",
+        "patchText": "Lahatsoratra fanovana",
+        "query": "Fikarohana",
+        "prompt": "Toromarika",
+        "header": "Lohateny",
+        "question": "Fanontaniana",
+        "options": "Safidy"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Tsy nahomby ny fampisehoana ny votoaty."
@@ -2582,7 +2615,7 @@
       "assistantContextOverflow": "Lava loatra ny resaka ho an'ny modely.",
       "assistantProviderError": "Namaly diso ny mpamatsy.",
       "assistantProviderRefused": "Nolavin'ny mpamatsy ity fangatahana ity ary tsy azo averina intsony.",
-      "assistantCreditsRefusal": "Tsy ampy ny kireditra hampandehanana ny Cloud Agent.",
+      "assistantCreditsRefusal": "Tsy ampy ny kireditra ho an'ity fangatahana ity.",
       "assistantOutputLimit": "Tonga tamin'ny fetran'ny valian'ny modely ny famaliana.",
       "assistantStructuredOutput": "Tsy nifanaraka tamin'ny endrika takiana ny famaliana.",
       "assistantFailed": "Tsy nahomby ny famaliana."
@@ -3808,7 +3841,7 @@
     "reasoningEffort": {
       "modelFlag": "Manohana ezaka amin'ny fisainana ity modely ity"
     },
-    "creditsRequired": "Tsy ampy kireditra handefasana ity hafatra ity, ka ampio kireditra ary andramo indray."
+    "creditsRequired": "Tsy ampy kireditra handefasana ity hafatra ity."
   },
   "settingsTools": {
     "confirmTitle": "Hamafiso ity fanovana ity?"
@@ -4001,6 +4034,7 @@
       "namePlaceholder": "Ny mpandraharahako",
       "promptPlaceholder": "Ianao dia...",
       "tools": "Fitaovana",
+      "wholeToolRule": "Ity agent ity dia mampihatra fitsipika iray amin'ny fitaovana rehetra indray mandeha: {{rule}}. Vakiana fotsiny ireo mpifamadihana ireo.",
       "visibility": "Fahitana",
       "visibilityPrimary": "Kilonga — aseho ao amin'ny mpanangona",
       "visibilitySubagent": "Subagent — azo antsoina amin'ny hafa ihany",
@@ -4041,7 +4075,8 @@
       "duplicateName": "Efa misy baiko mitondra io anarana io ao amin'ity profil ity"
     },
     "repoBindings": {
-      "title": "Profiles Default ho an'ny Repos",
+      "title": "Profiles default ho an'ny Repos",
+      "entryLabel": "Profil default",
       "add": "Ampio ny default",
       "empty": "Tsy misy default voarindra",
       "emptyDescription": "Manampia default hampihatra ho azy ny mombamomba rehefa manomboka fivoriana ho an'ny repo.",
@@ -4249,5 +4284,8 @@
     "noEnabledContexts": "Tsy misy toe-javatra nandefasana tatitra voalahatra",
     "sourceBlocker": "Mila fikarakarana ny fotoam-piasana",
     "sourceMetadata": "Metadata momba ny fotoam-piasana voarakitra"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Tsy voasokatra ity valim-pikarohana ity"
   }
 }

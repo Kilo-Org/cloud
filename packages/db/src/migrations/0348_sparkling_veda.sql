@@ -1,0 +1,5 @@
+ALTER TABLE "claude_billing_connections" DROP CONSTRAINT "claude_billing_connections_owner_check";--> statement-breakpoint
+DROP INDEX "UQ_claude_billing_connections_organization";--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_claude_billing_connections_org_member" ON "claude_billing_connections" USING btree ("kilo_user_id","organization_id") WHERE "claude_billing_connections"."organization_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_claude_billing_connections_shared_services" ON "claude_billing_connections" USING btree ("organization_id") WHERE "claude_billing_connections"."organization_id" IS NOT NULL AND "claude_billing_connections"."kilo_user_id" IS NULL;--> statement-breakpoint
+ALTER TABLE "claude_billing_connections" ADD CONSTRAINT "claude_billing_connections_owner_check" CHECK ("claude_billing_connections"."kilo_user_id" IS NOT NULL OR "claude_billing_connections"."organization_id" IS NOT NULL);

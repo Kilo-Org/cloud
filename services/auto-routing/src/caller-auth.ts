@@ -14,6 +14,7 @@ import {
 import { eq } from 'drizzle-orm';
 import {
   extractBearerToken,
+  formatError,
   getCachedSecret,
   verifyKiloTokenForResource,
   type KiloTokenPayload,
@@ -23,13 +24,12 @@ import {
   findOrganizationMemberBalanceRow,
   findOrganizationMemberRole,
   isApiTokenPepperCurrent,
-  isEmailBlacklistedByDomain,
+  createEmailDomainBlacklistCache,
   organizationMemberBalance,
   requestOrganizationId,
 } from '@kilocode/worker-utils/account-access';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import * as z from 'zod';
-import { getBlacklistedDomains } from './organization-policy';
 
 export class CustomRouterError extends Error {
   readonly code: CustomRouterErrorCode;
@@ -71,12 +71,15 @@ export type Caller = {
   db: WorkerDb;
 };
 
-type CallerEnv = Pick<
-  Env,
-  'HYPERDRIVE' | 'NEXTAUTH_SECRET' | 'UPSTASH_REDIS_REST_URL' | 'UPSTASH_REDIS_REST_TOKEN'
->;
+type CallerEnv = Pick<Env, 'HYPERDRIVE' | 'NEXTAUTH_SECRET'>;
 
 const OrganizationIdSchema = z.uuid();
+
+const emailDomainBlacklist = createEmailDomainBlacklistCache();
+
+export function clearEmailDomainBlacklistCache(): void {
+  emailDomainBlacklist.clear();
+}
 
 async function verifyCallerToken(env: CallerEnv, token: string): Promise<KiloTokenPayload> {
   const secret = await getCachedSecret(env.NEXTAUTH_SECRET, 'NEXTAUTH_SECRET');
@@ -106,40 +109,38 @@ export async function authenticateCaller(env: CallerEnv, headers: Headers): Prom
   const payload = await verifyCallerToken(env, token);
 
   const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 2_000 });
-  const [[user], blacklistedDomains] = await Promise.all([
-    db
-      .select({
-        api_token_pepper: kilocode_users.api_token_pepper,
-        blocked_at: kilocode_users.blocked_at,
-        blocked_reason: kilocode_users.blocked_reason,
-        google_user_email: kilocode_users.google_user_email,
-        total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
-        microdollars_used: kilocode_users.microdollars_used,
-      })
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, payload.kiloUserId))
-      .limit(1),
-    getBlacklistedDomains(env),
-  ]);
+  const [user] = await db
+    .select({
+      api_token_pepper: kilocode_users.api_token_pepper,
+      blocked_reason: kilocode_users.blocked_reason,
+      google_user_email: kilocode_users.google_user_email,
+      total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
+      microdollars_used: kilocode_users.microdollars_used,
+    })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, payload.kiloUserId))
+    .limit(1);
   if (!user || !isApiTokenPepperCurrent(user.api_token_pepper, payload.apiTokenPepper)) {
     throw new CustomRouterError('unauthorized', 'Invalid token');
   }
-  // The Worker package does not depend on @kilocode/web-shared, so the account-availability
-  // rule is inlined here: either column marks the account blocked.
-  if (user.blocked_at || user.blocked_reason) {
-    throw new CustomRouterError('forbidden', 'Access denied');
-  }
-  // Fail closed: without a blocked-domain list this request cannot be admitted.
-  if (blacklistedDomains === null) {
-    throw new CustomRouterError(
-      'internal_error',
-      'Account checks are temporarily unavailable',
-      DEPENDENCY_RETRY_AFTER_SECONDS
-    );
-  }
-  if (isEmailBlacklistedByDomain(user.google_user_email, blacklistedDomains)) {
-    throw new CustomRouterError('forbidden', 'Access denied');
-  }
+  if (user.blocked_reason) throw new CustomRouterError('forbidden', 'Access denied');
+  // Fail closed: without the blocked-domain answer this request cannot be admitted.
+  const blacklisted = await emailDomainBlacklist
+    .isBlacklisted(db, user.google_user_email)
+    .catch((error: unknown) => {
+      console.warn(
+        JSON.stringify({
+          event: 'auto_routing_blacklisted_domains_read_failed',
+          ...formatError(error),
+        })
+      );
+      throw new CustomRouterError(
+        'internal_error',
+        'Account checks are temporarily unavailable',
+        DEPENDENCY_RETRY_AFTER_SECONDS
+      );
+    });
+  if (blacklisted) throw new CustomRouterError('forbidden', 'Access denied');
 
   const organizationId =
     requestOrganizationId(payload.organizationId, headers.get(AUTO_ROUTING_ORGANIZATION_HEADER)) ??

@@ -22,6 +22,7 @@ import { CLOUD_AGENT_NEXT_WS_URL } from '@kilocode/web-shared/lib/constants';
 import { subscribeSandboxStatus } from './sandbox-status-stream';
 import { cn } from '@/lib/utils';
 import { sandboxStatusPresentation, type SandboxStatusPresentation } from './sandbox-status';
+import { formatSnapshotTime } from './snapshot-display';
 
 const statusBadgeIcons = {
   active: Circle,
@@ -62,6 +63,23 @@ function SandboxStatusDetails({ view }: { view: SandboxStatusPresentation }) {
           )}
         </dl>
       </section>
+      {view.snapshotCapturedAt !== null && (
+        <section className="space-y-2 border-t pt-3">
+          <div className="flex items-baseline justify-between gap-4">
+            <h3 className="text-foreground font-medium">Workspace snapshot</h3>
+            <span className="text-muted-foreground">Local time</span>
+          </div>
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 gap-y-1.5">
+            <dt className="text-muted-foreground">Captured</dt>
+            <dd className="text-right tabular-nums">
+              <time dateTime={new Date(view.snapshotCapturedAt).toISOString()}>
+                {formatSnapshotTime(view.snapshotCapturedAt)}
+              </time>
+            </dd>
+          </dl>
+          <p className="text-muted-foreground">Shared by all chats in this workspace.</p>
+        </section>
+      )}
       {hasTiming && (
         <section className="space-y-2 border-t pt-3">
           <div className="flex items-baseline justify-between gap-4">

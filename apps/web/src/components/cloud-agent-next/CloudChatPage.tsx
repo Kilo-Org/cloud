@@ -13,6 +13,7 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
+import { toast } from 'sonner';
 import { ArrowDown, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
@@ -26,6 +27,7 @@ import { ChatHeader } from './ChatHeader';
 import { ParentSessionLink } from './ParentSessionLink';
 import { worktreeParentQueryOptions } from './worktree-parent-query';
 import { sessionResumeHref } from '@/lib/cloud-agent/session-resume-target';
+import { useChatStackInfo } from './useChatStackInfo';
 import {
   getWorkspaceControlSession,
   getWorktreeBranch,
@@ -66,9 +68,14 @@ import { getCurrentTodos } from './current-todos';
 import { useCloudThreadScroll } from './assistant-ui/use-cloud-thread-scroll';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
 import type { ChildSessionDrawerEntry } from './ChildSessionSection';
-import { SessionStatusIndicator } from './SessionStatusIndicator';
+import { SessionErrorNotice } from './SessionErrorNotice';
+import { readableSessionError } from './session-error-copy';
 import { isNoOpCompletedPreparationAttempt } from './preparation-summary';
 import { PreparationDrawer } from './PreparationDrawer';
+import { WorkspaceSnapshotRecovery } from './WorkspaceSnapshotRecovery';
+import { EnvironmentBuildRecovery } from './EnvironmentBuildRecovery';
+import { environmentBuildRecoveryOffered } from './environment-build-recovery';
+import { workspaceSnapshotRecoveryOffered } from './workspace-snapshot-recovery';
 import { QuestionToolCard } from './QuestionToolCard';
 import { QuestionContextProvider } from './QuestionContext';
 import { PermissionCard, PermissionContextProvider } from './PermissionCard';
@@ -124,6 +131,7 @@ import type { KnownModel } from './known-models';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
 import { useCelebrationSound } from '@/hooks/useCelebrationSound';
 import { useCliSessionPresence } from '@/hooks/useCliSessionPresence';
+import { useCollapseToolsPreference } from './collapse-tools-preference';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 
 import { cn } from '@/lib/utils';
@@ -295,6 +303,7 @@ export default function CloudChatPage({
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
+  const cloudAgentModelOverride = useAtomValue(manager.atoms.cloudAgentModelOverride);
   const hasOlderMessages = useAtomValue(manager.atoms.hasOlderMessages);
   const isLoadingOlderMessages = useAtomValue(manager.atoms.isLoadingOlderMessages);
   const olderMessagesError = useAtomValue(manager.atoms.olderMessagesError);
@@ -416,6 +425,51 @@ export default function CloudChatPage({
     deletingSessionIds,
   });
   const workspaceCloudSessionId = workspaceControlSession?.cloudAgentSessionId ?? sessionId;
+  const workspaceSnapshotRecovery = useQuery({
+    ...(organizationId
+      ? trpc.organizations.cloudAgentNext.getWorkspaceSnapshotRecovery.queryOptions({
+          sessionId: workspaceCloudSessionId ?? '',
+          organizationId,
+        })
+      : trpc.cloudAgentNext.getWorkspaceSnapshotRecovery.queryOptions({
+          sessionId: workspaceCloudSessionId ?? '',
+        })),
+    enabled: Boolean(workspaceCloudSessionId) && cloudStatus?.type === 'error',
+    staleTime: 0,
+    retry: false,
+  });
+  const removeWorkspaceSnapshot = useMutation({
+    mutationFn: async () => {
+      if (!workspaceCloudSessionId) throw new Error('Session is not ready');
+      if (organizationId) {
+        return await trpcClient.organizations.cloudAgentNext.removeWorkspaceSnapshot.mutate({
+          sessionId: workspaceCloudSessionId,
+          organizationId,
+        });
+      }
+      return await trpcClient.cloudAgentNext.removeWorkspaceSnapshot.mutate({
+        sessionId: workspaceCloudSessionId,
+      });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries(
+        organizationId
+          ? trpc.organizations.cloudAgentNext.getWorkspaceSnapshotRecovery.pathFilter()
+          : trpc.cloudAgentNext.getWorkspaceSnapshotRecovery.pathFilter()
+      );
+    },
+  });
+  const workspaceSnapshotRecoveryState = workspaceSnapshotRecoveryOffered({
+    cloudStatus,
+    recovery: workspaceSnapshotRecovery.data,
+    recoveryIsFresh: workspaceSnapshotRecovery.isSuccess && !workspaceSnapshotRecovery.isFetching,
+    isReadOnly,
+  });
+  const environmentBuildRecoveryId = environmentBuildRecoveryOffered({
+    cloudStatus,
+    attempts: preparationAttempts,
+    environmentId: isCurrentSession ? fetchedSessionData?.environmentId : null,
+  });
   const currentSessionCanOpenChanges =
     sessionIdFromParams !== null &&
     isCurrentSession &&
@@ -537,6 +591,7 @@ export default function CloudChatPage({
     remoteModelState,
     observedModel,
     remoteModelOverride,
+    cloudAgentModelOverride,
     gatewayModelId: composerSettings?.model,
     gatewayVariant: composerSettings?.variant,
     // A chat listed under this route belongs to its organization, so its models load at once.
@@ -572,6 +627,7 @@ export default function CloudChatPage({
   const { availableCommands } = useSlashCommandSets();
 
   const { play: playCelebrationSound, soundEnabled, setSoundEnabled } = useCelebrationSound();
+  const { collapseTools } = useCollapseToolsPreference();
 
   const prevActivityRef = useRef<string | null>(null);
   useEffect(() => {
@@ -633,8 +689,8 @@ export default function CloudChatPage({
   const newChatComposer = composerSettings
     ? {
         mode: composerSettings.mode,
-        model: composerSettings.model,
-        variant: composerSettings.variant ?? null,
+        model: sessionModels.selectedValue ?? composerSettings.model,
+        variant: sessionModels.selectedVariant ?? null,
       }
     : null;
   const handleCreateWorktreeChat = useCallback(() => {
@@ -664,8 +720,8 @@ export default function CloudChatPage({
           type: 'prompt',
           prompt,
           mode: selection.mode,
-          model: selection.model,
-          variant: selection.variant,
+          model: sessionModels.selectedValue ?? selection.model,
+          variant: sessionModels.selectedVariant,
         },
         attachments: supportsAttachments ? attachments : undefined,
       });
@@ -690,6 +746,8 @@ export default function CloudChatPage({
       manager,
       scheduleScrollToBottom,
       sessionConfig,
+      sessionModels.selectedValue,
+      sessionModels.selectedVariant,
       supportsAttachments,
       captureSendPosition,
       followAcceptedSend,
@@ -1231,9 +1289,10 @@ export default function CloudChatPage({
       const newModelVariants =
         modelOptions.find(candidate => candidate.id === model)?.variants ?? [];
       const validVariant =
-        sessionConfig.variant && newModelVariants.includes(sessionConfig.variant)
-          ? sessionConfig.variant
+        sessionModels.selectedVariant && newModelVariants.includes(sessionModels.selectedVariant)
+          ? sessionModels.selectedVariant
           : newModelVariants[0];
+      manager.setCloudAgentModelOverride({ model, variant: validVariant });
       setSessionConfig({ ...sessionConfig, model, variant: validVariant });
     },
     [
@@ -1253,7 +1312,9 @@ export default function CloudChatPage({
         manager.setRemoteModelOverride(createRemoteModelOverride(option, variant));
         return;
       }
-      if (sessionConfig) setSessionConfig({ ...sessionConfig, variant });
+      if (!sessionConfig || !sessionModels.selectedValue) return;
+      manager.setCloudAgentModelOverride({ model: sessionModels.selectedValue, variant });
+      setSessionConfig({ ...sessionConfig, model: sessionModels.selectedValue, variant });
     },
     [
       activeSessionType,
@@ -1284,11 +1345,7 @@ export default function CloudChatPage({
 
   const showChatInterface =
     Boolean(selectedWorktreeId) || Boolean(sessionConfig) || Boolean(sessionIdFromParams);
-  const currentModelOption = modelOptions.find(model =>
-    activeSessionType === 'remote'
-      ? model.id === sessionModels.selectedValue
-      : model.id === sessionConfig?.model
-  );
+  const currentModelOption = modelOptions.find(model => model.id === displayModel);
   const modelDisplayName = currentModelOption?.name
     ? formatShortModelDisplayName(currentModelOption.name)
     : undefined;
@@ -1339,6 +1396,15 @@ export default function CloudChatPage({
       ? { sessionId: sessionIdFromParams, message: statusIndicator.message }
       : null;
 
+  const sessionErrorMessage =
+    transcriptPhase !== 'opening' && !billingFailure && statusIndicator?.type === 'error'
+      ? readableSessionError(statusIndicator.message)
+      : null;
+  const failedPreparationAttemptId =
+    cloudStatus?.type === 'error'
+      ? (preparationAttempts.filter(attempt => attempt.status === 'failed').at(-1)?.id ?? null)
+      : null;
+
   const chatOpening = transcriptPhase === 'opening' || (isLoading && transcriptPhase !== 'local');
 
   // The worktree's sandbox stays reachable through its control chat while a chat loads.
@@ -1351,14 +1417,10 @@ export default function CloudChatPage({
 
   const preview = usePreviewController({
     selectedWorktreeId,
-    routeReady:
-      sessionIdFromParams !== null && fetchedSessionData?.kiloSessionId === sessionIdFromParams
-        ? fetchedSessionData?.routeReady
-        : undefined,
-    sessionIdFromParams,
     sessionId: workspaceCloudSessionId,
-    worktreeChats,
-    canOpenTerminal,
+    canOpenPreview: selectedWorktreeId
+      ? worktreeChats.some(chat => Boolean(chat.cloudAgentSessionId))
+      : canOpenTerminal,
     organizationId,
   });
 
@@ -1378,6 +1440,28 @@ export default function CloudChatPage({
   );
 
   // Feedback context carries the session the server resolved for this route.
+  const headerRepository = workspaceControlSession?.repository ?? sessionConfig?.repository ?? '';
+  const headerBranch = workspaceControlSession
+    ? (workspaceControlSession.branch ?? undefined)
+    : fetchedSessionData?.isPreparingAsync &&
+        cloudStatus?.type !== 'ready' &&
+        !preparationAttempts.some(attempt => attempt.status === 'completed')
+      ? undefined
+      : (sessionBranch ?? undefined);
+  const headerGitUrl = workspaceControlSession ? undefined : fetchedSessionData?.gitUrl;
+  const [stackRefreshToken, setStackRefreshToken] = useState(0);
+  const chatStackInfo = useChatStackInfo({
+    enabled: Boolean(selectedWorktreeId),
+    userId: currentUserId,
+    currentWorktreeId: selectedWorktreeId,
+    cloudAgentSessionId: workspaceCloudSessionId ?? '',
+    organizationId,
+    repository: headerRepository,
+    branch: headerBranch,
+    gitUrl: fetchedSessionData?.gitUrl,
+    refreshToken: stackRefreshToken,
+    openSession,
+  });
   const sessionActions = (
     <ChatHeader
       currentUserId={currentUserId}
@@ -1394,18 +1478,10 @@ export default function CloudChatPage({
           : workspaceControlSession?.sessionId
       }
       organizationId={organizationId}
-      repository={workspaceControlSession?.repository ?? sessionConfig?.repository ?? ''}
-      branch={
-        workspaceControlSession
-          ? (workspaceControlSession.branch ?? undefined)
-          : fetchedSessionData?.isPreparingAsync &&
-              cloudStatus?.type !== 'ready' &&
-              !preparationAttempts.some(attempt => attempt.status === 'completed')
-            ? undefined
-            : (sessionBranch ?? undefined)
-      }
-      gitUrl={workspaceControlSession ? undefined : fetchedSessionData?.gitUrl}
-      model={workspaceControlSession?.model ?? sessionConfig?.model}
+      repository={headerRepository}
+      branch={headerBranch}
+      gitUrl={headerGitUrl}
+      model={workspaceControlSession?.model ?? displayModel}
       modelDisplayName={workspaceControlSession ? undefined : modelDisplayName}
       getSessionCostBreakdown={
         !workspaceControlSession && isCurrentSession && fetchedSessionData
@@ -1435,6 +1511,9 @@ export default function CloudChatPage({
         Boolean(workspaceControlSession) ||
         (!isReadOnly && Boolean(fetchedSessionData?.cloudAgentSessionId))
       }
+      stack={chatStackInfo}
+      onSendStackInstruction={handleSendMessage}
+      onStackOperationCompleted={() => setStackRefreshToken(token => token + 1)}
       sandboxStatusEligible={isSandboxStatusEligible({
         currentUserId,
         sessionId: workspaceCloudSessionId,
@@ -1680,6 +1759,7 @@ export default function CloudChatPage({
                                   <PreviewLinksContext.Provider value={preview.links}>
                                     <CloudThread
                                       active={chatTabActive}
+                                      collapseTools={collapseTools}
                                       getChildMessages={getChildMessages}
                                       onOpenChildSession={handleOpenTopLevelChildSession}
                                       onOpenPreparationDetails={handleOpenPreparationDetails}
@@ -1788,6 +1868,60 @@ export default function CloudChatPage({
                               <div className="px-[max(1rem,calc(50%_-_27rem))]">
                                 <CurrentTaskList todos={currentTodos} />
                               </div>
+                              {sessionErrorMessage !== null && (
+                                <div className="-mb-2 px-[max(1rem,calc(50%_-_27rem))]">
+                                  <SessionErrorNotice
+                                    message={sessionErrorMessage}
+                                    hint={
+                                      workspaceSnapshotRecoveryState !== null
+                                        ? 'Start fresh to discard the snapshot, or send your message again to retry.'
+                                        : environmentBuildRecoveryId !== null
+                                          ? 'Send your message again once the environment snapshot is ready.'
+                                          : undefined
+                                    }
+                                    actions={
+                                      environmentBuildRecoveryId !== null ||
+                                      workspaceSnapshotRecoveryState !== null ||
+                                      failedPreparationAttemptId !== null ? (
+                                        <>
+                                          {environmentBuildRecoveryId !== null && (
+                                            <EnvironmentBuildRecovery
+                                              environmentId={environmentBuildRecoveryId}
+                                              organizationId={organizationId}
+                                            />
+                                          )}
+                                          {workspaceSnapshotRecoveryState !== null && (
+                                            <WorkspaceSnapshotRecovery
+                                              capturedAt={workspaceSnapshotRecoveryState.capturedAt}
+                                              isRemoving={removeWorkspaceSnapshot.isPending}
+                                              onRemove={async () => {
+                                                await removeWorkspaceSnapshot.mutateAsync();
+                                                toast.success(
+                                                  'Workspace snapshot removed. Your next start will use the environment snapshot or base image.'
+                                                );
+                                              }}
+                                            />
+                                          )}
+                                          {failedPreparationAttemptId !== null && (
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() =>
+                                                handleOpenPreparationDetails(
+                                                  failedPreparationAttemptId
+                                                )
+                                              }
+                                            >
+                                              View details
+                                            </Button>
+                                          )}
+                                        </>
+                                      ) : undefined
+                                    }
+                                  />
+                                </div>
+                              )}
                               <CloudComposer
                                 inputRef={composerInputRef}
                                 onSend={handleSendMessage}
@@ -1852,16 +1986,6 @@ export default function CloudChatPage({
                                   },
                                 }}
                               />
-                              {transcriptPhase !== 'opening' &&
-                                !billingFailure &&
-                                statusIndicator?.type === 'error' && (
-                                  <div
-                                    className="px-[max(1rem,calc(50%_-_27rem))] pb-2"
-                                    role="alert"
-                                  >
-                                    <SessionStatusIndicator indicator={statusIndicator} />
-                                  </div>
-                                )}
                               <ComposerContextLine
                                 userId={currentUserId}
                                 reserve={Boolean(sessionIdFromParams)}

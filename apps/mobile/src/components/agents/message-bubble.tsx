@@ -158,7 +158,10 @@ function MessageBubbleImpl({
   if (parts.length === 1 && firstPart?.type === 'compaction') {
     return (
       <View className="px-4">
-        <CompactionSeparator />
+        <CompactionSeparator
+          info={message.info}
+          isStreaming={isLastAssistantMessage && isSessionStreaming}
+        />
       </View>
     );
   }
@@ -191,7 +194,13 @@ function MessageBubbleImpl({
   const trailingFailure = failure?.side === 'user';
   const failureFooter =
     failure !== null && relevantHandlerWired ? (
-      <View className={cn('gap-2 px-4 py-1', trailingFailure && 'items-end')}>
+      /* The actions close the turn rather than opening the next one: the space
+         under them is the gap between turns, so a Retry is never read as part of
+         the message that follows it. 24 dp is more than twice the gap between a
+         bubble and its own status line, which is what keeps a turn's status and
+         actions in its own group. `items-end` is logical, so the status stays
+         with the end-aligned bubble in either direction. */
+      <View className={cn('gap-2 px-4 pt-1 pb-[24px]', trailingFailure && 'items-end')}>
         <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
           {failure.error ? (
             // Every failure that reports an error carries the same marker; a
@@ -257,6 +266,7 @@ function MessageBubbleImpl({
             <Button
               variant="outline"
               size="sm"
+              className={STATE_ACTION_CLASS}
               onPress={() => {
                 onCopyToComposer(copyText);
               }}
@@ -364,6 +374,7 @@ function MessageBubbleImpl({
     <PartRenderer
       key={part.id}
       part={part}
+      messageInfo={message.info}
       isStreaming={isStreaming}
       getChildMessages={getChildMessages}
       defaultReasoningExpanded={defaultReasoningExpanded}

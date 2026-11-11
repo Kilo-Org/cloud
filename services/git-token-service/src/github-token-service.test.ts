@@ -430,6 +430,7 @@ describe('GitHubTokenService', () => {
       expect(error).toMatchObject({
         status,
         reason,
+        rejectionProvenance: status === 404 ? 'installation_token_http404' : undefined,
         message: 'Failed to generate GitHub installation token',
       });
       expect(error).not.toHaveProperty('cause');

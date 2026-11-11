@@ -52,6 +52,43 @@ describe('CLI route compatibility', () => {
   });
 });
 
+describe('provider organization catalog', () => {
+  const organizationId = '30f1620a-4aad-4456-bf4d-550f335e6f55';
+  const pathname = `/api/openrouter/organizations/${organizationId}/models`;
+
+  function resolve(input: { organizationId?: string; method?: string }) {
+    const derived = deriveKiloSandboxTargets({}, 'user-token');
+    if (!derived.success) throw new Error('Expected default targets');
+    return resolveRuntimeCredentialProxyRoute({
+      targets: derived.targets,
+      route: 'provider',
+      method: input.method ?? 'GET',
+      pathname,
+      search: '',
+      kiloSessionId: 'ses_cli_compatibility',
+      ...(input.organizationId === undefined ? {} : { organizationId: input.organizationId }),
+    })?.href;
+  }
+
+  it('routes the session organization catalog to the gateway', () => {
+    expect(resolve({ organizationId })).toBe(
+      `https://api.kilo.ai/api/gateway/organizations/${organizationId}/models`
+    );
+  });
+
+  it('rejects another organization', () => {
+    expect(resolve({ organizationId: 'another-organization' })).toBeUndefined();
+  });
+
+  it('rejects a catalog request when the grant has no organization', () => {
+    expect(resolve({})).toBeUndefined();
+  });
+
+  it('rejects a non-GET method on the organization catalog', () => {
+    expect(resolve({ organizationId, method: 'POST' })).toBeUndefined();
+  });
+});
+
 describe('providerBaseUrlEncodedInToken', () => {
   it('extracts and normalizes a provider base while preserving the full token separately', () => {
     expect(

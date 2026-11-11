@@ -11,17 +11,7 @@ import type {
 
 type Text = string | null | undefined;
 
-type RequestText = { source: 'input' | 'tool'; text: Text };
-
-type RequestSegment = RequestText[];
-
-function inputTexts(texts: Text[]): RequestText[] {
-  return texts.map(text => ({ source: 'input', text }));
-}
-
-function toolTexts(texts: Text[]): RequestText[] {
-  return texts.map(text => ({ source: 'tool', text }));
-}
+type RequestSegment = Text[];
 
 /** Tool inputs and schemas are scanned as the JSON the model reads. */
 function jsonText(value: unknown): Text {
@@ -102,18 +92,18 @@ function chatToolCallTexts(call: OpenAI.Chat.ChatCompletionMessageToolCall): Tex
 
 function chatMessageTexts(
   message: OpenAI.Chat.ChatCompletionMessageParam & MessageWithReasoning
-): RequestText[] {
+): Text[] {
   switch (message.role) {
     case 'tool':
-      return toolTexts(chatContentTexts(message.content));
+      return chatContentTexts(message.content);
     case 'function':
-      return toolTexts([message.content]);
+      return [message.content];
     case 'system':
     case 'developer':
     case 'user':
-      return inputTexts(chatContentTexts(message.content));
+      return chatContentTexts(message.content);
     case 'assistant':
-      return inputTexts([
+      return [
         ...chatContentTexts(message.content),
         message.refusal,
         message.reasoning,
@@ -122,9 +112,9 @@ function chatMessageTexts(
         message.function_call?.name,
         message.function_call?.arguments,
         ...(message.tool_calls ?? []).flatMap(chatToolCallTexts),
-      ]);
+      ];
     default:
-      return inputTexts(unrecognizedTexts(message));
+      return unrecognizedTexts(message);
   }
 }
 
@@ -155,11 +145,9 @@ function chatResponseFormatTexts(
 
 function chatCompletionsSegments(body: OpenRouterChatCompletionRequest): RequestSegment[] {
   return [
-    ...(body.tools ?? []).map(tool => inputTexts(chatToolDefinitionTexts(tool))),
-    ...(body.functions ?? []).map(fn =>
-      inputTexts([fn.name, fn.description, jsonText(fn.parameters)])
-    ),
-    inputTexts(chatResponseFormatTexts(body.response_format)),
+    ...(body.tools ?? []).map(chatToolDefinitionTexts),
+    ...(body.functions ?? []).map(fn => [fn.name, fn.description, jsonText(fn.parameters)]),
+    chatResponseFormatTexts(body.response_format),
     ...body.messages.map(chatMessageTexts),
   ];
 }
@@ -241,61 +229,57 @@ function anthropicTextEditorTexts(
   }
 }
 
-function anthropicBlockTexts(block: AnthropicBlock): RequestText[] {
+function anthropicBlockTexts(block: AnthropicBlock): Text[] {
   switch (block.type) {
     case 'text':
-      return inputTexts([block.text]);
+      return [block.text];
     case 'thinking':
-      return inputTexts([block.thinking]);
+      return [block.thinking];
     case 'tool_use':
     case 'server_tool_use':
     case 'mcp_tool_use':
-      return inputTexts([block.name, jsonText(block.input)]);
+      return [block.name, jsonText(block.input)];
     case 'document':
-      return inputTexts(anthropicDocumentTexts(block));
+      return anthropicDocumentTexts(block);
     case 'compaction':
-      return inputTexts([block.content]);
+      return [block.content];
     case 'mid_conv_system':
-      return inputTexts(anthropicTextBlocksTexts(block.content));
+      return anthropicTextBlocksTexts(block.content);
     case 'tool_result':
     case 'mcp_tool_result':
-      return toolTexts(anthropicToolResultTexts(block.content));
+      return anthropicToolResultTexts(block.content);
     case 'search_result':
-      return toolTexts(anthropicSearchResultTexts(block));
+      return anthropicSearchResultTexts(block);
     case 'web_search_tool_result':
-      return toolTexts(
-        Array.isArray(block.content) ? block.content.map(result => result.title) : []
-      );
+      return Array.isArray(block.content) ? block.content.map(result => result.title) : [];
     case 'web_fetch_tool_result':
-      return toolTexts(
-        block.content.type === 'web_fetch_result'
-          ? anthropicDocumentTexts(block.content.content)
-          : []
-      );
+      return block.content.type === 'web_fetch_result'
+        ? anthropicDocumentTexts(block.content.content)
+        : [];
     case 'code_execution_tool_result':
     case 'bash_code_execution_tool_result':
-      return toolTexts(anthropicCodeExecutionTexts(block.content));
+      return anthropicCodeExecutionTexts(block.content);
     case 'text_editor_code_execution_tool_result':
-      return toolTexts(anthropicTextEditorTexts(block.content));
+      return anthropicTextEditorTexts(block.content);
     case 'tool_search_tool_result':
-      return toolTexts(
-        block.content.type === 'tool_search_tool_result_error' ? [block.content.error_message] : []
-      );
+      return block.content.type === 'tool_search_tool_result_error'
+        ? [block.content.error_message]
+        : [];
     case 'advisor_tool_result':
-      return toolTexts(block.content.type === 'advisor_result' ? [block.content.text] : []);
+      return block.content.type === 'advisor_result' ? [block.content.text] : [];
     case 'image':
     case 'redacted_thinking':
     case 'container_upload':
     case 'fallback':
       return [];
     default:
-      return inputTexts(unrecognizedTexts(block));
+      return unrecognizedTexts(block);
   }
 }
 
-function anthropicMessageTexts(message: Anthropic.Beta.BetaMessageParam): RequestText[] {
+function anthropicMessageTexts(message: Anthropic.Beta.BetaMessageParam): Text[] {
   return typeof message.content === 'string'
-    ? inputTexts([message.content])
+    ? [message.content]
     : message.content.flatMap(anthropicBlockTexts);
 }
 
@@ -317,12 +301,9 @@ function messagesSegments(request: GatewayMessagesRequest): RequestSegment[] {
   const body: AnthropicTextSources = request;
   const { system } = body;
   return [
-    ...(body.tools ?? []).map(tool => inputTexts(anthropicToolDefinitionTexts(tool))),
-    inputTexts([
-      jsonText(body.output_format?.schema),
-      jsonText(body.output_config?.format?.schema),
-    ]),
-    inputTexts(typeof system === 'string' ? [system] : anthropicTextBlocksTexts(system ?? [])),
+    ...(body.tools ?? []).map(anthropicToolDefinitionTexts),
+    [jsonText(body.output_format?.schema), jsonText(body.output_config?.format?.schema)],
+    typeof system === 'string' ? [system] : anthropicTextBlocksTexts(system ?? []),
     ...body.messages.map(anthropicMessageTexts),
   ];
 }
@@ -404,81 +385,74 @@ function computerActionTexts(action: ComputerAction): Text[] {
   return action.type === 'type' ? [action.text] : [];
 }
 
-function responsesItemTexts(item: OpenAI.Responses.ResponseInputItem): RequestText[] {
+function responsesItemTexts(item: OpenAI.Responses.ResponseInputItem): Text[] {
   switch (item.type) {
     case undefined:
     case null:
     case 'message':
-      return 'content' in item ? inputTexts(responsesContentTexts(item.content)) : [];
+      return 'content' in item ? responsesContentTexts(item.content) : [];
     case 'reasoning':
-      return inputTexts([
+      return [
         ...(item.content ?? []).map(content => content.text),
         ...item.summary.map(summary => summary.text),
-      ]);
-    case 'function_call':
-      return inputTexts([item.name, item.arguments]);
-    case 'custom_tool_call':
-      return inputTexts([item.name, item.input]);
-    case 'mcp_approval_request':
-      return inputTexts([item.name, item.arguments]);
-    case 'mcp_approval_response':
-      return inputTexts([item.reason]);
-    case 'mcp_call':
-      return [...inputTexts([item.name, item.arguments]), ...toolTexts([item.output, item.error])];
-    case 'tool_search_call':
-      return inputTexts([jsonText(item.arguments)]);
-    case 'file_search_call':
-      return [
-        ...inputTexts(item.queries),
-        ...toolTexts((item.results ?? []).map(result => result.text)),
       ];
+    case 'function_call':
+      return [item.name, item.arguments];
+    case 'custom_tool_call':
+      return [item.name, item.input];
+    case 'mcp_approval_request':
+      return [item.name, item.arguments];
+    case 'mcp_approval_response':
+      return [item.reason];
+    case 'mcp_call':
+      return [item.name, item.arguments, item.output, item.error];
+    case 'tool_search_call':
+      return [jsonText(item.arguments)];
+    case 'file_search_call':
+      return [...item.queries, ...(item.results ?? []).map(result => result.text)];
     case 'web_search_call':
-      return inputTexts(
-        item.action.type === 'search' ? [item.action.query, ...(item.action.queries ?? [])] : []
-      );
+      return item.action.type === 'search'
+        ? [item.action.query, ...(item.action.queries ?? [])]
+        : [];
     case 'computer_call':
-      return inputTexts([
+      return [
         ...(item.action ? computerActionTexts(item.action) : []),
         ...(item.actions ?? []).flatMap(computerActionTexts),
-      ]);
+      ];
     case 'code_interpreter_call':
       return [
-        ...inputTexts([item.code]),
-        ...toolTexts(
-          (item.outputs ?? []).map(output => (output.type === 'logs' ? output.logs : undefined))
-        ),
+        item.code,
+        ...(item.outputs ?? []).map(output => (output.type === 'logs' ? output.logs : undefined)),
       ];
     case 'local_shell_call':
-      return inputTexts(item.action.command);
+      return item.action.command;
     case 'shell_call':
-      return inputTexts(item.action.commands);
+      return item.action.commands;
     case 'apply_patch_call':
-      return inputTexts(
-        'diff' in item.operation
-          ? [item.operation.path, item.operation.diff]
-          : [item.operation.path]
-      );
+      return 'diff' in item.operation
+        ? [item.operation.path, item.operation.diff]
+        : [item.operation.path];
     case 'program':
-      return inputTexts([item.code]);
+      return [item.code];
     case 'additional_tools':
-      return inputTexts(item.tools.flatMap(responsesToolDefinitionTexts));
+      return item.tools.flatMap(responsesToolDefinitionTexts);
     case 'function_call_output':
     case 'custom_tool_call_output':
-      return toolTexts(responsesContentTexts(item.output));
+      return responsesContentTexts(item.output);
     case 'local_shell_call_output':
     case 'apply_patch_call_output':
-      return toolTexts([item.output]);
+      return [item.output];
     case 'shell_call_output':
-      return toolTexts(item.output.flatMap(output => [output.stdout, output.stderr]));
+      return item.output.flatMap(output => [output.stdout, output.stderr]);
     case 'program_output':
-      return toolTexts([item.result]);
+      return [item.result];
     case 'mcp_list_tools':
-      return toolTexts([
+      return [
         ...item.tools.flatMap(tool => [tool.name, tool.description, jsonText(tool.input_schema)]),
         item.error,
-      ]);
+      ];
     case 'tool_search_output':
-      return toolTexts(item.tools.flatMap(responsesToolDefinitionTexts));
+      return item.tools.flatMap(responsesToolDefinitionTexts);
     case 'computer_call_output':
     case 'image_generation_call':
     case 'compaction':
@@ -486,17 +460,17 @@ function responsesItemTexts(item: OpenAI.Responses.ResponseInputItem): RequestTe
     case 'item_reference':
       return [];
     default:
-      return inputTexts(unrecognizedTexts(item));
+      return unrecognizedTexts(item);
   }
 }
 
 function responsesSegments(body: GatewayResponsesRequest): RequestSegment[] {
   const { input } = body;
   return [
-    ...(body.tools ?? []).map(tool => inputTexts(responsesToolDefinitionTexts(tool))),
-    inputTexts(responsesFormatTexts(body.text?.format)),
-    inputTexts([body.instructions]),
-    ...(typeof input === 'string' ? [inputTexts([input])] : (input ?? []).map(responsesItemTexts)),
+    ...(body.tools ?? []).map(responsesToolDefinitionTexts),
+    responsesFormatTexts(body.text?.format),
+    [body.instructions],
+    ...(typeof input === 'string' ? [[input]] : (input ?? []).map(responsesItemTexts)),
   ];
 }
 
@@ -523,24 +497,19 @@ export function joinRequestSegments(segments: string[]): string {
 
 /**
  * Every request can rewrite history, including assistant and system messages. Scan the full
- * conversation rather than trusting earlier turns, respecting the organization's tool-result scope.
+ * conversation, including all textual tool results, rather than trusting earlier turns.
  * Binary media, encrypted content, and transport settings are never scanned.
  *
  * Returns one entry per tool definition, output format, system prompt, and message or input item
  * that has scannable text, in order. Joined with `joinRequestSegments`, they are the scanned text.
  */
-export function extractRequestSegments(
-  request: GatewayRequest,
-  { includeToolResults }: { includeToolResults: boolean }
-): string[] {
+export function extractRequestSegments(request: GatewayRequest): string[] {
   return requestSegments(request).flatMap(segment => {
     const joined = joinRequestSegments(
-      segment
-        .filter(({ source }) => includeToolResults || source === 'input')
-        .flatMap(({ text }) => {
-          const trimmed = text?.trim();
-          return trimmed ? [trimmed] : [];
-        })
+      segment.flatMap(text => {
+        const trimmed = text?.trim();
+        return trimmed ? [trimmed] : [];
+      })
     );
     return joined ? [joined] : [];
   });

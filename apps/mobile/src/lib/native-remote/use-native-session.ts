@@ -1,15 +1,19 @@
 import {
+  type NativeConversation,
+  type NativePendingRequests,
   type NativeSessionConnection,
   type NativeSessionState,
   type NativeSessionSummary,
+  readNativeConversation,
 } from '@kilocode/cloud-agent-sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner-native';
-import { type NativePendingRequests, pendingRequests, sendNativePrompt } from './projections';
+import { sendNativePrompt } from './projections';
 import { nativeError, type NativeRemoteClient } from './use-native-inventory';
 
 export type NativeRemoteSession = {
   state: NativeSessionState | undefined;
+  conversation: NativeConversation | undefined;
   busy: boolean;
   error: string;
   commandID: string;
@@ -107,11 +111,12 @@ export function useNativeSession(client: NativeRemoteClient, session?: NativeSes
       }
     }
   }
-  const events = state?.events;
-  const pending = useMemo(() => pendingRequests(events ?? []), [events]);
+  const conversation = useMemo(() => (state ? readNativeConversation(state) : undefined), [state]);
+  const pending = conversation?.pending ?? { permissions: [], questions: [] };
 
   return {
     state,
+    conversation,
     busy,
     error: errorMessage,
     commandID,

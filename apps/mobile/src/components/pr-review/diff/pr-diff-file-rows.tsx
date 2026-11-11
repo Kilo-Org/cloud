@@ -115,15 +115,18 @@ export function FileHeaderRow({
             <Text className="font-mono-medium text-sm text-foreground" numberOfLines={2}>
               {isolateLtrBidiText(pathLine)}
             </Text>
+            {/* Each count is its own run, and a sign is a neutral: an RTL
+                paragraph would take it and paint `+1` as `1+`. The isolate
+                pins the count's order; the row itself still mirrors. */}
             <View className="mt-0.5 flex-row items-center gap-2">
               <Text variant="muted" className="text-xs">
                 {fileStatusLabel(file.status)}
               </Text>
               <Text variant="muted" className="text-xs">
-                +{file.additions}
+                {isolateLtrBidiText(`+${file.additions}`)}
               </Text>
               <Text variant="muted" className="text-xs">
-                -{file.deletions}
+                {isolateLtrBidiText(`-${file.deletions}`)}
               </Text>
             </View>
           </View>

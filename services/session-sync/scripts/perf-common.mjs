@@ -33,6 +33,8 @@ export const configSchema = z.strictObject({
   root: z.string(),
   keysFile: z.string(),
   sessions: positive.max(100000),
+  streamingSources: positive.max(100000),
+  sourceTrafficMode: z.literal('all-streaming-sources'),
   watched: positive.max(10000),
   sdkViewers: z.number().int().min(0).max(10000),
   rawViewers: z.number().int().min(0).max(10000).default(0),
@@ -65,11 +67,21 @@ export const configSchema = z.strictObject({
 export function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
 }
+
+export function populationMatches(actual, expected) {
+  return Object.entries(expected).every(([key, value]) => actual[key] === value);
+}
+
 export function readConfig(path) {
   const config = configSchema.parse(JSON.parse(readFileSync(path, 'utf8')));
   const url = new URL(config.baseURL);
   assert(!url.username && !url.password && !url.search && !url.hash && url.pathname === '/');
-  assert(config.watched <= config.sessions && config.sdkViewers <= config.watched);
+  assert(
+    config.watched <= config.streamingSources &&
+      config.streamingSources <= config.sessions &&
+      config.sdkViewers <= config.watched,
+    'Viewer-backed sessions must be streaming sources within the registered population'
+  );
   assert.equal(
     config.rawMirror
       ? Math.max(config.sdkViewers, config.rawViewers)
@@ -529,7 +541,15 @@ export function validateCloudAdmission(
   );
   const stage = budget.workloadBounds?.find(row => row.name === config.budgetStage);
   assert(
-    stage && stage.sessions >= config.sessions,
+    stage &&
+      stage.sessions >= config.sessions &&
+      stage.streamingSources >= config.streamingSources &&
+      stage.watched >= config.watched &&
+      stage.sourceTrafficMode === config.sourceTrafficMode &&
+      stage.sdkViewers >= config.sdkViewers &&
+      stage.viewerConnections >=
+        config.sdkViewers + (config.rawViewers ?? 0) * (config.rawCopies ?? 1) &&
+      stage.eventHz >= config.eventHz,
     'Workload population is absent from the approved budget'
   );
   assert(
@@ -539,12 +559,12 @@ export function validateCloudAdmission(
   assert(stage.finalCheckpoints >= config.sessions);
   assert(
     stage.incomingWebSocketMessages >=
-      config.watched * config.eventHz * (config.warmSeconds + config.measuredSeconds)
+      config.streamingSources * config.eventHz * (config.warmSeconds + config.measuredSeconds)
   );
   assert(
     stage.ticketRequests >=
       config.sessions +
-        config.watched +
+        config.streamingSources +
         config.sdkViewers +
         (config.rawViewers ?? 0) * (config.rawCopies ?? 1)
   );

@@ -19,7 +19,7 @@ import {
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
 import { EmptyState } from '@/components/empty-state';
 import { CardControl } from '@/components/home/adaptive-home-card-frame';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { DENSE_ROW_FRAME_CLASS, DENSE_ROW_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { Bot } from '@/components/ui/icons';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,8 +31,8 @@ import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 /** Shared minimum frame; text determines the loaded card's height. */
 const CARD_CLASS = 'overflow-hidden rounded-2xl border border-border bg-card';
-const COUNTS_CLASS = 'gap-2 px-4 py-3';
-const COUNT_ROW_CLASS = `${ROW_TARGET_CLASS} flex-row items-center gap-2`;
+const COUNTS_CLASS = 'px-4 py-3';
+const COUNT_ROW_CLASS = `${DENSE_ROW_FRAME_CLASS} flex-row items-center gap-2`;
 const DIVIDER_CLASS = 'h-px bg-border';
 const NEWEST_BLOCK_CLASS = 'min-h-[68px] justify-center gap-1 px-4 py-3';
 const NEWEST_ROW_CLASS = 'min-h-5 flex-row items-center gap-2';
@@ -103,8 +103,8 @@ export function GlanceableActiveCard({
           <View className={COUNTS_CLASS}>
             {STATUS_FILTER_ORDER.map(line => {
               const isPrimary = line.kind === primaryKind;
-              // The row keeps its drawn height so the frame's sizing probe
-              // still matches; the touch target grows through hitSlop. Rows
+              // Counts read as one column, so the rows keep the dense row
+              // rhythm; hitSlop lifts each touch target past 44 dp. Rows
               // render through CardControl so the reserved layer stays inert.
               return (
                 <CardControl
@@ -118,7 +118,7 @@ export function GlanceableActiveCard({
                   }
                   accessibilityRole={onPressStatus === undefined ? undefined : 'button'}
                   testID={`home-status-${line.kind}`}
-                  hitSlop={onPressStatus === undefined ? undefined : 3}
+                  hitSlop={onPressStatus === undefined ? undefined : DENSE_ROW_HIT_SLOP}
                   className={COUNT_ROW_CLASS}
                 >
                   <SessionStatusIcon kind={line.kind} />

@@ -49,6 +49,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/chat/gguf-catalog.ts': 'file-extension comparison',
   'lib/chat/hf-catalog.ts': 'SPDX id lookup key',
   'lib/chat/hf-quant-size.ts': 'quantization-family normalization for a size table',
+  'lib/credits/store-products-loader.ts': 'store failure report token normalization',
   'lib/auth/use-native-auth.ts': 'email normalization',
   'lib/telemetry/install-error-reporting.ts': 'hostname comparison',
   'lib/pr-review/diff/highlight.ts': 'file-extension normalization',

@@ -42,6 +42,12 @@ export function createKilo2Harness(options: {
   const { reads, session, list } = createKilo2Reads(api, options.directory);
   const post = (path: string, body: unknown, signal?: AbortSignal) =>
     api.request(path, { method: 'POST', body, signal });
+  // Context can contain a one-shot startup-failure note; never inherit it into a new turn.
+  const replaceCloudAgentContext = (input: HarnessSession, context = '') =>
+    api.request(
+      `/api/experimental/session/${encodeURIComponent(input.sessionId)}/instructions/entries/cloud-agent-context`,
+      { method: 'PUT', body: { value: context }, signal: input.signal }
+    );
   async function select(
     input: HarnessSession & { agent?: string; model?: string; variant?: string }
   ) {
@@ -81,6 +87,7 @@ export function createKilo2Harness(options: {
   async function compact(input: HarnessSession & { model: string }) {
     await select(input);
     await options.lifecycle.waitForInterrupt(input.sessionId, input.signal);
+    await replaceCloudAgentContext(input);
     const id = createMessageId();
     await post(`${kilo2SessionPath(input.sessionId)}/compact`, { id }, input.signal);
     await post(
@@ -193,6 +200,7 @@ export function createKilo2Harness(options: {
     },
   };
   return {
+    supportsHistoryPreload: true,
     async open(input) {
       try {
         const existing = await session(input.sessionId, input.signal);
@@ -217,22 +225,17 @@ export function createKilo2Harness(options: {
     async submit(input) {
       await select(input);
       await options.lifecycle.waitForInterrupt(input.sessionId, input.signal);
+      await replaceCloudAgentContext(input, input.context);
       await post(
         `${kilo2SessionPath(input.sessionId)}/prompt`,
         {
           id: input.messageId,
-          // v2 has no synthetic prompt part, so server context leads the prompt text.
-          text: [
-            input.context,
-            input.parts
-              ? input.parts
-                  .filter(part => part.type === 'text')
-                  .map(part => part.text)
-                  .join('\n')
-              : (input.prompt ?? ''),
-          ]
-            .filter(text => text !== undefined)
-            .join('\n\n'),
+          text: input.parts
+            ? input.parts
+                .filter(part => part.type === 'text')
+                .map(part => part.text)
+                .join('\n')
+            : (input.prompt ?? ''),
           files: input.parts
             ?.filter(part => part.type === 'file')
             .map(part => ({ uri: part.url, name: part.filename })),
@@ -244,6 +247,7 @@ export function createKilo2Harness(options: {
     async command(input) {
       await select(input);
       await options.lifecycle.waitForInterrupt(input.sessionId, input.signal);
+      await replaceCloudAgentContext(input);
       // The native command API has no message id; the command creates its own user message.
       await post(
         `${kilo2SessionPath(input.sessionId)}/command`,

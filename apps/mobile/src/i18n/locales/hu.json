@@ -229,6 +229,21 @@
     "signInCodeField": "Bejelentkezési kód",
     "or": "vagy"
   },
+  "pendingLink": {
+    "description": "A(z) {{email}} címet már használja egy fiók. Jelentkezz be annak egyik módszerével a(z) {{provider}} hozzáadásához.",
+    "emailCode": "Bejelentkezési kód küldése e-mailben",
+    "continueInBrowser": "Folytatás böngészőben",
+    "startAgain": "Újrakezdés",
+    "expired": "A(z) {{provider}} hozzáadására vonatkozó kérés lejárt.",
+    "noMethods": "Ennek a fióknak nincs más bejelentkezési módja, ezért a(z) {{provider}} nem adható hozzá.",
+    "linked": "A(z) {{provider}} hozzá lett adva a fiókodhoz.",
+    "failedExpired": "A(z) {{provider}} nem lett hozzáadva, mert a kérés lejárt.",
+    "failedWrongAccount": "A(z) {{provider}} nem lett hozzáadva, mert egy másik fiókba jelentkeztél be.",
+    "failedAccountAlreadyLinked": "A(z) {{provider}} nem lett hozzáadva, mert már egy másik fiókhoz van kapcsolva.",
+    "failedProviderAlreadyLinked": "A(z) {{provider}} nem lett hozzáadva, mert a fiókodhoz már tartozik egy másik {{provider}}-bejelentkezés.",
+    "failedLinking": "A(z) {{provider}} nem adható hozzá a fiókodhoz.",
+    "notAdded": "Bejelentkeztél. A(z) {{provider}} nem lett hozzáadva a fiókodhoz."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatikus PR-ellenőrzések",
     "securityAgentSubtitle": "Sérülékenységek keresése és javítása",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Törlés megerősítése",
     "credits": "Kreditek",
     "failedToLoadBalance": "Nem sikerült betölteni az egyenleget. Az újrapróbáláshoz koppints.",
+    "balanceLoadFailed": "Nem tölthető be az egyenleg",
     "hideBalance": "Egyenleg elrejtése",
     "showBalance": "Egyenleg megjelenítése",
     "balanceHidden": "Egyenleg elrejtve",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Tesztfiók",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Vállalati SSO",
     "passkeysTitle": "Jelkulcsok",
     "passkeysSubtitle": "Bejelentkezés jelszó nélkül",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Ez a módosítási kérelem nem tartalmaz fájlmódosításokat.",
     "fileList": {
       "openNavigator": "Fájlböngésző megnyitása",
-      "filesViewed": "Fájlok · {{viewed}} / {{total}} megtekintve",
       "listed": "(felsorolva)",
       "layout": "Elrendezés",
       "unified": "Egyesített",
@@ -2298,7 +2315,7 @@
       "cloningSession": "Munkamenet klónozása…",
       "couldNotLoadThisSession": "Nem sikerült betölteni ezt a munkamenetet.",
       "cloneFailedRetry": "Nem sikerült klónozni ezt a munkamenetet. Próbáld újra.",
-      "notEnoughCredits": "Nincs elég kredit a Cloud Agent futtatásához. Töltsd fel az egyenleged, és próbáld újra.",
+      "notEnoughCredits": "Nincs elég kredit ehhez a kéréshez. Töltsd fel az egyenleged, és próbáld újra.",
       "previousTaskFinishing": "Az előző feladat még nem fejeződött be. Várj egy kicsit.",
       "serviceUnavailable": "A szolgáltatás jelenleg nem érhető el. Próbáld újra.",
       "connectionTrouble": "Hiba történt a kapcsolódáskor. Próbáld újra egy kicsit később.",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Az utasításod és az elküldött üzenetekhez nem csatolt feltöltések törlődnek.",
       "discardFailed": "Nem sikerült elvetni a piszkozatot. Próbáld újra.",
       "remoteHint": "Ha a számítógépeden szeretnéd futtatni, indítsd el ott a Kilót, és hagyd futni.",
-      "continueFrom": "Ezt a munkamenetet folytatod: {{title}}",
+      "continueFrom": "Ezt a munkamenetet folytatod: „{{title}}”",
       "importingSession": "Munkamenet importálása…",
       "cliCannotContinue": "Ez a CLI nem támogatja a munkamenetek folytatását. Válaszd a Cloud Agentet vagy egy másik CLI-t.",
       "importFailed": "Nem sikerült importálni ezt a munkamenetet.",
@@ -2460,6 +2477,8 @@
       "toolList": "listázás",
       "toolPatch": "módosítás",
       "toolTask": "feladat",
+      "toolSendFile": "Fájl elküldve",
+      "toolSendFileAction": "fájl küldése",
       "readTodos": "Terv olvasása",
       "updateTodos": "Terv frissítése",
       "linesBadge": "{{displayCount}} sor",
@@ -2560,7 +2579,21 @@
       "thought": "Gondolat",
       "showDetails": "Részletek megjelenítése",
       "pending": "Függőben…",
-      "running": "Folyamatban…"
+      "running": "Folyamatban…",
+      "field": {
+        "filePath": "Fájlútvonal",
+        "path": "Útvonal",
+        "offset": "Eltolás",
+        "limit": "Korlát",
+        "pattern": "Minta",
+        "include": "Belefoglalás",
+        "patchText": "Javítás szövege",
+        "query": "Keresés",
+        "prompt": "Utasítás",
+        "header": "Címsor",
+        "question": "Kérdés",
+        "options": "Lehetőségek"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nem sikerült megjeleníteni a tartalmat."
@@ -2576,7 +2609,7 @@
       "assistantContextOverflow": "A beszélgetés túl hosszú a modell számára.",
       "assistantProviderError": "A szolgáltató hibát adott vissza.",
       "assistantProviderRefused": "A szolgáltató elutasította ezt a kérést, ezért nem lehet újrapróbálni.",
-      "assistantCreditsRefusal": "Nincs elég kredit a Cloud Agent futtatásához.",
+      "assistantCreditsRefusal": "Nincs elég kredit ehhez a kéréshez.",
       "assistantOutputLimit": "A válasz elérte a modell kimeneti korlátját.",
       "assistantStructuredOutput": "A válasz nem felelt meg a szükséges formátumnak.",
       "assistantFailed": "Nem sikerült létrehozni a választ."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Ez a modell támogatja a gondolkodás szintjét"
     },
-    "creditsRequired": "Nincs elég egyenleged ennek az üzenetnek az elküldéséhez. Töltsd fel az egyenleged, és próbáld újra."
+    "creditsRequired": "Nincs elég egyenleged ennek az üzenetnek az elküldéséhez."
   },
   "settingsTools": {
     "confirmTitle": "Megerősíted ezt a módosítást?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Ügynököm",
       "promptPlaceholder": "Ön egy...",
       "tools": "Eszközök",
+      "wholeToolRule": "Ez az ügynök egyszerre egy szabályt alkalmaz minden eszközre: {{rule}}. Ezek a kapcsolók csak olvashatók.",
       "visibility": "Láthatóság",
       "visibilityPrimary": "Elsődleges — a választóban látható",
       "visibilitySubagent": "Alügynök — csak másoktól hívható",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Alapértelmezett profilok adattárakhoz",
+      "entryLabel": "Alapértelmezett profilok",
       "add": "Alapértelmezés hozzáadása",
       "empty": "Nincsenek beállított alapértelmezett profilok",
       "emptyDescription": "Adjon hozzá egy alapértelmezett profilt, amely automatikusan alkalmazza a profilt az adattár munkameneteinek indításakor.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Egyetlen környezetben sincsenek engedélyezve az ütemezett jelentések",
     "sourceBlocker": "A munkamenet figyelmet igényel",
     "sourceMetadata": "A munkamenet rögzített metaadatai"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nem sikerült megnyitni ezt a keresési találatot"
   }
 }

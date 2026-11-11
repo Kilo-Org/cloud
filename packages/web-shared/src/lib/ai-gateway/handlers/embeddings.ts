@@ -26,7 +26,7 @@ import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { BalancePayer } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
   getEffectiveProviderPrivacy,
-  providerPrivacySchema,
+  providerPreferencesSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
@@ -45,7 +45,10 @@ import {
   anonymousBouncerRequest,
   signedInBouncerRequest,
 } from '@kilocode/web-shared/lib/bouncer/request';
-import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  emitApiMetricsForResponse,
+  emitGatewayApiMetrics,
+} from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
@@ -116,7 +119,7 @@ export async function handleEmbeddingsRequest(
     return invalidRequestResponse();
   }
 
-  const requestPrivacy = providerPrivacySchema.optional().safeParse(requestBodyParsed.provider);
+  const requestPrivacy = providerPreferencesSchema.optional().safeParse(requestBodyParsed.provider);
   if (!requestPrivacy.success) return invalidRequestResponse();
 
   const requestedModel = requestBodyParsed.model.trim();
@@ -328,24 +331,20 @@ export async function handleEmbeddingsRequest(
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.ttfb_ms = ttfbMs;
 
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: isAnonymousContext(user),
-      isStreaming: false,
-      userByok: !!userByok,
-      provider: provider.type,
-      requestedModel: requestedModelLowerCased,
-      resolvedModel: normalizeModelId(requestedModelLowerCased),
-      toolsAvailable: [],
-      toolsUsed: [],
-      ttfbMs,
-      statusCode: response.status,
-    },
-    response.clone(),
-    requestStartedAt
-  );
+  const metricsParams = {
+    kiloUserId: user.id,
+    organizationId,
+    isAnonymous: isAnonymousContext(user),
+    isStreaming: false,
+    userByok: !!userByok,
+    provider: provider.type,
+    requestedModel: requestedModelLowerCased,
+    resolvedModel: normalizeModelId(requestedModelLowerCased),
+    toolsAvailable: [],
+    toolsUsed: [],
+    ttfbMs,
+    statusCode: response.status,
+  };
 
   usageContext.status_code = response.status;
 
@@ -358,10 +357,18 @@ export async function handleEmbeddingsRequest(
     organizationId,
     model: requestedModelLowerCased,
   });
-  if (upstreamErrorResponse) return upstreamErrorResponse;
+  if (upstreamErrorResponse) {
+    emitGatewayApiMetrics({ ...metricsParams, completeRequestMs: ttfbMs });
+    return upstreamErrorResponse;
+  }
 
   const clonedResponse = response.clone();
-  countAndStoreEmbeddingUsage(clonedResponse, usageContext, embeddingRequestSpan);
+  const accounting = countAndStoreEmbeddingUsage(
+    clonedResponse,
+    usageContext,
+    embeddingRequestSpan
+  );
+  emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
 
   return wrapInSafeNextResponse(response);
 }

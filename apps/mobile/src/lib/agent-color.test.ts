@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { agentColor, PLACEHOLDER_TINT, stateTint } from '@/lib/agent-color';
+import {
+  agentColor,
+  isPlaceholderTint,
+  PLACEHOLDER_TINT,
+  stateTint,
+  toneColor,
+} from '@/lib/agent-color';
 
 describe('stateTint', () => {
   it('renders the unknown origin as a muted placeholder, never an accent', () => {
@@ -13,7 +19,7 @@ describe('stateTint', () => {
     // A row whose eyebrow can only name the kind of agent it ran on is not
     // naming itself: an accent there competes with the title beside it.
     expect(stateTint('platform')).toBe(PLACEHOLDER_TINT);
-    expect(stateTint('platform').hueClass).toBe('bg-muted-soft');
+    expect(stateTint('platform').hueClass).toBe('bg-session-strip');
   });
 
   it('renders the repository a row ran in as muted context, never an accent', () => {
@@ -21,7 +27,7 @@ describe('stateTint', () => {
     // entry would out-shout the session title the row is about.
     expect(stateTint('repository')).toBe(PLACEHOLDER_TINT);
     expect(stateTint('repository').hueTextClass).toBe('text-muted-foreground');
-    expect(stateTint('repository').hueClass).toBe('bg-muted-soft');
+    expect(stateTint('repository').hueClass).toBe('bg-session-strip');
   });
 
   it('keeps each live state at the tint its English word first rendered', () => {
@@ -30,5 +36,21 @@ describe('stateTint', () => {
     // existing live surface changes hue for no reason.
     expect(stateTint('idle')).toBe(agentColor('IDLE'));
     expect(stateTint('live')).toBe(agentColor('LIVE'));
+  });
+});
+
+describe('isPlaceholderTint', () => {
+  it('holds for every state that names the row context', () => {
+    for (const state of ['unknown', 'platform', 'repository'] as const) {
+      expect(isPlaceholderTint(stateTint(state))).toBe(true);
+    }
+  });
+
+  it('leaves every accent tint alone, so its strip still dims', () => {
+    expect(isPlaceholderTint(agentColor('Cloud'))).toBe(false);
+    expect(isPlaceholderTint(agentColor('Some model that hashes elsewhere'))).toBe(false);
+    expect(isPlaceholderTint(toneColor('danger'))).toBe(false);
+    expect(isPlaceholderTint(stateTint('idle'))).toBe(false);
+    expect(isPlaceholderTint(stateTint('live'))).toBe(false);
   });
 });

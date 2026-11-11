@@ -2,8 +2,18 @@ jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
   assertGitHubInstallationRuntimeAuthorized: jest.fn(async () => undefined),
 }));
 
+jest.mock('@/lib/slack-bot/github-repository-context', () => ({
+  resolveGitHubRepositoryForOwner: jest.fn(),
+}));
+
+jest.mock('@/lib/integrations/db/platform-integrations', () => ({
+  getGitHubIntegrationById: jest.fn(),
+}));
+
 import type { PlatformIntegration } from '@kilocode/db';
 import { assertGitHubInstallationRuntimeAuthorized } from '@/lib/integrations/github/runtime-authorization';
+import { resolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
+import { getGitHubIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import {
   authorizeGitHubRepository,
   getGitHubRepositoryPermission,
@@ -32,6 +42,7 @@ function createFetchPermission(permission: Permission) {
 }
 
 beforeEach(() => {
+  jest.clearAllMocks();
   mockedAssertAuthorized.mockResolvedValue(undefined);
 });
 
@@ -63,7 +74,8 @@ describe('authorizeGitHubRepository', () => {
       'widgets',
       `permission-${permission}`,
       'standard',
-      'pi_github_1'
+      'pi_github_1',
+      'workflow'
     );
   });
 
@@ -126,18 +138,196 @@ describe('authorizeGitHubRepository', () => {
     expect(fetchPermission).not.toHaveBeenCalled();
   });
 
-  test('non-GitHub integrations are unaffected', async () => {
-    const fetchPermission = createFetchPermission('none');
+  describe('chat integration repositories', () => {
+    const slackIntegration = createIntegration({ id: 'pi_slack_1', platform: 'slack' });
+    const linearIntegration = createIntegration({ id: 'pi_linear_1', platform: 'linear' });
+    const githubConnection = createIntegration({ id: 'pi_github_1' });
+    const requesterLogin = async () => 'octocat';
 
-    const result = await authorizeGitHubRepository({
-      platformIntegration: createIntegration({ platform: 'slack' }),
-      repository: 'acme/slack',
-      actorLogin: 'U123',
-      fetchPermission,
+    beforeEach(() => {
+      // Each case names its own repository: the permission cache is keyed by
+      // repository and account, so a shared name would reuse another case.
+      jest.mocked(resolveGitHubRepositoryForOwner).mockImplementation(async (_owner, fullName) => ({
+        id: 7,
+        name: fullName.split('/')[1] ?? fullName,
+        full_name: fullName,
+        private: true,
+        githubIntegrationId: 'pi_github_1',
+        githubAppType: 'standard',
+      }));
+      jest.mocked(getGitHubIntegrationById).mockResolvedValue(githubConnection);
     });
 
-    expect(result).toEqual({ allowed: true });
-    expect(fetchPermission).not.toHaveBeenCalled();
+    test('allows a repository the requesting account can write to', async () => {
+      const fetchPermission = createFetchPermission('write');
+
+      const result = await authorizeGitHubRepository({
+        platformIntegration: slackIntegration,
+        repository: 'acme/allowed',
+        requesterUserId: 'user_1',
+        purpose: 'agent',
+        getRequesterLogin: requesterLogin,
+        fetchPermission,
+      });
+
+      expect(result).toEqual({ allowed: true });
+      expect(resolveGitHubRepositoryForOwner).toHaveBeenCalledWith(
+        { type: 'org', id: 'org_1' },
+        'acme/allowed',
+        'agent'
+      );
+      expect(getGitHubIntegrationById).toHaveBeenCalledWith(
+        { type: 'org', id: 'org_1' },
+        'pi_github_1'
+      );
+      expect(fetchPermission).toHaveBeenCalledWith(
+        '98765',
+        'acme',
+        'allowed',
+        'octocat',
+        'standard',
+        'pi_github_1',
+        'agent'
+      );
+    });
+
+    test('authorizes a Linear run the same way', async () => {
+      const fetchPermission = createFetchPermission('admin');
+
+      const result = await authorizeGitHubRepository({
+        platformIntegration: linearIntegration,
+        repository: 'acme/linear',
+        requesterUserId: 'user_1',
+        getRequesterLogin: requesterLogin,
+        fetchPermission,
+      });
+
+      expect(result).toEqual({ allowed: true });
+      expect(resolveGitHubRepositoryForOwner).toHaveBeenCalledWith(
+        { type: 'org', id: 'org_1' },
+        'acme/linear',
+        'workflow'
+      );
+    });
+
+    test('refuses an account without a linked GitHub identity', async () => {
+      const fetchPermission = createFetchPermission('write');
+
+      const result = await authorizeGitHubRepository({
+        platformIntegration: slackIntegration,
+        repository: 'acme/no-identity',
+        requesterUserId: 'user_1',
+        getRequesterLogin: async () => null,
+        fetchPermission,
+      });
+
+      expect(result).toEqual({
+        allowed: false,
+        markdown: expect.stringContaining('`acme/no-identity`'),
+      });
+      expect(resolveGitHubRepositoryForOwner).not.toHaveBeenCalled();
+      expect(fetchPermission).not.toHaveBeenCalled();
+    });
+
+    test('refuses an account whose GitHub identity lacks write access', async () => {
+      const fetchPermission = createFetchPermission('read');
+
+      const result = await authorizeGitHubRepository({
+        platformIntegration: slackIntegration,
+        repository: 'acme/read-only',
+        requesterUserId: 'user_1',
+        getRequesterLogin: requesterLogin,
+        fetchPermission,
+      });
+
+      expect(result).toEqual({ allowed: false, markdown: expect.stringContaining('write access') });
+      expect(fetchPermission).toHaveBeenCalledTimes(1);
+    });
+
+    test('refuses after one retry when the permission lookup keeps failing', async () => {
+      const fetchPermission = createFetchPermission(null);
+
+      const result = await authorizeGitHubRepository({
+        platformIntegration: slackIntegration,
+        repository: 'acme/lookup-failure-chat',
+        requesterUserId: 'user_1',
+        getRequesterLogin: requesterLogin,
+        fetchPermission,
+      });
+
+      expect(result.allowed).toBe(false);
+      expect(fetchPermission).toHaveBeenCalledTimes(2);
+    });
+
+    test('refuses a repository the account connections cannot serve', async () => {
+      jest.mocked(resolveGitHubRepositoryForOwner).mockResolvedValue(null);
+      const fetchPermission = createFetchPermission('write');
+
+      const result = await authorizeGitHubRepository({
+        platformIntegration: slackIntegration,
+        repository: 'acme/other',
+        requesterUserId: 'user_1',
+        getRequesterLogin: requesterLogin,
+        fetchPermission,
+      });
+
+      expect(result).toEqual({ allowed: false, markdown: expect.stringContaining('`acme/other`') });
+      expect(fetchPermission).not.toHaveBeenCalled();
+    });
+
+    test('refuses when the connection cannot mint a token for the repository', async () => {
+      jest
+        .mocked(getGitHubIntegrationById)
+        .mockResolvedValue({ ...githubConnection, platform_installation_id: null });
+      const fetchPermission = createFetchPermission('write');
+
+      const result = await authorizeGitHubRepository({
+        platformIntegration: slackIntegration,
+        repository: 'acme/stale-connection',
+        requesterUserId: 'user_1',
+        getRequesterLogin: requesterLogin,
+        fetchPermission,
+      });
+
+      expect(result.allowed).toBe(false);
+      expect(fetchPermission).not.toHaveBeenCalled();
+    });
+
+    test('refuses a rejected installation authorization', async () => {
+      mockedAssertAuthorized.mockRejectedValueOnce(new Error('integration suspended'));
+      const fetchPermission = createFetchPermission('write');
+
+      const result = await authorizeGitHubRepository({
+        platformIntegration: slackIntegration,
+        repository: 'acme/suspended-chat',
+        requesterUserId: 'user_1',
+        getRequesterLogin: requesterLogin,
+        fetchPermission,
+      });
+
+      expect(result.allowed).toBe(false);
+      expect(fetchPermission).not.toHaveBeenCalled();
+    });
+
+    test('keeps personally owned chat integrations owner-controlled', async () => {
+      const fetchPermission = createFetchPermission('none');
+
+      const result = await authorizeGitHubRepository({
+        platformIntegration: createIntegration({
+          platform: 'slack',
+          owned_by_organization_id: null,
+          owned_by_user_id: 'user_1',
+        }),
+        repository: 'acme/personal',
+        requesterUserId: 'user_1',
+        getRequesterLogin: requesterLogin,
+        fetchPermission,
+      });
+
+      expect(result).toEqual({ allowed: true });
+      expect(resolveGitHubRepositoryForOwner).not.toHaveBeenCalled();
+      expect(fetchPermission).not.toHaveBeenCalled();
+    });
   });
 
   test('a missing triggering login may only use the conversation repository', async () => {

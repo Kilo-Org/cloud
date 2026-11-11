@@ -10,6 +10,22 @@ export const MAX_ENKRYPT_CREDITS_PER_CALL = 1_000;
 export const ENKRYPT_USAGE_WRITE_PATH = '/api/internal/enkrypt-usage/record';
 
 /**
+ * `ENKRYPT_DETECTOR_IDS` from `@kilocode/db/schema-types`, which this package cannot import;
+ * `usage-record-contract-alignment.ts` checks that they match.
+ */
+const ENKRYPT_DETECTOR_IDS = [
+  'injection_attack',
+  'pii',
+  'keyword_detector',
+  'topic_detector',
+  'policy_violation',
+  'toxicity',
+  'nsfw',
+  'bias',
+  'sponge_attack',
+] as const;
+
+/**
  * Wire contract for `POST /api/internal/enkrypt-usage/record`.
  *
  * `id` and `occurredAt` are fixed once per Enkrypt call and are the writer's idempotency key, so
@@ -29,15 +45,37 @@ export const EnkryptUsageWriteSchema = z.strictObject({
   addedLatencyMs: z.number().int().nonnegative().nullable(),
   /** Optional so input calls stay compatible with a gateway or web app deployed before it. */
   guardrail: z.enum(['input', 'output']).default('input'),
+  /**
+   * The detectors that fired on this call, blocking or log-only. Omitted when none fired, so a
+   * call without a detection stays compatible with a web app deployed before the field.
+   */
+  detectorsFired: z.array(z.enum(ENKRYPT_DETECTOR_IDS)).nonempty().optional(),
 });
 
 export type EnkryptUsageWrite = z.infer<typeof EnkryptUsageWriteSchema>;
 
 export type EnkryptUsageWriteInput = z.input<typeof EnkryptUsageWriteSchema>;
 
-/** `duplicate` means an earlier delivery of the same usage id already committed it and its debit. */
+/**
+ * `duplicate` means an earlier delivery of the same usage id already committed it and its debit.
+ * `usageId` echoes the written id. It is optional so a sender accepts replies from a writer
+ * deployed before the echo; a sender that receives it must check that it matches.
+ */
 export const EnkryptUsageWriteResponseSchema = z.strictObject({
   status: z.enum(['recorded', 'duplicate']),
+  usageId: z.uuid().optional(),
 });
 
 export type EnkryptUsageWriteResponse = z.infer<typeof EnkryptUsageWriteResponseSchema>;
+
+/**
+ * Body of an Enkrypt usage message on the shared usage queue. The kind tag is what separates it
+ * from an LLM usage message, which is always sent untagged.
+ */
+export const EnkryptUsageQueueMessageSchema = z.strictObject({
+  kind: z.literal('enkrypt_usage'),
+  v: z.literal(1),
+  record: EnkryptUsageWriteSchema,
+});
+
+export type EnkryptUsageQueueMessage = z.infer<typeof EnkryptUsageQueueMessageSchema>;

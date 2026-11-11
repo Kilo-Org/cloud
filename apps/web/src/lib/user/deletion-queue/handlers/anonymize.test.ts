@@ -40,7 +40,7 @@ jest.mock('@/lib/user', () => ({
 
 jest.mock('@/lib/claude-billing/delete', () => {
   const actual = jest.requireActual<typeof ClaudeProfileDeletion>('@/lib/claude-billing/delete');
-  return { ...actual, deletePersonalClaudeProfile: jest.fn(actual.deletePersonalClaudeProfile) };
+  return { ...actual, deleteUserClaudeProfiles: jest.fn(actual.deleteUserClaudeProfiles) };
 });
 
 jest.mock('@/lib/user/owned-by-user-batch-delete', () => {
@@ -61,11 +61,11 @@ describe('handleAnonymize', () => {
     await cleanupDbForTest();
     anonymizeCloudUserDataMock.mockClear();
     jest
-      .mocked(ClaudeProfileDeletion.deletePersonalClaudeProfile)
+      .mocked(ClaudeProfileDeletion.deleteUserClaudeProfiles)
       .mockReset()
       .mockImplementation(
         jest.requireActual<typeof ClaudeProfileDeletion>('@/lib/claude-billing/delete')
-          .deletePersonalClaudeProfile
+          .deleteUserClaudeProfiles
       );
     deleteOwnedByUserIdPageMock.mockReset();
     deleteOwnedByUserIdPageMock.mockImplementation(
@@ -81,7 +81,7 @@ describe('handleAnonymize', () => {
         `profile-cleanup-${crypto.randomUUID()}@example.com`
       );
       jest
-        .mocked(ClaudeProfileDeletion.deletePersonalClaudeProfile)
+        .mocked(ClaudeProfileDeletion.deleteUserClaudeProfiles)
         .mockRejectedValueOnce(new ClaudeProfileDeletion.ClaudeProfileDeletionError(retryable));
       const outcome = await handleAnonymize({
         request,

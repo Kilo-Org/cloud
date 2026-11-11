@@ -6,18 +6,11 @@ import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import {
-  cli_sessions_v2,
-  cloud_agent_session_runs,
-  github_branch_pull_requests,
-} from '@kilocode/db/schema';
+import { cli_sessions_v2, cloud_agent_session_runs } from '@kilocode/db/schema';
+import { sessionAssociatedPr } from '@/lib/session-associated-pr';
 import { and, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { activeOrganizationAccessSql } from '@kilocode/worker-utils/organization-membership';
-import {
-  associatedPrSchema,
-  formatAssociatedPr,
-  sessionPrJoinPredicate,
-} from '@/routers/cli-sessions-v2-router';
+import { associatedPrSchema, formatAssociatedPr } from '@/routers/cli-sessions-v2-router';
 
 export const activeSessionSchema = z.object({
   id: z.string(),
@@ -170,6 +163,7 @@ type EnrichmentRow = {
   pr_last_synced_at: string | null;
   pr_review_decision: string | null;
   review_decision_pending: boolean | null;
+  pr_from_workspace: boolean | null;
 };
 
 type CloudCandidateRow = EnrichmentRow & {
@@ -210,6 +204,7 @@ function associatedPrFromRow(row: EnrichmentRow): z.infer<typeof associatedPrSch
       pr_last_synced_at: row.pr_last_synced_at,
       pr_review_decision: row.pr_review_decision,
       review_decision_pending: row.review_decision_pending,
+      pr_from_workspace: row.pr_from_workspace,
     }
   );
 }
@@ -393,6 +388,14 @@ export async function listActiveSessions({
   // Normal list callers retain best-effort behavior. Background snapshots
   // require an authoritative read so outages never erase last-known work.
   let parsed: { sessions: ActiveSession[] } = { sessions: [] };
+  /**
+   * The worker read could not answer. The full merge is still built (an empty
+   * heartbeat part is a real part of it), but the caller learns about the read
+   * failure at the end instead of receiving a bare `{ sessions: [] }` — that
+   * body is indistinguishable on the wire from a user with nothing running,
+   * and the tray must not report live work as gone.
+   */
+  let upstreamReadFailed = false;
 
   if (!SESSION_INGEST_WORKER_URL) {
     if (requireCompleteSnapshot) {
@@ -404,6 +407,8 @@ export async function listActiveSessions({
     if (!includeCloudAgentSessions) {
       return { sessions: [] as ActiveSession[] };
     }
+    // An unconfigured source cannot have live CLI rows at all, so the empty
+    // heartbeat part is complete; the cloud merge below still runs.
   } else {
     const token = generateBoundedInternalServiceToken(userId, {
       audience: SESSION_INGEST_AUDIENCE,
@@ -433,6 +438,10 @@ export async function listActiveSessions({
         if (!includeCloudAgentSessions) {
           return { sessions: [] as ActiveSession[] };
         }
+        // The merged answer decides at the end of this function (see
+        // `upstreamReadFailed`): an empty one here would read as "nothing
+        // runs".
+        upstreamReadFailed = true;
       } else {
         const raw = await response.json();
         parsed = activeSessionsResponseSchema.parse(raw);
@@ -449,6 +458,9 @@ export async function listActiveSessions({
       if (!includeCloudAgentSessions) {
         return { sessions: [] as ActiveSession[] };
       }
+      // Same reason as the non-OK branch above: an unreachable worker must not
+      // read as "nothing runs".
+      upstreamReadFailed = true;
     }
   }
 
@@ -482,18 +494,19 @@ export async function listActiveSessions({
           session_pr_url: cli_sessions_v2.pr_url,
           session_pr_number: cli_sessions_v2.pr_number,
           session_pr_verified_at: cli_sessions_v2.pr_link_verified_at,
-          pr_url: github_branch_pull_requests.pr_url,
-          pr_number: github_branch_pull_requests.pr_number,
-          pr_state: github_branch_pull_requests.pr_state,
-          pr_title: github_branch_pull_requests.pr_title,
-          pr_head_sha: github_branch_pull_requests.pr_head_sha,
-          pr_observations: github_branch_pull_requests.pr_observations,
-          pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
-          pr_review_decision: github_branch_pull_requests.pr_review_decision,
-          review_decision_pending: github_branch_pull_requests.review_decision_pending,
+          pr_url: sessionAssociatedPr.pr_url,
+          pr_number: sessionAssociatedPr.pr_number,
+          pr_state: sessionAssociatedPr.pr_state,
+          pr_title: sessionAssociatedPr.pr_title,
+          pr_head_sha: sessionAssociatedPr.pr_head_sha,
+          pr_observations: sessionAssociatedPr.pr_observations,
+          pr_last_synced_at: sessionAssociatedPr.pr_last_synced_at,
+          pr_review_decision: sessionAssociatedPr.pr_review_decision,
+          review_decision_pending: sessionAssociatedPr.review_decision_pending,
+          pr_from_workspace: sessionAssociatedPr.pr_from_workspace,
         })
         .from(cli_sessions_v2)
-        .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
+        .leftJoinLateral(sessionAssociatedPr, sql`true`)
         .where(
           and(eq(cli_sessions_v2.kilo_user_id, userId), inArray(cli_sessions_v2.session_id, ids))
         );
@@ -610,18 +623,19 @@ export async function listActiveSessions({
           session_pr_url: cli_sessions_v2.pr_url,
           session_pr_number: cli_sessions_v2.pr_number,
           session_pr_verified_at: cli_sessions_v2.pr_link_verified_at,
-          pr_url: github_branch_pull_requests.pr_url,
-          pr_number: github_branch_pull_requests.pr_number,
-          pr_state: github_branch_pull_requests.pr_state,
-          pr_title: github_branch_pull_requests.pr_title,
-          pr_head_sha: github_branch_pull_requests.pr_head_sha,
-          pr_observations: github_branch_pull_requests.pr_observations,
-          pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
-          pr_review_decision: github_branch_pull_requests.pr_review_decision,
-          review_decision_pending: github_branch_pull_requests.review_decision_pending,
+          pr_url: sessionAssociatedPr.pr_url,
+          pr_number: sessionAssociatedPr.pr_number,
+          pr_state: sessionAssociatedPr.pr_state,
+          pr_title: sessionAssociatedPr.pr_title,
+          pr_head_sha: sessionAssociatedPr.pr_head_sha,
+          pr_observations: sessionAssociatedPr.pr_observations,
+          pr_last_synced_at: sessionAssociatedPr.pr_last_synced_at,
+          pr_review_decision: sessionAssociatedPr.pr_review_decision,
+          review_decision_pending: sessionAssociatedPr.review_decision_pending,
+          pr_from_workspace: sessionAssociatedPr.pr_from_workspace,
         })
         .from(cli_sessions_v2)
-        .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
+        .leftJoinLateral(sessionAssociatedPr, sql`true`)
         .where(
           and(
             eq(cli_sessions_v2.kilo_user_id, userId),
@@ -660,6 +674,17 @@ export async function listActiveSessions({
       }
       // Unfiltered: skip cloud merge, return heartbeat rows as built.
     }
+  }
+
+  // The merged list is built now, so an empty answer is only authoritative
+  // when the worker read succeeded. Snapshot callers already threw on the
+  // failed read above, so this decides the remaining best-effort callers: an
+  // empty merged list is not proof that nothing runs.
+  if (upstreamReadFailed && sessions.length === 0) {
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Session ingest is unavailable',
+    });
   }
 
   return { sessions };

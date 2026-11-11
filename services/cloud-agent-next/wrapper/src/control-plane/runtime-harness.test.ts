@@ -3,6 +3,33 @@ import { runtimeHarness, kilo2RuntimeEnvironment } from './runtime-harness.js';
 import { readKilo2Sse } from './kilo2-event-feed.js';
 
 describe('runtime harness selection', () => {
+  it('exposes legacy rule files to V2 once without replacing repository instruction configuration', () => {
+    const original = {
+      HOME: '/workspace-shared-home',
+      KILO_CONFIG_CONTENT: JSON.stringify({
+        instructions: ['AGENTS.md', '/workspace-shared-home/.kilocode/rules/*.md'],
+        mcp: { fixture: { type: 'remote', url: 'http://localhost:1/mcp' } },
+      }),
+    };
+    const result = kilo2RuntimeEnvironment(original);
+    const config = JSON.parse(result.KILO_CONFIG_CONTENT);
+    expect(config.instructions).toEqual([
+      'AGENTS.md',
+      '/workspace-shared-home/.kilocode/rules/*.md',
+    ]);
+    expect(config.mcp).toEqual(JSON.parse(original.KILO_CONFIG_CONTENT).mcp);
+    expect(result.OPENCODE_CONFIG_CONTENT).toBe(result.KILO_CONFIG_CONTENT);
+    expect(kilo2RuntimeEnvironment(result).KILO_CONFIG_CONTENT).toBe(result.KILO_CONFIG_CONTENT);
+  });
+
+  it('adds the workspace rules source when no instructions were configured', () => {
+    const env = { HOME: '/shared', KILO_CONFIG_CONTENT: '{}' };
+    expect(JSON.parse(kilo2RuntimeEnvironment(env).KILO_CONFIG_CONTENT).instructions).toEqual([
+      '/shared/.kilocode/rules/*.md',
+    ]);
+    // V1 keeps its implicit rule discovery, with no second configured copy.
+    expect(env.KILO_CONFIG_CONTENT).toBe('{}');
+  });
   it('selects v1 by default and rejects unknown harnesses and untrusted binary paths', () => {
     expect(runtimeHarness({}).kind).toBe('kilo');
     expect(runtimeHarness({ KILO_RUNTIME_HARNESS: 'kilo2' }).cli).toBe('kilo2');
@@ -58,6 +85,26 @@ describe('runtime harness selection', () => {
       });
     }
   );
+
+  it('preserves the projected organization through the v2 config adapter', () => {
+    const result = kilo2RuntimeEnvironment({
+      KILOCODE_ORGANIZATION_ID: 'org-session',
+      KILO_CONFIG_CONTENT: JSON.stringify({
+        provider: {
+          kilo: {
+            options: {
+              baseURL: 'https://worker.example/api/openrouter',
+              kilocodeOrganizationId: 'org-session',
+            },
+          },
+        },
+      }),
+    });
+    expect(result.KILOCODE_ORGANIZATION_ID).toBe('org-session');
+    expect(
+      JSON.parse(result.KILO_CONFIG_CONTENT).provider.kilo.options.kilocodeOrganizationId
+    ).toBe('org-session');
+  });
 
   it('keeps heartbeat comments and frames split across transport chunks', async () => {
     const chunks = [': heart', 'beat\n\nda', 'ta: {"type":"server.connected"}\n\n'];

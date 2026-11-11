@@ -7,6 +7,8 @@ export type PublicCloudAgentStatusStep =
   | 'branch'
   | 'devcontainer_setup'
   | 'setup_commands'
+  | 'session_setup_commands'
+  | 'start_commands'
   | 'sandbox_provision'
   | 'sandbox_boot'
   | 'kilo_server'
@@ -112,6 +114,8 @@ function isCloudStatusStep(value: unknown): value is PublicCloudAgentStatusStep 
     value === 'branch' ||
     value === 'devcontainer_setup' ||
     value === 'setup_commands' ||
+    value === 'session_setup_commands' ||
+    value === 'start_commands' ||
     value === 'sandbox_provision' ||
     value === 'sandbox_boot' ||
     value === 'kilo_server' ||

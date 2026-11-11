@@ -765,7 +765,7 @@ pnpm --filter cloud-agent-next test:watch
 
 #### Integration Tests (Cloudflare Workers Runtime)
 
-Tests that run in the actual Cloudflare Workers runtime via Miniflare using `@cloudflare/vitest-pool-workers`. These tests have access to real Durable Objects, queues, and other Workers APIs through the `cloudflare:test` module.
+Tests that run in the actual Cloudflare Workers runtime via Miniflare using `@cloudflare/vitest-plugin`. These tests have access to real Durable Objects, queues, and other Workers APIs through the `cloudflare:test` module.
 
 ```bash
 # Run integration tests (test/**/*.test.ts)

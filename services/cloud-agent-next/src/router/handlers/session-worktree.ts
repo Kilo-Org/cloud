@@ -47,6 +47,7 @@ import { buildControlPlaneSandboxSelection } from '../../session/control-plane-s
 import { createMessageId } from '../../session/message-id.js';
 import { preflightAndQueuePromptMessage } from '../../session/queue-message.js';
 import type { MessageResultRPCResponse } from '../../session/message-result.js';
+import { classifyStoredInitialTurn } from '../../session/initial-turn-outcome.js';
 import {
   assertSessionOperationIdentity,
   SESSION_CREATE_INTENT_FINGERPRINT_KEY,
@@ -1656,8 +1657,9 @@ async function initialTurnState(
   );
   if (result.type === 'state-invalid') throw creationInProgress();
   if (result.type !== 'found') return 'missing';
-  if (result.result.status === 'failed' || result.result.status === 'interrupted') return 'failed';
-  return 'admitted';
+  return classifyStoredInitialTurn(result.result).type === 'terminal-failure'
+    ? 'failed'
+    : 'admitted';
 }
 
 function rpcErrorCode(error: unknown): string {

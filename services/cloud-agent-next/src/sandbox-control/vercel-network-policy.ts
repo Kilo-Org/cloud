@@ -155,6 +155,16 @@ function runtimeProxyInjectionRules(
         add(provider, `${basePath(provider)}${prefix}${path}`, [...methods], authorization);
       }
     }
+    if (organizationId !== undefined) {
+      for (const prefix of ['/api/openrouter', '/api/gateway']) {
+        add(
+          provider,
+          `${basePath(provider)}${prefix}/organizations/${organizationId}/models`,
+          ['GET'],
+          authorization
+        );
+      }
+    }
     for (const path of ['/v1/chat/completions', '/v1/responses']) {
       add(provider, `${basePath(provider)}/api/gateway${path}`, ['POST'], authorization);
     }

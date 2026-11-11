@@ -5,6 +5,7 @@ import type { Organization } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
 import {
   getMagicLinkUrl,
+  SIGN_IN_CODE_EXPIRY_MINUTES,
   type MagicLinkTokenWithPlaintext,
 } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
@@ -25,6 +26,8 @@ export const subjects = {
   orgInvitation: 'Kilo: Teams Invitation',
   magicLink: 'Sign in to Kilo Code',
   signInCode: 'Your Kilo Code sign-in code',
+  accountLinkCode: 'Kilo: Confirm adding a sign-in method',
+  newSignInMethod: 'Kilo: A new sign-in method was added to your account',
   balanceAlert: 'Kilo: Low Balance Alert',
   spendAlert: 'Kilo: Spend alert',
   autoTopUpFailed: 'Kilo: Auto Top-Up Failed',
@@ -294,7 +297,49 @@ export async function sendSignInCodeEmail(email: string, code: string): Promise<
     templateVars: {
       code,
       email,
-      expires_in: '10 minutes',
+      expires_in: `${SIGN_IN_CODE_EXPIRY_MINUTES} minutes`,
+    },
+  });
+}
+
+export async function sendAccountLinkCodeEmail(
+  email: string,
+  code: string,
+  providerName: string
+): Promise<SendResult> {
+  return send({
+    to: email,
+    templateName: 'accountLinkCode',
+    templateVars: {
+      code,
+      email,
+      provider_name: providerName,
+      expires_in: `${SIGN_IN_CODE_EXPIRY_MINUTES} minutes`,
+    },
+  });
+}
+
+export async function sendNewSignInMethodEmail(
+  email: string,
+  providerName: string,
+  linkedIdentity: { email: string; displayName?: string | null }
+): Promise<SendResult> {
+  const displayName = linkedIdentity.displayName?.trim();
+  const connectedAccountsUrl = `${NEXTAUTH_URL}/connected-accounts`;
+  return send({
+    to: email,
+    templateName: 'newSignInMethod',
+    templateVars: {
+      email,
+      provider_name: providerName,
+      linked_identity: displayName
+        ? `${displayName} (${linkedIdentity.email})`
+        : linkedIdentity.email,
+      connected_accounts_link: new RawHtml(
+        `<a href="${escapeHtml(connectedAccountsUrl)}" style="color: #1a1a1a">${escapeHtml(
+          connectedAccountsUrl
+        )}</a>`
+      ),
     },
   });
 }

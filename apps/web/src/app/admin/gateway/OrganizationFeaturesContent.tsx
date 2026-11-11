@@ -25,8 +25,8 @@ type FeatureValues = Record<OrganizationFeature, string>;
 function toFeatureValues(features: OrganizationFeatures): FeatureValues {
   return {
     experimental_byok: features.experimental_byok.join('\n'),
+    enkrypt_output_guardrail: features.enkrypt_output_guardrail.join('\n'),
     gateway_settings: features.gateway_settings.join('\n'),
-    request_logs: features.request_logs.join('\n'),
   };
 }
 
@@ -47,8 +47,8 @@ function OrganizationFeaturesPreview({
   const trpc = useTRPC();
   const parsed = OrganizationFeaturesInputSchema.safeParse({
     experimental_byok: parseOrganizationIds(values.experimental_byok),
+    enkrypt_output_guardrail: parseOrganizationIds(values.enkrypt_output_guardrail),
     gateway_settings: parseOrganizationIds(values.gateway_settings),
-    request_logs: parseOrganizationIds(values.request_logs),
   });
   const features = parsed.success ? parsed.data : DEFAULT_ORGANIZATION_FEATURES;
   const hasOrganizations = ORGANIZATION_FEATURES.some(feature => features[feature].length > 0);
@@ -68,9 +68,6 @@ function OrganizationFeaturesPreview({
             {hasChanges ? 'Unsaved changes' : 'Stored configuration'}
           </Badge>
         </div>
-        <CardDescription>
-          Organizations in the editor. Editing updates this preview without saving.
-        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
         {!parsed.success ? (
@@ -185,8 +182,8 @@ export function OrganizationFeaturesContent() {
     if (!values) return;
     const parsed = OrganizationFeaturesInputSchema.safeParse({
       experimental_byok: parseOrganizationIds(values.experimental_byok),
+      enkrypt_output_guardrail: parseOrganizationIds(values.enkrypt_output_guardrail),
       gateway_settings: parseOrganizationIds(values.gateway_settings),
-      request_logs: parseOrganizationIds(values.request_logs),
     });
     if (!parsed.success) {
       setValidationError(formatZodError(parsed.error));
@@ -202,10 +199,8 @@ export function OrganizationFeaturesContent() {
         <CardHeader>
           <CardTitle>Organization Features</CardTitle>
           <CardDescription>
-            These features are experimental. Enable gateway features for specific organizations.
-            Stored under <code>organization_features</code> in the <code>config</code> column of{' '}
-            <code>ai_gateway_config</code>. Enter one organization ID per line. Gateway requests
-            pick up changes within one minute on warm instances.
+            Enable gateway features for specific organizations, one organization ID per line.
+            Changes apply within about a minute.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
@@ -215,8 +210,7 @@ export function OrganizationFeaturesContent() {
               <div key={feature} className="flex flex-col gap-2">
                 <Label htmlFor={id}>{ORGANIZATION_FEATURE_DESCRIPTIONS[feature].label}</Label>
                 <p id={`${id}-description`} className="text-muted-foreground text-xs">
-                  {ORGANIZATION_FEATURE_DESCRIPTIONS[feature].description} Feature key:{' '}
-                  <code>{feature}</code>.
+                  {ORGANIZATION_FEATURE_DESCRIPTIONS[feature].description}
                 </p>
                 <Textarea
                   id={id}

@@ -1,8 +1,15 @@
 name: Deploy to Production
 
 on:
+  # A completed main CI run is the normal start: a new deployable candidate can
+  # only appear when CI turns a main push green. The hourly poll is the catch-up
+  # path when a completion event is missed, and dispatch stays manual.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   schedule:
-    - cron: '7,27,47 * * * *'
+    - cron: '7 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -19,7 +26,17 @@ env:
   VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
 
 jobs:
+  # Only a successful CI run may start an automatic deploy; the poll and the
+  # dispatch pass the same guard unchanged. Every later job depends on this one,
+  # so a CI completion that must not deploy skips the whole run. The deployed
+  # SHA is still chosen by check-deployment-changes.yml, which also verifies
+  # main and records the admitted trigger.
   check-changes:
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: >-
+      github.repository == 'Kilo-Org/cloud' &&
+      (github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success')
     uses: ./.github/workflows/check-deployment-changes.yml
     with:
       workflow_file: deploy-production.yml
@@ -29,7 +46,8 @@ jobs:
   # the same connection.
   db-gate:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 45
     environment: production
@@ -68,7 +86,8 @@ jobs:
 
   stage-app:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -79,7 +98,8 @@ jobs:
 
   stage-ai-gateway:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -89,7 +109,19 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}
 
   promote-app:
-    needs: [stage-app, db-gate]
+    needs: [stage-app, db-gate, stage-ai-gateway, promote-ai-gateway]
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: >-
+      ${{
+        github.repository == 'Kilo-Org/cloud' &&
+        !cancelled() &&
+        needs.stage-app.result == 'success' &&
+        needs.db-gate.result == 'success' &&
+        (
+          (needs.stage-ai-gateway.result == 'success' && needs.promote-ai-gateway.result == 'success') ||
+          (needs.stage-ai-gateway.result == 'skipped' && needs.promote-ai-gateway.result == 'skipped')
+        )
+      }}
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
@@ -100,6 +132,9 @@ jobs:
 
   promote-ai-gateway:
     needs: [stage-ai-gateway, db-gate]
+    # stage-ai-gateway skips when there is nothing to deploy, which skips this job too.
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-ai-gateway.outputs.deployment_url }}
@@ -112,12 +147,35 @@ jobs:
       AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
+  # Worker change detection reads only the SHAs check-changes publishes, so this
+  # call runs beside the Vercel staging chain instead of after it: the matrix is
+  # ready when the deploy gate below opens. It deploys nothing by itself.
+  detect-workers:
+    needs: check-changes
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
+    uses: ./.github/workflows/deploy-workers.yml
+    with:
+      base_sha: ${{ needs.check-changes.outputs.base_sha }}
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
+
   deploy-workers:
-    needs: [db-gate, check-changes, stage-app, stage-ai-gateway, promote-app, promote-ai-gateway]
+    needs:
+      [
+        db-gate,
+        check-changes,
+        detect-workers,
+        stage-app,
+        stage-ai-gateway,
+        promote-app,
+        promote-ai-gateway,
+      ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
+        needs.detect-workers.result == 'success' &&
         needs.db-gate.result == 'success' &&
         contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
         contains(fromJSON('["success","skipped"]'), needs.stage-ai-gateway.result) &&
@@ -126,7 +184,8 @@ jobs:
       }}
     uses: ./.github/workflows/deploy-workers.yml
     with:
-      base_sha: ${{ needs.check-changes.outputs.base_sha }}
+      worker_matrix: ${{ needs.detect-workers.outputs.matrix }}
+      deploy_cloud_agent_after_session_ingest: ${{ needs.detect-workers.outputs.deploy-cloud-agent-after-session-ingest }}
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets: inherit
 
@@ -134,7 +193,7 @@ jobs:
   # successful worker deploy and releases only when the kilo-mcp bundle changed.
   kilo-mcp-release:
     needs: [check-changes, deploy-workers]
-    if: ${{ !cancelled() && needs.deploy-workers.result == 'success' }}
+    if: ${{ github.repository == 'Kilo-Org/cloud' && !cancelled() && needs.deploy-workers.result == 'success' }}
     # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot
     # exceed the caller).
     permissions:
@@ -163,6 +222,7 @@ jobs:
       ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.db-gate.result == 'success' &&

@@ -135,6 +135,12 @@ async function deleteOwnedLeafSession(
   sessionId: string
 ) {
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
+  // The worktree deletion owns its members' rows while it runs; deleting one
+  // here would race that delete and strand local session state.
+  if (await isWorktreeSessionDeleting(db, kiloUserId, sessionId)) {
+    return c.json({ success: false, error: 'worktree_deleting' }, 409);
+  }
+
   const existingRows = await db
     .select()
     .from(cli_sessions_v2)

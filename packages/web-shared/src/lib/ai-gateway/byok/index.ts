@@ -3,15 +3,10 @@ import { byok_api_keys } from '@kilocode/db/schema';
 import { ByokApiKeySettingsSchema } from '@kilocode/db/schema-types';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import type { BYOKApiKeyEnvelope, EncryptedData } from '@kilocode/db/schema-types';
+import type { BYOKApiKeyEnvelope } from '@kilocode/db/schema-types';
 import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
-import {
-  decryptByokEnvelope,
-  getByokKmsClientConfig,
-} from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
+import { decryptByokEnvelope } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
-import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {
   GatewayUserByokProviderIdSchema,
   UserByokProviderIdSchema,
@@ -28,8 +23,8 @@ import {
   getVercelModelsFromDatabase,
   getVercelModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
-  type StoredModelMap,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
@@ -42,7 +37,7 @@ export type ByokSourceDb = typeof db | DrizzleTransaction;
 
 async function deriveModelInferenceUserByokProviders(
   modelId: string,
-  vercelModelMetadata: StoredModelMap
+  vercelModelMetadata: GatewayModelMap
 ): Promise<UserByokProviderId[]> {
   const providers: UserByokProviderId[] = [
     ...new Set(
@@ -86,7 +81,7 @@ export async function getModelGatewayUserByokProviders(
   );
 }
 
-async function getVercelModelMetadata(caller: string): Promise<StoredModelMap | null> {
+async function getVercelModelMetadata(caller: string): Promise<GatewayModelMap | null> {
   const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
   if (Object.keys(vercelModelMetadata).length === 0) {
     console.error('[%s] no Vercel model metadata', caller);
@@ -188,7 +183,6 @@ export type ByokKeyState = EnabledByokProvider & { isEnabled: boolean; priority?
 
 const encryptedByokKeyColumns = {
   id: byok_api_keys.id,
-  encrypted_api_key: byok_api_keys.encrypted_api_key,
   encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
   organization_id: byok_api_keys.organization_id,
   kilo_user_id: byok_api_keys.kilo_user_id,
@@ -454,18 +448,18 @@ export function getByokKmsContext(row: {
 
 export async function decryptByokRow(row: {
   id: string;
-  encrypted_api_key: EncryptedData;
   encrypted_api_key_envelope: BYOKApiKeyEnvelope | null;
   organization_id: string | null;
   kilo_user_id: string | null;
   provider_id: string;
 }) {
-  // The legacy column is always written alongside the envelope, so with the KMS service
-  // unconfigured (rollback) it is still valid and we read it instead of failing.
-  const decryptedAPIKey =
-    row.encrypted_api_key_envelope && getByokKmsClientConfig()
-      ? await decryptByokEnvelope(row.encrypted_api_key_envelope, getByokKmsContext(row))
-      : decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY);
+  if (!row.encrypted_api_key_envelope) {
+    throw new Error(`BYOK key ${row.id} has no encryption envelope`);
+  }
+  const decryptedAPIKey = await decryptByokEnvelope(
+    row.encrypted_api_key_envelope,
+    getByokKmsContext(row)
+  );
   return {
     decryptedAPIKey,
     providerId: UserByokProviderIdSchema.parse(row.provider_id),

@@ -23,7 +23,6 @@ type DetectorSettings = z.infer<typeof DetectorSettingsSchema>;
 
 const GuardrailSettingsSchema = z.object({
   status: z.enum(['ready', 'invalid']),
-  scan_tool_results: z.boolean(),
   detectors: z.array(DetectorSettingsSchema),
 });
 
@@ -132,7 +131,6 @@ export function guardrailSettings(
 ): z.infer<typeof GuardrailSettingsSchema> {
   return {
     status: config.status,
-    scan_tool_results: config.scanToolResults,
     detectors:
       config.status === 'ready' ? detectorSettings(config.detectors, config.blockingDetectors) : [],
   };

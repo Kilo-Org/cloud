@@ -1,14 +1,19 @@
 import { timingSafeEqual } from '@kilocode/encryption';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
-import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
+import {
+  UsageRecordRequestSchema,
+  type LlmUsageQueueMessage,
+  type UsageQueueMessage,
+} from '@kilocode/usage-contracts';
 import { logSafely, queueMetrics } from './diagnostics';
+import { handlePublishEnkryptUsage } from './publish-enkrypt-usage';
 import { schemaRejectionDetails } from './rejection-diagnostics';
 
 export type Env = Omit<
   CloudflareEnv,
   'USAGE_INGEST_QUEUE' | 'USAGE_WRITER_URL' | 'USAGE_INGEST_PARALLELISM'
 > & {
-  USAGE_INGEST_QUEUE: Queue<UsageRecordRequest>;
+  USAGE_INGEST_QUEUE: Queue<UsageQueueMessage>;
   USAGE_INGEST_PUBLISH_SECRET?: string;
   USAGE_INGEST_PARALLELISM?: string;
   USAGE_WRITER_URL?: string;
@@ -123,7 +128,9 @@ async function handlePublishUsage(
   const sendStartedAt = performance.now();
   let sendPromise: Promise<unknown>;
   try {
-    sendPromise = env.USAGE_INGEST_QUEUE.send(result.data, { contentType: 'json' });
+    sendPromise = env.USAGE_INGEST_QUEUE.send(result.data satisfies LlmUsageQueueMessage, {
+      contentType: 'json',
+    });
   } catch {
     logSafely('warn', () => ({
       event: 'usage_ingest_enqueue',
@@ -169,12 +176,14 @@ export async function handleFetch(
   ctx?: ExecutionContext
 ): Promise<Response> {
   const entryAtMs = Date.now();
-  if (new URL(request.url).pathname !== '/usage') {
+  const pathname = new URL(request.url).pathname;
+  if (pathname !== '/usage' && pathname !== '/enkrypt-usage') {
     return new Response('Not Found', { status: 404 });
   }
   if (request.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'POST' } });
   }
+  if (pathname === '/enkrypt-usage') return handlePublishEnkryptUsage(request, env, entryAtMs);
 
   return handlePublishUsage(request, env, entryAtMs, ctx);
 }

@@ -119,13 +119,13 @@ vi.mock('./chat-markdown-text', () => ({
   ChatMarkdownText: () => null,
 }));
 vi.mock('./compaction-separator', () => ({
-  CompactionSeparator: () => null,
+  CompactionSeparator: 'CompactionSeparator',
 }));
 vi.mock('./file-part-renderer', () => ({
   FilePartRenderer: () => null,
 }));
 vi.mock('./part-renderer', () => ({
-  PartRenderer: () => null,
+  PartRenderer: 'PartRenderer',
 }));
 vi.mock('./tool-run-rows', () => ({
   CondensedToolRunRow: 'CondensedToolRunRow',
@@ -147,6 +147,49 @@ vi.mock('./use-message-copy', () => ({
 }));
 
 const BADGE_CLASS = 'flex-row items-center gap-1 self-end pr-1';
+
+describe('MessageBubble compaction', () => {
+  it.each([true, false])(
+    'passes live state %s to the compaction-only separator',
+    async isStreaming => {
+      const message = assistantMessage('compaction');
+      message.parts = [
+        {
+          id: 'part',
+          sessionID: 'ses_1',
+          messageID: 'compaction',
+          type: 'compaction',
+          auto: false,
+        },
+      ];
+      const { MessageBubble } = await import('./message-bubble');
+      // eslint-disable-next-line new-cap -- Inspect the component's unrendered tree.
+      const tree = MessageBubble.type({
+        message,
+        isLastAssistantMessage: true,
+        isSessionStreaming: isStreaming,
+      });
+      expect(findElementByType(tree, 'CompactionSeparator')?.props.info).toBe(message.info);
+      expect(findElementByType(tree, 'CompactionSeparator')?.props.isStreaming).toBe(isStreaming);
+    }
+  );
+
+  it('passes assistant status to parts in a mixed message', async () => {
+    const message = assistantMessage('compaction');
+    message.parts = [
+      { id: 'part', sessionID: 'ses_1', messageID: 'compaction', type: 'compaction', auto: false },
+      {
+        id: 'text',
+        sessionID: 'ses_1',
+        messageID: 'compaction',
+        type: 'text',
+        text: 'Other content',
+      },
+    ];
+    const tree = await renderBubble(message);
+    expect(findElementByType(tree, 'PartRenderer')?.props.messageInfo).toBe(message.info);
+  });
+});
 
 describe('MessageBubble queued badge', () => {
   it('renders the Queued badge visible when deliveryState is queued', async () => {
@@ -386,8 +429,9 @@ describe('MessageBubble failure footer', () => {
     });
 
     const userFooter = footerOf(userTree);
+    expect(String(userFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px] items-end');
     const userFooterClasses = String(userFooter?.props.className).split(' ');
-    expect(userFooterClasses).toEqual(expect.arrayContaining(['px-4', 'py-1', 'items-end']));
+    expect(userFooterClasses).toEqual(expect.arrayContaining(['px-4', 'items-end']));
     // The title and the detail line end-align with the bubble's trailing edge,
     // so a wrapped line does not fall back to the leading edge, and each keeps
     // its own colour. The action row is unchanged: the column places it.
@@ -406,8 +450,9 @@ describe('MessageBubble failure footer', () => {
 
     // An assistant row's footer keeps its existing leading layout.
     const assistantFooter = footerOf(assistantTree);
+    expect(String(assistantFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px]');
     const assistantFooterClasses = String(assistantFooter?.props.className).split(' ');
-    expect(assistantFooterClasses).toEqual(expect.arrayContaining(['px-4', 'py-1']));
+    expect(assistantFooterClasses).toEqual(expect.arrayContaining(['px-4']));
     expect(
       classNamesIn(assistantFooter?.props.children).filter(name =>
         name.split(' ').includes('text-right')
@@ -415,7 +460,7 @@ describe('MessageBubble failure footer', () => {
     ).toEqual([]);
 
     const executionFooter = footerOf(executionTree);
-    expect(String(executionFooter?.props.className)).toBe('gap-2 px-4 py-1');
+    expect(String(executionFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px]');
     expect(
       classNamesIn(executionFooter?.props.children).filter(name =>
         name.split(' ').includes('text-right')
@@ -485,6 +530,20 @@ describe('MessageBubble failure footer', () => {
     ).toBeNull();
   });
 
+  it('gives both recovery controls the shared state-surface target', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-targets'), {
+      deliveryState: { status: 'failed', error: '', reason: 'execution' },
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+    /* The footer's actions are the failure's whole recovery, so both take the
+       48 dp frame the shared state surface gives them. */
+    for (const label of ['Retry', 'Copy to composer']) {
+      const control = findElementByType(tree, 'Button', p => p.accessibilityLabel === label);
+      expect(String(control?.props.className).split(' ')).toContain('min-h-[48px]');
+    }
+  });
+
   it('omits the Retry button for a non-retryable assistant error', async () => {
     const tree = await renderBubbleWithHandlers(
       assistantMessageWithError('m-asst-nr', 'ProviderAuthError'),
@@ -547,7 +606,7 @@ describe('MessageBubble failure footer', () => {
     );
 
     expect(findText(tree, t => t === 'Response failed')).toBe(true);
-    expect(findText(tree, t => t === 'Not enough credits to run Cloud Agent.')).toBe(true);
+    expect(findText(tree, t => t === 'Not enough credits for this request.')).toBe(true);
 
     const addCredits = findElementByType(
       tree,
@@ -1398,7 +1457,9 @@ function findElementByLabel(
 
 /** The failed row's footer container, found by its own spacing classes. */
 function footerOf(tree: unknown): { type: string; props: Record<string, unknown> } | null {
-  return findElementByType(tree, 'View', p => /^gap-\d+ px-4 py-1/.test(String(p.className)));
+  return findElementByType(tree, 'View', p =>
+    String(p.className).startsWith('gap-2 px-4 pt-1 pb-[24px]')
+  );
 }
 
 /** Every className in an unrendered element tree, in document order. */

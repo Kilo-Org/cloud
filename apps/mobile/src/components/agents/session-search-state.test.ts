@@ -145,25 +145,49 @@ describe('resolveSearchRestoreDecision', () => {
   it('seeds a non-empty restored query and remounts the input', () => {
     expect(
       resolveSearchRestoreDecision({ settled: true, hasInteracted: false, restoredQuery: 'hello' })
-    ).toEqual({ shouldSeed: true, query: 'hello', hasText: true, shouldRemount: true });
+    ).toEqual({
+      shouldSeed: true,
+      query: 'hello',
+      text: 'hello',
+      hasText: true,
+      shouldRemount: true,
+    });
   });
 
   it('does not seed before the load settles', () => {
     expect(
       resolveSearchRestoreDecision({ settled: false, hasInteracted: false, restoredQuery: 'hello' })
-    ).toEqual({ shouldSeed: false, query: '', hasText: false, shouldRemount: false });
+    ).toEqual({
+      shouldSeed: false,
+      query: '',
+      text: '',
+      hasText: false,
+      shouldRemount: false,
+    });
   });
 
   it('does not overwrite a field the user has already touched', () => {
     expect(
       resolveSearchRestoreDecision({ settled: true, hasInteracted: true, restoredQuery: 'hello' })
-    ).toEqual({ shouldSeed: false, query: '', hasText: false, shouldRemount: false });
+    ).toEqual({
+      shouldSeed: false,
+      query: '',
+      text: '',
+      hasText: false,
+      shouldRemount: false,
+    });
   });
 
   it('seeds empty when nothing was stored (null)', () => {
     expect(
       resolveSearchRestoreDecision({ settled: true, hasInteracted: false, restoredQuery: null })
-    ).toEqual({ shouldSeed: true, query: '', hasText: false, shouldRemount: false });
+    ).toEqual({
+      shouldSeed: true,
+      query: '',
+      text: '',
+      hasText: false,
+      shouldRemount: false,
+    });
   });
 
   it('an empty persisted clear does not reload the previous query', () => {
@@ -171,6 +195,42 @@ describe('resolveSearchRestoreDecision', () => {
     // empty value, never a stale previous query.
     expect(
       resolveSearchRestoreDecision({ settled: true, hasInteracted: false, restoredQuery: '' })
-    ).toEqual({ shouldSeed: true, query: '', hasText: false, shouldRemount: false });
+    ).toEqual({
+      shouldSeed: true,
+      query: '',
+      text: '',
+      hasText: false,
+      shouldRemount: false,
+    });
+  });
+
+  it('commits a whitespace-only draft as an empty query and keeps the field text', () => {
+    // Typing the same five spaces commits '' (the list shows everything), so the
+    // restore must commit '' too; the field still shows the stored spaces.
+    expect(
+      resolveSearchRestoreDecision({ settled: true, hasInteracted: false, restoredQuery: '     ' })
+    ).toEqual({
+      shouldSeed: true,
+      query: '',
+      text: '     ',
+      hasText: true,
+      shouldRemount: true,
+    });
+  });
+
+  it('commits a padded draft as its trimmed term and keeps the padding visible', () => {
+    expect(
+      resolveSearchRestoreDecision({
+        settled: true,
+        hasInteracted: false,
+        restoredQuery: '  alpha ',
+      })
+    ).toEqual({
+      shouldSeed: true,
+      query: 'alpha',
+      text: '  alpha ',
+      hasText: true,
+      shouldRemount: true,
+    });
   });
 });

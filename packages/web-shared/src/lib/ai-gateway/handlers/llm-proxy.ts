@@ -204,15 +204,17 @@ export async function handleLlmProxyRequest(
       ? readGatewayBalance(caller.user, caller.organizationId, requestedModelLowerCased)
       : anonymousBalance
   );
-  const organizationGroupPolicyPromise = callerPromise.then(async caller => {
+  const organizationGroupContextPromise = callerPromise.then(async caller => {
     if (caller.kind !== 'signed-in' || !caller.organizationId) return null;
-    const context = await getOrganizationGroupPolicyContext({
+    return await getOrganizationGroupPolicyContext({
       organizationId: caller.organizationId,
       subject: { type: 'member', kiloUserId: caller.user.id },
       fromDb: readDb,
     });
-    return evaluateEffectiveModelAccessPolicy(context);
   });
+  const organizationGroupPolicyPromise = organizationGroupContextPromise.then(
+    context => context && evaluateEffectiveModelAccessPolicy(context)
+  );
   // Some early returns do not await organization policy. Keep those paths from
   // surfacing policy-context failures as unhandled rejections.
   void organizationGroupPolicyPromise.catch(() => {});
@@ -221,7 +223,10 @@ export async function handleLlmProxyRequest(
   const usageId = randomUUID();
 
   const enkryptAdmission = await Promise.all([callerPromise, balanceAndSettingsPromise]).then(
-    ([caller, account]) => admitEnkryptGuardrail(caller, account)
+    ([caller, account]) =>
+      admitEnkryptGuardrail(caller, account, () =>
+        organizationGroupContextPromise.then(context => context?.groupIds ?? [])
+      )
   );
   if (enkryptAdmission.kind === 'rejected') return enkryptAdmission.response;
 
@@ -237,9 +242,7 @@ export async function handleLlmProxyRequest(
           microdollarUsageId: usageId,
           apiKind: requestBodyParsed.kind,
           clientRequestId: headers.clientRequestId,
-          segments: extractRequestSegments(requestBodyParsed, {
-            includeToolResults: inputGuardrail.config.scanToolResults,
-          }),
+          segments: extractRequestSegments(requestBodyParsed),
         }
     ),
     request.signal

@@ -34,6 +34,23 @@ temporary Home route cannot replace the recovery destination. Credential
 preloads are used only for the first auth-provider mount; recovery reads the
 current stored credentials through the normal bounded retry path.
 
+## Voice-input terminal ownership
+
+Stop, cancel, and a queued next start wait for a terminal event with a 60-second
+silence bound. Completed gateway segments and final transcripts extend that
+window; interim text does not. A timed-out stop reports the retryable stopped
+message, while cancel stays silent.
+
+The OS adapter assigns each start a numeric `kiloSessionId` and consumes only
+the patched recognizer's `kiloEvent` channel. Native callbacks retain their
+originating run identity, and old teardown owns only that run's resources.
+Foreign-run events are dropped before controller delivery and iOS transcript
+deduplication. A genuine failed-start error and end remain valid without start.
+
+The versioned `expo-speech-recognition@57.1.1` patch, its workspace registration,
+and its lockfile hash form one native compatibility change. Rebuild both native
+clients; reloading JavaScript onto an older recognizer binary is not supported.
+
 ## New-session model choice
 
 Model resolution waits for stored preferences to load. An explicit model and
@@ -281,6 +298,8 @@ their default resource classes. The production builder requires a paid EAS plan.
 - Sign local simulator builds with an Apple Development identity and its correct team ID.
 - Unsigned builds cannot restore the local account from the keychain on this simulator.
 - Check both displays, all three fold poses, and each orientation after the rebuild.
+- `ios.requireFullScreen` is false, so an iOS 27 window resizes continuously.
+- Expo's config plugin then writes the four `UISupportedInterfaceOrientations~ipad` values for App Store validation.
 
 #### Widget layout checks
 
@@ -302,6 +321,9 @@ their default resource classes. The production builder requires a paid EAS plan.
 - Use `--display=1` for the outer display and `--display=3` for the inner display.
 - An inactive display produces a black screenshot.
 - Type a draft, change the appearance in both directions, and verify the draft stays readable.
+- Resize the window to a narrow size and to a wide size; keep headers, tab labels, lists and transcript controls inside the horizontal safe areas.
+- Resize with an open sheet and the keyboard shown; keep every field and action visible and tappable.
+- Type a draft, resize the window, then background and foreground the app; keep the draft, the route and the transcript position.
 
 ## Diagram host checks
 

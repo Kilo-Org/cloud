@@ -229,6 +229,21 @@
     "signInCodeField": "Codi d'inici de sessió",
     "or": "o"
   },
+  "pendingLink": {
+    "description": "Ja hi ha un compte que utilitza {{email}}. Inicia la sessió amb un dels seus mètodes per afegir {{provider}}.",
+    "emailCode": "Envia'm un codi d'inici de sessió per correu",
+    "continueInBrowser": "Continua al navegador",
+    "startAgain": "Torna a començar",
+    "expired": "Aquesta sol·licitud per afegir {{provider}} ha caducat.",
+    "noMethods": "Aquest compte no té cap altre mètode d'inici de sessió, així que no es pot afegir {{provider}}.",
+    "linked": "S'ha afegit {{provider}} al teu compte.",
+    "failedExpired": "No s'ha afegit {{provider}} perquè la sol·licitud ha caducat.",
+    "failedWrongAccount": "No s'ha afegit {{provider}} perquè has iniciat la sessió en un altre compte.",
+    "failedAccountAlreadyLinked": "No s'ha afegit {{provider}} perquè ja està vinculat a un altre compte.",
+    "failedProviderAlreadyLinked": "No s'ha afegit {{provider}} perquè el teu compte ja té un altre inici de sessió amb {{provider}}.",
+    "failedLinking": "No s'ha pogut afegir {{provider}} al teu compte.",
+    "notAdded": "Has iniciat la sessió. No s'ha afegit {{provider}} al teu compte."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revisions automàtiques de PR",
     "securityAgentSubtitle": "Troba i corregeix vulnerabilitats",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Confirma l'eliminació",
     "credits": "Crèdits",
     "failedToLoadBalance": "No s'ha pogut carregar el saldo. Toca per tornar-ho a provar.",
+    "balanceLoadFailed": "No s'ha pogut carregar el saldo",
     "hideBalance": "Amaga el saldo",
     "showBalance": "Mostra el saldo",
     "balanceHidden": "Saldo amagat",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Compte de prova",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO d'empresa",
     "passkeysTitle": "Claus d'accés",
     "passkeysSubtitle": "Inicia la sessió sense contrasenya",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Aquesta sol·licitud d'integració no modifica cap fitxer.",
     "fileList": {
       "openNavigator": "Obre el navegador de fitxers",
-      "filesViewed": "Fitxers · {{viewed}} de {{total}} vistos",
       "listed": "(llistats)",
       "layout": "Disposició",
       "unified": "Unificat",
@@ -2340,7 +2357,7 @@
       "cloningSession": "Clonant la sessió…",
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió.",
       "cloneFailedRetry": "No s'ha pogut clonar aquesta sessió. Torna-ho a provar.",
-      "notEnoughCredits": "No tens prou crèdits per executar Cloud Agent. Afegeix crèdits i torna-ho a provar.",
+      "notEnoughCredits": "No tens prou crèdits per a aquesta sol·licitud. Afegeix crèdits i torna-ho a provar.",
       "previousTaskFinishing": "La tasca anterior encara no ha acabat. Espera un moment.",
       "serviceUnavailable": "El servei no està disponible ara mateix. Torna-ho a provar.",
       "connectionTrouble": "Hi ha problemes de connexió. Torna-ho a provar d'aquí a un moment.",
@@ -2450,7 +2467,7 @@
       "discardWithUploadsMessage": "S'eliminaran el teu missatge i els fitxers penjats que no s'hagin adjuntat a missatges enviats.",
       "discardFailed": "No s'ha pogut descartar l'esborrany. Torna-ho a provar.",
       "remoteHint": "Per executar-lo al teu ordinador, inicia Kilo allà i deixa'l en execució.",
-      "continueFrom": "S'està continuant la sessió {{title}}.",
+      "continueFrom": "S'està continuant la sessió «{{title}}».",
       "importingSession": "Important la sessió…",
       "cliCannotContinue": "Aquest CLI no pot continuar una sessió. Tria Cloud Agent o un altre CLI.",
       "importFailed": "No s'ha pogut importar aquesta sessió.",
@@ -2503,6 +2520,8 @@
       "toolList": "llista",
       "toolPatch": "aplica un pedaç",
       "toolTask": "tasca",
+      "toolSendFile": "Fitxer enviat",
+      "toolSendFileAction": "envia fitxer",
       "readTodos": "Llegeix el pla",
       "updateTodos": "Actualitza el pla",
       "linesBadge": "{{displayCount}} línies",
@@ -2606,7 +2625,21 @@
       "thought": "Raonament",
       "showDetails": "Mostra els detalls",
       "pending": "Pendent…",
-      "running": "En execució…"
+      "running": "En execució…",
+      "field": {
+        "filePath": "Camí del fitxer",
+        "path": "Camí",
+        "offset": "Desplaçament",
+        "limit": "Límit",
+        "pattern": "Patró",
+        "include": "Inclusió",
+        "patchText": "Text del pedaç",
+        "query": "Consulta",
+        "prompt": "Indicació",
+        "header": "Encapçalament",
+        "question": "Pregunta",
+        "options": "Opcions"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "No s'ha pogut mostrar el contingut."
@@ -2622,7 +2655,7 @@
       "assistantContextOverflow": "La conversa és massa llarga per al model.",
       "assistantProviderError": "El proveïdor ha retornat un error.",
       "assistantProviderRefused": "El proveïdor ha rebutjat aquesta sol·licitud i no es pot tornar a intentar.",
-      "assistantCreditsRefusal": "No tens prou crèdits per executar Cloud Agent.",
+      "assistantCreditsRefusal": "No tens prou crèdits per a aquesta sol·licitud.",
       "assistantOutputLimit": "La resposta ha arribat al límit de sortida del model.",
       "assistantStructuredOutput": "La resposta no coincideix amb el format requerit.",
       "assistantFailed": "No s'ha pogut generar la resposta."
@@ -3858,7 +3891,7 @@
     "reasoningEffort": {
       "modelFlag": "Aquest model admet l'esforç de raonament"
     },
-    "creditsRequired": "No hi ha prou crèdits per enviar aquest missatge. Afegeix crèdits i torna-ho a provar."
+    "creditsRequired": "No hi ha prou crèdits per enviar aquest missatge."
   },
   "settingsTools": {
     "confirmTitle": "Confirmar aquest canvi?"
@@ -4057,6 +4090,7 @@
       "namePlaceholder": "El meu agent",
       "promptPlaceholder": "Ets un...",
       "tools": "Eines",
+      "wholeToolRule": "Aquest agent aplica una regla a cada eina alhora: {{rule}}. Aquests interruptors són de només lectura.",
       "visibility": "Visibilitat",
       "visibilityPrimary": "Principal — es mostra al selector",
       "visibilitySubagent": "Subagent — només es pot trucar des d'altres",
@@ -4098,6 +4132,7 @@
     },
     "repoBindings": {
       "title": "Perfils predeterminats per a Repos",
+      "entryLabel": "Perfils predeterminats",
       "add": "Afegeix per defecte",
       "empty": "No s'ha configurat cap valor predeterminat",
       "emptyDescription": "Afegiu un valor predeterminat per aplicar automàticament un perfil quan inicieu sessions per a un repo.",
@@ -4309,5 +4344,8 @@
     "noEnabledContexts": "No hi ha cap context activat per als informes programats",
     "sourceBlocker": "La sessió requereix atenció",
     "sourceMetadata": "Metadades de sessió capturades"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "No s'ha pogut obrir aquest resultat de la cerca"
   }
 }

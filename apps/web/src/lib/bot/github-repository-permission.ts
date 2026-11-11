@@ -7,6 +7,10 @@ import {
 } from '@/lib/integrations/platforms/github/adapter';
 import { assertGitHubInstallationRuntimeAuthorized } from '@/lib/integrations/github/runtime-authorization';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { getLinkedGitHubLogin } from '@/lib/integrations/platforms/github/identity-store';
+import { ownerFromIntegration } from '@/lib/integrations/core/owner';
+import { resolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
+import { getGitHubIntegrationById } from '@/lib/integrations/db/platform-integrations';
 
 export const GITHUB_REPOSITORY_PERMISSION_CACHE_TTL_MS = 5 * 60_000;
 
@@ -17,6 +21,8 @@ type GitHubRepositoryPermissionInput = {
   repo: string;
   username: string;
   platformIntegrationId?: string;
+  /** Kept out of the cache key: a permission does not depend on the purpose. */
+  purpose?: GitHubAccessPurpose;
 };
 
 type FetchRepositoryPermission = typeof getCollaboratorPermissionLevel;
@@ -77,7 +83,8 @@ export async function getGitHubRepositoryPermission(
       input.repo,
       input.username,
       input.appType,
-      input.platformIntegrationId
+      input.platformIntegrationId,
+      input.purpose ?? 'workflow'
     );
     if (permission !== null) {
       const expiresAtMs = Date.now() + GITHUB_REPOSITORY_PERMISSION_CACHE_TTL_MS;
@@ -100,6 +107,10 @@ export type GitHubRepositoryAuthorization =
   | { allowed: true }
   | { allowed: false; markdown: string };
 
+export type GitHubAccessPurpose = 'workflow' | 'agent';
+
+type LinkedGitHubLoginLookup = (kiloUserId: string) => Promise<string | null>;
+
 function writeAccessRequiredMarkdown(repository: string | null): string {
   const target = repository ? `\`${repository}\`` : 'this repository';
   return (
@@ -108,9 +119,72 @@ function writeAccessRequiredMarkdown(repository: string | null): string {
   );
 }
 
+function notAllowed(repository: string | null): GitHubRepositoryAuthorization {
+  return { allowed: false, markdown: writeAccessRequiredMarkdown(repository) };
+}
+
+function isSameRepository(left: string, right: string): boolean {
+  return left.trim().toLowerCase() === right.trim().toLowerCase();
+}
+
 /**
- * Requires write access for the triggering GitHub account before a bot action
- * runs against `repository`.
+ * One permission verification shared by every platform path: the installation
+ * that serves the repository asks GitHub for the account's permission level.
+ */
+async function hasRepositoryWriteAccess(params: {
+  installationId: string;
+  appType: GitHubAppType;
+  platformIntegrationId: string;
+  repository: string;
+  username: string;
+  purpose?: GitHubAccessPurpose;
+  fetchPermission?: FetchRepositoryPermission;
+}): Promise<boolean> {
+  const [owner, repo] = params.repository.split('/');
+  if (!owner || !repo) return false;
+
+  const permissionInput = {
+    installationId: params.installationId,
+    appType: params.appType,
+    owner,
+    repo,
+    username: params.username,
+    platformIntegrationId: params.platformIntegrationId,
+    purpose: params.purpose,
+  };
+
+  try {
+    await assertGitHubInstallationRuntimeAuthorized(
+      params.installationId,
+      params.appType,
+      params.platformIntegrationId,
+      params.purpose
+    );
+    let permission = await getGitHubRepositoryPermission(permissionInput, params.fetchPermission);
+    if (permission === null) {
+      // A single GitHub error (rate limit, 5xx, timeout) must not end the action.
+      permission = await getGitHubRepositoryPermission(permissionInput, params.fetchPermission);
+    }
+    return permission === 'admin' || permission === 'maintain' || permission === 'write';
+  } catch (error) {
+    console.warn('[KiloBot] Failed to verify GitHub repository access:', {
+      repository: params.repository,
+      platformIntegrationId: params.platformIntegrationId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+}
+
+/**
+ * Authorizes a bot action that can change code against `repository`.
+ *
+ * Every integration that can start work on a repository is authorized against
+ * the account that asked for it. A GitHub integration uses the conversation's
+ * repository and the triggering GitHub login. A chat integration (Slack,
+ * Linear) carries no GitHub identity of its own and runs with the account's
+ * GitHub connection, so the login bound to the requesting Kilo account must
+ * hold write access to the repository through that connection.
  *
  * `threadRepository` is the repository the conversation belongs to. Callers
  * that have no triggering account identity (for example a callback
@@ -121,65 +195,82 @@ export async function authorizeGitHubRepository(params: {
   repository: string | null | undefined;
   threadRepository?: string | null;
   actorLogin?: string;
+  /** Kilo account that triggered the run, when the platform can name one. */
+  requesterUserId?: string;
+  /** Purpose the session will use, so the check reads the same connection. */
+  purpose?: GitHubAccessPurpose;
   fetchPermission?: FetchRepositoryPermission;
+  getRequesterLogin?: LinkedGitHubLoginLookup;
 }): Promise<GitHubRepositoryAuthorization> {
   const { platformIntegration, repository, threadRepository, actorLogin } = params;
 
-  if (platformIntegration.platform !== PLATFORM.GITHUB) return { allowed: true };
   // Organization-owned integrations get repository-level verification. Personally
   // owned integrations stay owner-controlled, which is documented here because
   // the gate deliberately does not run for them.
   if (!platformIntegration.owned_by_organization_id) return { allowed: true };
 
-  if (!repository) return { allowed: false, markdown: writeAccessRequiredMarkdown(null) };
+  if (!repository) return notAllowed(null);
 
-  if (!actorLogin) {
-    if (
-      threadRepository &&
-      repository.trim().toLowerCase() === threadRepository.trim().toLowerCase()
-    ) {
-      return { allowed: true };
+  if (platformIntegration.platform === PLATFORM.GITHUB) {
+    if (!actorLogin) {
+      if (threadRepository && isSameRepository(repository, threadRepository)) {
+        return { allowed: true };
+      }
+      return notAllowed(repository);
     }
-    return { allowed: false, markdown: writeAccessRequiredMarkdown(repository) };
-  }
 
-  const [owner, repo] = repository.split('/');
-  const installationId = platformIntegration.platform_installation_id;
-  if (!owner || !repo || !installationId) {
-    return { allowed: false, markdown: writeAccessRequiredMarkdown(repository) };
-  }
+    const installationId = platformIntegration.platform_installation_id;
+    if (!installationId) return notAllowed(repository);
 
-  const appType = platformIntegration.github_app_type ?? 'standard';
-
-  try {
-    await assertGitHubInstallationRuntimeAuthorized(
+    const allowed = await hasRepositoryWriteAccess({
       installationId,
-      appType,
-      platformIntegration.id
-    );
-    const permissionInput = {
-      installationId,
-      appType,
-      owner,
-      repo,
-      username: actorLogin,
+      appType: platformIntegration.github_app_type ?? 'standard',
       platformIntegrationId: platformIntegration.id,
-    };
-    let permission = await getGitHubRepositoryPermission(permissionInput, params.fetchPermission);
-    if (permission === null) {
-      // A single GitHub error (rate limit, 5xx, timeout) must not end the action.
-      permission = await getGitHubRepositoryPermission(permissionInput, params.fetchPermission);
-    }
-    if (permission === 'admin' || permission === 'maintain' || permission === 'write') {
+      repository,
+      username: actorLogin,
+      fetchPermission: params.fetchPermission,
+    });
+    return allowed ? { allowed: true } : notAllowed(repository);
+  }
+
+  if (!params.requesterUserId) {
+    if (threadRepository && isSameRepository(repository, threadRepository)) {
       return { allowed: true };
     }
+    return notAllowed(repository);
+  }
+
+  const purpose = params.purpose ?? 'workflow';
+  try {
+    const requesterLogin = await (params.getRequesterLogin ?? getLinkedGitHubLogin)(
+      params.requesterUserId
+    );
+    if (!requesterLogin) return notAllowed(repository);
+
+    const owner = ownerFromIntegration(platformIntegration);
+    const connection = await resolveGitHubRepositoryForOwner(owner, repository, purpose);
+    if (!connection) return notAllowed(repository);
+
+    const integration = await getGitHubIntegrationById(owner, connection.githubIntegrationId);
+    const installationId = integration?.platform_installation_id;
+    if (!integration || !installationId) return notAllowed(repository);
+
+    const allowed = await hasRepositoryWriteAccess({
+      installationId,
+      appType: integration.github_app_type ?? connection.githubAppType,
+      platformIntegrationId: integration.id,
+      repository,
+      username: requesterLogin,
+      purpose,
+      fetchPermission: params.fetchPermission,
+    });
+    return allowed ? { allowed: true } : notAllowed(repository);
   } catch (error) {
-    console.warn('[KiloBot] Failed to verify GitHub repository access:', {
+    console.warn('[KiloBot] Failed to resolve the requesting GitHub identity:', {
       repository,
       platformIntegrationId: platformIntegration.id,
       error: error instanceof Error ? error.message : String(error),
     });
+    return notAllowed(repository);
   }
-
-  return { allowed: false, markdown: writeAccessRequiredMarkdown(repository) };
 }

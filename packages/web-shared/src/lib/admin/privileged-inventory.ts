@@ -105,6 +105,7 @@ const adminAreaPolicies: Record<string, AdminAreaPolicy> = {
   kiloclawInstances: platform,
   kiloclawProviders: platform,
   kiloclawRegions: platform,
+  kiloclawStripeRenewals: { read: 'platform_read', write: 'sensitive_write', target: 'none' },
   kiloclawVersions: platform,
   kiloPass: sensitiveWrite,
   modelEvalIngest: platform,
@@ -747,6 +748,13 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     occurrences: 1,
   },
   {
+    id: 'internal.securityAgent.auditLogService',
+    file: 'apps/web/src/lib/security-agent/services/audit-log-service.ts',
+    actionClass: 'platform_read',
+    surface: 'trpc',
+    occurrences: 1,
+  },
+  {
     id: 'internal.securityAgent.sharedHandlers',
     file: 'apps/web/src/lib/security-agent/router/shared-handlers.ts',
     actionClass: 'support_read',
@@ -863,7 +871,7 @@ export const internalElevationSites: readonly InternalElevationSite[] = [
     file: 'apps/web/src/lib/organizations/organization-auth.ts',
     actionClass: 'support_read',
     surface: 'rest',
-    occurrences: 2,
+    occurrences: 4,
   },
   {
     id: 'internal.webShared.organizationsUtils',

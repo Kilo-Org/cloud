@@ -229,6 +229,21 @@
     "signInCodeField": "Koodhka soo galista",
     "or": "ama"
   },
+  "pendingLink": {
+    "description": "Akoon ayaa horey u isticmaalaya {{email}}. Ku soo gal mid ka mid ah hababkiisa si aad ugu darto {{provider}}.",
+    "emailCode": "Iimayl iigu soo dir koodh soo galis",
+    "continueInBrowser": "Ku sii wad biraawsarka",
+    "startAgain": "Dib u bilow",
+    "expired": "Codsigan lagu darayo {{provider}} wuu dhacay.",
+    "noMethods": "Akoonkan ma laha hab kale oo soo galis, sidaa darteed {{provider}} laguma dari karo.",
+    "linked": "{{provider}} waxaa lagu daray akoonkaaga.",
+    "failedExpired": "{{provider}} lama darin sababtoo ah codsigu wuu dhacay.",
+    "failedWrongAccount": "{{provider}} lama darin sababtoo ah waxaad soo gashay akoon kale.",
+    "failedAccountAlreadyLinked": "{{provider}} lama darin sababtoo ah horey ayuu ugu xiran yahay akoon kale.",
+    "failedProviderAlreadyLinked": "{{provider}} lama darin sababtoo ah akoonkaagu horey ayuu u leeyahay soo galis {{provider}} oo kale.",
+    "failedLinking": "{{provider}} laguma dari karin akoonkaaga.",
+    "notAdded": "Waad soo gashay. {{provider}} laguma darin akoonkaaga."
+  },
   "profile": {
     "codeReviewerSubtitle": "Dib-u-eegisyada tooska ah ee PR",
     "securityAgentSubtitle": "Raadi oo sax nuglaanta amniga",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Xaqiiji tirtirista",
     "credits": "Lacagta isticmaalka",
     "failedToLoadBalance": "Hadhaaga lama soo shubi karin. Taabo si aad mar kale isku daydo.",
+    "balanceLoadFailed": "Hadhaaga lama soo shubi karin",
     "hideBalance": "Qari hadhaaga",
     "showBalance": "Muuji hadhaaga",
     "balanceHidden": "Hadhaaga waa la qariyay",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Akoon tijaabo ah",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO-ga shirkadda",
     "passkeysTitle": "Furahayaasha gelitaanka",
     "passkeysSubtitle": "Ku soo gal iyada oo aan lahayn furaha sirta ah",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Codsigan isku-darka kuma jiraan isbeddello faylal.",
     "fileList": {
       "openNavigator": "Fur hagaha faylasha",
-      "filesViewed": "Faylal · {{viewed}} ka mid ah {{total}} la arkay",
       "listed": "(liiska ku jira)",
       "layout": "Qaabka bandhigga",
       "unified": "Midaysan",
@@ -2298,7 +2315,7 @@
       "cloningSession": "Kalfadhiga waa la nuqulayaa",
       "couldNotLoadThisSession": "Kalfadhigan lama soo shubi karin.",
       "cloneFailedRetry": "Kalfadhigan nuqul lagama samayn karin. Mar kale isku day.",
-      "notEnoughCredits": "Lacagta isticmaalka kuma filna socodsiinta Cloud Agent. Lacag ku dar oo mar kale isku day.",
+      "notEnoughCredits": "Lacagta isticmaalka kuma filna codsigan. Lacag ku dar oo mar kale isku day.",
       "previousTaskFinishing": "Hawshii hore weli waa la dhammaystirayaa. Fadlan wax yar sug.",
       "serviceUnavailable": "Adeegga hadda lama heli karo. Fadlan mar kale isku day.",
       "connectionTrouble": "Xiriirka ayaa cilad leh. Fadlan wax yar ka dib mar kale isku day.",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Tilmaantaada iyo faylasha la gudbiyay ee aan weli la isticmaalin waa la tirtiri doonaa.",
       "discardFailed": "Qabyada lama tirtiri karin. Fadlan mar kale isku day.",
       "remoteHint": "Si aad ugu socodsiiso kombiyuutarkaaga, ku bilow Kilo halkaas oo u dhaaf si uu u sii socdo.",
-      "continueFrom": "Waxaa la sii wadaa {{title}}.",
+      "continueFrom": "Waxaa la sii wadaa “{{title}}”.",
       "importingSession": "Kalfadhiga waa la soo gelinayaa",
       "cliCannotContinue": "CLI-kan ma sii wadi karo kalfadhi. Dooro Cloud Agent ama CLI kale.",
       "importFailed": "Kalfadhigan lama soo gelin karin.",
@@ -2460,6 +2477,8 @@
       "toolList": "tax",
       "toolPatch": "wax ka beddel",
       "toolTask": "hawsha",
+      "toolSendFile": "Fayl la diray",
+      "toolSendFileAction": "dir",
       "readTodos": "Akhri qorshaha",
       "updateTodos": "Cusboonaysii qorshaha",
       "linesBadge": "{{displayCount}} sadar",
@@ -2560,7 +2579,21 @@
       "thought": "Fikrad",
       "showDetails": "Muuji faahfaahinta",
       "pending": "Waa la sugayaa…",
-      "running": "Way socotaa…"
+      "running": "Way socotaa…",
+      "field": {
+        "filePath": "Wadada faylka",
+        "path": "Wadada",
+        "offset": "Bilowga",
+        "limit": "Xadka",
+        "pattern": "Qaabka",
+        "include": "Ku darid",
+        "patchText": "Qoraalka hagaajinta",
+        "query": "Raadin",
+        "prompt": "Tilmaam",
+        "header": "Cinwaan",
+        "question": "Su'aal",
+        "options": "Xulashooyin"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nuxurka lama soo bandhigi karin."
@@ -2576,7 +2609,7 @@
       "assistantContextOverflow": "Wadahadalku aad buu ugu dheer yahay moodeelka.",
       "assistantProviderError": "Bixiyaha ayaa cillad ku soo celiyay.",
       "assistantProviderRefused": "Bixiyaha ayaa diiday codsigan, dibna looma dayi karo.",
-      "assistantCreditsRefusal": "Lacagta isticmaalka kuma filna socodsiinta Cloud Agent.",
+      "assistantCreditsRefusal": "Lacagta isticmaalka kuma filna codsigan.",
       "assistantOutputLimit": "Jawaabtu waxay gaartay xadka wax-soo-saarka moodeelka.",
       "assistantStructuredOutput": "Jawaabtu ma ahayn qaabka loo baahnaa.",
       "assistantFailed": "Jawaabtu way fashilantay."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Moodeelkani wuxuu taageeraa heerka fikirka"
     },
-    "creditsRequired": "Lacagta isticmaalka kuma filna farriintan la soo diray. Ku dar lacagta isticmaalka oo isku day mar kale."
+    "creditsRequired": "Lacagta isticmaalka kuma filna farriintan la soo diray."
   },
   "settingsTools": {
     "confirmTitle": "Ma xaqiijinayaa isbeddelkan?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Wakiilkayga",
       "promptPlaceholder": "Waxaad tahay...",
       "tools": "Qalabka",
+      "wholeToolRule": "Wakiilkan waxa uu hal xeer isku mar ku dabaqaa qalab kasta: {{rule}}. Beddelladan waa akhris-kaliya.",
       "visibility": "Muuqashada",
       "visibilityPrimary": "Aasaasiga ah — oo lagu muujiyay dooriyaha",
       "visibilitySubagent": "Subagent — kaliya kuwa kale looga yeeri karo",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Profile-ka ugu tala galay Repos",
+      "entryLabel": "Profile-ka ugu tala galay",
       "add": "Kudar default",
       "empty": "Ma jiro wax khalad ah oo la habeeyey",
       "emptyDescription": "Ku dar default si toos ah u codso profile marka la bilaabayo fadhiyada repo.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Ma jiraan xaalado loo shiday warbixinnada la jadwalay",
     "sourceBlocker": "Fadhigu wuxuu u baahan yahay fiiro gaar ah",
     "sourceMetadata": "Xogta sharaxaysa fadhiga ee la kaydiyay"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Natiijadan raadinta lama furi karin"
   }
 }

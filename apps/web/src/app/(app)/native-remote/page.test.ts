@@ -1,6 +1,7 @@
 jest.mock('./NativeRemotePreview', () => ({ __esModule: true, default: () => null }));
 
 import NativeRemotePage from './page';
+import OrganizationNativeRemotePage from '../organizations/[id]/native-remote/page';
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -11,8 +12,10 @@ it.each<NodeJS.ProcessEnv['NODE_ENV']>(['production', 'test'])(
   environment => {
     jest.replaceProperty(process, 'env', { ...process.env, NODE_ENV: environment });
 
-    expect(() => NativeRemotePage()).toThrow(
-      expect.objectContaining({ digest: 'NEXT_HTTP_ERROR_FALLBACK;404' })
-    );
+    for (const Page of [NativeRemotePage, OrganizationNativeRemotePage]) {
+      expect(() => Page()).toThrow(
+        expect.objectContaining({ digest: 'NEXT_HTTP_ERROR_FALLBACK;404' })
+      );
+    }
   }
 );

@@ -229,6 +229,21 @@
     "signInCodeField": "Մուտքի կոդ",
     "or": "կամ"
   },
+  "pendingLink": {
+    "description": "{{email}} հասցեն արդեն օգտագործվում է հաշվի կողմից։ Մուտք գործիր դրա եղանակներից մեկով՝ {{provider}}-ն ավելացնելու համար։",
+    "emailCode": "Ուղարկել ինձ մուտքի կոդ էլ. փոստով",
+    "continueInBrowser": "Շարունակել դիտարկիչում",
+    "startAgain": "Սկսել նորից",
+    "expired": "{{provider}}-ն ավելացնելու այս հարցման ժամկետն անցել է։",
+    "noMethods": "Այս հաշիվը մուտքի այլ եղանակ չունի, ուստի {{provider}}-ն հնարավոր չէ ավելացնել։",
+    "linked": "{{provider}}-ն ավելացվեց քո հաշվին։",
+    "failedExpired": "{{provider}}-ն չավելացվեց, քանի որ հարցման ժամկետն անցել է։",
+    "failedWrongAccount": "{{provider}}-ն չավելացվեց, քանի որ մուտք ես գործել այլ հաշիվ։",
+    "failedAccountAlreadyLinked": "{{provider}}-ն չավելացվեց, քանի որ այն արդեն կապված է այլ հաշվի։",
+    "failedProviderAlreadyLinked": "{{provider}}-ն չավելացվեց, քանի որ քո հաշիվն արդեն ունի այլ {{provider}} մուտք։",
+    "failedLinking": "Չհաջողվեց {{provider}}-ն ավելացնել քո հաշվին։",
+    "notAdded": "Դու մուտք ես գործել։ {{provider}}-ն չավելացվեց քո հաշվին։"
+  },
   "profile": {
     "codeReviewerSubtitle": "PR-ների ավտոմատ ստուգումներ",
     "securityAgentSubtitle": "Գտնել և վերացնել խոցելիությունները",
@@ -248,6 +263,7 @@
     "confirmDeletion": "Հաստատել ջնջումը",
     "credits": "Կրեդիտներ",
     "failedToLoadBalance": "Չհաջողվեց բեռնել մնացորդը։ Հպեք՝ կրկին փորձելու համար։",
+    "balanceLoadFailed": "Չհաջողվեց բեռնել մնացորդը",
     "hideBalance": "Թաքցնել մնացորդը",
     "showBalance": "Ցուցադրել մնացորդը",
     "balanceHidden": "Մնացորդը թաքցված է",
@@ -266,6 +282,8 @@
     "providerTestAccount": "Թեստային հաշիվ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Կորպորատիվ SSO",
     "passkeysTitle": "Մուտքի բանալիներ",
     "passkeysSubtitle": "Մուտք գործել առանց գաղտնաբառի",
@@ -331,7 +349,6 @@
     "noFilesChangedDescription": "Այս pull request-ում ֆայլերի փոփոխություններ չկան։",
     "fileList": {
       "openNavigator": "Բացել ֆայլերի նավարկիչը",
-      "filesViewed": "Ֆայլեր · դիտված է {{total}}-ից {{viewed}}-ը",
       "listed": "(ցուցակված)",
       "layout": "Տեսք",
       "unified": "Միավորված",
@@ -2298,7 +2315,7 @@
       "cloningSession": "Նստաշրջանը կլոնավորվում է",
       "couldNotLoadThisSession": "Չհաջողվեց բեռնել այս նստաշրջանը։",
       "cloneFailedRetry": "Չհաջողվեց կլոնավորել այս նստաշրջանը։ Կրկին փորձեք։",
-      "notEnoughCredits": "Cloud Agent-ը գործարկելու համար կրեդիտները բավարար չեն։ Ավելացրեք կրեդիտներ և կրկին փորձեք։",
+      "notEnoughCredits": "Այս հարցման համար կրեդիտները բավարար չեն։ Ավելացրեք կրեդիտներ և կրկին փորձեք։",
       "previousTaskFinishing": "Նախորդ առաջադրանքը դեռ չի ավարտվել։ Մի փոքր սպասեք։",
       "serviceUnavailable": "Ծառայությունն այս պահին հասանելի չէ։ Կրկին փորձեք։",
       "connectionTrouble": "Կապի խնդիր է առաջացել։ Մի փոքր սպասեք և կրկին փորձեք։",
@@ -2460,6 +2477,8 @@
       "toolList": "ցուցադրել ցանկը",
       "toolPatch": "կիրառել փոփոխությունները",
       "toolTask": "առաջադրանք",
+      "toolSendFile": "Ֆայլն ուղարկվեց",
+      "toolSendFileAction": "ֆայլ ուղարկել",
       "readTodos": "Կարդալ պլանը",
       "updateTodos": "Թարմացնել պլանը",
       "linesBadge": "{{displayCount}} տող",
@@ -2560,7 +2579,21 @@
       "thought": "Միտք",
       "showDetails": "Ցուցադրել մանրամասները",
       "pending": "Սպասում է…",
-      "running": "Կատարվում է…"
+      "running": "Կատարվում է…",
+      "field": {
+        "filePath": "Ֆայլի ուղի",
+        "path": "Ուղի",
+        "offset": "Շեղում",
+        "limit": "Սահմանաչափ",
+        "pattern": "Նախշ",
+        "include": "Ներառում",
+        "patchText": "Կարկատակի տեքստ",
+        "query": "Հարցում",
+        "prompt": "Հուշում",
+        "header": "Վերնագիր",
+        "question": "Հարց",
+        "options": "Ընտրանքներ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Չհաջողվեց ցուցադրել բովանդակությունը։"
@@ -2576,7 +2609,7 @@
       "assistantContextOverflow": "Զրույցը չափազանց երկար է մոդելի համար։",
       "assistantProviderError": "Մատակարարը սխալ է վերադարձրել։",
       "assistantProviderRefused": "Մատակարարը մերժեց այս հարցումը, և այն հնարավոր չէ կրկին փորձել։",
-      "assistantCreditsRefusal": "Cloud Agent-ը գործարկելու համար կրեդիտները բավարար չեն։",
+      "assistantCreditsRefusal": "Այս հարցման համար կրեդիտները բավարար չեն։",
       "assistantOutputLimit": "Պատասխանը հասել է մոդելի ելքի սահմանին։",
       "assistantStructuredOutput": "Պատասխանը չի համապատասխանում պահանջվող ձևաչափին։",
       "assistantFailed": "Չհաջողվեց ստեղծել պատասխանը։"
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Այս մոդելն աջակցում է մտածելու խորությանը"
     },
-    "creditsRequired": "Բավարար կրեդիտներ չկան այս հաղորդագրությունը ուղարկելու համար։ Ավելացրեք կրեդիտներ և նորից փորձեք։"
+    "creditsRequired": "Բավարար կրեդիտներ չկան այս հաղորդագրությունը ուղարկելու համար։"
   },
   "settingsTools": {
     "confirmTitle": "Հաստատե՞լ այս փոփոխությունը։"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Իմ գործակալը",
       "promptPlaceholder": "Դու օգնական ես...",
       "tools": "Գործիքներ",
+      "wholeToolRule": "Այս գործակալը միանգամից մեկ կանոն է կիրառում յուրաքանչյուր գործիքի վրա՝ {{rule}}։ Այս անջատիչները միայն ընթերցման համար են։",
       "visibility": "Տեսանելիություն",
       "visibilityPrimary": "Առաջնային — ցուցադրվում է ընտրիչում",
       "visibilitySubagent": "Ենթագործակալ — կարելի է կանչել միայն ուրիշներից",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Լռելյայն պրոֆիլներ պահոցների համար",
+      "entryLabel": "Լռելյայն պրոֆիլներ",
       "add": "Ավելացնել լռելյայն պրոֆիլ",
       "empty": "Լռելյայն կարգավորումներ չկան",
       "emptyDescription": "Ավելացրեք լռելյայն պրոֆիլ՝ պահոցում նստաշրջաններ սկսելիս այն ավտոմատ կերպով կիրառելու համար։",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Պլանավորված հաշվետվությունների համար միացված համատեքստեր չկան",
     "sourceBlocker": "Նստաշրջանն ուշադրություն է պահանջում",
     "sourceMetadata": "Նստաշրջանի արձանագրված մետատվյալներ"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Չհաջողվեց բացել այս որոնման արդյունքը"
   }
 }

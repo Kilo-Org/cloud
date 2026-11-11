@@ -946,8 +946,8 @@
       "couldNotLoadProviders": "Impossible de charger les fournisseurs connectés à votre compte. Réessayez.",
       "instructions": "Instructions (facultatives)",
       "instructionsPlaceholder": "Points à examiner en priorité…",
-      "invalidUrl": "Saisissez une URL de demande de fusion valide.",
-      "pullRequestUrl": "URL de la demande de fusion",
+      "invalidUrl": "Saisissez une URL de pull request valide.",
+      "pullRequestUrl": "URL de la pull request",
       "start": "Démarrer la revue",
       "starting": "Démarrage de la revue…",
       "title": "Revue manuelle",
@@ -962,7 +962,7 @@
     },
     "notConnectedReadOnly": "{{platform}} n'est pas connecté. Seuls les propriétaires et les administrateurs de l'organisation peuvent établir la connexion.",
     "gitlab": {
-      "notConnectedReadOnly": "{{platform}} n'est pas connecté. Demandez à un propriétaire, un administrateur ou un responsable de la facturation de le connecter."
+      "notConnectedReadOnly": "{{platform}} n'est pas connecté. Demandez à un propriétaire de l'organisation, un administrateur ou un responsable de la facturation de le connecter."
     },
     "platformList": {
       "activity": "Activité",
@@ -971,7 +971,7 @@
       "statusUnavailable": "État indisponible"
     },
     "providerConnect": {
-      "description": "Établissez la connexion entre Kilo et votre {{label}} pour examiner automatiquement les demandes de fusion.",
+      "description": "Établissez la connexion entre Kilo et votre {{label}} pour examiner automatiquement les pull requests.",
       "githubApp": "Application GitHub",
       "githubError": "Impossible d'ouvrir la configuration de GitHub. Réessayez.",
       "gitlabAccount": "Compte GitLab",
@@ -987,7 +987,7 @@
       "couldNotGetLatest": "Impossible de récupérer les dernières données.",
       "couldNotLoad": "Impossible de charger la revue.",
       "council": "Conseil",
-      "created": "Date de création",
+      "created": "Création",
       "decision": "Décision",
       "gate": "Contrôle de validation",
       "gateHidden": "Masqué",
@@ -1023,7 +1023,7 @@
       "executionStarted": "Exécution démarrée",
       "reviewCompleted": "Revue terminée",
       "reviewInterrupted": "Revue interrompue",
-      "sessionError": "La session a rencontré une erreur : {{error}}.",
+      "sessionError": "La session a rencontré une erreur : {{error}}",
       "statusWithValue": "État : {{status}}",
       "toolName": "Outil : {{name}}",
       "toolNameError": "L'outil {{name}} a rencontré une erreur.",
@@ -1038,7 +1038,7 @@
       "configureProvider": "Configurer le fournisseur",
       "couldNotLoad": "Impossible de charger les revues.",
       "noReviews": "Aucune revue pour le moment",
-      "noReviewsDescription": "Les revues apparaissent ici après l'examen d'une demande de fusion par l'agent de revue de code.",
+      "noReviewsDescription": "Les revues apparaissent ici après l'examen d'une pull request par l'agent de revue de code.",
       "startManualReview": "Démarrer une revue manuelle",
       "title": "Revues récentes"
     },
@@ -1064,7 +1064,7 @@
         "edited": "Modifiée",
         "opening_change_request": "Ouverture de la PR",
         "change_request_failed": "Échec de l’ouverture de la PR",
-        "superseded": "Déjà présent"
+        "superseded": "Déjà présente"
       },
       "noProposalsDescription": "Les propositions de la mémoire de revue apparaissent ici après l'analyse des réponses des responsables du dépôt par Kilo.",
       "changeRequestInProgress": "Kilo ouvre déjà une pull request pour cette proposition. Réessayez dans un instant.",
@@ -1072,13 +1072,13 @@
       "changeRequestNoGitHubAccess": "Aucune connexion GitHub n'a accès à ce dépôt. Reconnectez GitHub avec un accès à ce dépôt, puis réessayez.",
       "changeRequestMissingPermissions": "L'application GitHub de Kilo ne peut pas ouvrir de pull requests dans ce dépôt. Un propriétaire du dépôt doit accorder à l'application l'accès en écriture au contenu et aux pull requests, puis réessayer.",
       "changeRequestFailed": "Kilo n'a pas pu ouvrir la pull request. Réessayez dans un instant.",
-      "proposalConflict": "Une autre proposition de mémoire de revue est toujours active pour ce dépôt ; celle-ci ne peut donc pas encore être enregistrée.",
+      "proposalConflict": "Une autre proposition pour ce dépôt est toujours active.",
       "offAction": "La mémoire de revue est désactivée. Activez-la, puis réessayez.",
       "off": "La mémoire de revue est désactivée.",
       "on": "La mémoire de revue est activée.",
       "offDescription": "Activez-la pour permettre à Kilo d'apprendre des réponses des responsables du dépôt et de proposer des consignes pour REVIEW.md.",
       "readOnlyDescription": "Seuls les propriétaires, les administrateurs et les responsables de la facturation de l'organisation peuvent modifier la mémoire de revue.",
-      "title": "Mémoire des revues"
+      "title": "Mémoire de revue"
     },
     "scopeList": {
       "personalStillAvailable": "Les dépôts personnels restent disponibles ci-dessous.",
@@ -1096,7 +1096,7 @@
     "overview": {
       "allAreas": "Tous les domaines",
       "nSelected": "{{displayCount}} sélectionnés",
-      "nSelected_one": "{{displayCount}} sélectionnés",
+      "nSelected_one": "{{displayCount}} sélectionné",
       "nSelected_other": "{{displayCount}} sélectionnés",
       "nSelected_many": "{{displayCount}} sélectionnés",
       "proposedReviewMdGuidance": "Consignes proposées pour REVIEW.md",
@@ -1150,7 +1150,7 @@
       "title": "L'agent de revue de code nécessite votre intervention.",
       "recoveryLabel": "Contacter l'assistance"
     },
-    "unknownError": "Une erreur inconnue s'est produite."
+    "unknownError": "Erreur inconnue"
   },
   "securityAgent": {
     "filter": {

@@ -20,9 +20,10 @@ type ProbeApi = {
 
 type ScrollList = { scrollToEnd: ReturnType<typeof vi.fn> };
 
-const layoutAt = (height: number): LayoutChangeEvent => ({
-  nativeEvent: { layout: { height, width: 400 } },
-});
+const layoutAt = (height: number): LayoutChangeEvent => {
+  const event = { nativeEvent: { layout: { x: 0, y: 0, width: 400, height } } };
+  return event as unknown as LayoutChangeEvent;
+};
 
 const mounted: ReactTestRenderer[] = [];
 

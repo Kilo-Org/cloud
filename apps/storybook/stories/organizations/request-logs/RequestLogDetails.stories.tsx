@@ -290,6 +290,7 @@ const enkryptBlockedDetails: RequestLogDetails = {
         scans: [
           {
             scan: 'blocking',
+            part: 'conversation',
             detectors_enabled: ['injection_attack'],
             detectors_blocking: ['injection_attack'],
             verdict_cache: 'miss',
@@ -298,6 +299,7 @@ const enkryptBlockedDetails: RequestLogDetails = {
             total_segments: 1,
             cached_characters: 0,
             cached_segments: 0,
+            omitted_attachments: 0,
             scanned_characters: 148,
             decision: 'blocked',
             error: null,

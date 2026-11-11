@@ -86,6 +86,12 @@ const IN_APP_SAMPLING_SLACK_MS = 10_000;
 // A screen that paints its loading placeholder gets this long to replace it
 // with content before the sample is reported as unsettled.
 const LOADING_SETTLE_TIMEOUT_MS = 30_000;
+/**
+ * How long a screen whose layout keeps changing under the screenshot gets to
+ * come to rest before the capture is reported as unbracketed. A screen that
+ * paints its own content late settles well inside this.
+ */
+const BRACKET_SETTLE_BUDGET_MS = 12_000;
 // The deep link must land before its placeholder can be judged. A link that
 // never lands is the navigation retry's business, not the loading wait's, so the
 // wait releases itself instead of spending the whole settle budget on it.
@@ -472,22 +478,56 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
       return { startedMs, completedMs: ctx.clock.now() - started, error: String(error) };
     }
   };
-  const before = await readTree();
-  const dump = before.dump ?? settled.dump;
+  const bracketDeadline = ctx.clock.now() + BRACKET_SETTLE_BUDGET_MS;
+  let before = await readTree();
+  let dump = before.dump ?? settled.dump;
   // Preserve collected tree evidence even if the native screenshot or its decode fails.
   writeJson(files.absolute(files.dump), dump);
-  const screenshot = { startedMs: ctx.clock.now() - started, completedMs: 0 };
+  let screenshot = { startedMs: ctx.clock.now() - started, completedMs: 0 };
   ctx.device.screenshot(files.absolute(files.screenshot));
   screenshot.completedMs = ctx.clock.now() - started;
-  const after = await readTree();
-  const image = ctx.readImage(files.absolute(files.screenshot));
-  const alignment = captureAlignment(
+  let after = await readTree();
+  let image = ctx.readImage(files.absolute(files.screenshot));
+  let alignment = captureAlignment(
     before,
     screenshot,
     after,
     layoutSignature,
     screenshotObservation(dump, image)
   );
+  // A screen whose own content arrives after the first settled layout changes
+  // under the screenshot, so the two tree reads disagree even though no
+  // placeholder test ID marks the wait. Let the new layout rest and bracket the
+  // settled screen again: a late screen is then measured instead of reported
+  // unbracketed. A screen that never rests keeps its mismatch, because the
+  // change it shows is the finding.
+  let restedAfterRetry = false;
+  while (alignment.status === 'mismatch' && ctx.clock.now() < bracketDeadline) {
+    ctx.log(
+      `design-gate: ${target.id} changed while its screenshot bracketed; waiting for it to rest`
+    );
+    const rested = await waitForStableLayout(ctx.probe, ctx.clock);
+    const reread = await readTree();
+    if (reread.dump === undefined) {
+      break;
+    }
+    before = reread;
+    dump = reread.dump;
+    restedAfterRetry = rested;
+    writeJson(files.absolute(files.dump), dump);
+    screenshot = { startedMs: ctx.clock.now() - started, completedMs: 0 };
+    ctx.device.screenshot(files.absolute(files.screenshot));
+    screenshot.completedMs = ctx.clock.now() - started;
+    after = await readTree();
+    image = ctx.readImage(files.absolute(files.screenshot));
+    alignment = captureAlignment(
+      before,
+      screenshot,
+      after,
+      layoutSignature,
+      screenshotObservation(dump, image)
+    );
+  }
   const stillLoading = loadingPlaceholder(normalize(dump));
   const sampled: Sampled = {
     ...settled,
@@ -497,8 +537,11 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     // A screen that still paints its loading placeholder is never the settled
     // screen the target describes, whatever the settle loop saw before it. The
     // finding reports the wait that ran, not the settle loop's own elapsed time.
+    // A re-bracket that waited for the final layout to rest settles the sample
+    // on that rested read, which replaces the sampled frame by design.
     settled:
-      settled.settled && !stillLoading && layoutSignature(settled.dump) === layoutSignature(dump),
+      restedAfterRetry ||
+      (settled.settled && !stillLoading && layoutSignature(settled.dump) === layoutSignature(dump)),
     ...(stillLoading ? { blockedBy: 'loading-placeholder' as const } : {}),
     ...(placeholderWaitedMs > 0 ? { loadingWaitMs: placeholderWaitedMs } : {}),
   };

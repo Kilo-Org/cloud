@@ -782,16 +782,18 @@ test('capture brackets the screenshot with the latest tree and persists alignmen
   assert.match(alignment.reason, /paint is not certified/);
 });
 
-test('capture retains a mismatched screenshot and reports inconclusive pixel alignment', async () => {
+test('capture retains a mismatched screenshot when the screen never rests', async () => {
   const calls: string[] = [];
   const state = probeState();
   const device = fakeDevice(calls, state);
   const screenshot = device.screenshot;
   let captures = 0;
+  let text = 'Changed during screenshot';
   device.screenshot = file => {
     captures += 1;
     screenshot(file);
-    state.text = 'Changed during screenshot';
+    // The screen keeps changing under every screenshot, so no bracket can match.
+    state.text = `${text} ${captures}`;
   };
   const ctx = context(device, fakeProbe(state));
   ctx.readImage = () => ({
@@ -800,7 +802,8 @@ test('capture retains a mismatched screenshot and reports inconclusive pixel ali
     data: new Uint8Array(100 * 200 * 4).fill(255),
   });
   const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
-  assert.equal(captures, 1);
+  assert.ok(captures > 1, 'a changing screen is measured again before it is reported');
+  assert.ok(captures <= 20, 'the re-bracket attempts stay bounded by the settle budget');
   assert.ok(outcome.findings.some(finding => finding.rule === 'blank-frame'));
   assert.equal(
     outcome.findings.find(finding => finding.rule === 'capture-alignment')?.severity,
@@ -811,6 +814,34 @@ test('capture retains a mismatched screenshot and reports inconclusive pixel ali
   const alignment = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.capture), 'utf8'));
   assert.equal(alignment.status, 'mismatch');
   assert.ok(fs.existsSync(path.join(ctx.out, screen.screenshot)));
+});
+
+test('capture brackets a screen that paints its body after the first screenshot', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const device = fakeDevice(calls, state);
+  const screenshot = device.screenshot;
+  let captures = 0;
+  device.screenshot = file => {
+    captures += 1;
+    screenshot(file);
+    // Only the first screenshot lands while the body is still arriving.
+    if (captures === 1) {
+      state.text = 'Body after the first screenshot';
+    }
+  };
+  const ctx = context(device, fakeProbe(state));
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  assert.equal(captures, 2);
+  assert.ok(!outcome.findings.some(finding => finding.rule === 'capture-alignment'));
+  const screen = outcome.cells[0]?.screens[0];
+  assert.ok(screen?.capture);
+  const alignment = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.capture), 'utf8'));
+  assert.equal(alignment.status, 'bracketed');
+  // The persisted tree and the compared environment describe the settled screen.
+  const dump: ProbeDump = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.dump), 'utf8'));
+  assert.equal(dump.nodes[1]?.text, 'Body after the first screenshot');
+  assert.equal(alignment.before.dump.nodes[1].text, 'Body after the first screenshot');
 });
 
 test('capture marks slow bracketing reads inconclusive instead of certifying paint', async () => {

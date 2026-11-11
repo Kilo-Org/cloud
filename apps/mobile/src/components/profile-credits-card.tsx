@@ -20,8 +20,6 @@ import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
 import {
   ICON_TARGET_BOX_CLASS,
-  LINE_ACTION_BOX_CLASS,
-  LINE_ACTION_HIT_SLOP,
   STATE_ACTION_CLASS,
 } from '@/lib/a11y/tap-target';
 import { formatPrefixedMoney } from '@/lib/format';
@@ -297,19 +295,16 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         setAvailableWidth(event.nativeEvent.layout.width);
       }}
     >
-      {/* The picker is a line action: its box cancels its layout height and
-          overflows the eyebrow's line instead of lifting the row to its own
-          height, which centred the eyebrow in the box and opened the gap to
-          the credits card to twice the other sections' gap to their rows. The
-          row pads by the overflow (7) plus the box's hit slop (9) and cancels
-          that padding with the same negative margin, so the row keeps its
-          layout height and the whole reach stays inside the row: RN drops
-          touches outside the parent, which is the rule the balance block's
-          failed state follows. */}
+      {/* The row keeps its 44dp height so the picker's own box carries the
+          whole touch target inside the row's bounds: RN drops touches outside
+          every ancestor, so a shorter row would clip it. Both children align to
+          the row's bottom instead of its centre, which puts the eyebrow on the
+          picker's line and keeps the gap to the credits card at the gap the
+          section headers below keep to their first rows. */}
       <View
         className={cn(
-          'gap-3 py-[16px] -my-[16px]',
-          narrow ? 'flex-col items-stretch' : 'flex-row items-center justify-between'
+          'min-h-11 gap-3',
+          narrow ? 'flex-col items-stretch' : 'flex-row items-end justify-between'
         )}
       >
         <Text variant="small" className="shrink uppercase tracking-wide text-muted-foreground">
@@ -318,15 +313,13 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         {canPickContext && (
           <Pressable
             className={cn(
-              LINE_ACTION_BOX_CLASS,
-              'min-w-0 flex-row items-center gap-1 active:opacity-70',
+              'min-h-11 min-w-0 flex-row items-end gap-1 active:opacity-70',
               narrow ? 'max-w-full justify-start' : 'max-w-[65%] shrink justify-end'
             )}
             onPress={openPicker}
             accessibilityRole="button"
             accessibilityLabel={selectedLabel}
             accessibilityHint={t('profile.selectAccount')}
-            hitSlop={LINE_ACTION_HIT_SLOP}
           >
             <Text
               className="min-w-0 shrink text-xs font-medium text-muted-foreground"

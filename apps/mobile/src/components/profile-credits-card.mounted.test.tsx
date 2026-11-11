@@ -20,11 +20,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { CreditsCard } from './profile-credits-card';
-import {
-  ICON_TARGET_BOX_CLASS,
-  LINE_ACTION_BOX_CLASS,
-  LINE_ACTION_HIT_SLOP,
-} from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { OrganizationProvider } from '@/lib/organization-context';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
@@ -1334,25 +1330,22 @@ describe('CreditsCard credits header', () => {
     unmount();
   });
 
-  it('keeps the header on the eyebrow line instead of the picker box height', async () => {
+  it('keeps the header on the eyebrow line with the picker target inside the row', async () => {
     const { renderer, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
 
-    // The picker is a line action: its box cancels its own layout height and
-    // overflows the eyebrow's line. A minimum height on the row would centre
-    // the eyebrow in the box's height instead and open the gap to the credits
-    // card to twice the gap the section headers below keep to their rows.
-    expect(headerClasses(renderer)).not.toContain('min-h-11');
+    // The row keeps its 44dp height, so the picker's own box carries the whole
+    // touch target inside the row's bounds: RN drops touches outside every
+    // ancestor, and a shorter row would clip it. Both children align to the
+    // row's bottom, which puts the eyebrow on the picker's line and closes the
+    // gap to the credits card to the section headers' own gap.
+    expect(headerClasses(renderer)).toContain('min-h-11');
+    expect(headerClasses(renderer)).toContain('items-end');
     const picker = renderer.root.find(
       node => Object.is(node.type, Pressable) && node.props.accessibilityHint === 'Select account'
     );
-    expect(String(picker.props.className)).toContain(LINE_ACTION_BOX_CLASS);
-    expect(picker.props.hitSlop).toEqual(LINE_ACTION_HIT_SLOP);
-    // RN drops touches outside the parent row, so the row pads by the box's
-    // overflow (7dp) plus the slop (9dp) and cancels the padding with the same
-    // negative margin: the whole target stays inside the row, and the row keeps
-    // the layout height of the eyebrow line.
-    expect(headerClasses(renderer)).toContain('py-[16px]');
-    expect(headerClasses(renderer)).toContain('-my-[16px]');
+    expect(String(picker.props.className)).toContain('min-h-11');
+    expect(String(picker.props.className)).toContain('items-end');
+    expect(picker.props.hitSlop).toBeUndefined();
     unmount();
   });
 });

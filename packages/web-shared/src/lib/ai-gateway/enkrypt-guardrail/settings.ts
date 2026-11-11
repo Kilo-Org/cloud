@@ -197,8 +197,8 @@ function selectDetectors(
 /**
  * Log-only detectors never gate a request, so they are scanned in their own Enkrypt call that the
  * request does not wait for. Enkrypt bills each enabled detector per call, so the extra call only
- * adds its 1-credit per-call minimum. An invalid configuration stays blocking, so it keeps failing
- * closed.
+ * adds the per-call minimums of its detectors, which are small for most detectors but about 5
+ * credits for a policy. An invalid configuration stays blocking, so it keeps failing closed.
  */
 export function splitEnkryptInputGuardrail(
   config: EnkryptInputGuardrailConfig

@@ -514,8 +514,10 @@ function toolsReport(
 /**
  * Plans the tool definitions and response formats. Each is looked up and cached by exact match on
  * its own, so a changed, added, or removed tool rescans only that tool, and each uncached one is
- * scanned by its own Enkrypt call, which also keeps every call far below the scan limit. The
- * results are aggregated into one result for the part: it blocks when any tool blocks, and is
+ * scanned by its own Enkrypt call, which also keeps every call far below the scan limit. Each call
+ * pays Enkrypt's per-call minimum, so an uncached tool set costs more than one combined call would;
+ * verdicts are shared across the organization, so that is paid once per tool and detector set.
+ * The results are aggregated into one result for the part: it blocks when any tool blocks, and is
  * otherwise unavailable when any tool's scan is.
  */
 async function planTools(

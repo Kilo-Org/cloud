@@ -2,8 +2,9 @@ import type { NextResponse as NextResponseType } from 'next/server';
 import type { User } from '@kilocode/db';
 import {
   getProvider,
-  type GetProviderProviderResult,
+  type ProviderRoute,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import type { FailoverRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/byok-failover';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import {
   getManagedGatewayFromUrl,
@@ -84,8 +85,10 @@ type ProviderPolicyInput = {
 type ProviderPolicyResult =
   | {
       ok: true;
-      /** Its `failover` leads only to keys the policy admits. */
-      providerResult: GetProviderProviderResult;
+      /** The first of `getProvider`'s routes, which the policy admits. */
+      route: ProviderRoute;
+      /** `getProvider`'s later routes, each resolving to null when the policy refuses it. */
+      failoverRoutes: readonly FailoverRoute[];
       isNonTrialEnterprise: boolean;
       dataRegion: OrganizationGatewaySettings['dataRegion'];
     }
@@ -163,7 +166,7 @@ export async function resolveProviderAndPolicy(
         (await input.balanceAndSettingsPromise).settings
       )
     : NO_ORGANIZATION_GATEWAY_SETTINGS;
-  const providerResult = await getProvider({
+  const getProviderResult = await getProvider({
     requestedModel: model,
     request,
     user,
@@ -181,28 +184,28 @@ export async function resolveProviderAndPolicy(
     kiloIgnoredProviders: getIgnoredProviders(model, isNonTrialEnterprise),
     onDecision: decision => input.providerMetadataCapture?.captureRoutingDecision(decision),
   });
-  if (providerResult.kind === 'chatgpt-reconnect') {
+  if (getProviderResult.kind === 'chatgpt-reconnect') {
     // The person's enabled ChatGPT connection is terminally dead. Fail readably
     // instead of silently serving the request through another billing path.
-    return reject(chatGptReconnectResponse(providerResult.message));
+    return reject(chatGptReconnectResponse(getProviderResult.message));
   }
-  if (providerResult.kind === 'claude-billing-unavailable') {
+  if (getProviderResult.kind === 'claude-billing-unavailable') {
     // The owner's Claude billing connection cannot bill. Never serve it on
     // another payer's allowance without telling them.
     return reject(
-      claudeBillingUnavailableResponse(providerResult.message, providerResult.retryable)
+      claudeBillingUnavailableResponse(getProviderResult.message, getProviderResult.retryable)
     );
   }
-  if (providerResult.kind === 'custom-llm-unavailable') {
+  if (getProviderResult.kind === 'custom-llm-unavailable') {
     // Same response as an unknown model id, so callers cannot probe for custom LLMs.
     return reject(modelDoesNotExistOnOpenRouterResponse(model));
   }
-  if (providerResult.kind === 'direct-byok-catalog-only') {
+  if (getProviderResult.kind === 'direct-byok-catalog-only') {
     // Falling through to the managed gateway would fail later with a misleading unknown-model error.
     const message = directByokCatalogOnlyMessage({
       model,
-      providerId: providerResult.providerId,
-      catalogModelId: providerResult.catalogModelId,
+      providerId: getProviderResult.providerId,
+      catalogModelId: getProviderResult.catalogModelId,
     });
     return reject(
       orgAutoRouteTarget
@@ -214,7 +217,7 @@ export async function resolveProviderAndPolicy(
   }
   /** Why the policy refuses the route, or null when it may serve the request. */
   const routeRejection = async (
-    route: GetProviderProviderResult
+    route: ProviderRoute
   ): Promise<NextResponseType<unknown> | null> => {
     // A local, so the type guard narrows it rather than `route.provider.type`.
     const providerType = route.provider.type;
@@ -306,10 +309,12 @@ export async function resolveProviderAndPolicy(
     return null;
   };
 
-  const rejection = await routeRejection(providerResult);
+  const [resolveFirstRoute, ...resolveFailoverRoutes] = getProviderResult.routes;
+  const route = await resolveFirstRoute();
+  const rejection = await routeRejection(route);
   if (rejection) return reject(rejection);
 
-  if (!isAnonymous && !providerResult.bypassAccessCheck) {
+  if (!isAnonymous && !route.bypassAccessCheck) {
     const { effectiveProviderConfig } = await getAccessCheck();
     if (effectiveProviderConfig) {
       request.body.provider = effectiveProviderConfig;
@@ -341,28 +346,31 @@ export async function resolveProviderAndPolicy(
     }
   }
 
-  /** The route with a failover that skips the keys the policy refuses. */
-  const withPolicyFailover = (route: GetProviderProviderResult): GetProviderProviderResult => {
-    const { failover } = route;
-    if (!failover) return route;
-    return {
-      ...route,
-      failover: async () => {
-        let next = await failover();
-        while (next && (await routeRejection(next))) {
-          console.warn('[byok-failover] Skipping a BYOK key the policy refuses', {
-            providerIds: next.userByok?.map(byok => byok.providerId) ?? [],
-          });
-          next = next.failover ? await next.failover() : null;
-        }
-        return next && withPolicyFailover(next);
-      },
-    };
-  };
+  const failoverRoutes = resolveFailoverRoutes.map(
+    resolveRoute => async (): Promise<ProviderRoute | null> => {
+      let failoverRoute: ProviderRoute;
+      try {
+        failoverRoute = await resolveRoute();
+      } catch (error) {
+        console.error('[byok-failover] Skipping a BYOK key that could not be resolved', {
+          errorType: error instanceof Error ? error.name : 'unknown',
+        });
+        return null;
+      }
+      if (await routeRejection(failoverRoute)) {
+        console.warn('[byok-failover] Skipping a BYOK key the policy refuses', {
+          providerIds: failoverRoute.userByok?.map(byok => byok.providerId) ?? [],
+        });
+        return null;
+      }
+      return failoverRoute;
+    }
+  );
 
   return {
     ok: true,
-    providerResult: withPolicyFailover(providerResult),
+    route,
+    failoverRoutes,
     isNonTrialEnterprise,
     dataRegion: organizationGatewaySettings.dataRegion,
   };

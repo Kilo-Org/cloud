@@ -1,4 +1,4 @@
-import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import type { ProviderRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { ByokFailoverAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
@@ -17,7 +17,7 @@ const ERROR_CODE_PATTERN = /^[\w.:-]{1,64}$/;
 type ByokFailoverResult = {
   attempt: SendUpstreamAttemptResult;
   /** The route that sent the returned attempt. */
-  providerContext: GetProviderProviderResult;
+  providerContext: ProviderRoute;
   /** The request as sent for the returned attempt. */
   request: GatewayRequest;
   /** Every attempt, in order, when the request failed over at least once; otherwise null. */
@@ -33,7 +33,7 @@ function failedResponse(attempt: SendUpstreamAttemptResult): Response | null {
   return attempt.response;
 }
 
-function byokProviderIds(route: GetProviderProviderResult) {
+function byokProviderIds(route: ProviderRoute) {
   return route.userByok?.map(byok => byok.providerId) ?? [];
 }
 
@@ -83,6 +83,18 @@ async function readErrorCode(response: Response): Promise<string | undefined> {
   }
 }
 
+/** Resolves a later route of the request, or null when it cannot serve it, such as a key the
+ * organization policy refuses. */
+export type FailoverRoute = () => Promise<ProviderRoute | null>;
+
+async function firstUsable(routes: Iterator<FailoverRoute>): Promise<ProviderRoute | null> {
+  for (let next = routes.next(); !next.done; next = routes.next()) {
+    const route = await next.value();
+    if (route) return route;
+  }
+  return null;
+}
+
 function remainingBudgetMs(startedAt: number): number {
   // Node's AbortSignal.timeout throws for a fractional delay.
   return Math.floor(UPSTREAM_DURATION_BUDGET_MS - (performance.now() - startedAt));
@@ -93,16 +105,18 @@ type PendingAttempt = Omit<ByokFailoverAttempt, 'error_code'> & {
 };
 
 /**
- * Sends the request through its route and, while a BYOK key's upstream fails with an
- * unsuccessful status, through the owner's next BYOK key. When every key fails, the last
- * failure is returned: failover never reaches Kilo's route or another payer's connection.
+ * Sends the request through its first route and, while a route's upstream fails with an
+ * unsuccessful status, through the next of `failoverRoutes`. When every route fails, the last
+ * failure is returned. `getProvider` lists only the owner's BYOK keys after the first route, so
+ * failover never reaches Kilo's route or another payer's connection.
  */
 export async function sendUpstreamAttemptWithByokFailover(
-  input: Omit<SendUpstreamAttemptInput, 'upstreamDurationBudgetMs'>
+  input: Omit<SendUpstreamAttemptInput, 'upstreamDurationBudgetMs'>,
+  failoverRoutes: readonly FailoverRoute[]
 ): Promise<ByokFailoverResult> {
   let providerContext = input.providerContext;
   let request = input.request;
-  if (!providerContext.failover) {
+  if (failoverRoutes.length === 0) {
     return {
       attempt: await sendUpstreamAttempt({
         ...input,
@@ -120,6 +134,7 @@ export async function sendUpstreamAttemptWithByokFailover(
   // Error codes are read off the request path, so reading a slow error body never delays failover
   // or the response.
   const pending: PendingAttempt[] = [];
+  const remainingRoutes = failoverRoutes.values();
   let attemptStartedAt = startedAt;
   let attempt = await sendUpstreamAttempt({
     ...input,
@@ -144,7 +159,7 @@ export async function sendUpstreamAttemptWithByokFailover(
       stopReason = 'budget-exhausted';
       break;
     }
-    const next = providerContext.failover ? await providerContext.failover() : null;
+    const next = await firstUsable(remainingRoutes);
     if (!next) {
       stopReason = 'no-keys-left';
       break;

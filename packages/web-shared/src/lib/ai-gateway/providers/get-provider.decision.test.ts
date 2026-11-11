@@ -5,6 +5,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { getProviderInput } from '@kilocode/web-shared/tests/helpers/get-provider-input.helper';
 import {
+  expectProviderResult,
+  onlyRoute,
+} from '@kilocode/web-shared/tests/helpers/get-provider-result.helper';
+import {
   KiloRoutingDecisionRecordSchema,
   type ProviderRoutingDecision,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
@@ -291,10 +295,8 @@ describe('getProvider routing decision', () => {
         },
       })
     );
-    expect(result).toMatchObject({ kind: 'provider' });
     expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
-    if (result.kind !== 'provider') throw new Error('Expected normal gateway routing');
-    expect(result.provider.type).not.toBe('claude-billing');
+    expect((await onlyRoute(result)).provider.type).not.toBe('claude-billing');
   });
 
   describe.each([
@@ -326,8 +328,7 @@ describe('getProvider routing decision', () => {
         })
       );
 
-      expect(result).toMatchObject({
-        kind: 'provider',
+      expect(await onlyRoute(result)).toMatchObject({
         provider: { type: 'direct-byok', inferenceProviderId },
         userByok: [{ providerId: provider.id }],
       });
@@ -813,7 +814,7 @@ describe('getProvider routing decision', () => {
       })
     );
 
-    expect(result).toMatchObject({ kind: 'provider', userByok: null });
+    expect(await onlyRoute(result)).toMatchObject({ userByok: null });
     expect(error).toHaveBeenCalledWith('[getProvider] failed to report the routing decision', {
       errorType: 'TypeError',
     });
@@ -1078,27 +1079,23 @@ describe('getProvider BYOK failover candidates', () => {
     input: Omit<Parameters<typeof getProviderInput>[0], 'onDecision'>
   ): Promise<GetProviderProviderResult> {
     const result = await getProvider(getProviderInput(input));
-    if (result.kind !== 'provider') throw new Error(`Expected a provider, got ${result.kind}`);
+    expectProviderResult(result);
     return result;
   }
 
-  async function nextRoute(route: GetProviderProviderResult) {
-    return route.failover ? route.failover() : null;
-  }
-
-  async function failoverChain(result: GetProviderProviderResult) {
-    const routes: GetProviderProviderResult[] = [];
-    for (let route = await nextRoute(result); route; route = await nextRoute(route)) {
-      routes.push(route);
-    }
-    return routes;
+  async function byokProviderIds(result: GetProviderProviderResult) {
+    return (await result.routes[0]()).userByok?.map(byok => byok.providerId);
   }
 
   async function failoverProviderIds(result: GetProviderProviderResult) {
-    return (await failoverChain(result)).map(route => route.userByok?.[0]?.providerId);
+    const providerIds = [];
+    for (const resolveRoute of result.routes.slice(1)) {
+      providerIds.push((await resolveRoute()).userByok?.[0]?.providerId);
+    }
+    return providerIds;
   }
 
-  test('chains the later serving keys in route order, skipping disabled and passed-over keys', async () => {
+  test('lists the later serving keys in route order, skipping disabled and passed-over keys', async () => {
     const user = await insertTestUser();
     await insertKeys(user, [
       { providerId: 'zai-coding', catalogMode: true, priority: 0 },
@@ -1124,7 +1121,7 @@ describe('getProvider BYOK failover candidates', () => {
       organizationId: undefined,
     });
 
-    expect(result.userByok?.map(byok => byok.providerId)).toEqual(['zai-coding']);
+    expect(await byokProviderIds(result)).toEqual(['zai-coding']);
     expect(await failoverProviderIds(result)).toEqual(['openrouter', 'anthropic']);
   });
 
@@ -1143,38 +1140,34 @@ describe('getProvider BYOK failover candidates', () => {
       organizationId: undefined,
     });
 
-    expect(result.userByok?.map(byok => byok.providerId)).toEqual(['moonshotai']);
+    expect(decryptApiKey).toHaveBeenCalledTimes(1);
+    expect(await byokProviderIds(result)).toEqual(['moonshotai']);
     expect(decryptApiKey).toHaveBeenCalledTimes(1);
 
-    const openrouterRoute = await nextRoute(result);
-    expect(decryptApiKey).toHaveBeenCalledTimes(2);
-    expect(openrouterRoute).toMatchObject({
-      kind: 'provider',
+    const [, resolveOpenrouterRoute, resolveAnthropicRoute, ...rest] = result.routes;
+    expect(rest).toEqual([]);
+    expect(await resolveOpenrouterRoute?.()).toMatchObject({
       provider: { type: 'openrouter', apiKey: 'openrouter-secret' },
       userByok: [{ providerId: 'openrouter', decryptedAPIKey: 'openrouter-secret' }],
       isFree: false,
       bypassAccessCheck: false,
     });
-    if (!openrouterRoute) throw new Error('Expected the openrouter route');
+    expect(decryptApiKey).toHaveBeenCalledTimes(2);
 
-    const anthropicRoute = await nextRoute(openrouterRoute);
-    expect(decryptApiKey).toHaveBeenCalledTimes(3);
-    expect(anthropicRoute).toMatchObject({
-      kind: 'provider',
+    expect(await resolveAnthropicRoute?.()).toMatchObject({
       provider: { type: 'vercel' },
       userByok: [{ providerId: 'anthropic', decryptedAPIKey: 'anthropic-secret' }],
     });
-    expect(anthropicRoute?.failover).toBeUndefined();
+    expect(decryptApiKey).toHaveBeenCalledTimes(3);
   });
 
-  test('skips a failover key that cannot be decrypted and continues with the next', async () => {
+  test('lists a key that cannot be decrypted as a route that rejects, followed by the next key', async () => {
     const user = await insertTestUser();
     await insertKeys(user, [
       { providerId: 'moonshotai', priority: 0 },
       { providerId: 'openrouter', priority: 1, undecryptable: true },
       { providerId: 'anthropic', priority: 2 },
     ]);
-    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     const result = await routeProvider({
       requestedModel: MODEL,
@@ -1183,29 +1176,22 @@ describe('getProvider BYOK failover candidates', () => {
       organizationId: undefined,
     });
 
-    expect(result.userByok?.map(byok => byok.providerId)).toEqual(['moonshotai']);
-    expect(consoleError).not.toHaveBeenCalled();
-
-    const next = await nextRoute(result);
-    expect(next).toMatchObject({
+    expect(await byokProviderIds(result)).toEqual(['moonshotai']);
+    const [, resolveOpenrouterRoute, resolveAnthropicRoute, ...rest] = result.routes;
+    expect(rest).toEqual([]);
+    await expect(resolveOpenrouterRoute?.()).rejects.toThrow();
+    expect(await resolveAnthropicRoute?.()).toMatchObject({
       provider: { type: 'vercel' },
       userByok: [{ providerId: 'anthropic', decryptedAPIKey: 'anthropic-secret' }],
     });
-    expect(next?.failover).toBeUndefined();
-    expect(consoleError).toHaveBeenCalledWith(
-      '[getProvider] Skipping a BYOK failover key that could not be resolved',
-      { providerId: 'openrouter', errorType: expect.any(String) }
-    );
-    expect(JSON.stringify(consoleError.mock.calls)).not.toMatch(/secret/);
   });
 
-  test('fails over to nothing when the only remaining key cannot be decrypted', async () => {
+  test('lists an undecryptable last key as a route that rejects', async () => {
     const user = await insertTestUser();
     await insertKeys(user, [
       { providerId: 'moonshotai', priority: 0 },
       { providerId: 'openrouter', priority: 1, undecryptable: true },
     ]);
-    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     const result = await routeProvider({
       requestedModel: MODEL,
@@ -1214,9 +1200,9 @@ describe('getProvider BYOK failover candidates', () => {
       organizationId: undefined,
     });
 
-    expect(result.failover).toBeDefined();
-    await expect(nextRoute(result)).resolves.toBeNull();
-    expect(consoleError).toHaveBeenCalledTimes(1);
+    expect(await byokProviderIds(result)).toEqual(['moonshotai']);
+    expect(result.routes).toHaveLength(2);
+    await expect(result.routes[1]?.()).rejects.toThrow();
   });
 
   test('resolves a catalog-mode key to its direct BYOK provider', async () => {
@@ -1236,16 +1222,14 @@ describe('getProvider BYOK failover candidates', () => {
       organizationId: undefined,
     });
 
-    const next = await nextRoute(result);
-    expect(next).toMatchObject({
-      kind: 'provider',
+    expect(result.routes).toHaveLength(2);
+    expect(await result.routes[1]?.()).toMatchObject({
       provider: { type: 'direct-byok' },
       userByok: [{ providerId: 'zai-coding', decryptedAPIKey: 'zai-coding-secret' }],
     });
-    expect(next?.failover).toBeUndefined();
   });
 
-  test('never chains an unavailable ChatGPT connection among the failover keys', async () => {
+  test('never lists an unavailable ChatGPT connection among the failover keys', async () => {
     const user = await insertTestUser();
     await insertKeys(user, [
       { providerId: 'zai-coding', catalogMode: true, priority: 0 },
@@ -1263,7 +1247,7 @@ describe('getProvider BYOK failover candidates', () => {
       organizationId: undefined,
     });
 
-    expect(result.userByok?.map(byok => byok.providerId)).toEqual(['zai-coding']);
+    expect(await byokProviderIds(result)).toEqual(['zai-coding']);
     expect(await failoverProviderIds(result)).toEqual(['moonshotai']);
     expect(checkOpenAiChatGptByok).toHaveBeenCalledTimes(1);
   });
@@ -1279,7 +1263,7 @@ describe('getProvider BYOK failover candidates', () => {
       organizationId: undefined,
     });
 
-    expect(result.failover).toBeUndefined();
+    expect(result.routes).toHaveLength(1);
   });
 
   test('has no later key when the request is served by the key it ignores', async () => {
@@ -1297,11 +1281,11 @@ describe('getProvider BYOK failover candidates', () => {
       organizationId: undefined,
     });
 
-    expect(result.userByok?.map(byok => byok.providerId)).toEqual(['anthropic']);
-    expect(result.failover).toBeUndefined();
+    expect(await byokProviderIds(result)).toEqual(['anthropic']);
+    expect(result.routes).toHaveLength(1);
   });
 
-  test('gives the ChatGPT connection no failover', async () => {
+  test('gives the ChatGPT connection no failover route', async () => {
     const user = await insertTestUser();
     await insertKeys(user, [{ providerId: 'moonshotai' }]);
     jest.mocked(checkOpenAiChatGptByok).mockResolvedValue({
@@ -1319,11 +1303,11 @@ describe('getProvider BYOK failover candidates', () => {
       organizationId: undefined,
     });
 
-    expect(result.provider.type).toBe('openai-chatgpt');
-    expect(result.failover).toBeUndefined();
+    expect((await result.routes[0]()).provider.type).toBe('openai-chatgpt');
+    expect(result.routes).toHaveLength(1);
   });
 
-  test('gives Kilo-paid routing no failover', async () => {
+  test('gives Kilo-paid routing no failover route', async () => {
     const user = await insertTestUser();
     await insertKeys(user, [{ providerId: 'moonshotai', isEnabled: false }]);
     jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
@@ -1335,11 +1319,14 @@ describe('getProvider BYOK failover candidates', () => {
       organizationId: undefined,
     });
 
-    expect(result).toMatchObject({ provider: { type: 'openrouter' }, userByok: null });
-    expect(result.failover).toBeUndefined();
+    expect(await result.routes[0]()).toMatchObject({
+      provider: { type: 'openrouter' },
+      userByok: null,
+    });
+    expect(result.routes).toHaveLength(1);
   });
 
-  test('gives a catalog key served over another API kind no failover', async () => {
+  test('gives a catalog key served over another API kind no failover route', async () => {
     const user = await insertTestUser();
     await insertKeys(user, [{ providerId: 'synthetic', catalogMode: true }]);
     jest
@@ -1353,11 +1340,11 @@ describe('getProvider BYOK failover candidates', () => {
       organizationId: undefined,
     });
 
-    expect(result.userByok?.map(byok => byok.providerId)).toEqual(['synthetic']);
-    expect(result.failover).toBeUndefined();
+    expect(await byokProviderIds(result)).toEqual(['synthetic']);
+    expect(result.routes).toHaveLength(1);
   });
 
-  test('gives a provider model id served by its own key no failover', async () => {
+  test('gives a provider model id served by its own key no failover route', async () => {
     const user = await insertTestUser();
     await insertKeys(user, [{ providerId: 'zai-coding' }, { providerId: 'moonshotai' }]);
     const { provider, model } = catalogModel('zai-coding', ['chat_completions']);
@@ -1370,8 +1357,8 @@ describe('getProvider BYOK failover candidates', () => {
       organizationId: undefined,
     });
 
-    expect(result.userByok?.map(byok => byok.providerId)).toEqual(['zai-coding']);
-    expect(result.failover).toBeUndefined();
+    expect(await byokProviderIds(result)).toEqual(['zai-coding']);
+    expect(result.routes).toHaveLength(1);
   });
 });
 

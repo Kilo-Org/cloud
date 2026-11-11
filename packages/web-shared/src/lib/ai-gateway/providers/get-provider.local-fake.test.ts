@@ -4,6 +4,11 @@ import {
   getTranscriptionProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { getProviderInput } from '@kilocode/web-shared/tests/helpers/get-provider-input.helper';
+import {
+  expectProviderResult,
+  firstRoute,
+  onlyRoute,
+} from '@kilocode/web-shared/tests/helpers/get-provider-result.helper';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
@@ -179,8 +184,7 @@ describe('getProvider local fake deterministic routing', () => {
     const env = replaceEnv({ NODE_ENV: 'development', FAKE_LLM_URL: 'http://localhost:8811' });
 
     const result = await getProvider(getProviderInput(providerInput('fake-deterministic')));
-    expect(result).toMatchObject({
-      kind: 'provider',
+    expect(await onlyRoute(result)).toMatchObject({
       bypassAccessCheck: true,
       userByok: null,
       isFree: true,
@@ -191,7 +195,7 @@ describe('getProvider local fake deterministic routing', () => {
     });
 
     const prefixed = await getProvider(getProviderInput(providerInput('kilo/fake-deterministic')));
-    expect(prefixed.kind === 'provider' && prefixed.provider.apiUrl).toBe(
+    expect((await firstRoute(prefixed)).provider.apiUrl).toBe(
       'http://localhost:8811/api/openrouter'
     );
     env.restore();
@@ -199,8 +203,7 @@ describe('getProvider local fake deterministic routing', () => {
 
   test('does not route fake-deterministic when disabled, on Vercel, or without a URL', async () => {
     const disabled = await getProvider(getProviderInput(providerInput('fake-deterministic')));
-    expect(disabled).toEqual({
-      kind: 'provider',
+    expect(await onlyRoute(disabled)).toEqual({
       provider: OPENROUTER,
       userByok: null,
       isFree: false,
@@ -212,8 +215,9 @@ describe('getProvider local fake deterministic routing', () => {
       FAKE_LLM_URL: 'http://localhost:8811',
       VERCEL: '1',
     });
-    expect(await getProvider(getProviderInput(providerInput('fake-deterministic')))).toEqual({
-      kind: 'provider',
+    expect(
+      await onlyRoute(await getProvider(getProviderInput(providerInput('fake-deterministic'))))
+    ).toEqual({
       provider: OPENROUTER,
       userByok: null,
       isFree: false,
@@ -222,8 +226,9 @@ describe('getProvider local fake deterministic routing', () => {
     vercel.restore();
 
     const missingUrl = replaceEnv({ NODE_ENV: 'development' });
-    expect(await getProvider(getProviderInput(providerInput('fake-deterministic')))).toEqual({
-      kind: 'provider',
+    expect(
+      await onlyRoute(await getProvider(getProviderInput(providerInput('fake-deterministic'))))
+    ).toEqual({
       provider: OPENROUTER,
       userByok: null,
       isFree: false,
@@ -256,8 +261,7 @@ describe('getProvider local fake deterministic routing', () => {
         jest.mocked(shouldRouteToVercel).mockResolvedValue(routeToVercel);
         const input = providerInput(modelId);
 
-        expect(await getProvider(getProviderInput(input))).toEqual({
-          kind: 'provider',
+        expect(await onlyRoute(await getProvider(getProviderInput(input)))).toEqual({
           provider,
           userByok: null,
           isFree: true,
@@ -279,9 +283,9 @@ describe('getProvider auto small free model routing', () => {
   });
 
   test('routes the auto small free model to OpenRouter', async () => {
-    const result = await getProvider(getProviderInput(providerInput(GEMMA_4_26B_A4B_IT_FREE_ID)));
-    expect(result.kind).toBe('provider');
-    if (result.kind !== 'provider') throw new Error('Expected a provider');
+    const result = await firstRoute(
+      await getProvider(getProviderInput(providerInput(GEMMA_4_26B_A4B_IT_FREE_ID)))
+    );
     expect(result.provider).toBe(OPENROUTER);
     expect(result.userByok).toBeNull();
     expect(result.bypassAccessCheck).toBe(false);
@@ -292,14 +296,14 @@ describe('getProvider auto small free model routing', () => {
 
     const result = await getProvider(getProviderInput(providerInput(GEMMA_4_26B_A4B_IT_FREE_ID)));
 
-    expect(result.kind === 'provider' && result.provider).toBe(OPENROUTER);
+    expect((await firstRoute(result)).provider).toBe(OPENROUTER);
     expect(getModelInferenceUserByokProviders).not.toHaveBeenCalled();
   });
 
   test('preserves Vercel routing eligibility for the auto small free model', async () => {
     jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
     const result = await getProvider(getProviderInput(providerInput(GEMMA_4_26B_A4B_IT_FREE_ID)));
-    expect(result.kind === 'provider' && result.provider).toBe(VERCEL_AI_GATEWAY);
+    expect((await firstRoute(result)).provider).toBe(VERCEL_AI_GATEWAY);
   });
 
   test('forwards the spend ceiling to the Vercel routing decision', async () => {
@@ -312,7 +316,7 @@ describe('getProvider auto small free model routing', () => {
       })
     );
 
-    expect(result.kind === 'provider' && result.provider).toBe(OPENROUTER);
+    expect((await firstRoute(result)).provider).toBe(OPENROUTER);
     expect(shouldRouteToVercel).toHaveBeenCalledWith(
       expect.objectContaining({ requestedModel: 'openai/gpt-5-nano', boundedSpending: true }),
       expect.any(Function)
@@ -329,7 +333,7 @@ describe('getProvider auto small free model routing', () => {
       })
     );
 
-    expect(result.kind === 'provider' && result.provider).toBe(OPENROUTER);
+    expect((await firstRoute(result)).provider).toBe(OPENROUTER);
     expect(shouldRouteToVercel).toHaveBeenCalledWith(
       expect.objectContaining({ organizationDisabledVercelAiGateway: true }),
       expect.any(Function)
@@ -393,8 +397,7 @@ describe('getProvider ChatGPT connection routing order', () => {
 
     const result = await getProvider(getProviderInput(responsesInput('openai/gpt-5-nano')));
 
-    expect(result).toMatchObject({
-      kind: 'provider',
+    expect(await onlyRoute(result)).toMatchObject({
       userByok: null,
       bypassAccessCheck: false,
       provider: {
@@ -433,13 +436,11 @@ describe('getProvider ChatGPT connection routing order', () => {
 
     const result = await getProvider(getProviderInput(responsesInput('openai/gpt-5-nano')));
 
-    expect(result).toEqual({
-      kind: 'provider',
+    expect(await onlyRoute(result)).toEqual({
       provider: VERCEL_AI_GATEWAY,
       userByok: [{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }],
       isFree: false,
       bypassAccessCheck: false,
-      failover: undefined,
     });
     env.restore();
   });
@@ -453,13 +454,11 @@ describe('getProvider ChatGPT connection routing order', () => {
 
     const result = await getProvider(getProviderInput(providerInput('anthropic/synthetic-model')));
 
-    expect(result).toEqual({
-      kind: 'provider',
+    expect(await onlyRoute(result)).toEqual({
       provider: VERCEL_AI_GATEWAY,
       userByok: credentials,
       isFree: false,
       bypassAccessCheck: false,
-      failover: undefined,
     });
     expect(decrypt.mock.calls).toEqual([['anthropic']]);
   });
@@ -472,8 +471,7 @@ describe('getProvider ChatGPT connection routing order', () => {
 
     const result = await getProvider(getProviderInput(providerInput('openai/gpt-5-nano')));
 
-    expect(result).toEqual({
-      kind: 'provider',
+    expect(await onlyRoute(result)).toEqual({
       provider: OPENROUTER,
       userByok: null,
       isFree: false,
@@ -492,13 +490,11 @@ describe('getProvider ChatGPT connection routing order', () => {
 
     const result = await getProvider(getProviderInput(responsesInput('openai/gpt-5-nano')));
 
-    expect(result).toEqual({
-      kind: 'provider',
+    expect(await onlyRoute(result)).toEqual({
       provider: VERCEL_AI_GATEWAY,
       userByok: [{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }],
       isFree: false,
       bypassAccessCheck: false,
-      failover: undefined,
     });
     env.restore();
   });
@@ -531,9 +527,7 @@ describe('getProvider gateway BYOK routing', () => {
   });
 
   async function resolve(input: Parameters<typeof getProviderInput>[0] = providerInput(model)) {
-    const result = await getProvider(getProviderInput(input));
-    if (result.kind !== 'provider') throw new Error('expected provider result');
-    return result;
+    return firstRoute(await getProvider(getProviderInput(input)));
   }
 
   test('routes to OpenRouter with the user key when only an OpenRouter key exists', async () => {
@@ -583,8 +577,7 @@ describe('getProvider gateway BYOK routing', () => {
     jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
     storeKeys(vercelKey);
 
-    expect(await resolve()).toEqual({
-      kind: 'provider',
+    expect(await onlyRoute(await getProvider(getProviderInput(providerInput(model))))).toEqual({
       provider: OPENROUTER,
       userByok: null,
       isFree: false,
@@ -595,29 +588,27 @@ describe('getProvider gateway BYOK routing', () => {
   test('prefers inference provider keys over gateway keys', async () => {
     const decrypt = storeKeys(vercelKey, anthropicKey, openRouterKey);
 
-    const result = await resolve();
+    const result = await getProvider(getProviderInput(providerInput(model)));
+    expectProviderResult(result);
+    const [first, vercel, openRouter, ...rest] = result.routes;
 
-    expect(result).toEqual({
-      kind: 'provider',
+    expect(await first()).toEqual({
       provider: VERCEL_AI_GATEWAY,
       userByok: [anthropicKey],
       isFree: false,
       bypassAccessCheck: false,
-      failover: expect.any(Function),
     });
+    expect(rest).toEqual([]);
     expect(decrypt.mock.calls).toEqual([['anthropic']]);
 
-    const vercelRoute = await result.failover?.();
-    expect(vercelRoute).toMatchObject({
+    expect(await vercel?.()).toMatchObject({
       provider: { type: 'vercel', apiKey: 'user-vercel-gateway-key' },
       userByok: [vercelKey],
     });
-    const openRouterRoute = await vercelRoute?.failover?.();
-    expect(openRouterRoute).toMatchObject({
+    expect(await openRouter?.()).toMatchObject({
       provider: { type: 'openrouter', apiKey: 'user-openrouter-key' },
       userByok: [openRouterKey],
     });
-    expect(openRouterRoute?.failover).toBeUndefined();
     expect(decrypt.mock.calls).toEqual([['anthropic'], ['vercel-ai-gateway'], ['openrouter']]);
   });
 
@@ -765,7 +756,7 @@ describe('getProvider direct BYOK routing', () => {
       const result = await getProvider(
         getProviderInput(providerInput(`${providerId}/upstream-model`))
       );
-      if (result.kind !== 'provider') throw new Error('expected provider result');
+      const route = await firstRoute(result);
 
       const request: GatewayRequest = {
         kind: 'chat_completions',
@@ -775,13 +766,13 @@ describe('getProvider direct BYOK routing', () => {
           provider: { only: ['openai'], data_collection: 'deny' },
         },
       };
-      await result.provider.transformRequest({
-        provider: result.provider,
+      await route.provider.transformRequest({
+        provider: route.provider,
         model: `${providerId}/upstream-model`,
         request,
         originalHeaders: getFraudDetectionHeaders(new Headers()),
         extraHeaders: {},
-        userByok: result.userByok,
+        userByok: route.userByok,
         kilo_user_id: user.id,
         organization_id: null,
         session_id: null,
@@ -792,9 +783,9 @@ describe('getProvider direct BYOK routing', () => {
         { type: 'user', id: user.id },
         [providerId]
       );
-      expect(result.provider.type).toBe('direct-byok');
-      expect(result.provider.responseTransforms).toBe(ReasoningDetailsTransform.ReasoningContent);
-      expect(result.userByok).toEqual([{ decryptedAPIKey: 'user-direct-key', providerId }]);
+      expect(route.provider.type).toBe('direct-byok');
+      expect(route.provider.responseTransforms).toBe(ReasoningDetailsTransform.ReasoningContent);
+      expect(route.userByok).toEqual([{ decryptedAPIKey: 'user-direct-key', providerId }]);
       expect(directByokTransform).toHaveBeenCalledTimes(1);
       expect(request.body).not.toHaveProperty('provider');
       expect(request.body.model).toBe('upstream-model');
@@ -848,21 +839,21 @@ describe('getProvider direct BYOK routing', () => {
         request: { kind: 'chat_completions', body: { ...input.request.body, stream: true } },
       })
     );
-    if (result.kind !== 'provider') throw new Error('expected provider result');
+    const route = await firstRoute(result);
 
     expect(resolveUpstream).toHaveBeenCalledWith({
       credential: '{"stored":"credential"}',
       model: expect.objectContaining({ id: 'zai.glm-5' }),
       stream: true,
     });
-    expect(result.provider).toMatchObject({
+    expect(route.provider).toMatchObject({
       type: 'direct-byok',
       apiUrl: 'https://bedrock-runtime.eu-west-1.amazonaws.com/openai/v1',
       apiKey: '',
       supportedChatApis: ['chat_completions'],
       awsBedrock: { region: 'eu-west-1' },
     });
-    expect(result.bypassAccessCheck).toBe(true);
+    expect(route.bypassAccessCheck).toBe(true);
   });
 
   function directByokProvider(
@@ -934,32 +925,32 @@ describe('getProvider direct BYOK routing', () => {
         organizationId: ORG_ID,
       })
     );
-    if (result.kind !== 'provider') throw new Error('expected provider result');
+    const route = await firstRoute(result);
 
     expect(getStoredByokKeys).toHaveBeenLastCalledWith(expect.anything(), {
       type: 'organization',
       id: ORG_ID,
     });
     expect(decrypt.mock.calls).toEqual([['zai-coding']]);
-    expect(result.provider).toMatchObject({
+    expect(route.provider).toMatchObject({
       type: 'direct-byok',
       apiUrl: 'https://zai-coding.example/v1',
       apiKey: 'zai-key',
     });
-    expect(result.userByok).toEqual([{ decryptedAPIKey: 'zai-key', providerId: 'zai-coding' }]);
-    expect(result.bypassAccessCheck).toBe(false);
+    expect(route.userByok).toEqual([{ decryptedAPIKey: 'zai-key', providerId: 'zai-coding' }]);
+    expect(route.bypassAccessCheck).toBe(false);
 
     const request: GatewayRequest = {
       kind: 'chat_completions',
       body: { model: 'moonshotai/kimi-k2.6', messages: [], provider: { only: ['openai'] } },
     };
-    await result.provider.transformRequest({
-      provider: result.provider,
+    await route.provider.transformRequest({
+      provider: route.provider,
       model: 'moonshotai/kimi-k2.6',
       request,
       originalHeaders: getFraudDetectionHeaders(new Headers()),
       extraHeaders: {},
-      userByok: result.userByok,
+      userByok: route.userByok,
       kilo_user_id: user.id,
       organization_id: ORG_ID,
       session_id: null,
@@ -999,8 +990,7 @@ describe('getProvider direct BYOK routing', () => {
       id: ORG_ID,
     });
     expect(decrypt.mock.calls).toEqual([['zai-coding']]);
-    expect(result).toMatchObject({
-      kind: 'provider',
+    expect(await firstRoute(result)).toMatchObject({
       provider: { type: 'direct-byok', apiKey: 'zai-key' },
       bypassAccessCheck: false,
     });
@@ -1031,7 +1021,7 @@ describe('getProvider direct BYOK routing', () => {
     );
 
     expect(decrypt).not.toHaveBeenCalled();
-    expect(result).toMatchObject({ kind: 'provider', provider: OPENROUTER, userByok: null });
+    expect(await firstRoute(result)).toMatchObject({ provider: OPENROUTER, userByok: null });
   });
 
   test('keeps the Kilo route for a catalog id without a catalog-mode key', async () => {
@@ -1053,7 +1043,7 @@ describe('getProvider direct BYOK routing', () => {
 
     const result = await getProvider(getProviderInput(providerInput('moonshotai/kimi-k2.6')));
 
-    expect(result).toMatchObject({ kind: 'provider', provider: OPENROUTER, userByok: null });
+    expect(await firstRoute(result)).toMatchObject({ provider: OPENROUTER, userByok: null });
   });
 
   test('skips catalog-mode keys whose upstream cannot serve the API kind', async () => {
@@ -1071,8 +1061,7 @@ describe('getProvider direct BYOK routing', () => {
 
     const result = await getProvider(getProviderInput(responsesInput('openai/gpt-oss')));
 
-    expect(result).toMatchObject({
-      kind: 'provider',
+    expect(await firstRoute(result)).toMatchObject({
       provider: { type: 'direct-byok', apiKey: 'zai-key' },
       bypassAccessCheck: false,
     });
@@ -1096,15 +1085,13 @@ describe('getProvider direct BYOK routing', () => {
 
     const result = await getProvider(getProviderInput(responsesInput('openai/gpt-oss')));
 
-    if (result.kind !== 'provider') throw new Error('expected provider result');
-    expect(result.provider).toMatchObject({
+    const route = await firstRoute(result);
+    expect(route.provider).toMatchObject({
       type: 'direct-byok',
       apiKey: 'synthetic-key',
       supportedChatApis: ['chat_completions'],
     });
-    expect(result.userByok).toEqual([
-      { decryptedAPIKey: 'synthetic-key', providerId: 'synthetic' },
-    ]);
+    expect(route.userByok).toEqual([{ decryptedAPIKey: 'synthetic-key', providerId: 'synthetic' }]);
   });
 
   test('lets another BYOK key serve an API kind the catalog-mode keys cannot', async () => {
@@ -1121,8 +1108,7 @@ describe('getProvider direct BYOK routing', () => {
 
     const result = await getProvider(getProviderInput(responsesInput('openai/gpt-oss')));
 
-    expect(result).toMatchObject({
-      kind: 'provider',
+    expect(await firstRoute(result)).toMatchObject({
       provider: VERCEL_AI_GATEWAY,
       userByok: [{ decryptedAPIKey: 'openai-key', providerId: 'openai' }],
     });

@@ -393,26 +393,26 @@ export async function handleLlmProxyRequest(
     organizationGroupPolicyPromise,
   });
   if (!providerPolicy.ok) return providerPolicy.response;
-  const { providerResult, isNonTrialEnterprise, dataRegion } = providerPolicy;
+  const { route, failoverRoutes, isNonTrialEnterprise, dataRegion } = providerPolicy;
 
-  console.debug(`Routing request to ${providerResult.provider.type}`, {
-    byokProviderIds: providerResult.userByok?.map(byok => byok.providerId) ?? null,
+  console.debug(`Routing request to ${route.provider.type}`, {
+    byokProviderIds: route.userByok?.map(byok => byok.providerId) ?? null,
   });
 
   const promptInfo = extractPromptInfo(requestBodyParsed);
   const usageContext: MicrodollarUsageContext = {
     ...usageBase.context,
     api_kind: requestBodyParsed.kind,
-    provider: providerResult.provider.type,
+    provider: route.provider.type,
     requested_model: effectiveModelIdLowerCased,
-    is_free: providerResult.isFree,
+    is_free: route.isFree,
     custom_llm_pricing: customLlm?.definition.pricing ?? null,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
     reasoning_setting: extractReasoningSetting(requestBodyParsed.body),
     isStreaming: requestBodyParsed.body.stream === true,
-    user_byok: !!providerResult.userByok,
+    user_byok: !!route.userByok,
     has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
     feature,
     auto_model: autoModel,
@@ -466,7 +466,7 @@ export async function handleLlmProxyRequest(
     await logUnrewrittenResponse({
       response: guardrailRejection.clone(),
       model: effectiveModelIdLowerCased,
-      providerId: providerResult.provider.type,
+      providerId: route.provider.type,
       logging: requestLogging,
       error: { guardrail_rejection: guardrailVerdict.action },
     });
@@ -479,29 +479,32 @@ export async function handleLlmProxyRequest(
     providerContext,
     request: sentRequest,
     failoverAttempts,
-  } = await sendUpstreamAttemptWithByokFailover({
-    providerContext: providerResult,
-    request: requestBodyParsed,
-    requestedModel: effectiveModelIdLowerCased,
-    fraudHeaders,
-    userId: user.id,
-    organizationId: organizationId ?? null,
-    sessionId: headers.sessionId,
-    taskId: headers.taskId,
-    isNonTrialEnterprise,
-    search: url.search,
-    method: request.method,
-    signal: request.signal,
-    vercelRequestId: headers.vercelRequestId,
-    dataRegion,
-    costLimit:
-      requestCostLimit !== null && requestCostBalance
-        ? {
-            maximumMicrodollars: requestCostLimit,
-            availableBalanceMicrodollars: Math.floor(requestCostBalance.balance * 1_000_000),
-          }
-        : undefined,
-  });
+  } = await sendUpstreamAttemptWithByokFailover(
+    {
+      providerContext: route,
+      request: requestBodyParsed,
+      requestedModel: effectiveModelIdLowerCased,
+      fraudHeaders,
+      userId: user.id,
+      organizationId: organizationId ?? null,
+      sessionId: headers.sessionId,
+      taskId: headers.taskId,
+      isNonTrialEnterprise,
+      search: url.search,
+      method: request.method,
+      signal: request.signal,
+      vercelRequestId: headers.vercelRequestId,
+      dataRegion,
+      costLimit:
+        requestCostLimit !== null && requestCostBalance
+          ? {
+              maximumMicrodollars: requestCostLimit,
+              availableBalanceMicrodollars: Math.floor(requestCostBalance.balance * 1_000_000),
+            }
+          : undefined,
+    },
+    failoverRoutes
+  );
   if (failoverAttempts) providerMetadataCapture?.captureByokFailoverAttempts(failoverAttempts);
   if (attempt.type === 'invalid-openrouter-model') {
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);

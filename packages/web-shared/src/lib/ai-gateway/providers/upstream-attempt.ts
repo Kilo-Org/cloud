@@ -32,7 +32,7 @@ import {
 import { readChatGptUsageLimit } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
-import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import type { ProviderRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -43,7 +43,7 @@ import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detec
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
 export type SendUpstreamAttemptInput = {
-  providerContext: GetProviderProviderResult;
+  providerContext: ProviderRoute;
   requestedModel: string;
   request: GatewayRequest;
   fraudHeaders: FraudDetectionHeaders;

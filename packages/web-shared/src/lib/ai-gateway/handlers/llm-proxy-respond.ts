@@ -5,7 +5,7 @@ import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/up
 import { REPLACED_ANSWER_HEADER } from '@kilocode/web-shared/lib/ai-gateway/replaced-answer-header';
 import { recordBriefingUsage } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import type { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
-import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import type { ProviderRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import {
   accountForMicrodollarUsage,
   extractInferenceRegion,
@@ -36,7 +36,7 @@ type RespondInput = {
   model: string;
   /** The model id the caller asked for, lowercased. */
   requestedModel: string;
-  providerResult: GetProviderProviderResult;
+  providerResult: ProviderRoute;
   user: User | AnonymousUserContext;
   organizationId: string | undefined;
   usageContext: MicrodollarUsageContext;

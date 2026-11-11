@@ -276,7 +276,7 @@ export async function collectSystemSearchDocuments(
   const sessions: SessionCatalogCandidate[] = [];
   const observedSources = new Set<string>();
   let accessibleOrganizations: Set<string> | null = null;
-  let sessionsSettled = false;
+  const settledSessionScopes: (string | null)[] = [];
   const collections = collectionsFor(queryClient);
   const seen = new Set<string>();
   for (const query of queryClient.getQueryCache().getAll()) {
@@ -285,7 +285,9 @@ export async function collectSystemSearchDocuments(
     const collected = collectOrReuse(collections, query, queryHash);
     documents.push(...collected.documents);
     sessions.push(...collected.sessions);
-    sessionsSettled = sessionsSettled || collected.sessionsSettled;
+    if (collected.sessionsSettled) {
+      settledSessionScopes.push(sessionListOrganizationId(query.queryKey));
+    }
     // Only a successful query that fully enumerated a source scope is
     // authoritative. A query can hold the family path without enumerating it —
     // the findings capacity probe fetches `limit: 1` under `listFindings`, a
@@ -328,8 +330,18 @@ export async function collectSystemSearchDocuments(
     accessibleOrganizations,
     // A settled read is the only thing that may replace the device's catalog.
     // Building the entries only then keeps the caller from publishing a
-    // half-loaded cache under the account's titles.
-    sessions: sessionsSettled ? catalogEntries(sessions, accessibleOrganizations) : null,
+    // half-loaded cache under the account's titles. The read has to belong to a
+    // scope the account can still open as well: a read from any other scope
+    // carries only that scope's rows, so it must not replace titles the run has
+    // not re-read.
+    sessions: settledSessionScopes.some(
+      organizationId =>
+        organizationId === null ||
+        accessibleOrganizations === null ||
+        accessibleOrganizations.has(organizationId)
+    )
+      ? catalogEntries(sessions, accessibleOrganizations)
+      : null,
   };
 }
 
@@ -531,12 +543,17 @@ function documentsFromQuery(query: Query): QueryDocuments {
     return {
       documents: rows.flatMap(row => presentOrEmpty(activeSessionSearchDocument(row))),
       sessions: namedSessions(
-        rows.map(row => ({
-          id: row.id,
-          title: row.title,
-          updatedAt: row.updatedAt,
-          organizationId: row.organizationId ?? null,
-        }))
+        // A live row without an organization attribution stays out of the
+        // picker as well as out of the index, so the picker offers the same
+        // rows the index does.
+        rows
+          .filter(row => row.organizationId !== undefined)
+          .map(row => ({
+            id: row.id,
+            title: row.title,
+            updatedAt: row.updatedAt,
+            organizationId: row.organizationId ?? null,
+          }))
       ),
       sessionsSettled: false,
       observedSource: null,
@@ -637,6 +654,17 @@ function findingsFromQuery(query: Query, scope: string): QueryDocuments {
 function findingsFilters(queryKey: readonly unknown[]): QueryInput | null {
   const filters = queryInputSchema.safeParse(queryKey[2]);
   return filters.success ? filters.data : queryInput(queryKey);
+}
+
+/**
+ * The organization a stored-history query enumerates, or null for the personal
+ * scope and for an input this module cannot read. The catalog's published set
+ * is decided per settled read, so each read has to name the scope it speaks
+ * for.
+ */
+function sessionListOrganizationId(queryKey: readonly unknown[]): string | null {
+  const scope = sessionScopeInputSchema.safeParse(queryInput(queryKey));
+  return scope.success ? (scope.data.organizationId ?? null) : null;
 }
 
 /**

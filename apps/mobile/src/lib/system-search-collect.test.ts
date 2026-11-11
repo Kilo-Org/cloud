@@ -822,6 +822,55 @@ describe('collectSystemSearchDocuments session catalog', () => {
     expect(sessions).toEqual([{ id: 'personal', title: 'Personal session' }]);
   });
 
+  it('publishes the catalog only from a settled read of an openable scope', async () => {
+    // The publish replaces the device's titles, so it needs a read of a scope
+    // the account can open: a settled read of any other scope carries only
+    // that scope's rows, and replacing with them would drop the titles the run
+    // did not re-read.
+    const client = new QueryClient();
+    client.setQueryData(
+      [['cliSessionsV2', 'list'], { type: 'infinite', input: { organizationId: 'org-1' } }],
+      {
+        pages: [
+          {
+            cliSessions: [{ session_id: 'org-session', title: 'Org session' }],
+            nextCursor: null,
+          },
+        ],
+      }
+    );
+    client.setQueryData(ORGANIZATIONS_KEY, [{ organizationId: 'org-2' }]);
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toBeNull();
+  });
+
+  it('leaves an unattributed live session out of a published picker', async () => {
+    // The index leaves a row without an organization attribution out, and the
+    // picker offers the same rows: offering it as a personal session would
+    // report a scope the row does not name.
+    const client = new QueryClient();
+    client.setQueryData(SESSION_LIST_KEY, {
+      pages: [
+        { cliSessions: [{ session_id: 'stored', title: 'Stored session' }], nextCursor: null },
+      ],
+    });
+    client.setQueryData(ACTIVE_SESSIONS_KEY, {
+      sessions: [
+        { id: 'live-attributed', title: 'Attributed', organizationId: null, gitBranch: null },
+        { id: 'live-unattributed', title: 'Unattributed', gitBranch: null },
+      ],
+    });
+
+    const { sessions } = await collectSystemSearchDocuments(client);
+
+    expect(sessions).toEqual([
+      { id: 'stored', title: 'Stored session' },
+      { id: 'live-attributed', title: 'Attributed' },
+    ]);
+  });
+
   it('orders the catalog by each row’s update time across cached queries', async () => {
     // The cache insertion order is not recency: the older organization's query
     // can be cached first. The cap and the picker must still see the newest

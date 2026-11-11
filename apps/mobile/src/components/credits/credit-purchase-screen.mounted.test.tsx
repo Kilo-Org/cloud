@@ -428,7 +428,16 @@ describe('CreditPurchaseScreen', () => {
     // A store failure is not a catalog claim: the no-match body belongs to a
     // store that answered and priced no pack.
     expect(allText(renderer)).not.toContain('No matching credit packs were returned by App Store.');
-    expect(allText(renderer)).toContain('Price unavailable');
+    // The card above is the only visible statement of the failure: a disabled
+    // row does not repeat it. A screen reader still hears the state per row.
+    expect(allText(renderer)).not.toContain('Price unavailable');
+    expect(
+      packRows(renderer).every(row =>
+        (row.props as { accessibilityLabel: string }).accessibilityLabel.includes(
+          'Price unavailable'
+        )
+      )
+    ).toBe(true);
     // The store SDK's own wording never reaches the screen.
     expect(allText(renderer)).not.toContain('Failed to query product');
 
@@ -443,7 +452,7 @@ describe('CreditPurchaseScreen', () => {
     await waitFor(() => owner.fetchStoreProducts.mock.calls.length >= 2);
 
     expect(packRows(renderer)).toHaveLength(4);
-    expect(allText(renderer)).toContain('Price unavailable');
+    expect(allText(renderer)).not.toContain('Price unavailable');
     unmount();
   });
 
@@ -490,9 +499,10 @@ describe('CreditPurchaseScreen', () => {
       expect(allText(renderer)).not.toContain(
         'Could not connect to Google Play. Check your connection and try again.'
       );
-      // The backend amounts stay on screen, unpriced, with a retry to offer.
+      // The backend amounts stay on screen, unpriced, with a retry to offer,
+      // and the timeout card above is the only visible statement of why.
       expect(packRows(renderer)).toHaveLength(4);
-      expect(allText(renderer)).toContain('Price unavailable');
+      expect(allText(renderer)).not.toContain('Price unavailable');
       unmount();
     } finally {
       vi.useRealTimers();
@@ -590,7 +600,7 @@ describe('CreditPurchaseScreen', () => {
     expect(allText(renderer)).toContain(
       'Could not connect to the App Store. Check your connection and try again.'
     );
-    expect(allText(renderer)).toContain('Price unavailable');
+    expect(allText(renderer)).not.toContain('Price unavailable');
     expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
     // The button that started the retry stays on screen, busy and disabled.
     const pendingRetry = tryAgainButton(renderer);
@@ -652,7 +662,7 @@ describe('CreditPurchaseScreen', () => {
         await vi.advanceTimersByTimeAsync(8000);
       });
       expect(allText(renderer)).toContain('App Store products unavailable');
-      expect(allText(renderer)).toContain('Price unavailable');
+      expect(allText(renderer)).not.toContain('Price unavailable');
 
       // The store reconnects with the cached prices still fresh, so React Query
       // keeps `status: success` and never refetches: only the connection itself
@@ -689,6 +699,75 @@ describe('CreditPurchaseScreen', () => {
       `Add ${packAmount('$500.00')} of credits, Price unavailable, Credits purchased through the App Store do not expire.`
     );
     expect(allText(renderer)).toContain('Price unavailable');
+    unmount();
+  });
+
+  it('store unavailable: the card states the failure once and every row keeps its title, note and inactive reason', async () => {
+    owner.fetchStoreProducts.mockRejectedValue(new Error('Failed to query product for sku'));
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(renderer).includes('App Store products unavailable'));
+
+    const rows = packRows(renderer);
+    expect(rows).toHaveLength(4);
+    // The card above is the one visible statement; no row repeats the status.
+    expect(allText(renderer)).not.toContain('Price unavailable');
+    // The rows keep their disabled style, their pack title and their expiry
+    // note, and a screen reader still hears why each one is inactive.
+    const labels = rows.map(
+      row => (row.props as { accessibilityLabel: string }).accessibilityLabel
+    );
+    expect(labels).toContain(
+      `Add ${packAmount('$10.00')} of credits, Price unavailable, Credits purchased through the App Store do not expire.`
+    );
+    expect(allText(renderer)).toContain(`Add ${packAmount('$10.00')} of credits`);
+    expect(
+      classNamesOf(rows).every(
+        classes => classes.includes(PACK_ROW_SHELL) && classes.includes('opacity-50')
+      )
+    ).toBe(true);
+    unmount();
+  });
+
+  it('place: a status phrase sits under the title, and only a real price takes the trailing slot', async () => {
+    owner.fetchStoreProducts.mockResolvedValue(STORE_LISTINGS.slice(0, 3));
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const rows = packRows(renderer);
+    const priced = rows[0]?.findAll(node => String(node.type) === 'Text') ?? [];
+    // Title, then the store price: the price is the only trailing child, and
+    // the expiry note follows on its own line.
+    expect(priced).toHaveLength(3);
+    expect(priced[1]?.props.children).toBe('$10.99');
+    expect(String(priced[1]?.props.className)).toContain('shrink-0');
+    const unpriced = rows[3]?.findAll(node => String(node.type) === 'Text') ?? [];
+    // Title, its own status line, then the expiry note.
+    expect(unpriced.map(node => node.props.children)).toEqual([
+      `Add ${packAmount('$500.00')} of credits`,
+      'Price unavailable',
+      'Credits purchased through the App Store do not expire.',
+    ]);
+    // The status never shares the title's line, so the title keeps one line.
+    expect(String(unpriced[1]?.props.className)).toContain('mt-1');
+    expect(String(unpriced[1]?.props.className)).toContain('text-sm');
+    unmount();
+  });
+
+  it('place: every row title is bounded to one line', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const titles = renderer.root.findAll(node => {
+      if (String(node.type) !== 'Text') {
+        return false;
+      }
+      const { children } = node.props;
+      return typeof children === 'string' && children.includes('of credits');
+    });
+    expect(titles).toHaveLength(4);
+    expect(titles.every(title => title.props.numberOfLines === 1)).toBe(true);
     unmount();
   });
 
@@ -749,6 +828,8 @@ describe('CreditPurchaseScreen', () => {
     await waitFor(() => packRows(renderer).length === 4);
 
     expect(allText(renderer)).toContain('Completing purchase');
+    // The in-flight row keeps its store price visible beside its state.
+    expect(allText(renderer)).toContain('$10.99');
     const rows = packRows(renderer);
     // The in-flight row announces its state in the label too.
     const busyRow = rows.find(

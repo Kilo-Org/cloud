@@ -240,13 +240,27 @@ export function CreditPurchaseScreen() {
               // drops them when initialization fails), so even a priced row
               // cannot complete: keep every row disabled until it reconnects.
               const disabled = purchasing || !connected || !hasStorePrice;
-              const priceLabel = rowCompleting
-                ? t('kiloPass.completingPurchase')
-                : (pack.displayPrice ?? t('credits.priceUnavailable'));
+              // A status phrase reads on its own line under the title, so the
+              // title keeps one line at the compact width. The store-unavailable
+              // card above already names the failure, so no row repeats it
+              // there: only the partly priced state, where the store answered
+              // and left this pack out, needs the row to say it.
+              let statusLabel: string | null = null;
+              if (rowCompleting) {
+                statusLabel = t('kiloPass.completingPurchase');
+              } else if (!hasStorePrice && !storeUnavailable) {
+                statusLabel = t('credits.priceUnavailable');
+              }
               // The row is one accessible element: the explicit label replaces
               // its children, so the charge and the disabled reason must be in
               // the label itself (the canonical Kilo Pass row does the same).
-              const rowAccessibilityLabel = [packLabel, priceLabel, expiryMessage]
+              // The state is never dropped from the label, also when the card
+              // above is its only visible statement.
+              const rowAccessibilityLabel = [
+                packLabel,
+                statusLabel ?? pack.displayPrice ?? t('credits.priceUnavailable'),
+                expiryMessage,
+              ]
                 .filter(Boolean)
                 .join(', ');
 
@@ -266,11 +280,21 @@ export function CreditPurchaseScreen() {
                   }}
                 >
                   <View className="flex-row items-start justify-between gap-4">
-                    <Text className="flex-1 font-semibold text-foreground">{packLabel}</Text>
-                    <Text className="text-base font-semibold text-foreground tabular-nums">
-                      {priceLabel}
+                    <Text className="flex-1 font-semibold text-foreground" numberOfLines={1}>
+                      {packLabel}
                     </Text>
+                    {/* Only a real store price takes the trailing slot, and it
+                        keeps its full width: the title yields instead, so the
+                        price a user pays is never truncated. */}
+                    {pack.displayPrice !== null && (
+                      <Text className="shrink-0 text-base font-semibold text-foreground tabular-nums">
+                        {pack.displayPrice}
+                      </Text>
+                    )}
                   </View>
+                  {statusLabel !== null && (
+                    <Text className="mt-1 text-sm text-muted-foreground">{statusLabel}</Text>
+                  )}
                   {expiryMessage && (
                     <Text className="mt-2 text-xs text-muted-foreground">{expiryMessage}</Text>
                   )}

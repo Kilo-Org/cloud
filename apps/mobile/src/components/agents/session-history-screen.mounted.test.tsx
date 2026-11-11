@@ -15,6 +15,7 @@ import {
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 import type * as PlatformFilterModule from './platform-filter-modal';
 import { AGENT_SESSION_NAV_GUARD_MS } from './agent-session-nav-guard';
+import { OwnedKeyboardLift } from './owned-keyboard-lift';
 import { SessionHistoryScreen } from './session-history-screen';
 
 type MockStoredSession = Pick<StoredSession, 'session_id' | 'organization_id'> &
@@ -89,6 +90,44 @@ const keyboardState = vi.hoisted(() => {
 });
 
 const focusState = vi.hoisted(() => ({ current: true as boolean }));
+
+// The screen reads the keyboard from `react-native-keyboard-controller`'s
+// provider, so this suite drives that store: a lift is only observable when the
+// keyboard it owns is actually up.
+const keyboardLift = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  return {
+    state: { height: 0 },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    setHeight: (height: number) => {
+      keyboardLift.state.height = height;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+  };
+});
+vi.mock('react-native-keyboard-controller', async () => {
+  // `vi.mock` factories are hoisted above the file's static imports, so `react`
+  // must be pulled in here.
+  const React = await import('react');
+  const heightOf = () => keyboardLift.state.height;
+  return {
+    KeyboardProvider: 'KeyboardProvider',
+    KeyboardAvoidingView: 'KeyboardAvoidingView',
+    useKeyboardState: (selector?: (snapshot: Record<string, unknown>) => unknown) => {
+      const height = React.useSyncExternalStore(keyboardLift.subscribe, heightOf, heightOf);
+      const snapshot = { height, isVisible: height > 0, progress: height > 0 ? 1 : 0, duration: 0 };
+      return selector ? selector(snapshot) : snapshot;
+    },
+  };
+});
+
 const focusCallbacks = vi.hoisted(() => ({
   current: new Set<() => void>(),
 }));
@@ -314,6 +353,19 @@ function applyFilters(
   expect(modal.props.visible).toBe(false);
 }
 
+/** The pad the lift actually writes on the body frame; 0 means full height. */
+function liftPad(renderer: TestRenderer.ReactTestRenderer): number {
+  const style: unknown = renderer.root.findByType(OwnedKeyboardLift).findByType('View').props.style;
+  if (typeof style !== 'object' || style === null || !('paddingBottom' in style)) {
+    throw new TypeError('The keyboard lift wrote no paddingBottom');
+  }
+  const pad: unknown = style.paddingBottom;
+  if (typeof pad !== 'number') {
+    throw new TypeError('The keyboard lift wrote a non-numeric paddingBottom');
+  }
+  return pad;
+}
+
 function storedSessionIds(renderer: TestRenderer.ReactTestRenderer) {
   const sections = findNodeByType(renderer, 'AgentSessionListContent').props.sections as {
     data: MockStoredSession[];
@@ -342,6 +394,7 @@ describe('SessionHistoryScreen', () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     platformState.OS = 'ios';
     keyboardState.clear();
+    keyboardLift.setHeight(0);
     listState.storedSessions = [];
     listState.isSearching = false;
     listState.isError = false;
@@ -810,7 +863,7 @@ describe('SessionHistoryScreen', () => {
     const queryClient = createTestQueryClient();
     const renderer = await renderScreen(queryClient);
     const searchHeader = findNodeByType(renderer, 'SessionListSearchHeader');
-    const container = findNodeByType(renderer, 'KeyboardAvoidingView');
+    const container = renderer.root.findByType(OwnedKeyboardLift);
     for (const state of [
       { storedIsPending: false, isSearching: false, storedSessions: [] },
       {
@@ -832,7 +885,7 @@ describe('SessionHistoryScreen', () => {
         );
       });
       expect(findNodeByType(renderer, 'SessionListSearchHeader')).toBe(searchHeader);
-      expect(findNodeByType(renderer, 'KeyboardAvoidingView')).toBe(container);
+      expect(renderer.root.findByType(OwnedKeyboardLift)).toBe(container);
     }
   });
 
@@ -930,24 +983,64 @@ describe('SessionHistoryScreen', () => {
   // on-screen keyboard. The whole body (empty state, list, refresh band) must
   // live inside one permanently mounted keyboard container so it lifts with the
   // keyboard while the header and search field above it stay put.
-  it('mounts the history body inside the iOS keyboard-avoiding container', async () => {
+  it('mounts the history body inside the owned keyboard lift', async () => {
     const renderer = await renderScreen();
 
-    const container = findNodeByType(renderer, 'KeyboardAvoidingView');
-    expect(container.props.behavior).toBe('padding');
-    expect(container.props.className).toBe('flex-1');
+    const container = renderer.root.findByType(OwnedKeyboardLift);
+    expect(container.props.occlusion).toBe(0);
     expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
+  });
+
+  // Regression: the list kept its keyboard-open height after the search keyboard
+  // closed, so only a few rows stayed visible above a blank band and a swipe in
+  // that band did nothing. The lift must give the pad back every time, including
+  // after the field regains focus when the user returns to the screen.
+  it('gives the keyboard pad back when the search keyboard closes', async () => {
+    const renderer = await renderScreen();
+    const searchHeader = findNodeByType(renderer, 'SessionListSearchHeader');
+
+    act(() => {
+      (searchHeader.props.onFocus as () => void)();
+    });
+    act(() => {
+      keyboardLift.setHeight(336);
+    });
+    expect(liftPad(renderer)).toBe(336);
+
+    act(() => {
+      keyboardLift.setHeight(0);
+    });
+    expect(liftPad(renderer)).toBe(0);
+
+    // iOS restores the field's focus on return, and the pad must stay at 0: the
+    // ownership claim alone never lifts the body.
+    act(() => {
+      (searchHeader.props.onBlur as () => void)();
+    });
+    act(() => {
+      (searchHeader.props.onFocus as () => void)();
+    });
+    expect(liftPad(renderer)).toBe(0);
+  });
+
+  it('pads nothing for a keyboard another screen raised', async () => {
+    const renderer = await renderScreen();
+
+    act(() => {
+      keyboardLift.setHeight(320);
+    });
+
+    expect(liftPad(renderer)).toBe(0);
   });
 
   it('keeps the history body in one permanently mounted keyboard container on Android', async () => {
     platformState.OS = 'android';
     const renderer = await renderScreen();
 
-    // The body lives in the single native container on this platform too: the
-    // provider measures the IME and lifts that host, so the tree carries no JS
-    // padding node and the container is the lift's sole owner.
-    const container = findNodeByType(renderer, 'KeyboardAvoidingView');
-    expect(container.props.behavior).toBe('padding');
+    // The body lives in the single container on this platform too, and the
+    // container is the sole owner of the pad.
+    const container = renderer.root.findByType(OwnedKeyboardLift);
+    expect(container.props.occlusion).toBe(0);
     expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
 
     // The container is permanent, not swapped per render: a state change (here
@@ -956,7 +1049,7 @@ describe('SessionHistoryScreen', () => {
       historyHeaderActions(renderer).onOpenFilters();
     });
 
-    expect(findNodeByType(renderer, 'KeyboardAvoidingView')).toBe(container);
+    expect(renderer.root.findByType(OwnedKeyboardLift)).toBe(container);
     expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
   });
 

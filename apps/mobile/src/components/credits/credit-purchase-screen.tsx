@@ -4,6 +4,7 @@ import { selectionHaptic } from '@/lib/haptics';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
@@ -38,6 +39,21 @@ import { CreditExpiryNote } from './credit-expiry-note';
 const PACK_SKELETON_ROWS = 4;
 
 /**
+ * The footer's gap between its own lines, in dp: `pt-4` at NativeWind's 14dp
+ * rem.
+ */
+const FOOTER_GAP_DP = 14;
+
+/**
+ * Pulls the legal-link row's own slack back out of the layout. Each link box
+ * reserves a 48dp target around a 14dp line, so the row's inner gutter is 17dp
+ * on each side; the footer removes the extra 3dp so the links sit the same gap
+ * from the description as the description sits from the divider. The box keeps
+ * its full audited height — only the space around it shrinks.
+ */
+const LEGAL_LINK_ROW_STYLE = { marginVertical: -(17 - FOOTER_GAP_DP) };
+
+/**
  * One-off credit packs bought with the store's own purchase sheet.
  *
  * The stores sell fixed SKUs, not an arbitrary amount, so the catalog is the
@@ -47,6 +63,7 @@ const PACK_SKELETON_ROWS = 4;
  */
 export function CreditPurchaseScreen() {
   const { t, i18n } = useTranslation();
+  const { bottom: bottomInset } = useSafeAreaInsets();
   const storefront = getCreditStorefront();
   const trpc = useTRPC();
   const {
@@ -195,49 +212,15 @@ export function CreditPurchaseScreen() {
           {/* The card holds both of its data slots in every state: the amount (a
               skeleton, the value, or the failed read's own retry target) and
               the expiry caption, which is two lines at text-xs in this card's
-              width and keeps one line when the account has none. The copy below
-              must not move when a read settles, and the card is the one block
-              above that copy whose height comes from late data. */}
+              width and keeps one line when the account has none. It is the one
+              block above the pack rows whose height comes from late data, so
+              without the slots a settling read would move every row below it. */}
           <View className="rounded-xl border border-border bg-card px-5 py-4">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('profile.credits')}
             </Text>
             <View className="mt-1 min-h-11 justify-center">{renderBalanceValue()}</View>
             <View className="mt-1 min-h-8 justify-center">{renderExpirySlot()}</View>
-          </View>
-
-          {/* The description and the store's legal links sit above the pack
-              area, not below it. The pack area's height depends on the store —
-              four placeholder rows while it connects, the priced rows after, an
-              empty card or the unavailable card instead — so anything written
-              under it is pushed by every one of those swaps. Above it, no store
-              state or catalog answer can move this copy. */}
-          <Text className="px-1 text-xs text-muted-foreground">{t('credits.description')}</Text>
-          {/* The two store legal links are controls of their own, not words in
-              the sentence above, so each carries the shared legal-link box: a
-              real 48dp target the control-size audit can read, which keeps its
-              height in the flow so the two boxes never overlap when a long
-              locale wraps them onto two lines. `px-1` stays the screen's inset,
-              not the shared row's. */}
-          <View className={cn('px-1', LEGAL_LINK_ROW_CLASS)}>
-            <Pressable
-              accessibilityRole="link"
-              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
-              onPress={() => {
-                void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
-              }}
-            >
-              <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="link"
-              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
-              onPress={() => {
-                void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
-              }}
-            >
-              <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
-            </Pressable>
           </View>
 
           {/* The purchase error is rendered inline (the store sheet has just
@@ -370,6 +353,44 @@ export function CreditPurchaseScreen() {
               );
             })}
         </DetailScreenScrollView>
+      </View>
+      {/* The description and the store's legal links are the screen's footer,
+          outside the scroll view. The pack area's height comes from the store —
+          placeholder rows while it connects, the priced rows after, an empty
+          card or the unavailable card instead — so copy written under it inside
+          the scroll is pushed by every one of those swaps. Pinned below the
+          scroll, the copy holds its place in every state and every locale.
+
+          The two gaps around the legal links are the same as the gap above the
+          description: each link's box reserves a 48dp target around a 14dp
+          line, so the row pulls its own 3dp of slack back out of the layout
+          and the ink keeps the footer's gap. The box keeps its full audited
+          height, because the pull is the row's. */}
+      <View
+        className="border-t border-border px-5 pt-4"
+        style={{ paddingBottom: Math.max(bottomInset, 16) }}
+      >
+        <Text className="text-xs text-muted-foreground">{t('credits.description')}</Text>
+        <View className={LEGAL_LINK_ROW_CLASS} style={LEGAL_LINK_ROW_STYLE}>
+          <Pressable
+            accessibilityRole="link"
+            className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
+            onPress={() => {
+              void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
+            }}
+          >
+            <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="link"
+            className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
+            onPress={() => {
+              void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
+            }}
+          >
+            <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );

@@ -5,6 +5,7 @@ import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import { DetailScreenScrollView } from '@/components/detail-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { type BackendStoreCreditProduct } from '@/lib/credits/store-products';
 import { LEGAL_LINK_BOX_CLASS, LEGAL_LINK_ROW_CLASS } from '@/lib/a11y/tap-target';
@@ -59,6 +60,12 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+
+// The footer pads itself with the bottom inset. The library loads a native
+// module, so the mounted project stubs the read like the other screen tests do.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 
 vi.mock('sonner-native', () => ({ toast: toastMock }));
 
@@ -191,6 +198,14 @@ function packRows(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactT
       String(node.type) === 'Pressable' &&
       typeof (node.props as { accessibilityLabel?: unknown }).accessibilityLabel === 'string' &&
       (node.props as { accessibilityLabel: string }).accessibilityLabel.includes('of credits')
+  );
+}
+
+function legalLinkNodes(scope: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return scope.findAll(
+    node =>
+      String(node.type) === 'Pressable' &&
+      (node.props as { accessibilityRole?: string }).accessibilityRole === 'link'
   );
 }
 
@@ -760,10 +775,11 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
-  it('keeps the description and the legal links above the pack area in every state', async () => {
+  it('keeps the description and the legal links out of the pack area’s scroll view in every state', async () => {
     // The pack area's height depends on the store: placeholder rows, priced
-    // rows, an empty card or the unavailable card. The copy sits above it, so
-    // no store answer can move it down the screen.
+    // rows, an empty card or the unavailable card. The copy sits in the footer
+    // beside that scroller, so no store answer can move it, and the pack rows
+    // stay the screen's first content.
     const DESCRIPTION_PREFIX = 'Credits are a one-time purchase';
     const labelOf = (node: TestRenderer.ReactTestInstance): string => {
       const label = node.props.accessibilityLabel;
@@ -809,9 +825,10 @@ describe('CreditPurchaseScreen', () => {
 
     const measured: {
       state: string;
-      copyRendered: boolean;
-      legalAfterCopy: boolean;
-      packAreaAfterLegal: boolean;
+      copyPresent: boolean;
+      copyInScroller: number;
+      legalInScroller: number;
+      packAreaInScroller: number;
     }[] = [];
     // Sequential, not parallel: every scenario mutates the same owner mock and
     // the same backend fixture, so two mounted screens would race.
@@ -828,29 +845,25 @@ describe('CreditPurchaseScreen', () => {
       scenario.prepare();
       const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
       // Wait for the state's own pack-area surface as well as the copy: the
-      // rows arrive after the store answers, so only the pair proves ordering.
+      // rows arrive after the store answers, so only the pair proves the state.
       await waitFor(
         () =>
           allText(renderer).includes(DESCRIPTION_PREFIX) &&
           renderer.root.findAll(() => true).some(node => scenario.isPackArea(node))
       );
-      const order = renderer.root.findAll(() => true);
-      const copyAt = order.findIndex(
-        node =>
-          String(node.type) === 'Text' &&
-          node.children.some(
-            child => typeof child === 'string' && child.startsWith(DESCRIPTION_PREFIX)
-          )
-      );
-      const legalAt = order.findIndex(
-        node => String(node.props.accessibilityRole ?? '') === 'link'
-      );
-      const packAreaAt = order.findIndex(node => scenario.isPackArea(node));
+      const scroller = renderer.root.findByType(DetailScreenScrollView);
       measured.push({
         state: scenario.state,
-        copyRendered: copyAt !== -1,
-        legalAfterCopy: copyAt !== -1 && legalAt > copyAt,
-        packAreaAfterLegal: legalAt !== -1 && packAreaAt > legalAt,
+        copyPresent: allText(renderer).includes(DESCRIPTION_PREFIX),
+        copyInScroller: scroller.findAll(
+          node =>
+            String(node.type) === 'Text' &&
+            node.children.some(
+              child => typeof child === 'string' && child.startsWith(DESCRIPTION_PREFIX)
+            )
+        ).length,
+        legalInScroller: legalLinkNodes(scroller).length,
+        packAreaInScroller: scroller.findAll(node => scenario.isPackArea(node)).length,
       });
       unmount();
       vi.clearAllMocks();
@@ -858,12 +871,10 @@ describe('CreditPurchaseScreen', () => {
     /* eslint-enable no-await-in-loop */
 
     for (const result of measured) {
-      expect(result).toEqual({
-        state: result.state,
-        copyRendered: true,
-        legalAfterCopy: true,
-        packAreaAfterLegal: true,
-      });
+      expect(result.copyPresent, result.state).toBe(true);
+      expect(result.copyInScroller, result.state).toBe(0);
+      expect(result.legalInScroller, result.state).toBe(0);
+      expect(result.packAreaInScroller, result.state).toBeGreaterThan(0);
     }
   });
 
@@ -998,11 +1009,7 @@ describe('CreditPurchaseScreen', () => {
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => packRows(renderer).length === 4);
 
-    const legalLinks = renderer.root.findAll(
-      node =>
-        String(node.type) === 'Pressable' &&
-        (node.props as { accessibilityRole?: string }).accessibilityRole === 'link'
-    );
+    const legalLinks = legalLinkNodes(renderer.root);
     expect(legalLinks).toHaveLength(2);
     const [termsLink, privacyLink] = legalLinks;
     if (!termsLink || !privacyLink) {

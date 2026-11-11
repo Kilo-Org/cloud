@@ -2754,7 +2754,7 @@
       "positionHint": "(1 од {{displayCount}})",
       "movedPastPrompt": "Агентот веќе продолжи понатаму од ова барање. Картичката ќе се затвори кога ќе продолжи сесијата.",
       "waitingForAnswer": "Агентот го чека твојот одговор. Додека прашањето е отворено, твојата порака до агентот е на чекање.",
-      "waitingForPermission": "Агентот чека дозвола. Додека барањето е отворено, твојата порака до агентот е на чекање."
+      "waitingForPermission": "Додека барањето е отворено, твојата порака до агентот е на чекање."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

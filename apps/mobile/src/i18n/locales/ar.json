@@ -2316,7 +2316,7 @@
       "positionHint": "(1 من {{displayCount}})",
       "movedPastPrompt": "تجاوز الوكيل هذا الطلب. ستُغلق هذه البطاقة عند استئناف الجلسة.",
       "waitingForAnswer": "الوكيل في انتظار إجابتك. يبقى إرسال رسالتك إلى الوكيل متوقفًا مؤقتًا ما دام هذا السؤال مفتوحًا.",
-      "waitingForPermission": "الوكيل في انتظار الإذن. يبقى إرسال رسالتك إلى الوكيل متوقفًا مؤقتًا ما دام هذا الطلب مفتوحًا."
+      "waitingForPermission": "يبقى إرسال رسالتك إلى الوكيل متوقفًا مؤقتًا ما دام هذا الطلب مفتوحًا."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}، {{taskName}}{{modelLabel}}، {{latestActivityLabel}}، {{status}}",

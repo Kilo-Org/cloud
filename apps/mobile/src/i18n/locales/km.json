@@ -2754,7 +2754,7 @@
       "positionHint": "(1 ក្នុងចំណោម {{displayCount}})",
       "movedPastPrompt": "ភ្នាក់ងារបានឆ្លងផុតសំណើនេះហើយ។ កាតនេះនឹងបិទនៅពេលវគ្គបន្ត។",
       "waitingForAnswer": "ភ្នាក់ងារកំពុងរង់ចាំចម្លើយរបស់អ្នក។ ការផ្ញើសាររបស់អ្នកទៅភ្នាក់ងារត្រូវបានផ្អាក រហូតដល់សំណួរនេះបិទ។",
-      "waitingForPermission": "ភ្នាក់ងារកំពុងរង់ចាំការអនុញ្ញាត។ ការផ្ញើសាររបស់អ្នកទៅភ្នាក់ងារត្រូវបានផ្អាក រហូតដល់សំណើនេះបិទ។"
+      "waitingForPermission": "ការផ្ញើសាររបស់អ្នកទៅភ្នាក់ងារត្រូវបានផ្អាក រហូតដល់សំណើនេះបិទ។"
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

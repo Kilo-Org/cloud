@@ -2800,7 +2800,7 @@
       "positionHint": "(1 din {{displayCount}})",
       "movedPastPrompt": "Agentul a trecut de această solicitare. Acest panou se va închide când sesiunea va continua.",
       "waitingForAnswer": "Agentul așteaptă răspunsul tău. Mesajul tău către agent rămâne în așteptare cât timp această întrebare este deschisă.",
-      "waitingForPermission": "Agentul așteaptă permisiunea. Mesajul tău către agent rămâne în așteptare cât timp această solicitare este deschisă."
+      "waitingForPermission": "Mesajul tău către agent rămâne în așteptare cât timp această solicitare este deschisă."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

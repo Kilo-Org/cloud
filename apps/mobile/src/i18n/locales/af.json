@@ -2754,7 +2754,7 @@
       "positionHint": "(1 van {{displayCount}})",
       "movedPastPrompt": "Die agent het reeds met die volgende stap begin. Hierdie kaart sal sluit wanneer die sessie voortgaan.",
       "waitingForAnswer": "Die agent wag op jou antwoord. Jou boodskap aan die agent word teruggehou terwyl hierdie vraag oop is.",
-      "waitingForPermission": "Die agent wag op toestemming. Jou boodskap aan die agent word teruggehou terwyl hierdie versoek oop is."
+      "waitingForPermission": "Jou boodskap aan die agent word teruggehou terwyl hierdie versoek oop is."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

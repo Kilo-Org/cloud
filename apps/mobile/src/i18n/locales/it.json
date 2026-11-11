@@ -2208,7 +2208,7 @@
       "positionHint": "(1 su {{displayCount}})",
       "movedPastPrompt": "L'agente è già passato oltre questa richiesta. Questa scheda si chiuderà quando la sessione riprenderà.",
       "waitingForAnswer": "L'agente attende la tua risposta. L'invio del tuo messaggio all'agente resta sospeso finché la domanda è aperta.",
-      "waitingForPermission": "L'agente attende l'autorizzazione. L'invio del tuo messaggio all'agente resta sospeso finché la richiesta è aperta."
+      "waitingForPermission": "L'invio del tuo messaggio all'agente resta sospeso finché la richiesta è aperta."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

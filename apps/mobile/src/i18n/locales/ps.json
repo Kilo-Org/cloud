@@ -2754,7 +2754,7 @@
       "positionHint": "(له {{displayCount}} څخه ۱)",
       "movedPastPrompt": "ایجنټ له دې پرامپټ څخه تېر شوی دی. کله چې ناسته دوام وکړي، دا کارت به وتړل شي.",
       "waitingForAnswer": "ایجنټ ستاسو ځواب ته په تمه دی. تر هغه چې دا پوښتنه خلاصه وي، ایجنټ ته ستاسو د پیغام لېږل ځنډول شوي دي.",
-      "waitingForPermission": "ایجنټ اجازې ته په تمه دی. تر هغه چې دا غوښتنه خلاصه وي، ایجنټ ته ستاسو د پیغام لېږل ځنډول شوي دي."
+      "waitingForPermission": "تر هغه چې دا غوښتنه خلاصه وي، ایجنټ ته ستاسو د پیغام لېږل ځنډول شوي دي."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}، {{taskName}}{{modelLabel}}، {{latestActivityLabel}}، {{status}}",

@@ -2760,7 +2760,7 @@
       "positionHint": "(1 sa {{displayCount}})",
       "movedPastPrompt": "Nalampasan na ng ahente ang prompt na ito. Magsasara ang card na ito kapag nagpatuloy ang sesyon.",
       "waitingForAnswer": "Naghihintay ang ahente ng sagot mo. Hindi muna ipapadala ang mensahe mo sa ahente habang bukas ang tanong na ito.",
-      "waitingForPermission": "Naghihintay ang ahente ng pahintulot. Hindi muna ipapadala ang mensahe mo sa ahente habang bukas ang kahilingang ito."
+      "waitingForPermission": "Hindi muna ipapadala ang mensahe mo sa ahente habang bukas ang kahilingang ito."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

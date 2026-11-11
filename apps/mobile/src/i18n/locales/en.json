@@ -2840,7 +2840,7 @@
       "positionHint": "(1 of {{displayCount}})",
       "movedPastPrompt": "The agent has moved past this prompt. This card will close when the session continues.",
       "waitingForAnswer": "The agent is waiting for your answer. While this question is open, your message to the agent is paused.",
-      "waitingForPermission": "The agent is waiting for permission. While this request is open, your message to the agent is paused."
+      "waitingForPermission": "While this request is open, your message to the agent is paused."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

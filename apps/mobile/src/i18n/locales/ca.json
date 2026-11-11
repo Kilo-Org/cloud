@@ -2800,7 +2800,7 @@
       "positionHint": "(1 de {{displayCount}})",
       "movedPastPrompt": "L'agent ja no espera una resposta a aquesta sol·licitud. Aquesta targeta es tancarà quan la sessió continuï.",
       "waitingForAnswer": "L'agent espera la teva resposta. Mentre la pregunta estigui pendent, l'enviament del teu missatge a l'agent queda en pausa.",
-      "waitingForPermission": "L'agent espera permís per continuar. Mentre la sol·licitud estigui pendent, l'enviament del teu missatge a l'agent queda en pausa."
+      "waitingForPermission": "Mentre la sol·licitud estigui pendent, l'enviament del teu missatge a l'agent queda en pausa."
     },
     "childSession": {
       "accessibilityLabel": "Agent {{agentName}}, tasca {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

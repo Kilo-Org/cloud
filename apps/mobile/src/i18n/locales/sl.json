@@ -2846,7 +2846,7 @@
       "positionHint": "(1 od {{displayCount}})",
       "movedPastPrompt": "Agent je že nadaljeval obdelavo po tem pozivu. Kartica se bo zaprla, ko se seja nadaljuje.",
       "waitingForAnswer": "Agent čaka na tvoj odgovor. Dokler je to vprašanje odprto, pošiljanje tvojega sporočila agentu čaka.",
-      "waitingForPermission": "Agent čaka na dovoljenje. Dokler je ta zahteva odprta, pošiljanje tvojega sporočila agentu čaka."
+      "waitingForPermission": "Dokler je ta zahteva odprta, pošiljanje tvojega sporočila agentu čaka."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

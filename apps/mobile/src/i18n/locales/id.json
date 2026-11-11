@@ -2216,7 +2216,7 @@
       "positionHint": "(1 dari {{displayCount}})",
       "movedPastPrompt": "Agen telah melewati permintaan ini. Kartu ini akan ditutup saat sesi berlanjut.",
       "waitingForAnswer": "Agen sedang menunggu jawabanmu. Pengiriman pesanmu ke agen ditunda selama pertanyaan ini masih terbuka.",
-      "waitingForPermission": "Agen sedang menunggu izin. Pengiriman pesanmu ke agen ditunda selama permintaan ini masih terbuka."
+      "waitingForPermission": "Pengiriman pesanmu ke agen ditunda selama permintaan ini masih terbuka."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

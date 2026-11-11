@@ -2754,7 +2754,7 @@
       "positionHint": "(1 n'ime {{displayCount}})",
       "movedPastPrompt": "Onye nnọchi anya atụpụla arịrịọ a n'ihu. Kaadị a ga-emechi mgbe nnọkọ ga-aga n'ihu.",
       "waitingForAnswer": "Onye nnọchi anya na-eche azịza gị. A kwụsịtụrụ ozi gị nye onye nnọchi anya ruo mgbe a zara ajụjụ a.",
-      "waitingForPermission": "Onye nnọchi anya na-eche ikike. A kwụsịtụrụ ozi gị nye onye nnọchi anya ruo mgbe a zara arịrịọ a."
+      "waitingForPermission": "A kwụsịtụrụ ozi gị nye onye nnọchi anya ruo mgbe a zara arịrịọ a."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

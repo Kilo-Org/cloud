@@ -2846,7 +2846,7 @@
       "positionHint": "(1 z {{displayCount}})",
       "movedPastPrompt": "Agent už pokračoval ďalej a túto výzvu nepotrebuje. Karta sa zatvorí, keď bude relácia pokračovať.",
       "waitingForAnswer": "Agent čaká na tvoju odpoveď. Kým je táto otázka otvorená, odosielanie tvojej správy agentovi je pozastavené.",
-      "waitingForPermission": "Agent čaká na povolenie. Kým je táto žiadosť otvorená, odosielanie tvojej správy agentovi je pozastavené."
+      "waitingForPermission": "Kým je táto žiadosť otvorená, odosielanie tvojej správy agentovi je pozastavené."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

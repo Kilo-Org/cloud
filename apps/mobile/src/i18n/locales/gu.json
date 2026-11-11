@@ -2760,7 +2760,7 @@
       "positionHint": "({{displayCount}} માંથી 1)",
       "movedPastPrompt": "એજન્ટ આ પ્રોમ્પ્ટથી આગળ વધી ગયો છે. જ્યારે સત્ર ચાલુ થશે ત્યારે આ કાર્ડ બંધ થશે.",
       "waitingForAnswer": "એજન્ટ તમારા જવાબની રાહ જોઈ રહ્યો છે. આ પ્રશ્ન ખુલ્લો હોય ત્યાં સુધી એજન્ટને તમારો સંદેશ મોકલવાનું અટકાવ્યું છે.",
-      "waitingForPermission": "એજન્ટ પરવાનગીની રાહ જોઈ રહ્યો છે. આ વિનંતી ખુલ્લી હોય ત્યાં સુધી એજન્ટને તમારો સંદેશ મોકલવાનું અટકાવ્યું છે."
+      "waitingForPermission": "આ વિનંતી ખુલ્લી હોય ત્યાં સુધી એજન્ટને તમારો સંદેશ મોકલવાનું અટકાવ્યું છે."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

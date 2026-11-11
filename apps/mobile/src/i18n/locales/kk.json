@@ -2754,7 +2754,7 @@
       "positionHint": "(1 / {{displayCount}})",
       "movedPastPrompt": "Агент бұл сұраудан әрі өтті. Сессия жалғасқанда бұл карточка жабылады.",
       "waitingForAnswer": "Агент жауабыңызды күтуде. Бұл сұрақ ашық тұрғанда, агентке хабарлама жіберу кідіртіледі.",
-      "waitingForPermission": "Агент рұқсат күтуде. Бұл сұрау ашық тұрғанда, агентке хабарлама жіберу кідіртіледі."
+      "waitingForPermission": "Бұл сұрау ашық тұрғанда, агентке хабарлама жіберу кідіртіледі."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

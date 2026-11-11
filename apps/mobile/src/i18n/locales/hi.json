@@ -2193,7 +2193,7 @@
       "positionHint": "({{displayCount}} में से 1)",
       "movedPastPrompt": "एजेंट इस प्रॉम्प्ट से आगे बढ़ चुका है। सत्र आगे बढ़ने पर यह कार्ड बंद हो जाएगा।",
       "waitingForAnswer": "एजेंट आपके उत्तर का इंतज़ार कर रहा है। जब तक यह प्रश्न खुला है, एजेंट को आपका संदेश नहीं भेजा जाएगा।",
-      "waitingForPermission": "एजेंट अनुमति का इंतज़ार कर रहा है। जब तक यह अनुरोध खुला है, एजेंट को आपका संदेश नहीं भेजा जाएगा।"
+      "waitingForPermission": "जब तक यह अनुरोध खुला है, एजेंट को आपका संदेश नहीं भेजा जाएगा।"
     },
     "childSession": {
       "accessibilityLabel": "एजेंट {{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

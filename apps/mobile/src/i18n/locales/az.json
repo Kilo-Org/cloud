@@ -2754,7 +2754,7 @@
       "positionHint": "(1 / {{displayCount}})",
       "movedPastPrompt": "Agent artıq bu sorğunu keçib. Sessiya davam etdikdə bu kart bağlanacaq.",
       "waitingForAnswer": "Agent cavabını gözləyir. Bu sual açıq olduğu müddətdə agentə mesajın göndərilməsi dayandırılıb.",
-      "waitingForPermission": "Agent icazə gözləyir. Bu sorğu açıq olduğu müddətdə agentə mesajın göndərilməsi dayandırılıb."
+      "waitingForPermission": "Bu sorğu açıq olduğu müddətdə agentə mesajın göndərilməsi dayandırılıb."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

@@ -2754,7 +2754,7 @@
       "positionHint": "(1/{{displayCount}})",
       "movedPastPrompt": "Agentti on jo siirtynyt tämän kehotteen ohi. Tämä kortti sulkeutuu, kun istunto jatkuu.",
       "waitingForAnswer": "Agentti odottaa vastaustasi. Viestisi lähetys agentille odottaa, kunnes olet vastannut tähän kysymykseen.",
-      "waitingForPermission": "Agentti odottaa lupaa. Viestisi lähetys agentille odottaa, kunnes olet vastannut tähän pyyntöön."
+      "waitingForPermission": "Viestisi lähetys agentille odottaa, kunnes olet vastannut tähän pyyntöön."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

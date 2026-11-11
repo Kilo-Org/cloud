@@ -2760,7 +2760,7 @@
       "positionHint": "(۱ از {{displayCount}})",
       "movedPastPrompt": "عامل از این درخواست گذشته است. با ادامهٔ نشست، این کارت بسته می‌شود.",
       "waitingForAnswer": "عامل منتظر پاسخ شماست. تا زمانی که این پرسش باز است، ارسال پیام شما به عامل متوقف می‌ماند.",
-      "waitingForPermission": "عامل منتظر مجوز است. تا زمانی که این درخواست باز است، ارسال پیام شما به عامل متوقف می‌ماند."
+      "waitingForPermission": "تا زمانی که این درخواست باز است، ارسال پیام شما به عامل متوقف می‌ماند."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}، {{taskName}}{{modelLabel}}، {{latestActivityLabel}}، {{status}}",

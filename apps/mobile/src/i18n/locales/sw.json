@@ -2754,7 +2754,7 @@
       "positionHint": "(1 kati ya {{displayCount}})",
       "movedPastPrompt": "Wakala ameshapita ombi hili. Kadi hii itafungwa kikao kitakapoendelea.",
       "waitingForAnswer": "Wakala anasubiri jibu lako. Ujumbe wako kwa wakala unasubiri hadi swali hili lijibiwe au lirukwe.",
-      "waitingForPermission": "Wakala anasubiri ruhusa. Ujumbe wako kwa wakala unasubiri hadi uamue kuhusu ombi hili."
+      "waitingForPermission": "Ujumbe wako kwa wakala unasubiri hadi uamue kuhusu ombi hili."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

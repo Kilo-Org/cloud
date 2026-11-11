@@ -2760,7 +2760,7 @@
       "positionHint": "(1 kwangu-{{displayCount}})",
       "movedPastPrompt": "Umenzeli usedlulile kulesi sicelo. Leli khadi lizovaleka lapho iseshini iqhubeka.",
       "waitingForAnswer": "Umenzeli ulinde impendulo yakho. Ukuthunyelwa komlayezo wakho kumenzeli kumisiwe ngenkathi lo mbuzo uvulekile.",
-      "waitingForPermission": "Umenzeli ulinde imvume. Ukuthunyelwa komlayezo wakho kumenzeli kumisiwe ngenkathi lesi sicelo sivulekile."
+      "waitingForPermission": "Ukuthunyelwa komlayezo wakho kumenzeli kumisiwe ngenkathi lesi sicelo sivulekile."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

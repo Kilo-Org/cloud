@@ -2754,7 +2754,7 @@
       "positionHint": "(1 ka mid ah {{displayCount}})",
       "movedPastPrompt": "Wakiilku wuu dhaafay codsigan. Kaadhkan wuu xirmi doonaa marka kalfadhigu sii socdo.",
       "waitingForAnswer": "Wakiilku wuxuu sugayaa jawaabtaada. Inta su'aashani furan tahay, dirista farriintaada wakiilka waa la hakiyay.",
-      "waitingForPermission": "Wakiilku wuxuu sugayaa oggolaansho. Inta codsigani furan yahay, dirista farriintaada wakiilka waa la hakiyay."
+      "waitingForPermission": "Inta codsigani furan yahay, dirista farriintaada wakiilka waa la hakiyay."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

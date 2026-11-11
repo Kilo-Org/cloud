@@ -2760,7 +2760,7 @@
       "positionHint": "({{displayCount}} ਵਿੱਚੋਂ 1)",
       "movedPastPrompt": "ਏਜੰਟ ਇਸ ਪ੍ਰੌਂਪਟ ਤੋਂ ਅੱਗੇ ਵਧ ਚੁੱਕਾ ਹੈ। ਸੈਸ਼ਨ ਮੁੜ ਚੱਲਣ 'ਤੇ ਇਹ ਕਾਰਡ ਬੰਦ ਹੋ ਜਾਵੇਗਾ।",
       "waitingForAnswer": "ਏਜੰਟ ਤੁਹਾਡੇ ਜਵਾਬ ਦੀ ਉਡੀਕ ਕਰ ਰਿਹਾ ਹੈ। ਜਦੋਂ ਤੱਕ ਇਹ ਸਵਾਲ ਖੁੱਲ੍ਹਾ ਹੈ, ਏਜੰਟ ਨੂੰ ਤੁਹਾਡਾ ਸੁਨੇਹਾ ਭੇਜਣਾ ਰੋਕਿਆ ਰਹੇਗਾ।",
-      "waitingForPermission": "ਏਜੰਟ ਇਜਾਜ਼ਤ ਦੀ ਉਡੀਕ ਕਰ ਰਿਹਾ ਹੈ। ਜਦੋਂ ਤੱਕ ਇਹ ਬੇਨਤੀ ਖੁੱਲ੍ਹੀ ਹੈ, ਏਜੰਟ ਨੂੰ ਤੁਹਾਡਾ ਸੁਨੇਹਾ ਭੇਜਣਾ ਰੋਕਿਆ ਰਹੇਗਾ।"
+      "waitingForPermission": "ਜਦੋਂ ਤੱਕ ਇਹ ਬੇਨਤੀ ਖੁੱਲ੍ਹੀ ਹੈ, ਏਜੰਟ ਨੂੰ ਤੁਹਾਡਾ ਸੁਨੇਹਾ ਭੇਜਣਾ ਰੋਕਿਆ ਰਹੇਗਾ।"
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

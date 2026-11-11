@@ -2754,7 +2754,7 @@
       "positionHint": "(1 nga {{displayCount}})",
       "movedPastPrompt": "Agjenti e ka kaluar këtë kërkesë. Kjo kartë do të mbyllet kur të vazhdojë seanca.",
       "waitingForAnswer": "Agjenti po pret përgjigjen tënde. Derisa t'i përgjigjesh kësaj pyetjeje, mesazhi yt për agjentin mbetet në pritje.",
-      "waitingForPermission": "Agjenti po pret lejen. Derisa të vendosësh për këtë kërkesë, mesazhi yt për agjentin mbetet në pritje."
+      "waitingForPermission": "Derisa të vendosësh për këtë kërkesë, mesazhi yt për agjentin mbetet në pritje."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

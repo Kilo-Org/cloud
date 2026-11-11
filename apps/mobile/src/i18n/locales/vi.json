@@ -2216,7 +2216,7 @@
       "positionHint": "(1 trong số {{displayCount}})",
       "movedPastPrompt": "Tác nhân đã chuyển sang bước khác. Thẻ này sẽ đóng khi phiên tiếp tục.",
       "waitingForAnswer": "Tác nhân đang chờ bạn trả lời. Việc gửi tin nhắn cho tác nhân sẽ tạm dừng cho đến khi câu hỏi này được đóng.",
-      "waitingForPermission": "Tác nhân đang chờ được cấp quyền. Việc gửi tin nhắn cho tác nhân sẽ tạm dừng cho đến khi yêu cầu này được đóng."
+      "waitingForPermission": "Việc gửi tin nhắn cho tác nhân sẽ tạm dừng cho đến khi yêu cầu này được đóng."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

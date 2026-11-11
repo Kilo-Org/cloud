@@ -2760,7 +2760,7 @@
       "positionHint": "(ከ{{displayCount}} 1ኛ)",
       "movedPastPrompt": "ወኪሉ ይህን ጥያቄ አልፎታል። ክፍለ ጊዜው ሲቀጥል ይህ ካርድ ይዘጋል።",
       "waitingForAnswer": "ወኪሉ መልስዎን እየጠበቀ ነው። ይህ ጥያቄ ክፍት ሆኖ እስካለ ድረስ፣ ወደ ወኪሉ መልእክት መላክ ለጊዜው ቆሟል።",
-      "waitingForPermission": "ወኪሉ ፈቃድ እየጠበቀ ነው። ይህ ጥያቄ ክፍት ሆኖ እስካለ ድረስ፣ ወደ ወኪሉ መልእክት መላክ ለጊዜው ቆሟል።"
+      "waitingForPermission": "ይህ ጥያቄ ክፍት ሆኖ እስካለ ድረስ፣ ወደ ወኪሉ መልእክት መላክ ለጊዜው ቆሟል።"
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}፣ {{taskName}}{{modelLabel}}፣ {{latestActivityLabel}}፣ {{status}}",

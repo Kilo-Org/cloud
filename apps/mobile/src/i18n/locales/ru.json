@@ -2266,7 +2266,7 @@
       "positionHint": "(1 из {{displayCount}})",
       "movedPastPrompt": "Агент уже перешёл к следующему шагу. Эта карточка закроется, когда сеанс продолжится.",
       "waitingForAnswer": "Агент ждёт вашего ответа. Пока вопрос открыт, отправка вашего сообщения агенту приостановлена.",
-      "waitingForPermission": "Агент ждёт разрешения. Пока запрос открыт, отправка вашего сообщения агенту приостановлена."
+      "waitingForPermission": "Пока запрос открыт, отправка вашего сообщения агенту приостановлена."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

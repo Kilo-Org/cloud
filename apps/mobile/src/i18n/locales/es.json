@@ -2241,7 +2241,7 @@
       "positionHint": "(1 de {{displayCount}})",
       "movedPastPrompt": "El agente ya ha avanzado más allá de esta solicitud. Esta tarjeta se cerrará cuando continúe la sesión.",
       "waitingForAnswer": "El agente está esperando tu respuesta. El envío de tu mensaje al agente está en pausa mientras esta pregunta siga abierta.",
-      "waitingForPermission": "El agente está esperando permiso. El envío de tu mensaje al agente está en pausa mientras esta solicitud siga abierta."
+      "waitingForPermission": "El envío de tu mensaje al agente está en pausa mientras esta solicitud siga abierta."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

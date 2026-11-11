@@ -2754,7 +2754,7 @@
       "positionHint": "(1 af {{displayCount}})",
       "movedPastPrompt": "Fulltrúinn hefur þegar haldið áfram frá þessari beiðni. Þetta spjald lokast þegar lotan heldur áfram.",
       "waitingForAnswer": "Fulltrúinn bíður eftir svari frá þér. Skilaboðin þín til fulltrúans bíða á meðan þessi spurning er opin.",
-      "waitingForPermission": "Fulltrúinn bíður eftir heimild. Skilaboðin þín til fulltrúans bíða á meðan þessi beiðni er opin."
+      "waitingForPermission": "Skilaboðin þín til fulltrúans bíða á meðan þessi beiðni er opin."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

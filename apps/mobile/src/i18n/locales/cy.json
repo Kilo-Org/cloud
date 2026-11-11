@@ -2938,7 +2938,7 @@
       "positionHint": "(1 o {{displayCount}})",
       "movedPastPrompt": "Mae'r asiant wedi symud ymlaen o'r anogiad hwn. Bydd y cerdyn hwn yn cau pan fydd y sesiwn yn parhau.",
       "waitingForAnswer": "Mae'r asiant yn aros am eich ateb. Mae eich neges at yr asiant yn aros tra bo'r cwestiwn hwn ar agor.",
-      "waitingForPermission": "Mae'r asiant yn aros am ganiatâd. Mae eich neges at yr asiant yn aros tra bo'r cais hwn ar agor."
+      "waitingForPermission": "Mae eich neges at yr asiant yn aros tra bo'r cais hwn ar agor."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

@@ -2754,7 +2754,7 @@
       "positionHint": "(1 o {{displayCount}})",
       "movedPastPrompt": "Kua hipa te māngai i tēnei tono. Ka kati tēnei kāri ina haere tonu te wātū.",
       "waitingForAnswer": "Kei te tatari te māngai ki tō whakautu. Ka whakatārewatia tō karere ki te māngai i te wā e tuwhera ana tēnei pātai.",
-      "waitingForPermission": "Kei te tatari te māngai ki te whakaaetanga. Ka whakatārewatia tō karere ki te māngai i te wā e tuwhera ana tēnei tono."
+      "waitingForPermission": "Ka whakatārewatia tō karere ki te māngai i te wā e tuwhera ana tēnei tono."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

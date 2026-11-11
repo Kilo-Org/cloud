@@ -2754,7 +2754,7 @@
       "positionHint": "(1 nínú {{displayCount}})",
       "movedPastPrompt": "Aṣojú ti kọjá ọ̀rọ̀ ìtọ́ni yìí. Káàdì yìí yóò pa dé nígbà tí ìgbà iṣẹ́ bá tẹ̀síwájú.",
       "waitingForAnswer": "Aṣojú ń dúró de ìdáhùn rẹ. Bí ìbéèrè yìí ṣe ṣì ṣí sílẹ̀, a ti dá ìfiránṣẹ́ rẹ sí aṣojú dúró.",
-      "waitingForPermission": "Aṣojú ń dúró de ìyọ̀ǹda. Bí ìbéèrè yìí ṣe ṣì ṣí sílẹ̀, a ti dá ìfiránṣẹ́ rẹ sí aṣojú dúró."
+      "waitingForPermission": "Bí ìbéèrè yìí ṣe ṣì ṣí sílẹ̀, a ti dá ìfiránṣẹ́ rẹ sí aṣojú dúró."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

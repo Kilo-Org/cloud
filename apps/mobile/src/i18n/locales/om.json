@@ -2754,7 +2754,7 @@
       "positionHint": "({{displayCount}} keessaa 1)",
       "movedPastPrompt": "Ergamaan gaaffii kana irra darbeera. Yeroo turtiin itti fufu kaardiin kun ni cufama.",
       "waitingForAnswer": "Ergamaan deebii kee eegaa jira. Hanga gaaffiin kun banaa jirutti ergaan ergamaaf ergitu ni tura.",
-      "waitingForPermission": "Ergamaan hayyama eegaa jira. Hanga gaaffiin kun banaa jirutti ergaan ergamaaf ergitu ni tura."
+      "waitingForPermission": "Hanga gaaffiin kun banaa jirutti ergaan ergamaaf ergitu ni tura."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

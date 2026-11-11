@@ -2892,7 +2892,7 @@
       "positionHint": "(1 de {{displayCount}})",
       "movedPastPrompt": "Tá an gníomhaire tar éis dul ar aghaidh ón leid seo. Dúnfaidh an cárta seo nuair a leanfaidh an seisiún ar aghaidh.",
       "waitingForAnswer": "Tá an gníomhaire ag fanacht le do fhreagra. Fanfaidh do theachtaireacht chuig an ngníomhaire ar sos fad a bheidh an cheist seo oscailte.",
-      "waitingForPermission": "Tá an gníomhaire ag fanacht le cead. Fanfaidh do theachtaireacht chuig an ngníomhaire ar sos fad a bheidh an t-iarratas seo oscailte."
+      "waitingForPermission": "Fanfaidh do theachtaireacht chuig an ngníomhaire ar sos fad a bheidh an t-iarratas seo oscailte."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

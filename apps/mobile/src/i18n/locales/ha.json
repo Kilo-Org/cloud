@@ -2754,7 +2754,7 @@
       "positionHint": "(1 cikin {{displayCount}})",
       "movedPastPrompt": "Wakilin ya wuce wannan tambaya. Wannan katin zai rufe idan zaman ya ci gaba.",
       "waitingForAnswer": "Wakilin yana jiran amsarka. An dakatar da saƙonka zuwa wakilin har sai ka amsa wannan tambayar.",
-      "waitingForPermission": "Wakilin yana jiran izini. An dakatar da saƙonka zuwa wakilin har sai ka amsa wannan buƙatar."
+      "waitingForPermission": "An dakatar da saƙonka zuwa wakilin har sai ka amsa wannan buƙatar."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

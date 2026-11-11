@@ -2754,7 +2754,7 @@
       "positionHint": "(1 ຈາກທັງໝົດ {{displayCount}})",
       "movedPastPrompt": "ເອເຈນໄດ້ຜ່ານຄຳຂໍນີ້ໄປແລ້ວ. ແຜງນີ້ຈະປິດເມື່ອເຊດຊັນເຮັດວຽກຕໍ່.",
       "waitingForAnswer": "ເອເຈນກຳລັງລໍຖ້າຄຳຕອບຂອງເຈົ້າ. ການສົ່ງຂໍ້ຄວາມໄປຫາເອເຈນຈະຢຸດຊົ່ວຄາວຈົນກວ່າຈະຕອບຄຳຖາມນີ້.",
-      "waitingForPermission": "ເອເຈນກຳລັງລໍຖ້າການອະນຸຍາດ. ການສົ່ງຂໍ້ຄວາມໄປຫາເອເຈນຈະຢຸດຊົ່ວຄາວຈົນກວ່າຈະຕອບຄຳຂໍນີ້."
+      "waitingForPermission": "ການສົ່ງຂໍ້ຄວາມໄປຫາເອເຈນຈະຢຸດຊົ່ວຄາວຈົນກວ່າຈະຕອບຄຳຂໍນີ້."
     },
     "childSession": {
       "accessibilityLabel": "ເອເຈນ {{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

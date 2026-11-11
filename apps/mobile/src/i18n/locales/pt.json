@@ -2806,7 +2806,7 @@
       "positionHint": "(1 de {{displayCount}})",
       "movedPastPrompt": "O agente já passou este pedido. Este cartão será fechado quando a sessão continuar.",
       "waitingForAnswer": "O agente aguarda a sua resposta. Enquanto esta pergunta estiver aberta, o envio da sua mensagem ao agente fica em pausa.",
-      "waitingForPermission": "O agente aguarda permissão. Enquanto este pedido estiver aberto, o envio da sua mensagem ao agente fica em pausa."
+      "waitingForPermission": "Enquanto este pedido estiver aberto, o envio da sua mensagem ao agente fica em pausa."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",

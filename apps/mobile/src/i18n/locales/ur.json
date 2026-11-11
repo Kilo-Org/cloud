@@ -2754,7 +2754,7 @@
       "positionHint": "({{displayCount}} میں سے 1)",
       "movedPastPrompt": "ایجنٹ اس درخواست سے آگے بڑھ چکا ہے۔ سیشن دوبارہ جاری ہونے پر یہ کارڈ بند ہو جائے گا۔",
       "waitingForAnswer": "ایجنٹ آپ کے جواب کا انتظار کر رہا ہے۔ جب تک یہ سوال کھلا ہے، ایجنٹ کو آپ کا پیغام بھیجنے کا عمل رکا رہے گا۔",
-      "waitingForPermission": "ایجنٹ اجازت کا انتظار کر رہا ہے۔ جب تک یہ درخواست کھلی ہے، ایجنٹ کو آپ کا پیغام بھیجنے کا عمل رکا رہے گا۔"
+      "waitingForPermission": "جب تک یہ درخواست کھلی ہے، ایجنٹ کو آپ کا پیغام بھیجنے کا عمل رکا رہے گا۔"
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}، {{taskName}}{{modelLabel}}، {{latestActivityLabel}}، {{status}}",

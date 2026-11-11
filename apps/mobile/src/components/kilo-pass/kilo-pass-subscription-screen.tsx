@@ -84,17 +84,20 @@ function KiloPassUnavailableScreen({ presentation }: PresentationProps) {
   const router = useRouter();
 
   if (presentation.kind === 'unavailable') {
-    // The ended sentence only where the server says the pass ended, so the copy
-    // never claims a lapse for an account that never had one.
-    const ended =
-      presentation.statusClass === 'terminal' ? t('kiloPass.purchaseUnavailableEnded') : null;
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('kiloPass.title')} modal />
         <EmptyState
           icon={Crown}
           title={t('kiloPass.purchaseUnavailableTitle')}
-          description={ended ?? t('kiloPass.purchaseUnavailable')}
+          // Only a pass the server reports as ended has something the title does
+          // not say; the plain kind would restate the title, which the state's
+          // own guide forbids.
+          description={
+            presentation.statusClass === 'terminal'
+              ? t('kiloPass.purchaseUnavailableEnded')
+              : undefined
+          }
           action={
             <Button
               accessibilityLabel={t('credits.title')}

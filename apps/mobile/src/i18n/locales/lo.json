@@ -3174,7 +3174,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "ຕອນນີ້ຍັງບໍ່ສາມາດຊື້ Kilo Pass ໄດ້.",
     "purchaseUnavailableTitle": "ຕອນນີ້ຍັງບໍ່ສາມາດໃຊ້ໄດ້",
-    "purchaseUnavailableEnded": "Kilo Pass ຂອງທ່ານໄດ້ສິ້ນສຸດແລ້ວ. ຕອນນີ້ຍັງບໍ່ສາມາດຊື້ Kilo Pass ໄດ້.",
+    "purchaseUnavailableEnded": "Kilo Pass ຂອງທ່ານໄດ້ສິ້ນສຸດແລ້ວ.",
     "kiloPassManagement": "ການຈັດການ Kilo Pass",
     "kiloPassSetup": "ການຕັ້ງຄ່າ Kilo Pass",
     "subscriptionHeaderDescription": "ການສະໝັກລາຍເດືອນທີ່ເພີ່ມເຄຣດິດໃສ່ຍອດ Kilo ຂອງທ່ານສຳລັບການແລ່ນເຊດຊັນການຂຽນໂຄ້ດ AI ໃນ Kilo App.",

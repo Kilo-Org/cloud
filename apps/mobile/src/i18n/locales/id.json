@@ -2632,7 +2632,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Pembelian Kilo Pass tidak tersedia saat ini.",
     "purchaseUnavailableTitle": "Tidak tersedia saat ini",
-    "purchaseUnavailableEnded": "Kilo Pass Anda telah berakhir. Pembelian Kilo Pass tidak tersedia saat ini.",
+    "purchaseUnavailableEnded": "Kilo Pass Anda telah berakhir.",
     "kiloPassManagement": "Pengelolaan Kilo Pass",
     "kiloPassSetup": "Penyiapan Kilo Pass",
     "subscriptionHeaderDescription": "Langganan bulanan yang menambah kredit ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App.",

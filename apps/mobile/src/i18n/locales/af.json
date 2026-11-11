@@ -3174,7 +3174,7 @@
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Jy kan nie tans Kilo Pass koop nie.",
     "purchaseUnavailableTitle": "Nie tans beskikbaar nie",
-    "purchaseUnavailableEnded": "Jou Kilo Pass het verstryk. Jy kan nie tans Kilo Pass koop nie.",
+    "purchaseUnavailableEnded": "Jou Kilo Pass het verstryk.",
     "kiloPassManagement": "Kilo Pass-bestuur",
     "kiloPassSetup": "Kilo Pass-opstelling",
     "subscriptionHeaderDescription": "'n Maandelikse intekening wat krediete by jou Kilo-saldo voeg vir die bestuur van AI-koderingsessies in Kilo App.",

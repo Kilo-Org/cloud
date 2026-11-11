@@ -3286,7 +3286,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Nakup naročnine Kilo Pass trenutno ni na voljo.",
     "purchaseUnavailableTitle": "Trenutno ni na voljo",
-    "purchaseUnavailableEnded": "Tvoj Kilo Pass je potekel. Nakup naročnine Kilo Pass trenutno ni na voljo.",
+    "purchaseUnavailableEnded": "Tvoj Kilo Pass je potekel.",
     "kiloPassManagement": "Upravljanje naročnine Kilo Pass",
     "kiloPassSetup": "Nastavitev naročnine Kilo Pass",
     "subscriptionHeaderDescription": "Mesečna naročnina, ki tvojemu Kilo stanju doda kredite za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo.",

@@ -3286,7 +3286,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Šiuo metu Kilo Pass įsigyti negalima.",
     "purchaseUnavailableTitle": "Šiuo metu nepasiekiama",
-    "purchaseUnavailableEnded": "Jūsų Kilo Pass prenumerata baigėsi. Šiuo metu Kilo Pass įsigyti negalima.",
+    "purchaseUnavailableEnded": "Jūsų Kilo Pass prenumerata baigėsi.",
     "kiloPassManagement": "Kilo Pass valdymas",
     "kiloPassSetup": "Kilo Pass sąranka",
     "subscriptionHeaderDescription": "Mėnesinė prenumerata, kuri prideda kreditų prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje.",

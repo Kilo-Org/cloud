@@ -2665,7 +2665,7 @@
     "cardAccessibility": "{{title}}. {{description}}. פעולה: {{actionLabel}}",
     "purchaseUnavailable": "רכישת Kilo Pass אינה זמינה כרגע.",
     "purchaseUnavailableTitle": "לא זמין כרגע",
-    "purchaseUnavailableEnded": "ה-Kilo Pass שלך הסתיים. רכישת Kilo Pass אינה זמינה כרגע.",
+    "purchaseUnavailableEnded": "ה-Kilo Pass שלך הסתיים.",
     "kiloPassManagement": "ניהול Kilo Pass",
     "kiloPassSetup": "הגדרת Kilo Pass",
     "subscriptionHeaderDescription": "מנוי חודשי שמוסיף קרדיטים ליתרת Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App.",

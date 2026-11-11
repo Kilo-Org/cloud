@@ -3174,7 +3174,7 @@
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Kilo Passia ei voi ostaa juuri nyt.",
     "purchaseUnavailableTitle": "Ei juuri nyt saatavilla",
-    "purchaseUnavailableEnded": "Kilo Pass -tilauksesi on päättynyt. Kilo Passia ei voi ostaa juuri nyt.",
+    "purchaseUnavailableEnded": "Kilo Pass -tilauksesi on päättynyt.",
     "kiloPassManagement": "Kilo Passin hallinta",
     "kiloPassSetup": "Kilo Passin käyttöönotto",
     "subscriptionHeaderDescription": "Kuukausitilaus, joka lisää krediittejä Kilo-saldollesi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa.",

@@ -3174,7 +3174,7 @@
     "cardAccessibility": "{{title}} — {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Η αγορά του Kilo Pass δεν είναι διαθέσιμη αυτή τη στιγμή.",
     "purchaseUnavailableTitle": "Μη διαθέσιμο αυτή τη στιγμή",
-    "purchaseUnavailableEnded": "Το Kilo Pass σας έχει λήξει. Η αγορά του Kilo Pass δεν είναι διαθέσιμη αυτή τη στιγμή.",
+    "purchaseUnavailableEnded": "Το Kilo Pass σας έχει λήξει.",
     "kiloPassManagement": "Διαχείριση του Kilo Pass",
     "kiloPassSetup": "Ρύθμιση του Kilo Pass",
     "subscriptionHeaderDescription": "Μια μηνιαία συνδρομή που προσθέτει πιστώσεις στο υπόλοιπό σας Kilo για την εκτέλεση συνεδριών προγραμματισμού με AI στην Εφαρμογή Kilo.",

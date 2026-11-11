@@ -2632,7 +2632,7 @@
     "cardAccessibility": "{{title}}。{{description}}。{{actionLabel}}",
     "purchaseUnavailable": "現在Kilo Passを購入できません。",
     "purchaseUnavailableTitle": "現在ご利用いただけません",
-    "purchaseUnavailableEnded": "Kilo Passは終了しました。現在Kilo Passを購入できません。",
+    "purchaseUnavailableEnded": "Kilo Passは終了しました。",
     "kiloPassManagement": "Kilo Passの管理",
     "kiloPassSetup": "Kilo Passのセットアップ",
     "subscriptionHeaderDescription": "毎月のサブスクリプションで、Kilo AppでのAIコーディングセッションの実行に使えるクレジットをKilo残高に追加します。",

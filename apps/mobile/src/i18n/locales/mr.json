@@ -3174,7 +3174,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Kilo Pass खरेदी सध्या उपलब्ध नाही.",
     "purchaseUnavailableTitle": "सध्या उपलब्ध नाही",
-    "purchaseUnavailableEnded": "तुमचा Kilo Pass संपला आहे. Kilo Pass खरेदी सध्या उपलब्ध नाही.",
+    "purchaseUnavailableEnded": "तुमचा Kilo Pass संपला आहे.",
     "kiloPassManagement": "Kilo Pass व्यवस्थापन",
     "kiloPassSetup": "Kilo Pass सेटअप",
     "subscriptionHeaderDescription": "मासिक सदस्यत्व जे Kilo App मध्ये AI कोडिंग सत्रे चालवण्यासाठी तुमच्या Kilo शिल्लकीमध्ये क्रेडिट्स जोडते.",

@@ -3174,7 +3174,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Tsy azo vidina ny Kilo Pass amin'izao fotoana izao.",
     "purchaseUnavailableTitle": "Tsy azo vidina amin'izao fotoana izao",
-    "purchaseUnavailableEnded": "Efa tapitra ny Kilo Pass anao. Tsy azo vidina ny Kilo Pass amin'izao fotoana izao.",
+    "purchaseUnavailableEnded": "Efa tapitra ny Kilo Pass anao.",
     "kiloPassManagement": "Fitantanana ny Kilo Pass",
     "kiloPassSetup": "Fametrahana ny Kilo Pass",
     "subscriptionHeaderDescription": "Abonnement isam-bolana manampy crédits amin'ny balan Kilo anao ho an'ny session coding AI ao amin'ny Kilo App.",

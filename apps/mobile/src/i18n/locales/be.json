@@ -3286,7 +3286,7 @@
     "cardAccessibility": "{{title}} — {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Пакупка Kilo Pass зараз недаступная.",
     "purchaseUnavailableTitle": "Зараз недаступна",
-    "purchaseUnavailableEnded": "Ваш Kilo Pass скончыўся. Пакупка Kilo Pass зараз недаступная.",
+    "purchaseUnavailableEnded": "Ваш Kilo Pass скончыўся.",
     "kiloPassManagement": "Кіраванне Kilo Pass",
     "kiloPassSetup": "Наладжванне Kilo Pass",
     "subscriptionHeaderDescription": "Штомесячная падпіска, якая дадае крэдыты на ваш баланс Kilo для запуску AI-сеансаў праграмавання ў дадатку Kilo.",

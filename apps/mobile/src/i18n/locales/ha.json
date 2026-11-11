@@ -3174,7 +3174,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Ba a iya sayen Kilo Pass a yanzu.",
     "purchaseUnavailableTitle": "Ba ya samuwa a yanzu",
-    "purchaseUnavailableEnded": "Kilo Pass ɗinka ya ƙare. Ba a iya sayen Kilo Pass a yanzu.",
+    "purchaseUnavailableEnded": "Kilo Pass ɗinka ya ƙare.",
     "kiloPassManagement": "Sarrafa Kilo Pass",
     "kiloPassSetup": "Saitin Kilo Pass",
     "subscriptionHeaderDescription": "Biyan kuɗi na wata-wata wanda ke ƙara credits zuwa ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App.",

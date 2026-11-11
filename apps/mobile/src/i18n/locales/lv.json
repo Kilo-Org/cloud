@@ -3230,7 +3230,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Kilo Pass pašlaik nevar iegādāties.",
     "purchaseUnavailableTitle": "Pašlaik nav pieejams",
-    "purchaseUnavailableEnded": "Jūsu Kilo Pass ir beidzies. Kilo Pass pašlaik nevar iegādāties.",
+    "purchaseUnavailableEnded": "Jūsu Kilo Pass ir beidzies.",
     "kiloPassManagement": "Kilo Pass pārvaldība",
     "kiloPassSetup": "Kilo Pass iestatīšana",
     "subscriptionHeaderDescription": "Mēneša abonements, kas pievieno kredītus tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App.",

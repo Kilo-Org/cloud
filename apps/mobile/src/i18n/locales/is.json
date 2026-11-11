@@ -3174,7 +3174,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Ekki er hægt að kaupa Kilo Pass núna.",
     "purchaseUnavailableTitle": "Ekki í boði núna",
-    "purchaseUnavailableEnded": "Kilo Pass þínu er lokið. Ekki er hægt að kaupa Kilo Pass núna.",
+    "purchaseUnavailableEnded": "Kilo Pass þínu er lokið.",
     "kiloPassManagement": "Umsjón með Kilo Pass",
     "kiloPassSetup": "Uppsetning Kilo Pass",
     "subscriptionHeaderDescription": "Mánaðarleg áskrift sem bætir kredítum við Kilo-stöðuna þína fyrir að keyra AI-forritunarlotur í Kilo App.",

@@ -3174,7 +3174,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Det går inte att köpa Kilo Pass just nu.",
     "purchaseUnavailableTitle": "Inte tillgängligt just nu",
-    "purchaseUnavailableEnded": "Ditt Kilo Pass har avslutats. Det går inte att köpa Kilo Pass just nu.",
+    "purchaseUnavailableEnded": "Ditt Kilo Pass har avslutats.",
     "kiloPassManagement": "Hantering av Kilo Pass",
     "kiloPassSetup": "Konfiguration av Kilo Pass",
     "subscriptionHeaderDescription": "En månadsprenumeration som lägger till krediter till ditt Kilo-saldo för att köra AI-kodningssessioner i Kilo-appen.",

@@ -3174,7 +3174,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Blerja e Kilo Pass nuk është e disponueshme tani.",
     "purchaseUnavailableTitle": "Nuk është i disponueshëm tani",
-    "purchaseUnavailableEnded": "Kilo Pass juaj ka përfunduar. Blerja e Kilo Pass nuk është e disponueshme tani.",
+    "purchaseUnavailableEnded": "Kilo Pass juaj ka përfunduar.",
     "kiloPassManagement": "Menaxhimi i Kilo Pass",
     "kiloPassSetup": "Konfigurimi i Kilo Pass",
     "subscriptionHeaderDescription": "Një abonim mujor që shton kredite në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App.",

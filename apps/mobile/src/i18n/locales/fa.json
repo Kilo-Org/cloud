@@ -3174,7 +3174,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "خرید Kilo Pass در حال حاضر ممکن نیست.",
     "purchaseUnavailableTitle": "در حال حاضر در دسترس نیست",
-    "purchaseUnavailableEnded": "Kilo Pass شما به پایان رسیده است. خرید Kilo Pass در حال حاضر ممکن نیست.",
+    "purchaseUnavailableEnded": "Kilo Pass شما به پایان رسیده است.",
     "kiloPassManagement": "مدیریت Kilo Pass",
     "kiloPassSetup": "راه‌اندازی Kilo Pass",
     "subscriptionHeaderDescription": "اشتراک ماهانه‌ای که برای اجرای نشست‌های کدنویسی با هوش مصنوعی در Kilo App به موجودی Kilo شما اعتبار اضافه می‌کند.",

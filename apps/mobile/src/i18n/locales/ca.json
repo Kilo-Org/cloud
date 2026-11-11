@@ -3230,7 +3230,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "La compra de Kilo Pass no està disponible ara mateix.",
     "purchaseUnavailableTitle": "No disponible ara mateix",
-    "purchaseUnavailableEnded": "El teu Kilo Pass ha finalitzat. La compra de Kilo Pass no està disponible ara mateix.",
+    "purchaseUnavailableEnded": "El teu Kilo Pass ha finalitzat.",
     "kiloPassManagement": "Gestió de Kilo Pass",
     "kiloPassSetup": "Configuració de Kilo Pass",
     "subscriptionHeaderDescription": "Una subscripció mensual que afegeix crèdits al teu saldo de Kilo per executar sessions de programació d'IA a l'aplicació Kilo.",

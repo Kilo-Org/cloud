@@ -3174,7 +3174,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Kilo Passi ei saa praegu osta.",
     "purchaseUnavailableTitle": "Praegu pole saadaval",
-    "purchaseUnavailableEnded": "Sinu Kilo Pass on lõppenud. Kilo Passi ei saa praegu osta.",
+    "purchaseUnavailableEnded": "Sinu Kilo Pass on lõppenud.",
     "kiloPassManagement": "Kilo Passi haldamine",
     "kiloPassSetup": "Kilo Passi seadistamine",
     "subscriptionHeaderDescription": "Kuutellimus, mis lisab krediiti sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis.",

@@ -2698,7 +2698,7 @@
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Купити Kilo Pass зараз неможливо.",
     "purchaseUnavailableTitle": "Зараз недоступно",
-    "purchaseUnavailableEnded": "Термін дії вашого Kilo Pass завершився. Купити Kilo Pass зараз неможливо.",
+    "purchaseUnavailableEnded": "Термін дії вашого Kilo Pass завершився.",
     "kiloPassManagement": "Керування Kilo Pass",
     "kiloPassSetup": "Налаштування Kilo Pass",
     "subscriptionHeaderDescription": "Щомісячна підписка, яка додає кредити на ваш баланс Kilo для запуску AI-сесій кодування в Kilo App.",

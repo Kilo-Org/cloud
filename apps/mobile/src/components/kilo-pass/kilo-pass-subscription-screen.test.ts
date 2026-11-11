@@ -81,15 +81,15 @@ describe('KiloPassSubscriptionScreen', () => {
     mockRouter.push.mockClear();
   });
 
-  it('unavailable: renders the shared empty state with a title, the explanation, and one way out', async () => {
+  it('unavailable: renders the shared empty state with a title and one way out', async () => {
     mocks.presentation.data = { kind: 'unavailable', statusClass: 'inactive', webUrl: null };
     const renderer = await renderScreen();
     const emptyState = nodesOfType(renderer, 'EmptyState');
     expect(emptyState).toHaveLength(1);
-    expect(emptyState[0]?.props).toMatchObject({
-      title: 'Not available right now',
-      description: 'Kilo Pass purchase is not available right now.',
-    });
+    expect(emptyState[0]?.props.title).toBe('Not available right now');
+    // The plain kind has nothing the title does not say, so it carries no
+    // description that would restate it.
+    expect(emptyState[0]?.props.description).toBeUndefined();
     // The state is a finished surface, not the raw centered text it used to be.
     expect(nodesOfType(renderer, 'CenteredState')).toHaveLength(0);
     expect(nodesOfType(renderer, 'DetailScreenScrollView')).toHaveLength(0);
@@ -114,11 +114,11 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
-  it('unavailable: a lapsed pass says the pass ended', async () => {
+  it('unavailable: a lapsed pass states that the pass ended', async () => {
     mocks.presentation.data = { kind: 'unavailable', statusClass: 'terminal', webUrl: null };
     const renderer = await renderScreen();
     expect(nodesOfType(renderer, 'EmptyState')[0]?.props.description).toBe(
-      'Your Kilo Pass has ended. Kilo Pass purchase is not available right now.'
+      'Your Kilo Pass has ended.'
     );
     renderer.unmount();
   });

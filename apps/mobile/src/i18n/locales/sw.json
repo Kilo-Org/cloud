@@ -3174,7 +3174,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Ununuzi wa Kilo Pass haupatikani sasa hivi.",
     "purchaseUnavailableTitle": "Haipatikani sasa hivi",
-    "purchaseUnavailableEnded": "Kilo Pass yako imeisha. Ununuzi wa Kilo Pass haupatikani sasa hivi.",
+    "purchaseUnavailableEnded": "Kilo Pass yako imeisha.",
     "kiloPassManagement": "Usimamizi wa Kilo Pass",
     "kiloPassSetup": "Usanidi wa Kilo Pass",
     "subscriptionHeaderDescription": "Usajili wa kila mwezi unaoongeza salio kwenye usawa wako wa Kilo kwa kuendesha vikao vya kuandika msimbo kwa AI katika Kilo App.",

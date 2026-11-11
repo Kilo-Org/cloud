@@ -2632,7 +2632,7 @@
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Je kunt op dit moment geen Kilo Pass kopen.",
     "purchaseUnavailableTitle": "Nu niet beschikbaar",
-    "purchaseUnavailableEnded": "Je Kilo Pass is verlopen. Je kunt op dit moment geen Kilo Pass kopen.",
+    "purchaseUnavailableEnded": "Je Kilo Pass is verlopen.",
     "kiloPassManagement": "Kilo Pass-beheer",
     "kiloPassSetup": "Kilo Pass-configuratie",
     "subscriptionHeaderDescription": "Een maandelijks abonnement dat credits toevoegt aan je Kilo-saldo voor AI-coderingssessies in Kilo App.",

@@ -3174,7 +3174,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "د Kilo Pass پېرود اوس مهال ممکن نه دی.",
     "purchaseUnavailableTitle": "اوس مهال ممکن نه دی",
-    "purchaseUnavailableEnded": "ستاسو Kilo Pass پای ته ورسېد. د Kilo Pass پېرود اوس مهال ممکن نه دی.",
+    "purchaseUnavailableEnded": "ستاسو Kilo Pass پای ته ورسېد.",
     "kiloPassManagement": "د Kilo Pass مدیریت",
     "kiloPassSetup": "د Kilo Pass تنظیم",
     "subscriptionHeaderDescription": "یو میاشتنی ګډون چې ستاسو Kilo توازن ته کریډیټونه اضافه کوي په Kilo App کې د AI کوډ کولو ناستو چلولو لپاره.",

@@ -3174,7 +3174,7 @@
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "දැනට Kilo Pass මිලදී ගත නොහැක.",
     "purchaseUnavailableTitle": "දැනට ලබා ගත නොහැක",
-    "purchaseUnavailableEnded": "ඔබේ Kilo Pass අවසන් වී ඇත. දැනට Kilo Pass මිලදී ගත නොහැක.",
+    "purchaseUnavailableEnded": "ඔබේ Kilo Pass අවසන් වී ඇත.",
     "kiloPassManagement": "Kilo Pass කළමනාකරණය",
     "kiloPassSetup": "Kilo Pass සැකසුම",
     "subscriptionHeaderDescription": "Kilo App තුළ AI කේතීකරණ සැසි පවත්වාගෙන යාම සඳහා ඔබේ Kilo ශේෂයට ක්‍රෙඩිට් එක් කරන මාසික දායකත්වයකි.",

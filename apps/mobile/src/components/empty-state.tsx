@@ -26,7 +26,9 @@ type EmptyStateProps = {
    *  depend on a measured surface (the root runtime-error screen). */
   placement?: 'center' | 'top' | 'static';
   refreshControl?: ScrollViewProps['refreshControl'];
-  /** Placement-memory identity; see `CenteredState`'s `stateKey`. */
+  /** Placement-memory identity; see `CenteredState`'s `stateKey`. Defaults to
+   *  one derived from `title`, so two empty states on one surface keep their
+   *  own placements; pass one to name the state independently of its copy. */
   stateKey?: string;
   /** Overrides the icon bubble's container classes (size/shape/background). Defaults to the card-style bubble. */
   iconContainerClassName?: string;
@@ -56,11 +58,16 @@ export function EmptyState({
   refreshControl,
   stateKey,
   compact,
+  title,
   ...props
 }: Readonly<EmptyStateProps>) {
-  const body = <EmptyStateBody {...props} placement={placement} compact={compact} />;
+  const body = <EmptyStateBody {...props} title={title} placement={placement} compact={compact} />;
+  // Placement memory names one state, so two empty states on one surface must
+  // not share it: the one that mounts second would paint its first frame at the
+  // other one's size and then shift. The copy identifies the state, so a caller
+  // that renders several of them needs no key of its own.
   return placement === 'center' ? (
-    <CenteredState refreshControl={refreshControl} stateKey={stateKey}>
+    <CenteredState refreshControl={refreshControl} stateKey={stateKey ?? `empty-state:${title}`}>
       {body}
     </CenteredState>
   ) : (

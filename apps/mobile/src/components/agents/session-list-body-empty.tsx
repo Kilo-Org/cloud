@@ -34,6 +34,11 @@ export function BodyEmpty({
   stateKey,
 }: Readonly<BodyEmptyProps>) {
   const { t } = useTranslation();
+  // One placement identity per body state. These states swap in place — clearing
+  // a no-match search hands over to the no-past-sessions body — and a state that
+  // painted from the previous one's remembered placement would show its first
+  // frame at the other state's size and then shift.
+  const placementKey = stateKey === undefined ? undefined : `${stateKey}:${kind}`;
   if (kind === 'filtered-empty') {
     return (
       <EmptyState
@@ -46,13 +51,13 @@ export function BodyEmpty({
         }
         action={clearQueryAction}
         refreshControl={refreshControl}
-        stateKey={stateKey}
+        stateKey={placementKey}
       />
     );
   }
   if (kind === 'query-error-empty') {
     return (
-      <CenteredState refreshControl={refreshControl} stateKey={stateKey}>
+      <CenteredState refreshControl={refreshControl} stateKey={placementKey}>
         <View className="items-center gap-4">
           <QueryError
             placement="top"
@@ -79,7 +84,7 @@ export function BodyEmpty({
       description={t('agents.sessionList.completedWillAppear')}
       action={createSessionAction}
       refreshControl={refreshControl}
-      stateKey={stateKey}
+      stateKey={placementKey}
     />
   );
 }

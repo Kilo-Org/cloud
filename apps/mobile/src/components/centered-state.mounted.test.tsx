@@ -548,6 +548,57 @@ describe('CenteredState first-frame paint', () => {
     otherState.unmount();
   });
 
+  it('keeps one placement per empty-state copy on one surface', async () => {
+    // Two empty bodies can occupy one surface in turn: clearing a no-match
+    // search hands over to the no-past-sessions body. The copy names the state,
+    // so the body that mounts second never paints at the first one's size.
+    const noMatch = await renderWithProviders(
+      <EmptyState icon={SearchX} title="No matches" description="Try another term" />
+    );
+    const noMatchContent = noMatch.renderer.root.findByProps({
+      testID: 'centered-state-content',
+    }).props as ViewProps;
+    act(() => {
+      noMatchContent.onLayout?.(contentLayout as LayoutChangeEvent);
+    });
+    act(() => {
+      for (const onMeasure of native.measurements.splice(0)) {
+        onMeasure(0, 80, 400, 340);
+      }
+    });
+    const placed = (noMatch.renderer.root.findByType(ScrollView).props as ScrollViewProps)
+      .contentContainerStyle;
+    expect(placed).not.toEqual(UNPLACED_FALLBACK_STYLE);
+    noMatch.unmount();
+
+    native.surface = { ...native.surface, frame: null, bounds: null };
+    // The same copy returns with no size measured yet: it still paints at the
+    // placement it remembered, so the memory keeps working per state.
+    const returning = await renderWithProviders(
+      <EmptyState icon={SearchX} title="No matches" description="Try another term" />
+    );
+    expect(
+      (returning.renderer.root.findByType(ScrollView).props as ScrollViewProps)
+        .contentContainerStyle
+    ).toEqual(placed);
+    returning.unmount();
+
+    // A different body has no placement of its own yet, so it falls back
+    // instead of borrowing the other state's placement.
+    const noPastSessions = await renderWithProviders(
+      <EmptyState
+        icon={SearchX}
+        title="No past sessions"
+        description="Completed sessions appear here."
+      />
+    );
+    expect(
+      (noPastSessions.renderer.root.findByType(ScrollView).props as ScrollViewProps)
+        .contentContainerStyle
+    ).toEqual(UNPLACED_FALLBACK_STYLE);
+    noPastSessions.unmount();
+  });
+
   it('reserves the surface bottom band once while the layout measurement is pending', async () => {
     // The tab bar is an absolute overlay: its band is known from the surface
     // reservation before any geometry lands. The fallback placement must keep

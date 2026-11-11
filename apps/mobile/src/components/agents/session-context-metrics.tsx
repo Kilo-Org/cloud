@@ -2,10 +2,13 @@ import { Pressable, View } from 'react-native';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { formatPercent } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
+import { formatSessionCostBadge } from './session-list-helpers';
 import { ContextUsageRing } from './context-usage-ring';
 import {
   type ContextTone,
@@ -52,15 +55,17 @@ const RING_STROKE = 3;
  * or shrank would move the whole trailing cluster, including the Follow control
  * beside it.
  *
- * The width comes from an invisible copy of the widest value each slot can
- * show rather than from a fixed size: a dp width would hold the reading at the
- * default font scale only and truncate it as the reader's text grows. The cost
- * badge reaches `$0.0031` at four decimals and `$999.99` at two, both seven
- * characters, so the sizer covers every form the formatter emits. Both strings
- * are layout measurements and never reach a reader.
+ * The width comes from an invisible copy of the widest value each slot can show,
+ * built by the same formatter the value uses: a dp width would hold the reading
+ * at the default font scale only, and an ASCII literal would miss the space some
+ * catalogs put before the percent sign. The percentage reads at most `100`.
+ * Session cost is unbounded, so the cost sizer covers the four-figure badge; a
+ * longer total truncates to one line in its slot, which is the pill's standing
+ * behaviour for a badge that outgrows its box. Both sizers are layout
+ * measurements and never reach a reader.
  */
-const WIDEST_PERCENTAGE = '100%';
-const WIDEST_COST = '$0.0031';
+export const WIDEST_PERCENTAGE_VALUE = 100;
+export const WIDEST_COST_MICRODOLLARS = 1_234_560_000;
 const VALUE_SLOT_CLASS = 'min-w-0 shrink items-center justify-center';
 const VALUE_TEXT_CLASS = 'text-xs tabular-nums';
 const VALUE_OVERLAY_CLASS = 'absolute inset-0 items-center justify-center';
@@ -135,6 +140,8 @@ export function SessionContextMetrics({
   // A slot with nothing to paint shows only its invisible sizer, so no dash
   // stands in for a value that has not arrived while the row keeps its width.
   // The loading state already paints the whole row invisible under its bar.
+  const percentageSizer = formatPercent(WIDEST_PERCENTAGE_VALUE, i18n.language);
+  const costSizer = formatSessionCostBadge(WIDEST_COST_MICRODOLLARS) ?? percentageSizer;
   const costLabel = content.costSlot === 'label' && content.secondary !== null;
   const costText = content.secondary ?? UNKNOWN_WINDOW_LABEL;
   const costUnresolved = content.costSlot === 'none';
@@ -147,8 +154,7 @@ export function SessionContextMetrics({
         accessibilityElementsHidden
         importantForAccessibility="no"
       >
-        {/* oxlint-disable-next-line no-literal-copy/no-literal-copy -- layout measurement, never read */}
-        {WIDEST_PERCENTAGE}
+        {percentageSizer}
       </Text>
       {content.primary !== null ? (
         <View className={VALUE_OVERLAY_CLASS}>
@@ -171,8 +177,7 @@ export function SessionContextMetrics({
         accessibilityElementsHidden
         importantForAccessibility="no"
       >
-        {/* oxlint-disable-next-line no-literal-copy/no-literal-copy -- layout measurement, never read */}
-        {WIDEST_COST}
+        {costSizer}
       </Text>
       {costLabel || !costUnresolved ? (
         <View className={VALUE_OVERLAY_CLASS}>

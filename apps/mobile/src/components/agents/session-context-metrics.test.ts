@@ -1,6 +1,11 @@
 /* eslint-disable max-lines -- one case per pill state: permission controls, reserved box, slot widths and the loading bar share these render helpers. */
 import { describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
+import { formatPercent } from '@/lib/format';
+
+import { formatSessionCostBadge } from './session-list-helpers';
+import { WIDEST_COST_MICRODOLLARS, WIDEST_PERCENTAGE_VALUE } from './session-context-metrics';
 import {
   expectHiddenReservedBox,
   findAll,
@@ -317,9 +322,12 @@ describe('SessionContextMetrics', () => {
     expect(props.accessibilityLabel).toContain('usage unavailable');
     expect(textsWith(settled, '—')).toHaveLength(2);
     // Each slot is sized by an invisible copy of the widest value it can show,
-    // so the row keeps one width across the loading, unresolved and settled
-    // states; the dashes themselves paint.
-    const sizers = [textsWith(settled, '100%'), textsWith(settled, '$0.0031')];
+    // built by the formatter itself, so the row keeps one width across the
+    // loading, unresolved and settled states; the dashes themselves paint.
+    const sizers = [
+      textsWith(settled, formatPercent(WIDEST_PERCENTAGE_VALUE, i18n.language)),
+      textsWith(settled, formatSessionCostBadge(WIDEST_COST_MICRODOLLARS) ?? ''),
+    ];
     for (const found of sizers) {
       expect(found).toHaveLength(1);
       expect(classOf(found[0] ?? settled)).toContain('opacity-0');

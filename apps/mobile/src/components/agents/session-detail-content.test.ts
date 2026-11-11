@@ -1584,9 +1584,9 @@ describe('session detail header right cluster', () => {
     if (priced.info.role !== 'assistant') {
       throw new Error('expected an assistant message');
     }
-    priced.info = { ...priced.info, sessionID: ROOT_ID, cost: 1234.56 };
+    priced.info = { ...priced.info, sessionID: ROOT_ID, cost: 123_456.78 };
     const { renderer } = await mountDetails([priced]);
-    const expected = formatSessionCostBadge(1234.56 * 1_000_000);
+    const expected = formatSessionCostBadge(123_456.78 * 1_000_000);
     if (expected === null) {
       throw new Error('expected a formatted cost badge');
     }

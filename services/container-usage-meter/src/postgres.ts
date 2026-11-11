@@ -448,15 +448,31 @@ async function isUnreviewedEnterpriseOrganization(
       : row;
   if (getOrganizationTrialEndDate(owner.freeTrialEndAt, owner.createdAt) <= now) return true;
 
-  // Read the latest event, not any historical active subscription. Trialing
-  // subscriptions have not started paying.
+  // A child organization can also hold its own subscription.
+  if (await hasStartedPayingForSeats(tx, row.id)) return true;
+  return owner.id !== row.id && hasStartedPayingForSeats(tx, owner.id);
+}
+
+// Unlike PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES in
+// @kilocode/organization-entitlement, this excludes `trialing`: a trialing
+// subscription has not started paying, so it remains billable.
+const STARTED_PAYING_SEAT_SUBSCRIPTION_STATUSES: ReadonlySet<string> = new Set([
+  'active',
+  'past_due',
+]);
+
+async function hasStartedPayingForSeats(
+  tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
+  organizationId: string
+): Promise<boolean> {
+  // Read the latest event, not any historical active subscription.
   const [purchase] = await tx
     .select({ status: organization_seats_purchases.subscription_status })
     .from(organization_seats_purchases)
-    .where(eq(organization_seats_purchases.organization_id, owner.id))
+    .where(eq(organization_seats_purchases.organization_id, organizationId))
     .orderBy(desc(organization_seats_purchases.created_at))
     .limit(1);
-  return purchase?.status === 'active' || purchase?.status === 'past_due';
+  return purchase !== undefined && STARTED_PAYING_SEAT_SUBSCRIPTION_STATUSES.has(purchase.status);
 }
 
 export async function applyStart(

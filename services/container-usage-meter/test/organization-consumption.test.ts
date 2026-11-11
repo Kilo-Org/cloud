@@ -332,6 +332,15 @@ describe('native organization compute accounting', () => {
       explicit: false,
       billingMode: 'paid',
     },
+    // A child can hold its own subscription while the parent is in its trial.
+    {
+      plan: 'enterprise',
+      owner: 'parent-with-child-seats',
+      trialEnded: false,
+      seats: ['active'],
+      explicit: false,
+      billingMode: 'shadow',
+    },
   ] as const)(
     'uses $billingMode billing for a $plan $owner org (trial ended: $trialEnded, seats: $seats, explicit: $explicit)',
     async ({ plan, owner, trialEnded, seats, explicit, billingMode }) => {
@@ -361,11 +370,12 @@ describe('native organization compute accounting', () => {
           .set({ parent_organization_id: ownerId })
           .where(eq(organizations.id, f.orgId));
       }
+      const seatOrgId = owner === 'parent-with-child-seats' ? f.orgId : ownerId;
       if (seats.length > 0) {
         await client.db.insert(organization_seats_purchases).values(
           seats.map((status, index) => ({
-            organization_id: ownerId,
-            subscription_stripe_id: `sub_${ownerId}`,
+            organization_id: seatOrgId,
+            subscription_stripe_id: `sub_${seatOrgId}`,
             subscription_status: status,
             seat_count: 1,
             amount_usd: 19,

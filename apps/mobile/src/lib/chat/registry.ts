@@ -626,12 +626,15 @@ async function keepAsked(sessionId: string): Promise<void> {
     return;
   }
   const outcome: Displaced['outcome'] = held.failureKey === null ? 'stopped' : 'failed';
+  const failureKey = held.failureKey;
   const askedFrom = held.askedFrom;
   if (askedFrom !== null) {
     /* It is already in the transcript, where it was said. This attempt is the
        one its bubble stands for now, so only how it ended is written down. */
     change(sessionId, {
-      displaced: held.displaced.map(one => (one.id === askedFrom ? { ...one, outcome } : one)),
+      displaced: held.displaced.map(one =>
+        one.id === askedFrom ? { ...one, outcome, failureKey } : one
+      ),
       asked: null,
       askedImages: [],
       askedModel: null,
@@ -657,6 +660,7 @@ async function keepAsked(sessionId: string): Promise<void> {
     effort: held.askedEffort,
     afterTurns: held.turns.length,
     outcome,
+    failureKey,
   };
   change(sessionId, {
     displaced: [...snapshotOf(sessionId).displaced, stored],

@@ -170,6 +170,35 @@ describe('titledByAsked', () => {
     ]);
   });
 
+  it('carries the failure a kept question ended with, and reads one written without it', async () => {
+    await replaceKept('causes', [
+      {
+        id: 'c1',
+        text: 'a question the balance refused',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+        failureKey: 'modelChat.creditsRequired',
+      },
+      {
+        id: 'c2',
+        text: 'a question kept before the cause was written down',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+      },
+    ]);
+
+    const written = await keptIn('causes');
+    // The cause travels with the bubble; a record from before it existed says
+    // nothing about one rather than dropping the entry.
+    expect(written.map(one => one.failureKey)).toEqual(['modelChat.creditsRequired', null]);
+  });
+
   it('names each question with an identifier no other question has', () => {
     // An identifier is made, not read from the list, which may not hold a queued
     // retry's copy yet: taking the next free number would land on that copy.

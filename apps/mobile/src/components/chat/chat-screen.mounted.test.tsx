@@ -33,6 +33,7 @@ const state = vi.hoisted(() => ({
     effort: 'low' | 'medium' | 'high' | null;
     afterTurns: number;
     outcome: 'failed' | 'stopped';
+    failureKey?: string | null;
   }[],
   failed: null as string | null,
   failureKey: null as string | null,
@@ -910,6 +911,7 @@ describe('message actions', () => {
         effort: null,
         afterTurns: 0,
         outcome: 'failed',
+        failureKey: 'modelChat.backends.deletedBackend',
       },
     ];
     // In the order the registry draws them: the failure, then the question that
@@ -937,6 +939,43 @@ describe('message actions', () => {
     expect(sheetOf(tree).deliveryState).toEqual(kept.deliveryState);
   });
 
+  it('keeps the balance cause on a question a later send pushed out of the slot', async () => {
+    state.status = 'idle';
+    state.asked = 'second question';
+    state.failureKey = CREDITS_FAILURE_KEY;
+    state.displaced = [
+      {
+        id: 'k1',
+        text: 'the long question that failed',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+        failureKey: CREDITS_FAILURE_KEY,
+      },
+    ];
+    state.messages = [
+      { info: { id: 's1:displaced:k1', role: 'user' } },
+      { info: { id: 's1:asked', role: 'user' } },
+    ];
+    const tree = await mount();
+    const kept = bubbleFor(tree, 's1:displaced:k1');
+
+    // The cause it failed with travels with it, so the bubble where it was said
+    // states the balance rather than a generic agent failure.
+    expect(kept.deliveryState).toEqual({ status: 'failed', error: '', reason: 'credits' });
+    // Asking it again meets the same balance: the action that settles it stays,
+    // and the Retry does not.
+    expect(kept.onRetryMessage).toBeUndefined();
+    act(() => {
+      kept.onAddCredits?.();
+    });
+    expect(router.push).toHaveBeenCalledWith('/(app)/credits');
+    expect(state.retry).not.toHaveBeenCalled();
+    expect(bubbleFor(tree, 's1:asked').deliveryState).toEqual(kept.deliveryState);
+  });
+
   it('reads a kept question the person stopped as interrupted', async () => {
     state.status = 'idle';
     state.displaced = [
@@ -948,6 +987,7 @@ describe('message actions', () => {
         effort: null,
         afterTurns: 0,
         outcome: 'stopped',
+        failureKey: null,
       },
     ];
     state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];
@@ -972,6 +1012,7 @@ describe('message actions', () => {
         effort: null,
         afterTurns: 0,
         outcome: 'failed',
+        failureKey: CREDITS_FAILURE_KEY,
       },
     ];
     state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];
@@ -1017,6 +1058,7 @@ describe('message actions', () => {
         effort: null,
         afterTurns: 0,
         outcome: 'failed',
+        failureKey: CREDITS_FAILURE_KEY,
       },
     ];
     state.messages = [{ info: { id: 's1:displaced:k1', role: 'user' } }];

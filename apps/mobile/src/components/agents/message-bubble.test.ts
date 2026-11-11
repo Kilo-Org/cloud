@@ -448,6 +448,7 @@ describe('MessageBubble failure footer', () => {
     const onAddCredits = vi.fn<() => void>();
     const tree = await renderBubbleWithHandlers(userMessage('m-credits'), {
       deliveryState: { status: 'failed', error: '', reason: 'credits' },
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
       onAddCredits,
       onCopyToComposer: vi.fn<(text: string) => void>(),
     });

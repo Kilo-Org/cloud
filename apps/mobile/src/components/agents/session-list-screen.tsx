@@ -352,6 +352,13 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
     holdSessionListTouch();
     clearNoMatch();
   }, [clearNoMatch]);
+  // The status bar's own Clear control sits above the list, so the rows it
+  // brings back land under the point it released too: it holds the list for the
+  // same window as the no-match action.
+  const handleClearStatusFilter = useCallback(() => {
+    holdSessionListTouch();
+    clearStatusFilter();
+  }, [clearStatusFilter]);
 
   let body: ReactNode = null;
   if (!query.hasLoaded || content === 'pending') {
@@ -510,7 +517,7 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
           <SessionStatusFilterBar
             kind={statusKind}
             count={visibleSessions.length}
-            onClear={clearStatusFilter}
+            onClear={handleClearStatusFilter}
           />
         ) : null}
         {/* Android runs edge-to-edge and never resizes the window for the IME,

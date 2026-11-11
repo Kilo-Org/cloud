@@ -2003,6 +2003,30 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(gateProps.onStartShouldSetResponderCapture()).toBe(true);
   });
 
+  it('holds the list through the body swap after the status bar Clear control', async () => {
+    state.live.activeSessions = [{ ...row, id: 'work-1', status: 'running' }];
+    state.routeParams = { status: 'running' };
+    const renderer = await renderScreen();
+    const gateProps = renderer.root
+      .findByType(SessionListTouchGate)
+      .findByType('View' as unknown as React.ElementType).props as {
+      onStartShouldSetResponderCapture: () => boolean;
+    };
+    expect(gateProps.onStartShouldSetResponderCapture()).toBe(false);
+
+    const statusBar = requireNode('SessionStatusFilterBar').props as { onClear: () => void };
+    act(() => {
+      statusBar.onClear();
+    });
+
+    // The bar's own Clear control sits above the list, so the rows it brings
+    // back land under the point it released.
+    expect(state.routeParams.status).toBeUndefined();
+    expect(nodes('FlashList')).toHaveLength(1);
+    expect(isSessionListTouchHeld()).toBe(true);
+    expect(gateProps.onStartShouldSetResponderCapture()).toBe(true);
+  });
+
   it('shows a clearable no-match state when every live row is filtered out', async () => {
     state.live.activeSessions = [
       { ...row, id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },

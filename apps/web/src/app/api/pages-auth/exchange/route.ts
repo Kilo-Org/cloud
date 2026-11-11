@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 import { getProfileOrganizations } from '@kilocode/web-shared/lib/organizations/organizations';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/server';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import { isPagesAuthClient } from '@/lib/pages-auth/pages-auth-clients';
@@ -50,7 +51,7 @@ export const POST = withRestTiming('/api/pages-auth/exchange', async (request: R
   }
 
   const user = await findUserById(grant.userId);
-  if (!user || user.blocked_reason || (await isUserBlacklistedByDomain(user))) {
+  if (!user || isBlockedAccount(user) || (await isUserBlacklistedByDomain(user))) {
     return refuse(403, 'account_unavailable');
   }
 

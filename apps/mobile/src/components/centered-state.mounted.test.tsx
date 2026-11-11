@@ -466,6 +466,32 @@ describe('CenteredState first-frame paint', () => {
     returning.unmount();
   });
 
+  it('places a returning state before its content lays out', async () => {
+    const first = await mount();
+    first.settle();
+    const placed = first.scroll().contentContainerStyle;
+    first.unmount();
+
+    native.surface = {
+      ...native.surface,
+      frame: null,
+      bounds: null,
+    };
+    // No content layout yet: the remembered size stands in, so the first frame
+    // is already the measured placement instead of the pending centering.
+    const returned = await renderWithProviders(
+      <CenteredState testID="state">{null}</CenteredState>
+    );
+    const scroll = () => returned.renderer.root.findByType(ScrollView).props as ScrollViewProps;
+    act(() => {
+      for (const onMeasure of native.measurements.splice(0)) {
+        onMeasure(0, 80, 400, 340);
+      }
+    });
+    expect(scroll().contentContainerStyle).toEqual(placed);
+    returned.unmount();
+  });
+
   it('reserves the surface bottom band once while the layout measurement is pending', async () => {
     // The tab bar is an absolute overlay: its band is known from the surface
     // reservation before any geometry lands. The fallback placement must keep

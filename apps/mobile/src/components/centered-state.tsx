@@ -55,6 +55,8 @@ type RememberedSurface = {
   bottomInset: number;
   boundsBottom: number | undefined;
   nativeViewportFillsSurface: boolean;
+  /** Content height per state, so a returning state paints at its own size. */
+  heights: Map<string, number>;
 };
 
 /**
@@ -69,9 +71,13 @@ type RememberedSurface = {
  */
 let rememberedSurface: RememberedSurface | null = null;
 
+/** Content heights per state, per surface; a sheet's state is not the screen's. */
+const rememberedHeightsBySurface = new Map<(() => () => void) | undefined, Map<string, number>>();
+
 /** Test-only: drop the remembered band so a suite starts from a cold mount. */
 export function _resetRememberedSurfaceForTests(): void {
   rememberedSurface = null;
+  rememberedHeightsBySurface.clear();
 }
 
 /**
@@ -99,6 +105,18 @@ export function CenteredState({
   const requestRef = useRef(0);
   const [viewport, setViewport] = useState<MeasuredViewport | null>(null);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
+  const heightsRef = useRef<{ surface: (() => () => void) | undefined; heights: Map<string, number> } | null>(
+    null
+  );
+  if (heightsRef.current === null || heightsRef.current.surface !== surface?.register) {
+    let heights = rememberedHeightsBySurface.get(surface?.register);
+    if (heights === undefined) {
+      heights = new Map();
+      rememberedHeightsBySurface.set(surface?.register, heights);
+    }
+    heightsRef.current = { surface: surface?.register, heights };
+  }
+  const rememberedHeights = heightsRef.current.heights;
 
   // The geometry this state paints against: the live surface while it is
   // published, and otherwise the band this window had last time. A returning
@@ -134,6 +152,7 @@ export function CenteredState({
       bottomInset: surface.bottomInset,
       boundsBottom: surface.bounds?.bottom,
       nativeViewportFillsSurface: surface.nativeViewportFillsSurface,
+      heights: rememberedHeights,
     };
   }, [surface, windowSize.width, windowSize.height]);
 
@@ -201,9 +220,19 @@ export function CenteredState({
     };
   }, [measure]);
 
-  const measureContent = useCallback((event: LayoutChangeEvent) => {
-    setContentHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
-  }, []);
+  const measureContent = useCallback(
+    (event: LayoutChangeEvent) => {
+      const height = PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height);
+      rememberedHeights.set(testID, height);
+      setContentHeight(height);
+    },
+    [testID]
+  );
+  // The state's own size, from this mount or from the mount it returns from: a
+  // first paint that does not know its content height centres at the pending
+  // placement and then lifts to the measured one, which is the shift this
+  // removes.
+  const placementHeight = contentHeight ?? remembered?.heights.get(testID) ?? null;
   const layout = useMemo(() => {
     // The stored viewport carries the band it was measured against, and the
     // surface publishes a fresh frame object on every measurement, so compare
@@ -215,7 +244,7 @@ export function CenteredState({
       !measured ||
       measured.surface.top !== frame.top ||
       measured.surface.bottom !== frame.bottom ||
-      contentHeight === null
+      placementHeight === null
     ) {
       return undefined;
     }
@@ -223,14 +252,14 @@ export function CenteredState({
     return getCenteredStateLayout({
       surface: frame,
       viewport: measuredFrame,
-      contentHeight,
+      contentHeight: placementHeight,
       topInset,
       bottomInset,
       nativeViewportFillsSurface,
       nativeViewportBottom: boundsBottom ?? frame.bottom,
       roundToPixel: value => PixelRatio.roundToNearestPixel(value),
     });
-  }, [boundsBottom, bottomInset, contentHeight, frame, nativeViewportFillsSurface, topInset, viewport]);
+  }, [boundsBottom, bottomInset, frame, nativeViewportFillsSurface, placementHeight, topInset, viewport]);
   const ready = layout !== undefined;
   // While the measured layout is pending, the fallback must still keep the band
   // the surface reserved (the fixed tab bar) free: without it the body centers

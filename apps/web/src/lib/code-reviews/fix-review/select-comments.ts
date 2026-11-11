@@ -193,7 +193,9 @@ function splitRepositoryFullName(repositoryFullName: string): { owner: string; r
  * The newest comments are the ones a run was started for, so a pull request
  * with more pages than the budget is read from its last page down and its older
  * comments are reported as unread. The last page is read first, so the number
- * of comments the read skipped is known without reading the skipped pages.
+ * of comments the read skipped is known without reading the skipped pages. A
+ * response that does not state its last page in either form is an error: the
+ * caller refuses a session whose comment count cannot be established.
  */
 async function readReviewComments(
   octokit: Octokit,
@@ -217,7 +219,11 @@ async function readReviewComments(
     // page number the comment count, so the read still starts at the newest
     // page instead of keeping the oldest one.
     const oneRow = await readPage(1, 1);
-    listedCount = lastLinkedPage(oneRow.headers.link) ?? oneRow.data.length;
+    const probedLastPage = lastLinkedPage(oneRow.headers.link);
+    if (probedLastPage === null) {
+      throw new Error('GitHub did not report the last page of the review comments');
+    }
+    listedCount = probedLastPage;
     lastPage = Math.max(1, Math.ceil(listedCount / COMMENTS_PAGE_SIZE));
   }
   const pageCount = lastPage ?? 1;

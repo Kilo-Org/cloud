@@ -183,6 +183,25 @@ describe('createFixReviewCommentClient', () => {
     expect(calls).toHaveLength(3);
   });
 
+  it('refuses a listing whose page count cannot be read', async () => {
+    const commentPage = (size: number) =>
+      Array.from({ length: size }, (_, index) => ({
+        id: index + 1,
+        path: 'src/file.ts',
+        line: index + 1,
+        body: 'comment',
+        user: { login: 'reviewer', id: 1, type: 'User' },
+      }));
+    const { octokit } = octokitWithFetch(
+      call => commentPage(new URL(call.url).searchParams.get('per_page') === '1' ? 1 : 100),
+      () => '<https://api.github.com/repositories/1/pulls/7/comments?per_page=1&page=2>; rel="next"'
+    );
+
+    await expect(createFixReviewCommentClient(octokit, TARGET).listComments()).rejects.toThrow(
+      'GitHub did not report the last page of the review comments'
+    );
+  });
+
   it('reads a long review thread to its last page before deciding it is answered', async () => {
     const { octokit, calls } = octokitWithFetch(call => {
       if (call.query?.includes('FixReviewThreadComments')) {

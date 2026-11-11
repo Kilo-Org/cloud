@@ -292,7 +292,7 @@ type RedeemGitHubSessionCapabilityResult =
         | 'integration_mismatch';
     };
 
-type GetGitLabTokenFailureReason =
+export type GetGitLabTokenFailureReason =
   | 'database_not_configured'
   | 'no_integration_found'
   | 'invalid_org_id'

@@ -37,7 +37,7 @@ import {
   type GetGitLabTokenFailure,
   type GetGitLabTokenResult,
 } from './gitlab-runtime-token-resolver.js';
-import { DEFAULT_GITLAB_INSTANCE_URL } from './gitlab-constants.js';
+import { DEFAULT_GITLAB_INSTANCE_URL } from '@kilocode/worker-utils/gitlab-url';
 import { readBoundedJsonBody } from './lib/bounded-read.js';
 import {
   GitLabSessionCapabilityCodec,
@@ -54,7 +54,7 @@ import {
   parseGitLabBaseUrl,
   parseGitLabCloneUrl,
   type GitLabCloneUrlFailureReason,
-} from './gitlab-url.js';
+} from '@kilocode/worker-utils/gitlab-url';
 import {
   GitLabCredentialBrokerRequestSchema,
   createGitLabCredentialBroker,

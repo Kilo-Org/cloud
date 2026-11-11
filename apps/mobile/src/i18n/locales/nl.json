@@ -2947,7 +2947,11 @@
       "retryLoadingMoreFiles": "Meer bestanden opnieuw proberen te laden",
       "title": "Bestanden",
       "viewedCount": "{{viewed}} van {{total}} bekeken",
-      "viewedOfListed": "{{viewed}} van de {{total}} bestanden in de lijst bekeken"
+      "viewedCount_one": "{{viewed}} van {{total}} bekeken",
+      "viewedCount_other": "{{viewed}} van {{total}} bekeken",
+      "viewedOfListed": "{{viewed}} van de {{total}} bestanden in de lijst bekeken",
+      "viewedOfListed_one": "{{viewed}} van de {{total}} bestanden in de lijst bekeken",
+      "viewedOfListed_other": "{{viewed}} van de {{total}} bestanden in de lijst bekeken"
     },
     "fileRows": {
       "collapseFile": "Bestand inklappen",

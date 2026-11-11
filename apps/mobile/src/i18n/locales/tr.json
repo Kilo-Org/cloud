@@ -2947,7 +2947,11 @@
       "retryLoadingMoreFiles": "Daha fazla dosyayı yüklemeyi tekrar dene",
       "title": "Dosyalar",
       "viewedCount": "{{viewed}}/{{total}} görüntülendi",
-      "viewedOfListed": "listelenen dosyalardan {{viewed}}/{{total}} görüntülendi"
+      "viewedCount_one": "{{viewed}}/{{total}} görüntülendi",
+      "viewedCount_other": "{{viewed}}/{{total}} görüntülendi",
+      "viewedOfListed": "listelenen dosyalardan {{viewed}}/{{total}} görüntülendi",
+      "viewedOfListed_one": "listelenen dosyalardan {{viewed}}/{{total}} görüntülendi",
+      "viewedOfListed_other": "listelenen dosyalardan {{viewed}}/{{total}} görüntülendi"
     },
     "fileRows": {
       "collapseFile": "Dosyayı daralt",

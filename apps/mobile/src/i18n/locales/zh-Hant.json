@@ -2947,7 +2947,11 @@
       "retryLoadingMoreFiles": "重新載入更多檔案",
       "title": "檔案",
       "viewedCount": "已檢視 {{viewed}} / {{total}}",
-      "viewedOfListed": "清單中的 {{total}} 個檔案已檢視 {{viewed}} 個"
+      "viewedCount_one": "已檢視 {{viewed}} / {{total}}",
+      "viewedCount_other": "已檢視 {{viewed}} / {{total}}",
+      "viewedOfListed": "清單中的 {{total}} 個檔案已檢視 {{viewed}} 個",
+      "viewedOfListed_one": "清單中的 {{total}} 個檔案已檢視 {{viewed}} 個",
+      "viewedOfListed_other": "清單中的 {{total}} 個檔案已檢視 {{viewed}} 個"
     },
     "fileRows": {
       "collapseFile": "收合檔案",

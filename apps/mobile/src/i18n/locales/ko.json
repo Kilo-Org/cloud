@@ -2947,7 +2947,11 @@
       "retryLoadingMoreFiles": "파일 더 불러오기 다시 시도",
       "title": "파일",
       "viewedCount": "{{total}}개 중 {{viewed}}개 확인함",
-      "viewedOfListed": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함"
+      "viewedCount_one": "{{total}}개 중 {{viewed}}개 확인함",
+      "viewedCount_other": "{{total}}개 중 {{viewed}}개 확인함",
+      "viewedOfListed": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함",
+      "viewedOfListed_one": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함",
+      "viewedOfListed_other": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함"
     },
     "fileRows": {
       "collapseFile": "파일 접기",

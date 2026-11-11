@@ -3027,7 +3027,15 @@
       "retryLoadingMoreFiles": "Повторити завантаження наступних файлів",
       "title": "Файли",
       "viewedCount": "переглянуто {{viewed}} з {{total}}",
-      "viewedOfListed": "переглянуто {{viewed}} з {{total}} файлів у списку"
+      "viewedCount_one": "переглянуто {{viewed}} з {{total}}",
+      "viewedCount_few": "переглянуто {{viewed}} з {{total}}",
+      "viewedCount_many": "переглянуто {{viewed}} з {{total}}",
+      "viewedCount_other": "переглянуто {{viewed}} з {{total}}",
+      "viewedOfListed": "переглянуто {{viewed}} з {{total}} файлів у списку",
+      "viewedOfListed_one": "переглянуто {{viewed}} з {{total}} файлів у списку",
+      "viewedOfListed_few": "переглянуто {{viewed}} з {{total}} файлів у списку",
+      "viewedOfListed_many": "переглянуто {{viewed}} з {{total}} файлів у списку",
+      "viewedOfListed_other": "переглянуто {{viewed}} з {{total}} файлів у списку"
     },
     "fileRows": {
       "collapseFile": "Згорнути файл",

@@ -2947,7 +2947,11 @@
       "retryLoadingMoreFiles": "重新加载更多文件",
       "title": "文件",
       "viewedCount": "已查看 {{viewed}}/{{total}}",
-      "viewedOfListed": "所列文件：已查看 {{viewed}}/{{total}}"
+      "viewedCount_one": "已查看 {{viewed}}/{{total}}",
+      "viewedCount_other": "已查看 {{viewed}}/{{total}}",
+      "viewedOfListed": "所列文件：已查看 {{viewed}}/{{total}}",
+      "viewedOfListed_one": "所列文件：已查看 {{viewed}}/{{total}}",
+      "viewedOfListed_other": "所列文件：已查看 {{viewed}}/{{total}}"
     },
     "fileRows": {
       "collapseFile": "折叠文件",

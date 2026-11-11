@@ -2947,7 +2947,11 @@
       "retryLoadingMoreFiles": "Weitere Dateien erneut laden",
       "title": "Dateien",
       "viewedCount": "{{viewed}} von {{total}} angesehen",
-      "viewedOfListed": "{{viewed}} von {{total}} der aufgelisteten Dateien angesehen"
+      "viewedCount_one": "{{viewed}} von {{total}} angesehen",
+      "viewedCount_other": "{{viewed}} von {{total}} angesehen",
+      "viewedOfListed": "{{viewed}} von {{total}} der aufgelisteten Dateien angesehen",
+      "viewedOfListed_one": "{{viewed}} von {{total}} der aufgelisteten Dateien angesehen",
+      "viewedOfListed_other": "{{viewed}} von {{total}} der aufgelisteten Dateien angesehen"
     },
     "fileRows": {
       "collapseFile": "Datei einklappen",

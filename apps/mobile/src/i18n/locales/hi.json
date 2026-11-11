@@ -2953,7 +2953,11 @@
       "retryLoadingMoreFiles": "और फ़ाइलें लोड करने की फिर से कोशिश करें",
       "title": "फ़ाइलें",
       "viewedCount": "{{viewed}}/{{total}} देखी गईं",
-      "viewedOfListed": "सूचीबद्ध फ़ाइलों में से {{viewed}}/{{total}} देखी गईं"
+      "viewedCount_one": "{{viewed}}/{{total}} देखी गईं",
+      "viewedCount_other": "{{viewed}}/{{total}} देखी गईं",
+      "viewedOfListed": "सूचीबद्ध फ़ाइलों में से {{viewed}}/{{total}} देखी गईं",
+      "viewedOfListed_one": "सूचीबद्ध फ़ाइलों में से {{viewed}}/{{total}} देखी गईं",
+      "viewedOfListed_other": "सूचीबद्ध फ़ाइलों में से {{viewed}}/{{total}} देखी गईं"
     },
     "fileRows": {
       "collapseFile": "फ़ाइल समेटें",

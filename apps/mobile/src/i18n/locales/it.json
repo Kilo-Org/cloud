@@ -2987,7 +2987,13 @@
       "retryLoadingMoreFiles": "Riprova a caricare altri file",
       "title": "Documenti",
       "viewedCount": "{{viewed}} su {{total}} visualizzati",
-      "viewedOfListed": "{{viewed}} su {{total}} file elencati visualizzati"
+      "viewedCount_one": "{{viewed}} su {{total}} visualizzati",
+      "viewedCount_many": "{{viewed}} su {{total}} visualizzati",
+      "viewedCount_other": "{{viewed}} su {{total}} visualizzati",
+      "viewedOfListed": "{{viewed}} su {{total}} file elencati visualizzati",
+      "viewedOfListed_one": "{{viewed}} su {{total}} file elencati visualizzati",
+      "viewedOfListed_many": "{{viewed}} su {{total}} file elencati visualizzati",
+      "viewedOfListed_other": "{{viewed}} su {{total}} file elencati visualizzati"
     },
     "fileRows": {
       "collapseFile": "Comprimi il file",

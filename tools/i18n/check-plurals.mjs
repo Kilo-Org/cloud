@@ -108,14 +108,6 @@ export const NO_AGREEMENT = new Map([
     'counts of a total, not a count of the noun: "Files · {{viewed}} of {{total}} viewed"',
   ],
   [
-    'prReview.fileNavigator.viewedCount',
-    'counts of a total, not a count of the noun: "{{viewed}} of {{total}} viewed"',
-  ],
-  [
-    'prReview.fileNavigator.viewedOfListed',
-    'counts of a total, not a count of the noun: "{{viewed}} of {{total}} viewed of listed files"',
-  ],
-  [
     'prReview.fileNavigator.loadingFiles',
     'progress read-out: "Loading {{loaded}} of {{total}}…" has no inflected word',
   ],

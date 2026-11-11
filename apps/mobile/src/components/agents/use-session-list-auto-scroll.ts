@@ -304,9 +304,8 @@ export function useSessionListAutoScroll<ItemT>({
       clearAutoScrollResetTimeout();
       clearAutoScrollRetryTimeout();
       clearUserScrollingTimeout();
-      tailRepin.cancel();
     },
-    [clearAutoScrollResetTimeout, clearAutoScrollRetryTimeout, clearUserScrollingTimeout, tailRepin]
+    [clearAutoScrollResetTimeout, clearAutoScrollRetryTimeout, clearUserScrollingTimeout]
   );
 
   const updateAutoScrollFromEvent = useCallback(

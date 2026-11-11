@@ -1031,7 +1031,7 @@ describe('SessionHistoryScreen', () => {
     const renderer = await renderScreen();
 
     const container = renderer.root.findByType(OwnedKeyboardLift);
-    expect(container.props.occlusion).toBe(0);
+    expect(container.props.pad).toBe(0);
     expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
   });
 
@@ -1114,7 +1114,7 @@ describe('SessionHistoryScreen', () => {
     // The body lives in the single container on this platform too, and the
     // container is the sole owner of the pad.
     const container = renderer.root.findByType(OwnedKeyboardLift);
-    expect(container.props.occlusion).toBe(0);
+    expect(container.props.pad).toBe(0);
     expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
 
     // The container is permanent, not swapped per render: a state change (here

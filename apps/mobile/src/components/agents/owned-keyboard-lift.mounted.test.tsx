@@ -4,8 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   clampLiftPad,
+  type KeyboardLiftFrame,
   OwnedKeyboardLift,
-  type OwnedKeyboardLiftProps,
+  useKeyboardLiftPad,
 } from './owned-keyboard-lift';
 import { MIN_BODY_VIEWPORT } from '@/lib/body-viewport';
 
@@ -21,26 +22,35 @@ type FrameProps = {
   onLayout?: (event: { nativeEvent: { layout: { height: number } } }) => void;
 };
 
-function liftProps(occlusion: number, onApplied?: (applied: number) => void) {
-  const props: OwnedKeyboardLiftProps = {
-    occlusion,
-    onApplied,
-    children: createElement('Body'),
-  };
-  return props;
+/** The body the lift renders in this suite. */
+function LiftBody() {
+  return null;
 }
 
-function renderLift(occlusion: number, onApplied?: (applied: number) => void): LiftRenderer {
+/**
+ * Mounts the hook and its frame the way a screen does: the screen reads the pad
+ * in the same render that writes it.
+ */
+function mountLift(occlusion: number) {
+  const seen: { value?: KeyboardLiftFrame } = {};
+  function Harness() {
+    const value = useKeyboardLiftPad(occlusion);
+    seen.value = value;
+    return (
+      <OwnedKeyboardLift pad={value.pad} onLayout={value.handleLayout}>
+        <LiftBody />
+      </OwnedKeyboardLift>
+    );
+  }
   const mounted: { current: LiftRenderer | undefined } = { current: undefined };
   act(() => {
-    mounted.current = TestRenderer.create(
-      createElement(OwnedKeyboardLift, liftProps(occlusion, onApplied), null)
-    );
+    mounted.current = TestRenderer.create(createElement(Harness));
   });
-  if (!mounted.current) {
+  const renderer = mounted.current;
+  if (!renderer) {
     throw new Error('the lift did not mount');
   }
-  return mounted.current;
+  return { renderer, seen };
 }
 
 function frameProps(renderer: LiftRenderer): FrameProps {
@@ -95,20 +105,20 @@ describe('clampLiftPad', () => {
   });
 });
 
-describe('OwnedKeyboardLift', () => {
+describe('useKeyboardLiftPad', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   });
 
   it('writes the measured band for a body that has the room', () => {
-    const renderer = renderLift(336);
+    const { renderer } = mountLift(336);
     layout(renderer, 758);
 
     expect(liftPad(renderer)).toBe(336);
   });
 
   it('keeps the body rendered when a rotation leaves less room than the band', () => {
-    const renderer = renderLift(336);
+    const { renderer } = mountLift(336);
     layout(renderer, 758);
     expect(liftPad(renderer)).toBe(336);
 
@@ -118,23 +128,21 @@ describe('OwnedKeyboardLift', () => {
   });
 
   it('gives the pad back when the keyboard closes', () => {
-    const renderer = renderLift(336);
+    const { renderer } = mountLift(0);
     layout(renderer, 253);
-
-    act(() => {
-      renderer.update(createElement(OwnedKeyboardLift, liftProps(0), null));
-    });
 
     expect(liftPad(renderer)).toBe(0);
   });
 
-  it('reports the pad it wrote, so a shared band can subtract the reserved part', () => {
-    const applied: number[] = [];
-    const renderer = renderLift(336, pad => {
-      applied.push(pad);
-    });
+  it('hands the pad to the screen that reserves the same band in this render', () => {
+    // The Agents list reads the pad for its floating button band. A pad that
+    // reached it through a later effect would reserve the previous frame's band.
+    const { renderer, seen } = mountLift(320);
+    expect(seen.value?.pad).toBe(320);
+
     layout(renderer, 253);
 
-    expect(applied.at(-1)).toBe(253 - MIN_BODY_VIEWPORT);
+    expect(seen.value?.pad).toBe(253 - MIN_BODY_VIEWPORT);
+    expect(liftPad(renderer)).toBe(seen.value?.pad);
   });
 });

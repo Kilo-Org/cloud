@@ -1,18 +1,7 @@
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { type LayoutChangeEvent, View } from 'react-native';
 
 import { MIN_BODY_VIEWPORT } from '@/lib/body-viewport';
-
-export type OwnedKeyboardLiftProps = {
-  /** The keyboard band this screen's own input raised; 0 while it is closed. */
-  occlusion: number;
-  /**
-   * The pad this lift wrote, so a caller that reserves the same band elsewhere
-   * (the Agents list's floating action button) tracks what is left of it.
-   */
-  onApplied?: (applied: number) => void;
-  children: ReactNode;
-};
 
 /**
  * The pad the body frame takes for `occlusion`: the whole band while the frame
@@ -32,6 +21,47 @@ export function clampLiftPad(occlusion: number, frameHeight: number | null): num
   return Math.min(occlusion, Math.max(0, frameHeight - MIN_BODY_VIEWPORT));
 }
 
+type LayoutHandler = (event: LayoutChangeEvent) => void;
+
+/** What a screen needs to reserve this keyboard band. */
+export type KeyboardLiftFrame = {
+  /** The pad the body frame takes for the band the screen's own input raised. */
+  pad: number;
+  /** The frame's layout reporter; pass it as the lift's `onLayout`. */
+  handleLayout: LayoutHandler;
+};
+
+type OwnedKeyboardLiftProps = {
+  pad: KeyboardLiftFrame['pad'];
+  onLayout: LayoutHandler;
+  children: ReactNode;
+};
+
+/**
+ * The keyboard band a screen's body frame reserves, clamped so the body keeps a
+ * viewport.
+ *
+ * The screen reads the pad itself, in the same render that writes it, so a
+ * caller that reserves the same band elsewhere (the Agents list's floating
+ * action button) cannot fall a commit behind the pad the body actually gave up.
+ *
+ * A keyboard height belongs to the window geometry it was measured in, and a
+ * rotation replaces that geometry with a much shorter one — an iPhone's
+ * landscape window is shorter than its own portrait keyboard. An unclamped pad
+ * then fills the whole body and the list renders nothing, with no rows,
+ * skeleton, empty state or error to explain it. The clamp keeps
+ * `MIN_BODY_VIEWPORT` points of body until a fresh keyboard height arrives (see
+ * `@/lib/body-viewport`).
+ */
+export function useKeyboardLiftPad(occlusion: number): KeyboardLiftFrame {
+  const [frameHeight, setFrameHeight] = useState<number | null>(null);
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    const { height } = event.nativeEvent.layout;
+    setFrameHeight(previous => (previous === height ? previous : height));
+  }, []);
+  return { pad: clampLiftPad(occlusion, frameHeight), handleLayout };
+}
+
 /**
  * The body frame that clears this screen's own keyboard.
  *
@@ -42,33 +72,13 @@ export function clampLiftPad(occlusion: number, frameHeight: number | null): num
  * remounted, so the list ended above the tab bar with a dead band below it.
  * Writing the pad always, 0 included, leaves no stale value to restore.
  *
- * The pad is clamped so the body keeps a viewport. A keyboard height belongs to
- * the window geometry it was measured in, and a rotation replaces that geometry
- * with a much shorter one — an iPhone's landscape window is shorter than its own
- * portrait keyboard. An unclamped pad then fills the whole body and the list
- * renders nothing, with no rows, skeleton, empty state or error to explain it.
- * The clamp keeps `MIN_BODY_VIEWPORT` points of body until a fresh keyboard
- * height arrives (see `@/lib/body-viewport`).
- *
- * Ownership still gates the pad, so a keyboard another screen raised pads
- * nothing here (see `useOwnedKeyboard`).
+ * Ownership still gates the band, so a keyboard another screen raised pads
+ * nothing here (see `useOwnedKeyboard`), and `useKeyboardLiftPad` supplies the
+ * clamp.
  */
-export function OwnedKeyboardLift({
-  occlusion,
-  onApplied,
-  children,
-}: Readonly<OwnedKeyboardLiftProps>) {
-  const [frameHeight, setFrameHeight] = useState<number | null>(null);
-  const pad = clampLiftPad(occlusion, frameHeight);
-  const handleLayout = useCallback((event: LayoutChangeEvent) => {
-    const { height } = event.nativeEvent.layout;
-    setFrameHeight(previous => (previous === height ? previous : height));
-  }, []);
-  useEffect(() => {
-    onApplied?.(pad);
-  }, [onApplied, pad]);
+export function OwnedKeyboardLift({ pad, onLayout, children }: Readonly<OwnedKeyboardLiftProps>) {
   return (
-    <View className="flex-1" style={{ paddingBottom: pad }} onLayout={handleLayout}>
+    <View className="flex-1" style={{ paddingBottom: pad }} onLayout={onLayout}>
       {children}
     </View>
   );

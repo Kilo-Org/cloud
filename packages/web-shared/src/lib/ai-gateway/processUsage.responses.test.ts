@@ -523,4 +523,13 @@ describe('parseResponsesMicrodollarUsageFromString validation', () => {
   ])('rejects malformed nonstream response %s', response => {
     expect(() => parseResponsesMicrodollarUsageFromString(response, 200, 'openrouter')).toThrow();
   });
+
+  test('keeps usage when status is not a string', () => {
+    const result = parseResponsesMicrodollarUsageFromString(
+      '{"model":"model","status":3,"usage":{"input_tokens":10,"output_tokens":2}}',
+      200,
+      'openrouter'
+    );
+    expect(result).toMatchObject({ finish_reason: 3, inputTokens: 10, outputTokens: 2 });
+  });
 });

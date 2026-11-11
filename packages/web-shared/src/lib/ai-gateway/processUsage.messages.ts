@@ -53,13 +53,13 @@ const contentDeltaSchema = z
   .refine(delta => delta.type !== 'text_delta' || delta.text !== undefined);
 
 const messageDeltaSchema = z.object({
-  delta: z.object({ stop_reason: z.string().nullish() }).nullish(),
+  delta: z.object({ stop_reason: z.unknown().optional() }).nullish(),
   usage: messagesUsageSchema.nullish(),
   provider_metadata: vercelProviderMetadataSchema.nullish(),
 });
 
 const messageResponseSchema = messageSchema.extend({
-  stop_reason: z.string().nullish(),
+  stop_reason: z.unknown().optional(),
   content: z
     .array(
       z
@@ -148,7 +148,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
   let firstTokenReceived = false;
   let startUsage: MessagesApiUsage | null = null;
   let deltaUsage: MessagesApiUsage | null = null;
-  let finish_reason: string | null = null;
+  let finish_reason: unknown = null;
   let providerMetadata: VercelProviderMetaData | null = null;
   let inference_provider: string | null = null;
 

@@ -735,4 +735,18 @@ describe('parseMessagesMicrodollarUsageFromString validation', () => {
   ])('rejects malformed nonstream response %s', response => {
     expect(() => parseMessagesMicrodollarUsageFromString(response, 200, 'openrouter')).toThrow();
   });
+
+  test('keeps usage when stop_reason is not a string', () => {
+    const result = parseMessagesMicrodollarUsageFromString(
+      '{"model":"model","stop_reason":3,"usage":{"input_tokens":10,"output_tokens":2}}',
+      200,
+      'openrouter'
+    );
+    expect(result).toMatchObject({
+      finish_reason: 3,
+      hasError: false,
+      inputTokens: 10,
+      outputTokens: 2,
+    });
+  });
 });

@@ -86,7 +86,8 @@ export type NotYetCostedUsageStats = {
   hasError: boolean;
   inference_provider: string | null;
   upstream_id: string | null;
-  finish_reason: string | null;
+  /** Unvalidated upstream value; `toInsertableDbUsageRecord` records a non-string as null. */
+  finish_reason: unknown;
   latency: number | null;
   moderation_latency: number | null;
   generation_time: number | null;

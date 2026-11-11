@@ -1416,7 +1416,7 @@ const chatUsageChunkSchema = chatUsageFieldsSchema.extend({
     .array(
       z.looseObject({
         delta: chatMessageSchema.nullish(),
-        finish_reason: z.string().nullish(),
+        finish_reason: z.unknown().optional(),
       })
     )
     .nullish(),
@@ -1427,7 +1427,7 @@ const chatUsageResponseSchema = chatUsageFieldsSchema.extend({
     .array(
       z.looseObject({
         message: chatMessageSchema,
-        finish_reason: z.string().nullish(),
+        finish_reason: z.unknown().optional(),
       })
     )
     .nullish(),
@@ -1463,7 +1463,7 @@ export async function parseMicrodollarUsageFromStream(
   let firstTokenReceived = false;
   let usage: z.infer<typeof openRouterUsageSchema> | null = null;
   let inference_provider: string | null = null;
-  let finish_reason: string | null = null;
+  let finish_reason: unknown = null;
   let vercelProviderMetadata: VercelProviderMetaData | null = null;
 
   const onEvent = (event: EventSourceMessage) => {

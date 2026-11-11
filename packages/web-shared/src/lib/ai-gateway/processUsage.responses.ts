@@ -40,7 +40,7 @@ const responseSchema = z.object({
   model: z.string().nullish(),
   usage: responsesUsageSchema.nullish(),
   provider_metadata: vercelProviderMetadataSchema.nullish(),
-  status: z.string().nullish(),
+  status: z.unknown().optional(),
 });
 
 const responseEventSchema = z
@@ -141,7 +141,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
   let usage: ResponsesApiUsage | null = null;
   let providerMetadata: VercelProviderMetaData | null = null;
   let inference_provider: string | null = null;
-  let finish_reason: string | null = null;
+  let finish_reason: unknown = null;
 
   const onEvent = (event: EventSourceMessage) => {
     if (!firstTokenReceived) {

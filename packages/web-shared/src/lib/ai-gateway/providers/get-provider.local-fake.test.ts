@@ -439,7 +439,7 @@ describe('getProvider ChatGPT connection routing order', () => {
       userByok: [{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }],
       isFree: false,
       bypassAccessCheck: false,
-      byokFailovers: [],
+      failover: undefined,
     });
     env.restore();
   });
@@ -459,7 +459,7 @@ describe('getProvider ChatGPT connection routing order', () => {
       userByok: credentials,
       isFree: false,
       bypassAccessCheck: false,
-      byokFailovers: [],
+      failover: undefined,
     });
     expect(decrypt.mock.calls).toEqual([['anthropic']]);
   });
@@ -498,7 +498,7 @@ describe('getProvider ChatGPT connection routing order', () => {
       userByok: [{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }],
       isFree: false,
       bypassAccessCheck: false,
-      byokFailovers: [],
+      failover: undefined,
     });
     env.restore();
   });
@@ -593,19 +593,32 @@ describe('getProvider gateway BYOK routing', () => {
   });
 
   test('prefers inference provider keys over gateway keys', async () => {
-    storeKeys(vercelKey, anthropicKey, openRouterKey);
+    const decrypt = storeKeys(vercelKey, anthropicKey, openRouterKey);
 
-    expect(await resolve()).toEqual({
+    const result = await resolve();
+
+    expect(result).toEqual({
       kind: 'provider',
       provider: VERCEL_AI_GATEWAY,
       userByok: [anthropicKey],
       isFree: false,
       bypassAccessCheck: false,
-      byokFailovers: [
-        { providerId: 'vercel-ai-gateway', resolve: expect.any(Function) },
-        { providerId: 'openrouter', resolve: expect.any(Function) },
-      ],
+      failover: expect.any(Function),
     });
+    expect(decrypt.mock.calls).toEqual([['anthropic']]);
+
+    const vercelRoute = await result.failover?.();
+    expect(vercelRoute).toMatchObject({
+      provider: { type: 'vercel', apiKey: 'user-vercel-gateway-key' },
+      userByok: [vercelKey],
+    });
+    const openRouterRoute = await vercelRoute?.failover?.();
+    expect(openRouterRoute).toMatchObject({
+      provider: { type: 'openrouter', apiKey: 'user-openrouter-key' },
+      userByok: [openRouterKey],
+    });
+    expect(openRouterRoute?.failover).toBeUndefined();
+    expect(decrypt.mock.calls).toEqual([['anthropic'], ['vercel-ai-gateway'], ['openrouter']]);
   });
 
   test('checks the Vercel AI Gateway key without Kilo provider exclusions', async () => {

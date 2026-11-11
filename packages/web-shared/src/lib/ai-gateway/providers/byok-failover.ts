@@ -98,14 +98,16 @@ type PendingAttempt = Omit<ByokFailoverAttempt, 'error_code'> & {
  * failure is returned: failover never reaches Kilo's route or another payer's connection.
  */
 export async function sendUpstreamAttemptWithByokFailover(
-  input: SendUpstreamAttemptInput,
-  nextByokFailover: () => Promise<GetProviderProviderResult | null>
+  input: Omit<SendUpstreamAttemptInput, 'upstreamDurationBudgetMs'>
 ): Promise<ByokFailoverResult> {
   let providerContext = input.providerContext;
   let request = input.request;
-  if (!providerContext.byokFailovers?.length) {
+  if (!providerContext.failover) {
     return {
-      attempt: await sendUpstreamAttempt(input),
+      attempt: await sendUpstreamAttempt({
+        ...input,
+        upstreamDurationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
+      }),
       providerContext,
       request,
       failoverAttempts: null,
@@ -119,7 +121,10 @@ export async function sendUpstreamAttemptWithByokFailover(
   // or the response.
   const pending: PendingAttempt[] = [];
   let attemptStartedAt = startedAt;
-  let attempt = await sendUpstreamAttempt(input);
+  let attempt = await sendUpstreamAttempt({
+    ...input,
+    upstreamDurationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
+  });
   let attemptDurationMs = Math.round(performance.now() - attemptStartedAt);
   let stopReason: ByokFailoverAttempt['stop_reason'];
   for (;;) {
@@ -139,7 +144,7 @@ export async function sendUpstreamAttemptWithByokFailover(
       stopReason = 'budget-exhausted';
       break;
     }
-    const next = await nextByokFailover();
+    const next = providerContext.failover ? await providerContext.failover() : null;
     if (!next) {
       stopReason = 'no-keys-left';
       break;

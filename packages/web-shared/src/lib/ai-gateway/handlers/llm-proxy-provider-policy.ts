@@ -84,9 +84,8 @@ type ProviderPolicyInput = {
 type ProviderPolicyResult =
   | {
       ok: true;
+      /** Its `failover` leads only to keys the policy admits. */
       providerResult: GetProviderProviderResult;
-      /** The next of the route's BYOK failover keys that the policy admits, or null when none is left. */
-      nextByokFailover: () => Promise<GetProviderProviderResult | null>;
       isNonTrialEnterprise: boolean;
       dataRegion: OrganizationGatewaySettings['dataRegion'];
     }
@@ -342,36 +341,28 @@ export async function resolveProviderAndPolicy(
     }
   }
 
-  const byokFailovers = providerResult.byokFailovers ?? [];
-  let nextFailoverIndex = 0;
-  const nextByokFailover = async (): Promise<GetProviderProviderResult | null> => {
-    while (nextFailoverIndex < byokFailovers.length) {
-      const candidate = byokFailovers[nextFailoverIndex++];
-      let route: GetProviderProviderResult;
-      try {
-        route = await candidate.resolve();
-      } catch (error) {
-        console.error('[byok-failover] Skipping a BYOK key that could not be resolved', {
-          providerId: candidate.providerId,
-          errorType: error instanceof Error ? error.name : 'unknown',
-        });
-        continue;
-      }
-      if (await routeRejection(route)) {
-        console.warn('[byok-failover] Skipping a BYOK key the policy refuses', {
-          providerId: candidate.providerId,
-        });
-        continue;
-      }
-      return route;
-    }
-    return null;
+  /** The route with a failover that skips the keys the policy refuses. */
+  const withPolicyFailover = (route: GetProviderProviderResult): GetProviderProviderResult => {
+    const { failover } = route;
+    if (!failover) return route;
+    return {
+      ...route,
+      failover: async () => {
+        let next = await failover();
+        while (next && (await routeRejection(next))) {
+          console.warn('[byok-failover] Skipping a BYOK key the policy refuses', {
+            providerIds: next.userByok?.map(byok => byok.providerId) ?? [],
+          });
+          next = next.failover ? await next.failover() : null;
+        }
+        return next && withPolicyFailover(next);
+      },
+    };
   };
 
   return {
     ok: true,
-    providerResult,
-    nextByokFailover,
+    providerResult: withPolicyFailover(providerResult),
     isNonTrialEnterprise,
     dataRegion: organizationGatewaySettings.dataRegion,
   };

@@ -109,16 +109,11 @@ export type GetProviderProviderResult = {
    *  outside Kilo credits pays for the request, such as the ChatGPT
    *  subscription, while abuse and organization policy checks still apply. */
   skipBalanceCheck?: boolean;
-  /** The owner's later BYOK keys that serve the request, in route order, for when this key's
-   *  upstream fails. Never the ChatGPT connection or Kilo's route, so a failing key never makes
-   *  another payer, or Kilo, pay. */
-  byokFailovers?: readonly ByokFailoverCandidate[];
-};
-
-export type ByokFailoverCandidate = {
-  providerId: UserByokProviderId;
-  /** Decrypts the key only when failover reaches it. */
-  resolve: () => Promise<GetProviderProviderResult>;
+  /** The route to try when this route's upstream fails: the owner's next BYOK key that serves the
+   *  request, in route order, or null when none is left. Its key is decrypted only when called.
+   *  Only BYOK key routes have one, and it never leads to the ChatGPT connection or Kilo's route,
+   *  so a failing key never makes another payer, or Kilo, pay. */
+  failover?: () => Promise<GetProviderProviderResult | null>;
 };
 
 /** A bespoke direct BYOK id whose key serves only catalog ids. */
@@ -529,17 +524,34 @@ async function selectProvider(
       : gatewayRoutedByokResult(step, credential, requestedModel);
   };
 
-  const byokFailoversAfter = (planIndex: number): ByokFailoverCandidate[] =>
+  const failoverThrough = (steps: readonly KeyPlanStep[]): GetProviderProviderResult['failover'] =>
+    steps.length === 0
+      ? undefined
+      : async () => {
+          for (const [index, step] of steps.entries()) {
+            try {
+              return {
+                ...(await resolveKey(step)),
+                failover: failoverThrough(steps.slice(index + 1)),
+              };
+            } catch (error) {
+              console.error(
+                '[getProvider] Skipping a BYOK failover key that could not be resolved',
+                {
+                  providerId: step.key.providerId,
+                  errorType: error instanceof Error ? error.name : 'unknown',
+                }
+              );
+            }
+          }
+          return null;
+        };
+
+  /** The serving keys after `planIndex`, then the key the request ignores. */
+  const failoverStepsAfter = (planIndex: number): KeyPlanStep[] =>
     plan.slice(planIndex + 1).flatMap(step => {
-      const keyStep =
-        step.route === 'ignored-key-fallback'
-          ? step.step
-          : isKeyPlanStep(step) && !reasonToPass(step)
-            ? step
-            : null;
-      return keyStep
-        ? [{ providerId: keyStep.key.providerId, resolve: () => resolveKey(keyStep) }]
-        : [];
+      if (step.route === 'ignored-key-fallback') return [step.step];
+      return isKeyPlanStep(step) && !reasonToPass(step) ? [step] : [];
     });
 
   const takeKey = async (
@@ -556,7 +568,7 @@ async function selectProvider(
       route: step.route,
       provider_id: providerId,
     });
-    return { ...result, byokFailovers: byokFailoversAfter(planIndex) };
+    return { ...result, failover: failoverThrough(failoverStepsAfter(planIndex)) };
   };
 
   // A connection whose credential is terminally dead must fail readably instead of resolving to

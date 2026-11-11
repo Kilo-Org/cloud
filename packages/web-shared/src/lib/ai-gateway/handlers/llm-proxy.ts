@@ -393,7 +393,7 @@ export async function handleLlmProxyRequest(
     organizationGroupPolicyPromise,
   });
   if (!providerPolicy.ok) return providerPolicy.response;
-  const { providerResult, nextByokFailover, isNonTrialEnterprise, dataRegion } = providerPolicy;
+  const { providerResult, isNonTrialEnterprise, dataRegion } = providerPolicy;
 
   console.debug(`Routing request to ${providerResult.provider.type}`, {
     byokProviderIds: providerResult.userByok?.map(byok => byok.providerId) ?? null,
@@ -479,32 +479,29 @@ export async function handleLlmProxyRequest(
     providerContext,
     request: sentRequest,
     failoverAttempts,
-  } = await sendUpstreamAttemptWithByokFailover(
-    {
-      providerContext: providerResult,
-      request: requestBodyParsed,
-      requestedModel: effectiveModelIdLowerCased,
-      fraudHeaders,
-      userId: user.id,
-      organizationId: organizationId ?? null,
-      sessionId: headers.sessionId,
-      taskId: headers.taskId,
-      isNonTrialEnterprise,
-      search: url.search,
-      method: request.method,
-      signal: request.signal,
-      vercelRequestId: headers.vercelRequestId,
-      dataRegion,
-      costLimit:
-        requestCostLimit !== null && requestCostBalance
-          ? {
-              maximumMicrodollars: requestCostLimit,
-              availableBalanceMicrodollars: Math.floor(requestCostBalance.balance * 1_000_000),
-            }
-          : undefined,
-    },
-    nextByokFailover
-  );
+  } = await sendUpstreamAttemptWithByokFailover({
+    providerContext: providerResult,
+    request: requestBodyParsed,
+    requestedModel: effectiveModelIdLowerCased,
+    fraudHeaders,
+    userId: user.id,
+    organizationId: organizationId ?? null,
+    sessionId: headers.sessionId,
+    taskId: headers.taskId,
+    isNonTrialEnterprise,
+    search: url.search,
+    method: request.method,
+    signal: request.signal,
+    vercelRequestId: headers.vercelRequestId,
+    dataRegion,
+    costLimit:
+      requestCostLimit !== null && requestCostBalance
+        ? {
+            maximumMicrodollars: requestCostLimit,
+            availableBalanceMicrodollars: Math.floor(requestCostBalance.balance * 1_000_000),
+          }
+        : undefined,
+  });
   if (failoverAttempts) providerMetadataCapture?.captureByokFailoverAttempts(failoverAttempts);
   if (attempt.type === 'invalid-openrouter-model') {
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);

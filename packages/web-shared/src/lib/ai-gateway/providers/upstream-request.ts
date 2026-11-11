@@ -298,7 +298,7 @@ export async function upstreamRequest({
   signal,
   vercelRequestId,
   reasoningEffort,
-  durationBudgetMs = UPSTREAM_DURATION_BUDGET_MS,
+  durationBudgetMs,
 }: {
   chatApi: GatewayChatApiKind;
   search: string;
@@ -310,8 +310,8 @@ export async function upstreamRequest({
   /** Incoming `x-vercel-id`, used to correlate failures with the platform logs. */
   vercelRequestId?: string | null;
   reasoningEffort: string | null;
-  /** What remains of `UPSTREAM_DURATION_BUDGET_MS` when an earlier attempt of the invocation spent part of it. */
-  durationBudgetMs?: number;
+  /** At most `UPSTREAM_DURATION_BUDGET_MS`; less when an earlier attempt of the invocation spent part of it. */
+  durationBudgetMs: number;
 }): Promise<{ type: 'success'; response: Response } | { type: 'error'; response: NextResponse }> {
   const headers = new Headers();
   for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {

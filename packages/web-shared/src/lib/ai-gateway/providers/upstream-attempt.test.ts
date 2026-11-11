@@ -46,6 +46,7 @@ import { upstreamRequest } from './upstream-request';
 import { sendUpstreamAttempt } from './upstream-attempt';
 
 const ACCESS_TOKEN = 'delegated-access-token';
+const upstreamDurationBudgetMs = 123_000;
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -96,6 +97,7 @@ describe('bounded spending provider enforcement', () => {
     } as never);
     return sendUpstreamAttempt({
       dataRegion: null,
+      upstreamDurationBudgetMs,
       providerContext: { provider: { type: providerId }, userByok } as never,
       requestedModel: model.id,
       request: {
@@ -164,6 +166,7 @@ describe('bounded spending provider enforcement', () => {
 
     const result = await sendUpstreamAttempt({
       dataRegion: null,
+      upstreamDurationBudgetMs,
       providerContext: { provider: { type: 'openrouter' }, userByok: null } as never,
       requestedModel: model.id,
       request: request as never,
@@ -241,6 +244,7 @@ describe('upstream model catalog validation', () => {
       });
     return sendUpstreamAttempt({
       dataRegion: null,
+      upstreamDurationBudgetMs,
       providerContext: {
         provider: { type: providerId },
         userByok,
@@ -314,7 +318,10 @@ describe('upstream model catalog validation', () => {
     expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([[requestedModel]]);
     expect(upstreamRequest).toHaveBeenCalledTimes(1);
     expect(upstreamRequest).toHaveBeenCalledWith(
-      expect.objectContaining({ body: expect.objectContaining({ model: wireModel }) })
+      expect.objectContaining({
+        body: expect.objectContaining({ model: wireModel }),
+        durationBudgetMs: upstreamDurationBudgetMs,
+      })
     );
   });
 
@@ -388,6 +395,7 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
     jest.mocked(upstreamRequest).mockResolvedValue({ type: 'success', response } as never);
     return sendUpstreamAttempt({
       dataRegion: null,
+      upstreamDurationBudgetMs,
       providerContext: {
         provider: { type: 'openai-chatgpt', chatGptOwner: owner },
         userByok: null,

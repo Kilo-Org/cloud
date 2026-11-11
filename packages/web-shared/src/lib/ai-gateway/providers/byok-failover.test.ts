@@ -62,16 +62,18 @@ function servedAttempt(): SendUpstreamAttemptResult {
   };
 }
 
-function withFailovers(primary: GetProviderProviderResult): GetProviderProviderResult {
-  return {
-    ...primary,
-    byokFailovers: [{ providerId: 'anthropic', resolve: async () => primary }],
-  };
-}
-
-function nextRoutes(...routes: GetProviderProviderResult[]) {
-  const remaining = [...routes];
-  return jest.fn(async () => remaining.shift() ?? null);
+/** Links the routes so each one's failover leads to the next; the last one's leads to null. */
+function chain(primary: GetProviderProviderResult, ...next: GetProviderProviderResult[]) {
+  const failover = jest.fn(async (route: GetProviderProviderResult | null) => route);
+  const link = (
+    route: GetProviderProviderResult,
+    after: GetProviderProviderResult | null
+  ): GetProviderProviderResult => ({ ...route, failover: () => failover(after) });
+  const routes = next.reduceRight<GetProviderProviderResult[]>(
+    (after, route) => [link(route, after[0] ?? null), ...after],
+    []
+  );
+  return { primary: link(primary, routes[0] ?? null), routes, failover };
 }
 
 async function failoverAttemptsOf(result: {
@@ -81,7 +83,9 @@ async function failoverAttemptsOf(result: {
   return result.failoverAttempts;
 }
 
-function input(providerContext: GetProviderProviderResult): SendUpstreamAttemptInput {
+function input(
+  providerContext: GetProviderProviderResult
+): Omit<SendUpstreamAttemptInput, 'upstreamDurationBudgetMs'> {
   return {
     providerContext,
     requestedModel: 'openai/gpt-4o',
@@ -113,67 +117,69 @@ describe('sendUpstreamAttemptWithByokFailover upstream budget', () => {
   });
 
   it('gives a failover attempt only what the earlier attempts left of the budget', async () => {
-    const failover = route('failover-key');
-    const primary = {
-      ...route('primary-key'),
-      byokFailovers: [{ providerId: 'anthropic' as const, resolve: async () => failover }],
-    };
+    const {
+      primary,
+      routes: [next],
+    } = chain(route('primary-key'), route('failover-key'));
     mockedSendUpstreamAttempt.mockImplementationOnce(async () => {
       now += 120_000.4;
       return failedAttempt(503);
     });
     mockedSendUpstreamAttempt.mockResolvedValueOnce(failedAttempt(500));
 
-    const nextByokFailover = jest
-      .fn(async (): Promise<GetProviderProviderResult | null> => null)
-      .mockResolvedValueOnce(failover);
+    const result = await sendUpstreamAttemptWithByokFailover(input(primary));
 
-    const result = await sendUpstreamAttemptWithByokFailover(input(primary), nextByokFailover);
-
-    expect(result.providerContext).toBe(failover);
+    expect(result.providerContext).toBe(next);
     expect(mockedSendUpstreamAttempt).toHaveBeenCalledTimes(2);
-    expect(mockedSendUpstreamAttempt.mock.calls[0]?.[0].upstreamDurationBudgetMs).toBeUndefined();
+    expect(mockedSendUpstreamAttempt.mock.calls[0]?.[0].upstreamDurationBudgetMs).toBe(
+      UPSTREAM_DURATION_BUDGET_MS
+    );
     expect(mockedSendUpstreamAttempt.mock.calls[1]?.[0].upstreamDurationBudgetMs).toBe(
       UPSTREAM_DURATION_BUDGET_MS - 120_001
     );
   });
 
+  it('gives a route without failover keys the whole budget', async () => {
+    mockedSendUpstreamAttempt.mockResolvedValueOnce(failedAttempt(503));
+
+    await sendUpstreamAttemptWithByokFailover(input(route('primary-key')));
+
+    expect(mockedSendUpstreamAttempt).toHaveBeenCalledTimes(1);
+    expect(mockedSendUpstreamAttempt.mock.calls[0]?.[0].upstreamDurationBudgetMs).toBe(
+      UPSTREAM_DURATION_BUDGET_MS
+    );
+  });
+
   it('returns the failure without failing over when too little of the budget is left', async () => {
-    const failover = route('failover-key');
-    const nextByokFailover = jest.fn(async () => failover);
-    const primary = {
-      ...route('primary-key'),
-      byokFailovers: [{ providerId: 'anthropic' as const, resolve: nextByokFailover }],
-    };
+    const { primary, failover } = chain(route('primary-key'), route('failover-key'));
     mockedSendUpstreamAttempt.mockImplementationOnce(async () => {
       now += UPSTREAM_DURATION_BUDGET_MS - 1_000;
       return failedAttempt(503);
     });
 
-    const result = await sendUpstreamAttemptWithByokFailover(input(primary), nextByokFailover);
+    const result = await sendUpstreamAttemptWithByokFailover(input(primary));
 
     expect(result.providerContext).toBe(primary);
     expect(result.attempt.type === 'error' && result.attempt.response.status).toBe(503);
     expect(mockedSendUpstreamAttempt).toHaveBeenCalledTimes(1);
-    expect(nextByokFailover).not.toHaveBeenCalled();
+    expect(failover).not.toHaveBeenCalled();
     expect(result.failoverAttempts).toBeNull();
   });
 
   it('returns the failure without failing over when resolving the next key leaves under 30s', async () => {
-    const failover = route('failover-key');
-    const nextByokFailover = jest.fn(async () => {
+    const { primary, failover } = chain(route('primary-key'), route('failover-key'));
+    failover.mockImplementationOnce(async next => {
       now = UPSTREAM_DURATION_BUDGET_MS - 29_000;
-      return failover;
+      return next;
     });
-    const primary = withFailovers(route('primary-key'));
     mockedSendUpstreamAttempt.mockImplementationOnce(async () => {
       now += 1_000;
       return failedAttempt(503);
     });
 
-    const result = await sendUpstreamAttemptWithByokFailover(input(primary), nextByokFailover);
+    const result = await sendUpstreamAttemptWithByokFailover(input(primary));
 
-    expect(nextByokFailover).toHaveBeenCalledTimes(1);
+    expect(failover).toHaveBeenCalledTimes(1);
     expect(mockedSendUpstreamAttempt).toHaveBeenCalledTimes(1);
     expect(result.providerContext).toBe(primary);
     expect(result.attempt.type === 'error' && result.attempt.response.status).toBe(503);
@@ -186,15 +192,13 @@ describe('sendUpstreamAttemptWithByokFailover upstream budget', () => {
       return failedAttempt(503);
     });
     mockedSendUpstreamAttempt.mockResolvedValueOnce(servedAttempt());
-    const nextByokFailover = jest.fn(async () => {
+    const { primary, failover } = chain(route('primary-key'), route('failover-key'));
+    failover.mockImplementationOnce(async next => {
       now += 50_000;
-      return route('failover-key');
+      return next;
     });
 
-    await sendUpstreamAttemptWithByokFailover(
-      input(withFailovers(route('primary-key'))),
-      nextByokFailover
-    );
+    await sendUpstreamAttemptWithByokFailover(input(primary));
 
     expect(mockedSendUpstreamAttempt).toHaveBeenCalledTimes(2);
     expect(mockedSendUpstreamAttempt.mock.calls[1]?.[0].upstreamDurationBudgetMs).toBe(
@@ -260,12 +264,16 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
     );
     answerAfter(845.5, servedAttempt());
 
-    const result = await sendUpstreamAttemptWithByokFailover(
-      input(withFailovers(route('openai-key', 'openai', 'vercel'))),
-      nextRoutes(anthropic, bedrock, openrouter)
+    const { primary, routes } = chain(
+      route('openai-key', 'openai', 'vercel'),
+      anthropic,
+      bedrock,
+      openrouter
     );
 
-    expect(result.providerContext).toBe(openrouter);
+    const result = await sendUpstreamAttemptWithByokFailover(input(primary));
+
+    expect(result.providerContext).toBe(routes[2]);
     const failoverAttempts = await failoverAttemptsOf(result);
     expect(failoverAttempts).toEqual([
       {
@@ -315,8 +323,7 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
     answerAfter(60, servedAttempt());
 
     const result = await sendUpstreamAttemptWithByokFailover(
-      input(withFailovers(route('primary-key'))),
-      nextRoutes(route('failover-key', 'anthropic'))
+      input(chain(route('primary-key'), route('failover-key', 'anthropic')).primary)
     );
 
     expect(
@@ -336,8 +343,7 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
     answerAfter(200, upstreamJsonFailure(429, lastBody));
 
     const result = await sendUpstreamAttemptWithByokFailover(
-      input(withFailovers(route('primary-key'))),
-      nextRoutes(route('failover-key', 'anthropic', 'vercel'))
+      input(chain(route('primary-key'), route('failover-key', 'anthropic', 'vercel')).primary)
     );
 
     expect(await failoverAttemptsOf(result)).toEqual([
@@ -375,8 +381,7 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
     });
 
     const result = await sendUpstreamAttemptWithByokFailover(
-      input(withFailovers(route('primary-key'))),
-      nextRoutes(route('failover-key', 'anthropic'))
+      input(chain(route('primary-key'), route('failover-key', 'anthropic')).primary)
     );
 
     expect((await failoverAttemptsOf(result)).at(-1)).toMatchObject({
@@ -394,17 +399,15 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
   it('records a final model OpenRouter does not list as a failed 404', async () => {
     answerAfter(100, upstreamJsonFailure(500, { error: { code: 'server_error' } }));
     answerAfter(5, { type: 'invalid-openrouter-model' });
-    const nextByokFailover = nextRoutes(
+    const { primary, failover } = chain(
+      route('primary-key'),
       route('failover-key', 'openrouter', 'openrouter'),
       route('third-key', 'anthropic')
     );
 
-    const result = await sendUpstreamAttemptWithByokFailover(
-      input(withFailovers(route('primary-key'))),
-      nextByokFailover
-    );
+    const result = await sendUpstreamAttemptWithByokFailover(input(primary));
 
-    expect(nextByokFailover).toHaveBeenCalledTimes(1);
+    expect(failover).toHaveBeenCalledTimes(1);
 
     expect((await failoverAttemptsOf(result)).at(-1)).toEqual({
       provider_type: 'openrouter',
@@ -422,17 +425,15 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
       UPSTREAM_DURATION_BUDGET_MS - 10_000,
       upstreamJsonFailure(503, { error_type: 'upstream_disconnect' })
     );
-    const nextByokFailover = nextRoutes(
+    const { primary, failover } = chain(
+      route('primary-key'),
       route('failover-key', 'anthropic'),
       route('third-key', 'openrouter', 'openrouter')
     );
 
-    const result = await sendUpstreamAttemptWithByokFailover(
-      input(withFailovers(route('primary-key'))),
-      nextByokFailover
-    );
+    const result = await sendUpstreamAttemptWithByokFailover(input(primary));
 
-    expect(nextByokFailover).toHaveBeenCalledTimes(1);
+    expect(failover).toHaveBeenCalledTimes(1);
     expect((await failoverAttemptsOf(result)).at(-1)).toMatchObject({
       byok_provider_ids: ['anthropic'],
       outcome: 'failed',
@@ -447,17 +448,18 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
       controller.abort();
       return upstreamJsonFailure(500, { error: { code: 'server_error' } });
     });
-    const nextByokFailover = nextRoutes(
+    const { primary, failover } = chain(
+      route('primary-key'),
       route('failover-key', 'anthropic'),
       route('third-key', 'openrouter', 'openrouter')
     );
 
-    const result = await sendUpstreamAttemptWithByokFailover(
-      { ...input(withFailovers(route('primary-key'))), signal: controller.signal },
-      nextByokFailover
-    );
+    const result = await sendUpstreamAttemptWithByokFailover({
+      ...input(primary),
+      signal: controller.signal,
+    });
 
-    expect(nextByokFailover).toHaveBeenCalledTimes(1);
+    expect(failover).toHaveBeenCalledTimes(1);
     expect((await failoverAttemptsOf(result)).at(-1)).toMatchObject({
       outcome: 'failed',
       stop_reason: 'client-disconnected',
@@ -466,26 +468,23 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
 
   it('records nothing when the first key serves the request', async () => {
     answerAfter(100, servedAttempt());
-    const nextByokFailover = nextRoutes(route('failover-key', 'anthropic'));
+    const { primary, failover } = chain(route('primary-key'), route('failover-key', 'anthropic'));
 
-    const result = await sendUpstreamAttemptWithByokFailover(
-      input(withFailovers(route('primary-key'))),
-      nextByokFailover
-    );
+    const result = await sendUpstreamAttemptWithByokFailover(input(primary));
 
     expect(result.failoverAttempts).toBeNull();
-    expect(nextByokFailover).not.toHaveBeenCalled();
+    expect(failover).not.toHaveBeenCalled();
   });
 
   it('records nothing when the failing key has no failover left', async () => {
     answerAfter(100, upstreamJsonFailure(429, { error: { code: 'insufficient_quota' } }));
 
-    const result = await sendUpstreamAttemptWithByokFailover(
-      input(withFailovers(route('primary-key'))),
-      nextRoutes()
-    );
+    const { primary, failover } = chain(route('primary-key'));
+
+    const result = await sendUpstreamAttemptWithByokFailover(input(primary));
 
     expect(result.failoverAttempts).toBeNull();
+    expect(failover).toHaveBeenCalledTimes(1);
     expect(mockedSendUpstreamAttempt).toHaveBeenCalledTimes(1);
     if (result.attempt.type === 'invalid-openrouter-model') throw new Error('Expected a response');
     expect(await result.attempt.response.json()).toEqual({
@@ -496,10 +495,7 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
   it('records nothing for a route without failover keys', async () => {
     answerAfter(100, upstreamJsonFailure(429, { error: { code: 'insufficient_quota' } }));
 
-    const result = await sendUpstreamAttemptWithByokFailover(
-      input(route('primary-key')),
-      nextRoutes()
-    );
+    const result = await sendUpstreamAttemptWithByokFailover(input(route('primary-key')));
 
     expect(result.failoverAttempts).toBeNull();
   });
@@ -522,8 +518,7 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
     answerAfter(100, servedAttempt());
 
     const result = await sendUpstreamAttemptWithByokFailover(
-      input(withFailovers(route('primary-key'))),
-      nextRoutes(route('failover-key', 'anthropic'))
+      input(chain(route('primary-key'), route('failover-key', 'anthropic')).primary)
     );
 
     const [failed, served] = await failoverAttemptsOf(result);
@@ -563,8 +558,7 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
     answerAfter(100, servedAttempt());
 
     const result = await sendUpstreamAttemptWithByokFailover(
-      input(withFailovers(route('primary-key'))),
-      nextRoutes(route('failover-key', 'anthropic'))
+      input(chain(route('primary-key'), route('failover-key', 'anthropic')).primary)
     );
 
     const [failed] = await failoverAttemptsOf(result);
@@ -579,8 +573,7 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
     answerAfter(100, servedAttempt());
 
     const result = await sendUpstreamAttemptWithByokFailover(
-      input(withFailovers(route('primary-key'))),
-      nextRoutes(route('failover-key', 'anthropic'))
+      input(chain(route('primary-key'), route('failover-key', 'anthropic')).primary)
     );
 
     const [failed] = await failoverAttemptsOf(result);
@@ -601,8 +594,7 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
     answerAfter(100, servedAttempt());
 
     const result = await sendUpstreamAttemptWithByokFailover(
-      input(withFailovers(route('primary-key'))),
-      nextRoutes(route('failover-key', 'anthropic'))
+      input(chain(route('primary-key'), route('failover-key', 'anthropic')).primary)
     );
     expect(mockedSendUpstreamAttempt).toHaveBeenCalledTimes(2);
     expect(cancel).not.toHaveBeenCalled();
@@ -643,8 +635,7 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
     });
 
     const result = await sendUpstreamAttemptWithByokFailover(
-      input(withFailovers(route('primary-key'))),
-      nextRoutes(route('failover-key', 'anthropic'))
+      input(chain(route('primary-key'), route('failover-key', 'anthropic')).primary)
     );
 
     expect(mockedSendUpstreamAttempt).toHaveBeenCalledTimes(2);
@@ -661,15 +652,13 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
   it('measures each attempt only until its upstream answered', async () => {
     answerAfter(250.2, upstreamJsonFailure(500, { error: { code: 'server_error' } }));
     answerAfter(750.7, servedAttempt());
-    const nextByokFailover = jest.fn(async () => {
+    const { primary, failover } = chain(route('primary-key'), route('failover-key', 'anthropic'));
+    failover.mockImplementationOnce(async next => {
       now += 5_000;
-      return route('failover-key', 'anthropic');
+      return next;
     });
 
-    const result = await sendUpstreamAttemptWithByokFailover(
-      input(withFailovers(route('primary-key'))),
-      nextByokFailover
-    );
+    const result = await sendUpstreamAttemptWithByokFailover(input(primary));
 
     expect((await failoverAttemptsOf(result)).map(attempt => attempt.duration_ms)).toEqual([
       250, 751,

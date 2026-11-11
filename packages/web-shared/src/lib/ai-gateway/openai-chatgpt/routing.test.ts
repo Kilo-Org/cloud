@@ -45,7 +45,10 @@ import type {
   GatewayRequest,
   GatewayResponsesRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import {
+  UPSTREAM_DURATION_BUDGET_MS,
+  upstreamRequest,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import {
   buildOpenAiChatGptProvider,
@@ -702,6 +705,7 @@ describe('checkOpenAiChatGptByok', () => {
       extraHeaders,
       provider,
       reasoningEffort: null,
+      durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
     });
 
     expect(outcome.type).toBe('success');

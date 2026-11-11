@@ -58,7 +58,8 @@ export type SendUpstreamAttemptInput = {
   vercelRequestId?: string | null;
   costLimit?: { maximumMicrodollars: string; availableBalanceMicrodollars: number };
   dataRegion: OrganizationDataRegion | null;
-  upstreamDurationBudgetMs?: number;
+  /** What remains of `UPSTREAM_DURATION_BUDGET_MS` for this attempt. */
+  upstreamDurationBudgetMs: number;
 };
 
 export type SendUpstreamAttemptResult =

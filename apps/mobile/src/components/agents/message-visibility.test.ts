@@ -1,7 +1,11 @@
 import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
-import { messageRendersContent, partRendersContent } from './message-visibility';
+import {
+  messageRendersContent,
+  partRendersContent,
+  userBubbleRendersContent,
+} from './message-visibility';
 
 function textPart(overrides: Partial<Extract<Part, { type: 'text' }>> = {}): Part {
   return {
@@ -237,4 +241,57 @@ describe('messageRendersContent', () => {
       expect(partRendersContent(textPart({ text }))).toBe(true);
     }
   );
+});
+
+describe('userBubbleRendersContent', () => {
+  it('returns true for a human prompt', () => {
+    expect(userBubbleRendersContent([textPart({ text: 'fix the parser' })])).toBe(true);
+  });
+
+  it('returns false for a row with no parts', () => {
+    expect(userBubbleRendersContent([])).toBe(false);
+  });
+
+  it('returns false when the only text part is the synthetic routing context', () => {
+    // The bubble renders human text through `humanTextParts`, which drops the
+    // server's context wrapper: accepting the wrapper here would draw an empty
+    // bubble inside the row's long-press surface.
+    expect(
+      userBubbleRendersContent([
+        textPart({ synthetic: true, text: '<cloud-agent-context session-id="w1" />' }),
+      ])
+    ).toBe(false);
+  });
+
+  it('returns true when a context wrapper sits beside the prompt', () => {
+    expect(
+      userBubbleRendersContent([
+        textPart({ synthetic: true, text: '<cloud-agent-context session-id="w1" />' }),
+        textPart({ id: 'p2', text: 'fix the parser' }),
+      ])
+    ).toBe(true);
+  });
+
+  it('returns false for blank text and for a prompt sanitization removes', () => {
+    expect(userBubbleRendersContent([textPart({ text: '   \n ' })])).toBe(false);
+    expect(userBubbleRendersContent([textPart({ text: "<script>alert('x')</script>" })])).toBe(false);
+  });
+
+  it('returns false for tool, reasoning and patch parts the bubble never draws', () => {
+    expect(userBubbleRendersContent([toolPart('bash')])).toBe(false);
+    expect(userBubbleRendersContent([reasoningPart('thinking')])).toBe(false);
+    expect(userBubbleRendersContent([patchPart(['src/a.ts'])])).toBe(false);
+  });
+
+  it('returns true for a file attachment', () => {
+    const file: Part = {
+      id: 'p-file',
+      sessionID: 's1',
+      messageID: 'm1',
+      type: 'file',
+      mime: 'text/plain',
+      url: 'file:///a.txt',
+    };
+    expect(userBubbleRendersContent([file])).toBe(true);
+  });
 });

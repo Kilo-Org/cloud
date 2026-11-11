@@ -2,6 +2,7 @@ import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import {
   hasNonWhitespaceText,
+  humanTextParts,
   isCompactionPart,
   isFilePart,
   isPatchPart,
@@ -79,5 +80,20 @@ export function messageRendersContent(message: StoredMessage): boolean {
   return (
     (message.info.role === 'user' && message.parts.length === 0) ||
     message.parts.some(partRendersContent)
+  );
+}
+
+/**
+ * Whether the user bubble draws visible content: a human text part with ink, or
+ * a file part. The bubble renders its text through `humanTextParts`, so a row
+ * whose only part is the server's synthetic `cloud-agent-context` wrapper draws
+ * no text even though that part renders content elsewhere. Judging the bubble by
+ * this predicate keeps the row and the bubble on one answer, so a row that draws
+ * nothing renders no bubble and no long-press surface either.
+ */
+export function userBubbleRendersContent(parts: readonly Part[]): boolean {
+  return (
+    humanTextParts(parts).some(partRendersContent) ||
+    parts.some(part => isFilePart(part) && partRendersContent(part))
   );
 }

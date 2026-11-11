@@ -47,6 +47,7 @@ const connectionString = process.env.POSTGRES_URL;
 if (!connectionString) throw new Error('Set POSTGRES_URL to the isolated local test database');
 const client = createDrizzleClient({ connectionString, ssl: false });
 const fixtures: { userId: string; orgId: string; skuId: string }[] = [];
+const parentOrgIds: string[] = [];
 
 beforeAll(async () => {
   const now = new Date();
@@ -91,6 +92,12 @@ afterAll(async () => {
     await client.db.delete(organizations).where(eq(organizations.id, f.orgId));
     await client.db.delete(kilocode_users).where(eq(kilocode_users.id, f.userId));
     await client.db.delete(cloud_billing_sku).where(eq(cloud_billing_sku.id, f.skuId));
+  }
+  for (const parentOrgId of parentOrgIds) {
+    await client.db
+      .delete(organization_seats_purchases)
+      .where(eq(organization_seats_purchases.organization_id, parentOrgId));
+    await client.db.delete(organizations).where(eq(organizations.id, parentOrgId));
   }
   await client.pool.end();
 });
@@ -278,6 +285,53 @@ describe('native organization compute accounting', () => {
         .where(eq(container_usage_interval.id, f.intervalId));
       expect(interval.billing_mode).toBe(billingMode);
       expect(interval.confirmed_seconds).toBe(300);
+    }
+  );
+
+  it.each([
+    { parentStatus: 'active', billingMode: 'shadow' },
+    { parentStatus: 'past_due', billingMode: 'shadow' },
+    { parentStatus: 'trialing', billingMode: 'paid' },
+    { parentStatus: 'ended', billingMode: 'paid' },
+    { parentStatus: null, billingMode: 'paid' },
+  ])(
+    'uses $billingMode billing for a child org whose parent seat status is $parentStatus',
+    async ({ parentStatus, billingMode }) => {
+      const f = await fixture();
+      f.config.cloudAgentOrgIds = new Set(['*']);
+      f.config.warnRemainingMicrodollars = 5_000_000;
+      const parentOrgId = crypto.randomUUID();
+      parentOrgIds.push(parentOrgId);
+      await client.db.insert(organizations).values({ id: parentOrgId, name: 'Compute parent' });
+      await client.db
+        .update(organizations)
+        .set({ parent_organization_id: parentOrgId })
+        .where(eq(organizations.id, f.orgId));
+      if (parentStatus !== null) {
+        await client.db.insert(organization_seats_purchases).values({
+          organization_id: parentOrgId,
+          subscription_stripe_id: `sub_${parentOrgId}`,
+          subscription_status: parentStatus,
+          seat_count: 1,
+          amount_usd: 19,
+          starts_at: new Date(f.start).toISOString(),
+          expires_at: new Date(f.start + 30 * 86_400_000).toISOString(),
+        });
+      }
+      if (billingMode === 'shadow') await f.limit(0);
+
+      expect(await f.admission()).toMatchObject({ kind: 'applied', billingMode, dedup: false });
+      expect(await f.heartbeat()).toMatchObject({
+        billingMode,
+        budget: { verdict: 'continue' },
+      });
+      const charged = billingMode === 'paid';
+      expect((await f.payer()).microdollars_used).toBe(charged ? 3_000_000 : 0);
+      const charges = await client.db
+        .select()
+        .from(compute_usage_charge)
+        .where(eq(compute_usage_charge.organization_id, f.orgId));
+      expect(charges).toHaveLength(charged ? 1 : 0);
     }
   );
 

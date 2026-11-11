@@ -406,6 +406,36 @@ async function recoverMissingInterval(
   return existing;
 }
 
+async function hasPayingSeatSubscription(
+  tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
+  organizationId: string
+): Promise<boolean> {
+  // Read the latest event, not any historical active subscription. Trialing
+  // subscriptions deliberately remain eligible for compute billing.
+  const [purchase] = await tx
+    .select({ status: organization_seats_purchases.subscription_status })
+    .from(organization_seats_purchases)
+    .where(eq(organization_seats_purchases.organization_id, organizationId))
+    .orderBy(desc(organization_seats_purchases.created_at))
+    .limit(1);
+  return purchase?.status === 'active' || purchase?.status === 'past_due';
+}
+
+// Child organizations have no subscription of their own; they inherit the
+// parent's. The hierarchy is one level deep, so only the direct parent counts.
+async function isPayingOrganizationOrChild(
+  tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
+  organizationId: string
+): Promise<boolean> {
+  if (await hasPayingSeatSubscription(tx, organizationId)) return true;
+  const [organization] = await tx
+    .select({ parentId: organizations.parent_organization_id })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  return organization?.parentId ? hasPayingSeatSubscription(tx, organization.parentId) : false;
+}
+
 export async function applyStart(
   env: Cloudflare.Env,
   input: RecordStartInput,
@@ -482,19 +512,10 @@ export async function applyStartWithDb(
     if (
       billingMode === 'paid' &&
       input.service.startsWith('cloud-agent-next-') &&
-      input.subject.type === 'org'
+      input.subject.type === 'org' &&
+      (await isPayingOrganizationOrChild(tx, input.subject.id))
     ) {
-      // Read the latest event, not any historical active subscription. Trialing
-      // subscriptions deliberately remain eligible for compute billing.
-      const [purchase] = await tx
-        .select({ status: organization_seats_purchases.subscription_status })
-        .from(organization_seats_purchases)
-        .where(eq(organization_seats_purchases.organization_id, input.subject.id))
-        .orderBy(desc(organization_seats_purchases.created_at))
-        .limit(1);
-      if (purchase?.status === 'active' || purchase?.status === 'past_due') {
-        billingMode = 'shadow';
-      }
+      billingMode = 'shadow';
     }
     const [open] = await tx
       .select()

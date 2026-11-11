@@ -85,6 +85,7 @@ describe('TRPCContext transport', () => {
   ])('sends 1,000 IDs per feature in a short POST request $label', async ({ skipBatch }) => {
     const input = {
       experimental_byok: Array.from({ length: 1000 }, () => crypto.randomUUID()),
+      enkrypt_output_guardrail: Array.from({ length: 1000 }, () => crypto.randomUUID()),
       gateway_settings: Array.from({ length: 1000 }, () => crypto.randomUUID()),
       request_logs: Array.from({ length: 1000 }, () => crypto.randomUUID()),
     };

@@ -25,6 +25,7 @@ import type {
 } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import { createChatProcessor } from './chat-processor';
+import { readKilo2Messages } from './kilo2-source-messages';
 import { createServiceState } from './service-state';
 import type {
   AssistantMessage,
@@ -2383,6 +2384,42 @@ describe('createSessionManager', () => {
       });
     });
 
+    it('keeps the selected Kilo2 variant through live user and assistant updates', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const model = { providerID: 'kilo', id: 'openai/gpt-5', variant: 'high' };
+      mockSessionCallbacks.onSessionCreated?.({ id: 'ses-1', model });
+      mockSessionCallbacks.onReplayComplete?.();
+      const messages = readKilo2Messages(
+        {
+          id: 'ses-1',
+          location: { directory: '/workspace/app' },
+          model,
+          time: { created: 1, updated: 3 },
+        },
+        [
+          { id: 'msg_native_user', type: 'user', time: { created: 2 }, text: 'Continue' },
+          {
+            id: 'msg_native_assistant',
+            type: 'assistant',
+            agent: 'code',
+            model,
+            time: { created: 3 },
+            content: [{ type: 'text', text: 'Working' }],
+          },
+        ]
+      );
+      for (const message of messages) {
+        mockSessionCallbacks.onEvent?.({ type: 'message.updated', info: message.info });
+        expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+          model: { providerID: 'kilo', modelID: 'openai/gpt-5' },
+          variant: 'high',
+        });
+      }
+      expect(atomValue(config.store, mgr.atoms.sessionConfig)).toMatchObject({ variant: 'high' });
+    });
+
     it('uses a replayed root message model when session metadata has no model', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -3747,6 +3784,81 @@ describe('createSessionManager', () => {
       expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toBeNull();
     });
 
+    it('lets a runtime agent pin beat the explicit cloud override and payload on send', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          runtimeAgents: [
+            { slug: 'locked-bot', name: 'Locked Bot', model: 'openai/gpt-5', variant: 'high' },
+            { slug: 'plain-bot', name: 'Plain Bot', model: 'anthropic/claude-sonnet-4' },
+          ],
+        }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSession.send.mockResolvedValue(undefined);
+      const override = { model: 'override/model', variant: 'low' };
+      mgr.setCloudAgentModelOverride(override);
+
+      await mgr.send({
+        payload: {
+          type: 'prompt',
+          prompt: 'pinned send',
+          mode: 'locked-bot',
+          model: 'payload/model',
+          variant: 'payload-variant',
+        },
+      });
+
+      expect(mockSession.send).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          payload: {
+            type: 'prompt',
+            prompt: 'pinned send',
+            mode: 'locked-bot',
+            model: { providerID: 'kilo', modelID: 'openai/gpt-5' },
+            variant: 'high',
+          },
+        })
+      );
+      // The pin must not consume the user's override: leaving the agent restores it.
+      expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toEqual(override);
+
+      await mgr.send({
+        payload: {
+          type: 'prompt',
+          prompt: 'pinned without variant',
+          mode: 'plain-bot',
+          model: 'payload/model',
+          variant: 'payload-variant',
+        },
+      });
+      const noVariantPayload = mockSession.send.mock.calls.at(-1)?.[0].payload;
+      expect(noVariantPayload).toEqual({
+        type: 'prompt',
+        prompt: 'pinned without variant',
+        mode: 'plain-bot',
+        model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' },
+      });
+      expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toEqual(override);
+
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'left the pin', mode: 'code' },
+      });
+      expect(mockSession.send).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          payload: {
+            type: 'prompt',
+            prompt: 'left the pin',
+            mode: 'code',
+            model: { providerID: 'kilo', modelID: 'override/model' },
+            variant: 'low',
+          },
+        })
+      );
+    });
+
     it('sends only the explicit remote override and omits stale session model fields after clear', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -4017,6 +4129,31 @@ describe('createSessionManager', () => {
       await mgr.send({ payload: { type: 'command', command: 'help', arguments: '' } });
       expect(atomValue(config.store, mgr.atoms.billingFailure)).toEqual(billingFailure);
       expect(atomValue(config.store, mgr.atoms.failedPrompt)).toBe('/help');
+    });
+
+    it('shows streamed billing failure details and clears them when a new message starts', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const billingFailure = {
+        code: 'INSUFFICIENT_CREDITS' as const,
+        payer: { type: 'org' as const, id: 'org-1' },
+        retryable: true,
+        remainingMicrodollars: 4_000_000,
+        minimumRequiredMicrodollars: 5_000_000,
+      };
+      mockSessionCallbacks.onEvent?.({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        reason: 'execution',
+        error: 'Sandbox billing requires additional credits',
+        accepted: true,
+        billingFailure,
+      });
+      expect(atomValue(config.store, mgr.atoms.billingFailure)).toEqual(billingFailure);
+      mockSessionCallbacks.onEvent?.({ type: 'cloud.message.queued', messageId: 'm2' });
+      expect(atomValue(config.store, mgr.atoms.billingFailure)).toBeNull();
+      mgr.destroy();
     });
 
     it('clears structured billing state for a normal failure and on reset', async () => {
@@ -6277,6 +6414,74 @@ describe('createSessionManager', () => {
       );
       expect(sc?.mode).toBe('debug');
       expect(sc?.variant).toBe('max');
+    });
+
+    it('keeps the session model over older replay while restoring the assistant mode', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          model: 'openai/gpt-5',
+          mode: 'code',
+          variant: null,
+        }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onSessionCreated?.({
+        id: 'ses-1',
+        model: { providerID: 'openai', id: 'gpt-5', variant: 'high' },
+      });
+      const initialConfig = config.store.get(mgr.atoms.sessionConfig);
+      expect(initialConfig).toEqual(
+        expect.objectContaining({
+          model: 'openai/gpt-5',
+          mode: 'code',
+          variant: null,
+        })
+      );
+
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: createStoredAssistantMessage('msg-old', 'ses-1', {
+          providerID: 'anthropic',
+          modelID: 'claude-sonnet-4',
+          agent: 'plan',
+          variant: 'max',
+        }).info,
+      });
+
+      expect(config.store.get(mgr.atoms.sessionConfig)).toEqual({ ...initialConfig, mode: 'plan' });
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'openai', modelID: 'gpt-5' },
+        variant: 'high',
+      });
+    });
+
+    it('keeps the cloud-agent model override selection through a late assistant config write', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({ ...defaultFetchedSession, mode: 'plan' }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onReplayComplete?.();
+      const initialConfig = config.store.get(mgr.atoms.sessionConfig);
+      const override = { model: 'openai/gpt-5', variant: 'high' };
+      mgr.setCloudAgentModelOverride(override);
+
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: createStoredAssistantMessage('msg-live', 'ses-1', {
+          providerID: 'anthropic',
+          modelID: 'claude-sonnet-4',
+          agent: 'code',
+          variant: 'max',
+        }).info,
+      });
+
+      expect(config.store.get(mgr.atoms.sessionConfig)).toEqual({ ...initialConfig, mode: 'code' });
+      expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toEqual(override);
     });
   });
 
@@ -8721,14 +8926,15 @@ describe('createSessionManager', () => {
       latestStorage?.upsertMessage(stubUserMessage({ id: 'msg_post_clear', sessionID: 'ses-1' }));
       mockSessionCallbacks.onReplayComplete?.();
 
-      // The successful send left its optimistic row (a `msg_<hex>…` id sorts
-      // before any `msg_p…`), plus the replayed pre- and post-clear history.
+      // The successful send left its optimistic row, stamped with the device
+      // clock, so it is the newest row and closes the transcript. The replayed
+      // pre- and post-clear rows share the stored epoch time and keep id order.
       const ids = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(
         m => m.info.id
       );
       expect(ids).toHaveLength(3);
-      expect(ids[0]).toMatch(/^msg_[0-9a-f]{12}/);
-      expect(ids.slice(1)).toEqual(['msg_post_clear', 'msg_pre_clear']);
+      expect(ids.slice(0, 2)).toEqual(['msg_post_clear', 'msg_pre_clear']);
+      expect(ids[2]).toMatch(/^msg_[0-9a-f]{12}/);
     });
 
     it('re-sets marker on a second /clear after send so reconnect purges again', async () => {
@@ -9655,6 +9861,47 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
     const reopened = config.store.get(mgr.atoms.messagesList).map(row => row.info.id);
     expect(reopened).toContain('a-reply');
     expect(reopened.indexOf('z-prompt')).toBeLessThan(reopened.indexOf('a-reply'));
+    mgr.destroy();
+  });
+
+  it('orders a stored transcript by creation time and keeps an older page above the loaded rows', async () => {
+    // A stored session whose ids descend while the clock rises. The store keeps
+    // ids in id order, so the transcript used to read newest-first.
+    const row = (id: string, text: string, created: number) => ({
+      info: stubUserMessage({
+        id,
+        sessionID: 'ses-1',
+        time: { created },
+        agent: 'build',
+        model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' },
+      }),
+      parts: [stubTextPart({ id: `${id}-text`, sessionID: 'ses-1', messageID: id, text })],
+    });
+    const fetchSnapshotPage = createPageFetchMock(async (_id, options) =>
+      options.cursor
+        ? makePage({
+            messages: [row('msg_z_old', 'Older prompt', 10), row('msg_a_old', 'Older reply', 20)],
+            nextCursor: null,
+          })
+        : makePage({
+            messages: [row('msg_z_new', 'Newest prompt', 30), row('msg_a_new', 'Newest reply', 40)],
+            nextCursor: 'opaque-older',
+          })
+    );
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+    await mgr.switchSession(kiloId('ses-1'));
+    expect(config.store.get(mgr.atoms.messagesList).map(entry => entry.info.id)).toEqual([
+      'msg_z_new',
+      'msg_a_new',
+    ]);
+    await mgr.loadOlderMessages();
+    expect(config.store.get(mgr.atoms.messagesList).map(entry => entry.info.id)).toEqual([
+      'msg_z_old',
+      'msg_a_old',
+      'msg_z_new',
+      'msg_a_new',
+    ]);
     mgr.destroy();
   });
 

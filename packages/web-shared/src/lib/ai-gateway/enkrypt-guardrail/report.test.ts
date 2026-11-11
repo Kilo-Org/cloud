@@ -4,12 +4,15 @@ import {
   ENKRYPT_RULE_RISK_CATEGORIES,
   ENKRYPT_RULE_SEVERITIES,
 } from '@kilocode/db/schema-types';
-import { guardrailSettings } from './report';
+import {
+  EnkryptGuardrailReportSchema,
+  EnkryptOutputGuardrailReportSchema,
+  guardrailSettings,
+} from './report';
 
 describe('guardrailSettings', () => {
   it('reports each detector and its action, with only the size of authored text', () => {
     const settings = guardrailSettings({
-      scanToolResults: false,
       status: 'ready',
       detectors: {
         injection_attack: { enabled: true, need_explanation: false },
@@ -28,7 +31,6 @@ describe('guardrailSettings', () => {
 
     expect(settings).toEqual({
       status: 'ready',
-      scan_tool_results: false,
       detectors: [
         { detector: 'injection_attack', action: 'block' },
         { detector: 'pii', action: 'log', pii_entities: ['pii', 'secrets'] },
@@ -45,7 +47,6 @@ describe('guardrailSettings', () => {
 
   it('counts policy rules without their text', () => {
     const settings = guardrailSettings({
-      scanToolResults: true,
       status: 'ready',
       detectors: {
         policy_violation: {
@@ -81,10 +82,35 @@ describe('guardrailSettings', () => {
   });
 
   it('reports an invalid configuration without detectors', () => {
-    expect(guardrailSettings({ scanToolResults: true, status: 'invalid' })).toEqual({
+    expect(guardrailSettings({ status: 'invalid' })).toEqual({
       status: 'invalid',
-      scan_tool_results: true,
       detectors: [],
     });
   });
+});
+
+it.each([false, true])('strips legacy report scan_tool_results: %s', scan_tool_results => {
+  const settings = { status: 'ready', detectors: [] };
+  const report = {
+    settings: { ...settings, scan_tool_results },
+    verdict: 'allow',
+    unavailable_reason: null,
+    added_latency_ms: 0,
+    scans: [],
+  };
+  const input = EnkryptGuardrailReportSchema.parse(report);
+  const output = EnkryptOutputGuardrailReportSchema.parse({
+    ...report,
+    held_back: false,
+    held_bytes: null,
+    held_ms: null,
+    upstream_read_failed: false,
+    output_characters: 0,
+    not_scanned_reason: null,
+  });
+
+  expect(input.settings).toEqual(settings);
+  expect(input.settings).not.toHaveProperty('scan_tool_results');
+  expect(output.settings).toEqual(settings);
+  expect(output.settings).not.toHaveProperty('scan_tool_results');
 });

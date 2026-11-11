@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "Saisissez votre adresse e-mail.",
     "or": "ou"
   },
+  "pendingLink": {
+    "description": "Un compte utilise déjà {{email}}. Connectez-vous avec l'une de ses méthodes pour ajouter {{provider}}.",
+    "emailCode": "M'envoyer un code de connexion par e-mail",
+    "continueInBrowser": "Continuer dans le navigateur",
+    "startAgain": "Recommencer",
+    "expired": "Cette demande d'ajout de {{provider}} a expiré.",
+    "noMethods": "Ce compte n'a aucune autre méthode de connexion, {{provider}} ne peut donc pas être ajouté.",
+    "linked": "{{provider}} a été ajouté à votre compte.",
+    "failedExpired": "{{provider}} n'a pas été ajouté, car la demande a expiré.",
+    "failedWrongAccount": "{{provider}} n'a pas été ajouté, car vous vous êtes connecté à un autre compte.",
+    "failedAccountAlreadyLinked": "{{provider}} n'a pas été ajouté, car il est déjà lié à un autre compte.",
+    "failedProviderAlreadyLinked": "{{provider}} n'a pas été ajouté, car votre compte possède déjà une autre connexion {{provider}}.",
+    "failedLinking": "Impossible d'ajouter {{provider}} à votre compte.",
+    "notAdded": "Vous êtes connecté. {{provider}} n'a pas été ajouté à votre compte."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revues automatiques de PR",
     "securityAgentSubtitle": "Trouver et corriger les vulnérabilités",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Compte de test",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO d'entreprise",
     "passkeysTitle": "Clés d'accès",
     "passkeysSubtitle": "Se connecter sans mot de passe",
@@ -1796,7 +1813,7 @@
       "discardWithUploadsMessage": "Votre consigne et les fichiers transférés qui ne sont liés à aucun message envoyé seront supprimés.",
       "discardFailed": "Impossible de supprimer le brouillon. Réessayez.",
       "remoteHint": "Pour l'exécuter sur votre ordinateur, démarrez Kilo sur celui-ci et laissez-le en cours d'exécution.",
-      "continueFrom": "La session {{title}} reprend.",
+      "continueFrom": "La session « {{title}} » reprend.",
       "importingSession": "Importation de la session…",
       "cliCannotContinue": "Cette CLI ne permet pas de reprendre une session. Choisissez Cloud Agent ou une autre CLI.",
       "importFailed": "Impossible d'importer cette session.",
@@ -1849,6 +1866,8 @@
       "toolList": "lister",
       "toolPatch": "appliquer un correctif",
       "toolTask": "tâche",
+      "toolSendFile": "Fichier envoyé",
+      "toolSendFileAction": "envoyer le fichier",
       "readTodos": "Lire le programme",
       "updateTodos": "Mettre à jour le programme",
       "linesBadge": "{{displayCount}} lignes",
@@ -1952,7 +1971,21 @@
       "thought": "Réflexion",
       "showDetails": "Afficher les détails",
       "pending": "En attente…",
-      "running": "En cours…"
+      "running": "En cours…",
+      "field": {
+        "filePath": "Chemin du fichier",
+        "path": "Chemin",
+        "offset": "Décalage",
+        "limit": "Limite",
+        "pattern": "Motif",
+        "include": "Inclusion",
+        "patchText": "Texte correctif",
+        "query": "Requête",
+        "prompt": "Consigne",
+        "header": "En-tête",
+        "question": "Question",
+        "options": "Options"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Impossible d'afficher le contenu."
@@ -3864,7 +3897,7 @@
     "reasoningEffort": {
       "modelFlag": "Ce modèle prend en charge le niveau de réflexion"
     },
-    "creditsRequired": "Pas assez de crédits pour envoyer ce message. Ajoutez des crédits et réessayez."
+    "creditsRequired": "Pas assez de crédits pour envoyer ce message."
   },
   "settingsTools": {
     "confirmTitle": "Confirmer cette modification ?"
@@ -4063,6 +4096,7 @@
       "namePlaceholder": "Mon agent",
       "promptPlaceholder": "Vous êtes un...",
       "tools": "Outils",
+      "wholeToolRule": "Cet agent applique une règle à tous les outils à la fois : {{rule}}. Ces interrupteurs sont en lecture seule.",
       "visibility": "Visibilité",
       "visibilityPrimary": "Primaire — affiché dans le sélecteur",
       "visibilitySubagent": "Sous-agent — appelable uniquement par d'autres",
@@ -4104,6 +4138,7 @@
     },
     "repoBindings": {
       "title": "Profils par défaut pour les dépôts",
+      "entryLabel": "Profils par défaut",
       "add": "Ajouter une valeur par défaut",
       "empty": "Aucune valeur par défaut configurée",
       "emptyDescription": "Ajoutez une valeur par défaut pour appliquer automatiquement un profil lors du démarrage des sessions pour un dépôt.",
@@ -4315,5 +4350,8 @@
     "noEnabledContexts": "Aucun contexte activé pour les briefings planifiés",
     "sourceBlocker": "La session nécessite votre attention",
     "sourceMetadata": "Métadonnées de session capturées"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Impossible d'ouvrir ce résultat de recherche"
   }
 }

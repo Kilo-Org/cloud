@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
@@ -28,6 +28,11 @@ import {
   SupportOrganizationPicker,
   type SelectedSupportOrganization,
 } from './SupportOrganizationPicker';
+import {
+  SupportRequestOutcomeNotice,
+  supportRequestOutcome,
+  type SupportRequestOutcome,
+} from './request-outcome';
 
 type ActionClass = 'support_read' | 'support_write';
 
@@ -79,6 +84,8 @@ export function SupportAccessContent() {
   const [ticketReference, setTicketReference] = useState('');
   const [reason, setReason] = useState('');
   const [emergencyReason, setEmergencyReason] = useState('');
+  const [requestOutcome, setRequestOutcome] = useState<SupportRequestOutcome | null>(null);
+  const requestedOrganization = useRef<SelectedSupportOrganization | null>(null);
 
   const mineOptions = trpc.admin.supportAccess.listMine.queryOptions();
   const pendingOptions = trpc.admin.supportAccess.listPending.queryOptions();
@@ -100,6 +107,15 @@ export function SupportAccessContent() {
     trpc.admin.supportAccess.request.mutationOptions({
       onSuccess: grant => {
         toast.success(grant.status === 'active' ? 'Read access active' : 'Write access requested');
+        const requested = requestedOrganization.current;
+        setRequestOutcome(
+          supportRequestOutcome({
+            actionClass: grant.actionClass,
+            status: grant.status,
+            organizationId: grant.organizationId,
+            organizationName: requested?.id === grant.organizationId ? requested.name : null,
+          })
+        );
         setReason('');
         setTicketReference('');
         setDurationMinutes('');
@@ -260,15 +276,17 @@ export function SupportAccessContent() {
                 missingRequirements.length > 0 ? 'support-request-missing' : undefined
               }
               disabled={request.isPending || missingRequirements.length > 0}
-              onClick={() =>
+              onClick={() => {
+                setRequestOutcome(null);
+                requestedOrganization.current = organization;
                 request.mutate({
                   organizationId,
                   actionClass,
                   reason: reason.trim(),
                   ticketReference: ticketReference.trim() || undefined,
                   durationSeconds,
-                })
-              }
+                });
+              }}
             >
               {actionClass === 'support_read' ? 'Start read access' : 'Request write access'}
             </Button>
@@ -282,6 +300,7 @@ export function SupportAccessContent() {
                 ))}
               </ul>
             )}
+            {requestOutcome && <SupportRequestOutcomeNotice outcome={requestOutcome} />}
           </div>
         </CardContent>
       </Card>
@@ -329,7 +348,15 @@ export function SupportAccessContent() {
                           </Button>
                         )}
                         {grant.status === 'active' && (
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <a
+                              href={`/organizations/${grant.organizationId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary text-sm font-medium hover:underline"
+                            >
+                              Open
+                            </a>
                             <Input
                               aria-label="Revocation reason"
                               className="h-8 w-56"

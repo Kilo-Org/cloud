@@ -18,7 +18,6 @@ jest.mock('@/lib/user', () => ({
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   ...jest.requireActual<typeof userServerModule>('@kilocode/web-shared/lib/user/server'),
   getUserFromSession: jest.fn(),
-  isEmailBlacklistedByDomainAsync: jest.fn(),
   isBlockedTLD: jest.fn(),
 }));
 jest.mock('@/lib/account-linking-session', () => ({
@@ -39,6 +38,7 @@ import {
   parseAnacondaProfile,
   parseOpenAiProfile,
   profileProvesEmailOwnership,
+  githubEmailsProveOwnership,
   authOptions,
   parseSignInRedirectContext,
   getInvitationTokenFromCallbackPath,
@@ -54,11 +54,15 @@ import {
   user_auth_provider,
 } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  insertTestUser,
+  insertTestUserAndGoogleAuth,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Account, Profile } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
-import { OPENAI_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
+import jwt from 'jsonwebtoken';
+import { NEXTAUTH_SECRET, OPENAI_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
 import {
   OPENAI_IDENTITY_SCOPE,
   OPENAI_ISSUER,
@@ -509,6 +513,66 @@ describe('profileProvesEmailOwnership', () => {
   test('rejects undefined', () => {
     expect(profileProvesEmailOwnership(undefined)).toBe(false);
   });
+
+  test('accepts a Discord profile with verified true', () => {
+    expect(profileProvesEmailOwnership({ verified: true }, 'discord')).toBe(true);
+  });
+
+  test('rejects a Discord profile with verified false', () => {
+    expect(profileProvesEmailOwnership({ verified: false }, 'discord')).toBe(false);
+  });
+
+  test('rejects a Discord profile without the verified flag', () => {
+    expect(profileProvesEmailOwnership({ email_verified: true }, 'discord')).toBe(false);
+  });
+
+  test('rejects a GitHub profile without the email list proof', () => {
+    expect(profileProvesEmailOwnership({ login: 'octocat' }, 'github')).toBe(false);
+  });
+
+  test('keeps the generic claim rule for GitLab', () => {
+    expect(profileProvesEmailOwnership({ confirmed_at: '2024-01-01' }, 'gitlab')).toBe(false);
+    expect(profileProvesEmailOwnership({ email_verified: true }, 'gitlab')).toBe(true);
+  });
+});
+
+describe('githubEmailsProveOwnership', () => {
+  test('accepts the verified flag for the address the sign-in uses', () => {
+    expect(
+      githubEmailsProveOwnership(
+        [
+          { email: 'Other@Example.com', primary: false, verified: false, visibility: 'private' },
+          { email: 'Used@Example.com', primary: true, verified: true, visibility: 'public' },
+        ],
+        'used@example.com'
+      )
+    ).toBe(true);
+  });
+
+  test('rejects an unverified address and a verified different address', () => {
+    expect(
+      githubEmailsProveOwnership(
+        [{ email: 'used@example.com', primary: true, verified: false, visibility: null }],
+        'used@example.com'
+      )
+    ).toBe(false);
+    expect(
+      githubEmailsProveOwnership(
+        [{ email: 'other@example.com', primary: true, verified: true, visibility: null }],
+        'used@example.com'
+      )
+    ).toBe(false);
+  });
+
+  test('rejects a malformed payload', () => {
+    expect(githubEmailsProveOwnership({ email: 'used@example.com' }, 'used@example.com')).toBe(
+      false
+    );
+    expect(githubEmailsProveOwnership(null, 'used@example.com')).toBe(false);
+    expect(githubEmailsProveOwnership([{ email: 'used@example.com' }], 'used@example.com')).toBe(
+      false
+    );
+  });
 });
 
 describe('parseSignInRedirectContext', () => {
@@ -639,7 +703,6 @@ describe('WorkOS sign-in callback', () => {
     jest.mocked(readWatchwoodSignupAssessment).mockResolvedValue(watchwood);
     jest.mocked(processSSOUserLogin).mockResolvedValue(true);
     jest.mocked(userLib.findAndSyncExistingUser).mockResolvedValue(null);
-    jest.mocked(userServer.isEmailBlacklistedByDomainAsync).mockResolvedValue(false);
     jest.mocked(userServer.isBlockedTLD).mockResolvedValue(false);
   });
 
@@ -699,6 +762,126 @@ describe('WorkOS sign-in callback', () => {
       undefined
     );
     expect(readWatchwoodSignupAssessment).not.toHaveBeenCalled();
+  });
+});
+
+describe('Sign-in verification address', () => {
+  const turnstileGuid = '0f4d7b9a-2c1e-4a55-9d1b-6a1f6f0c3a10';
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    // The test env file labels itself as a Vercel environment; clear the labels
+    // so each case picks the platform branch it means to exercise.
+    process.env = { ...originalEnv };
+    delete process.env.VERCEL;
+    delete process.env.VERCEL_ENV;
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  async function signInWithTurnstile(turnstileIp: string, requestHeaders: Headers) {
+    const user = await insertTestUserAndGoogleAuth({
+      google_user_email: `turnstile-${crypto.randomUUID()}@gmail.com`,
+      google_user_name: 'Turnstile User',
+    });
+    const now = Math.floor(Date.now() / 1000);
+    const verification = jwt.sign(
+      { guid: turnstileGuid, ip: turnstileIp, iat: now, exp: now + 3600 },
+      NEXTAUTH_SECRET,
+      { algorithm: 'HS256' }
+    );
+
+    jest.mocked(cookies).mockResolvedValue({
+      get: (name: string) => (name === 'turnstile_jwt' ? { name, value: verification } : undefined),
+      delete: jest.fn(),
+    } as unknown as Awaited<ReturnType<typeof cookies>>);
+    jest.mocked(headers).mockResolvedValue(requestHeaders as Awaited<ReturnType<typeof headers>>);
+    jest.mocked(getAccountLinkingSession).mockResolvedValue(null);
+    jest.mocked(readWatchwoodSignupAssessment).mockResolvedValue(undefined);
+    jest
+      .mocked(userLib.findAndSyncExistingUser)
+      .mockImplementation(
+        jest.requireActual<typeof userModule>('@/lib/user').findAndSyncExistingUser
+      );
+    jest.mocked(userServer.isBlockedTLD).mockResolvedValue(false);
+
+    const profile = {
+      sub: `subject-${user.id}`,
+      email: user.google_user_email,
+      email_verified: true,
+      name: user.google_user_name,
+    };
+
+    return authOptions.callbacks!.signIn!({
+      user: {
+        id: user.id,
+        email: user.google_user_email,
+        name: user.google_user_name,
+        image: null,
+      },
+      account: { provider: 'google', providerAccountId: `google-${user.id}`, type: 'oauth' },
+      profile,
+    });
+  }
+
+  test('accepts a forwarded chain whose client hop is the recorded address', async () => {
+    await expect(
+      signInWithTurnstile(
+        '203.0.113.7',
+        new Headers({ 'x-forwarded-for': '203.0.113.7, 10.0.0.1' })
+      )
+    ).resolves.toBe(true);
+  });
+
+  test('accepts a single-entry forwarded header for the recorded address', async () => {
+    await expect(
+      signInWithTurnstile('203.0.113.7', new Headers({ 'x-forwarded-for': '203.0.113.7' }))
+    ).resolves.toBe(true);
+  });
+
+  test('accepts the platform address when Vercel labels a multi-entry chain', async () => {
+    process.env.VERCEL = '1';
+
+    await expect(
+      signInWithTurnstile(
+        '198.51.100.5',
+        new Headers({
+          'x-forwarded-for': '198.51.100.5, 10.0.0.1',
+          'x-vercel-forwarded-for': '198.51.100.5, 10.0.0.2',
+        })
+      )
+    ).resolves.toBe(true);
+  });
+
+  test('refuses a client address that differs from the recorded one', async () => {
+    const result = await signInWithTurnstile(
+      '203.0.113.7',
+      new Headers({ 'x-forwarded-for': '198.51.100.5, 10.0.0.1' })
+    );
+
+    expect(result).toContain('error=IP_MISMATCH');
+  });
+
+  test('refuses an unlabelled forwarded chain when Vercel labels the sign-in', async () => {
+    process.env.VERCEL = '1';
+
+    const result = await signInWithTurnstile(
+      '203.0.113.7',
+      new Headers({ 'x-forwarded-for': '203.0.113.7, 10.0.0.1' })
+    );
+
+    expect(result).toContain('error=IP_MISMATCH');
+  });
+
+  test('refuses when the client address cannot be resolved', async () => {
+    const result = await signInWithTurnstile(
+      '203.0.113.7',
+      new Headers({ 'accept-language': 'en-US' })
+    );
+
+    expect(result).toContain('error=IP_MISMATCH');
   });
 });
 

@@ -27,8 +27,10 @@ export function formatCount(value: number): string {
   return value.toLocaleString();
 }
 
+export const ABSENT = '—';
+
 export function formatDurationMs(milliseconds: number | null): string {
-  if (milliseconds === null) return '—';
+  if (milliseconds === null) return ABSENT;
   if (milliseconds < 1000) return `${Math.round(milliseconds)} ms`;
   return `${(milliseconds / 1000).toFixed(2)} s`;
 }

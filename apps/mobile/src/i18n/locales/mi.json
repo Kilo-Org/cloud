@@ -229,6 +229,21 @@
     "signInCodeField": "Waehere takiuru",
     "or": "rānei"
   },
+  "pendingLink": {
+    "description": "Kei te whakamahia kē a {{email}} e tētahi pūkete. Takiuru mā tētahi o ōna tikanga hei tāpiri i a {{provider}}.",
+    "emailCode": "Īmēratia mai he waehere takiuru",
+    "continueInBrowser": "Haere tonu i te pūtirotiro",
+    "startAgain": "Tīmata anō",
+    "expired": "Kua pau te wā o tēnei tono ki te tāpiri i a {{provider}}.",
+    "noMethods": "Kāore he tikanga takiuru kē i tēnei pūkete, nō reira kāore e taea a {{provider}} te tāpiri.",
+    "linked": "Kua tāpirihia a {{provider}} ki tō pūkete.",
+    "failedExpired": "Kāore i tāpirihia a {{provider}} nā te mea kua pau te wā o te tono.",
+    "failedWrongAccount": "Kāore i tāpirihia a {{provider}} nā te mea i takiuru koe ki tētahi pūkete kē.",
+    "failedAccountAlreadyLinked": "Kāore i tāpirihia a {{provider}} nā te mea kua honoa kētia ki tētahi atu pūkete.",
+    "failedProviderAlreadyLinked": "Kāore i tāpirihia a {{provider}} nā te mea he takiuru {{provider}} kē tō tō pūkete.",
+    "failedLinking": "Kāore i taea a {{provider}} te tāpiri ki tō pūkete.",
+    "notAdded": "Kua takiuru koe. Kāore i tāpirihia a {{provider}} ki tō pūkete."
+  },
   "profile": {
     "codeReviewerSubtitle": "Ngā arotake PR aunoa",
     "securityAgentSubtitle": "Rapua, whakatikahia hoki ngā whakaraeraetanga",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Pūkete whakamātau",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO umanga",
     "passkeysTitle": "Ngā kī whakauru",
     "passkeysSubtitle": "Takiuru me te kore kupuhipa",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "Ka mukua ō tohutohu me ngā kōnae kua tukuna ake kāore anō kia hono ki tētahi karere.",
       "discardFailed": "Kāore i taea te muku i te hukihuki. Whakamātau anō.",
       "remoteHint": "Mō te haere i tō rorohiko, whakatīmata a Kilo ki reira, ka waiho kia haere tonu.",
-      "continueFrom": "Kei te haere tonu te wātū {{title}}.",
+      "continueFrom": "Kei te haere tonu te wātū “{{title}}”.",
       "importingSession": "Kei te kawemai i te wātū",
       "cliCannotContinue": "Kāore e taea e tēnei CLI te haere tonu i tētahi wātū. Kōwhiria a Cloud Agent, tētahi atu CLI rānei.",
       "importFailed": "Kāore i taea te kawemai i tēnei wātū.",
@@ -2460,6 +2477,8 @@
       "toolList": "whakarārangitia",
       "toolPatch": "papakihia",
       "toolTask": "mahi",
+      "toolSendFile": "kua tukuna",
+      "toolSendFileAction": "tukuna te kōnae",
       "readTodos": "Pānuitia te mahere",
       "updateTodos": "Whakahoutia te mahere",
       "linesBadge": "{{displayCount}} rārangi",
@@ -2560,7 +2579,21 @@
       "thought": "Te whakaaro",
       "showDetails": "Whakaaturia ngā taipitopito",
       "pending": "E tatari ana…",
-      "running": "Kei te haere…"
+      "running": "Kei te haere…",
+      "field": {
+        "filePath": "Ara kōnae",
+        "path": "Ara",
+        "offset": "Nekehanga",
+        "limit": "Tepe",
+        "pattern": "Tauira",
+        "include": "Whakauru",
+        "patchText": "Kuputuhi whakatikatanga",
+        "query": "Rapunga",
+        "prompt": "Tohutohu",
+        "header": "Upoko",
+        "question": "Pātai",
+        "options": "Kōwhiringa"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Kāore i taea te whakaatu i ngā ihirangi."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Ka tautoko tēnei tauira i te kaha whakaaro"
     },
-    "creditsRequired": "Kāore i te nui ake ngā moni tōmua hei tuku i tēnei karere. Tāpirihia he moni tōmua, ka ngana anō."
+    "creditsRequired": "Kāore i te nui ake ngā moni tōmua hei tuku i tēnei karere."
   },
   "settingsTools": {
     "confirmTitle": "Whakaū i tēnei huringa?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Taku Kaihoko",
       "promptPlaceholder": "He...",
       "tools": "Utauta",
+      "wholeToolRule": "Ka whakahāngai tēnei māngai i tētahi ture ki ngā utauta katoa i te wā kotahi: {{rule}}. He pānui anake ēnei whakakā.",
       "visibility": "Tirohanga",
       "visibilityPrimary": "Tuatahi — ka whakaatuhia ki te kaikokoti",
       "visibilitySubagent": "Subagent — ka taea anake te waea mai i etahi atu",
@@ -4035,7 +4069,8 @@
       "duplicateName": "Kua whakamahia tēnei ingoa e tētahi atu whakahau i tēnei kōtaha"
     },
     "repoBindings": {
-      "title": "Kōtaha Taunoa mō Repos",
+      "title": "Kōtaha taunoa mō Repos",
+      "entryLabel": "Kōtaha taunoa",
       "add": "Tāpiri taunoa",
       "empty": "Karekau he taunoa i whirihora",
       "emptyDescription": "Tāpirihia he taunoa ki te tono aunoa i tetahi kōtaha i te wa e tiimata ana nga huihuinga mo te repo.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Kāore he horopaki kua whakahohea mō ngā pūrongo kua hōtaka",
     "sourceBlocker": "Me aro ki te wātū",
     "sourceMetadata": "Ngā raraungameta wātū kua hopukina"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Kāore i taea te whakatuwhera i tēnei hua kimi"
   }
 }

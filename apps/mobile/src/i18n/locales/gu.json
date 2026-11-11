@@ -229,6 +229,21 @@
     "signInCodeField": "સાઇન ઇન માટેનો કોડ",
     "or": "અથવા"
   },
+  "pendingLink": {
+    "description": "{{email}} નો ઉપયોગ પહેલેથી એક એકાઉન્ટ કરે છે. {{provider}} ઉમેરવા માટે તેની કોઈ એક પદ્ધતિથી સાઇન ઇન કરો.",
+    "emailCode": "મને સાઇન ઇન માટેનો કોડ ઇમેઇલ કરો",
+    "continueInBrowser": "બ્રાઉઝરમાં ચાલુ રાખો",
+    "startAgain": "ફરી શરૂ કરો",
+    "expired": "{{provider}} ઉમેરવાની આ વિનંતીની સમયમર્યાદા પૂરી થઈ ગઈ છે.",
+    "noMethods": "આ એકાઉન્ટમાં સાઇન ઇનની બીજી કોઈ પદ્ધતિ નથી, તેથી {{provider}} ઉમેરી શકાતું નથી.",
+    "linked": "{{provider}} તમારા એકાઉન્ટમાં ઉમેરાયું.",
+    "failedExpired": "વિનંતીની સમયમર્યાદા પૂરી થઈ ગઈ હોવાથી {{provider}} ઉમેરાયું નથી.",
+    "failedWrongAccount": "તમે બીજા એકાઉન્ટમાં સાઇન ઇન કર્યું હોવાથી {{provider}} ઉમેરાયું નથી.",
+    "failedAccountAlreadyLinked": "{{provider}} પહેલેથી બીજા એકાઉન્ટ સાથે લિંક થયેલું હોવાથી ઉમેરાયું નથી.",
+    "failedProviderAlreadyLinked": "તમારા એકાઉન્ટમાં પહેલેથી અલગ {{provider}} સાઇન ઇન હોવાથી {{provider}} ઉમેરાયું નથી.",
+    "failedLinking": "{{provider}} તમારા એકાઉન્ટમાં ઉમેરી શકાયું નથી.",
+    "notAdded": "તમે સાઇન ઇન કરેલું છે. {{provider}} તમારા એકાઉન્ટમાં ઉમેરાયું નથી."
+  },
   "profile": {
     "codeReviewerSubtitle": "સ્વચાલિત PR સમીક્ષાઓ",
     "securityAgentSubtitle": "નબળાઈઓ શોધો અને ઠીક કરો",
@@ -267,6 +282,8 @@
     "providerTestAccount": "પરીક્ષણ એકાઉન્ટ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "એન્ટરપ્રાઇઝ SSO",
     "passkeysTitle": "પાસકી",
     "passkeysSubtitle": "પાસવર્ડ વગર સાઇન ઇન કરો",
@@ -2414,7 +2431,7 @@
       "discardWithUploadsMessage": "તમારો પ્રોમ્પ્ટ અને હજી કોઈ સંદેશમાં જોડાઈ ન હોય તેવી અપલોડ કરેલી ફાઇલો કાઢી નાખવામાં આવશે.",
       "discardFailed": "ડ્રાફ્ટ કાઢી શકાયો નહીં. ફરી પ્રયાસ કરો.",
       "remoteHint": "તમારા કમ્પ્યુટર પર ચલાવવા માટે ત્યાં Kilo શરૂ કરો અને તેને ચાલુ રાખો.",
-      "continueFrom": "{{title}} સત્ર આગળ ચાલુ થઈ રહ્યું છે.",
+      "continueFrom": "“{{title}}” સત્ર આગળ ચાલુ થઈ રહ્યું છે.",
       "importingSession": "સત્ર આયાત થઈ રહ્યું છે",
       "cliCannotContinue": "આ CLI સત્ર ચાલુ રાખી શકતું નથી. Cloud Agent અથવા બીજું CLI પસંદ કરો.",
       "importFailed": "આ સત્ર આયાત કરી શકાયું નહીં.",
@@ -2466,6 +2483,8 @@
       "toolList": "યાદી બનાવો",
       "toolPatch": "પૅચ લાગુ કરો",
       "toolTask": "કાર્ય",
+      "toolSendFile": "ફાઇલ મોકલી",
+      "toolSendFileAction": "ફાઇલ મોકલો",
       "readTodos": "યોજના વાંચો",
       "updateTodos": "યોજના અપડેટ કરો",
       "linesBadge": "{{displayCount}} પંક્તિઓ",
@@ -2566,7 +2585,21 @@
       "thought": "વિચાર",
       "showDetails": "વિગતો બતાવો",
       "pending": "બાકી છે…",
-      "running": "ચાલી રહ્યું છે…"
+      "running": "ચાલી રહ્યું છે…",
+      "field": {
+        "filePath": "ફાઇલ પાથ",
+        "path": "પાથ",
+        "offset": "ઑફસેટ",
+        "limit": "મર્યાદા",
+        "pattern": "પેટર્ન",
+        "include": "સમાવેશ",
+        "patchText": "પેચ લખાણ",
+        "query": "ક્વેરી",
+        "prompt": "સૂચના",
+        "header": "શીર્ષક",
+        "question": "પ્રશ્ન",
+        "options": "વિકલ્પો"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "સામગ્રી બતાવી શકાઈ નહીં."
@@ -3808,7 +3841,7 @@
     "reasoningEffort": {
       "modelFlag": "આ મોડેલ વિચારના સ્તરને સપોર્ટ કરે છે"
     },
-    "creditsRequired": "આ સંદેશ મોકલવા માટે પૂરતા ક્રેડિટ નથી. ક્રેડિટ ઉમેરો અને ફરી પ્રયાસ કરો."
+    "creditsRequired": "આ સંદેશ મોકલવા માટે પૂરતા ક્રેડિટ નથી."
   },
   "settingsTools": {
     "confirmTitle": "આ ફેરફારની પુષ્ટિ કરવી?"
@@ -4001,6 +4034,7 @@
       "namePlaceholder": "મારા એજન્ટ",
       "promptPlaceholder": "તમે એક...",
       "tools": "સાધનો",
+      "wholeToolRule": "આ એજન્ટ એક જ સમયે દરેક સાધન પર એક નિયમ લાગુ કરે છે: {{rule}}. આ સ્વિચ ફક્ત વાંચન માટે છે.",
       "visibility": "દૃશ્યતા",
       "visibilityPrimary": "પ્રાથમિક — પીકરમાં બતાવેલ છે",
       "visibilitySubagent": "સબએજન્ટ — ફક્ત અન્ય એજન્ટો પાસેથી કૉલ કરી શકાય છે",
@@ -4042,6 +4076,7 @@
     },
     "repoBindings": {
       "title": "રિપોઝિટરીઓ માટે ડિફૉલ્ટ પ્રોફાઇલ્સ",
+      "entryLabel": "ડિફોલ્ટ પ્રોફાઇલ",
       "add": "ડિફૉલ્ટ ઉમેરો",
       "empty": "કોઈ ડિફૉલ્ટ ગોઠવેલ નથી",
       "emptyDescription": "રિપોઝિટરી માટે સત્રો શરૂ કરતી વખતે આપમેળે પ્રોફાઇલ લાગુ કરવા માટે ડિફૉલ્ટ ઉમેરો.",
@@ -4249,5 +4284,8 @@
     "noEnabledContexts": "શેડ્યૂલ કરેલા રિપોર્ટ માટે કોઈ સંદર્ભ ચાલુ નથી",
     "sourceBlocker": "સત્ર પર ધ્યાન આપવાની જરૂર છે",
     "sourceMetadata": "સાચવેલ સત્ર મેટાડેટા"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "આ શોધ પરિણામ ખોલી શકાયું નહીં"
   }
 }

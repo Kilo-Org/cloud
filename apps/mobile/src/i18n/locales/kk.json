@@ -229,6 +229,21 @@
     "signInCodeField": "Кіру коды",
     "or": "немесе"
   },
+  "pendingLink": {
+    "description": "{{email}} мекенжайын басқа аккаунт пайдаланып жатыр. {{provider}} қосу үшін оның кіру әдістерінің бірімен кіріңіз.",
+    "emailCode": "Кіру кодын электрондық поштаға жіберу",
+    "continueInBrowser": "Браузерде жалғастыру",
+    "startAgain": "Қайта бастау",
+    "expired": "{{provider}} қосу сұрауының мерзімі өтіп кетті.",
+    "noMethods": "Бұл аккаунтта басқа кіру әдісі жоқ, сондықтан {{provider}} қосу мүмкін емес.",
+    "linked": "{{provider}} аккаунтыңызға қосылды.",
+    "failedExpired": "Сұраудың мерзімі өткендіктен, {{provider}} қосылмады.",
+    "failedWrongAccount": "Басқа аккаунтқа кіргендіктен, {{provider}} қосылмады.",
+    "failedAccountAlreadyLinked": "{{provider}} басқа аккаунтқа әлдеқашан байланыстырылғандықтан, қосылмады.",
+    "failedProviderAlreadyLinked": "Аккаунтыңызда басқа {{provider}} кіру әдісі бар болғандықтан, {{provider}} қосылмады.",
+    "failedLinking": "{{provider}} аккаунтыңызға қосылмады.",
+    "notAdded": "Сіз кірдіңіз. {{provider}} аккаунтыңызға қосылмады."
+  },
   "profile": {
     "codeReviewerSubtitle": "PR сұрауларын автоматты тексеру",
     "securityAgentSubtitle": "Осалдықтарды табу және жою",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Сынақ тіркелгісі",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Корпоративтік SSO",
     "passkeysTitle": "Кіру кілттері",
     "passkeysSubtitle": "Құпия сөзсіз кіру",
@@ -2460,6 +2477,8 @@
       "toolList": "тізімдеу",
       "toolPatch": "түзету енгізу",
       "toolTask": "тапсырма",
+      "toolSendFile": "Файл жіберілді",
+      "toolSendFileAction": "Файл жіберу",
       "readTodos": "Жоспарды оқу",
       "updateTodos": "Жоспарды жаңарту",
       "linesBadge": "{{displayCount}} жол",
@@ -2560,7 +2579,21 @@
       "thought": "Ой",
       "showDetails": "Мәліметтерді көрсету",
       "pending": "Күтілуде…",
-      "running": "Орындалуда…"
+      "running": "Орындалуда…",
+      "field": {
+        "filePath": "Файл жолы",
+        "path": "Жол",
+        "offset": "Ығысу",
+        "limit": "Шектеу",
+        "pattern": "Үлгі",
+        "include": "Қосу",
+        "patchText": "Жамау мәтіні",
+        "query": "Сұраныс",
+        "prompt": "Нұсқау",
+        "header": "Тақырып",
+        "question": "Сұрақ",
+        "options": "Нұсқалар"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Мазмұнды көрсету мүмкін болмады."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Бұл модель ойлау деңгейін қолдайды"
     },
-    "creditsRequired": "Бұл хабарламаны жіберу үшін кредит жеткіліксіз. Кредит қосыңыз да, қайталап көріңіз."
+    "creditsRequired": "Бұл хабарламаны жіберу үшін кредит жеткіліксіз."
   },
   "settingsTools": {
     "confirmTitle": "Осы өзгеріс расталсын ба?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Менің агентім",
       "promptPlaceholder": "Сіз ...",
       "tools": "Құралдар",
+      "wholeToolRule": "Бұл агент барлық құралға бір ережені бірден қолданады: {{rule}}. Бұл қосқыштар тек оқуға арналған.",
       "visibility": "Көріну",
       "visibilityPrimary": "Негізгі — таңдаушыда көрсетіледі",
       "visibilitySubagent": "Субагент — тек басқалардан шақыруға болады",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Репо үшін әдепкі профильдер",
+      "entryLabel": "Әдепкі профильдер",
       "add": "Әдепкі қосу",
       "empty": "Әдепкі параметрлер конфигурацияланбаған",
       "emptyDescription": "Репо сеанстарын бастаған кезде профильді автоматты түрде қолдану үшін әдепкі параметрді қосыңыз.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Жоспарланған шолулар үшін қосылған контекстер жоқ",
     "sourceBlocker": "Сеанс назар аударуды қажет етеді",
     "sourceMetadata": "Сақталған сеанс метадеректері"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Бұл іздеу нәтижесі ашылмады"
   }
 }

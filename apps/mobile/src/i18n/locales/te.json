@@ -229,6 +229,21 @@
     "signInCodeField": "సైన్ ఇన్ కోడ్",
     "or": "లేదా"
   },
+  "pendingLink": {
+    "description": "{{email}} ఇప్పటికే ఒక ఖాతాలో ఉపయోగంలో ఉంది. {{provider}}‌ను జోడించడానికి ఆ ఖాతా పద్ధతుల్లో ఒకదానితో సైన్ ఇన్ చేయండి.",
+    "emailCode": "నాకు ఈమెయిల్ ద్వారా సైన్ ఇన్ కోడ్ పంపండి",
+    "continueInBrowser": "బ్రౌజర్‌లో కొనసాగించండి",
+    "startAgain": "మళ్లీ ప్రారంభించండి",
+    "expired": "{{provider}}‌ను జోడించే ఈ అభ్యర్థన గడువు ముగిసింది.",
+    "noMethods": "ఈ ఖాతాకు వేరే సైన్ ఇన్ పద్ధతి లేదు, కాబట్టి {{provider}}‌ను జోడించలేము.",
+    "linked": "{{provider}} మీ ఖాతాకు జోడించబడింది.",
+    "failedExpired": "అభ్యర్థన గడువు ముగిసినందున {{provider}} జోడించబడలేదు.",
+    "failedWrongAccount": "మీరు వేరే ఖాతాకు సైన్ ఇన్ చేసినందున {{provider}} జోడించబడలేదు.",
+    "failedAccountAlreadyLinked": "{{provider}} ఇప్పటికే మరొక ఖాతాకు లింక్ అయి ఉన్నందున జోడించబడలేదు.",
+    "failedProviderAlreadyLinked": "మీ ఖాతాలో ఇప్పటికే వేరే {{provider}} సైన్ ఇన్ ఉన్నందున {{provider}} జోడించబడలేదు.",
+    "failedLinking": "{{provider}}‌ను మీ ఖాతాకు జోడించలేకపోయాము.",
+    "notAdded": "మీరు సైన్ ఇన్ చేశారు. {{provider}} మీ ఖాతాకు జోడించబడలేదు."
+  },
   "profile": {
     "codeReviewerSubtitle": "స్వయంచాలక PR సమీక్షలు",
     "securityAgentSubtitle": "భద్రతా లోపాలను కనుగొని పరిష్కరించండి",
@@ -267,6 +282,8 @@
     "providerTestAccount": "పరీక్ష ఖాతా",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "ఎంటర్‌ప్రైజ్ SSO",
     "passkeysTitle": "పాస్‌కీలు",
     "passkeysSubtitle": "పాస్‌వర్డ్ లేకుండా సైన్ ఇన్ చేయండి",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "మీ ప్రాంప్ట్‌తో పాటు, అప్‌లోడ్ చేసి ఇంకా ఉపయోగించని ఫైళ్లు కూడా తొలగిపోతాయి.",
       "discardFailed": "చిత్తుప్రతిని తొలగించలేకపోయాము. మళ్లీ ప్రయత్నించండి.",
       "remoteHint": "మీ కంప్యూటర్‌పై అమలు చేయడానికి, అక్కడ Kiloను ప్రారంభించి, అది నడుస్తూనే ఉండేలా వదిలివేయండి.",
-      "continueFrom": "{{title}}ను కొనసాగిస్తోంది.",
+      "continueFrom": "“{{title}}”ను కొనసాగిస్తోంది.",
       "importingSession": "సెషన్‌ను దిగుమతి చేస్తోంది",
       "cliCannotContinue": "ఈ CLIతో సెషన్‌ను కొనసాగించడం సాధ్యం కాదు. Cloud Agent లేదా మరో CLIను ఎంచుకోండి.",
       "importFailed": "ఈ సెషన్‌ను దిగుమతి చేయలేకపోయాము.",
@@ -2460,6 +2477,8 @@
       "toolList": "జాబితా చూపండి",
       "toolPatch": "సవరించండి",
       "toolTask": "పని",
+      "toolSendFile": "ఫైల్ పంపబడింది",
+      "toolSendFileAction": "ఫైల్ పంపండి",
       "readTodos": "ప్లాన్ చదవండి",
       "updateTodos": "ప్లాన్ నవీకరించండి",
       "linesBadge": "{{displayCount}} పంక్తులు",
@@ -2560,7 +2579,21 @@
       "thought": "ఆలోచన",
       "showDetails": "వివరాలను చూపించండి",
       "pending": "వేచి ఉంది…",
-      "running": "నడుస్తోంది…"
+      "running": "నడుస్తోంది…",
+      "field": {
+        "filePath": "ఫైల్ మార్గం",
+        "path": "మార్గం",
+        "offset": "ఆఫ్సెట్",
+        "limit": "పరిమితి",
+        "pattern": "నమూనా",
+        "include": "చేర్పు",
+        "patchText": "ప్యాచ్ పాఠ్యం",
+        "query": "శోధన ప్రశ్న",
+        "prompt": "ప్రాంప్ట్",
+        "header": "శీర్షిక",
+        "question": "ప్రశ్న",
+        "options": "ఎంపికలు"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "విషయాన్ని చూపలేకపోయాము."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "ఈ మోడల్ ఆలోచనా స్థాయికి మద్దతు ఇస్తుంది"
     },
-    "creditsRequired": "ఈ సందేశాన్ని పంపడానికి తగినంత క్రెడిట్లు లేవు. క్రెడిట్లను జోడించి మళ్లీ ప్రయత్నించండి."
+    "creditsRequired": "ఈ సందేశాన్ని పంపడానికి తగినంత క్రెడిట్లు లేవు."
   },
   "settingsTools": {
     "confirmTitle": "ఈ మార్పును నిర్ధారించాలా?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "నా ఏజెంట్",
       "promptPlaceholder": "మీరు ఒక ...",
       "tools": "ఉపకరణాలు",
+      "wholeToolRule": "ఈ ఏజెంట్ ఒకేసారి ప్రతి ఉపకరణానికి ఒక నియమాన్ని వర్తిస్తుంది: {{rule}}. ఈ స్విచ్‌లు చదవడానికి మాత్రమే.",
       "visibility": "దృశ్యమానత",
       "visibilityPrimary": "ప్రాథమిక — పికర్‌లో చూపబడింది",
       "visibilitySubagent": "సబ్జెక్ట్ — ఇతరుల నుండి మాత్రమే పిలవబడుతుంది",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Repos కోసం డిఫాల్ట్ ప్రొఫైల్‌లు",
+      "entryLabel": "డిఫాల్ట్ ప్రొఫైల్‌లు",
       "add": "డిఫాల్ట్‌ని జోడించండి",
       "empty": "డిఫాల్ట్‌లు ఏవీ కాన్ఫిగర్ చేయబడలేదు",
       "emptyDescription": "రెపో కోసం సెషన్‌లను ప్రారంభించేటప్పుడు ప్రొఫైల్‌ను స్వయంచాలకంగా వర్తింపజేయడానికి డిఫాల్ట్‌ను జోడించండి.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "షెడ్యూల్ చేసిన బ్రీఫింగ్‌ల కోసం ఏ సందర్భాలూ ప్రారంభించబడలేదు",
     "sourceBlocker": "సెషన్‌పై శ్రద్ధ అవసరం",
     "sourceMetadata": "సంగ్రహించిన సెషన్ మెటాడేటా"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "ఈ శోధన ఫలితాన్ని తెరవలేకపోయాము"
   }
 }

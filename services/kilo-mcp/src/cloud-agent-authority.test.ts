@@ -32,6 +32,7 @@ const launch = {
   mode: 'code',
   prompt: 'Perform a bounded child task',
   autoInitiate: true,
+  operationKey: '33333333-3333-4333-8333-333333333333',
 };
 const childSessionId = 'workspace_33333333-3333-4333-8333-333333333333';
 const messageId = 'msg_0123456789abABCDEFGHIJKLMN';
@@ -140,10 +141,23 @@ describe('Cloud Agent MCP authority', () => {
     { githubRepo: 'Other-Owner/Another_Repo', model: 'other-provider/another-model' },
     { callbackTarget: { url: 'workspace:new-chat' } },
     {
+      stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+      operationKey: '33333333-3333-4333-8333-333333333333',
+    },
+    {
       variant: 'high',
       upstreamBranch: 'feature/child-task',
       autoCommit: true,
       operationKey: '33333333-3333-4333-8333-333333333333',
+    },
+    {
+      requestedEnvironment: {
+        id: '55555555-5555-4555-8555-555555555555',
+        repositories: [
+          { repoFullName: 'acme/other', branch: 'feature/child' },
+          { repoFullName: 'acme/third' },
+        ],
+      },
     },
   ])('forwards normally-valid child options without additional restrictions: %j', async options => {
     const fetchImpl = upstream();
@@ -160,21 +174,57 @@ describe('Cloud Agent MCP authority', () => {
     expect(fetchImpl.mock.calls[0][1]?.body).toBe(JSON.stringify(input));
   });
 
-  it('forwards an allowed organization launch without changing its organization', async () => {
+  it('forwards an organization stacked launch without changing its organization', async () => {
     const fetchImpl = upstream();
+    const input = {
+      ...launch,
+      organizationId,
+      stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+      operationKey: '33333333-3333-4333-8333-333333333333',
+    };
     await callCatalogEndpoint({
       catalog,
       path: cloudAgentAuthorityProcedure(organizationScope),
-      input: { ...launch, organizationId },
+      input,
       auth: organizationAuth,
       webBaseUrl: 'https://fixture.invalid',
       fetchImpl,
     });
     expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(fetchImpl.mock.calls[0][1]?.body).toBe(JSON.stringify(input));
     expect(fetchImpl.mock.calls[0][1]?.headers).toMatchObject({
       'x-kilocode-organizationid': organizationId,
     });
   });
+
+  it.each([null, organizationId])(
+    'forwards scoped environment listing for %s authority',
+    async scopeOrganizationId => {
+      const fetchImpl = upstream();
+      const repository = { platform: 'github', fullName: 'acme/widgets' };
+      const input = scopeOrganizationId === null ? { repository } : { repository, organizationId };
+      await callCatalogEndpoint({
+        catalog,
+        path: 'cloudEnvironments.list',
+        input,
+        auth: scopeOrganizationId === null ? auth : organizationAuth,
+        webBaseUrl: 'https://fixture.invalid',
+        fetchImpl,
+      });
+      expect(fetchImpl).toHaveBeenCalledOnce();
+      const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+      expect(init.method).toBe('GET');
+      expect(url).toBe(
+        `https://fixture.invalid/api/trpc/cloudEnvironments.list?input=${encodeURIComponent(JSON.stringify(input))}`
+      );
+      expect(init.headers).toMatchObject({
+        Authorization: `Bearer ${token}`,
+        ...(scopeOrganizationId === null
+          ? {}
+          : { 'x-kilocode-organizationid': scopeOrganizationId }),
+      });
+    }
+  );
 
   it.each(personalLifecycle)(
     'forwards the personal lifecycle procedure $path with $method',
@@ -303,6 +353,95 @@ describe('Cloud Agent MCP authority', () => {
     { path: 'cloudAgentNext.prepareSession', input: { ...launch, mcpServers: {} } },
     { path: 'cloudAgentNext.prepareSession', input: { ...launch, cloudAgentSpawn: scope } },
     {
+      path: 'cloudAgentNext.prepareSession',
+      input: {
+        ...launch,
+        requestedEnvironment: { id: 'not-a-uuid' },
+      },
+    },
+    {
+      path: 'cloudAgentNext.prepareSession',
+      input: {
+        ...launch,
+        requestedEnvironment: { id: '55555555-5555-4555-8555-555555555555', extra: true },
+      },
+    },
+    {
+      path: 'cloudAgentNext.prepareSession',
+      input: {
+        ...launch,
+        requestedEnvironment: {
+          id: '55555555-5555-4555-8555-555555555555',
+          repositories: [{ repoFullName: 'acme/other', branch: '' }],
+        },
+      },
+    },
+    {
+      path: 'cloudAgentNext.prepareSession',
+      input: { ...launch, requireEnvironmentChoice: true },
+    },
+    {
+      path: 'cloudAgentNext.prepareSession',
+      input: { ...launch, requireEnvironmentChoice: false },
+    },
+    {
+      path: 'cloudEnvironments.list',
+      input: {},
+    },
+    {
+      path: 'cloudEnvironments.list',
+      input: { repository: { platform: 'github', fullName: 'acme/widgets' }, extra: true },
+    },
+    {
+      path: 'cloudEnvironments.list',
+      input: {
+        repository: { platform: 'github', fullName: 'acme/widgets' },
+        organizationId,
+      },
+    },
+    {
+      path: 'cloudEnvironments.list',
+      input: {
+        repository: { platform: 'github', fullName: 'acme/widgets', workspaceUuid: organizationId },
+      },
+    },
+    {
+      path: 'cloudEnvironments.list',
+      input: { repository: { platform: 'gitlab', projectPath: 'group/project' } },
+    },
+    {
+      path: 'cloudEnvironments.list',
+      input: {
+        repository: {
+          platform: 'bitbucket',
+          workspaceUuid: organizationId,
+          repositoryUuid: organizationId,
+        },
+      },
+    },
+    {
+      path: 'cloudEnvironments.listAll',
+      input: { repository: { platform: 'github', fullName: 'acme/widgets' } },
+    },
+    {
+      path: 'cloudEnvironments.get',
+      input: {
+        repository: { platform: 'github', fullName: 'acme/widgets' },
+        environmentId: '55555555-5555-4555-8555-555555555555',
+      },
+    },
+    {
+      path: 'cloudEnvironments.create',
+      input: { repository: { platform: 'github', fullName: 'acme/widgets' } },
+    },
+    {
+      path: 'organizations.cloudEnvironments.list',
+      input: {
+        repository: { platform: 'github', fullName: 'acme/widgets' },
+        organizationId,
+      },
+    },
+    {
       path: 'cloudAgentNext.listChildSessions',
       input: { limit: 51 },
     },
@@ -363,6 +502,16 @@ describe('Cloud Agent MCP authority', () => {
         attachments: [],
       },
     },
+    {
+      path: 'cloudAgentNext.prepareSession',
+      input: {
+        ...launch,
+        stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+        upstreamBranch: 'main',
+        operationKey: '33333333-3333-4333-8333-333333333333',
+      },
+    },
+    { path: 'cloudAgentNext.prepareSession', input: { ...launch, baseSha: 'a'.repeat(40) } },
   ])(
     'denies procedure or request escalation without forwarding: $path',
     async ({ path, input }) => {
@@ -428,6 +577,45 @@ describe('Cloud Agent MCP authority', () => {
       }
     }
   );
+
+  it('pins organization environment listing to its verified organization', async () => {
+    const repository = { platform: 'github', fullName: 'acme/widgets' };
+    const otherOrganizationId = '22222222-2222-4222-8222-222222222222';
+    for (const input of [
+      { repository },
+      { repository, organizationId: otherOrganizationId },
+      { repository, organizationId, extra: true },
+      { repository: { platform: 'github', fullName: '' }, organizationId },
+    ]) {
+      const fetchImpl = upstream();
+      await expect(
+        callCatalogEndpoint({
+          catalog,
+          path: 'cloudEnvironments.list',
+          input,
+          auth: organizationAuth,
+          webBaseUrl: 'https://fixture.invalid',
+          fetchImpl,
+        })
+      ).rejects.toThrow('does not permit');
+      expect(fetchImpl).not.toHaveBeenCalled();
+    }
+  });
+
+  it('denies expired environment listing without fetching', async () => {
+    const fetchImpl = upstream();
+    await expect(
+      callCatalogEndpoint({
+        catalog,
+        path: 'cloudEnvironments.list',
+        input: { repository: { platform: 'github', fullName: 'acme/widgets' } },
+        auth: { ...auth, cloudAgentAuthority: { ...scope, expiresAt: 1 } },
+        webBaseUrl: 'https://fixture.invalid',
+        fetchImpl,
+      })
+    ).rejects.toThrow('does not permit');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
 
   it('denies expired authority and mismatched authenticated identity', async () => {
     for (const denied of [
@@ -585,7 +773,11 @@ describe('Cloud Agent MCP authority', () => {
       );
       expect(schemaFor('sendMessage')).not.toHaveProperty('properties.attachments');
       expect(schemaFor('prepareSession')).toMatchObject({
-        properties: { githubRepo: { type: 'string' }, model: { type: 'string' } },
+        properties: {
+          githubRepo: { type: 'string' },
+          model: { type: 'string' },
+          stackOnWorktreeId: { type: 'string' },
+        },
         required: expect.arrayContaining(['githubRepo', 'model', 'autoInitiate']),
       });
       expect(schemaFor('prepareSession')).not.toHaveProperty(
@@ -653,6 +845,8 @@ describe('Cloud Agent MCP authority', () => {
       expect(body.result.instructions).toContain('spawn_session');
       expect(body.result.instructions).toContain('search_models');
       expect(body.result.instructions).toContain('generate_message_id');
+      expect(body.result.instructions).toContain('list_environments');
+      expect(body.result.instructions).toContain('requestedEnvironment');
       expect(body.result.instructions).toContain('There is no implicit model default');
       expect(body.result.instructions).toContain('follow-ups do not inherit it');
       expect(body.result.instructions).toContain(
@@ -661,6 +855,10 @@ describe('Cloud Agent MCP authority', () => {
       expect(body.result.instructions).toContain('Example launch sequence:');
       expect(body.result.instructions).toContain('Example follow-up sequence:');
       expect(body.result.instructions).not.toContain('Search before every call');
+      expect(body.result.instructions).toContain('stackOnWorktreeId');
+      expect(body.result.instructions).toContain('A.worktreeId');
+      expect(body.result.instructions).toContain('callback target stays the orchestrator');
+      expect(body.result.instructions).toContain('Omit upstreamBranch for stacked launches');
     }
   );
 
@@ -694,6 +892,7 @@ describe('Cloud Agent MCP authority', () => {
       expect(body.result.tools.map(tool => tool.name)).toEqual([
         'search_models',
         'generate_message_id',
+        'list_environments',
         'spawn_session',
         'list_child_sessions',
         'get_session',

@@ -47,6 +47,10 @@ jest.mock('@/lib/organizations/organization-billing', () => {
     ),
   };
 });
+jest.mock('@kilocode/web-shared/lib/utils.server', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/utils.server');
+  return { ...actual, warnExceptInTest: jest.fn() };
+});
 jest.mock(
   'tldts',
   () => ({
@@ -85,6 +89,7 @@ import {
   getStripeSeatsCheckoutUrl,
 } from '@/lib/stripe';
 import { client } from '@kilocode/web-shared/lib/stripe-client';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { chargeDecide, deliverCreditEventWireBody } from '@kilocode/web-shared/lib/bouncer/client';
 import * as kiloPassOrgStripe from '@/lib/kilo-pass-org/stripe-adapter';
 import {
@@ -2938,6 +2943,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
   let listCheckoutSessionsSpy: { mockRestore: () => void } | undefined;
 
   beforeEach(async () => {
+    jest.mocked(warnExceptInTest).mockClear();
     const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     listCheckoutSessionsSpy = jest.spyOn(client.checkout.sessions, 'list').mockResolvedValue({
       object: 'list',
@@ -3217,19 +3223,45 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     const piId = `pi_unknown_${Math.random()}`;
     const chId = `ch_unknown_${Math.random()}`;
 
-    const charge = makeCharge({
-      id: chId,
-      amount: amountInCents,
-      customer: user.stripe_customer_id,
-    });
-    const paymentIntent = makePaymentIntent({
-      id: piId,
-      // Unknown charge type - no stripe-checkout-topup
-      metadata: { kiloUserId: user.id, type: 'something-else' },
-      payment_method: null,
-    });
+    const charge = {
+      ...makeCharge({
+        id: chId,
+        amount: amountInCents,
+        customer: user.stripe_customer_id,
+      }),
+      billing_details: { email: 'sensitive@example.test' },
+      receipt_url: 'https://stripe.example/receipt-sensitive',
+    } as unknown as Stripe.Charge;
+    const paymentIntent = {
+      ...makePaymentIntent({
+        id: piId,
+        // Unknown charge type - no stripe-checkout-topup
+        metadata: {
+          kiloUserId: user.id,
+          type: 'something-else',
+          serviceFeeFlow: 'sensitive-metadata',
+        },
+        payment_method: null,
+      }),
+      client_secret: 'pi_unknown_secret_sensitive',
+    } as Stripe.PaymentIntent;
 
     await handleSuccessfulChargeWithPayment(charge, paymentIntent);
+
+    expect(warnExceptInTest).toHaveBeenCalledWith(
+      'Unknown charge type (not stripe-checkout-topup, not auto-topup-setup). Ignoring.',
+      {
+        chargeId: chId,
+        paymentIntentId: piId,
+        customerId: user.stripe_customer_id,
+        paymentIntentType: 'something-else',
+      }
+    );
+    const warningLogs = JSON.stringify(jest.mocked(warnExceptInTest).mock.calls);
+    expect(warningLogs).not.toContain('pi_unknown_secret_sensitive');
+    expect(warningLogs).not.toContain('sensitive@example.test');
+    expect(warningLogs).not.toContain('receipt-sensitive');
+    expect(warningLogs).not.toContain('sensitive-metadata');
 
     // Should NOT create a credit transaction
     const creditTx = await db.query.credit_transactions.findFirst({
@@ -3287,14 +3319,33 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     const piId = `pi_neither_${Math.random()}`;
     const chId = `ch_neither_${Math.random()}`;
 
-    const charge = makeCharge({ id: chId, amount: amountInCents, customer: 'cus_nonexistent' });
-    const paymentIntent = makePaymentIntent({
-      id: piId,
-      metadata: {}, // no orgId, no kiloUserId, no topup type
-      payment_method: null,
-    });
+    const charge = {
+      ...makeCharge({ id: chId, amount: amountInCents, customer: 'cus_nonexistent' }),
+      billing_details: { email: 'sensitive@example.test' },
+    } as unknown as Stripe.Charge;
+    const paymentIntent = {
+      ...makePaymentIntent({
+        id: piId,
+        metadata: {}, // no orgId, no kiloUserId, no topup type
+        payment_method: null,
+      }),
+      client_secret: 'pi_no_user_secret_sensitive',
+    } as Stripe.PaymentIntent;
 
     await handleSuccessfulChargeWithPayment(charge, paymentIntent);
+
+    expect(warnExceptInTest).toHaveBeenCalledWith(
+      'No user found for Stripe charge; skipping processing.',
+      {
+        chargeId: chId,
+        paymentIntentId: piId,
+        customerId: 'cus_nonexistent',
+        paymentIntentType: null,
+      }
+    );
+    const warningLogs = JSON.stringify(jest.mocked(warnExceptInTest).mock.calls);
+    expect(warningLogs).not.toContain('pi_no_user_secret_sensitive');
+    expect(warningLogs).not.toContain('sensitive@example.test');
 
     const txByPi = await db.query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, piId),

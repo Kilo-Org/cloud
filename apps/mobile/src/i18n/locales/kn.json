@@ -229,6 +229,21 @@
     "signInCodeField": "ಸೈನ್ ಇನ್ ಕೋಡ್",
     "or": "ಅಥವಾ"
   },
+  "pendingLink": {
+    "description": "{{email}} ಅನ್ನು ಈಗಾಗಲೇ ಒಂದು ಖಾತೆ ಬಳಸುತ್ತಿದೆ. {{provider}} ಸೇರಿಸಲು ಅದರ ಯಾವುದಾದರೂ ಒಂದು ವಿಧಾನದಿಂದ ಸೈನ್ ಇನ್ ಮಾಡಿ.",
+    "emailCode": "ನನಗೆ ಸೈನ್ ಇನ್ ಕೋಡ್ ಅನ್ನು ಇಮೇಲ್ ಮಾಡಿ",
+    "continueInBrowser": "ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಮುಂದುವರಿಸಿ",
+    "startAgain": "ಮತ್ತೆ ಪ್ರಾರಂಭಿಸಿ",
+    "expired": "{{provider}} ಸೇರಿಸುವ ಈ ವಿನಂತಿಯ ಅವಧಿ ಮುಗಿದಿದೆ.",
+    "noMethods": "ಈ ಖಾತೆಗೆ ಬೇರೆ ಯಾವುದೇ ಸೈನ್ ಇನ್ ವಿಧಾನವಿಲ್ಲ, ಆದ್ದರಿಂದ {{provider}} ಸೇರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+    "linked": "{{provider}} ಅನ್ನು ನಿಮ್ಮ ಖಾತೆಗೆ ಸೇರಿಸಲಾಗಿದೆ.",
+    "failedExpired": "ವಿನಂತಿಯ ಅವಧಿ ಮುಗಿದಿದ್ದರಿಂದ {{provider}} ಅನ್ನು ಸೇರಿಸಲಾಗಿಲ್ಲ.",
+    "failedWrongAccount": "ನೀವು ಬೇರೆ ಖಾತೆಗೆ ಸೈನ್ ಇನ್ ಮಾಡಿದ್ದರಿಂದ {{provider}} ಅನ್ನು ಸೇರಿಸಲಾಗಿಲ್ಲ.",
+    "failedAccountAlreadyLinked": "{{provider}} ಈಗಾಗಲೇ ಬೇರೆ ಖಾತೆಗೆ ಲಿಂಕ್ ಆಗಿರುವುದರಿಂದ ಅದನ್ನು ಸೇರಿಸಲಾಗಿಲ್ಲ.",
+    "failedProviderAlreadyLinked": "ನಿಮ್ಮ ಖಾತೆಯಲ್ಲಿ ಈಗಾಗಲೇ ಬೇರೆ {{provider}} ಸೈನ್ ಇನ್ ಇರುವುದರಿಂದ {{provider}} ಅನ್ನು ಸೇರಿಸಲಾಗಿಲ್ಲ.",
+    "failedLinking": "{{provider}} ಅನ್ನು ನಿಮ್ಮ ಖಾತೆಗೆ ಸೇರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "notAdded": "ನೀವು ಸೈನ್ ಇನ್ ಮಾಡಿದ್ದೀರಿ. {{provider}} ಅನ್ನು ನಿಮ್ಮ ಖಾತೆಗೆ ಸೇರಿಸಲಾಗಿಲ್ಲ."
+  },
   "profile": {
     "codeReviewerSubtitle": "ಸ್ವಯಂಚಾಲಿತ PR ಪರಿಶೀಲನೆಗಳು",
     "securityAgentSubtitle": "ಭದ್ರತಾ ದೋಷಗಳನ್ನು ಹುಡುಕಿ ಸರಿಪಡಿಸಿ",
@@ -267,6 +282,8 @@
     "providerTestAccount": "ಪರೀಕ್ಷಾ ಖಾತೆ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "ಸಾಂಸ್ಥಿಕ SSO",
     "passkeysTitle": "ಪಾಸ್ಕೀಗಳು",
     "passkeysSubtitle": "ಪಾಸ್‌ವರ್ಡ್ ಇಲ್ಲದೆ ಸೈನ್ ಇನ್ ಮಾಡಿ",
@@ -2414,7 +2431,7 @@
       "discardWithUploadsMessage": "ನಿಮ್ಮ ಪ್ರಾಂಪ್ಟ್ ಮತ್ತು ಕಳುಹಿಸಿದ ಸಂದೇಶಗಳಿಗೆ ಲಗತ್ತಿಸದ ಯಾವುದೇ ಅಪ್‌ಲೋಡ್‌ಗಳನ್ನು ಅಳಿಸಲಾಗುತ್ತದೆ.",
       "discardFailed": "ಕರಡನ್ನು ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "remoteHint": "ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್‌ನಲ್ಲಿ ಚಲಾಯಿಸಲು, ಅಲ್ಲಿ Kilo ಅನ್ನು ಪ್ರಾರಂಭಿಸಿ ಮತ್ತು ಅದನ್ನು ಚಾಲನೆಯಲ್ಲೇ ಇರಲು ಬಿಡಿ.",
-      "continueFrom": "{{title}} ಅನ್ನು ಮುಂದುವರಿಸಲಾಗುತ್ತಿದೆ.",
+      "continueFrom": "“{{title}}” ಅನ್ನು ಮುಂದುವರಿಸಲಾಗುತ್ತಿದೆ.",
       "importingSession": "ಸೆಶನ್ ಆಮದು ಆಗುತ್ತಿದೆ",
       "cliCannotContinue": "ಈ CLI ಮೂಲಕ ಸೆಶನ್ ಅನ್ನು ಮುಂದುವರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. Cloud Agent ಅಥವಾ ಇನ್ನೊಂದು CLI ಅನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
       "importFailed": "ಈ ಸೆಶನ್ ಅನ್ನು ಆಮದು ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
@@ -2466,6 +2483,8 @@
       "toolList": "ಪಟ್ಟಿ ಮಾಡಿ",
       "toolPatch": "ತಿದ್ದುಪಡಿ ಮಾಡಿ",
       "toolTask": "ಕಾರ್ಯ",
+      "toolSendFile": "ಫೈಲ್ ಕಳುಹಿಸಲಾಗಿದೆ",
+      "toolSendFileAction": "{\"value\": \"ಫೈಲ್ ಕಳುಹಿಸಿ\"}",
       "readTodos": "ಯೋಜನೆಯನ್ನು ಓದಿ",
       "updateTodos": "ಯೋಜನೆಯನ್ನು ನವೀಕರಿಸಿ",
       "linesBadge": "{{displayCount}} ಸಾಲುಗಳು",
@@ -2566,7 +2585,21 @@
       "thought": "ಯೋಚನೆ",
       "showDetails": "ವಿವರಗಳನ್ನು ತೋರಿಸಿ",
       "pending": "ಕಾಯುತ್ತಿದೆ…",
-      "running": "ಚಾಲನೆಯಲ್ಲಿದೆ…"
+      "running": "ಚಾಲನೆಯಲ್ಲಿದೆ…",
+      "field": {
+        "filePath": "ಕಡತದ ಮಾರ್ಗ",
+        "path": "ಮಾರ್ಗ",
+        "offset": "ಆರಂಭ ಸ್ಥಾನ",
+        "limit": "ಮಿತಿ",
+        "pattern": "ಮಾದರಿ",
+        "include": "ಸೇರ್ಪಡೆ",
+        "patchText": "ತಿದ್ದುಪಡಿ ಪಠ್ಯ",
+        "query": "ವಿಚಾರಣೆ",
+        "prompt": "ಸೂಚನೆ",
+        "header": "ಶೀರ್ಷಿಕೆ",
+        "question": "ಪ್ರಶ್ನೆ",
+        "options": "ಆಯ್ಕೆಗಳು"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "ವಿಷಯವನ್ನು ಪ್ರದರ್ಶಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
@@ -3808,7 +3841,7 @@
     "reasoningEffort": {
       "modelFlag": "ಈ ಮಾದರಿ ಯೋಚನೆಯ ಮಟ್ಟವನ್ನು ಬೆಂಬಲಿಸುತ್ತದೆ"
     },
-    "creditsRequired": "ಈ ಸಂದೇಶವನ್ನು ಕಳುಹಿಸಲು ಸಾಕಷ್ಟು ಕ್ರೆಡಿಟ್‌ಗಳಿಲ್ಲ. ಕ್ರೆಡಿಟ್‌ಗಳನ್ನು ಸೇರಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+    "creditsRequired": "ಈ ಸಂದೇಶವನ್ನು ಕಳುಹಿಸಲು ಸಾಕಷ್ಟು ಕ್ರೆಡಿಟ್‌ಗಳಿಲ್ಲ."
   },
   "settingsTools": {
     "confirmTitle": "ಈ ಬದಲಾವಣೆ ದೃಢೀಕರಿಸುವುದೇ?"
@@ -4001,6 +4034,7 @@
       "namePlaceholder": "ನನ್ನ ಏಜೆಂಟ್",
       "promptPlaceholder": "ನೀವು ಒಂದು ...",
       "tools": "ಪರಿಕರಗಳು",
+      "wholeToolRule": "ಈ ಏಜೆಂಟ್ ಎಲ್ಲಾ ಪರಿಕರಗಳಿಗೆ ಏಕಕಾಲದಲ್ಲಿ ಒಂದೇ ನಿಯಮವನ್ನು ಅನ್ವಯಿಸುತ್ತದೆ: {{rule}}. ಈ ಸ್ವಿಚ್‌ಗಳು ಓದಲು-ಮಾತ್ರ.",
       "visibility": "ಗೋಚರತೆ",
       "visibilityPrimary": "ಪ್ರಾಥಮಿಕ — ಪಿಕ್ಕರ್‌ನಲ್ಲಿ ತೋರಿಸಲಾಗಿದೆ",
       "visibilitySubagent": "ಸಬ್ಜೆಂಟ್ — ಇತರರಿಂದ ಮಾತ್ರ ಕರೆಯಬಹುದು",
@@ -4042,6 +4076,7 @@
     },
     "repoBindings": {
       "title": "Repos ಗಾಗಿ ಡೀಫಾಲ್ಟ್ ಪ್ರೊಫೈಲ್‌ಗಳು",
+      "entryLabel": "ಡೀಫಾಲ್ಟ್ ಪ್ರೊಫೈಲ್‌ಗಳು",
       "add": "ಡೀಫಾಲ್ಟ್ ಸೇರಿಸಿ",
       "empty": "ಯಾವುದೇ ಡೀಫಾಲ್ಟ್‌ಗಳನ್ನು ಕಾನ್ಫಿಗರ್ ಮಾಡಲಾಗಿಲ್ಲ",
       "emptyDescription": "ರೆಪೊಗಾಗಿ ಸೆಷನ್‌ಗಳನ್ನು ಪ್ರಾರಂಭಿಸುವಾಗ ಪ್ರೊಫೈಲ್ ಅನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಅನ್ವಯಿಸಲು ಡೀಫಾಲ್ಟ್ ಸೇರಿಸಿ.",
@@ -4249,5 +4284,8 @@
     "noEnabledContexts": "ನಿಗದಿತ ವರದಿಗಳಿಗಾಗಿ ಯಾವುದೇ ಸಂದರ್ಭಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಲಾಗಿಲ್ಲ",
     "sourceBlocker": "ಸೆಷನ್‌ಗೆ ಗಮನ ನೀಡಬೇಕಿದೆ",
     "sourceMetadata": "ದಾಖಲಿಸಿದ ಸೆಷನ್ ಮೆಟಾಡೇಟಾ"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "ಈ ಹುಡುಕು ಫಲಿತಾಂಶವನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ"
   }
 }

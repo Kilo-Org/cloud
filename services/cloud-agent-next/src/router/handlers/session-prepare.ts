@@ -186,6 +186,12 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
     }
   }
 
+  repository = {
+    ...repository,
+    ...(input.baseBranch === undefined ? {} : { baseBranch: input.baseBranch }),
+    ...(input.baseSha === undefined ? {} : { baseSha: input.baseSha }),
+  };
+
   const initialTurn: SessionCreateRequest['initialTurn'] =
     input.cloneFromKiloSessionId !== undefined
       ? undefined
@@ -212,6 +218,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       variant: input.variant,
     },
     repository,
+    ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
     runtime:
       input.sandboxAllocation !== undefined ||
       input.egressMode !== undefined ||
@@ -334,6 +341,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
       const response = {
         cloudAgentSessionId: result.cloudAgentSessionId,
         kiloSessionId: result.kiloSessionId,
+        ...(result.worktreeId === undefined ? {} : { worktreeId: result.worktreeId }),
       };
       if ('replayed' in result && result.replayed === true) {
         return { ...response, replayed: true };

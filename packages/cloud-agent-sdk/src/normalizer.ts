@@ -54,6 +54,7 @@ import {
   cloudMessageFailedDataSchema,
   type CloudAgentEvent,
   type SessionStatus,
+  type CustomerBillingFailure,
 } from './schemas';
 
 /** Chat events — data mutations for messages and parts. */
@@ -166,6 +167,7 @@ export type ServiceEvent =
       commandIndex?: number | undefined;
       commandCount?: number | undefined;
       detail?: string | undefined;
+      snapshotCapturedAt?: number | undefined;
       output?: string | undefined;
       safeError?: string | undefined;
       exitCode?: number | undefined;
@@ -242,6 +244,7 @@ export type ServiceEvent =
       executionId?: string | undefined;
       delivery?: 'queued' | 'sent' | undefined;
       accepted?: boolean | undefined;
+      billingFailure?: CustomerBillingFailure;
       error: string;
       reason: 'interrupted' | 'exhausted' | 'execution';
       attempts?: number | undefined;
@@ -557,6 +560,9 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
               ...(r.data.commandIndex === undefined ? {} : { commandIndex: r.data.commandIndex }),
               ...(r.data.commandCount === undefined ? {} : { commandCount: r.data.commandCount }),
               ...(r.data.detail === undefined ? {} : { detail: r.data.detail }),
+              ...(r.data.snapshotCapturedAt === undefined
+                ? {}
+                : { snapshotCapturedAt: r.data.snapshotCapturedAt }),
               ...(r.data.output === undefined ? {} : { output: r.data.output }),
               ...(r.data.safeError === undefined ? {} : { safeError: r.data.safeError }),
               ...(r.data.exitCode === undefined ? {} : { exitCode: r.data.exitCode }),
@@ -692,6 +698,10 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         error,
         reason,
         attempts,
+        ...((rawReason === 'billing_blocked' || rawReason === 'billing_unavailable') &&
+        r.data.billingFailure !== undefined
+          ? { billingFailure: r.data.billingFailure }
+          : {}),
       };
     }
 

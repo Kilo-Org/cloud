@@ -229,6 +229,21 @@
     "signInCodeField": "Kóòdù ìwọlé",
     "or": "tàbí"
   },
+  "pendingLink": {
+    "description": "Àkọọ́lẹ̀ kan ti ń lo {{email}} tẹ́lẹ̀. Wọlé pẹ̀lú ọ̀kan nínú àwọn ọ̀nà rẹ̀ láti ṣàfikún {{provider}}.",
+    "emailCode": "Fi kóòdù ìwọlé ránṣẹ́ sí mi ní ímeèlì",
+    "continueInBrowser": "Tẹ̀síwájú nínú aṣàwákiri",
+    "startAgain": "Bẹ̀rẹ̀ lẹ́ẹ̀kansí",
+    "expired": "Ìbéèrè yìí láti ṣàfikún {{provider}} ti parí àkókò.",
+    "noMethods": "Àkọọ́lẹ̀ yìí kò ní ọ̀nà ìwọlé mìíràn, nítorí náà a kò lè ṣàfikún {{provider}}.",
+    "linked": "A ti ṣàfikún {{provider}} sí àkọọ́lẹ̀ rẹ.",
+    "failedExpired": "A kò ṣàfikún {{provider}} nítorí ìbéèrè náà ti parí àkókò.",
+    "failedWrongAccount": "A kò ṣàfikún {{provider}} nítorí o wọlé sí àkọọ́lẹ̀ mìíràn.",
+    "failedAccountAlreadyLinked": "A kò ṣàfikún {{provider}} nítorí ó ti so mọ́ àkọọ́lẹ̀ mìíràn tẹ́lẹ̀.",
+    "failedProviderAlreadyLinked": "A kò ṣàfikún {{provider}} nítorí àkọọ́lẹ̀ rẹ ti ní ìwọlé {{provider}} mìíràn tẹ́lẹ̀.",
+    "failedLinking": "A kò lè ṣàfikún {{provider}} sí àkọọ́lẹ̀ rẹ.",
+    "notAdded": "O ti wọlé. A kò ṣàfikún {{provider}} sí àkọọ́lẹ̀ rẹ."
+  },
   "profile": {
     "codeReviewerSubtitle": "Àtúnyẹ̀wò PR láìfọwọ́yí",
     "securityAgentSubtitle": "Wá àwọn àlàfo ààbò kí o sì ṣàtúnṣe wọn",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Àkọọ́lẹ̀ àdánwò",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO ilé iṣẹ́",
     "passkeysTitle": "Àwọn passkey",
     "passkeysSubtitle": "Wọlé láìsí ọ̀rọ̀ ìpamọ́",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "A ó pa ọ̀rọ̀ ìtọ́ni rẹ àti àwọn fáìlì tí o ti gbé sókè tí kò tíì ní ìfiránṣẹ́ tí a so wọ́n mọ́ rẹ́.",
       "discardFailed": "A kò lè pa àkọ́kọ́ ìkọ̀wé náà rẹ́. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "remoteHint": "Láti lè ṣiṣẹ́ lórí kọ̀ǹpútà rẹ, bẹ̀rẹ̀ Kilo níbẹ̀ kí o sì fi sílẹ̀ kí ó máa ṣiṣẹ́.",
-      "continueFrom": "A ń tẹ̀síwájú pẹ̀lú {{title}}.",
+      "continueFrom": "A ń tẹ̀síwájú pẹ̀lú “{{title}}”.",
       "importingSession": "Ń gbé ìgbà iṣẹ́ wọlé",
       "cliCannotContinue": "CLI yìí kò lè tẹ̀síwájú pẹ̀lú ìgbà iṣẹ́ kan. Yan Cloud Agent tàbí CLI mìíràn.",
       "importFailed": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",
@@ -2460,6 +2477,8 @@
       "toolList": "ṣe àkójọ",
       "toolPatch": "ṣàtúnṣe",
       "toolTask": "iṣẹ́",
+      "toolSendFile": "Ti fi fáìlì ránṣẹ́",
+      "toolSendFileAction": "Fi fáìlì ránṣẹ́",
       "readTodos": "Ka ètò",
       "updateTodos": "Ṣe ìmúdójúìwọ̀n ètò",
       "linesBadge": "ìlà {{displayCount}}",
@@ -2560,7 +2579,21 @@
       "thought": "Ìrònú",
       "showDetails": "Fi àwọn àlàyé hàn",
       "pending": "Ń dúró…",
-      "running": "Ń ṣiṣẹ́…"
+      "running": "Ń ṣiṣẹ́…",
+      "field": {
+        "filePath": "Ọ̀nà fáìlì",
+        "path": "Ọ̀nà",
+        "offset": "Ìbẹ̀rẹ̀",
+        "limit": "Ààlà",
+        "pattern": "Àpẹẹrẹ",
+        "include": "Ìmúpẹ̀lú",
+        "patchText": "Ọ̀rọ̀ àtúnṣe",
+        "query": "Ìwádìí",
+        "prompt": "Ìtọ́ni",
+        "header": "Àkọlé",
+        "question": "Ìbéèrè",
+        "options": "Àwọn àṣàyàn"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "A kò lè fi àkóónú hàn."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Awoṣe yìí ṣe àtìlẹ́yìn fún ìwọ̀n ìrònú"
     },
-    "creditsRequired": "Kirẹ́dítì kò tó láti fi ìfiránṣẹ́ yìí ránṣẹ́, fi kirẹ́dítì kún un kí o sì gbìyànjú lẹ́ẹ̀kan sí i."
+    "creditsRequired": "Kirẹ́dítì kò tó láti fi ìfiránṣẹ́ yìí ránṣẹ́."
   },
   "settingsTools": {
     "confirmTitle": "Ìjẹ́rìí ìyípadà yìí?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Aṣoju mi",
       "promptPlaceholder": "Iwọ jẹ ...",
       "tools": "Awọn irinṣẹ",
+      "wholeToolRule": "Aṣojú yìí ń lo òfin kan sí gbogbo irinṣẹ lẹ́ẹ̀kan náà: {{rule}}. Àwọn swíṣì wọ̀nyí kìkì fún kíkà nìkan.",
       "visibility": "Hihan",
       "visibilityPrimary": "Alakoko — ti o han ni oluka",
       "visibilitySubagent": "Subagent — nikan callable lati elomiran",
@@ -4035,7 +4069,8 @@
       "duplicateName": "Aṣẹ miiran ti o ni orukọ yẹn wa ninu profaili yii tẹlẹ"
     },
     "repoBindings": {
-      "title": "Awọn profaili Aiyipada fun Repos",
+      "title": "Awọn profaili aiyipada fun Repos",
+      "entryLabel": "Awọn profaili aiyipada",
       "add": "Fi aiyipada kun",
       "empty": "Ko si awọn atunto aiyipada",
       "emptyDescription": "Ṣafikun aiyipada lati kan profaili laifọwọyi nigbati o bẹrẹ awọn akoko fun atunto kan.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Kò sí àyíká tí a ti mú ṣiṣẹ́ fún àwọn ìròyìn tí a ṣètò",
     "sourceBlocker": "Ìgbà iṣẹ́ nílò àfiyèsí",
     "sourceMetadata": "Ìsọfúnni àpèjúwe ìgbà iṣẹ́ tí a gbà sílẹ̀"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "A kò lè ṣí àbájọ́ ìwádìí yìí"
   }
 }

@@ -59,6 +59,41 @@ function wire(type: string, properties: unknown): CloudAgentEvent {
 }
 
 describe('versioned native conversation sources', () => {
+  it.each(['user', 'assistant'])(
+    'retains the native %s model variant in history and live updates',
+    type => {
+      const message = {
+        ...(type === 'user' ? user : assistant),
+        model: { providerID: 'kilo', id: 'fake', variant: 'high' },
+      };
+      const display = cloudSessionMessagesPageSchema.parse({
+        ...page,
+        messages: [{ message }],
+      });
+      expect(display?.messages[0].info).toMatchObject({ variant: 'high' });
+      const events = createConversationSourceReader().read(
+        wire('conversation.message.updated', {
+          sessionID: session.id,
+          source,
+          message,
+        })
+      ).events;
+      expect(events[0]).toMatchObject({ type: 'message.updated', info: { variant: 'high' } });
+    }
+  );
+
+  it('uses the session variant only when the native message has no model selection', () => {
+    const selectedSession = { ...session, model: { ...session.model, variant: 'high' } };
+    const nativeAssistant = kilo2MessageSchema.parse(assistant);
+    expect(
+      readKilo2Messages(selectedSession, [user, nativeAssistant]).map(item => item.info.variant)
+    ).toEqual(['high', 'high']);
+    expect(
+      readKilo2Messages(selectedSession, [{ ...nativeAssistant, model: session.model }])[0]?.info
+        .variant
+    ).toBeUndefined();
+  });
+
   it('keeps native fields on the wire and builds the shared display model only inside the SDK', () => {
     expect(cloudSessionMessagesPageWireSchema.parse(page)).toEqual(page);
     const display = cloudSessionMessagesPageSchema.parse(page);

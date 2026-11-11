@@ -45,8 +45,11 @@ export type GatewayCaller = SignedInGatewayCaller | AnonymousGatewayCaller | Rej
  * Who an inference request runs as. A presented credential that failed
  * verification is never downgraded to anonymous; see `invalidTokenResponse`.
  *
- * `passThroughAuthFailure` returns any other auth failure as is, such as the 403
- * for a blocked user or a non-member, instead of the sign-in prompt.
+ * A refused authorization always returns the authentication layer's response,
+ * whether or not `passThroughAuthFailure` is set. That covers a blocked
+ * account, a blacklisted domain, a non-member organization, and an admin-only
+ * route. `passThroughAuthFailure` returns any other auth failure as is, instead
+ * of the sign-in prompt.
  */
 export function resolveGatewayCaller(
   auth: GatewayAuthResult,
@@ -72,6 +75,7 @@ export function resolveGatewayCaller(
     return { kind: 'rejected', response: auth.authFailedResponse };
   }
   if (auth.credentialsRejected) return { kind: 'rejected', response: invalidTokenResponse() };
+  if (auth.authorizationRefused) return { kind: 'rejected', response: auth.authFailedResponse };
   if (opts.passThroughAuthFailure) return { kind: 'rejected', response: auth.authFailedResponse };
   if (opts.allowAnonymous && opts.ipAddress) {
     return { kind: 'anonymous', user: createAnonymousContext(opts.ipAddress) };

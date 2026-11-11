@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
-import type { StoredModel } from '@kilocode/db';
-import type { StoredModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type {
+  GatewayModelMap,
+  GatewayModelWithEndpoints,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   deleteCustomLlmForTest,
@@ -53,11 +55,11 @@ function makeModel(id: string): OpenRouterModel {
   };
 }
 
-function storedModel(id: string, providerNames: string[]): StoredModel {
+function storedModel(id: string, providerNames: string[]): GatewayModelWithEndpoints {
   return { id, name: id, endpoints: providerNames.map(provider_name => ({ provider_name })) };
 }
 
-const metadata: StoredModelMap = {
+const metadata: GatewayModelMap = {
   'anthropic/claude-fixture': storedModel('anthropic/claude-fixture', ['anthropic', 'bedrock']),
   'openai/gpt-fixture': storedModel('openai/gpt-fixture', ['openai']),
   'mistral/codestral-fixture': storedModel('mistral/codestral-fixture', ['mistral']),

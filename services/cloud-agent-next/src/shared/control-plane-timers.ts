@@ -22,6 +22,8 @@ export type ControlPlaneTimers = {
   sandbox: {
     providerCreateMs: number;
     providerCreateRetryMs: number;
+    billingAdmissionMs: number;
+    billingAdmissionMinimumMs: number;
     wrapperFirstConnectMs: number;
     wrapperHelloMs: number;
     heartbeatMs: number;
@@ -33,8 +35,16 @@ export type ControlPlaneTimers = {
     providerLeaseMs: number;
     credentialGrantMs: number;
     credentialGrantReissueBelowMs: number;
+    /** Wait before the alarm retries a failed renewal while the grant is still valid. */
+    credentialGrantRenewalRetryMs: number;
     /** Bounds one member's backing renewal during scope-handle resolution. */
     scopeBackingTokenMs: number;
+    /** Bounds the membership read that gates an organization-attributed grant. */
+    organizationMembershipReadMs: number;
+    /** How many bounded membership reads one grant issuance makes before it denies. */
+    organizationMembershipReadAttempts: number;
+    /** Wait between two membership reads of the same issuance. */
+    organizationMembershipReadRetryMs: number;
     providerStopAttemptMs: number;
     providerStopLadderMs: readonly number[];
   };
@@ -106,8 +116,8 @@ const ROUTE_PREPARATION_MS =
 // max backoff). Timers that bound external work stay real: provider create and
 // container boot, the preparation attempt, the pause before a failed create is retried,
 // restore/clone/save/runtime/session bounds, SSE silence (Kilo heartbeats every
-// 10-15 s), health request, the real-SSE reconnect window, credential grants
-// and the provider stop ladder.
+// 10-15 s), health request, the real-SSE reconnect window, credential grants,
+// the organization membership read and the provider stop ladder.
 function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
   const ms = (value: number): number => Math.max(1, Math.round(value / divisor));
   const sandbox = {
@@ -115,6 +125,8 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     providerCreateRetryMs: PROVIDER_CREATE_RETRY_MS,
     wrapperFirstConnectMs: WRAPPER_FIRST_CONNECT_MS,
     wrapperHelloMs: WRAPPER_HELLO_MS,
+    billingAdmissionMs: MINUTE_MS,
+    billingAdmissionMinimumMs: 1_000,
     heartbeatMs: ms(45_000),
     reconnectMs: ms(90_000),
     routePreparationMs: ROUTE_PREPARATION_MS,
@@ -123,11 +135,22 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     // Bounds one Sandbox -> Session notification; real (not scaled) like the
     // other bounds on external work.
     sessionNotifyDeadlineMs: 2_000,
+    // Grants are renewed from the alarm and on `deliver` below the threshold, so
+    // their lease does not bound how long one native execution may run.
     credentialGrantMs: 4 * HOUR_MS,
     credentialGrantReissueBelowMs: HOUR_MS,
+    credentialGrantRenewalRetryMs: 5 * MINUTE_MS,
     // Bounds external token renewal, so it stays real and short enough for the
     // Session DO's total scope-resolution bound.
     scopeBackingTokenMs: 3_000,
+    // The membership read is one indexed row. A read that cannot answer inside
+    // the bound denies the grant instead of holding the Sandbox DO operation
+    // queue, so it stays real. One unreadable read is a single observation, not
+    // a decision, so an issuance retries it a few times inside the 30 s grant
+    // issuance bound (3 * 3 s + 2 * 1 s = 11 s) before it denies.
+    organizationMembershipReadMs: 3_000,
+    organizationMembershipReadAttempts: 3,
+    organizationMembershipReadRetryMs: 1_000,
     providerStopAttemptMs: 30_000,
     providerStopLadderMs: [5_000, 10_000, 10_000, 10_000, 10_000],
   };
@@ -151,7 +174,7 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     // Allow transient reclaim to clear while bounding a sustained memory stall.
     kiloMemoryHoldMs: ms(2 * MINUTE_MS),
     noProgressMs: ms(20 * MINUTE_MS),
-    turnHardCapMs: ms(120 * MINUTE_MS),
+    turnHardCapMs: ms(12 * HOUR_MS),
     reconnectBackoffMinMs: ms(1_000),
     reconnectBackoffMaxMs: ms(30_000),
   };

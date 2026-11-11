@@ -480,8 +480,9 @@ describe('mergeProfileConfiguration', () => {
         REPO_ONLY: 'repo-val',
         SHARED: 'from-manual',
       });
-      // The environment owns setup: the bound profile's command does not run.
-      expect(result.setupCommands).toEqual(['env-cmd', 'manual-cmd']);
+      // Profile setup commands stay: they are session setup and run beside the
+      // environment's build commands.
+      expect(result.setupCommands).toEqual(['env-cmd', 'repo-cmd', 'manual-cmd']);
       expect(result.environmentSetupCommandCount).toBe(1);
 
       const withoutEnvironment = await mergeProfileConfiguration(db, {
@@ -508,7 +509,7 @@ describe('mergeProfileConfiguration', () => {
         setupCommands: ['manual-cmd'],
       });
 
-      expect(result.setupCommands).toEqual(['install', 'manual-cmd']);
+      expect(result.setupCommands).toEqual(['install', 'default-cmd', 'manual-cmd']);
       expect(result.startCommands).toEqual(['serve']);
 
       const withoutEnvironment = await mergeProfileConfiguration(db, {
@@ -533,7 +534,7 @@ describe('mergeProfileConfiguration', () => {
       expect(result.environmentSetupCommandCount).toBe(0);
     });
 
-    test('an empty environment still replaces profile setup commands, not profile vars', async () => {
+    test('an empty environment keeps profile setup commands, not profile vars', async () => {
       const user = await insertTestUser();
       const owner: ProfileOwner = { type: 'user', id: user.id };
       const repoProfileId = await createProfile(owner, 'repo-profile');
@@ -549,7 +550,7 @@ describe('mergeProfileConfiguration', () => {
         platform: 'github',
         environment: {},
       });
-      expect(withEnvironment.setupCommands).toBeUndefined();
+      expect(withEnvironment.setupCommands).toEqual(['repo-cmd', 'default-cmd']);
       expect(withEnvironment.envVars).toEqual({ FROM_DEFAULT: 'default-val' });
 
       const withoutEnvironment = await mergeProfileConfiguration(db, {
@@ -624,7 +625,9 @@ describe('mergeProfileConfiguration', () => {
         });
 
         expect(result.envVars).toEqual({ FROM_ENV: 'env', FROM_DEFAULT: 'default-val' });
-        expect(result.setupCommands).toEqual(['env-cmd']);
+        // The default profile's setup commands run as session setup after the
+        // environment's build commands; the binding's never apply.
+        expect(result.setupCommands).toEqual(['env-cmd', 'default-cmd']);
         expect(result.resolvedProfileId).toBe(defaultProfileId);
       });
 
@@ -701,8 +704,9 @@ describe('mergeProfileConfiguration', () => {
           FROM_PICKED: 'picked-val',
           FROM_MANUAL: 'manual-val',
         });
-        // The environment owns setup: the picked profile's command does not run.
-        expect(result.setupCommands).toEqual(['env-cmd', 'manual-cmd']);
+        // Profile setup commands are session setup and run beside the
+        // environment's build commands.
+        expect(result.setupCommands).toEqual(['env-cmd', 'picked-cmd', 'manual-cmd']);
         expect(result.resolvedProfileId).toBe(pickedProfileId);
       });
     });

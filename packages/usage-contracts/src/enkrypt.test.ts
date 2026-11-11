@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   ENKRYPT_USAGE_WRITE_PATH,
+  EnkryptUsageQueueMessageSchema,
   EnkryptUsageWriteResponseSchema,
   EnkryptUsageWriteSchema,
   MAX_ENKRYPT_CREDITS_PER_CALL,
@@ -161,6 +162,24 @@ describe('EnkryptUsageWriteSchema', () => {
     expect(EnkryptUsageWriteSchema.safeParse(writeWith({ decision })).success).toBe(false);
   });
 
+  test('accepts the detectors that fired', () => {
+    const write = writeWith({ decision: 'allowed', detectorsFired: ['pii', 'toxicity'] });
+    expect(EnkryptUsageWriteSchema.parse(write)).toStrictEqual(write);
+  });
+
+  test('leaves omitted detectors absent', () => {
+    expect(EnkryptUsageWriteSchema.parse(validWrite())).not.toHaveProperty('detectorsFired');
+  });
+
+  test.each([
+    ['an empty list', []],
+    ['an unknown detector', ['system_prompt_similarity']],
+    ['null', null],
+    ['a single detector string', 'pii'],
+  ])('rejects %s as detectorsFired', (_label, detectorsFired) => {
+    expect(EnkryptUsageWriteSchema.safeParse(writeWith({ detectorsFired })).success).toBe(false);
+  });
+
   test.each(['both', 'Input', null])('rejects the guardrail %j', guardrail => {
     expect(EnkryptUsageWriteSchema.safeParse(writeWith({ guardrail })).success).toBe(false);
   });
@@ -199,12 +218,48 @@ describe('EnkryptUsageWriteResponseSchema', () => {
     expect(EnkryptUsageWriteResponseSchema.parse({ status })).toStrictEqual({ status });
   });
 
+  test.each(['recorded', 'duplicate'])('accepts %s with an echoed usage id', status => {
+    const body = { status, usageId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301' };
+    expect(EnkryptUsageWriteResponseSchema.parse(body)).toStrictEqual(body);
+  });
+
   test.each([
     ['an unknown status', { status: 'not_recorded' }],
     ['a missing status', {}],
-    ['an echoed usage id', { status: 'recorded', usageId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301' }],
+    ['a non-UUID usage id', { status: 'recorded', usageId: 'usage-1' }],
+    ['a null usage id', { status: 'recorded', usageId: null }],
     ['an extra key', { status: 'duplicate', result: null }],
+    [
+      'an extra key beside an echoed usage id',
+      { status: 'recorded', usageId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301', result: null },
+    ],
   ])('rejects %s', (_label, body) => {
     expect(EnkryptUsageWriteResponseSchema.safeParse(body).success).toBe(false);
+  });
+});
+
+describe('EnkryptUsageQueueMessageSchema', () => {
+  test('accepts the version 1 envelope around a valid write', () => {
+    const message = { kind: 'enkrypt_usage', v: 1, record: validWrite() };
+    expect(EnkryptUsageQueueMessageSchema.parse(message)).toStrictEqual(message);
+  });
+
+  test('applies the write defaults to the enveloped record', () => {
+    const message = { kind: 'enkrypt_usage', v: 1, record: writeWithout('guardrail') };
+    expect(EnkryptUsageQueueMessageSchema.parse(message).record.guardrail).toBe('input');
+  });
+
+  test.each([
+    ['another kind', { kind: 'exa_usage', v: 1, record: validWrite() }],
+    ['another version', { kind: 'enkrypt_usage', v: 2, record: validWrite() }],
+    ['a string version', { kind: 'enkrypt_usage', v: '1', record: validWrite() }],
+    ['a missing version', { kind: 'enkrypt_usage', record: validWrite() }],
+    ['an extra key', { kind: 'enkrypt_usage', v: 1, record: validWrite(), extra: true }],
+    ['an invalid record', { kind: 'enkrypt_usage', v: 1, record: writeWith({ id: 'x' }) }],
+    ['an unknown record key', { kind: 'enkrypt_usage', v: 1, record: writeWith({ prompt: 'x' }) }],
+    ['a missing record', { kind: 'enkrypt_usage', v: 1 }],
+    ['a bare record', validWrite()],
+  ])('rejects %s', (_label, message) => {
+    expect(EnkryptUsageQueueMessageSchema.safeParse(message).success).toBe(false);
   });
 });

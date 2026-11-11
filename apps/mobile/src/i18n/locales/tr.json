@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "Lütfen e-posta adresini gir.",
     "or": "veya"
   },
+  "pendingLink": {
+    "description": "{{email}} adresini zaten bir hesap kullanıyor. {{provider}} eklemek için bu hesabın yöntemlerinden biriyle oturum aç.",
+    "emailCode": "Bana e-postayla oturum açma kodu gönder",
+    "continueInBrowser": "Tarayıcıda devam et",
+    "startAgain": "Baştan başla",
+    "expired": "{{provider}} ekleme isteğinin süresi doldu.",
+    "noMethods": "Bu hesabın başka bir oturum açma yöntemi olmadığından {{provider}} eklenemiyor.",
+    "linked": "{{provider}} hesabına eklendi.",
+    "failedExpired": "İsteğin süresi dolduğu için {{provider}} eklenmedi.",
+    "failedWrongAccount": "Farklı bir hesapta oturum açtığın için {{provider}} eklenmedi.",
+    "failedAccountAlreadyLinked": "{{provider}} zaten başka bir hesaba bağlı olduğu için eklenmedi.",
+    "failedProviderAlreadyLinked": "Hesabında zaten farklı bir {{provider}} oturum açma yöntemi olduğu için {{provider}} eklenmedi.",
+    "failedLinking": "{{provider}} hesabına eklenemedi.",
+    "notAdded": "Oturum açtın. {{provider}} hesabına eklenmedi."
+  },
   "profile": {
     "codeReviewerSubtitle": "Otomatik PR incelemeleri",
     "securityAgentSubtitle": "Güvenlik açıklarını bul ve gider",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Test hesabı",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Kurumsal SSO",
     "passkeysTitle": "Geçiş anahtarları",
     "passkeysSubtitle": "Parolasız oturum açın",
@@ -1870,7 +1887,7 @@
       "discardWithUploadsMessage": "İstemin ve henüz bir mesaja eklenmemiş tüm yüklemeler silinecek.",
       "discardFailed": "Taslak silinemedi. Tekrar dene.",
       "remoteHint": "Bilgisayarında çalıştırmak için Kilo'yu orada başlat ve çalışır halde bırak.",
-      "continueFrom": "{{title}} oturumuna devam ediliyor.",
+      "continueFrom": "“{{title}}” oturumuna devam ediliyor.",
       "importingSession": "Oturum içe aktarılıyor",
       "cliCannotContinue": "Bu CLI bir oturuma devam etmeyi desteklemiyor. Cloud Agent veya başka bir CLI seç.",
       "importFailed": "Bu oturum içe aktarılamadı.",
@@ -1922,6 +1939,8 @@
       "toolList": "listele",
       "toolPatch": "yama uygula",
       "toolTask": "görev",
+      "toolSendFile": "Dosya gönderildi",
+      "toolSendFileAction": "Dosya gönder",
       "readTodos": "Planı oku",
       "updateTodos": "Planı güncelle",
       "linesBadge": "{{displayCount}} satır",
@@ -2022,7 +2041,21 @@
       "thought": "Düşünce",
       "showDetails": "Ayrıntıları göster",
       "pending": "Bekliyor…",
-      "running": "Çalışıyor…"
+      "running": "Çalışıyor…",
+      "field": {
+        "filePath": "Dosya yolu",
+        "path": "Yol",
+        "offset": "Başlangıç",
+        "limit": "Sınır",
+        "pattern": "Desen",
+        "include": "Dosya filtresi",
+        "patchText": "Yama metni",
+        "query": "Sorgu",
+        "prompt": "İstem",
+        "header": "Başlık",
+        "question": "Soru",
+        "options": "Seçenekler"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "İçerik görüntülenemedi."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Bu model düşünme düzeyini destekler"
     },
-    "creditsRequired": "Bu mesajı göndermek için yeterli kredi yok. Kredi ekle ve tekrar dene."
+    "creditsRequired": "Bu mesajı göndermek için yeterli kredi yok."
   },
   "settingsTools": {
     "confirmTitle": "Bu değişiklik onaylansın mı?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Temsilcim",
       "promptPlaceholder": "Sen bir...",
       "tools": "Aletler",
+      "wholeToolRule": "Bu ajan tüm aletlere aynı anda tek bir kural uygular: {{rule}}. Bu anahtarlar salt okunur.",
       "visibility": "Görünürlük",
       "visibilityPrimary": "Birincil — seçicide gösterilir",
       "visibilitySubagent": "Alt temsilci — yalnızca başkaları tarafından aranabilir",
@@ -4035,7 +4069,8 @@
       "duplicateName": "Bu adı kullanan bir komut bu profilde zaten mevcut"
     },
     "repoBindings": {
-      "title": "Depolar için Varsayılan Profiller",
+      "title": "Depolar için varsayılan profiller",
+      "entryLabel": "Varsayılan profiller",
       "add": "Varsayılan ekle",
       "empty": "Varsayılan ayar yapılandırılmadı",
       "emptyDescription": "Bir depo için oturum başlatırken bir profili otomatik olarak uygulamak için bir varsayılan ekleyin.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Planlanmış raporlar için etkinleştirilmiş bağlam yok",
     "sourceBlocker": "Oturumla ilgilenilmesi gerekiyor",
     "sourceMetadata": "Kaydedilen oturum meta verileri"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Bu arama sonucu açılamadı"
   }
 }

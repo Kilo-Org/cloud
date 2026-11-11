@@ -572,7 +572,15 @@ Runner input: `{channel:"events",type,body?}` (missing body defaults to null). T
 `{type:"subscribe",afterSeq}`. Available events replay in order; a gap, expired
 tail, unknown future cursor, or lost ring produces `reset_required` and pauses
 event delivery. Refetch the durable snapshot, then explicitly resubscribe from
-the supplied boundary.
+the supplied boundary. A socket that is already subscribed replays only the
+entries above the highest sequence it has received, so a repeated `subscribe`
+sends the `subscribed` control frame alone; a client that needs an earlier
+cursor reconnects instead. The `subscribed` body is `{seq,cursor}`: `seq` is the
+current event sequence and `cursor` is the position the replay continued from,
+so a client can detect that its requested cursor was advanced. The received
+position is held in memory only and is not written to the socket attachment:
+after hibernation the replay floor already starts at the stored sequence
+ceiling, so a persisted position could never change replay.
 The `hello` control frame includes the current event sequence, runner connectivity,
 ticket lifetime, and a jittered `reconnectAfterMs`.
 
@@ -611,7 +619,9 @@ One hibernatable runner socket per CLI process advertises via
 `startedAt` is Unix milliseconds, `gitBranch` is string or null, capabilities and
 sessions are string arrays. Advertisements are bounded; no heartbeat means
 offline after 90 seconds. Presence viewer `{type:"subscribe"}` receives `instances`
-snapshots, including removals. Records include `{instanceID,tenant,advertisement,
+snapshots, including removals. Snapshots are change-driven: a new or changed
+advertisement, an online-state change, or an instance leaving produces one snapshot,
+and `lastHeartbeatAt` is the value at that snapshot. Records include `{instanceID,tenant,advertisement,
 online,lastHeartbeatAt}`. Same-user/tenant/instance reconnect replaces the previous
 socket with code 4009; presence 4009 may retry, unlike session-relay 4009.
 No disconnected-instance history is retained. Ads are held
@@ -686,8 +696,9 @@ decision. The SyncDO tombstone retains intent until purge is acknowledged.
 Sessions never authorized for live access skip relay creation and purge.
 
 Relay/presence Analytics Engine points index the normalized live operation, with
-blobs `[route,role]` and doubles `[bytes,fanout,latencyMs]`; payloads and identities
-are excluded. HTTP request points retain the schema documented above.
+blobs `[route,role,reason?]` and doubles `[bytes,fanout,latencyMs]`; payloads and identities
+are excluded. Presence fan-out points carry the cause of the fan-out in the reason blob.
+HTTP request points retain the schema documented above.
 
 ### Local end-to-end proof
 

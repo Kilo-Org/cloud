@@ -46,6 +46,11 @@ jest.mock('@/lib/auth/native-admission', () => ({
   persistAttestedKey: jest.fn(),
 }));
 jest.mock('@/lib/auth/device-sessions');
+jest.mock('@/lib/auth/pending-link', () => ({
+  createPendingLinkForDifferentOAuth: jest.fn(),
+  resolvePendingLinkForUser: jest.fn(),
+  summarizePendingLink: jest.fn(),
+}));
 jest.mock('@/lib/auth/native-token-rate-limit', () => ({
   isNativeTokenAddressRateLimited: jest.fn(),
   isNativeTokenUserRateLimited: jest.fn(),
@@ -94,6 +99,11 @@ import {
   isNativeTokenUserRateLimited,
 } from '@/lib/auth/native-token-rate-limit';
 import { captureMessage } from '@sentry/nextjs';
+import {
+  createPendingLinkForDifferentOAuth,
+  resolvePendingLinkForUser,
+  summarizePendingLink,
+} from '@/lib/auth/pending-link';
 
 const mockVerifyNativeAppleIdToken = jest.mocked(verifyNativeAppleIdToken);
 const mockVerifyNativeGoogleIdToken = jest.mocked(verifyNativeGoogleIdToken);
@@ -119,6 +129,9 @@ const mockIsNativeTokenAddressRateLimited = jest.mocked(isNativeTokenAddressRate
 const mockIsNativeTokenUserRateLimited = jest.mocked(isNativeTokenUserRateLimited);
 const mockRevokeDeviceSession = jest.mocked(revokeDeviceSession);
 const mockCaptureMessage = jest.mocked(captureMessage);
+const mockCreatePendingLink = jest.mocked(createPendingLinkForDifferentOAuth);
+const mockResolvePendingLink = jest.mocked(resolvePendingLinkForUser);
+const mockSummarizePendingLink = jest.mocked(summarizePendingLink);
 
 const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as User;
 
@@ -176,6 +189,8 @@ describe('POST /api/auth/native/token', () => {
     mockIsNativeTokenAddressRateLimited.mockResolvedValue(false);
     mockIsNativeTokenUserRateLimited.mockResolvedValue(false);
     mockRevokeDeviceSession.mockResolvedValue(undefined);
+    mockCreatePendingLink.mockResolvedValue(null);
+    mockResolvePendingLink.mockResolvedValue(undefined);
   });
 
   describe('apple', () => {
@@ -812,6 +827,68 @@ describe('POST /api/auth/native/token', () => {
       });
       expect(mockReleaseSignInCode).toHaveBeenCalled();
       expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    });
+
+    it('returns the pending link object on an eligible DIFFERENT-OAUTH', async () => {
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: false,
+        error: 'DIFFERENT-OAUTH',
+        targetUserId: 'user-1',
+        accountHasVerifiedPrimaryAddress: true,
+        providerAlreadyPresent: false,
+      } as never);
+      mockCreatePendingLink.mockResolvedValue({
+        secret: 'pending-secret',
+        pendingLink: { id: 'pending-1' },
+      } as never);
+      mockSummarizePendingLink.mockResolvedValue({
+        provider: 'email',
+        email: 'pending@example.com',
+        methods: ['google'],
+        emailCode: true,
+        expiresAt: '2026-01-01T00:15:00.000Z',
+        kind: 'existing_account',
+        callbackPath: null,
+        kiloUserId: 'user-1',
+      } as never);
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'pending@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'DIFFERENT-OAUTH',
+        pendingLink: {
+          token: 'pending-secret',
+          provider: 'email',
+          email: 'pending@example.com',
+          methods: ['google'],
+          emailCode: true,
+          expiresAt: '2026-01-01T00:15:00.000Z',
+        },
+      });
+    });
+
+    it('adds the pending link result to a successful sign-in that carried a token', async () => {
+      mockResolvePendingLink.mockResolvedValue({
+        status: 'linked',
+        provider: 'github',
+      } as never);
+
+      const response = await POST(
+        createRequest({
+          provider: 'email',
+          email: 'linked@example.com',
+          code: '123456',
+          pendingLinkToken: 'pending-secret',
+        })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.pendingLink).toEqual({ status: 'linked', provider: 'github' });
+      expect(mockResolvePendingLink).toHaveBeenCalledWith('pending-secret', fakeUser.id);
     });
 
     it('releases the code on DIFFERENT-OAUTH settlement failure so retry succeeds', async () => {

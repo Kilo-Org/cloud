@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "请输入邮箱地址。",
     "or": "或"
   },
+  "pendingLink": {
+    "description": "已有账户在使用 {{email}}。请使用该账户的任一登录方式登录，以添加 {{provider}}。",
+    "emailCode": "通过邮件向我发送登录验证码",
+    "continueInBrowser": "在浏览器中继续",
+    "startAgain": "重新开始",
+    "expired": "添加 {{provider}} 的请求已过期。",
+    "noMethods": "此账户没有其他登录方式，因此无法添加 {{provider}}。",
+    "linked": "{{provider}} 已添加到你的账户。",
+    "failedExpired": "请求已过期，未能添加 {{provider}}。",
+    "failedWrongAccount": "你登录了其他账户，未能添加 {{provider}}。",
+    "failedAccountAlreadyLinked": "{{provider}} 已关联到其他账户，未能添加。",
+    "failedProviderAlreadyLinked": "你的账户已有另一个 {{provider}} 登录方式，未能添加 {{provider}}。",
+    "failedLinking": "无法将 {{provider}} 添加到你的账户。",
+    "notAdded": "你已登录，但未能将 {{provider}} 添加到你的账户。"
+  },
   "profile": {
     "codeReviewerSubtitle": "自动 PR 审查",
     "securityAgentSubtitle": "查找并修复漏洞",
@@ -267,6 +282,8 @@
     "providerTestAccount": "测试账户",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "企业 SSO",
     "passkeysTitle": "通行密钥",
     "passkeysSubtitle": "无需密码即可登录",
@@ -1922,6 +1939,8 @@
       "toolList": "列出目录",
       "toolPatch": "应用补丁",
       "toolTask": "任务",
+      "toolSendFile": "已发送文件",
+      "toolSendFileAction": "发送文件",
       "readTodos": "读取计划",
       "updateTodos": "更新计划",
       "linesBadge": "{{displayCount}} 行",
@@ -2022,7 +2041,21 @@
       "thought": "思考过程",
       "showDetails": "显示详情",
       "pending": "待处理……",
-      "running": "正在运行……"
+      "running": "正在运行……",
+      "field": {
+        "filePath": "文件路径",
+        "path": "路径",
+        "offset": "偏移量",
+        "limit": "上限",
+        "pattern": "模式",
+        "include": "包含",
+        "patchText": "补丁文本",
+        "query": "查询",
+        "prompt": "提示词",
+        "header": "标题",
+        "question": "问题",
+        "options": "选项"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "无法显示内容。"
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "此模型支持思考强度"
     },
-    "creditsRequired": "额度不足，无法发送此消息。请充值额度后重试。"
+    "creditsRequired": "额度不足，无法发送此消息。"
   },
   "settingsTools": {
     "confirmTitle": "确认此更改？"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "我的代理",
       "promptPlaceholder": "你是一个...",
       "tools": "工具",
+      "wholeToolRule": "此智能体会同时对每个工具应用一条规则：{{rule}}。这些开关为只读状态。",
       "visibility": "可见性",
       "visibilityPrimary": "主代理 — 显示在选择器中",
       "visibilitySubagent": "子代理 — 仅可由其他代理调用",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "仓库的默认配置文件",
+      "entryLabel": "默认配置",
       "add": "添加默认值",
       "empty": "没有配置默认值",
       "emptyDescription": "添加默认值以在启动仓库会话时自动应用配置文件。",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "未为定时简报启用任何上下文",
     "sourceBlocker": "会话需要关注",
     "sourceMetadata": "已采集的会话元数据"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "无法打开此搜索结果"
   }
 }

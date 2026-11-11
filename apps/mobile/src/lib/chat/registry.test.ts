@@ -35,6 +35,8 @@ let openedWith: { readonly tools?: readonly string[] } | undefined = undefined;
 let clonedWith:
   | { readonly tools?: readonly string[]; readonly model?: string; readonly effort?: string }
   | undefined = undefined;
+/** How many moves this run has made: a clone is always a session of its own. */
+let clonesMade = 0;
 /** The effort the store says a session was opened with. */
 let storedEffort: string | null = null;
 /**
@@ -149,6 +151,14 @@ const TURN = {
   parts: [{ id: 'prt_1', kind: 'text', body: 'hi' }],
 } as const;
 
+/** The answer to it: an answered question is stored as both turns, not as one. */
+const ANSWER = {
+  id: 'trn_2',
+  sessionId: 's1',
+  role: 'assistant',
+  parts: [{ id: 'prt_2', kind: 'text', body: 'because' }],
+} as const;
+
 const handleFor = (id: string) => {
   totals.set(id, { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 });
   routedTotals.delete(id);
@@ -261,7 +271,8 @@ vi.mock('@kilocode/harness-sdk', () => {
       if (missingCloneFor === id && onto?.tools === undefined) {
         return Effect.fail(new FakeToolMissingError());
       }
-      return Effect.succeed(handleFor('s2'));
+      clonesMade += 1;
+      return Effect.succeed(handleFor(`s${clonesMade + 1}`));
     },
   };
 });
@@ -442,7 +453,7 @@ const {
 } = await import('./registry');
 const { change, snapshotOf } = await import('./state');
 const { chatPlaceOf } = await import('./scope');
-const { askedIn, forgetAsked } = await import('./pending');
+const { askedIn, firstQuestionIn, forgetAsked, keptIn } = await import('./pending');
 
 /** The words of the line that is waiting, which is what most of these read. */
 const waitingWords = (sessionId: string) => snapshotOf(sessionId).waiting.map(one => one.text);
@@ -502,8 +513,10 @@ beforeEach(async () => {
   failHistoryFor = undefined;
   failForgetFor = undefined;
   failAnswerFor = undefined;
+  creditsFailureFor = undefined;
   storedQuestions.clear();
   clonedWith = undefined;
+  clonesMade = 0;
   storedEffort = null;
   openedWith = undefined;
   storedTools = null;
@@ -1015,6 +1028,722 @@ describe('a send the account cannot pay for', () => {
   });
 });
 
+describe('a question a later send took the slot from', () => {
+  it('keeps the failed words in the transcript, before the question that replaced them', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+
+    await say(
+      opened,
+      { text: 'the long question', images: [] },
+      { model: 'kilo/one', effort: null }
+    );
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const held = snapshotOf(opened);
+    /* It keeps everything needed to ask it again, and where it was said: no
+       turn was stored for it, so it goes before every one of them. */
+    expect(held.displaced).toMatchObject([
+      {
+        text: 'the long question',
+        images: [],
+        model: 'kilo/one',
+        effort: null,
+        afterTurns: 0,
+        outcome: 'failed',
+      },
+    ]);
+    const [kept] = held.displaced;
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    // The identifier names its bubble, and is the one its Retry finds it by.
+    expect(asMessages(held).map(one => one.info.id)).toEqual([
+      `${held.sessionId}:displaced:${kept.id}`,
+      `${held.sessionId}:asked`,
+    ]);
+    // Written down with the chat, so reopening it keeps the bubble.
+    expect(await keptIn(held.sessionId)).toEqual(held.displaced);
+  });
+
+  it('says why the newest question failed after a reopen, with the kept one still above it', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await releaseChat(opened);
+    await enterChat(place, opened);
+
+    /* Both records are read back: the words of the question a later send took
+       the slot from, and why the question now in the slot has no answer. The
+       banner and its Add credits control hang off the second. */
+    const held = snapshotOf(opened);
+    expect(held).toMatchObject({ asked: 'second', failureKey: CREDITS_FAILURE_KEY });
+    expect(held.displaced.map(one => one.text)).toEqual(['first']);
+    const kept = held.displaced[0];
+    expect(asMessages(held).map(one => one.info.id)).toEqual([
+      `${held.sessionId}:displaced:${kept?.id}`,
+      `${held.sessionId}:asked`,
+    ]);
+  });
+
+  it('is on screen above the answer that came after it', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    /* The next question moves the chat onto another model, which is a session
+       the gateway answers for, so an answer lands after the failure. */
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/two', effort: null });
+    await settled();
+    storedHistory = [TURN];
+    finish?.();
+    await settled();
+
+    const held = snapshotOf(opened);
+    // Said before the turn the store now holds, so it stays above it.
+    expect(held.turns).toEqual([TURN]);
+    const drawn = asMessages(held).map(one => one.info.id);
+    expect(drawn).toHaveLength(2);
+    expect(drawn[0]).toMatch(/:displaced:/);
+    expect(drawn[1]).toBe(TURN.id);
+  });
+
+  it('is asked again from its own Retry, on the model it was asked of', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/two', effort: null });
+    await settled();
+    finish?.();
+    await settled();
+
+    const kept = snapshotOf(opened).displaced[0];
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    asked.length = 0;
+    clonedWith = undefined;
+    creditsFailureFor = undefined;
+
+    await retryChat(opened, kept);
+    await settled();
+
+    /* It stays in the transcript where it was said, and the slot draws no
+       second bubble for it: the attempt on screen is that one bubble. */
+    expect(snapshotOf(opened).displaced.map(one => one.text)).toEqual(['first']);
+    expect(snapshotOf(opened).askedFrom).toBe(kept.id);
+    const drawn = asMessages(snapshotOf(opened)).map(one => one.info.id);
+    expect(drawn[0]).toBe(`${snapshotOf(opened).sessionId}:displaced:${kept.id}`);
+    expect(drawn).not.toContain(`${snapshotOf(opened).sessionId}:asked`);
+    expect(asked.map(one => one.text)).toEqual(['first']);
+    // Asked on the model it was asked of, not the one the chat is on now.
+    expect(clonedWith).toEqual({ model: 'kilo/one' });
+    expect(snapshotOf(opened).askedModel).toBe('kilo/one');
+
+    finish?.();
+    await settled();
+    expect(snapshotOf(opened).asked).toBeNull();
+    // The answer is a stored turn now, so the bubble it was asked at goes.
+    expect(snapshotOf(opened).displaced).toEqual([]);
+  });
+
+  it('stays above the question said after it when it is asked again', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const [first] = snapshotOf(opened).displaced;
+    if (first === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    expect(snapshotOf(opened).asked).toBe('second');
+
+    await retryChat(opened, first);
+    await settled();
+
+    /* The conversation reads in the order it was said: the question asked
+       again stays where it was, and the one said after it — kept when the slot
+       was taken back — stays under it. */
+    const [askedFirst, second] = snapshotOf(opened).displaced;
+    if (askedFirst === undefined || second === undefined) {
+      throw new TypeError('both failed questions were not kept');
+    }
+    expect(askedFirst.id).toBe(first.id);
+    expect(asMessages(snapshotOf(opened)).map(one => one.info.id)).toEqual([
+      `${opened}:displaced:${first.id}`,
+      `${opened}:displaced:${second.id}`,
+    ]);
+    expect(snapshotOf(opened).askedFrom).toBe(first.id);
+    // Its own copy survives the attempt, because its bubble is on screen.
+    const written = await keptIn(opened);
+    expect(written.map(one => one.id)).toEqual([first.id, second.id]);
+  });
+
+  it('is asked once when its Retry is pressed twice', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const kept = snapshotOf(opened).displaced[0];
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    asked.length = 0;
+
+    await retryChat(opened, kept);
+    // The second press holds the entry the first one took away.
+    await retryChat(opened, kept);
+    await settled();
+
+    expect(asked.map(one => one.text)).toEqual(['first']);
+  });
+
+  it('is queued once when its Retry is pressed twice while another answer arrives', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const kept = snapshotOf(opened).displaced[0];
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    creditsFailureFor = undefined;
+    // An answer is arriving, so the retry waits behind it rather than asking now.
+    await say(opened, { text: 'third', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await retryChat(opened, kept);
+    // The second press finds the question already in the line.
+    await retryChat(opened, kept);
+    await settled();
+
+    expect(waitingWords(opened)).toEqual(['first']);
+  });
+
+  it('keeps a question said after it under its answer once it is asked again', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const [first] = snapshotOf(opened).displaced;
+    if (first === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    creditsFailureFor = undefined;
+    await retryChat(opened, first);
+    await settled();
+    /* The answer to the question asked again is stored as its own turn and the
+       answer's, which is what the exchange writes. */
+    storedHistory = [TURN, ANSWER];
+    finish?.();
+    await settled();
+
+    const held = snapshotOf(opened);
+    /* The question said after the one it answers moves under both stored turns,
+       so it reads after the answer rather than between it and its question. */
+    expect(held.displaced.map(one => [one.text, one.afterTurns])).toEqual([['second', 2]]);
+    expect(asMessages(held).map(one => one.info.id)).toEqual([
+      TURN.id,
+      ANSWER.id,
+      `${held.sessionId}:displaced:${held.displaced[0]?.id ?? ''}`,
+    ]);
+    // The list is written as it is drawn, so a reopen keeps the order.
+    const written = await keptIn(held.sessionId);
+    expect(written.map(one => one.afterTurns)).toEqual([2]);
+  });
+
+  it('is still named for the question that opened the chat after it is asked again', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const kept = snapshotOf(opened).displaced[0];
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    // The first question stays the chat's name, and stays where it was said,
+    // while the question said after it is kept under it.
+    await retryChat(opened, kept);
+    await settled();
+
+    expect(snapshotOf(opened).displaced.map(one => one.text)).toEqual(['first', 'second']);
+    expect(await firstQuestionIn(opened)).toBe('first');
+  });
+
+  it('is kept when what took its slot was the person stopping the answer', async () => {
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    // The second question waits; stopping the first lets it be asked.
+    await stopChat(opened);
+    await settled();
+
+    expect(snapshotOf(opened).displaced.map(one => one.text)).toEqual(['first']);
+    expect(snapshotOf(opened).asked).toBe('second');
+  });
+
+  it('keeps the written copy of a retry still waiting when another question is asked', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'third', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    const held = snapshotOf(opened).displaced;
+    expect(held.map(one => one.text)).toEqual(['first', 'second']);
+
+    creditsFailureFor = undefined;
+    await say(opened, { text: 'fourth', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    // Both retries wait for the answer arriving, with nothing but their written
+    // copies to survive a restart.
+    await retryChat(opened, held[0]);
+    await retryChat(opened, held[1]);
+    await settled();
+    expect(snapshotOf(opened).waiting.map(one => one.text)).toEqual(['first', 'second']);
+    // The third one the fourth send pushed out of the slot is written too.
+    const waiting = await keptIn(opened);
+    expect(waiting.map(one => one.text)).toEqual(['first', 'second', 'third']);
+
+    // The answer lands and the first retry is asked, which writes its own copy
+    // away without touching the one still waiting behind it.
+    finish?.();
+    await settled();
+    /* The first retry is the slot's question now, so its own copy stays while
+       it is asked, and the one waiting behind it keeps its copy too. */
+    const written = await keptIn(opened);
+    expect(written.map(one => one.text)).toEqual(['first', 'second', 'third']);
+  });
+
+  it('keeps the earlier failed bubble when the same question is sent again', async () => {
+    storedHistory = [];
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'the same words', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'the same words', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    const held = snapshotOf(opened);
+    // The first failure is a bubble of its own, and the second is the slot's.
+    expect(held.displaced.map(one => one.text)).toEqual(['the same words']);
+    expect(asMessages(held)).toHaveLength(2);
+  });
+
+  it('reopens a question it was asked again where it was said', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('interrupted', place);
+    /* The slot names the kept question it asks again, and the list holds that
+       question and the one said after it: the open draws both once, in the
+       order they were asked. */
+    const question = {
+      text: 'the question asked again',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+    };
+    storedQuestions.set(
+      `chat-asked-target:interrupted`,
+      JSON.stringify({ ...question, from: 'a' })
+    );
+    storedQuestions.set(
+      'chat-kept-questions:interrupted',
+      JSON.stringify([
+        { id: 'a', ...question, afterTurns: 0, outcome: 'failed' },
+        {
+          id: 'b',
+          text: 'the failure it was slid above',
+          model: 'kilo/one',
+          effort: null,
+          images: [],
+          afterTurns: 0,
+          outcome: 'failed',
+        },
+      ])
+    );
+
+    await enterChat(place, 'interrupted');
+    await settled();
+
+    const held = snapshotOf('interrupted');
+    /* Both are kept questions, and the second was said after the first: the
+       attempt is the earlier bubble rather than a copy at the bottom. */
+    expect(held.displaced.map(one => one.text)).toEqual([
+      'the question asked again',
+      'the failure it was slid above',
+    ]);
+    expect(held.askedFrom).toBe('a');
+    expect(asMessages(held).map(one => one.info.id)).toEqual([
+      'interrupted:displaced:a',
+      'interrupted:displaced:b',
+    ]);
+    // Both stay written: each is a bubble the conversation cannot rebuild.
+    const written = await keptIn('interrupted');
+    expect(written.map(one => one.id)).toEqual(['a', 'b']);
+  });
+
+  it('drops both records of a question whose answer landed before the slot was cleared', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('answered', place);
+    /* The answer landed, the kept record was dropped, and the process stopped
+       before the slot's record was cleared. */
+    storedHistory = [
+      {
+        id: 'trn_9',
+        sessionId: 'answered',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: 'the question asked again' }],
+      },
+      {
+        id: 'trn_10',
+        sessionId: 'answered',
+        role: 'assistant',
+        parts: [{ id: 'p2', kind: 'text', body: 'the answer' }],
+      },
+    ];
+    storedQuestions.set(
+      'chat-asked-target:answered',
+      JSON.stringify({
+        text: 'the question asked again',
+        model: 'kilo/one',
+        effort: null,
+        images: [],
+        from: 'a',
+      })
+    );
+
+    await enterChat(place, 'answered');
+    await settled();
+
+    const held = snapshotOf('answered');
+    // The answer is the transcript; no failed bubble stands beside it.
+    expect(held.asked).toBeNull();
+    expect(held.displaced).toEqual([]);
+    expect(asMessages(held).map(one => one.info.id)).toEqual(['trn_9', 'trn_10']);
+    expect(await askedIn('answered')).toBeNull();
+  });
+
+  it('does not fold a later attempt that repeats an earlier answered question', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('repeat', place);
+    /* The first "hi" was answered long before; the second, said after two turns,
+       failed and was asked again when the app stopped. */
+    const words = {
+      text: 'hi',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      afterTurns: 2,
+      outcome: 'failed' as const,
+    };
+    storedHistory = [
+      {
+        id: 'trn_13',
+        sessionId: 'repeat',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: 'hi' }],
+      },
+      {
+        id: 'trn_14',
+        sessionId: 'repeat',
+        role: 'assistant',
+        parts: [{ id: 'p2', kind: 'text', body: 'the earlier answer' }],
+      },
+    ];
+    storedQuestions.set('chat-asked-target:repeat', JSON.stringify({ ...words, from: 'a' }));
+    storedQuestions.set('chat-kept-questions:repeat', JSON.stringify([{ id: 'a', ...words }]));
+
+    await enterChat(place, 'repeat');
+    await settled();
+
+    // The earlier answer is not this attempt's answer: the bubble and its Retry stay.
+    const held = snapshotOf('repeat');
+    expect(held.asked).toBe('hi');
+    expect(held.askedFrom).toBe('a');
+    expect(held.displaced.map(one => one.id)).toEqual(['a']);
+    const written = await keptIn('repeat');
+    expect(written.map(one => one.id)).toEqual(['a']);
+  });
+
+  it('does not fold a retry whose answer never came when the same words were answered before', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('retry-lost', place);
+    /* "hi" failed and was kept; "hi" sent again was answered, which stored its
+       turn; then the kept one was asked again and its answer never came. The
+       answer the store holds is not the retry's. */
+    const words = {
+      text: 'hi',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      afterTurns: 0,
+      outcome: 'failed' as const,
+    };
+    storedHistory = [
+      {
+        id: 'trn_15',
+        sessionId: 'retry-lost',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: 'hi' }],
+      },
+      {
+        id: 'trn_16',
+        sessionId: 'retry-lost',
+        role: 'assistant',
+        parts: [{ id: 'p2', kind: 'text', body: 'the earlier answer' }],
+      },
+    ];
+    storedQuestions.set(
+      'chat-asked-target:retry-lost',
+      JSON.stringify({ ...words, from: 'a', after: 2 })
+    );
+    storedQuestions.set('chat-kept-questions:retry-lost', JSON.stringify([{ id: 'a', ...words }]));
+
+    await enterChat(place, 'retry-lost');
+    await settled();
+
+    // Its bubble and its Retry stay: the stored turn is not the answer to it.
+    const held = snapshotOf('retry-lost');
+    expect(held.asked).toBe('hi');
+    expect(held.askedFrom).toBe('a');
+    expect(held.displaced.map(one => one.id)).toEqual(['a']);
+  });
+
+  it('folds a question whose answer is the newest question after tool results', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('tooled', place);
+    /* The answer used the chat's tool, so its results are stored as a user turn
+       with no text, after the question and before the answer's own words. */
+    const words = {
+      text: 'what time is it',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      afterTurns: 0,
+      outcome: 'failed' as const,
+    };
+    storedHistory = [
+      {
+        id: 'trn_17',
+        sessionId: 'tooled',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: words.text }],
+      },
+      {
+        id: 'trn_18',
+        sessionId: 'tooled',
+        role: 'user',
+        parts: [{ id: 'p2', kind: 'toolResult', callId: 'c1', body: '12:00', failed: false }],
+      },
+      {
+        id: 'trn_19',
+        sessionId: 'tooled',
+        role: 'assistant',
+        parts: [{ id: 'p3', kind: 'text', body: 'noon' }],
+      },
+    ];
+    /* The slot names a kept record the list no longer holds, which is what a
+       refused `forgetAsked` after the list was written away leaves, and what an
+       entry `keptIn` could not read leaves too. The newest question turn then
+       has to win over the tool-results turn for the fold to happen at all. */
+    storedQuestions.set('chat-asked-target:tooled', JSON.stringify({ ...words, from: 'a' }));
+
+    await enterChat(place, 'tooled');
+    await settled();
+
+    const held = snapshotOf('tooled');
+    expect(held.asked).toBeNull();
+    expect(held.displaced).toEqual([]);
+  });
+
+  it('drops the kept record a stored answer already answered', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('half', place);
+    /* The kept record survived a refused write while the answer landed, and the
+       slot still names it. */
+    const words = {
+      text: 'the question asked again',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      afterTurns: 0,
+      outcome: 'failed' as const,
+    };
+    storedHistory = [
+      {
+        id: 'trn_11',
+        sessionId: 'half',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: words.text }],
+      },
+      {
+        id: 'trn_12',
+        sessionId: 'half',
+        role: 'assistant',
+        parts: [{ id: 'p2', kind: 'text', body: 'the answer' }],
+      },
+    ];
+    storedQuestions.set('chat-asked-target:half', JSON.stringify({ ...words, from: 'a' }));
+    storedQuestions.set('chat-kept-questions:half', JSON.stringify([{ id: 'a', ...words }]));
+
+    await enterChat(place, 'half');
+    await settled();
+
+    const held = snapshotOf('half');
+    expect(held.asked).toBeNull();
+    expect(held.displaced).toEqual([]);
+    const written = await keptIn('half');
+    expect(written.map(one => one.id)).toEqual([]);
+  });
+
+  it('keeps the slot question whose kept copy was never written', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('unwritten', place);
+    storedQuestions.set(
+      'chat-asked-target:unwritten',
+      JSON.stringify({
+        text: 'the question asked again',
+        model: 'kilo/one',
+        effort: null,
+        images: [],
+        from: 'a',
+      })
+    );
+
+    await enterChat(place, 'unwritten');
+    await settled();
+
+    // Nothing was answered, so the question is still the one its Retry hangs off.
+    const held = snapshotOf('unwritten');
+    expect(held.asked).toBe('the question asked again');
+    expect(asMessages(held).map(one => one.info.id)).toEqual(['unwritten:asked']);
+  });
+
+  it('draws two questions that say the same words with different pictures', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('pictures', place);
+    const words = { text: 'what is this', model: 'kilo/one', effort: null };
+    storedQuestions.set(
+      `chat-asked-target:pictures`,
+      JSON.stringify({ ...words, images: [{ media: 'image/jpeg', data: 'BBBB' }] })
+    );
+    storedQuestions.set(
+      'chat-kept-questions:pictures',
+      JSON.stringify([
+        {
+          id: 'a',
+          ...words,
+          images: [{ media: 'image/jpeg', data: 'AAAA' }],
+          afterTurns: 0,
+          outcome: 'failed',
+        },
+      ])
+    );
+
+    await enterChat(place, 'pictures');
+    await settled();
+
+    // Same words, different picture: two questions, both on screen.
+    expect(asMessages(snapshotOf('pictures')).map(one => one.info.id)).toEqual([
+      'pictures:displaced:a',
+      'pictures:asked',
+    ]);
+  });
+
+  it('leaves the slot record with the question being answered when a retry only waits', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    const kept = snapshotOf(opened).displaced[0];
+    if (kept === undefined) {
+      throw new TypeError('the failed question was not kept');
+    }
+    creditsFailureFor = undefined;
+    // An answer is arriving now, with its own record in the slot.
+    await say(opened, { text: 'third', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await retryChat(opened, kept);
+    await settled();
+
+    // It waits behind the answer, and the slot still records that answer's question.
+    expect(snapshotOf(opened).waiting.map(one => one.text)).toEqual(['first']);
+    expect(await askedIn(opened)).toEqual({
+      text: 'third',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+      // The answer in front of it is a turn the store already holds.
+      after: 1,
+      // Nothing says why an answer still arriving failed.
+      failureKey: null,
+    });
+
+    // The answer in front of it lands, so the retry is asked and becomes the slot's.
+    finish?.();
+    await settled();
+
+    expect(snapshotOf(opened).waiting).toEqual([]);
+    expect(await askedIn(opened)).toMatchObject({
+      text: 'first',
+      model: 'kilo/one',
+      effort: null,
+      images: [],
+    });
+    /* Its kept copy stays, because that bubble is the attempt on screen; the
+       failure the ask pushed out of the slot took its place after it. */
+    const keptAfter = await keptIn(opened);
+    expect(keptAfter.map(one => one.text)).toEqual(['first', 'second']);
+    expect(snapshotOf(opened).askedFrom).toBe(kept.id);
+  });
+
+  it('opens again with what a later send kept', async () => {
+    creditsFailureFor = 's1';
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await releaseChat(opened);
+    await enterChat(place, opened);
+    await settled();
+
+    expect(snapshotOf(opened).displaced.map(one => one.text)).toEqual(['first']);
+  });
+});
+
 describe('a chat that moved', () => {
   it('leaves the chat it moved off pointing at the one it became', async () => {
     await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
@@ -1523,6 +2252,7 @@ describe('custom backend question targets', () => {
         model: target,
         effort: null,
         images: [],
+        after: 1,
         failureKey: errorKey,
       });
 
@@ -1632,6 +2362,7 @@ describe('custom backend question targets', () => {
         model: target,
         effort: null,
         images: [],
+        after: 1,
         failureKey: errorKey,
       });
       await retryChat(opened);

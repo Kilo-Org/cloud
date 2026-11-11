@@ -59,9 +59,9 @@ VERCEL_SANDBOX_EXTEND_DURATION_MS=600000
 # `*` enrolls both personal accounts and organizations. BYOC sessions use isolated sandboxes.
 BYOC_VERCEL_IDS=
 
-# Explicit organization or user IDs allowed to capture and restore registered workspace tail snapshots. No wildcard.
-WORKSPACE_SNAPSHOT_ORG_IDS=
-WORKSPACE_SNAPSHOT_USER_IDS=
+# Comma-separated user or organization IDs allowed to capture and restore registered workspace tail snapshots.
+# `*` enables snapshots for everyone; empty or unset is off.
+WORKSPACE_SNAPSHOT_IDS=
 
 # GitHub App credentials for git commit attribution
 # These identify commits as coming from the Kilo Code GitHub App

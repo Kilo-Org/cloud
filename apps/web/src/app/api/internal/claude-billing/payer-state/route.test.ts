@@ -4,6 +4,8 @@ import { claude_billing_connections } from '@kilocode/db/schema';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { POST } from './route';
 
 function request(owner: unknown, authorized = true) {
@@ -51,6 +53,8 @@ describe('Authoritative Claude payer state', () => {
         status: 'connected',
         user_profile_id: row.user_profile_id,
         connected_at: '2026-01-01T00:00:00.123Z',
+        kilo_user_id: user.id,
+        created_by: user.id,
       },
     });
     await db
@@ -59,8 +63,45 @@ describe('Authoritative Claude payer state', () => {
       .where(eq(claude_billing_connections.id, row.id));
     const removed = await POST(request(owner));
     expect(await removed.json()).toEqual({
-      connection: { status: 'removed', user_profile_id: row.user_profile_id, connected_at: null },
+      connection: {
+        status: 'removed',
+        user_profile_id: row.user_profile_id,
+        connected_at: null,
+        kilo_user_id: user.id,
+        created_by: user.id,
+      },
     });
+  });
+
+  it("answers an organization query with the shared-services row and a person's with theirs", async () => {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization('Claude payer state', user.id, 0);
+    await db.insert(claude_billing_connections).values([
+      {
+        kilo_user_id: user.id,
+        organization_id: organization.id,
+        user_profile_id: `uprof_member_${user.id}`,
+        created_by: user.id,
+      },
+      {
+        organization_id: organization.id,
+        user_profile_id: `uprof_shared_${user.id}`,
+        created_by: user.id,
+      },
+    ]);
+    const responseSchema = z.object({ connection: z.object({ user_profile_id: z.string() }) });
+    const profileFor = async (owner: object) =>
+      responseSchema.parse(await (await POST(request(owner))).json()).connection.user_profile_id;
+    expect(await profileFor({ kind: 'organization', organizationId: organization.id })).toBe(
+      `uprof_shared_${user.id}`
+    );
+    expect(
+      await profileFor({
+        kind: 'organization',
+        organizationId: organization.id,
+        kiloUserId: user.id,
+      })
+    ).toBe(`uprof_member_${user.id}`);
   });
 
   it('rejects invalid ownership before querying another account', async () => {

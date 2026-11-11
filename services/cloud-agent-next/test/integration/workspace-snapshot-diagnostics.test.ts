@@ -11,12 +11,15 @@ import { workspaceDiskSnapshots } from '../../src/control-plane/sandbox/sqlite-s
 import {
   captureIdleWorkspaceSnapshot,
   deleteWorkspaceSnapshot,
+  fenceWorkspaceSnapshot,
   readWorkspaceSnapshot,
   readWorkspaceSnapshotAllocation,
   selectWorkspaceSnapshot,
+  WORKSPACE_SNAPSHOT_TTL_MS,
   workspaceSnapshotOwner,
   workspaceSnapshotRoutesEligible,
   workspaceSnapshotRestoreSkip,
+  workspaceSnapshotStatus,
   writeWorkspaceSnapshotAllocation,
 } from '../../src/control-plane/sandbox/workspace-snapshot.js';
 import type { NativeCaptureResult } from '../../src/sandbox-containers/native-capture.js';
@@ -35,7 +38,7 @@ const descriptor = (overrides: Record<string, unknown> = {}) => ({
   snapshotId: 'private-handle',
   baseImage: 'image:1',
   runtimeIdentity: RUNTIME,
-  capturedAt: 1,
+  capturedAt: Date.now(),
   ...overrides,
 });
 const disk = () => ({
@@ -116,6 +119,7 @@ function captureInput(db: RouteDatabase) {
     read: async () => ({ state, routes, capable }),
     enqueue: async operation => operation(),
     eligible: () => true,
+    stored: async () => {},
   };
   return {
     input,
@@ -140,12 +144,39 @@ afterEach(async () => {
 });
 
 describe('workspace snapshot diagnostics with durable SQLite', () => {
+  it('projects only persisted capture time for the complete matching identity', async () =>
+    withDatabase(db => {
+      expect(workspaceSnapshotStatus(db, IDENTITY)).toEqual({});
+      saveDescriptor(db, descriptor({ capturedAt: 1 }));
+      expect(workspaceSnapshotStatus(db, IDENTITY)).toEqual({
+        workspaceSnapshot: { capturedAt: 1 },
+      });
+      expect(workspaceSnapshotStatus(db, null)).toEqual({});
+      for (const change of [
+        { sandboxId: 'other-sandbox' },
+        { workspaceId: 'worktree_00000000-0000-4000-8000-000000000002' as const },
+        { directory: '/workspace/other' },
+        { userId: 'other-user' },
+        { orgId: 'other-org' },
+      ]) {
+        expect(workspaceSnapshotStatus(db, { ...IDENTITY, ...change })).toEqual({});
+      }
+      deleteWorkspaceSnapshot(db, IDENTITY.workspaceId);
+      expect(workspaceSnapshotStatus(db, IDENTITY)).toEqual({});
+      saveDescriptor(db, { ...descriptor(), capturedAt: 'invalid' });
+      expect(workspaceSnapshotStatus(db, IDENTITY)).toEqual({});
+    }));
+
   it.each([
     { change: undefined, reason: 'missing' },
     { change: { sandboxId: IDENTITY.sandboxId }, reason: 'invalid_descriptor' },
     { change: descriptor({ directory: '/workspace/another' }), reason: 'ownership_mismatch' },
     { change: descriptor({ runtimeIdentity: OTHER_RUNTIME }), reason: 'runtime_mismatch' },
-    { change: descriptor({ baseImage: 'old-image' }), reason: 'image_mismatch' },
+    {
+      change: descriptor({ capturedAt: Date.now() - WORKSPACE_SNAPSHOT_TTL_MS - 1 }),
+      reason: 'expired',
+    },
+    { change: descriptor({ baseImage: 'old-image' }), reason: 'selected' },
     { change: descriptor(), reason: 'selected' },
   ])('reports $reason without changing the descriptor', async ({ change, reason }) =>
     withDatabase(db => {
@@ -180,6 +211,28 @@ describe('workspace snapshot diagnostics with durable SQLite', () => {
       expect(JSON.stringify(fields.mock.calls)).not.toContain('private-handle');
     })
   );
+
+  it('fences a generation without deleting the descriptor or its payload', () =>
+    withDatabase(db => {
+      writeWorkspaceSnapshotAllocation(db, disk());
+      saveDescriptor(db, descriptor());
+      const before = readWorkspaceSnapshot(db, IDENTITY.workspaceId);
+      const fields = vi.spyOn(logger, 'withFields');
+      fenceWorkspaceSnapshot(db, 'prompt', 'workspace-1');
+      expect(readWorkspaceSnapshot(db, IDENTITY.workspaceId)).toEqual(before);
+      const fenced = readWorkspaceSnapshotAllocation(db);
+      expect(fenced?.invalidationGeneration).toBe(1);
+      expect(fenced?.idleConnectionId).toBeUndefined();
+      expect(fields.mock.calls.map(([value]) => value)).toContainEqual(
+        expect.objectContaining({
+          diagnosticEvent: 'workspace_snapshot_fenced',
+          reason: 'prompt',
+          previousGeneration: 0,
+          generation: 1,
+        })
+      );
+      expect(JSON.stringify(fields.mock.calls)).not.toContain('private-handle');
+    }));
 
   it.each([
     'not_connected',

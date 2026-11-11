@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { appScreenLayout } from '@/components/app-screen-layout';
 import { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { Platform, useWindowDimensions } from 'react-native';
 
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { PickerLaunchRestoreMount } from '@/components/agents/picker-launch-restore-mount';
@@ -22,6 +22,7 @@ import {
   attemptPushRegistrationReconciliation,
   subscribeToPushTokenRotation,
 } from '@/lib/auth/push-registration-reconciliation';
+import { searchPickerHeaderInList } from '@/lib/form-sheet-detents';
 import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getProfileRouteNames } from '@/lib/profile-agent-navigation';
@@ -129,10 +130,16 @@ export const unstable_settings = {
 export default function AppLayout() {
   const colors = useThemeColors();
   const sheetOptions = useFormSheetScreenOptions();
-  // Android's half-height search sheets leave their results behind the IME.
-  // Keep searchable sheets at the existing safe-area-capped full detent.
+  // Android's half-height search sheets leave their results behind the IME, so
+  // they keep the existing safe-area-capped full detent. iOS keeps its native
+  // detent expansion on focus, except in a short window: there the half detent
+  // sizes the sheet to its header (measured: a 213pt sheet in a 501pt window,
+  // first row clipped at the sheet edge), so a searchable picker presents full
+  // height and the shared `searchPickerHeaderInList` rule moves its search
+  // field into the list.
+  const shortWindow = searchPickerHeaderInList({ windowHeight: useWindowDimensions().height });
   const searchSheetOptions =
-    Platform.OS === 'android'
+    Platform.OS === 'android' || shortWindow
       ? { ...sheetOptions, sheetAllowedDetents: [sheetOptions.sheetAllowedDetents[1]] }
       : sheetOptions;
   // Android lays a formSheet route's content out at the sheet's largest

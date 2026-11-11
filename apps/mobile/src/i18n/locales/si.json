@@ -229,6 +229,21 @@
     "signInCodeField": "පිවිසුම් කේතය",
     "or": "හෝ"
   },
+  "pendingLink": {
+    "description": "{{email}} දැනටමත් ගිණුමක් භාවිත කරයි. {{provider}} එක් කිරීමට එහි එක් ක්‍රමයකින් පිවිසෙන්න.",
+    "emailCode": "මට පිවිසුම් කේතයක් ඊමේල් කරන්න",
+    "continueInBrowser": "බ්‍රවුසරයේ ඉදිරියට යන්න",
+    "startAgain": "නැවත අරඹන්න",
+    "expired": "{{provider}} එක් කිරීමේ මෙම ඉල්ලීම කල් ඉකුත් වී ඇත.",
+    "noMethods": "මෙම ගිණුමට වෙනත් පිවිසුම් ක්‍රමයක් නැති නිසා {{provider}} එක් කළ නොහැක.",
+    "linked": "{{provider}} ඔබේ ගිණුමට එක් කරන ලදී.",
+    "failedExpired": "ඉල්ලීම කල් ඉකුත් වූ නිසා {{provider}} එක් නොකෙරිණි.",
+    "failedWrongAccount": "ඔබ වෙනත් ගිණුමකට පිවිසි නිසා {{provider}} එක් නොකෙරිණි.",
+    "failedAccountAlreadyLinked": "{{provider}} දැනටමත් වෙනත් ගිණුමකට සම්බන්ධ කර ඇති නිසා එක් නොකෙරිණි.",
+    "failedProviderAlreadyLinked": "ඔබේ ගිණුමට දැනටමත් වෙනත් {{provider}} පිවිසුමක් ඇති නිසා {{provider}} එක් නොකෙරිණි.",
+    "failedLinking": "{{provider}} ඔබේ ගිණුමට එක් කළ නොහැකි විය.",
+    "notAdded": "ඔබ පිවිස ඇත. {{provider}} ඔබේ ගිණුමට එක් නොකෙරිණි."
+  },
   "profile": {
     "codeReviewerSubtitle": "ස්වයංක්‍රීය PR සමාලෝචන",
     "securityAgentSubtitle": "ආරක්ෂක දුර්වලතා සොයා පිළියම් යොදන්න",
@@ -267,6 +282,8 @@
     "providerTestAccount": "පරීක්ෂණ ගිණුම",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "ව්‍යවසාය SSO",
     "passkeysTitle": "ප්‍රවේශ යතුරු",
     "passkeysSubtitle": "මුරපදයක් නොමැතිව පිවිසෙන්න",
@@ -2414,7 +2431,7 @@
       "discardWithUploadsMessage": "ඔබේ ඉල්ලීම සහ යැවූ පණිවිඩවලට අමුණා නැති උඩුගත කළ ගොනු මකා දමනු ඇත.",
       "discardFailed": "කටු සටහන ඉවත දැමිය නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
       "remoteHint": "ඔබේ පරිගණකයේ ධාවනය කිරීම සඳහා, එහි Kilo ආරම්භ කර එය දිගටම ධාවනය වන පරිදි තබන්න.",
-      "continueFrom": "{{title}} සැසිය දිගටම කරගෙන යමින් පවතී.",
+      "continueFrom": "“{{title}}” සැසිය දිගටම කරගෙන යමින් පවතී.",
       "importingSession": "සැසිය ආයාත කරමින්",
       "cliCannotContinue": "මෙම CLI අනුවාදයට සැසියක් දිගටම කරගෙන යා නොහැක. Cloud Agent හෝ වෙනත් CLI එකක් තෝරන්න.",
       "importFailed": "මෙම සැසිය ආයාත කළ නොහැකි විය.",
@@ -2466,6 +2483,8 @@
       "toolList": "ලැයිස්තුගත කරන්න",
       "toolPatch": "සංශෝධනය යොදන්න",
       "toolTask": "කාර්යය",
+      "toolSendFile": "ගොනුව යවන ලදි",
+      "toolSendFileAction": "ගොනුව යවන්න",
       "readTodos": "සැලැස්ම කියවන්න",
       "updateTodos": "සැලැස්ම යාවත්කාලීන කරන්න",
       "linesBadge": "පේළි {{displayCount}}",
@@ -2566,7 +2585,21 @@
       "thought": "සිතුවිල්ල",
       "showDetails": "විස්තර පෙන්වන්න",
       "pending": "පොරොත්තුවේ…",
-      "running": "ධාවනය වෙමින්…"
+      "running": "ධාවනය වෙමින්…",
+      "field": {
+        "filePath": "ගොනු මාර්ගය",
+        "path": "මාර්ගය",
+        "offset": "ආරම්භක ස්ථානය",
+        "limit": "සීමාව",
+        "pattern": "රටාව",
+        "include": "ඇතුළත් කිරීම",
+        "patchText": "සංශෝධන පෙළ",
+        "query": "විමසුම",
+        "prompt": "උපදෙස",
+        "header": "ශීර්ෂය",
+        "question": "ප්‍රශ්නය",
+        "options": "විකල්ප"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "අන්තර්ගතය පෙන්විය නොහැකි විය."
@@ -3808,7 +3841,7 @@
     "reasoningEffort": {
       "modelFlag": "මෙම ආකෘතිය සිතීමේ මට්ටමට සහාය දක්වයි"
     },
-    "creditsRequired": "මෙම පණිවිඩය යැවීමට ප්‍රමාණවත් ක්‍රෙඩිට් නැත. ක්‍රෙඩිට් එක් කර නැවත උත්සාහ කරන්න."
+    "creditsRequired": "මෙම පණිවිඩය යැවීමට ප්‍රමාණවත් ක්‍රෙඩිට් නැත."
   },
   "settingsTools": {
     "confirmTitle": "මෙම වෙනස තහවුරු කරන්නද?"
@@ -4001,6 +4034,7 @@
       "namePlaceholder": "මගේ නියෝජිතයා",
       "promptPlaceholder": "ඔබ කෙනෙක්...",
       "tools": "මෙවලම්",
+      "wholeToolRule": "මෙම නියෝජිතයා සියලු මෙවලම් සඳහා එකවර එකම රීතිය යොදයි: {{rule}}. මෙම ස්විච කියවීමට පමණක් වේ.",
       "visibility": "දෘශ්‍යතාව",
       "visibilityPrimary": "ප්‍රාථමික — පිකර් තුළ පෙන්වා ඇත",
       "visibilitySubagent": "Subagen — අන් අයගෙන් පමණක් ඇමතිය හැකිය",
@@ -4042,6 +4076,7 @@
     },
     "repoBindings": {
       "title": "Repos සඳහා පෙරනිමි පැතිකඩ",
+      "entryLabel": "පෙරනිමි පැතිකඩ",
       "add": "පෙරනිමිය එක් කරන්න",
       "empty": "පෙරනිමි කිසිවක් වින්‍යාස කර නැත",
       "emptyDescription": "repo සඳහා සැසි ආරම්භ කරන විට පැතිකඩක් ස්වයංක්‍රීයව යෙදීමට පෙරනිමියක් එක් කරන්න.",
@@ -4249,5 +4284,8 @@
     "noEnabledContexts": "කාලසටහන්ගත වාර්තා සඳහා කිසිදු සන්දර්භයක් සක්‍රිය කර නැත",
     "sourceBlocker": "සැසියට අවධානය අවශ්‍යයි",
     "sourceMetadata": "සටහන් කළ සැසි පාරදත්ත"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "මෙම සෙවුම් ප්‍රතිඵලය විවෘත කිරීමට නොහැකි විය"
   }
 }

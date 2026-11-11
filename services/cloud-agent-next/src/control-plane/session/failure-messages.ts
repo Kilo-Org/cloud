@@ -22,6 +22,7 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
     'Container limit reached. Stop an existing container before starting another.',
   account_blocked: 'This account is blocked.',
   invalid_configuration: 'Sandbox configuration is invalid or unsupported',
+  sandbox_create_failed: 'The sandbox could not be created',
   connection_lost: 'The sandbox connection was lost',
   sandbox_lost: 'The sandbox was lost',
   agent_restarted: 'The agent restarted',

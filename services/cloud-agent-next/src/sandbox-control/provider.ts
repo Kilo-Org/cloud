@@ -1,4 +1,5 @@
 import type { SandboxBillingInput, SandboxClassName } from '../container-usage-context.js';
+import type { CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
 import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { SessionCredentialGrant } from './session-credentials.js';
 import {
@@ -12,6 +13,7 @@ import type { RuntimeStartupConfig } from '../shared/runtime-startup-config.js';
 import type { CredentialContainmentRequirements } from './credential-containment.js';
 import type { BillingContext } from '@kilocode/container-usage';
 import type { NativeCaptureResult } from '../sandbox-containers/native-capture.js';
+import type { SnapshotStartFailureReason } from '../sandbox-containers/snapshot-start-failures.js';
 
 export type ProviderCreationCause =
   | 'insufficient_credits'
@@ -20,7 +22,10 @@ export type ProviderCreationCause =
   | 'invalid_configuration';
 
 export class ProviderCreationError extends AgentSandboxUnavailableError {
-  constructor(public readonly code: ProviderCreationCause) {
+  constructor(
+    public readonly code: ProviderCreationCause,
+    public readonly billingFailure?: CustomerBillingFailure
+  ) {
     super(
       code === 'insufficient_credits'
         ? 'Sandbox billing requires additional credits'
@@ -116,6 +121,12 @@ export type ProviderLaunchOptions = {
 export type ProviderLaunchResult = {
   startSource: ProviderStartSource;
   snapshotFailed?: true;
+  /**
+   * Why a provider snapshot start failed. The Sandbox DO retries `transient`
+   * against the same artifact and fails permanent reasons without an image
+   * relaunch.
+   */
+  snapshotFailureReason?: SnapshotStartFailureReason;
 };
 
 /**

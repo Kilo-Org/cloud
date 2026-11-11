@@ -2,7 +2,13 @@ import { Plug, Paperclip } from 'lucide-react';
 import { toSafeHttpUrl } from '@/lib/safe-http-url';
 import { ToolCardShell } from './ToolCardShell';
 import { ToolCodeBlock, ToolMarkdown } from './ToolOutput';
-import { formatDuration, getToolArguments, getToolInputPath, toolPathKeys } from './toolCardUtils';
+import {
+  formatDuration,
+  getToolArguments,
+  getToolDisplayName,
+  getToolInputPath,
+  toolPathKeys,
+} from './toolCardUtils';
 import type { ToolPart } from './types';
 
 type GenericToolCardProps = {
@@ -10,19 +16,6 @@ type GenericToolCardProps = {
 };
 
 const labelKeys = ['description', 'query', 'url', 'pattern', 'name'];
-
-function resolveDisplayName(toolPart: ToolPart): string {
-  const input = toolPart.state.input;
-  if (
-    toolPart.tool === 'mcp' &&
-    typeof input.server_name === 'string' &&
-    typeof input.tool_name === 'string'
-  ) {
-    return `${input.server_name}/${input.tool_name}`;
-  }
-
-  return toolPart.tool;
-}
 
 function getArgumentSummary(args: Record<string, unknown> | undefined): string | undefined {
   if (!args) return undefined;
@@ -80,7 +73,7 @@ export function GenericToolCard({ toolPart }: GenericToolCardProps) {
   return (
     <ToolCardShell
       icon={Plug}
-      title={resolveDisplayName(toolPart)}
+      title={getToolDisplayName(toolPart)}
       subtitle={getArgumentSummary(args)}
       status={state.status}
       badge={

@@ -1,5 +1,6 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
+import type jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 import { verifyAppleJwtWithJwks } from '@/lib/auth/apple-jwks';
 import {
@@ -75,6 +76,86 @@ function hasResponse(error: unknown): boolean {
 
 export type VerifiedAppleIdToken = { sub: string; email: string };
 
+/**
+ * Lifetime of an acceptance record: as long as the identity token it binds,
+ * bounded by the longest Apple ID-token lifetime.
+ */
+function recordTtlSeconds(exp: number | undefined): number {
+  if (typeof exp !== 'number') return NONCE_TTL_CAP_SECONDS;
+  const remaining = Math.floor(exp - Date.now() / 1000);
+  return Math.max(1, Math.min(remaining, NONCE_TTL_CAP_SECONDS));
+}
+
+/** The claims every native Apple path requires from a verified identity token. */
+function appleIdentityFromPayload(payload: jwt.JwtPayload): VerifiedAppleIdToken {
+  if (typeof payload.email !== 'string' || !payload.email) {
+    throw new NativeIdTokenError('Apple ID token missing email');
+  }
+  if (payload.email_verified !== true && payload.email_verified !== 'true') {
+    throw new NativeIdTokenError('Apple email not verified');
+  }
+  if (typeof payload.sub !== 'string' || !payload.sub) {
+    throw new NativeIdTokenError('Apple ID token missing sub');
+  }
+  return { sub: payload.sub, email: payload.email };
+}
+
+/** Key of the single-use record for one identity token. */
+function appleTokenRecordKey(idToken: string): string {
+  return `auth:apple-signin-token:${createHash('sha256').update(idToken).digest('hex')}`;
+}
+
+/**
+ * Consume a verified Apple identity token so it signs in exactly once. The
+ * record lives as long as the token it binds, and a store write that cannot
+ * complete refuses the sign-in with the retryable error, so the acceptance rule
+ * never depends on the store being reachable.
+ */
+async function recordSingleUseAppleToken(idToken: string, exp: number | undefined): Promise<void> {
+  let recorded: string | null = null;
+  try {
+    recorded = await redisClient.set(appleTokenRecordKey(idToken), '1', {
+      nx: true,
+      ex: recordTtlSeconds(exp),
+    });
+  } catch {
+    throw new NonceStoreUnavailableError('Apple token record unavailable');
+  }
+  if (recorded !== 'OK') {
+    throw new NativeIdTokenError('Apple ID token already used');
+  }
+}
+
+/**
+ * Consume both acceptance records of one nonce-bound sign-in in a single
+ * transaction, so a store fault commits neither of them: the caller can retry
+ * the same request instead of finding one record already spent. Each record
+ * keeps its own key, value and lifetime.
+ */
+async function recordSingleUseAppleNonceAcceptance(
+  nonceDigest: string,
+  idToken: string,
+  exp: number | undefined
+): Promise<void> {
+  const ex = recordTtlSeconds(exp);
+  let results: [string | null, string | null] = [null, null];
+  try {
+    results = (await redisClient
+      .multi()
+      .set(`auth:apple-signin-nonce:${nonceDigest}`, '1', { nx: true, ex })
+      .set(appleTokenRecordKey(idToken), '1', { nx: true, ex })
+      .exec<[string | null, string | null]>()) ?? [null, null];
+  } catch {
+    throw new NonceStoreUnavailableError('Apple sign-in records unavailable');
+  }
+  if (results[0] !== 'OK') {
+    throw new NativeIdTokenError('Apple nonce already used');
+  }
+  if (results[1] !== 'OK') {
+    throw new NativeIdTokenError('Apple ID token already used');
+  }
+}
+
 export type VerifiedGoogleIdToken = {
   sub: string;
   email: string;
@@ -106,54 +187,23 @@ export async function verifyNativeAppleIdToken(
       throw new NativeIdTokenError('Apple nonce missing');
     }
     captureMessage('native_apple_nonce_legacy_count: 1');
-    if (typeof payload.email !== 'string' || !payload.email) {
-      throw new NativeIdTokenError('Apple ID token missing email');
-    }
-    if (payload.email_verified !== true && payload.email_verified !== 'true') {
-      throw new NativeIdTokenError('Apple email not verified');
-    }
-    if (typeof payload.sub !== 'string' || !payload.sub) {
-      throw new NativeIdTokenError('Apple ID token missing sub');
-    }
-    return { sub: payload.sub, email: payload.email };
+    const identity = appleIdentityFromPayload(payload);
+    await recordSingleUseAppleToken(idToken, payload.exp);
+    return identity;
   }
 
   const expectedNonce = createHash('sha256').update(nonce).digest('hex');
   if (payload.nonce !== expectedNonce) {
     throw new NativeIdTokenError('Apple nonce mismatch');
   }
-  // The record lives as long as the identity token it binds, bounded by the
-  // longest Apple ID-token lifetime. A store write that cannot complete
-  // refuses the sign-in, keeping the acceptance rule uniform.
-  const ttlSeconds = (() => {
-    if (typeof payload.exp !== 'number') return NONCE_TTL_CAP_SECONDS;
-    const remaining = Math.floor(payload.exp - Date.now() / 1000);
-    return Math.max(1, Math.min(remaining, NONCE_TTL_CAP_SECONDS));
-  })();
-  let recorded: string | null = null;
-  try {
-    recorded = await redisClient.set(`auth:apple-signin-nonce:${expectedNonce}`, '1', {
-      nx: true,
-      ex: ttlSeconds,
-    });
-  } catch {
-    throw new NonceStoreUnavailableError('Apple nonce check unavailable');
-  }
-  if (recorded !== 'OK') {
-    throw new NativeIdTokenError('Apple nonce already used');
-  }
 
-  if (typeof payload.email !== 'string' || !payload.email) {
-    throw new NativeIdTokenError('Apple ID token missing email');
-  }
-  if (payload.email_verified !== true && payload.email_verified !== 'true') {
-    throw new NativeIdTokenError('Apple email not verified');
-  }
-  if (typeof payload.sub !== 'string' || !payload.sub) {
-    throw new NativeIdTokenError('Apple ID token missing sub');
-  }
-
-  return { sub: payload.sub, email: payload.email };
+  const identity = appleIdentityFromPayload(payload);
+  // Both acceptance records commit together, so a store fault leaves neither
+  // of them spent and the caller can retry the same request. The identity
+  // token record is shared with the path that accepts a token without a nonce,
+  // so one token signs in once whichever path accepted it first.
+  await recordSingleUseAppleNonceAcceptance(expectedNonce, idToken, payload.exp);
+  return identity;
 }
 
 // Lazily constructed so module import order doesn't matter for tests mocking OAuth2Client.

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { cleanupDbForTest, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { cleanupDbForTest, db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { blacklisted_domains } from '@kilocode/db/schema';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { getBlacklistedDomains } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { defineTestUser, insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { BLACKLIST_STATS_ROW_LIMIT } from '@/lib/abuse/blacklist-domain-stats';
 import { GET } from './route';
@@ -9,12 +9,12 @@ import { GET } from './route';
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
-  getBlacklistedDomains: jest.fn(),
-}));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
-const mockedGetBlacklistedDomains = jest.mocked(getBlacklistedDomains);
+
+async function insertBlacklistedDomains(domains: string[]): Promise<void> {
+  await db.insert(blacklisted_domains).values(domains.map(domain => ({ domain })));
+}
 
 async function insertHostUsers(emailHost: string, count: number): Promise<void> {
   for (let i = 0; i < count; i++) {
@@ -36,7 +36,7 @@ describe('GET /admin/api/abuse/blacklisted-domains', () => {
     jest.restoreAllMocks();
   });
 
-  it('reports per-domain blocked counts from one grouped query', async () => {
+  it('reports per-domain blocked counts from the stored list and one grouped query', async () => {
     await insertHostUsers('mailinator.com', 3);
     await insertHostUsers('sub.mailinator.com', 1);
     await insertHostUsers('spam.org', 2);
@@ -44,7 +44,7 @@ describe('GET /admin/api/abuse/blacklisted-domains', () => {
     // The count reads the email itself, so a row without the stored domain still counts.
     await insertTestUser({ google_user_email: 'legacy@mailinator.com', email_domain: null });
 
-    mockedGetBlacklistedDomains.mockResolvedValue([
+    await insertBlacklistedDomains([
       'mailinator.com',
       'sub.mailinator.com',
       'spam.org',
@@ -56,7 +56,7 @@ describe('GET /admin/api/abuse/blacklisted-domains', () => {
 
     expect(response.status).toBe(200);
     expect(mockedGetUserFromAuth).toHaveBeenCalledWith({ adminOnly: true });
-    expect(selectSpy).toHaveBeenCalledTimes(1);
+    expect(selectSpy).toHaveBeenCalledTimes(2);
     await expect(response.json()).resolves.toEqual({
       domains: [
         { domain: 'mailinator.com', blockedCount: 5 },
@@ -78,7 +78,7 @@ describe('GET /admin/api/abuse/blacklisted-domains', () => {
     // Its whole text is never an exact entry.
     await insertTestUser({ google_user_email: 'spam.org' });
 
-    mockedGetBlacklistedDomains.mockResolvedValue(['mailinator.com', 'spam.org']);
+    await insertBlacklistedDomains(['mailinator.com', 'spam.org']);
 
     const response = await GET();
 
@@ -93,16 +93,16 @@ describe('GET /admin/api/abuse/blacklisted-domains', () => {
     });
   });
 
-  it('keeps one query and a bounded row count for a large blacklist', async () => {
+  it('keeps two replica queries and a bounded row count for a large blacklist', async () => {
     await insertHostUsers('bulk7.test', 5);
     const blacklistedDomains = Array.from({ length: 300 }, (_, i) => `bulk${i}.test`);
-    mockedGetBlacklistedDomains.mockResolvedValue(blacklistedDomains);
+    await insertBlacklistedDomains(blacklistedDomains);
     const selectSpy = jest.spyOn(readDb, 'select');
 
     const response = await GET();
 
     expect(response.status).toBe(200);
-    expect(selectSpy).toHaveBeenCalledTimes(1);
+    expect(selectSpy).toHaveBeenCalledTimes(2);
     const body = await response.json();
     expect(body.domains).toHaveLength(BLACKLIST_STATS_ROW_LIMIT);
     expect(body.domains[0]).toEqual({ domain: 'bulk7.test', blockedCount: 5 });
@@ -118,13 +118,12 @@ describe('GET /admin/api/abuse/blacklisted-domains', () => {
         { status: 401 }
       ),
     });
-    mockedGetBlacklistedDomains.mockResolvedValue(['mailinator.com']);
+    await insertBlacklistedDomains(['mailinator.com']);
     const selectSpy = jest.spyOn(readDb, 'select');
 
     const response = await GET();
 
     expect(response.status).toBe(401);
     expect(selectSpy).not.toHaveBeenCalled();
-    expect(mockedGetBlacklistedDomains).not.toHaveBeenCalled();
   });
 });

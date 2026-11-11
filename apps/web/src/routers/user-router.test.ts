@@ -156,10 +156,9 @@ describe('user router - linkAuthProvider', () => {
       expect(mockCreateLinkingSession).toHaveBeenCalledWith(user.id, id, undefined, undefined);
     }
 
-    // Apple is a sign-in method the card does not offer, so a link it starts
-    // cannot complete and must not open a linking session.
+    // A method the card does not offer must not open a linking session.
     mockCreateLinkingSession.mockClear();
-    await expect(caller.user.linkAuthProvider({ provider: 'apple' })).rejects.toMatchObject({
+    await expect(caller.user.linkAuthProvider({ provider: 'workos' })).rejects.toMatchObject({
       code: 'BAD_REQUEST',
     });
     expect(mockCreateLinkingSession).not.toHaveBeenCalled();

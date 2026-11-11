@@ -90,6 +90,15 @@ function isChatPart(part: Part): boolean {
   return isTextPart(part) || isFilePart(part);
 }
 
+const TOOL_FILE_ID_SEPARATOR = '_file_';
+
+/** Native v2 projects files a tool returned as `${toolPartId}_file_${index}` file parts. */
+function producingToolPartId(part: Part): string | undefined {
+  if (!isFilePart(part)) return undefined;
+  const separator = part.id.lastIndexOf(TOOL_FILE_ID_SEPARATOR);
+  return separator > 0 ? part.id.slice(0, separator) : undefined;
+}
+
 function toolDurationMs(part: ToolPart): number | null {
   const { state } = part;
   if (state.status !== 'completed' && state.status !== 'error') {
@@ -122,7 +131,7 @@ function formatWorkedDuration(durationMs: number): string {
   return minutes === 1 ? 'Worked for 1 minute' : `Worked for ${minutes} minutes`;
 }
 
-export function summarizeAgentWork(parts: Part[]): string {
+export function summarizeAgentWork(parts: Part[], working = false): string {
   const tools = parts.filter(isToolPart);
   const reasoning = parts.filter(shouldRenderReasoningPart);
   const subtasks = parts.filter(isSubtaskPart);
@@ -145,8 +154,11 @@ export function summarizeAgentWork(parts: Part[]): string {
   const durations = parts
     .map(part => (isToolPart(part) ? toolDurationMs(part) : reasoningDurationMs(part)))
     .filter((duration): duration is number => duration !== null);
-  const worked =
-    durations.length > 0 ? formatWorkedDuration(durations.reduce((a, b) => a + b, 0)) : null;
+  const worked = working
+    ? 'Working'
+    : durations.length > 0
+      ? formatWorkedDuration(durations.reduce((a, b) => a + b, 0))
+      : null;
 
   if (worked && details.length > 0) {
     return `${worked} · ${details.join(' · ')}`;
@@ -160,29 +172,46 @@ export function summarizeAgentWork(parts: Part[]): string {
   return 'Agent work';
 }
 
-export function groupAssistantParts(parts: Part[]): SharedTranscriptSegment[] {
+export function groupAssistantParts(
+  parts: Part[],
+  mode: 'shared' | 'live' = 'shared'
+): SharedTranscriptSegment[] {
   const segments: SharedTranscriptSegment[] = [];
+  const toolSegmentTypes = new Map<string, SharedTranscriptSegment['type']>();
 
   for (const part of parts) {
-    if (isHiddenSharedPart(part)) {
+    if (isHiddenSharedPart(part) && !(mode === 'live' && isSnapshotProgressPart(part))) {
       continue;
     }
 
-    const type = isChatPart(part) ? 'chat' : 'agent-work';
+    const standaloneTool =
+      mode === 'live' &&
+      isToolPart(part) &&
+      (part.tool === 'question' ||
+        part.tool === 'task' ||
+        part.tool === 'suggest' ||
+        part.state.status === 'error');
+    const toolId = producingToolPartId(part);
+    // A tool's returned files stay beside that tool instead of ending its group.
+    const type =
+      (toolId === undefined ? undefined : toolSegmentTypes.get(toolId)) ??
+      (isChatPart(part) || standaloneTool ? 'chat' : 'agent-work');
+    if (isToolPart(part)) toolSegmentTypes.set(part.id, type);
     const last = segments.at(-1);
     if (last?.type === type) {
       last.parts.push(part);
-      if (last.type === 'agent-work') {
-        last.summary = summarizeAgentWork(last.parts);
-      }
       continue;
     }
 
     if (type === 'agent-work') {
-      segments.push({ type, parts: [part], summary: summarizeAgentWork([part]) });
+      segments.push({ type, parts: [part], summary: '' });
     } else {
       segments.push({ type, parts: [part] });
     }
+  }
+
+  for (const segment of segments) {
+    if (segment.type === 'agent-work') segment.summary = summarizeAgentWork(segment.parts);
   }
 
   return segments;

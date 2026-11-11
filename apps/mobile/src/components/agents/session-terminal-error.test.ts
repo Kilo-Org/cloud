@@ -576,7 +576,7 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
 
   // An agent-execution delivery failure renders the assistant-failure title
   // (message-failure-state.ts), so the status line must not state the same
-  // failure a second time in either of its two copies.
+  // failure a second time in any of its copies.
   const executionFailure: MessageFailure = {
     kind: 'delivery',
     side: 'assistant',

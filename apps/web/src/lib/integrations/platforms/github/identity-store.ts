@@ -64,3 +64,23 @@ export async function storeGitHubIdentity(
   if (stored.status === 'connected') evictGitHubUserAccessTokenCache(values.kilo_user_id);
   return stored;
 }
+
+/**
+ * The GitHub account bound to this Kilo account's standard identity slot, or
+ * `null` when the account never authorized one. GitHub verified the login when
+ * it was stored, so it names the person; whether that account still holds a
+ * credential here does not change which account it is.
+ */
+export async function getLinkedGitHubLogin(kiloUserId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ githubLogin: user_github_app_tokens.github_login })
+    .from(user_github_app_tokens)
+    .where(
+      and(
+        eq(user_github_app_tokens.kilo_user_id, kiloUserId),
+        eq(user_github_app_tokens.github_app_type, 'standard')
+      )
+    )
+    .limit(1);
+  return row?.githubLogin ?? null;
+}

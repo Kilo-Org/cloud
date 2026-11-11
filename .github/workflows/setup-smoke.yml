@@ -4,8 +4,9 @@ on:
   schedule:
     # The pull_request trigger below covers every change to a setup input, so the
     # clock trigger only sweeps for drift (a moved upstream image, an expiring
-    # external dependency). Four sweeps a day keep that detection cheap.
-    - cron: '17 */6 * * *'
+    # external dependency). One sweep a day is enough for that: an upstream break
+    # is found within a day, and a setup change never waits for the clock.
+    - cron: '17 4 * * *'
   workflow_dispatch:
   pull_request:
     branches: [main]
@@ -28,6 +29,10 @@ concurrency:
 
 jobs:
   setup-smoke:
+    # Guard: a fork with Actions enabled can trigger this on schedule or via
+    # workflow_dispatch, and it posts issue comments via GITHUB_TOKEN. Only
+    # the canonical repo needs this smoke test.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 45
 
@@ -51,11 +56,16 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
+      # The shared store keeps this install warm when a pull request moves the
+      # lockfile; a lockfile-keyed setup-node cache misses and downloads every
+      # package from the registry.
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
       - name: Enable Corepack
         run: |

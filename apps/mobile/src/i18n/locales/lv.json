@@ -229,6 +229,21 @@
     "signInCodeField": "Pierakstīšanās kods",
     "or": "vai"
   },
+  "pendingLink": {
+    "description": "Konts ar {{email}} jau pastāv. Pieraksties ar kādu no tā metodēm, lai pievienotu {{provider}}.",
+    "emailCode": "Nosūtīt man pierakstīšanās kodu e-pastā",
+    "continueInBrowser": "Turpināt pārlūkā",
+    "startAgain": "Sākt no jauna",
+    "expired": "Šim pieprasījumam pievienot {{provider}} ir beidzies derīguma termiņš.",
+    "noMethods": "Šim kontam nav citas pierakstīšanās metodes, tāpēc {{provider}} nevar pievienot.",
+    "linked": "{{provider}} tika pievienots tavam kontam.",
+    "failedExpired": "{{provider}} netika pievienots, jo pieprasījumam beidzās derīguma termiņš.",
+    "failedWrongAccount": "{{provider}} netika pievienots, jo tu pierakstījies citā kontā.",
+    "failedAccountAlreadyLinked": "{{provider}} netika pievienots, jo tas jau ir saistīts ar citu kontu.",
+    "failedProviderAlreadyLinked": "{{provider}} netika pievienots, jo tavam kontam jau ir cita {{provider}} pierakstīšanās.",
+    "failedLinking": "{{provider}} nevarēja pievienot tavam kontam.",
+    "notAdded": "Tu esi pierakstījies. {{provider}} netika pievienots tavam kontam."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automātiskas PR pārbaudes",
     "securityAgentSubtitle": "Atrast un novērst ievainojamības",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Testa konts",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Uzņēmuma SSO",
     "passkeysTitle": "Piekļuves atslēgas",
     "passkeysSubtitle": "Pierakstīties bez paroles",
@@ -2450,7 +2467,7 @@
       "discardWithUploadsMessage": "Tava uzvedne un augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti.",
       "discardFailed": "Neizdevās atmest melnrakstu. Lūdzu, mēģini vēlreiz.",
       "remoteHint": "Lai sesija darbotos tavā datorā, palaid Kilo tajā un atstāj to darbojamies.",
-      "continueFrom": "Tiek turpināta sesija: {{title}}.",
+      "continueFrom": "Tiek turpināta sesija: “{{title}}”.",
       "importingSession": "Importē sesiju…",
       "cliCannotContinue": "Šis CLI nevar turpināt sesiju. Izvēlies Cloud Agent vai citu CLI.",
       "importFailed": "Neizdevās importēt šo sesiju.",
@@ -2503,6 +2520,8 @@
       "toolList": "uzskaitīt",
       "toolPatch": "labot",
       "toolTask": "uzdevums",
+      "toolSendFile": "Nosūtīts fails",
+      "toolSendFileAction": "Nosūtīt failu",
       "readTodos": "Lasīt plānu",
       "updateTodos": "Atjaunināt plānu",
       "linesBadge": "{{displayCount}} rindas",
@@ -2606,7 +2625,21 @@
       "thought": "Domas",
       "showDetails": "Rādīt detalizētu informāciju",
       "pending": "Gaida…",
-      "running": "Darbojas…"
+      "running": "Darbojas…",
+      "field": {
+        "filePath": "Faila ceļš",
+        "path": "Ceļš",
+        "offset": "Nobīde",
+        "limit": "Ierobežojums",
+        "pattern": "Raksts",
+        "include": "Iekļaušana",
+        "patchText": "Ielāpa teksts",
+        "query": "Vaicājums",
+        "prompt": "Uzvedne",
+        "header": "Virsraksts",
+        "question": "Jautājums",
+        "options": "Iespējas"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Neizdevās attēlot saturu."
@@ -3858,7 +3891,7 @@
     "reasoningEffort": {
       "modelFlag": "Šis modelis atbalsta domāšanas intensitāti"
     },
-    "creditsRequired": "Nepietiek kredītu, lai nosūtītu šo ziņojumu, tāpēc papildiniet kredītus un mēģiniet vēlreiz."
+    "creditsRequired": "Nepietiek kredītu, lai nosūtītu šo ziņojumu."
   },
   "settingsTools": {
     "confirmTitle": "Apstiprināt šo izmaiņu?"
@@ -4057,6 +4090,7 @@
       "namePlaceholder": "Mans aģents",
       "promptPlaceholder": "Tu esi...",
       "tools": "Rīki",
+      "wholeToolRule": "Šis aģents vienlaikus piemēro vienu noteikumu visiem rīkiem: {{rule}}. Šie slēdži ir tikai lasāmi.",
       "visibility": "Redzamība",
       "visibilityPrimary": "Primārais — parādīts atlasītājā",
       "visibilitySubagent": "Subaģents — izsaucams tikai no citiem",
@@ -4097,7 +4131,8 @@
       "duplicateName": "Komanda ar šādu nosaukumu šajā profilā jau pastāv"
     },
     "repoBindings": {
-      "title": "Atpirkšanas darījumu noklusējuma profili",
+      "title": "Noklusējuma profili repozitorijiem",
+      "entryLabel": "Noklusējuma profili",
       "add": "Pievienot noklusējumu",
       "empty": "Nav konfigurēti noklusējuma iestatījumi",
       "emptyDescription": "Pievienojiet noklusējuma iestatījumu, lai automātiski lietotu profilu, sākot repo sesijas.",
@@ -4309,5 +4344,8 @@
     "noEnabledContexts": "Plānotajām atskaitēm nav iespējots neviens konteksts",
     "sourceBlocker": "Sesijai jāpievērš uzmanība",
     "sourceMetadata": "Fiksētie sesijas metadati"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Neizdevās atvērt šo meklēšanas rezultātu"
   }
 }

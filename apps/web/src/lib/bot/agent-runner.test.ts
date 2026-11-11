@@ -11,6 +11,8 @@ import type { SpawnCloudAgentInput as SpawnInput } from './tools/spawn-cloud-age
 import {
   buildGitLabCloneUrl,
   getGitLabInstanceUrlForOrganization,
+  getGitLabInstanceUrlForUser,
+  getGitLabProjectAccessForRequester,
   getGitLabTokenForOrganization,
   getGitLabTokenForUser,
   validateGitLabRepoAccessForOrganization,
@@ -108,6 +110,7 @@ jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
   getGitLabInstanceUrlForOrganization: jest.fn(),
   getGitLabInstanceUrlForUser: jest.fn(),
   buildGitLabCloneUrl: jest.fn(),
+  getGitLabProjectAccessForRequester: jest.fn(),
   validateGitLabRepoAccessForOrganization: jest.fn(),
   validateGitLabRepoAccessForUser: jest.fn(),
 }));
@@ -121,6 +124,9 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
 }));
 jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
   assertGitHubInstallationRuntimeAuthorized: jest.fn(),
+}));
+jest.mock('@/lib/integrations/platforms/github/identity-store', () => ({
+  getLinkedGitHubLogin: jest.fn(async () => 'requester-github'),
 }));
 jest.mock('@/lib/web-config.server', () => ({ CALLBACK_TOKEN_SECRET: 'callback-secret' }));
 jest.mock('@kilocode/web-shared/lib/constants', () => ({
@@ -240,6 +246,7 @@ beforeEach(() => {
   mockGetGitHubIntegrationById.mockResolvedValue({
     ...runParams().platformIntegration,
     id: 'github-association-1',
+    platform_installation_id: 'installation-1',
     repositories: githubRepositories,
   });
   jest.mocked(getGitLabRepositoryContext).mockResolvedValue({
@@ -251,9 +258,11 @@ beforeEach(() => {
   });
   jest.mocked(validateGitLabRepoAccessForOrganization).mockResolvedValue(true);
   jest.mocked(validateGitLabRepoAccessForUser).mockResolvedValue(true);
+  jest.mocked(getGitLabProjectAccessForRequester).mockResolvedValue({ outcome: 'allowed' });
   jest.mocked(getGitLabTokenForOrganization).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabTokenForUser).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabInstanceUrlForOrganization).mockResolvedValue('https://gitlab.com');
+  jest.mocked(getGitLabInstanceUrlForUser).mockResolvedValue('https://gitlab.com');
   jest.mocked(buildGitLabCloneUrl).mockReturnValue(`https://gitlab.com/${gitlabProject}.git`);
 });
 

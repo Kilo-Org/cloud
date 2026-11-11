@@ -229,6 +229,21 @@
     "signInCodeField": "Koodu nbanye",
     "or": "ma ọ bụ"
   },
+  "pendingLink": {
+    "description": "Akaụntụ na-eji {{email}} ugbu a. Jiri otu n'ime ụzọ nbanye ya banye iji tinye {{provider}}.",
+    "emailCode": "Zitere m koodu nbanye site n'ozi-e",
+    "continueInBrowser": "Gaa n'ihu na ihe nchọgharị",
+    "startAgain": "Malite ọzọ",
+    "expired": "Arịrịọ a iji tinye {{provider}} agwụla.",
+    "noMethods": "Akaụntụ a enweghị ụzọ nbanye ọzọ, ya mere enweghị ike itinye {{provider}}.",
+    "linked": "Etinyela {{provider}} na akaụntụ gị.",
+    "failedExpired": "Etinyeghị {{provider}} n'ihi na arịrịọ ahụ agwụla.",
+    "failedWrongAccount": "Etinyeghị {{provider}} n'ihi na ị banyere n'akaụntụ ọzọ.",
+    "failedAccountAlreadyLinked": "Etinyeghị {{provider}} n'ihi na ejikọọla ya na akaụntụ ọzọ.",
+    "failedProviderAlreadyLinked": "Etinyeghị {{provider}} n'ihi na akaụntụ gị nwereworị nbanye {{provider}} ọzọ.",
+    "failedLinking": "Enweghị ike itinye {{provider}} na akaụntụ gị.",
+    "notAdded": "Ị banyela. Etinyeghị {{provider}} na akaụntụ gị."
+  },
   "profile": {
     "codeReviewerSubtitle": "Nyocha PR akpaghị aka",
     "securityAgentSubtitle": "Chọta ma dozie adịghị ike nchebe",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Akaụntụ nnwale",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO ụlọ ọrụ",
     "passkeysTitle": "Igodo nbanye",
     "passkeysSubtitle": "Banye na-enweghị paswọọdụ",
@@ -2408,7 +2425,7 @@
       "discardWithUploadsMessage": "A ga-ehichapụ ihe ị dere na faịlụ ọ bụla ebugotere nke a na-ejikọtaghị na ozi ezigara.",
       "discardFailed": "Enweghị ike ịtụfu ozi a na-ede. Biko nwaa ọzọ.",
       "remoteHint": "Iji rụọ ọrụ na kọmputa gị, malite Kilo n'ebe ahụ ma hapụ ka ọ na-aga n'ihu na-arụ ọrụ.",
-      "continueFrom": "A na-aga n'ihu na {{title}}.",
+      "continueFrom": "A na-aga n'ihu na “{{title}}”.",
       "importingSession": "Na-ebubata nnọkọ",
       "cliCannotContinue": "CLI a enweghị ike ịga n'ihu na nnọkọ. Họrọ Cloud Agent ma ọ bụ CLI ọzọ.",
       "importFailed": "Enweghị ike ibubata nnọkọ a.",
@@ -2460,6 +2477,8 @@
       "toolList": "depụta",
       "toolPatch": "tinye mgbanwe",
       "toolTask": "ọrụ",
+      "toolSendFile": "Ezigara faịlụ",
+      "toolSendFileAction": "Zipu faịlụ",
       "readTodos": "Gụọ atụmatụ",
       "updateTodos": "Melite atụmatụ",
       "linesBadge": "ahịrị {{displayCount}}",
@@ -2560,7 +2579,21 @@
       "thought": "Echiche",
       "showDetails": "Gosi nkọwa",
       "pending": "Na-echere…",
-      "running": "Na-arụ ọrụ…"
+      "running": "Na-arụ ọrụ…",
+      "field": {
+        "filePath": "Ụzọ faịlụ",
+        "path": "Ụzọ",
+        "offset": "Mmalite",
+        "limit": "Oke",
+        "pattern": "Ụkpụrụ",
+        "include": "Ntinye",
+        "patchText": "Ederede ndozi",
+        "query": "Okwu ọchụchọ",
+        "prompt": "Ntụziaka",
+        "header": "Isi okwu",
+        "question": "Ajụjụ",
+        "options": "Nhọrọ"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Enweghị ike igosi ọdịnaya ahụ."
@@ -3802,7 +3835,7 @@
     "reasoningEffort": {
       "modelFlag": "Ihe nlereanya a na-akwado mgbalị iche echiche"
     },
-    "creditsRequired": "Ego ojiji ezughị oke izipu ozi a. Tinye ego ojiji ma nwaa ọzọ."
+    "creditsRequired": "Ego ojiji ezughị oke izipu ozi a."
   },
   "settingsTools": {
     "confirmTitle": "Kwenye mgbanwe a?"
@@ -3995,6 +4028,7 @@
       "namePlaceholder": "Onye nnọchi anya m",
       "promptPlaceholder": "Ị bụ onye...",
       "tools": "Ngwa",
+      "wholeToolRule": "Onye nnọchite anya a na-etinye otu iwu n'ọrụ na ngwa ọ bụla n'otu oge: {{rule}}. Mgbanwe ndị a bụ naanị maka ịgụ.",
       "visibility": "Nhụta",
       "visibilityPrimary": "Primary — gosiri na onye na-ahọrọ",
       "visibilitySubagent": "Onye nnọchi anya inyeaka — naanị ndị ọzọ nwere ike ịkpọ",
@@ -4036,6 +4070,7 @@
     },
     "repoBindings": {
       "title": "Profaịlụ ndabara maka ebe nchekwa",
+      "entryLabel": "Profaịlụ ndabara",
       "add": "Tinye ndabara",
       "empty": "Ọ nweghị ndabara ahaziri",
       "emptyDescription": "Tinye ndabara ka itinye profaịlụ na-akpaghị aka mgbe ịmalite nnọkọ maka repo.",
@@ -4243,5 +4278,8 @@
     "noEnabledContexts": "Enweghị ọnọdụ akwadoro maka akụkọ a haziri oge ha",
     "sourceBlocker": "Nnọkọ chọrọ nlebara anya",
     "sourceMetadata": "Ozi nkọwa nnọkọ e dekọrọ"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Enweghị ike imepe nsonaazụ ọchụchọ a"
   }
 }

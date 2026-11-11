@@ -229,6 +229,21 @@
     "signInCodeField": "Cod de autentificare",
     "or": "sau"
   },
+  "pendingLink": {
+    "description": "Există deja un cont care folosește {{email}}. Autentifică-te cu una dintre metodele lui pentru a adăuga {{provider}}.",
+    "emailCode": "Trimite-mi un cod de autentificare pe e-mail",
+    "continueInBrowser": "Continuă în browser",
+    "startAgain": "Începe din nou",
+    "expired": "Această solicitare de a adăuga {{provider}} a expirat.",
+    "noMethods": "Acest cont nu are altă metodă de autentificare, așa că {{provider}} nu poate fi adăugat.",
+    "linked": "{{provider}} a fost adăugat în contul tău.",
+    "failedExpired": "{{provider}} nu a fost adăugat pentru că solicitarea a expirat.",
+    "failedWrongAccount": "{{provider}} nu a fost adăugat pentru că te-ai autentificat în alt cont.",
+    "failedAccountAlreadyLinked": "{{provider}} nu a fost adăugat pentru că este deja asociat cu alt cont.",
+    "failedProviderAlreadyLinked": "{{provider}} nu a fost adăugat pentru că contul tău are deja o altă autentificare {{provider}}.",
+    "failedLinking": "{{provider}} nu a putut fi adăugat în contul tău.",
+    "notAdded": "Te-ai autentificat. {{provider}} nu a fost adăugat în contul tău."
+  },
   "profile": {
     "codeReviewerSubtitle": "Revizuiri automate de PR",
     "securityAgentSubtitle": "Găsește și remediază vulnerabilitățile",
@@ -267,6 +282,8 @@
     "providerTestAccount": "Cont de test",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO pentru companii",
     "passkeysTitle": "Chei de acces",
     "passkeysSubtitle": "Autentifică-te fără parolă",
@@ -2450,7 +2467,7 @@
       "discardWithUploadsMessage": "Instrucțiunile tale și fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse.",
       "discardFailed": "Nu s-a putut șterge ciorna. Încearcă din nou.",
       "remoteHint": "Pentru a rula pe computerul tău, pornește Kilo acolo și lasă-l pornit.",
-      "continueFrom": "Se continuă sesiunea {{title}}.",
+      "continueFrom": "Se continuă sesiunea „{{title}}”.",
       "importingSession": "Se importă sesiunea",
       "cliCannotContinue": "Acest CLI nu poate continua o sesiune. Alege Cloud Agent sau alt CLI.",
       "importFailed": "Nu s-a putut importa această sesiune.",
@@ -2503,6 +2520,8 @@
       "toolList": "listare",
       "toolPatch": "aplicare de modificări",
       "toolTask": "sarcină",
+      "toolSendFile": "fișier trimis",
+      "toolSendFileAction": "trimitere fișier",
       "readTodos": "Citește planul",
       "updateTodos": "Actualizează planul",
       "linesBadge": "{{displayCount}} linii",
@@ -2606,7 +2625,21 @@
       "thought": "Raționament",
       "showDetails": "Afișează detaliile",
       "pending": "În așteptare…",
-      "running": "În curs…"
+      "running": "În curs…",
+      "field": {
+        "filePath": "Cale fișier",
+        "path": "Cale",
+        "offset": "Decalaj",
+        "limit": "Limită",
+        "pattern": "Model",
+        "include": "Includere",
+        "patchText": "Text corecție",
+        "query": "Interogare",
+        "prompt": "Instrucțiune",
+        "header": "Titlu",
+        "question": "Întrebare",
+        "options": "Opțiuni"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nu s-a putut afișa conținutul."
@@ -3858,7 +3891,7 @@
     "reasoningEffort": {
       "modelFlag": "Acest model acceptă efort de raționament"
     },
-    "creditsRequired": "Nu ai suficiente credite pentru a trimite acest mesaj. Adaugă credite și încearcă din nou."
+    "creditsRequired": "Nu ai suficiente credite pentru a trimite acest mesaj."
   },
   "settingsTools": {
     "confirmTitle": "Confirmi această modificare?"
@@ -4057,6 +4090,7 @@
       "namePlaceholder": "Agentul meu",
       "promptPlaceholder": "esti un...",
       "tools": "Instrumente",
+      "wholeToolRule": "Acest agent aplică o singură regulă tuturor instrumentelor simultan: {{rule}}. Aceste comutatoare sunt doar pentru citire.",
       "visibility": "Vizibilitate",
       "visibilityPrimary": "Primar — afișat în selector",
       "visibilitySubagent": "Subagent — apelabil numai de la alții",
@@ -4098,6 +4132,7 @@
     },
     "repoBindings": {
       "title": "Profiluri implicite pentru Repos",
+      "entryLabel": "Profiluri implicite",
       "add": "Adăugați implicit",
       "empty": "Nu sunt configurate implicite",
       "emptyDescription": "Adăugați o valoare prestabilită pentru a aplica automat un profil la pornirea sesiunilor pentru un depozit.",
@@ -4309,5 +4344,8 @@
     "noEnabledContexts": "Niciun context activat pentru rapoarte programate",
     "sourceBlocker": "Sesiunea necesită atenție",
     "sourceMetadata": "Metadate capturate ale sesiunii"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nu s-a putut deschide acest rezultat de căutare"
   }
 }

@@ -85,7 +85,7 @@ export default function ApiRequestLogPage() {
 
   return (
     <AdminPage breadcrumbs={breadcrumbs}>
-      <div className="w-full max-w-xl space-y-4">
+      <div className="w-full max-w-3xl space-y-4">
         {summaryQuery.data && (
           <p className="text-muted-foreground text-sm tabular-nums">
             {summaryQuery.data.recordCount.toLocaleString()}{' '}
@@ -106,6 +106,7 @@ export default function ApiRequestLogPage() {
         )}
         <LogExportForm
           title="Download API Request Log"
+          description="Requests and responses logged for the opt-ins below, kept for 30 days."
           downloadPath="/admin/api/api-request-log/download"
           idLabel="Log ID"
           idPlaceholder="Enter numeric log ID"

@@ -386,8 +386,9 @@ describe('MessageBubble failure footer', () => {
     });
 
     const userFooter = footerOf(userTree);
+    expect(String(userFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px] items-end');
     const userFooterClasses = String(userFooter?.props.className).split(' ');
-    expect(userFooterClasses).toEqual(expect.arrayContaining(['px-4', 'py-1', 'items-end']));
+    expect(userFooterClasses).toEqual(expect.arrayContaining(['px-4', 'items-end']));
     // The title and the detail line end-align with the bubble's trailing edge,
     // so a wrapped line does not fall back to the leading edge, and each keeps
     // its own colour. The action row is unchanged: the column places it.
@@ -406,8 +407,9 @@ describe('MessageBubble failure footer', () => {
 
     // An assistant row's footer keeps its existing leading layout.
     const assistantFooter = footerOf(assistantTree);
+    expect(String(assistantFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px]');
     const assistantFooterClasses = String(assistantFooter?.props.className).split(' ');
-    expect(assistantFooterClasses).toEqual(expect.arrayContaining(['px-4', 'py-1']));
+    expect(assistantFooterClasses).toEqual(expect.arrayContaining(['px-4']));
     expect(
       classNamesIn(assistantFooter?.props.children).filter(name =>
         name.split(' ').includes('text-right')
@@ -415,7 +417,7 @@ describe('MessageBubble failure footer', () => {
     ).toEqual([]);
 
     const executionFooter = footerOf(executionTree);
-    expect(String(executionFooter?.props.className)).toBe('gap-2 px-4 py-1');
+    expect(String(executionFooter?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px]');
     expect(
       classNamesIn(executionFooter?.props.children).filter(name =>
         name.split(' ').includes('text-right')
@@ -483,6 +485,20 @@ describe('MessageBubble failure footer', () => {
     expect(
       findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Copy to composer')
     ).toBeNull();
+  });
+
+  it('gives both recovery controls the shared state-surface target', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-targets'), {
+      deliveryState: { status: 'failed', error: '', reason: 'execution' },
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+    /* The footer's actions are the failure's whole recovery, so both take the
+       48 dp frame the shared state surface gives them. */
+    for (const label of ['Retry', 'Copy to composer']) {
+      const control = findElementByType(tree, 'Button', p => p.accessibilityLabel === label);
+      expect(String(control?.props.className).split(' ')).toContain('min-h-[48px]');
+    }
   });
 
   it('omits the Retry button for a non-retryable assistant error', async () => {
@@ -1398,7 +1414,9 @@ function findElementByLabel(
 
 /** The failed row's footer container, found by its own spacing classes. */
 function footerOf(tree: unknown): { type: string; props: Record<string, unknown> } | null {
-  return findElementByType(tree, 'View', p => /^gap-\d+ px-4 py-1/.test(String(p.className)));
+  return findElementByType(tree, 'View', p =>
+    String(p.className).startsWith('gap-2 px-4 pt-1 pb-[24px]')
+  );
 }
 
 /** Every className in an unrendered element tree, in document order. */

@@ -296,6 +296,21 @@
     "signInCodeField": "Sign-in code",
     "or": "or"
   },
+  "pendingLink": {
+    "description": "An account already uses {{email}}. Sign in with one of its methods to add {{provider}}.",
+    "emailCode": "Email me a sign-in code",
+    "continueInBrowser": "Continue in browser",
+    "startAgain": "Start again",
+    "expired": "This request to add {{provider}} has expired.",
+    "noMethods": "This account has no other sign-in method, so {{provider}} can't be added.",
+    "linked": "{{provider}} was added to your account.",
+    "failedExpired": "{{provider}} wasn't added because the request expired.",
+    "failedWrongAccount": "{{provider}} wasn't added because you signed in to a different account.",
+    "failedAccountAlreadyLinked": "{{provider}} wasn't added because it's already linked to another account.",
+    "failedProviderAlreadyLinked": "{{provider}} wasn't added because your account already has a different {{provider}} sign-in.",
+    "failedLinking": "{{provider}} couldn't be added to your account.",
+    "notAdded": "You're signed in. {{provider}} wasn't added to your account."
+  },
   "profile": {
     "codeReviewerSubtitle": "Automatic PR reviews",
     "securityAgentSubtitle": "Find and remediate vulnerabilities",
@@ -334,6 +349,8 @@
     "providerTestAccount": "Test Account",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Enterprise SSO",
     "passkeysTitle": "Passkeys",
     "passkeysSubtitle": "Sign in without a password",
@@ -2475,7 +2492,7 @@
       "discardWithUploadsMessage": "Your prompt and any unclaimed uploads will be deleted.",
       "discardFailed": "Could not discard the draft. Please try again.",
       "remoteHint": "To run on your computer, start Kilo there and leave it running.",
-      "continueFrom": "Continuing {{title}}",
+      "continueFrom": "Continuing \"{{title}}\"",
       "importingSession": "Importing session",
       "cliCannotContinue": "This CLI cannot continue a session. Pick Cloud Agent or another CLI.",
       "importFailed": "Couldn't import this session.",
@@ -2527,6 +2544,8 @@
       "toolList": "list",
       "toolPatch": "patch",
       "toolTask": "task",
+      "toolSendFile": "Sent file",
+      "toolSendFileAction": "Send file",
       "readTodos": "Read plan",
       "updateTodos": "Update plan",
       "linesBadge_one": "{{displayCount}} line",
@@ -2638,7 +2657,21 @@
       "thought": "Thought",
       "showDetails": "Show details",
       "pending": "Pending…",
-      "running": "Running…"
+      "running": "Running…",
+      "field": {
+        "filePath": "File path",
+        "path": "Path",
+        "offset": "Offset",
+        "limit": "Limit",
+        "pattern": "Pattern",
+        "include": "Include",
+        "patchText": "Patch text",
+        "query": "Query",
+        "prompt": "Prompt",
+        "header": "Header",
+        "question": "Question",
+        "options": "Options"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Failed to render content"
@@ -3869,7 +3902,7 @@
       "signInA11y": "Sign in to this server: {{name}}",
       "signInFailed": "Couldn't sign in to {{name}}. Try again."
     },
-    "creditsRequired": "Not enough credits to send this message. Add credits and try again."
+    "creditsRequired": "Not enough credits to send this message."
   },
   "settingsTools": {
     "confirmTitle": "Confirm this change?"
@@ -4062,6 +4095,7 @@
       "namePlaceholder": "My Agent",
       "promptPlaceholder": "You are a ...",
       "tools": "Tools",
+      "wholeToolRule": "This agent applies one rule for every tool at once: {{rule}}. These switches are read-only.",
       "visibility": "Visibility",
       "visibilityPrimary": "Primary — shown in the picker",
       "visibilitySubagent": "Subagent — only callable from others",
@@ -4102,7 +4136,8 @@
       "duplicateName": "A command with this name already exists in this profile"
     },
     "repoBindings": {
-      "title": "Default Profiles for Repos",
+      "title": "Default profiles for repos",
+      "entryLabel": "Default profiles",
       "add": "Add default",
       "empty": "No defaults configured",
       "emptyDescription": "Add a default to automatically apply a profile when starting sessions for a repo.",
@@ -4243,5 +4278,8 @@
       "title": "Save to list",
       "saved": "Saved to {{list}}"
     }
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Could not open this search result"
   }
 }

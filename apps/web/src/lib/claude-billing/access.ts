@@ -14,3 +14,15 @@ export async function canManageClaudeBillingOrganization(userId: string, organiz
     memberships.find(entry => entry.orgId === organization?.parent_organization_id)?.role
   );
 }
+
+/**
+ * A person's own connection in an organization needs a direct membership there.
+ * Removing that membership ends the connection, so a connection never outlives
+ * the access it was created under.
+ */
+export async function isClaudeBillingOrganizationMember(
+  userId: string,
+  organizationId: string
+): Promise<boolean> {
+  return (await getUserOrgMemberships(userId)).some(entry => entry.orgId === organizationId);
+}

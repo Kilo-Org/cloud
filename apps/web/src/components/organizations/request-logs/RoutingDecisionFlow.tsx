@@ -7,12 +7,13 @@ import type {
   RequestLogRoutingStep,
 } from '@/lib/request-logs/routing-details';
 import { TONE_CLASSNAMES, ToneBadge } from './detail-primitives';
+import { getByokProviderDisplayName } from '@/lib/byok/provider-names';
 import {
   byokOutcomeLabel,
   byokSkipReasonLabel,
+  describeResult,
   describeStep,
-  payerLabel,
-  providerTypeLabel,
+  inferenceProviderNames,
   rejectedResultLabel,
   type StepTone,
 } from './routing-labels';
@@ -80,10 +81,9 @@ function ByokCandidates({ candidates }: { candidates: RequestLogByokCandidate[] 
           className="flex flex-wrap items-center gap-2 text-xs"
         >
           <span className="text-muted-foreground w-5 text-right tabular-nums">{index + 1}.</span>
-          <span className="font-mono">{candidate.provider_id}</span>
-          <span className="text-muted-foreground">{candidate.route}</span>
-          {candidate.priority != null && (
-            <span className="text-muted-foreground">priority {candidate.priority}</span>
+          <span className="font-medium">{getByokProviderDisplayName(candidate.provider_id)}</span>
+          {candidate.route === 'vercel-byok' && (
+            <span className="text-muted-foreground">via Vercel AI Gateway</span>
           )}
           <ToneBadge tone={byokOutcomeTone(candidate.outcome)}>
             {byokOutcomeLabel(candidate.outcome)}
@@ -115,7 +115,8 @@ function KiloStepDetails({ step }: { step: RequestLogRoutingStep }) {
       ))}
       {ignored.length > 0 && (
         <span className="text-muted-foreground text-xs">
-          Providers ignored by Kilo: <span className="font-mono">{ignored.join(', ')}</span>
+          Providers ignored by Kilo:{' '}
+          <span className="text-foreground">{inferenceProviderNames(ignored)}</span>
         </span>
       )}
     </div>
@@ -138,30 +139,15 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
       </FlowNode>
     );
   }
+  const { title, paidBy } = describeResult(result);
   return (
     <FlowNode tone="selected" icon={Flag} isLast>
-      <span className="text-sm font-medium">
-        {result.provider_type ? providerTypeLabel(result.provider_type) : 'Provider selected'}
-      </span>
-      <div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
-        {result.route && (
-          <span>
-            Route: <span className="text-foreground font-mono">{result.route}</span>
-          </span>
-        )}
-        {result.payer && (
-          <span>
-            Paid by: <span className="text-foreground">{payerLabel(result.payer)}</span>
-          </span>
-        )}
-        {result.byok_provider_ids && result.byok_provider_ids.length > 0 && (
-          <span>
-            BYOK keys:{' '}
-            <span className="text-foreground font-mono">{result.byok_provider_ids.join(', ')}</span>
-          </span>
-        )}
-        {result.is_free && <span className="text-foreground">Free</span>}
-      </div>
+      <span className="text-sm font-medium">{title}</span>
+      {paidBy && (
+        <p className="text-muted-foreground text-xs">
+          Paid by: <span className="text-foreground">{paidBy}</span>
+        </p>
+      )}
     </FlowNode>
   );
 }

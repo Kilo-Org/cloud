@@ -336,14 +336,18 @@ describe('emitApiMetricsForResponse', () => {
     );
   });
 
-  test('propagates usage parse failure without emitting replacement metrics', async () => {
+  test('emits metrics without a provider when usage parsing fails', async () => {
     const stats = Promise.withResolvers<null>();
-    emitApiMetricsForResponse(params, stats.promise, performance.now());
+    jest.spyOn(performance, 'now').mockReturnValue(400);
+    emitApiMetricsForResponse(params, stats.promise, 100);
     const [task] = jest.mocked(after).mock.calls[0] ?? [];
-    const rejected = expect(task).rejects.toThrow('Usage parse failed');
 
     stats.reject(new Error('Usage parse failed'));
-    await rejected;
-    expect(mockedFetch).not.toHaveBeenCalled();
+    await expect(task).resolves.toBeUndefined();
+
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(mockedFetch.mock.calls[0][1]?.body as string);
+    expect(body).toMatchObject({ statusCode: 200, ttfbMs: 10, completeRequestMs: 300 });
+    expect(body).not.toHaveProperty('inferenceProvider');
   });
 });

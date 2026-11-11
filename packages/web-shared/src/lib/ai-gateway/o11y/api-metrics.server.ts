@@ -210,16 +210,19 @@ export function emitApiMetricsForResponse(
   if (!apiMetricsUrl) return;
   if (!O11Y_KILO_GATEWAY_CLIENT_SECRET) return;
 
+  // Accounting reports a usage parse failure; metrics still record the request without a provider.
   after(
-    statsPromise.then(async stats => {
-      const completeRequestMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
+    statsPromise
+      .catch(() => null)
+      .then(async stats => {
+        const completeRequestMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
 
-      await sendApiMetrics({
-        ...params,
-        inferenceProvider: stats?.inference_provider ?? undefined,
-        clientSecret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
-        completeRequestMs,
-      } satisfies ApiMetricsParams);
-    })
+        await sendApiMetrics({
+          ...params,
+          inferenceProvider: stats?.inference_provider ?? undefined,
+          clientSecret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
+          completeRequestMs,
+        } satisfies ApiMetricsParams);
+      })
   );
 }

@@ -768,6 +768,24 @@ describe('countAndStoreFimUsage', () => {
     expect(JSON.stringify(jest.mocked(captureMessage).mock.calls)).not.toContain('zzq-');
   });
 
+  it('reports a malformed FIM stream event with operational fields only', async () => {
+    jest.mocked(captureException).mockClear();
+    const data = 'zzq-prompt-content';
+    countAndStoreFimUsage(
+      new Response(`data: ${data}\n\n`),
+      makeUsageContext({ isStreaming: true }),
+      undefined
+    );
+    await waitForUsageWrite();
+
+    expect(captureException).toHaveBeenCalledWith(expect.any(SyntaxError), {
+      tags: { source: 'fim_sse_parsing' },
+      extra: { event_type: null, data_length: data.length },
+    });
+    const reportOptions = jest.mocked(captureException).mock.calls[0][1];
+    expect(JSON.stringify(reportOptions)).not.toContain('zzq-');
+  });
+
   describe('response timing', () => {
     let clockSpy: ReturnType<typeof clock.install>;
 

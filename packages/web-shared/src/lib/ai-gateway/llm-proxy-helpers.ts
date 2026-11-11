@@ -55,6 +55,7 @@ import {
   providerReportsIsByok,
   readResponseText,
   reportUpstreamStreamError,
+  streamEventReportFields,
   usageContextReportFields,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
@@ -1185,7 +1186,7 @@ async function parseMistralFimUsageFromStream(
       if (statusCode < 400) {
         captureException(e, {
           tags: { source: 'fim_sse_parsing' },
-          extra: { eventData: event.data },
+          extra: streamEventReportFields(event),
         });
       }
     }

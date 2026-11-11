@@ -34,6 +34,16 @@ type DetailScreenScrollViewProps = ScrollViewProps & {
    * Opt-in: every other caller keeps the reserved band.
    */
   overlayRefreshProgress?: boolean;
+  /**
+   * Space the scroller reserves below its content. Defaults to the screen's
+   * own detail bottom padding.
+   *
+   * Pass `0` when the caller pins a footer below the scroller and that footer
+   * carries the safe-area inset itself: the scroller's default clearance would
+   * then be blank space above the footer's divider when the content is
+   * scrolled to its end.
+   */
+  bottomClearance?: number;
 };
 
 // Detail-screen counterpart to TabScreenScrollView. Provides bottom clearance via
@@ -43,9 +53,11 @@ export function DetailScreenScrollView({
   children,
   style,
   overlayRefreshProgress = false,
+  bottomClearance,
   ...props
 }: DetailScreenScrollViewProps) {
-  const paddingBottom = useDetailScreenBottomPadding();
+  const defaultPaddingBottom = useDetailScreenBottomPadding();
+  const paddingBottom = bottomClearance ?? defaultPaddingBottom;
   const { left, right } = useScreenInsets();
   // Native-inset callers rely on the scroll view's own focused-field reveal,
   // which runs on focus only. Two re-layouts leave the focused row parked

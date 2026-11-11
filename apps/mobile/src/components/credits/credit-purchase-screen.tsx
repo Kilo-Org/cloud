@@ -29,6 +29,7 @@ import { formatPrefixedMoney } from '@/lib/format';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { getStoreLegalLinks } from '@/lib/iap/legal-links';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -49,6 +50,7 @@ const PACK_SKELETON_ROWS = 4;
 export function CreditPurchaseScreen() {
   const { t, i18n } = useTranslation();
   const { bottom: bottomInset } = useSafeAreaInsets();
+  const sideInsetStyle = useSideInsetStyle();
   const storefront = getCreditStorefront();
   const trpc = useTRPC();
   const {
@@ -193,6 +195,10 @@ export function CreditPurchaseScreen() {
           className="-mx-1 flex-1"
           contentContainerClassName="gap-3 px-1"
           showsVerticalScrollIndicator={false}
+          // The footer below the scroller carries the safe-area inset, so the
+          // scroller's own clearance would only add blank space above the
+          // divider when the pack rows are scrolled to their end.
+          bottomClearance={0}
         >
           {/* The card holds both of its data slots in every state: the amount (a
               skeleton, the value, or the failed read's own retry target) and
@@ -351,31 +357,35 @@ export function CreditPurchaseScreen() {
           above and below the link text by construction. Matching that number
           above the description gives the footer one rhythm — divider,
           description, links — with no margin pulled through a neighbouring
-          frame, and the boxes keep their full audited height. */}
-      <View
-        className="border-t border-border px-5 pt-[17px]"
-        style={{ paddingBottom: Math.max(bottomInset, 16) }}
-      >
-        <Text className="text-xs text-muted-foreground">{t('credits.description')}</Text>
-        <View className={LEGAL_LINK_ROW_CLASS}>
-          <Pressable
-            accessibilityRole="link"
-            className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
-            onPress={() => {
-              void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
-            }}
-          >
-            <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="link"
-            className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
-            onPress={() => {
-              void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
-            }}
-          >
-            <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
-          </Pressable>
+          frame, and the boxes keep their full audited height.
+
+          The divider spans the whole width, so the content inside carries the
+          side insets itself: the scroller above insets its own content for the
+          landscape notch band, and copy outside it would otherwise sit nearer
+          the edge than the rows it follows. */}
+      <View className="border-t border-border" style={{ paddingBottom: Math.max(bottomInset, 16) }}>
+        <View className="px-5 pt-[17px]" style={sideInsetStyle}>
+          <Text className="text-xs text-muted-foreground">{t('credits.description')}</Text>
+          <View className={LEGAL_LINK_ROW_CLASS}>
+            <Pressable
+              accessibilityRole="link"
+              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
+              onPress={() => {
+                void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
+              }}
+            >
+              <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="link"
+              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
+              onPress={() => {
+                void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
+              }}
+            >
+              <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </View>

@@ -3248,7 +3248,7 @@
       "pendingComment_one": "commentaire en attente",
       "summaryOptional": "Résumé (facultatif)",
       "partialPostedFresh": "Commentaires publiés : {{displayFreshCount}}. ",
-      "partialPostedFresh_one": "Commentaire publié : {{displayFreshCount}}. ",
+      "partialPostedFresh_one": "Publié : {{displayFreshCount}} commentaire. ",
       "partialPostedFresh_many": "Commentaires publiés : {{displayFreshCount}}. ",
       "partialPostedFresh_other": "Commentaires publiés : {{displayFreshCount}}. ",
       "partialPostedStale": "Commentaires conservés en attente car ils concernent un commit plus ancien : {{displayStaleCount}}.",

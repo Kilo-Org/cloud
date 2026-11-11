@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveTranscriptFrame } from './session-message-list-anchor';
+import { composerInsetForSession, resolveTranscriptFrame } from './session-message-list-anchor';
 
 describe('resolveTranscriptFrame', () => {
   it('fills the region exactly when the chrome has not grown', () => {
@@ -29,5 +29,17 @@ describe('resolveTranscriptFrame', () => {
   it('treats a non-finite or shrinking chrome as no growth', () => {
     expect(resolveTranscriptFrame(Number.NaN).holder).toEqual({ flex: 1 });
     expect(resolveTranscriptFrame(-20).holder).toEqual({ flex: 1 });
+  });
+});
+
+describe('composerInsetForSession', () => {
+  it('reserves the growth a session measured for itself', () => {
+    expect(composerInsetForSession({ sessionId: 'ses-a', dp: 64 }, 'ses-a')).toBe(64);
+  });
+
+  it('reserves nothing from another session', () => {
+    // The next session mounts its composer on the one-line floor, which
+    // publishes no change, so a carried-over value would offset its transcript.
+    expect(composerInsetForSession({ sessionId: 'ses-a', dp: 64 }, 'ses-b')).toBe(0);
   });
 });

@@ -33,3 +33,16 @@ export function resolveTranscriptFrame(chromeGrowth: number): TranscriptFrame {
     content: { position: 'absolute', left: 0, right: 0, bottom: 0, top: -chromeGrowth },
   };
 }
+
+/**
+ * A composer measurement belongs to the session whose composer took it. A
+ * mounted screen can switch sessions, and the next session's composer mounts on
+ * its one-line floor without publishing a change, so the previous session's
+ * growth must not offset the new transcript.
+ */
+export function composerInsetForSession(
+  measurement: Readonly<{ sessionId: string; dp: number }>,
+  sessionId: string
+): number {
+  return measurement.sessionId === sessionId ? measurement.dp : 0;
+}

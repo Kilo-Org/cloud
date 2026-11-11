@@ -146,7 +146,10 @@ import {
 } from '@/components/agents/session-slow-load';
 import { getLanguageSnapshot } from '@/i18n';
 import { SessionMessageList } from '@/components/agents/session-message-list';
-import { resolveTranscriptFrame } from '@/components/agents/session-message-list-anchor';
+import {
+  composerInsetForSession,
+  resolveTranscriptFrame,
+} from '@/components/agents/session-message-list-anchor';
 import {
   collectTranscriptItemKeysByPart,
   condenseTranscriptToolRuns,
@@ -324,10 +327,19 @@ export function SessionDetailContent({
   // the reservation is dropped while that chrome is up — the read-only footer
   // and a blocking card fill the body — so a multi-line draft gets its anchor
   // back when the composer returns, without waiting for the next line to land.
-  const [composerBottomInset, setComposerBottomInset] = useState(0);
-  const handleComposerBottomInsetChange = useCallback((insetDp: number) => {
-    setComposerBottomInset(insetDp);
-  }, []);
+  // The measurement is tagged with the session it was taken for: a new session
+  // mounts its own composer on the one-line floor, which publishes no change,
+  // so the previous session's growth must never offset the new transcript.
+  const [composerBottomInset, setComposerBottomInset] = useState<{
+    sessionId: KiloSessionId;
+    dp: number;
+  }>({ sessionId, dp: 0 });
+  const handleComposerBottomInsetChange = useCallback(
+    (insetDp: number) => {
+      setComposerBottomInset({ sessionId, dp: insetDp });
+    },
+    [sessionId]
+  );
 
   const clearChildSheetReleaseTimeout = useCallback(() => {
     if (childSheetReleaseTimeoutRef.current !== null) {
@@ -2146,7 +2158,9 @@ export function SessionDetailContent({
   // A blocking card or the read-only footer replaces the composer with chrome of
   // another height on purpose, so its reservation only applies while the
   // composer it was measured for is the chrome on screen.
-  const transcriptFrame = resolveTranscriptFrame(isComposerVisible ? composerBottomInset : 0);
+  const transcriptFrame = resolveTranscriptFrame(
+    isComposerVisible ? composerInsetForSession(composerBottomInset, sessionId) : 0
+  );
   // The pending slot holds the shape its session will end in. The kind is only
   // set once the transport answers, but the metadata read lands before that and
   // names a cloud-agent session, which is writable by construction; the id

@@ -14,6 +14,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { GatewayResponsesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
+  contentPartSchema,
   drainSseStream,
   extractVercelUpstreamId,
   reportUpstreamStreamError,
@@ -65,13 +66,7 @@ const responseEventSchema = z
 const responseOutputItemSchema = z
   .object({
     type: z.string(),
-    content: z
-      .array(
-        z
-          .object({ type: z.string(), text: z.string().optional() })
-          .refine(block => block.type !== 'output_text' || block.text !== undefined)
-      )
-      .optional(),
+    content: z.array(contentPartSchema('output_text')).optional(),
   })
   .refine(item => item.type !== 'message' || item.content !== undefined);
 

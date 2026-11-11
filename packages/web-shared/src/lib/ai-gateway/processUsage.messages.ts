@@ -13,6 +13,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { GatewayMessagesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
+  contentPartSchema,
   drainSseStream,
   extractVercelUpstreamId,
   reportUpstreamStreamError,
@@ -46,9 +47,7 @@ const messageEventSchema = z.looseObject({
   error: upstreamStreamErrorSchema.nullish(),
 });
 
-const contentDeltaSchema = z
-  .object({ type: z.string(), text: z.string().optional() })
-  .refine(delta => delta.type !== 'text_delta' || delta.text !== undefined);
+const contentDeltaSchema = contentPartSchema('text_delta');
 
 const messageDeltaSchema = z.object({
   delta: z.object({ stop_reason: z.unknown().optional() }).nullish(),
@@ -60,14 +59,7 @@ const messageDeltaSchema = z.object({
 const messageResponseSchema = messageSchema.extend({
   model: z.string().nullish(),
   stop_reason: z.unknown().optional(),
-  content: z
-    .array(
-      z
-        .object({ type: z.string(), text: z.string().optional() })
-        .refine(block => block.type !== 'text' || block.text !== undefined)
-        .nullable()
-    )
-    .nullish(),
+  content: z.array(contentPartSchema('text').nullable()).nullish(),
 });
 
 // message_start already reports the input and cache tokens, so a stream that

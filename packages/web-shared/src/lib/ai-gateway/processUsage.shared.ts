@@ -55,6 +55,13 @@ export const usageCostSchema = z.object({
   cost_details: z.object({ upstream_inference_cost: z.number().nullish() }).nullish(),
 });
 
+/** A typed content part, such as a text block or delta, whose `textType` parts must carry text. */
+export function contentPartSchema(textType: string) {
+  return z
+    .looseObject({ type: z.string(), text: z.string().optional() })
+    .refine(part => part.type !== textType || part.text !== undefined);
+}
+
 export const upstreamStreamErrorSchema = z.object({
   message: z.string().nullish(),
   code: z.union([z.number(), z.string()]).nullish(),

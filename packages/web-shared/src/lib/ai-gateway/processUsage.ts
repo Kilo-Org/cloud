@@ -87,6 +87,7 @@ import {
   computeOpenRouterCostFields,
   providerReportsIsByok,
   drainSseStream,
+  contentPartSchema,
   extractVercelIsByok,
   extractVercelUpstreamId,
   parseUsageWithRecovery,
@@ -1407,12 +1408,8 @@ const chatUsageFieldsSchema = z.looseObject({
 });
 
 // Reasoning models such as Mistral's send content as `text` and `thinking` chunks.
-const chatContentChunkSchema = z
-  .looseObject({ type: z.string(), text: z.string().optional() })
-  .refine(chunk => chunk.type !== 'text' || chunk.text !== undefined);
-
 const chatMessageSchema = z.looseObject({
-  content: z.union([z.string(), z.array(chatContentChunkSchema)]).nullish(),
+  content: z.union([z.string(), z.array(contentPartSchema('text'))]).nullish(),
   provider_metadata: vercelProviderMetadataSchema.nullish(),
 });
 

@@ -1,7 +1,8 @@
 /* eslint-disable max-lines -- Queued-badge, delivery, and a11y seams share the direct-invocation MessageBubble harness. */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { readKilo2Messages } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
 import type * as React from 'react';
 
 import type * as PartTypes from './part-types';
@@ -146,6 +147,50 @@ vi.mock('./use-message-copy', () => ({
 const BADGE_CLASS = 'flex-row items-center gap-1 self-end pr-1';
 
 describe('MessageBubble compaction', () => {
+  beforeEach(async () => {
+    const { isTextPart } = await import('./part-types');
+    const actual = await vi.importActual<typeof PartTypes>('./part-types');
+    vi.mocked(isTextPart).mockImplementation(actual.isTextPart);
+  });
+
+  afterEach(async () => {
+    const { isTextPart } = await import('./part-types');
+    vi.mocked(isTextPart).mockReturnValue(false);
+  });
+
+  it.each([false, true])(
+    'keeps the projected Kilo v2 summary out of ordinary markdown (native content: %s)',
+    async withNativeContent => {
+      const [message] = readKilo2Messages(
+        { id: 'ses_1', location: { directory: '/workspace' }, time: { created: 1, updated: 2 } },
+        [
+          {
+            id: 'msg_compaction',
+            type: 'compaction',
+            status: 'completed',
+            summary: 'Saved context summary',
+            time: { created: 2 },
+            content: withNativeContent ? [{ type: 'text', text: 'Native compaction detail' }] : [],
+          },
+        ]
+      );
+      expect(message.parts).toHaveLength(withNativeContent ? 3 : 2);
+      const tree = await renderBubble(message);
+      expect(
+        findElementByType(tree, 'PartRenderer', props => props.part === message.parts[1])
+      ).toBeNull();
+      if (withNativeContent) {
+        expect(
+          findElementByType(tree, 'PartRenderer', props => props.part === message.parts[2])?.props
+            .messageInfo
+        ).toBe(message.info);
+      } else {
+        expect(findElementByType(tree, 'CompactionSeparator')?.props.info).toBe(message.info);
+        expect(findElementByType(tree, 'PartRenderer')).toBeNull();
+      }
+    }
+  );
+
   it.each([true, false])(
     'passes live state %s to the compaction-only separator',
     async isStreaming => {

@@ -11,7 +11,7 @@ import {
   resolveEnkryptInputGuardrail,
   resolveEnkryptOutputGuardrail,
   splitEnkryptInputGuardrail,
-  type EnkryptInputGuardrailConfig,
+  type EnkryptGuardrailConfig,
 } from './settings';
 
 const organizationId = '00000000-0000-4000-8000-000000000002';
@@ -276,7 +276,7 @@ describe('splitEnkryptInputGuardrail', () => {
   });
 
   it('makes only a blocking scan when every detector blocks', () => {
-    const config: EnkryptInputGuardrailConfig = {
+    const config: EnkryptGuardrailConfig = {
       status: 'ready',
       detectors,
       blockingDetectors: ['injection_attack', 'pii', 'bias'],
@@ -286,7 +286,7 @@ describe('splitEnkryptInputGuardrail', () => {
   });
 
   it('makes only a log-only scan when every detector only logs', () => {
-    const config: EnkryptInputGuardrailConfig = {
+    const config: EnkryptGuardrailConfig = {
       status: 'ready',
       detectors: { pii: detectors.pii, bias: detectors.bias },
       blockingDetectors: [],
@@ -296,7 +296,7 @@ describe('splitEnkryptInputGuardrail', () => {
   });
 
   it('keeps an invalid configuration blocking so it fails closed', () => {
-    const config: EnkryptInputGuardrailConfig = { status: 'invalid' };
+    const config: EnkryptGuardrailConfig = { status: 'invalid' };
 
     expect(splitEnkryptInputGuardrail(config)).toEqual({ blocking: config, logOnly: null });
   });

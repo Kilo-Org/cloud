@@ -116,6 +116,33 @@ describe('addUserByokAvailability', () => {
     expect(allowed?.hasUserByokAvailable).toBe(true);
   });
 
+  test('only clears the free flag for models served by an enabled BYOK key', async () => {
+    mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
+    const models = [
+      { ...makeModel('anthropic/claude-fixture'), isFree: true },
+      { ...makeModel('openai/gpt-fixture'), isFree: true },
+      { ...makeModel('mistral/codestral-fixture'), isFree: false },
+    ];
+
+    const result = await addUserByokAvailability(models, ['anthropic', 'codestral']);
+
+    expect(result.map(model => [model.hasUserByokAvailable, model.isFree])).toEqual([
+      [true, false],
+      [false, true],
+      [true, false],
+    ]);
+    expect(models[0].isFree).toBe(true);
+    expect(result[0].pricing).toEqual(models[0].pricing);
+  });
+
+  test('preserves free models when no BYOK keys are enabled', async () => {
+    const model = { ...makeModel('anthropic/claude-fixture'), isFree: true };
+
+    await expect(addUserByokAvailability([model], [])).resolves.toEqual([
+      { ...model, hasUserByokAvailable: false },
+    ]);
+  });
+
   test('reports no availability when the Vercel metadata is empty', async () => {
     mockedGetVercelModelsMetadata.mockResolvedValue({});
     const models = [makeModel('anthropic/claude-fixture'), makeModel('openai/gpt-fixture')];
@@ -183,6 +210,19 @@ describe('addUserByokAvailability', () => {
       ['moonshotai/kimi-k2.6', true],
       ['openai/gpt-fixture', false],
     ]);
+  });
+
+  test('does not mark direct BYOK catalog models as free', () => {
+    const models = [
+      { ...makeModel('moonshotai/kimi-k2.6'), isFree: true },
+      { ...makeModel('openai/gpt-fixture'), isFree: true },
+    ];
+
+    const result = addDirectByokCatalogAvailability(models, new Set(['moonshotai/kimi-k2.6']));
+
+    expect(result[0]).toEqual({ ...models[0], hasUserByokAvailable: true, isFree: false });
+    expect(result[1]).toBe(models[1]);
+    expect(models[0].isFree).toBe(true);
   });
 });
 

@@ -335,7 +335,11 @@ export const remoteModelCatalogV1Schema = remoteModelCatalogWireV1Schema.transfo
             ...(model.recommendedIndex !== undefined
               ? { recommendedIndex: model.recommendedIndex }
               : {}),
-            ...(model.isFree !== undefined ? { isFree: model.isFree } : {}),
+            ...(model.hasUserByokAvailable === true
+              ? { isFree: false }
+              : model.isFree !== undefined
+                ? { isFree: model.isFree }
+                : {}),
             ...(model.mayTrainOnYourPrompts !== undefined
               ? { mayTrainOnYourPrompts: model.mayTrainOnYourPrompts }
               : {}),

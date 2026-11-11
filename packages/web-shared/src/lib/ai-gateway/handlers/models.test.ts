@@ -165,8 +165,12 @@ describe('GET /api/openrouter/models', () => {
   });
 
   test('returns BYOK availability for regular and direct authenticated models', async () => {
-    const publicModel = makeModel('public/model');
-    const directModel = { ...makeModel('direct/model'), hasUserByokAvailable: true };
+    const publicModel = { ...makeModel('public/model'), isFree: true };
+    const directModel = {
+      ...makeModel('direct/model'),
+      hasUserByokAvailable: true,
+      isFree: false,
+    };
     mockedGetUserFromAuth.mockResolvedValue({
       user: { id: 'user-id' },
       organizationId: null,
@@ -184,7 +188,7 @@ describe('GET /api/openrouter/models', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      data: [{ ...publicModel, hasUserByokAvailable: true }, directModel],
+      data: [{ ...publicModel, hasUserByokAvailable: true, isFree: false }, directModel],
     });
     expect(mockedGetDirectByokCatalogModelIds).toHaveBeenCalledWith({
       type: 'user',

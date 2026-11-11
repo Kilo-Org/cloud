@@ -105,6 +105,7 @@ function convertModel(provider: DirectByokProvider, model: DirectByokModel) {
     ),
     default_parameters: {},
     hasUserByokAvailable: true,
+    isFree: false,
     opencode: withLegacyVariants({
       ai_sdk_provider: getDirectByokAiSdkProvider(provider, model, id),
       reasoning_options:

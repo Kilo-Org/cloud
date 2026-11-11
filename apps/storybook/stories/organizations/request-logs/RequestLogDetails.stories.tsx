@@ -239,6 +239,82 @@ const kiloGatewayDetails: RequestLogDetails = {
   },
 };
 
+const enkryptBlockedDetails: RequestLogDetails = {
+  request: {
+    ...request,
+    model: 'anthropic/claude-haiku-5.5',
+    provider: 'openrouter',
+    inference_provider: null,
+    cache_write_tokens: 0,
+    status_code: 400,
+    finish_reason: null,
+    api_kind: 'chat_completions',
+    streamed: true,
+  },
+  metadata: {
+    status: 'available',
+    routing: {
+      requested_model: 'anthropic/claude-haiku-5.5',
+      api_kind: 'chat_completions',
+      owner_type: 'organization',
+      steps: [
+        { step: 'custom-llm', outcome: 'skipped', reason: 'no-match' },
+        { step: 'direct-byok-model', outcome: 'skipped', reason: 'no-match' },
+        { step: 'byok-key', outcome: 'skipped', reason: 'no-candidates' },
+        {
+          step: 'kilo',
+          outcome: 'selected',
+          gateway: 'openrouter',
+          bounded_spending: false,
+          organization_disabled_vercel_ai_gateway: false,
+          kilo_ignored_providers: [],
+        },
+      ],
+      byok_candidates: [],
+      result: {
+        kind: 'provider',
+        route: 'kilo',
+        provider_type: 'openrouter',
+        byok_provider_ids: [],
+        payer: 'kilo',
+        is_free: false,
+      },
+      enkrypt: {
+        settings: {
+          status: 'ready',
+          detectors: [{ detector: 'injection_attack', action: 'block' }],
+        },
+        verdict: 'block',
+        unavailable_reason: null,
+        added_latency_ms: 191,
+        scans: [
+          {
+            scan: 'blocking',
+            part: 'conversation',
+            detectors_enabled: ['injection_attack'],
+            detectors_blocking: ['injection_attack'],
+            verdict_cache: 'miss',
+            verdict_cache_write: 'skipped',
+            total_characters: 148,
+            total_segments: 1,
+            cached_characters: 0,
+            cached_segments: 0,
+            omitted_attachments: 0,
+            scanned_characters: 148,
+            decision: 'blocked',
+            error: null,
+            detectors_fired: ['injection_attack'],
+            attempts: 1,
+            credits_cost: 2,
+            latency_ms: 197,
+          },
+        ],
+      },
+      enkrypt_output: null,
+    },
+  },
+};
+
 function RequestLogDetailsBody({
   row,
   details,
@@ -296,5 +372,22 @@ export const KiloGateway: Story = {
       cost_microdollars: 41_250,
     },
     details: kiloGatewayDetails,
+  },
+};
+
+export const BlockedByEnkryptInputGuardrail: Story = {
+  args: {
+    row: {
+      ...row,
+      provider: null,
+      is_user_byok: false,
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_hit_tokens: 0,
+      has_error: true,
+      latency_ms: 214,
+      generation_time_ms: null,
+    },
+    details: enkryptBlockedDetails,
   },
 };

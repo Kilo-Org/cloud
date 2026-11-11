@@ -1,5 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-import { parseRoutingDetails } from './routing-details';
+import { parseRoutingDetails, requestNotSentReason } from './routing-details';
 
 const productionRecord = `{"schema_version":1,"usage_id":"00000000-0000-4000-8000-000000000001","created_at":"2026-11-04T13:32:13.604Z","requested_model":"anthropic/claude-haiku-4.5","api_kind":"chat_completions","owner_type":"organization","steps":[{"step":"custom-llm","outcome":"skipped","reason":"no-match"},{"step":"direct-byok-model","outcome":"skipped","reason":"no-match"},{"step":"byok-key","outcome":"skipped","reason":"no-candidates"},{"step":"kilo","outcome":"selected","gateway":"vercel","bounded_spending":false,"organization_disabled_vercel_ai_gateway":false,"kilo_ignored_providers":[]}],"byok_candidates":[],"result":{"kind":"provider","route":"kilo","provider_type":"vercel","byok_provider_ids":[],"payer":"kilo","is_free":false},"vercel":{"metadata":{"anthropic":{"usage":{"input_tokens":9}},"gateway":{"routing":{"originalModelId":"anthropic/claude-haiku-4.5","resolvedProvider":"bedrock","fallbacksAvailable":["vertexAnthropic"],"planningReasoning":"BYOK credentials available for: bedrock, vertexAnthropic. System credentials planned for: bedrock, vertexAnthropic. Total execution order: bedrock(BYOK) → vertexAnthropic(BYOK) → bedrock(system) → vertexAnthropic(system)","canonicalSlug":"anthropic/claude-haiku-4.5","finalProvider":"bedrock","modelAttemptCount":1,"modelAttempts":[{"canonicalSlug":"anthropic/claude-haiku-4.5","success":true,"providerAttemptCount":1,"providerAttempts":[{"provider":"bedrock","credentialType":"byok","success":true,"startTime":1793799527929,"endTime":1793799528567,"providerRequestId":"04e8455b","statusCode":200,"inferenceEndpoint":{"slug":"eu-central-1","scope":"specific","geoRegion":"eu","providerRegion":"eu-central-1"}}]}],"totalProviderAttemptCount":1,"affinity":{"outcome":"skipped_below_min_prefix"},"clientSessionId":"secret-session","clientSessionIdSource":"fingerprint"},"cost":"0","marketCost":"0.0000979","generationId":"gen_01M6KCH7EPQKNJCFMF37V2P1KN"}}},"enkrypt":{"settings":{"status":"ready","scan_tool_results":true,"detectors":[{"detector":"injection_attack","action":"block"},{"detector":"pii","action":"log","pii_entities":["secrets"]}]},"verdict":"block","unavailable_reason":null,"added_latency_ms":191,"scans":[{"scan":"blocking","part":"conversation","detectors_enabled":["injection_attack"],"detectors_blocking":["injection_attack"],"verdict_cache":"miss","total_characters":148,"total_segments":1,"cached_characters":0,"cached_segments":0,"omitted_attachments":0,"scanned_characters":148,"decision":"blocked","error":null,"detectors_fired":["injection_attack"],"attempts":1,"credits_cost":2,"latency_ms":197,"verdict_cache_write":"skipped"}]}}`;
 
@@ -325,5 +325,36 @@ describe('parseRoutingDetails', () => {
     );
 
     expect(parsed?.result).toBeNull();
+  });
+});
+
+describe('requestNotSentReason', () => {
+  test('reads a request the Enkrypt input guardrail blocked as not sent', () => {
+    const routing = parseRoutingDetails(productionRecord);
+
+    expect(routing && requestNotSentReason(routing)).toBe('enkrypt-block');
+  });
+
+  test.each([
+    ['block', 191, 'enkrypt-block'],
+    ['unavailable', 5_000, 'enkrypt-unavailable'],
+    ['allow', 191, null],
+    ['skip', 0, null],
+    ['allow', null, 'rejected-before-guardrail'],
+    ['block', null, 'rejected-before-guardrail'],
+    ['skip', null, 'rejected-before-guardrail'],
+  ] as const)('reads verdict %s after waiting %p ms as %p', (verdict, addedLatencyMs, reason) => {
+    const enkrypt = parseRoutingDetails(productionRecord)?.enkrypt;
+    if (!enkrypt) throw new Error('expected the production record to hold an Enkrypt report');
+
+    expect(
+      requestNotSentReason({
+        enkrypt: { ...enkrypt, verdict, added_latency_ms: addedLatencyMs },
+      })
+    ).toBe(reason);
+  });
+
+  test('treats a request without the input guardrail as sent', () => {
+    expect(requestNotSentReason({ enkrypt: null })).toBeNull();
   });
 });

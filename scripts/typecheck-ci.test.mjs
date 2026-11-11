@@ -1654,11 +1654,7 @@ test('extension CI installs the closure each job reads', () => {
     extensionShardInstall,
     'a shard installs the extension closure alone'
   );
-  assert.deepEqual(
-    jobs['e2e-chrome-shard'].strategy.matrix.shard,
-    [1, 2],
-    'both shards still run'
-  );
+  assert.deepEqual(jobs['e2e-chrome-shard'].strategy.matrix.shard, [1, 2], 'both shards still run');
 });
 
 // The account database job runs the root `drizzle` script, which executes

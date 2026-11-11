@@ -556,9 +556,9 @@ const defaultDeps: FixReviewSelectionDeps = {
 };
 
 /**
- * Raised when there is no credential to read with at all, so the caller can
- * offer a reconnection. This module throws it, so it carries no provider data
- * and keeps its own message.
+ * Raised when there is no credential to read with at all. This module throws
+ * it, so it carries no provider data and keeps its own message, which lets a
+ * caller tell the no-credential case apart from a provider read failure.
  */
 class FixReviewCredentialUnavailableError extends Error {
   constructor() {
@@ -678,7 +678,7 @@ export async function selectFixReviewCommentsForReview(input: {
 
     return selectWithinPromptBudget(selected, listing.unreadCount);
   } catch (error) {
-    // The caller shows this message, so it keeps its own text.
+    // A module-owned rejection keeps its own message and its own type.
     if (error instanceof FixReviewCredentialUnavailableError) throw error;
     // The diagnostic records the credential source and HTTP status only.
     const status =

@@ -174,6 +174,9 @@ describe('MessageBubble compaction', () => {
           },
         ]
       );
+      if (message === undefined) {
+        throw new Error('expected a projected compaction message');
+      }
       expect(message.parts).toHaveLength(withNativeContent ? 3 : 2);
       const tree = await renderBubble(message);
       expect(

@@ -18,6 +18,8 @@ const ProbeNodeSchema = z.object({
   rect: RectSchema,
   layoutRect: RectSchema.optional(),
   owners: z.array(z.string()).optional(),
+  /** The route file of the screen that renders the node, from the probe. */
+  screen: z.string().optional(),
   text: z.string().optional(),
   testID: z.string().optional(),
   label: z.string().optional(),

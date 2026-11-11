@@ -9,9 +9,32 @@ permissions:
   contents: read
 
 jobs:
-  probe-blacksmith:
+  probe-e2e:
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 30
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      NODE_ENV: development
+      POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      POSTGRES_CONNECT_TIMEOUT: 30000
+      POSTGRES_MAX_QUERY_TIME: 30000
+      DEBUG_SHOW_DEV_UI: 'true'
+      PORT: '3000'
+      DOTENV_PRIVATE_KEY_DEVELOPMENT: ${{ secrets.DOTENV_PRIVATE_KEY_DEVELOPMENT }}
+
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
@@ -32,10 +55,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Report the mounted store
-        run: |
-          test -d node_modules/.pnpm-store && echo "mounted store present"
-          echo "top-level links: $(find node_modules -maxdepth 1 -type l | wc -l)"
+      - name: Run database migrations
+        run: pnpm drizzle migrate
+        env:
+          DOTENV_PRIVATE_KEY_DEVELOPMENT: ${{ secrets.DOTENV_PRIVATE_KEY_DEVELOPMENT }}
 
       - name: Resolve Playwright version
         id: playwright
@@ -53,49 +76,13 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm --filter web exec playwright install chromium
 
-      - name: Launch Chromium
-        run: |
-          pnpm --filter web exec node -e "
-          const { chromium } = require('@playwright/test');
-          (async () => {
-            const browser = await chromium.launch();
-            const page = await browser.newPage();
-            await page.setContent('<h1>probe</h1>');
-            console.log('heading:', await page.textContent('h1'));
-            console.log('ua:', await page.evaluate(() => navigator.userAgent));
-            await browser.close();
-          })();
-          "
+      - name: Run Playwright tests
+        run: pnpm test:e2e
+        continue-on-error: true
 
-  probe-bare:
-    needs: probe-blacksmith
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        if: always()
         with:
-          lfs: true
-          fetch-depth: 0
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-
-      - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
-
-      - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --filter 'web...' --filter kilocode-monorepo
-
-      - name: Report the mounted store
-        run: |
-          test -d node_modules/.pnpm-store && echo "mounted store present"
-          echo "top-level links: $(find node_modules -maxdepth 1 -type l | wc -l)"
-
-      # No Playwright steps here: the ubuntu-latest image is Ubuntu 26.04,
-      # which this @playwright/test version refuses outright, with or without
-      # --with-deps.
+          name: test-results
+          path: ./test-results
+          retention-days: 7

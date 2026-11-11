@@ -21,8 +21,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CLOUD_AGENT_NEXT_WS_URL } from '@kilocode/web-shared/lib/constants';
 import { subscribeSandboxStatus } from './sandbox-status-stream';
 import { cn } from '@/lib/utils';
-import { sandboxStatusPresentation, type SandboxStatusPresentation } from './sandbox-status';
+import {
+  sandboxObservationKey,
+  sandboxStatusPresentation,
+  type SandboxObservation,
+  type SandboxStatusPresentation,
+} from './sandbox-status';
 import { formatSnapshotTime } from './snapshot-display';
+import { SandboxComputeRate } from './SandboxComputeRate';
 
 const statusBadgeIcons = {
   active: Circle,
@@ -216,9 +222,9 @@ export function SandboxStatusIndicator({
     };
   }, []);
 
-  const observationKey = ['cloud-agent-sandbox-observation', organizationId ?? null, scopeId];
+  const observationKey = sandboxObservationKey(scopeId, organizationId);
   // Filled only by the status stream below, never fetched.
-  const query = useQuery<{ snapshot: unknown; requestedAt: number; receivedAt: number }>({
+  const query = useQuery<SandboxObservation>({
     queryKey: observationKey,
     queryFn: skipToken,
     gcTime: 0,
@@ -229,7 +235,7 @@ export function SandboxStatusIndicator({
     if (!observation.enabled) return;
     const controller = new AbortController();
     const cloudAgentSessionId = cloudAgentSessionIdRef.current;
-    const key = ['cloud-agent-sandbox-observation', organizationId ?? null, scopeId];
+    const key = sandboxObservationKey(scopeId, organizationId);
     const getTicket = () =>
       queryClient.query({
         queryKey: [...key, cloudAgentSessionId, 'stream-ticket', observation.freshAfter],
@@ -392,6 +398,7 @@ export function SandboxStatusIndicator({
         >
           <div id={detailsId}>
             <SandboxStatusDetails view={view} />
+            <SandboxComputeRate snapshot={query.data?.snapshot} />
           </div>
           <details className="group mt-3 border-t text-xs">
             <summary

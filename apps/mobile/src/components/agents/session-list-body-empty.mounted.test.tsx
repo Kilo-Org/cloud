@@ -79,24 +79,30 @@ describe('BodyEmpty mounted', () => {
     // These bodies swap in place on one screen: clearing a no-match search hands
     // over to the no-past-sessions body. A shared identity would make the state
     // that mounts second paint its first frame at the previous one's size.
-    const kinds = ['no-past-sessions', 'filtered-empty', 'query-error-empty'] as const;
-    const keys = await Promise.all(
-      kinds.map(async kind => {
-        const renderer = await renderBody({
-          kind,
-          stateKey: 'session-history',
-          isSearching: true,
-          clearQueryAction: createElement('ClearQueryCTA'),
-          onRetry: vi.fn(() => undefined),
-        });
-        const state = findHost(renderer.root, 'CenteredState')[0];
-        const stateKey = state === undefined ? null : state.props.stateKey;
-        renderer.unmount();
-        return [kind, stateKey] as const;
-      })
-    );
+    const body = async (kind: BodyEmptyProps['kind']) => {
+      const renderer = await renderBody({
+        kind,
+        stateKey: 'session-history',
+        isSearching: true,
+        clearQueryAction: createElement('ClearQueryCTA'),
+        onRetry: vi.fn(() => undefined),
+      });
+      const state = findHost(renderer.root, 'CenteredState')[0];
+      const stateKey: unknown = state === undefined ? null : state.props.stateKey;
+      renderer.unmount();
+      return stateKey;
+    };
 
-    expect(Object.fromEntries(keys)).toEqual({
+    // Sequential on purpose: each render owns its own act().
+    const noPastSessions = await body('no-past-sessions');
+    const filteredEmpty = await body('filtered-empty');
+    const queryErrorEmpty = await body('query-error-empty');
+
+    expect({
+      'no-past-sessions': noPastSessions,
+      'filtered-empty': filteredEmpty,
+      'query-error-empty': queryErrorEmpty,
+    }).toEqual({
       'no-past-sessions': 'session-history:no-past-sessions',
       'filtered-empty': 'session-history:filtered-empty',
       'query-error-empty': 'session-history:query-error-empty',

@@ -599,6 +599,45 @@ describe('CenteredState first-frame paint', () => {
     noPastSessions.unmount();
   });
 
+  it('keeps one placement for two bodies that share a title but differ in controls', async () => {
+    // A retryable body and the action-less body can carry the same title, and
+    // the action is what makes the first one taller. The second must not paint
+    // its first frame at the error body's size and then shift.
+    const retryable = await renderWithProviders(
+      <EmptyState
+        icon={SearchX}
+        title="Empty"
+        description="Could not load older messages"
+        action={createElement('Button', null, 'Retry')}
+      />
+    );
+    const content = retryable.renderer.root.findByProps({ testID: 'centered-state-content' })
+      .props as ViewProps;
+    act(() => {
+      content.onLayout?.(contentLayout as LayoutChangeEvent);
+    });
+    act(() => {
+      for (const onMeasure of native.measurements.splice(0)) {
+        onMeasure(0, 80, 400, 340);
+      }
+    });
+    expect(
+      (retryable.renderer.root.findByType(ScrollView).props as ScrollViewProps)
+        .contentContainerStyle
+    ).not.toEqual(UNPLACED_FALLBACK_STYLE);
+    retryable.unmount();
+
+    native.surface = { ...native.surface, frame: null, bounds: null };
+    const actionless = await renderWithProviders(
+      <EmptyState icon={SearchX} title="Empty" description="Nothing here yet" />
+    );
+    expect(
+      (actionless.renderer.root.findByType(ScrollView).props as ScrollViewProps)
+        .contentContainerStyle
+    ).toEqual(UNPLACED_FALLBACK_STYLE);
+    actionless.unmount();
+  });
+
   it('reserves the surface bottom band once while the layout measurement is pending', async () => {
     // The tab bar is an absolute overlay: its band is known from the surface
     // reservation before any geometry lands. The fallback placement must keep

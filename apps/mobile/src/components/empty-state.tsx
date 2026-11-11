@@ -59,15 +59,41 @@ export function EmptyState({
   stateKey,
   compact,
   title,
+  description,
+  action,
   ...props
 }: Readonly<EmptyStateProps>) {
-  const body = <EmptyStateBody {...props} title={title} placement={placement} compact={compact} />;
+  const body = (
+    <EmptyStateBody
+      {...props}
+      title={title}
+      description={description}
+      action={action}
+      placement={placement}
+      compact={compact}
+    />
+  );
   // Placement memory names one state, so two empty states on one surface must
   // not share it: the one that mounts second would paint its first frame at the
-  // other one's size and then shift. The copy identifies the state, so a caller
-  // that renders several of them needs no key of its own.
+  // other one's size and then shift. The state's identity is its own copy and
+  // its own controls, which is what decides its height: bodies that agree on
+  // both paint the same size, and bodies that differ on either never borrow
+  // each other's placement. A caller that renders two states with identical
+  // copy and controls passes a key of its own.
+  let descriptionIdentity = 'no-description';
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string variant
+  if (typeof description === 'string') {
+    descriptionIdentity = description;
+  } else if (description !== undefined) {
+    descriptionIdentity = 'node-description';
+  }
+  const identity =
+    stateKey ??
+    ['empty-state', title, descriptionIdentity, action === undefined ? 'no-action' : 'action'].join(
+      ':'
+    );
   return placement === 'center' ? (
-    <CenteredState refreshControl={refreshControl} stateKey={stateKey ?? `empty-state:${title}`}>
+    <CenteredState refreshControl={refreshControl} stateKey={identity}>
       {body}
     </CenteredState>
   ) : (

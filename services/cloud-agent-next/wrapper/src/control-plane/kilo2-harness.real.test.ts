@@ -429,7 +429,13 @@ suite('real Kilo v2 harness', () => {
       ).toHaveLength(1);
       mode = 'text';
       expect(
-        await harness.compact({ sessionId, directory, model: 'fake-deterministic', signal })
+        await harness.compact({
+          sessionId,
+          directory,
+          messageId: createMessageId(),
+          model: 'fake-deterministic',
+          signal,
+        })
       ).toBe(true);
       const pty = await harness.terminals.createPty({
         cwd: directory,

@@ -58,6 +58,93 @@ const credential = {
   expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
 };
 
+describe('Kilo v2 harness compaction', () => {
+  const sessionId = 'ses_compaction';
+  const messageId = `msg_${'a'.repeat(26)}`;
+  const input = { sessionId, directory, messageId, model: 'test-model' };
+
+  it.each([
+    { type: 'compaction', status: 'completed' },
+    {
+      type: 'compaction',
+      status: 'failed',
+      error: { type: 'compaction.unavailable', message: 'Nothing to compact yet' },
+    },
+  ])('preserves the Cloud message id and accepts %j', async result => {
+    const { url, requests } = startStub((_request, url) =>
+      url.pathname.includes('/message/')
+        ? Response.json({ data: result })
+        : new Response(null, { status: 204 })
+    );
+
+    expect(await createHarness(url).compact(input)).toBe(true);
+    expect(requests.map(request => [request.method, request.pathname, request.body])).toEqual([
+      [
+        'POST',
+        `/api/session/${sessionId}/model`,
+        { model: { providerID: 'kilo', id: input.model } },
+      ],
+      [
+        'PUT',
+        `/api/experimental/session/${sessionId}/instructions/entries/cloud-agent-context`,
+        { value: '' },
+      ],
+      ['POST', `/api/session/${sessionId}/compact`, { id: messageId }],
+      ['POST', `/api/experimental/session/${sessionId}/wait`, undefined],
+      ['GET', `/api/session/${sessionId}/message/${messageId}`, undefined],
+    ]);
+  });
+
+  it.each([
+    { type: 'provider.rate-limit', message: 'Rate limited' },
+    { type: 'provider.error', message: 'Nothing to compact yet' },
+    { type: 'compaction.unavailable', message: 'Compaction is disabled' },
+    { message: 'Unknown compaction error' },
+    undefined,
+  ])('keeps real compaction failures failing: %j', async error => {
+    const { url } = startStub((_request, url) =>
+      url.pathname.includes('/message/')
+        ? Response.json({ data: { type: 'compaction', status: 'failed', error } })
+        : new Response(null, { status: 204 })
+    );
+
+    const failure: unknown = await createHarness(url)
+      .compact(input)
+      .catch(cause => cause);
+    expect(failure).toBeInstanceOf(Error);
+    expect(String(failure)).toContain(
+      `Kilo v2 compaction failed: ${error?.message ?? 'Unknown native failure'}`
+    );
+  });
+
+  it('accepts empty finalization compaction using its own message id', async () => {
+    const { url, requests } = startStub((_request, url) =>
+      url.pathname.includes('/message/')
+        ? Response.json({
+            data: {
+              type: 'compaction',
+              status: 'failed',
+              error: { type: 'compaction.unavailable', message: 'Nothing to compact yet' },
+            },
+          })
+        : new Response(null, { status: 204 })
+    );
+
+    expect(await createHarness(url).condense({ sessionId, directory, model: input.model })).toEqual(
+      {
+        success: true,
+        wasAborted: false,
+      }
+    );
+    const compact = requests.find(request => request.pathname.endsWith('/compact'));
+    expect(compact?.body).toEqual({
+      id: expect.stringMatching(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/),
+    });
+    const read = requests.at(-1);
+    expect(compact?.body).toEqual({ id: read?.pathname.split('/').at(-1) });
+  });
+});
+
 describe('Kilo v2 harness MCP refresh', () => {
   it('sends a slash command in the native command payload', async () => {
     const { url, requests } = startStub(() => new Response(null, { status: 204 }));
@@ -246,7 +333,7 @@ describe('Kilo v2 harness MCP refresh', () => {
         context: 'Some startup commands failed during session preparation.',
       });
       const harness = createHarness(url);
-      const input = { sessionId, directory, model: 'test-model' };
+      const input = { sessionId, directory, model: 'test-model', messageId: 'msg_compact' };
       if (operation === 'command') await harness.command({ ...input, command: 'review' });
       else if (operation === 'compact') expect(await harness.compact(input)).toBe(true);
       else expect(await harness.condense(input)).toEqual({ success: true, wasAborted: false });
@@ -272,7 +359,12 @@ describe('Kilo v2 harness MCP refresh', () => {
           new Response(null, { status: url.pathname.includes('/instructions/') ? 503 : 204 })
       );
       const harness = createHarness(url);
-      const input = { sessionId: 'ses_clear_failure', directory, model: 'test-model' };
+      const input = {
+        sessionId: 'ses_clear_failure',
+        directory,
+        model: 'test-model',
+        messageId: 'msg_compact',
+      };
       if (operation === 'condense') {
         const result = await harness.condense(input);
         expect(result.success).toBe(false);

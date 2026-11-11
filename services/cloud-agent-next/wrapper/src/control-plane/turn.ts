@@ -661,6 +661,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
           const summarized = await client.compact({
             sessionId: route.kiloSessionId,
             directory: route.directory,
+            messageId: pending.payload.messageId,
             signal: pending.abort.signal,
             model,
           });

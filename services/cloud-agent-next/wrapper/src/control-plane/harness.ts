@@ -91,7 +91,9 @@ export type Harness = {
       variant?: string;
     }
   ): Promise<void>;
-  compact(input: HarnessSession & { model: string; auto?: boolean }): Promise<boolean>;
+  compact(
+    input: HarnessSession & { messageId: string; model: string; auto?: boolean }
+  ): Promise<boolean>;
   condense(input: HarnessSession & { model: string }): Promise<CondenseResult>;
   answer(input: {
     directory: string;

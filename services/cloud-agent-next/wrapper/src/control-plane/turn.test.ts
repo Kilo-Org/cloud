@@ -571,6 +571,7 @@ describe('turn manager submission', () => {
     h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
     await settle();
     expect(client.summaries).toHaveLength(1);
+    expect(client.summaries[0]).toMatchObject({ messageId: 'c1' });
     expect(client.summaries[0].auto).toBeUndefined();
     expect(client.prompts).toHaveLength(0);
     expect(outcomeFrames(h.frames)[0]).toMatchObject({

@@ -292,17 +292,15 @@ export function CreditPurchaseScreen() {
                       </Text>
                     )}
                   </View>
-                  {/* While the store is available a row can gain or lose its
-                      status, so the slot keeps its height and the rows below
-                      never move. While the card above states the failure no row
-                      can show a status, so the slot adds no dead band there. */}
-                  {!storeUnavailable && (
-                    <View className="mt-1 min-h-5 justify-center">
-                      {statusLabel !== null && (
-                        <Text className="text-sm text-muted-foreground">{statusLabel}</Text>
-                      )}
-                    </View>
-                  )}
+                  {/* The slot keeps its height in every state, so a row never
+                      changes height: not when a purchase starts or ends, not
+                      when a pack gains its price, and not when the store drops
+                      or reconnects with cached prices. */}
+                  <View className="mt-1 min-h-5 justify-center">
+                    {statusLabel !== null && (
+                      <Text className="text-sm text-muted-foreground">{statusLabel}</Text>
+                    )}
+                  </View>
                   {expiryMessage && (
                     <Text className="mt-2 text-xs text-muted-foreground">{expiryMessage}</Text>
                   )}

@@ -727,6 +727,19 @@ describe('CreditPurchaseScreen', () => {
         classes => classes.includes(PACK_ROW_SHELL) && classes.includes('opacity-50')
       )
     ).toBe(true);
+    // Each row reserves the status slot empty, so the store dropping or
+    // reconnecting with cached prices never changes a row's height.
+    expect(
+      rows.every(
+        row =>
+          row.findAll(
+            node =>
+              String(node.type) === 'View' &&
+              String((node.props as { className?: string }).className).includes('min-h-5') &&
+              node.findAll(child => String(child.type) === 'Text').length === 0
+          ).length === 1
+      )
+    ).toBe(true);
     unmount();
   });
 
@@ -750,16 +763,26 @@ describe('CreditPurchaseScreen', () => {
       'Price unavailable',
       'Credits purchased through the App Store do not expire.',
     ]);
-    // The status never shares the title's line, and its slot keeps its height
-    // whether or not it holds a status, so a row that gains or loses one never
-    // moves the rows below. The title row is the only flex-row in the row.
-    const statusSlot = unpriced[1]?.parent;
-    expect(String(statusSlot?.props.className)).toContain('mt-1');
-    expect(String(statusSlot?.props.className)).toContain('min-h-5');
-    expect(String(statusSlot?.parent?.props.className)).not.toContain('flex-row');
-    // The priced row reserves the same slot, empty.
-    const pricedTexts = priced.map(node => node.props.children);
-    expect(pricedTexts).not.toContain('Price unavailable');
+    // The status never shares the title's line, and every row reserves the same
+    // slot, so a row that gains or loses a status, or the store dropping or
+    // reconnecting with cached prices, never moves the rows below.
+    const slotClass = 'min-h-5';
+    const unpricedSlot = rows[3]?.findAll(
+      node =>
+        String(node.type) === 'View' &&
+        String((node.props as { className?: string }).className).includes(slotClass)
+    )[0];
+    expect(String(unpricedSlot?.props.className)).toContain('mt-1');
+    expect(String(unpricedSlot?.parent?.props.className)).not.toContain('flex-row');
+    expect(unpricedSlot?.findAll(node => String(node.type) === 'Text')).toHaveLength(1);
+    // The priced row reserves the same slot, with no status in it.
+    const pricedSlot = rows[0]?.findAll(
+      node =>
+        String(node.type) === 'View' &&
+        String((node.props as { className?: string }).className).includes(slotClass)
+    )[0];
+    expect(pricedSlot).toBeDefined();
+    expect(pricedSlot?.findAll(node => String(node.type) === 'Text')).toHaveLength(0);
     unmount();
   });
 

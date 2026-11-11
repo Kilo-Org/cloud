@@ -134,7 +134,7 @@ function MessageBubbleImpl({
   // its parts land. Drawing the long-press wrapper around that empty row left an
   // empty interactive strip (its own py-1, plus an invisible focus stop) in the
   // transcript, so the wrapper is rendered only when there is something in it.
-  const visibleParts = useMemo(() => parts.filter(partRendersContent), [parts]);
+  const visibleParts = useMemo(() => parts.filter(part => partRendersContent(part)), [parts]);
 
   // The bubble is memo-wrapped, but the transcript still re-renders its rows
   // while a message streams. Memoize the derived text on the parts identity so
@@ -307,7 +307,7 @@ function MessageBubbleImpl({
     // or whose only part is the server's synthetic context wrapper — draws no
     // bubble, and must not leave the empty strip around it.
     const drawsBubble = userBubbleRendersContent(parts);
-    const drawsControls = hasBadgeSlot || onRestoreQueued !== undefined;
+    const drawsControls = hasBadgeSlot === true || onRestoreQueued !== undefined;
 
     return (
       <View>

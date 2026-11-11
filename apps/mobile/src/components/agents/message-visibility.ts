@@ -93,7 +93,7 @@ export function messageRendersContent(message: StoredMessage): boolean {
  */
 export function userBubbleRendersContent(parts: readonly Part[]): boolean {
   return (
-    humanTextParts(parts).some(partRendersContent) ||
+    humanTextParts(parts).some(part => partRendersContent(part)) ||
     parts.some(part => isFilePart(part) && partRendersContent(part))
   );
 }

@@ -539,7 +539,7 @@ test('web promotion waits for a completed or deliberately skipped gateway rollou
   }
 });
 
-test('ai-gateway deploys with each scheduled release after migrations', () => {
+test('ai-gateway deploys with each scheduled release and its promotion waits for the gate', () => {
   const stageAiGateway = production.jobs['stage-ai-gateway'];
   assert.equal(stageAiGateway.needs, 'check-changes');
   assert.match(stageAiGateway.if, /should_deploy == 'true'/);
@@ -564,7 +564,7 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
   );
 
   const deployAiGateway = staging.jobs['deploy-ai-gateway'];
-  assert.deepEqual(deployAiGateway.needs, ['check-changes', 'db-gate']);
+  assert.equal(deployAiGateway.needs, 'check-changes');
   assert.equal(deployAiGateway.with.target_environment, 'staging');
   assert.equal(deployAiGateway.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
   assert.equal(deployAiGateway.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
@@ -579,9 +579,9 @@ test('ai-gateway deploys with each scheduled release after migrations', () => {
       assert.match(production.jobs[job].if, new RegExp(`needs\\.${dependency}\\.result`));
     }
   }
-  // Staging Workers read nothing from the Vercel jobs, so they start with them
-  // after the gate and the matrix lookup; record-deployment below still requires
-  // all three.
+  // Staging Workers read nothing the Vercel staging deploys produce, so they
+  // start with the gate and the matrix lookup rather than with those deploys,
+  // which now start earlier; record-deployment below still requires all three.
   assert.deepEqual(staging.jobs['deploy-workers'].needs, [
     'check-changes',
     'db-gate',
@@ -663,11 +663,18 @@ test('one database gate per deployment checks out, installs and migrates once', 
 
   for (const [deployment, jobs] of [
     [production, ['promote-app', 'promote-ai-gateway', 'deploy-workers', 'record-deployment']],
-    [staging, ['deploy-app', 'deploy-ai-gateway', 'deploy-workers', 'record-deployment']],
+    [staging, ['deploy-workers', 'record-deployment']],
   ]) {
     for (const job of jobs) {
       assert.ok(deployment.jobs[job].needs.includes('db-gate'), `${job} must wait for db-gate`);
     }
+  }
+  // The staging Vercel deploys start with the SHA lookup and reach the staging
+  // target on their own: a custom environment cannot hold the traffic switch
+  // until the gate finishes, so they run beside it. The Worker deploy and the
+  // release record below keep the gate, so a failed migration still stops them.
+  for (const job of ['deploy-app', 'deploy-ai-gateway']) {
+    assert.equal(staging.jobs[job].needs, 'check-changes', `${job} must start beside db-gate`);
   }
   // Production also tolerates skipped staging jobs, so its Worker deploy names the
   // gate result explicitly; staging relies on the default needs-success behaviour.

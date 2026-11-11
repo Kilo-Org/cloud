@@ -410,6 +410,10 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
         getItemType={() => 'session'}
         style={rowsInsets.frame}
         contentContainerStyle={rowsInsets.content}
+        // Same contract as the history list: the compact search field above
+        // this list holds the keyboard, and a row must answer the first tap
+        // instead of the list consuming it to close the keyboard.
+        keyboardShouldPersistTaps="handled"
         refreshControl={rowsControl}
         maintainVisibleContentPosition={{ autoscrollToTopThreshold: 10 }}
       />

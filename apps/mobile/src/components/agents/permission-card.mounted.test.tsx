@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
 import { type BlockingCardSubmissionError } from './blocking-card-state';
 import { PermissionCard } from './permission-card';
 
@@ -36,7 +37,16 @@ function findByAccessibilityLabel(
   return root.findAll(node => node.props.accessibilityLabel === label);
 }
 
+/** Every literal string child of a rendered text node, in tree order. */
+function textLines(root: TestRenderer.ReactTestInstance): string[] {
+  return root
+    .findAll(node => String(node.type) === 'Text')
+    .flatMap(node => node.children.filter((value: unknown) => typeof value === 'string'));
+}
+
 type CardOverrides = {
+  permission?: string;
+  patterns?: string[];
   metadata?: Record<string, unknown>;
   submissionError?: BlockingCardSubmissionError | null;
   onRespond?: (response: 'once' | 'always' | 'reject') => void;
@@ -66,6 +76,39 @@ async function renderCard(overrides: CardOverrides = {}) {
 }
 
 describe('PermissionCard mounted', () => {
+  it('shows the command alone when a bash request carries one', async () => {
+    const renderer = await renderCard({
+      patterns: ['rg todo 2_/dev/null'],
+      metadata: { command: 'rg todo 2>/dev/null' },
+    });
+    const lines = textLines(renderer.root);
+
+    expect(lines).not.toContain(i18n.t('agentChat.permissionCard.appliesTo'));
+    expect(lines).not.toContain('rg todo 2_/dev/null');
+    expect(lines).toContain(i18n.t('profiles.commandLabel'));
+    expect(lines).toContain('rg todo 2>/dev/null');
+  });
+
+  it('keeps the patterns for a request that has no command', async () => {
+    const renderer = await renderCard({
+      permission: 'external_directory',
+      patterns: ['/var/tmp/scope/**'],
+    });
+    const lines = textLines(renderer.root);
+
+    expect(lines).toContain(i18n.t('agentChat.permissionCard.appliesTo'));
+    expect(lines).toContain('/var/tmp/scope/**');
+    expect(lines).not.toContain(i18n.t('profiles.commandLabel'));
+  });
+
+  it('shows neither block when the request has no patterns and no command', async () => {
+    const renderer = await renderCard({ permission: 'external_directory' });
+    const lines = textLines(renderer.root);
+
+    expect(lines).not.toContain(i18n.t('agentChat.permissionCard.appliesTo'));
+    expect(lines).not.toContain(i18n.t('profiles.commandLabel'));
+  });
+
   it('hides Always allow for a skillShell request and keeps Allow once and Deny', async () => {
     const renderer = await renderCard({
       metadata: { skillShell: true, skill: 'e2e', commands: ['echo hi'] },

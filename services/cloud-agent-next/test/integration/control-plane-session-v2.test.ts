@@ -2010,6 +2010,25 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     stream.close();
   });
 
+  it('publishes a command catalog loaded after the client connects', async () => {
+    const { sessionId, stub } = await setup();
+    const stream = await connectStream(sessionId);
+    await waitForStreamEvent(stream, 'commands.available');
+    const commands = [{ name: 'profile-check', description: 'Check the profile' }];
+    await stub.onEvents({ events: [{ type: 'commands.available', properties: { commands } }] });
+    const updated = await waitForStreamEvent(stream, 'commands.available');
+    expect(updated.data).toMatchObject({
+      commands: expect.arrayContaining([expect.objectContaining(commands[0])]),
+    });
+    stream.close();
+    await evictAllDurableObjects();
+    const reconnected = await connectStream(sessionId);
+    expect((await waitForStreamEvent(reconnected, 'commands.available')).data).toMatchObject({
+      commands: expect.arrayContaining([expect.objectContaining(commands[0])]),
+    });
+    reconnected.close();
+  });
+
   it('returns session-not-found for an old-plane instance after the storage cutover', async () => {
     const sessionId = newSessionId();
     const sandboxId = unique('sbx__session_v2');

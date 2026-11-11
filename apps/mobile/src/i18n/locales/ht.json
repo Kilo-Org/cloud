@@ -22,6 +22,8 @@
     "expired": "Ekspire"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Anile",
     "done": "Fèt",
     "retry": "Eseye ankò",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "Chwazi pwofil la",
       "manualOverrides": "Manyèl overrides",
       "openSettingsToReview": "Louvri Anviwònman pou revize",
-      "profileSelection": "Seleksyon pwofil"
+      "profileSelection": "Seleksyon pwofil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Nou mete {{displayCount}} fichye ajou.",
@@ -3535,7 +3538,7 @@
       "provider": "Sispann: erè founisè",
       "tool": "Sispann: erè zouti",
       "cancelled": "Sispann: anile",
-      "other": "SISPANN"
+      "other": "Sispann"
     }
   },
   "transcriptionModel": {
@@ -4271,10 +4274,10 @@
     "snapshotSummaryFailed": "Rezime AI a echwe. Apèsi estriktire ou a toujou disponib.",
     "scheduledContextEnabled": "Rapò pwograme",
     "scheduledContextSettings": "Rapò pwograme · {{context}}",
-    "scheduledContextHint": "Aktive anrejistreman pwograme ak rezime AI peye pou kontèks sa a sèlman. Yo voye ekstrè yo chwazi, apre yo fin retire enfòmasyon sansib yo, ansanm ak fè estriktire bay modèl ou a. Rezime yo sèvi ak lang aplikasyon an ki anrejistre lè ou chanje paramèt rapò yo ou menm. Lang sa a pa mete ajou otomatikman lè ou chanje lang aplikasyon an. Frè yo soti nan balans kontèks sa a. Apèsi san aktivite yo pa sèvi ak AI.",
+    "scheduledContextHint": "Aktive anrejistreman pwograme ak rezime AI peye pou kontèks sa a sèlman. Yo voye ekstrè yo chwazi, apre yo fin retire enfòmasyon sansib yo, ansanm ak fè estriktire bay modèl ou a. Rezime yo sèvi ak lang aplikasyon an ki anrejistre lè ou chanje paramèt rapò yo ou menm. Frè yo soti nan balans kontèks sa a. Apèsi san aktivite yo pa sèvi ak AI.",
     "snapshotSafeguards": "Limit tan ak depans pou chak rezime aplike pou chak apèsi pwograme, se pa yon bidjè chak jou.",
     "snapshotEstimateInputTooLarge": "Apèsi sa a gen twòp prèv pou modèl ou chwazi a.",
-    "quietSnapshot": "Yo pa t chwazi okenn aktivite sesyon pou apèsi sa a nan seleksyon ki fèt nan mezi sa posib la. Yo pa t rele okenn modèl AI pou fè yon rezime, epi yo pa t chaje okenn frè.",
+    "quietSnapshot": "Yo pa t chwazi okenn aktivite sesyon pou apèsi sa a. Yo pa t mande ni chaje okenn rezime AI.",
     "noEnabledContexts": "Pa gen kontèks ki aktive pou rapò pwograme yo",
     "sourceBlocker": "Sesyon an bezwen atansyon",
     "sourceMetadata": "Metadone sesyon an ki anrejistre"

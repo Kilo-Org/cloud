@@ -22,6 +22,8 @@
     "expired": "Platnost vypršela"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Zrušit",
     "done": "Hotovo",
     "retry": "Zkusit znovu",
@@ -2541,7 +2543,8 @@
       "selectedProfile": "Vybraný profil",
       "manualOverrides": "Ruční ovládání",
       "openSettingsToReview": "Pro kontrolu otevřete Nastavení",
-      "profileSelection": "Výběr profilu"
+      "profileSelection": "Výběr profilu",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Byl aktualizován {{displayCount}} soubor.",
@@ -3645,7 +3648,7 @@
       "provider": "Zastaveno: chyba poskytovatele",
       "tool": "Zastaveno: chyba nástroje",
       "cancelled": "Zastaveno: zrušeno",
-      "other": "ZASTAVENO"
+      "other": "Zastaveno"
     }
   },
   "transcriptionModel": {
@@ -4403,10 +4406,10 @@
     "snapshotSummaryFailed": "AI shrnutí selhalo. Strukturovaný snímek je stále dostupný.",
     "scheduledContextEnabled": "Naplánované přehledy",
     "scheduledContextSettings": "Naplánované přehledy · {{context}}",
-    "scheduledContextHint": "Povolte plánované zachycování stavu a placená AI shrnutí pouze pro tento kontext. Vybrané úryvky s odstraněnými citlivými údaji a strukturovaná fakta se odesílají vašemu modelu. Shrnutí používají jazyk aplikace uložený při uložení změn nastavení přehledu. Samotná změna jazyka aplikace jazyk shrnutí nezmění. Poplatky se strhávají z kreditu tohoto kontextu. Snímky bez aktivity nevyužívají AI.",
+    "scheduledContextHint": "Povolte plánované zachycování stavu a placená AI shrnutí pouze pro tento kontext. Vybrané úryvky s odstraněnými citlivými údaji a strukturovaná fakta se odesílají vašemu modelu. Shrnutí používají jazyk aplikace uložený při uložení změn nastavení přehledu. Poplatky se strhávají z kreditu tohoto kontextu. Snímky bez aktivity nevyužívají AI.",
     "snapshotSafeguards": "Limity času a útraty pro každé shrnutí platí pro každý naplánovaný snímek, nejde o denní rozpočet.",
     "snapshotEstimateInputTooLarge": "Tento snímek obsahuje příliš mnoho podkladů pro vybraný model.",
-    "quietSnapshot": "Pro tento snímek nebyla vybrána žádná aktivita relací. Výběr nemusí být úplný. Nebyl odeslán žádný požadavek na AI shrnutí ani účtován žádný poplatek.",
+    "quietSnapshot": "Pro tento snímek nebyla vybrána žádná aktivita relací. Nebyl odeslán žádný požadavek na AI shrnutí ani účtován žádný poplatek.",
     "noEnabledContexts": "Pro naplánované přehledy nejsou povoleny žádné kontexty",
     "sourceBlocker": "Relace vyžaduje pozornost",
     "sourceMetadata": "Zachycená metadata relace"

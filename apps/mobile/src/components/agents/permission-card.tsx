@@ -125,6 +125,11 @@ export function PermissionCard({
   // or machine payloads and must not reach the card as raw key/value rows.
   const parsedCommand = commandSchema.safeParse(metadata?.command);
   const command = parsedCommand.success ? parsedCommand.data : null;
+  // Patterns are the rule-matching form of the request, not display copy. When
+  // the verbatim command is present they repeat it in a different spelling, so
+  // the card shows the command alone and keeps the patterns for requests that
+  // have no command, such as path scopes.
+  const showPatterns = patterns.length > 0 && !command;
 
   return (
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
@@ -149,7 +154,7 @@ export function PermissionCard({
             {t('agentChat.permissionCard.allowQuestion', { permission: permissionDisplay })}
           </Text>
 
-          {patterns.length > 0 ? (
+          {showPatterns ? (
             <View className="gap-1 rounded-lg bg-muted p-2">
               <Text className="text-xs font-medium text-muted-foreground">
                 {t('agentChat.permissionCard.appliesTo')}

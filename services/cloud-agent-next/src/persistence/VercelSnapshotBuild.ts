@@ -54,7 +54,12 @@ import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-
 import { resolveSecret } from '../auth.js';
 import { CONTROL_PLANE_ALLOCATION_ID_ENV } from '../shared/control-plane-protocol.js';
 import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
-import { VERCEL_BASE_SYSTEM_SETUP, VERCEL_BASE_NODE_SETUP } from '../byoc/vercel-runtime-base.js';
+import {
+  VERCEL_BASE_SYSTEM_SETUP,
+  VERCEL_BASE_NODE_SETUP,
+  VERCEL_BASE_GH_STACK_SETUP,
+  VERCEL_BASE_GH_STACK_VERIFICATION,
+} from '../byoc/vercel-runtime-base.js';
 import {
   installPinnedNpmPackageScript,
   toolchainVerificationScript,
@@ -665,6 +670,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
           '-lc',
           [
             VERCEL_BASE_NODE_SETUP,
+            VERCEL_BASE_GH_STACK_SETUP,
             installPinnedNpmPackageScript('kilo'),
             toolchainVerificationScript(['bun', 'kilo']),
             'case "$(node --version)" in v24.*) ;; *) exit 1 ;; esac',
@@ -718,6 +724,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
             'test -f /usr/local/bin/kilocode-control-plane-wrapper.js',
             toolchainVerificationScript(['bun', 'kilo']),
             `test "$(node --version | cut -c1-3)" = "v24"`,
+            VERCEL_BASE_GH_STACK_VERIFICATION,
             `control_hash="$(sha256sum /usr/local/bin/kilocode-control-plane-wrapper.js | cut -d' ' -f1)"`,
             `jq -e --arg build ${JSON.stringify(state.runtime_build_id)} --arg bun ${JSON.stringify(PINNED_BUN_VERSION)} --arg control "$control_hash" '.runtimeBuildId == $build and .bunVersion == $bun and .controlWrapperSha256 == $control' /usr/local/share/kilo/runtime-manifest.json >/dev/null`,
           ].join('\n'),

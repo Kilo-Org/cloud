@@ -733,7 +733,7 @@ function buildRegistrationInput(
   const now = Date.now();
   // Explicit field list: a sibling session inherits route/agent/profile but not
   // the parent's callback, clone source, devcontainer runtime or initial
-  // message. `workspace` is the resolved worktree placement.
+  // message. Siblings reuse their workspace's exclusive sandbox, never another workspace's.
   const metadata: SessionMetadata = {
     metadataSchemaVersion: 2,
     allowSubagentSessions:

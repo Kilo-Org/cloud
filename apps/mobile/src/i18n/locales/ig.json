@@ -22,6 +22,8 @@
     "expired": "Oge agwụla"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Kagbuo",
     "done": "Emechara",
     "retry": "Nwaa ọzọ",
@@ -2457,7 +2459,8 @@
       "selectedProfile": "profaịlụ ahọpụtara",
       "manualOverrides": "Mgbanwe aka",
       "openSettingsToReview": "Mepee Ntọala ka ịlele",
-      "profileSelection": "Nhọrọ profaịlụ"
+      "profileSelection": "Nhọrọ profaịlụ",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Emelitere faịlụ {{displayCount}}.",
@@ -4271,7 +4274,7 @@
     "snapshotSummaryFailed": "Nchịkọta AI dara. Ndekọ ọnọdụ gị ahaziri ahazi ka dị.",
     "scheduledContextEnabled": "Akụkọ a haziri oge ha",
     "scheduledContextSettings": "Akụkọ a haziri oge ha · {{context}}",
-    "scheduledContextHint": "Kwado ndekọ ọnọdụ n'oge a kara aka na nchịkọta AI akwụ ụgwọ maka ọnọdụ a naanị. A na-ezigara ụdị gị akụkụ ahọpụtara, nke e wepụrụ ozi nzuzo na ha, na eziokwu ahaziri ahazi. Nchịkọta na-eji asụsụ ngwa e chekwara. A na-echekwa asụsụ a naanị mgbe ị gbanwere ntọala akụkọ n'onwe gị; ọ naghị agbanwe na-akpaghị aka mgbe asụsụ ngwa gbanwere. Ụgwọ na-eji ego fọdụrụ n'ọnọdụ a. Ndekọ ọnọdụ na-enweghị ọrụ anaghị eji AI.",
+    "scheduledContextHint": "Kwado ndekọ ọnọdụ n'oge a kara aka na nchịkọta AI akwụ ụgwọ maka ọnọdụ a naanị. A na-ezigara ụdị gị akụkụ ahọpụtara, nke e wepụrụ ozi nzuzo na ha, na eziokwu ahaziri ahazi. Nchịkọta na-eji asụsụ ngwa e chekwara mgbe ị na-emelite ntọala akụkọ. Ụgwọ na-eji ego fọdụrụ n'ọnọdụ a. Ndekọ ọnọdụ na-enweghị ọrụ anaghị eji AI.",
     "snapshotSafeguards": "Oke oge na mmefu maka nchịkọta ọ bụla na-emetụta ndekọ ọnọdụ ọ bụla a haziri oge ya, ọ bụghị mmefu kwa ụbọchị.",
     "snapshotEstimateInputTooLarge": "Ndekọ ọnọdụ a nwere ihe akaebe karịrị nke ụdị AI ahọpụtara nwere ike ijikwa.",
     "quietSnapshot": "Enweghị ọrụ nnọkọ ahọpụtara maka ndekọ ọnọdụ a. A rịọghị nchịkọta AI, a naraghịkwa ụgwọ.",

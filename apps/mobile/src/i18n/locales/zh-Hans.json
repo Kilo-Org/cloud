@@ -22,6 +22,8 @@
     "expired": "已过期"
   },
   "common": {
+    "sentenceJoiner": "。",
+    "listJoiner": "、",
     "cancel": "取消",
     "done": "完成",
     "retry": "重试",
@@ -1919,7 +1921,8 @@
       "selectedProfile": "选定的配置文件",
       "manualOverrides": "手动覆盖",
       "openSettingsToReview": "打开设置进行查看",
-      "profileSelection": "配置文件选择"
+      "profileSelection": "配置文件选择",
+      "profileLayerAccessibility": "{{label}}：{{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件。",
@@ -4271,10 +4274,10 @@
     "snapshotSummaryFailed": "AI 摘要生成失败。你的结构化快照仍可查看。",
     "scheduledContextEnabled": "定时简报",
     "scheduledContextSettings": "定时简报 · {{context}}",
-    "scheduledContextHint": "仅为此上下文启用定时采集和付费 AI 摘要。经选择和脱敏的摘录及结构化信息将发送给你的模型。摘要使用你明确更改简报偏好设置时保存的应用语言，不会随应用语言的变化自动同步。费用从此上下文的余额中扣除。无活动的快照不使用 AI。",
+    "scheduledContextHint": "仅为此上下文启用定时采集和付费 AI 摘要。经选择和脱敏的摘录及结构化信息将发送给你的模型。摘要使用你更新简报偏好设置时保存的应用语言。费用从此上下文的余额中扣除。无活动的快照不使用 AI。",
     "snapshotSafeguards": "每份摘要的时间和花费保护上限适用于每个定时快照，并非每日预算。",
     "snapshotEstimateInputTooLarge": "此快照的证据量超出所选模型可处理的范围。",
-    "quietSnapshot": "此次快照已尽力筛选，但未选中任何会话活动。未调用 AI 生成摘要，也未产生费用。",
+    "quietSnapshot": "此次快照未选中任何会话活动。未请求 AI 摘要，也未产生费用。",
     "noEnabledContexts": "未为定时简报启用任何上下文",
     "sourceBlocker": "会话需要关注",
     "sourceMetadata": "已采集的会话元数据"

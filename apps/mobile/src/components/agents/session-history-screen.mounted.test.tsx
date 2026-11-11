@@ -23,6 +23,9 @@ type MockStoredSession = Pick<StoredSession, 'session_id' | 'organization_id'> &
 const listState = vi.hoisted(() => ({
   storedSessions: [] as MockStoredSession[],
   isSearching: false,
+  // Mirrors the hook's restorePending: the saved search has not reached the
+  // search state yet, so the body must load instead of claiming a result.
+  restorePending: false,
   isError: false,
   // Mirrors the real hook's stored-query flags so the screen's loading
   // decision can be exercised on the first render, before the request
@@ -160,6 +163,7 @@ vi.mock('@/components/screen-header', () => ({
 vi.mock('@/components/agents/use-session-search-input', () => ({
   useSessionSearchInput: () => ({
     searchQuery: listState.isSearching ? 'no matching sessions' : '',
+    restorePending: listState.restorePending,
     searchInputRef: { current: null },
     hasText: listState.isSearching,
     awaitingCommit: false,
@@ -358,6 +362,7 @@ describe('SessionHistoryScreen', () => {
     listState.storedQuery.mockClear();
     listState.searchQuery.mockClear();
     listState.repositoryQuery.mockClear();
+    listState.restorePending = false;
     readFilterRecord.mockReset();
     readFilterRecord.mockResolvedValue(null);
     focusState.current = true;
@@ -769,6 +774,44 @@ describe('SessionHistoryScreen', () => {
     const content = findNodeByType(renderer, 'AgentSessionListContent');
     expect(content.props.isLoading).toBe(false);
     expect(content.props.hasAnySessions).toBe(false);
+  });
+
+  it('keeps the loading body until the saved search draft settles, then hands the search body over', async () => {
+    // Reopen with a saved search: the durable draft is the only source of the
+    // search text, and it settles after the mount. Painting the unfiltered
+    // list, or "No past sessions", before that claims a result the saved search
+    // is about to replace, and the replacement used to land on an unpainted
+    // body.
+    listState.restorePending = true;
+    listState.storedSessions = [];
+    listState.storedIsPending = false;
+    listState.storedLoadedPageCount = 1;
+    const queryClient = createTestQueryClient();
+    const renderer = await renderScreen(queryClient);
+
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isLoading).toBe(true);
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.hasActiveQuery).toBe(false);
+
+    listState.restorePending = false;
+    listState.isSearching = true;
+    act(() => {
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(SessionHistoryScreen)
+        )
+      );
+    });
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props).toMatchObject({
+      isLoading: false,
+      isSearching: true,
+      hasActiveQuery: true,
+      hasAnySessions: true,
+      sections: [],
+    });
   });
 
   it('names history and keeps back navigation available for direct entry', async () => {

@@ -8,7 +8,7 @@
       "scheduledAction": "Une action planifiée a une mise à jour",
       "lowBalance": "Votre solde nécessite une attention",
       "spendAlert": "Vos dépenses nécessitent une attention",
-      "securityFinding": "Un résultat de sécurité nécessite une attention",
+      "securityFinding": "Un signalement de sécurité nécessite une attention",
       "securityUpdate": "Une vérification de sécurité a une mise à jour",
       "activeAgentsGlanceable": "Les agents actifs ont une mise à jour"
     }
@@ -49,7 +49,7 @@
       "body": "Les dépenses de {{scopeName}} ont dépassé ${{amountUsd}}"
     },
     "securityFindingNew": {
-      "title": "Nouveau résultat de sécurité ({{severity}})",
+      "title": "Nouveau signalement de sécurité ({{severity}})",
       "body": "{{findingTitle}} dans {{repoFullName}}"
     },
     "securityFindingSlaWarning": {
@@ -67,7 +67,7 @@
   },
   "instanceLifecycle": {
     "ready": {
-      "title": "{{instanceName}} est prête",
+      "title": "{{instanceName}} est disponible",
       "body": "Appuyez pour commencer à discuter."
     },
     "startFailed": {
@@ -85,7 +85,7 @@
       "body": "Le redémarrage précédemment prévu a été annulé."
     },
     "versionChangeNotice": {
-      "title": "{{instanceName}} va bientôt être mise à niveau",
+      "title": "Mise à niveau imminente pour {{instanceName}}",
       "bodyWithTag": "Mise à niveau vers {{targetImageTag}} à {{when}}.",
       "bodyWithoutTag": "Mise à niveau prévue à {{when}}."
     },

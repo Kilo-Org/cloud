@@ -7,7 +7,8 @@ import { selectedRuntimeCli } from '../shared/runtime-distribution.js';
 import { classifyControlPlaneFailure } from '../telemetry/control-plane-failure.js';
 import { loadRuntimeRelease } from './runtime-release-loader.js';
 import { downloadedStartup } from './downloaded-startup.js';
-import { newSandboxHarness, selectStartup, startupRepositoryKey } from './startup-selection.js';
+import { newSandboxHarness, selectStartup } from './startup-selection.js';
+import { RetiredSandboxProviderError } from './retired-cloudflare-provider.js';
 import {
   mintRuntimeArtifactGrant,
   validateRuntimeArtifactGrant,
@@ -68,20 +69,18 @@ const scopedEnv = {
   RUNTIME_STARTUP_MODE: 'downloaded',
   NATIVE_RUNTIME_IMAGE: 'runtime-free',
   RUNTIME_RELEASE_DESCRIPTOR: text,
-  RUNTIME_INTERACTIVE_ORG_IDS: interactiveOrgId,
 } as const;
 const isolatedCohort = {
   preparingRoutes: [orgRoute],
   sandboxId: isolatedSandboxId,
   sandboxKind: 'isolated' as const,
 };
-const baseline = { mode: 'preinstalled', image: 'all-in-one' } as const;
 const scopedDownloaded = { mode: 'downloaded', image: 'runtime-free', descriptor: text } as const;
 
 describe('startup selection and preflight', () => {
-  it('preserves absent configuration for each provider', () => {
-    for (const provider of ['cloudflare', 'cloudflare-containers', 'vercel'] as const)
-      expect(selectStartup({}, provider)).toEqual({ mode: 'preinstalled', image: 'all-in-one' });
+  it('requires a release descriptor instead of falling back to an image runtime', () => {
+    for (const provider of ['cloudflare-containers', 'vercel'] as const)
+      expect(() => selectStartup({}, provider)).toThrow('configuration');
   });
   it.each([
     [{ RUNTIME_STARTUP_MODE: 'invalid' }, 'cloudflare-containers'],
@@ -90,14 +89,14 @@ describe('startup selection and preflight', () => {
   ] as const)('rejects unsupported configuration before provider work: %s', (env, provider) => {
     expect(() => selectStartup(env, provider)).toThrow('configuration');
   });
-  it('keeps preinstalled startup for SDK pins on a downloaded target', () => {
-    for (const provider of ['cloudflare'] as const)
-      expect(
-        selectStartup(
-          { RUNTIME_STARTUP_MODE: 'downloaded', RUNTIME_RELEASE_DESCRIPTOR: text },
-          provider
-        ).mode
-      ).toBe('preinstalled');
+  it('rejects the retired SDK provider for a new allocation', () => {
+    expect(() => selectStartup({}, 'cloudflare')).toThrow(RetiredSandboxProviderError);
+    expect(() =>
+      selectStartup(
+        { RUNTIME_STARTUP_MODE: 'downloaded', RUNTIME_RELEASE_DESCRIPTOR: text },
+        'cloudflare'
+      )
+    ).toThrow(RetiredSandboxProviderError);
   });
   it('selects downloaded startup for Vercel and requires its release descriptor', () => {
     expect(
@@ -110,8 +109,8 @@ describe('startup selection and preflight', () => {
       'configuration'
     );
   });
-  it('keeps image and mode independent and isolates downloaded snapshot keys', () => {
-    for (const image of ['all-in-one', 'runtime-free'])
+  it('defaults to runtime-free and rejects retired startup selections', () => {
+    for (const image of [undefined, 'runtime-free'])
       expect(
         selectStartup(
           {
@@ -122,8 +121,18 @@ describe('startup selection and preflight', () => {
           'cloudflare-containers'
         ).mode
       ).toBe('downloaded');
-    expect(startupRepositoryKey('repo', 'preinstalled')).toBe('repo');
-    expect(startupRepositoryKey('repo', 'downloaded')).not.toBe('repo');
+    expect(() =>
+      selectStartup(
+        { RUNTIME_RELEASE_DESCRIPTOR: text, NATIVE_RUNTIME_IMAGE: 'all-in-one' },
+        'cloudflare-containers'
+      )
+    ).toThrow('configuration');
+    expect(() =>
+      selectStartup(
+        { RUNTIME_RELEASE_DESCRIPTOR: text, RUNTIME_STARTUP_MODE: 'preinstalled' },
+        'cloudflare-containers'
+      )
+    ).toThrow('configuration');
   });
   it('keeps the configured target when no interactive org scope is configured', () => {
     expect(
@@ -218,11 +227,11 @@ describe('startup selection and preflight', () => {
       'no preparing routes',
       { preparingRoutes: [], sandboxId: isolatedSandboxId, sandboxKind: 'isolated' as const },
     ],
-  ])('keeps %s on the baseline', (_name, cohort) => {
-    expect(selectStartup(scopedEnv, 'cloudflare-containers', cohort)).toEqual(baseline);
+  ])('downloads the runtime even for %s', (_name, cohort) => {
+    expect(selectStartup(scopedEnv, 'cloudflare-containers', cohort)).toEqual(scopedDownloaded);
   });
-  it('does not require a descriptor for an excluded cohort', () => {
-    expect(
+  it('requires a descriptor regardless of cohort', () => {
+    expect(() =>
       selectStartup(
         { ...scopedEnv, RUNTIME_RELEASE_DESCRIPTOR: undefined },
         'cloudflare-containers',
@@ -232,7 +241,7 @@ describe('startup selection and preflight', () => {
           sandboxKind: 'isolated',
         }
       )
-    ).toEqual(baseline);
+    ).toThrow('configuration');
     expect(() =>
       selectStartup(
         { ...scopedEnv, RUNTIME_RELEASE_DESCRIPTOR: undefined },
@@ -241,21 +250,22 @@ describe('startup selection and preflight', () => {
       )
     ).toThrow('configuration');
   });
-  it('keeps SDK pins on the baseline even for a matching cohort', () => {
-    expect(selectStartup(scopedEnv, 'cloudflare', isolatedCohort)).toEqual(baseline);
+  it('rejects SDK pins even for a matching cohort', () => {
+    expect(() => selectStartup(scopedEnv, 'cloudflare', isolatedCohort)).toThrow(
+      RetiredSandboxProviderError
+    );
   });
-  it('applies the organization scope to Vercel without native isolation', () => {
+  it('downloads on Vercel regardless of organization', () => {
     expect(selectStartup(scopedEnv, 'vercel', { preparingRoutes: [orgRoute] })).toEqual(
       scopedDownloaded
     );
-    expect(selectStartup(scopedEnv, 'vercel', {})).toEqual(baseline);
+    expect(selectStartup(scopedEnv, 'vercel', {})).toEqual(scopedDownloaded);
     expect(
       selectStartup(scopedEnv, 'vercel', { preparingRoutes: [{ ...orgRoute, orgId: otherOrgId }] })
-    ).toEqual(baseline);
+    ).toEqual(scopedDownloaded);
   });
-  it('ignores an invalid interactive scope before native downloaded startup is selected', () => {
+  it('rejects obsolete interactive startup scope without fallback', () => {
     for (const [env, provider] of [
-      [{ ...scopedEnv, RUNTIME_INTERACTIVE_ORG_IDS: '*' }, 'cloudflare'],
       [
         {
           ...scopedEnv,
@@ -266,16 +276,16 @@ describe('startup selection and preflight', () => {
         'cloudflare-containers',
       ],
     ] as const)
-      expect(selectStartup(env, provider, isolatedCohort)).toEqual(baseline);
+      expect(() => selectStartup(env, provider, isolatedCohort)).toThrow('configuration');
   });
-  it('keeps an empty configured scope on the baseline', () => {
-    expect(
+  it('rejects an empty obsolete startup scope', () => {
+    expect(() =>
       selectStartup(
         { ...scopedEnv, RUNTIME_INTERACTIVE_ORG_IDS: '' },
         'cloudflare-containers',
         isolatedCohort
       )
-    ).toEqual(baseline);
+    ).toThrow('configuration');
   });
   it.each(['*', 'not-a-uuid', `${interactiveOrgId},*`])(
     'rejects a non-UUID or wildcard interactive scope: %s',
@@ -497,7 +507,7 @@ describe('runtime harness selection', () => {
       }
     }
   );
-  it('keeps v1 when the list is unset or empty, or startup is not downloaded', () => {
+  it('keeps v1 when its list is unset or empty and rejects retired startup paths', () => {
     for (const ids of [undefined, ''])
       expect(
         newSandboxHarness(
@@ -506,14 +516,16 @@ describe('runtime harness selection', () => {
           webCohort
         )
       ).toBe('kilo');
-    expect(newSandboxHarness(kilo2Env, 'cloudflare', webCohort)).toBe('kilo');
-    expect(
+    expect(() => newSandboxHarness(kilo2Env, 'cloudflare', webCohort)).toThrow(
+      RetiredSandboxProviderError
+    );
+    expect(() =>
       newSandboxHarness(
         { ...kilo2Env, RUNTIME_INTERACTIVE_ORG_IDS: otherOrgId },
         'cloudflare-containers',
         webCohort
       )
-    ).toBe('kilo');
+    ).toThrow('configuration');
     expect(() =>
       newSandboxHarness(
         { ...kilo2Env, RUNTIME_KILO2_ORG_IDS: '*' },

@@ -11,6 +11,7 @@ import {
   kilo_pass_org_term_versions,
   kilocode_users,
   organization_memberships,
+  organization_seats_purchases,
   organization_user_limits,
   organization_user_usage,
   organizations,
@@ -46,6 +47,7 @@ const connectionString = process.env.POSTGRES_URL;
 if (!connectionString) throw new Error('Set POSTGRES_URL to the isolated local test database');
 const client = createDrizzleClient({ connectionString, ssl: false });
 const fixtures: { userId: string; orgId: string; skuId: string }[] = [];
+const parentOrgIds: string[] = [];
 
 beforeAll(async () => {
   const now = new Date();
@@ -80,6 +82,9 @@ afterAll(async () => {
     await client.db
       .delete(credit_transactions)
       .where(eq(credit_transactions.organization_id, f.orgId));
+    await client.db
+      .delete(organization_seats_purchases)
+      .where(eq(organization_seats_purchases.organization_id, f.orgId));
     for (const agreement of agreements)
       await client.db
         .delete(kilo_pass_org_term_versions)
@@ -87,6 +92,12 @@ afterAll(async () => {
     await client.db.delete(organizations).where(eq(organizations.id, f.orgId));
     await client.db.delete(kilocode_users).where(eq(kilocode_users.id, f.userId));
     await client.db.delete(cloud_billing_sku).where(eq(cloud_billing_sku.id, f.skuId));
+  }
+  for (const parentOrgId of parentOrgIds) {
+    await client.db
+      .delete(organization_seats_purchases)
+      .where(eq(organization_seats_purchases.organization_id, parentOrgId));
+    await client.db.delete(organizations).where(eq(organizations.id, parentOrgId));
   }
   await client.pool.end();
 });
@@ -215,6 +226,187 @@ async function fixture() {
 }
 
 describe('native organization compute accounting', () => {
+  it.each([
+    {
+      plan: 'teams',
+      owner: 'self',
+      trialEnded: true,
+      seats: ['active'],
+      explicit: false,
+      billingMode: 'paid',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'self',
+      trialEnded: true,
+      seats: [],
+      explicit: false,
+      billingMode: 'shadow',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'self',
+      trialEnded: true,
+      seats: [],
+      explicit: true,
+      billingMode: 'paid',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'self',
+      trialEnded: false,
+      seats: [],
+      explicit: false,
+      billingMode: 'paid',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'self',
+      trialEnded: false,
+      seats: ['active'],
+      explicit: false,
+      billingMode: 'shadow',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'self',
+      trialEnded: false,
+      seats: ['past_due'],
+      explicit: false,
+      billingMode: 'shadow',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'self',
+      trialEnded: false,
+      seats: ['trialing'],
+      explicit: false,
+      billingMode: 'paid',
+    },
+    // An old active purchase must not hide a newer cancellation.
+    {
+      plan: 'enterprise',
+      owner: 'self',
+      trialEnded: false,
+      seats: ['active', 'ended'],
+      explicit: false,
+      billingMode: 'paid',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'parent',
+      trialEnded: true,
+      seats: [],
+      explicit: false,
+      billingMode: 'shadow',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'parent',
+      trialEnded: false,
+      seats: [],
+      explicit: false,
+      billingMode: 'paid',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'parent',
+      trialEnded: false,
+      seats: ['active'],
+      explicit: false,
+      billingMode: 'shadow',
+    },
+    {
+      plan: 'teams',
+      owner: 'parent',
+      trialEnded: true,
+      seats: [],
+      explicit: false,
+      billingMode: 'paid',
+    },
+    {
+      plan: 'enterprise',
+      owner: 'deleted-parent',
+      trialEnded: true,
+      seats: [],
+      explicit: false,
+      billingMode: 'paid',
+    },
+    // A child can hold its own subscription while the parent is in its trial.
+    {
+      plan: 'enterprise',
+      owner: 'parent-with-child-seats',
+      trialEnded: false,
+      seats: ['active'],
+      explicit: false,
+      billingMode: 'shadow',
+    },
+  ] as const)(
+    'uses $billingMode billing for a $plan $owner org (trial ended: $trialEnded, seats: $seats, explicit: $explicit)',
+    async ({ plan, owner, trialEnded, seats, explicit, billingMode }) => {
+      const f = await fixture();
+      f.config.cloudAgentOrgIds = new Set(explicit ? [f.orgId] : ['*']);
+      f.config.warnRemainingMicrodollars = 5_000_000;
+      const trial = {
+        plan,
+        free_trial_end_at: new Date(f.start + (trialEnded ? -1 : 1) * 86_400_000).toISOString(),
+      };
+      let ownerId = f.orgId;
+      if (owner === 'self') {
+        await client.db.update(organizations).set(trial).where(eq(organizations.id, f.orgId));
+      } else {
+        // A new teams child: only the parent's plan and trial apply.
+        ownerId = crypto.randomUUID();
+        parentOrgIds.push(ownerId);
+        await client.db.insert(organizations).values({
+          ...trial,
+          id: ownerId,
+          name: 'Compute parent',
+          deleted_at:
+            owner === 'deleted-parent' ? new Date(f.start - 86_400_000).toISOString() : null,
+        });
+        await client.db
+          .update(organizations)
+          .set({ parent_organization_id: ownerId })
+          .where(eq(organizations.id, f.orgId));
+      }
+      const seatOrgId = owner === 'parent-with-child-seats' ? f.orgId : ownerId;
+      if (seats.length > 0) {
+        await client.db.insert(organization_seats_purchases).values(
+          seats.map((status, index) => ({
+            organization_id: seatOrgId,
+            subscription_stripe_id: `sub_${seatOrgId}`,
+            subscription_status: status,
+            seat_count: 1,
+            amount_usd: 19,
+            starts_at: new Date(f.start).toISOString(),
+            expires_at: new Date(f.start + 30 * 86_400_000).toISOString(),
+            created_at: new Date(f.start - (seats.length - index) * 86_400_000).toISOString(),
+          }))
+        );
+      }
+      if (billingMode === 'shadow') await f.limit(0);
+
+      expect(await f.admission()).toMatchObject({ kind: 'applied', billingMode, dedup: false });
+      expect(await f.admission()).toMatchObject({ kind: 'applied', billingMode, dedup: true });
+      expect(await f.heartbeat()).toMatchObject({ billingMode, budget: { verdict: 'continue' } });
+      const charged = billingMode === 'paid';
+      expect((await f.payer()).microdollars_used).toBe(charged ? 3_000_000 : 0);
+      expect(await f.usage()).toBe(charged ? 3_000_000 : undefined);
+      const charges = await client.db
+        .select()
+        .from(compute_usage_charge)
+        .where(eq(compute_usage_charge.organization_id, f.orgId));
+      expect(charges).toHaveLength(charged ? 1 : 0);
+      const [interval] = await client.db
+        .select()
+        .from(container_usage_interval)
+        .where(eq(container_usage_interval.id, f.intervalId));
+      expect(interval.billing_mode).toBe(billingMode);
+      expect(interval.confirmed_seconds).toBe(300);
+    }
+  );
+
   it('blocks a $1.50 allowance, counts a running $3 charge once and recovers only after the allowance rises', async () => {
     const f = await fixture();
     await f.limit(1_500_000);

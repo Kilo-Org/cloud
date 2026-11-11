@@ -9,12 +9,11 @@ import {
 import type { RuntimeHarness } from '../shared/control-plane-runtime-contract.js';
 import type { AgentSandboxProvider, Env } from '../types.js';
 import { ProviderCreationError } from './provider.js';
+import { RetiredSandboxProviderError } from './retired-cloudflare-provider.js';
 
 export type StartupMode = 'preinstalled' | 'downloaded';
 export type NativeRuntimeImage = 'all-in-one' | 'runtime-free';
-export type StartupSelection =
-  | { mode: 'preinstalled'; image: NativeRuntimeImage }
-  | { mode: 'downloaded'; image: NativeRuntimeImage; descriptor: string };
+export type StartupSelection = { mode: 'downloaded'; image: 'runtime-free'; descriptor: string };
 
 export type StartupRouteIdentity = {
   orgId?: string;
@@ -52,11 +51,6 @@ function isIsolatedNativeSandbox(cohort: StartupCohortContext | undefined): bool
   return sandboxClass === 'isolated-small' || sandboxClass === 'isolated-standard';
 }
 
-/**
- * Every preparing route must belong to one configured organization, whatever
- * its origin. Mixed or missing identity stays on the baseline. Native sandboxes
- * must also be isolated.
- */
 function inOrgScope(
   provider: AgentSandboxProvider,
   cohort: StartupCohortContext | undefined,
@@ -88,24 +82,19 @@ type StartupEnv = Pick<
   | 'RUNTIME_KILO2_ORG_IDS'
 >;
 
-const BASELINE = { mode: 'preinstalled', image: 'all-in-one' } as const;
-
 function startupTarget(
   env: StartupEnv,
-  provider: AgentSandboxProvider,
-  cohort: StartupCohortContext | undefined
-): typeof BASELINE | { mode: 'downloaded'; image: NativeRuntimeImage } {
+  provider: AgentSandboxProvider
+): { mode: 'downloaded'; image: 'runtime-free' } {
+  if (provider === 'cloudflare') throw new RetiredSandboxProviderError('create');
+  if (env.RUNTIME_INTERACTIVE_ORG_IDS !== undefined)
+    throw new ProviderCreationError('invalid_configuration');
   const selected = runtimeStartupConfigSchema.safeParse({
-    mode: env.RUNTIME_STARTUP_MODE ?? 'preinstalled',
-    image: env.NATIVE_RUNTIME_IMAGE ?? 'all-in-one',
+    mode: env.RUNTIME_STARTUP_MODE ?? 'downloaded',
+    image: env.NATIVE_RUNTIME_IMAGE ?? 'runtime-free',
   });
   if (!selected.success) throw new ProviderCreationError('invalid_configuration');
   const { mode, image } = selected.data;
-  // The retired SDK provider keeps its preinstalled launch contract.
-  if (mode === 'preinstalled' || provider === 'cloudflare') return BASELINE;
-  const interactiveOrgIds = configuredOrgIds(env.RUNTIME_INTERACTIVE_ORG_IDS);
-  if (interactiveOrgIds !== undefined && !inOrgScope(provider, cohort, interactiveOrgIds))
-    return BASELINE;
   return { mode, image };
 }
 
@@ -120,7 +109,7 @@ export function newSandboxHarness(
   provider: AgentSandboxProvider,
   cohort?: StartupCohortContext
 ): RuntimeHarness {
-  if (startupTarget(env, provider, cohort).mode !== 'downloaded') return 'kilo';
+  startupTarget(env, provider);
   const orgIds = configuredOrgIds(env.RUNTIME_KILO2_ORG_IDS);
   return orgIds !== undefined &&
     inOrgScope(provider, cohort, orgIds) &&
@@ -133,22 +122,12 @@ export function newSandboxHarness(
 export function selectStartup(
   env: StartupEnv,
   provider: AgentSandboxProvider,
-  cohort?: StartupCohortContext,
+  _cohort?: StartupCohortContext,
   harness: RuntimeHarness = 'kilo'
 ): StartupSelection {
-  const target = startupTarget(env, provider, cohort);
-  if (target.mode === 'preinstalled') {
-    // Preinstalled images carry only v1, so a v2 sandbox cannot fall back to them.
-    if (harness === 'kilo2') throw new ProviderCreationError('invalid_configuration');
-    return target;
-  }
+  const target = startupTarget(env, provider);
   const descriptor =
     harness === 'kilo2' ? env.RUNTIME_RELEASE_DESCRIPTOR_KILO2 : env.RUNTIME_RELEASE_DESCRIPTOR;
   if (!descriptor) throw new ProviderCreationError('invalid_configuration');
   return { ...target, descriptor };
-}
-
-/** Preserve legacy preinstalled snapshot keys. Downloaded snapshots have a separate namespace. */
-export function startupRepositoryKey(repoKey: string, mode: StartupMode): string {
-  return mode === 'preinstalled' ? repoKey : `downloaded:${repoKey}`;
 }

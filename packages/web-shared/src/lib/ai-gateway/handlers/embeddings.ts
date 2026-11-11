@@ -366,7 +366,8 @@ export async function handleEmbeddingsRequest(
   const accounting = countAndStoreEmbeddingUsage(
     clonedResponse,
     usageContext,
-    embeddingRequestSpan
+    embeddingRequestSpan,
+    effectiveProvider
   );
   emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
 

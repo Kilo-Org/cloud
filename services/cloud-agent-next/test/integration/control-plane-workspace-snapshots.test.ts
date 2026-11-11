@@ -126,9 +126,6 @@ async function setup(
     await instance.getAllocationState();
     installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
       WORKSPACE_SNAPSHOT_IDS: options.enabled === false ? '' : USER,
-      RUNTIME_STARTUP_MODE: 'preinstalled',
-      NATIVE_RUNTIME_IMAGE: 'all-in-one',
-      RUNTIME_RELEASE_DESCRIPTOR: '',
       SANDBOX_CONTAINERS: { idFromName: (name: string) => ({ toString: () => `oc_${name}` }) },
     });
     installFakeRuntimeProxyPeer(instance, async (owner, id) => ({

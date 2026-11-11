@@ -22,6 +22,8 @@
     "expired": "Caducada"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Cancel·la",
     "done": "Fet",
     "retry": "Torna-ho a provar",
@@ -2499,7 +2501,8 @@
       "selectedProfile": "Perfil seleccionat",
       "manualOverrides": "Anul·lació manual",
       "openSettingsToReview": "Obriu Configuració per revisar-lo",
-      "profileSelection": "Selecció de perfil"
+      "profileSelection": "Selecció de perfil",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "S'ha actualitzat {{displayCount}} fitxer.",
@@ -3590,7 +3593,7 @@
       "provider": "Aturat: error del proveïdor",
       "tool": "Aturat: error de l'eina",
       "cancelled": "Aturat: cancel·lat",
-      "other": "ATURAT"
+      "other": "Aturat"
     }
   },
   "transcriptionModel": {
@@ -4294,11 +4297,11 @@
     "offline": "Sense connexió · informe desat",
     "cached": "Informe desat · no es pot actualitzar",
     "window": "{{start}} – {{end}}",
-    "summary": "Resum d'AI",
-    "summaryPending": "El resum d'AI està en curs. S'adjuntarà aquí quan estigui llest.",
-    "summaryUnavailable": "El resum d'AI no està disponible. L'informe estructurat continua disponible.",
-    "summaryCharge": "Càrrec d'AI: {{cost}}",
-    "summaryChargePending": "Càrrec d'AI pendent de conciliació",
+    "summary": "Resum d'IA",
+    "summaryPending": "El resum d'IA està en curs. S'adjuntarà aquí quan estigui llest.",
+    "summaryUnavailable": "El resum d'IA no està disponible. L'informe estructurat continua disponible.",
+    "summaryCharge": "Càrrec d'IA: {{cost}}",
+    "summaryChargePending": "Càrrec d'IA pendent de conciliació",
     "sources": "Proves i artefactes",
     "timezone": "Zona horària de l'informe",
     "deviceTimezone": "Usa la zona horària del dispositiu",
@@ -4309,7 +4312,7 @@
     "morningEnd": "Informe disponible fins a les",
     "timeHint": "La targeta d'Inici torna a l'estat en directe quan acaba la finestra de l'informe, fins i tot sense connexió.",
     "invalidSchedule": "Tria una zona horària vàlida i una finestra de l'informe no buida.",
-    "notificationsHint": "Una notificació genèrica per cada informe programat. Independent dels resums d'AI de pagament.",
+    "notificationsHint": "Una notificació genèrica per cada informe programat. Independent dels resums d'IA de pagament.",
     "notificationPermission": "Activa les notificacions del dispositiu a $t(common.notifications) per rebre l'informe.",
     "defaultModel": "Usa el model per defecte de Kilo",
     "duration": "Límit de temps (minuts)",
@@ -4318,7 +4321,7 @@
     "estimate": "Estimació {{estimate}} · màxim {{maximum}}",
     "estimateUnavailable": "No hi ha cap resum de pagament disponible per a aquesta configuració.",
     "confirmPaid": "Vols activar els resums de pagament per a {{context}}?",
-    "paidDisclosure": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} minuts. Els càrrecs s'apliquen encara que la generació falli.",
+    "paidDisclosure": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
     "enable": "Activa els resums de pagament",
     "allContexts": "Els informes personals i d'organització es mantenen separats.",
     "emptyHistory": "No hi ha informes desats",
@@ -4334,13 +4337,13 @@
     "capturedAt": "Capturada {{time}}",
     "snapshotHint": "Instantània de l'últim estat disponible de les sessions, capturada al matí a l'hora programada. Pot ser incompleta. Els recomptes descriuen les sessions seleccionades, no tota l'activitat nocturna.",
     "snapshotTruncated": "S'han omès algunes sessions o proves per limitar la mida d'aquesta instantània.",
-    "snapshotSummaryFailed": "El resum d'AI ha fallat. La instantània estructurada continua disponible.",
+    "snapshotSummaryFailed": "El resum d'IA ha fallat. La instantània estructurada continua disponible.",
     "scheduledContextEnabled": "Informes programats",
     "scheduledContextSettings": "Informes programats · {{context}}",
-    "scheduledContextHint": "Activa la captura programada i els resums d'AI de pagament només per a aquest context. S'envien al teu model fragments seleccionats amb les dades sensibles ocultes i dades estructurades. Els resums usen l'idioma de l'app desat quan canvies explícitament la configuració de l'informe. Aquest idioma no s'actualitza automàticament quan canvies l'idioma de l'app. Els càrrecs usen el saldo d'aquest context. Les instantànies sense activitat no usen AI.",
+    "scheduledContextHint": "Activa la captura programada i els resums d'IA de pagament només per a aquest context. S'envien al teu model fragments seleccionats amb les dades sensibles ocultes i dades estructurades. Els resums usen l'idioma de l'app desat quan actualitzes la configuració de l'informe. Els càrrecs usen el saldo d'aquest context. Les instantànies sense activitat no usen IA.",
     "snapshotSafeguards": "Els límits de temps i despesa per resum s'apliquen a cada instantània programada; no són un pressupost diari.",
     "snapshotEstimateInputTooLarge": "Aquesta instantània conté massa proves per al model seleccionat.",
-    "quietSnapshot": "No s'ha seleccionat cap activitat de sessió per a aquesta instantània. La selecció pot ser incompleta. No s'ha fet cap crida al model ni s'ha cobrat cap resum d'AI.",
+    "quietSnapshot": "No s'ha seleccionat cap activitat de sessió per a aquesta instantània. No s'ha sol·licitat ni s'ha cobrat cap resum d'IA.",
     "noEnabledContexts": "No hi ha cap context activat per als informes programats",
     "sourceBlocker": "La sessió requereix atenció",
     "sourceMetadata": "Metadades de sessió capturades"

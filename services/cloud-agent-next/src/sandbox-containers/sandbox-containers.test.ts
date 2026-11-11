@@ -1,4 +1,4 @@
-import { preinstalledStartup } from '../sandbox-control/preinstalled-startup.js';
+import { supervisorStartup } from '../../test/fixtures/supervisor-startup.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const { DurableObjectMock } = vi.hoisted(() => ({
@@ -367,7 +367,7 @@ function launch(
   env: Record<string, string> = {}
 ) {
   return instance.launchWrapper({
-    command: preinstalledStartup(),
+    command: supervisorStartup(),
     allocationRef,
     env,
     instance: 'standard-4',
@@ -403,12 +403,12 @@ describe('supplied startup command', () => {
 
   it('starts the code-review instance at the legacy code-review capacity', async () => {
     const { instance, container } = setup();
-    container.cmdlineRaw = `${preinstalledStartup().argv.join('\0')}\0`;
+    container.cmdlineRaw = `${supervisorStartup().argv.join('\0')}\0`;
 
     await expect(
       instance.launchWrapper({
         allocationRef: REF_A,
-        command: preinstalledStartup(),
+        command: supervisorStartup(),
         env: {},
         instance: 'code-review',
       })
@@ -491,7 +491,7 @@ function nativeStartOptions(
   env: Record<string, string> = {}
 ): Record<string, unknown> {
   return {
-    image: 'registry.example/kilo/app:test',
+    image: 'registry.example/kilo/runtime-free:test',
     instance,
     enableInternet: true,
     entrypoint: [...NATIVE_ENTRYPOINT],
@@ -527,7 +527,7 @@ describe('SandboxContainers egress enforcement', () => {
         instanceId: 'audit-allocation',
       });
       const input = {
-        command: preinstalledStartup(),
+        command: supervisorStartup(),
         allocationRef,
         env: { EGRESS_AUDIT: 'false', ALLOCATION_REF: 'sandbox-forged' },
         instance: 'standard-3' as const,
@@ -605,7 +605,7 @@ describe('SandboxContainers egress enforcement', () => {
       });
       await expect(
         state.instance.launchWrapper({
-          command: preinstalledStartup(),
+          command: supervisorStartup(),
           allocationRef: REF_A,
           env: {},
           instance: 'standard-3',
@@ -626,7 +626,7 @@ describe('SandboxContainers egress enforcement', () => {
         new Error('unavailable')
       );
       const input = {
-        command: preinstalledStartup(),
+        command: supervisorStartup(),
         allocationRef: REF_A,
         env: {},
         instance: 'standard-3' as const,
@@ -662,7 +662,7 @@ describe('SandboxContainers egress enforcement', () => {
       });
       const outbound = attachOutbound(state.instance);
       await state.instance.launchWrapper({
-        command: preinstalledStartup(),
+        command: supervisorStartup(),
         allocationRef: REF_A,
         env: {},
         instance: 'standard-3',
@@ -719,7 +719,7 @@ describe('SandboxContainers egress enforcement', () => {
       return exec(cmd, options);
     });
     await state.instance.launchWrapper({
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-3',
@@ -744,7 +744,7 @@ describe('SandboxContainers egress enforcement', () => {
       const { instance, container, readRecord } = setup();
       const outbound = attachOutbound(instance);
       await instance.launchWrapper({
-        command: preinstalledStartup(),
+        command: supervisorStartup(),
         allocationRef: REF_A,
         env: { EGRESS_ALLOWLIST: '*' },
         instance: 'standard-3',
@@ -785,7 +785,7 @@ describe('SandboxContainers egress enforcement', () => {
       vi.spyOn(container, method).mockRejectedValue(new Error('interceptor unavailable'));
       await expect(
         instance.launchWrapper({
-          command: preinstalledStartup(),
+          command: supervisorStartup(),
           allocationRef: REF_A,
           env: {},
           instance: 'standard-3',
@@ -800,7 +800,7 @@ describe('SandboxContainers egress enforcement', () => {
     const initial = setup();
     attachOutbound(initial.instance);
     await initial.instance.launchWrapper({
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-3',
@@ -809,7 +809,7 @@ describe('SandboxContainers egress enforcement', () => {
     const restored = setup({ record: initial.readRecord(), running: true });
     const outbound = attachOutbound(restored.instance);
     await restored.instance.launchWrapper({
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-3',
@@ -840,7 +840,7 @@ describe('SandboxContainers egress enforcement', () => {
       });
       await expect(
         instance.launchWrapper({
-          command: preinstalledStartup(),
+          command: supervisorStartup(),
           allocationRef: REF_A,
           env: {},
           instance: 'standard-3',
@@ -859,7 +859,7 @@ describe('SandboxContainers egress enforcement', () => {
     });
     await expect(
       instance.launchWrapper({
-        command: preinstalledStartup(),
+        command: supervisorStartup(),
         allocationRef: REF_A,
         env: {},
         instance: 'standard-3',
@@ -875,7 +875,7 @@ describe('SandboxContainers egress enforcement', () => {
       const { instance, container } = setup({ running: true });
       await expect(
         instance.launchWrapper({
-          command: preinstalledStartup(),
+          command: supervisorStartup(),
           allocationRef: REF_A,
           env: {},
           instance: 'standard-3',
@@ -892,7 +892,7 @@ describe('SandboxContainers egress enforcement', () => {
     const { instance, container } = setup();
     await expect(
       instance.launchWrapper({
-        command: preinstalledStartup(),
+        command: supervisorStartup(),
         allocationRef: REF_A,
         env: {},
         instance: 'standard-3',
@@ -924,7 +924,7 @@ describe('SandboxContainers egress enforcement', () => {
     attachOutbound(instance);
     container.startBehavior = 'effect-then-reject';
     const input = {
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-3' as const,
@@ -953,7 +953,7 @@ describe('SandboxContainers egress enforcement', () => {
     });
     attachOutbound(instance);
     await instance.launchWrapper({
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-3',
@@ -974,7 +974,7 @@ describe('SandboxContainers egress enforcement', () => {
     const outbound = attachOutbound(instance);
     container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
     await instance.launchWrapper({
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-3',
@@ -993,7 +993,7 @@ describe('SandboxContainers egress enforcement', () => {
     const { instance, container, readRecord } = setup();
     attachOutbound(instance);
     await instance.launchWrapper({
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-3',
@@ -1009,7 +1009,7 @@ describe('SandboxContainers egress enforcement', () => {
     const { instance, container, readRecord } = setup();
     attachOutbound(instance);
     const input = {
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-3' as const,
@@ -1034,7 +1034,7 @@ describe('SandboxContainers launch', () => {
     attachOutbound(instance);
 
     const result = await instance.launchWrapper({
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: { FOO: 'bar' },
       instance: 'standard-4',
@@ -1072,7 +1072,7 @@ describe('SandboxContainers launch', () => {
     });
 
     await instance.launchWrapper({
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_B,
       env: {},
       instance: 'standard-3',
@@ -1089,7 +1089,7 @@ describe('SandboxContainers launch', () => {
     attachOutbound(instance);
 
     await instance.launchWrapper({
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: { FOO: 'bar' },
       instance: 'standard-4',
@@ -1111,7 +1111,7 @@ describe('SandboxContainers launch', () => {
 
     await expect(
       instance.launchWrapper({
-        command: preinstalledStartup(),
+        command: supervisorStartup(),
         allocationRef: REF_A,
         env: { FOO: 'bar' },
         instance: 'standard-4',
@@ -1620,7 +1620,7 @@ describe('SandboxContainers launch', () => {
     });
 
     const resumed = await instance.launchWrapper({
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-3',
@@ -1848,7 +1848,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
 
       await expect(
         instance.launchWrapper({
-          command: preinstalledStartup(),
+          command: supervisorStartup(),
           allocationRef: REF_A,
           env: {},
           instance: 'standard-4',
@@ -1914,7 +1914,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
       attachOutbound(instance);
       await expect(
         instance.launchWrapper({
-          command: preinstalledStartup(),
+          command: supervisorStartup(),
           allocationRef: REF_A,
           env: {},
           instance: 'standard-4',
@@ -1944,7 +1944,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
     attachOutbound(instance);
 
     await instance.launchWrapper({
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-4',
@@ -2302,7 +2302,7 @@ describe('SandboxContainers native start confirmation', () => {
 
     const failed = expect(
       instance.launchWrapper({
-        command: preinstalledStartup(),
+        command: supervisorStartup(),
         allocationRef: REF_A,
         env: {},
         instance: 'standard-4',
@@ -2785,12 +2785,12 @@ describe('SandboxContainers lease and log', () => {
   });
 });
 
-const IMAGE = 'registry.example/kilo/app:test';
+const IMAGE = 'registry.example/kilo/runtime-free:test';
 const SNAPSHOT = { snapshotId: 'snap-env', baseImage: IMAGE };
 
 function launchFromSnapshot(instance: SandboxContainers, ref: string, extra = {}) {
   return instance.launchWrapper({
-    command: preinstalledStartup(),
+    command: supervisorStartup(),
     allocationRef: ref,
     env: {},
     instance: 'standard-4',
@@ -2887,7 +2887,7 @@ describe('SandboxContainers environment snapshot starts', () => {
     await expect(instance.stop(REF_A)).resolves.toBe('terminal');
     container.identityAfterStart = 'supervisor';
     await instance.launchWrapper({
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-4',
@@ -2989,7 +2989,7 @@ describe('SandboxContainers environment snapshot starts', () => {
 
     await expect(
       instance.launchWrapper({
-        command: preinstalledStartup(),
+        command: supervisorStartup(),
         allocationRef: REF_A,
         env: {},
         instance: 'standard-4',
@@ -3208,7 +3208,7 @@ describe('SandboxContainers environment builder', () => {
     ).resolves.toMatchObject({ started: true, startSource: 'repository' });
     expect(session.container.startCalls[0]).toMatchObject({
       containerSnapshot: { id: capture.snapshotId },
-      entrypoint: [...preinstalledStartup().argv],
+      entrypoint: [...supervisorStartup().argv],
     });
     expect(session.readRecord().startImage).toBe(image);
   });
@@ -3294,16 +3294,29 @@ describe('SandboxContainers environment builder', () => {
 
 function runningForCapture() {
   return setup({
-    record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+    record: { ...idleRecord, state: 'running', allocationRef: REF_A, startImage: IMAGE },
     running: true,
   });
 }
 
 describe('SandboxContainers capture by id', () => {
+  it('retains a running legacy allocation image after the app deployment image is removed', async () => {
+    const legacyImage = 'registry.example/kilo/app:old';
+    const { instance, container } = setup({
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A, startImage: legacyImage },
+      running: true,
+    });
+    delete container.images.app;
+    expect(await instance.captureSnapshot(REF_A, 'legacy-image')).toMatchObject({
+      status: 'stored',
+      baseImage: legacyImage,
+    });
+  });
+
   it('pins capture compatibility to the running allocation image across a rollout', async () => {
     const { instance, container } = setup();
     await launch(instance, REF_A);
-    container.images.app = 'registry.example/kilo/app:next';
+    container.images['runtime-free'] = 'registry.example/kilo/runtime-free:next';
     expect(await instance.captureSnapshot(REF_A, 'image-pin')).toMatchObject({
       status: 'stored',
       baseImage: IMAGE,
@@ -3503,7 +3516,7 @@ describe('SandboxContainers preview fetch boundary', () => {
 describe('SandboxContainers native image selection', () => {
   const RUNTIME_FREE_IMAGE = 'registry.example/kilo/runtime-free:test';
 
-  it('starts the baseline app image when no image is selected', async () => {
+  it('starts the runtime-free image when no image is selected', async () => {
     const { instance, container, readRecord } = setup();
 
     await launch(instance, REF_A);
@@ -3517,7 +3530,7 @@ describe('SandboxContainers native image selection', () => {
     container.images['runtime-free'] = RUNTIME_FREE_IMAGE;
 
     await instance.launchWrapper({
-      command: preinstalledStartup(),
+      command: supervisorStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-4',
@@ -3538,7 +3551,7 @@ describe('SandboxContainers native image selection', () => {
 
     await expect(
       instance.launchWrapper({
-        command: preinstalledStartup(),
+        command: supervisorStartup(),
         allocationRef: REF_A,
         env: {},
         instance: 'standard-4',
@@ -3555,7 +3568,10 @@ describe('SandboxContainers native image selection', () => {
     const baselineSnapshot = setup();
     baselineSnapshot.container.images['runtime-free'] = RUNTIME_FREE_IMAGE;
     await expect(
-      launchFromSnapshot(baselineSnapshot.instance, REF_A, { nativeImage: 'runtime-free' })
+      launchFromSnapshot(baselineSnapshot.instance, REF_A, {
+        nativeImage: 'runtime-free',
+        snapshot: { snapshotId: 'snap-legacy', baseImage: 'registry.example/kilo/app:test' },
+      })
     ).resolves.toEqual({ started: true, startSource: 'image' });
     expect(baselineSnapshot.container.startCalls[0]).toMatchObject({ image: RUNTIME_FREE_IMAGE });
 

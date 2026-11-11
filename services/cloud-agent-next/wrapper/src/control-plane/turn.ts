@@ -290,6 +290,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
 
   const routes = new Map<string, TurnRoute>();
   const routeSpecs = new Map<string, ControlPlaneRouteSpec>();
+  const commandPublications = new Map<string, { dirty: boolean; done: Promise<void> }>();
   const turns = new Map<string, Turn>();
   const interruptedFinalizations = new Map<
     string,
@@ -1322,10 +1323,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
     }
   }
 
-  async function publishCommandsFor(sessionId: string): Promise<void> {
-    const route = routes.get(sessionId);
-    if (route === undefined) return;
-    const runtime = deps.runtimes.get(route.runtimeKey);
+  async function publishRuntimeCommands(runtimeKeyValue: string): Promise<void> {
+    const runtime = deps.runtimes.get(runtimeKeyValue);
     if (runtime === undefined || runtime.isRestarting() || runtime.isUnavailable()) return;
     let client: Harness;
     try {
@@ -1336,24 +1335,42 @@ export function createTurnManager(deps: TurnManagerDeps) {
     try {
       const catalog = await client.listCommands();
       const catalogStatus = slashCommandCatalogStatus(catalog);
-      emitEvents(sessionId, [
-        {
-          type: 'commands.available',
-          properties: {
-            commands: catalog.commands,
-            ...(catalogStatus ? { catalogStatus } : {}),
+      for (const route of routes.values()) {
+        if (route.runtimeKey !== runtimeKeyValue) continue;
+        emitEvents(route.sessionId, [
+          {
+            type: 'commands.available',
+            properties: {
+              commands: catalog.commands,
+              ...(catalogStatus ? { catalogStatus } : {}),
+            },
           },
-        },
-      ]);
+        ]);
+      }
     } catch (error) {
       log(`turn: listCommands failed - ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  async function publishCommandsForRuntimeKey(runtimeKeyValue: string): Promise<void> {
-    for (const route of routes.values()) {
-      if (route.runtimeKey === runtimeKeyValue) await publishCommandsFor(route.sessionId);
+  function publishCommandsForRuntimeKey(runtimeKeyValue: string): Promise<void> {
+    const active = commandPublications.get(runtimeKeyValue);
+    if (active) {
+      active.dirty = true;
+      return active.done;
     }
+    const publication = { dirty: false, done: Promise.resolve() };
+    commandPublications.set(runtimeKeyValue, publication);
+    publication.done = (async () => {
+      try {
+        do {
+          publication.dirty = false;
+          await publishRuntimeCommands(runtimeKeyValue);
+        } while (publication.dirty);
+      } finally {
+        commandPublications.delete(runtimeKeyValue);
+      }
+    })();
+    return publication.done;
   }
 
   function turnsForRuntimeKey(runtimeKeyValue: string): Turn[] {
@@ -1476,6 +1493,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
     },
 
     observeKiloEvent(event: KiloFeedEvent): void {
+      if (event.type === 'command.updated' && event.runtimeKey) {
+        void publishCommandsForRuntimeKey(event.runtimeKey);
+        return;
+      }
       observeFeed(
         event,
         eventKiloSessionId(event.properties),
@@ -1587,7 +1608,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
     },
 
     publishCommands(sessionId: string): Promise<void> {
-      return publishCommandsFor(sessionId);
+      const route = routes.get(sessionId);
+      return route ? publishCommandsForRuntimeKey(route.runtimeKey) : Promise.resolve();
     },
 
     refreshActivity,

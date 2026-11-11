@@ -4,7 +4,7 @@ import type { EnkryptOutputDetectors, OrganizationSettings } from '@kilocode/db/
 import {
   ENKRYPT_DETECT_URL,
   ENKRYPT_MAX_SCAN_CHARACTERS,
-  SCAN_TOO_LARGE_MESSAGES,
+  RESPONSE_TOO_LARGE_MESSAGE,
   type EnkryptGuardrailVerdict,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import { createEmptyEnkryptOutputDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
@@ -852,7 +852,7 @@ describe('guardEnkryptOutput', () => {
       expect(client.status).toBe(400);
       expect(await client.json()).toMatchObject({
         error: {
-          message: SCAN_TOO_LARGE_MESSAGES.response,
+          message: RESPONSE_TOO_LARGE_MESSAGE,
           code: 'guardrail_blocked',
         },
       });

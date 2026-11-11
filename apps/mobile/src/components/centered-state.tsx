@@ -114,9 +114,7 @@ export function CenteredState({
   const topInset = surface?.frame ? surface.topInset : 0;
   const bottomInset = surface?.frame ? surface.bottomInset : (surface?.bottomReservation ?? 0);
   const boundsBottom = surface?.frame ? surface.bounds?.bottom : frame.bottom;
-  const nativeViewportFillsSurface = surface?.frame
-    ? surface.nativeViewportFillsSurface
-    : false;
+  const nativeViewportFillsSurface = surface?.frame ? surface.nativeViewportFillsSurface : false;
   const scrollRef = useRef<ScrollViewInstance | null>(null);
   const requestRef = useRef(0);
   const [viewport, setViewport] = useState<MeasuredViewport | null>(null);
@@ -263,8 +261,8 @@ export function CenteredState({
   // twice and pushes the body above the centre of the visible area.
   const bottomReservation = surface?.bottomReservation ?? 0;
   const contentStyle = useMemo(() => {
-    const style =
-      layout ?? rememberedStyle ?? {
+    const style = layout ??
+      rememberedStyle ?? {
         justifyContent: 'center' as const,
         paddingTop: 16,
         paddingBottom: 16 + bottomReservation,

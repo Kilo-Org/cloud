@@ -113,7 +113,8 @@ export function SidebarSettingsSection({ organizationId }: { organizationId?: st
         </div>
         <p className="text-muted-foreground text-sm">
           This order is personal to you. It applies to your personal account and to all your
-          organizations.
+          organizations, including workspaces in regular folders. Smart folders have their own
+          order.
         </p>
         <div className="flex flex-wrap gap-2">
           {SIDEBAR_SORT_OPTIONS.map(option => (
@@ -211,8 +212,8 @@ export function SidebarSettingsSection({ organizationId }: { organizationId?: st
       </section>
 
       <p className="text-muted-foreground text-xs">
-        Drag a workspace onto a folder or between rows to change its position. The first drag
-        assigns positions once; later drags only move the workspace you dragged.
+        Drag a workspace onto a folder to move it. To reorder workspaces within a regular folder or
+        Ungrouped, set Workspace order to Manual.
       </p>
     </div>
   );

@@ -2,6 +2,7 @@ import React, { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { createRequire } from 'node:module';
 import type { StoredSession } from './types';
+import type { WorkspaceFolder } from '@/lib/cloud-agent/workspace-folders';
 
 Object.assign(globalThis, { React });
 
@@ -1285,7 +1286,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
 
   function workspaceFolders() {
     return {
-      folders: [],
+      folders: [] as WorkspaceFolder[],
       isLoading: false,
       isFirstLoadPending: false,
       isError: false,
@@ -1311,7 +1312,8 @@ describe('ChatSidebar phase 4 drag ordering', () => {
   function dragRows(
     source: Element,
     target: Element,
-    clientY: number
+    clientY: number,
+    afterDragOver?: () => void
   ): { dataTransfer: { setData: jest.Mock; setDragImage: jest.Mock } } {
     const dataTransfer = {
       setData: jest.fn(),
@@ -1334,6 +1336,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
       ({ top: 0, left: 0, width: 200, height: 40, bottom: 40, right: 200, x: 0, y: 0 }) as DOMRect;
     event(source, 'dragstart');
     event(target, 'dragover', clientY);
+    afterDragOver?.();
     event(target, 'drop', clientY);
     return { dataTransfer };
   }
@@ -1618,6 +1621,133 @@ describe('ChatSidebar phase 4 drag ordering', () => {
     expect(worktreeId).toBe('worktree_drag_1');
     expect(folderId).toBeNull();
     expect((position as string) < 'a2').toBe(true);
+  });
+
+  function manualFolder(groups: NonNullable<ChatSidebarProps['workspaceGroups']>): WorkspaceFolder {
+    return {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'Product',
+      color: 'default',
+      kind: 'manual',
+      smartPreset: null,
+      sortMode: 'activity',
+      worktreeIds: groups.map(group => group.worktreeId),
+    };
+  }
+
+  function fileGroups(groups: NonNullable<ChatSidebarProps['workspaceGroups']>, folderId: string) {
+    return groups.map(group => ({ ...group, details: { ...group.details!, folderId } }));
+  }
+
+  function workspaceIds(): (string | null)[] {
+    return [...dom.container.querySelectorAll('[data-worktree-id]')].map(row =>
+      row.getAttribute('data-worktree-id')
+    );
+  }
+
+  it('renders saved manual folder positions after a drag, refetch and remount', () => {
+    const folders = workspaceFolders();
+    const initial = [phase4Group(0, null), phase4Group(1, null), phase4Group(2, null)];
+    const folder = manualFolder(initial);
+    folders.folders = [folder];
+    let groups = fileGroups(initial, folder.id);
+    const props = () => ({
+      workspaceGroups: groups,
+      workspaceFolders: folders,
+      workspaceOrder: 'manual' as const,
+    });
+    renderSidebar(props());
+    expect(workspaceIds()).toEqual(initial.map(group => group.worktreeId));
+
+    folders.initializeWorktreePositions.mockImplementation(async ids => {
+      groups = groups.map(group => ({
+        ...group,
+        details: { ...group.details!, sidebarPosition: `a${ids.indexOf(group.worktreeId) + 1}` },
+      }));
+      return true;
+    });
+    const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+    dragRows(rows[0]!, rows[1]!, 35, () => {
+      expect(rows[1]?.classList.contains('border-b-2')).toBe(true);
+    });
+    const expected = ['worktree_drag_1', 'worktree_drag_0', 'worktree_drag_2'];
+    expect(folders.initializeWorktreePositions).toHaveBeenCalledWith(expected, folder.id);
+    renderSidebar(props());
+    expect(workspaceIds()).toEqual(expected);
+    expect(dom.container.textContent).not.toContain('Sort workspaces');
+
+    act(() => root.unmount());
+    root = createRoot(dom.container);
+    renderSidebar(props());
+    expect(workspaceIds()).toEqual(expected);
+  });
+
+  it.each(['created', 'activity'] as const)(
+    'does not advertise or save row reordering in %s mode, inside or outside a folder',
+    workspaceOrder => {
+      const folders = workspaceFolders();
+      const groups = [phase4Group(0, 'a2'), phase4Group(1, 'a1')];
+      const folder = { ...manualFolder(groups), sortMode: 'manual' as const };
+      for (const filed of [false, true]) {
+        folders.folders = filed ? [folder] : [];
+        renderSidebar({
+          workspaceGroups: filed ? fileGroups(groups, folder.id) : groups,
+          workspaceFolders: folders,
+          workspaceOrder,
+        });
+        expect(workspaceIds()).toEqual(['worktree_drag_0', 'worktree_drag_1']);
+        const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+        expect(rows[0]?.getAttribute('draggable')).toBe('true');
+        dragRows(rows[0]!, rows[1]!, 35, () => {
+          expect(dom.container.querySelector('[data-worktree-id].border-b-2')).toBeNull();
+          expect(dom.container.querySelector('[data-worktree-id].border-t-2')).toBeNull();
+        });
+        expect(folders.moveWorktree).not.toHaveBeenCalled();
+        expect(folders.initializeWorktreePositions).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it.each(['manual', 'created', 'activity'] as const)(
+    'moves between folders without assigning a row position in %s mode',
+    workspaceOrder => {
+      const folders = workspaceFolders();
+      const groups = [phase4Group(0, 'a1'), phase4Group(1, 'a2')];
+      const first = manualFolder([groups[0]!]);
+      const second = { ...manualFolder([groups[1]!]), id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' };
+      folders.folders = [first, second];
+      renderSidebar({
+        workspaceGroups: [
+          ...fileGroups([groups[0]!], first.id),
+          ...fileGroups([groups[1]!], second.id),
+        ],
+        workspaceFolders: folders,
+        workspaceOrder,
+      });
+      const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+      dragRows(rows[0]!, rows[1]!, 35, () => {
+        expect(dom.container.querySelector('[data-worktree-id].border-b-2')).toBeNull();
+      });
+      expect(folders.moveWorktree).toHaveBeenCalledWith(groups[0]?.worktreeId, second.id);
+      expect(folders.initializeWorktreePositions).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not reorder automatically grouped rows using their underlying manual folder', () => {
+    const folders = workspaceFolders();
+    const groups = [phase4Group(0, 'a1'), phase4Group(1, 'a2')].map(group => ({
+      ...group,
+      sessions: group.sessions.map(session => ({ ...session, sessionStatus: 'question' })),
+    }));
+    const folder = manualFolder(groups);
+    folders.folders = [folder, { ...folder, id: 'needs', kind: 'smart', smartPreset: 'needs_you' }];
+    renderSidebar({ workspaceGroups: fileGroups(groups, folder.id), workspaceFolders: folders });
+    const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+    dragRows(rows[0]!, rows[1]!, 35, () => {
+      expect(dom.container.querySelector('[data-worktree-id].border-b-2')).toBeNull();
+    });
+    expect(folders.moveWorktree).not.toHaveBeenCalled();
+    expect(folders.initializeWorktreePositions).not.toHaveBeenCalled();
   });
 });
 

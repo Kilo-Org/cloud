@@ -23,15 +23,12 @@ import { getSecretValue } from './util/secret';
 // Token cache TTL: 30 minutes. Token validity is 1 hour, so 30 min gives safety margin.
 const TOKEN_CACHE_TTL_SECONDS = 30 * 60;
 
-// Maximum number of retry attempts for failed webhook processing
 const MAX_RETRY_ATTEMPTS = 3;
 
 function tokenCacheKey(
   triggerConfig: TriggerConfig,
   sharedResourceTokensEnabled: string | boolean | undefined
 ): string {
-  // Cache key is based on userId or orgId, not namespace
-  // This ensures token caching is per-user or per-org
   const principal = triggerConfig.userId ?? triggerConfig.orgId;
   const format =
     sharedResourceTokensEnabled === true || sharedResourceTokensEnabled === 'true'
@@ -65,10 +62,6 @@ async function failRequest(
   );
 }
 
-/**
- * Get or mint a webhook API token.
- * First checks KV cache, then mints via Hyperdrive if not cached.
- */
 async function getOrMintToken(
   env: Env,
   triggerConfig: TriggerConfig
@@ -84,7 +77,6 @@ async function getOrMintToken(
   }
   const cacheKey = tokenCacheKey(triggerConfig, env.SHARED_RESOURCE_TOKENS_ENABLED);
 
-  // Check KV cache first
   const cachedToken = await env.WEBHOOK_TOKEN_CACHE.get(cacheKey);
   if (cachedToken) {
     logger.debug('Token cache hit', { triggerId: triggerConfig.triggerId });
@@ -93,7 +85,6 @@ async function getOrMintToken(
 
   logger.debug('Token cache miss, minting new token', { triggerId: triggerConfig.triggerId });
 
-  // Mint token locally via Hyperdrive (singleton for connection pooling)
   const tokenMintingService = getTokenMintingService(env);
   const result = await tokenMintingService.mintToken({
     userId: triggerConfig.userId,
@@ -143,7 +134,6 @@ export async function processKiloclawChatMessage(
   triggerConfig: TriggerConfig,
   env: Env
 ): Promise<void> {
-  // Skip if already delivered (idempotency guard for queue retries)
   if (
     request.processStatus === 'success' ||
     request.processStatus === 'failed' ||
@@ -160,7 +150,6 @@ export async function processKiloclawChatMessage(
     return;
   }
 
-  // KiloClaw Chat triggers require a user-scoped trigger (KiloClaw instances are personal)
   if (!triggerConfig.userId) {
     await failRequest(
       stub,
@@ -352,7 +341,6 @@ async function processWebhookMessage(
       return;
     }
 
-    // Branch based on target type
     if (triggerConfig.targetType === 'kiloclaw_chat') {
       if (triggerConfig.executionUserId != null) {
         throw new CreatorExecutionAuthorizationError(
@@ -384,7 +372,6 @@ async function processWebhookMessage(
 
     const { token } = await getOrMintToken(env, triggerConfig);
 
-    // Fetch callback signing and internal API credentials once for Cloud Agent calls.
     const [internalApiSecret, callbackTokenSecret] = await Promise.all([
       getSecretValue(env.INTERNAL_API_SECRET),
       getSecretValue(env.CALLBACK_TOKEN_SECRET),
@@ -406,7 +393,6 @@ async function processWebhookMessage(
         promptLength: renderedPrompt.length,
       });
 
-      // Build callback target for completion notifications
       const callbackUrl = `${env.WEBHOOK_AGENT_URL}/api/callbacks/execution`;
       const callbackToken = await deriveCallbackToken({
         secret: callbackTokenSecret,
@@ -458,7 +444,6 @@ async function processWebhookMessage(
         prepareSessionBody.allowUserAuthorization = true;
       }
 
-      // Behavior flags from trigger config (not profile-related)
       if (triggerConfig.autoCommit !== undefined) {
         prepareSessionBody.autoCommit = triggerConfig.autoCommit;
       }

@@ -72,7 +72,7 @@ export function formatPrefixedUsd(
 }
 
 /**
- * A balance or a spend in the shares a reader compares between screens: two
+ * A balance or a spend in the shape a reader compares between screens: two
  * fraction digits, the symbol leading the number whatever the locale's money
  * pattern says. The locale formatter still writes the digits, their separators
  * and the minus glyph (`formatPrefixedUsd`); this is the money-shaped twin of

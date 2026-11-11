@@ -94,11 +94,9 @@ function storeFailureToken(value: unknown): string | undefined {
  */
 function storeFailureIdentity(cause: unknown): StoreFailureIdentity {
   const fields = StoreFailureFieldsSchema.safeParse(cause);
-  const source = fields.success ? fields.data : {};
-  return {
-    name: storeFailureToken(source.name) ?? 'unknown',
-    code: storeFailureToken(source.code) ?? 'uncoded',
-  };
+  const name = fields.success ? storeFailureToken(fields.data.name) : undefined;
+  const code = fields.success ? storeFailureToken(fields.data.code) : undefined;
+  return { name: name ?? 'unknown', code: code ?? 'uncoded' };
 }
 
 /** The length at which the report scrubber treats an unbroken run as a token. */

@@ -553,11 +553,23 @@ function toJsonValue(value: unknown, budget: { remaining: number }): JsonValue {
 }
 
 // Property names reach the snapshot too, so the same cap applies to them. The
-// sensitive-key check above still reads the caller's original name.
+// sensitive-key check above still reads the caller's original name. Names that
+// share their first characters keep distinct entries through the fingerprint.
 function keptKey(key: string) {
   return key.length > PROVIDER_HINTS_MAX_STRING_LENGTH
-    ? key.slice(0, PROVIDER_HINTS_MAX_STRING_LENGTH) + TRUNCATED_KEY
+    ? `${key.slice(0, PROVIDER_HINTS_MAX_STRING_LENGTH)}[truncated:${keyFingerprint(key)}]`
     : key;
+}
+
+// FNV-1a over the whole name: synchronous, dependency-free, and stable across
+// the gateway and the worker.
+function keyFingerprint(key: string) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
 }
 
 function isSensitiveKey(key: string) {

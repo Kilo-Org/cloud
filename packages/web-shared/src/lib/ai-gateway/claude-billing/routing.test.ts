@@ -340,12 +340,10 @@ describe('Claude customer-billed routing', () => {
   });
 
   it('serves a personal connection even when the recorded connector is gone', async () => {
-    jest
-      .mocked(findUserById)
-      .mockResolvedValue({
-        id: 'connector',
-        blocked_reason: 'soft-deleted at 2026-01-01',
-      } as never);
+    jest.mocked(findUserById).mockResolvedValue({
+      id: 'connector',
+      blocked_reason: 'soft-deleted at 2026-01-01',
+    } as never);
     jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(row);
 
     const result = await checkClaudeBilling(input());

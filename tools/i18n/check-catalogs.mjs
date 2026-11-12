@@ -779,15 +779,19 @@ function checkPushLocaleRegistry() {
     fail(problem);
   }
 
-  const imported = new Set();
-  const registered = new Set();
+  const imported = new Map();
+  const registered = new Map();
   let registryFound = false;
   walk(program, node => {
     if (node.type === 'ImportDeclaration') {
       const source = node.source.value;
       const prefix = './locales/';
       if (typeof source === 'string' && source.startsWith(prefix) && source.endsWith('.json')) {
-        imported.add(source.slice(prefix.length, -'.json'.length));
+        const tag = source.slice(prefix.length, -'.json'.length);
+        const binding = node.specifiers.find(
+          specifier => specifier.type === 'ImportDefaultSpecifier'
+        );
+        imported.set(tag, binding ? binding.local.name : null);
       }
       return;
     }
@@ -799,6 +803,10 @@ function checkPushLocaleRegistry() {
       return;
     }
     registryFound = true;
+    if (node.init === null) {
+      fail(`${relativeModule}: the push locale registry has no initializer`);
+      return;
+    }
     const init = unwrap(node.init);
     if (init?.type !== 'ObjectExpression') {
       fail(`${relativeModule}: the push locale registry is not an object literal`);
@@ -810,13 +818,21 @@ function checkPushLocaleRegistry() {
         continue;
       }
       const key = unwrap(property.key);
+      let tag;
       if (key.type === 'Identifier') {
-        registered.add(key.name);
+        tag = key.name;
       } else if (key.type === 'Literal' && typeof key.value === 'string') {
-        registered.add(key.value);
+        tag = key.value;
       } else {
         fail(`${relativeModule}: the push locale registry has a key this check cannot read`);
+        continue;
       }
+      const value = unwrap(property.value);
+      if (value.type !== 'Identifier') {
+        fail(`${relativeModule}: the push locale registry entry "${tag}" is not a catalog import`);
+        continue;
+      }
+      registered.set(tag, value.name);
     }
   });
   if (!registryFound) {
@@ -832,14 +848,22 @@ function checkPushLocaleRegistry() {
       fail(`notifications: catalog "${tag}.json" has no push locale registry entry`);
     }
   }
-  for (const tag of [...imported].sort()) {
+  for (const tag of [...imported.keys()].sort()) {
     if (!present.has(tag)) {
       fail(`notifications: ${relativeModule} imports "./locales/${tag}.json" with no catalog file`);
     }
   }
-  for (const tag of [...registered].sort()) {
+  for (const [tag, binding] of [...registered].sort((left, right) =>
+    left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0
+  )) {
     if (!imported.has(tag)) {
       fail(`notifications: the push locale registry names "${tag}" with no catalog import`);
+      continue;
+    }
+    if (binding !== imported.get(tag)) {
+      fail(
+        `notifications: the push locale registry binds "${tag}" to "${binding}" instead of the "${tag}" catalog import`
+      );
     }
   }
 }

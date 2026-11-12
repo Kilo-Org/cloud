@@ -1128,3 +1128,37 @@ test('rejects a notification catalog file the push locale module does not import
     /notifications: catalog "ru\.json" has no import in packages\/notifications\/src\/i18n\.ts/
   );
 });
+
+test('rejects a push locale registry entry bound to another catalog', context => {
+  const result = runChecker(context, {
+    extraFiles: {
+      'packages/notifications/src/i18n.ts': [
+        `import en from './locales/en.json';`,
+        `import ru from './locales/ru.json';`,
+        `const pushCatalogs = { 'en': en, 'ru': en };`,
+      ].join('\n'),
+    },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /notifications: the push locale registry binds "ru" to "en" instead of the "ru" catalog import/
+  );
+});
+
+test('rejects a push locale registry with no initializer', context => {
+  const result = runChecker(context, {
+    extraFiles: {
+      'packages/notifications/src/i18n.ts': [
+        `import en from './locales/en.json';`,
+        `import ru from './locales/ru.json';`,
+        `let pushCatalogs;`,
+      ].join('\n'),
+    },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /notifications\/src\/i18n\.ts: the push locale registry has no initializer/
+  );
+});

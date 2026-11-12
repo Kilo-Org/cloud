@@ -93,7 +93,8 @@ import zu from './locales/zu.json';
  * a stored device token carries. `resources` below and `resolvePushLocale` read
  * this one map, so a catalog is registered for translation exactly when it can
  * be resolved, and a supported tag always has its messages behind it. Three
- * tags differ from their import name because a file name cannot carry a hyphen.
+ * tags carry a hyphen that an import name cannot, so those keep an explicit
+ * key.
  *
  * `tools/i18n/check-catalogs.mjs` fails when this map, the `./locales` imports
  * and the catalog files disagree.

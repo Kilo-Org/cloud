@@ -1,5 +1,5 @@
 import { platform_integrations, organizations } from '@kilocode/db/schema';
-import { eq, like, or } from 'drizzle-orm';
+import { and, eq, like, or } from 'drizzle-orm';
 
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import type { SeedResult } from '../index';
@@ -88,7 +88,11 @@ function fixtureRows(owner: { userId: string; organizationId: string | null }) {
   const owned = owner.organizationId
     ? { owned_by_user_id: null, owned_by_organization_id: owner.organizationId }
     : { owned_by_user_id: owner.userId, owned_by_organization_id: null };
-  const id = (platform: string) => `${FIXTURE_PREFIX}-${platform}`;
+  // One account can hold both a personal scope and several organizations, and
+  // Slack's and Linear's installation ids are unique across the whole table, so
+  // every id carries the owner it belongs to.
+  const ownerKey = owner.organizationId ?? 'personal';
+  const id = (suffix: string) => `${FIXTURE_PREFIX}-${ownerKey}-${suffix}`;
 
   return [
     {
@@ -157,15 +161,23 @@ function fixtureRows(owner: { userId: string; organizationId: string | null }) {
   ] satisfies (typeof platform_integrations.$inferInsert)[];
 }
 
-async function removeFixtureRows(): Promise<number> {
+async function removeFixtureRows(owner: {
+  userId: string;
+  organizationId: string | null;
+}): Promise<number> {
   const db = getSeedDb();
   const fixture = or(
     like(platform_integrations.platform_installation_id, `${FIXTURE_PREFIX}%`),
     like(platform_integrations.platform_account_id, `${FIXTURE_PREFIX}%`)
   );
+  // One account can seed its personal scope and several organizations in the
+  // same database, so a rerun clears only the owner it is about to write.
+  const owned = owner.organizationId
+    ? eq(platform_integrations.owned_by_organization_id, owner.organizationId)
+    : eq(platform_integrations.owned_by_user_id, owner.userId);
   const deleted = await db
     .delete(platform_integrations)
-    .where(fixture)
+    .where(and(fixture, owned))
     .returning({ id: platform_integrations.id });
   return deleted.length;
 }
@@ -180,7 +192,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   assertLocalSeedDatabase('app:integrations');
   const db = getSeedDb();
 
-  const removed = await removeFixtureRows();
+  const removed = await removeFixtureRows(options);
   if (options.clear) {
     console.log(`Removed ${removed} seeded integration row(s).`);
     return { cleared: removed };

@@ -251,7 +251,7 @@ describe('NewSessionStartButton', () => {
     const renderer = await mountButton({ isStartDisabled: true });
     const button = hostByType(renderer.root, 'Pressable')[0];
     const classes = String(button?.props.className).split(' ');
-    expect(classes).toContain('bg-primary-disabled');
+    expect(classes).toContain('bg-primary-disabled-action');
     expect(classes).not.toContain('dark:bg-control-idle');
 
     renderer.unmount();

@@ -23,6 +23,7 @@ vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#FFFFFF',
   useThemeColors: () => ({}),
 }));
 vi.mock('@/lib/a11y/announce', () => ({

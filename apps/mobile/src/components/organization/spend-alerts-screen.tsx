@@ -416,7 +416,7 @@ function SpendAlertsForm({
       )}
 
       <Button disabled={!canSave} loading={save.isPending} onPress={onSave}>
-        <Text className="text-primary-foreground">{t('common.save')}</Text>
+        <Text>{t('common.save')}</Text>
       </Button>
     </>
   );

@@ -186,7 +186,7 @@ export function RenameModal<TSaveResult>({
           disabled={!canSave || saveInFlight}
           loading={pending}
         >
-          <Text className="text-primary-foreground">{t('common.save')}</Text>
+          <Text>{t('common.save')}</Text>
         </Button>
       </View>
     </DialogCard>

@@ -18,7 +18,7 @@ import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
 import {
   PR_REVIEW_GATE_ICON_TILE_CLASS,
@@ -108,6 +108,7 @@ function GitHubConnectGate({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
   const authorization = useQuery(trpc.githubApps.getUserAuthorization.queryOptions());
@@ -238,7 +239,7 @@ function GitHubConnectGate({
               >
                 <View className="size-4 items-center justify-center">
                   {connecting ? (
-                    <ActivityIndicator size="small" color={colors.primaryForeground} />
+                    <ActivityIndicator size="small" color={mutedDisabledInk} />
                   ) : (
                     <GitHubIcon size={16} color={colors.primaryForeground} />
                   )}

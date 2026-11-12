@@ -32,8 +32,14 @@
   --primary-foreground: #ffffff;
   /* Disabled primary fill. The palette's warm neutral, chosen because it keeps
    * the ink label (primary-foreground) legible: white on this fill clears 4.5:1,
-   * so a disabled default button reads as inactive without losing its label. */
+   * so a disabled control reads as inactive without losing its label. */
   --primary-disabled: #6f6a61;
+  /* Fill of a disabled primary action (a default-variant Button). Light keeps
+   * the palette's disabled primary, whose white label clears 4.5:1. It is its
+   * own token because the dark plate the action needs differs from the dark
+   * `--primary-disabled`, which the shared Switch paints as its disabled
+   * on-track (see the dark block). */
+  --primary-disabled-action: #6f6a61;
   --destructive: #b0483a;
   --destructive-foreground: #ffffff;
   /* Solid destructive control fill. Separate from `--destructive` because the
@@ -188,6 +194,14 @@
      * The fill stays neutral and muted: a tinted fill reads as a second brand
      * colour and competes with the enabled #ffdd00 it replaces. */
     --primary-disabled: #8a8680;
+    /* Dark counterpart of a disabled primary action's fill. `--primary-disabled`
+     * (a light neutral, 5.3:1 above the near-black page) outshines every other
+     * element and reads as an enabled control, and the inactive icon surface
+     * (`--control-idle`, 1.7:1) leaves a full-width plate without presence. This
+     * step keeps the plate a visible object on the page while it stays well
+     * below the enabled #ffdd00, and `--foreground` clears 6.4:1 on it. The
+     * palette's `--primary-disabled` stays with the Switch's disabled on-track. */
+    --primary-disabled-action: #5a564f;
     --destructive: #f28b7a;
     --destructive-foreground: #1a1a10;
     /* The deep red the light scheme fills with, lifted just enough to stand off
@@ -310,6 +324,7 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-disabled: var(--primary-disabled);
+  --color-primary-disabled-action: var(--primary-disabled-action);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary-fill: var(--secondary-fill);

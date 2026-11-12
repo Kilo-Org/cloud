@@ -8,6 +8,7 @@ export const CURRENT_CAPABILITY_PREFIX = {
 
 /** Issued instead of the current GitHub prefix when the grant carries a GitHub task policy. */
 export const GITHUB_TASK_CAPABILITY_PREFIX = 'kgh3.';
+export const GITHUB_WORKSPACE_CAPABILITY_PREFIX = 'kgh4.';
 
 export const LEGACY_CAPABILITY_PREFIX = {
   github: 'kgh1.',
@@ -21,6 +22,7 @@ export const ACCEPTED_CAPABILITY_PREFIXES = {
     LEGACY_CAPABILITY_PREFIX.github,
     CURRENT_CAPABILITY_PREFIX.github,
     GITHUB_TASK_CAPABILITY_PREFIX,
+    GITHUB_WORKSPACE_CAPABILITY_PREFIX,
   ],
   gitlab: [LEGACY_CAPABILITY_PREFIX.gitlab, CURRENT_CAPABILITY_PREFIX.gitlab],
   bitbucket: [CURRENT_CAPABILITY_PREFIX.bitbucket],
@@ -31,6 +33,7 @@ export const CAPABILITY_FAMILY_PATTERN_SOURCE = '(?:kka|kgh|kgl|kbb)\\d+\\.';
 
 export function hasCurrentCapabilityPrefix(value: string): boolean {
   return (
+    value.startsWith(GITHUB_WORKSPACE_CAPABILITY_PREFIX) ||
     value.startsWith(GITHUB_TASK_CAPABILITY_PREFIX) ||
     Object.values(CURRENT_CAPABILITY_PREFIX).some(prefix => value.startsWith(prefix))
   );
@@ -43,7 +46,9 @@ export function hasCurrentProviderCapabilityPrefix(
 ): boolean {
   return (
     value.startsWith(CURRENT_CAPABILITY_PREFIX[purpose]) ||
-    (purpose === 'github' && value.startsWith(GITHUB_TASK_CAPABILITY_PREFIX))
+    (purpose === 'github' &&
+      (value.startsWith(GITHUB_TASK_CAPABILITY_PREFIX) ||
+        value.startsWith(GITHUB_WORKSPACE_CAPABILITY_PREFIX)))
   );
 }
 

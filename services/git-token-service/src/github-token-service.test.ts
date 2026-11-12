@@ -1,3 +1,4 @@
+import { githubRepositoryPermissions } from '@kilocode/worker-utils/workspace-repository-access';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAppAuth } from '@octokit/auth-app';
 import { Octokit } from '@octokit/rest';
@@ -309,10 +310,73 @@ describe('GitHubTokenService', () => {
     }
   );
 
+  it.each(['read', 'contribute'] as const)(
+    'requests and verifies exact %s installation permissions',
+    async mode => {
+      const generate = vi.fn(async (input: { permissions: object; repositoryIds: number[] }) => ({
+        token: `synthetic-${mode}`,
+        expiresAt: new Date(Date.now() + 3600000).toISOString(),
+        repositorySelection: 'selected',
+        repositoryIds: input.repositoryIds,
+        permissions: input.permissions,
+      }));
+      vi.mocked(createAppAuth).mockReturnValue(
+        generate as unknown as ReturnType<typeof createAppAuth>
+      );
+      const service = new GitHubTokenService({
+        GITHUB_APP_ID: 'app',
+        GITHUB_APP_PRIVATE_KEY: 'synthetic-key',
+        TOKEN_CACHE: createTokenCache(),
+      } as unknown as CloudflareEnv);
+      expect(await service.getTokenForRepositoryIds('123', [202, 101], 'standard', mode)).toBe(
+        `synthetic-${mode}`
+      );
+      expect(generate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          permissions: githubRepositoryPermissions(mode),
+          repositoryIds: [101, 202],
+        })
+      );
+    }
+  );
+  it.each([
+    { repositorySelection: 'all' },
+    { repositoryIds: [101, 202] },
+    { repositoryIds: undefined },
+    { repositoryIds: [101, 101] },
+    { permissions: { ...githubRepositoryPermissions('read'), contents: 'write' } },
+    { permissions: { ...githubRepositoryPermissions('read'), workflows: 'write' } },
+    { permissions: { ...githubRepositoryPermissions('read'), administration: 'read' } },
+    { permissions: undefined },
+  ])('rejects broad or unverifiable installation issuance: %j', async returned => {
+    const generate = vi.fn(async () => ({
+      token: 'synthetic-token',
+      expiresAt: new Date(Date.now() + 3600000).toISOString(),
+      repositorySelection: 'selected',
+      repositoryIds: [101],
+      permissions: githubRepositoryPermissions('read'),
+      ...returned,
+    }));
+    vi.mocked(createAppAuth).mockReturnValue(
+      generate as unknown as ReturnType<typeof createAppAuth>
+    );
+    const service = new GitHubTokenService({
+      GITHUB_APP_ID: 'app',
+      GITHUB_APP_PRIVATE_KEY: 'synthetic-key',
+      TOKEN_CACHE: createTokenCache(),
+    } as unknown as CloudflareEnv);
+    await expect(
+      service.getTokenForRepositoryIds('123', [101], 'standard', 'read')
+    ).rejects.toThrow();
+  });
+
   it('mints sibling-read credentials using stable repository IDs in the same installation', async () => {
     const tokenCache = createTokenCache();
     const generate = vi.fn().mockResolvedValue({
       token: 'scoped-installation-token',
+      repositorySelection: 'selected',
+      repositoryIds: [101, 202],
+      permissions: githubRepositoryPermissions('contribute'),
       expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     });
     vi.mocked(createAppAuth).mockReturnValue(
@@ -335,9 +399,10 @@ describe('GitHubTokenService', () => {
       type: 'installation',
       repositoryNames: undefined,
       repositoryIds: [101, 202],
+      permissions: githubRepositoryPermissions('contribute'),
     });
     expect(tokenCache.put).toHaveBeenCalledWith(
-      'gh-token:123:standard:repository-ids:101,202',
+      'gh-token:123:standard:repository-ids:mvp-v1:contribute:101,202',
       expect.any(String),
       expect.anything()
     );

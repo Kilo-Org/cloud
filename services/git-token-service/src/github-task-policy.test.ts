@@ -68,7 +68,6 @@ describe('GitHub repository write boundary', () => {
     ['/issues/7', { state: 'closed' }, 'PATCH'],
     ['/issues/7/comments', { body: 'Issue or PR comment' }, 'POST'],
     ['/issues/comments/9', { body: 'Edited comment' }, 'PATCH'],
-    ['/pulls/7/reviews', { event: 'APPROVE', body: 'Reviewed' }, 'POST'],
     ['/pulls/7/reviews', { event: 'COMMENT', body: 'Reviewed' }, 'POST'],
     [
       '/pulls/7/comments',
@@ -223,7 +222,10 @@ describe('GitHub repository reads', () => {
     ).toEqual({
       allowed: true,
       operation: 'read',
-      checks: [{ kind: 'repository-read', owner: 'personal-user', name: 'private' }],
+      checks: [
+        { kind: 'repository-read', owner: 'na2-org', name: 'cloud-agent-security-test-a' },
+        { kind: 'repository-read', owner: 'personal-user', name: 'private' },
+      ],
     });
   });
 });

@@ -33,6 +33,7 @@ const InstallationRefreshCandidateSchema = InstallationLookupResultSchema.extend
 });
 
 const ManagedInstallationLookupResultSchema = InstallationLookupResultSchema.extend({
+  id: z.string().uuid(),
   repository_access: z.string().nullable(),
   repositories: z
     .array(
@@ -84,6 +85,7 @@ export type InstallationRefreshCandidatesResult =
   | InstallationLookupFailure;
 
 export type ManagedInstallationLookupSuccess = InstallationLookupSuccess & {
+  integrationId: string;
   repoName: string;
   permissions: Record<string, unknown> | null;
 };
@@ -707,6 +709,7 @@ export class InstallationLookupService {
         githubAppType: selected.data.github_app_type ?? 'standard',
         repoName,
         permissions: selected.data.permissions,
+        integrationId: selected.data.id,
       };
     }
 
@@ -744,6 +747,7 @@ export class InstallationLookupService {
       githubAppType: selected.github_app_type ?? 'standard',
       repoName,
       permissions: selected.permissions,
+      integrationId: selected.id,
     };
   }
 

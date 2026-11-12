@@ -1,6 +1,13 @@
+import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import { Buffer } from 'node:buffer';
 import { z } from 'zod';
+import {
+  githubRepositoryPermissions,
+  githubPermissionsAreRestricted,
+  type RepositoryAccessMode,
+  type WorkspaceGitHubRepositoryAccess,
+} from '@kilocode/worker-utils/workspace-repository-access';
 import {
   githubTaskGrantSchema,
   githubTaskScopeSchema,
@@ -14,6 +21,7 @@ const repositorySchema = z.object({
   node_id: z.string().min(1),
   name: z.string().min(1),
   owner: z.object({ login: z.string().min(1) }),
+  permissions: z.object({ push: z.boolean().optional() }).optional(),
 });
 export type GitHubRepositoryScope = {
   owner: string;
@@ -25,7 +33,10 @@ export type GitHubTaskResourceFailure =
   | 'ref_not_allowed'
   | 'operation_not_allowed'
   | 'source_unavailable'
-  | 'invalid_task_scope';
+  | 'invalid_task_scope'
+  | 'repository_access_required'
+  | 'separate_repository_requests_required'
+  | 'authorization_unavailable';
 export class GitHubTaskResourceError extends Error {
   constructor(readonly reason: GitHubTaskResourceFailure) {
     super(reason);
@@ -34,6 +45,7 @@ export class GitHubTaskResourceError extends Error {
 }
 type ResourceEnv = Pick<CloudflareEnv, 'GITHUB_APP_CLIENT_ID' | 'GITHUB_APP_CLIENT_SECRET'> & {
   GITHUB_API_BASE_URL?: string;
+  TOKEN_CACHE?: Pick<KVNamespace, 'get' | 'put'>;
 };
 
 /** Resolves resource identities before any guest request receives upstream authorization. */
@@ -92,6 +104,40 @@ export class GitHubTaskResources {
     }
   }
 
+  async publicRepository(owner: string, name: string): Promise<void> {
+    let value: unknown;
+    try {
+      value = await this.request(
+        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`,
+        {
+          headers: {
+            Accept: 'application/vnd.github+json',
+            'User-Agent': 'Kilo-Git-Token-Service',
+          },
+        }
+      );
+    } catch (error) {
+      if (error instanceof GitHubTaskResourceError && error.reason === 'repository_mismatch')
+        throw new GitHubTaskResourceError('repository_access_required');
+      throw error;
+    }
+    const repository = repositorySchema.extend({ private: z.literal(false) }).safeParse(value);
+    if (
+      !repository.success ||
+      repository.data.owner.login.toLowerCase() !== owner ||
+      repository.data.name.toLowerCase() !== name
+    )
+      throw new GitHubTaskResourceError('repository_access_required');
+  }
+
+  async userSubjectId(): Promise<string> {
+    const user = z
+      .object({ id: z.number().int().positive().safe() })
+      .safeParse(await this.request('/user'));
+    if (!user.success) throw new GitHubTaskResourceError('authorization_unavailable');
+    return String(user.data.id);
+  }
+
   async repository(owner: string, name: string) {
     const value = await this.request(
       `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`
@@ -112,12 +158,17 @@ export class GitHubTaskResources {
     return githubTaskGrantSchema.parse({
       revision: 1,
       scopeId: scope.data.scopeId,
-      taskRef: scope.data.taskRef,
+      ...(scope.data.taskRef ? { taskRef: scope.data.taskRef } : {}),
+      ...(scope.data.mode ? { mode: scope.data.mode } : {}),
       repository: { id: repository.id, nodeId: repository.node_id, owner, name },
     });
   }
 
-  async verify(grant: GitHubTaskGrant, checks: GitHubTaskCheck[]): Promise<GitHubRepositoryScope> {
+  async verify(
+    grant: GitHubTaskGrant,
+    checks: GitHubTaskCheck[],
+    approved: readonly WorkspaceGitHubRepositoryAccess[] = []
+  ): Promise<GitHubRepositoryScope> {
     const repository = await this.repository(grant.repository.owner, grant.repository.name);
     if (repository.id !== grant.repository.id || repository.node_id !== grant.repository.nodeId)
       throw new GitHubTaskResourceError('repository_mismatch');
@@ -125,19 +176,34 @@ export class GitHubTaskResources {
     for (const check of checks) {
       if (check.kind === 'owner-read') continue;
       if (check.kind === 'repository-read') {
-        if (check.owner === grant.repository.owner) {
-          repositoryIds.add((await this.repository(check.owner, check.name)).id);
+        const selected = approved.find(
+          repo => repo.owner === check.owner && repo.name === check.name
+        );
+        if (selected) {
+          if (selected.owner !== grant.repository.owner)
+            throw new GitHubTaskResourceError('separate_repository_requests_required');
+          const resolved = await this.repository(check.owner, check.name);
+          if (resolved.id !== selected.repositoryId || resolved.node_id !== selected.nodeId)
+            throw new GitHubTaskResourceError('repository_access_required');
+          repositoryIds.add(resolved.id);
         } else {
           // Never use the connected identity to determine whether another owner's repository is public.
-          const value = await this.request(
-            `/repos/${encodeURIComponent(check.owner)}/${encodeURIComponent(check.name)}`,
-            {
-              headers: {
-                Accept: 'application/vnd.github+json',
-                'User-Agent': 'Kilo-Git-Token-Service',
-              },
-            }
-          );
+          let value: unknown;
+          try {
+            value = await this.request(
+              `/repos/${encodeURIComponent(check.owner)}/${encodeURIComponent(check.name)}`,
+              {
+                headers: {
+                  Accept: 'application/vnd.github+json',
+                  'User-Agent': 'Kilo-Git-Token-Service',
+                },
+              }
+            );
+          } catch (error) {
+            if (error instanceof GitHubTaskResourceError && error.reason === 'repository_mismatch')
+              throw new GitHubTaskResourceError('repository_access_required');
+            throw error;
+          }
           const publicRepository = repositorySchema
             .extend({ private: z.literal(false) })
             .safeParse(value);
@@ -146,7 +212,7 @@ export class GitHubTaskResources {
             publicRepository.data.owner.login.toLowerCase() !== check.owner ||
             publicRepository.data.name.toLowerCase() !== check.name
           )
-            throw new GitHubTaskResourceError('repository_mismatch');
+            throw new GitHubTaskResourceError('repository_access_required');
         }
       } else {
         await this.verifyNode(grant, check);
@@ -154,9 +220,7 @@ export class GitHubTaskResources {
     }
     return {
       owner: grant.repository.owner,
-      ...(checks.some(check => check.kind === 'owner-read')
-        ? {}
-        : { repositoryIds: [...repositoryIds] }),
+      repositoryIds: [...repositoryIds],
     };
   }
 
@@ -198,9 +262,24 @@ export class GitHubTaskResources {
   }
 
   /** GitHub limits the token to one owner, even when the parent identity spans multiple installations. */
-  async scopeUserToken(scope: GitHubRepositoryScope): Promise<string> {
+  async scopeUserToken(
+    scope: GitHubRepositoryScope,
+    mode: RepositoryAccessMode = 'contribute'
+  ): Promise<string> {
     if (!this.env.GITHUB_APP_CLIENT_ID || !this.env.GITHUB_APP_CLIENT_SECRET)
       throw new GitHubTaskResourceError('source_unavailable');
+    if (!scope.repositoryIds?.length)
+      throw new GitHubTaskResourceError('authorization_unavailable');
+    const ids = [...new Set(scope.repositoryIds)].sort((left, right) => left - right);
+    if (ids.length !== scope.repositoryIds.length)
+      throw new GitHubTaskResourceError('authorization_unavailable');
+    const cacheKey = `github-workspace-scoped:v1:${await sha256Hex(JSON.stringify({ identity: await sha256Hex(this.token), owner: scope.owner, ids, permissions: githubRepositoryPermissions(mode) }))}`;
+    if (this.env.TOKEN_CACHE) {
+      const cached = z
+        .object({ token: z.string().min(1), expiresAt: z.number().positive() })
+        .safeParse(await this.env.TOKEN_CACHE.get(cacheKey, 'json'));
+      if (cached.success && cached.data.expiresAt > Date.now() + 60_000) return cached.data.token;
+    }
     const basic = Buffer.from(
       `${this.env.GITHUB_APP_CLIENT_ID}:${this.env.GITHUB_APP_CLIENT_SECRET}`
     ).toString('base64');
@@ -217,21 +296,68 @@ export class GitHubTaskResources {
         body: JSON.stringify({
           access_token: this.token,
           target: scope.owner,
-          ...(scope.repositoryIds ? { repository_ids: scope.repositoryIds } : {}),
+          repository_ids: scope.repositoryIds,
+          permissions: githubRepositoryPermissions(mode),
         }),
       }
     );
     const parsed = z
       .object({
         token: z.string().min(1),
+        expires_at: z.string().optional(),
         installation: z.object({
-          repository_selection: scope.repositoryIds
-            ? z.literal('selected')
-            : z.enum(['all', 'selected']),
+          id: z.number().int().positive(),
+          repository_selection: z.literal('selected'),
+          permissions: z.unknown(),
         }),
       })
       .safeParse(value);
-    if (!parsed.success) throw new GitHubTaskResourceError('source_unavailable');
+    if (
+      !parsed.success ||
+      !githubPermissionsAreRestricted(parsed.data.installation.permissions, mode)
+    )
+      throw new GitHubTaskResourceError('authorization_unavailable');
+    const issuedIds: number[] = [];
+    for (let page = 1; page <= Math.ceil(ids.length / 100); page += 1) {
+      const selected = z
+        .object({
+          total_count: z.number().int().nonnegative(),
+          repositories: z.array(z.object({ id: z.number().int().positive().safe() })),
+        })
+        .safeParse(
+          await this.request(
+            `/user/installations/${parsed.data.installation.id}/repositories?per_page=100${page > 1 ? `&page=${page}` : ''}`,
+            {
+              headers: {
+                Authorization: `Bearer ${parsed.data.token}`,
+                Accept: 'application/vnd.github+json',
+                'User-Agent': 'Kilo-Git-Token-Service',
+              },
+            }
+          )
+        );
+      if (!selected.success || selected.data.total_count !== ids.length)
+        throw new GitHubTaskResourceError('authorization_unavailable');
+      issuedIds.push(...selected.data.repositories.map(repo => repo.id));
+    }
+    if (
+      issuedIds.length !== ids.length ||
+      new Set(issuedIds).size !== ids.length ||
+      issuedIds.some(id => !ids.includes(id))
+    )
+      throw new GitHubTaskResourceError('authorization_unavailable');
+    if (parsed.data.expires_at !== undefined) {
+      const expiresAt = Date.parse(parsed.data.expires_at);
+      if (!Number.isFinite(expiresAt) || expiresAt <= Date.now())
+        throw new GitHubTaskResourceError('authorization_unavailable');
+      const expirationTtl = Math.min(1800, Math.floor((expiresAt - Date.now()) / 1000));
+      if (this.env.TOKEN_CACHE && expirationTtl >= 60)
+        await this.env.TOKEN_CACHE.put(
+          cacheKey,
+          JSON.stringify({ token: parsed.data.token, expiresAt }),
+          { expirationTtl }
+        );
+    }
     return parsed.data.token;
   }
 }

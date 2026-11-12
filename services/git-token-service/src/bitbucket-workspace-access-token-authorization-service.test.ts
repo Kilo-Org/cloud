@@ -139,6 +139,7 @@ function service(
     HYPERDRIVE: {
       connectionString: 'postgres://unused',
       host: 'unused',
+      ip: '127.0.0.1',
       port: 5432,
       user: 'unused',
       password: 'unused',

@@ -668,7 +668,7 @@ describe('handleManagedScmOutbound', () => {
       new Request(action.href, { headers: action.header }),
       createEnv(redeem)
     );
-    expect(denied.status).toBe(403);
+    expect(denied.status).toBe(503);
     expect(forward).toHaveBeenCalledOnce();
     expect(redeem).toHaveBeenLastCalledWith({
       capability: CAPABILITY,
@@ -734,7 +734,7 @@ describe('handleManagedScmOutbound', () => {
     expect(forward).toHaveBeenCalledWith(request);
   });
 
-  it('rejects unscoped GitHub capabilities while retaining the GitLab contract', async () => {
+  it('sends bound legacy GitHub capabilities to the current-policy compatibility reader', async () => {
     const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
       success: false,
       reason: 'invalid_capability',
@@ -758,7 +758,12 @@ describe('handleManagedScmOutbound', () => {
       env
     );
 
-    expect(redeemGitHubSessionCapability).not.toHaveBeenCalled();
+    expect(redeemGitHubSessionCapability).toHaveBeenCalledWith(
+      expect.objectContaining({
+        capability: LEGACY_CAPABILITY,
+        outboundContainerId: OUTBOUND_CONTEXT.containerId,
+      })
+    );
     expect(redeemGitLabSessionCapability).toHaveBeenCalledWith({
       capability: LEGACY_GITLAB_CAPABILITY,
       outboundContainerId: OUTBOUND_CONTEXT.containerId,
@@ -810,7 +815,7 @@ describe('handleManagedScmOutbound', () => {
   });
 
   it.each([
-    ['GitHub Git Basic', { Authorization: basicCredential('kgh4.opaque') }],
+    ['GitHub Git Basic', { Authorization: basicCredential('kgh9.opaque') }],
     ['GitHub API bearer', { Authorization: 'Bearer kgh42.opaque' }],
     ['GitLab Git Basic', { Authorization: basicCredential('kgl3.opaque', 'Basic', 'oauth2') }],
     ['GitLab API bearer', { Authorization: 'Bearer kgl42.opaque' }],
@@ -1444,6 +1449,7 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
         requestMethod: request.method,
         ...(purpose === 'github'
           ? {
+              workspaceSandboxId: 'sbx_1',
               requestContentType: 'text/plain;charset=UTF-8',
               requestBody: new TextEncoder().encode('{}'),
             }
@@ -1519,8 +1525,10 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
         env
       );
 
-      expect(response.status).toBe(403);
-      expect(await response.text()).toBe('GitHub request is outside the task policy');
+      expect(response.status).toBe(reason === 'source_unavailable' ? 503 : 403);
+      expect(await response.text()).toBe(
+        `${reason}: Open Repository access, then retry the operation in this workspace.`
+      );
       expect(redemptions.github).toHaveBeenCalledOnce();
       expect(forward).not.toHaveBeenCalled();
       expect(logging.logger.withFields).toHaveBeenCalledWith(
@@ -1829,6 +1837,20 @@ describe('handleManagedScmOutbound bounded GitHub git rate-limit retry', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('rechecks current policy and does not retry after access removal during a rate-limit wait', async () => {
+    const redeem = githubRedeem()
+      .mockResolvedValueOnce({ success: true, authorization: REDEEMED_GIT_AUTHORIZATION })
+      .mockResolvedValueOnce({ success: false, reason: 'repository_access_required' });
+    const forward = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: { 'retry-after': '1' } }),
+      () => new Response('must not forward'),
+    ]);
+    const response = await settle(handleOutbound(githubGitGetRequest(), createEnv(redeem)));
+    expect(response.status).toBe(503);
+    expect(redeem).toHaveBeenCalledTimes(2);
+    expect(forward).toHaveBeenCalledOnce();
   });
 
   it('waits the retry-after delta-seconds delay before re-issuing', async () => {

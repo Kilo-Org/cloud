@@ -5,6 +5,17 @@ import {
 import { canonicalGitLabCloneUrl } from '@kilocode/worker-utils/git-url';
 import type { SessionRepositoryRequest } from './session-requests.js';
 
+/** The admitted identity policy, shared by credential material and durable policy initialization. */
+export function githubUserAuthorizationAllowed(input: {
+  allowUserAuthorization?: boolean;
+  createdOnPlatform?: string;
+}): boolean {
+  return (
+    input.allowUserAuthorization ??
+    ['cloud-agent-web', 'agent-manager', 'slack'].includes(input.createdOnPlatform ?? '')
+  );
+}
+
 /** The GitHub access purpose a launch repository request carries, in either request shape. */
 type LaunchGitHubAccess = {
   type: string;

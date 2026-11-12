@@ -14,6 +14,7 @@ import { forwardUnmanagedScmRequest } from './scm-broker/unmanaged-forwarding.js
 import {
   CURRENT_CAPABILITY_PREFIX,
   GITHUB_TASK_CAPABILITY_PREFIX,
+  GITHUB_WORKSPACE_CAPABILITY_PREFIX,
 } from '@kilocode/worker-utils/scm-capability-contract';
 
 export { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
@@ -92,7 +93,11 @@ async function handleControlPlaneOutbound(
     const { credential } = resolved.data;
     const expectedPrefix =
       capability.provider === 'github'
-        ? GITHUB_TASK_CAPABILITY_PREFIX
+        ? credential.startsWith(GITHUB_WORKSPACE_CAPABILITY_PREFIX)
+          ? GITHUB_WORKSPACE_CAPABILITY_PREFIX
+          : credential.startsWith(GITHUB_TASK_CAPABILITY_PREFIX)
+            ? GITHUB_TASK_CAPABILITY_PREFIX
+            : CURRENT_CAPABILITY_PREFIX.github
         : CURRENT_CAPABILITY_PREFIX[capability.provider];
     if (
       !credential.startsWith(expectedPrefix) ||
@@ -106,7 +111,8 @@ async function handleControlPlaneOutbound(
       request,
       env.GIT_TOKEN_SERVICE,
       { provider: capability.provider, capability: credential },
-      ctx.containerId
+      ctx.containerId,
+      parsed.sandboxId
     );
   } catch {
     return new Response('SCM authorization unavailable', { status: 502 });

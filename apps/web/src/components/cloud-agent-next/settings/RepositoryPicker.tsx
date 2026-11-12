@@ -23,6 +23,7 @@ import {
 import { excludeListedRepositories } from './settings-options';
 
 export type RepositoryOption = {
+  repositoryId?: number;
   fullName: string;
   private: boolean;
   platform: 'github' | 'gitlab';
@@ -31,6 +32,7 @@ export type RepositoryOption = {
 const PLATFORM_HEADINGS = { github: 'GitHub', gitlab: 'GitLab' } as const;
 
 type RepositoryPickerProps = {
+  githubOnly?: boolean;
   organizationId?: string;
   listed: ReadonlyArray<{ repositoryFullName: string; repositoryPlatform: string }>;
   disabled: boolean;
@@ -38,6 +40,7 @@ type RepositoryPickerProps = {
 };
 
 export function RepositoryPicker({
+  githubOnly = false,
   organizationId,
   listed,
   disabled,
@@ -66,6 +69,7 @@ export function RepositoryPicker({
   const available = useMemo(() => {
     const repositories = [
       ...(github.data?.repositories ?? []).map(repo => ({
+        repositoryId: repo.id,
         fullName: repo.fullName,
         private: repo.private,
         platform: 'github' as const,
@@ -76,11 +80,16 @@ export function RepositoryPicker({
         platform: 'gitlab' as const,
       })),
     ];
-    return excludeListedRepositories(repositories, listed);
-  }, [github.data, gitlab.data, listed]);
+    return excludeListedRepositories(
+      githubOnly ? repositories.filter(repo => repo.platform === 'github') : repositories,
+      listed
+    );
+  }, [github.data, gitlab.data, listed, githubOnly]);
 
   const hasBothPlatforms =
-    (github.data?.repositories.length ?? 0) > 0 && (gitlab.data?.repositories.length ?? 0) > 0;
+    !githubOnly &&
+    (github.data?.repositories.length ?? 0) > 0 &&
+    (gitlab.data?.repositories.length ?? 0) > 0;
 
   const githubNotices = getGitHubRepositoryNotices(
     github.data,

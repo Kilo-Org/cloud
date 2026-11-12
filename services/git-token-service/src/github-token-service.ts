@@ -1,3 +1,8 @@
+import {
+  githubRepositoryPermissions,
+  githubPermissionsAreRestricted,
+  type RepositoryAccessMode,
+} from '@kilocode/worker-utils/workspace-repository-access';
 import { createAppAuth } from '@octokit/auth-app';
 import { Octokit } from '@octokit/rest';
 import { createHash } from 'node:crypto';
@@ -174,20 +179,21 @@ export class GitHubTokenService {
   async getTokenForRepositoryIds(
     installationId: string,
     repositoryIds: number[],
-    appType: GitHubAppType = 'standard'
+    appType: GitHubAppType = 'standard',
+    mode: RepositoryAccessMode = 'contribute'
   ): Promise<string> {
     const numericId = this.validateInstallationId(installationId);
     const ids = [...new Set(repositoryIds)].sort((left, right) => left - right);
     if (!ids.length || ids.some(id => !Number.isSafeInteger(id) || id <= 0))
       throw new GitHubTokenGenerationError(undefined);
-    const cacheKey = `${installationId}:${appType}:repository-ids:${ids.join(',')}`;
+    const cacheKey = `${installationId}:${appType}:repository-ids:mvp-v1:${mode}:${ids.join(',')}`;
     const cached = await this.getCachedToken(cacheKey);
     if (cached) return cached;
     const { token, expiresAt } = await this.generateToken(
       numericId,
       this.getCredentials(appType),
       undefined,
-      undefined,
+      githubRepositoryPermissions(mode),
       ids
     );
     await this.cacheToken(cacheKey, token, expiresAt);
@@ -338,6 +344,20 @@ export class GitHubTokenService {
         ...(permissions ? { permissions } : {}),
         ...(repositoryIds ? { repositoryIds } : {}),
       });
+      if (
+        repositoryIds &&
+        permissions &&
+        (result.repositorySelection !== 'selected' ||
+          !result.repositoryIds ||
+          result.repositoryIds.length !== repositoryIds.length ||
+          new Set(result.repositoryIds).size !== repositoryIds.length ||
+          result.repositoryIds.some(id => !repositoryIds.includes(id)) ||
+          !githubPermissionsAreRestricted(
+            result.permissions,
+            permissions.contents === 'write' ? 'contribute' : 'read'
+          ))
+      )
+        throw new GitHubRepositoryPermissionsUnavailableError();
       return {
         token: result.token,
         expiresAt: new Date(result.expiresAt).getTime(),

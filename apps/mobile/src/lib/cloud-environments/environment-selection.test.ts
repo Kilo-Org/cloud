@@ -27,7 +27,14 @@ function environment(id: string, repositories?: number): EnvironmentSummaryRow {
   };
   return (
     repositories === undefined
-      ? { ...base, platform: 'github', repoFullName: 'acme/widgets', gitlabCloneUrl: null, bitbucketWorkspaceUuid: null, bitbucketRepositoryUuid: null }
+      ? {
+          ...base,
+          platform: 'github',
+          repoFullName: 'acme/widgets',
+          gitlabCloneUrl: null,
+          bitbucketWorkspaceUuid: null,
+          bitbucketRepositoryUuid: null,
+        }
       : {
           ...base,
           repositories: Array.from({ length: repositories }, (_, index) => ({

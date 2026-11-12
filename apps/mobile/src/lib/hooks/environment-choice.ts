@@ -9,12 +9,12 @@ import { LAST_CLOUD_ENVIRONMENT_KEY } from '@/lib/storage-keys';
  * the same map in localStorage, so switching back to a repository restores the
  * environment picked for it instead of asking again.
  */
-export type StoredEnvironmentChoice = Record<string, string>;
+type StoredEnvironmentChoice = Record<string, string>;
 
 const rawStoredEnvironmentChoiceSchema = z.record(z.string(), z.unknown());
 const storedEnvironmentIdSchema = z.string();
 
-export function parseStoredEnvironmentChoice(raw: string | null): StoredEnvironmentChoice {
+function parseStoredEnvironmentChoice(raw: string | null): StoredEnvironmentChoice {
   if (!raw) {
     return {};
   }
@@ -52,11 +52,6 @@ store.preload();
 
 export function clearEnvironmentChoices() {
   store.clear();
-}
-
-/** The stored environment id for one repository and scope, if any. */
-export function getStoredEnvironmentChoice(key: string): string | null {
-  return store.getRequested()[key] ?? null;
 }
 
 function saveEnvironmentChoice(key: string, environmentId: string) {

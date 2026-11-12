@@ -36,10 +36,7 @@ const SIMPLE_STAGE_KEYS = {
   failed: 'common.failed',
   canceled: 'common.cancelled',
   obsolete: 'agentChat.environment.buildSuperseded',
-} satisfies Record<
-  Exclude<EnvironmentBuildSummaryRow['state'], 'preparing' | 'stopping'>,
-  string
->;
+} satisfies Record<Exclude<EnvironmentBuildSummaryRow['state'], 'preparing' | 'stopping'>, string>;
 
 export function buildStageLabel(summary: EnvironmentBuildSummaryRow, t: TFunction): string {
   if (summary.state === 'preparing') {
@@ -68,7 +65,7 @@ export function buildStageLabel(summary: EnvironmentBuildSummaryRow, t: TFunctio
   return t(SIMPLE_STAGE_KEYS[summary.state]);
 }
 
-const FAILURE_KEYS = {
+const FAILURE_KEYS: Record<string, string> = {
   clone_failed: 'agentChat.environment.failureClone',
   setup_failed: 'agentChat.environment.failureSetup',
   setup_timeout: 'agentChat.environment.failureTimeout',
@@ -83,7 +80,7 @@ const FAILURE_KEYS = {
   billing_blocked: 'agentChat.environment.failureBilling',
   billing_unavailable: 'agentChat.environment.failureBilling',
   configuration_changed: 'agentChat.environment.failureConfiguration',
-} satisfies Record<string, string>;
+};
 
 export function buildFailureText(reason: string | null, t: TFunction): string | null {
   if (reason === null) {

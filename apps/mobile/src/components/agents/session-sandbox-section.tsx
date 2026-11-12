@@ -11,7 +11,7 @@ import {
   sandboxStatusLabel,
 } from '@/lib/cloud-environments/sandbox-status-copy';
 import { formatDate } from '@/lib/format';
-import { useTRPC } from '@/lib/trpc';
+import { trpcClient, useTRPC } from '@/lib/trpc';
 
 /** The worker's own status is a snapshot; a sleeping sandbox changes on its own. */
 const SANDBOX_POLL_MS = 15_000;
@@ -76,39 +76,30 @@ export function SessionSandboxSection({
           { enabled: cloudAgentSessionId !== null && startFailed, retry: false, staleTime: 0 }
         )
   );
-  const removeSnapshot = useMutation(
-    organizationId
-      ? trpc.organizations.cloudAgentNext.removeWorkspaceSnapshot.mutationOptions({
-          onSuccess: () => {
-            void queryClient.invalidateQueries({
-              queryKey: trpc.organizations.cloudAgentNext.getWorkspaceSnapshotRecovery.queryKey(),
-            });
-            toast.success(t('agentChat.environment.startFreshDone'));
-          },
-          onError: error => {
-            toast.error(
-              error.message.length > 0
-                ? error.message
-                : t('agentChat.environment.couldNotRemoveSnapshot')
-            );
-          },
-        })
-      : trpc.cloudAgentNext.removeWorkspaceSnapshot.mutationOptions({
-          onSuccess: () => {
-            void queryClient.invalidateQueries({
-              queryKey: trpc.cloudAgentNext.getWorkspaceSnapshotRecovery.queryKey(),
-            });
-            toast.success(t('agentChat.environment.startFreshDone'));
-          },
-          onError: error => {
-            toast.error(
-              error.message.length > 0
-                ? error.message
-                : t('agentChat.environment.couldNotRemoveSnapshot')
-            );
-          },
-        })
-  );
+  const removeSnapshot = useMutation({
+    mutationFn: async () => {
+      if (organizationId) {
+        return await trpcClient.organizations.cloudAgentNext.removeWorkspaceSnapshot.mutate({
+          sessionId,
+          organizationId,
+        });
+      }
+      return await trpcClient.cloudAgentNext.removeWorkspaceSnapshot.mutate({ sessionId });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries(
+        organizationId
+          ? { queryKey: trpc.organizations.cloudAgentNext.getWorkspaceSnapshotRecovery.queryKey() }
+          : { queryKey: trpc.cloudAgentNext.getWorkspaceSnapshotRecovery.queryKey() }
+      );
+      toast.success(t('agentChat.environment.startFreshDone'));
+    },
+    onError: error => {
+      toast.error(
+        error.message.length > 0 ? error.message : t('agentChat.environment.couldNotRemoveSnapshot')
+      );
+    },
+  });
 
   if (cloudAgentSessionId === null) {
     return null;
@@ -133,7 +124,7 @@ export function SessionSandboxSection({
       confirmLabel: t('agentChat.environment.startFresh'),
       cancelLabel: t('common.cancel'),
       onConfirm: () => {
-        removeSnapshot.mutate(organizationId ? { sessionId, organizationId } : { sessionId });
+        removeSnapshot.mutate();
       },
     });
   };
@@ -154,9 +145,7 @@ export function SessionSandboxSection({
           <Text className="text-base font-medium text-foreground">
             {sandboxStatusLabel(data.status, t)}
           </Text>
-          {detail === null ? null : (
-            <Text className="text-sm text-muted-foreground">{detail}</Text>
-          )}
+          {detail === null ? null : <Text className="text-sm text-muted-foreground">{detail}</Text>}
           <Text className="text-xs text-muted-foreground">
             {t('agentChat.environment.sandboxChecked', {
               when: formatDate(new Date(data.observedAt), i18n.language, {
@@ -172,12 +161,7 @@ export function SessionSandboxSection({
           <Text className="text-sm text-muted-foreground">
             {t('agentChat.environment.snapshotCaptured', { when: capturedLabel })}
           </Text>
-          <Button
-            variant="outline"
-            size="sm"
-            loading={removeSnapshot.isPending}
-            onPress={discard}
-          >
+          <Button variant="outline" size="sm" loading={removeSnapshot.isPending} onPress={discard}>
             <Text>{t('agentChat.environment.startFresh')}</Text>
           </Button>
         </View>

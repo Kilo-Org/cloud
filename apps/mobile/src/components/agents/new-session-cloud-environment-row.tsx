@@ -3,7 +3,11 @@ import { useTranslation } from 'react-i18next';
 
 import { ChevronDown } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import {
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
+  ROW_TARGET_CLASS,
+} from '@/lib/a11y/tap-target';
 import {
   buildSummaryLabel,
   type EnvironmentBuildStatusRow,

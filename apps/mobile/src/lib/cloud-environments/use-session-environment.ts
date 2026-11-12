@@ -5,6 +5,7 @@ import { type NewSessionRepository } from '@/components/agents/new-session-repos
 import {
   environmentChoiceKey,
   type EnvironmentSelection,
+  type EnvironmentSummaryRow,
   selectedEnvironment,
   selectEnvironment,
   toEnvironmentRepositoryInput,
@@ -96,7 +97,9 @@ export function useSessionEnvironment({
   return {
     matches,
     isError: list.isError,
-    refetch: list.refetch,
+    retryEnvironmentList: () => {
+      void list.refetch();
+    },
     selection,
     environment: selectedEnvironment(selection),
     buildStatusFor: (environmentId: string) => buildStatusById.get(environmentId),

@@ -88,9 +88,7 @@ function EnvironmentSheetBody({
 }: Readonly<Omit<EnvironmentSheetProps, 'visible'>>) {
   const insets = useSafeAreaInsets();
   const [openEnvironmentId, setOpenEnvironmentId] = useState<string | null>(null);
-  const openEnvironment = environments.find(
-    environment => environment.id === openEnvironmentId
-  );
+  const openEnvironment = environments.find(environment => environment.id === openEnvironmentId);
 
   return (
     <Sheet visible onClose={onClose}>

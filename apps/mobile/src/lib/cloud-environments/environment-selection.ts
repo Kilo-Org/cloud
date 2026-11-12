@@ -61,7 +61,7 @@ export function environmentChoiceKey(
 
 /** How many repositories an environment clones; a V1 environment has one. */
 export function environmentRepositoryCount(environment: EnvironmentSummaryRow): number {
-  return environment.repositories !== undefined ? environment.repositories.length : 1;
+  return 'repositories' in environment ? environment.repositories.length : 1;
 }
 
 /**

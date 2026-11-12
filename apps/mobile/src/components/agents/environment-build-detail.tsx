@@ -18,7 +18,11 @@ import { type EnvironmentSummaryRow } from '@/lib/cloud-environments/environment
 import { formatDate } from '@/lib/format';
 import { useTRPC } from '@/lib/trpc';
 
-import { BuildControl, BuildLogSection, BuildStatusPending } from './environment-build-detail-parts';
+import {
+  BuildControl,
+  BuildLogSection,
+  BuildStatusPending,
+} from './environment-build-detail-parts';
 
 const BUILD_POLL_MS = 3_000;
 
@@ -126,10 +130,7 @@ export function EnvironmentBuildDetail({
       />
       <View className="gap-3 px-4 pb-4">
         {status === undefined ? (
-          <BuildStatusPending
-            failed={buildStatusFailed}
-            onRetry={onRetryBuildStatus}
-          />
+          <BuildStatusPending failed={buildStatusFailed} onRetry={onRetryBuildStatus} />
         ) : (
           <>
             <Text className="text-sm font-medium text-foreground">
@@ -164,9 +165,6 @@ export function EnvironmentBuildDetail({
               action={action}
               isSubmitting={isSubmitting}
               onBuild={() => {
-                if (status === undefined) {
-                  return;
-                }
                 requestBuild.mutate({
                   environmentId: environment.id,
                   expectedRevision: status.configurationRevision,
@@ -188,4 +186,3 @@ export function EnvironmentBuildDetail({
     </>
   );
 }
-

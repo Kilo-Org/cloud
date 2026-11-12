@@ -64,9 +64,7 @@ describe('isBuildActive', () => {
 describe('buildStageLabel', () => {
   it('names the preparing step the build is on', () => {
     expect(buildStageLabel(build({ state: 'queued' }), t)).toBe('common.queued');
-    expect(buildStageLabel(build({ step: 'clone' }), t)).toBe(
-      'agentChat.environment.buildCloning'
-    );
+    expect(buildStageLabel(build({ step: 'clone' }), t)).toBe('agentChat.environment.buildCloning');
     expect(buildStageLabel(build({ step: 'setup' }), t)).toBe('agentChat.environment.buildSetup');
     expect(buildStageLabel(build({ step: 'cleanup' }), t)).toBe(
       'agentChat.environment.buildCleanup'
@@ -166,9 +164,9 @@ describe('buildSummaryLabel', () => {
     expect(buildSummaryLabel(status({ published }), t)).toBe(
       'agentChat.environment.buildSucceeded'
     );
-    expect(
-      buildSummaryLabel(status({ published: { ...published, stale: 'revision' } }), t)
-    ).toBe('agentChat.environment.buildStale');
+    expect(buildSummaryLabel(status({ published: { ...published, stale: 'revision' } }), t)).toBe(
+      'agentChat.environment.buildStale'
+    );
   });
 
   it('says so when nothing was built', () => {
@@ -185,9 +183,10 @@ describe('environmentBuildAction', () => {
   });
 
   it('refuses a provider that cannot build and a build that is still stopping', () => {
-    expect(
-      environmentBuildAction(status({ supported: false }), { canManage: true }, t)
-    ).toEqual({ kind: 'none', message: 'agentChat.environment.buildsUnavailable' });
+    expect(environmentBuildAction(status({ supported: false }), { canManage: true }, t)).toEqual({
+      kind: 'none',
+      message: 'agentChat.environment.buildsUnavailable',
+    });
     expect(
       environmentBuildAction(
         status({ activeBuild: build({ state: 'stopping' }) }),

@@ -15,13 +15,7 @@ import { cn } from '@/lib/utils';
 const LOGS_MAX_WINDOW_FRACTION = 0.3;
 
 /** The build state before the first read settles, or its failure with a retry. */
-export function BuildStatusPending({
-  failed,
-  onRetry,
-}: {
-  failed: boolean;
-  onRetry: () => void;
-}) {
+export function BuildStatusPending({ failed, onRetry }: { failed: boolean; onRetry: () => void }) {
   const { t } = useTranslation();
   if (failed) {
     return (

@@ -198,6 +198,7 @@ export type GetCloudAgentAuthForRepoSuccess = {
 };
 
 export type GitHubUserAuthorizationFailure =
+  | 'user_authorization_revoked'
   | 'user_authorization_unavailable'
   | 'provided_token_not_supported';
 export type GetCloudAgentAuthForRepoResult =

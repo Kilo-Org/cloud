@@ -1872,6 +1872,20 @@ describe('GitTokenRPCEntrypoint current workspace GitHub authority', () => {
     ).toEqual({ success: false, reason: 'authorization_unavailable' });
   });
 
+  it('preserves revoked user authorization for read-only repository credentials', async () => {
+    serviceMocks.selectUserAuthorization.mockResolvedValue({ selected: false, reason: 'revoked' });
+    serviceMocks.getTokenForRepo.mockClear();
+    await expect(
+      service.getCloudAgentAuthForRepo({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+        repositoryMode: 'read',
+      })
+    ).resolves.toEqual({ success: false, reason: 'user_authorization_revoked' });
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
   it.each([false, true])(
     'checks current policy for legacy=%s and revokes a captured capability',
     async legacy => {
@@ -2144,6 +2158,22 @@ describe('GitTokenRPCEntrypoint current workspace GitHub authority', () => {
     providerUnavailable = false;
     expect(await redeem(cap)).toEqual({ success: false, reason: 'authorization_unavailable' });
   });
+  it.each([false, true])(
+    'requires current policy before credential lookup (legacy=%s)',
+    async legacy => {
+      const cap = await capability('installation', legacy);
+      serviceMocks.getTokenForRepo.mockClear();
+      serviceMocks.getToken.mockClear();
+      serviceMocks.getTokenForRepositoryIds.mockClear();
+      readPolicy.mockResolvedValue(null);
+      expect(await redeem(cap)).toEqual({ success: false, reason: 'authorization_unavailable' });
+      expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+      expect(serviceMocks.getToken).not.toHaveBeenCalled();
+      expect(serviceMocks.getTokenForRepositoryIds).not.toHaveBeenCalled();
+      expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+    }
+  );
+
   it('rejects a different container before reading policy', async () => {
     expect(await redeem(await capability(), undefined, { outboundContainerId: 'other' })).toEqual({
       success: false,

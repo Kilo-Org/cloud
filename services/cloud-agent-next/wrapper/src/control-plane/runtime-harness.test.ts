@@ -27,6 +27,14 @@ describe('runtime harness selection', () => {
     expect(kilo2RuntimeEnvironment(result)).toEqual(result);
     expect(JSON.parse(env.KILO_CONFIG_CONTENT).skills).toEqual(skills);
   });
+
+  it('exposes drain only through the v2 harness', () => {
+    const options = { server: { url: 'http://127.0.0.1:1' }, directory: '/workspace' };
+    expect(runtimeHarness({}).create(options).drainSession).toBeUndefined();
+    expect(
+      runtimeHarness({ KILO_RUNTIME_HARNESS: 'kilo2' }).create(options).drainSession
+    ).toBeFunction();
+  });
   it('exposes legacy rule files to V2 once without replacing repository instruction configuration', () => {
     const original = {
       HOME: '/workspace-shared-home',

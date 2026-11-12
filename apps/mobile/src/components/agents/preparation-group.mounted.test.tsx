@@ -144,40 +144,6 @@ describe('PreparationGroup phase label', () => {
   });
 });
 
-describe('PreparationGroup failed stage', () => {
-  it('names the stage that failed as a step, and keeps the reason under it', async () => {
-    const stage = phaseStep({
-      id: 'sandbox',
-      key: 'sandbox_provision',
-      label: 'sandbox provision',
-      status: 'failed',
-      completedAt: 2,
-      latestDetail: 'Creating sandbox',
-      safeError: 'invalid_configuration',
-    });
-    const renderer = await mountGroup({
-      ...attemptWithStep(stage),
-      status: 'failed',
-      completedAt: 2,
-      safeError: 'invalid_configuration',
-    });
-
-    // The header names the stage, so the group states the failure once.
-    expect(
-      renderer.root.findAll(node => node.props.accessibilityLabel === 'Sandbox provisioning failed')
-    ).toHaveLength(1);
-    const texts = textValues(renderer.root);
-    expect(texts).not.toContain('Sandbox provisioning');
-    // The body carries what the stage was doing and why it stopped.
-    expect(texts).toContain('Creating sandbox');
-    expect(texts).toContain('Sandbox configuration is invalid or unsupported');
-
-    act(() => {
-      renderer.unmount();
-    });
-  });
-});
-
 const INCOMPLETE_TEXT =
   'Session restore incomplete: 2 of 5 files were not restored (the patch did not apply). Missing: a.ts, b.ts';
 

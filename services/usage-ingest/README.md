@@ -398,10 +398,13 @@ retries, mixed histories, consumed attempts, scheduling and retention affect the
 actual lifecycle. Increasing the configured count does not reset existing attempts.
 
 Deploy and verify this retry consumer **before merging/deploying default-on
-writer admission PR #9241**. Merging both ahead of one deployment is insufficient:
-the production workflow promotes web before Workers. That rollout kept pool 10,
-batch 6/par 2, consumer cap 200 and exposure unchanged; admission is per-runtime
-and does not establish aggregate database capacity for larger settings.
+writer admission PR #9241**. Merging both ahead of one deployment is insufficient
+while the consumer is not yet live: production deploys Workers beside the Vercel
+stage-and-promote chain, so the graph does not order this service's deploy ahead
+of the promotion. Confirm the deploy of this service finished before relying on
+the promoted release. That rollout kept pool 10, batch 6/par 2, consumer cap 200
+and exposure unchanged; admission is per-runtime and does not establish aggregate
+database capacity for larger settings.
 
 Persistent failures still reach the configured DLQ after the finite retry budget;
 a DLQ is a recovery queue, not proof the payload is poison. DLQ retention is

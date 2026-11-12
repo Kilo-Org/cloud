@@ -748,7 +748,7 @@ const sessionMessageCompletionSourceNextSchema = z.enum([
 ]);
 
 // Mirrors the Worker's public result contract without duplicating its strict
-// validation. Non-strict here keeps web-first deploy rolling reads forward
+// validation. Non-strict here keeps a rolling deploy's reads forward
 // compatible; the Worker remains the authority for the full shape.
 export const baseGetMessageResultNextOutputSchema = z.object({
   cloudAgentSessionId: controlPlaneSessionIdNextSchema,

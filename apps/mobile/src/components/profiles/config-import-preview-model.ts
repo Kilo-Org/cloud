@@ -6,26 +6,25 @@
  * section ids and the selection live here rather than in the component.
  */
 
-/** One category of the server's diff, reduced to what the sheet renders. */
-type PreviewCategoryDiff<T> = Readonly<{
-  added: readonly Readonly<{ id: string; item: T }>[];
-  changed: readonly Readonly<{ id: string; after: T }>[];
-}>;
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
 /**
- * The server preview this sheet renders, stated structurally: the tRPC output
- * satisfies it, and a test can build one without the whole profile contract.
+ * The server preview this sheet renders, taken from the procedure that
+ * produces it. A change to the contract then reaches the sheet's rows instead
+ * of drifting behind a restated shape; the type-only import adds no runtime.
  */
-export type ImportPreviewInput = Readonly<{
-  agents: PreviewCategoryDiff<{ slug: string }>;
-  commands: PreviewCategoryDiff<{ name: string }>;
-  skills: PreviewCategoryDiff<{ name: string }>;
-  instructions: PreviewCategoryDiff<{ name: string }>;
-  issues: readonly Readonly<{ severity: 'error' | 'warning'; message: string }>[];
-}>;
+export type ImportPreviewInput = RouterOutputs['agentProfiles']['previewConfigImport'];
 
 /** The categories the server diffs, in the order the sheet lists them. */
 type ImportCategory = 'agents' | 'commands' | 'skills' | 'instructions';
+
+/** One category's diff, as `previewConfigImport` reports it. */
+type CategoryDiff<C extends ImportCategory> = ImportPreviewInput[C];
+
+/** One definition inside a category's diff. */
+type CategoryItem<C extends ImportCategory> = CategoryDiff<C>['added'][number]['item'];
 
 /** Whether the reader keeps each category of the preview. */
 export type ImportSelection = Record<ImportCategory, boolean>;
@@ -48,25 +47,27 @@ export type ImportIssueView = Readonly<{
   message: string;
 }>;
 
-function toView<T>({
+function toView<C extends ImportCategory>({
   category,
   titleKey,
-  added,
-  changed,
+  diff,
   label,
 }: Readonly<{
-  category: ImportCategory;
+  category: C;
   titleKey: string;
-  added: PreviewCategoryDiff<T>['added'];
-  changed: PreviewCategoryDiff<T>['changed'];
-  label: (item: T) => string;
+  diff: CategoryDiff<C>;
+  label: (item: CategoryItem<C>) => string;
 }>): ImportCategoryView {
   return {
     category,
     titleKey,
     items: [
-      ...added.map(entry => ({ id: entry.id, label: label(entry.item), status: 'added' as const })),
-      ...changed.map(entry => ({
+      ...diff.added.map(entry => ({
+        id: entry.id,
+        label: label(entry.item),
+        status: 'added' as const,
+      })),
+      ...diff.changed.map(entry => ({
         id: entry.id,
         label: label(entry.after),
         status: 'changed' as const,
@@ -85,29 +86,25 @@ export function importCategoryViews(preview: ImportPreviewInput): ImportCategory
     toView({
       category: 'agents',
       titleKey: 'common.agents',
-      added: preview.agents.added,
-      changed: preview.agents.changed,
+      diff: preview.agents,
       label: item => item.slug,
     }),
     toView({
       category: 'commands',
       titleKey: 'profiles.slashCommands.title',
-      added: preview.commands.added,
-      changed: preview.commands.changed,
+      diff: preview.commands,
       label: item => item.name,
     }),
     toView({
       category: 'skills',
       titleKey: 'profiles.skillsTitle',
-      added: preview.skills.added,
-      changed: preview.skills.changed,
+      diff: preview.skills,
       label: item => item.name,
     }),
     toView({
       category: 'instructions',
       titleKey: 'profiles.instructionsTitle',
-      added: preview.instructions.added,
-      changed: preview.instructions.changed,
+      diff: preview.instructions,
       label: item => item.name,
     }),
   ].filter(section => section.items.length > 0);

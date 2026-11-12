@@ -3,10 +3,7 @@ import { toast } from 'sonner-native';
 
 import { agentProfileMutationErrorMessage } from '@/lib/agent-profile-error-copy';
 import { withOrganization } from '@/lib/hooks/agent-profile-mutation-helpers';
-import {
-  type AgentProfileDetail,
-  type AgentProfileInstructionRow,
-} from '@/lib/hooks/agent-profile-types';
+import { type AgentProfileInstructionRow } from '@/lib/hooks/agent-profile-types';
 import {
   isLatestMutationGeneration,
   nextMutationGeneration,
@@ -30,10 +27,10 @@ function withInstructionEnabled(
 /**
  * Every mutation the profile Instructions screen calls. A failed call toasts
  * `error.message` once, and each success invalidates the `agentProfiles`
- * namespace so the list, the overview's count, and the profile read the screen
+ * namespace so the list, the overview's count, and the section read the screen
  * renders reconcile with server truth.
  *
- * `setInstructionEnabled` is optimistic: it snapshots the profile read in
+ * `setInstructionEnabled` is optimistic: it snapshots the section read in
  * `onMutate`, rolls back in `onError` (latest generation only), and invalidates
  * again in `onSettled` to reconcile.
  */
@@ -82,24 +79,15 @@ export function useAgentProfileInstructionMutations(organizationId?: string) {
       trpc.agentProfiles.setInstructionEnabled.mutationOptions({
         ...callbacks,
         onMutate: async variables => {
-          const detailFilter = trpc.agentProfiles.get.queryFilter({
+          const sectionFilter = trpc.agentProfiles.instructions.queryFilter({
             profileId: variables.profileId,
             organizationId,
           });
-          await queryClient.cancelQueries(detailFilter);
+          await queryClient.cancelQueries(sectionFilter);
           const generation = nextMutationGeneration(INSTRUCTION_MUTATION_KEY);
-          const previous = queryClient.getQueriesData<AgentProfileDetail>(detailFilter);
-          queryClient.setQueriesData<AgentProfileDetail>(detailFilter, old =>
-            old
-              ? {
-                  ...old,
-                  instructions: withInstructionEnabled(
-                    old.instructions,
-                    variables.instructionId,
-                    variables.enabled
-                  ),
-                }
-              : old
+          const previous = queryClient.getQueriesData<AgentProfileInstructionRow[]>(sectionFilter);
+          queryClient.setQueriesData<AgentProfileInstructionRow[]>(sectionFilter, old =>
+            old ? withInstructionEnabled(old, variables.instructionId, variables.enabled) : old
           );
           return { generation, previous };
         },

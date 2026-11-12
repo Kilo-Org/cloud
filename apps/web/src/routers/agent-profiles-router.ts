@@ -466,6 +466,23 @@ export const agentProfilesRouter = createTRPCRouter({
     }),
 
   /**
+   * A single profile's instruction (rules) files, ordered by name. See `vars`.
+   *
+   * The Instructions screen renders these and nothing else the profile
+   * carries, so it reads this rather than `get`, which ships every collection.
+   */
+  instructions: baseProcedure
+    .input(ProfileIdSchema.extend({ organizationId: z.uuid().optional() }))
+    .output(z.array(ProfileInstructionResponseSchema))
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      return profileInstructionsService.getProfileInstructions(db, input.profileId, owner);
+    }),
+
+  /**
    * Create a new profile.
    */
   create: baseProcedure

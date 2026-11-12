@@ -30,6 +30,7 @@ import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-pro
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -177,14 +178,20 @@ export function ProfileInstructionsScreen({
       await (target === null
         ? createInstruction.mutateAsync({ profileId, ...submission })
         : updateInstruction.mutateAsync({ profileId, instructionId: target.id, ...submission }));
-    } catch {
+    } catch (error) {
       if (!form.isCurrent(generation)) {
         return;
       }
-      setSaveFailure({
-        message: t('profiles.instructionSaveFailed'),
-        tone: 'error',
-      });
+      // A create the server refused at the cap, e.g. the list was stale; an
+      // update never hits the cap, so its PRECONDITION_FAILED (a name the
+      // server reserves) keeps the generic message.
+      const limited =
+        target === null && readTrpcErrorField(error, 'code') === 'PRECONDITION_FAILED';
+      setSaveFailure(
+        limited
+          ? instructionLimitFailure()
+          : { message: t('profiles.instructionSaveFailed'), tone: 'error' }
+      );
       return;
     }
     if (form.isCurrent(generation)) {

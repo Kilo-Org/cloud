@@ -46,6 +46,7 @@ export const agentProfilesMobileRouter = createTRPCRouter({
   updateInstruction: agentProfilesRouter.updateInstruction,
   deleteInstruction: agentProfilesRouter.deleteInstruction,
   setInstructionEnabled: agentProfilesRouter.setInstructionEnabled,
+  instructions: agentProfilesRouter.instructions,
   previewConfigImport: agentProfilesRouter.previewConfigImport,
   applyConfigImport: agentProfilesRouter.applyConfigImport,
   createKiloCommand: agentProfilesRouter.createKiloCommand,

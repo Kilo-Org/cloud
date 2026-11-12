@@ -28,20 +28,67 @@ function makePreview(overrides: {
   };
 }
 
+type AgentItem = ImportPreviewInput['agents']['added'][number]['item'];
+type CommandItem = ImportPreviewInput['commands']['added'][number]['item'];
+type SkillItem = ImportPreviewInput['skills']['added'][number]['item'];
+type InstructionItem = ImportPreviewInput['instructions']['added'][number]['item'];
+
+/** Fixtures hold the server's own item shapes, so a fixture cannot describe a definition it never sends. */
+function added<T>(id: string, item: T) {
+  return { id, item };
+}
+
+function changed<T>(id: string, item: T) {
+  return { id, before: item, after: item, changes: [] };
+}
+
+function agent(slug: string): AgentItem {
+  return { slug, name: slug, config: {} };
+}
+
+function command(name: string): CommandItem {
+  return {
+    name,
+    description: null,
+    template: '',
+    agent: null,
+    model: null,
+    subtask: false,
+    enabled: true,
+  };
+}
+
+function skill(name: string): SkillItem {
+  return {
+    name,
+    description: null,
+    rawMarkdown: '',
+    files: {},
+    enabled: true,
+    sourceType: 'custom',
+    sourceUrl: null,
+  };
+}
+
+function instruction(name: string): InstructionItem {
+  return { name, content: '', enabled: true };
+}
+
+function issue(
+  severity: ImportPreviewInput['issues'][number]['severity'],
+  message: string
+): ImportPreviewInput['issues'][number] {
+  return { severity, code: 'parse', category: 'archive', path: null, field: null, message };
+}
+
 const populated = makePreview({
   agents: {
-    added: [{ id: 'agent-new', item: { slug: 'reviewer' } }],
-    changed: [{ id: 'agent-existing', after: { slug: 'planner' } }],
+    added: [added('agent-new', agent('reviewer'))],
+    changed: [changed('agent-existing', agent('planner'))],
   },
-  commands: { added: [{ id: 'command-1', item: { name: 'explain' } }], changed: [] },
-  skills: {
-    added: [],
-    changed: [{ id: 'skill-1', after: { name: 'pdf-tools' } }],
-  },
-  instructions: {
-    added: [{ id: 'instruction-1', item: { name: 'release-notes' } }],
-    changed: [],
-  },
+  commands: { added: [added('command-1', command('explain'))], changed: [] },
+  skills: { added: [], changed: [changed('skill-1', skill('pdf-tools'))] },
+  instructions: { added: [added('instruction-1', instruction('release-notes'))], changed: [] },
 });
 
 describe('importCategoryViews', () => {
@@ -130,8 +177,8 @@ describe('importIssueViews', () => {
       importIssueViews(
         makePreview({
           issues: [
-            { severity: 'error', message: 'line 2, column 4: Unexpected token' },
-            { severity: 'warning', message: 'Ignored an unmapped file' },
+            issue('error', 'line 2, column 4: Unexpected token'),
+            issue('warning', 'Ignored an unmapped file'),
           ],
         })
       )

@@ -194,17 +194,12 @@ export function useAgentProfileKiloCommands(profileId: string, organizationId?: 
   });
 }
 
-/**
- * A single profile's instruction files. The router exposes no section read for
- * instructions — `get` carries them — so this reads `get` and selects the one
- * collection the screen renders.
- */
+/** A single profile's instruction files. See `vars`. */
 export function useAgentProfileInstructions(profileId: string, organizationId?: string) {
   const trpc = useTRPC();
   return useQuery({
-    ...trpc.agentProfiles.get.queryOptions({ profileId, organizationId }),
+    ...trpc.agentProfiles.instructions.queryOptions({ profileId, organizationId }),
     ...PROFILE_READ_OPTIONS,
-    select: data => data.instructions,
   });
 }
 

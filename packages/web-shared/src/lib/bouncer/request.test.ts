@@ -80,7 +80,7 @@ describe('signedInBouncerRequest', () => {
       usedMicrodollars: undefined,
       acquiredMicrodollars: undefined,
     });
-    expect(bouncer.usage(usageFields)).toEqual({
+    expect(await bouncer.usage(usageFields)).toEqual({
       ...usageFields,
       requestId: bouncer.requestId,
       accountId: 'org:org-1',
@@ -88,8 +88,71 @@ describe('signedInBouncerRequest', () => {
     });
   });
 
-  it('keeps a client-facing request IP on the usage row', () => {
-    expect(signedIn(null).usage(usageFields).clientIp).toBe(CLOUDFLARE_IP);
+  it('reports a sub-organization against its family root on both the decide and the usage row', async () => {
+    const bouncer = signedIn();
+    const payer = {
+      // The member's own organization: no credit of its own.
+      createdAt: '2026-02-01T00:00:00.000Z',
+      microdollarsUsed: 0,
+      totalMicrodollarsAcquired: 0,
+      bouncer: {
+        rootOrganizationId: 'org-root',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        microdollarsUsed: 500,
+        totalMicrodollarsAcquired: 5_000,
+      },
+    };
+    await bouncer.decide({ tier: 'team', payer });
+
+    expect(mockedDecide.mock.calls[0]?.[0]).toMatchObject({
+      accountId: 'org:org-root',
+      accountCreatedAt: payer.bouncer.createdAt,
+      usedMicrodollars: payer.bouncer.microdollarsUsed,
+      acquiredMicrodollars: payer.bouncer.totalMicrodollarsAcquired,
+    });
+    expect(await bouncer.usage(usageFields, payer)).toMatchObject({
+      accountId: 'org:org-root',
+      clientIp: undefined,
+    });
+    expect(mockedReleaseDecideLease).not.toHaveBeenCalled();
+  });
+
+  it('sends the own facts of a payer with no bouncer family', async () => {
+    const bouncer = signedIn();
+    const payer = {
+      createdAt: '2026-01-01T00:00:00.000Z',
+      microdollarsUsed: 500,
+      totalMicrodollarsAcquired: 5_000,
+    };
+    await bouncer.decide({ tier: 'paid', payer });
+
+    expect(mockedDecide.mock.calls[0]?.[0]).toMatchObject({
+      accountCreatedAt: payer.createdAt,
+      usedMicrodollars: payer.microdollarsUsed,
+      acquiredMicrodollars: payer.totalMicrodollarsAcquired,
+    });
+  });
+
+  it('accepts a payer promise so the usage row can wait for the balance check', async () => {
+    const bouncer = signedIn();
+    const payer = {
+      createdAt: '2026-02-01T00:00:00.000Z',
+      microdollarsUsed: 0,
+      totalMicrodollarsAcquired: 0,
+      bouncer: {
+        rootOrganizationId: 'org-root',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        microdollarsUsed: 0,
+        totalMicrodollarsAcquired: 0,
+      },
+    };
+    expect(await bouncer.usage(usageFields, Promise.resolve(payer))).toMatchObject({
+      accountId: 'org:org-root',
+    });
+  });
+
+  it('keeps a client-facing request IP on the usage row', async () => {
+    expect((await signedIn(null).usage(usageFields)).clientIp).toBe(CLOUDFLARE_IP);
   });
 
   it('waits for the account inputs before deciding', async () => {
@@ -144,7 +207,7 @@ describe('anonymousBouncerRequest', () => {
       ip: CLOUDFLARE_IP,
       ja4: JA4,
     });
-    expect(bouncer.usage(usageFields)).toMatchObject({
+    expect(await bouncer.usage(usageFields)).toMatchObject({
       requestId: bouncer.requestId,
       accountId: null,
       clientIp: CLOUDFLARE_IP,

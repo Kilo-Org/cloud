@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Tinye aha òtù",
       "balance": "Ego fọdụrụ",
       "organizationSeats": "Oghere ndị otu òtù",
+      "plan": "Atụmatụ òtù",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Agwụla",
+      "planEnded": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ.",
+      "manageBilling": "Jikwaa ịgba ụgwọ",
       "lowBalanceBelow": "N'okpuru {{amount}}"
     },
     "kiloPass": {

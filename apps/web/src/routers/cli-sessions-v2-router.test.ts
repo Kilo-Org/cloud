@@ -32,6 +32,7 @@ import type {
   fetchSessionMessagesPage as FetchSessionMessagesPageType,
 } from '@/lib/session-ingest-client';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
+import { ServiceFetchTimeoutError } from '@/lib/bounded-service-fetch';
 import { captureException } from '@sentry/nextjs';
 
 function enableSupportAccess(enabled: boolean) {
@@ -1320,6 +1321,27 @@ describe('cli-sessions-v2-router', () => {
       });
     });
 
+    it('maps a budget expiry to the retryable SERVICE_UNAVAILABLE', async () => {
+      // The worker did not answer inside the control-plane budget. That is a
+      // stalled upstream, not a defect here, so the client must see the
+      // retryable code instead of INTERNAL_SERVER_ERROR.
+      const timeoutError = new ServiceFetchTimeoutError(8000);
+      fetchSessionMessagesPage.mockRejectedValueOnce(timeoutError);
+
+      const caller = await createCallerForUser(regularUser.id);
+      const rejection = await caller.cliSessionsV2
+        .getSessionMessagesPage({ session_id: sessionId, limit: 50 })
+        .catch(err => err);
+
+      expect(rejection).toBeInstanceOf(TRPCError);
+      expect(rejection).toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Failed to fetch session messages page',
+      });
+      // The timeout stays attributable rather than being swallowed.
+      expect(rejection.cause).toBe(timeoutError);
+    });
+
     it('rejects a continuation cursor without a positive limit', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
@@ -1686,6 +1708,18 @@ describe('cli-sessions-v2-router', () => {
           caller.cliSessionsV2.getSessionDiff({ session_id: sessionId })
         ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
       }
+    });
+
+    it('maps a budget expiry to the retryable SERVICE_UNAVAILABLE', async () => {
+      fetchSessionDiff.mockRejectedValueOnce(new ServiceFetchTimeoutError(8000));
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionDiff({ session_id: sessionId })
+      ).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Failed to fetch session diff',
+      });
     });
   });
 

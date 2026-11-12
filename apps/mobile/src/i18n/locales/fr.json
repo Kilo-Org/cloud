@@ -2940,6 +2940,12 @@
       "balance": "Solde",
       "lowBalanceBelow": "Moins de {{amount}}",
       "organizationSeats": "Licences de l'organisation",
+      "plan": "Formule de l'organisation",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Expiré",
+      "planEnded": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif.",
+      "manageBilling": "Gérer la facturation",
       "renamePlaceholder": "Nom de l'organisation",
       "renameTitle": "Renommer l'organisation"
     },

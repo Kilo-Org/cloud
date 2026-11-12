@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "အဖွဲ့အစည်းအမည်",
       "balance": "လက်ကျန်",
       "organizationSeats": "အဖွဲ့အစည်း၏ အသုံးပြုခွင့်နေရာများ",
+      "plan": "အဖွဲ့အစည်း၏ အစီအစဉ်",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · ကုန်ဆုံးသွားပြီ",
+      "planEnded": "အဖွဲ့အစည်း၏ အစမ်းသုံးကာလ ကုန်ဆုံးသွားပြီး သက်ဝင်သော အစီအစဉ် မရှိတော့ပါ။",
+      "manageBilling": "ငွေတောင်းခံမှု စီမံခန့်ခွဲရန်",
       "lowBalanceBelow": "{{amount}} အောက်"
     },
     "kiloPass": {

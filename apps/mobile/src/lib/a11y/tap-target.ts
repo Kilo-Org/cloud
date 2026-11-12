@@ -251,6 +251,28 @@ export function textActionTargetClass(): string {
 }
 
 /**
+ * The box an action renders when it sits on its own row under a line of copy —
+ * the billing step under a notice tile's message — with the per-side vertical
+ * margin that cancels what the box holds above and below its own `text-sm` line.
+ *
+ * The box centres one label line, so on its own it holds the same slack above
+ * and below that line. Under copy, that slack lands inside the surface's
+ * padding below the label, so a tile with equal `py` reads with a wider gap
+ * under its action than above its message. The margin cancels the slack in
+ * layout, so the visible row is the label line and the surface pads the same on
+ * both edges. The box stays above the control-size audit's
+ * {@link MIN_TAP_TARGET_DP} floor and no part of it reaches the copy above,
+ * which is what keeps the tile's own overlap and inset readings inside their
+ * tolerances; a taller box would have to overlap the message.
+ * `LINE_ACTION_BOX_CLASS` does the same cancellation for an action that ends a
+ * line rather than following one.
+ */
+export const UNDER_COPY_ACTION_BOX_CLASS = 'min-h-[32px] min-w-[48px] -my-[7px]';
+
+/** The `hitSlop` {@link UNDER_COPY_ACTION_BOX_CLASS} renders, reaching past 44dp each way. */
+export const UNDER_COPY_ACTION_HIT_SLOP = { top: 9, bottom: 9, left: 5, right: 5 } as const;
+
+/**
  * The box an inline text link renders. The sign-in legal links sit inside a
  * sentence, so their box is the control-size audit's {@link MIN_TAP_TARGET_DP}
  * floor and the slop carries the reach; a larger box would reflow the prose

@@ -2887,6 +2887,12 @@
       "balance": "Saldo",
       "lowBalanceBelow": "Onder {{amount}}",
       "organizationSeats": "Gebruikerslicenties van de organisatie",
+      "plan": "Organisatieplan",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Afgelopen",
+      "planEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement.",
+      "manageBilling": "Facturering beheren",
       "renamePlaceholder": "Naam van de organisatie",
       "renameTitle": "Organisatie hernoemen"
     },

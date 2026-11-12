@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Szervezet neve",
       "balance": "Egyenleg",
       "organizationSeats": "Szervezeti férőhelyek",
+      "plan": "Szervezeti csomag",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Lejárt",
+      "planEnded": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja.",
+      "manageBilling": "Számlázás kezelése",
       "lowBalanceBelow": "{{amount}} alatt"
     },
     "kiloPass": {

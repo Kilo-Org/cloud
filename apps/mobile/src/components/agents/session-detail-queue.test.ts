@@ -200,9 +200,18 @@ vi.mock('@/components/todos/session-todo-link', () => ({
 vi.mock('@/components/agents/message-text-select-sheet', () => ({
   MessageTextSelectSheet: 'MessageTextSelectSheet',
 }));
+// The root container ref `session-detail-content` reads for navigation
+// readiness. expo-router exposes it as one module-level singleton, so the mock
+// hands back the same object on every render; these screens render with the
+// container up, so no debounced publish is dropped.
+const navigationContainer = vi.hoisted(() => ({
+  addListener: () => () => undefined,
+  isReady: () => true,
+}));
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
+  useNavigationContainerRef: () => navigationContainer,
   usePreventRemove: vi.fn(),
   useNavigation: () => ({
     getState: () => ({

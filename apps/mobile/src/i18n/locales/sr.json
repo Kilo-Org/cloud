@@ -3042,6 +3042,12 @@
       "renamePlaceholder": "Naziv organizacije",
       "balance": "Saldo",
       "organizationSeats": "Mesta u organizaciji",
+      "plan": "Plan organizacije",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Završen",
+      "planEnded": "Probni period organizacije je završen i ona nema aktivan plan.",
+      "manageBilling": "Upravljaj naplatom",
       "lowBalanceBelow": "Ispod {{amount}}"
     },
     "kiloPass": {

@@ -1,5 +1,5 @@
 diff --git a/android/src/main/java/expo/modules/notifications/badge/BadgeHelper.kt b/android/src/main/java/expo/modules/notifications/badge/BadgeHelper.kt
-index 1c41d99..e2e7464 100644
+index 1c41d99729045a1afa352b23a204fb87a47bd7a5..e2e7464a04a4a1e5cf55bbede982ab9e1f4f65be 100644
 --- a/android/src/main/java/expo/modules/notifications/badge/BadgeHelper.kt
 +++ b/android/src/main/java/expo/modules/notifications/badge/BadgeHelper.kt
 @@ -12,12 +12,8 @@ object BadgeHelper {
@@ -17,3 +17,21 @@ index 1c41d99..e2e7464 100644
        BadgeHelper.badgeCount = badgeCount
        true
      } catch (e: ShortcutBadgeException) {
+diff --git a/android/src/main/java/expo/modules/notifications/notifications/background/BackgroundRemoteNotificationTaskConsumer.kt b/android/src/main/java/expo/modules/notifications/notifications/background/BackgroundRemoteNotificationTaskConsumer.kt
+index 6fdc1c63a49dd1cd19486041c8c71b0ca4e76bb9..754af939ef040b97b0ffddf0cfd5b85497b0ea2a 100644
+--- a/android/src/main/java/expo/modules/notifications/notifications/background/BackgroundRemoteNotificationTaskConsumer.kt
++++ b/android/src/main/java/expo/modules/notifications/notifications/background/BackgroundRemoteNotificationTaskConsumer.kt
+@@ -60,7 +60,12 @@ class BackgroundRemoteNotificationTaskConsumer(
+   }
+ 
+   fun executeTask(bundle: Bundle) {
+-    requireNotNull(task) { "executeTask called but no task is registered" }.execute(bundle, null)
++    // The consumer joins the running list in `init`, before `didRegister` hands it
++    // the task, and every received message runs the whole list. A message that
++    // lands inside that window must skip this consumer instead of killing the
++    // process; the task registers right after and later messages reach it.
++    val task = task ?: return
++    task.execute(bundle, null)
+   }
+ 
+   companion object {

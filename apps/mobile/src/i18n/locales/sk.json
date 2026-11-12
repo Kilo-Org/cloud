@@ -3095,6 +3095,12 @@
       "renamePlaceholder": "Názov organizácie",
       "balance": "Zostatok",
       "organizationSeats": "Miesta v organizácii",
+      "plan": "Plán organizácie",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Skončený",
+      "planEnded": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán.",
+      "manageBilling": "Spravovať fakturáciu",
       "lowBalanceBelow": "Pod {{amount}}"
     },
     "kiloPass": {

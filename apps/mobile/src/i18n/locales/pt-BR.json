@@ -2946,6 +2946,12 @@
       "balance": "Saldo",
       "lowBalanceBelow": "Abaixo de {{amount}}",
       "organizationSeats": "Licenças da organização",
+      "plan": "Plano da organização",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Expirado",
+      "planEnded": "O período de teste da organização terminou e ela não tem nenhum plano ativo.",
+      "manageBilling": "Gerenciar cobrança",
       "renamePlaceholder": "Nome da organização",
       "renameTitle": "Renomear organização"
     },

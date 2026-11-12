@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "የድርጅት ስም",
       "balance": "ቀሪ ሂሳብ",
       "organizationSeats": "የድርጅት የተጠቃሚ ፈቃዶች",
+      "plan": "የድርጅት ዕቅድ",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · አልቋል",
+      "planEnded": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም።",
+      "manageBilling": "ክፍያን አስተዳድር",
       "lowBalanceBelow": "ከ{{amount}} በታች"
     },
     "kiloPass": {

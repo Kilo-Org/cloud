@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "ناوی ڕێکخراوە",
       "balance": "باڵانس",
       "organizationSeats": "شوێنەکانی ئەندامێتی ڕێکخراوە",
+      "plan": "پلانی ڕێکخراو",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · کۆتایی هاتووە",
+      "planEnded": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە و هیچ پلانێکی چالاکی نییە.",
+      "manageBilling": "بەڕێوەبردنی پارەدان",
       "lowBalanceBelow": "کەمتر لە {{amount}}"
     },
     "kiloPass": {

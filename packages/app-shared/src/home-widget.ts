@@ -3,6 +3,7 @@ import {
   sessionLiveCut,
 } from '@kilocode/session-ingest-contracts/session-live-summary';
 import { z } from 'zod';
+import { approvalKeySchema } from './approval-key';
 import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
@@ -23,11 +24,6 @@ export const HOME_WIDGET_DETAIL_LIMIT = 3;
 export const HOME_WIDGET_TITLE_LIMIT = 120;
 const titleSchema = z.string().max(HOME_WIDGET_TITLE_LIMIT);
 const kindSchema = z.enum(GLANCEABLE_STATUS_KINDS);
-/** SHA-256 hex of the exact visible approval target; grants no authority. */
-const approvalKeySchema = z
-  .string()
-  .regex(/^[a-f0-9]{64}$/)
-  .nullable();
 
 /** Private Home-only data. Never include this in Live Activity content-state. */
 export const homeWidgetDetailsSchema = z.object({

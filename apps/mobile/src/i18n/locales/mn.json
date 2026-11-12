@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Байгууллагын нэр",
       "balance": "Үлдэгдэл",
       "organizationSeats": "Байгууллагын хэрэглэгчийн эрх",
+      "plan": "Байгууллагын төлөвлөгөө",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Дууссан",
+      "planEnded": "Байгууллагын туршилтын хугацаа дууссан бөгөөд идэвхтэй төлөвлөгөө байхгүй байна.",
+      "manageBilling": "Төлбөрийн удирдлага",
       "lowBalanceBelow": "{{amount}}-оос доош"
     },
     "kiloPass": {

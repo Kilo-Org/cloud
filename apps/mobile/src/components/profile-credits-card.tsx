@@ -16,7 +16,7 @@ import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subsc
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { WEB_BASE_URL } from '@/lib/config';
+import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
 import {
   ICON_TARGET_BOX_CLASS,
   LINE_ACTION_BOX_CLASS,
@@ -255,10 +255,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // the narrow threshold.
   const orgAddCreditsAction =
     selectedOrgId != null && canManageOrgBilling ? (
-      <AddCreditsRow
-        url={`${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`}
-        inline={stackBalance}
-      />
+      <AddCreditsRow url={organizationBillingUrl(selectedOrgId)} inline={stackBalance} />
     ) : null;
 
   const addCreditsAction =

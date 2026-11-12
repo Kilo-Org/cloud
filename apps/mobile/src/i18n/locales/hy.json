@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Կազմակերպության անունը",
       "balance": "Մնացորդ",
       "organizationSeats": "Կազմակերպության տեղեր",
+      "plan": "Կազմակերպության պլան",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Ավարտված",
+      "planEnded": "Կազմակերպության փորձաշրջանն ավարտվել է, և այն չունի ակտիվ պլան։",
+      "manageBilling": "Կառավարել վճարումները",
       "lowBalanceBelow": "{{amount}}-ից ցածր"
     },
     "kiloPass": {

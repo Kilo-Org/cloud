@@ -2887,6 +2887,12 @@
       "balance": "Guthaben",
       "lowBalanceBelow": "Unter {{amount}}",
       "organizationSeats": "Nutzerplätze der Organisation",
+      "plan": "Organisationsplan",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Beendet",
+      "planEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan.",
+      "manageBilling": "Abrechnung verwalten",
       "renamePlaceholder": "Name der Organisation",
       "renameTitle": "Organisation umbenennen"
     },

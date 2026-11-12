@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Anaran'ny fikambanana",
       "balance": "Ambim-bola",
       "organizationSeats": "Toerana ho an'ny mpikambana",
+      "plan": "Drafitry ny fikambanana",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Lany",
+      "planEnded": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy.",
+      "manageBilling": "Hitantana faktiora",
       "lowBalanceBelow": "Latsaky ny {{amount}}"
     },
     "kiloPass": {

@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Ұйым атауы",
       "balance": "Баланс",
       "organizationSeats": "Ұйымдағы орындар",
+      "plan": "Ұйым жоспары",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Аяқталды",
+      "planEnded": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ.",
+      "manageBilling": "Төлемдерді басқару",
       "lowBalanceBelow": "{{amount}} сомасынан төмен"
     },
     "kiloPass": {

@@ -3148,6 +3148,12 @@
       "renamePlaceholder": "Isem l-organizzazzjoni",
       "balance": "Bilanċ",
       "organizationSeats": "Postijiet tal-organizzazzjoni",
+      "plan": "Pjan tal-organizzazzjoni",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Intemm",
+      "planEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv.",
+      "manageBilling": "Immaniġġja l-ħlasijiet",
       "lowBalanceBelow": "Taħt {{amount}}"
     },
     "kiloPass": {

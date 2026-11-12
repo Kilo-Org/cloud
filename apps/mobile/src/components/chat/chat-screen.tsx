@@ -43,6 +43,7 @@ import { useChatDetails } from './chat-details-state';
 import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
 import { BackendSettingsControl } from './backend-settings-sheet';
 import { useChatMessageActions } from './use-chat-message-actions';
+import { useChatAddCredits } from './use-chat-add-credits';
 import { useWebSearchSetting } from './web-search-row';
 
 /**
@@ -184,12 +185,10 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
 
   // Where the account buys the credit a refused send needs. Both the failed
   // question and the row above the composer reach it through this one action.
-  const openCredits = useCallback(() => {
-    router.push('/(app)/credits' as Href);
-  }, [router]);
+  const addCredits = useChatAddCredits(place);
 
   const messages = asMessages(state);
-  const actions = useChatMessageActions(state, messages, { retry, addCredits: openCredits });
+  const actions = useChatMessageActions(state, messages, { retry, addCredits });
   const { actionsFor } = actions;
   const details = useChatDetails({
     model: state.model === '' ? model : state.model,
@@ -317,7 +316,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
             failureKey={rowFailureKey}
             retryable={retryable}
             onRetry={() => void retry()}
-            onAddCredits={openCredits}
+            addCredits={addCredits}
             onSend={handleSend}
             composerControlRef={actions.composerControlRef}
             onStop={handleStop}

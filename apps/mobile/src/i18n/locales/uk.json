@@ -2993,6 +2993,12 @@
       "balance": "Баланс",
       "lowBalanceBelow": "Менше ніж {{amount}}",
       "organizationSeats": "Місця в організації",
+      "plan": "План організації",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Завершився",
+      "planEnded": "Пробний період організації завершився, і вона не має активного плану.",
+      "manageBilling": "Керувати оплатою",
       "renamePlaceholder": "Назва організації",
       "renameTitle": "Перейменувати організацію"
     },

@@ -141,7 +141,7 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
     });
   });
 
-  it('pins repository-only installation authority at issuance and every redemption despite available user authorization', async () => {
+  it('issues repository-only installation authority but rejects it at the task redemption boundary', async () => {
     const key = Buffer.alloc(32, 7).toString('base64');
     const service = new GitTokenRPCEntrypoint(
       {} as ExecutionContext,
@@ -163,68 +163,28 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
       version: 2,
       source: 'installation',
       permissionScope: 'repository',
-      owner: 'acme',
-      repo: 'repo',
-      outboundContainerId: 'allocation-1',
     });
-    for (const [requestMethod, requestUrl] of [
-      ['POST', 'https://api.github.com/graphql'],
-      ['PATCH', 'https://api.github.com/repos/acme/repo/issues/1'],
-    ]) {
-      expect(
-        await service.redeemGitHubSessionCapability({
-          capability: issued.capability,
-          outboundContainerId: 'allocation-1',
-          requestMethod,
-          requestUrl,
-        })
-      ).toMatchObject({
-        success: true,
-        source: 'installation',
-        authorization: 'Bearer repository-only-token',
-      });
-    }
+    serviceMocks.getRepositoryOnlyToken.mockClear();
     for (const requestUrl of [
-      'https://api.github.com/orgs/acme/members/octocat',
-      'https://api.github.com/repos/foreign/private',
+      'https://api.github.com/graphql',
+      'https://api.github.com/repos/acme/repo/issues/1',
+      'https://uploads.github.com/user-attachments/assets?repository_id=101',
     ]) {
       expect(
         await service.redeemGitHubSessionCapability({
           capability: issued.capability,
           outboundContainerId: 'allocation-1',
-          requestMethod: 'GET',
+          requestMethod: 'POST',
           requestUrl,
         })
-      ).toEqual({ success: false, reason: 'repository_mismatch' });
+      ).toEqual({ success: false, reason: 'invalid_task_scope' });
     }
-    expect(
-      await service.redeemGitHubSessionCapability({
-        capability: issued.capability,
-        outboundContainerId: 'allocation-1',
-        requestMethod: 'POST',
-        requestUrl:
-          'https://uploads.github.com/user-attachments/assets?name=screenshot.png&repository_id=1145038391',
-      })
-    ).toEqual({ success: false, reason: 'invalid_upstream_request' });
-    expect(serviceMocks.getRepositoryOnlyToken).toHaveBeenCalledTimes(3);
-    expect(serviceMocks.getRepositoryOnlyToken).toHaveBeenCalledWith('123', 'repo', 'standard', {
-      contents: 'write',
-      pull_requests: 'write',
-    });
+    expect(serviceMocks.getRepositoryOnlyToken).not.toHaveBeenCalled();
     expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
     expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
-    expect(
-      await service.redeemGitHubSessionCapability({
-        capability: issued.capability,
-        outboundContainerId: 'allocation-2',
-        requestMethod: 'GET',
-        requestUrl: 'https://api.github.com/repos/acme/repo',
-      })
-    ).toEqual({ success: false, reason: 'container_mismatch' });
-    expect(serviceMocks.getRepositoryOnlyToken).toHaveBeenCalledTimes(3);
   });
 
-  it('preserves recoverable permission lookup failures through capability issuance and redemption', async () => {
+  it('preserves recoverable permission lookup failures through native resolution and capability issuance', async () => {
     const service = new GitTokenRPCEntrypoint(
       {} as ExecutionContext,
       {
@@ -248,25 +208,14 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
       reason: 'repository_permissions_unavailable',
     });
 
-    const issued = await service.issueGitHubSessionCapability(params);
-    if (!issued.success) throw new Error('Expected repository capability');
-    const redemption = {
-      capability: issued.capability,
-      outboundContainerId: 'allocation-1',
-      requestMethod: 'POST',
-      requestUrl: 'https://api.github.com/graphql',
-    };
     serviceMocks.getRepositoryOnlyToken.mockRejectedValueOnce(
       new GitHubRepositoryPermissionsUnavailableError()
     );
-    expect(await service.redeemGitHubSessionCapability(redemption)).toEqual({
+    expect(await service.getCloudAgentAuthForRepo(params)).toEqual({
       success: false,
       reason: 'repository_permissions_unavailable',
     });
-    expect(await service.redeemGitHubSessionCapability(redemption)).toMatchObject({
-      success: true,
-      authorization: 'Bearer repository-only-token',
-    });
+    expect(await service.issueGitHubSessionCapability(params)).toMatchObject({ success: true });
     expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
     expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
   });

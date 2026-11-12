@@ -245,8 +245,7 @@ type GetCloudAgentAuthForRepoResult =
       reason:
         | GitHubRepositoryAuthorizationFailureReason
         | 'repository_permissions_unavailable'
-        | 'user_authorization_required'
-        | 'user_authorization_revoked'
+        | 'provided_token_not_supported'
         | 'user_authorization_unavailable';
     };
 
@@ -271,8 +270,7 @@ type IssueGitHubSessionCapabilityResult =
         | GitHubRepositoryAuthorizationFailureReason
         | 'capability_configuration_error'
         | 'repository_permissions_unavailable'
-        | 'user_authorization_required'
-        | 'user_authorization_revoked'
+        | 'provided_token_not_supported'
         | 'user_authorization_unavailable'
         | 'invalid_task_scope'
         | 'repository_mismatch'

@@ -777,14 +777,41 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
     );
 
     expect(getTokenForRepo).not.toHaveBeenCalled();
-    expect(result).toMatchObject({
+    expect(result).toEqual({
       success: true,
       value: {
         source: 'installation',
         githubToken: 'installation-token',
+        installationId: '123',
+        accountLogin: 'acme',
+        appType: 'standard',
+        gitAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
         fallbackReason: 'credential_unreadable',
       },
     });
+  });
+
+  it('explains unsupported provided credentials without an installation fallback', async () => {
+    const getCloudAgentAuthForRepo = vi.fn().mockResolvedValue({
+      success: false,
+      reason: 'provided_token_not_supported',
+    });
+    const getTokenForRepo = vi.fn();
+    await expect(
+      resolveCloudAgentGitHubAuthForRepo(createEnv({ getCloudAgentAuthForRepo, getTokenForRepo }), {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      })
+    ).resolves.toEqual({
+      success: false,
+      error: {
+        reason: 'provided_token_not_supported',
+        message:
+          'Provided GitHub tokens cannot authorize this task. Connect your GitHub account through the GitHub App.',
+      },
+    });
+    expect(getTokenForRepo).not.toHaveBeenCalled();
   });
 
   it('does not fall back to a different authorization path when the managed RPC rejects', async () => {

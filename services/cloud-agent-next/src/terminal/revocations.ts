@@ -3,6 +3,7 @@ import type { SandboxTerminalRecord } from '../sandbox-session/terminal-bridge.j
 
 const PREFIX = 'control_terminal_revocation:';
 const RETRY_MS = 5_000;
+const WRAPPER_PROBE_MS = 30_000;
 const MAX_ATTEMPTS = 3;
 const REQUEST_TIMEOUT_MS = 5_000;
 
@@ -84,10 +85,11 @@ export function createTerminalRevocations(deps: Deps) {
       if (item.attempts === MAX_ATTEMPTS || (item.nextAt !== null && item.nextAt > Date.now()))
         continue;
       if (wrapperId === undefined) {
-        // Pause background probes without spending a close attempt. A later
-        // operation or alarm can resume when the same wrapper is reachable.
-        if (item.nextAt !== null)
-          await deps.storage.put(key, { ...item, nextAt: null } satisfies Pending);
+        // Keep an alarm scheduled without spending a close attempt during an outage.
+        await deps.storage.put(key, {
+          ...item,
+          nextAt: Date.now() + WRAPPER_PROBE_MS,
+        } satisfies Pending);
         continue;
       }
       const attempts = item.attempts + 1;
@@ -119,7 +121,9 @@ export function createTerminalRevocations(deps: Deps) {
   }
 
   async function nextAttemptAt(): Promise<number | null> {
-    const times = (await pending()).flatMap(item => (item.nextAt === null ? [] : [item.nextAt]));
+    const times = (await pending()).flatMap(item =>
+      item.attempts === MAX_ATTEMPTS ? [] : [item.nextAt ?? Date.now() + WRAPPER_PROBE_MS]
+    );
     return times.length ? Math.min(...times) : null;
   }
 

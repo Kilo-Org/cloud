@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseSessionMetadata } from '../../persistence/session-metadata.js';
 import type { ControlPlaneControlResult } from '../../shared/control-plane-protocol.js';
 import {
@@ -155,23 +155,25 @@ function fixture(
     ok: true,
     result: { pty: pty('pty_new') },
   }));
+  const getWrapperId = vi.fn(async (): Promise<string | undefined> => CURRENT_WRAPPER);
   const checkAccess = vi.fn(async (): Promise<'allowed' | 'denied'> => 'allowed');
   const terminals = createControlPlaneTerminals({
     state: fakeState(values, overrides.sockets ?? []),
     sessionId: SESSION_ID,
     getMetadata: () => overrides.metadata ?? metadata(),
     getDirectory: () => DIRECTORY,
-    getWrapperId: async () => CURRENT_WRAPPER,
+    getWrapperId,
     isRouteReady: () => overrides.isRouteReady ?? true,
     getSandboxStatus: overrides.getSandboxStatus ?? (async () => sandboxStatus('active')),
     checkAccess,
     scheduleAuthorization: async () => undefined,
     request,
   });
-  return { terminals, values, request, checkAccess };
+  return { terminals, values, request, checkAccess, getWrapperId };
 }
 
 describe('V2 control-plane terminals projection', () => {
+  afterEach(() => vi.useRealTimers());
   it('reports a sleeping sandbox without forwarding a terminal request', async () => {
     const { terminals, request } = fixture({
       isRouteReady: false,
@@ -256,6 +258,29 @@ describe('V2 control-plane terminals projection', () => {
       SANDBOX_ID,
       expect.objectContaining({ operation: 'close' })
     );
+  });
+  it('schedules cleanup after a wrapper outage without another terminal operation', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    const { terminals, values, request, getWrapperId } = fixture();
+    values.set('control_terminal:pty_existing', record(CURRENT_WRAPPER, 'pty_existing'));
+    getWrapperId.mockResolvedValue(undefined);
+    await terminals.revoke();
+    expect(values.get('control_terminal:pty_existing')).toMatchObject({ state: 'ended' });
+    expect(request).not.toHaveBeenCalled();
+    expect(await terminals.nextAuthorizationCheckAt()).toBe(1_030_000);
+    await vi.advanceTimersByTimeAsync(30_000);
+    await terminals.maintainAuthorization();
+    expect(await terminals.nextAuthorizationCheckAt()).toBe(1_060_000);
+    getWrapperId.mockResolvedValue(CURRENT_WRAPPER);
+    request.mockResolvedValue({ ok: true, result: { success: true } });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await terminals.maintainAuthorization();
+    expect(request).toHaveBeenCalledExactlyOnceWith(
+      SANDBOX_ID,
+      expect.objectContaining({ operation: 'close' })
+    );
+    expect(await terminals.nextAuthorizationCheckAt()).toBeNull();
   });
   it('closes a PTY whose creation finishes after revocation', async () => {
     const { terminals, values, request, checkAccess } = fixture();

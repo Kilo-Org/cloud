@@ -330,7 +330,7 @@ describe.skipIf(!databaseUrl)(
       expect(upstreamRequests).toHaveLength(0);
     });
 
-    it('denies legacy installation uploads at the task outbound boundary', async () => {
+    it('denies legacy installation uploads at redemption and the task outbound boundary', async () => {
       const capability = await issue(false);
       await database.db
         .update(user_github_app_tokens)
@@ -347,8 +347,7 @@ describe.skipIf(!databaseUrl)(
         requestMethod: 'POST',
         requestUrl: 'https://uploads.github.com/user-attachments/assets?repository_id=42',
       });
-      if (!redemption.success) throw new Error(`Upload redemption denied: ${redemption.reason}`);
-      expect(redemption.authorization).toBe(`Bearer ${nextToken}`);
+      expect(redemption).toEqual({ success: false, reason: 'invalid_task_scope' });
       expect(
         (
           await proxyRequest(

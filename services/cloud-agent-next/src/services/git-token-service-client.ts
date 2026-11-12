@@ -75,8 +75,7 @@ export type ResolveGitHubTokenError = {
     | 'expired_capability'
     | 'service_not_configured'
     | 'rpc_error'
-    | 'user_authorization_required'
-    | 'user_authorization_revoked'
+    | 'provided_token_not_supported'
     | 'user_authorization_unavailable'
     | 'invalid_task_scope'
     | 'repository_mismatch'
@@ -213,8 +212,8 @@ async function resolveLegacyInstallationAuthForRepo(
 }
 
 function githubAuthorizationFailureMessage(reason: string): string {
-  if (reason === 'user_authorization_required' || reason === 'user_authorization_revoked')
-    return 'Reconnect your GitHub account to continue this task.';
+  if (reason === 'provided_token_not_supported')
+    return 'Provided GitHub tokens cannot authorize this task. Connect your GitHub account through the GitHub App.';
   if (reason === 'user_authorization_unavailable')
     return 'GitHub user authorization is unavailable. Try again.';
   if (reason === 'invalid_task_scope')

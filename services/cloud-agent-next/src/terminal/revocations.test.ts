@@ -34,7 +34,7 @@ function fixture() {
       getWrapperId,
       reportUnconfirmed,
     });
-  return { revocations: create(), create, request, getWrapperId, reportUnconfirmed };
+  return { revocations: create(), create, request, getWrapperId, reportUnconfirmed, values };
 }
 
 describe('durable terminal revocation cleanup', () => {
@@ -106,7 +106,7 @@ describe('durable terminal revocation cleanup', () => {
     await revocations.drain();
     expect(request).not.toHaveBeenCalled();
     expect(await revocations.hasUnconfirmed()).toBe(true);
-    expect(await revocations.nextAttemptAt()).toBeNull();
+    expect(await revocations.nextAttemptAt()).toBe(1_030_000);
   });
 
   it('resumes after wrapper outages without consuming the close-attempt budget', async () => {
@@ -115,12 +115,12 @@ describe('durable terminal revocation cleanup', () => {
     getWrapperId.mockResolvedValue(undefined);
     for (let probe = 0; probe < 5; probe++) {
       await create().drain();
-      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(30_000);
     }
     expect(request).not.toHaveBeenCalled();
     expect(reportUnconfirmed).not.toHaveBeenCalled();
     expect(await revocations.hasUnconfirmed()).toBe(true);
-    expect(await revocations.nextAttemptAt()).toBeNull();
+    expect(await revocations.nextAttemptAt()).toBe(1_150_000);
 
     getWrapperId.mockResolvedValue(record.wrapperId);
     request.mockResolvedValue(false);
@@ -133,15 +133,30 @@ describe('durable terminal revocation cleanup', () => {
     expect(await revocations.nextAttemptAt()).toBeNull();
   });
 
-  it('recovers a paused obligation when the same wrapper returns', async () => {
+  it('recovers after eviction when the same wrapper returns at the scheduled probe', async () => {
     const { revocations, create, getWrapperId, request } = fixture();
     await revocations.enqueue(record);
     getWrapperId.mockResolvedValue(undefined);
     await revocations.drain();
     getWrapperId.mockResolvedValue(record.wrapperId);
+    await vi.advanceTimersByTimeAsync(30_000);
     await create().drain();
     expect(request).toHaveBeenCalledOnce();
     expect(await revocations.hasUnconfirmed()).toBe(false);
+  });
+
+  it('schedules persisted paused obligations from an older instance', async () => {
+    const { revocations, create, values, getWrapperId, request } = fixture();
+    await revocations.enqueue(record);
+    const key = `control_terminal_revocation:${record.ptyId}`;
+    const pending = values.get(key) as Record<string, unknown>;
+    values.set(key, { ...pending, nextAt: null });
+    expect(await create().nextAttemptAt()).toBe(1_030_000);
+    getWrapperId.mockResolvedValue(record.wrapperId);
+    await vi.advanceTimersByTimeAsync(30_000);
+    await create().drain();
+    expect(request).toHaveBeenCalledOnce();
+    expect(await create().hasUnconfirmed()).toBe(false);
   });
 
   it('retains a stalled close as unconfirmed and permits a bounded retry', async () => {

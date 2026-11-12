@@ -263,8 +263,41 @@ describe('ConsentCard', () => {
     expect(revoke.props.variant).toBe('outline-destructive');
   });
 
-  it('defaults the optional switch to on', () => {
+  it('defaults the optional switch to on', async () => {
     const renderer = mountCard('onboarding');
+    await act(flush);
+    expect(singleSwitch(renderer.root).props.value).toBe(true);
+  });
+
+  it('starts the switch from the choice an older consent record carries', async () => {
+    mockedReadConsent.mockResolvedValue({
+      mandatory: false,
+      optional: false,
+      previousOptional: false,
+    });
+    const renderer = mountCard('onboarding');
+    await act(flush);
+
+    expect(singleSwitch(renderer.root).props.value).toBe(false);
+
+    const btn = findButton(renderer.root, 'Accept and continue');
+    await act(async () => {
+      await Promise.resolve();
+      (btn.props.onPress as () => void)();
+    });
+    // Accepting the updated disclosure keeps the choice the user already made.
+    expect(mockedAcceptConsent).toHaveBeenCalledWith('test-user-1', false);
+  });
+
+  it('keeps an on choice carried from an older consent record', async () => {
+    mockedReadConsent.mockResolvedValue({
+      mandatory: false,
+      optional: false,
+      previousOptional: true,
+    });
+    const renderer = mountCard('onboarding');
+    await act(flush);
+
     expect(singleSwitch(renderer.root).props.value).toBe(true);
   });
 
@@ -298,6 +331,7 @@ describe('ConsentCard', () => {
 
   it('accepts with optional on when the switch is untouched', async () => {
     const renderer = mountCard('onboarding');
+    await act(flush);
     const btn = findButton(renderer.root, 'Accept and continue');
     await act(async () => {
       await Promise.resolve();
@@ -308,6 +342,7 @@ describe('ConsentCard', () => {
 
   it('calls acceptConsent with optional value on primary action', async () => {
     const renderer = mountCard('onboarding');
+    await act(flush);
     const sw = singleSwitch(renderer.root);
     await act(async () => {
       await Promise.resolve();
@@ -416,10 +451,13 @@ describe('ConsentCard', () => {
     expect(singleSwitch(renderer.root).props.value).toBe(false);
   });
 
-  it('does not call readConsent in onboarding mode', async () => {
-    mountCard('onboarding');
+  it('reads the stored choice in onboarding so an older record can carry it', async () => {
+    const renderer = mountCard('onboarding');
     await act(flush);
-    expect(mockedReadConsent).not.toHaveBeenCalled();
+
+    expect(mockedReadConsent).toHaveBeenCalledWith('test-user-1');
+    // No older record: onboarding keeps its on-by-default.
+    expect(singleSwitch(renderer.root).props.value).toBe(true);
   });
 
   it('clears error when optional toggle succeeds after a prior failure', async () => {

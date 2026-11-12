@@ -74,27 +74,33 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   };
   const [pendingAction, setPendingAction] = useState<'primary' | 'secondary' | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Onboarding pre-selects optional telemetry. Review mode starts off and the
-  // stored value loads over it, so a stored decline never flashes as on.
+  // Onboarding pre-selects optional telemetry; review mode starts off. The
+  // stored value loads over either default, so a stored decline never flashes
+  // as on.
   const [optionalToggle, setOptionalToggle] = useState(mode === 'onboarding');
-  // Review mode must not present a switch state before the stored value has
-  // loaded: the pre-load OFF looked like a completed revoke in the b911 vr5
+  // The switch must not present a state before the stored value has loaded: in
+  // review mode the pre-load OFF looked like a completed revoke in the b911 vr5
   // e3 evidence (e3-toggled-off.png showed the switch off while the realm was
-  // still consented — no toggle had landed). Until loaded, the switch slot
-  // holds a same-size placeholder, so the card never claims a choice the
-  // user has not made and a tap cannot flip the wrong way. With no userId
-  // there is nothing to load: the switch renders as before and its toggle
-  // path shows the account error.
-  const [storedValueLoaded, setStoredValueLoaded] = useState(mode !== 'review');
-  const optionalControlPending = mode === 'review' && userId !== undefined && !storedValueLoaded;
+  // still consented — no toggle had landed), and onboarding needs the read
+  // because an older consent record carries the choice it must start from.
+  // Until loaded, the switch slot holds a same-size placeholder, so the card
+  // never claims a choice the user has not made and a tap cannot flip the wrong
+  // way. With no userId there is nothing to load: the switch renders as before
+  // and its toggle path shows the account error.
+  const [storedValueLoaded, setStoredValueLoaded] = useState(false);
+  const optionalControlPending = userId !== undefined && !storedValueLoaded;
   const [savingOptional, setSavingOptional] = useState(false);
   const loadedRef = useRef(false);
   const userToggledRef = useRef(false);
 
-  // Load the stored optional value in review mode only.  The active flag
-  // stops a late resolve from overwriting a value the user just toggled.
+  // Load the stored optional value. Review mode shows the accepted choice; a
+  // record from an older consent version re-opens onboarding, and its choice is
+  // what the switch must show, because an updated disclosure must never
+  // re-enable analytics for someone who turned it off. With nothing to carry,
+  // onboarding keeps its on-by-default. The active flag stops a late resolve
+  // from overwriting a value the user just toggled.
   useEffect(() => {
-    if (mode !== 'review' || !userId || loadedRef.current) {
+    if (!userId || loadedRef.current) {
       return undefined;
     }
     let active = true;
@@ -104,7 +110,9 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
       stored => {
         if (active) {
           if (!userToggledRef.current) {
-            setOptionalToggle(stored.optional);
+            setOptionalToggle(
+              mode === 'review' ? stored.optional : (stored.previousOptional ?? true)
+            );
             loadedRef.current = true;
           }
           setStoredValueLoaded(true);
@@ -337,7 +345,9 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           }}
           size="lg"
           accessibilityLabel={actions.primaryLabel}
-          disabled={pendingAction === 'secondary'}
+          // Accepting before the stored (or carried) choice has loaded would
+          // write the default over a decision the user already made.
+          disabled={pendingAction === 'secondary' || optionalControlPending}
           loading={pendingAction === 'primary'}
         >
           <Text>{actions.primaryLabel}</Text>

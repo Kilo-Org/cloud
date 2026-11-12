@@ -3,11 +3,15 @@ import { injectVercelModels } from '@/lib/providers/openrouter/inject-vercel-mod
 import {
   modelRetainsPrompts,
   modelTrains,
+  withWorstProviderDataPolicy,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
+import { buildDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import type {
+  NormalizedOpenRouterResponse,
   OpenRouterModel,
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
+import type { Endpoint } from '@kilocode/db/schema-types';
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 
 const MODEL_SLUG = 'nvidia/nemotron-3-super-120b-a12b';
@@ -475,6 +479,7 @@ describe('injectVercelModels with models only Vercel serves', () => {
           provider_display_name: 'Amazon Bedrock',
           is_free: false,
           pricing: { prompt: '0.0000002', completion: '0.0000008' },
+          data_policy: { training: false, retainsPrompts: false },
         },
       },
     ]);
@@ -611,5 +616,199 @@ describe('injectVercelModels with models only Vercel serves', () => {
       retainsPrompts: true,
     });
     expect(data.at(-1)?.provider.slug).toBe('runinfra');
+  });
+});
+
+describe('injectVercelModels data policy of paid Vercel-only models under OpenRouter providers', () => {
+  const VERCEL_ONLY_MODEL = 'tencent/hy-mt2-lite';
+
+  /** Tencent's OpenRouter-wide policy neither trains on nor retains prompts. */
+  function tencentProviderData(slug = 'tencent') {
+    return {
+      provider: provider(slug, 'Tencent', {
+        training: false,
+        retainsPrompts: false,
+        canPublish: false,
+      }),
+      models: [] as OpenRouterModel[],
+    };
+  }
+
+  function injectVercelOnlyModel(data: ProviderModelData, endpoints: Endpoint[]) {
+    injectVercelModels({
+      vercelModels: {
+        [VERCEL_ONLY_MODEL]: {
+          id: VERCEL_ONLY_MODEL,
+          name: 'HY-MT2 Lite',
+          type: 'language',
+          context_window: 32_000,
+          modalities: { input: ['text'], output: ['text'] },
+          pricing: { input: '0.0000001', output: '0.0000002' },
+          endpoints,
+        },
+      },
+      openRouterCatalogModels: [],
+      openRouterModelIds: [],
+      providerModelData: data,
+      vercelModelIdOverrides: new Map(),
+      updatedAt: '2026-11-02T00:00:00.000Z',
+    });
+  }
+
+  /** Normalizes the providers the way `syncProviders` stores them. */
+  function toSnapshot(data: ProviderModelData): NormalizedOpenRouterResponse {
+    const providers = data.map(({ provider, models }) => ({
+      ...provider,
+      models: models.map(model => withWorstProviderDataPolicy(model, provider.dataPolicy)),
+    }));
+    return {
+      providers,
+      total_providers: providers.length,
+      total_models: providers.reduce((total, { models }) => total + models.length, 0),
+      generated_at: '2026-11-02T00:00:00.000Z',
+    };
+  }
+
+  test.each([
+    ['denied', { has_no_training: false, has_zdr: false }],
+    ['missing', {}],
+  ])(
+    'requires data collection when the Vercel endpoint guarantees are %s',
+    (_label, guarantees) => {
+      const data = [tencentProviderData()];
+      injectVercelOnlyModel(data, [{ provider_name: 'tencent', ...guarantees }]);
+
+      expect(data[0]?.provider.dataPolicy).toEqual({
+        training: false,
+        retainsPrompts: false,
+        canPublish: false,
+      });
+      expect(data[0]?.models.map(model => [model.slug, model.endpoint])).toEqual([
+        [
+          VERCEL_ONLY_MODEL,
+          {
+            provider_display_name: 'Tencent',
+            is_free: false,
+            pricing: { prompt: '0.0000001', completion: '0.0000002' },
+            data_policy: { training: true, retainsPrompts: true },
+          },
+        ],
+      ]);
+      expect(buildDataCollectionRequiredModelIds(toSnapshot(data))).toEqual(
+        new Set([VERCEL_ONLY_MODEL])
+      );
+    }
+  );
+
+  test('keeps a model whose Vercel endpoint guarantees no training and no retention', () => {
+    const data = [tencentProviderData()];
+    injectVercelOnlyModel(data, [
+      { provider_name: 'tencent', has_no_training: true, has_zdr: true },
+    ]);
+
+    expect(data[0]?.models[0]?.endpoint?.data_policy).toEqual({
+      training: false,
+      retainsPrompts: false,
+    });
+    expect(buildDataCollectionRequiredModelIds(toSnapshot(data))).toEqual(new Set());
+  });
+
+  test("does not let endpoint guarantees override the provider's own data policy", () => {
+    const tencent = tencentProviderData();
+    tencent.provider.dataPolicy.training = true;
+    const data = [tencent];
+    injectVercelOnlyModel(data, [
+      { provider_name: 'tencent', has_no_training: true, has_zdr: true },
+    ]);
+
+    expect(data[0]?.models[0]?.endpoint?.data_policy).toEqual({
+      training: true,
+      retainsPrompts: false,
+    });
+    expect(buildDataCollectionRequiredModelIds(toSnapshot(data))).toEqual(
+      new Set([VERCEL_ONLY_MODEL])
+    );
+  });
+
+  test.each([
+    ['guaranteed endpoint first', [true, false]],
+    ['guaranteed endpoint last', [false, true]],
+  ])(
+    'takes the worst guarantees of every endpoint the provider serves, %s',
+    (_label, guaranteed) => {
+      const data = [tencentProviderData()];
+      injectVercelOnlyModel(
+        data,
+        guaranteed.map(isGuaranteed => ({
+          provider_name: 'tencent',
+          has_no_training: isGuaranteed,
+          has_zdr: isGuaranteed,
+        }))
+      );
+
+      expect(data[0]?.models).toHaveLength(1);
+      expect(data[0]?.models[0]?.endpoint?.data_policy).toEqual({
+        training: true,
+        retainsPrompts: true,
+      });
+    }
+  );
+
+  test('applies the guarantees under every OpenRouter provider alias', () => {
+    const data = [
+      {
+        provider: provider('amazon-bedrock', 'Amazon Bedrock', {
+          training: false,
+          retainsPrompts: false,
+          canPublish: false,
+        }),
+        models: [] as OpenRouterModel[],
+      },
+      {
+        provider: provider('bedrock', 'Bedrock', {
+          training: false,
+          retainsPrompts: true,
+          canPublish: false,
+        }),
+        models: [] as OpenRouterModel[],
+      },
+    ];
+    injectVercelOnlyModel(data, [
+      { provider_name: 'bedrock', has_no_training: true, has_zdr: true },
+    ]);
+
+    expect(data.map(({ models }) => models[0]?.endpoint?.data_policy)).toEqual([
+      { training: false, retainsPrompts: false },
+      { training: false, retainsPrompts: true },
+    ]);
+    expect(buildDataCollectionRequiredModelIds(toSnapshot(data))).toEqual(new Set());
+  });
+
+  test('keeps snapshot models on the provider data policy', () => {
+    const data = [tencentProviderData()];
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
+      [MODEL_SLUG]: {
+        id: MODEL_SLUG,
+        name: 'NVIDIA Nemotron 3 Super',
+        endpoints: [
+          { provider_name: 'nvidia' },
+          { provider_name: 'tencent', has_no_training: false, has_zdr: false },
+        ],
+      },
+    };
+    injectSnapshotModels(vercelModels, [
+      ...data,
+      {
+        provider: provider('nvidia', 'NVIDIA', {
+          training: true,
+          retainsPrompts: true,
+          canPublish: false,
+        }),
+        models: [nvidiaModel()],
+      },
+    ]);
+
+    expect(data[0]?.models[0]?.slug).toBe(MODEL_SLUG);
+    expect(data[0]?.models[0]?.endpoint?.data_policy).toBeUndefined();
   });
 });

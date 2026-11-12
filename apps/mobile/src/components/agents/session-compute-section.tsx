@@ -6,10 +6,10 @@ import { i18n } from '@/i18n';
 import { formatClockTime, formatCurrency, formatDate, formatDuration } from '@/lib/format';
 import { useComputeRates } from '@/lib/hooks/use-session-compute';
 import {
+  computeHourlyUsdFromCentsPerSecond,
   type SessionComputeCharges,
   type SessionComputeRate,
   type SessionComputeRun,
-  computeHourlyUsdFromCentsPerSecond,
 } from '@/lib/session-compute-total';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -39,6 +39,18 @@ function formatRunRate(rateCentsPerSecond: number): string {
 }
 
 /**
+ * A run's time and rate, in the one line under its clock times. A run that just
+ * opened has recorded no time yet, and `formatDuration` writes nothing for zero,
+ * so the duration and its separator are omitted instead of leaving the row with
+ * a `×` and no measured value in front of it.
+ */
+function formatRunMeasure(seconds: number, rateCentsPerSecond: number, locale: string): string {
+  const duration = formatDuration(seconds, locale);
+  const rate = formatRunRate(rateCentsPerSecond);
+  return duration.length === 0 ? rate : `${duration} × ${rate}`;
+}
+
+/**
  * The sandbox size a saved rate belongs to. The catalogue names sizes by their
  * platform instance, so the two selectable sizes are the only ones shown.
  */
@@ -54,9 +66,10 @@ function rateLabel(rate: SessionComputeRate): string | null {
 
 /**
  * The session's sandbox usage: what it cost, the runs charged for it, and the
- * rates a new sandbox is billed at. Charges are recorded per session, so this
- * block is the one place the compute half of the total is broken down; the
- * total itself is painted beside the model cost it is added to.
+ * rates a new sandbox is billed at. This block breaks down the compute half of
+ * the total beside the model cost it is added to; the sheet paints that total,
+ * and a total that includes a shared workspace's sandbox carries the note that
+ * says so, exactly as the web session information dialog labels its Compute row.
  *
  * A session with no reachable compute scope (an old session id, or one billed
  * to another payer) is denied by the router: the block stays absent instead of
@@ -145,12 +158,6 @@ export function SessionComputeSection({
         </View>
       )}
 
-      {charges.scope === 'workspace' ? (
-        <Text className="text-xs text-muted-foreground">
-          {t('cloudAgent.compute.sharedWorkspace')}
-        </Text>
-      ) : null}
-
       {availableRates.length > 0 ? (
         <View className="mt-1 gap-1">
           <Text className="text-xs text-muted-foreground">
@@ -198,7 +205,7 @@ function ComputeRunRow({ run }: Readonly<{ run: SessionComputeRun }>) {
           {startLabel} – {end}
         </Text>
         <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-          {formatDuration(run.seconds, locale)} × {formatRunRate(run.rateCentsPerSecond)}
+          {formatRunMeasure(run.seconds, run.rateCentsPerSecond, locale)}
         </Text>
       </View>
       <Text className="text-xs text-foreground tabular-nums">

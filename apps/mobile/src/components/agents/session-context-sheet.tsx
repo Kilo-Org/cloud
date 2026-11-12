@@ -423,6 +423,19 @@ export function SessionContextSheet({
               <Text className="text-base font-medium text-foreground tabular-nums">
                 {totalCostText ?? '-'}
               </Text>
+              {/* The web session information dialog adds the whole workspace's
+                  recorded compute to its total and names that sharing under the
+                  Compute figure. This total is the same one the header pill
+                  paints, so it carries the same note rather than reading as
+                  this chat's own sandbox spend. */}
+              {computeCharges.data?.scope === 'workspace' ? (
+                <Text
+                  className="text-xs text-muted-foreground"
+                  testID="session-context-sheet-shared-compute"
+                >
+                  {t('cloudAgent.compute.sharedWorkspace')}
+                </Text>
+              ) : null}
             </Row>
           ) : null}
 

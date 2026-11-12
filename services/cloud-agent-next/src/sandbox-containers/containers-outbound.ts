@@ -5,6 +5,8 @@ import { EgressAuditRequestSchema } from '../shared/egress-audit.js';
 import { isAllowedEgressUrl, nativeEgressAllowlistSchema } from './egress-policy.js';
 import { CLOUD_AGENT_SESSION_SYNC_ORIGIN } from '@kilocode/worker-utils/cloud-agent-session-sync';
 
+const SESSION_SYNC_HOSTNAME = new URL(CLOUD_AGENT_SESSION_SYNC_ORIGIN).hostname;
+
 export type ContainersOutboundProps = {
   containerId: string;
   egressAllowlist?: string[];
@@ -73,7 +75,11 @@ export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, Contain
       if (policy.data !== undefined) headers.set('Host', url.host);
       request = new Request(request, { headers, redirect: 'manual' });
     }
-    if (url.origin === CLOUD_AGENT_SESSION_SYNC_ORIGIN) {
+    if (url.hostname === SESSION_SYNC_HOSTNAME) {
+      // The runtime handle must reach Session Sync only through its binding.
+      if (url.origin !== CLOUD_AGENT_SESSION_SYNC_ORIGIN) {
+        return new Response('Session Sync requires HTTPS', { status: 403 });
+      }
       if (!this.env.SESSION_SYNC) {
         return Response.json(
           { error: { code: 'auth_unavailable', retryable: true } },

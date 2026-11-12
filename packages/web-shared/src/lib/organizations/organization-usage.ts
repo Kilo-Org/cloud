@@ -176,11 +176,15 @@ export async function getBalanceForOrganizationUser(
     );
   }
 
+  // The family sums were read before any expiry above; swap in this organization's current totals.
   const payer: BalancePayer = {
     rootOrganizationId: row.payerRootOrganizationId,
     createdAt: row.payerRootCreatedAt,
-    microdollarsUsed: row.payerMicrodollarsUsed,
-    totalMicrodollarsAcquired: row.payerTotalMicrodollarsAcquired,
+    microdollarsUsed: row.payerMicrodollarsUsed - row.microdollars_used + microdollars_used,
+    totalMicrodollarsAcquired:
+      row.payerTotalMicrodollarsAcquired -
+      row.total_microdollars_acquired +
+      total_microdollars_acquired,
   };
 
   const organization_balance = accountBalanceMicrodollars({

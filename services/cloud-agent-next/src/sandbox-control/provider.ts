@@ -13,7 +13,10 @@ import type { NativeRuntimeImage } from './startup-selection.js';
 import type { CredentialContainmentRequirements } from './credential-containment.js';
 import type { BillingContext } from '@kilocode/container-usage';
 import type { NativeCaptureResult } from '../sandbox-containers/native-capture.js';
-import type { SnapshotStartFailureReason } from '../sandbox-containers/snapshot-start-failures.js';
+import type {
+  SnapshotLaunchDiagnosticContext,
+  SnapshotStartFailureReason,
+} from '../sandbox-containers/snapshot-start-failures.js';
 
 export type ProviderCreationCause =
   | 'insufficient_credits'
@@ -126,6 +129,7 @@ export type ProviderLaunchOptions = {
   snapshot?: ProviderSnapshotStart;
   deadlineAt?: number;
   nativeImage?: NativeRuntimeImage;
+  snapshotDiagnostic?: SnapshotLaunchDiagnosticContext;
 };
 
 export type ProviderLaunchResult = {

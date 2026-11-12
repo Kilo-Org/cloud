@@ -2646,21 +2646,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const pendingConfirmationBySession = new Map<KiloSessionId, Map<string, string>>();
 
   /**
-   * The prompt a stored user row renders, or `null` while its text part has not
-   * arrived. The row's info and its parts land as separate storage changes, so
-   * an unresolved text part means "not yet": settling then would withdraw
-   * nothing and drop the record.
-   */
-  function confirmedUserPromptText(storage: JotaiSessionStorage, messageId: string): string | null {
-    const parts = storage.getParts(messageId);
-    if (parts.length === 0) return null;
-    const authoritative = parts.find(part => part.type === 'text' && part.synthetic !== true);
-    if (authoritative?.type === 'text') return authoritative.text;
-    const placeholder = parts.find(part => part.type === 'text');
-    return placeholder?.type === 'text' ? placeholder.text : '';
-  }
-
-  /**
    * Remember a failed send whose outcome is unknown, under the session that
    * owned the optimistic row (see `pendingConfirmationBySession`), and persist
    * it so an open after this route is gone still settles it.
@@ -2699,22 +2684,19 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     for (const [messageId, text] of pending) {
       const info = storage.getMessageInfo(messageId);
       if (info === undefined || info.role !== 'user') continue;
-      const failed = failedPromptBySession.get(kiloSessionId);
-      const restored = failed?.messageId === messageId;
-      const rowText = restored ? failed.text : confirmedUserPromptText(storage, messageId);
-      if (rowText === null) continue;
       pending.delete(messageId);
       config.clearPendingSendConfirmation?.(kiloSessionId, messageId);
-      if (restored) failedPromptBySession.delete(kiloSessionId);
+      // The record is the only owner of a prompt that may have arrived after
+      // this manager replaced the one that sent it, so the text comes from it.
+      const failed = failedPromptBySession.get(kiloSessionId);
+      if (failed?.messageId === messageId) failedPromptBySession.delete(kiloSessionId);
       if (activeSessionId !== kiloSessionId) continue;
-      if (restored) {
-        store.set(failedPromptAtom, null);
-        store.set(billingFailureAtom, null);
-      }
+      store.set(failedPromptAtom, null);
+      store.set(billingFailureAtom, null);
       deliveredFailedPromptSequence += 1;
       store.set(deliveredFailedPromptAtom, {
         messageId,
-        text: rowText,
+        text,
         sequence: deliveredFailedPromptSequence,
       });
     }

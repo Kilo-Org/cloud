@@ -50,14 +50,12 @@ import { cloudAgentId, kiloId } from '@kilocode/cloud-agent-sdk/test-helpers';
  * writing into that account's drafts. That state is proven by device captures
  * and the component suites instead.
  */
-export type AgentChatFixtureVariant = 'undelivered';
-
 export const AGENT_CHAT_FIXTURE_SESSION_ID: KiloSessionId = kiloId(
   'ses_designGateAgentChatFixture0001'
 );
 
 /** The prompt the refused message carries. */
-export const AGENT_CHAT_FIXTURE_PROMPT = 'Deploy the fix to staging';
+const FIXTURE_PROMPT = 'Deploy the fix to staging';
 
 /** The assistant turn before the prompt, so the transcript has a finished burst. */
 const answer: StoredMessage = {
@@ -121,7 +119,7 @@ const refused: StoredMessage = {
       sessionID: AGENT_CHAT_FIXTURE_SESSION_ID,
       messageID: 'msg_designGateRefused',
       type: 'text',
-      text: AGENT_CHAT_FIXTURE_PROMPT,
+      text: FIXTURE_PROMPT,
     },
   ],
 };

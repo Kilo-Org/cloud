@@ -39,7 +39,7 @@ export const PENDING_SEND_MAX_IDS = 20;
  * long-lived install would accumulate one entry per session that ever failed a
  * send.
  */
-export const PENDING_SEND_MAX_SESSIONS = 20;
+const PENDING_SEND_MAX_SESSIONS = 20;
 
 const PENDING_SEND_KEY_PREFIX = 'pending-send:';
 

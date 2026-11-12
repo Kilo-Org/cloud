@@ -301,6 +301,45 @@ describe('ConsentCard', () => {
     expect(singleSwitch(renderer.root).props.value).toBe(true);
   });
 
+  it('keeps an onboarding toggle made before the account id resolves', async () => {
+    currentUserId.value = undefined;
+    const load = Promise.withResolvers<{
+      mandatory: boolean;
+      optional: boolean;
+      previousOptional?: boolean;
+    }>();
+    mockedReadConsent.mockReturnValue(load.promise);
+
+    const renderer = mountCard('onboarding');
+    await act(flush);
+
+    // No account id yet, so nothing has been read: the switch stays operable and
+    // its position is the user's own answer.
+    expect(countByType(renderer.root, 'Skeleton')).toBe(0);
+    const sw = singleSwitch(renderer.root);
+    expect(sw.props.value).toBe(true);
+    await act(async () => {
+      await Promise.resolve();
+      (sw.props.onValueChange as (v: boolean) => void)(false);
+    });
+
+    // The account id resolves, and then the stored record arrives carrying the
+    // opposite choice.
+    currentUserId.value = 'test-user-1';
+    await act(async () => {
+      renderer.update(createElement(ConsentCard, { mode: 'onboarding' }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      load.resolve({ mandatory: false, optional: false, previousOptional: true });
+      await Promise.resolve();
+    });
+    await act(flush);
+
+    // The user's toggle survives the late read.
+    expect(singleSwitch(renderer.root).props.value).toBe(false);
+  });
+
   it('keeps the privacy line clear of the pinned actions', () => {
     // Finding 2 (the sentence cut in half at the footer boundary) is fixed at
     // the base revision by pinning the disclosure into the footer above the

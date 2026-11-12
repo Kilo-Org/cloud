@@ -225,6 +225,11 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
       } else if (mode === 'review') {
         setOptionalToggle(!next);
         setError(t('consent.couldNotLoadAccount'));
+      } else {
+        // Onboarding: the switch is the user's own answer. The stored read can
+        // still land later — the account id may resolve after this render — and
+        // it must not overwrite a choice the user already made.
+        userToggledRef.current = true;
       }
     },
     [mode, userId, t]

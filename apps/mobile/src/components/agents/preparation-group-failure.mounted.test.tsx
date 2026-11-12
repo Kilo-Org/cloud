@@ -116,13 +116,13 @@ describe('PreparationGroup failure copy', () => {
         ],
       })
     );
-    expect(mounted.group().props.accessibilityLabel).toBe('Provisioning sandbox failed');
+    expect(mounted.group().props.accessibilityLabel).toBe('Sandbox provisioning failed');
     expect(mounted.group().findAllByType('AlertCircle').length).toBeGreaterThan(0);
     // The header names the provisioning stage, so its cause stands in for its
     // row and the later stage keeps its own expandable row.
     expect(mounted.texts()).toContain('The sandbox ran out of memory');
-    expect(mounted.texts()).not.toContain('Provisioning sandbox');
-    expect(mounted.texts()).toContain('Starting sandbox');
+    expect(mounted.texts()).not.toContain('Sandbox provisioning');
+    expect(mounted.texts()).toContain('Sandbox start');
     mounted.unmount();
   });
 

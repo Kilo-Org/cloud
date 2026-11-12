@@ -8,7 +8,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 
-import { WIDGET_STORE_PROBE } from '@/lib/auth/secure-store-gated';
+import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
 import { setProtectedDataAvailable } from '@/lib/protected-data';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
@@ -105,7 +105,7 @@ beforeEach(() => {
   store.clear();
   // A keychain that has been unlocked since boot answers the probe, which is
   // what lets an absent record read as absent instead of unreadable.
-  store.set(WIDGET_STORE_PROBE.key, WIDGET_STORE_PROBE.value);
+  store.set(WIDGET_STORE_CLASS_MARKER.key, WIDGET_STORE_CLASS_MARKER.value);
   vi.clearAllMocks();
   secureStoreMock.setItemAsync.mockImplementation(defaultSetItem);
   secureStoreMock.getItemAsync.mockImplementation(defaultGetItem);

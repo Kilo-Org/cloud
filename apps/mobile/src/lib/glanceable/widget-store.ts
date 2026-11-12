@@ -1,12 +1,13 @@
 import {
-  ensureWidgetStoreProbe,
   type GatedSecureStore,
   LOCK_READABLE_METADATA_KEYS,
-  readGatedValueForUpdate,
   upgradeGatedValue,
+  WIDGET_STORE_CLASS_MARKER,
   widgetSecureStore,
+  widgetStoreClassApplied,
   writeGatedValue,
 } from '@/lib/auth/secure-store-gated';
+import { chainSave } from '@/lib/hooks/save-chain';
 
 /**
  * The SecureStore items of the Home widget, the glanceable mirror, the followed
@@ -38,13 +39,28 @@ const WIDGET_STORE_KEYS = [
   ...LOCK_READABLE_METADATA_KEYS,
 ] as const;
 
-// SecureStore cannot report the class an existing item was written with, so the
-// upgrade records itself beside the items: absent, every item is rewritten with
-// the widget class once; present, that rewrite already happened. A read that
-// fails leaves it unwritten, so the upgrade runs at the next start rather than
-// being skipped for good.
-const ACCESSIBILITY_MARKER_KEY = 'widget-store-accessibility';
-const ACCESSIBILITY_MARKER_VALUE = 'after-first-unlock';
+// The identity hints have an owner with its own per-key serializer.
+const lockReadableKeys: ReadonlySet<string> = new Set(LOCK_READABLE_METADATA_KEYS);
+
+/**
+ * Upgrade one item, on the chain its owner serializes on.
+ *
+ * The two identity hints belong to `lib/auth/account-metadata-write`, whose
+ * writes and deletes chain on `chainSave`, so their rewrite joins that chain: a
+ * sign-out delete or an organization save that lands meanwhile is either the
+ * value this read repeats or the value that wins after it, never an older id
+ * restored over it. The other items have no writer outside this module and are
+ * serialized by `upgradeGatedValue`'s own per-key queue.
+ */
+function upgradeWidgetStoreItem(
+  resolveStore: () => GatedSecureStore,
+  key: string
+): Promise<boolean> {
+  if (lockReadableKeys.has(key)) {
+    return chainSave(key, () => upgradeGatedValue(resolveStore, key));
+  }
+  return upgradeGatedValue(resolveStore, key);
+}
 
 /**
  * Rewrite every widget item with the class `widgetSecureStore` writes, once.
@@ -53,35 +69,30 @@ const ACCESSIBILITY_MARKER_VALUE = 'after-first-unlock';
  * could not read them on a locked phone. Each record is read and written back
  * through the widget store: an overwrite that carries the class upgrades the
  * item in place, and it also re-adds a record an older expo-secure-store wrote
- * under its legacy service, which the current read still accepts. The upgrade
- * runs on the item's own write queue (`upgradeGatedValue`), so a publish that
- * lands while it runs is either the value it repeats or the value that wins
- * after it — never a newer record replaced by an older one.
+ * under its legacy service, which the current read still accepts.
  *
- * A device that has not been unlocked since boot cannot read the items, so the
- * attempt returns without the marker and the next unlocked run finishes it. The
- * marker is written after every item, never before: a half-finished upgrade is
- * never recorded as done, and a rewrite that already landed is simply repeated.
- *
- * The probe goes first. It is written with the same class, so planting it proves
- * the keychain is open for every item below, and its presence is what lets a
- * `null` record read as an absent one instead of an unreadable one.
+ * The marker is the whole point. It is written with the same class and only
+ * after every item, so its presence is what lets an absent record read as absent
+ * rather than unreadable (`lib/auth/secure-store-gated`). A device that has not
+ * been unlocked since boot, or a pass that stopped at a refused write, leaves it
+ * unwritten: every absence then stays unreadable and the next unlocked start
+ * finishes the upgrade, which is the safe direction.
  */
 export async function migrateWidgetStoreAccessibility(
   resolveStore: () => GatedSecureStore = widgetSecureStore
 ): Promise<void> {
-  if (!(await ensureWidgetStoreProbe(resolveStore))) {
-    return;
-  }
-  const marker = await readGatedValueForUpdate(resolveStore, ACCESSIBILITY_MARKER_KEY);
-  if (marker.status === 'unreadable' || marker.value === ACCESSIBILITY_MARKER_VALUE) {
+  if (await widgetStoreClassApplied(resolveStore)) {
     return;
   }
   for (const key of WIDGET_STORE_KEYS) {
     // eslint-disable-next-line no-await-in-loop -- one item at a time: a device that has not been unlocked since boot refuses every call, and the upgrade must stop after the first refusal instead of firing the rest of them
-    if (!(await upgradeGatedValue(resolveStore, key))) {
+    if (!(await upgradeWidgetStoreItem(resolveStore, key))) {
       return;
     }
   }
-  await writeGatedValue(resolveStore, ACCESSIBILITY_MARKER_KEY, ACCESSIBILITY_MARKER_VALUE);
+  await writeGatedValue(
+    resolveStore,
+    WIDGET_STORE_CLASS_MARKER.key,
+    WIDGET_STORE_CLASS_MARKER.value
+  );
 }

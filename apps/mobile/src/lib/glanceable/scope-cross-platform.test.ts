@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { WIDGET_STORE_PROBE } from '@/lib/auth/secure-store-gated';
+import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 import { _setScopeStoreForTests, getActiveUserId, getSelectedOrganizationId } from './scope';
@@ -16,7 +16,7 @@ const store = { getItemAsync: mocks.getItemAsync };
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getItemAsync.mockImplementation((key: string) =>
-    key === WIDGET_STORE_PROBE.key ? WIDGET_STORE_PROBE.value : 'value'
+    key === WIDGET_STORE_CLASS_MARKER.key ? WIDGET_STORE_CLASS_MARKER.value : 'value'
   );
   _setScopeStoreForTests(store);
 });

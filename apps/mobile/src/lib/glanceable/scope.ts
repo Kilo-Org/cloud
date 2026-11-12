@@ -3,7 +3,6 @@ import {
   readGatedValueForUpdate,
   widgetSecureStore,
 } from '@/lib/auth/secure-store-gated';
-import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 /**
@@ -91,11 +90,12 @@ export type SignedInScope =
 /**
  * Read both identity hints and report which of the three outcomes they are.
  *
- * The user id decides which: a `null` it cannot vouch for — the keychain is
- * closed, or the read failed — is `unavailable`, never `absent`, so a locked
- * device is not read as a signed-out one. Once it answers with an id, an absent
- * organization id is the personal scope, which the read can then trust because
- * the item that proves the device is readable already answered.
+ * The user id decides signed-in from signed-out: a `null` it cannot vouch for —
+ * the keychain is closed, or the class upgrade has not run — is `unavailable`,
+ * never `absent`, so a locked device is not read as a signed-out one. The
+ * organization id is proven the same way before it may mean the personal scope:
+ * an item still on the old class answers `null` on a locked device, which would
+ * otherwise derive a personal scope for an organization account.
  */
 export async function readSignedInScope(keychain: ScopeKeychain): Promise<SignedInScope> {
   const userId = await readGatedValueForUpdate(() => keychain, ACTIVE_USER_ID_KEY);
@@ -105,11 +105,9 @@ export async function readSignedInScope(keychain: ScopeKeychain): Promise<Signed
   if (userId.value === null) {
     return { status: 'absent' };
   }
-  try {
-    const organizationId = await keychain.getItemAsync(ORGANIZATION_STORAGE_KEY);
-    return { status: 'known', userId: userId.value, organizationId };
-  } catch (error) {
-    reportSecureStoreFailure('read', error);
+  const organizationId = await readGatedValueForUpdate(() => keychain, ORGANIZATION_STORAGE_KEY);
+  if (organizationId.status === 'unreadable') {
     return { status: 'unavailable' };
   }
+  return { status: 'known', userId: userId.value, organizationId: organizationId.value };
 }

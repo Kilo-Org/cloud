@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { WIDGET_STORE_PROBE } from '@/lib/auth/secure-store-gated';
+import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
 import { setProtectedDataAvailable } from '@/lib/protected-data';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
@@ -17,14 +17,18 @@ const mocks = vi.hoisted(() => ({ getItemAsync: vi.fn() }));
 const keychain = { getItemAsync: mocks.getItemAsync };
 
 /**
- * Answer the given items, with the probe reading back the way a keychain that
- * has been unlocked since boot does. A case that models a closed keychain
- * overrides the mock with a plain `null` for every key instead.
+ * Answer the given items, with the class marker reading back the way an install
+ * whose upgrade finished does. `upgraded: false` models the window before it, or
+ * a closed keychain, where no `null` is trusted; a case that models a closed
+ * keychain can also override the mock with a plain `null` for every key.
  */
-function answers(values: Readonly<Record<string, string | null>> = {}): void {
+function answers(
+  values: Readonly<Record<string, string | null>> = {},
+  { upgraded = true }: { upgraded?: boolean } = {}
+): void {
   mocks.getItemAsync.mockImplementation((key: string) => {
-    if (key === WIDGET_STORE_PROBE.key) {
-      return WIDGET_STORE_PROBE.value;
+    if (key === WIDGET_STORE_CLASS_MARKER.key) {
+      return upgraded ? WIDGET_STORE_CLASS_MARKER.value : null;
     }
     return values[key] ?? null;
   });
@@ -88,7 +92,7 @@ describe('readSignedInScope', () => {
     });
   });
 
-  it('keeps a personal scope once the user id answers', async () => {
+  it('keeps a personal scope once the class upgrade has run', async () => {
     setProtectedDataAvailable(false);
     answers({ [ACTIVE_USER_ID_KEY]: 'u1' });
 
@@ -99,9 +103,19 @@ describe('readSignedInScope', () => {
     });
   });
 
+  it('does not read a null organization id as the personal scope before the upgrade', async () => {
+    // The user id answers, so the device is readable, but the organization item
+    // may still carry the old class and answer null while locked: that is not
+    // the personal scope, it is an unproven one.
+    setProtectedDataAvailable(false);
+    answers({ [ACTIVE_USER_ID_KEY]: 'u1' }, { upgraded: false });
+
+    await expect(readSignedInScope(keychain)).resolves.toEqual({ status: 'unavailable' });
+  });
+
   it('reads an unanswered user id before the first unlock as unavailable, never signed out', async () => {
     setProtectedDataAvailable(false);
-    // A closed keychain cannot answer the probe either, so the null proves nothing.
+    // A closed keychain cannot answer the marker either, so the null proves nothing.
     mocks.getItemAsync.mockResolvedValue(null);
 
     await expect(readSignedInScope(keychain)).resolves.toEqual({ status: 'unavailable' });

@@ -9,7 +9,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications/schemas';
 import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
-import { WIDGET_STORE_PROBE } from '@/lib/auth/secure-store-gated';
+import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
 import {
   _resetHomeWidgetDataForTests,
   _setHomeWidgetStoreForTests,
@@ -1854,7 +1854,7 @@ describe('iosSink stray sweep', () => {
         await gate.promise;
         // The probe answers, so the empty mirror is a real answer rather than an
         // unreadable keychain.
-        return key === WIDGET_STORE_PROBE.key ? WIDGET_STORE_PROBE.value : null;
+        return key === WIDGET_STORE_CLASS_MARKER.key ? WIDGET_STORE_CLASS_MARKER.value : null;
       },
     });
 

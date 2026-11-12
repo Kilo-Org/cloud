@@ -24,13 +24,14 @@ import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
  * fails.
  *
  * A read is still never proof of absence: iOS can answer `null` for an item it
- * will not hand over, and the cached protected-data state cannot be trusted to
- * notice the phone locking while the app was suspended. The proof is instead a
- * probe item written with the same class ({@link WIDGET_STORE_PROBE}): it reads
- * back exactly when these items can, so a `null` is only an absent record when
- * the probe answers. `ensureWidgetStoreProbe` plants it, and a device that has
- * not been unlocked since boot cannot, which leaves every absence unreadable
- * until the probe lands.
+ * will not hand over, the cached protected-data state cannot be trusted to
+ * notice the phone locking while the app was suspended, and an item still on the
+ * default class answers `null` on a locked device even while a class-bearing item
+ * answers. The proof is the upgrade marker instead
+ * ({@link WIDGET_STORE_CLASS_MARKER}): it is written with the class and only
+ * after every item, so its presence means each of them carries the class and the
+ * keychain is open for it. Only then is a `null` an absent record; before it
+ * lands, every absence reads as unreadable.
  *
  * The bearer tokens never reach this module. They keep
  * `WHEN_UNLOCKED_THIS_DEVICE_ONLY` (`credentials.ts`), which a locked device
@@ -55,13 +56,15 @@ type GatedStoreOptions = { keychainAccessible?: number };
 export const LOCK_READABLE_METADATA_KEYS = [ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY] as const;
 
 /**
- * The item whose presence proves the keychain is open for the items this module
- * owns: it is written with the same class, in the same service, so it reads back
- * exactly when they can. Its absence proves nothing, which is why a `null`
- * record read is unreadable until it lands.
+ * The marker that records the class upgrade finished. Its presence is the proof
+ * a `null` record needs: it is written with the same class, so it answers only
+ * while the keychain is open for that class, and it is written after every item,
+ * so every item carries the class by the time it lands. Until then "nothing
+ * stored" and "not readable" are indistinguishable, and a `null` reads as an
+ * unreadable one.
  */
-export const WIDGET_STORE_PROBE = {
-  key: 'widget-store-probe',
+export const WIDGET_STORE_CLASS_MARKER = {
+  key: 'widget-store-accessibility',
   value: 'after-first-unlock',
 } as const;
 
@@ -111,39 +114,21 @@ export function widgetSecureStore(): GatedSecureStore {
   return withWidgetAccessibility(require('expo-secure-store') as NativeWidgetStore);
 }
 
-/** `true` only when the probe reads back: a closed keychain cannot prove absence. */
-async function widgetStoreIsOpen(resolveStore: () => GatedReadStore): Promise<boolean> {
-  try {
-    const probe = await resolveStore().getItemAsync(WIDGET_STORE_PROBE.key);
-    return probe === WIDGET_STORE_PROBE.value;
-  } catch (error) {
-    reportSecureStoreFailure('read', error);
-    return false;
-  }
-}
-
 /**
- * Plant the probe, which is also the proof that the keychain is open for these
- * items. `false` when the keychain refused the read or the write: a device that
- * has not been unlocked since boot cannot plant it, so the caller stops and the
- * next unlocked run tries again.
+ * `true` only when the upgrade marker reads back, which means every item in the
+ * widget store carries the class and the keychain is open for it. A closed
+ * keychain cannot prove absence, and neither can an install the upgrade has not
+ * finished: a record still on expo-secure-store's default class answers `null`
+ * on a locked device, so the class is what makes a `null` mean "absent".
  */
-export async function ensureWidgetStoreProbe(
-  resolveStore: () => GatedSecureStore
+export async function widgetStoreClassApplied(
+  resolveStore: () => GatedReadStore
 ): Promise<boolean> {
   try {
-    if ((await resolveStore().getItemAsync(WIDGET_STORE_PROBE.key)) === WIDGET_STORE_PROBE.value) {
-      return true;
-    }
+    const marker = await resolveStore().getItemAsync(WIDGET_STORE_CLASS_MARKER.key);
+    return marker === WIDGET_STORE_CLASS_MARKER.value;
   } catch (error) {
     reportSecureStoreFailure('read', error);
-    return false;
-  }
-  try {
-    await resolveStore().setItemAsync(WIDGET_STORE_PROBE.key, WIDGET_STORE_PROBE.value);
-    return true;
-  } catch (error) {
-    reportSecureStoreFailure('write', error);
     return false;
   }
 }
@@ -191,7 +176,7 @@ async function setGatedValue(
  * Read for a read-modify-write: `'unreadable'` when the value cannot be taken
  * at face value, so the caller never persists a record derived from a value it
  * never read. That covers a failed read and — the one that matters for a
- * surface — a `null` the probe cannot vouch for.
+ * surface — a `null` the class upgrade does not yet vouch for.
  */
 export async function readGatedValueForUpdate(
   resolveStore: () => GatedReadStore,
@@ -199,10 +184,28 @@ export async function readGatedValueForUpdate(
 ): Promise<StoredValueRead> {
   try {
     const value = await resolveStore().getItemAsync(key);
-    if (value === null && !(await widgetStoreIsOpen(resolveStore))) {
+    if (value === null && !(await widgetStoreClassApplied(resolveStore))) {
       return { status: 'unreadable' };
     }
     return { status: 'value', value };
+  } catch (error) {
+    reportSecureStoreFailure('read', error);
+    return { status: 'unreadable' };
+  }
+}
+
+/**
+ * Read for the upgrade only: a successful read is the item's contents, `null`
+ * included, and only a rejection is unreadable. The upgrade runs in the
+ * foreground, and a device that cannot read a legacy item cannot write its
+ * marker either, so the marker still gates every absence read outside it.
+ */
+async function readGatedValueRaw(
+  resolveStore: () => GatedReadStore,
+  key: string
+): Promise<StoredValueRead> {
+  try {
+    return { status: 'value', value: await resolveStore().getItemAsync(key) };
   } catch (error) {
     reportSecureStoreFailure('read', error);
     return { status: 'unreadable' };
@@ -237,7 +240,7 @@ export function upgradeGatedValue(
   key: string
 ): Promise<boolean> {
   return serialized(key, async () => {
-    const stored = await readGatedValueForUpdate(resolveStore, key);
+    const stored = await readGatedValueRaw(resolveStore, key);
     if (stored.status === 'unreadable') {
       return false;
     }

@@ -115,10 +115,11 @@ export function SessionContextMetrics({
 
   // The pill's second value slot. `bg-muted-soft` is the one gray that stands
   // off this pill's own `bg-secondary` fill — the theme's `muted` equals
-  // `secondary` in both palettes. The label keeps the marker's 32 dp floor in
-  // every state, so the cost arriving fills the slot the placeholder showed and
-  // the pill keeps its width; a cost wider than the floor grows the slot, and
-  // the pill truncates only past what the row can hold.
+  // `secondary` in both palettes. The label keeps the marker's 28 dp floor in
+  // every state (`-8` is 2 rem and this app's NativeWind rem is 14 px, so it
+  // renders 28 dp), so the cost arriving fills the slot the placeholder showed
+  // and the pill keeps its width; a cost wider than the floor grows the slot,
+  // and the pill truncates only past what the row can hold.
   let costSlot: ReactNode = null;
   if (content.costSlot === 'label' && content.secondary !== null) {
     costSlot = (

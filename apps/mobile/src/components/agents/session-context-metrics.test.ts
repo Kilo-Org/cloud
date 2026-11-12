@@ -264,7 +264,7 @@ describe('SessionContextMetrics', () => {
       // The row shrinks, but the texts inside it keep RN's default
       // flexShrink: 0 unless they opt in too, so a squeezed row can never
       // compress them and the second text paints past the pill's right edge.
-      // The cost keeps a 32 dp floor — the width of the marker it replaces —
+      // The cost keeps a 28 dp floor — the width of the marker it replaces —
       // and still compresses below what the row can hold.
       const textClassName = (text.props as { className?: string }).className ?? '';
       expect(textClassName).toContain('shrink');

@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { verifyKiloToken, extractBearerToken } from '@kilocode/worker-utils';
+import { extractBearerToken } from '@kilocode/worker-utils';
 import { previewTargetSchema } from './shared/preview-target.js';
 
 type StreamTicketPayload = {
@@ -65,20 +65,6 @@ export type WrapperDispatchTicketClaims = {
   wrapperGeneration: number;
   wrapperConnectionId: string;
 };
-
-/**
- * A pre-migration raw Kilo user JWT presented as a workerAuthToken. Accepted
- * only so wrapper processes already bound before wrapper dispatch tickets
- * shipped can keep talking to the Worker until their next session/ready
- * dispatch mints a real ticket. Carries no fence claims — callers must treat
- * it as exempt from ticketClaimsMismatchRequestFence.
- */
-export type LegacyKiloTokenClaims = {
-  type: 'legacy_kilo_token';
-  userId: string;
-};
-
-export type WrapperAuthClaims = WrapperDispatchTicketClaims | LegacyKiloTokenClaims;
 
 const WRAPPER_DISPATCH_TICKET_MAX_LIFETIME_SECONDS = 4 * 60 * 60;
 
@@ -243,27 +229,12 @@ function isWrapperDispatchTicketClaims(payload: unknown): payload is WrapperDisp
   );
 }
 
-/**
- * Grandfather only audience-less Kilo tokens for pre-migration wrappers.
- * Resource-audience tokens, including cloud-agent-next, are not wrapper capabilities
- * and must not inherit this legacy path's exemption from dispatch fence checks.
- */
-async function legacyKiloTokenClaims(
-  ticket: string,
-  secret: string
-): Promise<LegacyKiloTokenClaims | undefined> {
-  try {
-    const payload = await verifyKiloToken(ticket, secret);
-    return { type: 'legacy_kilo_token', userId: payload.kiloUserId };
-  } catch {
-    return undefined;
-  }
-}
-
 export async function validateWrapperDispatchTicket(
   authHeader: string | null,
   secret: string | null | undefined
-): Promise<{ success: true; claims: WrapperAuthClaims } | { success: false; error: string }> {
+): Promise<
+  { success: true; claims: WrapperDispatchTicketClaims } | { success: false; error: string }
+> {
   if (!secret) {
     return { success: false, error: 'NEXTAUTH_SECRET is not configured on the worker' };
   }
@@ -287,10 +258,6 @@ export async function validateWrapperDispatchTicket(
   }
 
   if (!isWrapperDispatchTicketClaims(payload)) {
-    const legacyClaims = await legacyKiloTokenClaims(ticket, secret);
-    if (legacyClaims) {
-      return { success: true, claims: legacyClaims };
-    }
     return { success: false, error: 'Invalid ticket type' };
   }
 

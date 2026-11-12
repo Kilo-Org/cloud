@@ -17,7 +17,7 @@ import {
   type RequestScanParts,
   type RequestSegment,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
-import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import type { EnkryptGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import type { EnkryptGuardrailReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
@@ -81,7 +81,7 @@ export type EnkryptCachedScanResult = Omit<EnkryptGuardrailScanResult, 'report'>
   cacheEntry: EnkryptVerdictCacheEntry | null;
 };
 
-type ReadyConfig = Extract<EnkryptInputGuardrailConfig, { status: 'ready' }>;
+type ReadyConfig = Extract<EnkryptGuardrailConfig, { status: 'ready' }>;
 
 function configHash(config: ReadyConfig): Buffer {
   return createHash('sha256')

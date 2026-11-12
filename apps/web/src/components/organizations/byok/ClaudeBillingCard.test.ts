@@ -132,6 +132,40 @@ describe('ClaudeBillingCardView', () => {
     expect(render({ status: status('billing_unavailable') })).toContain('Billing unavailable');
   });
 
+  it('reports a link that needs a reconnect and offers the owner the action', () => {
+    const html = render({
+      status: { ...status('reconnect_required'), connectedAt: '2026-09-16T12:00:00.000Z' },
+      scope: 'shared_services',
+      onConnect: () => undefined,
+      onRemove: () => undefined,
+    });
+    const { document } = parseHTML(html);
+
+    expect(html).toContain('Reconnect required');
+    expect(html).not.toContain('>Linked<');
+    expect(html).toContain('is no longer available');
+    expect(
+      buttons({
+        status: status('reconnect_required'),
+        scope: 'shared_services',
+        onConnect: () => undefined,
+      }).map(button => button.textContent)
+    ).toEqual(['Reconnect Claude billing', 'Remove from Kilo']);
+    expect(document.querySelectorAll('button')).toHaveLength(2);
+  });
+
+  it('shows the reconnect state to a member without the action', () => {
+    const html = render({
+      status: { ...status('reconnect_required'), canManage: false },
+      scope: 'shared_services',
+    });
+    expect(html).toContain('Reconnect required');
+    expect(html).toContain('is no longer available');
+    expect(html).toContain(
+      'Ask a Kilo organization owner or admin to manage Claude shared services.'
+    );
+  });
+
   it.each(['not_connected', 'connected'] as const)(
     'keeps the Claude Console link outside the disclosure when %s',
     state => {

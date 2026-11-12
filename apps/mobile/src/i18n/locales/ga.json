@@ -1933,7 +1933,7 @@
       "costSpoken": "costas {{cost}}",
       "costSpokenWithTime": "costas {{cost}}, {{time}}",
       "pullRequest": "iarratas tarraingthe {{number}}",
-      "spokenJoiner": "agus"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Níorbh fhéidir GitHub a oscailt",
@@ -2868,6 +2868,8 @@
     "retryHint": "Déanann sé iarracht eile stádas Kilo Pass a lódáil.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Ní féidir Kilo Pass a cheannach faoi láthair.",
+    "purchaseUnavailableTitle": "Níl sé ar fáil faoi láthair",
+    "purchaseUnavailableEnded": "Tá do Kilo Pass críochnaithe.",
     "kiloPassManagement": "Bainistiú Kilo Pass",
     "kiloPassSetup": "Socrú Kilo Pass",
     "subscriptionHeaderDescription": "Sintiús míosúil a chuireann creidmheasanna le do chothromas Kilo le haghaidh seisiúin chódaithe AI a rith in Kilo App.",

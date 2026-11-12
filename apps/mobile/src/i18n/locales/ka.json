@@ -1810,7 +1810,7 @@
       "costSpoken": "ღირებულება {{cost}}",
       "costSpokenWithTime": "ღირებულება {{cost}}, {{time}}",
       "pullRequest": "შერწყმის მოთხოვნა {{number}}",
-      "spokenJoiner": "და"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ის გახსნა ვერ მოხერხდა",
@@ -2709,6 +2709,8 @@
     "retryHint": "ხელახლა ამოწმებს Kilo Pass-ის მდგომარეობას.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Kilo Pass-ის შეძენა ამჟამად შეუძლებელია.",
+    "purchaseUnavailableTitle": "ამჟამად შეუძლებელია",
+    "purchaseUnavailableEnded": "თქვენი Kilo Pass დასრულდა.",
     "kiloPassManagement": "Kilo Pass-ის მართვა",
     "kiloPassSetup": "Kilo Pass-ის გამართვა",
     "subscriptionHeaderDescription": "ყოველთვიური გამოწერა, რომელიც თქვენს Kilo ბალანსს კრედიტებს ამატებს AI კოდირების სესიებისთვის Kilo აპში.",

@@ -1810,7 +1810,7 @@
       "costSpoken": "baasii {{cost}}",
       "costSpokenWithTime": "gatii {{cost}}, {{time}}",
       "pullRequest": "gaaffii walitti makuu {{number}}",
-      "spokenJoiner": "fi"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub banuu hin dandeenye",
@@ -2709,6 +2709,8 @@
     "retryHint": "Haala Kilo Pass fe'uu irra deebi'ee yaala.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Amma Kilo Pass bitachuun hin danda'amu.",
+    "purchaseUnavailableTitle": "Amma hin argamu",
+    "purchaseUnavailableEnded": "Kilo Pass kee xumurame.",
     "kiloPassManagement": "Bulchiinsa Kilo Pass",
     "kiloPassSetup": "Qophii Kilo Pass",
     "subscriptionHeaderDescription": "Hubboo ji'aa kiriiditii baalansii Kilo kee itti dabaluuf, shumarra code AI Kilo App keessatti hojjechuuf.",

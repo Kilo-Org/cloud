@@ -1892,7 +1892,7 @@
       "costSpoken": "cena {{cost}}",
       "costSpokenWithTime": "cena {{cost}}, {{time}}",
       "pullRequest": "žiadosť o zlúčenie {{number}}",
-      "spokenJoiner": "a"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub sa nepodarilo otvoriť",
@@ -2815,6 +2815,8 @@
     "retryHint": "Znova načíta stav Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Kilo Pass si momentálne nemožno kúpiť.",
+    "purchaseUnavailableTitle": "Momentálne nedostupné",
+    "purchaseUnavailableEnded": "Váš Kilo Pass sa skončil.",
     "kiloPassManagement": "Správa Kilo Pass",
     "kiloPassSetup": "Nastavenie Kilo Pass",
     "subscriptionHeaderDescription": "Mesačné predplatné, ktoré pridáva kredity do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo.",

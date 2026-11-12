@@ -1851,7 +1851,7 @@
       "costSpoken": "trošak {{cost}}",
       "costSpokenWithTime": "trošak {{cost}}, {{time}}",
       "pullRequest": "zahtjev za spajanje {{number}}",
-      "spokenJoiner": "i"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nije moguće otvoriti GitHub",
@@ -2762,6 +2762,8 @@
     "retryHint": "Ponovo učitava stanje pretplate na Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Kupovina pretplate na Kilo Pass trenutno nije dostupna.",
+    "purchaseUnavailableTitle": "Trenutno nije dostupno",
+    "purchaseUnavailableEnded": "Vaš Kilo Pass je završen.",
     "kiloPassManagement": "Upravljanje pretplatom na Kilo Pass",
     "kiloPassSetup": "Podešavanje pretplate na Kilo Pass",
     "subscriptionHeaderDescription": "Mjesečna pretplata koja dodaje kredite vašem Kilo saldu za pokretanje AI sesija kodiranja u Kilo App.",

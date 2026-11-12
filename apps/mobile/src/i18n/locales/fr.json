@@ -2126,6 +2126,8 @@
     "retryHint": "Actualise à nouveau l'état de Kilo Pass.",
     "cardAccessibility": "{{title}} : {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Il n'est pas possible d'acheter Kilo Pass pour le moment.",
+    "purchaseUnavailableTitle": "Indisponible pour le moment",
+    "purchaseUnavailableEnded": "Votre Kilo Pass a pris fin.",
     "kiloPassManagement": "Gestion de Kilo Pass",
     "kiloPassSetup": "Configuration de Kilo Pass",
     "subscriptionHeaderDescription": "Un abonnement mensuel qui ajoute des crédits à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App.",
@@ -2272,7 +2274,7 @@
       "costSpoken": "coût de {{cost}}",
       "costSpokenWithTime": "coût : {{cost}}, {{time}}",
       "pullRequest": "demande de fusion {{number}}",
-      "spokenJoiner": "et"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenMessage": "Impossible de lancer la configuration de l'application GitHub. Réessayez.",
@@ -2374,8 +2376,8 @@
     },
     "connectionExpired": "La connexion à GitHub a expiré.",
     "couldNotLoadPullRequest": "Impossible de charger la pull request",
-    "reviewServiceUnavailable": "Service indisponible",
-    "reviewServiceUnavailableDescription": "Le service est temporairement indisponible. Réessayez dans quelques instants.",
+    "reviewServiceUnavailable": "Service de revue indisponible",
+    "reviewServiceUnavailableDescription": "Le service de revue est temporairement indisponible. Réessayez dans quelques instants.",
     "couldNotOpenGitHubAppSettings": "Impossible d'ouvrir les paramètres de l'application GitHub",
     "description": "Description",
     "discussion": {
@@ -2514,7 +2516,7 @@
       "couldNotLoadMoreFiles": "Impossible de charger d'autres fichiers",
       "diffTooLarge": "trop de différences",
       "failedToLoadAllFiles": "Impossible de charger tous les fichiers",
-      "filterPlaceholder": "Chemin du fichier",
+      "filterPlaceholder": "Filtrer les fichiers par chemin",
       "loadingFiles": "Chargement : {{loaded}} sur {{total}}…",
       "noMatches": "Aucun fichier ne correspond à « {{query}} »",
       "openFile": "Ouvrir {{path}}",
@@ -2545,7 +2547,7 @@
     },
     "floatingActions": {
       "clear": "Désélectionner",
-      "clearSelection": "Annuler la sélection",
+      "clearSelection": "Désélectionner les lignes sélectionnées",
       "comment": "Commenter",
       "commentOnSelectedLines": "Commenter les lignes sélectionnées",
       "finishReview": "Terminer la revue"
@@ -2569,7 +2571,7 @@
       "fileLoadedOfTotalCount": "{{displayCount}} fichiers chargés sur {{total}}",
       "fileLoadedOfTotalCount_other": "{{displayCount}} fichiers chargés sur {{total}}",
       "filesStillLoading": "Le chargement des fichiers est toujours en cours. Faites glisser vers le bas pour actualiser.",
-      "goToOverview": "Afficher l'aperçu",
+      "goToOverview": "Ouvrir l'onglet Aperçu",
       "goToOverviewTab": "Ouvrir l'onglet Aperçu",
       "hunkHeader": "En-tête du bloc de modifications {{header}}",
       "loadAll": "Tout charger",
@@ -2614,10 +2616,10 @@
     },
     "installKiloGitHubApp": "Installer l'application GitHub de Kilo",
     "merge": {
-      "merge": "Fusion",
+      "merge": "Fusionner",
       "mergeTitle": "Fusion",
       "mergeNow": "Fusionner maintenant",
-      "mergePullRequest": "Fusion de la demande",
+      "mergePullRequest": "Fusionner la pull request",
       "mergeTermTitle": "Fusionner : {{term}}",
       "enableAutoMerge": "Activer la fusion automatique",
       "disableAutoMerge": "Désactiver la fusion automatique",
@@ -2714,7 +2716,7 @@
       "file_other": "fichiers",
       "file_one": "fichier",
       "stateMerged": "Fusionnée",
-      "stateOpen": "Ouverture",
+      "stateOpen": "Ouverte",
       "stateOpenApproved": "Ouverte · Approuvée",
       "stateOpenChangesRequested": "Ouverte · Modifications demandées",
       "stateOpenReviewRequired": "Ouverte · Revue requise",
@@ -2757,7 +2759,7 @@
       "bitbucketTitle": "La connexion à Bitbucket a expiré"
     },
     "review": "Revue",
-    "reviewPullRequest": "Examiner la pull request",
+    "reviewPullRequest": "Revue de la pull request",
     "screen": {
       "shareA11y": "Partager la pull request",
       "title": "#{{number}}"
@@ -2766,7 +2768,7 @@
       "emptyDiffColumn": "colonne de différences vide",
       "emptyDiffRow": "Ligne de différences vide",
       "newOnly": "Nouvelle version uniquement : {{text}}",
-      "noNewlineAtEndOfFile": "le fichier ne se termine pas par un saut de ligne",
+      "noNewlineAtEndOfFile": "⚠️ aucun saut de ligne à la fin du fichier",
       "oldNew": "Avant : {{old}} | Après : {{new}}",
       "oldOnly": "Ancienne version uniquement : {{text}}"
     },
@@ -2793,7 +2795,7 @@
       "blockedComment": "Ajoutez un résumé ou au moins un commentaire pour publier une revue avec des commentaires."
     },
     "fileStatus": {
-      "changed": "Modifié",
+      "changed": "Changé",
       "copied": "Copié",
       "modified": "Modifié",
       "renamed": "Renommé"

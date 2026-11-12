@@ -199,6 +199,7 @@ export class SystemSearchIndexSync {
         indexed: indexedDocuments(await this.deps.fingerprints()),
         documents: documents.documents,
         observedSources: documents.observedSources,
+        accessibleOrganizations: documents.accessibleOrganizations,
       });
       const applySessions = this.deps.applySessions;
       const planIsEmpty = plan.add.length === 0 && plan.remove.length === 0;

@@ -1851,7 +1851,7 @@
       "costSpoken": "import de {{cost}}",
       "costSpokenWithTime": "cost de {{cost}}, {{time}}",
       "pullRequest": "sol·licitud d'integració {{number}}",
-      "spokenJoiner": "i"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "No s'ha pogut obrir GitHub",
@@ -2762,6 +2762,8 @@
     "retryHint": "Torna a consultar l'estat de Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "La compra de Kilo Pass no està disponible ara mateix.",
+    "purchaseUnavailableTitle": "No disponible ara mateix",
+    "purchaseUnavailableEnded": "El teu Kilo Pass ha finalitzat.",
     "kiloPassManagement": "Gestió de Kilo Pass",
     "kiloPassSetup": "Configuració de Kilo Pass",
     "subscriptionHeaderDescription": "Una subscripció mensual que afegeix crèdits al teu saldo de Kilo per executar sessions de programació d'IA a l'aplicació Kilo.",

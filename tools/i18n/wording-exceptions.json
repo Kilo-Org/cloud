@@ -280,6 +280,7 @@
     "high",
     "manual review",
     "medium",
+    "merge",
     "only adding {{accepted}} of {{total}} files (max {{max}})",
     "open",
     "open pull request",

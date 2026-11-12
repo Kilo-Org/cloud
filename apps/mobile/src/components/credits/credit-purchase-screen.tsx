@@ -26,7 +26,7 @@ import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-
 import { openExternalUrl } from '@/lib/external-link';
 import { formatPrefixedMoney } from '@/lib/format';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
-import { useSideInsetStyle } from '@/lib/screen-insets';
+import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { getStoreLegalLinks } from '@/lib/iap/legal-links';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
@@ -37,11 +37,14 @@ import { useCreditNativeIap } from './credit-native-iap-owner';
 import { CreditExpiryNote } from './credit-expiry-note';
 
 /**
- * The room the scroller keeps at its end for the floating purchase error. It is
- * the card's own height at three capped lines plus its margins, reserved in
- * every state so the copy can scroll above the card without the layout moving.
+ * The room the scroller keeps at its end for the floating purchase error: the
+ * card's own height at three capped lines plus its margins, at the live font
+ * scale, because the card is text. Reserved in every state, so the copy can
+ * scroll above the card and the clearance never depends on whether the error
+ * shows.
  */
 const PURCHASE_ERROR_CLEARANCE = 100;
+const purchaseErrorClearance = (fontScale: number): number => PURCHASE_ERROR_CLEARANCE * fontScale;
 
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
@@ -97,6 +100,8 @@ export function CreditPurchaseScreen() {
   // The error overlay sits outside the scroller, so it takes the side insets
   // the scroller applies to its own content.
   const sideInsetStyle = useSideInsetStyle();
+  // The error overlay must stay out of the home-indicator band.
+  const { bottom: bottomInset } = useScreenInsets();
   const trpc = useTRPC();
   const {
     connected,
@@ -250,10 +255,10 @@ export function CreditPurchaseScreen() {
           className="-mx-1 flex-1"
           contentContainerClassName="gap-3 px-1"
           showsVerticalScrollIndicator={false}
-          // The error overlay floats over the bottom of this area, so this adds
-          // the room that lets the description and the links scroll clear of
-          // it. It is a constant height, so it cannot move the copy.
-          contentContainerStyle={{ paddingBottom: PURCHASE_ERROR_CLEARANCE }}
+          // The trailing clearance for the error overlay is a child of the
+          // content, not `contentContainerStyle`: that style prop makes
+          // NativeWind drop this scroller's `contentContainerClassName`, and
+          // it would take the content gap and gutter with it.
         >
           {/* The card holds both of its data slots in every state: the amount (a
               skeleton, the value, or the failed read's own retry target) and
@@ -457,6 +462,12 @@ export function CreditPurchaseScreen() {
               <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
             </Pressable>
           </View>
+
+          {/* The room the floating purchase error needs at the end of the
+              content, as a child of the content rather than a container style
+              (see the scroller's comment). It scales with the text, because the
+              card it clears does. */}
+          <View style={{ height: purchaseErrorClearance(fontScale) }} />
         </DetailScreenScrollView>
         {/* The purchase error floats above the bottom of the scroll area. It
             is not one of the four pack states, so it takes no layout height,
@@ -467,7 +478,9 @@ export function CreditPurchaseScreen() {
             replaces its className padding. The scroller keeps a trailing
             clearance so the last content can scroll clear of the card. */}
         <View className="pointer-events-none absolute inset-x-0 bottom-0" style={sideInsetStyle}>
-          <View className="px-5 pb-4">
+          {/* The card clears the home indicator: the bottom inset is the
+              gesture area, and the card's text must not sit in it. */}
+          <View className="px-5" style={{ paddingBottom: Math.max(bottomInset, 16) + 8 }}>
             <AccessibleStatus
               message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
               className="rounded-xl border border-destructive bg-card px-4 py-3 text-sm"

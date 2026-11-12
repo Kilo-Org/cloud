@@ -782,11 +782,43 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
+  it('grows the error clearance with the text it clears', async () => {
+    // The card is text, so the room reserved beneath it must grow with the same
+    // scale; a fixed clearance would let a raised scale cover the copy.
+    const contentHeights = async (): Promise<number[]> => {
+      const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+      await waitFor(() => packRows(renderer).length === 4);
+      const scroller = renderer.root.findByType(DetailScreenScrollView);
+      const heights = scroller
+        .findAll(node => typeof node.props.style === 'object' && node.props.style !== null)
+        .map(node => {
+          const style: unknown = node.props.style;
+          if (typeof style !== 'object' || style === null || !('height' in style)) {
+            return 0;
+          }
+          const value = style.height;
+          return typeof value === 'number' ? value : 0;
+        })
+        .filter(height => height > 0);
+      unmount();
+      return heights;
+    };
+
+    dimensions.fontScale = 1;
+    const single = await contentHeights();
+    dimensions.fontScale = 1.5;
+    const raised = await contentHeights();
+    dimensions.fontScale = 1;
+
+    // The clearance is a child sized at 100 dp per unit of text scale.
+    expect(single.some(height => Math.abs(height - 100) <= 0.5)).toBe(true);
+    expect(raised.some(height => Math.abs(height - 150) <= 0.5)).toBe(true);
+  });
+
   it('floats the purchase error clear of the copy without taking layout height', async () => {
     // The error is not one of the four pack states, so it must not take layout
-    // height. It floats at the bottom of the scroll area, and the scroller keeps
-    // a constant trailing clearance so the copy can scroll above it — the error
-    // can never cover content that has been scrolled to its end.
+    // height. It floats at the bottom of the scroll area, and the content ends
+    // with a spacer sized to the card, so the copy can scroll above it.
     owner.errorMessageKey = 'credits.purchaseOwnedByAnotherAccount';
 
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
@@ -795,16 +827,28 @@ describe('CreditPurchaseScreen', () => {
     const scroller = renderer.root.findByType(DetailScreenScrollView);
     expect(scroller.findAllByType(AccessibleStatus)).toHaveLength(0);
 
-    // The clearance is the scroller's constant, present whether or not the
-    // error shows, so the copy's place does not depend on the error.
-    const containerStyle: unknown = scroller.props.contentContainerStyle;
-    expect(
-      typeof containerStyle === 'object' &&
-        containerStyle !== null &&
-        'paddingBottom' in containerStyle &&
-        typeof containerStyle.paddingBottom === 'number' &&
-        containerStyle.paddingBottom > 0
-    ).toBe(true);
+    // The clearance is a child of the content, never a container style: that
+    // style prop makes NativeWind drop the caller's contentContainerClassName,
+    // which would take the content gap and gutter with it.
+    expect(scroller.props.contentContainerStyle).toBeUndefined();
+    const contentStyle: unknown = scroller.props.contentContainerClassName;
+    expect(String(contentStyle)).toContain('gap-3');
+
+    const spacers = renderer.root.findAll(node => {
+      const style: unknown = node.props.style;
+      return (
+        typeof style === 'object' &&
+        style !== null &&
+        'height' in style &&
+        typeof style.height === 'number' &&
+        style.height > 0
+      );
+    });
+    // The spacer is the content's last child, sized to the card it clears.
+    const spacerHeight = spacers
+      .map(node => (node.props.style as { height: number }).height)
+      .at(-1);
+    expect(spacerHeight).toBeGreaterThanOrEqual(100);
 
     const [status] = renderer.root.findAllByType(AccessibleStatus);
     const inner = status?.parent;

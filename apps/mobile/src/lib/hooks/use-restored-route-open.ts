@@ -3,17 +3,24 @@ import { useRef } from 'react';
 import { consumeRestoredRouteOpen } from '@/lib/last-route';
 
 /**
- * Whether the relaunch repair opened this route: the automatic restore marks
- * the stored route it navigates to, and the first screen it reaches takes the
- * mark. A tap or a live link leaves the route unmarked, so the screen keeps its
- * own answer for it.
+ * Whether the relaunch repair opened the route now on screen: the automatic
+ * restore marks the stored route it navigates to, and the first screen it
+ * reaches takes the mark. A tap or a live link leaves the route unmarked, so
+ * the screen keeps its own answer for it.
  *
- * The mark is taken once per mount, before the screen knows how its read
- * settles; a later render of the same route must not read the mark again, or a
- * state that arrives after the first frame would lose it.
+ * The answer is latched per route, not per mount. The navigator reuses a route
+ * instance when it opens the same route name with other params — the session
+ * screen already resets its own open clock and rendered guard for that case —
+ * so a mount-only latch would keep the previous session's answer: a restored
+ * open would stay "restored" for the next session the person picks, and a
+ * screen mounted before the repair navigated would never see the mark at all.
+ * The mark itself is one-shot, so the second route on an instance asks and
+ * reads "not restored".
  */
 export function useRestoredRouteOpen(pathname: string): boolean {
-  const marked = useRef<boolean | null>(null);
-  marked.current ??= consumeRestoredRouteOpen(pathname);
-  return marked.current;
+  const answered = useRef<{ pathname: string; restored: boolean } | null>(null);
+  if (answered.current === null || answered.current.pathname !== pathname) {
+    answered.current = { pathname, restored: consumeRestoredRouteOpen(pathname) };
+  }
+  return answered.current.restored;
 }

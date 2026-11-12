@@ -40,8 +40,10 @@ export function resolveTranscriptRideUp(chromeGrowth: number): number {
  * `chromeGrowth` of the content, which the reader can only reach again by
  * shrinking the draft. The alternative — releasing the shift when the reader
  * leaves the bottom — moves every row by the growth in one frame, and no scroll
- * command can compensate in time; the growth is bounded by the composer's own
- * cap, so the strip is at most one and a half lines.
+ * command can compensate in time. The composer's input stops at its own cap
+ * (124 dp) and its one-line floor is about 44 dp, so the strip is at most the
+ * difference between them: roughly four collapsed lines, and only while the
+ * draft that holds them is unsent.
  */
 export type TranscriptFrame = Readonly<{ holder: ViewStyle; content: ViewStyle }>;
 

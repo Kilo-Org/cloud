@@ -1069,8 +1069,11 @@ jobs:
     # Postgres and Durable Object regressions' inputs. Each step below reads the
     # subject it needs, so a run that only one of them starts skips the other's
     # steps. A web-source diff matches neither, and the required `test` job
-    # passes this skipped job.
-    if: needs.changes.outputs.test_scripts == 'true' || needs.changes.outputs.test_scripts_db == 'true' || contains(fromJSON(needs.changes.outputs.affected).packages, 'container-usage-meter')
+    # passes this skipped job. The gate names no detector answer: a change that
+    # widens the selection, such as a workflow edit, reads nothing these suites
+    # cover, so it must not start them. The meter step alone still follows the
+    # detector, for the package selection a dependency-driven answer reports.
+    if: needs.changes.outputs.test_scripts == 'true' || needs.changes.outputs.test_scripts_db == 'true'
     # The Postgres regressions ran on the large runner in the job this one
     # replaces. The builder cleanup test drives two claims against the same
     # rows, so keep the runner it was written for.

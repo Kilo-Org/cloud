@@ -77,7 +77,7 @@ export function SessionSandboxSection({
         )
   );
   const removeSnapshot = useMutation({
-    mutationFn: async () => {
+    mutationFn: () => {
       if (organizationId) {
         return trpcClient.organizations.cloudAgentNext.removeWorkspaceSnapshot.mutate({
           sessionId,

@@ -2,7 +2,7 @@
 // oxlint-disable max-lines — gate teardown proof adds one mounted-hook test alongside existing module-level tests
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => {
   const client = {
@@ -587,6 +587,72 @@ describe('client reuse across gate re-runs', () => {
 
     renderer.unmount();
     vi.useRealTimers();
+  });
+});
+
+describe('consent level reaches Appsflyer in a development build', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.device.deviceType = 1;
+    hoisted.appsFlyer.create.mockResolvedValue(undefined);
+    vi.useFakeTimers();
+    // A dev build evaluates flags only against an explicit dev host and never
+    // captures, so the capture flag cannot carry a consent change to Appsflyer.
+    vi.stubGlobal('__DEV__', true);
+    process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST = 'http://127.0.0.1:8123';
+  });
+
+  afterEach(() => {
+    delete process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST;
+    vi.stubGlobal('__DEV__', false);
+    vi.useRealTimers();
+  });
+
+  it('starts Appsflyer when optional analytics is turned on for a dev flags client', async () => {
+    const gate = await loadPostHogWithGate();
+
+    type GateState = Parameters<typeof gate.useAnalyticsConsentGate>[0];
+    function GateWrapper(props: GateState): null {
+      gate.useAnalyticsConsentGate(props);
+      return null;
+    }
+
+    const state: GateState = {
+      hasToken: true,
+      ...SETTLED,
+      consentChecked: true,
+      needsConsent: false,
+      email: 'test@test.com',
+      accountId: 'test-account',
+      optionalConsent: false,
+    };
+
+    const renderer = TestRenderer.create(createElement(GateWrapper, state));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await vi.advanceTimersByTimeAsync(120);
+
+    expect(hoisted.holder.options).toMatchObject({ defaultOptIn: false });
+    expect(hoisted.appsFlyer.create).not.toHaveBeenCalled();
+
+    // The user turns optional analytics on for the same account.
+    renderer.update(createElement(GateWrapper, { ...state, optionalConsent: true }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await vi.advanceTimersByTimeAsync(120);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(hoisted.appsFlyer.create).toHaveBeenCalledTimes(1);
+    expect(hoisted.appsFlyer.setConsentData).toHaveBeenCalledWith(
+      expect.objectContaining({ hasConsentForDataUsage: true })
+    );
+
+    renderer.unmount();
   });
 });
 

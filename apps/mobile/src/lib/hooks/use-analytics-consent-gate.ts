@@ -4,7 +4,6 @@ import {
   discardPostHog,
   identifyUser,
   initPostHog,
-  isCaptureAllowed,
   livePostHogClient,
   resumePostHog,
 } from '@/lib/analytics/posthog';
@@ -46,9 +45,11 @@ async function discardOptionalTelemetry(epoch: number): Promise<void> {
  * Bring telemetry up for the signed-in account once the user has answered the
  * consent screen. The client only needs rebuilding when what it was built for
  * changes: another account (a different controller generation) or another
- * capture level. An unchanged build keeps its client and its queued events, and
- * a caller that only learned the email a moment later identifies the running
- * client instead.
+ * optional-consent level. The consent level, not the derived capture flag, is
+ * the key: a development build cannot capture either way, and a consent change
+ * still has to reach Appsflyer. An unchanged build keeps its client and its
+ * queued events, and a caller that only learned the email a moment later
+ * identifies the running client instead.
  *
  * When a rebuild is needed, a client already running under another account, or
  * another consent state, is torn down first: its queue may hold events the
@@ -68,7 +69,7 @@ async function startTelemetry(epoch: number, email: string | undefined): Promise
   if (
     live &&
     live.generation === currentGeneration() &&
-    live.captureAllowed === isCaptureAllowed()
+    live.optionalConsent === allowsOptional()
   ) {
     if (email !== undefined && live.identifiedEmail !== email) {
       identifyUser(email);

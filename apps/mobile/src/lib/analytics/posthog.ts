@@ -87,9 +87,10 @@ let client: PostHog | null = null;
 /** Generation that created the client. Stale events from a prior account
  *  are dropped — they must not transmit under the new identity. */
 let clientGeneration: number | null = null;
-/** Capture level the live client was built with. A caller that wants a
- *  different level needs a new client; the same level does not. */
-let clientCaptureAllowed = false;
+/** Optional-analytics consent level the live client was built for. A caller
+ *  that wants a different level needs a new client: Appsflyer init and the
+ *  capture options both follow it. */
+let clientOptionalConsent = false;
 /** Account email the live client was identified with, undefined until
  *  `identifyUser` runs. */
 let clientIdentifiedEmail: string | undefined = undefined;
@@ -193,9 +194,10 @@ const POSTHOG_HOST = 'https://us.i.posthog.com';
 /**
  * Whether this build and this account's consent allow any capture. A
  * development build never captures, even when it evaluates flags against a dev
- * host.
+ * host. The reuse key is the consent level, not this: a dev build cannot capture
+ * either way, and reuse must still notice a consent change.
  */
-export function isCaptureAllowed(): boolean {
+function isCaptureAllowed(): boolean {
   return allowsOptional() && !__DEV__;
 }
 
@@ -203,7 +205,8 @@ export function isCaptureAllowed(): boolean {
 export type LivePostHogClient = Readonly<{
   /** Controller generation the client was built for; another generation is another account. */
   generation: number;
-  captureAllowed: boolean;
+  /** Optional-analytics consent the client was built for. */
+  optionalConsent: boolean;
   identifiedEmail: string | undefined;
 }>;
 
@@ -218,7 +221,7 @@ export function livePostHogClient(): LivePostHogClient | null {
   }
   return {
     generation: clientGeneration,
-    captureAllowed: clientCaptureAllowed,
+    optionalConsent: clientOptionalConsent,
     identifiedEmail: clientIdentifiedEmail,
   };
 }
@@ -276,7 +279,7 @@ export function initPostHog(): void {
     customStorage: posthogCustomStorage,
   });
   clientGeneration = currentGeneration();
-  clientCaptureAllowed = captureAllowed;
+  clientOptionalConsent = allowsOptional();
   clientIdentifiedEmail = undefined;
   notifyPostHogReady();
   // Super property on every event so dashboards can filter mobile vs web
@@ -429,7 +432,7 @@ export async function discardPostHog(): Promise<void> {
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- see comment above: guards against a client that violates its own type's contract
     if (typeof c?.setPersistedProperty !== 'function') {
       client = null;
-      clientCaptureAllowed = false;
+      clientOptionalConsent = false;
       clientIdentifiedEmail = undefined;
       notifyPostHogReady();
       return;
@@ -447,7 +450,7 @@ export async function discardPostHog(): Promise<void> {
     // Ready listeners persist — they must observe both the false transition
     // now and a true transition from a later initPostHog.
     client = null;
-    clientCaptureAllowed = false;
+    clientOptionalConsent = false;
     clientIdentifiedEmail = undefined;
     notifyPostHogReady();
 

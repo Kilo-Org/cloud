@@ -636,7 +636,7 @@ describe('livePostHogClient', () => {
     initPostHog();
     expect(livePostHogClient()).toEqual({
       generation: 0,
-      captureAllowed: true,
+      optionalConsent: true,
       identifiedEmail: undefined,
     });
 
@@ -647,12 +647,29 @@ describe('livePostHogClient', () => {
     expect(livePostHogClient()).toBeNull();
   });
 
-  it('reports the capture level the client was built with', async () => {
+  it('reports the optional-consent level the client was built with', async () => {
     hoisted.controller.allowsOptional.mockReturnValue(false);
     const { initPostHog, livePostHogClient } = await loadModule();
     initPostHog();
 
-    expect(livePostHogClient()?.captureAllowed).toBe(false);
+    expect(livePostHogClient()?.optionalConsent).toBe(false);
+  });
+
+  it('records the consent level a development build cannot capture', async () => {
+    // A dev build captures nothing even with a dev host, so the captured flag
+    // says false either way; the recorded level must still follow consent.
+    vi.stubGlobal('__DEV__', true);
+    process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST = 'http://127.0.0.1:8123';
+    try {
+      const { initPostHog, livePostHogClient } = await loadModule();
+      initPostHog();
+
+      expect(hoisted.holder.options).toMatchObject({ defaultOptIn: false });
+      expect(livePostHogClient()?.optionalConsent).toBe(true);
+    } finally {
+      delete process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST;
+      vi.stubGlobal('__DEV__', false);
+    }
   });
 });
 

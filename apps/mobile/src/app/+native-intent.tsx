@@ -84,8 +84,11 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/button-label-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/button-label-fixture';
     }
-    if (/(?:^|\/)dev\/session-row-fixture\/?(?:[?#].*)?$/.test(path)) {
-      return '/(auth)/session-row-fixture';
+    // The fixture reads `lang` and `rows` from the query, so it forwards them:
+    // a Hindi inspection is the default and another catalog is one link away.
+    const sessionRowFixture = /(?:^|\/)dev\/session-row-fixture\/?(\?.*)?$/.exec(path);
+    if (sessionRowFixture) {
+      return `/(auth)/session-row-fixture${sessionRowFixture[1] ?? ''}`;
     }
     if (/(?:^|\/)dev\/system-search-unresolved-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/system-search-unresolved-fixture';

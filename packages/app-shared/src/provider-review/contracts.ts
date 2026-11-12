@@ -2,10 +2,12 @@
  * Provider-discriminated identity and DTO contracts for the PR/MR review
  * layer (GitHub, GitLab, Bitbucket).
  *
- * This module is pure vocabulary: types plus one canonical key function.
- * No behavior, no I/O. The server mappers (s2–s4), the router, and the
- * mobile presentation all derive their shapes from here, so a provider
- * difference never leaks past its mapper.
+ * This module is pure vocabulary: the provider types plus two pure key
+ * helpers, `providerPrRefKey` and `gitlabInstanceOrigin`. The helpers only
+ * build and fold strings; they perform no I/O and hold no state, so identity
+ * normalization belongs here rather than in a mapper. The server mappers
+ * (s2–s4), the router, and the mobile presentation all derive their shapes
+ * from here, so a provider difference never leaks past its mapper.
  */
 
 import type { CodeReviewPlatform } from '../code-review/enums';
@@ -152,7 +154,28 @@ export type ProviderPrSummary = {
   updatedAt: string;
 };
 
-/** One changed file in the files page. `patch` is null when the provider omits it. */
+/**
+ * One changed file in the files page.
+ *
+ * `status` is the provider's own change vocabulary, passed through rather than
+ * normalized: GitHub sends its file status (`added`, `removed`, `modified`,
+ * `renamed`, `copied`, `changed`), GitLab derives `added`, `deleted`,
+ * `renamed` or `modified` from its per-file flags, and Bitbucket sends the
+ * diffstat status it returned. The presentation maps the words it knows and
+ * renders an unknown word verbatim.
+ *
+ * `patch` is the unified diff the provider returned for the file, or null
+ * when it returned none.
+ *
+ * `patchMissing` is the presentation's "nothing to render" flag: true when
+ * the file has no usable diff — the provider omitted the patch (GitHub drops
+ * it for binary and oversized files), the diff is empty (a binary file), or
+ * the read carries no patch at all (Bitbucket's diffstat). The rows then show
+ * the "diff too large" copy and the provider's own diff instead of hunks.
+ * Each mapper sets it from the patch it produced, so today `patchMissing` is
+ * true exactly when `patch` is null; a consumer that only asks whether hunks
+ * exist can test either.
+ */
 export type ProviderPrFile = {
   path: string;
   previousPath: string | null;

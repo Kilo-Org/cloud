@@ -1268,7 +1268,7 @@
       "costSpoken": "비용 {{cost}}",
       "costSpokenWithTime": "비용 {{cost}}, {{time}}",
       "pullRequest": "풀 리퀘스트 {{number}}",
-      "spokenJoiner": "및"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenMessage": "GitHub 앱 설정을 시작하지 못했습니다. 다시 시도하세요.",
@@ -2167,6 +2167,8 @@
     "retryHint": "Kilo Pass 상태를 다시 확인합니다.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "지금은 Kilo Pass를 구매할 수 없습니다.",
+    "purchaseUnavailableTitle": "지금은 구매할 수 없음",
+    "purchaseUnavailableEnded": "Kilo Pass가 종료되었습니다.",
     "kiloPassManagement": "Kilo Pass 관리",
     "kiloPassSetup": "Kilo Pass 설정",
     "subscriptionHeaderDescription": "Kilo 앱에서 AI 코딩 세션을 실행하기 위해 Kilo 잔액에 크레딧을 추가하는 월간 구독.",

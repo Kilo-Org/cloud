@@ -105,14 +105,23 @@ it.each([
 });
 
 it.each([
-  [undefined, 3600],
-  [300, 300],
-  [7200, 3600],
-  [5 * 365 * 24 * 60 * 60, 3600],
+  [false, undefined, 3600],
+  [false, 300, 300],
+  [false, 7200, 3600],
+  [false, 5 * 365 * 24 * 60 * 60, 3600],
+  [true, undefined, 3600],
+  [true, 300, 300],
+  [true, 7200, 3600],
+  [true, 5 * 365 * 24 * 60 * 60, 3600],
 ] as const)(
-  'bounds the legacy gateway token lifetime to one hour (%s -> %s)',
-  (requestedExpiresIn, expectedLifetime) => {
-    const user = { id: 'oauth/legacy-bounded', api_token_pepper: 'legacy-bounded-pepper' } as User;
+  'bounds the gateway token lifetime to one hour (modern: %s, %s -> %s)',
+  (modern, requestedExpiresIn, expectedLifetime) => {
+    if (modern) {
+      process.env[master] = 'true';
+      process.env[families['workflow-gateway']] = 'true';
+    }
+    expect(isResourceTokenIssuanceEnabled('workflow-gateway')).toBe(modern);
+    const user = { id: 'oauth/bounded', api_token_pepper: 'bounded-pepper' } as User;
     const gateway = jwt.decode(
       generateWorkflowGatewayToken(user, {
         organizationId: 'organization-id',
@@ -120,8 +129,8 @@ it.each([
         expiresIn: requestedExpiresIn,
       })
     ) as jwt.JwtPayload;
-    expect(gateway.aud).toBeUndefined();
-    expect(gateway.tokenPurpose).toBeUndefined();
+    expect(gateway.aud).toBe(modern ? 'kilo-gateway' : undefined);
+    expect(gateway.tokenPurpose).toBe(modern ? 'delegated-workload' : undefined);
     expect(gateway.organizationId).toBe('organization-id');
     expect(gateway.exp! - gateway.iat!).toBe(expectedLifetime);
   }
@@ -134,6 +143,7 @@ it.each([false, true])(
       process.env[master] = 'true';
       process.env[families['workflow-gateway']] = 'true';
     }
+    expect(isResourceTokenIssuanceEnabled('workflow-gateway')).toBe(modern);
     const user = { id: 'oauth/nonpositive', api_token_pepper: 'nonpositive-pepper' } as User;
     for (const expiresIn of [0, -60]) {
       expect(() =>

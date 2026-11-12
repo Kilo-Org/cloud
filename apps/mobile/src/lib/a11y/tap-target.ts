@@ -511,17 +511,6 @@ export function tapTargetReachDp(boxDp: number, slopDp: number): number {
 }
 
 /**
- * Hit slop per side of the composer's `lg` voice toggle, in dp, unchanged from
- * the value the toggle already shipped with. `lg` is `h-10 w-10`, i.e. 35dp at
- * NativeWind's 14pt rem, so the slop is what widens its tap area past the
- * {@link MIN_TAP_TARGET_DP} audited frame floor. The composer input row keeps
- * the toggle's leading neighbour one `COMPOSER_CONTROL_GAP_DP` away, which has
- * to exceed this slop plus the row's own or the two tap areas overlap
- * (`chat-composer-input-row.tsx`).
- */
-export const VOICE_INPUT_LG_HIT_SLOP_DP = 4;
-
-/**
  * Hit slop per side the agent composer's input row gives the controls it owns
  * (the newline control and the send/stop control), in dp: the value the row
  * already shipped with. Their frames are already 44pt (iOS) / 48dp (Android),
@@ -532,35 +521,38 @@ export const COMPOSER_CONTROL_HIT_SLOP_DP = 6;
 /**
  * Leading gap between adjacent controls in the agent composer's input row, in
  * dp: the `ms-3` class is 0.75rem at NativeWind's 14pt rem, the same width as
- * the row's own `px-3` gutter. It has to carry the two facing hit slops, or the
- * neighbours' tap areas overlap and a tap between them cannot be told apart
- * (spot check e1 / e1-en-two-msg: with no gap at all the microphone and the
- * send/stop circles merged into one shape).
+ * the row's own `px-3` gutter. It has to carry the row's facing hit slop, or
+ * the neighbours' tap areas overlap and a tap between them cannot be told
+ * apart (spot check e1 / e1-en-two-msg: with no gap at all the microphone and
+ * the send/stop circles merged into one shape).
  */
 export const COMPOSER_CONTROL_GAP_DP = 10.5;
 
 /**
  * Clearance between the tap areas of two adjacent composer input-row controls,
- * in dp: the row's gap less the voice toggle's slop and the row's own slop. A
- * positive value means the two tap areas never overlap.
+ * in dp: the row's gap less the row's own slop. The voice toggle renders its
+ * whole target as its own {@link ICON_TARGET_DP} box
+ * ({@link ICON_TARGET_BOX_CLASS}), so it adds no slop of its own. A positive
+ * value means the two tap areas never overlap.
  */
 export function composerControlClearanceDp(): number {
-  return COMPOSER_CONTROL_GAP_DP - VOICE_INPUT_LG_HIT_SLOP_DP - COMPOSER_CONTROL_HIT_SLOP_DP;
+  return COMPOSER_CONTROL_GAP_DP - COMPOSER_CONTROL_HIT_SLOP_DP;
 }
 
 /**
  * Leading gap of the send/stop control when the voice toggle sits before it:
  * `ms-1` is 3.5dp (0.25rem at NativeWind's 14pt rem). The gap is narrower than
- * the facing slops, so both controls zero the side that faces the other
- * ({@link composerFacingHitSlop}). It stays above zero because the idle toggle
- * (`bg-secondary`) and the empty-input send (`bg-muted`) share one colour:
- * flush, the two circles read as one shape.
+ * the row's own slop, so the send control zeroes the side that faces the toggle
+ * ({@link composerFacingHitSlop}); the toggle's box carries no slop at all. It
+ * stays above zero because a live session fills the toggle's whole box, and a
+ * filled box flush against the send control's filled circle would read as one
+ * shape.
  */
 export const COMPOSER_VOICE_SEND_GAP_CLASS = 'ms-1';
 
 /**
  * Per-side `hitSlop` with the side that faces the closer neighbour set to 0, so
- * the voice toggle and the send/stop control keep separate tap areas across
+ * a control and its neighbour keep separate tap areas across
  * {@link COMPOSER_VOICE_SEND_GAP_CLASS}. `facing` is logical and `hitSlop` is
  * physical: the row mirrors in RTL, so the `end` side is the left edge there.
  */

@@ -1851,7 +1851,7 @@
       "costSpoken": "cost de {{cost}}",
       "costSpokenWithTime": "costul este {{cost}}, {{time}}",
       "pullRequest": "PR {{number}}",
-      "spokenJoiner": "și"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nu s-a putut deschide GitHub",
@@ -2762,6 +2762,8 @@
     "retryHint": "Încearcă din nou să încarce starea Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Kilo Pass nu poate fi achiziționat în acest moment.",
+    "purchaseUnavailableTitle": "Indisponibil în acest moment",
+    "purchaseUnavailableEnded": "Kilo Pass-ul tău s-a încheiat.",
     "kiloPassManagement": "Gestionarea Kilo Pass",
     "kiloPassSetup": "Configurarea Kilo Pass",
     "subscriptionHeaderDescription": "Un abonament lunar care adaugă credite la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App.",

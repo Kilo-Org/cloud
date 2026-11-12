@@ -1810,7 +1810,7 @@
       "costSpoken": "pris {{cost}}",
       "costSpokenWithTime": "pris {{cost}}, {{time}}",
       "pullRequest": "PR {{number}}",
-      "spokenJoiner": "og"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunne ikke åbne GitHub",
@@ -2709,6 +2709,8 @@
     "retryHint": "Prøver at indlæse status for Kilo Pass igen.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Du kan ikke købe Kilo Pass lige nu.",
+    "purchaseUnavailableTitle": "Ikke tilgængelig lige nu",
+    "purchaseUnavailableEnded": "Dit Kilo Pass er udløbet.",
     "kiloPassManagement": "Kilo Pass-administration",
     "kiloPassSetup": "Kilo Pass-opsætning",
     "subscriptionHeaderDescription": "Et månedligt abonnement, der tilføjer kreditter til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App.",

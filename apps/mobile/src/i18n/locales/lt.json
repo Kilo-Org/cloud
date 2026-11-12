@@ -1892,7 +1892,7 @@
       "costSpoken": "kaina {{cost}}",
       "costSpokenWithTime": "kaina {{cost}}, {{time}}",
       "pullRequest": "pakeitimų užklausa {{number}}",
-      "spokenJoiner": "ir"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nepavyko atidaryti GitHub",
@@ -2815,6 +2815,8 @@
     "retryHint": "Bando iš naujo gauti Kilo Pass būseną.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Šiuo metu Kilo Pass įsigyti negalima.",
+    "purchaseUnavailableTitle": "Šiuo metu nepasiekiama",
+    "purchaseUnavailableEnded": "Jūsų Kilo Pass prenumerata baigėsi.",
     "kiloPassManagement": "Kilo Pass valdymas",
     "kiloPassSetup": "Kilo Pass sąranka",
     "subscriptionHeaderDescription": "Mėnesinė prenumerata, kuri prideda kreditų prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje.",

@@ -72,14 +72,67 @@ const mockDelete = jest.fn<(input: { environmentId: string }) => Promise<void>>(
   }
 );
 
+type StartSetupInput = {
+  repositories: CreateInput['repositories'];
+  requirements: string;
+  model: string;
+  targetEnvironmentId?: string;
+};
+
+let mockSetupCanStart = false;
+const mockStartSetup = jest.fn<(input: StartSetupInput) => Promise<{ kiloSessionId: string }>>(
+  async () => ({ kiloSessionId: 'ses_setup' })
+);
+const mockRouterPush = jest.fn();
+const setupModel = 'anthropic/claude-sonnet-4.5';
+
 jest.mock('@/hooks/useEnvironmentSetupRuns', () => ({
   useEnvironmentSetupRunsForEnvironment: () => ({ data: [] }),
   isOpenEnvironmentSetupRun: () => false,
-  useEnvironmentSetupEnabled: () => ({ data: { enabled: false, canStart: false } }),
-  useEnvironmentSetupRunMutations: () => ({
-    resolveSecretRequests: { isPending: false, mutateAsync: jest.fn() },
+  useEnvironmentSetupEnabled: () => ({
+    data: { enabled: true, canStart: mockSetupCanStart },
+    isLoading: false,
+  }),
+  useEnvironmentSetupRunMutations: () => {
+    const react = jest.requireActual<typeof React>('react');
+    const [isPending, setPending] = react.useState(false);
+    const mutateAsync = async (input: StartSetupInput) => {
+      setPending(true);
+      try {
+        return await mockStartSetup(input);
+      } finally {
+        setPending(false);
+      }
+    };
+    return {
+      resolveSecretRequests: { isPending: false, mutateAsync: jest.fn() },
+      start: { isPending, mutateAsync },
+    };
+  },
+}));
+
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockRouterPush }),
+}));
+
+jest.mock('@/app/api/organizations/hooks', () => ({
+  useOrganizationDefaults: () => ({ data: { defaultModel: setupModel } }),
+}));
+
+jest.mock('@/lib/hooks/use-openrouter-models', () => ({
+  useModelSelectorList: () => ({
+    data: { data: [{ id: setupModel, name: 'Claude Sonnet 4.5', isFree: false }] },
+    isLoading: false,
   }),
 }));
+
+jest.mock('@/lib/hooks/use-model-preferences', () => ({
+  useModelPreferences: () => ({ lastSelected: null, setLastSelected: jest.fn() }),
+}));
+
+jest.mock('@/components/shared/ModelCombobox', () => ({ ModelCombobox: () => null }));
+
+jest.mock('@/components/shared/VariantCombobox', () => ({ VariantCombobox: () => null }));
 
 jest.mock('@/hooks/useCloudAgentEnvironments', () => {
   const react = jest.requireActual<typeof React>('react');
@@ -279,6 +332,9 @@ beforeEach(() => {
     },
   ];
   nextCreatedId = 'env-created';
+  mockSetupCanStart = false;
+  mockStartSetup.mockClear();
+  mockRouterPush.mockClear();
   mockDetailErrorId = null;
   mockListHasData = true;
   mockListLoading = false;
@@ -402,6 +458,7 @@ const { EnvironmentsSection } = require('./EnvironmentsSection') as {
     organizationId?: string;
     canManage: boolean;
     active?: boolean;
+    onSetupStarted?: () => void;
   }>;
 };
 bootstrapDom.cleanup();
@@ -479,6 +536,39 @@ function setInputValue(input: HTMLInputElement, value: string): void {
     setter.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
+function setTextareaValue(textarea: HTMLTextAreaElement, value: string): void {
+  let prototype: object | null = Object.getPrototypeOf(textarea);
+  let setter: ((next: string) => void) | undefined;
+  while (prototype && !setter) {
+    setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+    prototype = Object.getPrototypeOf(prototype);
+  }
+  if (!setter) throw new Error('Textarea value setter not found');
+  const set = setter;
+  act(() => {
+    set.call(textarea, value);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+function draftRow(container: ParentNode): Element | null {
+  return container.querySelector('[aria-current="true"]');
+}
+
+/** linkedom does not submit a form when its submit button is clicked. */
+async function submitWith(container: ParentNode, text: string): Promise<void> {
+  const button = findButton(container, text);
+  if (!button) throw new Error(`button not found: ${text}`);
+  expect(button.type).toBe('submit');
+  expect(button.disabled).toBe(false);
+  const form = button.closest('form');
+  if (!form) throw new Error(`form not found for: ${text}`);
+  await act(async () => {
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await Promise.resolve();
   });
 }
 
@@ -931,6 +1021,215 @@ describe('EnvironmentsSection inline detail pane', () => {
       expect(mounted.container.querySelector<HTMLInputElement>('#environment-name')?.value).toBe(
         'Other Environment'
       );
+    } finally {
+      mounted.cleanup();
+    }
+  });
+});
+
+describe('EnvironmentsSection new environment draft row', () => {
+  test('lists a new environment as a draft row until it is discarded', () => {
+    const mounted = mount(renderSection(true));
+    try {
+      expect(draftRow(mounted.container)).toBeNull();
+      clickButton(mounted.container, 'Kilo-Org/new-repo');
+
+      const row = draftRow(mounted.container);
+      expect(row?.textContent).toContain('New environment');
+      expect(row?.textContent).toContain('Draft');
+      expect(row?.textContent).toContain('Kilo-Org/new-repo');
+      expect(selectedLabel(mounted.container)).toBeNull();
+
+      click(mounted.container.querySelector('[aria-label="Discard new environment"]'));
+
+      expect(draftRow(mounted.container)).toBeNull();
+      expect(selectedLabel(mounted.container)).toBe('Edit environment Kilo Environment');
+    } finally {
+      mounted.cleanup();
+    }
+  });
+
+  test('shows the draft row when the owner has no environments yet', () => {
+    mockEnvironments = [];
+    const mounted = mount(renderSection(true));
+    try {
+      expect(mounted.container.textContent).toContain('No environments yet.');
+      clickButton(mounted.container, 'Kilo-Org/new-repo');
+      expect(draftRow(mounted.container)?.textContent).toContain('Kilo-Org/new-repo');
+      expect(mounted.container.textContent).not.toContain('No environments yet.');
+    } finally {
+      mounted.cleanup();
+    }
+  });
+
+  test('the draft row follows repository changes in the new environment form', () => {
+    mockRepoChoices = [
+      ...mockRepoChoices,
+      {
+        platform: 'github',
+        label: 'Kilo-Org/second-repo',
+        repository: { platform: 'github', fullName: 'Kilo-Org/second-repo' },
+      },
+    ];
+    const mounted = mount(renderSection(true));
+    try {
+      clickButton(mounted.container, 'Kilo-Org/new-repo');
+      const addInForm = Array.from(mounted.container.querySelectorAll('button')).filter(button =>
+        button.textContent?.includes('Kilo-Org/second-repo')
+      );
+      click(addInForm.at(-1));
+
+      expect(draftRow(mounted.container)?.textContent).toContain('Kilo-Org/second-repo');
+    } finally {
+      mounted.cleanup();
+    }
+  });
+});
+
+describe('EnvironmentsSection with agent setup', () => {
+  beforeEach(() => {
+    mockSetupCanStart = true;
+  });
+
+  test('a new environment opens the agent composer and starts setup from it', async () => {
+    const onSetupStarted = jest.fn();
+    const mounted = mount(
+      React.createElement(EnvironmentsSection, { canManage: true, onSetupStarted })
+    );
+    try {
+      clickButton(mounted.container, 'Kilo-Org/new-repo');
+
+      expect(mounted.container.textContent).toContain('What should this environment run?');
+      expect(mounted.container.querySelector('#environment-name')).toBeNull();
+      expect(findButton(mounted.container, 'Save environment')).toBeUndefined();
+      expect(draftRow(mounted.container)?.textContent).toContain('Kilo-Org/new-repo');
+
+      const guidance = mounted.container.querySelector<HTMLTextAreaElement>('textarea');
+      if (!guidance) throw new Error('guidance textarea not found');
+      setTextareaValue(guidance, 'Run the API tests.');
+      await submitWith(mounted.container, 'Start setup');
+
+      expect(mockStartSetup).toHaveBeenCalledTimes(1);
+      const input = mockStartSetup.mock.calls[0][0];
+      expect(input).toMatchObject({
+        repositories: [{ platform: 'github', fullName: 'Kilo-Org/new-repo' }],
+        requirements: 'Run the API tests.',
+        model: setupModel,
+      });
+      expect(input.targetEnvironmentId).toBeUndefined();
+      expect(onSetupStarted).toHaveBeenCalledTimes(1);
+      expect(mockRouterPush).toHaveBeenCalledWith('/cloud/chat?sessionId=ses_setup');
+      expect(draftRow(mounted.container)).toBeNull();
+    } finally {
+      mounted.cleanup();
+    }
+  });
+
+  test('the list is usable again after a started setup closes the draft', async () => {
+    const started = Promise.withResolvers<{ kiloSessionId: string }>();
+    mockStartSetup.mockImplementationOnce(() => started.promise);
+    const mounted = mount(renderSection(true));
+    try {
+      clickButton(mounted.container, 'Kilo-Org/new-repo');
+      await submitWith(mounted.container, 'Start setup');
+      expect(findButton(mounted.container, 'Add environment')?.disabled).toBe(true);
+      expect(findButton(mounted.container, 'Discard')?.disabled).toBe(true);
+
+      await act(async () => {
+        started.resolve({ kiloSessionId: 'ses_setup' });
+        await started.promise;
+      });
+
+      expect(draftRow(mounted.container)).toBeNull();
+      expect(findButton(mounted.container, 'Add environment')?.disabled).toBe(false);
+    } finally {
+      started.resolve({ kiloSessionId: 'ses_setup' });
+      mounted.cleanup();
+    }
+  });
+
+  test('Configure manually switches the draft to the manual form', async () => {
+    const mounted = mount(renderSection(true));
+    try {
+      clickButton(mounted.container, 'Kilo-Org/new-repo');
+      clickButton(mounted.container, 'Configure manually');
+
+      expect(mounted.container.textContent).not.toContain('What should this environment run?');
+      expect(mounted.container.querySelector('#environment-name')).not.toBeNull();
+      expect(draftRow(mounted.container)).not.toBeNull();
+
+      await clickButtonAndFlush(mounted.container, 'Save environment');
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(mockStartSetup).not.toHaveBeenCalled();
+      expect(draftRow(mounted.container)).toBeNull();
+    } finally {
+      mounted.cleanup();
+    }
+  });
+
+  test('a repository that the agent cannot set up opens the manual form directly', () => {
+    mockRepoChoices = [
+      {
+        platform: 'gitlab',
+        label: 'group/project',
+        repository: { platform: 'gitlab', projectPath: 'group/project' },
+      },
+    ];
+    const mounted = mount(renderSection(true));
+    try {
+      clickButton(mounted.container, 'group/project');
+      expect(mounted.container.textContent).not.toContain('What should this environment run?');
+      expect(mounted.container.querySelector('#environment-name')).not.toBeNull();
+    } finally {
+      mounted.cleanup();
+    }
+  });
+
+  test('an existing environment offers Update with agent instead of a setup method choice', async () => {
+    const mounted = mount(renderSection(true));
+    try {
+      expect(findButton(mounted.container, 'Update with agent')).toBeDefined();
+      expect(mounted.container.textContent).not.toContain('Setup method');
+      expect(mounted.container.querySelector('input[type="radio"]')).toBeNull();
+      expect(findButton(mounted.container, 'Save environment')).toBeDefined();
+
+      const request = mounted.container.querySelector<HTMLTextAreaElement>(
+        'textarea[placeholder^="For example: add Playwright"]'
+      );
+      if (!request) throw new Error('update request textarea not found');
+      setTextareaValue(request, 'Add Playwright browsers.');
+      await submitWith(mounted.container, 'Start update');
+
+      expect(mockStartSetup).toHaveBeenCalledTimes(1);
+      expect(mockStartSetup.mock.calls[0][0]).toMatchObject({
+        targetEnvironmentId: 'env-1',
+        repositories: [{ platform: 'github', fullName: 'Kilo-Org/kilocode' }],
+        requirements: 'Add Playwright browsers.',
+      });
+    } finally {
+      mounted.cleanup();
+    }
+  });
+
+  test('unsaved edits block an agent update until they are saved', () => {
+    const mounted = mount(renderSection(true));
+    try {
+      expect(findButton(mounted.container, 'Start update')?.disabled).toBe(false);
+      const input = mounted.container.querySelector<HTMLInputElement>('#environment-name');
+      if (!input) throw new Error('environment name input not found');
+      setInputValue(input, 'Edited environment');
+
+      expect(findButton(mounted.container, 'Start update')?.disabled).toBe(true);
+      expect(mounted.container.textContent).toContain('Save your changes first.');
+    } finally {
+      mounted.cleanup();
+    }
+  });
+
+  test('members do not see agent actions', () => {
+    const mounted = mount(renderSection(false));
+    try {
+      expect(findButton(mounted.container, 'Update with agent')).toBeUndefined();
     } finally {
       mounted.cleanup();
     }

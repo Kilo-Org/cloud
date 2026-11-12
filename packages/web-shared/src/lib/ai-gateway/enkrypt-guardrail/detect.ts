@@ -419,7 +419,6 @@ export async function scanRequest(
   const { text, config, coverage } = scan;
   const kind = scanKind(config);
   const scope: ScanScope = {
-    kind,
     logFields: { ...scanLogFields(scan), ...(coverage.chunk ? { chunk: coverage.chunk } : {}) },
     report: {
       scan: kind,
@@ -554,7 +553,6 @@ export async function scanRequest(
 }
 
 type ScanScope = {
-  kind: EnkryptScanKind;
   logFields: Record<string, unknown>;
   report: Pick<
     EnkryptScanReport,
@@ -648,14 +646,14 @@ function failedVerdict(
   }
 ): EnkryptGuardrailScanResult {
   const report = scanReport(scope, {
-    decision: failureDecision(scope.kind, failure.error),
+    decision: failureDecision(scope.report.scan, failure.error),
     error: failure.error,
     usageRecords,
     latencyMs: failure.latencyMs,
   });
   logDecision(scope, report);
   return {
-    verdict: failureVerdict(scope.kind, failure),
+    verdict: failureVerdict(scope.report.scan, failure),
     usageRecords:
       failure.error === 'client_aborted'
         ? usageRecords.filter(usageRecord => usageRecord.creditsCost !== null)

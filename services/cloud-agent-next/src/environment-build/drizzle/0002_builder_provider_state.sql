@@ -1,0 +1,1 @@
+ALTER TABLE `builds` ADD `provider_state` text;

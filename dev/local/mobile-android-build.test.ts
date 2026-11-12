@@ -77,20 +77,31 @@ test('Android fingerprint skips only Expo extra beyond defaults', () => {
   assert.equal(options.silent, true);
   assert.notEqual(options.sourceSkips, 0);
   // The generated tree is ignored so the hash is input-deterministic across
-  // worktrees and machines.
-  assert.deepEqual(options.ignorePaths, ['android/**']);
+  // worktrees and machines, and the parts of a local module that never reach
+  // the Android binary stay out of it.
+  assert.deepEqual(options.ignorePaths, [
+    'android/**',
+    'modules/**/ios/**',
+    'modules/*/src/**',
+    'modules/**/*.test.ts',
+  ]);
   assert.deepEqual(
     options.extraSources.map(source => ({
       type: source.type,
       id: source.id,
       contents: source.contents,
+      filePath: source.filePath,
     })),
     [
       {
         type: 'contents',
         id: 'repoRootNativeInputs',
         contents: hashRootNativeInputs(path.resolve(import.meta.dirname, '..', '..')),
+        filePath: undefined,
       },
+      // A local module carries no package.json identity for Expo to hash, so
+      // its Android sources only key a build through this directory.
+      { type: 'dir', id: undefined, contents: undefined, filePath: 'modules' },
     ]
   );
 });

@@ -37091,6 +37091,37 @@
     ],
     "searchBlob": "user.hasGatewayUsage Check whether the current user has any Kilo gateway usage, including organization-scoped requests and zero-cost free-model requests. user hasgatewayusage"
   },
+  "user.invoicesPage": {
+    "path": "user.invoicesPage",
+    "kind": "query",
+    "summary": "Get the signed-in user's personal billing invoices and payment history, optionally limited to a period such as the past week, month, year, or all time. Supports pagination with a cursor and returns invoice entries with a flag and cursor for loading more; users who have never been billed get an empty page.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "period": {
+          "default": "month",
+          "type": "string",
+          "enum": [
+            "week",
+            "month",
+            "year",
+            "all"
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        }
+      }
+    },
+    "tags": [
+      "user",
+      "invoicespage",
+      "period",
+      "cursor"
+    ],
+    "searchBlob": "user.invoicesPage Get the signed-in user's personal billing invoices and payment history, optionally limited to a period such as the past week, month, year, or all time. Supports pagination with a cursor and returns invoice entries with a flag and cursor for loading more; users who have never been billed get an empty page. user invoicespage period cursor period cursor"
+  },
   "user.linkAuthProvider": {
     "path": "user.linkAuthProvider",
     "kind": "mutation",

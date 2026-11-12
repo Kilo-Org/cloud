@@ -212,10 +212,10 @@ describe('remote MCP server connection', () => {
     expect(new Date(result.lastConnectedAt!).getTime()).toBeGreaterThanOrEqual(before);
   });
 
-  it('maps StreamableHTTPError code 401 to needs_auth', async () => {
+  it('maps StreamableHTTPError code 401 to needs_auth with a credentials message', async () => {
     const { StreamableHTTPError } =
       await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
-    mocks.connect.mockRejectedValueOnce(new StreamableHTTPError(401, 'Unauthorized'));
+    mocks.connect.mockRejectedValueOnce(new StreamableHTTPError(401, 'Error POSTing to endpoint:'));
     mocks.close.mockResolvedValueOnce();
 
     const result = await connectRemoteMcpServer({
@@ -224,8 +224,43 @@ describe('remote MCP server connection', () => {
     });
 
     expect(result.status).toBe('needs_auth');
-    expect(result.lastError).toContain('401');
+    // The row must say what is missing, never a bare status code or transport scaffolding.
+    expect(result.lastError).toBe(
+      'This server needs credentials. Add a bearer token, a custom header, or OAuth in Edit.'
+    );
     expect(result.cachedTools).toHaveLength(0);
+  });
+
+  it('reports a network failure as unreachable rather than a raw fetch error', async () => {
+    mocks.connect.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    mocks.close.mockResolvedValueOnce();
+
+    const result = await connectRemoteMcpServer({
+      fetch: noopFetch,
+      server: baseServer(),
+    });
+
+    expect(result.status).toBe('unavailable');
+    expect(result.lastError).toBe(
+      "Kilo couldn't reach this server. Check the URL and that the server is running."
+    );
+  });
+
+  it('keeps the server reason on a server error', async () => {
+    const { StreamableHTTPError } =
+      await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
+    mocks.connect.mockRejectedValueOnce(
+      new StreamableHTTPError(500, 'Error POSTing to endpoint: internal boom')
+    );
+    mocks.close.mockResolvedValueOnce();
+
+    const result = await connectRemoteMcpServer({
+      fetch: noopFetch,
+      server: baseServer(),
+    });
+
+    expect(result.status).toBe('unavailable');
+    expect(result.lastError).toBe('The server is busy. Try again in a moment. internal boom');
   });
 
   it('maps non-401 errors to unavailable', async () => {

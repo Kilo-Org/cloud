@@ -175,6 +175,7 @@ vi.mock('@/components/agents/session-message-list', () => ({
   SessionMessageList: 'SessionMessageList',
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -354,13 +355,12 @@ describe('the chat transcript while it opens', () => {
     expect(messagesOf(tree)).toEqual([]);
     /* Nothing failed, so the chat takes a first message. */
     expect(count(tree, 'ChatComposer')).toBe(1);
-    /* The state is measured against the transcript area it fills, not against
-       the whole window: the measured centring and the first frame's placement
-       then agree, so the state does not lift once the measurement lands. */
-    const surface = tree.root.findAll(node => (node.type as string) === 'StateSurface');
-    expect(surface).toHaveLength(1);
-    expect(surface[0]?.props.className).toBe('flex-1');
-    expect(surface[0]?.findAll(node => (node.type as string) === 'EmptyState')).toHaveLength(1);
+    /* The state centers in the transcript area it fills, not in the whole
+       window: the pending paint and the measured placement then agree from the
+       first frame, so the state does not move when a measurement lands. */
+    const empty = tree.root.find(node => (node.type as string) === 'CenteredState');
+    expect(empty.props.band).toBe('viewport');
+    expect(empty.findAll(node => (node.type as string) === 'EmptyState')).toHaveLength(1);
   });
 
   it.each([

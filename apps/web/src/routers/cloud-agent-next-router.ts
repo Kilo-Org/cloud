@@ -1,3 +1,4 @@
+import { createControlTokenForRequest as createRepositoryAccessToken } from '@/lib/auth/resource-delegation';
 import {
   repositoryAccessChangeSchema,
   repositoryAccessViewSchema,
@@ -955,7 +956,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .output(repositoryAccessViewSchema)
     .query(async ({ ctx, input }) => {
       await assertUserOwnsSession(ctx.user.id, input.sessionId);
-      const { token } = await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+      const { token } = await createRepositoryAccessToken(ctx.user, 'cloud-agent-next', {
         headers: ctx.headersList,
         operation: 'repository-access',
       });
@@ -966,7 +967,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .output(z.object({ changed: z.boolean(), current: repositoryAccessViewSchema }))
     .mutation(async ({ ctx, input }) => {
       await assertUserOwnsSession(ctx.user.id, input.sessionId);
-      const { token } = await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+      const { token } = await createRepositoryAccessToken(ctx.user, 'cloud-agent-next', {
         headers: ctx.headersList,
         operation: 'repository-access',
       });

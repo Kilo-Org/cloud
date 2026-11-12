@@ -565,6 +565,11 @@ describe('idle workspace disk checkpoint', () => {
         await test.session.send(prompt('m2'));
         await test.messageState('m2', 'accepted');
       } else if (change === 'connection') {
+        // A live wrapper keeps its connection, so a replacement attaches only after it closes.
+        wrapper.close();
+        await waitFor(async () =>
+          expect((await test.sandbox.getAllocationState()).kind).toBe('disconnected')
+        );
         const launch = test.launchEnvs[0];
         const next = await FakeWrapper.connect({
           sandboxId: test.registration.sandboxId,

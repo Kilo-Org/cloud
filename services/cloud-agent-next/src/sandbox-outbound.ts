@@ -10,7 +10,11 @@ import {
 } from './scm-broker/authorization.js';
 import { getSafeRequestLogFields, logDiagnostic } from './scm-broker/diagnostics.js';
 import { forwardResolvedScmCapability } from './scm-broker/managed-forwarding.js';
-import { CURRENT_CAPABILITY_PREFIX } from '@kilocode/worker-utils/scm-capability-contract';
+import { forwardUnmanagedScmRequest } from './scm-broker/unmanaged-forwarding.js';
+import {
+  CURRENT_CAPABILITY_PREFIX,
+  GITHUB_TASK_CAPABILITY_PREFIX,
+} from '@kilocode/worker-utils/scm-capability-contract';
 
 export { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
 
@@ -86,7 +90,10 @@ async function handleControlPlaneOutbound(
       return new Response('SCM authorization unavailable', { status: 502 });
     }
     const { credential } = resolved.data;
-    const expectedPrefix = CURRENT_CAPABILITY_PREFIX[capability.provider];
+    const expectedPrefix =
+      capability.provider === 'github'
+        ? GITHUB_TASK_CAPABILITY_PREFIX
+        : CURRENT_CAPABILITY_PREFIX[capability.provider];
     if (
       !credential.startsWith(expectedPrefix) ||
       credential.length === expectedPrefix.length ||
@@ -130,7 +137,7 @@ export function handleManagedScmOutbound(
   if (authorization.type === 'denied') {
     return Promise.resolve(new Response('SCM authorization unavailable', { status: 502 }));
   }
-  if (authorization.type === 'unmanaged') return fetch(request);
+  if (authorization.type === 'unmanaged') return forwardUnmanagedScmRequest(request);
   const capability = authorization.value;
   if (isControlPlaneCredential(capability.capability)) {
     return handleControlPlaneOutbound(request, env, capability, ctx);

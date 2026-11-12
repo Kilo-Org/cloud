@@ -145,6 +145,11 @@ import {
 } from '../../sandbox-placement.js';
 import { sessionDoName } from '../../session-identity.js';
 import { logger } from '../../logger.js';
+import { reserveLogUploadBudget } from '../../log-upload-policy.js';
+import {
+  controlLogIdentitySchema,
+  type ControlLogIdentity,
+} from '../../shared/control-diagnostics.js';
 import {
   diagnosticCause,
   logControlDiagnostic,
@@ -1107,6 +1112,29 @@ export class SandboxControlV2 extends DurableObject<Env> {
       provider: this.currentProvider(),
       configuration: this.providerPin?.configuration ?? null,
     };
+  }
+
+  /** Passive authorization read: log uploads cannot extend allocation liveness. */
+  async isLogUploadAuthorized(identity: ControlLogIdentity): Promise<boolean> {
+    await this.initialized;
+    const parsed = controlLogIdentitySchema.safeParse(identity);
+    if (!parsed.success || parsed.data.sandboxId !== this.sandboxId) return false;
+    const state = await this.readAllocation();
+    // The signed grant binds the diagnostic wrapper ID, which differs from
+    // the connection's wrapper ID and survives wrapper reconnects.
+    return (
+      state.allocationId === parsed.data.allocationId &&
+      state.kind !== 'stopping' &&
+      state.kind !== 'stopped'
+    );
+  }
+
+  async reserveLogUpload(identity: ControlLogIdentity, bytes: number): Promise<boolean> {
+    await this.initialized;
+    return this.enqueue(async () => {
+      if (!(await this.isLogUploadAuthorized(identity))) return false;
+      return reserveLogUploadBudget(this.ctx.storage, identity.allocationId, bytes);
+    });
   }
 
   /**
@@ -5050,6 +5078,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return null;
     }
     for (const ws of this.ctx.getWebSockets()) {
+      if (ws.readyState !== WebSocket.OPEN) continue;
       const attachment = this.readAttachment(ws);
       if (
         attachment?.allocationId === state.allocationId &&
@@ -6310,6 +6339,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (frame.type === 'hello') {
       if (attachment?.connectionId !== undefined) return;
       const credential = typeof attachment?.credential === 'string' ? attachment.credential : null;
+      const current = await this.readAllocation();
+      const occupied =
+        current.kind === 'connected' &&
+        this.boundWrapperSocket(current) !== null &&
+        current.lastFrameAt !== null &&
+        Date.now() < current.lastFrameAt + this.sandboxTimers().heartbeatMs;
       const accepted = await this.validateAllocationCredential(
         frame.allocationId,
         credential,
@@ -6355,6 +6390,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ) {
         this.sendFrame(ws, { type: 'shutdown', reason: 'hello_rejected' });
         ws.close(1008, 'Runtime contract mismatch');
+        return;
+      }
+      if (occupied) {
+        // An authenticated reconnect may race the old connection's close event.
+        // A socket close retries; shutdown would terminate the wrapper process.
+        ws.close(1013, 'Wrapper already connected');
         return;
       }
       const connectionId = crypto.randomUUID();

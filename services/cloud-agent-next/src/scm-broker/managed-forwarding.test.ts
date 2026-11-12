@@ -18,7 +18,7 @@ afterEach(() => {
 const providers = [
   {
     provider: 'github',
-    capability: 'kgh2.resolved',
+    capability: 'kgh3.resolved',
     method: 'redeemGitHubSessionCapability',
     url: 'https://api.github.com/graphql?synthetic=query-secret',
     result: { success: true, authorization: 'Bearer synthetic-upstream-secret' },
@@ -80,12 +80,20 @@ describe('forwardResolvedScmCapability', () => {
         outboundContainerId: 'trusted-admitted-container',
         requestMethod: 'POST',
         requestUrl: url,
+        // The task policy inspects the canonical JSON body of a GitHub API request.
+        ...(provider === 'github'
+          ? {
+              requestContentType: 'application/json',
+              requestBody: new TextEncoder().encode('{"synthetic":"body"}'),
+            }
+          : {}),
       });
       expect(forward).toHaveBeenCalledOnce();
       const forwarded = forward.mock.calls[0]?.[0];
       expect(forwarded?.url).toBe(url);
       expect(forwarded?.method).toBe('POST');
-      expect(forwarded?.headers.get('Host')).toBe(new URL(url).host);
+      // A GitHub task request is rebuilt without guest headers, so fetch derives the host.
+      expect(forwarded?.headers.get('Host')).toBe(provider === 'github' ? null : new URL(url).host);
       expect(forwarded?.redirect).toBe('manual');
       expect(await forwarded?.text()).toBe('{"synthetic":"body"}');
       expect(forwarded?.headers.get('Authorization')).toBe(
@@ -126,7 +134,8 @@ describe('forwardResolvedScmCapability', () => {
       capability,
       'wrong-container'
     );
-    expect(response.status).toBe(502);
+    // A rejected GitHub request is outside the task policy; the other providers fail as unavailable.
+    expect(response.status).toBe(fixture.provider === 'github' ? 403 : 502);
     expect(redeem).toHaveBeenCalledOnce();
     expect(forward).not.toHaveBeenCalled();
   });

@@ -1,3 +1,4 @@
+import type { GitHubTaskScope, GitHubTaskGrant } from '@kilocode/worker-utils/github-task-grant';
 import { logger } from '../logger.js';
 import {
   githubBrokerRejectionProvenanceSchema,
@@ -73,7 +74,15 @@ export type ResolveGitHubTokenError = {
     | 'invalid_capability'
     | 'expired_capability'
     | 'service_not_configured'
-    | 'rpc_error';
+    | 'rpc_error'
+    | 'user_authorization_required'
+    | 'user_authorization_revoked'
+    | 'user_authorization_unavailable'
+    | 'invalid_task_scope'
+    | 'repository_mismatch'
+    | 'ref_not_allowed'
+    | 'operation_not_allowed'
+    | 'source_unavailable';
   message: string;
 };
 
@@ -145,6 +154,7 @@ export type ResolvedCloudAgentGitHubAuth = {
 };
 
 export type ResolvedCloudAgentGitHubCapability = {
+  taskGrant?: GitHubTaskGrant;
   capability: string;
   installationId: string;
   appType: 'standard' | 'lite';
@@ -157,6 +167,7 @@ export type ResolvedCloudAgentGitHubCapability = {
 
 type IssueCloudAgentGitHubSessionCapabilityParams = {
   permissionScope?: 'repository';
+  taskScope?: GitHubTaskScope;
   accessPurpose?: 'workflow' | 'agent';
   githubRepo: string;
   userId: string;
@@ -201,6 +212,33 @@ async function resolveLegacyInstallationAuthForRepo(
   };
 }
 
+function githubAuthorizationFailureMessage(reason: string): string {
+  if (reason === 'user_authorization_required' || reason === 'user_authorization_revoked')
+    return 'Reconnect your GitHub account to continue this task.';
+  if (reason === 'user_authorization_unavailable')
+    return 'GitHub user authorization is unavailable. Try again.';
+  if (reason === 'invalid_task_scope')
+    return 'This worktree has no GitHub task authorization. Start a new worktree.';
+  return `GitHub managed auth lookup failed (${reason})`;
+}
+
+function githubAuthorizationFailure(
+  reason: ResolveGitHubTokenError['reason'],
+  rejectionProvenance?: GitHubBrokerRejectionProvenance
+): {
+  success: false;
+  error: ResolveGitHubTokenError;
+} {
+  return {
+    success: false,
+    error: {
+      reason,
+      ...(rejectionProvenance ? { rejectionProvenance } : {}),
+      message: githubAuthorizationFailureMessage(reason),
+    },
+  };
+}
+
 export async function resolveCloudAgentGitHubAuthForRepo(
   env: GitTokenServiceEnv,
   params: {
@@ -235,15 +273,7 @@ export async function resolveCloudAgentGitHubAuthForRepo(
 
   try {
     const result = await env.GIT_TOKEN_SERVICE.getCloudAgentAuthForRepo(params);
-    if (!result.success) {
-      return {
-        success: false,
-        error: {
-          reason: result.reason,
-          message: `GitHub managed auth lookup failed (${result.reason})`,
-        },
-      };
-    }
+    if (!result.success) return githubAuthorizationFailure(result.reason);
     logger
       .withFields({
         installationId: result.installationId,
@@ -342,14 +372,10 @@ export async function issueCloudAgentGitHubSessionCapability(
       const provenance = githubBrokerRejectionProvenanceSchema.safeParse(
         result.rejectionProvenance
       );
-      return {
-        success: false,
-        error: {
-          reason: result.reason,
-          ...(provenance.success ? { rejectionProvenance: provenance.data } : {}),
-          message: `GitHub managed auth lookup failed (${result.reason})`,
-        },
-      };
+      return githubAuthorizationFailure(
+        result.reason,
+        provenance.success ? provenance.data : undefined
+      );
     }
     if (
       params.permissionScope &&
@@ -376,6 +402,7 @@ export async function issueCloudAgentGitHubSessionCapability(
       success: true,
       value: {
         capability: result.capability,
+        ...(result.taskGrant ? { taskGrant: result.taskGrant } : {}),
         installationId: result.installationId,
         appType: result.appType,
         accountLogin: result.accountLogin,

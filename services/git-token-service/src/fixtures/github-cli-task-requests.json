@@ -1,0 +1,160 @@
+{
+  "cliVersion": "2.102.0",
+  "source": "Captured from the installed CLI through a local HTTPS fixture with synthetic credentials. No GitHub requests were sent.",
+  "requests": [
+    {
+      "command": "gh repo view",
+      "body": {
+        "query": "query RepositoryInfo($owner: String!, $name: String!) {\n\t\trepository(owner: $owner, name: $name) {id,name,nameWithOwner,isPrivate,defaultBranchRef{name},viewerPermission}\n\t}",
+        "variables": {
+          "name": "cloud-agent-security-test-a",
+          "owner": "na2-org"
+        }
+      },
+      "publication": "read"
+    },
+    {
+      "command": "gh pr list",
+      "body": {
+        "query": "fragment pr on PullRequest{number,title,state,url,headRefName,headRepositoryOwner{id,login,...on User{name}},isCrossRepository,isDraft,createdAt}\n\t\tquery PullRequestList(\n\t\t\t$owner: String!,\n\t\t\t$repo: String!,\n\t\t\t$limit: Int!,\n\t\t\t$endCursor: String,\n\t\t\t$baseBranch: String,\n\t\t\t$headBranch: String,\n\t\t\t$state: [PullRequestState!] = OPEN\n\t\t) {\n\t\t\trepository(owner: $owner, name: $repo) {\n\t\t\t\tpullRequests(\n\t\t\t\t\tstates: $state,\n\t\t\t\t\tbaseRefName: $baseBranch,\n\t\t\t\t\theadRefName: $headBranch,\n\t\t\t\t\tfirst: $limit,\n\t\t\t\t\tafter: $endCursor,\n\t\t\t\t\torderBy: {field: CREATED_AT, direction: DESC}\n\t\t\t\t) {\n\t\t\t\t\ttotalCount\n\t\t\t\t\tnodes {\n\t\t\t\t\t\t...pr\n\t\t\t\t\t}\n\t\t\t\t\tpageInfo {\n\t\t\t\t\t\thasNextPage\n\t\t\t\t\t\tendCursor\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t}",
+        "variables": {
+          "limit": 30,
+          "owner": "na2-org",
+          "repo": "cloud-agent-security-test-a",
+          "state": ["OPEN"]
+        }
+      },
+      "publication": "read"
+    },
+    {
+      "command": "gh pr view",
+      "body": {
+        "query": "\n\tquery PullRequestByNumber($owner: String!, $repo: String!, $pr_number: Int!) {\n\t\trepository(owner: $owner, name: $repo) {\n\t\t\tpullRequest(number: $pr_number) {url,number,title,state,body,author{login,...on User{id,name}},autoMergeRequest {authorEmail,commitBody,commitHeadline,mergeMethod,enabledAt,enabledBy{login,...on User{id,name}}},isDraft,maintainerCanModify,mergeable,additions,deletions,commits{totalCount},baseRefName,headRefName,headRepositoryOwner{id,login,...on User{name}},headRepository{id,name,nameWithOwner},isCrossRepository,reviewRequests(first: 100) {nodes {requestedReviewer {__typename,...on User{login,name},...on Bot{login},...on Team{organization{login}name,slug}}}},reviews(first: 100) {nodes {id,author{login},authorAssociation,submittedAt,body,state,commit{oid},reactionGroups{content,users{totalCount}}}pageInfo{hasNextPage,endCursor}totalCount},assignees(first:100){nodes{id,login,name,databaseId},totalCount},labels(first:100){nodes{id,name,description,color},totalCount},milestone{number,title,description,dueOn},comments(first: 100) {nodes {id,author{login,...on User{id,name}},authorAssociation,body,createdAt,includesCreatedEdit,isMinimized,minimizedReason,reactionGroups{content,users{totalCount}},url,viewerDidAuthor},pageInfo{hasNextPage,endCursor},totalCount},reactionGroups{content,users{totalCount}},createdAt,statusCheckRollup: commits(last: 1) {nodes {commit {statusCheckRollup {contexts(first:100) {nodes {__typename...on StatusContext {context,state,targetUrl,createdAt,description},...on CheckRun {name,checkSuite{workflowRun{workflow{name}}},status,conclusion,startedAt,completedAt,detailsUrl}},pageInfo{hasNextPage,endCursor}}}}}},id}\n\t\t}\n\t}",
+        "variables": {
+          "owner": "na2-org",
+          "pr_number": 42,
+          "repo": "cloud-agent-security-test-a"
+        }
+      },
+      "publication": "read"
+    },
+    {
+      "command": "gh pr view",
+      "body": {
+        "query": "query PullRequestProjectItems($endCursor:String$name:String!$number:Int!$owner:String!){repository(owner: $owner, name: $name){pullRequest(number: $number){projectItems(first: 100, after: $endCursor){totalCount,nodes{id,project{id,title},status:fieldValueByName(name: \"Status\"){... on ProjectV2ItemFieldSingleSelectValue{optionId,name}}},pageInfo{hasNextPage,endCursor}}}}}",
+        "variables": {
+          "endCursor": null,
+          "name": "cloud-agent-security-test-a",
+          "number": 42,
+          "owner": "na2-org"
+        }
+      },
+      "publication": "read"
+    },
+    {
+      "command": "gh pr create",
+      "body": {
+        "query": "\n\tfragment repo on Repository {\n\t\tid\n\t\tdatabaseId\n\t\tname\n\t\towner { login }\n\t\tsshUrl\n\t\thasIssuesEnabled\n\t\tdescription\n\t\thasWikiEnabled\n\t\tviewerPermission\n\t\tdefaultBranchRef {\n\t\t\tname\n\t\t}\n\t}\n\n\tquery RepositoryInfo($owner: String!, $name: String!) {\n\t\trepository(owner: $owner, name: $name) {\n\t\t\t...repo\n\t\t\tparent {\n\t\t\t\t...repo\n\t\t\t}\n\t\t\tmergeCommitAllowed\n\t\t\trebaseMergeAllowed\n\t\t\tsquashMergeAllowed\n\t\t}\n\t}",
+        "variables": {
+          "name": "cloud-agent-security-test-a",
+          "owner": "na2-org"
+        }
+      },
+      "publication": "read"
+    },
+    {
+      "command": "gh pr create",
+      "body": {
+        "query": "\n\tquery PullRequestForBranch($owner: String!, $repo: String!, $headRefName: String!, $states: [PullRequestState!]) {\n\t\trepository(owner: $owner, name: $repo) {\n\t\t\tpullRequests(headRefName: $headRefName, states: $states, first: 30, orderBy: { field: CREATED_AT, direction: DESC }) {\n\t\t\t\tnodes {url,id,number,state,baseRefName,headRefName,isCrossRepository,headRepositoryOwner{id,login,...on User{name}}}\n\t\t\t}\n\t\t\tdefaultBranchRef { name }\n\t\t}\n\t}",
+        "variables": {
+          "headRefName": "kilo/security-test",
+          "owner": "na2-org",
+          "repo": "cloud-agent-security-test-a",
+          "states": ["OPEN"]
+        }
+      },
+      "publication": "read"
+    },
+    {
+      "command": "gh pr create",
+      "body": {
+        "query": "\n\t\tmutation PullRequestCreate($input: CreatePullRequestInput!) {\n\t\t\tcreatePullRequest(input: $input) {\n\t\t\t\tpullRequest {\n\t\t\t\t\tid\n\t\t\t\t\turl\n\t\t\t\t}\n\t\t\t}\n\t}",
+        "variables": {
+          "input": {
+            "baseRefName": "main",
+            "body": "Synthetic local fixture",
+            "draft": false,
+            "headRefName": "kilo/security-test",
+            "maintainerCanModify": true,
+            "repositoryId": "R_fixture_a",
+            "title": "Synthetic local fixture"
+          }
+        }
+      },
+      "publication": "create"
+    },
+    {
+      "command": "gh pr edit",
+      "body": {
+        "query": "\n\tquery PullRequestByNumber($owner: String!, $repo: String!, $pr_number: Int!) {\n\t\trepository(owner: $owner, name: $repo) {\n\t\t\tpullRequest(number: $pr_number) {id,author{login,...on User{id,name}},url,title,body,baseRefName,reviewRequests(first: 100) {nodes {requestedReviewer {__typename,...on User{login,name},...on Bot{login},...on Team{organization{login}name,slug}}}},labels(first:100){nodes{id,name,description,color},totalCount},milestone{number,title,description,dueOn},assignedActors(first: 10) {nodes {...on User {id,login,name,__typename}...on Bot {id,login,__typename}},totalCount},number}\n\t\t}\n\t}",
+        "variables": {
+          "owner": "na2-org",
+          "pr_number": 42,
+          "repo": "cloud-agent-security-test-a"
+        }
+      },
+      "publication": "read"
+    },
+    {
+      "command": "gh pr edit",
+      "body": {
+        "query": "query PullRequestProjectItems($endCursor:String$name:String!$number:Int!$owner:String!){repository(owner: $owner, name: $name){pullRequest(number: $number){projectItems(first: 100, after: $endCursor){totalCount,nodes{id,project{id,title},status:fieldValueByName(name: \"Status\"){... on ProjectV2ItemFieldSingleSelectValue{optionId,name}}},pageInfo{hasNextPage,endCursor}}}}}",
+        "variables": {
+          "endCursor": null,
+          "name": "cloud-agent-security-test-a",
+          "number": 42,
+          "owner": "na2-org"
+        }
+      },
+      "publication": "read"
+    },
+    {
+      "command": "gh pr edit",
+      "body": {
+        "query": "mutation PullRequestUpdate($input:UpdatePullRequestInput!){updatePullRequest(input: $input){__typename}}",
+        "variables": {
+          "input": {
+            "pullRequestId": "PR_fixture_a",
+            "title": "Synthetic local fixture update"
+          }
+        }
+      },
+      "publication": "edit"
+    },
+    {
+      "command": "gh pr comment",
+      "body": {
+        "query": "\n\tquery PullRequestByNumber($owner: String!, $repo: String!, $pr_number: Int!) {\n\t\trepository(owner: $owner, name: $repo) {\n\t\t\tpullRequest(number: $pr_number) {id,url,number}\n\t\t}\n\t}",
+        "variables": {
+          "owner": "na2-org",
+          "pr_number": 42,
+          "repo": "cloud-agent-security-test-a"
+        }
+      },
+      "publication": "read"
+    },
+    {
+      "command": "gh pr comment",
+      "body": {
+        "query": "mutation CommentCreate($input:AddCommentInput!){addComment(input: $input){commentEdge{node{url}}}}",
+        "variables": {
+          "input": {
+            "subjectId": "PR_fixture_a",
+            "body": "Synthetic local fixture comment"
+          }
+        }
+      },
+      "publication": "comment"
+    }
+  ]
+}

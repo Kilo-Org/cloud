@@ -1307,15 +1307,19 @@ describe('AttachmentPreviewStrip — control hit targets', () => {
     return match ? Number(match[1]) * DP_PER_SPACING_UNIT : 0;
   }
 
-  /** The document chip's filename column: the filename Text's parent. */
-  function fileColumn(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
-    const filename = root.find(
+  /** The document chip's filename Text. */
+  function filenameText(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+    return root.find(
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'Text' &&
         node.props.children === 'a-rather-long-document.pdf'
     );
-    const column = filename.parent;
+  }
+
+  /** The document chip's filename column: the filename Text's parent. */
+  function fileColumn(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+    const column = filenameText(root).parent;
     if (!column || !String(column.props.className).includes('flex-1')) {
       throw new Error('file column missing');
     }
@@ -1383,6 +1387,21 @@ describe('AttachmentPreviewStrip — control hit targets', () => {
     expect(rowEndDp + columnEndDp).toBeGreaterThanOrEqual(28 + badgeEndDp);
     // Retry's badge is 24.5 dp inside a `p-1` inset, so its box is 28 dp.
     expect(rowStartDp).toBeGreaterThanOrEqual(28);
+  });
+
+  it('truncates the filename in the middle so the file type stays readable', async () => {
+    reactNativeMock.Platform.OS = 'android';
+    const renderer = await mount([
+      makeAttachment({ filename: 'a-rather-long-document.pdf', status: 'uploaded', progress: 1 }),
+    ]);
+
+    // Android applies an ellipsis mode only to a single-line Text. A tail
+    // ellipsis would drop "document.pdf" and leave two files of one type
+    // looking alike.
+    expect(filenameText(renderer.root).props.numberOfLines).toBe(1);
+    expect(filenameText(renderer.root).props.ellipsizeMode).toBe('middle');
+
+    renderer.unmount();
   });
 });
 

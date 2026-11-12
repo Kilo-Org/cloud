@@ -403,7 +403,10 @@ const AttachmentChip = memo(function AttachmentChip({
               insets stay equal; the badge box itself is unchanged. Removing it
               puts the filename back under the control. */}
           <View className={cn('min-w-0 flex-1', description.showRemove && 'pe-8')}>
-            <Text numberOfLines={1} className="text-xs text-foreground">
+            {/* The filename loses its middle, so the name's start and the file
+                type both stay readable. A tail ellipsis drops the extension
+                and leaves similar names of one type indistinguishable. */}
+            <Text className="text-xs text-foreground" numberOfLines={1} ellipsizeMode="middle">
               {description.filename}
             </Text>
             <Text numberOfLines={1} className="text-[10px] text-muted-foreground">

@@ -5,6 +5,7 @@ import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-
 type MessagesRequest = Extract<GatewayRequest, { kind: 'messages' }>;
 type Thinking = MessagesRequest['body']['thinking'];
 type Messages = MessagesRequest['body']['messages'];
+type ContentBlock = Exclude<Messages[number]['content'], string>[number];
 
 function apply(
   model: string,
@@ -321,6 +322,133 @@ describe('dropThinkingBlocksOnPrefixMismatch', () => {
     expect(body.messages[2].content).toEqual([
       { type: 'tool_result', tool_use_id: toolCall.id, content: 'ok' },
     ]);
+  });
+
+  it.each([null, false, 0, 42, [], {}, { trim: 'not a function' }])(
+    'leaves malformed text %j for upstream request validation after removing thinking',
+    text => {
+      const malformedText = { type: 'text', text } as unknown as ContentBlock;
+      const messages: Messages = [
+        { role: 'user', content: 'hello' },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: '', signature: 'FAKE_UNIT_TEST_SIGNATURE' },
+            malformedText,
+          ],
+        },
+      ];
+      const before = structuredClone(messages);
+      const { body } = apply('anthropic/claude-haiku-5.5', { type: 'disabled' }, {}, messages);
+
+      expect(body.messages).toEqual([before[0], { role: 'assistant', content: [malformedText] }]);
+      expect(messages).toEqual(before);
+    }
+  );
+
+  const cacheControl = { type: 'ephemeral', ttl: '1h' } as const;
+  it.each<{ name: string; preceding: Messages[number]; expected: Messages[number] }>([
+    {
+      name: 'string content',
+      preceding: { role: 'user', content: 'hello' },
+      expected: {
+        role: 'user',
+        content: [{ type: 'text', text: 'hello', cache_control: cacheControl }],
+      },
+    },
+    {
+      name: 'array content',
+      preceding: { role: 'user', content: [{ type: 'text', text: 'hello' }] },
+      expected: {
+        role: 'user',
+        content: [{ type: 'text', text: 'hello', cache_control: cacheControl }],
+      },
+    },
+    {
+      name: 'a tool result',
+      preceding: {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'toolu_unit_test', content: 'ok' }],
+      },
+      expected: {
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'toolu_unit_test',
+            content: 'ok',
+            cache_control: cacheControl,
+          },
+        ],
+      },
+    },
+    {
+      name: 'an already cached target',
+      preceding: {
+        role: 'user',
+        content: [{ type: 'text', text: 'hello', cache_control: { type: 'ephemeral' } }],
+      },
+      expected: {
+        role: 'user',
+        content: [{ type: 'text', text: 'hello', cache_control: { type: 'ephemeral' } }],
+      },
+    },
+  ])(
+    'preserves the removed assistant cache breakpoint with $name without mutating history',
+    ({ preceding, expected }) => {
+      const messages: Messages = [
+        preceding,
+        {
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: '', signature: 'FAKE_UNIT_TEST_SIGNATURE' },
+            { type: 'text', text: ' \n\t', cache_control: cacheControl },
+          ],
+        },
+        { role: 'user', content: 'continue' },
+      ];
+      const before = structuredClone(messages);
+      const { body } = apply('anthropic/claude-haiku-5.5', { type: 'disabled' }, {}, messages);
+
+      expect(body.messages).toEqual([expected, before[2]]);
+      expect(body.messages[1]).toBe(messages[2]);
+      expect(messages).toEqual(before);
+    }
+  );
+
+  it('carries a cache breakpoint past consecutive assistants emptied by stripping thinking', () => {
+    const { body } = apply('anthropic/claude-haiku-5.5', { type: 'disabled' }, {}, [
+      { role: 'user', content: 'hello' },
+      {
+        role: 'assistant',
+        content: [{ type: 'thinking', thinking: '', signature: 'FAKE_UNIT_TEST_SIGNATURE' }],
+      },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'redacted_thinking', data: 'FAKE_UNIT_TEST_REDACTED_DATA' },
+          { type: 'text', text: '\n\n', cache_control: cacheControl },
+        ],
+      },
+    ]);
+
+    expect(body.messages).toEqual([
+      { role: 'user', content: [{ type: 'text', text: 'hello', cache_control: cacheControl }] },
+    ]);
+  });
+
+  it('removes an emptied first assistant without inventing a cache target', () => {
+    const { body } = apply('anthropic/claude-haiku-5.5', { type: 'disabled' }, {}, [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: '', signature: 'FAKE_UNIT_TEST_SIGNATURE' },
+          { type: 'text', text: '\n\n', cache_control: cacheControl },
+        ],
+      },
+    ]);
+
+    expect(body.messages).toEqual([]);
   });
 
   it('leaves malformed non-array content for upstream request validation', () => {

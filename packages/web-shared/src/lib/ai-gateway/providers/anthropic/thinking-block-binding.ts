@@ -4,6 +4,10 @@ import {
   isClaudeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import type { TransformRequestContext } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import {
+  isWhitespaceOnlyMessage,
+  preserveCacheControl,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/remove-whitespace-only-messages';
 
 const THINKING_BINDING_BETA = 'thinking-binding-controls-2026-08-01';
 
@@ -56,15 +60,30 @@ export function dropThinkingBlocksOnPrefixMismatch({
   if (thinking.type !== 'adaptive') {
     // block_binding is adaptive-only. Remove whole blocks, including signatures and redacted data,
     // without changing the explicit mode or touching nested tool results and user content.
-    request.body.messages = request.body.messages.flatMap(message => {
-      if (message.role !== 'assistant' || !Array.isArray(message.content)) return [message];
+    const messages: typeof request.body.messages = [];
+    for (const message of request.body.messages) {
+      if (message.role !== 'assistant' || !Array.isArray(message.content)) {
+        messages.push(message);
+        continue;
+      }
       const content = message.content.filter(
         block => block.type !== 'thinking' && block.type !== 'redacted_thinking'
       );
-      if (content.length === message.content.length) return [message];
-      const hasContent = content.some(block => block.type !== 'text' || block.text.trim() !== '');
-      return hasContent ? [{ ...message, content }] : [];
-    });
+      if (content.length === message.content.length) {
+        messages.push(message);
+        continue;
+      }
+      const strippedMessage = { ...message, content };
+      if (!isWhitespaceOnlyMessage(strippedMessage)) {
+        messages.push(strippedMessage);
+        continue;
+      }
+      const previousMessage = messages.at(-1);
+      if (previousMessage) {
+        messages[messages.length - 1] = preserveCacheControl(previousMessage, strippedMessage);
+      }
+    }
+    request.body.messages = messages;
     return;
   }
   const binding = thinking.block_binding ?? {};

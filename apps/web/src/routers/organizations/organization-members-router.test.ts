@@ -2750,7 +2750,10 @@ describe('organizations members trpc router', () => {
     });
 
     it('should reject inviting someone who is not a parent organization member', async () => {
-      const childOrg = await createOrganizationWithSeats('Child Members Organization', regularUser.id);
+      const childOrg = await createOrganizationWithSeats(
+        'Child Members Organization',
+        regularUser.id
+      );
       await db
         .update(organizations)
         .set({ parent_organization_id: testOrganization.id })

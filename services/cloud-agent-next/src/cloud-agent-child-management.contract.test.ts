@@ -38,7 +38,10 @@ const promptPayload = {
   model: 'test/model',
 };
 
-function authority(organizationId: string | null): CloudAgentAuthority {
+function authority(
+  organizationId: string | null,
+  environmentSetup?: CloudAgentAuthority['environmentSetup']
+): CloudAgentAuthority {
   return {
     version: 1,
     ownerId: USER_ID,
@@ -46,6 +49,7 @@ function authority(organizationId: string | null): CloudAgentAuthority {
     organizationId,
     authorizationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
     expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    ...(environmentSetup === undefined ? {} : { environmentSetup }),
   };
 }
 
@@ -85,6 +89,7 @@ const personalInputs: Record<CloudAgentManagementPath, unknown> = {
     messageId: MESSAGE_ID,
     expectedWorktreeId: WORKTREE_ID,
   },
+  getEgressAudit: { cloudAgentSessionId: CHILD_ID, limit: 50 },
   interruptSession: { sessionId: CHILD_ID },
   sendMessageV2: {
     cloudAgentSessionId: CHILD_ID,
@@ -104,6 +109,7 @@ const organizationInputs: Record<CloudAgentManagementPath, unknown> = {
     expectedWorktreeId: WORKTREE_ID,
     organizationId: ORG_ID,
   },
+  getEgressAudit: { cloudAgentSessionId: CHILD_ID, limit: 50, organizationId: ORG_ID },
   interruptSession: { sessionId: CHILD_ID, organizationId: ORG_ID },
   sendMessageV2: {
     cloudAgentSessionId: CHILD_ID,
@@ -115,7 +121,11 @@ const organizationInputs: Record<CloudAgentManagementPath, unknown> = {
   },
 };
 
-const paths = Object.keys(personalInputs) as CloudAgentManagementPath[];
+// The egress audit is scoped to an environment setup claim, so it is covered
+// separately from the procedures every parent authority permits.
+const paths = (Object.keys(personalInputs) as CloudAgentManagementPath[]).filter(
+  path => path !== 'getEgressAudit'
+);
 
 beforeEach(() => {
   getSandboxSessionStubMock.mockReset();
@@ -206,5 +216,60 @@ describe('management request against the real shared contract', () => {
         organizationId: '22222222-2222-4222-8222-222222222222',
       })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  describe('egress audit under an environment setup claim', () => {
+    const environmentSetup = {
+      runId: '33333333-3333-4333-8333-333333333333',
+      environmentId: '44444444-4444-4444-8444-444444444444',
+    };
+
+    it('accepts a direct child for the personal path', async () => {
+      await expect(
+        request(authority(null, environmentSetup), 'getEgressAudit', personalInputs.getEgressAudit)
+      ).resolves.toBeUndefined();
+    });
+
+    it('accepts a direct child for the organization path', async () => {
+      requireCurrentSessionAccessMock.mockResolvedValue({
+        kiloSessionId: 'ses_12345678901234567890123456',
+        organizationId: ORG_ID,
+      });
+      getSandboxSessionStubMock.mockImplementation((_env, _owner, sessionId) =>
+        sessionId === PARENT_ID
+          ? stub()
+          : stub({ getMetadata: vi.fn().mockResolvedValue(metadata(ORG_ID)) })
+      );
+
+      await expect(
+        request(
+          authority(ORG_ID, environmentSetup),
+          'getEgressAudit',
+          organizationInputs.getEgressAudit
+        )
+      ).resolves.toBeUndefined();
+    });
+
+    it('rejects the procedure without the claim', async () => {
+      await expect(
+        request(authority(null), 'getEgressAudit', personalInputs.getEgressAudit)
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('rejects a target that is not a direct child', async () => {
+      getSandboxSessionStubMock.mockImplementation((_env, _owner, sessionId) =>
+        sessionId === PARENT_ID
+          ? stub()
+          : stub({
+              getMetadata: vi
+                .fn()
+                .mockResolvedValue({ ...metadata(null), parentCloudAgentSessionId: undefined }),
+            })
+      );
+
+      await expect(
+        request(authority(null, environmentSetup), 'getEgressAudit', personalInputs.getEgressAudit)
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
   });
 });

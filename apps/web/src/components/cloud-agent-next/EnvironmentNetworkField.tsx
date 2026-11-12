@@ -22,7 +22,11 @@ const NETWORK_ACCESS_OPTIONS: readonly {
   label: string;
   description: string;
 }[] = [
-  { value: 'none', label: 'None', description: 'No additional internet access' },
+  {
+    value: 'none',
+    label: 'None',
+    description: 'Only Kilo, Git, your repository hosts, and hosts this environment requires.',
+  },
   { value: 'limited', label: 'Limited', description: 'Only the additional domains listed below' },
   { value: 'full', label: 'Full', description: 'Any domain' },
 ];

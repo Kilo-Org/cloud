@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
   AlertCircle,
@@ -29,6 +29,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { EnvironmentSecretRequestList } from './EnvironmentSecretRequestList';
+import { omitUnresolvedSeededSecrets, seedPendingSecretKeys } from './environment-setup-secrets';
+import {
+  useEnvironmentSetupEnabled,
+  useEnvironmentSetupRunMutations,
+  type SetupRunResponse,
+} from '@/hooks/useEnvironmentSetupRuns';
+import { EnvironmentSetupAgentFields } from './EnvironmentSetupAgentFields';
 import { EnvironmentDeleteDialog } from './EnvironmentDeleteDialog';
 import { allocationSupportsMultiRepository } from '@kilocode/worker-utils/sandbox-allocation';
 import {
@@ -40,12 +48,10 @@ import {
 import { useEnvironmentProfiles } from '@/hooks/useEnvironmentProfiles';
 import {
   hasEnvironmentFormChanges,
-  buildEgressPolicy,
   toEnvironmentCommands,
   toEnvironmentScript,
   toNetworkAccessDraft,
 } from './environment-form';
-import { EnvironmentNetworkField } from './EnvironmentNetworkField';
 import { EnvironmentBuildPanel } from './EnvironmentBuildPanel';
 import {
   buildEnvironmentVariableChanges,
@@ -64,6 +70,9 @@ import { EnvironmentVariablesEditor } from './EnvironmentVariablesEditor';
 import { splitRepositoryName, toSelectableAllocation } from './settings/settings-options';
 
 type EnvironmentDialogProps = {
+  initialPage?: EnvironmentEditorPage;
+  setupRun?: SetupRunResponse;
+  onSetupStarted?: () => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   organizationId?: string;
@@ -82,6 +91,7 @@ export function EnvironmentDialog({
   environmentId,
   ...props
 }: EnvironmentDialogProps) {
+  const [saving, setSaving] = useState(false);
   const detailQuery = useCloudAgentEnvironment(environmentId, {
     organizationId: props.organizationId,
     enabled: open,
@@ -89,7 +99,12 @@ export function EnvironmentDialog({
   const isLoading = !!environmentId && detailQuery.isLoading;
   const isError = !!environmentId && !detailQuery.data && !detailQuery.isLoading;
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={next => {
+        if (!saving) onOpenChange(next);
+      }}
+    >
       <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         {isLoading || isError ? (
           <>
@@ -111,6 +126,11 @@ export function EnvironmentDialog({
             {...props}
             existing={detailQuery.data}
             variant="dialog"
+            onSavingChange={setSaving}
+            onSetupStarted={() => {
+              onOpenChange(false);
+              props.onSetupStarted?.();
+            }}
           />
         )}
       </DialogContent>
@@ -120,6 +140,7 @@ export function EnvironmentDialog({
 
 type EnvironmentDetailPaneProps = {
   active?: boolean;
+  onSetupStarted?: () => void;
   environmentId: string | null;
   organizationId?: string;
   repository?: EnvironmentRepository;
@@ -214,6 +235,8 @@ function EnvironmentForm({
   repositoryLabel,
   selectedProfileId,
   canManage,
+  setupRun,
+  onSetupStarted,
   existing,
   variant,
   active = true,
@@ -228,6 +251,16 @@ function EnvironmentForm({
   const { createEnvironment, updateEnvironment, deleteEnvironment } =
     useCloudAgentEnvironmentMutations();
   const [page, setPage] = useState<EnvironmentEditorPage>(initialPage ?? 'overview');
+  const agentFormId = useId();
+  const [setupMethod, setSetupMethod] = useState<'manual' | 'agent'>('manual');
+  const setupToggle = useEnvironmentSetupEnabled({ organizationId, enabled: active && canManage });
+  const setupWithAgent =
+    setupMethod === 'agent' && canManage && setupToggle.data?.canStart === true;
+  const [agentPending, setAgentPending] = useState(false);
+  const [agentValid, setAgentValid] = useState(false);
+  const [agentDirty, setAgentDirty] = useState(false);
+  const { resolveSecretRequests } = useEnvironmentSetupRunMutations();
+  const [skippedSecrets, setSkippedSecrets] = useState<string[]>([]);
   const [initialRepositories] = useState<EnvironmentRepository[]>(() =>
     existing ? repositoriesForEnvironment(existing) : repository ? [repository] : []
   );
@@ -249,8 +282,7 @@ function EnvironmentForm({
   const [initialNetworkAccess] = useState(() =>
     toNetworkAccessDraft(existing?.egressMode ?? null, existing?.egressAllowlist ?? null)
   );
-  const [networkAccess, setNetworkAccess] = useState(initialNetworkAccess);
-  const [networkAccessError, setNetworkAccessError] = useState<string | null>(null);
+  const networkAccess = initialNetworkAccess;
   const sandboxRepository = repositories[0]
     ? { platform: repositories[0].platform, fullName: repositoryName(repositories[0]) }
     : undefined;
@@ -270,14 +302,20 @@ function EnvironmentForm({
   const startCommands =
     existing && startScript === initialStartScript ? undefined : toEnvironmentCommands(startScript);
   // Retain the baseline shown when editing starts, even if queries refresh in the background.
-  const [savedVariables] = useState(() => ({
+  const [savedVariables, setSavedVariables] = useState<{
+    plainVars: { key: string; value: string }[];
+    secretKeys: string[];
+  }>(() => ({
     plainVars: existing?.plainVars ?? [],
     secretKeys: existing?.secretKeys ?? [],
   }));
   const [initialVariablesText] = useState(() =>
     formatEnvironmentVariables(savedVariables.plainVars, savedVariables.secretKeys)
   );
-  const [variablesText, setVariablesText] = useState(initialVariablesText);
+  const [seededSecrets] = useState(() =>
+    seedPendingSecretKeys(initialVariablesText, setupRun?.secretRequests ?? [])
+  );
+  const [variablesText, setVariablesText] = useState(seededSecrets.text);
   const hasUnsavedChanges =
     hasEnvironmentFormChanges(
       {
@@ -290,12 +328,18 @@ function EnvironmentForm({
       },
       { name: savedName, script, startScript, variablesText, sandboxAllocation, networkAccess }
     ) || repositoriesChanged;
+  const hasManualConfigurationChanges = existing
+    ? hasUnsavedChanges
+    : script !== initialScript ||
+      startScript !== initialStartScript ||
+      variablesText !== initialVariablesText ||
+      sandboxAllocation !== initialSandboxAllocation;
   const [error, setError] = useState<string | null>(null);
   let variables: ReturnType<typeof buildEnvironmentVariableChanges> | undefined;
   let variablesError: string | null = null;
   try {
     variables = buildEnvironmentVariableChanges(
-      variablesText,
+      omitUnresolvedSeededSecrets(variablesText, seededSecrets.seededKeys, skippedSecrets),
       savedVariables.plainVars,
       savedVariables.secretKeys
     );
@@ -305,13 +349,17 @@ function EnvironmentForm({
   const impact = describeEnvironmentProfileImpact(profileQuery.profiles, variables?.keys ?? []);
   const hasScript = script.trim().length > 0;
   const hasStartScript = startScript.trim().length > 0;
-  const isSaving = createEnvironment.isPending || updateEnvironment.isPending;
+  const isSaving =
+    agentPending ||
+    resolveSecretRequests.isPending ||
+    createEnvironment.isPending ||
+    updateEnvironment.isPending;
   const deletePending = deleteEnvironment.isPending;
   const isInline = variant === 'inline';
 
   useEffect(() => {
-    onDirtyChange?.(hasUnsavedChanges);
-  }, [hasUnsavedChanges, onDirtyChange]);
+    onDirtyChange?.(hasUnsavedChanges || (setupWithAgent && agentDirty));
+  }, [hasUnsavedChanges, setupWithAgent, agentDirty, onDirtyChange]);
 
   const busy = isSaving || deletePending;
 
@@ -331,13 +379,6 @@ function EnvironmentForm({
       changePage('variables');
       return;
     }
-    const egress = buildEgressPolicy(networkAccess, initialNetworkAccess);
-    if (egress.error) {
-      setNetworkAccessError(egress.error);
-      changePage('overview');
-      return;
-    }
-    setNetworkAccessError(null);
     setError(null);
     try {
       validateEnvironmentName(savedName);
@@ -354,8 +395,25 @@ function EnvironmentForm({
           commands,
           startCommands,
           sandboxAllocation,
-          ...egress.policy,
         });
+        if (setupRun) {
+          setSavedVariables({
+            plainVars: Object.entries(variables.plainVars).map(([key, value]) => ({ key, value })),
+            secretKeys: variables.keys.filter(key => !(key in variables.plainVars)),
+          });
+          try {
+            await resolveSecretRequests.mutateAsync({
+              organizationId,
+              runId: setupRun.id,
+              skipped: skippedSecrets,
+            });
+          } catch (caught) {
+            setError(
+              `The environment was saved, but the requests could not be resolved: ${caught instanceof Error ? caught.message : 'Try saving again.'}`
+            );
+            return;
+          }
+        }
         if (isInline) toast.success('Environment saved');
         onSaved(existing.id);
       } else {
@@ -377,7 +435,6 @@ function EnvironmentForm({
           commands,
           startCommands,
           sandboxAllocation,
-          ...egress.policy,
         });
         if (isInline) toast.success('Environment created');
         onSaved(created.id);
@@ -408,20 +465,20 @@ function EnvironmentForm({
           id="environment-name"
           type="text"
           value={name}
-          readOnly={!canManage}
+          readOnly={!canManage || (setupWithAgent && !!existing)}
           onChange={event => setName(event.target.value)}
           placeholder={defaultName}
           maxLength={ENVIRONMENT_LIMITS.MAX_NAME_LENGTH}
         />
       </div>
-      <fieldset disabled={!canManage} className="min-w-0">
+      <fieldset disabled={!canManage || (setupWithAgent && !!existing)} className="min-w-0">
         <EnvironmentRepositoriesField
           organizationId={organizationId}
           repositories={repositories}
           onChange={setRepositories}
         />
       </fieldset>
-      {sandboxRepository && (
+      {!setupWithAgent && sandboxRepository && (
         <EnvironmentSandboxField
           organizationId={organizationId}
           repository={sandboxRepository}
@@ -431,20 +488,53 @@ function EnvironmentForm({
           isAllowed={isMultiRepository ? allocationSupportsMultiRepository : undefined}
         />
       )}
-      <EnvironmentNetworkField
-        value={networkAccess}
-        sandboxAllocation={sandboxAllocation}
-        error={networkAccessError}
-        disabled={!canManage || isSaving}
-        onChange={next => {
-          setNetworkAccessError(null);
-          setNetworkAccess(next);
-        }}
-      />
+
+      {!existing?.isDraft && canManage && setupToggle.data?.canStart === true && (
+        <fieldset className="space-y-2">
+          <legend className="text-xs font-medium">Setup method</legend>
+          <div className="flex flex-wrap gap-4 text-sm">
+            {(['manual', 'agent'] as const).map(method => (
+              <label
+                key={method}
+                className="flex cursor-pointer items-center gap-2 py-1 pointer-coarse:min-h-11"
+              >
+                <input
+                  type="radio"
+                  name={`environment-setup-method-${agentFormId}`}
+                  value={method}
+                  checked={setupMethod === method}
+                  disabled={method === 'agent' && hasManualConfigurationChanges}
+                  onChange={() => setSetupMethod(method)}
+                  className="accent-primary size-4"
+                />
+                {method === 'manual' ? 'Manually' : 'With an agent'}
+              </label>
+            ))}
+          </div>
+          {hasManualConfigurationChanges && !setupWithAgent && (
+            <p className="text-muted-foreground text-xs">
+              Save manual configuration changes before starting agent setup.
+            </p>
+          )}
+        </fieldset>
+      )}
+      {setupWithAgent && (
+        <EnvironmentSetupAgentFields
+          formId={agentFormId}
+          organizationId={organizationId}
+          repositories={repositories}
+          name={savedName}
+          targetEnvironmentId={existing?.id}
+          onPendingChange={setAgentPending}
+          onValidChange={setAgentValid}
+          onDirtyChange={setAgentDirty}
+          onStarted={() => onSetupStarted?.()}
+        />
+      )}
     </>
   );
 
-  const buildPanel = existing ? (
+  const buildPanel = existing?.isDraft ? null : existing ? (
     <EnvironmentBuildPanel
       organizationId={organizationId}
       environmentId={existing.id}
@@ -488,7 +578,30 @@ function EnvironmentForm({
     </p>
   );
 
-  const saveDisabled = isSaving || deletePending || profileQuery.isLoading || profileQuery.isError;
+  const secretRequests = setupRun && (
+    <EnvironmentSecretRequestList
+      run={setupRun}
+      organizationId={organizationId}
+      skipped={skippedSecrets}
+      onSkippedChange={setSkippedSecrets}
+      disabled={!canManage || isSaving}
+    />
+  );
+  const saveAction =
+    canManage &&
+    (setupWithAgent ? (
+      <Button type="submit" form={agentFormId} size="sm" disabled={!agentValid || isSaving}>
+        {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}Start setup
+      </Button>
+    ) : (
+      <Button
+        size="sm"
+        onClick={handleSave}
+        disabled={isSaving || deletePending || profileQuery.isLoading || profileQuery.isError}
+      >
+        {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}Save environment
+      </Button>
+    ));
 
   const handleTabChange = (value: string) => {
     if (isEditorPage(value)) changePage(value);
@@ -511,16 +624,32 @@ function EnvironmentForm({
         </div>
         <div className="shrink-0 overflow-x-auto border-b px-2 py-1">
           <TabsList aria-label="Environment configuration" className="w-max">
-            <TabsTrigger value="overview" className="gap-1 text-xs pointer-coarse:min-h-11">
+            <TabsTrigger
+              disabled={isSaving}
+              value="overview"
+              className="gap-1 text-xs pointer-coarse:min-h-11"
+            >
               Overview
             </TabsTrigger>
-            <TabsTrigger value="scripts" className="gap-1 text-xs pointer-coarse:min-h-11">
+            <TabsTrigger
+              disabled={setupWithAgent || isSaving}
+              value="scripts"
+              className="gap-1 text-xs pointer-coarse:min-h-11"
+            >
               Snapshot
             </TabsTrigger>
-            <TabsTrigger value="start" className="gap-1 text-xs pointer-coarse:min-h-11">
+            <TabsTrigger
+              disabled={setupWithAgent || isSaving}
+              value="start"
+              className="gap-1 text-xs pointer-coarse:min-h-11"
+            >
               Workspace start
             </TabsTrigger>
-            <TabsTrigger value="variables" className="gap-1 text-xs pointer-coarse:min-h-11">
+            <TabsTrigger
+              disabled={setupWithAgent || isSaving}
+              value="variables"
+              className="gap-1 text-xs pointer-coarse:min-h-11"
+            >
               Variables
             </TabsTrigger>
           </TabsList>
@@ -546,7 +675,8 @@ function EnvironmentForm({
                 readOnly={!canManage}
               />
             </TabsContent>
-            <TabsContent value="variables" className="mt-0">
+            <TabsContent value="variables" className="mt-0 space-y-4">
+              {secretRequests}
               <EnvironmentVariablesEditor
                 text={variablesText}
                 readOnly={!canManage}
@@ -582,11 +712,7 @@ function EnvironmentForm({
                 Cancel
               </Button>
             )}
-            {canManage && (
-              <Button size="sm" onClick={handleSave} disabled={saveDisabled}>
-                {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}Save environment
-              </Button>
-            )}
+            {saveAction}
           </div>
         </div>
       </Tabs>
@@ -636,40 +762,42 @@ function EnvironmentForm({
           {page === 'overview' && (
             <>
               {overviewBaseFields}
-              <div className="space-y-3">
-                <EditorRow
-                  icon={<Terminal className="size-4" />}
-                  label="Snapshot build script"
-                  detail={
-                    hasScript
-                      ? 'Configure your snapshot build script'
-                      : 'Install dependencies and prepare your repository'
-                  }
-                  onClick={() => changePage('scripts')}
-                />
-                <EditorRow
-                  icon={<Play className="size-4" />}
-                  label="Workspace start script"
-                  detail={
-                    hasStartScript
-                      ? 'Configure your workspace start script'
-                      : 'Start services when a workspace starts'
-                  }
-                  onClick={() => changePage('start')}
-                />
-                <EditorRow
-                  icon={<KeyRound className="size-4" />}
-                  label="Environment variables"
-                  detail={
-                    variablesError
-                      ? 'Check variable format'
-                      : variables?.keys.length
-                        ? `${variables.keys.length} ${variables.keys.length === 1 ? 'variable' : 'variables'}`
-                        : 'Add configuration and credentials'
-                  }
-                  onClick={() => changePage('variables')}
-                />
-              </div>
+              {!setupWithAgent && (
+                <div className="space-y-3">
+                  <EditorRow
+                    icon={<Terminal className="size-4" />}
+                    label="Snapshot build script"
+                    detail={
+                      hasScript
+                        ? 'Configure your snapshot build script'
+                        : 'Install dependencies and prepare your repository'
+                    }
+                    onClick={() => changePage('scripts')}
+                  />
+                  <EditorRow
+                    icon={<Play className="size-4" />}
+                    label="Workspace start script"
+                    detail={
+                      hasStartScript
+                        ? 'Configure your workspace start script'
+                        : 'Start services when a workspace starts'
+                    }
+                    onClick={() => changePage('start')}
+                  />
+                  <EditorRow
+                    icon={<KeyRound className="size-4" />}
+                    label="Environment variables"
+                    detail={
+                      variablesError
+                        ? 'Check variable format'
+                        : variables?.keys.length
+                          ? `${variables.keys.length} ${variables.keys.length === 1 ? 'variable' : 'variables'}`
+                          : 'Add configuration and credentials'
+                    }
+                    onClick={() => changePage('variables')}
+                  />
+                </div>
+              )}
             </>
           )}
           {page === 'scripts' && (
@@ -684,16 +812,19 @@ function EnvironmentForm({
             />
           )}
           {page === 'variables' && (
-            <EnvironmentVariablesEditor
-              text={variablesText}
-              readOnly={!canManage}
-              onChange={setVariablesText}
-              removedKeys={variables?.removedKeys ?? []}
-              error={variablesError}
-            />
+            <>
+              {secretRequests}
+              <EnvironmentVariablesEditor
+                text={variablesText}
+                readOnly={!canManage}
+                onChange={setVariablesText}
+                removedKeys={variables?.removedKeys ?? []}
+                error={variablesError}
+              />
+            </>
           )}
         </fieldset>
-        {(page === 'overview' || page === 'scripts') && buildPanel}
+        {!setupWithAgent && (page === 'overview' || page === 'scripts') && buildPanel}
         {profileFeedback}
         {errorMessage}
       </div>
@@ -714,11 +845,7 @@ function EnvironmentForm({
               {canManage ? 'Cancel' : 'Close'}
             </Button>
           </DialogClose>
-          {canManage && (
-            <Button size="sm" onClick={handleSave} disabled={saveDisabled}>
-              {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}Save environment
-            </Button>
-          )}
+          {saveAction}
         </div>
       </DialogFooter>
     </>

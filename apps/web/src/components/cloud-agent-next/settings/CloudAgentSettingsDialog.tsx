@@ -49,6 +49,7 @@ type CloudAgentSettingsDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialSection?: SettingsSection;
+  onSetupStarted?: () => void;
   onSectionChange?: (section: SettingsSection) => void;
   onProfileSelect?: (profileId: string) => void;
   openToNewProfile?: boolean;
@@ -68,6 +69,7 @@ export function CloudAgentSettingsDialog({
           key={organizationId ?? 'personal'}
           organizationId={organizationId}
           {...profileOptions}
+          onSetupStarted={() => onOpenChange(false)}
           onProfileSelect={
             profileOptions.onProfileSelect
               ? profileId => {
@@ -85,6 +87,7 @@ export function CloudAgentSettingsDialog({
 function CloudAgentSettings({
   organizationId,
   initialSection = 'general',
+  onSetupStarted,
   onSectionChange,
   onProfileSelect,
   openToNewProfile,
@@ -262,6 +265,7 @@ function CloudAgentSettings({
               organizationId={organizationId}
               canManage={canManage}
               active={activeSection === 'environments'}
+              onSetupStarted={onSetupStarted}
             />
           )}
         </TabsContent>

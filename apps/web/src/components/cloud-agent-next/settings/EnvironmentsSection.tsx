@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Boxes, GitBranch, Loader2, Plus } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -23,18 +24,24 @@ import {
   type EnvironmentRepository,
   type EnvironmentSummary,
 } from '@/hooks/useCloudAgentEnvironments';
+import {
+  isOpenEnvironmentSetupRun,
+  useEnvironmentSetupRunsForEnvironment,
+} from '@/hooks/useEnvironmentSetupRuns';
 import { EnvironmentDetailPane, type EnvironmentEditorPage } from '../EnvironmentDialog';
 
 type EnvironmentsSectionProps = {
   organizationId?: string;
   canManage: boolean;
   active?: boolean;
+  onSetupStarted?: () => void;
 };
 
 export function EnvironmentsSection({
   organizationId,
   canManage,
   active = true,
+  onSetupStarted,
 }: EnvironmentsSectionProps) {
   const query = useCloudAgentEnvironmentsForOwner({ organizationId, enabled: active });
   const repoChoices = useEnvironmentRepositoryChoices(organizationId);
@@ -148,6 +155,8 @@ export function EnvironmentsSection({
             <div className="py-1">
               {environments.map(environment => (
                 <EnvironmentRow
+                  organizationId={organizationId}
+                  active={active}
                   key={environment.id}
                   environment={environment}
                   canManage={canManage}
@@ -229,6 +238,7 @@ export function EnvironmentsSection({
             active={active}
             initialPage={editorPage}
             onPageChange={setEditorPage}
+            onSetupStarted={onSetupStarted}
             onSavingChange={setSaving}
             onSaved={handleCreated}
             onDeleted={() => undefined}
@@ -255,6 +265,7 @@ export function EnvironmentsSection({
             active={active}
             initialPage={editorPage}
             onPageChange={setEditorPage}
+            onSetupStarted={onSetupStarted}
             onSavingChange={setSaving}
             onSaved={handleSaved}
             onDeleted={handleDeleted}
@@ -268,7 +279,7 @@ export function EnvironmentsSection({
             </p>
             <p className="text-muted-foreground max-w-sm text-xs">
               {environments.length === 0
-                ? 'Add one to give a repository setup commands, variables, secrets, a sandbox size, and network access.'
+                ? 'Add one to give a repository setup commands, variables, secrets, a sandbox size.'
                 : 'Choose an environment from the list to view or edit it.'}
             </p>
           </div>
@@ -279,18 +290,27 @@ export function EnvironmentsSection({
 }
 
 function EnvironmentRow({
+  organizationId,
+  active,
   environment,
   canManage,
   selected,
   disabled,
   onSelect,
 }: {
+  organizationId?: string;
+  active: boolean;
   environment: EnvironmentSummary;
   canManage: boolean;
   selected: boolean;
   disabled: boolean;
   onSelect: () => void;
 }) {
+  const setupRuns = useEnvironmentSetupRunsForEnvironment(environment.id, {
+    organizationId,
+    enabled: active,
+  });
+  const setupInProgress = setupRuns.data?.some(run => isOpenEnvironmentSetupRun(run.status));
   const members = environmentMembers(environment);
   return (
     <button
@@ -306,8 +326,15 @@ function EnvironmentRow({
     >
       <Boxes className="mt-0.5 h-3.5 w-3.5 shrink-0" />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium" title={environment.name}>
-          {environment.name}
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span className="truncate text-sm font-medium" title={environment.name}>
+            {environment.name}
+          </span>
+          {setupInProgress && (
+            <Badge variant="outline" className="shrink-0 text-[10px]">
+              Setup in progress
+            </Badge>
+          )}
         </span>
         {members.map(member => (
           <span

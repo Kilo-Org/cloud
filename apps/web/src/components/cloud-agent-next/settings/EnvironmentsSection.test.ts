@@ -72,6 +72,15 @@ const mockDelete = jest.fn<(input: { environmentId: string }) => Promise<void>>(
   }
 );
 
+jest.mock('@/hooks/useEnvironmentSetupRuns', () => ({
+  useEnvironmentSetupRunsForEnvironment: () => ({ data: [] }),
+  isOpenEnvironmentSetupRun: () => false,
+  useEnvironmentSetupEnabled: () => ({ data: { enabled: false, canStart: false } }),
+  useEnvironmentSetupRunMutations: () => ({
+    resolveSecretRequests: { isPending: false, mutateAsync: jest.fn() },
+  }),
+}));
+
 jest.mock('@/hooks/useCloudAgentEnvironments', () => {
   const react = jest.requireActual<typeof React>('react');
   const usePendingMutation = <TInput, TResult>(
@@ -247,6 +256,8 @@ function makeEnvironmentDetail(
     startCommands: [],
     egressMode: null,
     egressAllowlist: null,
+    egressRequiredHosts: [],
+    isDraft: false,
     secretKeys: [],
   };
 }

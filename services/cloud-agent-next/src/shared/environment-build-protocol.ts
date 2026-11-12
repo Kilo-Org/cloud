@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { CONTROL_PLANE_GIT_PLATFORMS } from './control-plane-protocol.js';
 import { ISOLATED_CONTAINER_WORKSPACE_PATH } from './environment-workspace.js';
+import { setupScriptSchema } from './setup-script.js';
 
 /**
  * Environment builder <-> Worker protocol (plan "Build admission and
@@ -102,7 +103,7 @@ export const environmentBuildInputSchema = z.union([
       git: environmentBuildGitSchema,
       members: z.undefined().optional(),
       directory: z.literal(ENVIRONMENT_BUILD_WORKSPACE),
-      commands: z.array(z.string().min(1).max(16_000)).max(20),
+      commands: z.array(setupScriptSchema.min(1)).max(20),
       env: z.record(z.string().min(1).max(128), z.string().max(10_000)),
       /** Names of the secret entries in `env`, so the builder redacts their values. */
       secretKeys: z.array(z.string().min(1).max(128)).max(50),
@@ -117,7 +118,7 @@ export const environmentBuildInputSchema = z.union([
       members: z.array(environmentBuildMemberSchema).min(1),
       git: z.undefined().optional(),
       directory: z.string().regex(/^\/workspace(\/[^/]+)?$/),
-      commands: z.array(z.string().min(1).max(16_000)).max(20),
+      commands: z.array(setupScriptSchema.min(1)).max(20),
       env: z.record(z.string().min(1).max(128), z.string().max(10_000)),
       secretKeys: z.array(z.string().min(1).max(128)).max(50),
       deadlineAt: z.number().int().positive(),

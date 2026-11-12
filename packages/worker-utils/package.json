@@ -26,6 +26,7 @@
     "./compute-member": "./src/compute-member.ts",
     "./cloud-agent-compute": "./src/cloud-agent-compute.ts",
     "./egress-allowlist": "./src/egress-allowlist.ts",
+    "./setup-script": "./src/setup-script.ts",
     "./egress-audit": "./src/egress-audit.ts",
     "./scm-capability-contract": "./src/scm-capability-contract.ts",
     "./sha256": "./src/sha256.ts",
@@ -68,7 +69,8 @@
     "./organization-membership": "./src/organization-membership.ts",
     "./webhook-body-validation": "./src/webhook-body-validation.ts",
     "./organization-usage": "./src/organization-usage.ts",
-    "./organization-consumption": "./src/organization-consumption.ts"
+    "./organization-consumption": "./src/organization-consumption.ts",
+    "./environment-setup-authority": "./src/environment-setup-authority.ts"
   },
   "scripts": {
     "test": "vitest run",

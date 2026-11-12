@@ -487,9 +487,10 @@ const UNSPACED_SENTENCE_TAGS = new Set(['ja', 'zh-Hans', 'zh-Hant']);
  * The catalogs that write their conjunction as a prefix letter of the next
  * word rather than as a word of its own. Arabic joins the waw to the noun it
  * governs, so `login.termsConnector` carries the space before the conjunction
- * and none after it; every other catalog separates the conjunction with a space
- * on both sides. A catalog whose orthography changes has to move into or out of
- * this set together with its values.
+ * and none after it. Every catalog that separates words with spaces and is
+ * absent from this set separates the conjunction on both sides; a catalog that
+ * abuts its words pads neither. A catalog whose orthography changes has to move
+ * into or out of this set together with its values.
  */
 const PREFIX_CONJUNCTION_TAGS = new Set(['ar']);
 
@@ -1160,10 +1161,11 @@ for (const catalog of CATALOGS) {
     // the Terms link: a padded prefix with a bare connector joins "our" to
     // "Terms" but runs the conjunction into the next noun; the reverse drops the
     // space before the link. The junction after the conjunction follows the
-    // catalog's orthography: a language that writes the conjunction as a
-    // separate word pads both of its sides (" and "), and one that writes it as
-    // a prefix letter pads only its start (" و") because the letter joins the
-    // noun it governs.
+    // catalog's orthography. A catalog that abuts its words pads neither side
+    // ("和"). One that separates words with spaces pads the conjunction's start,
+    // and its end depends on how the language writes the conjunction: as a word
+    // of its own (" and ") or, in the tags in `PREFIX_CONJUNCTION_TAGS`, as a
+    // prefix letter that joins the noun it governs (" و").
     const prefixValue = translated.get('login.termsPrefix');
     const connectorValue = translated.get('login.termsConnector');
     if (prefixValue !== undefined && connectorValue !== undefined) {
@@ -1176,8 +1178,13 @@ for (const catalog of CATALOGS) {
       }
       const wantsPaddedEnd = paddedPrefix && !PREFIX_CONJUNCTION_TAGS.has(tag);
       if (/\s$/.test(connectorValue) !== wantsPaddedEnd) {
+        const reason = !paddedPrefix
+          ? 'this catalog abuts its words'
+          : PREFIX_CONJUNCTION_TAGS.has(tag)
+            ? 'this catalog writes the conjunction as a prefix of the next word'
+            : 'this catalog writes the conjunction as a separate word';
         fail(
-          `${label}: "login.termsConnector" must ${wantsPaddedEnd ? 'end with a space, because this catalog writes the conjunction as a separate word' : 'end without a space, because this catalog writes the conjunction as a prefix of the next word'}`
+          `${label}: "login.termsConnector" must ${wantsPaddedEnd ? 'end with a space' : 'end without a space'}, because ${reason}`
         );
       }
     }

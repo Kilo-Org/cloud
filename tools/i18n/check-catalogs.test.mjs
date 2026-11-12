@@ -448,6 +448,33 @@ test('rejects a separately written conjunction that lost its trailing space', co
   );
 });
 
+test('accepts an abutting catalog whose conjunction carries no spaces', context => {
+  // Japanese abuts its words, so neither the prefix nor the conjunction carries
+  // an edge space. The connector's edge rule follows the prefix: a catalog that
+  // pads nothing demands nothing.
+  const english = {
+    login: {
+      termsPrefix: 'By continuing you agree to our ',
+      terms: 'Terms',
+      termsConnector: ' and ',
+    },
+  };
+  const result = runChecker(context, {
+    language: 'ja',
+    english,
+    translated: {
+      login: {
+        termsPrefix: '続行すると、',
+        terms: '利用規約',
+        termsConnector: 'および',
+      },
+    },
+    source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
 test('rejects a conjunction that starts without the space its prefix carries', context => {
   const english = {
     login: {

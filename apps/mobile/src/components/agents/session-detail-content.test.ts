@@ -2341,7 +2341,6 @@ describe('session detail slow load', () => {
     );
   });
 
-
   it('holds the composer while the metadata names a cloud-agent session', async () => {
     // The metadata read lands before the transport resolves, and it names the
     // one kind that is writable by construction. The slot then holds the
@@ -4925,7 +4924,6 @@ describe('session detail read-only composer', () => {
     expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
   });
 
-
   it('keeps the footer live when the mounted list never reports its open state', async () => {
     openSettledReport.value = null;
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
@@ -5010,8 +5008,6 @@ describe('session detail read-only composer', () => {
       navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
     ).toHaveLength(2);
   });
-
-
 
   it('states a failed open and retries it from the same footer', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });

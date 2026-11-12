@@ -2877,8 +2877,6 @@ export function SessionDetailContent({
           />
         ) : null}
 
-        
-
         {isReadOnlyFooterPlaceholderVisible ? <SessionReadOnlyFooterPlaceholder /> : null}
 
         {isComposerSkeletonVisible ? <SessionComposerSkeleton /> : null}

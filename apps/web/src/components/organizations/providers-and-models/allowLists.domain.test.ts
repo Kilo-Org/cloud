@@ -5,6 +5,7 @@ import {
   computeAllowedModelIds,
   computeEnabledProviderSlugs,
   deriveProviderAllowListFromLegacyDenyList,
+  nonTrainingProviderSlugs,
   toggleModelAllowed,
   toggleProviderEnabled,
 } from '@/components/organizations/providers-and-models/allowLists.domain';
@@ -59,6 +60,17 @@ describe('allowLists.domain', () => {
       draftProviderAllowList: ['openai', 'anthropic'],
     });
     expect(next).toEqual(['anthropic']);
+  });
+
+  test('nonTrainingProviderSlugs keeps only selectable providers that do not train', () => {
+    expect(
+      nonTrainingProviderSlugs([
+        { providerSlug: 'openai', trains: true },
+        { providerSlug: 'anthropic', trains: false },
+        { providerSlug: 'unavailable', trains: false, unavailableReason: 'Not offered' },
+        { providerSlug: 'mistral', trains: false },
+      ])
+    ).toEqual(['anthropic', 'mistral']);
   });
 
   test('toggleProviderEnabled(enable) adds provider to allow list', () => {

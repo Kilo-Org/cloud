@@ -45,6 +45,7 @@ export function ProvidersTab({
   onProviderLocationsFilterChange,
   onToggleProviderEnabled,
   onSetProvidersEnabled,
+  onSelectNonTrainingProviders,
   onOpenProviderDetails,
   scope = 'organization',
   showDetails = true,
@@ -67,6 +68,7 @@ export function ProvidersTab({
   onProviderLocationsFilterChange: (value: string[]) => void;
   onToggleProviderEnabled: (providerSlug: string, nextEnabled: boolean) => void;
   onSetProvidersEnabled: (providerSlugs: string[], nextEnabled: boolean) => void;
+  onSelectNonTrainingProviders?: () => void;
   onOpenProviderDetails: (providerSlug: string) => void;
   scope?: 'organization' | 'group';
   showDetails?: boolean;
@@ -187,6 +189,17 @@ export function ProvidersTab({
                     >
                       Disable all shown ({providersToDisable.length})
                     </Button>
+                    {onSelectNonTrainingProviders ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!canEdit}
+                        onClick={onSelectNonTrainingProviders}
+                      >
+                        Select providers that do not train
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
                 <div className="max-h-[560px] overflow-y-auto">

@@ -28,6 +28,7 @@ import type {
   ProviderOffering,
   ProviderRow,
 } from '@/components/organizations/providers-and-models/providersAndModels.types';
+import { nonTrainingProviderSlugs } from '@/components/organizations/providers-and-models/allowLists.domain';
 import {
   useProvidersAndModelsAllowListsState,
   type ProviderPolicyFilter,
@@ -349,6 +350,11 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     return rows;
   }, [openRouterProviders]);
 
+  const handleSelectNonTrainingProviders = useCallback(() => {
+    if (!canEdit) return;
+    actions.setProviderAllowList(nonTrainingProviderSlugs(providerRows));
+  }, [actions, canEdit, providerRows]);
+
   const providerLocationOptions = useMemo((): string[] => {
     const locations = new Set<string>();
     for (const provider of providerRows) {
@@ -540,6 +546,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
                 if (canEdit)
                   dispatch({ type: 'SET_PROVIDERS_ENABLED', providerSlugs, nextEnabled });
               }}
+              onSelectNonTrainingProviders={handleSelectNonTrainingProviders}
               onOpenProviderDetails={actions.setInfoProviderSlug}
             />
           </TabsContent>

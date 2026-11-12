@@ -103,6 +103,20 @@ export function computeAllModelIds(
   return sortUniqueStrings(ids);
 }
 
+export function nonTrainingProviderSlugs(
+  providers: ReadonlyArray<{
+    providerSlug: string;
+    trains: boolean;
+    unavailableReason?: string;
+  }>
+): string[] {
+  return sortUniqueStrings(
+    providers
+      .filter(provider => !provider.trains && !provider.unavailableReason)
+      .map(provider => provider.providerSlug)
+  );
+}
+
 export function toggleProviderEnabled(params: {
   providerSlug: string;
   nextEnabled: boolean;

@@ -61,6 +61,10 @@ export type ProvidersAndModelsAllowListsAction =
       nextEnabled: boolean;
     }
   | {
+      type: 'SET_PROVIDER_ALLOW_LIST';
+      providerAllowList: ReadonlyArray<string>;
+    }
+  | {
       type: 'TOGGLE_MODEL';
       modelId: string;
       nextAllowed: boolean;
@@ -172,6 +176,14 @@ export function providersAndModelsAllowListsReducer(
       };
     }
 
+    case 'SET_PROVIDER_ALLOW_LIST': {
+      if (state.status !== 'ready') return state;
+      return {
+        ...state,
+        draftProviderAllowList: canonicalizeProviderAllowList(action.providerAllowList),
+      };
+    }
+
     case 'TOGGLE_MODEL': {
       if (state.status !== 'ready') return state;
       const nextModelDenyList = toggleModelAllowed({
@@ -268,6 +280,7 @@ export function useProvidersAndModelsAllowListsState(params: {
       providerAllowList: ReadonlyArray<string>;
     }) => void;
     toggleProvider: (params: { providerSlug: string; nextEnabled: boolean }) => void;
+    setProviderAllowList: (providerAllowList: ReadonlyArray<string>) => void;
     toggleModel: (params: { modelId: string; nextAllowed: boolean }) => void;
     resetToInitial: () => void;
     markSaved: () => void;
@@ -343,6 +356,10 @@ export function useProvidersAndModelsAllowListsState(params: {
     []
   );
 
+  const setProviderAllowList = useCallback((providerAllowList: ReadonlyArray<string>) => {
+    dispatch({ type: 'SET_PROVIDER_ALLOW_LIST', providerAllowList });
+  }, []);
+
   const toggleProvider = useCallback((input: { providerSlug: string; nextEnabled: boolean }) => {
     dispatch({
       type: 'TOGGLE_PROVIDER',
@@ -382,6 +399,7 @@ export function useProvidersAndModelsAllowListsState(params: {
     () => ({
       initFromServer,
       toggleProvider,
+      setProviderAllowList,
       toggleModel,
       resetToInitial: () => dispatch({ type: 'RESET_TO_INITIAL' }),
       markSaved: () => dispatch({ type: 'MARK_SAVED' }),
@@ -401,7 +419,7 @@ export function useProvidersAndModelsAllowListsState(params: {
       setInfoProviderSlug: (value: string | null) =>
         dispatch({ type: 'SET_INFO_PROVIDER_SLUG', value }),
     }),
-    [initFromServer, toggleModel, toggleProvider]
+    [initFromServer, setProviderAllowList, toggleModel, toggleProvider]
   );
 
   return {

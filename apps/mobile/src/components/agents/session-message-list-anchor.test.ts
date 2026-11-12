@@ -38,8 +38,8 @@ describe('composerInsetForSession', () => {
   });
 
   it('reserves nothing from another session', () => {
-    // The next session mounts its composer on the one-line floor, which
-    // publishes no change, so a carried-over value would offset its transcript.
+    // The previous session's growth must not offset the next transcript before
+    // the new composer publishes its floor.
     expect(composerInsetForSession({ sessionId: 'ses-a', dp: 64 }, 'ses-b')).toBe(0);
   });
 });

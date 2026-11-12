@@ -327,9 +327,9 @@ export function SessionDetailContent({
   // the reservation is dropped while that chrome is up — the read-only footer
   // and a blocking card fill the body — so a multi-line draft gets its anchor
   // back when the composer returns, without waiting for the next line to land.
-  // The measurement is tagged with the session it was taken for: a new session
-  // mounts its own composer on the one-line floor, which publishes no change,
-  // so the previous session's growth must never offset the new transcript.
+  // The measurement is tagged with the session it was taken for, so the previous
+  // session's growth never offsets the new transcript before the new composer
+  // publishes its one-line floor and clears the reservation.
   const [composerBottomInset, setComposerBottomInset] = useState<{
     sessionId: KiloSessionId;
     dp: number;

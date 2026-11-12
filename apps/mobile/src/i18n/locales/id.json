@@ -2852,6 +2852,8 @@
       "plan": "Paket organisasi",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Berakhir",
+      "planEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif.",
       "manageBilling": "Kelola penagihan",
       "renamePlaceholder": "Nama organisasi",
       "renameTitle": "Ganti nama organisasi"

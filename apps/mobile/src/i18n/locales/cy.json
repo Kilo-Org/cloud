@@ -3166,6 +3166,8 @@
       "plan": "Cynllun y sefydliad",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Wedi dod i ben",
+      "planEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol.",
       "manageBilling": "Rheoli bilio",
       "lowBalanceBelow": "O dan {{amount}}"
     },

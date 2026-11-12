@@ -2954,6 +2954,8 @@
       "plan": "Təşkilat planı",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Başa çatıb",
+      "planEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur.",
       "manageBilling": "Ödənişi idarə et",
       "lowBalanceBelow": "{{amount}}-dan aşağı"
     },

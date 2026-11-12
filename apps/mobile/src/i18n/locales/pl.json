@@ -2958,6 +2958,8 @@
       "plan": "Plan organizacji",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Zakończony",
+      "planEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu.",
       "manageBilling": "Zarządzaj rozliczeniami",
       "renamePlaceholder": "Nazwa organizacji",
       "renameTitle": "Zmień nazwę organizacji"

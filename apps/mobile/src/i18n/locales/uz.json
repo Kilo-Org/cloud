@@ -2954,6 +2954,8 @@
       "plan": "Tashkilot tarifi",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Muddati tugagan",
+      "planEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas.",
       "manageBilling": "To'lovni boshqarish",
       "lowBalanceBelow": "{{amount}} dan kam"
     },

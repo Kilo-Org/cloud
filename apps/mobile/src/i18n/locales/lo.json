@@ -2954,6 +2954,8 @@
       "plan": "ແຜນອົງກອນ",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · ສິ້ນສຸດ",
+      "planEnded": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່.",
       "manageBilling": "ຈັດການການຮຽກເກັບເງິນ",
       "lowBalanceBelow": "ຕໍ່າກວ່າ {{amount}}"
     },

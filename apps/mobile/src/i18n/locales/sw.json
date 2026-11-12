@@ -2954,6 +2954,8 @@
       "plan": "Mpango wa shirika",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Umeisha",
+      "planEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika.",
       "manageBilling": "Dhibiti bili",
       "lowBalanceBelow": "Chini ya {{amount}}"
     },

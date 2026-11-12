@@ -2905,6 +2905,8 @@
       "plan": "תוכנית הארגון",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · הסתיים",
+      "planEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה.",
       "manageBilling": "ניהול חיובים",
       "renamePlaceholder": "שם הארגון",
       "renameTitle": "שינוי שם הארגון"

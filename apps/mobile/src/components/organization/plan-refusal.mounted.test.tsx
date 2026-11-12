@@ -65,7 +65,14 @@ describe('OrganizationPlanRefusal', () => {
     // Android's platform minimum: the control's own node carries it, so the
     // label cannot shrink below the target the design gate measures.
     expect(control.props.className).toContain('min-h-[48px]');
-    expect(root.findByType('Text').props.children).toBe('Manage billing');
+    const label = root.findByType('Text');
+    expect(label.props.children).toBe('Manage billing');
+    // The brand primary is off-palette on the error-tinted surface (olive in
+    // light, saturated yellow in dark), so the action wears the message's ink
+    // and marks itself as the action by its underline instead of by hue.
+    expect(label.props.className).toContain('text-destructive');
+    expect(label.props.className).toContain('underline');
+    expect(label.props.className).not.toContain('text-primary');
 
     act(() => {
       (control.props.onPress as () => void)();

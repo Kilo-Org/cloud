@@ -3113,6 +3113,8 @@
       "plan": "Plean eagraíochta",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Thart",
+      "planEnded": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici.",
       "manageBilling": "Bainistigh billeáil",
       "lowBalanceBelow": "Faoi {{amount}}"
     },

@@ -3060,6 +3060,8 @@
       "plan": "План арганізацыі",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Скончыўся",
+      "planEnded": "Пробны перыяд арганізацыі скончыўся, і ў яе няма актыўнага плана.",
       "manageBilling": "Кіраванне плацяжамі",
       "lowBalanceBelow": "Менш за {{amount}}"
     },

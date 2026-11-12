@@ -2954,6 +2954,8 @@
       "plan": "แผนขององค์กร",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · สิ้นสุดลงแล้ว",
+      "planEnded": "การทดลองใช้งานขององค์กรสิ้นสุดลงแล้วและองค์กรไม่มีแผนที่ใช้งานอยู่",
       "manageBilling": "จัดการการเรียกเก็บเงิน",
       "lowBalanceBelow": "ต่ำกว่า {{amount}}"
     },

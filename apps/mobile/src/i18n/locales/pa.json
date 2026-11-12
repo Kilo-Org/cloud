@@ -2954,6 +2954,8 @@
       "plan": "ਸੰਸਥਾ ਦਾ ਪਲਾਨ",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · ਖਤਮ ਹੋ ਗਈ",
+      "planEnded": "ਸੰਸਥਾ ਦਾ ਟ੍ਰਾਇਲ ਖਤਮ ਹੋ ਗਿਆ ਹੈ ਅਤੇ ਇਸਦੀ ਕੋਈ ਸਰਗਰਮ ਯੋਜਨਾ ਨਹੀਂ ਹੈ।",
       "manageBilling": "ਬਿਲਿੰਗ ਪ੍ਰਬੰਧ ਕਰੋ",
       "lowBalanceBelow": "{{amount}} ਤੋਂ ਘੱਟ"
     },

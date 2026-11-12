@@ -2954,6 +2954,8 @@
       "plan": "Drafitry ny fikambanana",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Lany",
+      "planEnded": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy.",
       "manageBilling": "Hitantana faktiora",
       "lowBalanceBelow": "Latsaky ny {{amount}}"
     },

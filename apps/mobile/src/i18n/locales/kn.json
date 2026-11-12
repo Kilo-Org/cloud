@@ -2954,6 +2954,8 @@
       "plan": "ಸಂಸ್ಥೆಯ ಯೋಜನೆ",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · ಅವಧಿ ಮುಗಿದಿದೆ",
+      "planEnded": "ಸಂಸ್ಥೆಯ ಪ್ರಾಯೋಗಿಕ ಅವಧಿ ಮುಗಿದಿದೆ ಮತ್ತು ಅದಕ್ಕೆ ಯಾವುದೇ ಸಕ್ರಿಯ ಯೋಜನೆ ಇಲ್ಲ.",
       "manageBilling": "ಬಿಲ್ಲಿಂಗ್ ನಿರ್ವಹಿಸಿ",
       "lowBalanceBelow": "{{amount}} ಕ್ಕಿಂತ ಕಡಿಮೆ"
     },

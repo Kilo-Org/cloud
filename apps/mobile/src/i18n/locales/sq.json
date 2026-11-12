@@ -2954,6 +2954,8 @@
       "plan": "Plani i organizatës",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Skaduar",
+      "planEnded": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv.",
       "manageBilling": "Menaxho faturimin",
       "lowBalanceBelow": "Nën {{amount}}"
     },

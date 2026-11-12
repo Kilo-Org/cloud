@@ -2954,6 +2954,8 @@
       "plan": "సంస్థ ప్లాన్",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · ముగిసింది",
+      "planEnded": "సంస్థ యొక్క ట్రయల్ ముగిసింది మరియు దానికి సక్రియ ప్లాన్ లేదు.",
       "manageBilling": "బిల్లింగ్ను నిర్వహించండి",
       "lowBalanceBelow": "{{amount}} కంటే తక్కువ"
     },

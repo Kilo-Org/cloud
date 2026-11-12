@@ -27,6 +27,9 @@ type OrganizationPlanRefusalProps = Readonly<{
  * alert icon and the error-tinted surface hold the explanation, the error ink
  * keeps its contrast on that tint in both schemes, and the caller decides
  * whether an action belongs beside it and how much room it takes above itself.
+ * The action wears that same ink with an underline: the brand primary is
+ * off-palette on this surface, and it reads as the action by decoration
+ * instead of by hue.
  */
 export function OrganizationPlanRefusal({
   message,
@@ -59,7 +62,9 @@ export function OrganizationPlanRefusal({
               textActionTargetClass()
             )}
           >
-            <Text className="text-sm font-semibold text-primary">{action.label}</Text>
+            <Text className="text-sm font-semibold text-destructive underline">
+              {action.label}
+            </Text>
           </Pressable>
         ) : null}
       </View>

@@ -2954,6 +2954,8 @@
       "plan": "संस्थेचा प्लॅन",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · संपली आहे",
+      "planEnded": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही.",
       "manageBilling": "बिलिंग व्यवस्थापित करा",
       "lowBalanceBelow": "{{amount}} पेक्षा कमी"
     },

@@ -215,14 +215,15 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
       >
         {/* A lapsed plan blocks every new session for every member of this
             organization, so it is stated before the numbers the screen opens
-            on. Only a billing role gets the action: the web billing page
-            refuses the other roles, and the sentence already says an owner can
-            update billing. The plan row inside the card below names the plan in
-            both states, so this block adds the state and the step, not the
-            tier. */}
+            on. The sentence stops at the state: the billing action below it is
+            the next step for a role that can take it, so repeating the
+            instruction the other surfaces carry would restate the control.
+            Only a billing role gets the action, because the web billing page
+            refuses the other roles. The plan row inside the card below states
+            the tier and its status, so this block adds neither. */}
         {planEnded ? (
           <OrganizationPlanRefusal
-            message={t('common.organizationTrialEnded')}
+            message={t('organization.hub.planEnded')}
             action={
               showMoney
                 ? {
@@ -281,9 +282,15 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           />
           {/* The plan is the tier the seats belong to, so it closes the card
               the seats are counted in and paints in every state. A lapsed plan
-              keeps its tier named here; the block above the card carries the
-              ended state and the billing step. */}
-          <KvRow label={t('organization.hub.plan')} value={planName} valueFace="text" last />
+              states that in this row: the tier alone beside the block above
+              would read as an active plan. */}
+          <KvRow
+            label={t('organization.hub.plan')}
+            value={planEnded ? t('organization.hub.planLapsed', { plan: planName }) : planName}
+            valueTone={planEnded ? 'danger' : 'default'}
+            valueFace="text"
+            last
+          />
         </Animated.View>
 
         <OrgUsageStats organizationId={organizationId} />

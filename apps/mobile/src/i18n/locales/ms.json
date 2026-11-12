@@ -2954,6 +2954,8 @@
       "plan": "Pelan organisasi",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Tamat",
+      "planEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif.",
       "manageBilling": "Urus pengebilan",
       "lowBalanceBelow": "Di bawah {{amount}}"
     },

@@ -3007,6 +3007,8 @@
       "plan": "Pla de l'organització",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Caducat",
+      "planEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu.",
       "manageBilling": "Gestiona la facturació",
       "lowBalanceBelow": "Per sota de {{amount}}"
     },

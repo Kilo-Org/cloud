@@ -2954,6 +2954,8 @@
       "plan": "تنظیم کا پلان",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · ختم شدہ",
+      "planEnded": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔",
       "manageBilling": "بلنگ کا انتظام کریں",
       "lowBalanceBelow": "{{amount}} سے کم"
     },

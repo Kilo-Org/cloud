@@ -3113,6 +3113,8 @@
       "plan": "Pjan tal-organizzazzjoni",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Intemm",
+      "planEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv.",
       "manageBilling": "Immaniġġja l-ħlasijiet",
       "lowBalanceBelow": "Taħt {{amount}}"
     },

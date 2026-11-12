@@ -2954,6 +2954,8 @@
       "plan": "គម្រោងស្ថាប័ន",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · បានបញ្ចប់",
+      "planEnded": "ការសាកល្បងរបស់ស្ថាប័នបានបញ្ចប់ ហើយវាមិនមានគម្រោងសកម្មទេ។",
       "manageBilling": "គ្រប់គ្រងការគិតប្រាក់",
       "lowBalanceBelow": "ក្រោម {{amount}}"
     },

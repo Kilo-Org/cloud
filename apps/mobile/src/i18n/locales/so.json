@@ -2954,6 +2954,8 @@
       "plan": "Qorshaha ururka",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Dhamaatay",
+      "planEnded": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon.",
       "manageBilling": "Maaree biilasha",
       "lowBalanceBelow": "Ka yar {{amount}}"
     },

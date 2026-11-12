@@ -3013,6 +3013,8 @@
       "plan": "Plano da organização",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Terminado",
+      "planEnded": "O período de teste da organização terminou e esta não tem um plano ativo.",
       "manageBilling": "Gerir faturação",
       "lowBalanceBelow": "Abaixo de {{amount}}"
     },

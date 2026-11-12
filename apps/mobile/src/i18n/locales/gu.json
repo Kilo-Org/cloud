@@ -2954,6 +2954,8 @@
       "plan": "સંસ્થાનો પ્લાન",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · સમાપ્ત",
+      "planEnded": "સંસ્થાનો ટ્રાયલ સમાપ્ત થઈ ગયો છે અને તેની પાસે કોઈ સક્રિય પ્લાન નથી.",
       "manageBilling": "બિલિંગ મેનેજ કરો",
       "lowBalanceBelow": "{{amount}}થી ઓછું"
     },

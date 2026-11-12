@@ -2958,6 +2958,8 @@
       "plan": "План організації",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Завершився",
+      "planEnded": "Пробний період організації завершився, і вона не має активного плану.",
       "manageBilling": "Керувати оплатою",
       "renamePlaceholder": "Назва організації",
       "renameTitle": "Перейменувати організацію"

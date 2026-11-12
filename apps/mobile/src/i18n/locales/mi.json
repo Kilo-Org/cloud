@@ -2954,6 +2954,8 @@
       "plan": "Mahere whakahaerenga",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Kua mutu",
+      "planEnded": "Kua mutu te whakamātautau o te whakahaerenga, ā, kāore ōna mahere kaha.",
       "manageBilling": "Whakahaere utu",
       "lowBalanceBelow": "I raro i te {{amount}}"
     },

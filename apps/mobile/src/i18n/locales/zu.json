@@ -2954,6 +2954,8 @@
       "plan": "Uhlelo lwenhlangano",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Oluphelile",
+      "planEnded": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo.",
       "manageBilling": "Phatha ukukhokha",
       "lowBalanceBelow": "Ngaphansi kwe-{{amount}}"
     },

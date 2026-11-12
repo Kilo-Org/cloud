@@ -3060,6 +3060,8 @@
       "plan": "Plán organizácie",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Skončený",
+      "planEnded": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán.",
       "manageBilling": "Spravovať fakturáciu",
       "lowBalanceBelow": "Pod {{amount}}"
     },

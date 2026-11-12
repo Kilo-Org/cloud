@@ -2954,6 +2954,8 @@
       "plan": "Organisasieplan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Het geëindig",
+      "planEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie.",
       "manageBilling": "Bestuur fakturering",
       "lowBalanceBelow": "Onder {{amount}}"
     },

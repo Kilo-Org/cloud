@@ -2954,6 +2954,8 @@
       "plan": "Organisatsiooni plaan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · lõppenud",
+      "planEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti.",
       "manageBilling": "Halda arveldust",
       "lowBalanceBelow": "Alla {{amount}}"
     },

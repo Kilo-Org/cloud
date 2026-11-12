@@ -2954,6 +2954,8 @@
       "plan": "Πλάνο οργανισμού",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · Έληξε",
+      "planEnded": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει και δεν υπάρχει ενεργό πρόγραμμα.",
       "manageBilling": "Διαχείριση χρέωσης",
       "lowBalanceBelow": "Κάτω από {{amount}}"
     },

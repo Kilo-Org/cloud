@@ -2954,6 +2954,8 @@
       "plan": "پلانی ڕێکخراو",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
+      "planLapsed": "{{plan}} · کۆتایی هاتووە",
+      "planEnded": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە و هیچ پلانێکی چالاکی نییە.",
       "manageBilling": "بەڕێوەبردنی پارەدان",
       "lowBalanceBelow": "کەمتر لە {{amount}}"
     },

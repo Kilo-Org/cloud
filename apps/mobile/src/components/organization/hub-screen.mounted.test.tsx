@@ -348,7 +348,9 @@ describe('Organization hub plan', () => {
   it('names the plan in every state, in the card the seats belong to', async () => {
     const entitled = await renderHub();
 
-    expect(planRow(entitled.renderer)?.props.value).toBe(i18n.t('organization.hub.planTeams'));
+    const entitledRow = planRow(entitled.renderer);
+    expect(entitledRow?.props.value).toBe(i18n.t('organization.hub.planTeams'));
+    expect(entitledRow?.props.valueTone).toBe('default');
     // An entitled organization is not warned about a state it is not in.
     expect(refusals(entitled.renderer)).toHaveLength(0);
     entitled.unmount();
@@ -357,19 +359,27 @@ describe('Organization hub plan', () => {
     boundary.isTrialExpiredForEnforcement = true;
     const lapsed = await renderHub();
 
-    // A lapsed organization keeps its tier named: the plan is not deleted when
-    // the trial ends.
-    expect(planRow(lapsed.renderer)?.props.value).toBe(i18n.t('organization.hub.planEnterprise'));
+    // A lapsed organization keeps its tier named and states the status in the
+    // same row: the bare tier beside a block that says there is no active plan
+    // reads as a plan that is still running.
+    const lapsedRow = planRow(lapsed.renderer);
+    expect(lapsedRow?.props.value).toBe(
+      i18n.t('organization.hub.planLapsed', { plan: i18n.t('organization.hub.planEnterprise') })
+    );
+    expect(lapsedRow?.props.valueTone).toBe('danger');
     lapsed.unmount();
   });
 
-  it('explains a lapsed plan with the sentence the new-session form shows', async () => {
+  it('explains a lapsed plan with the state alone, leaving the step to the action', async () => {
     boundary.isTrialExpiredForEnforcement = true;
 
     const { renderer, unmount } = await renderHub();
 
     const [refusal] = refusals(renderer);
-    expect(refusal?.props.message).toBe(i18n.t('common.organizationTrialEnded'));
+    expect(refusal?.props.message).toBe(i18n.t('organization.hub.planEnded'));
+    // The billing action below the sentence is the next step, so the message
+    // must not repeat the instruction the surfaces without an action carry.
+    expect(refusal?.props.message).not.toBe(i18n.t('common.organizationTrialEnded'));
     unmount();
   });
 
@@ -402,7 +412,7 @@ describe('Organization hub plan', () => {
     const [refusal] = refusals(renderer);
     // The web billing page refuses this role, so the block states the state
     // without offering a control that would fail.
-    expect(refusal?.props.message).toBe(i18n.t('common.organizationTrialEnded'));
+    expect(refusal?.props.message).toBe(i18n.t('organization.hub.planEnded'));
     expect(refusal?.props.action).toBeUndefined();
     unmount();
   });

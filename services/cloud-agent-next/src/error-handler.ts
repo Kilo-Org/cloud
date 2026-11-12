@@ -22,7 +22,8 @@ export function createWorkerErrorHandler(logger: ErrorLogger): ErrorHandler {
     return buildTrpcErrorResponse(
       500,
       'Internal server error',
-      extractProcedureName(pathname) ?? undefined
+      extractProcedureName(pathname) ?? undefined,
+      { retryable: false }
     );
   };
 }

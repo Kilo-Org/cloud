@@ -34,7 +34,7 @@ describe('createWorkerErrorHandler', () => {
           clientError: {
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Internal server error',
-            retryable: true,
+            retryable: false,
           },
         },
       },

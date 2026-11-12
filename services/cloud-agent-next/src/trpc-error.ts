@@ -111,16 +111,28 @@ export function projectTrpcErrorData(
   };
 }
 
-export function buildTrpcErrorResponse(status: number, message: string, path?: string): Response {
+type BuildTrpcErrorResponseOptions = { retryable?: boolean };
+
+export function buildTrpcErrorResponse(
+  status: number,
+  message: string,
+  path?: string,
+  options: BuildTrpcErrorResponseOptions = {}
+): Response {
   const code =
     STATUS_TO_TRPC_CODE[status as keyof typeof STATUS_TO_TRPC_CODE] ?? 'INTERNAL_SERVER_ERROR';
+  const data = projectTrpcErrorData({ code, httpStatus: status, path }, message);
+  const clientError =
+    options.retryable === undefined
+      ? data.clientError
+      : { ...data.clientError, retryable: options.retryable };
 
   return new Response(
     JSON.stringify({
       error: {
         message,
         code: TRPC_ERROR_CODES_BY_KEY[code],
-        data: projectTrpcErrorData({ code, httpStatus: status, path }, message),
+        data: { ...data, clientError },
       },
     }),
     {

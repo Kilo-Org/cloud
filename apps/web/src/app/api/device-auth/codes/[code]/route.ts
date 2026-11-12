@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
-import { pollDeviceAuthRequest, denyDeviceAuthRequest } from '@/lib/device-auth/device-auth';
+import {
+  pollDeviceAuthRequest,
+  denyDeviceAuthRequest,
+  cancelDeviceAuthRequest,
+} from '@/lib/device-auth/device-auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
 import { checkRateLimit } from '@vercel/firewall';
@@ -65,6 +69,33 @@ function getDenyRateLimitKey(userId: string): string {
   return crypto.createHmac('sha256', NEXTAUTH_SECRET).update(userId).digest('base64url');
 }
 
+function deviceAuthFailureResponse(error: unknown, notPendingMessage: string): Response {
+  if (error instanceof Error) {
+    if (error.message === 'Device authorization request not found') {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    if (error.message === 'Device authorization request is not pending') {
+      return NextResponse.json({ error: notPendingMessage }, { status: 409 });
+    }
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  Sentry.captureException(error instanceof Error ? error : new Error(message));
+  return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+}
+
+async function cancelFromDevice(code: string): Promise<Response> {
+  try {
+    await cancelDeviceAuthRequest(code);
+  } catch (error) {
+    return deviceAuthFailureResponse(
+      error,
+      'Device authorization request can no longer be cancelled'
+    );
+  }
+
+  return NextResponse.json({ success: true });
+}
+
 export const DELETE = withRestTiming(
   '/api/device-auth/codes/[code]',
   async (request: Request, context: RouteContext) => {
@@ -72,6 +103,14 @@ export const DELETE = withRestTiming(
 
     if (!code) {
       return NextResponse.json({ error: 'Code parameter is required' }, { status: 400 });
+    }
+
+    const viewerToken = request.headers.get('x-device-auth-viewer-token');
+
+    // Without a viewer token the caller is the device itself, presenting the
+    // poll secret that the poll GET accepts as `code`.
+    if (viewerToken === null) {
+      return cancelFromDevice(code);
     }
 
     // Authenticate the user
@@ -95,7 +134,6 @@ export const DELETE = withRestTiming(
     }
 
     // Verify viewer token
-    const viewerToken = request.headers.get('x-device-auth-viewer-token');
     const verified = verifyDeviceAuthViewerToken(viewerToken);
 
     if (!verified) {
@@ -113,20 +151,10 @@ export const DELETE = withRestTiming(
     try {
       await denyDeviceAuthRequest(code);
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === 'Device authorization request not found') {
-          return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        }
-        if (error.message === 'Device authorization request is not pending') {
-          return NextResponse.json(
-            { error: 'Device authorization request can no longer be denied' },
-            { status: 409 }
-          );
-        }
-      }
-      const message = error instanceof Error ? error.message : String(error);
-      Sentry.captureException(error instanceof Error ? error : new Error(message));
-      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      return deviceAuthFailureResponse(
+        error,
+        'Device authorization request can no longer be denied'
+      );
     }
 
     return NextResponse.json({ success: true });

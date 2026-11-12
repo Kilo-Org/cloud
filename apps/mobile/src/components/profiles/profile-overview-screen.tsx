@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -26,6 +26,8 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import {
   Bot,
   CornerDownLeft,
+  Download,
+  FileText,
   KeyRound,
   type LucideIcon,
   Server,
@@ -46,6 +48,7 @@ import { useTRPC } from '@/lib/trpc';
 import {
   getProfileAgentsPath,
   getProfileCommandsPath,
+  getProfileInstructionsPath,
   getProfileMcpPath,
   getProfileSkillsPath,
   getProfileSlashCommandsPath,
@@ -61,6 +64,7 @@ const SECTION_ICONS = {
   slashCommands: CornerDownLeft,
   mcp: Server,
   skills: Sparkles,
+  instructions: FileText,
   agents: Bot,
 } satisfies Record<OverviewSectionKey, LucideIcon>;
 
@@ -71,11 +75,24 @@ const SECTION_PATHS = {
   slashCommands: getProfileSlashCommandsPath,
   mcp: getProfileMcpPath,
   skills: getProfileSkillsPath,
+  instructions: getProfileInstructionsPath,
   agents: getProfileAgentsPath,
 } satisfies Record<
   OverviewSectionKey,
   (profileId: string, organizationId: string | undefined, stack: ProfileManagementStack) => Href
 >;
+
+/**
+ * The import sheet pulls in the page-sheet surface and the state-geometry hook
+ * behind it, which reach expo-router and `@sentry/react-native`'s native
+ * initialization: modules the mounted overview suites' Node environment cannot
+ * load. Lazy-loading the sheet keeps them out of this screen's graph until the
+ * reader opens Import config, and mounts the same sheet once they do.
+ */
+const LazyProfileConfigImportSheet = lazy(async () => {
+  const { ProfileConfigImportSheet } = await import('./profile-config-import-sheet');
+  return { default: ProfileConfigImportSheet };
+});
 
 /**
  * The mutation hook toasts `error.message`; the screen only supplies a
@@ -112,6 +129,9 @@ export function ProfileOverviewScreen({
   // profile form sheets do. A read-only viewer cannot edit the form, so the
   // guard stays off for them.
   const metadataGuard = useMetadataLeaveGuard({ enabled: canManage });
+  // The config-import sheet is a modal over this screen, so it holds no route
+  // and no draft of its own.
+  const [importOpen, setImportOpen] = useState(false);
 
   const profile = profileQuery.data;
   const isOrgOwned = organizationId !== undefined;
@@ -280,12 +300,23 @@ export function ProfileOverviewScreen({
                     icon={SECTION_ICONS[row.key]}
                     title={t(row.titleKey)}
                     subtitle={String(row.count)}
-                    last={index === rows.length - 1}
+                    last={index === rows.length - 1 && !canManage}
                     onPress={() => {
                       router.push(SECTION_PATHS[row.key](profileId, organizationId, stack));
                     }}
                   />
                 ))}
+                {canManage ? (
+                  <ConfigureRow
+                    icon={Download}
+                    title={t('profiles.importConfigTitle')}
+                    subtitle={t('profiles.importConfigRowSubtitle')}
+                    last
+                    onPress={() => {
+                      setImportOpen(true);
+                    }}
+                  />
+                ) : null}
               </View>
             </View>
 
@@ -308,6 +339,17 @@ export function ProfileOverviewScreen({
 
       {dialog}
       {metadataGuard.dialog}
+      {importOpen ? (
+        <Suspense fallback={null}>
+          <LazyProfileConfigImportSheet
+            profileId={profileId}
+            organizationId={organizationId}
+            onClose={() => {
+              setImportOpen(false);
+            }}
+          />
+        </Suspense>
+      ) : null}
     </View>
   );
 }

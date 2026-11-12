@@ -21,7 +21,10 @@ import type { CallbackJob } from './callbacks/index.js';
 import { AGENT_SANDBOX_PROVIDERS, type AgentSandboxProvider } from './shared/sandbox-provider.js';
 import type { NotificationsBinding } from './notifications-binding.js';
 import type { SessionIngestBinding } from './session-ingest-binding.js';
-import type { ContainerUsageRpcMethods } from '@kilocode/container-usage';
+import type {
+  ContainerBillingStatusRpcMethods,
+  ContainerUsageRpcMethods,
+} from '@kilocode/container-usage';
 import type { SecretBinding } from './auth.js';
 import * as z from 'zod';
 import { Limits } from './schema.js';
@@ -487,8 +490,7 @@ export type Env = {
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
   SESSION_SYNC?: Fetcher;
-  /** Record-only container lifecycle usage meter. */
-  CONTAINER_USAGE_METER: ContainerUsageRpcMethods;
+  CONTAINER_USAGE_METER: ContainerUsageRpcMethods & ContainerBillingStatusRpcMethods;
   /** Shared secret for internal service-to-service authentication */
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */

@@ -15,11 +15,13 @@ import {
   getLocalScopeKey,
   persistGlanceableSink,
 } from '@/lib/glanceable/persist';
+import { _setScopeStoreForTests } from '@/lib/glanceable/scope';
 import {
   type GlanceableSinkContext,
   registerGlanceableSink,
   unregisterGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
+import { setProtectedDataAvailable } from '@/lib/protected-data';
 import { ACTIVE_USER_ID_KEY, AUTH_TOKEN_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   _setGlanceableSinksLoaderForTests,
@@ -265,6 +267,11 @@ vi.mock('@/lib/glanceable/session-activity-tokens-android', async importOriginal
 // storage is replaced; payload parsing, mapping, and the pending slot are real.
 async function loadNotifications() {
   vi.resetModules();
+  // The hint reads go through the widget store, whose resolver lazy-loads the
+  // native module this pure suite cannot import; the reset above created a new
+  // scope module, so the seam is installed on that instance.
+  const scope = await import('@/lib/glanceable/scope');
+  scope._setScopeStoreForTests({ getItemAsync: mocks.getItemAsync });
   const pending = await import('./deep-link-launch');
   pending._setSecureStoreForTests({
     setItemAsync: vi.fn().mockResolvedValue(undefined),
@@ -319,6 +326,10 @@ beforeEach(() => {
   mocks.clearLastNotificationResponse.mockImplementation(() => {
     mocks.lastResponse = null;
   });
+  // The hint reads go through the widget store, which lazy-loads the native
+  // module the pure suite cannot import; the seam supplies the same mock the
+  // credential path uses.
+  _setScopeStoreForTests({ getItemAsync: mocks.getItemAsync });
 });
 
 describe('retired notification payloads', () => {
@@ -1535,6 +1546,62 @@ describe('applyGlanceablePushData', () => {
     unregisterGlanceableSink(sink);
   });
 
+  it('applies a push with the screen locked when the identity hints answer', async () => {
+    _setLastGlanceableSnapshotForTests(
+      glanceableSnapshot({
+        scopeKey: SCOPE_KEY,
+        revision: 3,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+    );
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+    setProtectedDataAvailable(false);
+
+    const result = await applyGlanceablePushData(
+      activeGlanceablePush({
+        scopeKey: SCOPE_KEY,
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        organizationBound: true,
+      })
+    );
+
+    expect(result).toBe(true);
+    expect(sink.publish).toHaveBeenCalledWith(expect.objectContaining({ revision: 4 }));
+
+    setProtectedDataAvailable(true);
+    unregisterGlanceableSink(sink);
+  });
+
+  it('drops a push before the first unlock without reading it as a sign-out', async () => {
+    _setLastGlanceableSnapshotForTests(
+      glanceableSnapshot({
+        scopeKey: SCOPE_KEY,
+        revision: 3,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+    );
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+    setProtectedDataAvailable(false);
+    // The keychain has not been unlocked since boot, so the hints cannot answer.
+    mocks.getItemAsync.mockResolvedValue(null);
+
+    const result = await applyGlanceablePushData(
+      activeGlanceablePush({ scopeKey: SCOPE_KEY, updatedAt: '2026-01-02T00:00:00.000Z' })
+    );
+
+    expect(result).toBe(false);
+    expect(sink.publish).not.toHaveBeenCalled();
+    // The seeded scope is the one this process already acts for; an unanswered
+    // hint must not retire it.
+    expect(getLocalScopeKey()).toBe(SCOPE_KEY);
+    expect(getLastGlanceableSnapshot()?.revision).toBe(3);
+
+    setProtectedDataAvailable(true);
+    unregisterGlanceableSink(sink);
+  });
+
   it('ends the sinks after the terminal window for a non-eligible remote snapshot', async () => {
     vi.useFakeTimers();
     _setLastGlanceableSnapshotForTests(
@@ -2612,6 +2679,10 @@ describe('cold iOS background delivery', () => {
 
   async function loadColdBackground() {
     vi.resetModules();
+    // A static import cannot reach the module instance `resetModules` just
+    // created, and the hint reads must run on that instance.
+    const scope = await import('@/lib/glanceable/scope');
+    scope._setScopeStoreForTests({ getItemAsync: mocks.getItemAsync });
     await import('@/lib/glanceable/delivery-registration');
     const [notifications, registry, persist, sink, cleanup, blank, waitingAsk] = await Promise.all([
       import('./notifications'),

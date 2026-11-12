@@ -1,7 +1,12 @@
 import { type ReasoningPart, type TextPart, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
-import { computeMessageStatus, computeStatus, SNAPSHOT_PROGRESS_STATUS } from './compute-status';
+import {
+  computeBlockingAskStatus,
+  computeMessageStatus,
+  computeStatus,
+  SNAPSHOT_PROGRESS_STATUS,
+} from './compute-status';
 
 function makeTextPart(text: string, synthetic?: boolean): TextPart {
   const part: TextPart = {
@@ -86,5 +91,18 @@ describe('computeMessageStatus', () => {
   it('falls back to Considering next steps when only empty placeholders exist', () => {
     expect(computeMessageStatus([makeTextPart('')])).toBe('Considering next steps');
     expect(computeMessageStatus([])).toBe('Considering next steps');
+  });
+});
+
+describe('computeBlockingAskStatus', () => {
+  it('names the wait for a permission ask instead of the blocked tool activity', () => {
+    // The ask holds the transcript at the blocked tool part, so the activity
+    // label would claim a command that has not started.
+    expect(computeStatus(makeToolPart('bash'))).toBe('Running commands');
+    expect(computeBlockingAskStatus('permission')).toBe('Waiting for permission');
+  });
+
+  it('names the pending question', () => {
+    expect(computeBlockingAskStatus('question')).toBe('Asking a question');
   });
 });

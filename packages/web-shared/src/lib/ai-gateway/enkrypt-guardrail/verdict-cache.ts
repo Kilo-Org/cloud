@@ -134,13 +134,12 @@ function cachedVerdict(
   config: ReadyConfig
 ): EnkryptVerdictCacheEntry['verdict'] | null {
   if (value === 'allow') return 'allow';
-  let parsed: unknown = value;
-  if (typeof value === 'string') {
-    try {
-      parsed = JSON.parse(value);
-    } catch {
-      return null;
-    }
+  if (typeof value !== 'string') return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return null;
   }
   const blocked = cachedBlockVerdictSchema.safeParse(parsed);
   return blocked.success &&

@@ -681,20 +681,6 @@ describe('scanRequestWithVerdictCache', () => {
     });
   });
 
-  it('accepts automatically deserialized block objects as well as serialized entries', async () => {
-    const store = memoryStore();
-    store.mget.mockResolvedValue([{ action: 'block', detectors: ['injection_attack'] }]);
-    const dependencies = deps(store);
-
-    const result = await scanConversation(makeRequest([segment('user', 'blocked')]), dependencies);
-
-    expect(result.verdict).toEqual({
-      action: 'block',
-      message: guardrailBlockMessage(['injection_attack'], null),
-    });
-    expect(dependencies.fetch).not.toHaveBeenCalled();
-  });
-
   it.each<[string, unknown]>([
     ['missing entry', null],
     ['old allow marker', '1'],
@@ -702,12 +688,16 @@ describe('scanRequestWithVerdictCache', () => {
     ['invalid JSON', '{"action":'],
     ['boolean', true],
     ['array', ['allow']],
-    ['missing detectors', { action: 'block' }],
-    ['empty detectors', { action: 'block', detectors: [] }],
-    ['unknown detector', { action: 'block', detectors: ['unknown_detector'] }],
-    ['non-blocking detector', { action: 'block', detectors: ['pii'] }],
-    ['wrong action', { action: 'allow', detectors: ['injection_attack'] }],
-    ['extra message', { action: 'block', detectors: ['injection_attack'], message: 'private' }],
+    ['unserialized block', { action: 'block', detectors: ['injection_attack'] }],
+    ['missing detectors', JSON.stringify({ action: 'block' })],
+    ['empty detectors', JSON.stringify({ action: 'block', detectors: [] })],
+    ['unknown detector', JSON.stringify({ action: 'block', detectors: ['unknown_detector'] })],
+    ['non-blocking detector', JSON.stringify({ action: 'block', detectors: ['pii'] })],
+    ['wrong action', JSON.stringify({ action: 'allow', detectors: ['injection_attack'] })],
+    [
+      'extra message',
+      JSON.stringify({ action: 'block', detectors: ['injection_attack'], message: 'private' }),
+    ],
     ['serialized invalid detectors', '{"action":"block","detectors":[123]}'],
   ])('rescans for malformed cache data: %s', async (_name, value) => {
     const store = memoryStore();

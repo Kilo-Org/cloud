@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
+import { sessionListNoMatchDescription } from '@/components/agents/session-list-empty-copy';
 import { QueryError } from '@/components/query-error';
 
 type BodyEmptyProps = {
@@ -37,17 +38,11 @@ export function BodyEmpty({
     // The search field and the filter badge stay visible above this body, so
     // naming every cause keeps the copy honest: a filter alone can hide the
     // session, and the row below offers one action per cause.
-    let description = t('agents.sessionList.tryAdjustFilters');
-    if (isSearching && hasActiveFilters) {
-      description = `${t('agents.sessionList.tryDifferentSearch')} ${description}`;
-    } else if (isSearching) {
-      description = t('agents.sessionList.tryDifferentSearch');
-    }
     return (
       <EmptyState
         icon={SearchX}
         title={t('agents.sessionList.noMatches')}
-        description={description}
+        description={sessionListNoMatchDescription(t, { isSearching, hasActiveFilters })}
         action={clearActions}
         refreshControl={refreshControl}
       />

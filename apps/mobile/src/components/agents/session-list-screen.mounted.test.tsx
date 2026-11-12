@@ -2010,7 +2010,7 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(state.routeParams.status).toBeUndefined();
   });
 
-  it('clears the search too when a status filter and a search leave no rows', async () => {
+  it('keeps the search when the filters are cleared and restores rows from Clear search', async () => {
     state.live.activeSessions = [{ ...row, id: 'idle-1', status: 'idle' }];
     state.routeParams = { status: 'idle' };
     await renderScreen();

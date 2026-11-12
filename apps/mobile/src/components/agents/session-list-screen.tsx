@@ -21,6 +21,7 @@ import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { SessionListHeader } from '@/components/agents/session-list-header';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
+import { sessionListNoMatchDescription } from '@/components/agents/session-list-empty-copy';
 import { SessionStatusFilterBar } from '@/components/agents/session-status-filter-bar';
 import { SessionListSkeletonRows } from '@/components/agents/session-list-skeleton-rows';
 import { SessionListTouchGate } from '@/components/session-list-touch-gate';
@@ -365,12 +366,10 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
 
   // The search field and the filter badge stay visible above this body, so the
   // copy names every cause the way the actions do.
-  let noMatchDescription = t('agents.sessionList.tryAdjustFilters');
-  if (isSearching && filtersNarrow) {
-    noMatchDescription = `${t('agents.sessionList.tryDifferentSearch')} ${noMatchDescription}`;
-  } else if (isSearching) {
-    noMatchDescription = t('agents.sessionList.tryDifferentSearch');
-  }
+  const noMatchDescription = sessionListNoMatchDescription(t, {
+    isSearching,
+    hasActiveFilters: filtersNarrow,
+  });
   const noMatchActions = (
     <View className="flex-row flex-wrap items-center justify-center gap-2">
       {isSearching ? (

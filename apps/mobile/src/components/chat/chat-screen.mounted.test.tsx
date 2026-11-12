@@ -354,6 +354,13 @@ describe('the chat transcript while it opens', () => {
     expect(messagesOf(tree)).toEqual([]);
     /* Nothing failed, so the chat takes a first message. */
     expect(count(tree, 'ChatComposer')).toBe(1);
+    /* The state is measured against the transcript area it fills, not against
+       the whole window: the measured centring and the first frame's placement
+       then agree, so the state does not lift once the measurement lands. */
+    const surface = tree.root.findAll(node => (node.type as string) === 'StateSurface');
+    expect(surface).toHaveLength(1);
+    expect(surface[0]?.props.className).toBe('flex-1');
+    expect(surface[0]?.findAll(node => (node.type as string) === 'EmptyState')).toHaveLength(1);
   });
 
   it.each([

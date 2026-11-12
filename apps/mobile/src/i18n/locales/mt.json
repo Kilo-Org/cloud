@@ -2619,6 +2619,7 @@
       "planningNextSteps": "Qed jippjana l-passi li jmiss",
       "delegatingWork": "Qed jiddelega x-xogħol",
       "askingQuestion": "Qed jagħmel mistoqsija",
+      "waitingForPermission": "Jistenna l-permess",
       "consideringNextSteps": "Qed jikkunsidra l-passi li jmiss",
       "writingResponse": "Qed jikteb it-tweġiba",
       "initializingSnapshot": "Qed iħejji kopja tal-istat attwali…"

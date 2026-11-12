@@ -1855,6 +1855,7 @@
       "planningNextSteps": "Planification des prochaines étapes",
       "delegatingWork": "Délégation des tâches",
       "askingQuestion": "Question en cours",
+      "waitingForPermission": "En attente d'autorisation",
       "consideringNextSteps": "Réflexion sur la suite",
       "writingResponse": "Rédaction de la réponse",
       "initializingSnapshot": "Initialisation de l'instantané…"

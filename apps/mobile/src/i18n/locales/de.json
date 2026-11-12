@@ -1930,6 +1930,7 @@
       "planningNextSteps": "Plant die nächsten Schritte",
       "delegatingWork": "Verteilt Aufgaben",
       "askingQuestion": "Stellt eine Frage",
+      "waitingForPermission": "Wartet auf Berechtigung",
       "consideringNextSteps": "Wägt die nächsten Schritte ab",
       "writingResponse": "Schreibt die Antwort",
       "initializingSnapshot": "Snapshot wird initialisiert…"

@@ -1930,6 +1930,7 @@
       "planningNextSteps": "Sonraki adımları planlıyor",
       "delegatingWork": "İş dağıtıyor",
       "askingQuestion": "Soru soruyor",
+      "waitingForPermission": "İzin bekliyor",
       "consideringNextSteps": "Sonraki adımları değerlendiriyor",
       "writingResponse": "Yanıt yazıyor",
       "initializingSnapshot": "Anlık görüntü hazırlanıyor…"

@@ -2472,6 +2472,7 @@
       "planningNextSteps": "Järgmiste sammude plaanimine",
       "delegatingWork": "Töö delegeerimine",
       "askingQuestion": "Küsimuse esitamine",
+      "waitingForPermission": "Loa ootamine",
       "consideringNextSteps": "Järgmiste sammude kaalumine",
       "writingResponse": "Vastuse kirjutamine",
       "initializingSnapshot": "Hetktõmmise ettevalmistamine…"

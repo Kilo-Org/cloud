@@ -2472,6 +2472,7 @@
       "planningNextSteps": "Planlægger næste trin",
       "delegatingWork": "Delegerer arbejde",
       "askingQuestion": "Stiller et spørgsmål",
+      "waitingForPermission": "Afventer tilladelse",
       "consideringNextSteps": "Overvejer næste trin",
       "writingResponse": "Skriver svar",
       "initializingSnapshot": "Klargør øjebliksbillede…"

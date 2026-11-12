@@ -1879,6 +1879,7 @@
       "planningNextSteps": "अगले चरणों की योजना बना रहा है",
       "delegatingWork": "काम सौंप रहा है",
       "askingQuestion": "प्रश्न पूछ रहा है",
+      "waitingForPermission": "अनुमति का इंतज़ार",
       "consideringNextSteps": "अगले चरणों पर विचार कर रहा है",
       "writingResponse": "उत्तर लिख रहा है",
       "initializingSnapshot": "स्नैपशॉट तैयार कर रहा है…"

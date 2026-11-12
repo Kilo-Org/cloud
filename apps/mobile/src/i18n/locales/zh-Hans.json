@@ -1930,6 +1930,7 @@
       "planningNextSteps": "正在规划下一步",
       "delegatingWork": "正在分派任务",
       "askingQuestion": "正在提问",
+      "waitingForPermission": "正在等待授权",
       "consideringNextSteps": "正在考虑下一步",
       "writingResponse": "正在撰写回复",
       "initializingSnapshot": "正在初始化快照……"

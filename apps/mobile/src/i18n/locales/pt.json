@@ -2527,6 +2527,7 @@
       "planningNextSteps": "A planear os próximos passos",
       "delegatingWork": "A delegar trabalho",
       "askingQuestion": "A fazer uma pergunta",
+      "waitingForPermission": "À espera de permissão",
       "consideringNextSteps": "A considerar os próximos passos",
       "writingResponse": "A escrever a resposta",
       "initializingSnapshot": "A preparar a cópia do estado atual…"

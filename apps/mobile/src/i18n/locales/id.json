@@ -1930,6 +1930,7 @@
       "planningNextSteps": "Merencanakan langkah berikutnya",
       "delegatingWork": "Mendelegasikan pekerjaan",
       "askingQuestion": "Mengajukan pertanyaan",
+      "waitingForPermission": "Menunggu izin",
       "consideringNextSteps": "Mempertimbangkan langkah berikutnya",
       "writingResponse": "Menulis respons",
       "initializingSnapshot": "Menyiapkan salinan kondisi awal…"

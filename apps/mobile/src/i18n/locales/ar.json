@@ -2034,6 +2034,7 @@
       "planningNextSteps": "جارٍ التخطيط للخطوات التالية",
       "delegatingWork": "جارٍ تفويض العمل",
       "askingQuestion": "جارٍ طرح سؤال",
+      "waitingForPermission": "بانتظار الإذن",
       "consideringNextSteps": "جارٍ التفكير في الخطوات التالية",
       "writingResponse": "جارٍ كتابة الرد",
       "initializingSnapshot": "جارٍ تهيئة اللقطة…"

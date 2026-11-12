@@ -1930,6 +1930,7 @@
       "planningNextSteps": "Đang lên kế hoạch cho bước tiếp theo",
       "delegatingWork": "Đang phân công công việc",
       "askingQuestion": "Đang đặt câu hỏi",
+      "waitingForPermission": "Đang chờ cấp quyền",
       "consideringNextSteps": "Đang cân nhắc các bước tiếp theo",
       "writingResponse": "Đang viết phản hồi",
       "initializingSnapshot": "Đang khởi tạo bản chụp trạng thái…"

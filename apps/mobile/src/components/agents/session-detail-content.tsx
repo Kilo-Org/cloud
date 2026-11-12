@@ -277,6 +277,12 @@ type CancelQueuedStatus = {
   attempt: number;
 };
 
+/**
+ * The state of the read-only footer's Continue control: idle, waiting for the
+ * composer to appear, or failed with a Retry on offer.
+ */
+type ContinueOpen = 'idle' | 'pending' | 'failed';
+
 const EMPTY_IDS: ReadonlySet<string> = new Set();
 
 export function SessionDetailContent({
@@ -2120,14 +2126,22 @@ export function SessionDetailContent({
   // placeholders, so neither offers a control. A failure, an agent status or a
   // pending ask is the session speaking, and each keeps the composer it already
   // has.
-  // The slot switches from its reserve to the session's own control only once
-  // the transcript is painted, not merely once the open resolves: a read-only
-  // footer above rows that are still skeletons is the same two states at once,
-  // so the reserve holds for that window too (see `isSessionChromePending`).
+  // The slot switches from its reserve to the session's own control once the
+  // kind resolves, not once the transcript is painted. The read-only footer
+  // used to wait for the body too, and its own button was the screen's only
+  // control: while the rows were still measuring, the footer swapped between
+  // the live control and the inert placeholder that reserves its shape — a
+  // press in that window landed on a skeleton with no press handler and did
+  // nothing, with no way to tell that apart from a dead button (measured on
+  // the emulator: live at ~0.4 s, inert at ~0.6-2.9 s, live again at ~3 s).
+  // The footer now goes live with the kind and stays live: while the body is
+  // still loading it shows the same control busy, so the press is always
+  // either answered or stated. The writable composer keeps the reserve (see
+  // `isSessionChromePending`): a composer above skeleton rows would hold a
+  // send the open cannot answer yet.
   const isComposerVisible =
     !hasBlockingInteraction && !isReadOnlySession && !isSessionChromePending;
-  const isReadOnlyContinueVisible =
-    isReadOnlySession && !hasBlockingInteraction && !isSessionChromePending;
+  const isReadOnlyContinueVisible = isReadOnlySession && !hasBlockingInteraction;
   // The pending slot holds the shape its session will end in. The kind is only
   // set once the transport answers, but the metadata read lands before that and
   // names a cloud-agent session, which is writable by construction; the id
@@ -2140,7 +2154,7 @@ export function SessionDetailContent({
     isWritableResolved ||
     (fetchedData?.kiloSessionId === sessionId && fetchedData.cloudAgentSessionId !== null);
   const isReadOnlyFooterPlaceholderVisible =
-    isSessionChromePending && !hasBlockingInteraction && !isPendingComposer;
+    isSessionChromePending && !hasBlockingInteraction && !isPendingComposer && !isReadOnlySession;
   const isComposerSkeletonVisible =
     isSessionChromePending && !hasBlockingInteraction && isPendingComposer;
   // Structural locks only. The live send capability is passed separately so a
@@ -2387,9 +2401,14 @@ export function SessionDetailContent({
     })();
   }, [exitFailure]);
 
+  // The read-only footer's one control. `pending` covers the read-back of the
+  // push, because the navigation is not a promise; `failed` is a push the
+  // navigator dropped while this screen is still the one the person sees.
+  const [continueOpen, setContinueOpen] = useState<ContinueOpen>('idle');
+
   const pushContinue = useCallback(
-    (cut: ForkCut | null) => {
-      openNewSessionHref(
+    async (cut: ForkCut | null) => {
+      const outcome = await openNewSessionHref(
         buildContinueHref({
           organizationId,
           cloneFromKiloSessionId: sessionId,
@@ -2405,6 +2424,16 @@ export function SessionDetailContent({
           }),
         }) as Href
       );
+      // A press the single-push guard answered belongs to the press that owns
+      // the window: it owns this state too, and must not have its busy state
+      // cleared under it. An opened composer leaves this screen behind it, and
+      // only a push the navigator dropped leaves the person here with nothing
+      // to show for the press.
+      if (outcome === 'opened') {
+        setContinueOpen('idle');
+      } else if (outcome === 'failed') {
+        setContinueOpen('failed');
+      }
     },
     [
       openNewSessionHref,
@@ -2420,16 +2449,30 @@ export function SessionDetailContent({
   );
 
   const handleContinueInNewSession = useCallback(() => {
-    pushContinue(null);
-  }, [pushContinue]);
+    if (continueOpen === 'pending') {
+      return;
+    }
+    setContinueOpen('pending');
+    void pushContinue(null);
+  }, [continueOpen, pushContinue]);
 
   const handleForkFromHere = useCallback(() => {
     if (detailsForkCut === null) {
       return;
     }
     handleCloseDetails();
-    pushContinue(detailsForkCut);
+    setContinueOpen('pending');
+    void pushContinue(detailsForkCut);
   }, [detailsForkCut, handleCloseDetails, pushContinue]);
+
+  // The composer was the destination: coming back here means the press that
+  // opened it is spent, so the footer offers a fresh one. A failure keeps its
+  // error until the person retries it or leaves.
+  useFocusEffect(
+    useCallback(() => {
+      setContinueOpen(current => (current === 'pending' ? 'idle' : current));
+    }, [])
+  );
 
   const isFocused = useIsFocused();
   const keepScreenAwake = shouldKeepSessionAwake({
@@ -2783,6 +2826,8 @@ export function SessionDetailContent({
           />
         ) : null}
 
+        
+
         {isReadOnlyFooterPlaceholderVisible ? <SessionReadOnlyFooterPlaceholder /> : null}
 
         {isComposerSkeletonVisible ? <SessionComposerSkeleton /> : null}
@@ -2794,17 +2839,40 @@ export function SessionDetailContent({
                 <Text className="text-center text-sm text-muted-foreground">
                   {t('agentChat.session.readOnly')}
                 </Text>
+                {/* A push the navigator dropped leaves the person on this screen.
+                    Say so, and keep the action: the same control retries it. */}
+                {continueOpen === 'failed' ? (
+                  <View className="flex-row items-center justify-center gap-2">
+                    <AccessibleStatus
+                      message={t('common.somethingWentWrong')}
+                      tone="error"
+                      className="shrink text-sm"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="action"
+                      className="shrink-0"
+                      accessibilityLabel={t('common.retry')}
+                      onPress={handleContinueInNewSession}
+                    >
+                      <Text>{t('common.retry')}</Text>
+                    </Button>
+                  </View>
+                ) : null}
                 {/* The footer's one action, and the only control on this screen:
                     a filled primary. Light already fills it with the palette's
                     muted olive; dark's primary (#ffdd00) is the full brand accent
                     and glares as a full-width fill under the near-black page. Dark
                     takes `--selection` instead — the same olive hue lifted to stand
                     off the page — with its own label tone, so the control keeps the
-                    light mode's weight in both schemes. */}
+                    light mode's weight in both schemes. While the composer is
+                    opening, the button is busy in place: a press is never a
+                    no-op. */}
                 <Button
                   variant="default"
                   size="action"
                   className="bg-primary dark:bg-selection"
+                  loading={continueOpen === 'pending'}
                   accessibilityLabel={t('agentChat.session.continueInNewSession')}
                   onPress={handleContinueInNewSession}
                 >

@@ -127,6 +127,9 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 // Keep the actual detail/card/sheet/header callbacks and SDK. Replace native
 // rendering and unrelated composer, account, model-picker, and router dependencies.
 const navigationRoutes = vi.hoisted(() => ['session-detail']);
+// A navigator that drops one kind of push, the way it drops an action issued
+// while the calling route is still settling: the call returns and nothing lands.
+const routerDropsPush = vi.hoisted(() => ({ value: false }));
 // The personal `agentProfiles.list` rows the header's active-profile chip
 // reads; tests set it before mounting to drive the chip's presence.
 const profileRowsState = vi.hoisted(() => {
@@ -211,9 +214,11 @@ vi.mock('expo-router', () => ({
   useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   usePreventRemove: vi.fn(),
   useNavigation: () => ({
+    // The state the navigator would hold after the router calls above: the
+    // composer's push is only "opened" once it is the route on top.
     getState: () => ({
-      index: 1,
-      routes: [{ name: '(tabs)' }, { name: 'agent-chat/[session-id]' }],
+      index: navigationRoutes.length - 1,
+      routes: navigationRoutes.map(name => ({ name })),
     }),
     addListener: () => () => undefined,
   }),
@@ -237,6 +242,9 @@ vi.mock('expo-router', () => ({
       }
     },
     push: (href: string) => {
+      if (routerDropsPush.value) {
+        return;
+      }
       navigationRoutes.push(href);
     },
     setParams: routerSetParams,
@@ -821,6 +829,15 @@ function composerProps(view: { renderer: ReactTestRenderer }) {
   };
 }
 
+/** The read-only footer's only control, found by the label a person reads. */
+function continueControlOf(renderer: ReactTestRenderer): ReactTestInstance {
+  return renderer.root.find(
+    node =>
+      Object.is(node.type, 'Button') &&
+      node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+  );
+}
+
 /**
  * The FlashList keys the first message list would mount rows under. The list is
  * stubbed, so read the props the stub was handed: the same `keyExtractor` the
@@ -840,6 +857,7 @@ function transcriptKeys(renderer: ReactTestRenderer): string[] {
 
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+  routerDropsPush.value = false;
   profileRowsState.personal = [];
   profileRowsState.combined = { orgProfiles: [], personalProfiles: [], effectiveDefaultId: null };
   profileRowsState.agentsById = {};
@@ -2259,15 +2277,17 @@ describe('session detail slow load', () => {
   });
 
   it('holds the read-only footer area, not a composer, while a read-only open has nothing to show', async () => {
+    // The kind is not known yet, so the area is still the reserve. The reserve
+    // exists to keep the slot out of a composer the session may never get.
     const view = await mountDetails(null);
-    // The session resolves to a kind with no writer while its transcript is
-    // still stalled, so its bottom slot is the footer's.
     act(() => {
-      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
-      view.store.set(view.manager.atoms.isReadOnly, true);
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, null);
+      view.store.set(view.manager.atoms.isReadOnly, false);
     });
-    // The skeleton owns the body and the session's transport has not answered:
-    // no composer, and the footer's area is held instead.
     expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
     expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(1);
     expect(view.renderer.root.findAllByType(SessionComposerSkeleton)).toHaveLength(0);
@@ -2275,8 +2295,28 @@ describe('session detail slow load', () => {
       0
     );
 
-    // The read-only footer takes the held area, so the transcript never moves
-    // under it when the transport turns out to have no writer.
+    // The kind resolves to read-only while the transport is still stalled: the
+    // footer goes live instead of keeping the reserve — it is the one control
+    // on this screen, and an inert one is what the explorer measured.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      view.store.set(view.manager.atoms.isReadOnly, true);
+    });
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
+    expect(
+      view.renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Button') &&
+          node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+      )
+    ).toHaveLength(1);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+
+    // The transcript lands, and the footer is the same control in the same
+    // slot: the transcript never moves under it.
     await view.respond(ROOT_ID, [childMessage(ROOT_ID, 'read-only row')]);
     expect(renderedText(view.renderer.root)).toContain('read-only row');
     expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(0);
@@ -2285,6 +2325,7 @@ describe('session detail slow load', () => {
       0
     );
   });
+
 
   it('holds the composer while the metadata names a cloud-agent session', async () => {
     // The metadata read lands before the transport resolves, and it names the
@@ -4789,25 +4830,28 @@ describe('session detail read-only composer', () => {
   // The transcript paints a skeleton until its rows stop measuring. The chrome
   // around it reads the same fact: a live continue footer, or a pill settled on
   // a bare ring, beside a loading body is the screen showing two states at once.
-  it('keeps the footer and the pill in their loading shapes until the rows are painted', async () => {
+  it('keeps the continue control on screen while the rows are still measuring', async () => {
+    // The transcript paints in two steps and the list reports its settle from
+    // its own measurement, which lands after the rows it just rendered. The
+    // footer used to follow that report: the live control was replaced by the
+    // inert placeholder that reserves its shape, and a press in the window
+    // landed on nothing. The control is the screen's one action, so it stays —
+    // busy while the body is still measuring, live once the rows have settled.
     openSettledReport.value = false;
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
-
-    expect(view.renderer.root.findAllByType(SessionReadOnlyFooterPlaceholder)).toHaveLength(1);
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    // The pill still holds the row its values will take instead of shrinking
+    // to a ring with no slot.
+    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(1);
     expect(
       view.renderer.root.findAll(
         node =>
           Object.is(node.type, 'Button') &&
           node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
       )
-    ).toHaveLength(0);
-    // The pill holds the row its values will take, instead of shrinking to a
-    // ring with no slot.
-    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
-    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(1);
+    ).toHaveLength(1);
 
-    // The list then reports its rows painted, and the footer takes the
-    // placeholder's place in the same slot.
+    // The rows settle, and the footer is the same slot with the live control.
     const list = view.renderer.root.findByType(SessionMessageList);
     act(() => {
       (list.props as ComponentProps<typeof SessionMessageList>).onOpenSettledChange?.(
@@ -4821,6 +4865,7 @@ describe('session detail read-only composer', () => {
     );
     expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
   });
+
 
   it('keeps the footer live when the mounted list never reports its open state', async () => {
     openSettledReport.value = null;
@@ -4887,21 +4932,66 @@ describe('session detail read-only composer', () => {
       nowSpy.mockRestore();
     });
 
-    act(() => {
+    await act(async () => {
       (continueControl.props.onPress as () => void)();
       (continueControl.props.onPress as () => void)();
+      // Flush the verification the press started before asserting on it.
+      await Promise.resolve();
     });
     expect(
       navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
     ).toHaveLength(1);
 
     nowSpy.mockReturnValue(now + AGENT_SESSION_NAV_GUARD_MS);
-    act(() => {
+    await act(async () => {
       (continueControl.props.onPress as () => void)();
+      await Promise.resolve();
     });
     expect(
       navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
     ).toHaveLength(2);
+  });
+
+
+
+  it('states a failed open and retries it from the same footer', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+      routerDropsPush.value = true;
+
+      await act(async () => {
+        (continueControlOf(view.renderer).props.onPress as () => void)();
+        await Promise.resolve();
+      });
+      // The press is acknowledged in place while the open is read back: the
+      // footer is busy, not unchanged.
+      expect(continueControlOf(view.renderer).props.loading).toBe(true);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+
+      // The push never landed, so the screen says so beside the control that
+      // can retry it.
+      expect(renderedText(view.renderer.root)).toContain(i18n.t('common.somethingWentWrong'));
+      const retry = view.renderer.root.find(
+        node =>
+          Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+      );
+      expect(continueControlOf(view.renderer).props.loading).toBe(false);
+
+      routerDropsPush.value = false;
+      await act(async () => {
+        (retry.props.onPress as () => void)();
+        await Promise.resolve();
+      });
+      expect(
+        navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+      ).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

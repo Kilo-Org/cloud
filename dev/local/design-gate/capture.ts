@@ -80,6 +80,14 @@ export type CaptureContext = {
 };
 
 export const SAMPLE_INTERVAL_MS = 120;
+// The cadence asked of the app itself, which is a different cost: one in-app
+// sample walks and serializes the whole document, measured at ~150 ms on a
+// mid-size screen. Asking for the runner's 120 ms leaves the JS thread with no
+// room to finish the screen it is measuring, and the gate then reports a target
+// that never leaves its loading placeholder on a build whose own timeline does.
+// The runner's own poll interval is unaffected: a CDP round trip costs more than
+// this anyway.
+export const IN_APP_SAMPLE_INTERVAL_MS = 250;
 export const DEFAULT_OBSERVE_MS = 2_500;
 const STABLE_SAMPLES = 3;
 const SETTLE_TIMEOUT_MS = 8_000;
@@ -289,7 +297,7 @@ export function screenFindings(args: {
     });
   }
   if (args.sampled !== undefined) {
-    findings.push(...checkShift(args.sampled.timeline.map(normalize), SAMPLE_INTERVAL_MS));
+    findings.push(...checkShift(args.sampled.timeline.map(normalize), IN_APP_SAMPLE_INTERVAL_MS));
     if (!args.sampled.settled) {
       findings.push(
         unsettledFinding({
@@ -432,7 +440,7 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     (dump.env.screen !== undefined && dump.env.screen !== beforeScreen) ||
     (beforeRoute === linkRoute && dump.env.route.split('?')[0] === linkRoute);
   await ctx.probe.startSampling(
-    SAMPLE_INTERVAL_MS,
+    IN_APP_SAMPLE_INTERVAL_MS,
     ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + 2 * LOADING_SETTLE_TIMEOUT_MS
   );
   await ctx.probe.openLink(target.link);
@@ -703,87 +711,87 @@ export async function runMatrix(
       for (const [index, target] of targets.entries()) {
         try {
           const targetLanguage = await ensureLanguage(ctx, language);
-        const languageReady = targetLanguage.matched;
-        // A cell-level reload leaves only its first target cold; a reload this
-        // target itself caused (the previous target switched the app language)
-        // leaves this target cold whatever its index.
-        const warm = targetLanguage.reloaded || (cellLanguage.reloaded && index === 0);
-        const { sampled, screen, unopened, image } = await captureScreen(
-          ctx,
-          config.id,
-          target,
-          warm
-        );
-        const { dump } = sampled;
-        run.env ??= dump.env;
-        run.screens.push(screen);
-        const identity = screenIdentity(dump);
-        const other = seen.get(identity);
-        if (other === undefined) seen.set(identity, target.id);
-        if (unopened !== undefined) {
-          outcome.findings.push(
-            warningFinding(
-              config.id,
-              target.id,
-              dump,
-              'the deep link changes the screen',
-              `${target.id} left the screen unchanged (route ${dump.env.route}); the deep link did not open: ${unopened}`
-            )
+          const languageReady = targetLanguage.matched;
+          // A cell-level reload leaves only its first target cold; a reload this
+          // target itself caused (the previous target switched the app language)
+          // leaves this target cold whatever its index.
+          const warm = targetLanguage.reloaded || (cellLanguage.reloaded && index === 0);
+          const { sampled, screen, unopened, image } = await captureScreen(
+            ctx,
+            config.id,
+            target,
+            warm
           );
-        } else if (other !== undefined) {
+          const { dump } = sampled;
+          run.env ??= dump.env;
+          run.screens.push(screen);
+          const identity = screenIdentity(dump);
+          const other = seen.get(identity);
+          if (other === undefined) seen.set(identity, target.id);
+          if (unopened !== undefined) {
+            outcome.findings.push(
+              warningFinding(
+                config.id,
+                target.id,
+                dump,
+                'the deep link changes the screen',
+                `${target.id} left the screen unchanged (route ${dump.env.route}); the deep link did not open: ${unopened}`
+              )
+            );
+          } else if (other !== undefined) {
+            outcome.findings.push(
+              warningFinding(
+                config.id,
+                target.id,
+                dump,
+                'a distinct screen per target',
+                `${target.id} showed the same screen as ${other} (route ${dump.env.route}); the deep link did not open`
+              )
+            );
+          }
+          if (config.id === 'base') baseWindow ??= dump.env.window;
+          if (languageReady && dump.env.language !== language.resolved) {
+            outcome.findings.push(
+              warningFinding(
+                config.id,
+                target.id,
+                dump,
+                `language ${language.resolved}`,
+                `${target.id} switched the app language to ${dump.env.language}; its rules were skipped`
+              )
+            );
+            continue;
+          }
+          const mismatches = envMismatches(config, dump.env, baseWindow, language.resolved);
+          if (mismatches.length > 0) {
+            outcome.findings.push(envMismatchFinding(config.id, target.id, dump, mismatches));
+            continue;
+          }
+          const tree = normalize(dump);
           outcome.findings.push(
-            warningFinding(
-              config.id,
-              target.id,
-              dump,
-              'a distinct screen per target',
-              `${target.id} showed the same screen as ${other} (route ${dump.env.route}); the deep link did not open`
-            )
-          );
-        }
-        if (config.id === 'base') baseWindow ??= dump.env.window;
-        if (languageReady && dump.env.language !== language.resolved) {
-          outcome.findings.push(
-            warningFinding(
-              config.id,
-              target.id,
-              dump,
-              `language ${language.resolved}`,
-              `${target.id} switched the app language to ${dump.env.language}; its rules were skipped`
-            )
-          );
-          continue;
-        }
-        const mismatches = envMismatches(config, dump.env, baseWindow, language.resolved);
-        if (mismatches.length > 0) {
-          outcome.findings.push(envMismatchFinding(config.id, target.id, dump, mismatches));
-          continue;
-        }
-        const tree = normalize(dump);
-        outcome.findings.push(
-          ...screenFindings({
-            cell: config.id,
-            target: target.id,
-            dump,
-            tree,
-            image,
-            sampled,
-          })
-        );
-        if (!sampled.settled) continue;
-        trees.set(`${config.id}/${target.id}`, tree);
-        const reference = config.rtl
-          ? trees.get(`${mirrorReference(config)}/${target.id}`)
-          : undefined;
-        if (reference !== undefined) {
-          outcome.findings.push(
-            ...checkMirror(reference, tree).map(finding => ({
-              ...finding,
+            ...screenFindings({
               cell: config.id,
               target: target.id,
-            }))
+              dump,
+              tree,
+              image,
+              sampled,
+            })
           );
-        }
+          if (!sampled.settled) continue;
+          trees.set(`${config.id}/${target.id}`, tree);
+          const reference = config.rtl
+            ? trees.get(`${mirrorReference(config)}/${target.id}`)
+            : undefined;
+          if (reference !== undefined) {
+            outcome.findings.push(
+              ...checkMirror(reference, tree).map(finding => ({
+                ...finding,
+                cell: config.id,
+                target: target.id,
+              }))
+            );
+          }
         } catch (error) {
           // A reload window that outlives the probe client's own retry leaves
           // the target unreadable: the probe client reports it as an
@@ -793,9 +801,7 @@ export async function runMatrix(
           // error (a failed screencap, a decode) is a real defect and still
           // aborts.
           if (!(error instanceof InfraError)) throw error;
-          ctx.log(
-            `design-gate: ${target.id} could not be read this cell: ${String(error)}`
-          );
+          ctx.log(`design-gate: ${target.id} could not be read this cell: ${String(error)}`);
         }
       }
     }

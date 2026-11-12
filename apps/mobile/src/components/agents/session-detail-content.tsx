@@ -2705,6 +2705,7 @@ export function SessionDetailContent({
       currentModel,
       currentVariant,
       sessionDataLoaded,
+      resetNewSessionGuard,
     ]
   );
 

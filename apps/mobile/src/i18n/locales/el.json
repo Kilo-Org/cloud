@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Δεν ήταν δυνατή η φόρτωση της δραστηριότητας μονάδων.",
       "appStoreReceipt": "Απόδειξη από το App Store",
       "deductionFallback": "Αφαίρεση μονάδων",
       "emptyDescription": "Οι αγορές μονάδων, οι αποδείξεις και η χρήση θα εμφανίζονται εδώ.",

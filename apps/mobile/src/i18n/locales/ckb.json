@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "نەتوانرا چالاکیی کرێدیت باربکرێت.",
       "appStoreReceipt": "پسوولە لە App Store",
       "deductionFallback": "لێبڕینی کرێدیت",
       "emptyDescription": "کڕین، پسوولە و بەکارهێنانی کرێدیت لێرە دەردەکەون.",

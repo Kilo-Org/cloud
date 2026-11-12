@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Det gick inte att läsa in kreditaktivitet.",
       "appStoreReceipt": "Kvitto från App Store",
       "deductionFallback": "Kreditavdrag",
       "emptyDescription": "Kreditköp, kvitton och användning visas här.",

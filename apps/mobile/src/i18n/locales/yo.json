@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Kò lè gbé ìgbòkègbodò kírẹ́dítì wọ̀.",
       "appStoreReceipt": "Ìwé ẹ̀rí ìsanwó láti App Store",
       "deductionFallback": "Ìyọkúrò kírẹ́dítì",
       "emptyDescription": "Àwọn ìrajà kírẹ́dítì, ìwé ẹ̀rí ìsanwó, àti ìlò yóò hàn níbí.",

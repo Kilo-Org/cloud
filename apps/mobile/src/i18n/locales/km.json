@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "មិនអាចផ្ទុកសកម្មភាពក្រេឌីតបានទេ។",
       "appStoreReceipt": "បង្កាន់ដៃពី App Store",
       "deductionFallback": "ការកាត់ក្រេឌីត",
       "emptyDescription": "ការទិញក្រេឌីត បង្កាន់ដៃ និងការប្រើប្រាស់នឹងបង្ហាញនៅទីនេះ។",

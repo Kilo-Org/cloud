@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "క్రెడిట్ యాక్టివిటీని లోడ్ చేయలేకపోయాం.",
       "appStoreReceipt": "App Store నుండి రసీదు",
       "deductionFallback": "క్రెడిట్ తగ్గింపు",
       "emptyDescription": "క్రెడిట్ కొనుగోళ్లు, రసీదులు మరియు వినియోగం ఇక్కడ కనిపిస్తాయి.",

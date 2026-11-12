@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "无法加载积分活动。",
       "appStoreReceipt": "收据位于 App Store",
       "deductionFallback": "积分扣除",
       "emptyDescription": "积分购买、收据和使用情况将显示在这里。",

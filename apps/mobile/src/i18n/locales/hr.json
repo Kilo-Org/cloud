@@ -3779,6 +3779,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Nije moguće učitati aktivnost kredita.",
       "appStoreReceipt": "Račun iz trgovine App Store",
       "deductionFallback": "Oduzimanje kredita",
       "emptyDescription": "Ovdje će se prikazivati kupnje kredita, računi i potrošnja.",

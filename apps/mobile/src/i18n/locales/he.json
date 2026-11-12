@@ -3779,6 +3779,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "לא ניתן לטעון פעילות קרדיט.",
       "appStoreReceipt": "קבלה מ-App Store",
       "deductionFallback": "ניכוי קרדיטים",
       "emptyDescription": "רכישות קרדיטים, קבלות ושימוש יופיעו כאן.",

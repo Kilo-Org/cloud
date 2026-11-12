@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Pa t ka chaje aktivite kredi.",
       "appStoreReceipt": "Resi ki nan App Store",
       "deductionFallback": "Dediksyon kredi",
       "emptyDescription": "Acha kredi, resi, ak itilizasyon ap parèt isit la.",

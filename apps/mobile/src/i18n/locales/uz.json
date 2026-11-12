@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Kredit harakatini yuklab bo‘lmadi.",
       "appStoreReceipt": "Chek App Store’da",
       "deductionFallback": "Kredit yechilishi",
       "emptyDescription": "Kredit xaridlari, cheklar va sarflar shu yerda ko‘rinadi.",

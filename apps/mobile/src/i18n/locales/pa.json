@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "ਕ੍ਰੈਡਿਟ ਗਤੀਵਿਧੀ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ।",
       "appStoreReceipt": "App Store ਤੋਂ ਰਸੀਦ",
       "deductionFallback": "ਕ੍ਰੈਡਿਟ ਕਟੌਤੀ",
       "emptyDescription": "ਕ੍ਰੈਡਿਟ ਖਰੀਦਾਂ, ਰਸੀਦਾਂ ਅਤੇ ਵਰਤੋਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",

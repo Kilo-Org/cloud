@@ -3901,6 +3901,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Ma stajniex nitgħabbu l-attività tal-kreditu.",
       "appStoreReceipt": "Irċevuta mill-App Store",
       "deductionFallback": "Tnaqqis tal-krediti",
       "emptyDescription": "Ix-xiri, l-irċevuti u l-użu tal-krediti se jidhru hawn.",

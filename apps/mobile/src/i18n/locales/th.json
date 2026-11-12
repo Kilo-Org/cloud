@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "ไม่สามารถโหลดกิจกรรมเครดิตได้",
       "appStoreReceipt": "ใบเสร็จจาก App Store",
       "deductionFallback": "การหักเครดิต",
       "emptyDescription": "การซื้อเครดิต ใบเสร็จ และการใช้งานจะแสดงที่นี่",

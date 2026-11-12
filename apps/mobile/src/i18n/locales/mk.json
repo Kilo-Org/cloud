@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Не може да се вчитаат активностите со кредити.",
       "appStoreReceipt": "Сметка од App Store",
       "deductionFallback": "Одбивање кредити",
       "emptyDescription": "Купувањата на кредити, сметките и користењето ќе се појават тука.",

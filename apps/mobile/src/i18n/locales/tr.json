@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Kredi hareketleri yüklenemedi.",
       "appStoreReceipt": "Makbuz App Store'da",
       "deductionFallback": "Kredi düşümü",
       "emptyDescription": "Kredi satın alımları, makbuzlar ve kullanım burada görünecek.",

@@ -3962,6 +3962,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Methwyd llwytho gweithgarwch credyd.",
       "appStoreReceipt": "Derbynneb gan yr App Store",
       "deductionFallback": "Didyniad credyd",
       "emptyDescription": "Bydd pryniannau credyd, derbynebau a defnydd yn ymddangos yma.",

@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Kāore i taea te uta ngā mahi kiredita.",
       "appStoreReceipt": "Rihīti mai i te App Store",
       "deductionFallback": "Tangohanga kiredita",
       "emptyDescription": "Ka puta mai ki konei ngā hoko kiredita, ngā rihīti, me te whakamahinga.",

@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Ayikwazanga ukulayisha umsebenzi wamakhredithi.",
       "appStoreReceipt": "Irisidi evela ku-App Store",
       "deductionFallback": "Ukudonswa kwamakhredithi",
       "emptyDescription": "Ukuthengwa kwamakhredithi, amarisidi, nokusetshenziswa kuzovela lapha.",

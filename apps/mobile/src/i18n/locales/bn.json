@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "ক্রেডিট কার্যকলাপ লোড করা যায়নি।",
       "appStoreReceipt": "App Store-এর রসিদ",
       "deductionFallback": "ক্রেডিট কর্তন",
       "emptyDescription": "ক্রেডিট কেনাকাটা, রসিদ এবং ব্যবহার এখানে দেখা যাবে।",

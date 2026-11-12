@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Kon nie kredietaktiwiteit laai nie.",
       "appStoreReceipt": "Kwitansie van die App Store",
       "deductionFallback": "Kredietaftrekking",
       "emptyDescription": "Kredietaankope, kwitansies en gebruik sal hier verskyn.",

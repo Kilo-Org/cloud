@@ -3840,6 +3840,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Aktivitu kreditov sa nepodarilo načítať.",
       "appStoreReceipt": "Doklad v obchode App Store",
       "deductionFallback": "Odpočet kreditov",
       "emptyDescription": "Tu sa zobrazia nákupy kreditov, doklady a ich využitie.",

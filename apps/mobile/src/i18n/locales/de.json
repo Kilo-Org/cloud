@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Credit-Aktivität konnte nicht geladen werden.",
       "appStoreReceipt": "Beleg im App Store",
       "deductionFallback": "Credit-Abzug",
       "emptyDescription": "Credit-Käufe, Belege und Nutzung werden hier angezeigt.",

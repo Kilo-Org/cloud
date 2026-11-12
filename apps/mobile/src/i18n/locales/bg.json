@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Неуспешно зареждане на кредитната активност.",
       "appStoreReceipt": "Разписка от App Store",
       "deductionFallback": "Приспадане на кредити",
       "emptyDescription": "Покупките на кредити, разписките и използването ще се показват тук.",

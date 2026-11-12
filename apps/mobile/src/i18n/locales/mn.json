@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Кредитийн гүйлгээг ачаалж чадсангүй.",
       "appStoreReceipt": "App Store-ын баримт",
       "deductionFallback": "Кредитийн хасалт",
       "emptyDescription": "Кредитийн худалдан авалт, баримт, хэрэглээ энд харагдана.",

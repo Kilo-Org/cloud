@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Hindi ma-load ang aktibidad ng credit.",
       "appStoreReceipt": "Resibo mula sa App Store",
       "deductionFallback": "Bawas sa credit",
       "emptyDescription": "Lalabas dito ang mga pagbili, resibo, at paggamit ng credit.",

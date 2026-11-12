@@ -3901,6 +3901,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Níorbh fhéidir gníomhaíocht chreidmheasa a lódáil.",
       "appStoreReceipt": "Admháil ón App Store",
       "deductionFallback": "Asbhaint chreidmheasa",
       "emptyDescription": "Taispeánfar ceannacháin chreidmheasa, admhálacha agus úsáid anseo.",

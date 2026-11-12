@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "ခရက်ဒစ် လှုပ်ရှားမှုကို ဖွင့်၍ မရပါ။",
       "appStoreReceipt": "App Store မှ ပြေစာ",
       "deductionFallback": "ခရက်ဒစ် နုတ်ယူမှု",
       "emptyDescription": "ခရက်ဒစ် ဝယ်ယူမှုများ၊ ပြေစာများနှင့် အသုံးပြုမှုများ ဤနေရာတွင် ပေါ်လာပါမည်။",

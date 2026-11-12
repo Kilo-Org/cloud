@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Kredit fəaliyyəti yüklənmədi.",
       "appStoreReceipt": "App Store qəbzi",
       "deductionFallback": "Kredit çıxılması",
       "emptyDescription": "Kredit alışları, qəbzlər və istifadə burada görünəcək.",

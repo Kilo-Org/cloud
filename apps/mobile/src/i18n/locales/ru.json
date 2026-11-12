@@ -3840,6 +3840,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Не удалось загрузить кредитную активность.",
       "appStoreReceipt": "Чек в App Store",
       "deductionFallback": "Списание кредитов",
       "emptyDescription": "Здесь появятся покупки кредитов, чеки и расход.",

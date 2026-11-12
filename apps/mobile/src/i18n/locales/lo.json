@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "ບໍ່ສາມາດໂຫລດກິດຈະກຳເຄຣດິດໄດ້.",
       "appStoreReceipt": "ໃບຮັບເງິນຈາກ App Store",
       "deductionFallback": "ການຫັກເຄຣດິດ",
       "emptyDescription": "ການຊື້ເຄຣດິດ, ໃບຮັບເງິນ ແລະ ການນຳໃຊ້ຈະສະແດງຢູ່ບ່ອນນີ້.",

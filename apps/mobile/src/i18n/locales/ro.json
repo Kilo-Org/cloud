@@ -3779,6 +3779,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Nu am putut încărca activitatea de credite.",
       "appStoreReceipt": "Chitanță din App Store",
       "deductionFallback": "Deducere de credite",
       "emptyDescription": "Achizițiile de credite, chitanțele și utilizarea vor apărea aici.",

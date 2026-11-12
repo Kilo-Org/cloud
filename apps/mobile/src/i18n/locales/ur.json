@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "کریڈٹ کی سرگرمی لوڈ نہیں ہو سکی۔",
       "appStoreReceipt": "App Store کی رسید",
       "deductionFallback": "کریڈٹ کی کٹوتی",
       "emptyDescription": "کریڈٹ کی خریداریاں، رسیدیں اور استعمال یہاں نظر آئیں گے۔",

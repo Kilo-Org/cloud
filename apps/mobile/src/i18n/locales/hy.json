@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Կրեդիտների ակտիվությունը չհաջողվեց բեռնել։",
       "appStoreReceipt": "Անդորրագիր App Store-ից",
       "deductionFallback": "Կրեդիտների դուրսգրում",
       "emptyDescription": "Կրեդիտների գնումները, անդորրագրերը և օգտագործումը կհայտնվեն այստեղ։",

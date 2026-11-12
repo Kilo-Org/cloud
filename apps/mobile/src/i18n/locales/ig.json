@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Enweghị ike ibudata mmemme kredit.",
       "appStoreReceipt": "Rịsịt sitere na App Store",
       "deductionFallback": "Mwepụ kredit",
       "emptyDescription": "Ịzụ kredit, rịsịt, na ojiji ga-apụta ebe a.",

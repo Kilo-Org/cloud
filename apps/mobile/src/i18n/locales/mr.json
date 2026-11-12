@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "क्रेडिट क्रियाकलाप लोड होऊ शकला नाही.",
       "appStoreReceipt": "App Store कडून पावती",
       "deductionFallback": "क्रेडिट वजावट",
       "emptyDescription": "क्रेडिट खरेदी, पावत्या आणि वापर येथे दिसतील.",

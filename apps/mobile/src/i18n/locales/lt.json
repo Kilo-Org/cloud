@@ -3840,6 +3840,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Nepavyko įkelti kredito aktyvumo.",
       "appStoreReceipt": "Kvitas iš App Store",
       "deductionFallback": "Kreditų nurašymas",
       "emptyDescription": "Čia bus rodomi kreditų pirkimai, kvitai ir naudojimas.",

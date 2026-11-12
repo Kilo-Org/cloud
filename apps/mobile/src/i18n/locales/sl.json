@@ -3840,6 +3840,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Kreditne aktivnosti ni bilo mogoče naložiti.",
       "appStoreReceipt": "Potrdilo iz trgovine App Store",
       "deductionFallback": "Odbitek kreditov",
       "emptyDescription": "Tukaj bodo prikazani nakupi kreditov, potrdila in poraba.",

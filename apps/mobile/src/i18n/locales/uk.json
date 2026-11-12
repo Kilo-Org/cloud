@@ -3840,6 +3840,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Не вдалося завантажити кредитну активність.",
       "appStoreReceipt": "Квитанція в App Store",
       "deductionFallback": "Списання кредитів",
       "emptyDescription": "Тут з’являтимуться покупки кредитів, квитанції та використання.",

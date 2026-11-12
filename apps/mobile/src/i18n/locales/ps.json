@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "د کریډیټ فعالیت پورته نه شو.",
       "appStoreReceipt": "له App Store څخه رسید",
       "deductionFallback": "د کریډیټ کسر",
       "emptyDescription": "د کریډیټ پېرودنې، رسیدونه، او کارونه به دلته ښکاره شي.",

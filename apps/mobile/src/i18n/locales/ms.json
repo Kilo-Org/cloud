@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Aktiviti kredit tidak dapat dimuatkan.",
       "appStoreReceipt": "Resit daripada App Store",
       "deductionFallback": "Potongan kredit",
       "emptyDescription": "Pembelian kredit, resit dan penggunaan akan dipaparkan di sini.",

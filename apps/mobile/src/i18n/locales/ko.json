@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "크레딧 활동을 불러오지 못했습니다.",
       "appStoreReceipt": "App Store 영수증",
       "deductionFallback": "크레딧 차감",
       "emptyDescription": "크레딧 구매, 영수증 및 사용 내역이 여기에 표시됩니다.",

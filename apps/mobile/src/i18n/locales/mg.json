@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Tsy afaka nampidirina ny hetsika momba ny trosa.",
       "appStoreReceipt": "Rosia avy amin'ny App Store",
       "deductionFallback": "Fanalana kredita",
       "emptyDescription": "Hiseho eto ny fividianana kredita, ny rosia ary ny fampiasana.",

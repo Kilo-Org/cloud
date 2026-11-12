@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "கிரெடிட் செயல்பாட்டை ஏற்ற முடியவில்லை.",
       "appStoreReceipt": "App Store-இலிருந்து ரசீது",
       "deductionFallback": "கிரெடிட் கழிவு",
       "emptyDescription": "கிரெடிட் வாங்குதல்கள், ரசீதுகள் மற்றும் பயன்பாடு இங்கே தோன்றும்.",

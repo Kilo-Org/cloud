@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Krediittitapahtumia ei voitu ladata.",
       "appStoreReceipt": "Kuitti App Storessa",
       "deductionFallback": "Krediittien veloitus",
       "emptyDescription": "Krediittien ostot, kuitit ja käyttö näkyvät täällä.",

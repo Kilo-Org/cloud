@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Gat ekki hlaðið inneignarferli.",
       "appStoreReceipt": "Kvittun frá App Store",
       "deductionFallback": "Frádráttur inneignar",
       "emptyDescription": "Kaup á inneign, kvittanir og notkun birtast hér.",

@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "ಕ್ರೆಡಿಟ್ ಚಟುವಟಿಕೆಯನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ.",
       "appStoreReceipt": "App Store ನಿಂದ ರಸೀದಿ",
       "deductionFallback": "ಕ್ರೆಡಿಟ್ ಕಡಿತ",
       "emptyDescription": "ಕ್ರೆಡಿಟ್ ಖರೀದಿಗಳು, ರಸೀದಿಗಳು ಮತ್ತು ಬಳಕೆ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",

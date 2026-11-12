@@ -3779,6 +3779,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Nije moguće učitati aktivnost kredita.",
       "appStoreReceipt": "Potvrda iz trgovine App Store",
       "deductionFallback": "Odbitak kredita",
       "emptyDescription": "Kupovine kredita, potvrde i potrošnja pojavit će se ovdje.",

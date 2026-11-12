@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "無法載入點數活動。",
       "appStoreReceipt": "App Store 收據",
       "deductionFallback": "點數扣除",
       "emptyDescription": "點數購買、收據與使用情況會顯示在這裡。",

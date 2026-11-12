@@ -3785,6 +3785,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Couldn't load credit activity.",
       "appStoreReceipt": "Receipt from the App Store",
       "deductionFallback": "Credit deduction",
       "emptyDescription": "Credit purchases, receipts, and usage will appear here.",

@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Non se puido cargar a actividade de crédito.",
       "appStoreReceipt": "Recibo da App Store",
       "deductionFallback": "Dedución de créditos",
       "emptyDescription": "As compras de créditos, os recibos e o uso aparecerán aquí.",

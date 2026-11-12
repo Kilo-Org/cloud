@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "クレジットアクティビティを読み込めませんでした。",
       "appStoreReceipt": "領収書は App Store にあります",
       "deductionFallback": "クレジットの差し引き",
       "emptyDescription": "クレジットの購入、領収書、使用状況がここに表示されます。",

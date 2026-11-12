@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "የክሬዲት እንቅስቃሴ ማምጣት አልተቻለም።",
       "appStoreReceipt": "ደረሰኝ ከApp Store",
       "deductionFallback": "የክሬዲት ቅነሳ",
       "emptyDescription": "የክሬዲት ግዢዎች፣ ደረሰኞች እና አጠቃቀም እዚህ ይታያሉ።",

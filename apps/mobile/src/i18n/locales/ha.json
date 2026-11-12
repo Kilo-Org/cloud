@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Ba a iya loda ayyukan kiredit ba.",
       "appStoreReceipt": "Rasiti daga App Store",
       "deductionFallback": "Cire kiredit",
       "emptyDescription": "Sayayyar kiredit, rasitai, da amfani za su bayyana a nan.",

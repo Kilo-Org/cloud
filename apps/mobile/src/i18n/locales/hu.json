@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Nem sikerült betölteni a kreditaktivitást.",
       "appStoreReceipt": "A nyugta az App Store-ban érhető el",
       "deductionFallback": "Kreditlevonás",
       "emptyDescription": "A kreditvásárlások, a nyugták és a felhasználás itt jelennek meg.",

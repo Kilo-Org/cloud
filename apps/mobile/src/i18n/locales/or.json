@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "କ୍ରେଡିଟ୍ କାର୍ଯ୍ୟକଳାପ ଲୋଡ୍ କରାଯାଇପାରିଲା ନାହିଁ।",
       "appStoreReceipt": "App Storeରୁ ରସିଦ",
       "deductionFallback": "କ୍ରେଡିଟ୍ କଟାଣ",
       "emptyDescription": "କ୍ରେଡିଟ୍ କ୍ରୟ, ରସିଦ ଏବଂ ବ୍ୟବହାର ଏଠାରେ ଦେଖାଯିବ।",

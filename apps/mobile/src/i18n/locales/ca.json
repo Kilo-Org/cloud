@@ -3779,6 +3779,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "No s'ha pogut carregar l'activitat de crèdit.",
       "appStoreReceipt": "Rebut de l'App Store",
       "deductionFallback": "Deducció de crèdits",
       "emptyDescription": "Les compres de crèdits, els rebuts i l'ús apareixeran aquí.",

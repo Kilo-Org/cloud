@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Nuk u aktivizua dot veprimtaria e kredisë.",
       "appStoreReceipt": "Dëftesë nga App Store",
       "deductionFallback": "Zbritje kredish",
       "emptyDescription": "Blerjet e kredive, dëftesat dhe përdorimi do të shfaqen këtu.",

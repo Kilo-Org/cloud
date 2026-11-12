@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "ക്രെഡിറ്റ് പ്രവർത്തനം ലോഡ് ചെയ്യാനായില്ല.",
       "appStoreReceipt": "App Store-ൽ നിന്നുള്ള രസീത്",
       "deductionFallback": "ക്രെഡിറ്റ് കിഴിവ്",
       "emptyDescription": "ക്രെഡിറ്റ് വാങ്ങലുകൾ, രസീതുകൾ, ഉപയോഗം എന്നിവ ഇവിടെ ദൃശ്യമാകും.",

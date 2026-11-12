@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Ezin izan da kreditu-jarduera kargatu.",
       "appStoreReceipt": "App Store-ko ordainagiria",
       "deductionFallback": "Kreditu-kenketa",
       "emptyDescription": "Kreditu-erosketak, ordainagiriak eta erabilera hemen agertuko dira.",

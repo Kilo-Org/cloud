@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Кредит белсенділігін жүктеу мүмкін болмады.",
       "appStoreReceipt": "App Store түбіртегі",
       "deductionFallback": "Кредит шегерімі",
       "emptyDescription": "Кредит сатып алулары, түбіртектер және пайдалану осында көрсетіледі.",

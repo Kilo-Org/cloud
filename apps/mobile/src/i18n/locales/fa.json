@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "فعالیت اعتباری بارگذاری نشد.",
       "appStoreReceipt": "رسید از App Store",
       "deductionFallback": "کسر اعتبار",
       "emptyDescription": "خریدهای اعتبار، رسیدها و مصرف در اینجا نمایش داده می‌شوند.",

@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "ක්‍රෙඩිට් ක්‍රියාකාරකම් පූරණය කළ නොහැක.",
       "appStoreReceipt": "App Store වෙතින් ලැබුණු රිසිට්පත",
       "deductionFallback": "ක්‍රෙඩිට් අඩු කිරීම",
       "emptyDescription": "ක්‍රෙඩිට් මිලදී ගැනීම්, රිසිට්පත් සහ භාවිතය මෙහි දිස් වේ.",

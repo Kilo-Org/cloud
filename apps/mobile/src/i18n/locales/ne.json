@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "क्रेडिट गतिविधि लोड गर्न सकिएन।",
       "appStoreReceipt": "App Store बाट रसिद",
       "deductionFallback": "क्रेडिट कटौती",
       "emptyDescription": "क्रेडिट खरिद, रसिद र प्रयोग यहाँ देखिनेछन्।",

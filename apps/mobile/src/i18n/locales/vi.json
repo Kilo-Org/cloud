@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Không thể tải hoạt động tín dụng.",
       "appStoreReceipt": "Biên lai từ App Store",
       "deductionFallback": "Khấu trừ tín dụng",
       "emptyDescription": "Các giao dịch mua tín dụng, biên lai và mức sử dụng sẽ hiển thị tại đây.",

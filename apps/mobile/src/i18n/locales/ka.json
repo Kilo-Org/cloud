@@ -3718,6 +3718,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "კრედიტების აქტივობის ჩატვირთვა ვერ მოხერხდა.",
       "appStoreReceipt": "ქვითარი App Store-იდან",
       "deductionFallback": "კრედიტების ჩამოჭრა",
       "emptyDescription": "კრედიტების შენაძენები, ქვითრები და გამოყენება აქ გამოჩნდება.",

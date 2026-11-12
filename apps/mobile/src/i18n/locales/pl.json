@@ -3840,6 +3840,7 @@
   },
   "credits": {
     "history": {
+      "activityUnavailable": "Nie udało się wczytać aktywności kredytowej.",
       "appStoreReceipt": "Potwierdzenie w App Store",
       "deductionFallback": "Pobranie kredytów",
       "emptyDescription": "Tutaj pojawią się zakupy kredytów, potwierdzenia i wykorzystanie.",

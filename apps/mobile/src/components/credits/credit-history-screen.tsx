@@ -126,6 +126,10 @@ export function PersonalCreditHistoryScreen() {
 
   const isLoading = purchases.query.status === 'pending' || blocks.isPending;
   const isLaterPageError = purchases.query.isFetchNextPageError;
+  // The ledger is a second read feeding this list. When it fails on its own the
+  // purchases that already loaded stay on screen, and the footer names the part
+  // that is missing instead of dropping it without a word.
+  const ledgerFailed = blocks.isError && items.length > 0;
 
   const retryAll = () => {
     void purchases.query.refetch();
@@ -189,6 +193,25 @@ export function PersonalCreditHistoryScreen() {
               className={STATE_ACTION_CLASS}
               onPress={() => void purchases.query.fetchNextPage()}
               loading={purchases.query.isFetchingNextPage}
+              accessibilityLabel={t('common.retry')}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          </View>
+        )}
+        {ledgerFailed && (
+          <View className="items-center gap-3 px-6 py-4">
+            <Text variant="muted" className="text-center text-xs">
+              {t('credits.history.activityUnavailable')}
+            </Text>
+            <Button
+              variant="outline"
+              size="sm"
+              className={STATE_ACTION_CLASS}
+              onPress={() => {
+                void blocks.refetch();
+              }}
+              loading={blocks.isFetching}
               accessibilityLabel={t('common.retry')}
             >
               <Text>{t('common.retry')}</Text>

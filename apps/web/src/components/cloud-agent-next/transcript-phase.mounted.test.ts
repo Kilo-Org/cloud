@@ -8,6 +8,8 @@ import type { StoredMessage } from './types';
 let mockRuntimeMessages: StoredMessage[] = [];
 import type { ResumeAnchor, ResumeAttemptStep } from './resume-anchor';
 import type { SessionStatusIndicator as SessionStatusIndicatorType } from '@kilocode/cloud-agent-sdk';
+import type { LocalSession } from './local-sessions/local-session';
+import type { ComposerFocusRequest } from './useSessionComposerFocus';
 
 Object.assign(globalThis, { React });
 
@@ -18,7 +20,10 @@ let mockChatInput: Record<string, unknown> | null = null;
 let mockChatHeader: ComponentProps<typeof ChatHeader> | null = null;
 let mockWorkspaceTabs: ComponentProps<typeof CloudAgentWorkspaceTabs> | null = null;
 let mockAtomValues: Record<string, unknown>;
+let mockLocalSession: LocalSession | null = null;
+let mockComposerFocusRequest: ComposerFocusRequest | null = null;
 const mockSetAtom = jest.fn();
+const mockSetLocalComposer = jest.fn();
 const mockUseCloudAgentEnvironment = jest.fn();
 const mockRequestOlderMessages = jest.fn();
 const mockPlanResumeAttempt = jest.fn((): ResumeAttemptStep => 'wait');
@@ -35,6 +40,7 @@ const mockManager = {
   loadOlderMessages: jest.fn(),
   trimRetainedHistory: jest.fn(),
   setRemoteModelOverride: jest.fn(),
+  setCloudAgentModelOverride: jest.fn(),
   interrupt: jest.fn(),
   answerQuestion: jest.fn(),
   rejectQuestion: jest.fn(),
@@ -77,6 +83,8 @@ class MockResizeObserver {
 
 // The SDK derives the cached page's owner; the mocks own the cached rows directly.
 function mockCachedTranscriptSessionId(): unknown {
+  if ('cachedTranscriptSessionId' in mockAtomValues)
+    return mockAtomValues.cachedTranscriptSessionId;
   if (!mockAtomValues.isRefreshingCachedTranscript) return null;
   const rows = [
     ...((mockAtomValues.staticMessages as { info: { sessionID: string } }[] | undefined) ?? []),
@@ -114,6 +122,10 @@ jest.mock('./useSavedWorktreeChanges', () => ({
   useSavedWorktreeChanges: () => ({ saved: { data: undefined }, queryKey: [] }),
 }));
 jest.mock('./use-cached-transcript-page', () => ({ useCachedTranscriptPage: () => null }));
+jest.mock('./local-sessions/LocalSessionsProvider', () => ({
+  useLocalSession: () => mockLocalSession,
+  useLocalSessions: () => ({ restored: true, setLocalComposer: mockSetLocalComposer }),
+}));
 jest.mock('./useChatStackInfo', () => ({ useChatStackInfo: () => null }));
 jest.mock('./use-preview', () => ({
   ...jest.requireActual('./use-preview'),
@@ -138,6 +150,7 @@ jest.mock('./CloudSidebarLayout', () => ({
   }),
   useWorktreeChatTabs: () => ({
     selectedWorktreeId: mockWorktreeId,
+    composerFocusRequest: mockComposerFocusRequest,
     worktreeChats: [],
     openWorktreeChats: [],
     closedWorktreeChats: [],
@@ -197,7 +210,11 @@ jest.mock('./WorktreeFilePane', () => ({ WorktreeFilePane: () => null }));
 jest.mock('./assistant-ui/CloudComposer', () => ({
   CloudComposer: (props: Record<string, unknown>) => {
     mockChatInput = props;
-    return createElement('input', { 'data-composer': true });
+    return createElement('textarea', {
+      'data-composer': true,
+      ref: props.inputRef as React.Ref<HTMLTextAreaElement>,
+      disabled: props.textareaDisabled as boolean,
+    });
   },
 }));
 jest.mock('./assistant-ui/CloudChatRuntimeProvider', () => ({
@@ -353,6 +370,8 @@ describe('CloudChatPage route-aware transcript phase', () => {
 
   beforeAll(async () => {
     ({ CloudChatPage } = await import('./CloudChatPage'));
+    const { default: loadable } = await import('next/dist/shared/lib/loadable.shared-runtime');
+    await loadable.preloadAll();
   });
 
   beforeEach(() => {
@@ -360,6 +379,8 @@ describe('CloudChatPage route-aware transcript phase', () => {
     mockAtParam = null;
     mockWorktreeId = null;
     mockChatInput = null;
+    mockLocalSession = null;
+    mockComposerFocusRequest = null;
     mockChatHeader = null;
     mockWorkspaceTabs = null;
     mockResizeObserve.mockClear();
@@ -369,12 +390,16 @@ describe('CloudChatPage route-aware transcript phase', () => {
     mockResumeAnchorForTranscript.mockReset().mockReturnValue(null);
     mockRequestOlderMessages.mockClear();
     mockSetAtom.mockClear();
+    mockSetLocalComposer.mockReset().mockImplementation((_id, composer) => {
+      if (mockLocalSession) mockLocalSession = { ...mockLocalSession, composer };
+    });
     mockUseCloudAgentEnvironment.mockReset().mockReturnValue({ data: undefined });
     mockAtomValues = {
       sessionId: null,
       fetchedSessionData: null,
       activity: { type: 'idle' },
       activeSessionType: 'cloud-agent',
+      isReadOnly: false,
       staticMessages: [],
       dynamicMessages: [],
       pendingMessages: new Map(),
@@ -419,6 +444,91 @@ describe('CloudChatPage route-aware transcript phase', () => {
     if (!container) throw new Error('transcript scroll container missing');
     return container;
   }
+
+  it('focuses a new local chat before creation or session loading completes', () => {
+    window.matchMedia = jest.fn(() => ({ matches: true }) as MediaQueryList);
+    const focus = jest.spyOn(window.HTMLElement.prototype, 'focus');
+    mockManager.switchSession.mockClear();
+    const onHandled = jest.fn();
+    mockComposerFocusRequest = { sessionId: 'ses_b', onHandled };
+    mockLocalSession = {
+      kiloSessionId: 'ses_b',
+      operationKey: '11111111-1111-4111-8111-111111111111',
+      organizationId: null,
+      worktreeId: 'worktree_local',
+      request: { kind: 'worktree-chat', sourceKiloSessionId: 'ses_a' },
+      repository: 'example/repository',
+      branch: 'main',
+      composer: { mode: 'code', model: 'example/model', variant: null },
+      firstMessage: null,
+      createdAt: '2026-11-12T00:00:00.000Z',
+      sync: { state: 'syncing' },
+    };
+
+    render();
+
+    expect(skeleton()).toBeNull();
+    expect(mockChatInput).toMatchObject({
+      textareaDisabled: false,
+      disabled: true,
+      toolbarDisabled: false,
+      sendUnavailableReason: 'Creating session…',
+      mode: 'code',
+    });
+    expect(mockManager.switchSession).not.toHaveBeenCalled();
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(onHandled).toHaveBeenCalledTimes(1);
+
+    mockLocalSession = { ...mockLocalSession, sync: { state: 'synced' } };
+    render();
+    expect(mockManager.switchSession).toHaveBeenCalledWith('ses_b');
+    mockAtomValues.isLoading = false;
+    mockAtomValues.fetchedSessionData = { kiloSessionId: 'ses_b', organizationId: null };
+    render();
+
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(onHandled).toHaveBeenCalledTimes(1);
+    focus.mockRestore();
+  });
+
+  it('shows installed workspace modes and accepts selection changes while creation is pending', () => {
+    mockLocalSession = {
+      kiloSessionId: 'ses_b',
+      operationKey: '11111111-1111-4111-8111-111111111111',
+      organizationId: null,
+      worktreeId: 'worktree_local',
+      request: { kind: 'worktree-chat', sourceKiloSessionId: 'ses_a' },
+      repository: 'example/repository',
+      branch: 'main',
+      firstMessage: null,
+      createdAt: '2026-11-12T00:00:00.000Z',
+      sync: { state: 'syncing' },
+      composer: {
+        mode: 'code',
+        model: 'example/model',
+        variant: null,
+        runtimeAgents: [
+          { slug: 'reviewer', name: 'Workspace reviewer', model: 'example/pinned' },
+          { slug: 'hidden', name: 'Hidden agent', hidden: true },
+        ],
+      },
+    };
+    render();
+    expect(mockChatInput).toMatchObject({
+      toolbarDisabled: false,
+      disabled: true,
+      customModeOptions: [{ value: 'reviewer', label: 'Workspace reviewer' }],
+    });
+    const onModeChange = mockChatInput?.onModeChange as (mode: string) => void;
+    act(() => onModeChange('reviewer'));
+    render();
+    expect(mockChatInput).toMatchObject({
+      mode: 'reviewer',
+      model: 'example/pinned',
+      modelPickerDisabled: true,
+    });
+    expect(mockLocalSession.composer?.mode).toBe('reviewer');
+  });
 
   it('renders the skeleton instead of a stale error while the started open is loading', () => {
     mockAtomValues.statusIndicator = { type: 'error', message: 'Stale failure' };
@@ -587,6 +697,18 @@ describe('CloudChatPage route-aware transcript phase', () => {
 
     expect(mockWorkspaceTabs?.currentChatLoadingLabel).toBeNull();
     expect(mockPlanResumeAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a fresh early page using its route owner, without waiting for metadata or a cache refresh', () => {
+    mockAtomValues.staticMessages = [anchorMessage('msg_early')];
+    mockAtomValues.cachedTranscriptSessionId = mockSessionId;
+    mockAtomValues.isRefreshingCachedTranscript = false;
+    mockAtomValues.isLoading = false;
+    mockAtomValues.canSend = false;
+    render();
+    expect(skeleton()).toBeNull();
+    expect(dom.container.querySelector('[data-message-id="msg_early"]')).not.toBeNull();
+    expect(mockChatInput?.disabled).toBe(true);
   });
 
   it('positions cached messages at the tail before any animation frame or refresh completes', () => {

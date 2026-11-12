@@ -7,10 +7,12 @@ import {
   _setSecureStoreForTests,
   clearLastRoute,
   consumeLastRouteForRepair,
+  consumeRestoredRouteOpen,
   getLastRoute,
   getLastRouteSnapshot,
   isLastRouteHydrated,
   type LastRouteRecord,
+  noteRestoredRouteOpen,
   prepareLastRouteRepair,
   recordLastRoute,
   subscribeLastRoute,
@@ -185,6 +187,32 @@ describe('consumeLastRouteForRepair', () => {
     recordLastRoute('/agent-chat/ses_stale', 'u1');
     expect(getLastRoute('u1')).toBe('/(app)/variables');
     expect(consumeLastRouteForRepair('u1')).toBe('/(app)/variables');
+  });
+});
+
+describe('consumeRestoredRouteOpen', () => {
+  it('marks the route the repair opened, groups and query included', () => {
+    noteRestoredRouteOpen('/(app)/agent-chat/ses_1?at=msg_2');
+
+    expect(consumeRestoredRouteOpen('/agent-chat/ses_1')).toBe(true);
+  });
+
+  it('is one-shot, so a later open of the same route answers for itself', () => {
+    noteRestoredRouteOpen('/(app)/agent-chat/ses_1');
+    expect(consumeRestoredRouteOpen('/agent-chat/ses_1')).toBe(true);
+
+    expect(consumeRestoredRouteOpen('/agent-chat/ses_1')).toBe(false);
+  });
+
+  it('does not mark a different route, and the next route is unmarked', () => {
+    noteRestoredRouteOpen('/(app)/agent-chat/ses_1');
+
+    expect(consumeRestoredRouteOpen('/(app)/(tabs)/(0_home)')).toBe(false);
+    expect(consumeRestoredRouteOpen('/agent-chat/ses_1')).toBe(false);
+  });
+
+  it('marks nothing when no restore ran', () => {
+    expect(consumeRestoredRouteOpen('/agent-chat/ses_1')).toBe(false);
   });
 });
 

@@ -73,22 +73,8 @@ describe('parseRoutingDetails', () => {
       result: expectedResult,
       enkrypt: expectedEnkrypt,
       enkrypt_output: null,
+      byok_failover_attempts: [],
     });
-  });
-
-  test('passes steps, BYOK candidates, and result through', () => {
-    const parsed = parseRoutingDetails(productionRecord);
-
-    expect(parsed?.steps).toEqual(expectedSteps);
-    expect(parsed?.byok_candidates).toEqual([]);
-    expect(parsed?.result).toEqual(expectedResult);
-  });
-
-  test('returns the Enkrypt guardrail report without its retired tool result setting', () => {
-    expect(parseRoutingDetails(productionRecord)?.enkrypt).toEqual(expectedEnkrypt);
-    expect(parseRoutingDetails(productionRecord)?.enkrypt?.settings).not.toHaveProperty(
-      'scan_tool_results'
-    );
   });
 
   test('drops an Enkrypt report from before scans were split into parts', () => {
@@ -181,7 +167,6 @@ describe('parseRoutingDetails', () => {
     expect(parsed?.enkrypt?.scans).toEqual([toolsScan]);
     expect(parsed?.enkrypt?.verdict).toBe('block');
     expect(parseRoutingDetails(JSON.stringify(parsed))).toEqual(parsed);
-    expect(parsed?.enkrypt?.scans[0]).toEqual(toolsScan);
   });
 
   test('drops a tools scan in the per-part shape from before tools were aggregated', () => {
@@ -275,6 +260,7 @@ describe('parseRoutingDetails', () => {
       },
       enkrypt: null,
       enkrypt_output: null,
+      byok_failover_attempts: [],
     });
   });
 
@@ -346,6 +332,7 @@ describe('parseRoutingDetails', () => {
       result: { kind: 'provider', route: 'kilo' },
       enkrypt: null,
       enkrypt_output: null,
+      byok_failover_attempts: [],
     });
   });
 
@@ -397,6 +384,75 @@ describe('parseRoutingDetails', () => {
     );
     expect(malformed?.enkrypt_output).toBeNull();
     expect(malformed?.enkrypt).toEqual(expectedEnkrypt);
+  });
+
+  test('returns the BYOK failover attempts in order', () => {
+    const attempts = [
+      {
+        provider_type: 'vercel',
+        byok_provider_ids: ['openai'],
+        status: 429,
+        error_code: 'insufficient_quota',
+        duration_ms: 1_204,
+        outcome: 'failed-over',
+      },
+      {
+        provider_type: 'openrouter',
+        byok_provider_ids: ['openrouter'],
+        status: 200,
+        duration_ms: 846,
+        outcome: 'served',
+      },
+    ];
+    const record = JSON.parse(productionRecord) as Record<string, unknown>;
+
+    expect(
+      parseRoutingDetails(JSON.stringify({ ...record, byok_failover_attempts: attempts }))
+        ?.byok_failover_attempts
+    ).toEqual(attempts);
+  });
+
+  test('drops malformed BYOK failover attempts and unreadable optional fields', () => {
+    const body = JSON.stringify({
+      steps: [],
+      byok_candidates: [],
+      byok_failover_attempts: [
+        null,
+        'openai',
+        { provider_type: 'vercel', byok_provider_ids: ['openai'], status: 429 },
+        { provider_type: 'vercel', byok_provider_ids: ['openai'], status: 429, outcome: 7 },
+        {
+          provider_type: 42,
+          byok_provider_ids: 'anthropic',
+          status: '503',
+          error_code: { code: 'upstream_disconnect' },
+          duration_ms: 'slow',
+          outcome: 'failed-over',
+          message: 'leaked upstream message',
+        },
+        { outcome: 'failed', status: 502 },
+      ],
+    });
+
+    const parsed = parseRoutingDetails(body);
+    expect(parsed?.byok_failover_attempts).toEqual([
+      { byok_provider_ids: [], outcome: 'failed-over' },
+      { byok_provider_ids: [], outcome: 'failed', status: 502 },
+    ]);
+    expect(JSON.stringify(parsed)).not.toContain('leaked upstream message');
+  });
+
+  test.each([
+    { name: 'missing', value: undefined },
+    { name: 'null', value: null },
+    { name: 'not an array', value: { outcome: 'served' } },
+  ])('returns no BYOK failover attempts when the field is $name', ({ value }) => {
+    const record = JSON.parse(productionRecord) as Record<string, unknown>;
+
+    expect(
+      parseRoutingDetails(JSON.stringify({ ...record, byok_failover_attempts: value }))
+        ?.byok_failover_attempts
+    ).toEqual([]);
   });
 
   test.each(['', 'not json', '{"steps":', '[]', '"x"', 'null', '42', 'true'])(

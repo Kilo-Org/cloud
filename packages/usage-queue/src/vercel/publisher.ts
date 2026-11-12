@@ -20,6 +20,11 @@ export async function enqueueVercelUsage(
     // The SDK has no send AbortSignal. A deadline is ambiguous acceptance, never
     // permission to publish to another transport or fall back to a direct write.
     const result = await Promise.race([
+      // An empty or blank USAGE_WRITER_SECRET makes signUsageMessage throw on purpose: nothing is
+      // sent, the catch below returns { kind: 'unavailable', reason: 'publish_failed' }, and the
+      // caller takes no direct-write fallback. See message.test.ts ("blank configuration cannot
+      // sign or authenticate") and publisher.test.ts ("missing signing configuration fails
+      // before any publish").
       signUsageMessage(payload, process.env.USAGE_WRITER_SECRET || '').then(async message => {
         // Signing may finish late; do not begin network I/O outside the caller's budget.
         if (publicationExpired) return 'timeout' as const;

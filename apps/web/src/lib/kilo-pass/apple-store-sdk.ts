@@ -2,7 +2,9 @@ import {
   AppStoreServerAPIClient,
   Environment,
   SignedDataVerifier,
+  type JWSTransactionDecodedPayload,
 } from '@apple/app-store-server-library';
+import * as z from 'zod';
 
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
@@ -91,4 +93,87 @@ export function createAppleStoreServerApiClient(): AppStoreServerAPIClient {
   );
   cachedApiClient = { key, value: client };
   return client;
+}
+
+export type AppleStoreEnvironment = 'Sandbox' | 'Production';
+
+export type AppleStoreDecodedTransaction = {
+  transactionId: string;
+  originalTransactionId: string;
+  bundleId: string;
+  productId: string;
+  purchaseDate: number;
+  expiresDate?: number;
+  appAccountToken?: string;
+  revocationDate?: number;
+  revocationType?: string;
+  /** Refunded share of the transaction in milliunits (100000 = 100%). */
+  revocationPercentage?: number;
+  /** `RevocationReason.REFUNDED_DUE_TO_ISSUE` (1) or `REFUNDED_FOR_OTHER_REASON` (0). */
+  revocationReason?: number;
+  currency?: string;
+  price?: number;
+  environment: AppleStoreEnvironment;
+  rawPayload: Record<string, unknown>;
+};
+
+const AppleStoreTransactionPayloadSchema = z
+  .object({
+    transactionId: z.string().min(1),
+    originalTransactionId: z.string().min(1),
+    bundleId: z.string().min(1),
+    productId: z.string().min(1),
+    purchaseDate: z.number(),
+    expiresDate: z.number().optional(),
+    appAccountToken: z.string().uuid().optional(),
+    revocationDate: z.number().optional(),
+    revocationType: z.string().optional(),
+    revocationPercentage: z.number().optional(),
+    revocationReason: z.number().optional(),
+    currency: z.string().optional(),
+    price: z.number().optional(),
+    environment: z.string().optional(),
+  })
+  .passthrough();
+
+export function normalizeEnvironment(environment: string | undefined): AppleStoreEnvironment {
+  if (environment === 'Production') return 'Production';
+  return 'Sandbox';
+}
+
+function decodeAppleStoreTransactionPayload(
+  decoded: JWSTransactionDecodedPayload
+): AppleStoreDecodedTransaction {
+  const parsed = AppleStoreTransactionPayloadSchema.safeParse(decoded);
+  if (!parsed.success) {
+    throw new Error('Apple transaction payload missing required identifiers');
+  }
+  const payload = parsed.data;
+
+  return {
+    transactionId: payload.transactionId,
+    originalTransactionId: payload.originalTransactionId,
+    bundleId: payload.bundleId,
+    productId: payload.productId,
+    purchaseDate: payload.purchaseDate,
+    expiresDate: payload.expiresDate,
+    appAccountToken: payload.appAccountToken,
+    revocationDate: payload.revocationDate,
+    revocationType: payload.revocationType,
+    revocationPercentage: payload.revocationPercentage,
+    revocationReason: payload.revocationReason,
+    currency: payload.currency,
+    price: payload.price,
+    environment: normalizeEnvironment(payload.environment),
+    rawPayload: payload,
+  };
+}
+
+export async function decodeAppleStoreTransactionJws(
+  signedTransactionJws: string
+): Promise<AppleStoreDecodedTransaction> {
+  const decoded = (await createAppleStoreSignedDataVerifier().verifyAndDecodeTransaction(
+    signedTransactionJws
+  )) as JWSTransactionDecodedPayload;
+  return decodeAppleStoreTransactionPayload(decoded);
 }

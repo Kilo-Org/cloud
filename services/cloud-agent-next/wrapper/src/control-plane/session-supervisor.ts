@@ -654,11 +654,21 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
         else endPause(record.execution, 'heldSince', options.now());
       }
     },
-    snapshotFailed(token: number) {
+    snapshotFailed(token: number, retainObservation = false) {
       if (token !== snapshot?.id) return;
       snapshot = undefined;
       tombstones.clear();
-      observed = false;
+      // V1 retains main's lost-observation behavior. V2 can keep uninterrupted feed evidence.
+      if (!retainObservation) observed = false;
+    },
+    /** The live execution ids in `root`'s tree, or undefined until a reconcile follows a feed loss. */
+    liveTreeExecutions(root: string): number[] | undefined {
+      if (disposed || !observed) return undefined;
+      return [...sessions.values()].flatMap(record =>
+        record.execution && (record.id === root || descendsFrom(record, root))
+          ? [record.execution.id]
+          : []
+      );
     },
     needsCompute: () =>
       [...sessions.values()].some(

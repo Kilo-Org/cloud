@@ -5,6 +5,7 @@ import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 import { type JSX } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
 import {
@@ -120,6 +121,8 @@ beforeEach(() => {
   mocks.runWidgetApprove.mockReset();
   // eslint-disable-next-line require-await -- mock returning a resolved promise
   secureStore.getItemAsync.mockReset().mockImplementation(async key => store.get(key) ?? null);
+  // The class upgrade has run: an absent record is absent, not unreadable.
+  store.set(WIDGET_STORE_CLASS_MARKER.key, WIDGET_STORE_CLASS_MARKER.value);
 });
 afterEach(() => {
   vi.clearAllTimers();

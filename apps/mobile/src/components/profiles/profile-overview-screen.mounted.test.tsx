@@ -12,6 +12,7 @@ import {
   pressSave,
   rerenderScreen,
   resetOverviewState,
+  rowSubtitles,
   testProfile,
   type TestProfileDetail,
 } from '@/components/profiles/profile-overview-screen.test-helpers';
@@ -76,6 +77,8 @@ vi.mock('@/lib/profile-agent-navigation', () => ({
   getProfileSlashCommandsPath: (id: string, org?: string) =>
     `/profiles/${id}/slash-commands${org ? `?org=${org}` : ''}`,
   getProfileMcpPath: (id: string, org?: string) => `/profiles/${id}/mcp${org ? `?org=${org}` : ''}`,
+  getProfileInstructionsPath: (id: string, org?: string) =>
+    `/profiles/${id}/instructions${org ? `?org=${org}` : ''}`,
   getProfileSkillsPath: (id: string, org?: string) =>
     `/profiles/${id}/skills${org ? `?org=${org}` : ''}`,
   getProfileAgentsPath: (id: string, org?: string) =>
@@ -112,6 +115,8 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
   CornerDownLeft: 'CornerDownLeft',
+  Download: 'Download',
+  FileText: 'FileText',
   KeyRound: 'KeyRound',
   Server: 'Server',
   Sparkles: 'Sparkles',
@@ -192,14 +197,10 @@ describe('ProfileOverviewScreen', () => {
     expect(findField(renderer.root, 'Profile description').props.defaultValue).toBe(
       'Old description'
     );
-    expect(findAll(renderer.root, 'ConfigureRow').map(row => row.props.subtitle)).toEqual([
-      '1',
-      '2',
-      '0',
-      '0',
-      '1',
-      '0',
-    ]);
+    // The seven sections in the web editor's order, then the Import config row.
+    const subtitles = rowSubtitles(renderer.root);
+    expect(subtitles.slice(0, 7)).toEqual(['1', '2', '0', '0', '1', '0', '0']);
+    expect(subtitles[7]).toBe('Paste a config and review its changes');
 
     act(() => {
       (findRow(renderer.root, 'Skills').props as { onPress: () => void }).onPress();
@@ -219,20 +220,14 @@ describe('ProfileOverviewScreen', () => {
     expect(h.success).toHaveBeenCalledWith('Updated');
   });
 
-  it('empty: an empty profile still renders all six rows with zero counts', async () => {
+  it('empty: an empty profile still renders all seven rows with zero counts', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
 
     const { renderer } = await mountScreen();
 
-    expect(findAll(renderer.root, 'ConfigureRow').map(row => row.props.subtitle)).toEqual([
-      '0',
-      '0',
-      '0',
-      '0',
-      '0',
-      '0',
-    ]);
+    expect(rowSubtitles(renderer.root).slice(0, 7)).toEqual(Array.from({ length: 7 }, () => '0'));
+    expect(findRow(renderer.root, 'Import config')).toBeDefined();
   });
 
   it('retains edited metadata after a failed save and clears the error after an explicit retry', async () => {

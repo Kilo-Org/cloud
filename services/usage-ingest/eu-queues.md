@@ -7,6 +7,13 @@
 | Production (top-level) | `usage-ingest` | `usage-ingest-processing-eu` / `usage-ingest-processing-dlq-eu` | Processing, batch6/parallelism2/cap225 (up to 450 writer calls) |
 | Staging | `usage-ingest-staging` | `usage-ingest-processing-staging-eu` / `usage-ingest-processing-dlq-staging-eu` | Processing, batch2/parallelism2/cap200 (at most400 writer calls) |
 
+Each environment also binds its old global pair as the
+[stall hedge](README.md#stall-hedge-to-the-global-queue) target
+(`usage-ingest-processing` / `usage-ingest-processing-dlq` in production,
+`usage-ingest-processing-staging` / `usage-ingest-processing-dlq-staging` in staging),
+consumed by the same Worker at cap 25 (50 more writer calls). Hedged copies are stored
+outside the EU jurisdiction; EU was a latency experiment, not a residency requirement.
+
 Production uses batch6/parallelism2/cap225; staging policy is unchanged at
 batch2/parallelism2/cap200. The production cap `225` is a bounded single-knob
 trial; batch, fill timeout, parallelism, retries and staging are unchanged.
@@ -54,7 +61,21 @@ lookup or API failures stop upload; reruns reuse compatible resources. The helpe
 also raises the selected DLQ's message retention to the maximum and reads it back;
 see [Retention](README.md#retention).
 
-Preparation verifies the selected source's consumer ownership before detaching
+When the config declares the hedge (a `USAGE_INGEST_HEDGE_QUEUE` producer on the
+environment's global source plus a second consumer on it that dead-letters into the
+global DLQ, exactly), preparation treats the global pair as the hedge pair rather than
+an obsolete source. It inspects all four queues before any write, verifies consumer
+ownership on both sources, creates a missing global DLQ (maximum retention) and then
+a missing global source without a jurisdiction, reads each back, raises the global
+DLQ's retention like the EU DLQ's, and detaches nothing. A foreign consumer on the
+hedge queue stops deployment. Cloudflare requires a DLQ to share its source queue's
+jurisdiction, so the hedge cannot use the EU DLQ. Any other hedge shape fails the
+config check before API access. The legacy two-producer, one-consumer shape below
+keeps its behaviour, so historical source revisions still deploy. That compatibility
+is not a safe rollback once the hedge has been on: a legacy-shaped deployment detaches
+the global consumer without checking the hedge queue's backlog (see removal below).
+
+Without the hedge, preparation verifies the selected source's consumer ownership before detaching
 only the obsolete source attachment owned by the selected Worker. All supplied
 script-name aliases must match; service metadata must match its default Worker
 environment. It reads back detachment. Missing/already-detached obsolete queues
@@ -80,6 +101,18 @@ existing deployment commands. The helper requires an already injected
 Actual token permissions must support Queue reads/create/update/consumer removal and
 normal Worker deployment; account admin UI access is not required. See
 [consumer API permissions](https://developers.cloudflare.com/api/resources/queues/subresources/consumers/methods/delete/).
+
+## Stall hedge removal
+
+Remove the hedge with a forward PR, not a revert: set `USAGE_INGEST_HEDGE_MODE` to
+`off` and deploy, wait until the hedge queue is empty, then remove the hedge consumer,
+binding and variables in a new PR; preparation then detaches the global consumer as
+the legacy shape does. A plain revert, or deploying a source revision from before the
+hedge, restores the unconditional detach and could leave hedge copies unprocessed,
+some of which may be the only accepted copy of an event. The same happens when the
+removal PR deploys before the hedge queue has drained: preparation does not check the
+backlog before detaching. The global routing rollback below needs the hedge removed
+first.
 
 ## Cutover and routing rollback
 

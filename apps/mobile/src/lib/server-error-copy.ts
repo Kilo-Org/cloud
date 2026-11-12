@@ -7,6 +7,7 @@
 // generic line, and a raw server sentence never reaches a screen.
 
 import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+import { ORGANIZATION_INVITE_SEAT_LIMIT_REACHED } from '@kilocode/app-shared/organizations';
 
 import { i18n } from '@/i18n';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -68,6 +69,9 @@ function copyKeyFor(message: string): string | undefined {
     }
     case ORGANIZATION_MEMBER_EXISTS_MESSAGE: {
       return 'organization.inviteMember.alreadyMember';
+    }
+    case ORGANIZATION_INVITE_SEAT_LIMIT_REACHED: {
+      return 'organization.inviteMember.noSeatsAvailable';
     }
     case ORGANIZATION_PENDING_INVITATION_MESSAGE: {
       return 'organization.inviteMember.pendingInvitation';

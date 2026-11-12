@@ -91,6 +91,7 @@ type CloudComposerProps = {
   canInterrupt?: boolean;
   disabled?: boolean;
   textareaDisabled?: boolean;
+  toolbarDisabled?: boolean;
   inputRef?: React.RefObject<HTMLTextAreaElement | null>;
   isStreaming?: boolean;
   placeholder?: string;
@@ -111,6 +112,7 @@ type CloudComposerProps = {
   pinnedModelOption?: ModelOption;
   /** Whether models are loading */
   isLoadingModels?: boolean;
+  onModelPickerIntent?: () => void;
   /** Callback when mode changes */
   onModeChange?: (mode: AgentMode) => void;
   /** Callback when model changes */
@@ -160,6 +162,7 @@ export function CloudComposer({
   canInterrupt = false,
   disabled = false,
   textareaDisabled = disabled,
+  toolbarDisabled = disabled,
   inputRef,
   isStreaming = false,
   placeholder = 'Type your message...',
@@ -170,6 +173,7 @@ export function CloudComposer({
   modelOptions = [],
   pinnedModelOption,
   isLoadingModels = false,
+  onModelPickerIntent,
   onModeChange,
   onModelChange,
   variant,
@@ -850,10 +854,11 @@ export function CloudComposer({
                 pinnedModelOption={pinnedModelOption}
                 onModelChange={onModelChange}
                 isLoadingModels={isLoadingModels}
+                onModelPickerIntent={onModelPickerIntent}
                 variant={variant}
                 availableVariants={availableVariants}
                 onVariantChange={onVariantChange}
-                disabled={disabled || isStreaming}
+                disabled={toolbarDisabled || isStreaming}
                 modelPickerDisabled={modelPickerDisabled}
                 modelPickerTooltip={modelPickerTooltip}
                 variantPickerDisabled={variantPickerDisabled}
@@ -873,7 +878,7 @@ export function CloudComposer({
                     onValueChange={onModeChange}
                     customOptions={customModeOptions}
                     variant="compact"
-                    disabled={disabled || isStreaming}
+                    disabled={toolbarDisabled || isStreaming}
                     className="min-w-0"
                   />
                 )}
@@ -894,13 +899,14 @@ export function CloudComposer({
                   </Tooltip>
                 ) : (
                   <ModelCombobox
+                    onLoadModels={onModelPickerIntent}
                     models={modelOptions}
                     pinnedModel={pinnedModelOption}
                     value={model}
                     onValueChange={onModelChange}
                     variant="compact"
                     isLoading={isLoadingModels}
-                    disabled={disabled || isStreaming}
+                    disabled={toolbarDisabled || isStreaming}
                     className="min-w-0"
                   />
                 )}
@@ -926,7 +932,7 @@ export function CloudComposer({
                         variants={availableVariants}
                         value={variant}
                         onValueChange={onVariantChange}
-                        disabled={disabled || isStreaming}
+                        disabled={toolbarDisabled || isStreaming}
                         className="min-w-0"
                       />
                     )}

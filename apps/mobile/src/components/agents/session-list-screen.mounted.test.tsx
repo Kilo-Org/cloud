@@ -471,6 +471,14 @@ function action(label: string) {
 function press(label: string) {
   (action(label).props.onPress as () => void)();
 }
+/** Press a control by its test id; the empty-state clear row carries one per cause. */
+function pressControl(testID: string) {
+  const control = nodes('Pressable').find(node => node.props.testID === testID);
+  if (!control) {
+    throw new Error(`Missing control: ${testID}`);
+  }
+  (control.props.onPress as () => void)();
+}
 /** Fire the body wrapper's layout with the height the list can use. */
 function layoutBody(height: number) {
   const keyboardFrame = liftNode().findByType('View');
@@ -1510,7 +1518,11 @@ describe('AgentSessionListScreen live filtering', () => {
     });
 
     const emptyState = renderer.root.findByType(EmptyState);
-    expect(emptyState.props.description).toBe('Try a different search term.');
+    // The persisted filter still narrows the list under the search, so the copy
+    // names both causes and each cause keeps its own control.
+    expect(emptyState.props.description).toBe(
+      'Try a different search term. Try adjusting or clearing your filters.'
+    );
     expect(nodes('CenteredState')).toHaveLength(1);
     expect(nodes('FlashList')).toHaveLength(0);
     // The no-match body owns the band the tab bar leaves (the FAB's band is no
@@ -1520,7 +1532,7 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(fab()).toBeUndefined();
     expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
     act(() => {
-      (emptyState.props.action as { props: { onPress: () => void } }).props.onPress();
+      pressControl('agents-clear-search');
     });
 
     expect(nodes('FlashList')).toHaveLength(1);
@@ -1992,31 +2004,35 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(requireNode('SessionStatusFilterBar').props.count).toBe(0);
     const emptyState = renderer.root.findByType(EmptyState);
     expect(emptyState.props.title).toBe('No sessions match');
-    const clearAction = emptyState.props.action as { props: { onPress: () => void } };
     act(() => {
-      clearAction.props.onPress();
+      pressControl('agents-clear-filters');
     });
     expect(state.routeParams.status).toBeUndefined();
   });
 
-  it('clears the search too when a status filter and a search leave no rows', async () => {
+  it('keeps the search when the filters are cleared and restores rows from Clear search', async () => {
     state.live.activeSessions = [{ ...row, id: 'idle-1', status: 'idle' }];
     state.routeParams = { status: 'idle' };
-    const renderer = await renderScreen();
+    await renderScreen();
     const searchHeader = openSearch();
     act(() => {
       (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
     });
 
-    const emptyState = renderer.root.findByType(EmptyState);
-    const clearAction = emptyState.props.action as { props: { onPress: () => void } };
+    // Each control retires only its own cause, so clearing the filters leaves
+    // the search term in place and the search body keeps the list empty.
     act(() => {
-      clearAction.props.onPress();
+      pressControl('agents-clear-filters');
     });
-
-    // Clearing only the status would land on the same empty body, so the action
-    // must also clear the search that still excludes every row.
     expect(state.routeParams.status).toBeUndefined();
+    expect(nodes('FlashList')).toHaveLength(0);
+    const searchField = requireNode('SessionListSearchHeader');
+    expect(searchField.props.hasText).toBe(true);
+
+    // The search control is what brings the rows back.
+    act(() => {
+      pressControl('agents-clear-search');
+    });
     expect(nodes('FlashList')).toHaveLength(1);
   });
 
@@ -2035,10 +2051,8 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
     });
-    const emptyState = renderer.root.findByType(EmptyState);
-    const clearAction = emptyState.props.action as { props: { onPress: () => void } };
     act(() => {
-      clearAction.props.onPress();
+      pressControl('agents-clear-search');
     });
 
     // The clear swaps the empty state for the rows in the same commit; the gate
@@ -2098,9 +2112,8 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(filterButtonProps().accessibilityValue).toBeUndefined();
     expect(nodes('ScrollView')).toHaveLength(0);
 
-    const clearAction = emptyState.props.action as { props: { onPress: () => void } };
     act(() => {
-      clearAction.props.onPress();
+      pressControl('agents-clear-filters');
     });
     expect(nodes('FlashList')).toHaveLength(1);
     expect(headerAction('agents-open-filters').props.activeCount).toBe(0);

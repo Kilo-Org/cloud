@@ -28,6 +28,8 @@ export type HonoContext = {
     token: string;
     organization_id: string;
     organization_role: string;
+    // The token's `apiTokenPepper` claim: a string, an explicit null, or undefined when absent.
+    token_pepper: string | null | undefined;
   };
 };
 

@@ -15,6 +15,7 @@ import {
 
 import { LIVE_ACTIVITY_RELEVANCE, type SessionLiveActivityContentState } from './push-data';
 import {
+  isFinishedSessionCardStatus,
   SESSION_CARD_QUIET_AFTER_MS,
   type SessionCardStatusKind,
   type SessionLiveOutcomeKind,
@@ -112,7 +113,7 @@ export function buildSessionLiveActivityContentState(
   const statusKind: SessionCardStatusKind = base === 'idle' && failure !== null ? 'failed' : base;
   const approvalKey = row.status === 'permission' ? options.approvalKey : null;
   const changes = row.changes ?? previous?.changes ?? null;
-  const finished = statusKind === 'idle' || statusKind === 'failed';
+  const finished = isFinishedSessionCardStatus(statusKind);
   const step = row.currentStep ?? previous?.currentStep ?? null;
   const plan = row.plan ?? previous?.plan ?? null;
   const command = row.permissionCommand ?? previous?.permissionCommand ?? null;
@@ -200,7 +201,7 @@ export function sessionLiveActivityRelevance(
   const band =
     statusKind === 'needsInput'
       ? LIVE_ACTIVITY_RELEVANCE.sessionNeedsInput
-      : statusKind === 'idle' || statusKind === 'failed'
+      : isFinishedSessionCardStatus(statusKind)
         ? LIVE_ACTIVITY_RELEVANCE.sessionIdle
         : LIVE_ACTIVITY_RELEVANCE.sessionActive;
   return band + recencyTerm(statusSince);

@@ -38,6 +38,13 @@
     "ORGANIZATION_TENANT_SESSIONS": "200000",
     "ORGANIZATION_TENANT_BYTES": "2199023255552",
   },
+  "services": [
+    {
+      "binding": "CLOUD_AGENT_SYNC_AUTH",
+      "service": "cloud-agent-next",
+      "entrypoint": "SessionSyncAuthorization",
+    },
+  ],
   "ratelimits": [
     {
       "name": "EXCHANGE_IP_LIMITER",
@@ -125,6 +132,13 @@
       "name": "session-sync-local",
       "workers_dev": false,
       "routes": [],
+      "services": [
+        {
+          "binding": "CLOUD_AGENT_SYNC_AUTH",
+          "service": "cloud-agent-next-dev",
+          "entrypoint": "SessionSyncAuthorization",
+        },
+      ],
       "vars": {
         "ENVIRONMENT": "development",
         "USER_TENANT_SESSIONS": "10000",

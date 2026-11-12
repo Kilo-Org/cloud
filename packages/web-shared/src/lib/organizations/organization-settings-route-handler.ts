@@ -1,3 +1,4 @@
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { createCallerFactory, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { createTRPCRouteHandler } from '@kilocode/web-shared/lib/trpc/route-handler';
 import { listAvailableModelsProcedure } from '@kilocode/web-shared/routers/organizations/organization-available-models-procedure';
@@ -10,6 +11,9 @@ const organizationSettingsRouter = createTRPCRouter({
   }),
 });
 
+// The AI gateway's organization model routes call this facade in `sfo1`, so the
+// shared catalog procedure loads its snapshot through the replica.
 export const handleTRPCRequest = createTRPCRouteHandler(
-  createCallerFactory(organizationSettingsRouter)
+  createCallerFactory(organizationSettingsRouter),
+  { fromDb: readDb }
 );

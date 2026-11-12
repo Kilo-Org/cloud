@@ -4,10 +4,10 @@ import { parseTimestamp } from '@/lib/utils';
 
 /**
  * Minimal structural shape of the `trpc.organizations.kiloPass.summary`
- * output needed here (mirrors `subscription-card-state.ts`, which also takes
- * a narrow local input type so the pure mapper stays free of tRPC/RN imports
- * and testable in a node environment). The screen passes the real tRPC
- * result; structural typing keeps the two in lockstep.
+ * output needed here (the pattern `lib/kilo-pass/state.ts` follows for the
+ * personal pass): a narrow local input type keeps the pure mapper free of
+ * tRPC/RN imports and testable in a node environment. The screen passes the
+ * real tRPC result; structural typing keeps the two in lockstep.
  */
 export type OrgKiloPassSummary = {
   state:

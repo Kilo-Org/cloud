@@ -7,6 +7,9 @@ Use this guide when a local Cloud Agent flow stalls, a sandbox behaves unexpecte
 - Worker, Durable Object, router, queue, stream, ingest, callback, and sandbox-control logs are emitted by Wrangler and normally land in `dev/logs/cloud-agent-next.log`.
 - The control wrapper runs inside the sandbox container. Its durable debug log is `/tmp/kilocode-control-wrapper.log` (`CONTROL_WRAPPER_LOG_PATH`, configured through `WRAPPER_LOG_PATH`).
 - Kilo CLI logs inside the sandbox live under `/tmp/kilo-worktrees/<home>/.local/share/kilo/log/*.log`.
+- Kilo v2 uses the runtime's actual home, commonly `/home/<id>/.local/share/kilo2/log/opencode.log`.
+  `/root/.local/share/kilo2/log/opencode.log` can contain only the version probe;
+  do not mistake it for the running session's log.
 - The wrapper uploads a bounded archive containing its own log plus the worktree Kilo logs every 30 seconds and again on shutdown. Wrangler shows matching R2 upload traffic.
 - `restore-session` logs print to wrapper stderr and are also mirrored into the wrapper log file, so import/restore traces survive sandbox-side debugging.
 

@@ -92,9 +92,6 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
 jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
   assertGitHubInstallationRuntimeAuthorized: jest.fn(async () => undefined),
 }));
-jest.mock('@/lib/integrations/platforms/github/identity-store', () => ({
-  getLinkedGitHubLogin: jest.fn(async () => 'bot-owner-github'),
-}));
 jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({}));
 jest.mock('@/lib/bot-users/bot-user-service', () => ({}));
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({

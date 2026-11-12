@@ -1,0 +1,173 @@
+/**
+ * Pure view-model for the profile config-import sheet.
+ *
+ * No React and no React Native imports. The sheet renders these rows and sends
+ * `importSelectionRequest` straight to `applyConfigImport`, which is why the
+ * section ids and the selection live here rather than in the component.
+ */
+
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
+
+/**
+ * The server preview this sheet renders, taken from the procedure that
+ * produces it. A change to the contract then reaches the sheet's rows instead
+ * of drifting behind a restated shape; the type-only import adds no runtime.
+ */
+export type ImportPreviewInput = RouterOutputs['agentProfiles']['previewConfigImport'];
+
+/** The categories the server diffs, in the order the sheet lists them. */
+type ImportCategory = 'agents' | 'commands' | 'skills' | 'instructions';
+
+/** One category's diff, as `previewConfigImport` reports it. */
+type CategoryDiff<C extends ImportCategory> = ImportPreviewInput[C];
+
+/** One definition inside a category's diff. */
+type CategoryItem<C extends ImportCategory> = CategoryDiff<C>['added'][number]['item'];
+
+/** Whether the reader keeps each category of the preview. */
+export type ImportSelection = Record<ImportCategory, boolean>;
+
+/** One preview row: what the archive would add or change. */
+export type ImportCategoryView = Readonly<{
+  category: ImportCategory;
+  /** The section's copy key: the shared `profiles.*` title for the collection. */
+  titleKey: string;
+  items: readonly Readonly<{
+    id: string;
+    label: string;
+    status: 'added' | 'changed';
+  }>[];
+}>;
+
+/** One issue the server reported for the archive or the config inside it. */
+export type ImportIssueView = Readonly<{
+  severity: 'error' | 'warning';
+  message: string;
+}>;
+
+function toView<C extends ImportCategory>({
+  category,
+  titleKey,
+  diff,
+  label,
+}: Readonly<{
+  category: C;
+  titleKey: string;
+  diff: CategoryDiff<C>;
+  label: (item: CategoryItem<C>) => string;
+}>): ImportCategoryView {
+  return {
+    category,
+    titleKey,
+    items: [
+      ...diff.added.map(entry => ({
+        id: entry.id,
+        label: label(entry.item),
+        status: 'added' as const,
+      })),
+      ...diff.changed.map(entry => ({
+        id: entry.id,
+        label: label(entry.after),
+        status: 'changed' as const,
+      })),
+    ],
+  };
+}
+
+/**
+ * The preview as the sheet lists it. A category with nothing to import is
+ * dropped, so the sheet never renders an empty section; `hasImportableItems`
+ * then says whether anything is left to import at all.
+ */
+export function importCategoryViews(preview: ImportPreviewInput): ImportCategoryView[] {
+  return [
+    toView({
+      category: 'agents',
+      titleKey: 'common.agents',
+      diff: preview.agents,
+      label: item => item.slug,
+    }),
+    toView({
+      category: 'commands',
+      titleKey: 'profiles.slashCommands.title',
+      diff: preview.commands,
+      label: item => item.name,
+    }),
+    toView({
+      category: 'skills',
+      titleKey: 'profiles.skillsTitle',
+      diff: preview.skills,
+      label: item => item.name,
+    }),
+    toView({
+      category: 'instructions',
+      titleKey: 'profiles.instructionsTitle',
+      diff: preview.instructions,
+      label: item => item.name,
+    }),
+  ].filter(section => section.items.length > 0);
+}
+
+/** Whether the archive holds anything this profile does not already have. */
+export function hasImportableItems(views: readonly ImportCategoryView[]): boolean {
+  return views.length > 0;
+}
+
+/** Every section with something to import starts selected, the way the web does. */
+export function defaultImportSelection(views: readonly ImportCategoryView[]) {
+  const selection = { agents: false, commands: false, skills: false, instructions: false };
+  for (const section of views) {
+    selection[section.category] = true;
+  }
+  return selection;
+}
+
+/** How many definitions the current selection imports. */
+export function selectedImportCount(
+  views: readonly ImportCategoryView[],
+  selection: ImportSelection
+): number {
+  return views.reduce(
+    (total, section) => total + (selection[section.category] ? section.items.length : 0),
+    0
+  );
+}
+
+/** How many of the selected definitions replace an existing cloud definition. */
+export function selectedOverwriteCount(
+  views: readonly ImportCategoryView[],
+  selection: ImportSelection
+): number {
+  return views.reduce(
+    (total, section) =>
+      total +
+      (selection[section.category]
+        ? section.items.filter(item => item.status === 'changed').length
+        : 0),
+    0
+  );
+}
+
+/** The id lists `applyConfigImport` takes for the current selection. */
+export function importSelectionRequest(
+  views: readonly ImportCategoryView[],
+  selection: ImportSelection
+) {
+  const idsFor = (category: ImportCategory): string[] =>
+    views
+      .filter(section => section.category === category && selection[category])
+      .flatMap(section => section.items.map(item => item.id));
+  return {
+    agents: idsFor('agents'),
+    commands: idsFor('commands'),
+    skills: idsFor('skills'),
+    instructions: idsFor('instructions'),
+  };
+}
+
+/** The server's archive and config issues, in the order it reported them. */
+export function importIssueViews(preview: ImportPreviewInput): ImportIssueView[] {
+  return preview.issues.map(issue => ({ severity: issue.severity, message: issue.message }));
+}

@@ -6605,6 +6605,10 @@ export const cloud_agent_workspace_folders = pgTable(
     kind: text().$type<'manual' | 'smart'>().notNull().default('manual'),
     smart_preset: text().$type<'needs_you' | 'in_review' | 'done'>(),
     sort_mode: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
+    manual_worktree_order: text()
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -7527,7 +7531,6 @@ export const byok_api_keys = pgTable(
       onDelete: 'cascade',
     }),
     provider_id: text().notNull(),
-    encrypted_api_key: jsonb().$type<EncryptedData>(),
     encrypted_api_key_envelope: jsonb().$type<BYOKApiKeyEnvelope>(),
     management_source: text().$type<BYOKManagementSource>().notNull().default('user'),
     is_enabled: boolean().default(true).notNull(),
@@ -11122,9 +11125,10 @@ export const enkrypt_usage = pgTable(
     fired_detector_ids: integer().array(),
     // Sizes in UTF-16 code units. `total_characters` is the text the scan covers: one of the
     // request's tool definitions, its system prompt, or its conversation, each scanned by its own
-    // call, or the response. `scanned_characters` is what this call sent to Enkrypt: the part no
-    // cached verdict covers, plus an overlap of already-scanned conversation text. Parts that the
-    // verdict cache covers entirely make no call and have no row. Null on rows that predate them.
+    // call, or the response. `scanned_characters` is what this call sent to Enkrypt: segments no
+    // cached verdict covers, packed into one call, with their separators and the headers of split
+    // segments. Parts that the verdict cache covers entirely make no call and have no row. Null on
+    // rows that predate them.
     scanned_characters: integer(),
     total_characters: integer(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),

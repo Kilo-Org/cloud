@@ -88,7 +88,7 @@ export function SessionsPageContent() {
   };
   const [selectedSession, setSelectedSession] = useState<SessionWithSource | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [sharingSessionId, setSharingSessionId] = useState<string | null>(null);
+  const [sharingSession, setSharingSession] = useState<SessionWithSource | null>(null);
 
   // Debounce search query (300ms delay)
   useEffect(() => {
@@ -106,7 +106,7 @@ export function SessionsPageContent() {
       if (!selectedSession || !event.deletedSessionIds.includes(selectedSession.sessionId)) return;
       setIsDialogOpen(false);
       setSelectedSession(null);
-      setSharingSessionId(null);
+      setSharingSession(null);
     },
     [selectedSession]
   );
@@ -339,7 +339,7 @@ export function SessionsPageContent() {
                       variant="outline"
                       size="sm"
                       disabled={isPending}
-                      onClick={() => setSharingSessionId(session.sessionId)}
+                      onClick={() => setSharingSession(session)}
                     >
                       Create new link
                     </Button>
@@ -378,14 +378,16 @@ export function SessionsPageContent() {
         />
       )}
 
-      {sharingSessionId && (
+      {sharingSession && (
         <ShareSessionDialog
-          key={sharingSessionId}
+          key={sharingSession.sessionId}
           open
           onOpenChange={open => {
-            if (!open) setSharingSessionId(null);
+            if (!open) setSharingSession(null);
           }}
-          kiloSessionId={sharingSessionId}
+          kiloSessionId={sharingSession.sessionId}
+          cloudAgentSessionId={sharingSession.cloudAgentSessionId}
+          organizationId={organizationId}
         />
       )}
 

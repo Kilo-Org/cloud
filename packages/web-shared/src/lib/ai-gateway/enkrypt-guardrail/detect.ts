@@ -11,8 +11,13 @@ import {
   enkryptSummaryDetectorId,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import type { EnkryptGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
-import type { EnkryptScanReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
-import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
+import type {
+  EnkryptScanKind,
+  EnkryptScanPart,
+  EnkryptScanReport,
+  EnkryptUnavailableReason,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
+import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/usage-contracts';
 import type { EnkryptCallLimiter } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-limiter';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
@@ -48,27 +53,20 @@ const MAX_SCAN_CHARACTERS_LABEL = ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en
 /** Request text is split into scans; only a segment whose header is too long to split is too large. */
 export const REQUEST_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail splits long requests into scans of at most ${MAX_SCAN_CHARACTERS_LABEL} characters, but this request has a name or label, such as a tool or file name, too long to split, so it was not sent. Shorten that name, then retry. Retrying the unchanged request will not help.`;
 
-export const RESPONSE_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of model output at once, so this response was withheld. Ask for a shorter response, for example by lowering the maximum output tokens, then retry.`;
-
 const detectResponseSchema = z.object({
   summary: z.record(z.string(), z.unknown()),
   result_message: z.string().nullish(),
 });
 
 /**
- * What a scan covers: one of the request's tool definitions or response formats, its system
- * prompt, its conversation, or the model's response.
- */
-export type EnkryptScanPart = 'tools' | 'system' | 'conversation' | 'response';
-
-/**
- * How much of the part `text` covers. With a cached conversation prefix, `text` is only the
- * uncached suffix plus an overlap of already-scanned text. A part too long for one call is split
- * into chunks, each scanned on its own; `chunk` locates this one.
+ * How much of the part `text` covers. Units (segments, or slices of a segment too long for one
+ * call) with a cached verdict are left out, and the rest are packed into calls of at most
+ * `ENKRYPT_MAX_SCAN_CHARACTERS`; `chunk` locates this call among them. For tool definitions, the
+ * totals and cached counts are those of the one tool the call scans.
  */
 export type EnkryptScanCoverage = {
   part: EnkryptScanPart;
-  cache: 'off' | 'miss' | 'hit' | 'error';
+  cache: EnkryptScanReport['verdict_cache'];
   totalCharacters: number;
   totalSegments: number;
   cachedCharacters: number;
@@ -78,17 +76,31 @@ export type EnkryptScanCoverage = {
   chunk?: { index: number; count: number };
 };
 
-export type EnkryptGuardrailScan = {
+/** The request a scan belongs to, and the detectors it scans with. */
+export type EnkryptScanContext = {
   sessionId: string | null;
   microdollarUsageId?: string;
   organizationId: string;
   kiloUserId: string;
   apiKind: EnkryptGuardrailApiKind;
   clientRequestId: string | null;
-  text: string;
-  coverage: EnkryptScanCoverage;
   config: EnkryptGuardrailConfig;
 };
+
+export type EnkryptGuardrailScan = EnkryptScanContext & {
+  text: string;
+  coverage: EnkryptScanCoverage;
+};
+
+/** The fields that identify a scan's request in logs. */
+export function scanLogFields(scan: EnkryptScanContext) {
+  return {
+    organization_id: scan.organizationId,
+    session_id: scan.sessionId,
+    client_request_id: scan.clientRequestId,
+    api_kind: scan.apiKind,
+  };
+}
 
 /**
  * `skip`: no scan gates the request, because the organization has no guardrail or its detectors
@@ -101,14 +113,6 @@ export type EnkryptGuardrailVerdict =
   | { action: 'allow' }
   | { action: 'block'; message: string }
   | { action: 'unavailable'; reason: EnkryptUnavailableReason };
-
-export type EnkryptUnavailableReason = 'transient' | 'timeout' | 'failed';
-
-/**
- * A `log_only` scan has no detector that can block, so the request does not wait for it and its
- * failures are only logged: the request is never rejected because of it.
- */
-export type EnkryptScanKind = 'blocking' | 'log_only';
 
 export function scanKind(config: EnkryptGuardrailConfig): EnkryptScanKind {
   return config.status === 'ready' && config.blockingDetectors.length === 0
@@ -356,34 +360,32 @@ function sanitizeBlockMessage(message: string | null): string | null {
   return cleaned || null;
 }
 
+const REQUEST_BLOCK_WORDING = {
+  blocked: "Your organization's Enkrypt AI guardrail blocked this request",
+  flaggedReason: 'The request was flagged by your organization policy.',
+};
+
+const RESPONSE_BLOCK_WORDING = {
+  blocked: "Your organization's Enkrypt AI guardrail blocked the model's response",
+  flaggedReason:
+    'The response was flagged by your organization policy. Rephrase the request and retry.',
+};
+
 /**
  * Enkrypt's `result_message` is a block message only when a block-type detector fired; when only
- * revise-type detectors fired it is the redacted input text, which is never shown.
+ * revise-type detectors fired it is the redacted input text, which is never shown. A block of the
+ * model's response is worded for the response; every other part is worded for the request.
  */
 export function guardrailBlockMessage(
   detectors: EnkryptDetectorId[],
-  resultMessage: string | null
+  resultMessage: string | null,
+  part?: EnkryptScanPart
 ): string {
+  const wording = part === 'response' ? RESPONSE_BLOCK_WORDING : REQUEST_BLOCK_WORDING;
   const enkryptBlocked = detectors.some(detector => ENKRYPT_DETECTOR_TYPES[detector] === 'block');
   const reason =
-    (enkryptBlocked ? sanitizeBlockMessage(resultMessage) : null) ?? REQUEST_FLAGGED_REASON;
-  return `${REQUEST_BLOCKED} (detected: ${detectors.join(', ')}). ${reason}`;
-}
-
-const REQUEST_BLOCKED = "Your organization's Enkrypt AI guardrail blocked this request";
-const REQUEST_FLAGGED_REASON = 'The request was flagged by your organization policy.';
-const RESPONSE_BLOCKED = "Your organization's Enkrypt AI guardrail blocked the model's response";
-const RESPONSE_FLAGGED_REASON =
-  'The response was flagged by your organization policy. Rephrase the request and retry.';
-
-/**
- * `scanRequest` words a block for a request; the output guardrail scans the model's response with
- * it and rewords the block for the response.
- */
-export function responseBlockMessage(requestBlockMessage: string): string {
-  return requestBlockMessage
-    .replace(REQUEST_BLOCKED, RESPONSE_BLOCKED)
-    .replace(REQUEST_FLAGGED_REASON, RESPONSE_FLAGGED_REASON);
+    (enkryptBlocked ? sanitizeBlockMessage(resultMessage) : null) ?? wording.flaggedReason;
+  return `${wording.blocked} (detected: ${detectors.join(', ')}). ${reason}`;
 }
 
 function attemptDecision(
@@ -406,30 +408,11 @@ export async function scanRequest(
   deps: EnkryptDetectDependencies
 ): Promise<EnkryptGuardrailScanResult> {
   const { text, config, coverage } = scan;
-  const kind = scanKind(config);
   const scope: ScanScope = {
-    kind,
-    logFields: {
-      organization_id: scan.organizationId,
-      session_id: scan.sessionId,
-      client_request_id: scan.clientRequestId,
-      api_kind: scan.apiKind,
-      ...(coverage.chunk ? { chunk: coverage.chunk } : {}),
-    },
-    report: {
-      scan: kind,
-      part: coverage.part,
-      detectors_enabled: config.status === 'ready' ? enabledDetectors(config) : [],
-      detectors_blocking: config.status === 'ready' ? config.blockingDetectors : [],
-      verdict_cache: coverage.cache,
-      total_characters: coverage.totalCharacters,
-      total_segments: coverage.totalSegments,
-      cached_characters: coverage.cachedCharacters,
-      cached_segments: coverage.cachedSegments,
-      omitted_attachments: coverage.omittedAttachments,
-      scanned_characters: text.length,
-    },
+    logFields: { ...scanLogFields(scan), ...(coverage.chunk ? { chunk: coverage.chunk } : {}) },
+    report: { ...coverageReport(config, coverage), scanned_characters: text.length },
   };
+  const kind = scope.report.scan;
 
   if (text.length === 0) {
     const report = scanReport(scope, { decision: 'allowed', latencyMs: 0 });
@@ -449,11 +432,7 @@ export async function scanRequest(
     return failedVerdict([], scope, {
       error: 'request_too_large',
       latencyMs: 0,
-      closedVerdict: {
-        action: 'block',
-        message:
-          coverage.part === 'response' ? RESPONSE_TOO_LARGE_MESSAGE : REQUEST_TOO_LARGE_MESSAGE,
-      },
+      closedVerdict: { action: 'block', message: REQUEST_TOO_LARGE_MESSAGE },
     });
   }
 
@@ -543,34 +522,63 @@ export async function scanRequest(
     verdict:
       blocking.length === 0
         ? { action: 'allow' }
-        : { action: 'block', message: guardrailBlockMessage(blocking, attempt.resultMessage) },
+        : {
+            action: 'block',
+            message: guardrailBlockMessage(blocking, attempt.resultMessage, coverage.part),
+          },
     usageRecords,
     report,
   };
 }
 
-type ScanScope = {
-  kind: EnkryptScanKind;
-  logFields: Record<string, unknown>;
-  report: Pick<
-    EnkryptScanReport,
-    | 'scan'
-    | 'part'
-    | 'detectors_enabled'
-    | 'detectors_blocking'
-    | 'verdict_cache'
-    | 'total_characters'
-    | 'total_segments'
-    | 'cached_characters'
-    | 'cached_segments'
-    | 'omitted_attachments'
-    | 'scanned_characters'
-  >;
-};
+type CoverageReport = Pick<
+  EnkryptScanReport,
+  | 'scan'
+  | 'part'
+  | 'detectors_enabled'
+  | 'detectors_blocking'
+  | 'verdict_cache'
+  | 'total_characters'
+  | 'total_segments'
+  | 'cached_characters'
+  | 'cached_segments'
+  | 'omitted_attachments'
+>;
 
-function enabledDetectors(config: ReadyEnkryptGuardrailConfig): EnkryptDetectorId[] {
-  return ENKRYPT_DETECTOR_IDS.filter(id => config.detectors[id] !== undefined);
+/** The report fields naming the detectors a scan uses. */
+export function detectorsReport(
+  config: EnkryptGuardrailConfig
+): Pick<EnkryptScanReport, 'detectors_enabled' | 'detectors_blocking'> {
+  return config.status === 'ready'
+    ? {
+        detectors_enabled: ENKRYPT_DETECTOR_IDS.filter(id => config.detectors[id] !== undefined),
+        detectors_blocking: config.blockingDetectors,
+      }
+    : { detectors_enabled: [], detectors_blocking: [] };
 }
+
+/** The report fields describing what a scan covers, and with which detectors. */
+export function coverageReport(
+  config: EnkryptGuardrailConfig,
+  coverage: EnkryptScanCoverage
+): CoverageReport {
+  return {
+    scan: scanKind(config),
+    part: coverage.part,
+    ...detectorsReport(config),
+    verdict_cache: coverage.cache,
+    total_characters: coverage.totalCharacters,
+    total_segments: coverage.totalSegments,
+    cached_characters: coverage.cachedCharacters,
+    cached_segments: coverage.cachedSegments,
+    omitted_attachments: coverage.omittedAttachments,
+  };
+}
+
+type ScanScope = {
+  logFields: Record<string, unknown>;
+  report: CoverageReport & Pick<EnkryptScanReport, 'scanned_characters'>;
+};
 
 function scanReport(
   scope: ScanScope,
@@ -589,7 +597,7 @@ function scanReport(
     error: outcome.error ?? null,
     detectors_fired: outcome.detectorsFired ?? [],
     attempts: usageRecords.length,
-    credits_cost: totalCredits(usageRecords),
+    credits_cost: totalCredits(usageRecords.map(usageRecord => usageRecord.creditsCost)),
     latency_ms: outcome.latencyMs,
   };
 }
@@ -602,11 +610,10 @@ function logDecision(scope: ScanScope, report: EnkryptScanReport): void {
   else console.debug('[enkrypt-guardrail] decision', fields);
 }
 
-function totalCredits(usageRecords: EnkryptGuardrailCall[]): number | null {
-  const costs = usageRecords.flatMap(usageRecord =>
-    usageRecord.creditsCost === null ? [] : [usageRecord.creditsCost]
-  );
-  return costs.length === 0 ? null : costs.reduce((sum, cost) => sum + cost, 0);
+/** The sum of the reported costs, or null when none was reported. */
+export function totalCredits(costs: (number | null)[]): number | null {
+  const reported = costs.filter(cost => cost !== null);
+  return reported.length === 0 ? null : reported.reduce((sum, cost) => sum + cost, 0);
 }
 
 function unavailableReason(error: ScanError): EnkryptUnavailableReason {
@@ -644,14 +651,14 @@ function failedVerdict(
   }
 ): EnkryptGuardrailScanResult {
   const report = scanReport(scope, {
-    decision: failureDecision(scope.kind, failure.error),
+    decision: failureDecision(scope.report.scan, failure.error),
     error: failure.error,
     usageRecords,
     latencyMs: failure.latencyMs,
   });
   logDecision(scope, report);
   return {
-    verdict: failureVerdict(scope.kind, failure),
+    verdict: failureVerdict(scope.report.scan, failure),
     usageRecords:
       failure.error === 'client_aborted'
         ? usageRecords.filter(usageRecord => usageRecord.creditsCost !== null)

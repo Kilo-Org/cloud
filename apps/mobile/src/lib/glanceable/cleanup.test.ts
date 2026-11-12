@@ -5,10 +5,12 @@ import {
   buildOpaqueScopeKey,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
 import {
   confirmGlanceableOrgMembership,
+  getGlanceableOrgConfirmationEpoch,
   getTerminalBlankEpoch,
   isGlanceableOrgLost,
   planOrgFenceAction,
@@ -253,6 +255,23 @@ describe('cleanup', () => {
     }
   });
 
+  it('advances the org confirmation epoch only when a lost org comes back', () => {
+    // The Home widget credential latches a refusal against this value: a plain
+    // confirmation must not release it, or a revoked credential would be asked
+    // for again on every org list.
+    const before = getGlanceableOrgConfirmationEpoch();
+
+    confirmGlanceableOrgMembership();
+    expect(getGlanceableOrgConfirmationEpoch()).toBe(before);
+
+    writeLostOrgSnapshotAndEnd();
+    confirmGlanceableOrgMembership();
+    expect(getGlanceableOrgConfirmationEpoch()).toBe(before + 1);
+
+    confirmGlanceableOrgMembership();
+    expect(getGlanceableOrgConfirmationEpoch()).toBe(before + 1);
+  });
+
   it('blanks to privacy only after a successful list misses the selection', () => {
     const fence = {
       organizationId: 'missing-org',
@@ -343,7 +362,10 @@ describe('cleanup', () => {
   it('republishes a restored record only for the signed-in scope', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-27T01:00:00.000Z'));
-    const store = new Map<string, string>();
+    const store = new Map<string, string>([
+      // The class upgrade has run, so an absent identity hint is absent.
+      [WIDGET_STORE_CLASS_MARKER.key, WIDGET_STORE_CLASS_MARKER.value],
+    ]);
     const secureStore = {
       setItemAsync: async (key: string, value: string) => {
         store.set(key, value);

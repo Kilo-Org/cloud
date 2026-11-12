@@ -101,7 +101,8 @@ jest.mock('@/components/ui/dropdown-menu', () => {
     DropdownMenuSeparator: () => null,
     DropdownMenuCheckboxItem: passthrough,
     DropdownMenuRadioGroup: passthrough,
-    DropdownMenuRadioItem: passthrough,
+    DropdownMenuRadioItem: ({ children }: { children?: ReactNode }) =>
+      react.createElement('div', { role: 'menuitemradio' }, children),
     DropdownMenuSub: passthrough,
     DropdownMenuSubTrigger: passthrough,
     DropdownMenuSubContent: passthrough,
@@ -326,6 +327,33 @@ describe('ChatSidebar row rendering', () => {
     expect(dom.container.textContent).toContain('No sessions yet');
   });
 
+  it('rerenders only the two affected workspace rows when selection changes', () => {
+    const sessions = makeSessions(SESSION_COUNT).map((session, index) => ({
+      ...session,
+      worktreeId: `worktree_${index}`,
+    }));
+    const onOpenSession = jest.fn();
+    renderSidebar({ sessions, currentSessionId: sessions[0].sessionId, onOpenSession });
+    tooltipMock.mockClear();
+    renderSidebar({ sessions, currentSessionId: sessions[1].sessionId, onOpenSession });
+    expect(tooltipMock.mock.calls.filter(([props]) => props.delayDuration === 400)).toHaveLength(2);
+  });
+
+  it('uses updated workspace actions even when the row does not rerender', () => {
+    const session = makeSession(0, { worktreeId: 'worktree_actions' });
+    const sessions = [session];
+    const previous = jest.fn();
+    const next = jest.fn();
+    renderSidebar({ sessions, onOpenSession: previous });
+    tooltipMock.mockClear();
+    renderSidebar({ sessions, onOpenSession: next });
+    expect(tooltipMock.mock.calls.filter(([props]) => props.delayDuration === 400)).toHaveLength(0);
+    const button = dom.container.querySelector<HTMLButtonElement>('[data-worktree-id] button');
+    act(() => button?.click());
+    expect(previous).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(session.sessionId);
+  });
+
   it('keeps one skeleton until sessions, names and folders are ready together', () => {
     const session = makeSession(0, { worktreeId: 'worktree_ready' });
     renderSidebar({ sessions: [session], isLoading: true });
@@ -335,6 +363,31 @@ describe('ChatSidebar row rendering', () => {
     renderSidebar({ sessions: [session] });
     expect(dom.container.querySelector('[aria-label="Loading sessions"]')).toBeNull();
     expect(dom.container.querySelector('[data-worktree-id="worktree_ready"]')).not.toBeNull();
+  });
+
+  it('passes the displayed worktree name to the current delete action without rerendering', () => {
+    const sessions = [makeSession(0, { worktreeId: 'worktree_delete' })];
+    const worktreeDetails = {
+      worktree_delete: {
+        name: 'Named workspace',
+        defaultTitle: null,
+        prSession: null,
+        sessions: [],
+      },
+    };
+    const previous = jest.fn();
+    const next = jest.fn();
+    renderSidebar({ sessions, worktreeDetails, onDeleteWorktree: previous });
+    tooltipMock.mockClear();
+    renderSidebar({ sessions, worktreeDetails, onDeleteWorktree: next });
+    expect(tooltipMock.mock.calls.filter(([props]) => props.delayDuration === 400)).toHaveLength(0);
+    const deleteItem = Array.from(
+      dom.container.querySelectorAll<HTMLElement>('[role="menuitem"]')
+    ).find(item => item.textContent === 'Delete worktree');
+    expect(deleteItem).toBeDefined();
+    act(() => deleteItem?.click());
+    expect(previous).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith('worktree_delete', 'Named workspace');
   });
 
   it('shows the full workspace title above the row, away from the sibling PR badge', () => {
@@ -688,6 +741,7 @@ describe('ChatSidebar row rendering', () => {
           smartPreset: null,
           sortMode: 'manual' as const,
           worktreeIds: [] as string[],
+          manualWorktreeOrder: [],
         },
         {
           id: ids[1],
@@ -697,6 +751,7 @@ describe('ChatSidebar row rendering', () => {
           smartPreset: 'needs_you' as const,
           sortMode: 'activity' as const,
           worktreeIds: [] as string[],
+          manualWorktreeOrder: [],
         },
       ],
       isLoading: false,
@@ -716,6 +771,7 @@ describe('ChatSidebar row rendering', () => {
         async (_orderedWorktreeIds: readonly string[], _folderId: string | null) => true
       ),
       reorderFolders: jest.fn(async () => true),
+      reorderSmartFolderWorktrees: jest.fn(async () => true),
       refresh: jest.fn(async () => undefined),
     } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>;
     const dataTransfer = {
@@ -737,6 +793,53 @@ describe('ChatSidebar row rendering', () => {
     };
     return { sessions, workspaceFolders, dataTransfer, dragEvent };
   }
+
+  it.each(['needs_you', 'in_review', 'done'] as const)(
+    'excludes %s smart folders from move destinations without hiding their sidebar section',
+    smartPreset => {
+      const { sessions, workspaceFolders } = folderDragFixture();
+      const smartFolder = { ...workspaceFolders.folders[1], smartPreset };
+      const workspaceGroups = sessions.map(session => ({
+        type: 'worktree' as const,
+        worktreeId: session.worktreeId!,
+        sessions: [session],
+        latestSession: session,
+      }));
+      renderSidebar({
+        sessions,
+        workspaceGroups,
+        workspaceFolders: {
+          ...workspaceFolders,
+          folders: [workspaceFolders.folders[0], smartFolder],
+        },
+      });
+
+      const row = dom.container.querySelector(`[data-worktree-id="${sessions[0].worktreeId}"]`);
+      if (!row) throw new Error('Workspace row missing');
+      const destinations = () =>
+        Array.from(row.querySelectorAll('[role="menuitemradio"]'), item => item.textContent);
+
+      expect(destinations()).toEqual(['Ungrouped', 'Product']);
+      expect(dom.container.querySelector(`[data-folder-id="${smartFolder.id}"]`)).not.toBeNull();
+
+      renderSidebar({
+        sessions,
+        workspaceGroups,
+        workspaceFolders: { ...workspaceFolders, folders: [smartFolder] },
+      });
+      expect(destinations()).toEqual([]);
+      expect(row.textContent).not.toContain('Move to folder');
+      expect(dom.container.querySelector(`[data-folder-id="${smartFolder.id}"]`)).not.toBeNull();
+
+      renderSidebar({
+        sessions,
+        workspaceGroups,
+        workspaceFolders: { ...workspaceFolders, folders: [] },
+      });
+      expect(destinations()).toEqual([]);
+      expect(row.textContent).not.toContain('Move to folder');
+    }
+  );
 
   it('requires confirmation before deleting a folder and allows cancellation', async () => {
     const { sessions, workspaceFolders } = folderDragFixture();
@@ -1403,9 +1506,33 @@ describe('ChatSidebar phase 4 drag ordering', () => {
         async (_orderedWorktreeIds: readonly string[], _folderId: string | null) => true
       ),
       reorderFolders: jest.fn(async () => true),
+      reorderSmartFolderWorktrees: jest.fn(
+        async (_folderId: string, _worktreeIds: readonly string[]) => true
+      ),
       refresh: jest.fn(async () => undefined),
     } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>;
   }
+
+  it('keeps Ungrouped available for a filed workspace while manual folders are unavailable', () => {
+    const group = phase4Group(0, null);
+    if (!group.details) throw new Error('Workspace details missing');
+    renderSidebar({
+      workspaceGroups: [
+        {
+          ...group,
+          details: { ...group.details, folderId: '11111111-1111-4111-8111-111111111111' },
+        },
+      ],
+      workspaceFolders: workspaceFolders(),
+    });
+
+    const row = dom.container.querySelector(`[data-worktree-id="${group.worktreeId}"]`);
+    if (!row) throw new Error('Workspace row missing');
+    expect(row.textContent).toContain('Move to folder');
+    expect(
+      Array.from(row.querySelectorAll('[role="menuitemradio"]'), item => item.textContent)
+    ).toEqual(['Ungrouped']);
+  });
 
   function dragRows(
     source: Element,
@@ -1484,6 +1611,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
       smartPreset: null,
       sortMode: 'manual',
       worktreeIds: [old.worktreeId],
+      manualWorktreeOrder: [],
     } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>['folders'][number];
     renderSidebar({
       workspaceGroups: [{ ...old, details: { ...old.details!, folderId: folder.id } }],
@@ -1730,6 +1858,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
       smartPreset: null,
       sortMode: 'activity',
       worktreeIds: groups.map(group => group.worktreeId),
+      manualWorktreeOrder: [],
     };
   }
 
@@ -1744,7 +1873,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
   }
 
   it.each(['manual', 'created', 'activity'] as const)(
-    'uses shared %s order for smart folders, not their saved sort mode',
+    'uses the global %s setting for smart folders, not their saved sort mode',
     workspaceOrder => {
       const folders = workspaceFolders();
       const groups = [
@@ -1768,6 +1897,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
           kind: 'smart',
           smartPreset: 'needs_you',
           sortMode: 'created',
+          manualWorktreeOrder: ['worktree_drag_1', 'worktree_drag_0'],
         },
       ];
       renderSidebar({ workspaceGroups: groups, workspaceFolders: folders, workspaceOrder });
@@ -1778,6 +1908,89 @@ describe('ChatSidebar phase 4 drag ordering', () => {
       );
     }
   );
+
+  it.each(['needs_you', 'in_review', 'done'] as const)(
+    'reorders within the %s smart folder without moving or repositioning its workspaces',
+    preset => {
+      const folders = workspaceFolders();
+      const groups = [phase4Group(0, 'a1'), phase4Group(1, 'a2')].map(group => {
+        const session = {
+          ...group.latestSession,
+          sessionStatus: preset === 'needs_you' ? 'question' : 'idle',
+          associatedPr:
+            preset === 'needs_you'
+              ? null
+              : {
+                  url: 'https://github.com/example/repo/pull/1',
+                  number: 1,
+                  state: preset === 'done' ? 'merged' : 'open',
+                  title: null,
+                  headSha: null,
+                  observations: null,
+                  lastSyncedAt: group.latestSession.createdAt,
+                  reviewDecision: null,
+                  reviewDecisionPending: false,
+                  platform: 'github',
+                },
+        };
+        return {
+          ...group,
+          latestSession: session,
+          sessions: [session],
+          details: { ...group.details!, prSession: session },
+        };
+      });
+      const folder: WorkspaceFolder = {
+        ...manualFolder([]),
+        kind: 'smart',
+        smartPreset: preset,
+        manualWorktreeOrder: groups.map(group => group.worktreeId),
+      };
+      folders.folders = [folder];
+      renderSidebar({ workspaceGroups: groups, workspaceFolders: folders });
+      const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+      const source = rows[0]?.querySelector('button span');
+      if (!source || !rows[1]) throw new Error('Rows missing');
+      dragRows(source, rows[1], 35);
+      expect(folders.reorderSmartFolderWorktrees).toHaveBeenCalledWith(folder.id, [
+        groups[1].worktreeId,
+        groups[0].worktreeId,
+      ]);
+      expect(folders.moveWorktree).not.toHaveBeenCalled();
+      expect(folders.initializeWorktreePositions).not.toHaveBeenCalled();
+    }
+  );
+
+  it('puts an existing positioned workspace on top when it enters a smart folder', () => {
+    const folders = workspaceFolders();
+    const groups = [
+      phase4Group(0, 'a1', { sessionStatus: 'question' }),
+      phase4Group(1, 'z', { sessionStatus: 'idle' }),
+    ];
+    folders.folders = [
+      {
+        ...manualFolder([]),
+        kind: 'smart',
+        smartPreset: 'needs_you',
+        manualWorktreeOrder: [groups[0].worktreeId],
+      },
+    ];
+    renderSidebar({ workspaceGroups: groups, workspaceFolders: folders });
+    const nextSession = { ...groups[1].latestSession, sessionStatus: 'question' };
+    renderSidebar({
+      workspaceGroups: [
+        groups[0],
+        { ...groups[1], latestSession: nextSession, sessions: [nextSession] },
+      ],
+      workspaceFolders: folders,
+    });
+    const section = dom.container.querySelector('[data-folder-id]');
+    expect(
+      [...section!.querySelectorAll('[data-worktree-id]')].map(row =>
+        row.getAttribute('data-worktree-id')
+      )
+    ).toEqual([groups[1].worktreeId, groups[0].worktreeId]);
+  });
 
   it.each([false, true])(
     'explains an empty smart folder when workspace truncation is %s',
@@ -1895,7 +2108,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
     }
   );
 
-  it('does not reorder automatically grouped rows using their underlying manual folder', () => {
+  it('reorders automatically grouped rows without changing their underlying manual folder', () => {
     const folders = workspaceFolders();
     const groups = [phase4Group(0, 'a1'), phase4Group(1, 'a2')].map(group => ({
       ...group,
@@ -1906,8 +2119,12 @@ describe('ChatSidebar phase 4 drag ordering', () => {
     renderSidebar({ workspaceGroups: fileGroups(groups, folder.id), workspaceFolders: folders });
     const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
     dragRows(rows[0]!, rows[1]!, 35, () => {
-      expect(dom.container.querySelector('[data-worktree-id].border-b-2')).toBeNull();
+      expect(dom.container.querySelector('[data-worktree-id].border-b-2')).not.toBeNull();
     });
+    expect(folders.reorderSmartFolderWorktrees).toHaveBeenCalledWith('needs', [
+      groups[1].worktreeId,
+      groups[0].worktreeId,
+    ]);
     expect(folders.moveWorktree).not.toHaveBeenCalled();
     expect(folders.initializeWorktreePositions).not.toHaveBeenCalled();
   });
@@ -2051,6 +2268,7 @@ describe('ChatSidebar phase 4 drag ordering end placement', () => {
         async (_orderedWorktreeIds: readonly string[], _folderId: string | null) => true
       ),
       reorderFolders: jest.fn(async () => true),
+      reorderSmartFolderWorktrees: jest.fn(async () => true),
       refresh: jest.fn(async () => undefined),
     } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>;
 

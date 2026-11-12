@@ -234,6 +234,8 @@ export const cloudSessionMessagesPageInputSchema = z.object({
   kiloSessionId: sessionIdSchema.optional(),
   cursor: z.string().min(1).optional(),
   limit: z.number().int().min(1).max(100).optional(),
+  /** `preview` bounds completed tool bodies; read them with the tool-detail procedure. */
+  toolDisplay: z.enum(['full', 'preview']).optional(),
 });
 
 const cloudV1MessagesPageWireSchema = z.object({

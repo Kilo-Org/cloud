@@ -15,6 +15,7 @@ import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { announceForA11y } from '@/lib/a11y/announce';
 import { CREDITS_FAILURE_KEY } from '@/lib/chat/backend-target';
+import { type AddCreditsDestination } from '@/lib/credits/add-credits-destination';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
@@ -40,8 +41,8 @@ type ChatComposerAreaProps = {
   /** False while a typed question still waits; then the Retry is withheld. */
   retryable: boolean;
   onRetry: () => void;
-  /** Opens where the account's credit is bought, for a send its balance blocked. */
-  onAddCredits?: () => void;
+  /** Where the credit a blocked send needs is bought, for a send its balance blocked. */
+  addCredits?: AddCreditsDestination;
   onSend: (text: string, options?: ChatComposerSendOptions) => void;
   /** Imperative handle the host uses to set composer text (Retry / Copy to composer). */
   composerControlRef: Ref<ChatComposerControl>;
@@ -66,7 +67,7 @@ export function ChatComposerArea({
   failureKey,
   retryable,
   onRetry,
-  onAddCredits,
+  addCredits,
   onSend,
   composerControlRef,
   onStop,
@@ -120,7 +121,7 @@ export function ChatComposerArea({
         <ChatFailureRow
           failureKey={failureKey}
           onRetry={retryable ? onRetry : undefined}
-          onAddCredits={failureKey === CREDITS_FAILURE_KEY ? onAddCredits : undefined}
+          addCredits={failureKey === CREDITS_FAILURE_KEY ? addCredits : undefined}
         />
       ) : null}
 

@@ -41,18 +41,25 @@ function toEffective(profile: AgentProfileListItem): EffectiveAgentProfile {
  */
 export function useEffectiveAgentProfile(
   organizationId?: string,
-  overrideProfileId?: string | null
+  overrideProfileId?: string | null,
+  /**
+   * `enabled: false` holds both reads until the caller's scope is resolved. A
+   * caller that is still resolving the scope passes it so neither the personal
+   * nor the organization read answers for a scope it has not settled yet.
+   */
+  options: { enabled?: boolean } = {}
 ) {
   const trpc = useTRPC();
+  const enabled = options.enabled ?? true;
 
   const personal = useQuery({
     ...trpc.agentProfiles.list.queryOptions({}),
-    enabled: organizationId === undefined,
+    enabled: enabled && organizationId === undefined,
   });
 
   const combined = useQuery({
     ...trpc.agentProfiles.listCombined.queryOptions({ organizationId: organizationId ?? '' }),
-    enabled: organizationId !== undefined,
+    enabled: enabled && organizationId !== undefined,
   });
 
   const isOrg = organizationId !== undefined;

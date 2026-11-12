@@ -1857,6 +1857,44 @@ describe('UserConnectionDO', () => {
       expect(att.subscribedSessions).toEqual(['s1']);
     });
 
+    it('answers a subscribe for a session the socket already holds from that subscription', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await sendSubscribe(doInstance, webWs, 's1');
+
+      sessionAccessMocks.resolveAccessibleKiloSession.mockClear();
+      webWs.send.mockClear();
+      cliWs.send.mockClear();
+
+      await sendSubscribe(doInstance, webWs, 's1');
+
+      expect(sessionAccessMocks.resolveAccessibleKiloSession).not.toHaveBeenCalled();
+      expect(webWs.send).not.toHaveBeenCalled();
+      expect(cliWs.send).not.toHaveBeenCalled();
+      expect(webWs.deserializeAttachment()).toMatchObject({ subscribedSessions: ['s1'] });
+    });
+
+    it('rechecks access for a subscribe that follows an unsubscribe', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await sendSubscribe(doInstance, webWs, 's1');
+      sendUnsubscribe(doInstance, webWs, 's1');
+      await flushAsync();
+
+      sessionAccessMocks.resolveAccessibleKiloSession.mockClear();
+      webWs.send.mockClear();
+      await sendSubscribe(doInstance, webWs, 's1');
+
+      expect(sessionAccessMocks.resolveAccessibleKiloSession).toHaveBeenCalledTimes(1);
+      expect(allSent(webWs).filter(m => m.event === 'sessions.list')).toHaveLength(1);
+    });
+
     it('unsubscribe sends to CLI when last subscriber leaves', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');

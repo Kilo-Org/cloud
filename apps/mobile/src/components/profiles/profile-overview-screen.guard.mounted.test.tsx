@@ -86,6 +86,8 @@ vi.mock('@/lib/profile-agent-navigation', () => ({
   getProfileSlashCommandsPath: (id: string, org?: string) =>
     `/profiles/${id}/slash-commands${org ? `?org=${org}` : ''}`,
   getProfileMcpPath: (id: string, org?: string) => `/profiles/${id}/mcp${org ? `?org=${org}` : ''}`,
+  getProfileInstructionsPath: (id: string, org?: string) =>
+    `/profiles/${id}/instructions${org ? `?org=${org}` : ''}`,
   getProfileSkillsPath: (id: string, org?: string) =>
     `/profiles/${id}/skills${org ? `?org=${org}` : ''}`,
   getProfileAgentsPath: (id: string, org?: string) =>
@@ -122,6 +124,8 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
   CornerDownLeft: 'CornerDownLeft',
+  Download: 'Download',
+  FileText: 'FileText',
   KeyRound: 'KeyRound',
   Server: 'Server',
   Sparkles: 'Sparkles',

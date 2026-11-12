@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import type { CachedSessionSnapshotPage, KiloSessionId } from '@kilocode/cloud-agent-sdk';
+import { removeToolDetailQueries } from './tool-part-detail-state';
 
 const TRANSCRIPT_CACHE_ROOT = 'cloud-agent-transcript';
 const CACHED_MESSAGE_LIMIT = 50;
@@ -88,6 +89,7 @@ export function createWebSessionTranscriptCache(
         queryKey: transcriptCacheKey(currentScope(), sessionId),
         exact: true,
       });
+      removeToolDetailQueries(queryClient, sessionId);
     },
   };
 }

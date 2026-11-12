@@ -37,7 +37,7 @@ import {
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useKeyboardState, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -53,6 +53,8 @@ import { i18n } from '@/i18n';
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { SharePrefillFailure } from '@/components/agents/share-prefill-failure';
 import { ChatToolbar, type ChatToolbarModeControl } from '@/components/agents/chat-toolbar';
+import { useInsideKeyboardFollowPane } from '@/components/keyboard-follow-pane';
+import { useKeyboardMotionProgress } from '@/components/keyboard-motion-provider';
 import { pickAgentAttachments, pickAgentImages } from '@/components/agents/attachment-picker';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -379,6 +381,9 @@ export function ChatComposer({
   const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hasText, setHasText] = useState(false);
   const keyboardHeight = useKeyboardState(state => state.height);
+  // The provider's keyboard height caps the remaining space and keeps the
+  // toolbar row in place while the IME still owns the bottom of the screen.
+  const keyboardVisible = keyboardHeight > 0;
   const [slashCommandInput, setSlashCommandInput] = useState<string | null>(null);
   // Inline validation feedback for a rejected slash-command submission. A
   // transient toast (sonner-native) renders outside the accessibility /
@@ -495,10 +500,6 @@ export function ChatComposer({
     minHeight: inputMinHeight,
     absoluteMaxHeight: COMPOSER_INPUT_MAX_HEIGHT * fontScale,
   });
-
-  // The provider's keyboard height caps the remaining space and keeps the
-  // toolbar row in place while the IME still owns the bottom of the screen.
-  const keyboardVisible = keyboardHeight > 0;
 
   // The mirror measurement lives in `ChatComposerMeasure`, a leaf that owns the
   // per-keystroke text state. It publishes the height and the line-snapped cap
@@ -915,7 +916,21 @@ export function ChatComposer({
   // keeps its space for as long as the keyboard has any claim on the composer:
   // losing it in the same frames the keyboard moved collapsed the chip through
   // the message field (video V1 ~4.5s and ~19s).
-  const showToolbarRow = control.showToolbar || keyboardVisible;
+  //
+  // Inside `KeyboardFollowPane` the transcript and the composer move with the
+  // keyboard as one transform, so the row must NOT resize with it: a per-frame
+  // height change resized the list on every keyboard frame, and the list
+  // corrected its tail on each of those layout events. There the row's height is
+  // a decision of the composer's own state, so the container never re-lays out
+  // during the animation. Every other host still avoids its own keyboard, so it
+  // keeps the collapse that moves with it.
+  const insideKeyboardFollowPane = useInsideKeyboardFollowPane();
+  // Inside the pane the row's presence follows the chip alone. A row that
+  // waits for the JS keyboard flag appears only after the keyboard has landed,
+  // and the composer would give that height back in one step right after the
+  // animation; following the chip alone moves the composer at blur, before the
+  // keyboard starts to move.
+  const showToolbarRow = control.showToolbar || (!insideKeyboardFollowPane && keyboardVisible);
 
   // Once the chip is hidden, its row gives its height back in the same frames
   // as the keyboard. `keyboardVisible` reaches false only after the keyboard
@@ -924,18 +939,26 @@ export function ChatComposer({
   // worklet reads only shared values and always writes `maxHeight`: Reanimated
   // keeps a style key a worklet stops returning, so a conditional key would
   // leave the row stuck at its collapsed height.
-  const { progress: keyboardProgress } = useReanimatedKeyboardAnimation();
+  const keyboardProgress = useKeyboardMotionProgress();
   const toolbarRowHeight = useSharedValue(0);
   const toolbarRowCollapsing = useSharedValue(false);
   useEffect(() => {
     toolbarRowCollapsing.value = !control.showToolbar;
   }, [control.showToolbar, toolbarRowCollapsing]);
-  const toolbarRowStyle = useAnimatedStyle(() => ({
+  const collapsingRowStyle = useAnimatedStyle(() => ({
     maxHeight: toolbarRowCollapsing.value
       ? toolbarRowHeight.value * keyboardProgress.value
       : TOOLBAR_ROW_UNCLAMPED_HEIGHT,
     overflow: 'hidden',
   }));
+  const constantRowStyle = useMemo(
+    () => ({
+      maxHeight: TOOLBAR_ROW_UNCLAMPED_HEIGHT,
+      overflow: 'hidden' as const,
+    }),
+    []
+  );
+  const toolbarRowStyle = insideKeyboardFollowPane ? constantRowStyle : collapsingRowStyle;
 
   const { paste: pasteClipboard } = useClipboardPaste({
     addFile: async file => {

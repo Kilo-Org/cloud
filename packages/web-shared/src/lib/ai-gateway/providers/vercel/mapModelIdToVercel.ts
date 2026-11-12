@@ -19,6 +19,13 @@ const vercelModelPrefixMapping: Record<string, string | undefined> = {
   'z-ai': 'zai',
 };
 
+const openRouterModelPrefixMapping: Record<string, string | undefined> = Object.fromEntries(
+  Object.entries(vercelModelPrefixMapping).map(([openRouterPrefix, vercelPrefix]) => [
+    vercelPrefix,
+    openRouterPrefix,
+  ])
+);
+
 /** Throws on an invalid stored config, so the cached getter keeps its last valid value. */
 export async function readVercelModelIdOverrides(): Promise<VercelModelIdOverrides> {
   const [row] = await readDb
@@ -38,17 +45,22 @@ export const getVercelModelIdOverrides = createCachedFetch<VercelModelIdOverride
   { name: 'vercelModelIdOverrides' }
 );
 
+function replaceModelPrefix(
+  modelId: string,
+  prefixMapping: Record<string, string | undefined>
+): string {
+  const slashIndex = modelId.indexOf('/');
+  if (slashIndex < 0) {
+    return modelId;
+  }
+  const prefix = prefixMapping[modelId.slice(0, slashIndex)];
+  return prefix ? prefix + modelId.slice(slashIndex) : modelId;
+}
+
 /** The Vercel model ID derived from the built-in rules, ignoring admin overrides. */
 export function mapResolvedModelIdToVercelWithoutOverrides(modelId: string): string {
   const internalId = isAutoSmallFreeModel(modelId) ? AUTO_SMALL_FREE_MODEL_UPSTREAM_ID : modelId;
-
-  const slashIndex = internalId.indexOf('/');
-  if (slashIndex < 0) {
-    return internalId;
-  }
-
-  const vercelPrefix = vercelModelPrefixMapping[internalId.slice(0, slashIndex)];
-  return vercelPrefix ? vercelPrefix + internalId.slice(slashIndex) : internalId;
+  return replaceModelPrefix(internalId, vercelModelPrefixMapping);
 }
 
 export function mapResolvedModelIdToVercel(
@@ -56,6 +68,22 @@ export function mapResolvedModelIdToVercel(
   overrides: VercelModelIdOverrides
 ): string {
   return overrides.get(modelId) ?? mapResolvedModelIdToVercelWithoutOverrides(modelId);
+}
+
+/**
+ * The OpenRouter-style ID that `mapResolvedModelIdToVercel` maps to `vercelModelId`, so a model
+ * listed under it routes back to that Vercel model. Undefined when no candidate maps back.
+ */
+export function mapVercelModelIdToOpenRouter(
+  vercelModelId: string,
+  overrides: VercelModelIdOverrides
+): string | undefined {
+  const overriddenIds = [...overrides]
+    .filter(([, overrideVercelModelId]) => overrideVercelModelId === vercelModelId)
+    .map(([openRouterModelId]) => openRouterModelId);
+  return [...overriddenIds, replaceModelPrefix(vercelModelId, openRouterModelPrefixMapping)].find(
+    openRouterModelId => mapResolvedModelIdToVercel(openRouterModelId, overrides) === vercelModelId
+  );
 }
 
 export async function mapModelIdToVercel(modelId: string): Promise<string> {

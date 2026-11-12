@@ -969,6 +969,63 @@ describe('CloudAgentTransport unexpected disconnect', () => {
 });
 
 describe('CloudAgentTransport ticket handling', () => {
+  it('paints an authorized history page while the stream ticket is still pending', async () => {
+    let resolveTicket: ((ticket: string) => void) | undefined;
+    const ticket = new Promise<string>(resolve => {
+      resolveTicket = resolve;
+    });
+    const onInitialPageLoaded = jest.fn();
+    const page = {
+      kind: 'success' as const,
+      info: { id: 'ses-1' },
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    };
+    const transport = createCloudAgentTransport({
+      sessionId: cloudAgentId('ses-1'),
+      kiloSessionId: kiloId('ses-1'),
+      api: createMockApi(),
+      getTicket: () => ticket,
+      fetchSnapshotPage: async () => page,
+      onInitialPageLoaded,
+      websocketBaseUrl: 'ws://localhost:9999',
+    })({ onChatEvent: () => undefined, onServiceEvent: () => undefined });
+
+    transport.connect();
+    await flushPromises();
+    expect(onInitialPageLoaded).toHaveBeenCalledWith(page);
+    expect(webSocketConstructor).not.toHaveBeenCalled();
+
+    resolveTicket?.('ticket');
+    await flushPromises();
+    expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+    expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+    transport.destroy();
+  });
+
+  it.each([
+    [undefined, null],
+    ['full', null],
+    ['preview', 'preview'],
+  ] as const)('requests replay tool display %s as %s', async (toolDisplay, expected) => {
+    const transport = createCloudAgentTransport({
+      sessionId: cloudAgentId('ses-1'),
+      kiloSessionId: kiloId('ses-1'),
+      api: createMockApi(),
+      getTicket: () => 'ticket',
+      fetchSnapshot: () => Promise.resolve(emptySnapshot),
+      websocketBaseUrl: 'ws://localhost:9999',
+      ...(toolDisplay === undefined ? {} : { toolDisplay }),
+    })({ onChatEvent: () => undefined, onServiceEvent: () => undefined });
+    transport.connect();
+    await flushPromises();
+    expect(new URL(webSocketConstructor.mock.calls[0][0]).searchParams.get('toolDisplay')).toBe(
+      expected
+    );
+    transport.destroy();
+  });
+
   it('calls getTicket with sessionId', () => {
     const getTicket = jest.fn((_sessionId: string) => 'ticket-abc');
     const { transport } = createTransportWithSinks(getTicket);
@@ -979,6 +1036,42 @@ describe('CloudAgentTransport ticket handling', () => {
 
     transport.destroy();
   });
+
+  it.each(['disconnect', 'destroy', 'ticket-error'] as const)(
+    'does not paint a late history page after %s',
+    async outcome => {
+      let resolvePage: ((page: SessionSnapshotPageOutcome) => void) | undefined;
+      const pendingPage = new Promise<SessionSnapshotPageOutcome>(resolve => {
+        resolvePage = resolve;
+      });
+      const onInitialPageLoaded = jest.fn();
+      const transport = createCloudAgentTransport({
+        sessionId: cloudAgentId('ses-1'),
+        kiloSessionId: kiloId('ses-1'),
+        api: createMockApi(),
+        getTicket: () =>
+          outcome === 'ticket-error' ? Promise.reject(new Error('Ticket denied')) : 'ticket',
+        fetchSnapshotPage: () => pendingPage,
+        onInitialPageLoaded,
+        websocketBaseUrl: 'ws://localhost:9999',
+        onError: jest.fn(),
+      })({ onChatEvent: () => undefined, onServiceEvent: () => undefined });
+      transport.connect();
+      await flushPromises();
+      if (outcome !== 'ticket-error') transport[outcome]();
+      resolvePage?.({
+        kind: 'success',
+        info: { id: 'ses-1' },
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+      });
+      await flushPromises();
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+      expect(webSocketConstructor).not.toHaveBeenCalled();
+      transport.destroy();
+    }
+  );
 
   it('handles async getTicket', async () => {
     const getTicket = jest.fn((_sessionId: string) => Promise.resolve('async-ticket'));

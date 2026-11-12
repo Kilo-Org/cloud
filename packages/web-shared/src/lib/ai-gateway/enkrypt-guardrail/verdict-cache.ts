@@ -2,14 +2,19 @@ import { createHash } from 'node:crypto';
 import * as z from 'zod';
 import { ENKRYPT_DETECTOR_IDS } from '@kilocode/db/schema-types';
 import {
+  coverageReport,
+  detectorsReport,
   guardrailBlockMessage,
   scanRequest,
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
   type EnkryptGuardrailScanResult,
   type EnkryptGuardrailVerdict,
+  type EnkryptScanContext,
   type EnkryptScanCoverage,
   scanKind,
+  scanLogFields,
+  totalCredits,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import {
   joinSegments,
@@ -19,9 +24,9 @@ import {
   type RequestToolDefinition,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import {
-  OMITTED_TEXT_MARKERS,
-  scanChunks,
-  type ScanChunk,
+  packUnits,
+  scanUnits,
+  type ScanUnit,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/scan-chunks';
 import type { EnkryptGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import {
@@ -30,27 +35,19 @@ import {
   type EnkryptGuardrailReport,
   type EnkryptInputPartScanReport,
   type EnkryptScanReport,
+  type EnkryptSegmentsPart,
   type EnkryptToolScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
-
-/** When false, every request is scanned in full. */
-export const ENKRYPT_VERDICT_CACHE_ENABLED = true;
 
 /**
  * Bump when key derivation or the meaning of a cached verdict changes, for example how detector
  * results are parsed or which detections block, so entries written by older code stop matching.
  * Extraction changes already change the hashed segments.
  */
-const VERDICT_CACHE_VERSION = 5;
+const VERDICT_CACHE_VERSION = 6;
 
 export const ENKRYPT_VERDICT_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
-
-/**
- * Bounds the lookup. Cached prefixes are earlier requests of the same conversation, which end near
- * the end of the current one.
- */
-export const MAX_PROBED_PREFIXES = 1_024;
 
 const cachedBlockVerdictSchema = z
   .object({
@@ -73,7 +70,7 @@ export type EnkryptVerdictCacheStore = {
   ): Promise<unknown>;
 };
 
-export type EnkryptGuardrailRequest = Omit<EnkryptGuardrailScan, 'text' | 'coverage'> & {
+export type EnkryptGuardrailRequest = EnkryptScanContext & {
   parts: RequestScanParts;
 };
 
@@ -82,7 +79,7 @@ type RequestPart = keyof RequestScanParts;
 export type EnkryptCachedScanResult = Omit<EnkryptGuardrailScanResult, 'report'> & {
   /** Null when no scan ran. */
   report: EnkryptInputPartScanReport | null;
-  /** One entry per tool definition, system prompt, or conversation whose verdict can be cached. */
+  /** One entry per segment, or slice of one, whose verdict can be cached. */
   cacheEntries: EnkryptVerdictCacheEntry[];
 };
 
@@ -102,36 +99,33 @@ function configHash(config: ReadyConfig): Buffer {
 }
 
 /**
- * One key per segment, each covering the exact ordered content of the part up to and including
- * that segment: `h_0` hashes the scope, and `h_i = sha256(h_{i-1} || length || segment_i)`.
- * Editing, removing, or reordering any segment changes the keys of every later one, so a client
- * that rewrites history never inherits an earlier verdict. Segments are hashed as UTF-16 code units
- * to stay exact for lone surrogates, which UTF-8 would replace. Each tool definition is keyed on
- * its own, as a part of one segment.
+ * The key of one unit: a segment, or a slice of a segment too long for one Enkrypt call. Enkrypt
+ * judges chunks of its input individually, so a unit's verdict does not depend on the text around
+ * it, and each unit is cached on its own wherever it appears. Text is hashed as UTF-16 code units
+ * to stay exact for lone surrogates, which UTF-8 would replace.
  *
  * The scope is the organization, the part, and the detector configuration, but not the user, so
- * members of an organization share verdicts: the same tool definitions and system prompt are
- * scanned once for all of them. Scan latency can therefore reveal to a member that someone in their
- * organization sent the same content before. For tool definitions and system prompts, which coding
- * agents mostly ship, that is accepted. A conversation key covers the whole conversation up to its
- * segment, so only a member who already has that exact conversation can hit it.
+ * members of an organization share verdicts: the same tool definitions, system prompts, and
+ * messages are scanned once for all of them.
+ *
+ * Timing attacks on this cache between members of the same organization are deliberately not
+ * defended against: scan latency can reveal to a member that someone in their organization sent
+ * the same text before, and we accept that within an organization. Keys never cross organizations.
  */
-export function verdictCacheKeys(
+export function verdictCacheKey(
   { organizationId }: Pick<EnkryptGuardrailRequest, 'organizationId'>,
   config: ReadyConfig,
   part: RequestPart,
-  segments: string[]
-): string[] {
+  text: string
+): string {
   const keyPrefix = `enkrypt-guardrail:verdict:v${VERDICT_CACHE_VERSION}:${organizationId}:${part}:`;
-  let chain = createHash('sha256').update(keyPrefix).update(configHash(config)).digest();
-  return segments.map(segment => {
-    chain = createHash('sha256')
-      .update(chain)
-      .update(`${segment.length}:`)
-      .update(segment, 'utf16le')
-      .digest();
-    return `${keyPrefix}${chain.toString('hex')}`;
-  });
+  const hash = createHash('sha256')
+    .update(keyPrefix)
+    .update(configHash(config))
+    .update(`${text.length}:`)
+    .update(text, 'utf16le')
+    .digest('hex');
+  return `${keyPrefix}${hash}`;
 }
 
 /**
@@ -143,13 +137,12 @@ function cachedVerdict(
   config: ReadyConfig
 ): EnkryptVerdictCacheEntry['verdict'] | null {
   if (value === 'allow') return 'allow';
-  let parsed: unknown = value;
-  if (typeof value === 'string') {
-    try {
-      parsed = JSON.parse(value);
-    } catch {
-      return null;
-    }
+  if (typeof value !== 'string') return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return null;
   }
   const blocked = cachedBlockVerdictSchema.safeParse(parsed);
   return blocked.success &&
@@ -158,51 +151,104 @@ function cachedVerdict(
     : null;
 }
 
+type CachedVerdict = EnkryptVerdictCacheEntry['verdict'];
+
+/** The verdict cache of a request, when it is used: with a store and a ready configuration. */
+type VerdictCache = { store: EnkryptVerdictCacheStore; config: ReadyConfig };
+
+/** A unit and its verdict cache key, or null when the cache is not used. */
+type KeyedUnit = ScanUnit & { key: string | null };
+
+/** A unit and its cached verdict, or null for none. */
+type LookedUpUnit = KeyedUnit & { verdict: CachedVerdict | null };
+
+function keyedUnits(
+  request: EnkryptScanContext,
+  part: RequestPart,
+  segments: RequestSegment[],
+  cache: VerdictCache | null
+): KeyedUnit[] {
+  return scanUnits(segments).map(unit => ({
+    ...unit,
+    key: cache ? verdictCacheKey(request, cache.config, part, unit.text) : null,
+  }));
+}
+
+/**
+ * The cached verdicts of `units`, by key, looked up in one call, and the cache status: `off` when
+ * the cache is not used or there is nothing to look up. A failed lookup finds no verdict, so every
+ * unit is scanned.
+ */
 async function lookup(
   organizationId: string,
-  keys: string[],
-  store: EnkryptVerdictCacheStore
-): Promise<unknown[] | 'error'> {
-  if (keys.length === 0) return [];
+  units: KeyedUnit[],
+  cache: VerdictCache | null
+): Promise<{ status: EnkryptScanCoverage['cache']; verdicts: Map<string, CachedVerdict> }> {
+  const verdicts = new Map<string, CachedVerdict>();
+  const keys = units.flatMap(unit => (unit.key ? [unit.key] : []));
+  if (!cache || keys.length === 0) return { status: 'off', verdicts };
   try {
-    return await store.mget(keys);
+    const values = await cache.store.mget(keys);
+    keys.forEach((key, index) => {
+      const verdict = cachedVerdict(values[index], cache.config);
+      if (verdict) verdicts.set(key, verdict);
+    });
+    return { status: verdicts.size > 0 ? 'hit' : 'miss', verdicts };
   } catch (error) {
     warnExceptInTest('[enkrypt-guardrail] verdict cache lookup failed; scanning in full', {
       organization_id: organizationId,
       error: error instanceof Error ? error.message : String(error),
     });
-    return 'error';
+    return { status: 'error', verdicts };
   }
 }
 
-/**
- * The longest cached prefix among the keys from `firstProbed` on. Only the conversation is
- * matched by prefix; the system prompt probes only its full key.
- */
-async function cachedPrefix(
-  organizationId: string,
-  keys: string[],
-  firstProbed: number,
-  config: ReadyConfig,
-  store: EnkryptVerdictCacheStore
-): Promise<{ cachedSegments: number; verdict: EnkryptVerdictCacheEntry['verdict'] } | 'error'> {
-  const values = await lookup(organizationId, keys.slice(firstProbed), store);
-  if (values === 'error') return 'error';
-  let cachedSegments = 0;
-  for (const [index, value] of values.entries()) {
-    const segments = firstProbed + index + 1;
-    const verdict = cachedVerdict(value, config);
-    if (verdict === 'allow') cachedSegments = segments;
-    else if (verdict) return { cachedSegments: segments, verdict };
+function withVerdicts(units: KeyedUnit[], verdicts: Map<string, CachedVerdict>): LookedUpUnit[] {
+  return units.map(unit => ({
+    ...unit,
+    verdict: unit.key === null ? null : (verdicts.get(unit.key) ?? null),
+  }));
+}
+
+/** The first cached block among `units`, if any. */
+function cachedBlock(units: LookedUpUnit[]): Exclude<CachedVerdict, 'allow'> | undefined {
+  for (const { verdict } of units) {
+    if (verdict !== null && verdict !== 'allow') return verdict;
   }
-  return { cachedSegments, verdict: 'allow' };
+  return undefined;
+}
+
+/** The segments whose units all have a cached verdict, and their length joined as in the part. */
+function cachedCoverage(
+  rendered: string[],
+  units: LookedUpUnit[]
+): Pick<EnkryptScanCoverage, 'cachedCharacters' | 'cachedSegments'> {
+  const uncached = new Set(units.filter(unit => !unit.verdict).map(unit => unit.segment));
+  const cached = rendered.filter((_, index) => !uncached.has(index));
+  return { cachedCharacters: joinSegments(cached).length, cachedSegments: cached.length };
+}
+
+/**
+ * The units without a cached verdict, each once, packed into Enkrypt calls. A unit that appears
+ * more than once, such as a repeated message, is scanned once.
+ */
+function uncachedCalls(units: LookedUpUnit[]): KeyedUnit[][] {
+  const seen = new Set<string>();
+  return packUnits(
+    units.filter(unit => {
+      const id = unit.key ?? unit.text;
+      if (unit.verdict || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    })
+  );
 }
 
 /**
  * A log-only scan gates nothing, so its result is cached even when it fails, unless the client
  * disconnected or the scan ran out of time before any call. Otherwise a failure that recurs, such
  * as a timeout, a detector error, or a request too large to scan, would rescan, log, and possibly be
- * charged for a growing suffix on every later request of the conversation. A scan that never got a
+ * charged for the same text on every later request of the conversation. A scan that never got a
  * call slot in time was not charged, and the next request scans it.
  */
 function isCacheableAllow({ verdict, report, usageRecords }: EnkryptGuardrailScanResult): boolean {
@@ -232,57 +278,25 @@ function cacheableVerdict(
 }
 
 /**
- * Where a part's verdicts are cached: `allow(through)` is the key for its content up to segment
- * `through`, or null when only the whole part is keyed and `through` falls short of it, and
- * `block(reaches)` the key for a block found in content reaching into segment `reaches`.
+ * What to cache for the calls of a part: an allowed call caches an allow for each of its units, so
+ * after another call fails or runs out of time, the next request rescans only that call's units.
+ * Writes are deferred and auto-pipelined, and an allow is never overwritten. Enkrypt does not say
+ * which unit of a packed call fired, so a genuine block is cached only for a call of one unit.
  */
-type PartKeys = {
-  allow(through: number): string | null;
-  block(reaches: number): string;
-};
-
-/** The conversation is keyed by prefix, so every segment boundary has a key. */
-function prefixKeys(keys: string[]): PartKeys {
-  return {
-    allow: through => keys[through - 1] ?? null,
-    block: reaches => required(keys[reaches - 1]),
-  };
-}
-
-/** A tool definition or the system prompt is keyed only as a whole. */
-function wholeKey(key: string, segments: number): PartKeys {
-  return { allow: through => (through === segments ? key : null), block: () => key };
-}
-
-/**
- * What to cache for a part scanned in chunks. Each run of allowed chunks from the start caches an
- * allow at the boundary it reached, so after a chunk fails or runs out of time, the next request of
- * the conversation resumes from there. Cold scans are rare, the writes are deferred, and an allow
- * is never overwritten, so a few writes for them are cheap. The first genuine block is cached for
- * every request retaining the content its chunk reached into.
- */
-function chunkCacheEntries(
-  chunks: ScanChunk[],
+function callCacheEntries(
+  calls: KeyedUnit[][],
   results: EnkryptGuardrailScanResult[],
-  config: ReadyConfig,
-  cachedSegments: number,
-  keys: PartKeys
+  cache: VerdictCache | null
 ): EnkryptVerdictCacheEntry[] {
-  const entries: EnkryptVerdictCacheEntry[] = [];
-  let allowedThrough: number | null = cachedSegments;
-  for (const [index, chunk] of chunks.entries()) {
-    const verdict = cacheableVerdict(required(results[index]), config);
-    if (verdict !== 'allow') {
-      allowedThrough = null;
-      if (verdict) return [...entries, { key: keys.block(chunk.reaches), verdict }];
-      continue;
+  if (!cache) return [];
+  return calls.flatMap((call, index): EnkryptVerdictCacheEntry[] => {
+    const verdict = cacheableVerdict(required(results[index]), cache.config);
+    if (verdict === 'allow') {
+      return call.flatMap(({ key }) => (key ? [{ key, verdict }] : []));
     }
-    if (allowedThrough === null || chunk.through <= allowedThrough) continue;
-    allowedThrough = chunk.through;
-    const key = keys.allow(chunk.through);
-    if (key) entries.push({ key, verdict });
-  }
-  return entries;
+    const [only] = call;
+    return verdict && call.length === 1 && only?.key ? [{ key: only.key, verdict }] : [];
+  });
 }
 
 const DECISION_SEVERITY: readonly EnkryptScanReport['decision'][] = [
@@ -297,15 +311,19 @@ function bySeverity<T extends { decision: EnkryptScanReport['decision'] }>(a: T,
   return DECISION_SEVERITY.indexOf(a.decision) - DECISION_SEVERITY.indexOf(b.decision);
 }
 
-function sum(values: number[]): number {
-  return values.reduce((total, value) => total + value, 0);
+function mostSevereDecision(
+  decisions: EnkryptScanReport['decision'][]
+): EnkryptScanReport['decision'] {
+  return DECISION_SEVERITY.find(each => decisions.includes(each)) ?? 'allowed';
 }
 
-function totalCredits(reports: { credits_cost: number | null }[]): number | null {
-  const credits = reports.flatMap(report =>
-    report.credits_cost === null ? [] : [report.credits_cost]
-  );
-  return credits.length === 0 ? null : sum(credits);
+/** The error of the most severe report that failed. */
+function mostSevereError(reports: EnkryptScanReport[]): EnkryptScanReport['error'] {
+  return reports.toSorted(bySeverity).find(report => report.error !== null)?.error ?? null;
+}
+
+function sum(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0);
 }
 
 /**
@@ -313,149 +331,86 @@ function totalCredits(reports: { credits_cost: number | null }[]): number | null
  * unavailable when any chunk's scan is, so a chunk that fails never lets the part through.
  */
 function combineChunks(results: EnkryptGuardrailScanResult[]): EnkryptGuardrailScanResult {
+  const first = required(results[0]);
+  if (results.length === 1) return first;
   const reports = results.map(result => result.report);
-  const [first] = reports;
-  if (!first || reports.length === 1) return required(results[0]);
-  const bySeverest = [...reports].sort(bySeverity);
   return {
     verdict: mostSevereVerdict(results.map(result => result.verdict)),
     usageRecords: results.flatMap(result => result.usageRecords),
     report: {
-      ...first,
+      ...first.report,
       scanned_characters: sum(reports.map(report => report.scanned_characters)),
-      decision: required(bySeverest[0]).decision,
-      error: bySeverest.find(report => report.error !== null)?.error ?? null,
+      decision: mostSevereDecision(reports.map(report => report.decision)),
+      error: mostSevereError(reports),
       detectors_fired: ENKRYPT_DETECTOR_IDS.filter(id =>
         reports.some(report => report.detectors_fired.includes(id))
       ),
       attempts: sum(reports.map(report => report.attempts)),
-      credits_cost: totalCredits(reports),
+      credits_cost: totalCredits(reports.map(report => report.credits_cost)),
       latency_ms: Math.max(...reports.map(report => report.latency_ms)),
     },
   };
 }
 
-function chunkScans(
-  request: Omit<EnkryptGuardrailRequest, 'parts'>,
-  coverage: EnkryptScanCoverage,
-  chunks: ScanChunk[]
-): EnkryptGuardrailScan[] {
-  return chunks.map((chunk, index) => ({
-    ...request,
-    text: chunk.text,
-    coverage: { ...coverage, chunk: { index, count: chunks.length } },
-  }));
-}
-
-function logFields(request: Omit<EnkryptGuardrailRequest, 'parts'>) {
-  return {
-    organization_id: request.organizationId,
-    session_id: request.sessionId,
-    client_request_id: request.clientRequestId,
-    api_kind: request.apiKind,
-  };
-}
-
 /**
  * A part's verdict cache lookup, done before any of the request's scans start: the Enkrypt calls it
- * still needs, as the chunks of each text it scans in order, and how to turn their results, in the
- * same order, into the part's result.
+ * still needs, and how to turn their results into the part's result.
  */
 type PartPlan = {
-  texts: EnkryptGuardrailScan[][];
-  finish(results: EnkryptGuardrailScanResult[]): EnkryptCachedScanResult;
+  scans: EnkryptGuardrailScan[];
+  finish(
+    resultOf: (scan: EnkryptGuardrailScan) => EnkryptGuardrailScanResult
+  ): EnkryptCachedScanResult;
 };
 
 /**
- * The chunks of a part's uncached text, from segment `start` on, and a scan for each. With nothing
- * to scan, one scan of no text still reports the part, without an Enkrypt call.
+ * A scan for each call, its units joined like segments. With nothing to scan, one scan of no text
+ * still reports the part, without an Enkrypt call.
  */
-function chunkedPlan(
-  part: keyof RequestScanParts,
-  segments: RequestSegment[],
-  start: number,
-  request: Omit<EnkryptGuardrailRequest, 'parts'>,
-  coverage: EnkryptScanCoverage
-): { chunks: ScanChunk[]; scans: EnkryptGuardrailScan[] } {
-  const chunks = scanChunks(segments, start, OMITTED_TEXT_MARKERS[part]);
-  return {
-    chunks,
-    scans:
-      chunks.length > 0
-        ? chunkScans(request, coverage, chunks)
-        : [{ ...request, text: '', coverage }],
-  };
+function callScans(
+  request: EnkryptScanContext,
+  coverage: EnkryptScanCoverage,
+  calls: KeyedUnit[][]
+): EnkryptGuardrailScan[] {
+  if (calls.length === 0) return [{ ...request, text: '', coverage }];
+  return calls.map((call, index) => ({
+    ...request,
+    text: joinSegments(call.map(unit => unit.text)),
+    coverage: { ...coverage, chunk: { index, count: calls.length } },
+  }));
 }
 
 /**
- * Plans the system prompt or the conversation. The conversation is scanned only from where no
- * earlier allowed request with the same scope covered it, plus an overlap; the system prompt is
- * skipped only when the whole of it was allowed before. Text too long for one Enkrypt call is
- * scanned in chunks. A cached block rejects requests retaining that content. A cache failure scans
- * the part in full, so it never lets unscanned content through. A failed blocking scan is never
- * cached; see `isCacheableAllow` for log-only scans.
+ * Plans the system prompt or the conversation. Each segment, or each slice of a segment too long
+ * for one Enkrypt call, has its verdict cached on its own; only the units without one are scanned,
+ * packed into as few calls as fit. A cached block of any unit rejects the request. A cache failure
+ * scans the part in full, so it never lets unscanned content through. A failed blocking scan is
+ * never cached; see `isCacheableAllow` for log-only scans.
  */
 async function planSegmentsPart(
-  part: 'system' | 'conversation',
+  part: EnkryptSegmentsPart,
   segments: RequestSegment[],
-  request: Omit<EnkryptGuardrailRequest, 'parts'>,
-  store: EnkryptVerdictCacheStore | null
+  request: EnkryptScanContext,
+  cache: VerdictCache | null
 ): Promise<PartPlan> {
   const rendered = segments.map(renderSegment);
-  const text = joinSegments(rendered);
-  const uncached: EnkryptScanCoverage = {
+  const keyed = keyedUnits(request, part, segments, cache);
+  const { status, verdicts } = await lookup(request.organizationId, keyed, cache);
+  const units = withVerdicts(keyed, verdicts);
+  const coverage: EnkryptScanCoverage = {
     part,
-    cache: 'off',
-    totalCharacters: text.length,
+    cache: status,
+    totalCharacters: joinSegments(rendered).length,
     totalSegments: segments.length,
-    cachedCharacters: 0,
-    cachedSegments: 0,
+    ...cachedCoverage(rendered, units),
     omittedAttachments: segments.filter(segment => segment.body === null).length,
   };
-  const { config } = request;
-  const scanOf = (
-    { chunks, scans }: ReturnType<typeof chunkedPlan>,
-    cacheEntries: (results: EnkryptGuardrailScanResult[]) => EnkryptVerdictCacheEntry[]
-  ): PartPlan => ({
-    texts: [scans],
-    finish(results) {
-      const result = combineChunks(results);
-      return {
-        ...result,
-        report: { ...result.report, part, chunks: chunks.length },
-        cacheEntries: cacheEntries(results),
-      };
-    },
-  });
-  if (!store || config.status !== 'ready' || segments.length === 0) {
-    return scanOf(chunkedPlan(part, segments, 0, request, uncached), () => []);
-  }
-
-  const keys = verdictCacheKeys(request, config, part, rendered);
-  const firstProbed =
-    part === 'conversation' ? Math.max(0, keys.length - MAX_PROBED_PREFIXES) : keys.length - 1;
-  const cached = await cachedPrefix(request.organizationId, keys, firstProbed, config, store);
-  const cachedSegments = cached === 'error' ? 0 : cached.cachedSegments;
-  const cachedCharacters = joinSegments(rendered.slice(0, cachedSegments)).length;
-  const coverage: EnkryptScanCoverage = {
-    ...uncached,
-    cache: cached === 'error' ? 'error' : cachedSegments > 0 ? 'hit' : 'miss',
-    cachedCharacters,
-    cachedSegments,
-  };
-  if (cached !== 'error' && cached.verdict !== 'allow') {
-    const { detectors } = cached.verdict;
+  const block = cachedBlock(units);
+  if (block && cache) {
+    const { detectors } = block;
     const report: EnkryptInputPartScanReport = {
-      scan: 'blocking',
+      ...coverageReport(cache.config, coverage),
       part,
-      detectors_enabled: ENKRYPT_DETECTOR_IDS.filter(id => config.detectors[id] !== undefined),
-      detectors_blocking: config.blockingDetectors,
-      verdict_cache: 'hit',
-      total_characters: text.length,
-      total_segments: segments.length,
-      cached_characters: cachedCharacters,
-      cached_segments: cachedSegments,
-      omitted_attachments: coverage.omittedAttachments,
       scanned_characters: 0,
       decision: 'blocked',
       error: null,
@@ -465,9 +420,9 @@ async function planSegmentsPart(
       latency_ms: 0,
       chunks: 0,
     };
-    console.debug('[enkrypt-guardrail] decision', { ...logFields(request), ...report });
+    console.debug('[enkrypt-guardrail] decision', { ...scanLogFields(request), ...report });
     return {
-      texts: [],
+      scans: [],
       finish: () => ({
         verdict: { action: 'block', message: guardrailBlockMessage(detectors, null) },
         usageRecords: [],
@@ -476,12 +431,20 @@ async function planSegmentsPart(
       }),
     };
   }
-  const plan = chunkedPlan(part, segments, cachedSegments, request, coverage);
-  const partKeys =
-    part === 'conversation' ? prefixKeys(keys) : wholeKey(required(keys.at(-1)), keys.length);
-  return scanOf(plan, results =>
-    chunkCacheEntries(plan.chunks, results, config, cachedSegments, partKeys)
-  );
+  const calls = uncachedCalls(units);
+  const scans = callScans(request, coverage, calls);
+  return {
+    scans,
+    finish(resultOf) {
+      const results = scans.map(resultOf);
+      const result = combineChunks(results);
+      return {
+        ...result,
+        report: { ...result.report, part, chunks: calls.length },
+        cacheEntries: callCacheEntries(calls, results, cache),
+      };
+    },
+  };
 }
 
 function required<T>(value: T | undefined): T {
@@ -498,7 +461,7 @@ export function mostSevereVerdict(verdicts: EnkryptGuardrailVerdict[]): EnkryptG
   );
 }
 
-/** The outcome of one tool definition: its cached verdict, or the scan of it, in chunks. */
+/** The outcome of one tool definition: its cached verdict, or the scan of its uncached segments. */
 type ToolOutcome = {
   tool: RequestToolDefinition;
   characters: number;
@@ -533,7 +496,6 @@ function flaggedTool({
 }
 
 function toolsReport(
-  kind: EnkryptToolScanReport['scan'],
   config: EnkryptGuardrailConfig,
   cache: EnkryptToolScanReport['verdict_cache'],
   outcomes: ToolOutcome[]
@@ -543,34 +505,30 @@ function toolsReport(
     outcome.kind === 'scanned' ? [outcome.result.report] : []
   );
   const flagged = outcomes.flatMap(each => flaggedTool(each) ?? []).sort(bySeverity);
-  const decisions = [
-    ...reports.map(report => report.decision),
-    ...flagged.map(each => each.decision),
-  ];
-  const decision = DECISION_SEVERITY.find(each => decisions.includes(each)) ?? 'allowed';
   return {
-    scan: kind,
+    scan: scanKind(config),
     part: 'tools',
-    detectors_enabled:
-      config.status === 'ready'
-        ? ENKRYPT_DETECTOR_IDS.filter(id => config.detectors[id] !== undefined)
-        : [],
-    detectors_blocking: config.status === 'ready' ? config.blockingDetectors : [],
-    verdict_cache: cache === 'miss' && cached.length > 0 ? 'hit' : cache,
+    ...detectorsReport(config),
+    verdict_cache: cache,
     tools_total: outcomes.length,
     tools_cached: cached.length,
     tools_scanned: outcomes.length - cached.length,
     tools_flagged: flagged.length,
     total_characters: sum(outcomes.map(each => each.characters)),
-    cached_characters: sum(cached.map(each => each.characters)),
+    cached_characters:
+      sum(cached.map(each => each.characters)) +
+      sum(reports.map(report => report.cached_characters)),
     scanned_characters: sum(reports.map(report => report.scanned_characters)),
-    decision,
-    error: [...reports].sort(bySeverity).find(report => report.error !== null)?.error ?? null,
+    decision: mostSevereDecision([
+      ...reports.map(report => report.decision),
+      ...flagged.map(each => each.decision),
+    ]),
+    error: mostSevereError(reports),
     detectors_fired: ENKRYPT_DETECTOR_IDS.filter(id =>
       flagged.some(each => each.detectors_fired.includes(id))
     ),
     attempts: sum(reports.map(report => report.attempts)),
-    credits_cost: totalCredits(reports),
+    credits_cost: totalCredits(reports.map(report => report.credits_cost)),
     latency_ms: reports.reduce((latest, report) => Math.max(latest, report.latency_ms), 0),
     flagged_tools: flagged.slice(0, MAX_REPORTED_FLAGGED_TOOLS).map(each => ({
       kind: each.kind,
@@ -581,76 +539,81 @@ function toolsReport(
   };
 }
 
+/** A tool's cached verdict, or the calls that scan its uncached segments. */
+type ToolPlan = { tool: RequestToolDefinition; characters: number } & (
+  | { verdict: CachedVerdict }
+  | { calls: KeyedUnit[][]; scans: EnkryptGuardrailScan[] }
+);
+
 /**
- * Plans the tool definitions and response formats. Each is looked up and cached by exact match on
- * its own, so a changed, added, or removed tool rescans only that tool, and each uncached one is
- * scanned by its own Enkrypt calls: one, unless it is too long for one call and is scanned in
- * chunks. Each call pays Enkrypt's per-call minimum, so an uncached tool set costs more than one
- * combined call would; verdicts are shared across the organization, so that is paid once per tool
- * and detector set. The results are aggregated into one result for the part: it blocks when any
- * tool blocks, and is otherwise unavailable when any tool's scan is.
+ * Plans the tool definitions and response formats. Each segment of each is cached on its own, as
+ * for the other parts, so a changed, added, or removed tool rescans only what changed. Each tool
+ * with uncached segments is scanned by its own Enkrypt calls, so a detection is reported for the
+ * tool that fired it. Each call pays Enkrypt's per-call minimum, so an uncached tool set costs more
+ * than one combined call would; verdicts are shared across the organization, so that is paid once
+ * per tool and detector set. The results are aggregated into one result for the part: it blocks
+ * when any tool blocks, and is otherwise unavailable when any tool's scan is.
  */
 async function planTools(
   tools: RequestToolDefinition[],
-  request: Omit<EnkryptGuardrailRequest, 'parts'>,
-  store: EnkryptVerdictCacheStore | null
+  request: EnkryptScanContext,
+  cache: VerdictCache | null
 ): Promise<PartPlan> {
   const { config } = request;
-  const ready = config.status === 'ready' ? config : null;
-  const texts = tools.map(tool => joinSegments(tool.segments.map(renderSegment)));
-  const keys = ready
-    ? texts.map(text => required(verdictCacheKeys(request, ready, 'tools', [text])[0]))
-    : null;
-  const values = store && keys ? await lookup(request.organizationId, keys, store) : null;
-  const cache: EnkryptToolScanReport['verdict_cache'] =
-    values === null ? 'off' : values === 'error' ? 'error' : 'miss';
-  const plans = tools.map((tool, index) => {
-    const verdict = ready && Array.isArray(values) ? cachedVerdict(values[index], ready) : null;
-    if (verdict) return { verdict };
-    return chunkedPlan('tools', tool.segments, 0, request, {
+  const toolUnits = tools.map(tool => ({
+    tool,
+    rendered: tool.segments.map(renderSegment),
+    units: keyedUnits(request, 'tools', tool.segments, cache),
+  }));
+  const { status, verdicts } = await lookup(
+    request.organizationId,
+    toolUnits.flatMap(each => each.units),
+    cache
+  );
+  const plans = toolUnits.map(({ tool, rendered, units: keyed }): ToolPlan => {
+    const characters = joinSegments(rendered).length;
+    const units = withVerdicts(keyed, verdicts);
+    const block = cachedBlock(units);
+    if (block) return { tool, characters, verdict: block };
+    if (units.every(unit => unit.verdict === 'allow')) {
+      return { tool, characters, verdict: 'allow' };
+    }
+    const calls = uncachedCalls(units);
+    const coverage: EnkryptScanCoverage = {
       part: 'tools',
-      cache,
-      totalCharacters: texts[index]?.length ?? 0,
+      cache: status,
+      totalCharacters: characters,
       totalSegments: tool.segments.length,
-      cachedCharacters: 0,
-      cachedSegments: 0,
+      ...cachedCoverage(rendered, units),
       omittedAttachments: 0,
-    });
+    };
+    return { tool, characters, calls, scans: callScans(request, coverage, calls) };
   });
   return {
-    texts: plans.flatMap(plan => ('scans' in plan ? [plan.scans] : [])),
-    finish(results) {
-      let scanned = 0;
-      const outcomes = tools.map((tool, index): ToolOutcome => {
-        const characters = texts[index]?.length ?? 0;
-        const plan = required(plans[index]);
+    scans: plans.flatMap(plan => ('scans' in plan ? plan.scans : [])),
+    finish(resultOf) {
+      const outcomes = plans.map((plan): ToolOutcome => {
+        const { tool, characters } = plan;
         if ('verdict' in plan) {
           return { tool, characters, outcome: { kind: 'cached', verdict: plan.verdict } };
         }
-        const chunkResults = results.slice(scanned, (scanned += plan.scans.length));
-        const key = keys?.[index];
+        const results = plan.scans.map(resultOf);
         return {
           tool,
           characters,
           outcome: {
             kind: 'scanned',
-            result: combineChunks(chunkResults),
-            cacheEntries:
-              ready && key
-                ? chunkCacheEntries(
-                    plan.chunks,
-                    chunkResults,
-                    ready,
-                    0,
-                    wholeKey(key, tool.segments.length)
-                  )
-                : [],
+            result: combineChunks(results),
+            cacheEntries: callCacheEntries(plan.calls, results, cache),
           },
         };
       });
-      const report = toolsReport(scanKind(config), config, cache, outcomes);
+      const report = toolsReport(config, status, outcomes);
       if (report.tools_cached > 0) {
-        console.debug('[enkrypt-guardrail] tool definitions', { ...logFields(request), ...report });
+        console.debug('[enkrypt-guardrail] tool definitions', {
+          ...scanLogFields(request),
+          ...report,
+        });
       }
       return {
         verdict: mostSevereVerdict(
@@ -681,12 +644,12 @@ async function planTools(
  * its conversation, each with its own verdict cache entries. Returns one result per scanned part,
  * in tools, system, conversation order.
  *
- * Every verdict cache lookup finishes before any scan starts. The scans then start longest text
+ * Every verdict cache lookup finishes before any scan starts. The calls then start longest text
  * first, so with `deps.limiter` capping concurrent calls the long ones do not run last and hold up
- * the verdict. A text's chunks start in order, ranked by its longest chunk, so when the deadline
- * cuts a long conversation short, its allowed chunks are a prefix the next request resumes from.
- * They share one deadline, started before the lookups, which includes time spent waiting for a
- * call slot, so the part results arrive within `deps.timeoutMs` plus the lookup.
+ * the verdict. Each allowed call is cached on its own, so when the deadline cuts a long
+ * conversation short, the next request rescans only the calls that did not finish. They share one
+ * deadline, started before the lookups, which includes time spent waiting for a call slot, so the
+ * part results arrive within `deps.timeoutMs` plus the lookup.
  */
 export async function scanRequestWithVerdictCache(
   { parts, ...request }: EnkryptGuardrailRequest,
@@ -696,23 +659,20 @@ export async function scanRequestWithVerdictCache(
     ...deps,
     deadline: deps.deadline ?? AbortSignal.timeout(deps.timeoutMs),
   };
+  const { config } = request;
+  const cache = store && config.status === 'ready' ? { store, config } : null;
   const plans = await Promise.all([
-    ...(parts.tools.length > 0 ? [planTools(parts.tools, request, store)] : []),
-    ...(parts.system.length > 0 ? [planSegmentsPart('system', parts.system, request, store)] : []),
-    planSegmentsPart('conversation', parts.conversation, request, store),
+    ...(parts.tools.length > 0 ? [planTools(parts.tools, request, cache)] : []),
+    ...(parts.system.length > 0 ? [planSegmentsPart('system', parts.system, request, cache)] : []),
+    planSegmentsPart('conversation', parts.conversation, request, cache),
   ]);
-  const longestChunk = (chunks: EnkryptGuardrailScan[]) =>
-    Math.max(0, ...chunks.map(scan => scan.text.length));
-  const started = new Map<EnkryptGuardrailScan, Promise<EnkryptGuardrailScanResult>>();
-  const byLength = plans
-    .flatMap(plan => plan.texts)
-    .sort((a, b) => longestChunk(b) - longestChunk(a));
-  for (const scan of byLength.flat()) started.set(scan, scanRequest(scan, scanDeps));
-  return Promise.all(
-    plans.map(async plan =>
-      plan.finish(await Promise.all(plan.texts.flat().map(scan => required(started.get(scan)))))
+  const byLength = plans.flatMap(plan => plan.scans).sort((a, b) => b.text.length - a.text.length);
+  const results = new Map(
+    await Promise.all(
+      byLength.map(async scan => [scan, await scanRequest(scan, scanDeps)] as const)
     )
   );
+  return plans.map(plan => plan.finish(scan => required(results.get(scan))));
 }
 
 export async function rememberRequestVerdict(

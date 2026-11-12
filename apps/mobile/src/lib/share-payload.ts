@@ -110,26 +110,42 @@ export function discardUnstoredSharePayload(payload: SharePayload): void {
   discardPayloadCacheFiles(payload);
 }
 
-/** Snapshot of the in-memory store in the persisted draft shape. */
-function sharePayloadsDraftSnapshot() {
-  const order = [...insertionOrder];
+/**
+ * Snapshot of the payloads staged under `userId` in the persisted draft shape.
+ * A capture staged before an account resolved is left out: it is memory-only
+ * (DEC-01), so it can never be restored under an account that did not stage it.
+ */
+function sharePayloadsDraftSnapshot(userId: string) {
+  const order = insertionOrder.filter(id => payloads.get(id)?.stagedUserId === userId);
   const entries: Record<
     ShareId,
     { text: string; files: { name: string; uri: string }[]; failedFiles: string[] }
   > = {};
-  for (const [id, entry] of payloads) {
-    entries[id] = {
-      text: entry.payload.text,
-      files: entry.payload.files.map(file => ({ name: file.name, uri: file.uri })),
-      failedFiles: [...entry.payload.failedFiles],
-    };
+  for (const id of order) {
+    const entry = payloads.get(id);
+    if (entry !== undefined) {
+      entries[id] = {
+        text: entry.payload.text,
+        files: entry.payload.files.map(file => ({ name: file.name, uri: file.uri })),
+        failedFiles: [...entry.payload.failedFiles],
+      };
+    }
   }
   return { order, entries };
 }
 
 /**
- * Persists the current in-memory payload store (debounced + flushed) so it
- * survives process death. No-ops while signed out (DEC-01 account scope).
+ * True when `id` is staged under `userId`, so a flush for that account keeps it
+ * and a durable draft for the account holds it.
+ */
+export function isSharePayloadStagedUnder(id: ShareId, userId: string): boolean {
+  return payloads.get(id)?.stagedUserId === userId;
+}
+
+/**
+ * Persists the payloads staged under the signed-in account (debounced + flushed)
+ * so they survive process death. No-ops while signed out, and never writes a
+ * capture that the account did not stage (DEC-01 account scope).
  */
 export async function persistSharePayloadsNow(): Promise<void> {
   const userId = sharePersistUserId;
@@ -137,7 +153,7 @@ export async function persistSharePayloadsNow(): Promise<void> {
     return;
   }
   const { saveDraft, flushDraft, SHARE_PAYLOADS_DRAFT_KEY } = await getDrafts();
-  saveDraft(userId, SHARE_PAYLOADS_DRAFT_KEY, sharePayloadsDraftSnapshot());
+  saveDraft(userId, SHARE_PAYLOADS_DRAFT_KEY, sharePayloadsDraftSnapshot(userId));
   await flushDraft(userId, SHARE_PAYLOADS_DRAFT_KEY);
 }
 

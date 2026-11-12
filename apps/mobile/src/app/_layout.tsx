@@ -148,6 +148,7 @@ import { useRecordLastRoute } from '@/lib/hooks/use-record-last-route';
 import {
   clearSharePayload,
   discardUnstoredSharePayload,
+  isSharePayloadStagedUnder,
   normalizeShareIntent,
   peekSharePayload,
   persistSharePayloadsNow,
@@ -616,16 +617,23 @@ function RootLayoutNav({
   // Flush a share staged while the account id was still loading: the ingest
   // effect persisted nothing (userId was falsy), so once userId resolves the
   // staged payload map, navigation queue, and pending id are written to durable
-  // drafts. A signed-out share never reaches this branch (userId stays null),
-  // so it remains in-memory only. Declared after `pendingShareIdRef` so the
-  // closure references an already-declared const.
+  // drafts. Each draft write holds only the entries staged under this account,
+  // and the pending-id hint is written only when this account staged the
+  // pending share: a capture from before an account resolved stays in memory
+  // (DEC-01) instead of reaching the account's draft. Declared after
+  // `pendingShareIdRef` so the closure references an already-declared const.
   useEffect(() => {
-    if (userId && pendingShareIdRef.current !== null) {
-      void persistSharePayloadsNow();
-      void persistShareNavigationNow();
-      saveDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, pendingShareIdRef.current);
-      void flushDraft(userId, PENDING_SHARE_ID_DRAFT_KEY);
+    const pendingId = pendingShareIdRef.current;
+    if (!userId || pendingId === null) {
+      return;
     }
+    void persistSharePayloadsNow();
+    void persistShareNavigationNow();
+    if (!isSharePayloadStagedUnder(pendingId, userId)) {
+      return;
+    }
+    saveDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, pendingId);
+    void flushDraft(userId, PENDING_SHARE_ID_DRAFT_KEY);
   }, [userId]);
 
   // Cold-start share restore. Order matters: payloads first, then the

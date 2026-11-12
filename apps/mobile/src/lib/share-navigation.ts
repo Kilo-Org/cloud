@@ -53,10 +53,15 @@ export async function persistShareNavigationNow(): Promise<void> {
     return;
   }
   const { saveDraft, flushDraft, SHARE_NAV_DRAFT_KEY } = await getDrafts();
+  // Only the destinations staged under this account are persisted: one staged
+  // before an account resolved is memory-only (DEC-01), so it cannot be
+  // restored under an account that did not stage it.
   saveDraft(
     userId,
     SHARE_NAV_DRAFT_KEY,
-    pendingQueue.map(entry => ({ href: entry.pending.href, shareId: entry.pending.shareId }))
+    pendingQueue
+      .filter(entry => entry.stagedUserId === userId)
+      .map(entry => ({ href: entry.pending.href, shareId: entry.pending.shareId }))
   );
   await flushDraft(userId, SHARE_NAV_DRAFT_KEY);
 }

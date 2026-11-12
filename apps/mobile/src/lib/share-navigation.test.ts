@@ -219,6 +219,34 @@ describe('share navigation durable persistence', () => {
     expect(takePendingShareNavigation()).toBeNull();
   });
 
+  it('persists no destination staged before an account resolved', async () => {
+    // A destination captured with no account resolved stays in memory (DEC-01).
+    setPendingShareNavigation({ href: '/(app)/agent-chat/new?shareId=out', shareId: 'out' });
+
+    setSharePersistUserId('u1');
+    await persistShareNavigationNow();
+
+    __resetPendingShareNavigationForTests();
+    await restoreShareNavigation('u1');
+    expect(takePendingShareNavigation()).toBeNull();
+  });
+
+  it('persists only the account destination when a signed-out one shares the queue', async () => {
+    setPendingShareNavigation({ href: '/(app)/agent-chat/new?shareId=out', shareId: 'out' });
+    setSharePersistUserId('u1');
+    setPendingShareNavigation({ href: '/(app)/agent-chat/new?shareId=owned', shareId: 'owned' });
+    await persistShareNavigationNow();
+
+    __resetPendingShareNavigationForTests();
+    await restoreShareNavigation('u1');
+
+    expect(takePendingShareNavigation()).toEqual({
+      href: '/(app)/agent-chat/new?shareId=owned',
+      shareId: 'owned',
+    });
+    expect(takePendingShareNavigation()).toBeNull();
+  });
+
   it('stops restoring when the account changes during the read', async () => {
     setSharePersistUserId('userA');
     saveDraft('userA', SHARE_NAV_DRAFT_KEY, [

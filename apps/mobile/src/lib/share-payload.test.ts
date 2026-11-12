@@ -11,6 +11,7 @@ import {
   clearSharePayload,
   composeShareText,
   discardUnstoredSharePayload,
+  isSharePayloadStagedUnder,
   normalizeShareIntent,
   peekSharePayload,
   persistSharePayloadsNow,
@@ -499,6 +500,53 @@ describe('share payload durable persistence', () => {
     expect(peekSharePayload(id)).toBeNull();
   });
 
+  it('writes no account draft for a capture staged before an account resolved', async () => {
+    const stagedOut = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
+
+    // The identity resolves and the flush that follows it runs.
+    setSharePersistUserId('u1');
+    await persistSharePayloadsNow();
+
+    __resetSharePayloadStoreForTests();
+    setSharePersistUserId('u1');
+    await restoreSharePayloads('u1');
+    expect(peekSharePayload(stagedOut)).toBeNull();
+  });
+
+  it('persists only the account entries when a signed-out capture shares the store', async () => {
+    const stagedOut = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
+    setSharePersistUserId('u1');
+    const owned = putSharePayload({ text: 'by-u1', files: [], failedFiles: [] });
+    await persistSharePayloadsNow();
+
+    __resetSharePayloadStoreForTests();
+    setSharePersistUserId('u1');
+    await restoreSharePayloads('u1');
+
+    expect(peekSharePayload(stagedOut)).toBeNull();
+    expect(peekSharePayload(owned)?.text).toBe('by-u1');
+  });
+
+  it('never restores one capture under a second account', async () => {
+    const stagedOut = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
+
+    setSharePersistUserId('userA');
+    await persistSharePayloadsNow();
+    clearAccountStagedSharePayloads();
+    setSharePersistUserId('userB');
+    await persistSharePayloadsNow();
+
+    __resetSharePayloadStoreForTests();
+    setSharePersistUserId('userA');
+    await restoreSharePayloads('userA');
+    expect(peekSharePayload(stagedOut)).toBeNull();
+
+    __resetSharePayloadStoreForTests();
+    setSharePersistUserId('userB');
+    await restoreSharePayloads('userB');
+    expect(peekSharePayload(stagedOut)).toBeNull();
+  });
+
   it('a put landing during the restore read wins over the draft', async () => {
     setSharePersistUserId('u1');
     saveDraft('u1', SHARE_PAYLOADS_DRAFT_KEY, {
@@ -716,6 +764,17 @@ describe('share payload account boundary', () => {
     } finally {
       unsubscribe();
     }
+  });
+
+  it('reports which staged id belongs to the account', () => {
+    const signedOut = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
+    setSharePersistUserId('userA');
+    const owned = putSharePayload({ text: 'by-a', files: [], failedFiles: [] });
+
+    expect(isSharePayloadStagedUnder(owned, 'userA')).toBe(true);
+    expect(isSharePayloadStagedUnder(owned, 'userB')).toBe(false);
+    expect(isSharePayloadStagedUnder(signedOut, 'userA')).toBe(false);
+    expect(isSharePayloadStagedUnder('missing', 'userA')).toBe(false);
   });
 
   it('stops notifying after the subscriber leaves', () => {

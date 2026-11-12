@@ -28,6 +28,7 @@ import type {
   ReviewAgentsConfig,
 } from '@kilocode/worker-utils/review-agents';
 import type { RuntimeAgentInput } from '@kilocode/worker-utils/cloud-agent-next-client';
+import type { GateThreshold } from '@kilocode/app-shared/code-review';
 import { enabledSpecialists, isCouncilActive } from '@kilocode/worker-utils/code-review-council';
 import { DEFAULT_COUNCIL_AGGREGATION_STRATEGY } from '@kilocode/db/schema-types';
 import {
@@ -140,7 +141,7 @@ export type SessionInput = {
   bitbucketPullRequestId?: number;
   bitbucketExpectedHeadSha?: string;
   /** Gate threshold — when not 'off', the agent should report gateResult in its callback */
-  gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  gateThreshold?: GateThreshold;
   /** Council runs only: one inline sub-agent per specialist, each pinned to its own model. */
   runtimeAgents?: RuntimeAgentInput[];
   /** Session environment variables, e.g. the publication self-check opt-in. */

@@ -6,6 +6,7 @@ import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import { TRPC_ERROR_CODES_BY_KEY, type TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
 import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
+import type { GateThreshold } from '@kilocode/app-shared/code-review';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import {
   GetEgressAuditResponseSchema,
@@ -187,7 +188,7 @@ type PrepareSessionSharedFields = {
   createdOnPlatform?: string;
   clientProvenance?: 'browser' | 'mobile';
   /** PR gate threshold — when not 'off', the agent reports gateResult in its callback */
-  gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  gateThreshold?: GateThreshold;
   /** Deprecated: true is rejected because devcontainer support is retired. */
   devcontainer?: boolean;
   sandboxAllocation?: SandboxAllocationInput;

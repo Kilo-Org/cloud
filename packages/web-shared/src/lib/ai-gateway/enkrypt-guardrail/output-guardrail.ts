@@ -381,10 +381,11 @@ export async function guardEnkryptOutput({
       verdict: verdict.action,
       reason: report.unavailable_reason ?? report.not_scanned_reason ?? undefined,
     });
-    const rejection = enkryptOutputGuardrailRejectionResponse(kind, verdict, stream);
-    return rejection
-      ? { action: 'reject', response: rejection, verdict }
-      : { action: 'release', response: allowed };
+    return {
+      action: 'reject',
+      response: enkryptOutputGuardrailRejectionResponse(kind, verdict, stream),
+      verdict,
+    };
   };
   const finalReport = (): EnkryptOutputGuardrailReport => ({
     ...report,

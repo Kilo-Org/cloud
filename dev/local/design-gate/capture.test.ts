@@ -736,6 +736,7 @@ test('a relaunch the device cannot perform skips the cell instead of aborting th
       ['base', 1],
       ['dark', 1],
       ['compact', 1],
+      ['rtl', 0],
     ]
   );
   assert.equal(calls.filter(call => call === 'relaunch').length, 1);

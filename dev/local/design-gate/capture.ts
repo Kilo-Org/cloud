@@ -759,11 +759,15 @@ export async function runMatrix(
       const language: LanguageTarget = config.rtl
         ? { preference: RTL_LANGUAGE, resolved: RTL_LANGUAGE, rtl: true }
         : ltrLanguage;
+      // The cell is part of the run from the moment it is applied: a cell whose
+      // language never arrives is listed with no screens, so the matrix the run
+      // covered stays visible and a comparison reports the gap against the
+      // manifest instead of comparing a shorter matrix.
+      const run: CellRun = { id: config.id, config, screens: [] };
+      outcome.cells.push(run);
       const cellLanguage = await switchCellLanguage(config.id, language);
       if (cellLanguage === undefined) continue;
       await ctx.clock.sleep(CONFIG_SETTLE_MS);
-      const run: CellRun = { id: config.id, config, screens: [] };
-      outcome.cells.push(run);
       const seen = new Map<string, string>();
       for (const [index, target] of targets.entries()) {
         try {

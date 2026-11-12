@@ -388,6 +388,11 @@ export function targetReadiness(
   out: string
 ): string[] {
   const failures: string[] = [];
+  const skipped = outcome.skipped ?? [];
+  // Every skip is named exactly once, including one whose cell never made it
+  // into the matrix: a cell the runner could not even start has no CellRun, and
+  // leaving it to the cell loop would hide the gap from a prepared comparison.
+  const reported = new Set<string>();
   if (outcome.cells.length === 0) failures.push('No matrix cells captured');
   if (new Set(outcome.cells.map(cell => cell.id)).size !== outcome.cells.length)
     failures.push('Duplicate matrix cells');
@@ -401,13 +406,12 @@ export function targetReadiness(
     for (const target of manifest.targets) {
       const screen = cell.screens.find(candidate => candidate.target === target.id);
       if (screen === undefined) {
-        const skipped = outcome.skipped?.find(
-          entry => entry.cell === cell.id && entry.target === target.id
-        );
+        const skip = skipped.find(entry => entry.cell === cell.id && entry.target === target.id);
+        reported.add(`${cell.id}/${target.id}`);
         failures.push(
-          skipped === undefined
+          skip === undefined
             ? `${cell.id}/${target.id}: missing screen`
-            : `${cell.id}/${target.id}: target could not be read (${skipped.reason})`
+            : `${cell.id}/${target.id}: target could not be read (${skip.reason})`
         );
         continue;
       }
@@ -454,6 +458,10 @@ export function targetReadiness(
     )
   ) {
     failures.push('Findings are outside the prepared target matrix');
+  }
+  for (const entry of skipped) {
+    const key = `${entry.cell}/${entry.target}`;
+    if (!reported.has(key)) failures.push(`${key}: target could not be read (${entry.reason})`);
   }
   return failures;
 }
@@ -545,8 +553,20 @@ const ComparisonFindingSchema = z
     count: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).default(1),
   })
   .passthrough();
+const SkippedTargetSchema = z.object({
+  cell: z.string(),
+  target: z.string(),
+  reason: z.string(),
+});
 const FindingsSchema = z.object({
-  run: z.object({ restoreError: z.string().optional() }).passthrough().optional(),
+  run: z
+    .object({
+      restoreError: z.string().optional(),
+      // `writeArtifacts` stores the skips here, beside the other run metadata.
+      skipped: z.array(SkippedTargetSchema).optional(),
+    })
+    .passthrough()
+    .optional(),
   cells: z.array(
     z.object({
       id: z.string(),
@@ -604,7 +624,13 @@ export async function compareProof(
       throw new Error('Unbound capture artifacts');
     if (run.run?.restoreError !== undefined) reasons.push(`${revision}: device restoration failed`);
     // Re-read the actual captured dumps; never trust a claimed readiness boolean.
-    const readiness = targetReadiness(run, preparation.manifest, dir);
+    // The skips live under `run` in the artifact, which is where the writer put
+    // them, so they are handed to the same readiness check the writer ran.
+    const readiness = targetReadiness(
+      { ...run, skipped: run.run?.skipped ?? [] },
+      preparation.manifest,
+      dir
+    );
     reasons.push(
       ...readiness.map(reason => `${revision}: ${reason}`),
       ...receipt.readiness.map(reason => `${revision}: ${reason}`)

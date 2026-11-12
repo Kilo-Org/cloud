@@ -422,7 +422,15 @@ export function targetReadiness(
         finding =>
           finding.cell === cell.id &&
           finding.target === target.id &&
-          ['env-mismatch', 'unsettled', 'capture-alignment', 'blank-frame'].includes(finding.rule)
+          // `unsettled` reports a screen that kept changing while it was
+          // measured. It is a finding about the screen, and `compare` already
+          // answers it by holding the base and head findings to the same set,
+          // so a screen that behaves the same on both revisions must not make
+          // the target unreadiness — that would fail the base run against
+          // itself. The rules below describe a capture that cannot be trusted
+          // at all: the wrong screen, a frame that never aligned, or a blank
+          // frame.
+          ['env-mismatch', 'capture-alignment', 'blank-frame'].includes(finding.rule)
       );
       if (
         blocked ||

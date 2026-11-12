@@ -1345,7 +1345,7 @@ export const authOptions: NextAuthOptions = {
         // both Turnstile and user settlement. This return sits after the domain
         // blacklist, the account-status gate and the SSO-authority checks above,
         // so a passkey can never bypass a domain that enforces SSO. The
-        // account-status gate refuses a closed account for every provider: a
+        // account-status gate refuses a blocked account for every provider: a
         // deletion in progress writes its `blocked_reason` through
         // `disableUserAccessForDeletion`, and the `isBlockedAccount` check right
         // after `findAndSyncExistingUser` then answers the BLOCKED redirect. No

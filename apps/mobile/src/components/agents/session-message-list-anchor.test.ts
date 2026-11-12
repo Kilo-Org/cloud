@@ -11,11 +11,11 @@ describe('resolveTranscriptRideUp', () => {
     expect(resolveTranscriptRideUp(0, true)).toBe(0);
   });
 
-  it('rides the transcript up by the growth while it is anchored at its bottom', () => {
+  it('rides the transcript up by the growth while the content can scroll', () => {
     expect(resolveTranscriptRideUp(64, true)).toBe(64);
   });
 
-  it('keeps the transcript still once the reader scrolled away from the bottom', () => {
+  it('keeps a transcript whose content fits the viewport still', () => {
     expect(resolveTranscriptRideUp(64, false)).toBe(0);
   });
 

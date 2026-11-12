@@ -3,13 +3,14 @@ import { type ViewStyle } from 'react-native';
 /**
  * How far the transcript rides up while the chrome under it grows.
  *
- * The shift applies only while the transcript is anchored at its bottom and its
- * content overflows the viewport: a reader above the tail keeps the rows they
- * are reading, and a transcript that cannot scroll has no anchoring problem to
- * solve.
+ * The shift applies only while the transcript's content overflows the viewport:
+ * a transcript that cannot scroll has no anchoring problem to solve, and
+ * shifting it would hide its first rows behind the holder with no way to
+ * scroll them back. A list that can scroll keeps every hidden row reachable,
+ * because the shift is a paint offset and the scroll range is untouched.
  */
-export function resolveTranscriptRideUp(chromeGrowth: number, anchoredAtBottom: boolean): number {
-  if (!anchoredAtBottom || !(chromeGrowth > 0) || !Number.isFinite(chromeGrowth)) {
+export function resolveTranscriptRideUp(chromeGrowth: number, scrollable: boolean): number {
+  if (!scrollable || !(chromeGrowth > 0) || !Number.isFinite(chromeGrowth)) {
     return 0;
   }
   return chromeGrowth;

@@ -808,12 +808,6 @@ describe('SessionMessageList chrome ride-up', () => {
     expect(shiftStyle(renderer)).toBe(-64);
   });
 
-  it('keeps the content still once the reader is above the tail', () => {
-    const renderer = mountList({ chromeGrowthDp: 64 });
-    settleAtBottom();
-    scrollAwayFromBottom();
-    expect(shiftStyle(renderer)).toBeNull();
-  });
 
   it('keeps a transcript that cannot scroll still', () => {
     const renderer = mountList({ chromeGrowthDp: 64 });

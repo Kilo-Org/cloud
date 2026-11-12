@@ -29,7 +29,15 @@ type LastSelectedSelection = { model: string; variant?: string };
 /** The cache write this save owns, so an older save's refetch cannot replace it. */
 type LastSelectedContext = { generation: number; hash: string };
 
-export function useModelPreferences(organizationId: string | undefined) {
+/**
+ * `enabled: false` holds the preference read until the caller's scope is
+ * resolved, so a screen that is still resolving its organization neither reads
+ * nor caches the organization-less preferences as if they were its own.
+ */
+export function useModelPreferences(
+  organizationId: string | undefined,
+  options: { enabled?: boolean } = {}
+) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   // Favorite-toggle failures are surfaced inline in the model picker sheet
@@ -40,6 +48,7 @@ export function useModelPreferences(organizationId: string | undefined) {
 
   const query = useQuery({
     ...trpc.modelPreferences.get.queryOptions(input),
+    enabled: options.enabled ?? true,
     // A paused read keeps the saved model and favorites out of the picker until
     // a connectivity edge that may never come.
     ...SETTLE_WHILE_OFFLINE,

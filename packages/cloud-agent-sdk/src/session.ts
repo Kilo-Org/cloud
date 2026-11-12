@@ -45,6 +45,12 @@ const REMOTE_SESSION_CREATION_NOT_SUPPORTED =
   'Remote session creation is not supported for the current session';
 const REMOTE_SESSION_EXIT_NOT_SUPPORTED =
   'Remote session exit is not supported for the current session';
+/**
+ * A create needs the active session's own scope. The manager reports this while
+ * that scope is not available yet.
+ */
+const REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED =
+  'Remote session creation is waiting for the current session to load';
 
 type CloudAgentSessionConfig = {
   kiloSessionId: KiloSessionId;
@@ -639,6 +645,7 @@ export {
   createCloudAgentSession,
   REMOTE_SESSION_EXIT_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_NOT_SUPPORTED,
+  REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED,
 };
 export type {
   CloudAgentSession,

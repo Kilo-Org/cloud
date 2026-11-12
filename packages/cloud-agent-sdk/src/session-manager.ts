@@ -28,6 +28,7 @@ import {
   createCloudAgentSession,
   REMOTE_SESSION_EXIT_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_NOT_SUPPORTED,
+  REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED,
 } from './session';
 import type { CloudAgentSession, CloudAgentSessionConfig } from './session';
 import { createChatProcessor } from './chat-processor';
@@ -4026,13 +4027,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       throw new Error(REMOTE_SESSION_CREATION_NOT_SUPPORTED);
     }
     // Inheritance from the active session (Decision 6). Explicit caller fields
-    // win when provided (e.g. tests); otherwise store-derived values apply.
+    // win when provided (e.g. tests); otherwise store-derived values apply. Only
+    // the active session's own row supplies an organization.
+    const fetched = store.get(fetchedSessionDataAtom);
+    if (fetched && fetched.kiloSessionId !== activeSessionId) {
+      throw new Error(REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED);
+    }
     const selection = store.get(remoteModelOverrideAtom)?.selection ?? store.get(observedModelAtom);
     const inherited = computeCreateRemoteSessionInheritance({
       modelSelection: selection,
       sessionMode: store.get(sessionConfigAtom)?.mode,
       lastPromptMode,
-      organizationId: store.get(fetchedSessionDataAtom)?.organizationId,
+      organizationId: fetched?.organizationId,
     });
     const agent = input?.agent ?? inherited.agent;
     const model = input?.model ?? inherited.model;

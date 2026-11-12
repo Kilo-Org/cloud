@@ -27,15 +27,24 @@ export type EffectiveProfileCustomModes = {
  */
 export function useEffectiveProfileCustomModes(
   organizationId?: string,
-  profileId?: string | null
+  profileId?: string | null,
+  /**
+   * `enabled: false` holds the context and agent reads until the caller's scope
+   * is resolved, so neither the personal nor the organization read answers for a
+   * scope the caller has not settled yet.
+   */
+  options: { enabled?: boolean } = {}
 ): EffectiveProfileCustomModes {
   const trpc = useTRPC();
+  const enabled = options.enabled ?? true;
 
-  const list = useQuery(trpc.agentProfiles.list.queryOptions({}, { enabled: !organizationId }));
+  const list = useQuery(
+    trpc.agentProfiles.list.queryOptions({}, { enabled: enabled && !organizationId })
+  );
   const listCombined = useQuery(
     trpc.agentProfiles.listCombined.queryOptions(
       { organizationId: organizationId ?? '' },
-      { enabled: Boolean(organizationId) }
+      { enabled: enabled && Boolean(organizationId) }
     )
   );
 
@@ -65,16 +74,15 @@ export function useEffectiveProfileCustomModes(
   const agentsQuery = useAgentProfileAgents(
     targetProfileId ?? '',
     getOrg,
-    Boolean(targetProfileId) && ownershipResolved
+    enabled && Boolean(targetProfileId) && ownershipResolved
   );
 
   const profileAgents = visibleProfileAgents(agentsQuery.data ?? []);
   const customOptions = dedupeCustomModeOptions(customModeOptionsFromProfileAgents(profileAgents));
   // True once the profile's agent list is known: the context lookup answered
   // and the selected profile (if any) loaded. A failed read is not settled.
-  const contextResolved = organizationId
-    ? listCombined.isSuccess
-    : Boolean(profileId) || list.isSuccess;
+  const contextResolved =
+    enabled && (organizationId ? listCombined.isSuccess : Boolean(profileId) || list.isSuccess);
   const settled = contextResolved && (!targetProfileId || agentsQuery.isSuccess);
 
   return {

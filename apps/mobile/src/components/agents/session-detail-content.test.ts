@@ -20,6 +20,7 @@ import {
   type CloudStatus,
   createSessionManager,
   createUserWebConnection,
+  type FetchedSessionData,
   type KiloSessionId,
   type MessageDeliveryState,
   type PreparationAttempt,
@@ -70,6 +71,10 @@ import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import type * as SessionTranscript from '@/components/agents/session-transcript';
 import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
+import type * as UseEffectiveAgentProfileModule from '@/components/agents/use-effective-agent-profile';
+import type * as UseEffectiveProfileCustomModesModule from '@/components/agents/use-effective-profile-custom-modes';
+import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
+import { restartAgentSession } from '@/components/agents/restart-agent-session';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import {
   SEND_REASON_MAX_FONT_SCALE,
@@ -519,12 +524,63 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 vi.mock('@/lib/last-opened-session', () => ({
   recordLastOpenedSession: vi.fn(),
 }));
+// The organization each org-scoped read on the screen is asked for. The screen
+// derives that scope from the session row, so the recorded arguments are the
+// assertion surface for it.
+const scopeReads = vi.hoisted(() => ({
+  models: [] as { organizationId: string | undefined; enabled: boolean | undefined }[],
+  preferences: [] as { organizationId: string | undefined; enabled: boolean | undefined }[],
+  profiles: [] as { organizationId: string | undefined; enabled: boolean | undefined }[],
+  modes: [] as { organizationId: string | undefined; enabled: boolean | undefined }[],
+}));
 vi.mock('@/lib/hooks/use-available-models', () => ({
-  useAvailableModels: () => ({ models: [], isLoading: false }),
+  useAvailableModels: (
+    organizationId: string | undefined,
+    _audience: unknown,
+    options?: { enabled?: boolean }
+  ) => {
+    scopeReads.models.push({ organizationId, enabled: options?.enabled });
+    return { models: [], isLoading: false };
+  },
 }));
 vi.mock('@/lib/hooks/use-model-preferences', () => ({
-  useModelPreferences: () => ({ setLastSelected: vi.fn() }),
+  useModelPreferences: (organizationId: string | undefined, options?: { enabled?: boolean }) => {
+    scopeReads.preferences.push({ organizationId, enabled: options?.enabled });
+    return { setLastSelected: vi.fn() };
+  },
 }));
+// Keep the real profile hook (the chip tests below assert its behavior) and
+// record the scope it is asked for.
+vi.mock('@/components/agents/use-effective-agent-profile', async importOriginal => {
+  const actual = await importOriginal<typeof UseEffectiveAgentProfileModule>();
+  return {
+    ...actual,
+    useEffectiveAgentProfile: (
+      organizationId?: string,
+      overrideProfileId?: string | null,
+      options?: { enabled?: boolean }
+    ) => {
+      scopeReads.profiles.push({ organizationId, enabled: options?.enabled });
+      return actual.useEffectiveAgentProfile(organizationId, overrideProfileId, options);
+    },
+  };
+});
+// Keep the real custom-mode read (its own suite asserts the resolution rules)
+// and record the scope it is asked for, like the profile hook above.
+vi.mock('@/components/agents/use-effective-profile-custom-modes', async importOriginal => {
+  const actual = await importOriginal<typeof UseEffectiveProfileCustomModesModule>();
+  return {
+    ...actual,
+    useEffectiveProfileCustomModes: (
+      organizationId?: string,
+      profileId?: string | null,
+      options?: { enabled?: boolean }
+    ) => {
+      scopeReads.modes.push({ organizationId, enabled: options?.enabled });
+      return actual.useEffectiveProfileCustomModes(organizationId, profileId, options);
+    },
+  };
+});
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
   usePersistedAgentModel: () => ({ saveModel: vi.fn() }),
 }));
@@ -864,6 +920,12 @@ beforeEach(() => {
   connectionHealth.isConnected = true;
   connectionHealth.reconnectExhausted = false;
   connectionHealth.retryConnection.mockClear();
+  scopeReads.models.length = 0;
+  scopeReads.preferences.length = 0;
+  scopeReads.profiles.length = 0;
+  scopeReads.modes.length = 0;
+  vi.mocked(createAndNavigateAgentSession).mockReset();
+  vi.mocked(restartAgentSession).mockReset();
 });
 
 type MountDetailsOptions = {
@@ -880,6 +942,12 @@ type MountDetailsOptions = {
   sessionOrganizationId?: string;
   /** The profile id the session row recorded, as `fetchSession` reports it. */
   sessionProfileId?: string | null;
+  /**
+   * Keep one mounted screen across `switchRoot`, the way the route's screen
+   * instance receives a new `sessionId` prop. The default remounts, as the
+   * route-keyed provider does.
+   */
+  keepInstanceOnSwitch?: boolean;
 };
 
 async function mountDetails(
@@ -1005,7 +1073,7 @@ async function mountDetails(
         Provider,
         { store },
         createElement(SessionDetailContent, {
-          key: id,
+          ...(options.keepInstanceOnSwitch ? {} : { key: id }),
           sessionId: id,
           displayScope,
           ...(cachedTitle === undefined ? {} : { cachedTitle }),
@@ -1333,6 +1401,117 @@ describe('session detail active-profile indicator', () => {
     // pre-load window; a fallback to the context default would surface here.
     await waitFor(() => view.store.get(view.manager.atoms.fetchedSessionData) !== null);
     expect(findChip(view.renderer)).toHaveLength(0);
+  });
+});
+
+describe('session detail organization scope', () => {
+  it('uses the displayed session organization once its row resolves', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    // One mounted screen, as the route keeps it: only the `sessionId` prop
+    // changes when another session opens.
+    const view = await mountDetails([], {
+      sessionOrganizationId: 'org-a',
+      keepInstanceOnSwitch: true,
+    });
+    await waitFor(
+      () => view.store.get(view.manager.atoms.fetchedSessionData)?.kiloSessionId === ROOT_ID
+    );
+    expect(scopeReads.models.at(-1)).toEqual({ organizationId: 'org-a', enabled: true });
+    expect(scopeReads.preferences.at(-1)).toEqual({ organizationId: 'org-a', enabled: true });
+    expect(scopeReads.profiles.at(-1)).toEqual({ organizationId: 'org-a', enabled: true });
+    expect(scopeReads.modes.at(-1)).toEqual({ organizationId: 'org-a', enabled: true });
+
+    const counts = {
+      models: scopeReads.models.length,
+      preferences: scopeReads.preferences.length,
+      profiles: scopeReads.profiles.length,
+      modes: scopeReads.modes.length,
+    };
+    // The manager's read for the new session has not answered yet.
+    vi.spyOn(view.manager, 'switchSession').mockImplementation(
+      () =>
+        new Promise<void>(() => {
+          // Never settles: the manager's read for the new session stays pending,
+          // which is the window this test describes.
+        })
+    );
+    await view.switchRoot(NEXT_ROOT_ID);
+    expect(view.store.get(view.manager.atoms.fetchedSessionData)?.kiloSessionId).toBe(ROOT_ID);
+
+    const afterSwitch = {
+      models: scopeReads.models.slice(counts.models),
+      preferences: scopeReads.preferences.slice(counts.preferences),
+      profiles: scopeReads.profiles.slice(counts.profiles),
+      modes: scopeReads.modes.slice(counts.modes),
+    };
+    // No org-scoped read runs for a scope the screen has not settled.
+    for (const reads of Object.values(afterSwitch)) {
+      expect(reads.length).toBeGreaterThan(0);
+      expect(reads.every(read => read.organizationId === undefined)).toBe(true);
+      expect(reads.at(-1)?.enabled).toBe(false);
+    }
+    // Start, Restart, Continue and fork are unavailable in this window.
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+    // The Continue control is the read-only session's one action; it stays
+    // unrendered while the scope is unresolved.
+    expect(
+      view.renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Button') &&
+          node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+      )
+    ).toHaveLength(0);
+    expect(createAndNavigateAgentSession).not.toHaveBeenCalled();
+    expect(restartAgentSession).not.toHaveBeenCalled();
+
+    // The new session's row lands: its organization scopes every read and action
+    // from here on.
+    const staleRow = view.store.get(view.manager.atoms.fetchedSessionData);
+    if (!staleRow) {
+      throw new Error('the stale session row was expected');
+    }
+    await act(async () => {
+      view.store.set<FetchedSessionData | null, [FetchedSessionData | null], unknown>(
+        view.manager.atoms.fetchedSessionData,
+        {
+          ...staleRow,
+          kiloSessionId: NEXT_ROOT_ID,
+          organizationId: 'org-b',
+        }
+      );
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.canSend, true);
+      await Promise.resolve();
+    });
+
+    expect(scopeReads.models.at(-1)).toEqual({ organizationId: 'org-b', enabled: true });
+    expect(scopeReads.preferences.at(-1)).toEqual({ organizationId: 'org-b', enabled: true });
+    expect(scopeReads.profiles.at(-1)).toEqual({ organizationId: 'org-b', enabled: true });
+    expect(scopeReads.modes.at(-1)).toEqual({ organizationId: 'org-b', enabled: true });
+
+    vi.mocked(createAndNavigateAgentSession).mockResolvedValue({
+      success: true,
+      sessionId: NEXT_ROOT_ID,
+    });
+    vi.mocked(restartAgentSession).mockResolvedValue({ success: true, sessionId: NEXT_ROOT_ID });
+    const [composer] = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'));
+    if (!composer) {
+      throw new Error('the composer was expected for the resolved session');
+    }
+    await act(async () => {
+      await (composer.props.onCreateSession as () => Promise<boolean>)();
+      await (composer.props.onRestartSession as () => Promise<boolean>)();
+      await Promise.resolve();
+    });
+    expect(createAndNavigateAgentSession).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'org-b' })
+    );
+    expect(restartAgentSession).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'org-b' })
+    );
   });
 });
 

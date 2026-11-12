@@ -13,6 +13,7 @@ import {
   createCloudAgentSession,
   REMOTE_SESSION_EXIT_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_NOT_SUPPORTED,
+  REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED,
 } from './session';
 import type {
   CloudAgentSession,
@@ -174,6 +175,8 @@ jest.mock('./session', () => ({
   REMOTE_SESSION_EXIT_NOT_SUPPORTED: 'Remote session exit is not supported for the current session',
   REMOTE_SESSION_CREATION_NOT_SUPPORTED:
     'Remote session creation is not supported for the current session',
+  REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED:
+    'Remote session creation is waiting for the current session to load',
   createCloudAgentSession: jest.fn(
     (sessionConfig: {
       kiloSessionId: string;
@@ -8303,6 +8306,26 @@ describe('createSessionManager', () => {
       await mgr.switchSession(kiloId('ses-1'));
       await expect(mgr.createRemoteSession()).rejects.toThrow(
         REMOTE_SESSION_CREATION_NOT_SUPPORTED
+      );
+      expect(mockSession.createRemoteSession).not.toHaveBeenCalled();
+    });
+
+    it('rejects before traffic until the active session scope is available', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSession.createRemoteSession.mockClear();
+      // The active session's own row has not landed yet.
+      config.store.set(mgr.atoms.fetchedSessionData, {
+        ...defaultFetchedSession,
+        kiloSessionId: kiloId('ses-2'),
+        organizationId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      });
+
+      await expect(mgr.createRemoteSession()).rejects.toThrow(
+        REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED
       );
       expect(mockSession.createRemoteSession).not.toHaveBeenCalled();
     });

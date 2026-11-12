@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+import {
+  type GatedSecureStore,
+  readGatedValueForUpdate,
+  writeGatedValue,
+} from '@/lib/auth/secure-store-gated';
+
 /**
  * The account and organization each followed session card belongs to
  * (`.specs/mobile-session-live-activity.md` "Follow scope").
@@ -48,21 +54,16 @@ export function isSessionCardScopeCurrent(
   );
 }
 
-export type SessionCardScopeStore = {
-  setItemAsync: (key: string, value: string) => Promise<void>;
-  getItemAsync: (key: string) => Promise<string | null>;
-};
-
 // Test-only override so pure suites do not load expo-secure-store
 // (→ expo-modules-core → RN), as `lib/glanceable/persist.ts` does.
-let secureStoreForTests: SessionCardScopeStore | null = null;
+let secureStoreForTests: GatedSecureStore | null = null;
 
-function getSecureStore(): SessionCardScopeStore {
+function getSecureStore(): GatedSecureStore {
   if (secureStoreForTests !== null) {
     return secureStoreForTests;
   }
   // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
-  return require('expo-secure-store') as SessionCardScopeStore;
+  return require('expo-secure-store') as GatedSecureStore;
 }
 
 // Every write is a read-modify-write of one key, so they run one at a time: a
@@ -76,8 +77,10 @@ function enqueue(write: () => Promise<void>): void {
     try {
       await write();
     } catch {
-      // A failed write costs the record, never the follow: the card stays, and
-      // the next follow or restore writes again.
+      // A gated write reports and resolves instead of rejecting, so this only
+      // keeps one unexpected rejection from poisoning the chain every later
+      // write awaits. A lost write costs the record, never the follow: the card
+      // stays, and the next follow or restore writes again.
     }
   })();
 }
@@ -87,12 +90,17 @@ function enqueue(write: () => Promise<void>): void {
  * cannot be read now. A null answer leaves the cards as they are.
  */
 export async function readSessionCardScopes(): Promise<Map<string, SessionCardScope> | null> {
+  const stored = await readGatedValueForUpdate(getSecureStore, STORE_KEY);
+  // A locked device reads as unconfirmed, not as empty: an empty map here would
+  // make every followed card out of scope and end it.
+  if (stored.status === 'unreadable') {
+    return null;
+  }
+  if (stored.value === null) {
+    return new Map();
+  }
   try {
-    const raw = await getSecureStore().getItemAsync(STORE_KEY);
-    if (raw === null) {
-      return new Map();
-    }
-    const parsed = storedScopesSchema.safeParse(JSON.parse(raw));
+    const parsed = storedScopesSchema.safeParse(JSON.parse(stored.value));
     if (!parsed.success) {
       return null;
     }
@@ -107,7 +115,7 @@ async function writeStored(scopes: Map<string, SessionCardScope>): Promise<void>
   for (const [sessionId, scope] of scopes) {
     cards[sessionId] = scope;
   }
-  await getSecureStore().setItemAsync(STORE_KEY, JSON.stringify({ version: 1, cards }));
+  await writeGatedValue(getSecureStore, STORE_KEY, JSON.stringify({ version: 1, cards }));
 }
 
 /** Record the scope one session was followed under. */
@@ -189,7 +197,7 @@ export function pruneSessionCardScopes(
 
 // ── Test-only helpers ──────────────────────────────────────────────────────
 
-export function _setSessionCardScopeStoreForTests(store: SessionCardScopeStore | null): void {
+export function _setSessionCardScopeStoreForTests(store: GatedSecureStore | null): void {
   secureStoreForTests = store;
 }
 

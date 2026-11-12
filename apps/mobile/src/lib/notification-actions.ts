@@ -32,13 +32,19 @@ import {
 import * as Sentry from '@sentry/react-native';
 
 import { getLanguageSnapshot, i18n } from '@/i18n';
+import { WEB_BASE_URL } from '@/lib/config';
 
+import { openClawNotificationWebUrl } from './claw-notification';
 import { type PendingDeepLinkOptions, setPendingDeepLink } from './deep-link-launch';
 import {
   type NeedsInputAction,
   type NeedsInputActionOutcome,
 } from './notification-action-interaction';
-import { notificationPathForData, prPathForData } from './notification-path';
+import {
+  notificationDestinationForData,
+  notificationPathForData,
+  prPathForData,
+} from './notification-path';
 import {
   clearPostedNeedsInputNotification,
   notificationIdentifierForSession,
@@ -296,16 +302,22 @@ async function dispatchNeedsInputResponse(
   if (data === null) {
     return false;
   }
-  const path = notificationPathForData(data);
-  if (path === null) {
+  const destination = notificationDestinationForData(data, WEB_BASE_URL);
+  if (destination === null) {
     return false;
   }
   Notifications.clearLastNotificationResponse();
+  if (destination.kind === 'external') {
+    // A KiloClaw push has no mobile screen: its tap opens the web page in the
+    // in-app browser, with the retry affordance a failed open offers.
+    void openClawNotificationWebUrl(destination.url);
+    return false;
+  }
   // Always stash: the gated consumer in `_layout.tsx` owns every navigation.
   // `router.navigate` queues rather than throws when the router is unmounted,
   // so a tap while at the consent/force-update/login gate would navigate past
   // the gate and be dropped by the root redirect.
-  setPendingDeepLink(path, 'notification', pendingDeepLinkOptionsForData(data));
+  setPendingDeepLink(destination.href, 'notification', pendingDeepLinkOptionsForData(data));
   return false;
 }
 

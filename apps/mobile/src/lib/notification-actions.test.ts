@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   runNeedsInputInteraction: vi.fn(),
   refreshGlanceableSurfacesFromTray: vi.fn(),
   captureException: vi.fn(),
+  openExternalUrl: vi.fn(),
 }));
 
 vi.mock('expo-notifications', () => ({
@@ -56,6 +57,18 @@ vi.mock('./glanceable/approve-front-agent', () => ({
 vi.mock('@sentry/react-native', () => ({
   captureException: mocks.captureException,
 }));
+
+// A KiloClaw tap opens the in-app browser; the suite asserts the URL instead of
+// mounting one. The web origin it opens on comes from the app build's config,
+// which the global setup stubs with no values.
+vi.mock('./external-link', () => ({ openExternalUrl: mocks.openExternalUrl }));
+vi.mock('@/lib/config', () => {
+  const values: Record<string, unknown> = { WEB_BASE_URL: 'https://app.example.com' };
+  return new Proxy(values, {
+    get: (target, key) => target[String(key)],
+    has: () => true,
+  });
+});
 
 type RaiseData = {
   type: 'cloud_agent_session';
@@ -851,12 +864,39 @@ describe('handleNeedsInputNotificationResponse — default action', () => {
     expect(mocks.runNeedsInputInteraction).not.toHaveBeenCalled();
   });
 
+  it('leaves the pending destination alone for payload data with no destination', async () => {
+    setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');
+
+    // This finding payload fails its schema (no finding id), so the tap has no
+    // destination at all.
+    const handled = await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+        data: { type: 'security_finding', scope: 'personal' },
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(handled).toBe(false);
+    expect(getPendingDeepLinkSnapshot()).toBe('/(app)/(tabs)/(3_profile)');
+    expect(mocks.clearLastNotificationResponse).not.toHaveBeenCalled();
+    expect(mocks.openExternalUrl).not.toHaveBeenCalled();
+  });
+
   it.each([
-    { type: 'security_finding', scope: 'personal' },
-    { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
-    { type: 'instance-lifecycle', event: 'ready', sandboxId: 's1' },
-    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 's1' },
-  ])('leaves the pending destination alone for unsupported tap data $type', async data => {
+    [
+      { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
+      'https://app.example.com/claw/chat/c1',
+    ],
+    [
+      { type: 'instance-lifecycle', event: 'ready', sandboxId: 's1' },
+      'https://app.example.com/claw',
+    ],
+    [
+      { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 's1' },
+      'https://app.example.com/claw',
+    ],
+  ] as const)('opens a KiloClaw $data.type tap on the web', async (data, url) => {
     setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');
 
     const handled = await handleNeedsInputNotificationResponse(
@@ -867,9 +907,13 @@ describe('handleNeedsInputNotificationResponse — default action', () => {
       { runInteraction: mocks.runNeedsInputInteraction }
     );
 
+    await vi.waitFor(() => {
+      expect(mocks.openExternalUrl).toHaveBeenCalledWith(url, { retryOnError: true });
+    });
     expect(handled).toBe(false);
+    // The browser opens directly; no app route is stashed or consumed.
     expect(getPendingDeepLinkSnapshot()).toBe('/(app)/(tabs)/(3_profile)');
-    expect(mocks.clearLastNotificationResponse).not.toHaveBeenCalled();
+    expect(mocks.clearLastNotificationResponse).toHaveBeenCalled();
   });
 });
 

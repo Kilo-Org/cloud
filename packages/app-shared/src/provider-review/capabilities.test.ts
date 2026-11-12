@@ -8,17 +8,22 @@ import {
 
 const PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
 
-function unsupported(capabilities: ProviderReviewCapabilities) {
-  return [capabilities.autoMerge, capabilities.reactions, capabilities.reviewStatus].filter(
-    capability => !capability.supported
-  );
-}
+/** Every affordance the table models, so the invariant covers a new one too. */
+const CAPABILITY_KEYS = [
+  'canComment',
+  'canResolveThreads',
+  'canMerge',
+  'autoMerge',
+  'reactions',
+  'reviewStatus',
+] as const satisfies readonly (keyof ProviderReviewCapabilities)[];
 
 describe('PROVIDER_REVIEW_CAPABILITIES', () => {
   it('gives every unsupported capability a human-readable provider reason', () => {
     for (const platform of PLATFORMS) {
-      const capabilities = PROVIDER_REVIEW_CAPABILITIES[platform];
-      for (const capability of unsupported(capabilities)) {
+      const table = PROVIDER_REVIEW_CAPABILITIES[platform];
+      for (const capability of CAPABILITY_KEYS.map(key => table[key])) {
+        if (capability.supported) continue;
         expect(capability.reason.length).toBeGreaterThan(0);
         expect(capability.reason[0]).toBe(capability.reason[0]?.toUpperCase());
       }
@@ -34,12 +39,8 @@ describe('PROVIDER_REVIEW_CAPABILITIES', () => {
 
   it('keeps supported capabilities free of a reason string', () => {
     for (const platform of PLATFORMS) {
-      const capabilities = PROVIDER_REVIEW_CAPABILITIES[platform];
-      for (const capability of [
-        capabilities.autoMerge,
-        capabilities.reactions,
-        capabilities.reviewStatus,
-      ]) {
+      const table = PROVIDER_REVIEW_CAPABILITIES[platform];
+      for (const capability of CAPABILITY_KEYS.map(key => table[key])) {
         if (capability.supported) expect(capability.reason).toBe('');
       }
     }

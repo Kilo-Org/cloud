@@ -548,7 +548,7 @@ test('closing the sole empty tab discards an unsent draft', async () => {
 
     await expect(sidePanel.getByLabel('Message agent')).toHaveValue('');
     await expect(
-      sidePanel.getByLabel('Agent conversation').getByText('Pick a tab and ask Kilo to inspect it.')
+      sidePanel.getByLabel('Agent conversation').getByText('Pick a tab, then ask Kilo about it.')
     ).toBeVisible();
   } finally {
     await context.close();

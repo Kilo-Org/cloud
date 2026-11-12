@@ -59,6 +59,7 @@ import {
 } from '../../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
 import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
+import { approvalKeySchema } from '@kilocode/app-shared/approval-key';
 export type { SendMessagePayload } from './types.js';
 
 const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL') || '';
@@ -1546,10 +1547,7 @@ export async function closeCloudAgentOrgStreams(
 const WIDGET_APPROVAL_KEY_BUDGET_MS = 1_500;
 
 const widgetApprovalKeyResponseSchema = z.object({
-  approvalKey: z
-    .string()
-    .regex(/^[a-f0-9]{64}$/)
-    .nullable(),
+  approvalKey: approvalKeySchema,
   // Absent when an older Worker answers; the session card then shows no command.
   command: z.string().max(60).nullable().optional(),
 });

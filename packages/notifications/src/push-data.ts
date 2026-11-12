@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { approvalKeySchema } from '@kilocode/app-shared/approval-key';
 import { glanceableAgentsSnapshotSchema } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { HOME_WIDGET_TITLE_LIMIT, homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
 import {
@@ -46,7 +47,7 @@ export const sessionLiveActivityContentStateSchema = z.object({
   /** True only when Approve can answer the waiting permission request. */
   awaitingPermission: z.boolean(),
   /** SHA-256 hex of `JSON.stringify([sessionId, permissionId])`, else null. */
-  approvalKey: z.string().nullable(),
+  approvalKey: approvalKeySchema,
   /** ISO 8601; when the server confirmed this content. */
   updatedAt: z.string(),
   /** The step the agent is on; null when the session is not working. */

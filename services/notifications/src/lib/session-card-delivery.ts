@@ -8,6 +8,7 @@
  * same ends. Pure: all IO is injected.
  */
 
+import { approvalKeySchema } from '@kilocode/app-shared/approval-key';
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
   buildSessionLiveActivityContentState,
@@ -52,10 +53,7 @@ export const sessionCardSourceSchema = z.object({
       status: z.string(),
       statusUpdatedAt: z.string().nullable(),
       scheduledAt: z.string().nullable(),
-      approvalKey: z
-        .string()
-        .regex(/^[a-f0-9]{64}$/)
-        .nullable(),
+      approvalKey: approvalKeySchema,
       /** The small derived summary the ingest service stored, or null. */
       summary: sessionLiveSummarySchema.nullable().optional(),
       /** The command of the request Approve answers, trimmed; null without one. */

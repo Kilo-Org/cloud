@@ -102,12 +102,12 @@ export const PILL_LAYOUT_TOKENS = [
   'h-[44px]',
   'flex-row',
   'items-center',
-  'gap-2',
+  'gap-1.5',
   'rounded-full',
   'border',
   'border-border',
   'bg-secondary',
-  'px-3',
+  'px-2.5',
   // The header row hands the trailing cluster a capped 50% box, but RN's
   // default flexShrink is 0. Without these the pill keeps its natural width
   // and paints past the row's right edge instead of compressing.

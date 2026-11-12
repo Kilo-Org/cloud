@@ -60,9 +60,15 @@ const RING_STROKE = 3;
  * default flexShrink is 0, so without them the pill would paint past the row's
  * right edge. Inside the capped pill the slots give up width before the pill
  * does, and each reading keeps to one line.
+ *
+ * The padding and the ring-to-reading gap are `px-2.5` and `gap-1.5` rather than
+ * the wider `px-3` and `gap-2`: the reserved slots make the pill the widest
+ * control in the header, and the compact window gives the title exactly the
+ * rest, so those few dp were the difference between the title's own badge
+ * fitting and being clipped by its row.
  */
 const PILL_CLASS =
-  'h-[44px] shrink min-w-0 flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
+  'h-[44px] shrink min-w-0 flex-row items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5';
 const VALUE_ROW_CLASS = 'min-w-0 shrink flex-row items-center gap-1';
 const VALUE_SLOT_CLASS = 'min-w-0 shrink justify-center';
 const PRIMARY_VALUE_CLASS = 'text-xs tabular-nums';

@@ -215,6 +215,11 @@ export function _setHomeWidgetStoreForTests(next: GatedSecureStore | null): void
   storeForTests = next;
 }
 
+/** Settle the mirror chain so a case can assert what landed on disk. */
+export async function _flushHomeWidgetMirrorForTests(): Promise<void> {
+  await writes;
+}
+
 export function _resetHomeWidgetDataForTests(): void {
   epoch += 1;
   lastData = null;

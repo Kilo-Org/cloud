@@ -174,6 +174,41 @@ describe('connected identity isolation for organization worktrees', () => {
       repository_ids: [101],
     });
   });
+  it.each(['user', 'installation'] as const)(
+    'keeps owner discovery and mixed GraphQL requests repository-scoped for %s credentials',
+    async source => {
+      const identity = { ...auth, source, githubToken: 'current-repository-token' };
+      const requests: GitHubTaskRequest[] = [
+        { method: 'GET', url: 'https://api.github.com/orgs/acme/repos' },
+        { method: 'GET', url: 'https://api.github.com/users/acme/repos' },
+        {
+          method: 'POST',
+          url: 'https://api.github.com/graphql',
+          contentType: 'application/json',
+          body: new TextEncoder().encode(
+            JSON.stringify({
+              query:
+                'query { organization(login:"acme") { repositories(first:10) { nodes { name } } } repository(owner:"acme",name:"current") { object(expression:"HEAD:file") { ... on Blob { text } } } }',
+            })
+          ),
+        },
+      ];
+      for (const request of requests) {
+        expect(await credential(request, identity)).toBe(
+          source === 'user' ? 'owner-scoped-user-token' : 'current-repository-token'
+        );
+        if (source === 'user') {
+          expect(JSON.parse(fetchMock.mock.calls.at(-1)?.[1].body)).toEqual({
+            access_token: 'current-repository-token',
+            target: 'acme',
+            repository_ids: [101],
+          });
+        }
+      }
+      expect(tokens.getTokenForRepositoryIds).not.toHaveBeenCalled();
+    }
+  );
+
   it('uses the same installation for sibling reads and narrows the forwarded credential by IDs', async () => {
     const identity = {
       ...auth,

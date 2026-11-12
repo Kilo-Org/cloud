@@ -37,7 +37,6 @@ export async function authorizeGitHubTaskCredential(
     return null;
   }
   if (auth.source === 'user') return resources.scopeUserToken(scope);
-  if (scope.repositoryIds === undefined) return lookupToken;
   if (scope.repositoryIds.length === 1) return auth.githubToken;
   return tokens.getTokenForRepositoryIds(auth.installationId, scope.repositoryIds, auth.appType);
 }

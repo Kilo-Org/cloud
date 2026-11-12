@@ -215,6 +215,49 @@ describe('GitHub repository reads', () => {
     expect(graphql(query, { login: 'personal-user' }).allowed).toBe(false);
   });
 
+  it.each(['organization', 'user'])(
+    'preserves metadata discovery through GraphQL %s connections and edges',
+    field => {
+      expect(
+        graphql(`query {
+          ${field}(login:"na2-org") {
+            repositories(first:10) {
+              ... on RepositoryConnection {
+                totalCount
+                pageInfo { hasNextPage endCursor }
+                nodes { name defaultBranchRef { name target { oid } } }
+                edges { cursor node { ...RepositoryMetadata } }
+              }
+            }
+          }
+        }
+        fragment RepositoryMetadata on Repository { id nameWithOwner owner { login } }`)
+      ).toEqual({ allowed: true, operation: 'read', checks: [{ kind: 'owner-read' }] });
+    }
+  );
+
+  it.each(['organization', 'user'])(
+    'denies repository contents reached through GraphQL %s discovery',
+    field => {
+      for (const selection of [
+        'nodes { object(expression:"HEAD:file") { ... on Blob { text } } }',
+        'edges { node { object(expression:"HEAD") { ... on Tree { entries { name object { ... on Blob { text } } } } } } }',
+        'nodes { defaultBranchRef { target { ... on Commit { message } } } }',
+        'nodes { issues(first:1) { nodes { body } } }',
+        'nodes { ...RepositoryContents }',
+      ]) {
+        const fragment = selection.includes('RepositoryContents')
+          ? 'fragment RepositoryContents on Repository { object(expression:"HEAD:file") { ... on Blob { text } } }'
+          : '';
+        expect(
+          graphql(
+            `query { ${field}(login:"na2-org") { repositories(first:10) { ${selection} } } } ${fragment}`
+          )
+        ).toMatchObject({ allowed: false });
+      }
+    }
+  );
+
   it('checks all repository selections, including aliases and skipped fields', () => {
     expect(
       graphql(

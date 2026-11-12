@@ -94,7 +94,7 @@ export const githubTaskGraphqlShapes: Record<string, Shape> = {
   owner: {
     types: ['User', 'Organization'],
     scalars: ['id', 'databaseId', 'login', 'name', 'url', 'description'],
-    children: { repositories: 'repositoryConnection' },
+    children: { repositories: 'repositoryIdentityConnection' },
     arguments: { repositories: [...pageArguments, 'privacy', 'orderBy', 'isFork'] },
   },
   repositoryIdentity: {
@@ -350,6 +350,7 @@ export const githubTaskGraphqlShapes: Record<string, Shape> = {
 
 for (const [name, node, type] of [
   ['repository', 'repository', 'Repository'],
+  ['repositoryIdentity', 'repositoryIdentity', 'Repository'],
   ['pull', 'pull', 'PullRequest'],
   ['issue', 'issue', 'Issue'],
   ['comment', 'comment', 'IssueComment'],

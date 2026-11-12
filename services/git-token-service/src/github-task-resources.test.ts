@@ -61,12 +61,14 @@ describe('trusted GitHub repository authority', () => {
       await resources().verify(grant, [{ kind: 'repository-read', owner: 'acme', name: 'other' }])
     ).toEqual({ owner: 'acme', repositoryIds: [101, 202] });
   });
-  it('limits repository discovery credentials to the selected owner', async () => {
-    expect(await resources().verify(grant, [{ kind: 'owner-read' }])).toEqual({ owner: 'acme' });
-    await resources().scopeUserToken({ owner: 'acme' });
+  it('keeps repository discovery credentials limited to the task repository', async () => {
+    const scope = await resources().verify(grant, [{ kind: 'owner-read' }]);
+    expect(scope).toEqual({ owner: 'acme', repositoryIds: [101] });
+    await resources().scopeUserToken(scope);
     expect(JSON.parse(fetchMock.mock.calls.at(-1)?.[1].body)).toEqual({
       access_token: 'synthetic-user-token',
       target: 'acme',
+      repository_ids: [101],
     });
   });
   it('probes foreign public repositories without personal authorization', async () => {

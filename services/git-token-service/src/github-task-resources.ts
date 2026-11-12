@@ -17,8 +17,7 @@ const repositorySchema = z.object({
 });
 export type GitHubRepositoryScope = {
   owner: string;
-  // An omitted list selects the owner's installation, never every user installation.
-  repositoryIds?: number[];
+  repositoryIds: number[];
 };
 export type GitHubTaskResourceFailure =
   | 'repository_mismatch'
@@ -154,9 +153,7 @@ export class GitHubTaskResources {
     }
     return {
       owner: grant.repository.owner,
-      ...(checks.some(check => check.kind === 'owner-read')
-        ? {}
-        : { repositoryIds: [...repositoryIds] }),
+      repositoryIds: [...repositoryIds],
     };
   }
 
@@ -217,7 +214,7 @@ export class GitHubTaskResources {
         body: JSON.stringify({
           access_token: this.token,
           target: scope.owner,
-          ...(scope.repositoryIds ? { repository_ids: scope.repositoryIds } : {}),
+          repository_ids: scope.repositoryIds,
         }),
       }
     );
@@ -225,9 +222,7 @@ export class GitHubTaskResources {
       .object({
         token: z.string().min(1),
         installation: z.object({
-          repository_selection: scope.repositoryIds
-            ? z.literal('selected')
-            : z.enum(['all', 'selected']),
+          repository_selection: z.literal('selected'),
         }),
       })
       .safeParse(value);

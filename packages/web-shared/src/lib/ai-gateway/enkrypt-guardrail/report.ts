@@ -94,18 +94,21 @@ export type EnkryptFlaggedTool = z.infer<typeof FlaggedToolSchema>;
 
 /**
  * The scans of a request's tool definitions and response formats by the blocking or the log-only
- * detectors, aggregated: each is cached and scanned on its own, so a request makes at least one
- * Enkrypt call per uncached tool. `verdict_cache` is `hit` when the cache covered at least one of them. The decision
- * and error are those of the most severe tool. Characters, calls, and credits are summed; the
- * latency runs until the last tool's scan finished.
+ * detectors, aggregated: each segment of each is cached on its own, and each tool with uncached
+ * segments is scanned by its own calls. `verdict_cache` is `hit` when the cache covered at least
+ * one segment. The decision and error are those of the most severe tool. Characters, calls, and
+ * credits are summed; the latency runs until the last tool's scan finished.
  */
 export const EnkryptToolScanReportSchema = z.object({
   ...scanOutcomeShape,
   part: z.literal('tools'),
   tools_total: z.number(),
-  /** Allowed before with the same organization and detectors, so not scanned again. */
+  /**
+   * Decided by the cache, with the same organization and detectors: every segment allowed before,
+   * or any segment blocked before. Not scanned again.
+   */
   tools_cached: z.number(),
-  /** Not covered by the cache, so each was scanned by its own calls, or failed. */
+  /** With segments the cache did not cover, which were scanned by the tool's own calls, or failed. */
   tools_scanned: z.number(),
   tools_flagged: z.number(),
   /** The tools that fired a detector or failed, most severe first, by name only. */

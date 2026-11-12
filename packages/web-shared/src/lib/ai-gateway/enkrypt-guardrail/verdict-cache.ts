@@ -164,9 +164,7 @@ async function lookup(
   store: EnkryptVerdictCacheStore | null
 ): Promise<Lookup> {
   const keys = units.flatMap(unit => (unit.key ? [unit.key] : []));
-  if (!store || config.status !== 'ready' || keys.length === 0 || keys.length !== units.length) {
-    return { status: 'off' };
-  }
+  if (!store || config.status !== 'ready' || keys.length === 0) return { status: 'off' };
   try {
     const values = await store.mget(keys);
     return {
@@ -519,7 +517,7 @@ function toolsReport(
         ? ENKRYPT_DETECTOR_IDS.filter(id => config.detectors[id] !== undefined)
         : [],
     detectors_blocking: config.status === 'ready' ? config.blockingDetectors : [],
-    verdict_cache: cache === 'miss' && cached.length > 0 ? 'hit' : cache,
+    verdict_cache: cache,
     tools_total: outcomes.length,
     tools_cached: cached.length,
     tools_scanned: outcomes.length - cached.length,

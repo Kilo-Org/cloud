@@ -134,8 +134,10 @@ export function ProfilesManager({
       setNewProfileName('');
       setNewProfileDescription('');
       if (created?.id) setSelectedId(created.id);
-    } catch {
-      toast.error('Failed to create profile');
+    } catch (error) {
+      // The server words its refusals, including the profile-count limit, so
+      // its sentence reaches the screen instead of a generic failure.
+      toast.error(error instanceof Error ? error.message : 'Failed to create profile');
     } finally {
       setSavingNew(false);
     }

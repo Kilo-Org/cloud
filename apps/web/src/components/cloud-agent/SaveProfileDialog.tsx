@@ -156,7 +156,9 @@ export function SaveProfileDialog({
       onSaved?.(profileId);
     } catch (error) {
       console.error('Failed to save profile:', error);
-      toast.error('Failed to save profile. Please try again.');
+      // The server words its refusals, including the profile-count limit, so
+      // its sentence reaches the screen instead of a generic failure.
+      toast.error(error instanceof Error ? error.message : 'Failed to save profile.');
     } finally {
       setIsSaving(false);
     }

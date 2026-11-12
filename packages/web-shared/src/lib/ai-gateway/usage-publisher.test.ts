@@ -9,6 +9,7 @@ import { captureException } from '@sentry/nextjs';
 import { createServer } from 'node:http';
 import {
   enqueueEnkryptUsage,
+  enqueueExaUsage,
   enqueueUsage,
   USAGE_ENQUEUE_TIMEOUT_MS,
   USAGE_ENQUEUE_MAX_ATTEMPTS,
@@ -18,6 +19,7 @@ import {
 } from './usage-publisher';
 import type {
   EnkryptUsageWriteInput,
+  ExaUsageRecord,
   LlmUsageQueueMessage,
   UsageRecordRequest,
 } from '@kilocode/usage-contracts';
@@ -1595,5 +1597,100 @@ describe('publisher attempt diagnostics', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expectUnavailableWarning('http_401');
     expect(captureException).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('enqueueExaUsage', () => {
+  const record: ExaUsageRecord = {
+    id: '6d1f3c2a-8b4e-4f7a-9c3d-2e5b7a9f1c04',
+    occurredAt: '2026-11-12T12:00:00.000Z',
+    userId: 'oauth/synthetic',
+    organizationId: null,
+    path: '/search',
+    costMicrodollars: 7000,
+    chargedToBalance: true,
+    freeAllowanceMicrodollars: 10_000_000,
+  };
+
+  test('posts the bare record to the /exa-usage sibling of the /usage endpoint', async () => {
+    mockFetch.mockResolvedValue(new Response(null, { status: 202 }));
+
+    expect(await enqueueExaUsage(record)).toEqual({ kind: 'accepted' });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe('https://usage.example.test/exa-usage');
+    expect(init).toMatchObject({
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        Authorization: 'Bearer synthetic-publisher-secret',
+      },
+      redirect: 'manual',
+    });
+    expect(init?.body).toBe(JSON.stringify(record));
+  });
+
+  test.each([
+    'https://usage.example.test/exa-usage',
+    'https://usage.example.test/usage/',
+    'https://usage.example.test/v2/usage',
+    'https://usage.example.test/usage?x=1',
+    'https://usage.example.test/usage#x',
+    'http://usage.example.test/usage',
+    'http://10.0.0.5/usage',
+    'localhost:3000/usage',
+    '',
+  ])('treats USAGE_INGEST_URL %p as not configured without a request', async value => {
+    config.USAGE_INGEST_URL = value;
+
+    expect(await enqueueExaUsage(record)).toEqual({
+      kind: 'unavailable',
+      reason: 'publisher_not_configured',
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith('usage enqueue unavailable', {
+      usageId: record.id,
+      usage_kind: 'exa_usage',
+      execution_region: 'unknown',
+      kind: 'unavailable',
+      reason: 'publisher_not_configured',
+    });
+  });
+
+  test.each([
+    ['http://localhost:8787/usage', 'http://localhost:8787/exa-usage'],
+    ['http://127.0.0.1:8787/usage', 'http://127.0.0.1:8787/exa-usage'],
+    ['http://[::1]:8787/usage', 'http://[::1]:8787/exa-usage'],
+  ])('allows plain HTTP only to loopback %s', async (value, expected) => {
+    config.USAGE_INGEST_URL = value;
+    mockFetch.mockResolvedValue(new Response(null, { status: 202 }));
+
+    expect(await enqueueExaUsage(record)).toEqual({ kind: 'accepted' });
+    expect(mockFetch.mock.calls.map(([url]) => url)).toEqual([expected]);
+  });
+
+  test('does not retry an HTTP 400', async () => {
+    mockFetch.mockResolvedValue(new Response('sensitive body', { status: 400 }));
+
+    expect(await enqueueExaUsage(record)).toEqual({ kind: 'unavailable', reason: 'http_400' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('retries a transient failure with the identical serialized record', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 503 }));
+    mockFetch.mockResolvedValue(new Response(null, { status: 202 }));
+
+    const result = enqueueExaUsage(record);
+    await jest.runAllTimersAsync();
+
+    expect(await result).toEqual({ kind: 'accepted' });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    for (const [url, init] of mockFetch.mock.calls) {
+      expect(url).toBe('https://usage.example.test/exa-usage');
+      expect(init?.body).toBe(JSON.stringify(record));
+    }
   });
 });

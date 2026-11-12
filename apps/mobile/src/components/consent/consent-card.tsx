@@ -1,13 +1,13 @@
 import * as WebBrowser from 'expo-web-browser';
 import { type Href, useRouter } from 'expo-router';
-import { LineChart, MessageSquare, Shield, Smartphone, User } from '@/components/ui/icons';
+import { LineChart, Shield } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ConsentRow } from '@/components/consent/consent-row';
+import { ConsentRequiredRows } from '@/components/consent/consent-required-rows';
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
 import { ConsentPolicySentence } from '@/components/consent/consent-policy-sentence';
 import { Button } from '@/components/ui/button';
@@ -253,23 +253,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             {t('consent.required')}
           </Text>
 
-          <View className="mt-3 gap-5">
-            <ConsentRow
-              icon={MessageSquare}
-              title={t('consent.promptsTitle')}
-              description={t('consent.promptsDescription')}
-            />
-            <ConsentRow
-              icon={User}
-              title={t('consent.accountTitle')}
-              description={t('consent.accountDescription')}
-            />
-            <ConsentRow
-              icon={Smartphone}
-              title={t('consent.diagnosticsTitle')}
-              description={t('consent.diagnosticsDescription')}
-            />
-          </View>
+          <ConsentRequiredRows />
 
           <Text className="mt-6 text-sm font-semibold text-foreground">
             {mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')}

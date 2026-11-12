@@ -1,7 +1,7 @@
-import { FlashList } from '@shopify/flash-list';
-import { memo, useCallback } from 'react';
+import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
+import { memo, type ReactNode, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { type ListRenderItemInfo, type ViewStyle, View } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatClockTime, formatDate } from '@/lib/format';
-import { useOrgAuditLogPage, type OrgAuditLogEntry } from '@/lib/hooks/use-org-billing-queries';
+import { type OrgAuditLogEntry, useOrgAuditLogPage } from '@/lib/hooks/use-org-billing-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -109,7 +109,7 @@ export function OrganizationAuditLogScreen() {
   // background refetch of page one from replacing the list.
   const isLaterPageError = query.isFetchNextPageError;
 
-  let body;
+  let body: ReactNode = null;
   if (query.isPending) {
     body = (
       <View className="gap-3 px-6 pt-4">

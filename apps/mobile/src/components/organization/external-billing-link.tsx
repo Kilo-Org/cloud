@@ -48,7 +48,8 @@ export function ExternalBillingLink({ url, label, className }: ExternalBillingLi
       variant="outline"
       className={cn(STATE_ACTION_CLASS, className)}
       accessibilityRole="button"
-      accessibilityLabel={`${label}. ${t('organization.billing.opensOnWeb')}`}
+      accessibilityLabel={label}
+      accessibilityHint={t('organization.billing.opensOnWeb')}
       onPress={() => {
         void openExternalUrl(url, { label });
       }}

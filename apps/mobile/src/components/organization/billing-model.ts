@@ -8,16 +8,16 @@ import { parseTimestamp } from '@/lib/utils';
  * and testable in a node environment, the pattern
  * `org-kilo-pass-row-state.ts` follows for the pass summary.
  */
-export type BillingSeatItem = Readonly<{
+type BillingSeatItem = Readonly<{
   id: string;
   current_period_end?: number | null;
 }>;
 
-export type BillingSubscription = Readonly<{
+type BillingSubscription = Readonly<{
   status: string;
   cancel_at_period_end?: boolean | null;
   current_period_end?: number | null;
-  items: Readonly<{ data: ReadonlyArray<BillingSeatItem> }>;
+  items: Readonly<{ data: readonly BillingSeatItem[] }>;
 }>;
 
 /** The `organizations.subscription.get` payload, as far as this screen reads it. */
@@ -37,7 +37,7 @@ export type OrgAutoTopUpConfig = Readonly<{
   thresholdCents: number;
 }>;
 
-export type BillingStateTone = 'good' | 'warn' | 'danger' | 'muted';
+type BillingStateTone = 'good' | 'warn' | 'danger' | 'muted';
 
 export type BillingState = Readonly<{ label: string; tone: BillingStateTone }>;
 
@@ -46,11 +46,7 @@ export type BillingState = Readonly<{ label: string; tone: BillingStateTone }>;
  * the record, so the row states that it ended instead of pretending none was
  * ever bought.
  */
-const TERMINAL_STATUSES: Record<string, true> = {
-  canceled: true,
-  incomplete_expired: true,
-  unpaid: true,
-};
+const TERMINAL_STATUSES = new Set<string>(['canceled', 'incomplete_expired', 'unpaid']);
 
 /** The date the paid period ends, in whole seconds, from the seat line item. */
 function periodEndSeconds(input: OrgSeatSubscription): number | null {
@@ -61,8 +57,7 @@ function periodEndSeconds(input: OrgSeatSubscription): number | null {
   const seatItem =
     subscription.items.data.find(entry => entry.id === input.paidSeatItemId) ??
     subscription.items.data[0];
-  const seconds = seatItem?.current_period_end ?? subscription.current_period_end ?? null;
-  return typeof seconds === 'number' ? seconds : null;
+  return seatItem?.current_period_end ?? subscription.current_period_end ?? null;
 }
 
 function formattedPeriodEnd(input: OrgSeatSubscription): string | null {
@@ -153,12 +148,9 @@ export function formatSeatCount(used: number, total: number): string {
 }
 
 /** The auto top-up readout: whether it is on, and the two amounts it uses. */
-export function getAutoTopUpReadout(config: OrgAutoTopUpConfig): Readonly<{
-  status: string;
-  amount: string;
-  threshold: string;
-}> {
+export function getAutoTopUpReadout(config: OrgAutoTopUpConfig) {
   return {
+    enabled: config.enabled,
     status: config.enabled ? i18n.t('common.enabled') : i18n.t('common.disabled'),
     amount: formatMoneyFromCents(config.amountCents, i18n.language),
     threshold: formatMoneyFromCents(config.thresholdCents, i18n.language),

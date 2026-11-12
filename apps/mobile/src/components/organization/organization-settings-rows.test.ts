@@ -1,10 +1,29 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   canViewOrgAuditLog,
   type OrgSettingsGate,
   visibleOrgSettingsRows,
 } from '@/components/organization/organization-settings-rows';
+
+// The row table carries icon components; the pure node project cannot load the
+// native icon package, and the icons are not what this suite asserts.
+vi.mock('@/components/ui/icons', () => ({
+  Building2: 'Building2',
+  Cpu: 'Cpu',
+  FileText: 'FileText',
+  KeyRound: 'KeyRound',
+  LineChart: 'LineChart',
+  Lock: 'Lock',
+  Mail: 'Mail',
+  Plug: 'Plug',
+  ScrollText: 'ScrollText',
+  Server: 'Server',
+  Shield: 'Shield',
+  SlidersHorizontal: 'SlidersHorizontal',
+  Users: 'Users',
+  Wallet: 'Wallet',
+}));
 
 function gate(overrides: Partial<OrgSettingsGate> = {}): OrgSettingsGate {
   return {
@@ -31,7 +50,6 @@ describe('visibleOrgSettingsRows', () => {
       'byok',
       'ssoAndDomain',
       'emailPreferences',
-      'dataCollection',
       'auditLogs',
       'requestLogs',
       'integrations',
@@ -109,7 +127,10 @@ describe('visibleOrgSettingsRows', () => {
     ).toBe(true);
     // A dashboard card rather than a page of its own.
     expect(byArea.get('ssoAndDomain')?.url.endsWith('/organizations/org_1')).toBe(true);
-    expect(byArea.get('dataCollection')?.web).toBe(true);
+    // Data collection is the teams dashboard's card, in place of providers and
+    // models, so it appears on that plan only.
+    const teams = visibleOrgSettingsRows(gate({ plan: 'teams' }), 'org_1');
+    expect(teams.find(row => row.area === 'dataCollection')?.web).toBe(true);
   });
 
   it('marks the audit log as the one area the app reads itself', () => {

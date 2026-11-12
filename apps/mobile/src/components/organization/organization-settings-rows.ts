@@ -11,6 +11,7 @@ import {
   KeyRound,
   LineChart,
   Lock,
+  type LucideIcon,
   Mail,
   Plug,
   ScrollText,
@@ -19,7 +20,6 @@ import {
   SlidersHorizontal,
   Users,
   Wallet,
-  type LucideIcon,
 } from '@/components/ui/icons';
 import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
@@ -52,7 +52,7 @@ import { WEB_BASE_URL } from '@/lib/config';
  *   the organization dashboard rather than pages of their own, so they open
  *   `/organizations/<id>`.
  */
-export type OrgSettingsArea =
+type OrgSettingsArea =
   | 'usageDetails'
   | 'providersAndModels'
   | 'customModes'
@@ -186,7 +186,7 @@ const ROW_SPECS: readonly OrgSettingsRowSpec[] = [
   },
 ];
 
-const TITLE_KEYS: Record<OrgSettingsArea, string> = {
+const TITLE_KEYS = {
   usageDetails: 'organization.settingsOnWeb.usageDetails',
   providersAndModels: 'organization.settingsOnWeb.providersAndModels',
   customModes: 'agentChat.modePicker.customModes',
@@ -201,7 +201,7 @@ const TITLE_KEYS: Record<OrgSettingsArea, string> = {
   integrations: 'organization.settingsOnWeb.integrations',
   subOrganizations: 'organization.settingsOnWeb.subOrganizations',
   distributeFunds: 'organization.settingsOnWeb.distributeFunds',
-};
+} satisfies Record<OrgSettingsArea, string>;
 
 /**
  * The audit log's gate. The sidebar lists the destination only for a billing

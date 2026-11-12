@@ -20,6 +20,10 @@
           { "/": "/organizations/*/code-reviews/review-md", "exclude": true },
           { "/": "/organizations/*/code-reviews/*" },
           { "/": "/organizations/*/overview" },
+          { "/": "/organizations/new", "exclude": true },
+          { "/": "/organizations/create", "exclude": true },
+          { "/": "/organizations/*/*", "exclude": true },
+          { "/": "/organizations/*" },
           { "/": "/pr-review/gitlab/**" },
           { "/": "/pr-review/bitbucket/**" },
           { "/": "/pr-review/*/*/*" }

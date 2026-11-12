@@ -203,11 +203,25 @@ vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
 }));
 
+// Every icon the hub composes, including the web-settings rows' own set: the
+// row table resolves them at module scope, so a missing export fails collection.
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
+  Building2: 'Building2',
+  Cpu: 'Cpu',
+  CreditCard: 'CreditCard',
   FileText: 'FileText',
+  KeyRound: 'KeyRound',
+  LineChart: 'LineChart',
+  Lock: 'Lock',
+  Mail: 'Mail',
   Pencil: 'Pencil',
+  Plug: 'Plug',
   Receipt: 'Receipt',
+  ScrollText: 'ScrollText',
+  Server: 'Server',
+  Shield: 'Shield',
+  SlidersHorizontal: 'SlidersHorizontal',
   Users: 'Users',
   Wallet: 'Wallet',
 }));

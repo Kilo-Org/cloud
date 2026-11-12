@@ -51,6 +51,8 @@ export function useOrgAutoTopUpConfig(organizationId: string | null, enabled: bo
 
 export type OrgAuditLogEntry = RouterOutputs['organizations']['auditLogs']['list']['logs'][number];
 
+type OrgAuditLogPage = RouterOutputs['organizations']['auditLogs']['list'];
+
 /**
  * The audit log's cursor is `before` — a timestamp — and tRPC's
  * `infiniteQueryOptions` folds the page param into `cursor`, so this query
@@ -67,12 +69,12 @@ export function useOrgAuditLogPage(organizationId: string | null, enabled: boole
       queryKey: ['organizations.auditLogs.list', organizationId] as const,
       enabled: enabled && organizationId != null,
       initialPageParam,
-      queryFn: ({ pageParam }) =>
+      queryFn: ({ pageParam }: { pageParam: string | undefined }) =>
         trpcClient.organizations.auditLogs.list.query({
           organizationId: organizationId ?? '',
           ...(pageParam === undefined ? {} : { before: pageParam }),
         }),
-      getNextPageParam: (lastPage, pages) =>
+      getNextPageParam: (lastPage: OrgAuditLogPage, pages: OrgAuditLogPage[]) =>
         lastPage.hasNext && hasRetentionBudget(pages.length)
           ? (lastPage.oldestTimestamp ?? undefined)
           : undefined,

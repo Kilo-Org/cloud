@@ -181,7 +181,7 @@ describe('formatSeatCount', () => {
 describe('getAutoTopUpReadout', () => {
   it('writes the enabled state with both amounts', () => {
     expect(getAutoTopUpReadout({ enabled: true, amountCents: 5000, thresholdCents: 1000 })).toEqual(
-      { status: 'Enabled', amount: '$50.00', threshold: '$10.00' }
+      { enabled: true, status: 'Enabled', amount: '$50.00', threshold: '$10.00' }
     );
   });
 

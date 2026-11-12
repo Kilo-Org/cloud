@@ -83,8 +83,8 @@ const ROW_CASES = [
 ] as const;
 
 describe('UNIVERSAL_LINK_ROUTES', () => {
-  it('has exactly 17 rows', () => {
-    expect(UNIVERSAL_LINK_ROUTES).toHaveLength(17);
+  it('has exactly 18 rows', () => {
+    expect(UNIVERSAL_LINK_ROUTES).toHaveLength(18);
   });
 });
 
@@ -168,6 +168,17 @@ describe('wildcard capture substitution', () => {
     expect(resolveIncomingUrl(`${WEB}/organizations/create`)).toBeNull();
     expect(webPathToAppPath('/organizations/new')).toBeNull();
     expect(webPathToAppPath('/organizations/create')).toBeNull();
+  });
+
+  it('keeps every deeper organization page in the browser', () => {
+    // `/organizations/<id>` is the only deep org target the app owns; the rest
+    // of the web dashboard (SSO, guardrails, request logs, members, …) is
+    // web-only, and one broad association would hijack it on every phone.
+    expect(resolveIncomingUrl(`${WEB}/organizations/org_123/guardrails`)).toBeNull();
+    expect(resolveIncomingUrl(`${WEB}/organizations/org_123/sso`)).toBeNull();
+    expect(resolveIncomingUrl(`${WEB}/organizations/org_123/request-logs`)).toBeNull();
+    expect(webPathToAppPath('/organizations/org_123/guardrails')).toBeNull();
+    expect(webPathToAppPath('/organizations/org_123/sso')).toBeNull();
   });
 
   it('inserts captures literally — dollar substitution patterns stay verbatim', () => {
@@ -355,8 +366,8 @@ describe('parseKiloWebPath', () => {
 });
 
 describe('aasaComponents', () => {
-  it('returns 22 entries (19 rows + 3 exclusions)', () => {
-    expect(aasaComponents()).toHaveLength(22);
+  it('returns 23 entries (18 rows + 5 exclusions)', () => {
+    expect(aasaComponents()).toHaveLength(23);
   });
 
   it('every entry has a "/" key', () => {
@@ -385,10 +396,34 @@ describe('aasaComponents', () => {
     const paths = aasaComponents().map(c => c['/']);
     const bare = paths.indexOf('/organizations/*');
     expect(bare).toBeGreaterThan(0);
-    expect(paths[bare - 2]).toBe('/organizations/new');
-    expect(paths[bare - 1]).toBe('/organizations/create');
+    expect(paths[bare - 3]).toBe('/organizations/new');
+    expect(paths[bare - 2]).toBe('/organizations/create');
+    expect(aasaComponents()[bare - 3]).toMatchObject({ exclude: true });
     expect(aasaComponents()[bare - 2]).toMatchObject({ exclude: true });
-    expect(aasaComponents()[bare - 1]).toMatchObject({ exclude: true });
+  });
+
+  it('excludes deeper organization paths immediately before the bare row', () => {
+    // Apple's `*` crosses `/`, so `/organizations/*` alone would associate
+    // every web-only org subpage. The exclusion must sit after the app-owned
+    // deeper rows (first match wins) and before the bare row.
+    const components = aasaComponents();
+    const paths = components.map(c => c['/']);
+    const deeperExclude = paths.indexOf('/organizations/*/*');
+    const bare = paths.indexOf('/organizations/*');
+    expect(deeperExclude).toBe(bare - 1);
+    expect(components[deeperExclude]).toEqual({ '/': '/organizations/*/*', exclude: true });
+
+    for (const handled of [
+      '/organizations/*/security-agent',
+      '/organizations/*/security-agent/findings',
+      '/organizations/*/code-reviews',
+      '/organizations/*/code-reviews/*',
+      '/organizations/*/overview',
+    ]) {
+      const index = paths.indexOf(handled);
+      expect(index).toBeGreaterThan(-1);
+      expect(index).toBeLessThan(deeperExclude);
+    }
   });
 
   it('keeps table * verbatim (Apple glob crosses /)', () => {
@@ -411,20 +446,33 @@ describe('androidPathPatterns', () => {
       '/profile',
       '/profile/preferences',
       '/cloud/sessions',
-      '/cloud/sessions/.*',
+      '/cloud/sessions/[^/]+',
       '/security-agent',
       '/security-agent/findings',
       '/code-reviews',
-      '/code-reviews/.*',
-      '/organizations/.*/security-agent',
-      '/organizations/.*/security-agent/findings',
-      '/organizations/.*/code-reviews',
-      '/organizations/.*/code-reviews/.*',
-      '/organizations/.*/overview',
-      '/organizations/.*',
+      '/code-reviews/[^/]+',
+      '/organizations/[^/]+/security-agent',
+      '/organizations/[^/]+/security-agent/findings',
+      '/organizations/[^/]+/code-reviews',
+      '/organizations/[^/]+/code-reviews/[^/]+',
+      '/organizations/[^/]+/overview',
+      '/organizations/[^/]+',
       '/pr-review/gitlab/.*',
       '/pr-review/bitbucket/.*',
-      '/pr-review/.*/.*/.*',
+      '/pr-review/[^/]+/[^/]+/[^/]+',
     ]);
+  });
+
+  it('keeps a one-segment row to exactly one segment', () => {
+    // `.*` would cross `/` and associate every deeper web page; `[^/]+` cannot.
+    const patterns = androidPathPatterns();
+    expect(patterns).not.toContain('/organizations/.*');
+    expect(patterns).toContain('/organizations/[^/]+');
+    // Only the `**` tail rows may cross `/`.
+    const crossing = patterns.filter(
+      (pattern, index) =>
+        pattern.includes('.*') && !UNIVERSAL_LINK_ROUTES[index]?.webPath.endsWith('/**')
+    );
+    expect(crossing).toEqual([]);
   });
 });

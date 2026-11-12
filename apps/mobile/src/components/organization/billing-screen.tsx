@@ -34,8 +34,8 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import {
   useOrgAutoTopUpConfig,
-  useOrgSeatSubscription,
   useOrgSeats,
+  useOrgSeatSubscription,
 } from '@/lib/hooks/use-org-billing-queries';
 
 /** A settings block: the raised surface the hub's own cards paint. */
@@ -157,6 +157,86 @@ export function OrganizationBillingScreen() {
         isError: kiloPassSummary.isError,
       });
 
+  const renderSubscriptionState = (): ReactNode => {
+    if (subscription.isPending) {
+      return <BillingCardSkeleton />;
+    }
+    if (subscription.isError) {
+      return (
+        <BillingCardError
+          onRetry={() => void subscription.refetch()}
+          isRetrying={subscription.isFetching}
+        />
+      );
+    }
+    if (subscriptionState == null) {
+      return <BillingCardSkeleton />;
+    }
+    return (
+      <BillingCard>
+        <KvRow
+          label={t('organization.hub.plan')}
+          value={planName}
+          valueFace="text"
+          valueTone={planEnded ? 'danger' : 'default'}
+        />
+        <KvRow
+          label={t('organization.billing.state')}
+          value={subscriptionState.label}
+          valueFace="text"
+          valueTone={subscriptionState.tone}
+          last={scheduledSeatChange == null}
+        />
+        {scheduledSeatChange == null ? null : (
+          <KvRow
+            label={t('organization.billing.scheduledChange')}
+            value={scheduledSeatChange}
+            valueFace="text"
+            last
+          />
+        )}
+      </BillingCard>
+    );
+  };
+
+  const renderAutoTopUpState = (): ReactNode => {
+    if (autoTopUp.isPending) {
+      return <BillingCardSkeleton />;
+    }
+    if (autoTopUp.isError) {
+      return (
+        <BillingCardError
+          onRetry={() => void autoTopUp.refetch()}
+          isRetrying={autoTopUp.isFetching}
+        />
+      );
+    }
+    if (autoTopUpReadout == null) {
+      return <BillingCardSkeleton />;
+    }
+    return (
+      <BillingCard>
+        <KvRow
+          label={t('common.status')}
+          value={autoTopUpReadout.status}
+          valueFace="text"
+          valueTone={autoTopUpReadout.enabled ? 'good' : 'muted'}
+        />
+        <KvRow
+          label={t('organization.billing.autoTopUpAmount')}
+          value={autoTopUpReadout.amount}
+          valueFace="numeric"
+        />
+        <KvRow
+          label={t('organization.billing.autoTopUpThreshold')}
+          value={autoTopUpReadout.threshold}
+          valueFace="numeric"
+          last
+        />
+      </BillingCard>
+    );
+  };
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('organization.billing.title')} />
@@ -187,40 +267,7 @@ export function OrganizationBillingScreen() {
 
         <View className="gap-2">
           <SectionLabel>{t('organization.billing.subscription')}</SectionLabel>
-          {subscription.isPending ? (
-            <BillingCardSkeleton />
-          ) : subscription.isError ? (
-            <BillingCardError
-              onRetry={() => void subscription.refetch()}
-              isRetrying={subscription.isFetching}
-            />
-          ) : subscriptionState == null ? (
-            <BillingCardSkeleton />
-          ) : (
-            <BillingCard>
-              <KvRow
-                label={t('organization.hub.plan')}
-                value={planName}
-                valueFace="text"
-                valueTone={planEnded ? 'danger' : 'default'}
-              />
-              <KvRow
-                label={t('organization.billing.state')}
-                value={subscriptionState.label}
-                valueFace="text"
-                valueTone={subscriptionState.tone}
-                last={scheduledSeatChange == null}
-              />
-              {scheduledSeatChange == null ? null : (
-                <KvRow
-                  label={t('organization.billing.scheduledChange')}
-                  value={scheduledSeatChange}
-                  valueFace="text"
-                  last
-                />
-              )}
-            </BillingCard>
-          )}
+          {renderSubscriptionState()}
         </View>
 
         <View className="gap-2">
@@ -237,36 +284,7 @@ export function OrganizationBillingScreen() {
 
         <View className="gap-2">
           <SectionLabel>{t('organization.billing.autoTopUp')}</SectionLabel>
-          {autoTopUp.isPending ? (
-            <BillingCardSkeleton />
-          ) : autoTopUp.isError ? (
-            <BillingCardError
-              onRetry={() => void autoTopUp.refetch()}
-              isRetrying={autoTopUp.isFetching}
-            />
-          ) : autoTopUpReadout == null ? (
-            <BillingCardSkeleton />
-          ) : (
-            <BillingCard>
-              <KvRow
-                label={t('common.status')}
-                value={autoTopUpReadout.status}
-                valueFace="text"
-                valueTone={autoTopUp.data?.enabled === true ? 'good' : 'muted'}
-              />
-              <KvRow
-                label={t('organization.billing.autoTopUpAmount')}
-                value={autoTopUpReadout.amount}
-                valueFace="numeric"
-              />
-              <KvRow
-                label={t('organization.billing.autoTopUpThreshold')}
-                value={autoTopUpReadout.threshold}
-                valueFace="numeric"
-                last
-              />
-            </BillingCard>
-          )}
+          {renderAutoTopUpState()}
         </View>
 
         {kiloPassRowState == null ? null : (

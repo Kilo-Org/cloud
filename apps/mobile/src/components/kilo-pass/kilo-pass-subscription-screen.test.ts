@@ -15,11 +15,46 @@ const mocks = vi.hoisted(() => ({
     isPending: false,
     refetch: vi.fn(),
   },
+  scheduled: {
+    data: undefined as unknown,
+    isError: false,
+    isPending: false,
+    refetch: vi.fn(),
+  },
+  ledgers: {
+    credit: {
+      query: {
+        isPending: false,
+        isError: false,
+        isFetchingNextPage: false,
+        isFetchNextPageError: false,
+        refetch: vi.fn(),
+        fetchNextPage: vi.fn(),
+      },
+      entries: [] as unknown[],
+      hasMore: false,
+    },
+    billing: {
+      query: {
+        isPending: false,
+        isError: false,
+        isFetchingNextPage: false,
+        isFetchNextPageError: false,
+        refetch: vi.fn(),
+        fetchNextPage: vi.fn(),
+      },
+      entries: [] as unknown[],
+      hasMore: false,
+    },
+  },
 }));
 
 vi.mock('expo-router', () => ({ useRouter: () => mockRouter }));
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, View: 'View' }));
-vi.mock('@tanstack/react-query', () => ({ useQuery: () => mocks.state }));
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: (options?: { key?: string }) =>
+    options?.key === 'scheduled' ? mocks.scheduled : mocks.state,
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'DetailScreenScrollView' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
@@ -29,11 +64,29 @@ vi.mock('@/components/ui/icons', () => ({ Crown: 'Crown' }));
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The body's blocks have their own suites. The screen owns which state it
+// shows and when it prints the page, so they render as hosts here.
+vi.mock('@/components/kilo-pass/kilo-pass-management', () => ({
+  KiloPassManagementSections: 'KiloPassManagementSections',
+}));
+vi.mock('@/components/kilo-pass/kilo-pass-history-sections', () => ({
+  KiloPassCreditHistorySection: 'KiloPassCreditHistorySection',
+  KiloPassBillingHistorySection: 'KiloPassBillingHistorySection',
+}));
+vi.mock('@/lib/hooks/use-kilo-pass-history', () => ({
+  useKiloPassCreditHistory: () => mocks.ledgers.credit,
+  useKiloPassBillingHistory: () => mocks.ledgers.billing,
+}));
 vi.mock('@/lib/form-sheet', () => ({
   useSheetHeaderTopClearance: () => mockClearance.windowTop,
 }));
 vi.mock('@/lib/trpc', () => ({
-  useTRPC: () => ({ kiloPass: { getState: { queryOptions: () => ({}) } } }),
+  useTRPC: () => ({
+    kiloPass: {
+      getState: { queryOptions: () => ({ key: 'state' }) },
+      getScheduledChange: { queryOptions: () => ({ key: 'scheduled' }) },
+    },
+  }),
 }));
 
 function subscription(overrides: Partial<KiloPassSubscription> = {}): KiloPassSubscription {
@@ -55,6 +108,11 @@ function subscription(overrides: Partial<KiloPassSubscription> = {}): KiloPassSu
     },
     ...overrides,
   };
+}
+
+/** A pass kilo.ai bills, so the screen reads its schedule and invoices. */
+function stripeSubscription(overrides: Partial<KiloPassSubscription> = {}) {
+  return { ...subscription(overrides), paymentProvider: 'stripe' };
 }
 
 async function renderScreen(): Promise<TestRenderer.ReactTestRenderer> {
@@ -101,6 +159,10 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.state.isError = false;
     mocks.state.data = { subscription: null, isEligibleForFirstMonthPromo: true };
     mocks.state.refetch.mockClear();
+    mocks.scheduled.isPending = false;
+    mocks.scheduled.data = { scheduledChange: null };
+    mocks.ledgers.credit.query.isPending = false;
+    mocks.ledgers.billing.query.isPending = false;
     mockRouter.replace.mockClear();
     mockRouter.push.mockClear();
   });
@@ -162,9 +224,48 @@ describe('KiloPassSubscriptionScreen', () => {
       isEligibleForFirstMonthPromo: false,
     };
     const renderer = await renderScreen();
-    expect(allText(renderer)).toContain('Canceling');
+    expect(allText(renderer)).toContain('Cancels on Dec 5, 2026');
     const rows = nodesOfType(renderer, 'KvRow');
     expect(rows[0]?.props.label).toBe('Active until');
+    renderer.unmount();
+  });
+
+  it('holds the page until a ledger has its first page', async () => {
+    mocks.state.data = { subscription: subscription(), isEligibleForFirstMonthPromo: false };
+    mocks.ledgers.credit.query.isPending = true;
+    const renderer = await renderScreen();
+    // Printing the details first would let the ledger grow under the reader
+    // and push everything below it.
+    expect(nodesOfType(renderer, 'Skeleton').length).toBeGreaterThan(0);
+    expect(nodesOfType(renderer, 'KvRow')).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('holds the page while the scheduled change is unresolved', async () => {
+    mocks.state.data = { subscription: stripeSubscription(), isEligibleForFirstMonthPromo: false };
+    mocks.scheduled.isPending = true;
+    const renderer = await renderScreen();
+    expect(nodesOfType(renderer, 'Skeleton').length).toBeGreaterThan(0);
+    expect(nodesOfType(renderer, 'KvRow')).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('hands each resolved block the value the page already read', async () => {
+    mocks.state.data = { subscription: stripeSubscription(), isEligibleForFirstMonthPromo: false };
+    const renderer = await renderScreen();
+    const sections = renderer.root.findAll(node =>
+      ['KiloPassCreditHistorySection', 'KiloPassBillingHistorySection'].includes(String(node.type))
+    );
+    // A block that read its own ledger would fetch a second time and settle
+    // after the page printed.
+    expect(sections).toHaveLength(2);
+    for (const section of sections) {
+      const history =
+        String(section.type) === 'KiloPassCreditHistorySection'
+          ? mocks.ledgers.credit
+          : mocks.ledgers.billing;
+      expect(section.props.history).toBe(history);
+    }
     renderer.unmount();
   });
 

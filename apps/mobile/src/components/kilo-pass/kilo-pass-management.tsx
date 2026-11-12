@@ -1,4 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -22,6 +23,10 @@ import { kiloPassPlanLabel } from '@/lib/kilo-pass/state';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
+export type KiloPassScheduledChange = NonNullable<
+  inferRouterOutputs<MobileRouter>['kiloPass']['getScheduledChange']['scheduledChange']
+>;
+
 /**
  * What a subscriber can do to their pass from the phone: cancel it, undo a
  * pending cancellation, resume a paused pass, cancel a scheduled plan change,
@@ -31,22 +36,23 @@ import { parseTimestamp } from '@/lib/utils';
  * text on iOS. The web's cancellation flow uses a third-party portal; this
  * screen calls the subscription procedure directly after its own confirmation,
  * which is the same cancellation without leaving the app.
+ *
+ * The scheduled change arrives as a prop, because the screen waits for its
+ * answer before it prints the page: a card that appeared later would push the
+ * rows under it.
  */
 export function KiloPassManagementSections({
   subscription,
-}: Readonly<{ subscription: KiloPassSubscriptionState }>) {
+  scheduledChange,
+}: Readonly<{
+  subscription: KiloPassSubscriptionState;
+  scheduledChange: KiloPassScheduledChange | null;
+}>) {
   const { t } = useTranslation();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { confirm, dialog } = useConfirmDialog();
   const storeManaged = isStoreManagedPass(subscription);
-
-  // A store-managed pass has no Stripe schedule, and the read rejects one.
-  const scheduledChangeQuery = useQuery({
-    ...trpc.kiloPass.getScheduledChange.queryOptions(),
-    enabled: !storeManaged,
-  });
-  const scheduledChange = scheduledChangeQuery.data?.scheduledChange ?? null;
 
   const invalidateKiloPass = () => {
     void queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.pathKey() });

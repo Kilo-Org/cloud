@@ -10,7 +10,10 @@ import {
   KiloPassBillingHistorySection,
   KiloPassCreditHistorySection,
 } from '@/components/kilo-pass/kilo-pass-history-sections';
-import { KiloPassManagementSections } from '@/components/kilo-pass/kilo-pass-management';
+import {
+  KiloPassManagementSections,
+  type KiloPassScheduledChange,
+} from '@/components/kilo-pass/kilo-pass-management';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Crown } from '@/components/ui/icons';
@@ -18,6 +21,12 @@ import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
+import {
+  type KiloPassBillingHistory,
+  type KiloPassCreditHistory,
+  useKiloPassBillingHistory,
+  useKiloPassCreditHistory,
+} from '@/lib/hooks/use-kilo-pass-history';
 import { isStoreManagedPass, type KiloPassSubscriptionState } from '@/lib/kilo-pass/management';
 import { getKiloPassDetailState, type KiloPassDetail } from '@/lib/kilo-pass/state';
 import { useTRPC } from '@/lib/trpc';
@@ -59,11 +68,21 @@ function KiloPassLoadingScreen() {
             cannot paint the reserved blocks under the sensor area. */}
         <DetailScreenScrollView
           className="-mx-1 flex-1"
-          contentContainerClassName="grow justify-center gap-3 px-1"
+          contentContainerClassName="grow gap-5 px-1 py-4"
           showsVerticalScrollIndicator={false}
         >
-          <Skeleton className="h-4 w-64 rounded" />
+          {/* The page prints once, at its final height: every block the pass
+              state introduces is held until it has one answer, so this
+              skeleton stands in for a page that would otherwise grow under
+              the reader and push the ledgers down. */}
+          <View className="gap-1">
+            <Skeleton className="h-5 w-40 rounded" />
+            <Skeleton className="h-4 w-24 rounded" />
+          </View>
           <Skeleton className="h-[132px] w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-[104px] w-full rounded-lg" />
+          <Skeleton className="h-[104px] w-full rounded-lg" />
         </DetailScreenScrollView>
       </View>
     </KiloPassFrame>
@@ -102,9 +121,15 @@ function KiloPassErrorScreen({ onRetry }: { onRetry: () => void }) {
 function KiloPassDetailBody({
   subscription,
   detail,
+  scheduledChange,
+  creditHistory,
+  billingHistory,
 }: Readonly<{
   subscription: KiloPassSubscriptionState;
   detail: Extract<KiloPassDetail, { kind: 'active' }>;
+  scheduledChange: KiloPassScheduledChange | null;
+  creditHistory: KiloPassCreditHistory;
+  billingHistory: KiloPassBillingHistory;
 }>) {
   return (
     <KiloPassFrame>
@@ -134,10 +159,12 @@ function KiloPassDetailBody({
             ))}
           </View>
         ) : null}
-        <KiloPassManagementSections subscription={subscription} />
-        <KiloPassCreditHistorySection />
+        <KiloPassManagementSections subscription={subscription} scheduledChange={scheduledChange} />
+        <KiloPassCreditHistorySection history={creditHistory} />
         {/* A store-sold pass has no Stripe invoices, and the read rejects one. */}
-        {!isStoreManagedPass(subscription) && <KiloPassBillingHistorySection />}
+        {!isStoreManagedPass(subscription) && (
+          <KiloPassBillingHistorySection history={billingHistory} />
+        )}
       </DetailScreenScrollView>
     </KiloPassFrame>
   );
@@ -164,7 +191,26 @@ export function KiloPassSubscriptionScreen() {
   });
   const { t } = useTranslation();
 
-  if (detail.kind === 'loading') {
+  // The pass state introduces three more reads, and each one adds or removes
+  // height below the state rows. Hold the page until all three answer so its
+  // first frame is its last: a ledger or a scheduled plan change that landed
+  // afterwards would push the blocks under it.
+  const isDetail = detail.kind === 'active' && subscription != null;
+  const storeManaged = subscription != null && isStoreManagedPass(subscription);
+  const creditHistory = useKiloPassCreditHistory(isDetail);
+  const billingHistory = useKiloPassBillingHistory(isDetail && !storeManaged);
+  const scheduledChangeQuery = useQuery({
+    ...trpc.kiloPass.getScheduledChange.queryOptions(),
+    enabled: isDetail && !storeManaged,
+  });
+  // A store-managed pass has neither a Stripe schedule nor invoices, so those
+  // two stay disabled and their pending status says nothing.
+  const blocksPending =
+    isDetail &&
+    (creditHistory.query.isPending ||
+      (!storeManaged && (billingHistory.query.isPending || scheduledChangeQuery.isPending)));
+
+  if (detail.kind === 'loading' || blocksPending) {
     return <KiloPassLoadingScreen />;
   }
   if (detail.kind === 'error') {
@@ -187,5 +233,13 @@ export function KiloPassSubscriptionScreen() {
     // type; the message keeps the screen total rather than throwing on it.
     return <KiloPassMessageBody message={t('kiloPass.notAvailableInApp')} />;
   }
-  return <KiloPassDetailBody subscription={subscription} detail={detail} />;
+  return (
+    <KiloPassDetailBody
+      subscription={subscription}
+      detail={detail}
+      scheduledChange={scheduledChangeQuery.data?.scheduledChange ?? null}
+      creditHistory={creditHistory}
+      billingHistory={billingHistory}
+    />
+  );
 }

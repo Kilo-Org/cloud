@@ -9,8 +9,8 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatDate, formatMoneyFromCents, formatPrefixedMoney } from '@/lib/format';
 import {
-  useKiloPassBillingHistory,
-  useKiloPassCreditHistory,
+  type KiloPassBillingHistory,
+  type KiloPassCreditHistory,
 } from '@/lib/hooks/use-kilo-pass-history';
 import { type KiloPassBillingEntry, type KiloPassCreditEntry } from '@/lib/kilo-pass/management';
 import { firstNonEmpty, parseTimestamp } from '@/lib/utils';
@@ -97,10 +97,14 @@ function BillingHistoryLine({ entry }: Readonly<{ entry: KiloPassBillingEntry }>
   return <HistoryLine title={title} date={historyDate(entry.date)} amount={amount} />;
 }
 
-/** The credits each Kilo Pass month has granted, newest first. */
-export function KiloPassCreditHistorySection() {
+/**
+ * The credits each Kilo Pass month has granted, newest first.
+ */
+export function KiloPassCreditHistorySection({
+  history,
+}: Readonly<{ history: KiloPassCreditHistory }>) {
   const { t } = useTranslation();
-  const { query, entries, hasMore } = useKiloPassCreditHistory(true);
+  const { query, entries, hasMore } = history;
   const firstPageFailed = query.isError && entries.length === 0;
 
   let body: ReactNode = null;
@@ -115,7 +119,7 @@ export function KiloPassCreditHistorySection() {
     body = (
       <SectionError
         onRetry={() => {
-          void query.refetch();
+          query.refetch();
         }}
       />
     );
@@ -137,7 +141,9 @@ export function KiloPassCreditHistorySection() {
           variant="outline"
           size="sm"
           loading={query.isFetchingNextPage}
-          onPress={() => void query.fetchNextPage()}
+          onPress={() => {
+            query.fetchNextPage();
+          }}
           accessibilityLabel={t('common.loadMore')}
         >
           <Text>{t('common.loadMore')}</Text>
@@ -146,7 +152,7 @@ export function KiloPassCreditHistorySection() {
       {query.isFetchNextPageError && (
         <SectionError
           onRetry={() => {
-            void query.fetchNextPage();
+            query.fetchNextPage();
           }}
         />
       )}
@@ -155,9 +161,11 @@ export function KiloPassCreditHistorySection() {
 }
 
 /** The Stripe invoices a Stripe-billed pass has produced, newest first. */
-export function KiloPassBillingHistorySection() {
+export function KiloPassBillingHistorySection({
+  history,
+}: Readonly<{ history: KiloPassBillingHistory }>) {
   const { t } = useTranslation();
-  const { query, entries, hasMore } = useKiloPassBillingHistory(true);
+  const { query, entries, hasMore } = history;
   const firstPageFailed = query.isError && entries.length === 0;
 
   let body: ReactNode = null;
@@ -172,7 +180,7 @@ export function KiloPassBillingHistorySection() {
     body = (
       <SectionError
         onRetry={() => {
-          void query.refetch();
+          query.refetch();
         }}
       />
     );
@@ -194,7 +202,9 @@ export function KiloPassBillingHistorySection() {
           variant="outline"
           size="sm"
           loading={query.isFetchingNextPage}
-          onPress={() => void query.fetchNextPage()}
+          onPress={() => {
+            query.fetchNextPage();
+          }}
           accessibilityLabel={t('common.loadMore')}
         >
           <Text>{t('common.loadMore')}</Text>
@@ -203,7 +213,7 @@ export function KiloPassBillingHistorySection() {
       {query.isFetchNextPageError && (
         <SectionError
           onRetry={() => {
-            void query.fetchNextPage();
+            query.fetchNextPage();
           }}
         />
       )}

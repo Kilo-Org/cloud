@@ -7,7 +7,7 @@ import {
   sessionLiveFailureSchema,
   sessionLivePlanSchema,
   sessionLiveStepSchema,
-} from '@kilocode/session-ingest-contracts';
+} from '@kilocode/session-ingest-contracts/session-live-summary';
 
 import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
 import {

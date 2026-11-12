@@ -11,6 +11,25 @@ import {
   isShortViewport,
 } from './centered-state-layout';
 
+/**
+ * Where the layout engine draws the content inside a scroll container that
+ * carries these paddings: centered in the slack when the content is shorter
+ * than the container, and from the top padding when it is taller.
+ */
+function renderedTop(
+  layout: { minHeight: number; paddingTop: number; paddingBottom: number },
+  viewportTop: number,
+  contentHeight: number
+) {
+  const container = Math.max(
+    layout.minHeight,
+    layout.paddingTop + contentHeight + layout.paddingBottom
+  );
+  const inside =
+    layout.paddingTop + (container - layout.paddingTop - layout.paddingBottom - contentHeight) / 2;
+  return viewportTop + inside;
+}
+
 describe('getCenteredStateLayout', () => {
   it.each([
     { title: 'no header or footer', viewport: { top: 0, bottom: 800 } },
@@ -24,7 +43,9 @@ describe('getCenteredStateLayout', () => {
       viewport,
       contentHeight: 200,
     });
-    expect(viewport.top + layout.paddingTop + 100).toBe((viewport.top + viewport.bottom) / 2);
+    expect(renderedTop(layout, viewport.top, 200) + 100).toBe(
+      (viewport.top + viewport.bottom) / 2
+    );
     expect(layout.minHeight).toBe(viewport.bottom - viewport.top);
   });
 
@@ -34,7 +55,7 @@ describe('getCenteredStateLayout', () => {
       viewport: { top: 380, bottom: 800 },
       contentHeight: 100,
     });
-    expect(380 + layout.paddingTop + 50).toBe(590);
+    expect(renderedTop(layout, 380, 100) + 50).toBe(590);
   });
 
   it('centers a short sheet inside its band', () => {
@@ -43,9 +64,7 @@ describe('getCenteredStateLayout', () => {
       viewport: { top: 60, bottom: 320 },
       contentHeight: 180,
     });
-    expect(layout.paddingTop).toBe(40);
-    expect(60 + layout.paddingTop + 90).toBe(190);
-    expect(layout.paddingBottom).toBe(40);
+    expect(renderedTop(layout, 60, 180) + 90).toBe(190);
   });
 
   it('centers below a tall header in the band that is left', () => {
@@ -54,18 +73,17 @@ describe('getCenteredStateLayout', () => {
       viewport: { top: 450, bottom: 800 },
       contentHeight: 200,
     });
-    expect(layout.paddingTop).toBe(75);
+    expect(renderedTop(layout, 450, 200) + 100).toBe(625);
   });
 
   it('keeps content above an overlay without counting its inset twice', () => {
     const layout = getCenteredStateLayout({
       window: { top: 0, bottom: 800 },
       viewport: { top: 100, bottom: 720 },
-      contentHeight: 600,
       bottomInset: 80,
+      contentHeight: 600,
     });
-    expect(layout.paddingTop).toBe(10);
-    expect(layout.paddingBottom).toBe(10);
+    expect(renderedTop(layout, 100, 600) + 300).toBe(410);
   });
 
   it.each([
@@ -74,46 +92,90 @@ describe('getCenteredStateLayout', () => {
       window: { top: 0, bottom: 640 },
       viewport: { top: 384, bottom: 640 },
       contentHeight: 177.5,
-      paddingTop: 39.25,
+      center: 512,
     },
     {
       name: 'iOS language picker above the keyboard',
       window: { top: 0, bottom: 435 },
       viewport: { top: 155, bottom: 667 },
       contentHeight: 109,
-      paddingTop: 85.5,
+      center: 295,
     },
     {
       name: 'Android language picker above the keyboard',
       window: { top: 0, bottom: 340 },
       viewport: { top: 173, bottom: 640 },
       contentHeight: 108.5,
-      paddingTop: 29.25,
+      center: 256.5,
     },
-  ])('centers inside the $name band', ({ window, viewport, contentHeight, paddingTop }) => {
+  ])('centers inside the $name band', ({ window, viewport, contentHeight, center }) => {
     const layout = getCenteredStateLayout({ window, viewport, contentHeight });
-    expect(layout.paddingTop).toBe(paddingTop);
-    expect(viewport.top + layout.paddingTop + contentHeight).toBeLessThanOrEqual(window.bottom);
+    expect(renderedTop(layout, viewport.top, contentHeight) + contentHeight / 2).toBe(center);
+    expect(renderedTop(layout, viewport.top, contentHeight) + contentHeight).toBeLessThanOrEqual(
+      window.bottom
+    );
   });
 
   it('does not force overflow when content exactly fills the available body', () => {
-    expect(
-      getCenteredStateLayout({
-        window: { top: 0, bottom: 400 },
-        viewport: { top: 100, bottom: 400 },
-        contentHeight: 300,
-      })
-    ).toEqual({ minHeight: 300, paddingTop: 0, paddingBottom: 0 });
+    const layout = getCenteredStateLayout({
+      window: { top: 0, bottom: 400 },
+      viewport: { top: 100, bottom: 400 },
+      contentHeight: 300,
+    });
+    expect(renderedTop(layout, 100, 300)).toBe(100);
+    expect(layout).toEqual({ minHeight: 300, paddingTop: 0, paddingBottom: 0 });
   });
 
   it('gives tall content normal scrollable padding rather than a negative offset', () => {
     const layout = getCenteredStateLayout({
       window: { top: 0, bottom: 400 },
       viewport: { top: 100, bottom: 400 },
-      contentHeight: 700,
       bottomInset: 40,
+      contentHeight: 700,
     });
     expect(layout).toEqual({ minHeight: 300, paddingTop: 16, paddingBottom: 56 });
+    expect(renderedTop(layout, 100, 700)).toBe(116);
+  });
+
+  it('does not add a second clearance for an overlay footer', () => {
+    const layout = getCenteredStateLayout({
+      window: { top: 0, bottom: 500 },
+      viewport: { top: 80, bottom: 500 },
+      bottomInset: 80,
+      contentHeight: 700,
+      nativeViewportFillsSurface: true,
+    });
+    expect(layout).toEqual({ minHeight: 420, paddingTop: 16, paddingBottom: 96 });
+  });
+
+  it('fills the sheet and centers inside its band when there is no footer', () => {
+    const layout = getCenteredStateLayout({
+      window: { top: 0, bottom: 800 },
+      viewport: { top: 380, bottom: 800 },
+      contentHeight: 120,
+      nativeViewportFillsSurface: true,
+    });
+    expect(layout).toEqual({ minHeight: 420, paddingTop: 150, paddingBottom: 150 });
+    expect(renderedTop(layout, 380, 120) + 60).toBe(590);
+  });
+
+  it('uses the visible viewport after keyboard avoidance', () => {
+    const layout = getCenteredStateLayout({
+      window: { top: 0, bottom: 500 },
+      viewport: { top: 80, bottom: 440 },
+      contentHeight: 120,
+    });
+    expect(renderedTop(layout, 80, 120) + 60).toBe(260);
+  });
+
+  it('keeps a clipped native sheet inside the window', () => {
+    const layout = getCenteredStateLayout({
+      window: { top: 0, bottom: 800 },
+      viewport: { top: 480, bottom: 1100 },
+      contentHeight: 120,
+    });
+    expect(renderedTop(layout, 480, 120) + 60).toBe(640);
+    expect(layout.paddingBottom).toBe(400);
   });
 
   it.each([false, true])(
@@ -131,7 +193,9 @@ describe('getCenteredStateLayout', () => {
       const scrollRange = layout.paddingTop + contentHeight + layout.paddingBottom - nativeHeight;
       expect(layout.minHeight).toBe(nativeHeight);
       expect(layout.paddingBottom).toBe(nativeViewportFillsSurface ? 96 : 16);
-      expect(viewport.top + layout.paddingTop + contentHeight - scrollRange).toBe(404);
+      expect(renderedTop(layout, viewport.top, contentHeight) + contentHeight - scrollRange).toBe(
+        404
+      );
     }
   );
 
@@ -139,78 +203,35 @@ describe('getCenteredStateLayout', () => {
     const layout = getCenteredStateLayout({
       window: { top: 0, bottom: 800 },
       viewport: { top: 380, bottom: 720 },
-      contentHeight: 120,
       bottomInset,
+      contentHeight: 120,
       nativeViewportFillsSurface: true,
     });
     expect(layout).toEqual({ minHeight: 420, paddingTop: 110, paddingBottom: 190 });
-    expect(380 + layout.paddingTop + 60).toBe(550);
-  });
-
-  it('does not add a second clearance for an overlay footer', () => {
-    const layout = getCenteredStateLayout({
-      window: { top: 0, bottom: 500 },
-      viewport: { top: 80, bottom: 500 },
-      contentHeight: 700,
-      bottomInset: 80,
-      nativeViewportFillsSurface: true,
-    });
-    expect(layout).toEqual({ minHeight: 420, paddingTop: 16, paddingBottom: 96 });
-  });
-
-  it('fills the sheet and centers inside its band when there is no footer', () => {
-    const layout = getCenteredStateLayout({
-      window: { top: 0, bottom: 800 },
-      viewport: { top: 380, bottom: 800 },
-      contentHeight: 120,
-      nativeViewportFillsSurface: true,
-    });
-    expect(layout).toEqual({ minHeight: 420, paddingTop: 150, paddingBottom: 150 });
-  });
-
-  it('uses the visible viewport after keyboard avoidance', () => {
-    const layout = getCenteredStateLayout({
-      window: { top: 0, bottom: 500 },
-      viewport: { top: 80, bottom: 440 },
-      contentHeight: 120,
-    });
-    expect(80 + layout.paddingTop + 60).toBe(260);
-  });
-
-  it('keeps a clipped native sheet inside the window', () => {
-    const layout = getCenteredStateLayout({
-      window: { top: 400, bottom: 800 },
-      viewport: { top: 480, bottom: 1100 },
-      contentHeight: 120,
-    });
-    expect(480 + layout.paddingTop + 60).toBe(640);
-    expect(layout.paddingBottom).toBe(400);
+    expect(renderedTop(layout, 380, 120) + 60).toBe(550);
   });
 });
 
 describe('native keyboard clipping', () => {
-  it('keeps the native scroll extent while centering above the keyboard', () => {
-    const layout = getCenteredStateLayout({
+  const layoutWithKeyboard = (contentHeight: number) =>
+    getCenteredStateLayout({
       window: { top: 0, bottom: 400 },
       viewport: { top: 80, bottom: 620 },
-      contentHeight: 120,
+      contentHeight,
       nativeViewportFillsSurface: true,
       nativeViewportBottom: 700,
     });
+
+  it('keeps the native scroll extent while centering above the keyboard', () => {
+    const layout = layoutWithKeyboard(120);
     expect(layout).toEqual({ minHeight: 620, paddingTop: 100, paddingBottom: 400 });
-    expect(80 + layout.paddingTop + 60).toBe(240);
+    expect(renderedTop(layout, 80, 120) + 60).toBe(240);
   });
 
   it('keeps a long state action above the keyboard at the end of scrolling', () => {
-    const layout = getCenteredStateLayout({
-      window: { top: 0, bottom: 400 },
-      viewport: { top: 80, bottom: 620 },
-      contentHeight: 800,
-      nativeViewportFillsSurface: true,
-      nativeViewportBottom: 700,
-    });
+    const layout = layoutWithKeyboard(800);
     const scrollRange = layout.paddingTop + 800 + layout.paddingBottom - layout.minHeight;
-    expect(80 + layout.paddingTop + 800 - scrollRange).toBe(384);
+    expect(renderedTop(layout, 80, 800) + 800 - scrollRange).toBe(384);
   });
 });
 
@@ -283,12 +304,24 @@ describe('getPendingCenteredStateStyle', () => {
     // the page header, and the tab bar reserved at the bottom.
     const window = { top: 0, bottom: 914.29 };
     const viewport = { top: 155.81, bottom: 914.29 };
-    const contentHeight = 170.67;
-    const layout = getCenteredStateLayout({ window, viewport, contentHeight, bottomInset: 78 });
     const pending = getPendingCenteredStateStyle(78);
-    const slack = viewport.bottom - viewport.top - pending.paddingTop - pending.paddingBottom;
-    expect(pending.paddingTop + (slack - contentHeight) / 2).toBeCloseTo(layout.paddingTop, 6);
-    expect(layout.paddingTop).toBeCloseTo(254.9, 1);
+    for (const contentHeight of [120, 170.67, 320]) {
+      const layout = getCenteredStateLayout({ window, viewport, bottomInset: 78, contentHeight });
+      expect(
+        renderedTop({ ...pending, minHeight: 758.48 }, viewport.top, contentHeight)
+      ).toBeCloseTo(renderedTop(layout, viewport.top, contentHeight), 6);
+    }
+    const measured = getCenteredStateLayout({
+      window,
+      viewport,
+      bottomInset: 78,
+      contentHeight: 170.67,
+    });
+    expect(renderedTop(measured, viewport.top, 170.67)).toBeCloseTo(410.67, 1);
+  });
+
+  it('keeps the bottom reserve free before the viewport is measured', () => {
+    const pending = getPendingCenteredStateStyle(78);
     expect(pending.paddingBottom - pending.paddingTop).toBe(78);
   });
 });

@@ -1,13 +1,16 @@
 export type StateFrame = Readonly<{ top: number; bottom: number }>;
 
-type CenteredStateLayoutInput = {
+type CenteredStateBandInput = {
   window: StateFrame;
   viewport: StateFrame;
-  contentHeight: number;
   topInset?: number;
   bottomInset?: number;
   nativeViewportFillsSurface?: boolean;
   nativeViewportBottom?: number;
+};
+
+type CenteredStateLayoutInput = CenteredStateBandInput & {
+  contentHeight: number;
   roundToPixel?: (value: number) => number;
 };
 
@@ -144,11 +147,6 @@ export function getCenteredStateLayout({
   });
   const bandHeight = bottom - top;
   const fits = contentHeight <= roundToPixel(bandHeight);
-  // A state that fits centers in the band the scroller shows. The pending style
-  // (`getPendingCenteredStateStyle`) leaves that centering to the layout engine,
-  // so the first painted position already equals this one and a state that
-  // mounted before its band was measurable does not move when the measurement
-  // lands.
   const contentTop = fits ? top + (bandHeight - contentHeight) / 2 : top + STATE_GAP;
 
   const paddingTop = Math.max(0, contentTop - viewport.top);
@@ -165,12 +163,42 @@ export function getCenteredStateLayout({
 }
 
 /**
- * The content style a centered state paints before its band and its content
- * height are measurable: the layout engine centers the content in the scroller
- * and the bottom reserve keeps it above the tab bar, which is the same placement
- * `getCenteredStateLayout` computes for the band once the measurement lands.
- * The top and bottom constants cancel in the centering, so only the bottom
- * reserve moves the content.
+ * The content box that places a state at the center of the band before its
+ * content height is known: the layout engine centers the content, and the two
+ * paddings only carry the band's own asymmetry — how far the band's top sits
+ * below the scroller's top, and how far its bottom sits above the scroller's
+ * bottom. `getCenteredStateLayout` computes the same center once the content
+ * reports its height, so a state painted with this style does not move.
+ */
+export function getCenteredStateBandStyle({
+  window: windowFrame,
+  viewport,
+  topInset = 0,
+  bottomInset = 0,
+  nativeViewportFillsSurface = false,
+  nativeViewportBottom = windowFrame.bottom,
+}: CenteredStateBandInput) {
+  const viewportBottom = nativeViewportFillsSurface ? nativeViewportBottom : viewport.bottom;
+  const { top, bottom } = getCenteredStateBand({
+    window: windowFrame,
+    viewport,
+    topInset,
+    bottomInset,
+  });
+  return {
+    minHeight: Math.max(0, viewportBottom - viewport.top),
+    justifyContent: 'center' as const,
+    paddingTop: Math.max(0, top - viewport.top) + STATE_GAP,
+    paddingBottom: Math.max(0, viewportBottom - bottom) + STATE_GAP,
+  };
+}
+
+/**
+ * The content box a centered state paints before the scroller has reported its
+ * viewport: the layout engine centers the content in the scroller and the bottom
+ * reserve keeps it above the tab bar. That is what
+ * `getCenteredStateBandStyle` returns when the band starts at the scroller's
+ * top, the case of a scroller below the page header.
  */
 export function getPendingCenteredStateStyle(bottomInset: number) {
   return {

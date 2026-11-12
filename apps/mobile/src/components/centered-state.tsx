@@ -13,6 +13,7 @@ import { ShortCenteredBandProvider } from '@/components/centered-state-band';
 import { useStateSurface } from '@/components/centered-state-surface';
 import { RefreshProgress } from '@/components/ui/refresh-progress';
 import {
+  getCenteredStateBandStyle,
   getCenteredStateLayout,
   getPendingCenteredStateStyle,
   isShortViewport,
@@ -135,6 +136,10 @@ export function CenteredState({
     });
   }, [frame]);
 
+  const measureContent = useCallback((event: LayoutChangeEvent) => {
+    setContentHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
+  }, []);
+
   const capture = useCallback(
     (node: ScrollViewInstance | null) => {
       scrollRef.current = node;
@@ -150,32 +155,38 @@ export function CenteredState({
     };
   }, [measure]);
 
-  const measureContent = useCallback((event: LayoutChangeEvent) => {
-    setContentHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
-  }, []);
+  // The stored viewport carries the band it was measured against, and the window
+  // frame is a fresh object on every dimension change, so compare the band
+  // itself: a state whose window has not moved keeps its placement instead of
+  // dropping back to the pending one and jumping when it returns.
+  const measuredViewport = useMemo(() => {
+    if (!viewport || viewport.surface.top !== frame.top || viewport.surface.bottom !== frame.bottom) {
+      return null;
+    }
+    return viewport.frame;
+  }, [frame, viewport]);
+
+  // The placement: centered in the band the scroller shows. Until the content
+  // reports its height the band style places it by centering alone, which is the
+  // same position, so the first frame and every later frame agree.
   const layout = useMemo(() => {
-    // The stored viewport carries the band it was measured against, and the
-    // surface publishes a fresh frame object on every measurement, so compare
-    // the band itself: a state whose surface has not moved keeps its placement
-    // instead of dropping back to the pending one and jumping when it returns.
-    const measured = viewport;
-    if (
-      !measured ||
-      measured.surface.top !== frame.top ||
-      measured.surface.bottom !== frame.bottom ||
-      contentHeight === null
-    ) {
+    if (!measuredViewport) {
       return undefined;
     }
-    const measuredFrame = measured.frame;
-    return getCenteredStateLayout({
+    const band = {
       window: frame,
-      viewport: measuredFrame,
-      contentHeight,
+      viewport: measuredViewport,
       topInset,
       bottomInset,
       nativeViewportFillsSurface,
       nativeViewportBottom: boundsBottom,
+    };
+    if (contentHeight === null) {
+      return getCenteredStateBandStyle(band);
+    }
+    return getCenteredStateLayout({
+      ...band,
+      contentHeight,
       roundToPixel: value => PixelRatio.roundToNearestPixel(value),
     });
   }, [
@@ -183,9 +194,9 @@ export function CenteredState({
     bottomInset,
     contentHeight,
     frame,
+    measuredViewport,
     nativeViewportFillsSurface,
     topInset,
-    viewport,
   ]);
   // While the measured layout is pending, the state paints with the layout
   // engine's own centering and the same bottom reserve the measured layout

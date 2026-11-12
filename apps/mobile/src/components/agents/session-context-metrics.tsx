@@ -101,8 +101,10 @@ export function SessionContextMetrics({
 
   // A value has no placeholder: the percentage paints once the session reports
   // it, and the cost paints once it is known, so the pill never stands a dash in
-  // for a number that has not arrived. The dash a session shows when it reported
-  // tokens but no context window is a real value and paints.
+  // for a number that has not arrived. A session that reported tokens but no
+  // context window has no honest percentage either, so its slot paints nothing;
+  // the ring's indeterminate arc, the accessibility label and the context sheet
+  // carry the unknown.
   const costLabel =
     content.costSlot === 'label' && content.secondary !== null
       ? isolateLtrBidiText(content.secondary)

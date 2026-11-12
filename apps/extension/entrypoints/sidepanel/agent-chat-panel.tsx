@@ -120,18 +120,37 @@ export const getSelectedInspectableTabId = ({
     ? selectedTabId
     : undefined;
 
+const isSignInPageUrl = (url: string): boolean => {
+  try {
+    const { pathname } = new URL(url);
+
+    return pathname.includes('sign_in') || pathname.includes('device-auth');
+  } catch {
+    return false;
+  }
+};
+
 export const getInitialInspectableTabId = ({
   activeTabId,
   inspectableTabs,
 }: {
   readonly activeTabId?: number | undefined;
-  readonly inspectableTabs: readonly { readonly id: number }[];
+  readonly inspectableTabs: readonly { readonly id: number; readonly url: string }[];
 }): number | undefined => {
-  if (activeTabId !== undefined && inspectableTabs.some(tab => tab.id === activeTabId)) {
-    return activeTabId;
+  const activeTab =
+    activeTabId === undefined ? undefined : inspectableTabs.find(tab => tab.id === activeTabId);
+
+  // Kilo's own sign-in and device-auth pages are leftovers, not pages to read: prefer the first
+  // real page and fall back to them only when nothing else is open.
+  if (activeTab !== undefined && !isSignInPageUrl(activeTab.url)) {
+    return activeTab.id;
   }
 
-  return inspectableTabs[0]?.id;
+  return (
+    inspectableTabs.find(tab => !isSignInPageUrl(tab.url))?.id ??
+    activeTab?.id ??
+    inspectableTabs[0]?.id
+  );
 };
 
 export const formatSystemEnvironment = ({
@@ -1155,9 +1174,12 @@ export const AgentChatPanel = ({
     void (async (): Promise<void> => {
       try {
         const freshActiveTabId = await getActiveTabId(browser.tabs);
-        const latestTabs = inspectableTabsRef.current;
+        const initialTabId = getInitialInspectableTabId({
+          activeTabId: freshActiveTabId,
+          inspectableTabs: inspectableTabsRef.current,
+        });
 
-        if (freshActiveTabId !== undefined && latestTabs.some(tab => tab.id === freshActiveTabId)) {
+        if (initialTabId !== undefined) {
           setConversationStore(currentStore => {
             const conversation = currentStore.conversations.find(
               item => item.id === newConversationId
@@ -1168,7 +1190,7 @@ export const AgentChatPanel = ({
             }
 
             return updateStoredConversationSettings(currentStore, newConversationId, {
-              selectedTabId: freshActiveTabId,
+              selectedTabId: initialTabId,
             });
           });
         }

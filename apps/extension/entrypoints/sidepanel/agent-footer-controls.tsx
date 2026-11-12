@@ -220,10 +220,10 @@ export const AgentFooterControls = ({
           value={selectedTabId === undefined ? '' : String(selectedTabId)}
         >
           {inspectableTabs.length === 0 ? (
-            <option value="">{isLoadingTabs ? 'Loading tabs...' : 'No tabs available'}</option>
+            <option value="">{isLoadingTabs ? 'Loading tabs...' : 'No tab selected'}</option>
           ) : (
             <>
-              {selectedTabId === undefined ? <option value="">Pick a tab</option> : null}
+              {selectedTabId === undefined ? <option value="">No tab selected</option> : null}
               {inspectableTabs.map(tab => (
                 <option key={tab.id} value={tab.id}>
                   {tab.title}

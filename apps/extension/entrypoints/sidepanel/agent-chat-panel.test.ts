@@ -61,7 +61,11 @@ describe('inspectable tab selection resolution', () => {
 });
 
 describe('initial tab selection', () => {
-  const inspectableTabs = [{ id: 1 }, { id: 2 }, { id: 3 }];
+  const inspectableTabs = [
+    { id: 1, url: 'https://example.com/' },
+    { id: 2, url: 'https://example.org/' },
+    { id: 3, url: 'https://example.net/' },
+  ];
 
   it('adopts the active tab when it is inspectable', () => {
     expect(getInitialInspectableTabId({ activeTabId: 2, inspectableTabs })).toBe(2);
@@ -69,6 +73,29 @@ describe('initial tab selection', () => {
 
   it('falls back to the first inspectable tab when the active tab is not inspectable', () => {
     expect(getInitialInspectableTabId({ activeTabId: 99, inspectableTabs })).toBe(1);
+  });
+
+  it('skips Kilo sign-in leftovers when a real page is open', () => {
+    expect(
+      getInitialInspectableTabId({
+        activeTabId: 4,
+        inspectableTabs: [
+          ...inspectableTabs,
+          { id: 4, url: 'http://localhost:3000/users/sign_in?next=%2Fdevice-auth' },
+        ],
+      })
+    ).toBe(1);
+  });
+
+  it('keeps a sign-in page when it is the only inspectable tab', () => {
+    expect(
+      getInitialInspectableTabId({
+        activeTabId: 4,
+        inspectableTabs: [
+          { id: 4, url: 'http://localhost:3000/users/sign_in?next=%2Fdevice-auth' },
+        ],
+      })
+    ).toBe(4);
   });
 
   it('returns undefined when nothing is inspectable', () => {

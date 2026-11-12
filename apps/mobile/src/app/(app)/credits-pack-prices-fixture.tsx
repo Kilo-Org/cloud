@@ -18,6 +18,7 @@ export default function CreditPackPricesFixtureRoute() {
   if (!__DEV__) {
     return <Redirect href="/" />;
   }
-  const resolved: CreditPackPricesFixtureState = state === 'priced' ? 'priced' : 'partly-priced';
+  const resolved: CreditPackPricesFixtureState =
+    state === 'priced' || state === 'completing' ? state : 'partly-priced';
   return <CreditPackPricesFixture state={resolved} />;
 }

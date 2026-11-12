@@ -240,11 +240,15 @@ export function CreditPurchaseScreen() {
               // drops them when initialization fails), so even a priced row
               // cannot complete: keep every row disabled until it reconnects.
               const disabled = purchasing || !connected || !hasStorePrice;
-              // The trailing slot carries the row's short state: the store price,
-              // or the in-flight label in its place. A swap there changes no
-              // row's height, so a purchase never moves the rows below.
+              // The trailing slot holds the store price only: it keeps its one
+              // line and its full width, so the title yields and a price a user
+              // pays is never truncated.
               const storePrice = hasStorePrice ? pack.displayPrice : null;
-              const trailingLabel = rowCompleting ? t('kiloPass.completingPurchase') : storePrice;
+              // The in-flight label takes the row's last line, in place of the
+              // expiry note. That line keeps one height for both, so a purchase
+              // never changes a row's height, and the label keeps the full row
+              // width instead of squeezing the title.
+              const completingLabel = rowCompleting ? t('kiloPass.completingPurchase') : null;
               // A status phrase reads on its own line under the title, so the
               // title keeps one line at the compact width. The store-unavailable
               // card above already names the failure, so no row repeats it
@@ -261,7 +265,7 @@ export function CreditPurchaseScreen() {
               // above is its only visible statement.
               const rowAccessibilityLabel = [
                 packLabel,
-                trailingLabel ?? statusLabel ?? t('credits.priceUnavailable'),
+                completingLabel ?? statusLabel ?? storePrice ?? t('credits.priceUnavailable'),
                 expiryMessage,
               ]
                 .filter(Boolean)
@@ -286,38 +290,36 @@ export function CreditPurchaseScreen() {
                     <Text className="flex-1 font-semibold text-foreground" numberOfLines={1}>
                       {packLabel}
                     </Text>
-                    {/* The trailing slot keeps its one line in every state: the
-                        store price, or the in-flight label in its place. It keeps
-                        its full width, so the title yields instead and a price a
-                        user pays is never truncated. */}
-                    {trailingLabel !== null && (
-                      <Text
-                        className={cn(
-                          'shrink-0 text-base font-semibold text-foreground',
-                          !rowCompleting && 'tabular-nums'
-                        )}
-                      >
-                        {trailingLabel}
+                    {storePrice !== null && (
+                      <Text className="shrink-0 text-base font-semibold text-foreground tabular-nums">
+                        {storePrice}
                       </Text>
                     )}
                   </View>
                   {/* The status, when a row states one, takes its own line
-                      under the title. The expiry note then follows the last
-                      line of the title block: one small gap under a status
-                      line, and the row's usual gap under the title itself. No
-                      row keeps an empty band for a status it does not state. */}
+                      under the title. The last line then follows the title
+                      block: one small gap under a status line, and the row's
+                      usual gap under the title itself. No row keeps an empty
+                      band for a status it does not state. */}
                   {statusLabel !== null && (
                     <Text className="mt-1 text-sm text-muted-foreground">{statusLabel}</Text>
                   )}
-                  {expiryMessage && (
-                    <Text
+                  {/* One fixed-height line holds the expiry note, or the
+                      in-flight label in its place, so a purchase never changes
+                      any row's height. */}
+                  {(expiryMessage !== undefined || completingLabel !== null) && (
+                    <View
                       className={cn(
-                        'text-xs text-muted-foreground',
+                        'min-h-5 justify-center',
                         statusLabel === null ? 'mt-2' : 'mt-1'
                       )}
                     >
-                      {expiryMessage}
-                    </Text>
+                      {completingLabel === null ? (
+                        <Text className="text-xs text-muted-foreground">{expiryMessage}</Text>
+                      ) : (
+                        <Text className="text-sm text-muted-foreground">{completingLabel}</Text>
+                      )}
+                    </View>
                   )}
                 </Pressable>
               );

@@ -19,11 +19,13 @@ import {
 // Development-only fixture for the design gate and for a manual look at pack
 // rows the emulator cannot produce: it has no store connection, so every real
 // row is unpriced there. The fixture mounts the real screen against fixed store
-// answers and never reaches the network. `state=priced` prices every pack and
+// answers and never reaches the network. `state=priced` prices every pack,
 // `state=partly-priced` leaves the largest pack unpriced, which is the only
-// state that renders a row-level price status beside a priced row.
+// state that renders a row-level price status beside a priced row, and
+// `state=completing` prices every pack and starts a purchase on the first one,
+// which an emulator cannot reach without a store.
 
-export type CreditPackPricesFixtureState = 'priced' | 'partly-priced';
+export type CreditPackPricesFixtureState = 'priced' | 'partly-priced' | 'completing';
 
 /** Store prices in the shape the German Play store returns for these packs. */
 const PLAY_PRICES = ['10,99 €', '54,99 €', '109,99 €', '549,99 €'] as const;
@@ -91,7 +93,7 @@ function fixtureResponse(value: unknown): Response {
 }
 
 function listings(state: CreditPackPricesFixtureState): StoreCreditProductListing[] {
-  const priced = state === 'priced' ? backends.products : backends.products.slice(0, 3);
+  const priced = state === 'partly-priced' ? backends.products.slice(0, 3) : backends.products;
   // The join key differs per store, so each listing carries the id of the
   // storefront the app reports. A Play id would join to nothing on the other
   // store, and the state would silently render as store-unavailable.
@@ -210,7 +212,9 @@ export function CreditPackPricesFixture({ state }: { state: CreditPackPricesFixt
         await Promise.resolve();
         return false;
       },
-      completingProductId: null,
+      // The completing state keeps the first pack's purchase open, which is the
+      // only way to render its in-flight label without a store.
+      completingProductId: state === 'completing' ? (listings(state)[0]?.id ?? null) : null,
       errorMessageKey: null,
       completedPurchaseCount: 0,
       clearError: () => undefined,

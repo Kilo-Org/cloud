@@ -733,17 +733,22 @@ describe('CreditPurchaseScreen', () => {
       )
     ).toBe(true);
     // No row keeps an empty band for a status it does not state: the title row
-    // and the expiry note are the row's only children, at the row's usual gap.
+    // and the row's one note line are its only children. The note line keeps a
+    // fixed height for the note or the in-flight label it may hold.
     expect(
       rows.every(row => {
         const children = row.children;
-        const note = children[1];
+        const line = children[1];
+        if (children.length !== 2 || line === undefined || typeof line === 'string') {
+          return false;
+        }
+        const texts = line.findAll(node => String(node.type) === 'Text');
         return (
-          children.length === 2 &&
-          note !== undefined &&
-          typeof note !== 'string' &&
-          String(note.type) === 'Text' &&
-          classNameOf(note).includes('mt-2')
+          String(line.type) === 'View' &&
+          classNameOf(line).includes('min-h-5') &&
+          classNameOf(line).includes('mt-2') &&
+          texts.length === 1 &&
+          texts[0]?.props.children === 'Credits purchased through the App Store do not expire.'
         );
       })
     ).toBe(true);
@@ -775,20 +780,22 @@ describe('CreditPurchaseScreen', () => {
     const unpricedStatus = unpriced[1];
     expect(String(unpricedStatus?.props.className)).toContain('mt-1');
     expect(String(unpricedStatus?.parent?.props.className)).not.toContain('flex-row');
-    // The expiry note follows the last line of the title block tightly: after a
-    // status, and directly under a title that states none.
-    expect(String(unpriced[2]?.props.className)).toContain('mt-1');
-    expect(String(priced[2]?.props.className)).toContain('mt-2');
-    expect(
-      rows.every(
-        row =>
-          row.findAll(
-            node =>
-              String(node.type) === 'View' &&
-              String((node.props as { className?: string }).className).includes('min-h-5')
-          ).length === 0
-      )
-    ).toBe(true);
+    // The row's last line follows the title block tightly: one small gap after
+    // a status line, and the row's usual gap under a title that states none.
+    const unpricedLine = rows[3]?.findAll(
+      node =>
+        String(node.type) === 'View' &&
+        String((node.props as { className?: string }).className).includes('min-h-5')
+    );
+    const pricedLine = rows[0]?.findAll(
+      node =>
+        String(node.type) === 'View' &&
+        String((node.props as { className?: string }).className).includes('min-h-5')
+    );
+    expect(unpricedLine).toHaveLength(1);
+    expect(pricedLine).toHaveLength(1);
+    expect(String(unpricedLine?.[0]?.props.className)).toContain('mt-1');
+    expect(String(pricedLine?.[0]?.props.className)).toContain('mt-2');
     unmount();
   });
 
@@ -875,13 +882,19 @@ describe('CreditPurchaseScreen', () => {
     const busyTexts = busyRow?.findAll(node => String(node.type) === 'Text') ?? [];
     expect(busyTexts.map(node => node.props.children)).toEqual([
       `Add ${packAmount('$10.00')} of credits`,
+      '$10.99',
       'Completing purchase',
-      'Credits purchased through the App Store do not expire.',
     ]);
-    // The state occupies the trailing slot of the title line, beside the title
-    // rather than on a line of its own, so the row keeps its height.
-    const busyState = busyTexts[1];
-    expect(busyState === undefined ? '' : classNameOf(busyState)).toContain('shrink-0');
+    // The label takes the row's last line in place of the expiry note, and that
+    // line keeps one height for both, so the row does not change height.
+    const busyLine = busyRow?.findAll(
+      node =>
+        String(node.type) === 'View' &&
+        String((node.props as { className?: string }).className).includes('min-h-5')
+    );
+    expect(busyLine).toHaveLength(1);
+    expect(busyLine?.[0]?.findAll(node => String(node.type) === 'Text')).toHaveLength(1);
+    expect(busyTexts).toHaveLength(3);
     expect(
       (busyRow?.props as { accessibilityLabel?: string } | undefined)?.accessibilityLabel
     ).toBe(

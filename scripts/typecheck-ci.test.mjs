@@ -1797,9 +1797,11 @@ test('the extension matrix row defers to extension CI outside the merge queue', 
 });
 
 // A selection document from scripts/affected-workspaces.mjs, as the root script
-// reads it.
+// reads it. `base_valid` is true for a normal run: the detector read the base and
+// attributed the change.
 const selection = (overrides = {}) => ({
   base: 'base',
+  base_valid: true,
   full: false,
   reasons: [],
   full_checks: [],
@@ -1820,6 +1822,7 @@ function runTypecheck(
     buildExit = 0,
     checkExit = 0,
     built = '',
+    event = '',
     affected = selection(),
     selectionExit = 0,
   } = {}
@@ -1892,6 +1895,7 @@ if (name === 'git') {
       env: {
         ...process.env,
         PATH: `${bin}:${process.env.PATH}`,
+        GITHUB_EVENT_NAME: event,
         KILO_TYPECHECK_TRPC_BUILT: built,
         EXTENSION_TYPECHECK: extension.scripts.typecheck,
         CHANGES: changes,
@@ -2163,6 +2167,84 @@ test('the web group stays out of a selection that names neither program', t => {
   });
   assert.equal(result.status, 0);
   assert.deepEqual(result.commands, []);
+});
+
+// extension-ci.yml has no merge-queue trigger, so the trpc row is the
+// extension's only gate on a queue entry: the leg must stay there.
+test('the trpc group typechecks the extension for a merge queue entry', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    group: 'trpc',
+    event: 'merge_group',
+    affected: selection({ full: true, dirs: ['apps/extension', 'apps/web'] }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.commands, [trpcBuild, 'pnpm --filter kilo-extension run typecheck']);
+});
+
+// extension-ci.yml runs `verify`, which typechecks the extension, whenever its
+// own selection reaches apps/extension, and that selection is this document's
+// `dirs` list. Repeating the compile in the ci.yml row pays for one program
+// twice on the same event.
+test('the trpc group leaves the extension compile to extension CI', t => {
+  for (const event of ['pull_request', 'push']) {
+    const result = runTypecheck(t, {
+      root: true,
+      group: 'trpc',
+      event,
+      built: '1',
+      affected: selection({ full: true, dirs: ['apps/extension', 'apps/web'] }),
+    });
+    assert.equal(result.status, 0);
+    assert.deepEqual(result.commands, [], `${event}: the row runs no extension check`);
+  }
+});
+
+// A full check that selects no workspace reaches the extension in no other
+// workflow, so the leg is what typechecks it.
+test('the trpc group keeps the extension when extension CI selects nothing', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    group: 'trpc',
+    event: 'pull_request',
+    built: '1',
+    affected: selection({ full_checks: ['typecheck'], dirs: [] }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.commands, ['pnpm --filter kilo-extension run typecheck']);
+});
+
+// Only the two events extension-ci.yml runs on may hand the compile over. A
+// local invocation carries no event name, and the row keeps the leg there.
+test('the trpc group typechecks the extension when the event is unknown', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    group: 'trpc',
+    built: '1',
+    affected: selection({ full: true, dirs: ['apps/extension'] }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.commands, ['pnpm --filter kilo-extension run typecheck']);
+});
+
+// A base the checkout cannot read selects every workspace without attributing
+// the change, and extension-ci.yml resolves its own fallback base for that
+// event, so the document cannot answer for it.
+test('the trpc group keeps the extension when the detector read no base', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    group: 'trpc',
+    event: 'push',
+    built: '1',
+    affected: selection({
+      base: '0000000000000000000000000000000000000000',
+      base_valid: false,
+      full: true,
+      dirs: ['apps/extension', 'apps/web'],
+    }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.commands, ['pnpm --filter kilo-extension run typecheck']);
 });
 // `pnpm-workspace.yaml` lists workspaces that sit inside another workspace
 // (services/cloud-agent-next/wrapper is one). Both the full and the affected

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { after } from 'next/server';
 import {
+  enkryptCreditsToMicrodollars,
   recordEnkryptUsage,
   type EnkryptGuardrailCall,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
@@ -31,7 +32,11 @@ import type {
   EnkryptToolScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import type { EnkryptDetectRequestDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
-import { combinedVerdict, startEnkryptInputGuardrail } from './input-guardrail';
+import {
+  combinedVerdict,
+  recordEnkryptUsageRecords,
+  startEnkryptInputGuardrail,
+} from './input-guardrail';
 
 jest.mock('next/server', () => ({
   ...jest.requireActual<Record<string, unknown>>('next/server'),
@@ -1358,6 +1363,44 @@ describe('startEnkryptInputGuardrail with many tool definitions', () => {
       ]);
       expect(mockedRedisSet.mock.calls).toEqual(allowWrites(keys));
     });
+  });
+});
+
+describe('recordEnkryptUsageRecords', () => {
+  const usageRecord = { ...call(), addedLatencyMs: 120 };
+  const loggedFields = {
+    organization_id: scan.organizationId,
+    kilo_user_id: scan.kiloUserId,
+    session_id: scan.sessionId,
+    api_kind: scan.apiKind,
+    decision: 'allowed',
+    credits_cost: 3,
+    charged_microdollars: enkryptCreditsToMicrodollars(3),
+    added_latency_ms: 120,
+    error: 'write failed',
+  };
+
+  it('logs and drops a record whose write fails', async () => {
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockedRecordUsage.mockRejectedValueOnce(new Error('write failed'));
+
+    await recordEnkryptUsageRecords([usageRecord, usageRecord]);
+
+    expect(mockedRecordUsage).toHaveBeenCalledTimes(2);
+    expect(errorLog.mock.calls).toEqual([
+      ['[enkrypt-guardrail] usage record write failed; record dropped', loggedFields],
+    ]);
+  });
+
+  it('logs the given fields first', async () => {
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockedRecordUsage.mockRejectedValueOnce(new Error('write failed'));
+
+    await recordEnkryptUsageRecords([usageRecord], { guardrail: 'output' });
+
+    const [[, fields]] = errorLog.mock.calls;
+    expect(fields).toEqual({ guardrail: 'output', ...loggedFields });
+    expect(Object.keys(fields as object)[0]).toBe('guardrail');
   });
 });
 

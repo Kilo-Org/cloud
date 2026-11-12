@@ -91,6 +91,31 @@ export function usageRecordsWithAddedLatency(
   }));
 }
 
+/** Never rejects: a failed write is logged, with `logFields` first, and the record dropped. */
+export async function recordEnkryptUsageRecords(
+  usageRecords: EnkryptUsageRecord[],
+  logFields: Record<string, unknown> = {}
+): Promise<void> {
+  await Promise.all(
+    usageRecords.map(usageRecord =>
+      recordEnkryptUsage(usageRecord).catch((error: unknown) => {
+        console.error('[enkrypt-guardrail] usage record write failed; record dropped', {
+          ...logFields,
+          organization_id: usageRecord.organizationId,
+          kilo_user_id: usageRecord.kiloUserId,
+          session_id: usageRecord.sessionId,
+          api_kind: usageRecord.apiKind,
+          decision: usageRecord.decision,
+          credits_cost: usageRecord.creditsCost,
+          charged_microdollars: enkryptCreditsToMicrodollars(usageRecord.creditsCost),
+          added_latency_ms: usageRecord.addedLatencyMs,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      })
+    )
+  );
+}
+
 /**
  * Starts the organization's input guardrail scans. A null scan (no organization, or the guardrail
  * is off) makes no Enkrypt call. Blocking detectors and log-only detectors are scanned
@@ -180,23 +205,7 @@ export function startEnkryptInputGuardrail(
       logOnly.flatMap(result => result.usageRecords),
       addedLatencyMs
     );
-    await Promise.all(
-      usageRecords.map(usageRecord =>
-        recordEnkryptUsage(usageRecord).catch((error: unknown) => {
-          console.error('[enkrypt-guardrail] usage record write failed; record dropped', {
-            organization_id: usageRecord.organizationId,
-            kilo_user_id: usageRecord.kiloUserId,
-            session_id: usageRecord.sessionId,
-            api_kind: usageRecord.apiKind,
-            decision: usageRecord.decision,
-            credits_cost: usageRecord.creditsCost,
-            charged_microdollars: enkryptCreditsToMicrodollars(usageRecord.creditsCost),
-            added_latency_ms: usageRecord.addedLatencyMs,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        })
-      )
-    );
+    await recordEnkryptUsageRecords(usageRecords);
   });
   return {
     async requestLogs(shouldCaptureResponse = true) {

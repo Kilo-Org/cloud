@@ -16,7 +16,10 @@ import {
   type EnkryptOutputGuardrailReport,
   type EnkryptScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
-import { usageRecordsWithAddedLatency } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
+import {
+  recordEnkryptUsageRecords,
+  usageRecordsWithAddedLatency,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import {
   extractResponseText,
   type ResponseBodyFormat,
@@ -26,11 +29,9 @@ import {
   resolveEnkryptOutputGuardrail,
   splitEnkryptInputGuardrail,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
-import {
-  enkryptCreditsToMicrodollars,
-  recordEnkryptUsage,
-  type EnkryptGuardrailCall,
-  type EnkryptUsageRecord,
+import type {
+  EnkryptGuardrailCall,
+  EnkryptUsageRecord,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
@@ -188,26 +189,8 @@ function outputUsageRecords(
   );
 }
 
-/** Never rejects: a failed write is logged and the record dropped, like the input guardrail's. */
-async function recordEnkryptUsageRecords(usageRecords: EnkryptUsageRecord[]): Promise<void> {
-  await Promise.all(
-    usageRecords.map(usageRecord =>
-      recordEnkryptUsage(usageRecord).catch((error: unknown) => {
-        console.error('[enkrypt-guardrail] usage record write failed; record dropped', {
-          guardrail: 'output',
-          organization_id: usageRecord.organizationId,
-          kilo_user_id: usageRecord.kiloUserId,
-          session_id: usageRecord.sessionId,
-          api_kind: usageRecord.apiKind,
-          decision: usageRecord.decision,
-          credits_cost: usageRecord.creditsCost,
-          charged_microdollars: enkryptCreditsToMicrodollars(usageRecord.creditsCost),
-          added_latency_ms: usageRecord.addedLatencyMs,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      })
-    )
-  );
+function recordOutputUsageRecords(usageRecords: EnkryptUsageRecord[]): Promise<void> {
+  return recordEnkryptUsageRecords(usageRecords, { guardrail: 'output' });
 }
 
 function errorMessage(error: unknown): string {
@@ -416,7 +399,7 @@ export async function guardEnkryptOutput({
           });
         }
       })();
-      const logged = scanned.then(records => recordEnkryptUsageRecords(records ?? []));
+      const logged = scanned.then(records => recordOutputUsageRecords(records ?? []));
       after(logged);
       captureRequestLogs?.(async (shouldCaptureResponse = true) => {
         captureResponse.resolve(shouldCaptureResponse);
@@ -504,7 +487,7 @@ export async function guardEnkryptOutput({
       ),
     };
   })();
-  const recorded = scanned.then(({ usageRecords }) => usageRecords).then(recordEnkryptUsageRecords);
+  const recorded = scanned.then(({ usageRecords }) => usageRecords).then(recordOutputUsageRecords);
   after(recorded);
   captureRequestLogs?.(async (shouldCaptureResponse = true) => {
     captureResponse.resolve(shouldCaptureResponse);

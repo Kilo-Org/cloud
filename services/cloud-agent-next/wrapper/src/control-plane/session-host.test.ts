@@ -13,7 +13,6 @@ import { createControlPlaneTerminals } from './terminals.js';
 import { git } from '../utils.js';
 import { createKilo2Harness } from './kilo2-harness.js';
 import { createKilo2Lifecycle } from './kilo2-lifecycle.js';
-import { COMPLETION_UNCONFIRMED_MESSAGE } from './turn-completion.js';
 
 async function settle() {
   for (let index = 0; index < 40; index++) await Promise.resolve();
@@ -1403,7 +1402,7 @@ describe('completion feed continuity and idle allocation', () => {
         }
       }
       expect(f.frames.filter(frame => frame.type === 'session.outcome')).toMatchObject([
-        { status: 'failed', reason: COMPLETION_UNCONFIRMED_MESSAGE, lastMessageId: 'm1' },
+        { status: 'failed', reason: 'completion_unconfirmed', lastMessageId: 'm1' },
       ]);
       expect(f.host.getHeartbeat().active).toBe(true);
     } finally {

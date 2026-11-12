@@ -7,7 +7,6 @@ import type {
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 import { DrainSessionError, type WrapperKiloClient } from '../kilo-api.js';
 import { DEFAULT_CONDENSE_TIMEOUT_MS } from '../condense-on-complete.js';
-import { COMPLETION_UNCONFIRMED_MESSAGE } from './turn-completion.js';
 import type { Harness } from './harness.js';
 import { createKiloHarness } from './kilo-harness.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
@@ -2271,7 +2270,7 @@ describe('native completion replaces snapshot completion', () => {
     http.resolve(false);
     await settle();
     expect(outcomeFrames(h.frames)).toMatchObject([
-      { status: 'failed', reason: COMPLETION_UNCONFIRMED_MESSAGE, lastMessageId: 'm1' },
+      { status: 'failed', reason: 'completion_unconfirmed', lastMessageId: 'm1' },
     ]);
     expect(h.client(routeSpec()).drains).toHaveLength(1);
   });
@@ -3230,7 +3229,7 @@ describe('turn drain completion', () => {
         type: 'session.outcome',
         sessionId: SESSION_ID,
         status: 'failed',
-        reason: COMPLETION_UNCONFIRMED_MESSAGE,
+        reason: 'completion_unconfirmed',
         lastMessageId: 'm1',
       },
     ]);
@@ -3758,7 +3757,7 @@ describe('GitHub review publication recovery', () => {
       expect(outcomeFrames(h.frames)).toMatchObject([
         failure === 'restart'
           ? { status: 'completed' }
-          : { status: 'failed', reason: COMPLETION_UNCONFIRMED_MESSAGE },
+          : { status: 'failed', reason: 'completion_unconfirmed' },
       ]);
       expect(h.timeouts.every(timer => timer.cancelled)).toBe(true);
       expect(h.manager.hasPendingWork()).toBe(false);
@@ -4722,7 +4721,7 @@ describe('completion ownership and transport bounds', () => {
       expect(new Set(tokens).size).toBe(3);
       expect(client.drains).toHaveLength(3);
       expect(outcomeFrames(h.frames)).toMatchObject([
-        { status: 'failed', reason: COMPLETION_UNCONFIRMED_MESSAGE },
+        { status: 'failed', reason: 'completion_unconfirmed' },
       ]);
       expect(h.manager.hasPendingWork()).toBe(false);
     }
@@ -4786,7 +4785,7 @@ describe('completion ownership and transport bounds', () => {
     await settle();
     expect(client.drains).toHaveLength(1);
     expect(outcomeFrames(h.frames)).toMatchObject([
-      { status: 'failed', reason: COMPLETION_UNCONFIRMED_MESSAGE },
+      { status: 'failed', reason: 'completion_unconfirmed' },
     ]);
     expect(h.manager.hasPendingWork()).toBe(false);
   });
@@ -5199,11 +5198,7 @@ describe('native feed gaps', () => {
 
   it.each([
     ['still live', [5], { status: 'completed', lastMessageId: 'm1' }],
-    [
-      'ended',
-      [],
-      { status: 'failed', reason: COMPLETION_UNCONFIRMED_MESSAGE, lastMessageId: 'm1' },
-    ],
+    ['ended', [], { status: 'failed', reason: 'completion_unconfirmed', lastMessageId: 'm1' }],
   ] as const)(
     'holds proof until the reconcile and decides an idle root whose background child is %s',
     async (_, after, outcome) => {

@@ -7,7 +7,6 @@ import { createMessageId } from '../../../src/shared/message-id.js';
 import { createKiloRuntime } from './kilo-runtime.js';
 import { createTurnManager } from './turn.js';
 import { DrainSessionError } from '../kilo-api.js';
-import { COMPLETION_UNCONFIRMED_MESSAGE } from './turn-completion.js';
 
 const binary = process.env.KILO2_BINARY;
 const suite = binary ? describe : describe.skip;
@@ -195,7 +194,7 @@ suite('real Kilo v2 drain completion', () => {
         await until(() => outcomes().length > 0);
         expect(outcomes()).toMatchObject([
           fault === 'exhaust'
-            ? { status: 'failed', reason: COMPLETION_UNCONFIRMED_MESSAGE }
+            ? { status: 'failed', reason: 'completion_unconfirmed' }
             : { status: 'completed' },
         ]);
         expect(outcomes()).toHaveLength(1);

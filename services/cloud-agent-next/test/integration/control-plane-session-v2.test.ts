@@ -3155,9 +3155,14 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     reconnected.close();
   });
 
-  it.each(['fail', 'pass', undefined] as const)(
-    'forwards a completed wrapper outcome through the Sandbox DO to the callback with gateResult %s',
-    async gateResult => {
+  it.each([
+    { status: 'completed', gateResult: 'fail', reason: undefined },
+    { status: 'completed', gateResult: 'pass', reason: undefined },
+    { status: 'completed', gateResult: undefined, reason: undefined },
+    { status: 'failed', gateResult: undefined, reason: 'completion_unconfirmed' },
+  ] as const)(
+    'forwards a $status wrapper outcome through the Sandbox DO to the callback with gateResult $gateResult',
+    async ({ status, gateResult, reason }) => {
       const sessionId = newSessionId();
       const sandboxId = isolatedSandboxId();
       const provider = createFakeProvider();
@@ -3191,8 +3196,13 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         sandboxSelection: { provider: 'cloudflare-containers' },
       });
       const callbacks: CallbackJob[] = [];
+      const reports: CloudAgentQueueReport[] = [];
       await runInDurableObject(sessionStub, instance => {
-        instance.env.CLOUD_AGENT_REPORT_QUEUE = { send: async () => {} } as never;
+        instance.env.CLOUD_AGENT_REPORT_QUEUE = {
+          send: async (report: CloudAgentQueueReport) => {
+            reports.push(report);
+          },
+        } as never;
         instance.env.CALLBACK_QUEUE = {
           send: async (job: CallbackJob) => {
             callbacks.push(job);
@@ -3227,20 +3237,38 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         wrapper.send({
           type: 'session.outcome',
           sessionId,
-          status: 'completed',
+          status,
           lastMessageId: 'm1',
+          ...(reason === undefined ? {} : { reason }),
           ...(gateResult === undefined ? {} : { gateResult }),
         });
-        await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe('completed'));
+        await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe(status));
         await runSessionAlarm(sessionStub);
         expect(callbacks).toHaveLength(1);
         expect(callbacks[0]?.payload).toMatchObject({
           sessionId,
           cloudAgentSessionId: sessionId,
           messageId: 'm1',
-          status: 'completed',
+          status,
         });
         expect(callbacks[0]?.payload.gateResult).toBe(gateResult);
+        if (status === 'failed') {
+          expect(await readMessageReason(sessionStub, 'm1')).toBe('completion_unconfirmed');
+          expect(callbacks[0]?.payload).toMatchObject({
+            errorMessage:
+              'The assistant finished its reply, but session completion could not be confirmed. Send a new message to continue.',
+            failureStage: 'post_dispatch_no_activity',
+            failure: { stage: 'post_dispatch_no_activity', code: 'wrapper_no_output' },
+          });
+          expect(reports).toHaveLength(1);
+          expect(reports[0]?.run).toMatchObject({
+            status: 'failed',
+            failureStage: 'post_dispatch_no_activity',
+            failureCode: 'wrapper_no_output',
+            failureResponsibility: 'platform',
+            failureReason: 'wrapper_liveness',
+          });
+        }
       } finally {
         wrapper.close();
       }

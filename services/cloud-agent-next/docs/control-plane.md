@@ -989,9 +989,10 @@ the legacy profile restrictions.
   elapsed milliseconds, classification, and a bounded, redacted error/cause chain. HTTP/marker pair
   timeouts also name the missing half and native feed gap. The sandbox-local HTTP transport is
   separate from the wrapper-to-Worker socket.
-  Unconfirmed completion uses the existing user-message outcome-reason contract:
+  Unconfirmed completion reports `completion_unconfirmed`, which maps to this user message:
   "The assistant finished its reply, but session completion could not be confirmed. Send a new
-  message to continue." It never reports `no_outcome`, and does not claim full-tree success.
+  message to continue." It retains the `wrapper_no_output` report and callback classification.
+  It never reports `no_outcome`, and does not claim full-tree success.
   The Worker backstop still uses `no_outcome` for runs that send no outcome.
 - The wrapper names the last received Cloud `messageId` in its outcome. It does not reconstruct
   successful outcomes from idle snapshots. Compact's own close reconciliation only releases its
@@ -1958,7 +1959,7 @@ Deploy session-ingest before cloud-agent-next; no database migration is needed.
 | `sandbox_create_failed` (create attempt budget spent) | `pre_dispatch` / `sandbox_connect_failed` |
 | `agent_unavailable` | queued: `pre_dispatch` / `kilo_server_failed`; accepted: `post_dispatch_no_activity` / `wrapper_disconnected` |
 | `connection_lost`, `sandbox_lost`, `agent_restarted`, `agent_unresponsive`, `sandbox_out_of_memory` | `post_dispatch_no_activity` / `wrapper_disconnected` |
-| `no_progress`, `no_outcome` | `post_dispatch_no_activity` / `wrapper_no_output` |
+| `no_progress`, `no_outcome`, `completion_unconfirmed` | `post_dispatch_no_activity` / `wrapper_no_output` |
 | `prompt_failed` | `post_dispatch_no_activity` / `wrapper_error_before_activity` |
 | `sandbox_stopped` (idle while waiting on the user), `execution_limit` | `interruption` / `system_interrupt` |
 | Kilo final error, or `no_progress` during a Kilo model retry | `agent_activity` / `assistant_error`; responsibility from the existing assistant-failure helpers, so Kilo and provider errors stay attributed to them |

@@ -30,6 +30,8 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   agent_unresponsive: 'Kilo was not responding and was restarted',
   no_progress: 'The turn made no progress',
   no_outcome: 'The turn did not complete',
+  completion_unconfirmed:
+    'The assistant finished its reply, but session completion could not be confirmed. Send a new message to continue.',
   prompt_failed: 'Prompt delivery failed',
   sandbox_stopped: 'The sandbox stopped while waiting for an answer',
   execution_limit: 'The turn exceeded its time limit',

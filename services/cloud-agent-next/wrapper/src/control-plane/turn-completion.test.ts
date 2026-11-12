@@ -4,9 +4,6 @@ import type { Harness } from './harness.js';
 import type { PendingPrompt, TurnKiloRuntime } from './turn.js';
 import { createTurnCompletion } from './turn-completion.js';
 
-const confirmationFailure =
-  'The assistant finished its reply, but session completion could not be confirmed. Send a new message to continue.';
-
 async function settle() {
   for (let i = 0; i < 30; i++) await Promise.resolve();
 }
@@ -148,7 +145,7 @@ describe('completed assistant turn drain', () => {
     expect(h.outcomes).toEqual([]);
     h.fire(2_000);
     await settle();
-    expect(h.outcomes).toEqual([{ status: 'failed', reason: confirmationFailure }]);
+    expect(h.outcomes).toEqual([{ status: 'failed', reason: 'completion_unconfirmed' }]);
     expect(h.outcomes.some(outcome => outcome.reason === 'no_outcome')).toBe(false);
     expect(h.diagnostics).toHaveLength(3);
     for (const [index, line] of h.diagnostics.entries()) {
@@ -172,7 +169,7 @@ describe('completed assistant turn drain', () => {
     h.setExecutions([]);
     h.completion.refresh();
     await settle();
-    expect(h.outcomes).toEqual([{ status: 'failed', reason: confirmationFailure }]);
+    expect(h.outcomes).toEqual([{ status: 'failed', reason: 'completion_unconfirmed' }]);
     expect(h.warnings[0]).toContain('completion history is incomplete');
     h.completion.dispose();
   });

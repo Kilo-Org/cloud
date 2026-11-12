@@ -7,9 +7,6 @@ import type { KiloFeedEvent } from './kilo-event-feed.js';
 import type { PendingPrompt, TurnKiloRuntime, TurnScheduler } from './turn.js';
 import type { createReviewPublication } from './review-publication.js';
 
-export const COMPLETION_UNCONFIRMED_MESSAGE =
-  'The assistant finished its reply, but session completion could not be confirmed. Send a new message to continue.';
-
 type CompletionRequest = {
   tail: PendingPrompt;
   delivery: Promise<void>;
@@ -367,7 +364,7 @@ export function createTurnCompletion(input: CompletionInput) {
           if (!isCurrent(turn, request) || !ownsNativeClient(turn, request)) continue;
           if (drained.state === 'failed') {
             input.warn(`Session completion was not confirmed: ${drained.reason}`);
-            input.outcome('failed', COMPLETION_UNCONFIRMED_MESSAGE);
+            input.outcome('failed', 'completion_unconfirmed');
             return;
           }
           if (drained.state !== 'drained') continue;
@@ -398,7 +395,7 @@ export function createTurnCompletion(input: CompletionInput) {
           invalidateCompletion(turn);
         } else if (isCurrent(turn, request) && ownsNativeClient(turn, request)) {
           input.warn(`Session completion was not confirmed: ${String(error)}`);
-          input.outcome('failed', COMPLETION_UNCONFIRMED_MESSAGE);
+          input.outcome('failed', 'completion_unconfirmed');
         }
       } finally {
         if (turn.completion === request) turn.completion = undefined;
@@ -466,7 +463,7 @@ export function createTurnCompletion(input: CompletionInput) {
     );
     input.outcome(
       'failed',
-      turn.closedThrough === turn.prompts.at(-1) ? COMPLETION_UNCONFIRMED_MESSAGE : 'no_outcome'
+      turn.closedThrough === turn.prompts.at(-1) ? 'completion_unconfirmed' : 'no_outcome'
     );
     return true;
   }
@@ -525,7 +522,7 @@ export function createTurnCompletion(input: CompletionInput) {
     } catch (error) {
       if (input.isActive() && ownsNativeClient(turn, request)) {
         input.warn(error instanceof Error ? error.message : String(error));
-        input.outcome('failed', COMPLETION_UNCONFIRMED_MESSAGE);
+        input.outcome('failed', 'completion_unconfirmed');
       }
     } finally {
       scheduler.clearTimeout(timer);

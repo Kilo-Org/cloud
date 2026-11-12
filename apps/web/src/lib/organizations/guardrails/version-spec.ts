@@ -184,7 +184,8 @@ export function resolvePackageVersion(
 
 /**
  * Converts a stored pre-range minimum version into an equivalent `>=` range.
- * Used while `min_version` remains readable during the client rollout.
+ * Used while `min_version` remains readable during the client rollout. The
+ * result excludes prereleases, which the pre-range numeric comparison admitted.
  */
 export function legacyMinVersionToSpec(input: string | null | undefined): string | null {
   const trimmed = input?.trim() ?? '';
@@ -246,7 +247,8 @@ export function isValidVersionSpec(spec: string): boolean {
 
 /**
  * Checks a resolved version against a stored range. Prereleases are excluded
- * unless the range names a prerelease comparator, matching standard semver.
+ * unless the range names a prerelease comparator on the same release tuple,
+ * matching standard semver; `>=1.2.0` therefore excludes `2.0.0-beta.3`.
  */
 export function checkVersion(
   version: string,

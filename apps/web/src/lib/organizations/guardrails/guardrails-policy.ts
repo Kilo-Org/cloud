@@ -194,7 +194,7 @@ export type McpConnectVersionReason = Exclude<VersionCheckResult, 'match'>;
  * `versionReason` carries the precise version failure for new clients.
  */
 export type McpConnectVerdict =
-  | { decision: 'allowed'; versionCheck?: 'server' | 'client' }
+  | { decision: 'allowed'; versionCheck?: 'server' | 'client'; versionSpec?: string }
   | { decision: 'denied'; reason: 'not_allowed' | 'unsupported_target' }
   | {
       decision: 'denied';
@@ -208,7 +208,9 @@ export type McpConnectVerdict =
  * client is about to run, not a tag or a range. In enforce mode, a package
  * server with an allowed-versions range but no reported version is allowed with
  * `versionCheck: 'client'`, so the client enforces the range itself. Shadow mode
- * records the decision without asking the client to enforce it.
+ * records the decision without asking the client to enforce it. The verdict
+ * carries the range so the instruction is self-contained; a client that ignores
+ * it must apply the range from the organization guardrails endpoint.
  */
 export function evaluateMcpConnect(params: {
   allowedServers: readonly Pick<AllowedMcpServer, 'identityKey' | 'config'>[];
@@ -246,7 +248,7 @@ export function evaluateMcpConnect(params: {
   const version = params.version?.trim() ?? '';
   if (version === '') {
     return params.mcpEnforcement === 'enforce'
-      ? { decision: 'allowed', versionCheck: 'client' }
+      ? { decision: 'allowed', versionCheck: 'client', versionSpec: config.version_spec }
       : { decision: 'allowed' };
   }
   const result = checkVersion(version, config.version_spec, config.ecosystem);

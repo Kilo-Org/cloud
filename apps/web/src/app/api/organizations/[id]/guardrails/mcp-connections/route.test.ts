@@ -167,6 +167,7 @@ describe('POST /api/organizations/[id]/guardrails/mcp-connections', () => {
       {
         decision: 'allowed',
         versionCheck: 'client',
+        versionSpec: '^2.0.0',
         identityKey: 'npm:@acme/server',
         action: 'allow',
         recorded: true,

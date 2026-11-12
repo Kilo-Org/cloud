@@ -152,6 +152,7 @@ describe('evaluateMcpConnect', () => {
     expect(evaluate({ allowedServers, target: packageTarget })).toEqual({
       decision: 'allowed',
       versionCheck: 'client',
+      versionSpec: '^2.0.0 || >=3.0.3',
     });
   });
 
@@ -159,6 +160,7 @@ describe('evaluateMcpConnect', () => {
     expect(evaluate({ allowedServers, target: packageTarget, version: '   ' })).toEqual({
       decision: 'allowed',
       versionCheck: 'client',
+      versionSpec: '^2.0.0 || >=3.0.3',
     });
   });
 

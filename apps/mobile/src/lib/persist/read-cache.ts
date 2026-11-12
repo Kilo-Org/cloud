@@ -87,8 +87,10 @@ type AllowedProcedure = {
   isAllowedInput: (meta: unknown) => boolean;
   /**
    * Present only for a procedure whose payload can name an organization. Such
-   * an entry persists the payloads this accepts and nothing else, so the shape
-   * of the result — not the key — decides what a cold start may restore.
+   * an entry persists the payloads this accepts and nothing else. The key rule
+   * decides which scope an entry may hold at all; this rule decides which
+   * content that scope may keep, because the key does not name the organization
+   * of every row a result carries.
    */
   isAllowedPayload?: (data: unknown) => boolean;
 };
@@ -101,20 +103,22 @@ type AllowedProcedure = {
  */
 const DEFAULT_SESSION_LIST_INPUT = buildAgentSessionListInput({ organizationId: null });
 
+// A list that names an organization is not cached at all: those rows are read
+// from the server, which owns the access decision. The payload rule below reads
+// the content a snapshot holds, and an empty page holds no report whose context
+// could name the organization, so the key is the only place that can deny the
+// organization scope itself. `organizationId` stays declared as absent-only
+// because the callers pass it as `undefined` for the other scopes, and a strict
+// object rejects an own key it does not declare.
 const briefingListCacheInputSchema = z
   .object({
-    scope: z.enum(['all', 'personal', 'organization']).optional(),
-    organizationId: z.string().min(1).optional(),
+    scope: z.enum(['all', 'personal']).optional(),
+    organizationId: z.undefined().optional(),
     currentOnly: z.boolean(),
     limit: z.union([z.literal(1), z.literal(30), z.literal(100)]),
     cursor: z.undefined().optional(),
   })
-  .strict()
-  .refine(input =>
-    input.scope === 'organization'
-      ? input.organizationId !== undefined
-      : input.organizationId === undefined
-  );
+  .strict();
 const briefingDetailCacheInputSchema = z.object({ reportId: z.string().min(1) }).strict();
 
 // A briefing payload carries the context it belongs to, so its own shape says

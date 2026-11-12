@@ -179,6 +179,28 @@ describe('allowlist filter', () => {
         },
       ])
     ).toBe(true);
+    // A key that names an organization is not cached in any scope: those rows
+    // come from the server, so the key denies the scope itself.
+    expect(
+      isReadCacheAllowedKey([
+        ['agentBriefing', 'list'],
+        {
+          type: 'query',
+          input: { scope: 'organization', organizationId: 'org-1', currentOnly: true, limit: 30 },
+        },
+      ])
+    ).toBe(false);
+    // The personal caller passes `organizationId` as an own undefined key, which
+    // the strict input object must still accept.
+    expect(
+      isReadCacheAllowedKey([
+        ['agentBriefing', 'list'],
+        {
+          type: 'query',
+          input: { scope: 'personal', organizationId: undefined, currentOnly: true, limit: 30 },
+        },
+      ])
+    ).toBe(true);
     expect(
       isReadCacheAllowedKey([
         ['agentBriefing', 'list'],
@@ -418,6 +440,13 @@ describe('dehydration filter', () => {
     ['agentBriefing', 'list'],
     { type: 'infinite', input: { scope: 'all', currentOnly: false, limit: 30 } },
   ];
+  const briefingOrganizationListKey: readonly unknown[] = [
+    ['agentBriefing', 'list'],
+    {
+      type: 'query',
+      input: { scope: 'organization', organizationId: 'org-1', currentOnly: true, limit: 30 },
+    },
+  ];
   const briefingReportKey: readonly unknown[] = [
     ['agentBriefing', 'get'],
     { type: 'query', input: { reportId: 'report-1' } },
@@ -530,6 +559,16 @@ describe('dehydration filter', () => {
             },
           },
           briefingHistoryKey
+        )
+      )
+    ).toBe(false);
+    // An empty organization page names no organization in its content, so the
+    // key must deny it: nothing else in the snapshot can.
+    expect(
+      shouldPersistReadCacheQuery(
+        queryLike(
+          { status: 'success', data: { reports: [], nextCursor: null } },
+          briefingOrganizationListKey
         )
       )
     ).toBe(false);
@@ -800,6 +839,43 @@ describe('cold-start restore and takeover', () => {
 
     expect(queryClient.getQueryData(personalKey)).toEqual({ context: { organizationId: null } });
     expect(queryClient.getQueryData(organizationKey)).toBeUndefined();
+  });
+
+  it('drops a stored organization list even when its first page is empty', async () => {
+    const { scopes } = createFakeKv();
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    const personalListKey = [
+      ['agentBriefing', 'list'],
+      { type: 'query', input: { scope: 'personal', currentOnly: true, limit: 30 } },
+    ];
+    const organizationListKey = [
+      ['agentBriefing', 'list'],
+      {
+        type: 'query',
+        input: { scope: 'organization', organizationId: 'org-1', currentOnly: true, limit: 30 },
+      },
+    ];
+    scopes.set(
+      readCacheScope('u1'),
+      new Map([
+        [
+          'read-cache',
+          storedBlob([
+            persistedEntry(GET_ME_QUERY_KEY, { id: 'u1' }),
+            persistedEntry(personalListKey, { reports: [], nextCursor: null }),
+            persistedEntry(organizationListKey, { reports: [], nextCursor: null }),
+          ]),
+        ],
+      ])
+    );
+    const queryClient = new QueryClient();
+
+    await restorePersistedCacheOnColdStart(queryClient);
+
+    // An empty organization page carries no report that names the organization,
+    // so the key is the only evidence for its scope and must deny it.
+    expect(queryClient.getQueryData(organizationListKey)).toBeUndefined();
+    expect(queryClient.getQueryData(personalListKey)).toEqual({ reports: [], nextCursor: null });
   });
 
   it('hydrates a stored session-list snapshot from its path and payload', async () => {

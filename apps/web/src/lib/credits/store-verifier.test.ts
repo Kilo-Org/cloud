@@ -230,18 +230,22 @@ describe('verifyAppleCreditPurchase', () => {
     );
 
     expect(error).toBeInstanceOf(StoreVerificationError);
-    expect((error as Error).message).toBe('Apple transaction could not be verified');
+    expect((error as Error).message).toBe(`Apple transaction could not be verified (${_name})`);
     expect((error as Error).message).not.toContain(signedTransactionJws);
   });
 
-  it('keeps an Apple retryable verification failure retryable', async () => {
+  it.each([
+    ['RETRYABLE_VERIFICATION_FAILURE', VerificationStatus.RETRYABLE_VERIFICATION_FAILURE],
+    ['INVALID_CERTIFICATE', VerificationStatus.INVALID_CERTIFICATE],
+    ['FAILURE', VerificationStatus.FAILURE],
+  ])('keeps an Apple %s verification failure retryable', async (_name, status) => {
     const { verifyAppleCreditPurchase } = loadVerifier();
-    const retryable = new VerificationException(VerificationStatus.RETRYABLE_VERIFICATION_FAILURE);
-    mockDecodeAppleStoreTransactionJws.mockRejectedValueOnce(retryable);
+    const verifierError = new VerificationException(status);
+    mockDecodeAppleStoreTransactionJws.mockRejectedValueOnce(verifierError);
 
     const error = await verifyAppleCreditPurchase('signed-jws').catch((caught: unknown) => caught);
 
-    expect(error).toBe(retryable);
+    expect(error).toBe(verifierError);
     expect(error).not.toBeInstanceOf(StoreVerificationError);
   });
 

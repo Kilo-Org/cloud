@@ -160,10 +160,24 @@ export function mapAppleCreditTransaction(
 
 /**
  * Apple's verifier rejects a transaction it can never accept (undecodable JWS,
- * bad signature or chain, wrong app or environment) with a terminal status, and
- * marks only transient problems such as an OCSP lookup failure as retryable.
+ * bad signature or chain, wrong app or environment) with one of these statuses.
+ * The list is explicit on purpose: `INVALID_CERTIFICATE` is absent because the
+ * library raises it for a missing or expired configured root certificate and
+ * for a clock that is off, and `FAILURE` is raised by OCSP response handling,
+ * so treating either as terminal would refuse genuine receipts after a
+ * configuration or provider problem.
+ */
+const TERMINAL_APPLE_VERIFICATION_STATUSES: ReadonlySet<VerificationStatus> = new Set([
+  VerificationStatus.VERIFICATION_FAILURE,
+  VerificationStatus.INVALID_APP_IDENTIFIER,
+  VerificationStatus.INVALID_ENVIRONMENT,
+  VerificationStatus.INVALID_CHAIN_LENGTH,
+]);
+
+/**
  * The refusal message is fixed so neither the JWS nor the library's cause text
- * reaches the error or telemetry.
+ * reaches the error. It names only the status, so a configuration-induced
+ * refusal stays distinguishable from a malformed receipt in telemetry.
  */
 async function decodeAppleCreditTransaction(
   signedTransactionJws: string
@@ -173,9 +187,11 @@ async function decodeAppleCreditTransaction(
   } catch (error) {
     if (
       error instanceof VerificationException &&
-      error.status !== VerificationStatus.RETRYABLE_VERIFICATION_FAILURE
+      TERMINAL_APPLE_VERIFICATION_STATUSES.has(error.status)
     ) {
-      throw new StoreVerificationError('Apple transaction could not be verified');
+      throw new StoreVerificationError(
+        `Apple transaction could not be verified (${VerificationStatus[error.status]})`
+      );
     }
     throw error;
   }

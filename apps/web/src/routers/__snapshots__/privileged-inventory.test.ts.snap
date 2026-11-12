@@ -184,6 +184,8 @@ exports[`privileged inventory covers discovered tRPC procedures the guarded proc
   "admin.internalBotUsers.create mutation [admin] -> trpc.admin.internalBotUsers",
   "admin.internalBotUsers.list query [admin] -> trpc.admin.internalBotUsers",
   "admin.kiloPass.cancelAndRefundKiloPassBulk mutation [admin,superadmin] -> trpc.admin.kiloPass",
+  "admin.kiloclawCreditRenewals.preview query [admin,superadmin] -> trpc.admin.kiloclawCreditRenewals",
+  "admin.kiloclawCreditRenewals.stop mutation [admin,superadmin] -> trpc.admin.kiloclawCreditRenewals",
   "admin.kiloclawInstances.adminAuditLogs query [admin] -> trpc.admin.kiloclawInstances",
   "admin.kiloclawInstances.bulkChangeVersion mutation [admin] -> trpc.admin.kiloclawInstances",
   "admin.kiloclawInstances.cancelDoctorViaController mutation [admin] -> trpc.admin.kiloclawInstances",

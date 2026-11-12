@@ -190,7 +190,6 @@ async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<
   const entityId = entity.type === 'user' ? entity.user.id : entity.organization.id;
   const entityLabel = entity.type === 'user' ? `user ${entityId}` : `organization ${entityId}`;
 
-  // Log auto-top-up trigger
   sentryLogger('auto-topup', 'info')('Auto-top-up triggered', {
     traceId,
     userId: entity.type === 'user' ? entity.user.id : undefined,

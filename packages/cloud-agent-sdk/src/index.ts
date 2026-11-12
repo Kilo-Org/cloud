@@ -52,6 +52,8 @@ export type {
   StandaloneSuggestion,
   ChildSessionHydrationState,
   StoredMessage,
+  DeliveredFailedPrompt,
+  PendingSendConfirmation,
   FetchedSessionData,
   AssociatedPrData,
   PrepareInput,

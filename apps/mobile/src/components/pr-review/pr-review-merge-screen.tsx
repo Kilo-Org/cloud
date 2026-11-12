@@ -83,7 +83,7 @@ export function PrReviewMergeScreen() {
   const sheetTitle =
     mode === 'enable-auto-merge'
       ? t('prReview.merge.enableAutoMerge')
-      : providerPrMergeTitles(t, providerRef ? providerRef.platform : 'github').action;
+      : providerPrMergeTitles(t, providerRef ? providerRef.platform : 'github').title;
   const eyebrow = providerRef ? providerPrRefLabel(providerRef) : `${owner}/${repo}#${rawNumber}`;
   const dismiss = () => {
     router.back();

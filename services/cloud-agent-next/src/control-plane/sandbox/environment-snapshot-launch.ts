@@ -1,7 +1,10 @@
 import { withTimeout } from '@kilocode/worker-utils';
 import type { EnvironmentBuild } from '../../environment-build/environment-build-do.js';
 import type { SnapshotResolution } from '../../environment-build/coordinator.js';
-import { SNAPSHOT_LOOKUP_BUDGET_MS } from '../../environment-build/policy.js';
+import {
+  SNAPSHOT_LOOKUP_BUDGET_MS,
+  type PublishedSnapshot,
+} from '../../environment-build/policy.js';
 import {
   sameEnvironmentScope,
   type SessionEnvironmentReference,
@@ -75,6 +78,8 @@ export function environmentLaunchCandidate(
   return { candidate: { reference, actorUserId, buildCommands } };
 }
 
+export type SnapshotProvider = PublishedSnapshot['provider'];
+
 export type EnvironmentLookup =
   | { kind: 'resolved'; resolution: SnapshotResolution }
   | { kind: 'timeout' }
@@ -88,6 +93,8 @@ export type EnvironmentLookup =
 export async function lookupEnvironmentSnapshot(input: {
   namespace: DurableObjectNamespace<EnvironmentBuild> | undefined;
   candidate: EnvironmentLaunchCandidate;
+  /** The session's pinned provider; the coordinator compares snapshots against it. */
+  provider: SnapshotProvider;
   launchDeadlineAt: number;
   now?: () => number;
 }): Promise<EnvironmentLookup> {
@@ -104,6 +111,7 @@ export async function lookupEnvironmentSnapshot(input: {
         stub.resolveSnapshot({
           reference: input.candidate.reference,
           actorUserId: input.candidate.actorUserId,
+          provider: input.provider,
         }),
         remaining,
         'Environment snapshot lookup timed out',
@@ -131,7 +139,11 @@ export function snapshotStart(resolution: SnapshotResolution): ProviderSnapshotS
     resolution.snapshot.stale === 'image'
       ? (resolution.currentBaseImage ?? resolution.snapshot.baseImage)
       : resolution.snapshot.baseImage;
-  return { snapshotId: resolution.snapshot.snapshotId, baseImage };
+  return {
+    snapshotId: resolution.snapshot.snapshotId,
+    baseImage,
+    ...(resolution.snapshot.provider === 'vercel' ? { provider: 'vercel' as const } : {}),
+  };
 }
 
 export type EnvironmentSnapshotBlockReason =
@@ -171,6 +183,8 @@ export const ENVIRONMENT_SNAPSHOT_MESSAGES = {
   retry: 'Environment snapshot is temporarily unavailable. Try again.',
   unsupported: 'Environment snapshots are not supported for this session.',
   newSession: 'This session cannot use the environment snapshot. Start a new session.',
+  providerMismatch:
+    "This session runs on different compute than the environment's snapshot. Use the environment's compute.",
 } as const;
 
 function buildIdOf(resolution: SnapshotResolution): string | null {
@@ -202,6 +216,13 @@ function blockedEnvironment(
       return {
         reason: 'environment_not_supported',
         detail: ENVIRONMENT_SNAPSHOT_MESSAGES.unsupported,
+        environmentId,
+        buildId,
+      };
+    case 'provider_mismatch':
+      return {
+        reason: 'environment_not_supported',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.providerMismatch,
         environmentId,
         buildId,
       };

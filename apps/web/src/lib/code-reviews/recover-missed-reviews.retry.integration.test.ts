@@ -319,6 +319,55 @@ describe('recoverMissedReviews restart against the database', () => {
     );
   });
 
+  it('restarts a review that stopped on an upstream refusal and dispatches it', async () => {
+    const { reviewId } = await insertReview({
+      status: 'failed',
+      terminalReason: 'assistant_unauthorized',
+      attemptCount: 1,
+    });
+
+    const summary = await recoverMissedReviews({ now: new Date() });
+
+    expect(summary.reviewsRetried).toBeGreaterThanOrEqual(1);
+    expect(summary.retriesExhausted).toBe(0);
+    expect(await storedReview(reviewId)).toEqual(
+      expect.objectContaining({
+        status: 'queued',
+        terminalReason: null,
+        dispatchReservationId: expect.any(String),
+      })
+    );
+    expect(await storedAttempts(reviewId)).toEqual([
+      expect.objectContaining({ attemptNumber: 1, retryReason: null, status: 'failed' }),
+      expect.objectContaining({
+        attemptNumber: 2,
+        retryReason: 'automatic_recovery',
+        status: 'queued',
+      }),
+    ]);
+    expect(mockDispatchReview).toHaveBeenCalledWith(
+      expect.objectContaining({ reviewId, skipBalanceCheck: true })
+    );
+  });
+
+  it('reports a review whose unattended restarts are spent instead of restarting it again', async () => {
+    const { reviewId } = await insertReview({
+      status: 'failed',
+      terminalReason: 'assistant_unauthorized',
+      attemptCount: AUTOMATIC_RETRY_ATTEMPT_LIMIT,
+    });
+
+    const summary = await recoverMissedReviews({ now: new Date() });
+
+    expect(summary.retriesExhausted).toBe(1);
+    expect(summary.reviewsRetried).toBe(0);
+    expect(await storedReview(reviewId)).toEqual(
+      expect.objectContaining({ status: 'failed', terminalReason: 'assistant_unauthorized' })
+    );
+    expect(await storedAttempts(reviewId)).toHaveLength(AUTOMATIC_RETRY_ATTEMPT_LIMIT);
+    expect(mockDispatchReview).not.toHaveBeenCalled();
+  });
+
   it('leaves a restarted review alone on the next run', async () => {
     const { reviewId } = await insertReview({
       status: 'failed',

@@ -510,15 +510,36 @@ export type SystemSearchUpdatePlan = {
  * be dropped as if the user could no longer see it. This is still how an item
  * the user can no longer see leaves the index — its source was enumerated, so
  * its absence is evidence, not ignorance.
+ *
+ * A membership read is the second piece of evidence. When the account's own
+ * organization list settled and no longer names an organization, that scope is
+ * gone whatever its queries answered: the cache can still hold the last payload
+ * the scope delivered, so its documents leave the desired set, and its indexed
+ * entries are removed whether or not their source was enumerated this run. A
+ * scope the list does not mention is never inferred from a read that did not
+ * settle, so an absent, loading or failed list keeps every entry it cannot
+ * speak for.
  */
 export function planSystemSearchUpdate(input: {
   indexed: readonly SystemSearchDocument[];
   documents: readonly SystemSearchDocument[];
   /** The source scopes the current run could fully enumerate from the cache. */
   observedSources: ReadonlySet<string>;
+  /**
+   * The organizations a settled membership read still names, or `null` when no
+   * such read settled this run.
+   */
+  accessibleOrganizations?: ReadonlySet<string> | null;
 }): SystemSearchUpdatePlan {
   const indexedById = indexById(input.indexed);
-  const documentsById = indexById(input.documents);
+  const documentsById = indexById(
+    input.documents.filter(
+      document =>
+        !sourceKeysOfIndexedDocument(document).some(source =>
+          isClosedOrganizationScope(source, input.accessibleOrganizations)
+        )
+    )
+  );
   const add: SystemSearchDocument[] = [];
   for (const [id, document] of documentsById) {
     const current = indexedById.get(id);
@@ -531,8 +552,10 @@ export function planSystemSearchUpdate(input: {
       if (documentsById.has(document.id)) {
         return false;
       }
-      return sourceKeysOfIndexedDocument(document).some(source =>
-        input.observedSources.has(source)
+      return sourceKeysOfIndexedDocument(document).some(
+        source =>
+          input.observedSources.has(source) ||
+          isClosedOrganizationScope(source, input.accessibleOrganizations)
       );
     })
     .map(document => document.id);
@@ -550,6 +573,52 @@ export function planSystemSearchUpdate(input: {
 function sourceKeysOfIndexedDocument(document: SystemSearchDocument): string[] {
   const embedded = fingerprintSource(document.fingerprint);
   return embedded === null ? systemSearchSourceKeysOfId(document.id) : [embedded];
+}
+
+/**
+ * Whether one source scope names an organization that a settled membership
+ * read no longer lists. `null`/`undefined` is "no read settled", and the
+ * personal and account-level scopes belong to no organization, so neither is
+ * ever evidence of a loss.
+ */
+function isClosedOrganizationScope(
+  source: string,
+  accessibleOrganizations: ReadonlySet<string> | null | undefined
+): boolean {
+  if (accessibleOrganizations === null || accessibleOrganizations === undefined) {
+    return false;
+  }
+  const organizationId = organizationIdOfSourceScope(source);
+  return organizationId !== null && !accessibleOrganizations.has(organizationId);
+}
+
+/**
+ * The organization one source key belongs to, or null when it belongs to the
+ * account at large. A session or finding key carries its scope directly
+ * (`personal` or an organization id). A pull-request key carries a provider
+ * first and then the organization or `personal`/`recents` its query ran under;
+ * the GitHub inbox is account-wide and names the provider alone.
+ */
+function organizationIdOfSourceScope(source: string): string | null {
+  const familySeparator = source.indexOf(':');
+  if (familySeparator === -1) {
+    return null;
+  }
+  const family = source.slice(0, familySeparator);
+  let scope = source.slice(familySeparator + 1);
+  if (family === 'pullRequests') {
+    const providerSeparator = scope.indexOf(':');
+    if (providerSeparator === -1) {
+      return null;
+    }
+    scope = scope.slice(providerSeparator + 1);
+  } else if (family !== 'sessions' && family !== 'findings') {
+    return null;
+  }
+  if (scope.length === 0 || scope === PERSONAL_SOURCE_SCOPE || scope === RECENTS_SOURCE_SCOPE) {
+    return null;
+  }
+  return scope;
 }
 
 /** The source scope a document's fingerprint carries, or null when it names none. */

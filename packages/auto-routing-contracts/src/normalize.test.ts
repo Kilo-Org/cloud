@@ -326,9 +326,47 @@ describe('classifier input normalization', () => {
     const hints = redactProviderHints({ provider, providerOptions: undefined });
     const elapsed = performance.now() - started;
 
-    expect(hints.provider).toMatchObject({ api_key: '[REDACTED]' });
-    expect((hints.provider as Record<string, unknown>)[repeated]).toBe('value');
+    const kept = Object.entries(hints.provider as Record<string, unknown>);
+    const longName = kept.find(([key]) => key.length > 256);
+
+    expect(hints.provider).toMatchObject({ order: ['openai'], api_key: '[REDACTED]' });
+    expect(kept).toHaveLength(3);
+    expect(longName?.[0]).toMatch(/^akeykey[^\s]*\[truncated:[0-9a-f]{8}\]$/);
+    expect(longName?.[1]).toBe('value');
     expect(elapsed).toBeLessThan(budgetMs);
+  });
+
+  it('cuts an oversized property name and keeps its value', () => {
+    const long = 'k'.repeat(2_000_000);
+    const hints = redactProviderHints({
+      provider: { order: ['openai'], [long]: 'kept' },
+      providerOptions: undefined,
+    });
+
+    const kept = Object.entries(hints.provider as Record<string, unknown>);
+    const longName = kept.find(([key]) => key.length > 256);
+
+    expect(kept).toHaveLength(2);
+    expect(longName?.[0]).toMatch(/^k{256}\[truncated:[0-9a-f]{8}\]$/);
+    expect(longName?.[1]).toBe('kept');
+    expect(JSON.stringify(hints).length).toBeLessThan(1000);
+  });
+
+  it('keeps two long property names apart when they share their first characters', () => {
+    const shared = 'field'.repeat(100);
+    const hints = redactProviderHints({
+      provider: { [`${shared}-alpha`]: 'first', [`${shared}-beta`]: 'second' },
+      providerOptions: undefined,
+    });
+
+    const kept = Object.entries(hints.provider as Record<string, unknown>);
+
+    expect(kept).toHaveLength(2);
+    expect(kept.map(([, value]) => value).sort()).toEqual(['first', 'second']);
+    for (const [key] of kept) {
+      expect(key.startsWith(shared.slice(0, 256))).toBe(true);
+      expect(key).toMatch(/\[truncated:[0-9a-f]{8}\]$/);
+    }
   });
 
   it('redacts credential-bearing keys nested in provider option arrays', () => {
@@ -389,6 +427,58 @@ describe('classifier input normalization', () => {
     expect(Object.keys(provider).length).toBeLessThan(600);
     expect(provider['field-0']).toBe(0);
     expect(provider['[truncated]']).toBe('[TRUNCATED]');
+  });
+
+  it('cuts one oversized string in the provider hints and marks it', () => {
+    const long = 'p'.repeat(2_000_000);
+    const hints = redactProviderHints({
+      provider: { order: ['openai'], passthrough: long },
+      providerOptions: undefined,
+    });
+
+    expect(hints.provider).toEqual({
+      order: ['openai'],
+      passthrough: `${'p'.repeat(256)}[TRUNCATED]`,
+    });
+    expect(JSON.stringify(hints).length).toBeLessThan(1000);
+  });
+
+  it('cuts oversized strings nested in provider options', () => {
+    const long = 'o'.repeat(2_000_000);
+    const hints = redactProviderHints({
+      provider: undefined,
+      providerOptions: { openrouter: { sort: 'price', transforms: [long] } },
+    });
+
+    expect(hints.providerOptions).toEqual({
+      openrouter: { sort: 'price', transforms: [`${'o'.repeat(256)}[TRUNCATED]`] },
+    });
+    expect(JSON.stringify(hints).length).toBeLessThan(1000);
+  });
+
+  it('copies a hint string at the cap unchanged and cuts the next character', () => {
+    const atCap = 'a'.repeat(256);
+    const overCap = 'a'.repeat(257);
+
+    expect(
+      redactProviderHints({ provider: { first: atCap, second: overCap }, providerOptions: null })
+    ).toEqual({
+      provider: { first: atCap, second: `${'a'.repeat(256)}[TRUNCATED]` },
+      providerOptions: null,
+    });
+  });
+
+  it('keeps the mirrored snapshot bounded when every hint string is oversized', () => {
+    const oversized = 'x'.repeat(100_000);
+    const provider = Object.fromEntries(
+      Array.from({ length: 600 }, (_, index) => [`field-${index}`, oversized])
+    );
+
+    const hints = redactProviderHints({ provider, providerOptions: provider });
+
+    // Every visited string is cut to the per-string cap, so the snapshot size
+    // follows the node budget.
+    expect(JSON.stringify(hints).length).toBeLessThan(200_000);
   });
 
   it('uses caller-captured requestedModel and providerHints over the body values', () => {

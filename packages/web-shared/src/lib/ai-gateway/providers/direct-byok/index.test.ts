@@ -384,6 +384,10 @@ describe('getDirectByokModel', () => {
       'chutes-byok/non-reasoning-model',
     ]);
     expect(organizationModels.map(model => model.id)).toEqual(['orcarouter/other-model']);
+    for (const model of [...userModels, ...organizationModels]) {
+      expect(model.hasUserByokAvailable).toBe(true);
+      expect(model.isFree).toBe(false);
+    }
     expect(getBYOKforUser).not.toHaveBeenCalled();
     expect(getBYOKforOrganization).not.toHaveBeenCalled();
   });

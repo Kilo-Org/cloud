@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+import { SessionListTouchGate } from '@/components/session-list-touch-gate';
 import { i18n } from '@/i18n';
 import {
   type StoredSession,
@@ -12,7 +13,12 @@ import {
   type useAgentSessionSearch,
   type useRecentAgentRepositories,
 } from '@/lib/hooks/use-agent-sessions';
+import {
+  __resetSessionListTouchGateForTests,
+  isSessionListTouchHeld,
+} from '@/lib/session-list-touch-gate';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
+import { MIN_BODY_VIEWPORT } from '@/lib/body-viewport';
 import type * as PlatformFilterModule from './platform-filter-modal';
 import { AGENT_SESSION_NAV_GUARD_MS } from './agent-session-nav-guard';
 import { OwnedKeyboardLift } from './owned-keyboard-lift';
@@ -94,6 +100,28 @@ const keyboardState = vi.hoisted(() => {
 
 const focusState = vi.hoisted(() => ({ current: true as boolean }));
 
+// The window the screen is laid out in. A rotation replaces it, and the lift
+// must not reuse a frame height it measured in the previous one.
+const windowState = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  const state = {
+    snapshot: { width: 402, height: 874, scale: 3, fontScale: 1 },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    set: (height: number, width: number) => {
+      state.snapshot = { width, height, scale: 3, fontScale: 1 };
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+  };
+  return state;
+});
+
 // The screen reads the keyboard from `react-native-keyboard-controller`'s
 // provider, so this suite drives that store: a lift is only observable when the
 // keyboard it owns is actually up.
@@ -137,17 +165,30 @@ const focusCallbacks = vi.hoisted(() => ({
 const handleRefetchSpy = vi.hoisted(() => vi.fn());
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
 
-vi.mock('react-native', () => ({
-  View: 'View',
-  Modal: 'Modal',
-  Pressable: 'Pressable',
-  ScrollView: 'ScrollView',
-  Platform: platformState,
-  Keyboard: { dismiss: vi.fn(), addListener: keyboardState.addListener },
-  KeyboardAvoidingView: 'KeyboardAvoidingView',
-  AppState: { addEventListener: appState.addEventListener },
-  ActivityIndicator: 'ActivityIndicator',
-}));
+vi.mock('react-native', async () => {
+  // `vi.mock` factories are hoisted above the file's static imports, so `react`
+  // must be pulled in here.
+  const React = await import('react');
+  return {
+    View: 'View',
+    Modal: 'Modal',
+    Pressable: 'Pressable',
+    ScrollView: 'ScrollView',
+    Platform: platformState,
+    Keyboard: { dismiss: vi.fn(), addListener: keyboardState.addListener },
+    KeyboardAvoidingView: 'KeyboardAvoidingView',
+    AppState: { addEventListener: appState.addEventListener },
+    ActivityIndicator: 'ActivityIndicator',
+    // The real hook re-renders on a window change; a rotation test needs that,
+    // and a snapshot object must keep its identity between calls.
+    useWindowDimensions: () =>
+      React.useSyncExternalStore(
+        windowState.subscribe,
+        () => windowState.snapshot,
+        () => windowState.snapshot
+      ),
+  };
+});
 // The modal mock below still loads the real module through `importOriginal`,
 // which imports `react-native-safe-area-context`; that package's `react-native`
 // entry points at its untranspiled `src/` TypeScript, which vitest cannot parse,
@@ -419,6 +460,7 @@ describe('SessionHistoryScreen', () => {
     readFilterRecord.mockReset();
     readFilterRecord.mockResolvedValue(null);
     focusState.current = true;
+    windowState.set(874, 402);
     focusCallbacks.current = new Set();
     handleRefetchSpy.mockClear();
     handleRefetchSpy.mockResolvedValue(undefined);
@@ -433,6 +475,7 @@ describe('SessionHistoryScreen', () => {
     });
     mountedRenderers.length = 0;
     appState.listeners.clear();
+    __resetSessionListTouchGateForTests();
     vi.restoreAllMocks();
   });
 
@@ -746,6 +789,38 @@ describe('SessionHistoryScreen', () => {
     expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
   });
 
+  it('holds the list through the body swap after Clear search so a row cannot take the press that follows', async () => {
+    listState.storedSessions = sessions;
+    listState.isSearching = true;
+    const queryClient = createTestQueryClient();
+    const renderer = await renderScreen(queryClient);
+    const gateProps = renderer.root
+      .findByType(SessionListTouchGate)
+      .findByType('View' as unknown as React.ElementType).props as {
+      onStartShouldSetResponderCapture: () => boolean;
+    };
+    expect(gateProps.onStartShouldSetResponderCapture()).toBe(false);
+
+    act(() => {
+      (findNodeByType(renderer, 'AgentSessionListContent').props.onClearQuery as () => void)();
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(SessionHistoryScreen)
+        )
+      );
+    });
+
+    // The clear swaps the empty state for the rows in the same commit, so the
+    // row now under the finger is a target for the next touch; the gate claims
+    // that touch instead of delivering it to the row.
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isSearching).toBe(false);
+    expect(storedSessionIds(renderer)).toEqual(['workflow', 'code-cloud', 'code-cli', 'other']);
+    expect(isSessionListTouchHeld()).toBe(true);
+    expect(gateProps.onStartShouldSetResponderCapture()).toBe(true);
+  });
+
   it.each([false, true])(
     'scopes history queries to the selected organization with readiness=%s',
     async loaded => {
@@ -1030,7 +1105,7 @@ describe('SessionHistoryScreen', () => {
     const renderer = await renderScreen();
 
     const container = renderer.root.findByType(OwnedKeyboardLift);
-    expect(container.props.occlusion).toBe(0);
+    expect(container.props.pad).toBe(0);
     expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
   });
 
@@ -1066,13 +1141,74 @@ describe('SessionHistoryScreen', () => {
     expect(liftPad(renderer)).toBe(0);
   });
 
+  // A keyboard height belongs to the window it was measured in. Rotating the
+  // history to a window shorter than that band used to pad the whole body away:
+  // the header, search field, filter and tab bar stayed, and the list rendered
+  // nothing — no rows, no skeleton, no empty state, no error. The lift keeps a
+  // minimum body viewport instead, so the rows stay on screen and scrollable.
+  it('keeps the history body rendered when the window is shorter than the keyboard band', async () => {
+    listState.storedSessions = [{ session_id: 'stored-1', organization_id: null }];
+    const renderer = await renderScreen();
+    const searchHeader = findNodeByType(renderer, 'SessionListSearchHeader');
+
+    act(() => {
+      (searchHeader.props.onFocus as () => void)();
+    });
+    act(() => {
+      keyboardLift.setHeight(336);
+    });
+    expect(liftPad(renderer)).toBe(336);
+
+    // The rotation leaves less room than the band the field raised.
+    act(() => {
+      (
+        renderer.root.findByType(OwnedKeyboardLift).findByType('View').props.onLayout as (event: {
+          nativeEvent: { layout: { height: number } };
+        }) => void
+      )({ nativeEvent: { layout: { height: 253 } } });
+    });
+
+    expect(liftPad(renderer)).toBe(253 - MIN_BODY_VIEWPORT);
+    expect(findNodeByType(renderer, 'AgentSessionListContent')).toBeDefined();
+  });
+
+  // The rotation render runs before the new layout pass reports the landscape
+  // frame, so the pad must not reuse the portrait measurement: 336 points of pad
+  // inside a 298-point frame fills the body for that frame.
+  it('releases the stale portrait frame for the render a rotation produces', async () => {
+    listState.storedSessions = [{ session_id: 'stored-1', organization_id: null }];
+    const renderer = await renderScreen();
+    const searchHeader = findNodeByType(renderer, 'SessionListSearchHeader');
+
+    act(() => {
+      (searchHeader.props.onFocus as () => void)();
+    });
+    act(() => {
+      keyboardLift.setHeight(336);
+    });
+    act(() => {
+      (
+        renderer.root.findByType(OwnedKeyboardLift).findByType('View').props.onLayout as (event: {
+          nativeEvent: { layout: { height: number } };
+        }) => void
+      )({ nativeEvent: { layout: { height: 708 } } });
+    });
+    expect(liftPad(renderer)).toBe(336);
+
+    act(() => {
+      windowState.set(402, 874);
+    });
+
+    expect(liftPad(renderer)).toBe(0);
+    expect(findNodeByType(renderer, 'AgentSessionListContent')).toBeDefined();
+  });
+
   it('pads nothing for a keyboard another screen raised', async () => {
     const renderer = await renderScreen();
 
     act(() => {
       keyboardLift.setHeight(320);
     });
-
     expect(liftPad(renderer)).toBe(0);
   });
 
@@ -1083,7 +1219,7 @@ describe('SessionHistoryScreen', () => {
     // The body lives in the single container on this platform too, and the
     // container is the sole owner of the pad.
     const container = renderer.root.findByType(OwnedKeyboardLift);
-    expect(container.props.occlusion).toBe(0);
+    expect(container.props.pad).toBe(0);
     expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
 
     // The container is permanent, not swapped per render: a state change (here

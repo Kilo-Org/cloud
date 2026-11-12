@@ -1199,8 +1199,11 @@ test('production deploys cloud-agent-next after the session-ingest job', () => {
   const deploy = ordered.steps.findIndex(step => step.name === 'Deploy cloud-agent-next');
   assert.ok(prepare >= 0 && prepare < deploy);
 
-  assert.equal(ordered.steps[deploy].with.preCommands, 'pnpm run predeploy');
-  assert.equal(ordered.steps[deploy + 1].with.preCommands, 'pnpm run predeploy');
+  // A source SHA may not define `predeploy`; an unguarded call fails the deploy.
+  const guardedPredeploy =
+    'if [ "$(jq -r \'.scripts.predeploy // empty\' package.json)" != "" ]; then pnpm run predeploy; fi\n';
+  assert.equal(ordered.steps[deploy].with.preCommands, guardedPredeploy);
+  assert.equal(ordered.steps[deploy + 1].with.preCommands, guardedPredeploy);
 });
 
 test('the ordered production path takes both workers out of the parallel matrix', () => {

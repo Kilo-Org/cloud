@@ -1042,6 +1042,7 @@ describe('final Enkrypt serialization boundaries', () => {
         default_parameters: {},
         preferredIndex: undefined,
         hasUserByokAvailable: true,
+        isFree: false,
         opencode: { ai_sdk_provider: undefined, variants: undefined },
         enkrypt: publishedEnkryptBenchmark,
       };

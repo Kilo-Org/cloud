@@ -1892,7 +1892,7 @@
       "costSpoken": "кошт {{cost}}",
       "costSpokenWithTime": "кошт {{cost}}, {{time}}",
       "pullRequest": "запыт на зліццё {{number}}",
-      "spokenJoiner": "і"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не атрымалася адкрыць GitHub",
@@ -2298,10 +2298,14 @@
       "stepFailed": "Не ўдалося наладзіць асяроддзе",
       "stepUnknown": "Налада асяроддзя",
       "detailCreatingSandbox": "Стварэнне пясочніцы",
+      "detailStartingSandbox": "Запуск пясочніцы",
+      "detailCloningRepository": "Кланіраванне рэпазітара",
       "detailUpdatingRepository": "Абнаўленне рэпазітара",
       "detailCheckingOutBranch": "Пераключэнне на галіну",
+      "detailSettingUpBranch": "Налада галіны",
       "detailRunningSetupCommands": "Выкананне каманд налады",
       "detailSavingRepository": "Захаванне рэпазітара для хутчэйшага запуску",
+      "detailStartingKilo": "Запуск Kilo",
       "detailStartingKiloRuntime": "Запуск рантайма Kilo",
       "detailPreparingKiloSession": "Падрыхтоўка сеансу Kilo",
       "detailWaitingForPreviousSandbox": "Чаканне спынення папярэдняй пясочніцы",
@@ -2815,6 +2819,8 @@
     "retryHint": "Паўторна загружае стан Kilo Pass.",
     "cardAccessibility": "{{title}} — {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Пакупка Kilo Pass зараз недаступная.",
+    "purchaseUnavailableTitle": "Зараз недаступна",
+    "purchaseUnavailableEnded": "Ваш Kilo Pass скончыўся.",
     "kiloPassManagement": "Кіраванне Kilo Pass",
     "kiloPassSetup": "Наладжванне Kilo Pass",
     "subscriptionHeaderDescription": "Штомесячная падпіска, якая дадае крэдыты на ваш баланс Kilo для запуску AI-сеансаў праграмавання ў дадатку Kilo.",

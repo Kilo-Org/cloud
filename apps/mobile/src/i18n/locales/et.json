@@ -1810,7 +1810,7 @@
       "costSpoken": "kulu {{cost}}",
       "costSpokenWithTime": "kulu {{cost}}, {{time}}",
       "pullRequest": "tõmbetaotlus {{number}}",
-      "spokenJoiner": "ja"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubi ei õnnestunud avada",
@@ -2208,10 +2208,14 @@
       "stepFailed": "Keskkonna seadistamine ebaõnnestus",
       "stepUnknown": "Keskkonna seadistamine",
       "detailCreatingSandbox": "Liivakasti loomine",
+      "detailStartingSandbox": "Liivakasti käivitamine",
+      "detailCloningRepository": "Repositooriumi kloonimine",
       "detailUpdatingRepository": "Repositooriumi värskendamine",
       "detailCheckingOutBranch": "Haru vahetamine",
+      "detailSettingUpBranch": "Haru seadistamine",
       "detailRunningSetupCommands": "Seadistamiskäskude käivitamine",
       "detailSavingRepository": "Repositooriumi salvestamine kiirema käivitamise jaoks",
+      "detailStartingKilo": "Kilo käivitamine",
       "detailStartingKiloRuntime": "Kilo käitusaja käivitamine",
       "detailPreparingKiloSession": "Kilo seansi ettevalmistamine",
       "detailWaitingForPreviousSandbox": "Eelmise liivakasti peatumise ootamine",
@@ -2709,6 +2713,8 @@
     "retryHint": "Proovib Kilo Passi olekut uuesti laadida.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Kilo Passi ei saa praegu osta.",
+    "purchaseUnavailableTitle": "Praegu pole saadaval",
+    "purchaseUnavailableEnded": "Sinu Kilo Pass on lõppenud.",
     "kiloPassManagement": "Kilo Passi haldamine",
     "kiloPassSetup": "Kilo Passi seadistamine",
     "subscriptionHeaderDescription": "Kuutellimus, mis lisab krediiti sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis.",

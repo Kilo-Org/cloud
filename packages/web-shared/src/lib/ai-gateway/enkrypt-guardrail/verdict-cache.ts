@@ -20,7 +20,7 @@ import {
   type RequestSegment,
   type RequestToolDefinition,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
-import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import type { EnkryptGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import {
   MAX_REPORTED_FLAGGED_TOOLS,
   type EnkryptFlaggedTool,
@@ -91,7 +91,7 @@ export type EnkryptCachedScanResult = Omit<EnkryptGuardrailScanResult, 'report'>
   cacheEntries: EnkryptVerdictCacheEntry[];
 };
 
-type ReadyConfig = Extract<EnkryptInputGuardrailConfig, { status: 'ready' }>;
+type ReadyConfig = Extract<EnkryptGuardrailConfig, { status: 'ready' }>;
 
 type ScanDependencies = EnkryptDetectDependencies & { store: EnkryptVerdictCacheStore | null };
 
@@ -461,7 +461,7 @@ function sum(values: number[]): number {
 
 function toolsReport(
   kind: EnkryptToolScanReport['scan'],
-  config: EnkryptInputGuardrailConfig,
+  config: EnkryptGuardrailConfig,
   cache: EnkryptToolScanReport['verdict_cache'],
   outcomes: ToolOutcome[]
 ): EnkryptToolScanReport {

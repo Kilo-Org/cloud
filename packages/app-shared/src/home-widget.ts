@@ -17,7 +17,7 @@ import {
   type GlanceableSessionRow,
   type GlanceableStatusKind,
 } from './glanceable-agents-snapshot';
-import { timestampMs } from './utils';
+import { timestampMs, timestampToIso } from './utils';
 
 export const HOME_WIDGET_DETAIL_LIMIT = 3;
 export const HOME_WIDGET_TITLE_LIMIT = 120;
@@ -114,13 +114,13 @@ function refreshInterval(snapshot: GlanceableAgentsSnapshot): number {
     : QUIET_REFRESH_MS;
 }
 
-/** ISO 8601 form of a row time, or null when it does not parse. */
-function isoTime(value: string | undefined | null): string | null {
-  const at = timestampMs(value);
-  return at === null ? null : new Date(at).toISOString();
-}
-
-function safeTitle(value: string | undefined | null): string {
+/**
+ * The one display-title cut every glanceable surface draws: the text as one
+ * line of what it draws, trimmed, then capped at `HOME_WIDGET_TITLE_LIMIT` on a
+ * character boundary. A surface adds only its own empty or placeholder rule on
+ * top, so the cap cannot drift between the Home widget and the session card.
+ */
+export function glanceableTitle(value: string | null | undefined): string {
   const title = sessionDisplayLine(value ?? '').trim();
   return sessionLiveCut(title, HOME_WIDGET_TITLE_LIMIT);
 }
@@ -158,17 +158,17 @@ export function buildHomeWidgetDetails(
             )[0];
   return {
     approvalKey: waiting.find(row => row.approvalKey != null)?.approvalKey ?? null,
-    primaryTitle: primary === undefined ? null : safeTitle(primary.title),
+    primaryTitle: primary === undefined ? null : glanceableTitle(primary.title),
     waitingAgents: waiting.slice(0, HOME_WIDGET_DETAIL_LIMIT).flatMap(row => {
       // The status fold above admits only needs-input statuses; a status that
       // is not one of them has no kind here and the row is dropped rather
       // than mislabelled.
       const kind = glanceableNeedsInputKind(row.status);
-      return kind === null ? [] : [{ title: safeTitle(row.title), kind }];
+      return kind === null ? [] : [{ title: glanceableTitle(row.title), kind }];
     }),
     scheduledAgents: scheduled.slice(0, HOME_WIDGET_DETAIL_LIMIT).map(row => ({
-      title: safeTitle(row.title),
-      scheduledAt: isoTime(row.scheduledAt),
+      title: glanceableTitle(row.title),
+      scheduledAt: timestampToIso(row.scheduledAt),
     })),
   };
 }

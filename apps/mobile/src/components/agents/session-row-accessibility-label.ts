@@ -209,11 +209,11 @@ export function sessionRowAccessibilityLabel({
   }
   const format = listFormat(i18n.language, { style: 'long', type: 'conjunction' });
   // Two fragments are plain labels ("title, badge"): the locale list
-  // formatter's own coupling is right for them. From three on, the fragments
-  // are clauses and a locale may need a separator other than its list
-  // conjunction — a verb-initial cost sentence after "and"/"und" reads as a
-  // second subject — so the coupling before the last fragment comes from the
-  // catalog and keeps this formatter's spacing around it.
+  // formatter's own coupling is right for them. From three on, the last
+  // fragments are clauses — a relative time, a cost sentence, an origin
+  // phrase — and a conjunction between a label and a clause speaks as a second
+  // list item, so the coupling before the last fragment comes from the catalog
+  // as that locale's pause mark and keeps this formatter's spacing around it.
   if (parts.length < 3) {
     return format.format(parts);
   }
@@ -231,10 +231,20 @@ export function sessionRowAccessibilityLabel({
   }
   const literal = literalToken.value;
   const joiner = i18n.t('agents.sessionRow.spokenJoiner');
-  // A coupling that opens with punctuation binds to the word before it, so it
-  // takes the formatter's trailing spacing only.
-  const leading = /^[,،、，]/u.test(joiner) ? '' : /^\s*/u.exec(literal)?.[0];
-  const trailing = /\s*$/u.exec(literal)?.[0];
-  tokens[lastLiteral] = { type: 'literal', value: `${leading ?? ''}${joiner}${trailing ?? ''}` };
+  // A pause mark binds to the word before it and takes this locale's separator
+  // spacing after it. Every punctuation category binds this way, not a
+  // hand-listed few: the Ethiopic (`፣`), Myanmar (`၊`) and CJK (`，`, `、`)
+  // commas are punctuation too, and a space before one is never right.
+  const pausesFragments = /^\p{P}/u.test(joiner);
+  const leading = pausesFragments ? '' : /^\s*/u.exec(literal)?.[0];
+  // A pause mark is a separator, so its following space comes from the
+  // formatter's first separator; the literal it replaces may abut the next word
+  // because that word was the conjunction's own (`th`, `he`). A joiner that
+  // ends in a hyphen is a prefix that still binds forward, so it keeps no
+  // space of its own.
+  const separator = tokens.find(token => token.type === 'literal');
+  const spacing = pausesFragments ? (separator?.value ?? literal) : literal;
+  const trailing = joiner.endsWith('-') ? '' : (/\s*$/u.exec(spacing)?.[0] ?? '');
+  tokens[lastLiteral] = { type: 'literal', value: `${leading ?? ''}${joiner}${trailing}` };
   return tokens.map(token => token.value).join('');
 }

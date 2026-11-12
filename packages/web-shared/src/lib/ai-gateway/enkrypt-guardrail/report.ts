@@ -1,7 +1,11 @@
 import * as z from 'zod';
-import { ENKRYPT_DETECTOR_IDS, EnkryptPiiEntitySchema } from '@kilocode/db/schema-types';
+import {
+  ENKRYPT_DETECTOR_IDS,
+  EnkryptPiiEntitySchema,
+  type EnkryptDetectorId,
+} from '@kilocode/db/schema-types';
 import type { EnkryptDetectRequestDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
-import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import type { EnkryptGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 
 const DetectorIdSchema = z.enum(ENKRYPT_DETECTOR_IDS);
 
@@ -175,7 +179,7 @@ export type EnkryptOutputGuardrailReport = z.infer<typeof EnkryptOutputGuardrail
 
 function detectorSettings(
   detectors: EnkryptDetectRequestDetectors,
-  blocking: readonly string[]
+  blocking: readonly EnkryptDetectorId[]
 ): DetectorSettings[] {
   return ENKRYPT_DETECTOR_IDS.flatMap((detector): DetectorSettings[] => {
     if (!detectors[detector]) return [];
@@ -201,7 +205,7 @@ function detectorSettings(
 }
 
 export function guardrailSettings(
-  config: EnkryptInputGuardrailConfig
+  config: EnkryptGuardrailConfig
 ): z.infer<typeof GuardrailSettingsSchema> {
   return {
     status: config.status,

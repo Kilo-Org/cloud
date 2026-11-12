@@ -27,7 +27,7 @@ import {
 import { extractRequestParts } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import {
   splitEnkryptInputGuardrail,
-  type EnkryptInputGuardrailConfig,
+  type EnkryptGuardrailConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import {
   rememberRequestVerdict,
@@ -48,7 +48,7 @@ mkdirSync(outputDir, { recursive: true });
 const detectors = createKiloDefaultEnkryptInputDetectors();
 detectors.injection_attack.action = 'block';
 detectors.pii = { enabled: true, action: 'log', entities: ['secrets'] };
-const config: EnkryptInputGuardrailConfig = {
+const config: EnkryptGuardrailConfig = {
   status: 'ready',
   detectors: buildEnkryptDetectRequestDetectors(detectors),
   blockingDetectors: ['injection_attack'],

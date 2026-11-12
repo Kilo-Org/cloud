@@ -30,7 +30,7 @@ export const ENKRYPT_DETECTOR_TYPES = {
 } as const satisfies Record<EnkryptDetectorId, 'block' | 'revise'>;
 
 /** Enkrypt reports two detectors in `summary` under names that differ from their request keys. */
-export const ENKRYPT_SUMMARY_DETECTORS: Record<string, EnkryptDetectorId> = {
+export const ENKRYPT_SUMMARY_DETECTORS = {
   injection_attack: 'injection_attack',
   on_topic: 'topic_detector',
   policy_violation: 'policy_violation',
@@ -40,7 +40,19 @@ export const ENKRYPT_SUMMARY_DETECTORS: Record<string, EnkryptDetectorId> = {
   pii: 'pii',
   keyword_detected: 'keyword_detector',
   bias: 'bias',
-};
+} as const satisfies Record<string, EnkryptDetectorId>;
+
+const ENKRYPT_SUMMARY_DETECTOR_BY_NAME = new Map<string, EnkryptDetectorId>(
+  Object.entries(ENKRYPT_SUMMARY_DETECTORS)
+);
+
+/**
+ * The detector ID of one `summary` key of a detect response, or undefined when Enkrypt reports a
+ * detector this map does not know.
+ */
+export function enkryptSummaryDetectorId(name: string): EnkryptDetectorId | undefined {
+  return ENKRYPT_SUMMARY_DETECTOR_BY_NAME.get(name);
+}
 
 /**
  * Kilo Default: prompt injection is logged, not blocked. Detectors without input controls stay off;

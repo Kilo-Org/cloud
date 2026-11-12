@@ -1304,7 +1304,7 @@
       "costSpoken": "стоимость {{cost}}",
       "costSpokenWithTime": "стоимость {{cost}}, {{time}}",
       "pullRequest": "запрос на слияние {{number}}",
-      "spokenJoiner": "и"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenMessage": "Не удалось начать настройку приложения GitHub. Попробуйте снова.",
@@ -1710,10 +1710,14 @@
       "stepFailed": "Не удалось подготовить окружение",
       "stepUnknown": "Подготовка окружения",
       "detailCreatingSandbox": "Создание песочницы",
+      "detailStartingSandbox": "Запуск песочницы",
+      "detailCloningRepository": "Клонирование репозитория",
       "detailUpdatingRepository": "Обновление репозитория",
       "detailCheckingOutBranch": "Переключение на ветку",
+      "detailSettingUpBranch": "Настройка ветки",
       "detailRunningSetupCommands": "Выполнение команд настройки",
       "detailSavingRepository": "Сохранение репозитория для быстрого запуска",
+      "detailStartingKilo": "Запуск Kilo",
       "detailStartingKiloRuntime": "Запуск среды выполнения Kilo",
       "detailPreparingKiloSession": "Подготовка сеанса Kilo",
       "detailWaitingForPreviousSandbox": "Ожидание остановки предыдущей песочницы",
@@ -2227,6 +2231,8 @@
     "retryHint": "Повторно загружает статус Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. Действие: {{actionLabel}}",
     "purchaseUnavailable": "Покупка Kilo Pass сейчас недоступна.",
+    "purchaseUnavailableTitle": "Сейчас недоступно",
+    "purchaseUnavailableEnded": "Ваш Kilo Pass завершён.",
     "kiloPassManagement": "Управление Kilo Pass",
     "kiloPassSetup": "Настройка Kilo Pass",
     "subscriptionHeaderDescription": "Ежемесячная подписка, которая добавляет кредиты на ваш баланс Kilo для проведения ИИ-сессий кодинга в Kilo App.",

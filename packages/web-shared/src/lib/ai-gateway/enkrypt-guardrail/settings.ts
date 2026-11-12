@@ -29,7 +29,7 @@ import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
  * schema, so every scanned request is rejected as if Enkrypt were unavailable rather than falling
  * back to a weaker policy.
  */
-export type EnkryptInputGuardrailConfig =
+export type EnkryptGuardrailConfig =
   | {
       status: 'ready';
       detectors: EnkryptDetectRequestDetectors;
@@ -46,6 +46,11 @@ export type StoredEnkryptDetectors = Stored<EnkryptInputDetectors>;
 
 export type StoredEnkryptOutputDetectors = Stored<EnkryptOutputDetectors>;
 
+/** The dotted paths of a schema failure, for a log that never carries the invalid value. */
+function issuePaths(error: z.ZodError): string[] {
+  return error.issues.map(issue => issue.path.join('.'));
+}
+
 function readStored<Detectors>(
   schema: z.ZodType<Detectors>,
   guardrail: EnkryptGuardrailDirection,
@@ -58,7 +63,7 @@ function readStored<Detectors>(
   warnExceptInTest('[enkrypt-guardrail] saved detectors are invalid', {
     guardrail,
     organization_id: organizationId,
-    issues: parsed.error.issues.map(issue => issue.path.join('.')),
+    issues: issuePaths(parsed.error),
   });
   return { status: 'invalid' };
 }
@@ -79,6 +84,43 @@ export function readStoredEnkryptOutputDetectors(
   return readStored(EnkryptOutputDetectorsSchema, 'output', organizationId, detectors);
 }
 
+/** The settings section that holds each direction's guardrail. */
+const GUARDRAIL_SETTINGS_KEYS = {
+  input: 'input_guardrail',
+  output: 'output_guardrail',
+} as const satisfies Record<
+  EnkryptGuardrailDirection,
+  keyof NonNullable<OrganizationSettings['enkrypt']>
+>;
+
+/**
+ * The enabled settings of one direction's guardrail, or null when Kilo admins have not granted the
+ * feature (`kilo_encrypt`), or the section is absent, invalid, or disabled. An invalid section is
+ * logged with its issue paths and treated as absent, so no request is scanned under settings nobody
+ * can read.
+ */
+function resolveGuardrailSettings(
+  organizationId: string,
+  direction: EnkryptGuardrailDirection,
+  settings: OrganizationSettings | undefined,
+  schema: z.ZodType<{ enabled: boolean; detectors?: unknown }>
+): { detectors: unknown } | null {
+  if (settings?.kilo_encrypt !== true) return null;
+  const section: unknown = settings.enkrypt?.[GUARDRAIL_SETTINGS_KEYS[direction]];
+  if (section === undefined) return null;
+  const parsed = schema.safeParse(section);
+  if (!parsed.success) {
+    warnExceptInTest('[enkrypt-guardrail] invalid organization settings; guardrail disabled', {
+      guardrail: direction,
+      organization_id: organizationId,
+      issues: issuePaths(parsed.error),
+    });
+    return null;
+  }
+  if (!parsed.data.enabled) return null;
+  return { detectors: parsed.data.detectors };
+}
+
 /**
  * The organization's input guardrail, or null when Kilo admins have not granted the feature
  * (`kilo_encrypt`), or the guardrail is absent, disabled, invalid in settings, or selects no
@@ -90,20 +132,15 @@ export function readStoredEnkryptOutputDetectors(
 export function resolveEnkryptInputGuardrail(
   organizationId: string,
   settings: OrganizationSettings | undefined
-): EnkryptInputGuardrailConfig | null {
-  if (settings?.kilo_encrypt !== true) return null;
-  const raw: unknown = settings.enkrypt?.input_guardrail;
-  if (raw === undefined) return null;
-  const parsed = EnkryptInputGuardrailSettingsSchema.safeParse(raw);
-  if (!parsed.success) {
-    warnExceptInTest('[enkrypt-guardrail] invalid organization settings; guardrail disabled', {
-      organization_id: organizationId,
-      issues: parsed.error.issues.map(issue => issue.path.join('.')),
-    });
-    return null;
-  }
-  if (!parsed.data.enabled) return null;
-  const stored = readStoredEnkryptDetectors(organizationId, parsed.data.detectors);
+): EnkryptGuardrailConfig | null {
+  const resolved = resolveGuardrailSettings(
+    organizationId,
+    'input',
+    settings,
+    EnkryptInputGuardrailSettingsSchema
+  );
+  if (resolved === null) return null;
+  const stored = readStoredEnkryptDetectors(organizationId, resolved.detectors);
   if (stored.status === 'invalid') return { status: 'invalid' };
   const detectors = enforcedEnkryptInputDetectors(
     stored.status === 'found' ? stored.detectors : createKiloDefaultEnkryptInputDetectors()
@@ -149,22 +186,16 @@ export function enkryptInputGuardrailAppliesTo(
 export function resolveEnkryptOutputGuardrail(
   organizationId: string,
   settings: OrganizationSettings | undefined
-): EnkryptInputGuardrailConfig | null {
-  if (settings?.kilo_encrypt !== true) return null;
-  const raw: unknown = settings.enkrypt?.output_guardrail;
-  if (raw === undefined) return null;
-  const parsed = EnkryptOutputGuardrailSettingsSchema.safeParse(raw);
-  if (!parsed.success) {
-    warnExceptInTest('[enkrypt-guardrail] invalid organization settings; guardrail disabled', {
-      guardrail: 'output',
-      organization_id: organizationId,
-      issues: parsed.error.issues.map(issue => issue.path.join('.')),
-    });
-    return null;
-  }
-  if (!parsed.data.enabled) return null;
+): EnkryptGuardrailConfig | null {
+  const resolved = resolveGuardrailSettings(
+    organizationId,
+    'output',
+    settings,
+    EnkryptOutputGuardrailSettingsSchema
+  );
+  if (resolved === null) return null;
 
-  const stored = readStoredEnkryptOutputDetectors(organizationId, parsed.data.detectors);
+  const stored = readStoredEnkryptOutputDetectors(organizationId, resolved.detectors);
   if (stored.status === 'missing') return null;
   if (stored.status === 'invalid') return { status: 'invalid' };
   if (enabledEnkryptOutputDetectorIds(stored.detectors).length === 0) return null;
@@ -178,8 +209,8 @@ export function resolveEnkryptOutputGuardrail(
 }
 
 type EnkryptInputGuardrailSplit = {
-  blocking: EnkryptInputGuardrailConfig | null;
-  logOnly: EnkryptInputGuardrailConfig | null;
+  blocking: EnkryptGuardrailConfig | null;
+  logOnly: EnkryptGuardrailConfig | null;
 };
 
 function selectDetectors(
@@ -201,7 +232,7 @@ function selectDetectors(
  * credits for a policy. An invalid configuration stays blocking, so it keeps failing closed.
  */
 export function splitEnkryptInputGuardrail(
-  config: EnkryptInputGuardrailConfig
+  config: EnkryptGuardrailConfig
 ): EnkryptInputGuardrailSplit {
   if (config.status === 'invalid') return { blocking: config, logOnly: null };
   const logOnlyDetectors = ENKRYPT_DETECTOR_IDS.filter(

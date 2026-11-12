@@ -90,6 +90,7 @@ import { getVercelRuntimeIdentity } from './byoc/vercel-runtime-identity.js';
 import { z } from 'zod';
 import { isOrgInList } from './sandbox-id.js';
 import { registerVercelScmBrokerRoute } from './scm-broker/vercel-route.js';
+import { isAllowedStreamWebSocketOrigin, isAllowedWebSocketOrigin } from './ws-origin.js';
 
 const app = new Hono<HonoContext>();
 
@@ -114,15 +115,6 @@ function snapshotBuildOwnerKey(input: z.infer<typeof SnapshotBuildOwnerSchema>):
 
 function snapshotBuildOwnerId(input: z.infer<typeof SnapshotBuildOwnerSchema>): string {
   return input.organizationId !== undefined ? input.organizationId : input.userId;
-}
-
-function isAllowedWebSocketOrigin(env: Env, origin: string | undefined): boolean {
-  const allowedOrigins = (env.WS_ALLOWED_ORIGINS || '')
-    .split(',')
-    .map(value => value.trim())
-    .filter(Boolean);
-  const isRealOrigin = origin !== undefined && origin !== 'null';
-  return allowedOrigins.length === 0 || !isRealOrigin || allowedOrigins.includes(origin);
 }
 
 function createTerminalForwardRequest(
@@ -170,7 +162,7 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
     return new Response('Invalid ptyId parameter', { status: 400 });
   }
 
-  if (!isAllowedWebSocketOrigin(env, request.headers.get('Origin') ?? undefined)) {
+  if (!isAllowedWebSocketOrigin(env, request.headers.get('Origin'))) {
     logger.withFields({ cloudAgentSessionId, ptyId }).warn('/terminal: Origin not allowed');
     return new Response('Origin not allowed', { status: 403 });
   }
@@ -350,7 +342,7 @@ app.get('/internal/byoc/vercel-runtime-identity', async (c: Context<HonoContext>
   if (unauthorized) return unauthorized;
 
   try {
-    return c.json(await getVercelRuntimeIdentity(c.env), 200, { 'Cache-Control': 'no-store' });
+    return c.json(await getVercelRuntimeIdentity(), 200, { 'Cache-Control': 'no-store' });
   } catch {
     return c.text('Vercel runtime identity could not be resolved', 502);
   }
@@ -750,6 +742,11 @@ app.get('/stream', async (c: Context<HonoContext>) => {
   if (!cloudAgentSessionId) {
     logger.warn('/stream: Missing cloudAgentSessionId parameter');
     return c.text('Missing cloudAgentSessionId parameter', 400);
+  }
+
+  if (!isAllowedStreamWebSocketOrigin(c.env, c.req.header('Origin'))) {
+    logger.withFields({ cloudAgentSessionId }).warn('/stream: Origin not allowed');
+    return c.text('Origin not allowed', 403);
   }
 
   const ticket = url.searchParams.get('ticket');

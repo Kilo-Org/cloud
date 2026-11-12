@@ -13,21 +13,25 @@ import type {
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import type { getBotUserId as GetBotUserId } from '@/lib/bot-users/bot-user-service';
 import type { resolveGitHubRepositoryForOwner as ResolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
+import type { authorizeGitHubRepository as AuthorizeGitHubRepository } from '@/lib/bot/github-repository-permission';
 import type SpawnCloudAgentSession from './spawn-cloud-agent-session';
 import { INSUFFICIENT_CREDITS_RESPONSE } from '@/lib/cloud-agent-next/run-session';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 
 const mockGetGitHubIntegrationById =
   jest.fn<(...args: unknown[]) => Promise<PlatformIntegration | null>>();
-const mockAuthorizeGitHubRepositoryFn =
-  jest.fn<(params: unknown) => Promise<{ allowed: true } | { allowed: false; markdown: string }>>();
+const mockAuthorizeGitHubRepositoryFn = jest.fn<typeof AuthorizeGitHubRepository>();
 
-function authorizeGitHubRepository(params: unknown) {
+function authorizeGitHubRepository(params: Parameters<typeof AuthorizeGitHubRepository>[0]) {
   return mockAuthorizeGitHubRepositoryFn(params);
 }
 
 jest.mock('@/lib/bot/github-repository-permission', () => ({
   authorizeGitHubRepository,
+}));
+
+jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
+  assertGitHubInstallationRuntimeAuthorized: jest.fn(),
 }));
 
 const mockLinkUploadedAttachmentsFn = jest.fn<(...args: unknown[]) => Promise<string[]>>();
@@ -300,8 +304,6 @@ describe('spawnCloudAgentSession delegation', () => {
       repository: 'other/repo',
       threadRepository: 'owner/repo',
       actorLogin: 'octocat',
-      requesterUserId: undefined,
-      purpose: 'workflow',
     });
     expect(mockResolveGitHubRepositoryForOwner).not.toHaveBeenCalled();
     expect(mockPrepareSession).not.toHaveBeenCalled();
@@ -323,43 +325,89 @@ describe('spawnCloudAgentSession delegation', () => {
       repository: 'owner/repo',
       threadRepository: 'owner/repo',
       actorLogin: 'octocat',
-      requesterUserId: undefined,
-      purpose: 'workflow',
     });
     expect(mockPrepareSession).toHaveBeenCalled();
   });
 
-  it('authorizes a chat integration repository with the requesting account', async () => {
+  it('prepares an organization Slack session without a linked GitHub identity through its connection', async () => {
     const slackIntegration = {
       owned_by_organization_id: 'organization-1',
       owned_by_user_id: null,
       platform: 'slack',
     } as PlatformIntegration;
-    mockAuthorizeGitHubRepositoryFn.mockResolvedValue({
-      allowed: false,
-      markdown: 'I could not confirm write access to `acme/private`.',
-    });
+    mockAuthorizeGitHubRepositoryFn.mockImplementation(
+      jest.requireActual<{ authorizeGitHubRepository: typeof AuthorizeGitHubRepository }>(
+        '@/lib/bot/github-repository-permission'
+      ).authorizeGitHubRepository
+    );
 
     await expect(
       spawnCloudAgentSession(
-        { githubRepo: 'acme/private', prompt: 'Read the source', mode: 'ask' },
+        { githubRepo: 'owner/repo', prompt: 'Read the source', mode: 'ask' },
         'model',
         slackIntegration,
         'auth-token',
-        'request-chat-denied',
+        'request-chat-allowed',
         undefined,
-        { chatPlatform: 'slack', requesterUserId: 'user-9' }
+        { chatPlatform: 'slack', requesterUserId: 'user-without-github' }
       )
-    ).resolves.toEqual({ response: 'I could not confirm write access to `acme/private`.' });
-
-    expect(mockAuthorizeGitHubRepositoryFn).toHaveBeenCalledWith({
-      platformIntegration: slackIntegration,
-      repository: 'acme/private',
-      threadRepository: undefined,
-      actorLogin: undefined,
-      requesterUserId: 'user-9',
-      purpose: 'agent',
+    ).resolves.toEqual({
+      response:
+        'Cloud Agent session started. I will post the final response back in this thread when it completes.',
+      cloudAgentSessionId: 'cloud-session-1',
+      kiloSessionId: 'kilo-session-1',
     });
+
+    expect(mockResolveGitHubRepositoryForOwner).toHaveBeenCalledTimes(1);
+    expect(mockResolveGitHubRepositoryForOwner).toHaveBeenCalledWith(
+      { type: 'org', id: 'organization-1' },
+      'owner/repo',
+      'agent'
+    );
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        githubRepo: 'owner/repo',
+        githubIntegrationId: 'github-association-1',
+        githubAccessPurpose: 'agent',
+        kilocodeOrganizationId: 'organization-1',
+        mode: 'ask',
+      })
+    );
+  });
+
+  it('rejects an unavailable organization Slack repository without a linked GitHub identity before prepare', async () => {
+    const slackIntegration = {
+      ...organizationIntegration,
+      platform: 'slack',
+    } as PlatformIntegration;
+    mockAuthorizeGitHubRepositoryFn.mockImplementation(
+      jest.requireActual<{ authorizeGitHubRepository: typeof AuthorizeGitHubRepository }>(
+        '@/lib/bot/github-repository-permission'
+      ).authorizeGitHubRepository
+    );
+    mockResolveGitHubRepositoryForOwner.mockResolvedValue(null);
+
+    await expect(
+      spawnCloudAgentSession(
+        { githubRepo: 'other/repo', prompt: 'Read the source', mode: 'ask' },
+        'model',
+        slackIntegration,
+        'auth-token',
+        'request-chat-unavailable',
+        undefined,
+        { chatPlatform: 'slack', requesterUserId: 'user-without-github' }
+      )
+    ).resolves.toEqual({
+      response:
+        "Error: That GitHub repository is not uniquely available through this organization's approved GitHub connections.",
+    });
+    expect(mockResolveGitHubRepositoryForOwner).toHaveBeenCalledTimes(1);
+    expect(mockResolveGitHubRepositoryForOwner).toHaveBeenCalledWith(
+      { type: 'org', id: 'organization-1' },
+      'other/repo',
+      'agent'
+    );
+    expect(mockGetGitHubIntegrationById).not.toHaveBeenCalled();
     expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 

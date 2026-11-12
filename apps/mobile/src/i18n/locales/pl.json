@@ -3998,5 +3998,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nie udało się otworzyć tego wyniku wyszukiwania"
+  },
+  "sessionShare": {
+    "title": "Udostępnij sesję",
+    "subtitle": "Każdy, kto ma link, może odczytać tę sesję.",
+    "durationLabel": "Ważność linku",
+    "duration1h": "1 godz.",
+    "duration1d": "1 dzień",
+    "duration7d": "7 dni",
+    "duration30d": "30 dni",
+    "durationForever": "Nigdy",
+    "includeNewMessages": "Uwzględniaj nowe wiadomości",
+    "includeNewMessagesOn": "Każdy, kto ma ten link, zobaczy też wiadomości dodane później.",
+    "includeNewMessagesOff": "Link obejmuje tylko wiadomości otrzymane przed jego utworzeniem.",
+    "create": "Utwórz link",
+    "createFailed": "Nie udało się utworzyć linku.",
+    "activeTitle": "Link aktywny",
+    "activeDescription": "Ta sesja ma już link do udostępniania. Utworzenie nowego zastąpi go, a stary link przestanie działać.",
+    "rotate": "Utwórz nowy link",
+    "revoke": "Unieważnij link",
+    "revokeTitle": "Unieważnić link?",
+    "revokeMessage": "Obecny link natychmiast przestanie działać.",
+    "revokeFailed": "Nie udało się unieważnić linku.",
+    "expiresIn": "Wygasa za {{duration}}",
+    "neverExpires": "Nie wygasa",
+    "includesNewMessages": "Nowe wiadomości są uwzględniane.",
+    "excludesNewMessages": "Nowe wiadomości nie są uwzględniane."
+  },
+  "sharedSession": {
+    "title": "Udostępniona sesja",
+    "someone": "Ktoś",
+    "sharedBy": "Udostępnione przez: {{owner}}",
+    "unavailableTitle": "Link niedostępny",
+    "unavailableDescription": "Ten link do udostępniania wygasł lub został unieważniony.",
+    "transcriptUnavailableTitle": "Nie udało się wczytać tej transkrypcji",
+    "transcriptUnavailableDescription": "Link nadal działa. Spróbuj ponownie za chwilę."
   }
 }

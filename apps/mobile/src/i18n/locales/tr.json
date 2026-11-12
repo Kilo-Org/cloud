@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu arama sonucu açılamadı"
+  },
+  "sessionShare": {
+    "title": "Oturumu paylaş",
+    "subtitle": "Bağlantıya sahip olan herkes bu oturumu okuyabilir.",
+    "durationLabel": "Bağlantı süresi",
+    "duration1h": "1 sa",
+    "duration1d": "1 gün",
+    "duration7d": "7 gün",
+    "duration30d": "30 gün",
+    "durationForever": "Süresiz",
+    "includeNewMessages": "Yeni mesajları dahil et",
+    "includeNewMessagesOn": "Bu bağlantıya sahip olan herkes sonradan eklenen mesajları da okur.",
+    "includeNewMessagesOff": "Bağlantı yalnızca siz oluşturmadan önce alınan mesajları içerir.",
+    "create": "Bağlantı oluştur",
+    "createFailed": "Bağlantı oluşturulamadı.",
+    "activeTitle": "Bağlantı etkin",
+    "activeDescription": "Bu oturumun zaten bir paylaşım bağlantısı var. Yeni bir bağlantı oluşturursanız mevcut bağlantının yerini alır ve eski bağlantı çalışmaz hâle gelir.",
+    "rotate": "Yeni bağlantı oluştur",
+    "revoke": "Bağlantıyı iptal et",
+    "revokeTitle": "Bağlantı iptal edilsin mi?",
+    "revokeMessage": "Mevcut bağlantı hemen çalışmayı durdurur.",
+    "revokeFailed": "Bağlantı iptal edilemedi.",
+    "expiresIn": "{{duration}} içinde sona erer",
+    "neverExpires": "Süresi dolmaz",
+    "includesNewMessages": "Yeni mesajlar dahildir.",
+    "excludesNewMessages": "Yeni mesajlar hariçtir."
+  },
+  "sharedSession": {
+    "title": "Paylaşılan oturum",
+    "someone": "Biri",
+    "sharedBy": "Paylaşan: {{owner}}",
+    "unavailableTitle": "Bağlantı kullanılamıyor",
+    "unavailableDescription": "Bu paylaşım bağlantısının süresi dolmuş veya bağlantı iptal edilmiş.",
+    "transcriptUnavailableTitle": "Bu döküm yüklenemedi",
+    "transcriptUnavailableDescription": "Bağlantı hâlâ çalışıyor. Birazdan tekrar deneyin."
   }
 }

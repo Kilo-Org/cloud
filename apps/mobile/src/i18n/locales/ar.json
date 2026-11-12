@@ -4128,5 +4128,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "تعذّر فتح نتيجة البحث هذه"
+  },
+  "sessionShare": {
+    "title": "مشاركة الجلسة",
+    "subtitle": "يمكن لأي شخص لديه الرابط قراءة هذه الجلسة.",
+    "durationLabel": "مدة الرابط",
+    "duration1h": "ساعة",
+    "duration1d": "يوم",
+    "duration7d": "7 أيام",
+    "duration30d": "30 يومًا",
+    "durationForever": "أبدًا",
+    "includeNewMessages": "تضمين الرسائل الجديدة",
+    "includeNewMessagesOn": "يمكن لأي شخص لديه هذا الرابط أيضًا قراءة الرسائل المضافة لاحقًا.",
+    "includeNewMessagesOff": "لا يتضمن الرابط إلا الرسائل المستلمة قبل إنشائه.",
+    "create": "إنشاء رابط",
+    "createFailed": "تعذّر إنشاء الرابط.",
+    "activeTitle": "الرابط نشط",
+    "activeDescription": "لهذه الجلسة رابط مشاركة بالفعل. سيؤدي إنشاء رابط جديد إلى استبداله وإيقاف عمل الرابط القديم.",
+    "rotate": "إنشاء رابط جديد",
+    "revoke": "إبطال الرابط",
+    "revokeTitle": "إبطال الرابط؟",
+    "revokeMessage": "سيتوقف الرابط الحالي عن العمل فورًا.",
+    "revokeFailed": "تعذّر إبطال الرابط.",
+    "expiresIn": "تنتهي صلاحيته خلال {{duration}}",
+    "neverExpires": "لا تنتهي صلاحيته",
+    "includesNewMessages": "الرسائل الجديدة مُضمّنة.",
+    "excludesNewMessages": "الرسائل الجديدة مستبعدة."
+  },
+  "sharedSession": {
+    "title": "جلسة مُشارَكة",
+    "someone": "شخص ما",
+    "sharedBy": "شاركها {{owner}}",
+    "unavailableTitle": "الرابط غير متاح",
+    "unavailableDescription": "انتهت صلاحية رابط المشاركة هذا أو تم إبطاله.",
+    "transcriptUnavailableTitle": "تعذّر تحميل هذا السجل",
+    "transcriptUnavailableDescription": "لا يزال الرابط يعمل. حاول مرة أخرى بعد قليل."
   }
 }

@@ -3933,5 +3933,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nu s-a putut deschide acest rezultat de căutare"
+  },
+  "sessionShare": {
+    "title": "Partajează sesiunea",
+    "subtitle": "Oricine are linkul poate citi această sesiune.",
+    "durationLabel": "Durata linkului",
+    "duration1h": "1 h",
+    "duration1d": "1 z",
+    "duration7d": "7 z",
+    "duration30d": "30 z",
+    "durationForever": "Niciodată",
+    "includeNewMessages": "Include mesajele noi",
+    "includeNewMessagesOn": "Oricine are acest link poate citi și mesajele adăugate ulterior.",
+    "includeNewMessagesOff": "Linkul include doar mesajele primite înainte de crearea lui.",
+    "create": "Creează linkul",
+    "createFailed": "Linkul nu a putut fi creat.",
+    "activeTitle": "Link activ",
+    "activeDescription": "Această sesiune are deja un link de partajare. Crearea unui link nou îl înlocuiește pe cel vechi, care nu va mai funcționa.",
+    "rotate": "Creează un link nou",
+    "revoke": "Revocă linkul",
+    "revokeTitle": "Revoci linkul?",
+    "revokeMessage": "Linkul actual nu va mai funcționa imediat.",
+    "revokeFailed": "Linkul nu a putut fi revocat.",
+    "expiresIn": "Expiră în {{duration}}",
+    "neverExpires": "Nu expiră niciodată",
+    "includesNewMessages": "Mesajele noi sunt incluse.",
+    "excludesNewMessages": "Mesajele noi nu sunt incluse."
+  },
+  "sharedSession": {
+    "title": "Sesiune partajată",
+    "someone": "Cineva",
+    "sharedBy": "Partajată de {{owner}}",
+    "unavailableTitle": "Link indisponibil",
+    "unavailableDescription": "Acest link de partajare a expirat sau a fost revocat.",
+    "transcriptUnavailableTitle": "Transcrierea nu a putut fi încărcată",
+    "transcriptUnavailableDescription": "Linkul încă funcționează. Încearcă din nou în câteva momente."
   }
 }

@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Չհաջողվեց բացել այս որոնման արդյունքը"
+  },
+  "sessionShare": {
+    "title": "Կիսվել սեսիայով",
+    "subtitle": "Հղումն ունեցող ցանկացած ոք կարող է կարդալ այս սեսիան։",
+    "durationLabel": "Հղման ժամկետ",
+    "duration1h": "1 ժ",
+    "duration1d": "1 օր",
+    "duration7d": "7 օր",
+    "duration30d": "30 օր",
+    "durationForever": "Երբեք",
+    "includeNewMessages": "Ներառել նոր հաղորդագրությունները",
+    "includeNewMessagesOn": "Այս հղումն ունեցող ցանկացած ոք կկարդա նաև հետագայում ավելացված հաղորդագրությունները։",
+    "includeNewMessagesOff": "Հղումը ներառում է միայն այն հաղորդագրությունները, որոնք ստացվել են մինչև դրա ստեղծումը։",
+    "create": "Ստեղծել հղում",
+    "createFailed": "Չհաջողվեց ստեղծել հղումը։",
+    "activeTitle": "Հղումն ակտիվ է",
+    "activeDescription": "Այս սեսիան արդեն ունի կիսման հղում։ Նորի ստեղծումը կփոխարինի այն, և հին հղումն այլևս չի աշխատի։",
+    "rotate": "Ստեղծել նոր հղում",
+    "revoke": "Չեղարկել հղումը",
+    "revokeTitle": "Չեղարկե՞լ հղումը",
+    "revokeMessage": "Ընթացիկ հղումն անմիջապես կդադարի աշխատել։",
+    "revokeFailed": "Չհաջողվեց չեղարկել հղումը։",
+    "expiresIn": "Ժամկետը լրանում է {{duration}} հետո",
+    "neverExpires": "Անժամկետ",
+    "includesNewMessages": "Նոր հաղորդագրությունները ներառված են։",
+    "excludesNewMessages": "Նոր հաղորդագրությունները ներառված չեն։"
+  },
+  "sharedSession": {
+    "title": "Կիսված սեսիա",
+    "someone": "Ինչ-որ մեկը",
+    "sharedBy": "Կիսվել է՝ {{owner}}",
+    "unavailableTitle": "Հղումն անհասանելի է",
+    "unavailableDescription": "Կիսման այս հղման ժամկետը լրացել է, կամ այն չեղարկվել է։",
+    "transcriptUnavailableTitle": "Չհաջողվեց բեռնել այս զրույցի պատմությունը",
+    "transcriptUnavailableDescription": "Հղումը դեռ աշխատում է։ Փորձեք մի փոքր ուշ։"
   }
 }

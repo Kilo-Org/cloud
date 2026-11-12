@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Dit zoekresultaat kon niet worden geopend"
+  },
+  "sessionShare": {
+    "title": "Sessie delen",
+    "subtitle": "Iedereen met de link kan deze sessie lezen.",
+    "durationLabel": "Geldigheidsduur link",
+    "duration1h": "1u",
+    "duration1d": "1d",
+    "duration7d": "7d",
+    "duration30d": "30d",
+    "durationForever": "Nooit",
+    "includeNewMessages": "Nieuwe berichten opnemen",
+    "includeNewMessagesOn": "Iedereen met deze link leest ook berichten die later worden toegevoegd.",
+    "includeNewMessagesOff": "De link bevat alleen berichten die zijn ontvangen voordat je hem aanmaakt.",
+    "create": "Link maken",
+    "createFailed": "Kan de link niet maken.",
+    "activeTitle": "Link actief",
+    "activeDescription": "Deze sessie heeft al een deellink. Als je een nieuwe maakt, wordt die vervangen en werkt de oude link niet meer.",
+    "rotate": "Nieuwe link maken",
+    "revoke": "Link intrekken",
+    "revokeTitle": "Link intrekken?",
+    "revokeMessage": "De huidige link werkt direct niet meer.",
+    "revokeFailed": "Kan de link niet intrekken.",
+    "expiresIn": "Verloopt over {{duration}}",
+    "neverExpires": "Verloopt nooit",
+    "includesNewMessages": "Nieuwe berichten worden opgenomen.",
+    "excludesNewMessages": "Nieuwe berichten worden niet opgenomen."
+  },
+  "sharedSession": {
+    "title": "Gedeelde sessie",
+    "someone": "Iemand",
+    "sharedBy": "Gedeeld door {{owner}}",
+    "unavailableTitle": "Link niet beschikbaar",
+    "unavailableDescription": "Deze deellink is verlopen of ingetrokken.",
+    "transcriptUnavailableTitle": "Kan dit transcript niet laden",
+    "transcriptUnavailableDescription": "De link werkt nog. Probeer het zo opnieuw."
   }
 }

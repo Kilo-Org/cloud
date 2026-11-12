@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "یہ تلاش کا نتیجہ کھولا نہیں جا سکا"
+  },
+  "sessionShare": {
+    "title": "سیشن شیئر کریں",
+    "subtitle": "لنک رکھنے والا کوئی بھی شخص یہ سیشن پڑھ سکتا ہے۔",
+    "durationLabel": "لنک کی مدت",
+    "duration1h": "1 گھنٹہ",
+    "duration1d": "1 دن",
+    "duration7d": "7 دن",
+    "duration30d": "30 دن",
+    "durationForever": "کبھی نہیں",
+    "includeNewMessages": "نئے پیغامات شامل کریں",
+    "includeNewMessagesOn": "اس لنک والا کوئی بھی شخص بعد میں شامل ہونے والے پیغامات بھی پڑھ سکے گا۔",
+    "includeNewMessagesOff": "لنک میں صرف وہ پیغامات شامل ہوں گے جو اسے بنانے سے پہلے موصول ہوئے۔",
+    "create": "لنک بنائیں",
+    "createFailed": "لنک نہیں بن سکا۔",
+    "activeTitle": "لنک فعال ہے",
+    "activeDescription": "اس سیشن کا شیئر لنک پہلے سے موجود ہے۔ نیا لنک بنانے سے یہ تبدیل ہو جائے گا اور پرانا لنک کام کرنا بند کر دے گا۔",
+    "rotate": "نیا لنک بنائیں",
+    "revoke": "لنک منسوخ کریں",
+    "revokeTitle": "لنک منسوخ کریں؟",
+    "revokeMessage": "موجودہ لنک فوراً کام کرنا بند کر دے گا۔",
+    "revokeFailed": "لنک منسوخ نہیں ہو سکا۔",
+    "expiresIn": "میعاد {{duration}} میں ختم ہوگی",
+    "neverExpires": "میعاد کبھی ختم نہیں ہوگی",
+    "includesNewMessages": "نئے پیغامات شامل ہیں۔",
+    "excludesNewMessages": "نئے پیغامات شامل نہیں ہیں۔"
+  },
+  "sharedSession": {
+    "title": "شیئر کردہ سیشن",
+    "someone": "کوئی شخص",
+    "sharedBy": "{{owner}} کی جانب سے شیئر کیا گیا",
+    "unavailableTitle": "لنک دستیاب نہیں",
+    "unavailableDescription": "اس شیئر لنک کی میعاد ختم ہو چکی ہے یا اسے منسوخ کر دیا گیا ہے۔",
+    "transcriptUnavailableTitle": "یہ ٹرانسکرپٹ لوڈ نہیں ہو سکا",
+    "transcriptUnavailableDescription": "لنک اب بھی کام کر رہا ہے۔ تھوڑی دیر بعد دوبارہ کوشش کریں۔"
   }
 }

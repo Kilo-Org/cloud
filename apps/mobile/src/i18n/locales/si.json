@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "මෙම සෙවුම් ප්‍රතිඵලය විවෘත කිරීමට නොහැකි විය"
+  },
+  "sessionShare": {
+    "title": "සැසිය බෙදාගන්න",
+    "subtitle": "සබැඳිය ඇති ඕනෑම අයෙකුට මෙම සැසිය කියවිය හැක.",
+    "durationLabel": "සබැඳි කාලසීමාව",
+    "duration1h": "පැය 1",
+    "duration1d": "දින 1",
+    "duration7d": "දින 7",
+    "duration30d": "දින 30",
+    "durationForever": "කිසිදා නැත",
+    "includeNewMessages": "නව පණිවිඩ ඇතුළත් කරන්න",
+    "includeNewMessagesOn": "මෙම සබැඳිය ඇති ඕනෑම අයෙකුට පසුව එක් කරන පණිවිඩද කියවිය හැක.",
+    "includeNewMessagesOff": "සබැඳියට ඇතුළත් වන්නේ ඔබ එය සෑදීමට පෙර ලැබුණු පණිවිඩ පමණි.",
+    "create": "සබැඳිය සාදන්න",
+    "createFailed": "සබැඳිය සෑදිය නොහැකි විය.",
+    "activeTitle": "සබැඳිය සක්‍රියයි",
+    "activeDescription": "මෙම සැසියට දැනටමත් බෙදාගැනීමේ සබැඳියක් ඇත. නව එකක් සෑදීමෙන් එය ප්‍රතිස්ථාපනය වන අතර පැරණි සබැඳිය ක්‍රියා කිරීම නවතී.",
+    "rotate": "නව සබැඳියක් සාදන්න",
+    "revoke": "සබැඳිය අවලංගු කරන්න",
+    "revokeTitle": "සබැඳිය අවලංගු කරන්නද?",
+    "revokeMessage": "වත්මන් සබැඳිය වහාම ක්‍රියා කිරීම නවතී.",
+    "revokeFailed": "සබැඳිය අවලංගු කළ නොහැකි විය.",
+    "expiresIn": "{{duration}}කින් කල් ඉකුත් වේ",
+    "neverExpires": "කිසිදා කල් ඉකුත් නොවේ",
+    "includesNewMessages": "නව පණිවිඩ ඇතුළත් වේ.",
+    "excludesNewMessages": "නව පණිවිඩ ඇතුළත් නොවේ."
+  },
+  "sharedSession": {
+    "title": "බෙදාගත් සැසිය",
+    "someone": "යමෙක්",
+    "sharedBy": "{{owner}} විසින් බෙදාගන්නා ලදී",
+    "unavailableTitle": "සබැඳිය ලබා ගත නොහැක",
+    "unavailableDescription": "මෙම බෙදාගැනීමේ සබැඳිය කල් ඉකුත් වී හෝ අවලංගු කර ඇත.",
+    "transcriptUnavailableTitle": "මෙම සංවාද සටහන පූරණය කළ නොහැකි විය",
+    "transcriptUnavailableDescription": "සබැඳිය තවමත් ක්‍රියා කරයි. මොහොතකින් නැවත උත්සාහ කරන්න."
   }
 }

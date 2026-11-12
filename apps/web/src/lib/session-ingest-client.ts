@@ -8,6 +8,10 @@ import {
   SESSION_INGEST_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
 import { ServiceFetchTimeoutError, fetchWithinBudget } from '@/lib/bounded-service-fetch';
+import {
+  toSharedTranscriptMessages,
+  type SharedTranscriptMessage,
+} from '@/lib/shared-session-transcript';
 import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import type { User } from '@kilocode/db/schema';
@@ -616,6 +620,55 @@ export async function fetchSharedSessionSnapshot(
   }
 
   return parsed.data;
+}
+
+/** A public share as the read-only viewer needs it: who shared it, and what it says. */
+export type SharedSessionRead = {
+  metadata: SharedSessionMetadata;
+  messages: SharedTranscriptMessage[];
+  /**
+   * The link is valid but the snapshot behind it could not be read. The viewer
+   * still shows the session's identity and says the transcript is unavailable,
+   * exactly like the public web page does.
+   */
+  transcriptUnavailable: boolean;
+};
+
+/**
+ * Read a publicly shared session by its share token.
+ *
+ * Returns null when the token names no live share — expired, revoked, rotated
+ * out by a newer link, or never valid. That is the one answer the viewer treats
+ * as terminal, because retrying it cannot succeed.
+ *
+ * The snapshot is validated into renderable messages here, so every client of
+ * this capability receives the same transcript the public web page shows. The
+ * token is intentionally never included in errors or Sentry context.
+ */
+export async function fetchSharedSession(shareToken: string): Promise<SharedSessionRead | null> {
+  const metadata = await fetchSharedSessionMetadata(shareToken);
+  if (!metadata) {
+    return null;
+  }
+
+  let snapshot: SessionSnapshot | null;
+  try {
+    snapshot = await fetchSharedSessionSnapshot(shareToken);
+  } catch {
+    // A valid capability whose snapshot read failed is not a dead link: the
+    // metadata above resolved, so the viewer keeps the session and reports the
+    // transcript as unavailable rather than claiming the link expired.
+    return { metadata, messages: [], transcriptUnavailable: true };
+  }
+  if (!snapshot) {
+    return { metadata, messages: [], transcriptUnavailable: true };
+  }
+
+  return {
+    metadata,
+    messages: toSharedTranscriptMessages(snapshot.messages),
+    transcriptUnavailable: false,
+  };
 }
 
 // ---------------------------------------------------------------------------

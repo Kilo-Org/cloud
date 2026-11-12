@@ -3933,5 +3933,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "No s'ha pogut obrir aquest resultat de la cerca"
+  },
+  "sessionShare": {
+    "title": "Comparteix la sessió",
+    "subtitle": "Qualsevol persona amb l'enllaç pot llegir aquesta sessió.",
+    "durationLabel": "Durada de l'enllaç",
+    "duration1h": "1 h",
+    "duration1d": "1 d",
+    "duration7d": "7 d",
+    "duration30d": "30 d",
+    "durationForever": "Mai",
+    "includeNewMessages": "Inclou els missatges nous",
+    "includeNewMessagesOn": "Qualsevol persona amb aquest enllaç també llegeix els missatges afegits més tard.",
+    "includeNewMessagesOff": "L'enllaç només inclou els missatges rebuts abans que el creïs.",
+    "create": "Crea l'enllaç",
+    "createFailed": "No s'ha pogut crear l'enllaç.",
+    "activeTitle": "Enllaç actiu",
+    "activeDescription": "Aquesta sessió ja té un enllaç per compartir. Si en crees un de nou, el substituirà i l'enllaç antic deixarà de funcionar.",
+    "rotate": "Crea un enllaç nou",
+    "revoke": "Revoca l'enllaç",
+    "revokeTitle": "Vols revocar l'enllaç?",
+    "revokeMessage": "L'enllaç actual deixa de funcionar immediatament.",
+    "revokeFailed": "No s'ha pogut revocar l'enllaç.",
+    "expiresIn": "Caduca d'aquí a {{duration}}",
+    "neverExpires": "No caduca mai",
+    "includesNewMessages": "Els missatges nous s'hi inclouen.",
+    "excludesNewMessages": "Els missatges nous no s'hi inclouen."
+  },
+  "sharedSession": {
+    "title": "Sessió compartida",
+    "someone": "Algú",
+    "sharedBy": "Compartida per {{owner}}",
+    "unavailableTitle": "Enllaç no disponible",
+    "unavailableDescription": "Aquest enllaç per compartir ha caducat o s'ha revocat.",
+    "transcriptUnavailableTitle": "No s'ha pogut carregar aquesta transcripció",
+    "transcriptUnavailableDescription": "L'enllaç encara funciona. Torna-ho a provar d'aquí a un moment."
   }
 }

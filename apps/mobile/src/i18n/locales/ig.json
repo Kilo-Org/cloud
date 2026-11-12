@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Enweghị ike imepe nsonaazụ ọchụchọ a"
+  },
+  "sessionShare": {
+    "title": "Kesaa nnọkọ",
+    "subtitle": "Onye ọ bụla nwere njikọ ahụ nwere ike ịgụ nnọkọ a.",
+    "durationLabel": "Ogologo oge njikọ",
+    "duration1h": "Awa 1",
+    "duration1d": "Ụbọchị 1",
+    "duration7d": "Ụbọchị 7",
+    "duration30d": "Ụbọchị 30",
+    "durationForever": "Ọ dịghị mgbe",
+    "includeNewMessages": "Tinye ozi ọhụrụ",
+    "includeNewMessagesOn": "Onye ọ bụla nwere njikọ a ga-agụkwa ozi a tinyere emesịa.",
+    "includeNewMessagesOff": "Njikọ a nwere naanị ozi a natara tupu i mepụta ya.",
+    "create": "Mepụta njikọ",
+    "createFailed": "Enweghị ike ịmepụta njikọ ahụ.",
+    "activeTitle": "Njikọ na-arụ ọrụ",
+    "activeDescription": "Nnọkọ a nwerela njikọ nkesa. Ịmepụta nke ọhụrụ ga-anọchi ya ma mee ka njikọ ochie ahụ kwụsị ịrụ ọrụ.",
+    "rotate": "Mepụta njikọ ọhụrụ",
+    "revoke": "Kagbuo njikọ",
+    "revokeTitle": "Kagbuo njikọ?",
+    "revokeMessage": "Njikọ dị ugbu a ga-akwụsị ịrụ ọrụ ozugbo.",
+    "revokeFailed": "Enweghị ike ịkagbu njikọ ahụ.",
+    "expiresIn": "Ọ ga-agwụ n'ime {{duration}}",
+    "neverExpires": "Ọ dịghị mgbe ọ ga-agwụ",
+    "includesNewMessages": "A na-etinye ozi ọhụrụ.",
+    "excludesNewMessages": "A naghị etinye ozi ọhụrụ."
+  },
+  "sharedSession": {
+    "title": "Nnọkọ ekesara",
+    "someone": "Otu onye",
+    "sharedBy": "{{owner}} kesara ya",
+    "unavailableTitle": "Njikọ adịghị",
+    "unavailableDescription": "Njikọ nkesa a agwụla oge ma ọ bụ a kagbuola ya.",
+    "transcriptUnavailableTitle": "Enweghị ike ibugo ndekọ a",
+    "transcriptUnavailableDescription": "Njikọ ahụ ka na-arụ ọrụ. Nwaa ọzọ n'oge na-adịghị anya."
   }
 }

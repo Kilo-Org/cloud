@@ -80,6 +80,9 @@ export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
     appPath: '/(app)/pr-review/bitbucket/<1>',
   },
   { webPath: '/pr-review/*/*/*', appPath: '/(app)/pr-review/<1>/<2>/<3>' },
+  // A public session share. The token is one opaque capability segment, and the
+  // app shows it read-only. Appended last so no earlier row's capture changes.
+  { webPath: '/s/*', appPath: '/(app)/shared/<1>' },
 ] as const;
 
 const KILO_WEB_HOST = 'app.kilo.ai';

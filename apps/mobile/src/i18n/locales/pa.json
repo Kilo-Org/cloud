@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ਇਹ ਖੋਜ ਨਤੀਜਾ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ"
+  },
+  "sessionShare": {
+    "title": "ਸੈਸ਼ਨ ਸਾਂਝਾ ਕਰੋ",
+    "subtitle": "ਲਿੰਕ ਵਾਲਾ ਕੋਈ ਵੀ ਵਿਅਕਤੀ ਇਹ ਸੈਸ਼ਨ ਪੜ੍ਹ ਸਕਦਾ ਹੈ।",
+    "durationLabel": "ਲਿੰਕ ਦੀ ਮਿਆਦ",
+    "duration1h": "1 ਘੰ.",
+    "duration1d": "1 ਦਿਨ",
+    "duration7d": "7 ਦਿਨ",
+    "duration30d": "30 ਦਿਨ",
+    "durationForever": "ਕਦੇ ਨਹੀਂ",
+    "includeNewMessages": "ਨਵੇਂ ਸੁਨੇਹੇ ਸ਼ਾਮਲ ਕਰੋ",
+    "includeNewMessagesOn": "ਇਸ ਲਿੰਕ ਵਾਲਾ ਕੋਈ ਵੀ ਵਿਅਕਤੀ ਬਾਅਦ ਵਿੱਚ ਸ਼ਾਮਲ ਕੀਤੇ ਸੁਨੇਹੇ ਵੀ ਪੜ੍ਹ ਸਕਦਾ ਹੈ।",
+    "includeNewMessagesOff": "ਲਿੰਕ ਵਿੱਚ ਸਿਰਫ਼ ਉਹ ਸੁਨੇਹੇ ਸ਼ਾਮਲ ਹੁੰਦੇ ਹਨ ਜੋ ਇਸਨੂੰ ਬਣਾਉਣ ਤੋਂ ਪਹਿਲਾਂ ਪ੍ਰਾਪਤ ਹੋਏ ਸਨ।",
+    "create": "ਲਿੰਕ ਬਣਾਓ",
+    "createFailed": "ਲਿੰਕ ਨਹੀਂ ਬਣਾਇਆ ਜਾ ਸਕਿਆ।",
+    "activeTitle": "ਲਿੰਕ ਕਿਰਿਆਸ਼ੀਲ ਹੈ",
+    "activeDescription": "ਇਸ ਸੈਸ਼ਨ ਦਾ ਪਹਿਲਾਂ ਹੀ ਇੱਕ ਸਾਂਝਾਕਰਨ ਲਿੰਕ ਹੈ। ਨਵਾਂ ਲਿੰਕ ਬਣਾਉਣ ਨਾਲ ਇਸਦੀ ਥਾਂ ਨਵਾਂ ਲਿੰਕ ਆ ਜਾਵੇਗਾ ਅਤੇ ਪੁਰਾਣਾ ਲਿੰਕ ਕੰਮ ਕਰਨਾ ਬੰਦ ਕਰ ਦੇਵੇਗਾ।",
+    "rotate": "ਨਵਾਂ ਲਿੰਕ ਬਣਾਓ",
+    "revoke": "ਲਿੰਕ ਰੱਦ ਕਰੋ",
+    "revokeTitle": "ਕੀ ਲਿੰਕ ਰੱਦ ਕਰਨਾ ਹੈ?",
+    "revokeMessage": "ਮੌਜੂਦਾ ਲਿੰਕ ਤੁਰੰਤ ਕੰਮ ਕਰਨਾ ਬੰਦ ਕਰ ਦੇਵੇਗਾ।",
+    "revokeFailed": "ਲਿੰਕ ਰੱਦ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
+    "expiresIn": "{{duration}} ਵਿੱਚ ਮਿਆਦ ਖਤਮ",
+    "neverExpires": "ਮਿਆਦ ਕਦੇ ਖਤਮ ਨਹੀਂ ਹੁੰਦੀ",
+    "includesNewMessages": "ਨਵੇਂ ਸੁਨੇਹੇ ਸ਼ਾਮਲ ਹਨ।",
+    "excludesNewMessages": "ਨਵੇਂ ਸੁਨੇਹੇ ਸ਼ਾਮਲ ਨਹੀਂ ਹਨ।"
+  },
+  "sharedSession": {
+    "title": "ਸਾਂਝਾ ਕੀਤਾ ਸੈਸ਼ਨ",
+    "someone": "ਕੋਈ",
+    "sharedBy": "{{owner}} ਵੱਲੋਂ ਸਾਂਝਾ ਕੀਤਾ ਗਿਆ",
+    "unavailableTitle": "ਲਿੰਕ ਉਪਲਬਧ ਨਹੀਂ",
+    "unavailableDescription": "ਇਸ ਸਾਂਝਾਕਰਨ ਲਿੰਕ ਦੀ ਮਿਆਦ ਖਤਮ ਹੋ ਗਈ ਹੈ ਜਾਂ ਇਸਨੂੰ ਰੱਦ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ।",
+    "transcriptUnavailableTitle": "ਇਹ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ",
+    "transcriptUnavailableDescription": "ਲਿੰਕ ਅਜੇ ਵੀ ਕੰਮ ਕਰਦਾ ਹੈ। ਥੋੜ੍ਹੀ ਦੇਰ ਬਾਅਦ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
   }
 }

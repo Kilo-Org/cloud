@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "无法打开此搜索结果"
+  },
+  "sessionShare": {
+    "title": "分享会话",
+    "subtitle": "任何拥有此链接的人都可以查看此会话。",
+    "durationLabel": "链接有效期",
+    "duration1h": "1小时",
+    "duration1d": "1天",
+    "duration7d": "7天",
+    "duration30d": "30天",
+    "durationForever": "永久",
+    "includeNewMessages": "包含新消息",
+    "includeNewMessagesOn": "拥有此链接的人还能看到之后新增的消息。",
+    "includeNewMessagesOff": "此链接仅包含创建链接前收到的消息。",
+    "create": "创建链接",
+    "createFailed": "无法创建链接。",
+    "activeTitle": "链接已生效",
+    "activeDescription": "此会话已有分享链接。创建新链接将替换现有链接，旧链接将随即失效。",
+    "rotate": "创建新链接",
+    "revoke": "撤销链接",
+    "revokeTitle": "撤销链接？",
+    "revokeMessage": "当前链接将立即失效。",
+    "revokeFailed": "无法撤销链接。",
+    "expiresIn": "{{duration}}后过期",
+    "neverExpires": "永不过期",
+    "includesNewMessages": "包含新消息。",
+    "excludesNewMessages": "不包含新消息。"
+  },
+  "sharedSession": {
+    "title": "已分享的会话",
+    "someone": "某人",
+    "sharedBy": "由{{owner}}分享",
+    "unavailableTitle": "链接不可用",
+    "unavailableDescription": "此分享链接已过期或已被撤销。",
+    "transcriptUnavailableTitle": "无法加载此对话记录",
+    "transcriptUnavailableDescription": "链接仍然有效。请稍后重试。"
   }
 }

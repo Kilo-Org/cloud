@@ -4128,5 +4128,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ni lwyddwyd i agor canlyniad chwilio hwn"
+  },
+  "sessionShare": {
+    "title": "Rhannu sesiwn",
+    "subtitle": "Gall unrhyw un sydd â'r ddolen ddarllen y sesiwn hon.",
+    "durationLabel": "Hyd y ddolen",
+    "duration1h": "1a",
+    "duration1d": "1d",
+    "duration7d": "7d",
+    "duration30d": "30d",
+    "durationForever": "Byth",
+    "includeNewMessages": "Cynnwys negeseuon newydd",
+    "includeNewMessagesOn": "Gall unrhyw un sydd â'r ddolen hon hefyd ddarllen negeseuon a ychwanegir yn nes ymlaen.",
+    "includeNewMessagesOff": "Dim ond negeseuon a dderbyniwyd cyn i chi ei chreu sydd yn y ddolen.",
+    "create": "Creu dolen",
+    "createFailed": "Methu creu'r ddolen.",
+    "activeTitle": "Dolen weithredol",
+    "activeDescription": "Mae gan y sesiwn hon ddolen rannu eisoes. Bydd creu un newydd yn ei disodli ac yn atal yr hen ddolen rhag gweithio.",
+    "rotate": "Creu dolen newydd",
+    "revoke": "Dirymu dolen",
+    "revokeTitle": "Dirymu'r ddolen?",
+    "revokeMessage": "Bydd y ddolen gyfredol yn peidio â gweithio ar unwaith.",
+    "revokeFailed": "Methu dirymu'r ddolen.",
+    "expiresIn": "Yn dod i ben ymhen {{duration}}",
+    "neverExpires": "Byth yn dod i ben",
+    "includesNewMessages": "Mae negeseuon newydd wedi'u cynnwys.",
+    "excludesNewMessages": "Nid yw negeseuon newydd wedi'u cynnwys."
+  },
+  "sharedSession": {
+    "title": "Sesiwn a rannwyd",
+    "someone": "Rhywun",
+    "sharedBy": "Rhannwyd gan {{owner}}",
+    "unavailableTitle": "Dolen ddim ar gael",
+    "unavailableDescription": "Mae'r ddolen rannu hon wedi dod i ben neu wedi'i dirymu.",
+    "transcriptUnavailableTitle": "Methu llwytho'r trawsgrifiad hwn",
+    "transcriptUnavailableDescription": "Mae'r ddolen yn dal i weithio. Rhowch gynnig arall arni mewn ychydig."
   }
 }

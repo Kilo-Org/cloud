@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Non se puido abrir este resultado da busca"
+  },
+  "sessionShare": {
+    "title": "Compartir sesión",
+    "subtitle": "Calquera persoa coa ligazón pode ler esta sesión.",
+    "durationLabel": "Duración da ligazón",
+    "duration1h": "1h",
+    "duration1d": "1d",
+    "duration7d": "7d",
+    "duration30d": "30d",
+    "durationForever": "Nunca",
+    "includeNewMessages": "Incluír mensaxes novas",
+    "includeNewMessagesOn": "Calquera persoa con esta ligazón tamén le as mensaxes engadidas máis tarde.",
+    "includeNewMessagesOff": "A ligazón só inclúe as mensaxes recibidas antes de creala.",
+    "create": "Crear ligazón",
+    "createFailed": "Non se puido crear a ligazón.",
+    "activeTitle": "Ligazón activa",
+    "activeDescription": "Esta sesión xa ten unha ligazón para compartir. Se creas unha nova, substituirá a actual e a ligazón antiga deixará de funcionar.",
+    "rotate": "Crear unha ligazón nova",
+    "revoke": "Revogar ligazón",
+    "revokeTitle": "Revogar a ligazón?",
+    "revokeMessage": "A ligazón actual deixa de funcionar inmediatamente.",
+    "revokeFailed": "Non se puido revogar a ligazón.",
+    "expiresIn": "Caduca dentro de {{duration}}",
+    "neverExpires": "Non caduca nunca",
+    "includesNewMessages": "Inclúense as mensaxes novas.",
+    "excludesNewMessages": "Exclúense as mensaxes novas."
+  },
+  "sharedSession": {
+    "title": "Sesión compartida",
+    "someone": "Alguén",
+    "sharedBy": "Compartida por {{owner}}",
+    "unavailableTitle": "Ligazón non dispoñible",
+    "unavailableDescription": "Esta ligazón para compartir caducou ou foi revogada.",
+    "transcriptUnavailableTitle": "Non se puido cargar esta transcrición",
+    "transcriptUnavailableDescription": "A ligazón segue funcionando. Téntao de novo nun momento."
   }
 }

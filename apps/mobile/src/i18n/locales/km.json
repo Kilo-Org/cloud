@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "មិនអាចបើកលទ្ធផលស្វែងរកនេះបានទេ"
+  },
+  "sessionShare": {
+    "title": "ចែករំលែកវគ្គ",
+    "subtitle": "អ្នកណាដែលមានតំណនេះអាចអានវគ្គនេះបាន។",
+    "durationLabel": "រយៈពេលតំណ",
+    "duration1h": "1 ម៉ោង",
+    "duration1d": "1 ថ្ងៃ",
+    "duration7d": "7 ថ្ងៃ",
+    "duration30d": "30 ថ្ងៃ",
+    "durationForever": "គ្មានកំណត់",
+    "includeNewMessages": "រួមបញ្ចូលសារថ្មី",
+    "includeNewMessagesOn": "អ្នកណាដែលមានតំណនេះក៏អាចអានសារដែលបានបន្ថែមនៅពេលក្រោយផងដែរ។",
+    "includeNewMessagesOff": "តំណនេះរួមបញ្ចូលតែសារដែលបានទទួលមុនពេលអ្នកបង្កើតវាប៉ុណ្ណោះ។",
+    "create": "បង្កើតតំណ",
+    "createFailed": "មិនអាចបង្កើតតំណបានទេ។",
+    "activeTitle": "តំណកំពុងសកម្ម",
+    "activeDescription": "វគ្គនេះមានតំណចែករំលែករួចហើយ។ ការបង្កើតតំណថ្មីនឹងជំនួសវា ហើយធ្វើឱ្យតំណចាស់លែងដំណើរការ។",
+    "rotate": "បង្កើតតំណថ្មី",
+    "revoke": "ដកហូតតំណ",
+    "revokeTitle": "ដកហូតតំណ?",
+    "revokeMessage": "តំណបច្ចុប្បន្ននឹងឈប់ដំណើរការភ្លាមៗ។",
+    "revokeFailed": "មិនអាចដកហូតតំណបានទេ។",
+    "expiresIn": "ផុតកំណត់ក្នុងរយៈពេល {{duration}}",
+    "neverExpires": "មិនផុតកំណត់",
+    "includesNewMessages": "សារថ្មីត្រូវបានរួមបញ្ចូល។",
+    "excludesNewMessages": "សារថ្មីមិនត្រូវបានរួមបញ្ចូលទេ។"
+  },
+  "sharedSession": {
+    "title": "វគ្គដែលបានចែករំលែក",
+    "someone": "នរណាម្នាក់",
+    "sharedBy": "ចែករំលែកដោយ {{owner}}",
+    "unavailableTitle": "តំណមិនអាចប្រើបាន",
+    "unavailableDescription": "តំណចែករំលែកនេះបានផុតកំណត់ ឬត្រូវបានដកហូតហើយ។",
+    "transcriptUnavailableTitle": "មិនអាចផ្ទុកប្រតិចារិកនេះបានទេ",
+    "transcriptUnavailableDescription": "តំណនេះនៅតែដំណើរការ។ សូមព្យាយាមម្ដងទៀតបន្តិចទៀត។"
   }
 }

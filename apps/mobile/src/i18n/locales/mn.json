@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Энэ хайлтын үр дүнг нээж чадсангүй"
+  },
+  "sessionShare": {
+    "title": "Сесс хуваалцах",
+    "subtitle": "Холбоостой хэн ч энэ сессийг унших боломжтой.",
+    "durationLabel": "Холбоосын хугацаа",
+    "duration1h": "1 цаг",
+    "duration1d": "1 өдөр",
+    "duration7d": "7 өдөр",
+    "duration30d": "30 өдөр",
+    "durationForever": "Хязгааргүй",
+    "includeNewMessages": "Шинэ мессежүүдийг оруулах",
+    "includeNewMessagesOn": "Энэ холбоостой хэн ч дараа нэмэгдсэн мессежүүдийг мөн унших боломжтой.",
+    "includeNewMessagesOff": "Холбоос нь зөвхөн таныг үүсгэхээс өмнө ирсэн мессежүүдийг агуулна.",
+    "create": "Холбоос үүсгэх",
+    "createFailed": "Холбоос үүсгэж чадсангүй.",
+    "activeTitle": "Холбоос идэвхтэй",
+    "activeDescription": "Энэ сесс аль хэдийн хуваалцах холбоостой байна. Шинэ холбоос үүсгэвэл одоогийнхыг орлох бөгөөд хуучин холбоос ажиллахаа болино.",
+    "rotate": "Шинэ холбоос үүсгэх",
+    "revoke": "Холбоосыг цуцлах",
+    "revokeTitle": "Холбоосыг цуцлах уу?",
+    "revokeMessage": "Одоогийн холбоос нэн даруй ажиллахаа болино.",
+    "revokeFailed": "Холбоосыг цуцалж чадсангүй.",
+    "expiresIn": "Дуусах хүртэл {{duration}}",
+    "neverExpires": "Хугацаа дуусахгүй",
+    "includesNewMessages": "Шинэ мессежүүд орсон.",
+    "excludesNewMessages": "Шинэ мессежүүд ороогүй."
+  },
+  "sharedSession": {
+    "title": "Хуваалцсан сесс",
+    "someone": "Хэн нэгэн",
+    "sharedBy": "Хуваалцсан: {{owner}}",
+    "unavailableTitle": "Холбоос ашиглах боломжгүй",
+    "unavailableDescription": "Энэ хуваалцах холбоосын хугацаа дууссан эсвэл цуцлагдсан байна.",
+    "transcriptUnavailableTitle": "Энэ харилцан яриаг ачаалж чадсангүй",
+    "transcriptUnavailableDescription": "Холбоос ажилласаар байна. Хэсэг хугацааны дараа дахин оролдоно уу."
   }
 }

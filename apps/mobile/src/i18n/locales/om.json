@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu'aa barbaachuu kana banuun hin danda'amne"
+  },
+  "sessionShare": {
+    "title": "Seshinii qoodi",
+    "subtitle": "Namni liinkii qabu kamiyyuu seshinii kana dubbisuu danda'a.",
+    "durationLabel": "Turtii liinkii",
+    "duration1h": "Sa'a 1",
+    "duration1d": "Guyyaa 1",
+    "duration7d": "Guyyaa 7",
+    "duration30d": "Guyyaa 30",
+    "durationForever": "Gonkumaa",
+    "includeNewMessages": "Ergaawwan haaraa dabali",
+    "includeNewMessagesOn": "Namni liinkii kana qabu kamiyyuu ergaawwan booda dabalaman illee ni dubbisa.",
+    "includeNewMessagesOff": "Liinkiin kun ergaawwan osoo ati isa hin uumin dura fudhataman qofa of keessaa qaba.",
+    "create": "Liinkii uumi",
+    "createFailed": "Liinkii uumuun hin danda'amne.",
+    "activeTitle": "Liinkiin hojii irra jira",
+    "activeDescription": "Seshiniin kun duraanuu liinkii qooddannaa qaba. Haaraa uumuun isa bakka buusa, liinkiin duraanii immoo hojii dhaabbata.",
+    "rotate": "Liinkii haaraa uumi",
+    "revoke": "Liinkii haqi",
+    "revokeTitle": "Liinkii haquu?",
+    "revokeMessage": "Liinkiin amma jiru battalumatti hojii dhaabbata.",
+    "revokeFailed": "Liinkii haquun hin danda'amne.",
+    "expiresIn": "Yeroon isaa {{duration}} keessatti xumurama",
+    "neverExpires": "Yeroon isaa gonkumaa hin xumuramu",
+    "includesNewMessages": "Ergaawwan haaraan ni dabalamu.",
+    "excludesNewMessages": "Ergaawwan haaraan hin dabalaman."
+  },
+  "sharedSession": {
+    "title": "Seshinii qoodame",
+    "someone": "Nama tokko",
+    "sharedBy": "Kan qoode {{owner}}",
+    "unavailableTitle": "Liinkiin hin argamu",
+    "unavailableDescription": "Yeroon liinkii qooddannaa kanaa darbeera ykn haqameera.",
+    "transcriptUnavailableTitle": "Galmee kana fe'uun hin danda'amne",
+    "transcriptUnavailableDescription": "Liinkiin ammallee ni hojjeta. Yeroo muraasa booda irra deebi'ii yaali."
   }
 }

@@ -4063,5 +4063,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ma stajniex niftħu dan ir-riżultat tat-tfittxija"
+  },
+  "sessionShare": {
+    "title": "Aqsam is-sessjoni",
+    "subtitle": "Kull min għandu l-link jista' jaqra din is-sessjoni.",
+    "durationLabel": "Tul tal-link",
+    "duration1h": "1 siegħa",
+    "duration1d": "1 jum",
+    "duration7d": "7 ijiem",
+    "duration30d": "30 jum",
+    "durationForever": "Qatt",
+    "includeNewMessages": "Inkludi messaġġi ġodda",
+    "includeNewMessagesOn": "Kull min għandu dan il-link jaqra wkoll il-messaġġi miżjuda aktar tard.",
+    "includeNewMessagesOff": "Il-link jinkludi biss il-messaġġi li waslu qabel ma toħolqu.",
+    "create": "Oħloq link",
+    "createFailed": "Ma stajniex noħolqu l-link.",
+    "activeTitle": "Link attiv",
+    "activeDescription": "Din is-sessjoni diġà għandha link għall-qsim. Jekk toħloq wieħed ġdid, dan jissostitwixxih u l-link il-qadim jieqaf jaħdem.",
+    "rotate": "Oħloq link ġdid",
+    "revoke": "Irrevoka l-link",
+    "revokeTitle": "Tirrevoka l-link?",
+    "revokeMessage": "Il-link attwali jieqaf jaħdem minnufih.",
+    "revokeFailed": "Ma stajniex nirrevokaw il-link.",
+    "expiresIn": "Jiskadi fi {{duration}}",
+    "neverExpires": "Qatt ma jiskadi",
+    "includesNewMessages": "Il-messaġġi l-ġodda huma inklużi.",
+    "excludesNewMessages": "Il-messaġġi l-ġodda huma esklużi."
+  },
+  "sharedSession": {
+    "title": "Sessjoni kondiviża",
+    "someone": "Xi ħadd",
+    "sharedBy": "Kondiviża minn {{owner}}",
+    "unavailableTitle": "Link mhux disponibbli",
+    "unavailableDescription": "Dan il-link għall-qsim skada jew ġie rrevokat.",
+    "transcriptUnavailableTitle": "Ma stajniex intellgħu din it-traskrizzjoni",
+    "transcriptUnavailableDescription": "Il-link għadu jaħdem. Erġa' pprova fi ftit mumenti."
   }
 }

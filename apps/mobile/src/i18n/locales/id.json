@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tidak dapat membuka hasil pencarian ini"
+  },
+  "sessionShare": {
+    "title": "Bagikan sesi",
+    "subtitle": "Siapa pun yang memiliki tautan dapat membaca sesi ini.",
+    "durationLabel": "Durasi tautan",
+    "duration1h": "1j",
+    "duration1d": "1h",
+    "duration7d": "7h",
+    "duration30d": "30h",
+    "durationForever": "Selamanya",
+    "includeNewMessages": "Sertakan pesan baru",
+    "includeNewMessagesOn": "Siapa pun yang memiliki tautan ini juga dapat membaca pesan yang ditambahkan kemudian.",
+    "includeNewMessagesOff": "Tautan hanya mencakup pesan yang diterima sebelum Anda membuatnya.",
+    "create": "Buat tautan",
+    "createFailed": "Tidak dapat membuat tautan.",
+    "activeTitle": "Tautan aktif",
+    "activeDescription": "Sesi ini sudah memiliki tautan berbagi. Membuat tautan baru akan menggantikannya dan membuat tautan lama tidak berfungsi lagi.",
+    "rotate": "Buat tautan baru",
+    "revoke": "Cabut tautan",
+    "revokeTitle": "Cabut tautan?",
+    "revokeMessage": "Tautan saat ini akan langsung berhenti berfungsi.",
+    "revokeFailed": "Tidak dapat mencabut tautan.",
+    "expiresIn": "Kedaluwarsa dalam {{duration}}",
+    "neverExpires": "Tidak pernah kedaluwarsa",
+    "includesNewMessages": "Pesan baru disertakan.",
+    "excludesNewMessages": "Pesan baru tidak disertakan."
+  },
+  "sharedSession": {
+    "title": "Sesi yang dibagikan",
+    "someone": "Seseorang",
+    "sharedBy": "Dibagikan oleh {{owner}}",
+    "unavailableTitle": "Tautan tidak tersedia",
+    "unavailableDescription": "Tautan berbagi ini sudah kedaluwarsa atau telah dicabut.",
+    "transcriptUnavailableTitle": "Tidak dapat memuat transkrip ini",
+    "transcriptUnavailableDescription": "Tautan masih berfungsi. Coba lagi sebentar lagi."
   }
 }

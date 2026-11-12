@@ -3998,5 +3998,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nepavyko atidaryti šio paieškos rezultato"
+  },
+  "sessionShare": {
+    "title": "Bendrinti sesiją",
+    "subtitle": "Šią sesiją gali skaityti visi, turintys nuorodą.",
+    "durationLabel": "Nuorodos galiojimas",
+    "duration1h": "1 val.",
+    "duration1d": "1 d.",
+    "duration7d": "7 d.",
+    "duration30d": "30 d.",
+    "durationForever": "Neribotai",
+    "includeNewMessages": "Įtraukti naujas žinutes",
+    "includeNewMessagesOn": "Visi, turintys šią nuorodą, taip pat skaitys vėliau pridėtas žinutes.",
+    "includeNewMessagesOff": "Nuoroda apima tik žinutes, gautas prieš ją sukuriant.",
+    "create": "Sukurti nuorodą",
+    "createFailed": "Nepavyko sukurti nuorodos.",
+    "activeTitle": "Nuoroda aktyvi",
+    "activeDescription": "Ši sesija jau turi bendrinimo nuorodą. Sukūrus naują, ji pakeis esamą, o senoji nuoroda nustos veikti.",
+    "rotate": "Sukurti naują nuorodą",
+    "revoke": "Atšaukti nuorodą",
+    "revokeTitle": "Atšaukti nuorodą?",
+    "revokeMessage": "Dabartinė nuoroda iš karto nustos veikti.",
+    "revokeFailed": "Nepavyko atšaukti nuorodos.",
+    "expiresIn": "Baigs galioti po {{duration}}",
+    "neverExpires": "Galioja neribotai",
+    "includesNewMessages": "Naujos žinutės įtraukiamos.",
+    "excludesNewMessages": "Naujos žinutės neįtraukiamos."
+  },
+  "sharedSession": {
+    "title": "Bendrinama sesija",
+    "someone": "Kažkas",
+    "sharedBy": "Pasidalijo {{owner}}",
+    "unavailableTitle": "Nuoroda nepasiekiama",
+    "unavailableDescription": "Šios bendrinimo nuorodos galiojimas baigėsi arba ji buvo atšaukta.",
+    "transcriptUnavailableTitle": "Nepavyko įkelti šio pokalbio įrašo",
+    "transcriptUnavailableDescription": "Nuoroda vis dar veikia. Bandykite dar kartą po akimirkos."
   }
 }

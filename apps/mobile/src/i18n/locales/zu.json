@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Asikwazanga ukuvula leli phumela lokusesha"
+  },
+  "sessionShare": {
+    "title": "Yabelana ngeseshini",
+    "subtitle": "Noma ubani onelinki angayifunda le seshini.",
+    "durationLabel": "Isikhathi selinki",
+    "duration1h": "1h",
+    "duration1d": "1d",
+    "duration7d": "7d",
+    "duration30d": "30d",
+    "durationForever": "Phakade",
+    "includeNewMessages": "Faka imilayezo emisha",
+    "includeNewMessagesOn": "Noma ubani onale linki uzofunda nemilayezo engezwe kamuva.",
+    "includeNewMessagesOff": "Ilinki ifaka kuphela imilayezo etholwe ngaphambi kokuthi uyidale.",
+    "create": "Dala ilinki",
+    "createFailed": "Akukwazekanga ukudala ilinki.",
+    "activeTitle": "Ilinki iyasebenza",
+    "activeDescription": "Le seshini isivele inelinki yokwabelana. Ukudala entsha kuyayithatha indawo bese ilinki endala iyeka ukusebenza.",
+    "rotate": "Dala ilinki entsha",
+    "revoke": "Hoxisa ilinki",
+    "revokeTitle": "Hoxisa ilinki?",
+    "revokeMessage": "Ilinki yamanje iyeka ukusebenza ngokushesha.",
+    "revokeFailed": "Akukwazekanga ukuhoxisa ilinki.",
+    "expiresIn": "Iphelelwa yisikhathi ku-{{duration}}",
+    "neverExpires": "Ayiphelelwa yisikhathi",
+    "includesNewMessages": "Imilayezo emisha ifakiwe.",
+    "excludesNewMessages": "Imilayezo emisha ayifakiwe."
+  },
+  "sharedSession": {
+    "title": "Iseshini eyabiwe",
+    "someone": "Othile",
+    "sharedBy": "Yabiwe ngu-{{owner}}",
+    "unavailableTitle": "Ilinki ayitholakali",
+    "unavailableDescription": "Le linki yokwabelana iphelelwe yisikhathi noma ihoxisiwe.",
+    "transcriptUnavailableTitle": "Akukwazekanga ukulayisha lo mbhalo wengxoxo",
+    "transcriptUnavailableDescription": "Ilinki isasebenza. Zama futhi kungekudala."
   }
 }

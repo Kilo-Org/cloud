@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ይህን የፍለጋ ውጤት መክፈት አልተቻለም"
+  },
+  "sessionShare": {
+    "title": "ክፍለ ጊዜውን አጋራ",
+    "subtitle": "ሊንኩ ያለው ማንኛውም ሰው ይህን ክፍለ ጊዜ ማንበብ ይችላል።",
+    "durationLabel": "የሊንክ ቆይታ",
+    "duration1h": "1 ሰዓት",
+    "duration1d": "1 ቀን",
+    "duration7d": "7 ቀን",
+    "duration30d": "30 ቀን",
+    "durationForever": "በጭራሽ",
+    "includeNewMessages": "አዲስ መልዕክቶችን አካትት",
+    "includeNewMessagesOn": "ይህ ሊንክ ያለው ማንኛውም ሰው በኋላ የሚታከሉ መልዕክቶችንም ያነባል።",
+    "includeNewMessagesOff": "ሊንኩ የሚያካትተው ሊንኩን ከመፍጠርዎ በፊት የደረሱ መልዕክቶችን ብቻ ነው።",
+    "create": "ሊንክ ፍጠር",
+    "createFailed": "ሊንኩን መፍጠር አልተቻለም።",
+    "activeTitle": "ሊንኩ ንቁ ነው",
+    "activeDescription": "ይህ ክፍለ ጊዜ አስቀድሞ የማጋሪያ ሊንክ አለው። አዲስ መፍጠር ይተካዋል፣ የድሮው ሊንክም መስራት ያቆማል።",
+    "rotate": "አዲስ ሊንክ ፍጠር",
+    "revoke": "ሊንኩን ሰርዝ",
+    "revokeTitle": "ሊንኩ ይሰረዝ?",
+    "revokeMessage": "የአሁኑ ሊንክ ወዲያውኑ መስራት ያቆማል።",
+    "revokeFailed": "ሊንኩን መሰረዝ አልተቻለም።",
+    "expiresIn": "በ{{duration}} ውስጥ ያበቃል",
+    "neverExpires": "በጭራሽ አያበቃም",
+    "includesNewMessages": "አዲስ መልዕክቶች ተካትተዋል።",
+    "excludesNewMessages": "አዲስ መልዕክቶች አልተካተቱም።"
+  },
+  "sharedSession": {
+    "title": "የተጋራ ክፍለ ጊዜ",
+    "someone": "አንድ ሰው",
+    "sharedBy": "በ{{owner}} የተጋራ",
+    "unavailableTitle": "ሊንኩ አይገኝም",
+    "unavailableDescription": "ይህ የማጋሪያ ሊንክ ጊዜው አልፏል ወይም ተሰርዟል።",
+    "transcriptUnavailableTitle": "ይህን ግልባጭ መጫን አልተቻለም",
+    "transcriptUnavailableDescription": "ሊንኩ አሁንም ይሰራል። ትንሽ ቆይተው እንደገና ይሞክሩ።"
   }
 }

@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Pa t ka louvri rezilta rechèch sa a"
+  },
+  "sessionShare": {
+    "title": "Pataje sesyon",
+    "subtitle": "Nenpòt moun ki gen lyen an ka li sesyon sa a.",
+    "durationLabel": "Dire lyen an",
+    "duration1h": "1h",
+    "duration1d": "1j",
+    "duration7d": "7j",
+    "duration30d": "30j",
+    "durationForever": "Jamè",
+    "includeNewMessages": "Mete nouvo mesaj yo",
+    "includeNewMessagesOn": "Nenpòt moun ki gen lyen sa a ap li mesaj yo ajoute pita yo tou.",
+    "includeNewMessagesOff": "Lyen an gen sèlman mesaj ou te resevwa anvan ou kreye l.",
+    "create": "Kreye lyen",
+    "createFailed": "Nou pa t ka kreye lyen an.",
+    "activeTitle": "Lyen aktif",
+    "activeDescription": "Sesyon sa a gen yon lyen pataj deja. Si ou kreye yon nouvo, l ap ranplase l epi ansyen lyen an ap sispann mache.",
+    "rotate": "Kreye yon nouvo lyen",
+    "revoke": "Anile lyen",
+    "revokeTitle": "Anile lyen?",
+    "revokeMessage": "Lyen aktyèl la ap sispann mache touswit.",
+    "revokeFailed": "Nou pa t ka anile lyen an.",
+    "expiresIn": "Ap ekspire nan {{duration}}",
+    "neverExpires": "Pa janm ekspire",
+    "includesNewMessages": "Nouvo mesaj yo enkli.",
+    "excludesNewMessages": "Nouvo mesaj yo pa enkli."
+  },
+  "sharedSession": {
+    "title": "Sesyon pataje",
+    "someone": "Yon moun",
+    "sharedBy": "Pataje pa {{owner}}",
+    "unavailableTitle": "Lyen pa disponib",
+    "unavailableDescription": "Lyen pataj sa a ekspire oswa yo anile l.",
+    "transcriptUnavailableTitle": "Nou pa t ka chaje transkripsyon sa a",
+    "transcriptUnavailableDescription": "Lyen an toujou mache. Eseye ankò nan yon ti moman."
   }
 }

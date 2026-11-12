@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "यो खोज परिणाम खोल्न सकिएन"
+  },
+  "sessionShare": {
+    "title": "सत्र सेयर गर्नुहोस्",
+    "subtitle": "लिङ्क भएका जो कोहीले यो सत्र पढ्न सक्छन्।",
+    "durationLabel": "लिङ्कको अवधि",
+    "duration1h": "१ घण्टा",
+    "duration1d": "१ दिन",
+    "duration7d": "७ दिन",
+    "duration30d": "३० दिन",
+    "durationForever": "कहिल्यै होइन",
+    "includeNewMessages": "नयाँ सन्देशहरू समावेश गर्नुहोस्",
+    "includeNewMessagesOn": "यो लिङ्क भएका जो कोहीले पछि थपिएका सन्देशहरू पनि पढ्न सक्छन्।",
+    "includeNewMessagesOff": "लिङ्कमा तपाईंले यसलाई बनाउनुअघि प्राप्त भएका सन्देशहरू मात्र समावेश हुन्छन्।",
+    "create": "लिङ्क बनाउनुहोस्",
+    "createFailed": "लिङ्क बनाउन सकिएन।",
+    "activeTitle": "लिङ्क सक्रिय छ",
+    "activeDescription": "यो सत्रको सेयर लिङ्क पहिले नै छ। नयाँ लिङ्क बनाउँदा यसलाई प्रतिस्थापन गर्छ र पुरानो लिङ्कले काम गर्न छोड्छ।",
+    "rotate": "नयाँ लिङ्क बनाउनुहोस्",
+    "revoke": "लिङ्क रद्द गर्नुहोस्",
+    "revokeTitle": "लिङ्क रद्द गर्ने?",
+    "revokeMessage": "हालको लिङ्कले तुरुन्तै काम गर्न छोड्छ।",
+    "revokeFailed": "लिङ्क रद्द गर्न सकिएन।",
+    "expiresIn": "{{duration}} मा म्याद सकिन्छ",
+    "neverExpires": "म्याद कहिल्यै सकिँदैन",
+    "includesNewMessages": "नयाँ सन्देशहरू समावेश छन्।",
+    "excludesNewMessages": "नयाँ सन्देशहरू समावेश छैनन्।"
+  },
+  "sharedSession": {
+    "title": "सेयर गरिएको सत्र",
+    "someone": "कोही",
+    "sharedBy": "{{owner}} द्वारा सेयर गरिएको",
+    "unavailableTitle": "लिङ्क उपलब्ध छैन",
+    "unavailableDescription": "यो सेयर लिङ्कको म्याद सकिएको छ वा रद्द गरिएको छ।",
+    "transcriptUnavailableTitle": "यो ट्रान्सक्रिप्ट लोड गर्न सकिएन",
+    "transcriptUnavailableDescription": "लिङ्कले अझै काम गर्छ। केही बेरपछि फेरि प्रयास गर्नुहोस्।"
   }
 }

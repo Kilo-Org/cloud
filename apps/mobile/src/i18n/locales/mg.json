@@ -3868,5 +3868,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tsy voasokatra ity valim-pikarohana ity"
+  },
+  "sessionShare": {
+    "title": "Hizara ny fotoam-piasana",
+    "subtitle": "Afaka mamaky ity fotoam-piasana ity izay rehetra manana ny rohy.",
+    "durationLabel": "Faharetan'ny rohy",
+    "duration1h": "1 ora",
+    "duration1d": "1 andro",
+    "duration7d": "7 andro",
+    "duration30d": "30 andro",
+    "durationForever": "Tsy misy fetra",
+    "includeNewMessages": "Ampidiro ny hafatra vaovao",
+    "includeNewMessagesOn": "Izay rehetra manana ity rohy ity dia mamaky koa ny hafatra ampiana any aoriana.",
+    "includeNewMessagesOff": "Ny hafatra voaray talohan'ny namoronanao ny rohy ihany no tafiditra ao.",
+    "create": "Mamorona rohy",
+    "createFailed": "Tsy afaka namorona ny rohy.",
+    "activeTitle": "Rohy mavitrika",
+    "activeDescription": "Efa manana rohy fizarana ity fotoam-piasana ity. Raha mamorona vaovao ianao dia hosoloina izy ary tsy hiasa intsony ny rohy taloha.",
+    "rotate": "Mamorona rohy vaovao",
+    "revoke": "Foano ny rohy",
+    "revokeTitle": "Hofoanana ve ny rohy?",
+    "revokeMessage": "Tsy hiasa intsony avy hatrany ny rohy ankehitriny.",
+    "revokeFailed": "Tsy afaka nanafoana ny rohy.",
+    "expiresIn": "Lany daty afaka {{duration}}",
+    "neverExpires": "Tsy lany daty mihitsy",
+    "includesNewMessages": "Tafiditra ny hafatra vaovao.",
+    "excludesNewMessages": "Tsy tafiditra ny hafatra vaovao."
+  },
+  "sharedSession": {
+    "title": "Fotoam-piasana nozaraina",
+    "someone": "Olona iray",
+    "sharedBy": "Nozarain'i {{owner}}",
+    "unavailableTitle": "Rohy tsy azo ampiasaina",
+    "unavailableDescription": "Efa lany daty na nofoanana ity rohy fizarana ity.",
+    "transcriptUnavailableTitle": "Tsy nety nampidirina ity firaketana ity",
+    "transcriptUnavailableDescription": "Mbola miasa ihany ny rohy. Andramo indray afaka kelikely."
   }
 }

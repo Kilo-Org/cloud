@@ -3998,5 +3998,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Не удалось открыть результат поиска"
+  },
+  "sessionShare": {
+    "title": "Поделиться сессией",
+    "subtitle": "Любой, у кого есть ссылка, может читать эту сессию.",
+    "durationLabel": "Срок действия ссылки",
+    "duration1h": "1 ч",
+    "duration1d": "1 дн.",
+    "duration7d": "7 дн.",
+    "duration30d": "30 дн.",
+    "durationForever": "Бессрочно",
+    "includeNewMessages": "Включать новые сообщения",
+    "includeNewMessagesOn": "Все, у кого есть эта ссылка, также увидят сообщения, добавленные позже.",
+    "includeNewMessagesOff": "Ссылка включает только сообщения, полученные до её создания.",
+    "create": "Создать ссылку",
+    "createFailed": "Не удалось создать ссылку.",
+    "activeTitle": "Ссылка активна",
+    "activeDescription": "У этой сессии уже есть ссылка для общего доступа. Новая ссылка заменит её, и старая перестанет работать.",
+    "rotate": "Создать новую ссылку",
+    "revoke": "Отозвать ссылку",
+    "revokeTitle": "Отозвать ссылку?",
+    "revokeMessage": "Текущая ссылка сразу перестанет работать.",
+    "revokeFailed": "Не удалось отозвать ссылку.",
+    "expiresIn": "Истекает через {{duration}}",
+    "neverExpires": "Без срока действия",
+    "includesNewMessages": "Новые сообщения включены.",
+    "excludesNewMessages": "Новые сообщения не включены."
+  },
+  "sharedSession": {
+    "title": "Общая сессия",
+    "someone": "Неизвестный пользователь",
+    "sharedBy": "Владелец: {{owner}}",
+    "unavailableTitle": "Ссылка недоступна",
+    "unavailableDescription": "Срок действия ссылки истёк, или она была отозвана.",
+    "transcriptUnavailableTitle": "Не удалось загрузить транскрипт",
+    "transcriptUnavailableDescription": "Ссылка по-прежнему работает. Повторите попытку чуть позже."
   }
 }

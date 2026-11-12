@@ -19,7 +19,7 @@ import { db, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { MICRODOLLARS_PER_ENKRYPT_CREDIT, recordEnkryptUsage } from './usage';
-import { EnkryptUsageWriteSchema } from './usage-write';
+import { EnkryptUsageWriteSchema } from '@kilocode/usage-contracts';
 
 const mockedIsUSRegion = jest.mocked(isUSRegion);
 const nativeFetch = globalThis.fetch;

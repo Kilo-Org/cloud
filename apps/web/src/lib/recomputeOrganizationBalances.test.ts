@@ -21,7 +21,7 @@ import {
   MICRODOLLARS_PER_ENKRYPT_CREDIT,
   recordEnkryptUsageLocally,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
-import type { EnkryptUsageWrite } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
+import type { EnkryptUsageWrite } from '@kilocode/usage-contracts';
 import { recordExaUsage } from './exa-usage';
 import { activatePaidAgreement, createPendingAgreement } from './kilo-pass-org/service';
 import { and, eq, inArray, like } from 'drizzle-orm';

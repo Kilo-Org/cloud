@@ -28,7 +28,6 @@ import {
   type EnkryptUsageRecord,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import { recordEnkryptUsageInPrimaryRegion } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-primary-region';
-import { EnkryptUsageWriteSchema as WebSharedEnkryptUsageWriteSchema } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
@@ -137,10 +136,6 @@ async function expectWrittenOnceAndReplayedAsDuplicate(usageWrite: EnkryptUsageW
 }
 
 describe('Enkrypt usage write across gateway, contract and writer', () => {
-  test('web-shared re-exports the contract schema', () => {
-    expect(WebSharedEnkryptUsageWriteSchema).toBe(EnkryptUsageWriteSchema);
-  });
-
   test('carries an output guardrail write unchanged into one ledger row and one debit', async () => {
     const usageRecord = await usageRecordForNewOrganization({ guardrail: 'output' });
 

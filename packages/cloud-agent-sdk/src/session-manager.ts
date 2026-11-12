@@ -2658,6 +2658,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * manager was destroyed can still retire its durable entry.
    */
   const pendingConfirmationBySession = new Map<KiloSessionId, Map<string, string>>();
+  const commandReceiptsAwaitingResponse = new Map<string, { acknowledged: boolean }>();
 
   /** Re-inserts the session's record last, so the oldest session is evicted first. */
   function boundedPendingConfirmationInsert(
@@ -2692,50 +2693,42 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   /**
-   * Settles a failed send the server accepted anyway. The response was lost, so
-   * the failure reached the caller and it put the text back; the row for that
-   * message id arrives later. Withdrawing the text is what keeps the message in
-   * one place: the transcript owns it now, and a restored draft beside it would
-   * send a duplicate on the next press.
-   *
-   * A row under the failed send's id is the server's record, whatever its
-   * `synthetic` flag says: the client deleted its own optimistic row when the
-   * send failed, and the server stores the turn under the id the client sent
-   * (a queue synthesize carries it too). Only the active session publishes,
-   * because the atom speaks for the chat the user is looking at; another session
-   * keeps its record, and its own activation publishes it.
+   * A server row or command receipt confirms an unknown-outcome send. Kilo v2
+   * commands can use another native id, so their sent receipt must also retire
+   * the restored draft. Only the active session publishes its composer state.
    */
+  function settlePendingSendConfirmation(kiloSessionId: KiloSessionId, messageId: string): void {
+    const pending = pendingConfirmationBySession.get(kiloSessionId);
+    const text = pending?.get(messageId);
+    if (text === undefined || pending === undefined) return;
+    pending.delete(messageId);
+    if (pending.size === 0) pendingConfirmationBySession.delete(kiloSessionId);
+    config.clearPendingSendConfirmation?.(kiloSessionId, messageId);
+    const failed = failedPromptBySession.get(kiloSessionId);
+    const ownsFailure = failed?.messageId === messageId;
+    if (ownsFailure) failedPromptBySession.delete(kiloSessionId);
+    if (activeSessionId !== kiloSessionId) return;
+    if (ownsFailure) {
+      store.set(failedPromptAtom, null);
+      store.set(billingFailureAtom, null);
+    }
+    deliveredFailedPromptSequence += 1;
+    store.set(deliveredFailedPromptAtom, {
+      messageId,
+      text,
+      sequence: deliveredFailedPromptSequence,
+    });
+  }
+
   function settleDeliveredFailedPrompt(kiloSessionId: KiloSessionId): void {
     const pending = pendingConfirmationBySession.get(kiloSessionId);
-    if (pending === undefined || pending.size === 0) return;
     const storage = store.get(sessionStorageAtom);
-    if (storage === null) return;
-    for (const [messageId, text] of pending) {
-      const info = storage.getMessageInfo(messageId);
-      if (info === undefined || info.role !== 'user') continue;
-      pending.delete(messageId);
-      config.clearPendingSendConfirmation?.(kiloSessionId, messageId);
-      // The record is the only owner of a prompt that may have arrived after
-      // this manager replaced the one that sent it, so the text comes from it.
-      // The failure atoms describe the session's latest failure: they are
-      // cleared only when it is this message, never for a different one whose
-      // cause and restored text must stay put.
-      const failed = failedPromptBySession.get(kiloSessionId);
-      const ownsFailure = failed?.messageId === messageId;
-      if (ownsFailure) failedPromptBySession.delete(kiloSessionId);
-      if (activeSessionId !== kiloSessionId) continue;
-      if (ownsFailure) {
-        store.set(failedPromptAtom, null);
-        store.set(billingFailureAtom, null);
+    if (pending === undefined || storage === null) return;
+    for (const messageId of pending.keys()) {
+      if (storage.getMessageInfo(messageId)?.role === 'user') {
+        settlePendingSendConfirmation(kiloSessionId, messageId);
       }
-      deliveredFailedPromptSequence += 1;
-      store.set(deliveredFailedPromptAtom, {
-        messageId,
-        text,
-        sequence: deliveredFailedPromptSequence,
-      });
     }
-    if (pending.size === 0) pendingConfirmationBySession.delete(kiloSessionId);
   }
 
   /**
@@ -3443,6 +3436,19 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         });
       },
       onEvent: event => {
+        if (
+          event.type === 'cloud.message.queued' ||
+          event.type === 'cloud.message.sent' ||
+          event.type === 'cloud.message.completed' ||
+          event.type === 'cloud.message.failed' ||
+          event.type === 'cloud.message.canceled'
+        ) {
+          const receipt = commandReceiptsAwaitingResponse.get(event.messageId);
+          if (receipt) receipt.acknowledged = true;
+        }
+        if (event.type === 'cloud.message.sent' && event.turnType === 'command') {
+          settlePendingSendConfirmation(open.kiloSessionId, event.messageId);
+        }
         if (event.type === 'cloud.message.failed' && !open.resolvedFailures.has(event.messageId)) {
           store.set(billingFailureAtom, event.billingFailure ?? null);
         } else if (
@@ -3844,6 +3850,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const insertedOptimisticRow =
       (input.payload.type === 'prompt' || sessionType === 'remote') &&
       Boolean(sessionAtSend && optimisticStorage && optimisticSessionId);
+    const commandReceipt =
+      sessionType === 'cloud-agent' && input.payload.type === 'command'
+        ? { acknowledged: false }
+        : null;
+    if (commandReceipt) commandReceiptsAwaitingResponse.set(messageId, commandReceipt);
     try {
       if (insertedOptimisticRow && optimisticStorage && optimisticSessionId) {
         insertOptimisticUserMessage({
@@ -3937,6 +3948,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       // `switchSession` clears the storage it leaves, so after a switch the
       // confirmation survives only in the page cached on the way out.
       const delivered =
+        commandReceipt?.acknowledged === true ||
         (stillOnSendingChat && mountedRow?.role === 'user' && mountedRow.synthetic !== true) ||
         (!stillOnSendingChat &&
           kiloSessionId !== null &&
@@ -3944,7 +3956,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (optimisticStorage && optimisticStorage !== mountedStorage && !delivered) {
         optimisticStorage.deleteMessage(messageId);
       }
-      if (mountedStorage && mountedRow?.role === 'user' && mountedRow.synthetic === true) {
+      if (
+        !delivered &&
+        mountedStorage &&
+        mountedRow?.role === 'user' &&
+        mountedRow.synthetic === true
+      ) {
         mountedStorage.deleteMessage(messageId);
       }
       remoteOptimisticIds.delete(messageId);
@@ -4014,6 +4031,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       return false;
     } finally {
+      commandReceiptsAwaitingResponse.delete(messageId);
       // The request is settled either way: the Sending cue is request-pending
       // state, so it must not outlive the call. Server delivery state (queued /
       // failed) takes over from here.
@@ -4364,6 +4382,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     supersededInFlightBySession.clear();
     failedPromptBySession.clear();
     pendingConfirmationBySession.clear();
+    commandReceiptsAwaitingResponse.clear();
     deniedSessionIds.clear();
     activeSessionId = null;
     activeSessionType = null;

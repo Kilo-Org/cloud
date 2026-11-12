@@ -3440,6 +3440,87 @@ describe('createSessionManager', () => {
       expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('/review main');
     });
 
+    it.each(['queued', 'sent', 'completed'] as const)(
+      'keeps a command acknowledged as %s before its transport rejects out of the composer',
+      async delivery => {
+        const config = createMockConfig();
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        let rejectSend: (error: Error) => void = () => {
+          throw new Error('Send did not start');
+        };
+        mockSession.send.mockImplementation(
+          () =>
+            new Promise((_resolve, reject) => {
+              rejectSend = reject;
+            })
+        );
+        const sending = mgr.send({
+          payload: { type: 'command', command: 'review', arguments: 'main' },
+        });
+        const messageId = mockSession.send.mock.calls[0][0].messageId;
+        const storage = mockSession.storage;
+        if (!messageId || !storage) throw new Error('Expected command submission and storage');
+        createChatProcessor(storage).synthesizeQueuedUserMessage({
+          messageId,
+          sessionId: 'ses-1',
+          content: '/review main',
+        });
+        mockSessionCallbacks.onEvent?.({
+          type: 'cloud.message.queued',
+          messageId,
+          content: '/review main',
+        });
+        if (delivery !== 'queued') {
+          storage.deleteMessage(messageId);
+          mockSessionCallbacks.onEvent?.({
+            type: 'cloud.message.sent',
+            messageId,
+            turnType: 'command',
+          });
+        }
+        if (delivery === 'completed')
+          mockSessionCallbacks.onEvent?.({ type: 'cloud.message.completed', messageId });
+        rejectSend(new Error('ECONNRESET'));
+        await expect(sending).resolves.toBe(true);
+        expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBeNull();
+        expect(storage.getMessageInfo(messageId) !== undefined).toBe(delivery === 'queued');
+        await mgr.switchSession(kiloId('ses-2'));
+        await mgr.switchSession(kiloId('ses-1'));
+        expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBeNull();
+      }
+    );
+
+    it.each([false, true])(
+      'retires a command draft from a rowless accepted receipt after reopening=%s',
+      async reopen => {
+        const config = createMockConfig();
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        mockSession.send.mockRejectedValueOnce(new Error('ECONNRESET'));
+        await expect(
+          mgr.send({ payload: { type: 'command', command: 'review', arguments: 'main' } })
+        ).resolves.toBe(false);
+        const messageId = mockSession.send.mock.calls[0][0].messageId;
+        if (!messageId) throw new Error('Expected command submission');
+        if (reopen) {
+          await mgr.switchSession(kiloId('ses-2'));
+          await mgr.switchSession(kiloId('ses-1'));
+        }
+        expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+        mockSessionCallbacks.onEvent?.({
+          type: 'cloud.message.sent',
+          messageId,
+          turnType: 'command',
+        });
+        expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBeNull();
+        expect(atomValue(config.store, mgr.atoms.deliveredFailedPrompt)).toMatchObject({
+          messageId,
+          text: '/review main',
+        });
+      }
+    );
+
     it('inserts one optimistic row before cloud.message.queued arrives', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

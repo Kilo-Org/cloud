@@ -47,11 +47,13 @@ export function viewArguments(input: Readonly<Record<string, unknown>>) {
 export const MAX_VIEW_BYTES = 1_000_000;
 
 /**
- * One origin a policy may name. Anything else — a wildcard, `'unsafe-inline'`,
- * a bare word — is dropped, because the policy is the resource's own request
- * and a request cannot widen the sandbox beyond what the host allows.
+ * One origin a policy may name: a scheme, an exact host and an optional port.
+ * Anything else — a wildcard host, a path, credentials, `'unsafe-inline'`, a
+ * bare word — is dropped, because the policy is the resource's own request and
+ * a request cannot widen the sandbox beyond what the host allows.
  */
-const ORIGIN = /^(?:https?|wss?):\/\/[^\s;'"<>]+$/u;
+const ORIGIN =
+  /^(?:https?|wss?):\/\/(?:\[[0-9A-Fa-f:.]+\]|[^\s/\\@?#;,'"<>()[\]{}|^`%*:]+)(?::\d{1,5})?$/u;
 
 const ResourceCspSchema = z.object({
   connectDomains: z.array(z.string()).optional(),
@@ -64,8 +66,23 @@ const ViewMetaSchema = z
   .object({ ui: z.object({ csp: ResourceCspSchema.optional() }).optional() })
   .optional();
 
+/**
+ * Whether a port an origin names is one a socket can have. A source with a
+ * larger one names nothing a request can reach, so it is not an origin here.
+ */
+const portInRange = (origin: string): boolean => {
+  const port = /:(\d{1,5})$/u.exec(origin)?.[1];
+  return port === undefined || Number(port) <= 65_535;
+};
+
+/**
+ * The origins a directive names, each exactly an origin. A host spelled with a
+ * trailing slash is the same origin, so the slash is dropped before the test.
+ */
 const originsOf = (domains: readonly string[] | undefined): readonly string[] =>
-  (domains ?? []).filter(domain => ORIGIN.test(domain));
+  (domains ?? [])
+    .map(domain => domain.replace(/\/$/u, ''))
+    .filter(domain => ORIGIN.test(domain) && portInRange(domain));
 
 /** The policy tokens for one directive: the named origins, or nothing. */
 const tokensFor = (origins: readonly string[]): string =>
@@ -110,21 +127,22 @@ export function contentSecurityPolicy(meta: Readonly<Record<string, unknown>> | 
  * The view's HTML with its policy in front of it.
  *
  * The policy is a meta element, because the document is loaded as `srcdoc`
- * with no headers of its own. It goes first in the head, before the resource's
- * own tags, so nothing in the document can run before it applies.
+ * with no headers of its own. It goes before everything the resource wrote, and
+ * after the resource's doctype when it has one, so:
+ *
+ * - the parser reads the meta while it is still building the head, which puts
+ *   the meta in the head of the document it draws;
+ * - the doctype keeps its place, so a document that declared one is drawn in
+ *   standards mode;
+ * - a document with no head is still a document the parser gives one, with the
+ *   policy already in it.
+ *
+ * Nothing in the resource's own markup, wherever it sits, decides where the
+ * policy goes.
  */
 export function viewDocument(html: string, policy: string): string {
   const meta = `<meta http-equiv="Content-Security-Policy" content="${policy.replaceAll('"', '&quot;')}">`;
-  const head = /<head[^>]*>/iu.exec(html);
-  if (head !== null) {
-    const at = head.index + head[0].length;
-    return `${html.slice(0, at)}${meta}${html.slice(at)}`;
-  }
-  /* A document without a head still gets its policy before its own content, and
-     after the doctype when it has one: a start tag in front of the doctype is
-     a parse error, and the parser then draws the whole document in quirks
-     mode. The parser hoists the meta into the head it makes. */
-  const doctype = /^\s*<!doctype[^>]*>/iu.exec(html);
+  const doctype = /^\uFEFF?\s*<!doctype[^>]*>/iu.exec(html);
   const at = doctype === null ? 0 : doctype.index + doctype[0].length;
   return `${html.slice(0, at)}${meta}${html.slice(at)}`;
 }

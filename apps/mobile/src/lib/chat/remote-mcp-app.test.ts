@@ -50,7 +50,18 @@ describe('the policy a view runs under', () => {
     const policy = contentSecurityPolicy({
       ui: {
         csp: {
-          connectDomains: ['*', "'unsafe-eval'", 'https://ok.example', 'https://a.example/x;y'],
+          connectDomains: [
+            '*',
+            "'unsafe-eval'",
+            'https://ok.example',
+            'https://a.example/x;y',
+            'https://*',
+            'https://*.example',
+            'http://*',
+            'https://*:8443',
+            'https://ok.example/path',
+            'https://user@ok.example',
+          ],
           resourceDomains: ["'unsafe-inline' 'unsafe-eval'", 'data:text/html,<script>'],
         },
       },
@@ -59,6 +70,40 @@ describe('the policy a view runs under', () => {
     expect(policy).not.toContain('*');
     expect(policy).not.toContain('unsafe-eval');
     expect(policy).not.toContain('data:text/html');
+    expect(policy).not.toContain('/path');
+    expect(policy).not.toContain('@');
+  });
+
+  it('names each source as the origin it is, and nothing longer', () => {
+    const policy = contentSecurityPolicy({
+      ui: {
+        csp: {
+          connectDomains: [
+            'https://api.example:8443',
+            'wss://socket.example',
+            'https://slash.example/',
+            'https://смр.example',
+          ],
+          resourceDomains: ['http://127.0.0.1:8080', 'https://cdn.example'],
+          baseUriDomains: ['https://[::1]:3000'],
+        },
+      },
+    });
+    expect(policy).toContain(
+      'connect-src https://api.example:8443 wss://socket.example https://slash.example https://смр.example'
+    );
+    expect(policy).toContain(
+      "script-src 'unsafe-inline' http://127.0.0.1:8080 https://cdn.example"
+    );
+    expect(policy).toContain('base-uri https://[::1]:3000');
+  });
+
+  it('drops a port no origin can have', () => {
+    const policy = contentSecurityPolicy({
+      ui: { csp: { connectDomains: ['https://api.example:99999', 'https://api.example:443'] } },
+    });
+    expect(policy).toContain('connect-src https://api.example:443');
+    expect(policy).not.toContain('99999');
   });
 });
 
@@ -86,6 +131,34 @@ describe('the document a view draws', () => {
     expect(document.startsWith('<!doctype html>')).toBe(true);
     expect(document.indexOf('Content-Security-Policy')).toBeLessThan(
       document.indexOf('<p>a view</p>')
+    );
+  });
+
+  it('keeps the policy ahead of every part of the document, at any head position', () => {
+    /* Each resource writes its head marker in a different position; the policy
+       is still the first token the parser reads, after the doctype. */
+    const documents = [
+      '<!-- <head> --><html><head><title>x</title></head><body></body></html>',
+      '<script>const tag = "<head>";</script><html><head><title>x</title></head></html>',
+      '<style>/* <head> */</style><html><head><title>x</title></head></html>',
+      '<html data-note="<head>"><head><title>x</title></head></html>',
+    ];
+    for (const html of documents) {
+      const document = viewDocument(html, "default-src 'none'");
+      expect(document.startsWith('<meta http-equiv="Content-Security-Policy"')).toBe(true);
+      expect(document.indexOf('Content-Security-Policy')).toBeLessThan(document.indexOf('<head>'));
+      expect(document.split('Content-Security-Policy')).toHaveLength(2);
+    }
+  });
+
+  it('keeps a byte-order mark and a doctype in front of the policy', () => {
+    const document = viewDocument(
+      '\uFEFF<!doctype html><!-- <head> --><html><head></head></html>',
+      "default-src 'none'"
+    );
+    expect(document.startsWith('\uFEFF<!doctype html><meta ')).toBe(true);
+    expect(document.indexOf('Content-Security-Policy')).toBeLessThan(
+      document.indexOf('<!-- <head> -->')
     );
   });
 });

@@ -201,11 +201,18 @@ export function getCenteredStateBandStyle({
 }
 
 /**
- * The content box a centered state paints before the scroller has reported its
- * viewport: the layout engine centers the content in the scroller and the bottom
- * reserve keeps it above the tab bar. That is what
- * `getCenteredStateBandStyle` returns when the band starts at the scroller's
- * top, the case of a scroller below the page header.
+ * The content box a centered state paints before the scroller reports its
+ * viewport, for a band that starts at the scroller's top and ends at the
+ * scroller's bottom: the layout engine centers the content in the scroller and
+ * the bottom reserve keeps it above the tab bar. That is exactly what
+ * `getCenteredStateBandStyle` returns for that band, the case of a scroller
+ * below the page header.
+ *
+ * A reserved top inset moves the band's top below the scroller's top, and a
+ * native-filled viewport moves its bottom below the scroller's bottom. This box
+ * cannot follow either move, so `CenteredState` keeps its content back until the
+ * scroller measures for such a band, and paints this box there only when the
+ * measurement cannot place the state at all.
  */
 export function getPendingCenteredStateStyle(bottomInset: number) {
   return {

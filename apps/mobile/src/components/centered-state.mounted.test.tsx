@@ -117,9 +117,13 @@ async function mount(props: Partial<ComponentPropsWithRef<typeof CenteredState>>
   );
   const content = () =>
     mounted.renderer.root.findByProps({ testID: 'state-content' }).props as ViewProps;
+  const contentNode = () =>
+    mounted.renderer.root.findAllByProps({ testID: 'state-content' })[0] as
+      | { props: ViewProps }
+      | undefined;
   const scroll = () => mounted.renderer.root.findByType(ScrollView).props as ScrollViewProps;
   act(() => {
-    content().onLayout?.(contentLayout as LayoutChangeEvent);
+    contentNode()?.props.onLayout?.(contentLayout as LayoutChangeEvent);
   });
   return {
     ...mounted,
@@ -268,10 +272,19 @@ describe('CenteredState measurements', () => {
     async nativeViewportFillsSurface => {
       native.surface.nativeViewportFillsSurface = nativeViewportFillsSurface;
       const mounted = await mount();
-      expectPainted(mounted);
+      if (nativeViewportFillsSurface) {
+        // A native-filled viewport moves the band's bottom below the scroller's
+        // bottom, so the state waits for that frame instead of estimating it.
+        expect(mounted.renderer.root.findAllByProps({ testID: 'state-content' })).toHaveLength(0);
+        expect(mounted.scroll().contentContainerStyle).toBeUndefined();
+      } else {
+        expectPainted(mounted);
+      }
       mounted.settle();
+      expectPainted(mounted);
       expect(mounted.scroll().contentContainerStyle).toEqual({
         flexGrow: 1,
+        justifyContent: nativeViewportFillsSurface ? 'center' : undefined,
         minHeight: nativeViewportFillsSurface ? 420 : 340,
         paddingTop: 16,
         paddingBottom: nativeViewportFillsSurface ? 96 : 16,
@@ -279,6 +292,61 @@ describe('CenteredState measurements', () => {
       mounted.unmount();
     }
   );
+
+  it.each([
+    [
+      'a reserved top inset',
+      () => {
+        native.surface.topInset = 48;
+      },
+      340,
+    ],
+    [
+      'a native-filled viewport',
+      () => {
+        native.surface.nativeViewportFillsSurface = true;
+      },
+      420,
+    ],
+  ] as const)(
+    'holds a state out of %s until its scroller measures',
+    async (_name, band, bandHeight) => {
+      // The estimate centers in the scroller and carries the bottom reserve, which
+      // is the band placement only when the band starts at the scroller's top. A
+      // moved band gets the scroller's own frame first, so no frame paints a
+      // position the measurement then corrects.
+      band();
+      const mounted = await mount();
+      expect(mounted.renderer.root.findAllByProps({ testID: 'state-content' })).toHaveLength(0);
+      expect(mounted.scroll().contentContainerStyle).toBeUndefined();
+      mounted.settle(80, 340);
+      expectPainted(mounted);
+      expect(mounted.scroll().contentContainerStyle).toMatchObject({ minHeight: bandHeight });
+      mounted.unmount();
+    }
+  );
+
+  it('paints a moved band at the estimate when the scroller cannot measure it', async () => {
+    // A band that cannot be measured must still show the state: the estimate
+    // keeps the bottom reserve free, which a blank body cannot do.
+    native.surface.topInset = 48;
+    native.surface.bottomInset = 78;
+    const mounted = await mount();
+    expect(mounted.renderer.root.findAllByProps({ testID: 'state-content' })).toHaveLength(0);
+    act(() => {
+      for (const onMeasure of native.measurements.splice(0)) {
+        onMeasure(0, Number.NaN, 400, Number.NaN);
+      }
+    });
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      justifyContent: 'center',
+      paddingTop: 16,
+      paddingBottom: 94,
+    });
+    mounted.unmount();
+  });
 
   it('waits for finite native viewport bounds without hiding the state', async () => {
     const mounted = await mount();

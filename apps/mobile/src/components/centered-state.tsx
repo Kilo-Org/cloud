@@ -50,6 +50,17 @@ type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
  * engine produces the pending placement from the caller's reserve alone, and
  * `getCenteredStateLayout` produces the same numbers once the surface, the
  * scroller and the content have reported their sizes.
+ *
+ * The pending placement is the band placement for a band that starts at the
+ * scroller's top and ends at the scroller's bottom, which is every band a screen
+ * paints. A reserved top inset moves the band's top below the scroller's top and
+ * a native-filled viewport moves its bottom below the scroller's bottom; the
+ * estimate has no scroller frame to follow either of them, so those bands keep
+ * the content back until the scroller reports its own frame. The measurement
+ * answers inside the commit that mounts the scroller, so the state paints placed
+ * rather than at a position the measurement then corrects. It also paints at the
+ * estimate whenever a measurement cannot place it at all, because a state that
+ * never appears is worse than one placed by the estimate.
  */
 export function CenteredState({
   children,
@@ -81,6 +92,10 @@ export function CenteredState({
   const requestRef = useRef(0);
   const [viewport, setViewport] = useState<MeasuredViewport | null>(null);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
+  // Whether the last measurement could place the state at all: no scroller node
+  // yet, or bounds that name no area. A band that cannot be estimated needs this
+  // to tell a measurement in flight from one that will never arrive.
+  const [unplaceable, setUnplaceable] = useState(false);
 
   const register = surface?.register;
   useLayoutEffect(() => register?.(), [register]);
@@ -96,6 +111,7 @@ export function CenteredState({
       // stays: dropping it here is what made a returning state re-center and
       // then jump back to its measured position. The measurement publishes a
       // fresh object each run, so compare the band, not the identity.
+      setUnplaceable(true);
       setViewport(previous =>
         previous !== null &&
         previous.surface.top === frame.top &&
@@ -118,9 +134,11 @@ export function CenteredState({
         !Number.isFinite(measuredBottom) ||
         measuredBottom <= measuredTop
       ) {
+        setUnplaceable(true);
         setViewport(null);
         return;
       }
+      setUnplaceable(false);
       setViewport(previous =>
         previous !== null &&
         previous.surface.top === frame.top &&
@@ -202,16 +220,27 @@ export function CenteredState({
     nativeViewportFillsSurface,
     topInset,
   ]);
-  // While the measured layout is pending, the state paints with the layout
-  // engine's own centering and the same bottom reserve the measured layout
-  // applies, so the band the surface reserved (the fixed tab bar) stays free
-  // and the position it paints is the position the measurement confirms. This
-  // padding is the only reservation — a caller that also shrinks the scroller
-  // frame by the same band clears it twice and pushes the body above the centre
-  // of the visible area.
+  // The pending placement centers in the scroller and carries the caller's
+  // bottom reserve, so the band the surface reserved (the fixed tab bar) stays
+  // free and the position it paints is the position the measurement confirms.
+  // This padding is the only reservation — a caller that also shrinks the
+  // scroller frame by the same band clears it twice and pushes the body above
+  // the centre of the visible area. It is the band placement for a band that
+  // starts at the scroller's top; a reserved top inset and a native-filled
+  // viewport move that band off the scroller's own edges, so those bands wait
+  // for the scroller's frame instead of painting a position the measurement
+  // would correct. The estimate still lands whenever a measurement cannot place
+  // the state, so a state never stays hidden.
+  const estimateFits = topInset === 0 && !nativeViewportFillsSurface;
+  const placement = useMemo(() => {
+    if (layout) {
+      return layout;
+    }
+    return estimateFits || unplaceable ? getPendingCenteredStateStyle(bottomInset) : null;
+  }, [bottomInset, estimateFits, layout, unplaceable]);
   const contentStyle = useMemo(
-    () => ({ flexGrow: 1, ...(layout ?? getPendingCenteredStateStyle(bottomInset)) }),
-    [bottomInset, layout]
+    () => (placement ? { flexGrow: 1, ...placement } : undefined),
+    [placement]
   );
 
   if (!surface) {
@@ -231,14 +260,16 @@ export function CenteredState({
         refreshControl={refreshControl}
         keyboardShouldPersistTaps="handled"
       >
-        <View
-          className={cn('w-full', contentContainerClassName)}
-          testID={testID ? `${testID}-content` : undefined}
-          onLayout={measureContent}
-        >
-          {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}
-          {children}
-        </View>
+        {contentStyle === undefined ? null : (
+          <View
+            className={cn('w-full', contentContainerClassName)}
+            testID={testID ? `${testID}-content` : undefined}
+            onLayout={measureContent}
+          >
+            {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}
+            {children}
+          </View>
+        )}
       </ScrollView>
     </ShortCenteredBandProvider>
   );

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { AlertTriangle, ArrowLeft, GitPullRequest } from 'lucide-react';
+import { MESSAGE_SENT_EVENT, captureEvent } from '@/src/shared/analytics';
 import type { StoredAuth } from '@/src/shared/auth';
 import { getKiloApiBaseUrl, loadStoredAuth } from '@/src/shared/auth';
 import { isGatewayModelId } from '@/src/shared/model-picker-rows';
@@ -204,6 +205,7 @@ export const AgentsSessionView = ({
           },
         });
         if (ok) {
+          captureEvent(MESSAGE_SENT_EVENT, { mode: 'agents' });
           setRetrySucceeded(true);
         } else {
           setIsSending(false);
@@ -252,6 +254,7 @@ export const AgentsSessionView = ({
         },
       });
       if (ok) {
+        captureEvent(MESSAGE_SENT_EVENT, { mode: 'agents' });
         setRetrySucceeded(true);
         manager.clearError();
       }

@@ -5,14 +5,20 @@ export const EXTENSION_SIGNED_IN_EVENT = 'extension_signed_in';
 export const EXTENSION_SIGNED_OUT_EVENT = 'extension_signed_out';
 export const CONVERSATION_CREATED_EVENT = 'conversation_created';
 export const MESSAGE_SENT_EVENT = 'message_sent';
+/** Daily heartbeat: at most one per signed-in user per local day, on panel open. */
+export const EXTENSION_ACTIVE_EVENT = 'extension_active';
 
 export const ANALYTICS_OPT_OUT_STORAGE_KEY = 'sync:analyticsOptOut';
+export const ANALYTICS_LAST_ACTIVE_DAY_STORAGE_KEY = 'local:analyticsLastActiveDay';
+
+/** Super property that separates extension traffic from web/CLI/mobile in PostHog. */
+export const ANALYTICS_SURFACE = 'browser_extension';
 
 type MaybePromise<Value> = Promise<Value> | Value;
 
 export interface AnalyticsStorageArea {
-  getItem(key: typeof ANALYTICS_OPT_OUT_STORAGE_KEY): MaybePromise<unknown>;
-  setItem(key: typeof ANALYTICS_OPT_OUT_STORAGE_KEY, value: boolean): MaybePromise<void>;
+  getItem(key: string): MaybePromise<unknown>;
+  setItem(key: string, value: unknown): MaybePromise<void>;
 }
 
 interface AnalyticsGateInput {
@@ -75,8 +81,27 @@ const dropClient = (client: PostHog | undefined): void => {
   client?.reset();
 };
 
-const publishIdentity = (client: PostHog, email: string): void => {
-  client.register({ platform: 'extension' });
+interface AnalyticsSurfaceContext {
+  readonly browser: 'chrome' | 'firefox';
+  readonly extensionVersion: string | undefined;
+}
+
+const publishIdentity = (
+  client: PostHog,
+  email: string,
+  context: AnalyticsSurfaceContext
+): void => {
+  const superProperties: Record<string, string> = {
+    browser: context.browser,
+    platform: 'extension',
+    surface: ANALYTICS_SURFACE,
+  };
+
+  if (context.extensionVersion !== undefined) {
+    superProperties['extension_version'] = context.extensionVersion;
+  }
+
+  client.register(superProperties);
   client.identify(email, { email });
   activeIdentity = { client, email };
 };
@@ -146,6 +171,37 @@ export const getFirefoxUsageDataGranted = async (): Promise<boolean> => {
   return dataCollection.includes('technicalAndInteraction');
 };
 
+type ExtensionVersionReader = () => MaybePromise<string | undefined>;
+
+// eslint-disable-next-line unicorn/no-useless-undefined -- explicit unset sentinel
+let extensionVersionReader: ExtensionVersionReader | undefined = undefined;
+
+/** Test-only seam for the manifest version read under Vitest (node, no browser.runtime). */
+export const __setExtensionVersionReaderForTests = (reader?: ExtensionVersionReader): void => {
+  extensionVersionReader = reader;
+};
+
+/**
+ * Reads the shipped extension version for the `extension_version` super property.
+ * Resolves `undefined` (property omitted) rather than failing startup when the
+ * manifest is unreadable.
+ */
+const readExtensionVersion = async (): Promise<string | undefined> => {
+  try {
+    const raw: unknown = await (async () => {
+      if (extensionVersionReader) {
+        return extensionVersionReader();
+      }
+      const { browser } = await import('wxt/browser');
+      return browser.runtime.getManifest().version;
+    })();
+
+    return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export const initAnalytics = async (
   storageArea: AnalyticsStorageArea,
   email: string
@@ -191,6 +247,7 @@ export const initAnalytics = async (
   }
 
   const client = createPostHogClient(apiKey);
+  const extensionVersion = await readExtensionVersion();
 
   if (lifecycleEpoch !== epochAtStart) {
     // Discard without identify — inert with flags/capture disabled.
@@ -198,7 +255,10 @@ export const initAnalytics = async (
     return false;
   }
 
-  publishIdentity(client, email);
+  publishIdentity(client, email, {
+    browser: isFirefoxBuild() ? 'firefox' : 'chrome',
+    extensionVersion,
+  });
   return true;
 };
 
@@ -217,6 +277,97 @@ export const captureEvent = (
   }
 
   activeIdentity.client.capture(name, properties);
+};
+
+/** Local calendar day (not UTC): a user's WAU must not turn over at their midnight-UTC. */
+const toLocalDay = (date: Date): string => {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const dayOfMonth = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${dayOfMonth}`;
+};
+
+/**
+ * FNV-1a marker for the signed-in email, so a stored day belongs to one user
+ * without putting the address itself into extension storage. Two accounts on one
+ * browser profile must both count.
+ */
+const emailMarker = (email: string): string => {
+  let hash = 0x81_1c_9d_c5;
+  for (let index = 0; index < email.length; index += 1) {
+    hash ^= email.codePointAt(index) ?? 0;
+    hash = Math.imul(hash, 0x01_00_01_93) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+};
+
+// eslint-disable-next-line unicorn/no-useless-undefined -- explicit unset sentinel
+let activeCaptureInFlight: Promise<boolean> | undefined = undefined;
+
+const readStoredDay = async (storageArea: AnalyticsStorageArea): Promise<unknown> => {
+  try {
+    return await storageArea.getItem(ANALYTICS_LAST_ACTIVE_DAY_STORAGE_KEY);
+  } catch {
+    // Analytics must never break the panel; an unreadable day just means "send".
+    return undefined;
+  }
+};
+
+const writeStoredDay = async (storageArea: AnalyticsStorageArea, value: string): Promise<void> => {
+  try {
+    await storageArea.setItem(ANALYTICS_LAST_ACTIVE_DAY_STORAGE_KEY, value);
+  } catch {
+    // Quota or a detached storage context: the heartbeat still counts.
+  }
+};
+
+/**
+ * Captures `extension_active` at most once per signed-in user per local day.
+ *
+ * The day (with a per-user marker) is persisted BEFORE the capture so a crash
+ * mid-flush cannot produce a second heartbeat for the same day; the trade-off (a
+ * dropped heartbeat if the browser dies at that instant) is the correct one for
+ * an at-most-once counter. Resolves `false` without writing when analytics is not
+ * active, so a signed-out or opted-out open never burns the day.
+ */
+export const captureDailyActive = async (
+  storageArea: AnalyticsStorageArea,
+  now: Date = new Date()
+): Promise<boolean> => {
+  const identity = activeIdentity;
+
+  if (identity === undefined) {
+    return false;
+  }
+
+  if (activeCaptureInFlight !== undefined) {
+    return activeCaptureInFlight;
+  }
+
+  const run = (async (): Promise<boolean> => {
+    const expected = `${toLocalDay(now)}:${emailMarker(identity.email)}`;
+    const previous = await readStoredDay(storageArea);
+
+    if (previous === expected) {
+      return false;
+    }
+
+    // A sign-out or opt-out can land while the read above is in flight.
+    if (activeIdentity === undefined) {
+      return false;
+    }
+
+    await writeStoredDay(storageArea, expected);
+    captureEvent(EXTENSION_ACTIVE_EVENT, {}, { sendInstantly: true });
+    return true;
+  })();
+
+  activeCaptureInFlight = run;
+
+  try {
+    return await run;
+  } finally {
+    activeCaptureInFlight = undefined;
+  }
 };
 
 export const resetAnalyticsUser = ({ reason }: ResetAnalyticsUserOptions): Promise<void> => {

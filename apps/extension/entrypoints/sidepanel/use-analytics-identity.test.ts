@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const analyticsMocks = vi.hoisted(() => ({
+  captureDailyActive: vi.fn(),
   captureEvent: vi.fn(),
   initAnalytics: vi.fn(),
 }));
@@ -9,6 +10,7 @@ const analyticsMocks = vi.hoisted(() => ({
 // eslint-disable-next-line vitest/prefer-import-in-mock, jest/no-untyped-mock-factory
 vi.mock('@/src/shared/analytics', () => ({
   EXTENSION_SIGNED_IN_EVENT: 'extension_signed_in',
+  captureDailyActive: analyticsMocks.captureDailyActive,
   captureEvent: analyticsMocks.captureEvent,
   initAnalytics: analyticsMocks.initAnalytics,
 }));
@@ -36,6 +38,7 @@ const emailLessSignedIn = { email: undefined as string | undefined, status: 'sig
 const signedOut = { email: undefined, status: 'signedOut' } as const;
 
 const resetMocks = (): void => {
+  analyticsMocks.captureDailyActive.mockReset();
   analyticsMocks.captureEvent.mockReset();
   analyticsMocks.initAnalytics.mockReset();
 };
@@ -105,6 +108,8 @@ describe('analytics identity tracker', () => {
     expect(analyticsMocks.initAnalytics).toHaveBeenCalledTimes(2);
     expect(emitSignedIn).toHaveBeenCalledTimes(2);
     expect(emitSignedIn).toHaveBeenLastCalledWith('device_auth');
+    // Each activation also records the once-per-day heartbeat.
+    expect(analyticsMocks.captureDailyActive).toHaveBeenCalledTimes(2);
   });
 
   it('dedupes identical observations across runs to a single init+emit', async () => {
@@ -133,6 +138,7 @@ describe('analytics identity tracker', () => {
     // eslint-disable-next-line vitest/prefer-called-once
     expect(analyticsMocks.initAnalytics).toHaveBeenCalledTimes(1);
     expect(emitSignedIn).not.toHaveBeenCalled();
+    expect(analyticsMocks.captureDailyActive).not.toHaveBeenCalled();
   });
 
   it('emits device_auth source for a device-approval observation', async () => {
@@ -210,5 +216,6 @@ describe('analytics identity tracker', () => {
 
     expect(analyticsMocks.initAnalytics).not.toHaveBeenCalled();
     expect(emitSignedIn).not.toHaveBeenCalled();
+    expect(analyticsMocks.captureDailyActive).not.toHaveBeenCalled();
   });
 });

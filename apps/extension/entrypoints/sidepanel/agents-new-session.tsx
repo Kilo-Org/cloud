@@ -27,6 +27,7 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import type { CreateRemoteSessionInput } from '@kilocode/cloud-agent-sdk';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
+import { CONVERSATION_CREATED_EVENT, captureEvent } from '@/src/shared/analytics';
 import { getKiloApiBaseUrl, loadStoredAuth } from '@/src/shared/auth';
 import { getDefaultGatewayModelId } from '@/src/shared/default-gateway-model';
 import { fetchModelPreferences } from '@/src/shared/model-preferences-client';
@@ -535,6 +536,7 @@ export const AgentsNewSession = ({
         void queryClient.invalidateQueries({
           queryKey: activeSessionsQueryKey({ organizationId, token }),
         });
+        captureEvent(CONVERSATION_CREATED_EVENT, { mode: 'agents' });
         setIsSubmitting(false);
         onCreated(parsed.kiloSessionId, trimmed);
       } catch (error) {
@@ -583,6 +585,7 @@ export const AgentsNewSession = ({
         queryKey: sessionHistoryQueryKey({ organizationId, token }),
       });
 
+      captureEvent(CONVERSATION_CREATED_EVENT, { mode: 'agents' });
       setIsSubmitting(false);
       onCreated(kiloSessionId);
     } catch (error) {

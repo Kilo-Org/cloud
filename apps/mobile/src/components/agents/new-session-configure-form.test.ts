@@ -618,30 +618,30 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === 'laptop on kilo')).toBe(true);
   });
 
-  // ── Case 3b: the bound instance keeps the line, the disconnected note adds its own ──
-  it('names the bound instance and shows the disconnected note in place of the setup sentence', async () => {
+  // ── Case 3b: a refused spawn resets the target, and the disconnected note owns the copy ──
+  it('leaves the disconnected note alone after a refused spawn resets the computer target', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = NewSessionConfigureForm({
       ...defaultProps(),
-      runOnInstance: INSTANCE,
+      runOnInstance: null,
+      pendingComputer: true,
       showRunOnSelector: true,
       showInstanceDisconnectedNote: true,
     }) as Node;
 
-    expect(findTextContent(element, t => t === 'laptop on kilo')).toBe(true);
+    expect(
+      findTextContent(element, t =>
+        t.includes('The selected instance disconnected. Start a session on Cloud Agent')
+      )
+    ).toBe(true);
     expect(
       findTextContent(
         element,
         t => t === 'To run on your computer, start Kilo there and leave it running.'
       )
     ).toBe(false);
-    expect(
-      findTextContent(element, t =>
-        t.includes('The selected instance disconnected. Start a session on Cloud Agent')
-      )
-    ).toBe(true);
   });
 
   // ── Case 3c: the unbound computer target keeps the setup sentence ──

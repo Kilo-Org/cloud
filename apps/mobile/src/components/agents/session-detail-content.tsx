@@ -2647,6 +2647,14 @@ export function SessionDetailContent({
   // acts as soon as the row lands. Dropping it is the defect the footer had —
   // the person pressed the only control on the screen and nothing happened.
   const heldContinueRef = useRef<{ cut: ForkCut | null } | null>(null);
+  // The cut of the press that owns the footer's current state, so Retry repeats
+  // that press: a failed fork retries as a fork, not as a plain Continue.
+  const [continueCut, setContinueCut] = useState<ForkCut | null>(null);
+  // How many times the footer was reset because the composer was the
+  // destination. A press that returns after such a reset (the person opened the
+  // composer and came back) must not paint a failure for a press that already
+  // resolved.
+  const continueResetRef = useRef(0);
 
   // Open the composer. The destination carries this session's organization, so
   // it needs the session's own row; every entry point below reaches this only
@@ -2654,6 +2662,7 @@ export function SessionDetailContent({
   // for the type system too.
   const pushContinue = useCallback(
     async (cut: ForkCut | null) => {
+      const generation = continueResetRef.current;
       if (!sessionDataLoaded) {
         return;
       }
@@ -2683,6 +2692,9 @@ export function SessionDetailContent({
       // cleared under it. An opened composer leaves this screen behind it, and
       // only a push the navigator dropped leaves the person here with nothing
       // to show for the press.
+      if (continueResetRef.current !== generation) {
+        return;
+      }
       if (outcome === 'opened') {
         setContinueOpen('idle');
       } else if (outcome === 'failed') {
@@ -2720,6 +2732,7 @@ export function SessionDetailContent({
         return;
       }
       setContinueOpen('pending');
+      setContinueCut(cut);
       if (!sessionDataLoaded) {
         heldContinueRef.current = { cut };
         return;
@@ -2770,6 +2783,12 @@ export function SessionDetailContent({
     startContinue(null);
   }, [startContinue]);
 
+  // Retry repeats the press the footer is reporting on: a fork that failed
+  // still opens the composer cut at the message it was forked from.
+  const handleRetryContinue = useCallback(() => {
+    startContinue(continueCut);
+  }, [continueCut, startContinue]);
+
   const handleForkFromHere = useCallback(() => {
     if (detailsForkCut === null) {
       return;
@@ -2788,8 +2807,12 @@ export function SessionDetailContent({
   useFocusEffect(
     useCallback(() => {
       // Setting the state it already holds is a no-op render, so this is safe
-      // on the mount focus too.
+      // on the mount focus too. The press counter moves with it, so a read-back
+      // that returns after this reset cannot paint a failure for a press the
+      // person already left behind.
+      continueResetRef.current += 1;
       heldContinueRef.current = null;
+      setContinueCut(null);
       setContinueOpen('idle');
     }, [])
   );
@@ -3172,7 +3195,7 @@ export function SessionDetailContent({
                       size="action"
                       className="shrink-0"
                       accessibilityLabel={t('common.retry')}
-                      onPress={handleContinueInNewSession}
+                      onPress={handleRetryContinue}
                     >
                       <Text>{t('common.retry')}</Text>
                     </Button>

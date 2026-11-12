@@ -1715,6 +1715,58 @@ describe('session detail organization scope', () => {
     expect(destination.startsWith('/(app)/agent-chat/new?organizationId=org-a')).toBe(true);
     expect(destination).toContain(`cloneUpToMessageId=${row.info.id}`);
   });
+
+  it('retries a failed fork as the same fork, not as a plain continue', async () => {
+    // The footer reports one failure with one Retry, so Retry must repeat the
+    // press that failed. A fork retried as a plain Continue would open a
+    // composer that is not cut at the message the person chose.
+    //
+    // Real timers on purpose: the read-back that decides the press failed runs
+    // on the clock, and the held-press release waits for the session row through
+    // this suite's own settled waits.
+    goalMountOptions = { resolvedType: 'remote' };
+    const row = childMessage(ROOT_ID, 'forked row');
+    const view = await mountDetails([row], { sessionOrganizationId: 'org-a' });
+    await waitFor(() => view.store.get(view.manager.atoms.fetchedSessionData) !== null);
+    // The footer that reports the failure belongs to a stored session.
+    await act(async () => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      await Promise.resolve();
+    });
+
+    act(() => {
+      messageBubbleProps(view.renderer, row.info.id).onLongPressDetails(row);
+    });
+    const fork = detailsSheetNode(view.renderer).props.onForkFromHere;
+    expect(typeof fork).toBe('function');
+
+    routerDropsPush.value = true;
+    await act(async () => {
+      (fork as () => void)();
+      await new Promise(resolve => {
+        setTimeout(resolve, 1500);
+      });
+    });
+    expect(renderedTextOutsideSheet(view.renderer.root)).toContain(
+      i18n.t('common.somethingWentWrong')
+    );
+
+    routerDropsPush.value = false;
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await new Promise(resolve => {
+        setTimeout(resolve, 1500);
+      });
+    });
+
+    const destination = navigationRoutes.at(-1) ?? '';
+    expect(destination).toContain(`cloneUpToMessageId=${row.info.id}`);
+    expect(destination).toContain('organizationId=org-a');
+  });
 });
 
 function roleProfileRow(id: string, name: string, isDefault: boolean) {
@@ -5699,6 +5751,41 @@ describe('session detail read-only composer', () => {
           effect();
         }
         await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.somethingWentWrong'));
+      expect(continueControlOf(view.renderer).props.loading).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('paints no failure for a press the focus reset already answered', async () => {
+    // The read-back is bounded but the navigator can answer later. A person who
+    // saw the composer and came back must not find an error about a press that
+    // actually worked.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+      const focusEffectsBefore = vi.mocked(useFocusEffect).mock.calls.length;
+      routerDropsPush.value = true;
+
+      await act(async () => {
+        (continueControlOf(view.renderer).props.onPress as () => void)();
+        await Promise.resolve();
+      });
+
+      // The composer was the destination and the person is back: the screen's
+      // focus effect runs before the read-back's answer.
+      const focusEffects = vi
+        .mocked(useFocusEffect)
+        .mock.calls.slice(0, focusEffectsBefore)
+        .map(([effect]) => effect);
+      await act(async () => {
+        for (const effect of focusEffects) {
+          effect();
+        }
+        await vi.advanceTimersByTimeAsync(2000);
       });
 
       expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.somethingWentWrong'));

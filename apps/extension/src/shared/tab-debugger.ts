@@ -203,6 +203,16 @@ export interface WebMcpDiscoveryResult {
   readonly tools: WebMcpToolDescriptor[];
 }
 
+/*
+ * Injected page code cannot report a rejection: Chrome turns a throw inside
+ * `executeScript` into a null result with no error, which would read as a
+ * successful tool call. The injected executor therefore reports through this
+ * envelope, and a missing envelope is treated as a failure.
+ */
+export type WebMcpExecuteEnvelope =
+  | { readonly ok: true; readonly value: unknown }
+  | { readonly ok: false; readonly error: string };
+
 export type EvalTabResult =
   | {
       readonly description?: string;
@@ -1011,8 +1021,7 @@ const runInjectedWebMcpExecute = async (
   toolNameText: string,
   argumentsText: string,
   definitionSignatureText: string
-  // oxlint-disable-next-line anti-slop/no-unknown-returns -- injected function; the third-party tool result shape is arbitrary and cannot be parsed without importing a schema.
-): Promise<unknown> => {
+): Promise<WebMcpExecuteEnvelope> => {
   const { modelContext } = document as Document & {
     modelContext?: {
       getTools?: () => Promise<unknown[]>;
@@ -1031,57 +1040,83 @@ const runInjectedWebMcpExecute = async (
   const isPlainObject = (value: unknown): value is Record<string, unknown> =>
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- injected function distinguishing a plain-object schema from a primitive/array in arbitrary third-party tool data; cannot import a schema to parse it.
     typeof value === 'object' && value !== null && !Array.isArray(value);
-
-  if (
-    modelContext === undefined ||
-    modelContext.getTools === undefined ||
-    modelContext.executeTool === undefined
-  ) {
-    throw new Error('WebMCP is not available in this document.');
-  }
-
-  const tools = await modelContext.getTools();
-  if (!isArray(tools)) {
-    throw new TypeError('WebMCP returned no tools.');
-  }
-
-  let tool: unknown = undefined;
-  for (const candidate of tools) {
-    const record = isToolRecord(candidate) ? candidate : {};
-    if (record['name'] === toolNameText) {
-      tool = candidate;
-      break;
+  /*
+   * JSON key order is not part of a tool definition, and it changes when the
+   * tool travels through extension messaging, so sort keys before comparing.
+   */
+  const canonicalize = (value: unknown): unknown => {
+    if (isArray(value)) {
+      return value.map(canonicalize);
     }
-  }
 
-  if (tool === undefined) {
-    throw new Error(`WebMCP tool "${toolNameText}" is not available.`);
-  }
-
-  // Rebuild the ordered definition signature identically to web-mcp-tools.ts and reject a changed registration as a stale tool.
-  const record = isToolRecord(tool) ? tool : {};
-  const name = asString(record['name']);
-  const title = asString(record['title']);
-  const description = asString(record['description']);
-  const origin = asString(record['origin']);
-  let schema = record['inputSchema'];
-  if (isString(schema)) {
-    try {
-      schema = JSON.parse(schema) as unknown;
-    } catch {
-      schema = undefined;
+    if (!isPlainObject(value)) {
+      return value;
     }
+
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+        .map(([key, entry]) => [key, canonicalize(entry)])
+    );
+  };
+
+  try {
+    if (
+      modelContext === undefined ||
+      modelContext.getTools === undefined ||
+      modelContext.executeTool === undefined
+    ) {
+      throw new Error('WebMCP is not available in this document.');
+    }
+
+    const tools = await modelContext.getTools();
+    if (!isArray(tools)) {
+      throw new TypeError('WebMCP returned no tools.');
+    }
+
+    let tool: unknown = undefined;
+    for (const candidate of tools) {
+      const record = isToolRecord(candidate) ? candidate : {};
+      if (record['name'] === toolNameText) {
+        tool = candidate;
+        break;
+      }
+    }
+
+    if (tool === undefined) {
+      throw new Error(`WebMCP tool "${toolNameText}" is not available.`);
+    }
+
+    // Rebuild the definition signature identically to web-mcp-tools.ts and reject a changed registration as a stale tool.
+    const record = isToolRecord(tool) ? tool : {};
+    const name = asString(record['name']);
+    const title = asString(record['title']);
+    const description = asString(record['description']);
+    const origin = asString(record['origin']);
+    let schema = record['inputSchema'];
+    if (isString(schema)) {
+      try {
+        schema = JSON.parse(schema) as unknown;
+      } catch {
+        schema = undefined;
+      }
+    }
+    const normalizedSchema = isPlainObject(schema) ? schema : undefined;
+    const definitionSignature = JSON.stringify(
+      canonicalize([name, title, description, origin, normalizedSchema])
+    );
+
+    if (definitionSignature !== definitionSignatureText) {
+      throw new Error(`WebMCP tool "${toolNameText}" changed; refresh the page tools.`);
+    }
+
+    return { ok: true, value: await modelContext.executeTool(tool, argumentsText) };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'The page failed to run the WebMCP tool.',
+      ok: false,
+    };
   }
-  const normalizedSchema = isPlainObject(schema) ? schema : undefined;
-  const definitionSignature = JSON.stringify([name, title, description, origin, normalizedSchema]);
-
-  if (definitionSignature !== definitionSignatureText) {
-    throw new Error(`WebMCP tool "${toolNameText}" changed; refresh the page tools.`);
-  }
-
-  const result = await modelContext.executeTool(tool, argumentsText);
-
-  return result;
 };
 /* eslint-enable unicorn/consistent-function-scoping */
 
@@ -1271,6 +1306,18 @@ export const getPageSnapshotInTabWithScripting = async ({
 const isWebMcpToolDescriptorArray = (value: unknown): value is WebMcpToolDescriptor[] =>
   Array.isArray(value);
 
+/*
+ * A missing or malformed envelope means the injected function never reported
+ * back (Chrome nulls a thrown injected result), so callers must not read it as
+ * a successful call.
+ */
+const isWebMcpExecuteEnvelope = (value: unknown): value is WebMcpExecuteEnvelope =>
+  typeof value === 'object' &&
+  value !== null &&
+  'ok' in value &&
+  ((value.ok === true && 'value' in value) ||
+    (value.ok === false && 'error' in value && typeof value.error === 'string'));
+
 export const discoverWebMcpToolsInTab = async ({
   scriptingApi,
   tabId,
@@ -1360,7 +1407,16 @@ export const executeWebMcpToolInTab = async ({
       };
     }
 
-    return { ok: true, value: response?.result };
+    const envelope = response?.result;
+
+    if (!isWebMcpExecuteEnvelope(envelope)) {
+      return {
+        error: 'WebMCP tool execution failed: the page returned no result.',
+        ok: false,
+      };
+    }
+
+    return envelope.ok ? { ok: true, value: envelope.value } : { error: envelope.error, ok: false };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'WebMCP tool execution failed.',

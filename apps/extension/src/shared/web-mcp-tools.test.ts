@@ -157,8 +157,30 @@ describe('webMCP tools', () => {
     expect(result.warning).toContain('the limit is 128');
   });
 
-  it('builds the definition signature from the ordered array', () => {
+  it('builds the definition signature from the tool definition', () => {
     const result = build([createTool()]);
+
+    expect(result.routes.get('search_page')?.definitionSignature).toBe(
+      JSON.stringify([
+        'search_page',
+        'Search Page',
+        'Search the page for a term.',
+        'https://example.com',
+        objectSchema,
+      ])
+    );
+  });
+
+  it('signs the same definition regardless of JSON key order', () => {
+    // The page rebuilds this signature itself, and key order changes through extension messaging.
+    const reorderedSchema = {
+      type: 'object',
+      required: ['query'],
+      properties: { query: { type: 'string' } },
+      additionalProperties: false,
+    };
+
+    const result = build([createTool({ inputSchema: reorderedSchema })]);
 
     expect(result.routes.get('search_page')?.definitionSignature).toBe(
       JSON.stringify([

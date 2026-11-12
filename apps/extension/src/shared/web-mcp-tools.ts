@@ -72,6 +72,27 @@ const buildDescription = (title: string, description: string): string => {
 const isWebMcpGatewayToolName = (name: string): name is WebMcpGatewayToolName =>
   pageNamePattern.test(name) && !isReservedName(name);
 
+/*
+ * The signature is compared against one rebuilt inside the page, and extension
+ * messaging reorders object keys, so both sides sort keys before comparing:
+ * JSON key order is not part of a tool definition.
+ */
+const canonicalize = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(canonicalize);
+  }
+
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([key, entry]) => [key, canonicalize(entry)])
+  );
+};
+
 export const buildWebMcpToolDefinitions = ({
   tabId,
   documentId,
@@ -108,13 +129,9 @@ export const buildWebMcpToolDefinitions = ({
       const title = normalizeString(tool.title);
       const description = normalizeString(tool.description);
       const origin = normalizeString(tool.origin);
-      const definitionSignature = JSON.stringify([
-        name,
-        title,
-        description,
-        origin,
-        normalizedSchema,
-      ]);
+      const definitionSignature = JSON.stringify(
+        canonicalize([name, title, description, origin, normalizedSchema])
+      );
 
       routes.set(name, {
         definitionSignature,

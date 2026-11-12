@@ -34,9 +34,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
-/** When false, every request is scanned in full. */
-export const ENKRYPT_VERDICT_CACHE_ENABLED = true;
-
 /**
  * Bump when key derivation or the meaning of a cached verdict changes, for example how detector
  * results are parsed or which detections block, so entries written by older code stop matching.

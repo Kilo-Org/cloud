@@ -1149,15 +1149,19 @@ describe('ScreenHeader mounted', () => {
     expect(androidStyle).toEqual(iosStyle);
   });
 
-  it('adds the window-top clearance a modal surface needs above the grabber clearance', () => {
+  it('lines a modal header up with a pinned header where the surface owns the window top', () => {
     // The Android route's sheet edge reaches the window top, so the shared rule
-    // resolves the status-bar inset and the header clears it itself.
+    // resolves the status-bar inset and the header clears it by the same 8 a
+    // pinned header adds. Two modals must not sit at different heights.
     formSheet.windowTopClearance = 51.8;
+    safeArea.top = 51.8;
     platform.OS = 'android';
     const androidModal = findOuterContainer(renderHeader({ title: 'Sessions', modal: true }).root)
       .props.style;
+    const androidPinned = findOuterContainer(renderHeader({ title: 'Sessions' }).root).props.style;
 
-    expect(androidModal).toEqual({ paddingTop: 51.8 + 32 });
+    expect(androidModal).toEqual({ paddingTop: 51.8 + 8 });
+    expect(androidModal).toEqual(androidPinned);
   });
 
   it('pads a pinned header by the window inset and leaves a sheet to its own clearance', () => {

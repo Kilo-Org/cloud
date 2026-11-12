@@ -19,11 +19,11 @@ import { HEADER_TITLE_TARGET_CLASS, ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap
 import { cn } from '@/lib/utils';
 
 /**
- * Top padding a modal header keeps above the surface edge that owns the window
- * top, clear of the grabber. The inset the surface needs is added on top by
- * `useSheetHeaderTopClearance('android-window-top')`: zero where the native
- * sheet presents below the status bar (iOS), the window inset where the sheet
- * edge reaches the window top (the Android route).
+ * Top padding for a modal header whose native sheet presents below the window
+ * top — a presented sheet, which keeps this clearance above its edge to clear
+ * the grabber. Where the surface reaches the window top instead, the header
+ * adds `useSheetHeaderTopClearance` to the pinned-header 8, so a modal and a
+ * pinned screen line up (see `baseTopPadding`).
  */
 const MODAL_HEADER_TOP_PADDING = 32;
 
@@ -345,10 +345,14 @@ export function ScreenHeader({
   // reaches the window top, so the header must clear the status bar itself.
   // `useSheetHeaderTopClearance('android-window-top')` answers that in the one
   // rule the form-sheet chrome already uses — the window inset on Android, zero
-  // on iOS — so the two sheet headers cannot disagree. A pinned header adds the
-  // app window's safe-area top inset plus the standard 8.
+  // on iOS. Where the surface owns the window top the app's own pinned-header
+  // clearance applies (`inset + 8`), so a modal header and a pinned one line up;
+  // the grabber constant belongs to the presented sheet, which has a grabber to
+  // clear and reaches the window top on neither platform. Two modals in one app
+  // must not sit at different heights.
   const modalTopClearance = useSheetHeaderTopClearance('android-window-top');
-  const baseTopPadding = modal ? modalTopClearance + MODAL_HEADER_TOP_PADDING : insets.top + 8;
+  const modalTopPadding = modalTopClearance > 0 ? modalTopClearance + 8 : MODAL_HEADER_TOP_PADDING;
+  const baseTopPadding = modal ? modalTopPadding : insets.top + 8;
 
   // The offline banner is an absolute overlay pinned at the safe-area top of
   // the app window, so a pinned header must reserve its height while it is

@@ -184,6 +184,7 @@ export {
   instructionCreateInputSchema,
   instructionUpdateInputSchema,
   listInstructionsForProfile,
+  getProfileInstructions,
   createInstruction,
   updateInstruction,
   deleteInstruction,

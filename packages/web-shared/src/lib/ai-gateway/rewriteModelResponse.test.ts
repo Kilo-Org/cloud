@@ -2325,34 +2325,40 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
       }
     );
 
-    test('reports ChatGPT subscription usage as BYOK with zero billed cost', async () => {
-      const { payload } = await rewriteUsageFixture(
-        shape,
-        stream,
-        {
-          requested_model: 'openai/gpt-5',
-          provider: 'openai-chatgpt',
-          is_free: false,
-          custom_llm_pricing: null,
-          user_byok: false,
-          custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
-          api_kind: shape.kind,
-        },
-        {
-          ...shape.tokens,
-          cost: 1.2,
-          cost_details: { upstream_inference_cost: 1.1 },
-          is_byok: false,
-        }
-      );
+    test.each([
+      { provider: 'openai-chatgpt', model: 'openai/gpt-5' },
+      { provider: 'claude-billing', model: 'anthropic/claude-sonnet-4.5' },
+    ] as const)(
+      'reports $provider connected billing as BYOK with zero billed cost',
+      async ({ provider, model }) => {
+        const { payload } = await rewriteUsageFixture(
+          shape,
+          stream,
+          {
+            requested_model: model,
+            provider,
+            is_free: false,
+            custom_llm_pricing: null,
+            user_byok: false,
+            custom_pricing_config: TEST_CUSTOM_PRICING_CONFIG,
+            api_kind: shape.kind,
+          },
+          {
+            ...shape.tokens,
+            cost: 1.2,
+            cost_details: { upstream_inference_cost: 1.1 },
+            is_byok: false,
+          }
+        );
 
-      expect(payload.usage).toMatchObject({
-        ...shape.tokens,
-        cost: 0,
-        is_byok: true,
-        cost_details: { upstream_inference_cost: 1.1 },
-      });
-    });
+        expect(payload.usage).toMatchObject({
+          ...shape.tokens,
+          cost: 0,
+          is_byok: true,
+          cost_details: { upstream_inference_cost: 1.1 },
+        });
+      }
+    );
 
     test.each(['provider_metadata', 'providerMetadata'])(
       'reads Vercel %s while preserving existing inference cost details',
@@ -3128,6 +3134,7 @@ describe('api_request_log storage', () => {
       {
         guardrail: 'input',
         scan: 'blocking',
+        part: 'conversation',
         request: {
           text: 'hello',
           detectors: { injection_attack: { enabled: true, need_explanation: false } },
@@ -3140,6 +3147,7 @@ describe('api_request_log storage', () => {
       {
         guardrail: 'output',
         scan: 'log_only',
+        part: 'response',
         request: {
           text: 'hello back',
           detectors: { pii: { enabled: true, entities: ['secrets'] } },

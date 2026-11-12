@@ -19,8 +19,6 @@ import {
   getResourceDelegationAuthority,
 } from './resource-delegation';
 import { GET as getIdentity } from '@/app/api/user/route';
-import { POST as mintGastownToken } from '@/app/api/gastown/token/route';
-import { POST as mintWastelandToken } from '@/app/api/wasteland/token/route';
 import {
   personalPrepareSessionNextSchema,
   organizationPrepareSessionNextSchema,
@@ -33,8 +31,6 @@ const mockMembership = jest.fn();
 const mockDirectMembership = jest.fn();
 const mockGetServerSession = jest.fn();
 const mockResolver = jest.fn();
-const mockOrgMemberships = jest.fn();
-const mockGastownEnabled = jest.fn();
 let resourceMigrationEnabled = true;
 
 jest.mock('next/headers', () => ({ headers: () => mockHeaders(), cookies: jest.fn() }));
@@ -66,17 +62,13 @@ jest.mock('@kilocode/worker-utils/account-access', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   isOrganizationMember: (...args: unknown[]) => mockMembership(...args),
-  getUserOrgMemberships: (...args: unknown[]) => mockOrgMemberships(...args),
-}));
-jest.mock('@/lib/gastown/feature-flags', () => ({
-  isGastownEnabled: (...args: unknown[]) => mockGastownEnabled(...args),
 }));
 jest.mock('@/lib/organizations/organization-auth', () => ({ getAuthorizedOrgContext: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/constants', () => ({
   ORGANIZATION_ID_HEADER: 'X-KiloCode-OrganizationId',
 }));
 jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
-  getBlacklistedDomains: async () => [],
+  isEmailBlacklisted: async () => false,
 }));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   warnExceptInTest: jest.fn(),
@@ -138,6 +130,7 @@ const launch = {
   mode: 'code',
   prompt: 'Launch the child',
   autoInitiate: true,
+  operationKey: '33333333-3333-4333-8333-333333333333',
 };
 function scopedClaims(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -189,8 +182,6 @@ beforeEach(() => {
   mockMembership.mockResolvedValue(true);
   mockDirectMembership.mockResolvedValue([{ id: 'fixture-membership' }]);
   mockGetServerSession.mockResolvedValue({ kiloUserId: user.id });
-  mockOrgMemberships.mockResolvedValue([]);
-  mockGastownEnabled.mockResolvedValue(true);
   mockResolver.mockResolvedValue('launched');
   jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -221,8 +212,6 @@ describe('verified scoped web authentication', () => {
   });
   it.each([
     undefined,
-    '/api/gastown/token',
-    '/api/wasteland/token',
     '/api/profile',
     '/api/trpc/user.getMe',
     '/api/trpc/cloudAgentNext.prepareSession,user.getMe',
@@ -266,18 +255,6 @@ describe('verified scoped web authentication', () => {
     headers.set('X-KiloCode-OrganizationId', organizationId);
     mockHeaders.mockResolvedValue(headers);
     expect((await getIdentity()).status).toBe(403);
-  });
-  it('cannot reach direct REST credential mint paths even with a valid browser cookie', async () => {
-    const headers = bearer();
-    headers.set('cookie', 'next-auth.session-token=fixture');
-    headers.set('x-pathname', '/api/user');
-    mockHeaders.mockResolvedValue(headers);
-    const directMintRequest = new Request('https://kilo.ai/api/gastown/token', { method: 'POST' });
-    expect((await mintGastownToken(directMintRequest)).status).toBe(401);
-    expect((await mintWastelandToken(directMintRequest)).status).toBe(401);
-    expect(mockOrgMemberships).not.toHaveBeenCalled();
-    expect(mockGastownEnabled).not.toHaveBeenCalled();
-    expect(mockGetServerSession).not.toHaveBeenCalled();
   });
   it('rechecks scope expiry after awaiting current-user authorization', async () => {
     mockFindUser.mockImplementation(async () => {
@@ -433,11 +410,6 @@ describe('scope-preserving control token exchange', () => {
     expect(claims.runtimeAuthorization).toBeUndefined();
     expect(claims.isAdmin).toBeUndefined();
     expect(result.expiresAt).toBe(new Date(scope.expiresAt * 1000).toISOString());
-  });
-  it.each(['gastown', 'wasteland'] as const)('cannot mint %s control', async resource => {
-    await expect(
-      createControlTokenForRequest(user, resource, { headers: bearer() })
-    ).rejects.toMatchObject({ status: 403 });
   });
   it('cannot mint other delegations, change org, re-exchange control, or use stale principal', async () => {
     await expect(getResourceDelegationAuthority(user, { headers: bearer() })).rejects.toMatchObject(

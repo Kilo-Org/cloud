@@ -50,14 +50,6 @@ export type VercelProviderMetaData = {
   };
 };
 
-export type MaybeHasVercelProviderMetaData = {
-  choices?: {
-    message?: {
-      provider_metadata?: VercelProviderMetaData;
-    };
-  }[];
-};
-
 export type MaybeHasVercelProviderMetaDataChunk = {
   choices?: {
     delta?: { provider_metadata?: VercelProviderMetaData };
@@ -86,7 +78,8 @@ export type NotYetCostedUsageStats = {
   hasError: boolean;
   inference_provider: string | null;
   upstream_id: string | null;
-  finish_reason: string | null;
+  /** Unvalidated upstream value; `toInsertableDbUsageRecord` records a non-string as null. */
+  finish_reason: unknown;
   latency: number | null;
   moderation_latency: number | null;
   generation_time: number | null;
@@ -302,11 +295,4 @@ export type UsageMetaData = {
   is_free: boolean | null;
   abuse_delay: number | null;
   abuse_downgraded_from: string | null;
-};
-
-export type OpenRouterError = {
-  message: string;
-  code: number | string;
-  metadata?: Record<string, unknown>;
-  provider_name?: string;
 };

@@ -2374,6 +2374,132 @@
       "when": 1793899074271,
       "tag": "0338_support_access_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 339,
+      "version": "7",
+      "when": 1793911550611,
+      "tag": "0339_public_roland_deschain",
+      "breakpoints": true
+    },
+    {
+      "idx": 340,
+      "version": "7",
+      "when": 1793960900444,
+      "tag": "0340_cloud_agent_builtin_agent_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 341,
+      "version": "7",
+      "when": 1793981793196,
+      "tag": "0341_claude_billing_connections",
+      "breakpoints": true
+    },
+    {
+      "idx": 342,
+      "version": "7",
+      "when": 1794216638064,
+      "tag": "0342_ai_gateway_metadata_cache",
+      "breakpoints": true
+    },
+    {
+      "idx": 343,
+      "version": "7",
+      "when": 1794222552877,
+      "tag": "0343_enkrypt_usage_detectors_fired",
+      "breakpoints": true
+    },
+    {
+      "idx": 344,
+      "version": "7",
+      "when": 1794229727439,
+      "tag": "0344_open_jazinda",
+      "breakpoints": true
+    },
+    {
+      "idx": 345,
+      "version": "7",
+      "when": 1794239031730,
+      "tag": "0345_cloud_agent_stacked_workspaces",
+      "breakpoints": true
+    },
+    {
+      "idx": 346,
+      "version": "7",
+      "when": 1794304398824,
+      "tag": "0346_sour_the_fury",
+      "breakpoints": true
+    },
+    {
+      "idx": 347,
+      "version": "7",
+      "when": 1794316861530,
+      "tag": "0347_drop_models_by_provider_gateway_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 348,
+      "version": "7",
+      "when": 1794318065561,
+      "tag": "0348_sparkling_veda",
+      "breakpoints": true
+    },
+    {
+      "idx": 349,
+      "version": "7",
+      "when": 1794319425521,
+      "tag": "0349_pending_auth_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 350,
+      "version": "7",
+      "when": 1794328810920,
+      "tag": "0350_kiloclaw_stripe_renewal_batch_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 351,
+      "version": "7",
+      "when": 1794335141995,
+      "tag": "0351_byok_legacy_key_nullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 352,
+      "version": "7",
+      "when": 1794342041544,
+      "tag": "0352_worktree_pull_request_branch",
+      "breakpoints": true
+    },
+    {
+      "idx": 353,
+      "version": "7",
+      "when": 1794346750792,
+      "tag": "0353_claude_billing_connection_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 354,
+      "version": "7",
+      "when": 1794401099270,
+      "tag": "0354_enkrypt_usage_characters",
+      "breakpoints": true
+    },
+    {
+      "idx": 355,
+      "version": "7",
+      "when": 1794403587165,
+      "tag": "0355_container_usage_session_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 356,
+      "version": "7",
+      "when": 1794438103423,
+      "tag": "0356_drop_byok_legacy_encrypted_api_key",
+      "breakpoints": true
     }
   ]
 }

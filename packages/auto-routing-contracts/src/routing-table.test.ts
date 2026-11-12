@@ -163,6 +163,73 @@ describe('rankCandidates', () => {
     expect(ranked[0].estimatedRequestCostUsd).toBeCloseTo(0.032);
   });
 
+  it('charges cold prompt price for an actual request size, ignoring cache-read price', () => {
+    const candidates = [
+      {
+        ...rankInput('cheap-cache', 1, 0.01),
+        pricing: {
+          promptUsdPerToken: 0.002,
+          completionUsdPerToken: 0.003,
+          cacheReadUsdPerToken: 0.00001,
+        },
+      },
+      {
+        ...rankInput('cheap-prompt', 1, 0.02),
+        pricing: {
+          promptUsdPerToken: 0.0002,
+          completionUsdPerToken: 0.003,
+          cacheReadUsdPerToken: 0.01,
+        },
+      },
+    ];
+    expect(order(rankCandidates(candidates, 0.9))).toEqual(['cheap-cache', 'cheap-prompt']);
+    const ranked = rankCandidates(candidates, 0.9, { requestTokens: 100 });
+    expect(order(ranked)).toEqual(['cheap-prompt', 'cheap-cache']);
+    expect(ranked[0].estimatedRequestCostUsd).toBeCloseTo(0.04);
+    expect(ranked[1].estimatedRequestCostUsd).toBeCloseTo(0.21);
+  });
+
+  it('retains the published estimate for unpriced candidates at an actual request size', () => {
+    const ranked = rankCandidates(
+      [
+        { ...rankInput('unpriced', 1, 0.001), estimatedRequestCostUsd: 0.5 },
+        {
+          ...rankInput('priced', 1, 0.01),
+          pricing: {
+            promptUsdPerToken: 0.001,
+            completionUsdPerToken: 0.003,
+            cacheReadUsdPerToken: null,
+          },
+        },
+      ],
+      0.9,
+      { requestTokens: 100 }
+    );
+    expect(order(ranked)).toEqual(['priced', 'unpriced']);
+    expect(ranked[0].estimatedRequestCostUsd).toBeCloseTo(0.11);
+    expect(ranked[1].estimatedRequestCostUsd).toBe(0.5);
+  });
+
+  it('keeps a $0 candidate free at an actual request size', () => {
+    const ranked = rankCandidates(
+      [
+        rankInput('paid', 1, 0.0001, 500),
+        {
+          ...rankInput('free', 0.99, 0, 20_000),
+          pricing: {
+            promptUsdPerToken: 0,
+            completionUsdPerToken: 0,
+            cacheReadUsdPerToken: 0,
+          },
+        },
+      ],
+      0.95,
+      { requestTokens: 100_000 }
+    );
+    expect(order(ranked)).toEqual(['free', 'paid']);
+    expect(ranked[0].estimatedRequestCostUsd).toBe(0);
+  });
+
   it('falls back to observed cost without pricing and prompt price without cache pricing', () => {
     const ranked = rankCandidates(
       [

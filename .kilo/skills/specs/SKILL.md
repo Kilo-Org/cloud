@@ -14,7 +14,6 @@ to the user if instructions or changes will cause deviations from the original i
 | Spec | Governs |
 |---|---|
 | `.specs/cloud-agent-session.md` | Cloud Agent chat as the user sees it — start, preparation, turns, composer, workspace, persistence, errors; the oracle for manual e2e testing |
-| `.specs/gastown-usage-based-billing.md` | Gastown container pricing, payer attribution, metering lifecycle, and budget enforcement |
 | `.specs/kiloclaw-billing.md` | KiloClaw billing, pricing, invoicing, usage metering, payment flows |
 | `.specs/kiloclaw-billing-lifecycle.md` | KiloClaw billing lifecycle — credit-renewal orchestration safety |
 | `.specs/kiloclaw-composio.md` | KiloClaw Composio credential provisioning, injection, and sharing |

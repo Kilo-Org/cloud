@@ -1,7 +1,10 @@
 import { z } from 'zod';
-import { StoredModelSchema, type StoredModel } from '@kilocode/db';
 import type { CustomPricingConfig, PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type {
+  GatewayModelMap,
+  GatewayModelWithEndpoints,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import {
   getRawOpenRouterModels,
   pickerExtraModel,
@@ -76,7 +79,7 @@ function combineRates(a: TextPricingRates, b: TextPricingRates): TextPricingRate
 
 function pickerRequestPrice(
   modelId: string,
-  models: Record<string, StoredModel>,
+  models: GatewayModelMap,
   catalog: OpenRouterModel[],
   preferredProviderOrderConfig: PreferredProviderOrderConfig,
   customPricingConfig: CustomPricingConfig,
@@ -321,11 +324,8 @@ export async function enforceRequestCostLimit(
         getPreferredProviderOrderConfig(),
         getCustomPricingConfig(),
       ]);
-    const requestedMetadata = StoredModelSchema.safeParse(models[model]);
-    const aliasTarget =
-      model.startsWith('~') && requestedMetadata.success
-        ? requestedMetadata.data.alias_target?.slug
-        : undefined;
+    const requestedMetadata = Object.hasOwn(models, model) ? models[model] : undefined;
+    const aliasTarget = model.startsWith('~') ? requestedMetadata?.alias_target?.slug : undefined;
     const targetCatalogEntry = aliasTarget
       ? rawCatalog.data.find(entry => entry.id === aliasTarget)
       : undefined;
@@ -333,7 +333,7 @@ export async function enforceRequestCostLimit(
     if (
       !pickerExtraModel(model) &&
       !rawCatalog.data.some(entry => entry.id === model) &&
-      !requestedMetadata.success
+      !requestedMetadata
     )
       return refused('Current model pricing is unavailable for bounded spending');
     if (aliasTarget && !targetPickerExtra && !targetCatalogEntry)
@@ -433,7 +433,7 @@ function worstRates(rates: readonly (TextPricingRates | null)[]): TextPricingRat
  * cannot price every one of them.
  */
 function storedModelWorstRates(
-  metadata: StoredModel,
+  metadata: GatewayModelWithEndpoints,
   customPricingConfig: CustomPricingConfig
 ): TextPricingRates | null {
   const routes = worstRates(
@@ -463,7 +463,7 @@ export const SYSTEM_ONE_MAX_OUTPUT_TOKENS = 16_384;
  * for the answer generation each model also prices.
  */
 export function systemOneRequestCostBound(
-  metadata: StoredModel,
+  metadata: GatewayModelWithEndpoints,
   request: { state: unknown; questions: Record<string, unknown> },
   customPricingConfig: CustomPricingConfig
 ): number | null {

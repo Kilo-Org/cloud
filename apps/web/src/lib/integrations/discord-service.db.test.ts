@@ -7,6 +7,7 @@ import { withWorkspaceInstallationLock } from './oauth/workspace-installation-lo
 import {
   DiscordGuildAlreadyConnectedError,
   DiscordGuildRebindNotAllowedError,
+  getInstallation,
   getInstallationByGuildId,
   getOwnerFromInstallation,
   upsertDiscordInstallation,
@@ -15,6 +16,34 @@ import {
 jest.mock('@/lib/slack-bot/model-allow-list', () => ({
   getDefaultAllowedModel: jest.fn(async () => 'test-model'),
 }));
+
+/**
+ * Persists a connection row directly, in either identifier shape the service
+ * reads: with the server in both columns, or only in `platform_account_id`.
+ */
+async function insertDiscordRow(
+  owner: Owner,
+  guild: { id: string; name: string; icon: string | null },
+  { installationId = guild.id }: { installationId?: string | null } = {}
+): Promise<string> {
+  const [row] = await db
+    .insert(platform_integrations)
+    .values({
+      owned_by_user_id: owner.type === 'user' ? owner.id : null,
+      owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+      platform: PLATFORM.DISCORD,
+      integration_type: 'oauth',
+      platform_installation_id: installationId,
+      platform_account_id: guild.id,
+      platform_account_login: guild.name,
+      scopes: ['bot', 'guilds'],
+      integration_status: 'active',
+      metadata: { guild_icon: guild.icon },
+    })
+    .returning({ id: platform_integrations.id });
+
+  return row.id;
+}
 
 describe('Discord installation lifecycle', () => {
   const userId = crypto.randomUUID();
@@ -155,6 +184,156 @@ describe('Discord installation lifecycle', () => {
           )
         );
       expect(rows).toHaveLength(0);
+    } finally {
+      await db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, otherOrgId));
+      await db.delete(organizations).where(eq(organizations.id, otherOrgId));
+    }
+  });
+
+  it('refuses a server another owner keeps without the canonical column', async () => {
+    const otherOrgId = crypto.randomUUID();
+    await db.insert(organizations).values({ id: otherOrgId, name: 'Discord Legacy' });
+    const guild = { id: '789012345678901234', name: 'Legacy Server', icon: null };
+
+    try {
+      await insertDiscordRow({ type: 'org', id: otherOrgId }, guild, { installationId: null });
+
+      await expect(
+        upsertDiscordInstallation(
+          { type: 'org', id: orgId },
+          {
+            access_token: 'test-access',
+            refresh_token: 'test-refresh',
+            token_type: 'Bearer',
+            expires_in: 3600,
+            scope: 'bot guilds',
+            guild,
+          },
+          { allowGuildRebind: true }
+        )
+      ).rejects.toThrow(DiscordGuildAlreadyConnectedError);
+
+      const legacy = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, otherOrgId));
+      expect(legacy).toHaveLength(1);
+      expect(legacy[0].platform_installation_id).toBeNull();
+      expect(legacy[0].platform_account_id).toBe(guild.id);
+
+      const claimed = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, orgId));
+      expect(claimed).toHaveLength(0);
+    } finally {
+      await db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, otherOrgId));
+      await db.delete(organizations).where(eq(organizations.id, otherOrgId));
+    }
+  });
+
+  it('resolves events for a server kept without the canonical column', async () => {
+    const owner: Owner = { type: 'user', id: userId };
+    const guild = { id: '890123456789012345', name: 'Account Column Server', icon: null };
+
+    await insertDiscordRow(owner, guild, { installationId: null });
+
+    const installation = await getInstallationByGuildId(guild.id);
+    expect(installation && getOwnerFromInstallation(installation)).toEqual(owner);
+    expect(installation?.platform_installation_id).toBeNull();
+  });
+
+  it('keeps the canonical row for a server ahead of an account-column row', async () => {
+    const otherOrgId = crypto.randomUUID();
+    await db.insert(organizations).values({ id: otherOrgId, name: 'Discord Stale' });
+    const guild = { id: '901234567890123456', name: 'Canonical Server', icon: null };
+    const response = {
+      access_token: 'test-access',
+      refresh_token: 'test-refresh',
+      token_type: 'Bearer',
+      expires_in: 3600,
+      scope: 'bot guilds',
+      guild,
+    };
+
+    try {
+      const canonical = await upsertDiscordInstallation({ type: 'org', id: orgId }, response);
+      await insertDiscordRow({ type: 'org', id: otherOrgId }, guild, { installationId: null });
+
+      const installation = await getInstallationByGuildId(guild.id);
+      expect(installation?.id).toBe(canonical.id);
+
+      const updated = await upsertDiscordInstallation({ type: 'org', id: orgId }, response, {
+        allowGuildRebind: true,
+      });
+      expect(updated.id).toBe(canonical.id);
+    } finally {
+      await db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, otherOrgId));
+      await db.delete(organizations).where(eq(organizations.id, otherOrgId));
+    }
+  });
+
+  it('updates the row that carries the server in the installation column', async () => {
+    const owner: Owner = { type: 'org', id: orgId };
+    const guild = { id: '131234567890123456', name: 'Canonical Update Server', icon: null };
+    const response = {
+      access_token: 'test-access',
+      refresh_token: 'test-refresh',
+      token_type: 'Bearer',
+      expires_in: 3600,
+      scope: 'bot guilds',
+      guild,
+    };
+
+    // Both identifier shapes exist for one connection, the account-column row first.
+    await insertDiscordRow(owner, guild, { installationId: null });
+    const canonicalId = await insertDiscordRow(owner, guild);
+
+    expect((await getInstallation(owner))?.id).toBe(canonicalId);
+
+    const updated = await upsertDiscordInstallation(owner, response, { allowGuildRebind: true });
+
+    expect(updated.id).toBe(canonicalId);
+    expect(updated.platform_installation_id).toBe(guild.id);
+    const rows = await db
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, orgId));
+    expect(rows).toHaveLength(2);
+  });
+
+  it('connects an unrelated server while another owner holds a different one', async () => {
+    const otherOrgId = crypto.randomUUID();
+    await db.insert(organizations).values({ id: otherOrgId, name: 'Discord Elsewhere' });
+
+    try {
+      await insertDiscordRow(
+        { type: 'org', id: otherOrgId },
+        { id: '112345678901234567', name: 'Elsewhere Server', icon: null },
+        { installationId: null }
+      );
+
+      const created = await upsertDiscordInstallation(
+        { type: 'org', id: orgId },
+        {
+          access_token: 'test-access',
+          refresh_token: 'test-refresh',
+          token_type: 'Bearer',
+          expires_in: 3600,
+          scope: 'bot guilds',
+          guild: { id: '122345678901234567', name: 'Own Server', icon: null },
+        },
+        { allowGuildRebind: true }
+      );
+
+      expect(created.platform_installation_id).toBe('122345678901234567');
+      expect((await getInstallationByGuildId('122345678901234567'))?.id).toBe(created.id);
     } finally {
       await db
         .delete(platform_integrations)

@@ -48,6 +48,23 @@ const actorUserId = 'user-1';
 
 type Call = { url: URL; init: RequestInit };
 
+/**
+ * Records the waits the client schedules between attempts, and runs each one at once, so the
+ * retry sequence is visible without spending its delay.
+ */
+function recordRetryWaits() {
+  const waits: number[] = [];
+  const spy = jest.spyOn(global, 'setTimeout').mockImplementation(((
+    callback: () => void,
+    ms?: number
+  ) => {
+    waits.push(ms ?? 0);
+    callback();
+    return 0;
+  }) as unknown as typeof setTimeout);
+  return { waits, restore: () => spy.mockRestore() };
+}
+
 function installFakeKms() {
   const calls: Call[] = [];
   const dataKeys = new Map<string, { dataKey: string; context: ByokKmsContext }>();
@@ -112,14 +129,14 @@ afterEach(() => {
 });
 
 describe('byok kms client', () => {
-  test('returns null when the service is not configured', async () => {
+  test('refuses to encrypt when the service is not configured', async () => {
     delete process.env.BYOK_KMS_SERVICE_URL;
     const { fakeFetch } = installFakeKms();
 
-    expect(getByokKmsClientConfig()).toBeNull();
+    expect(() => getByokKmsClientConfig()).toThrow('BYOK_KMS_SERVICE_URL is required');
     await expect(
       encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
-    ).resolves.toBeNull();
+    ).rejects.toThrow('BYOK_KMS_SERVICE_URL is required');
     expect(fakeFetch).not.toHaveBeenCalled();
   });
 
@@ -159,7 +176,6 @@ describe('byok kms client', () => {
     const { calls } = installFakeKms();
 
     const dataKey = await createByokDataKey({ context, actorUserId });
-    if (!dataKey) throw new Error('expected data key');
     expect(calls).toHaveLength(1);
     expect(JSON.parse(String(calls[0].init.body))).toEqual({
       ...context,
@@ -176,7 +192,9 @@ describe('byok kms client', () => {
     delete process.env.BYOK_KMS_SERVICE_URL;
     const { fakeFetch } = installFakeKms();
 
-    await expect(createByokDataKey({ context, actorUserId })).resolves.toBeNull();
+    await expect(createByokDataKey({ context, actorUserId })).rejects.toThrow(
+      'BYOK_KMS_SERVICE_URL is required'
+    );
     expect(fakeFetch).not.toHaveBeenCalled();
   });
 
@@ -193,7 +211,6 @@ describe('byok kms client', () => {
       context: orgContext,
       actorUserId,
     });
-    if (!envelope) throw new Error('expected envelope');
 
     await expect(decryptByokEnvelope(envelope, orgContext)).resolves.toBe('sk-secret');
 
@@ -215,7 +232,6 @@ describe('byok kms client', () => {
   test('never sends the BYOK key or its envelope ciphertext to the service', async () => {
     const { calls } = installFakeKms();
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
     await decryptByokEnvelope(envelope, context);
 
     for (const call of calls) {
@@ -228,7 +244,6 @@ describe('byok kms client', () => {
   test('fails to decrypt with a mismatched context', async () => {
     installFakeKms();
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
 
     await expect(
       decryptByokEnvelope(envelope, { ...context, provider_id: 'openai' })
@@ -238,7 +253,6 @@ describe('byok kms client', () => {
   test('fails to decrypt when the key id differs from the one the data key was created for', async () => {
     installFakeKms();
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
 
     await expect(decryptByokEnvelope(envelope, { ...context, key_id: 'key-9' })).rejects.toThrow(
       'status 400'
@@ -295,11 +309,22 @@ describe('byok kms client', () => {
       });
     });
     global.fetch = fetchMock as unknown as typeof fetch;
+    const { waits, restore } = recordRetryWaits();
 
-    const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
+    try {
+      const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
 
-    expect(envelope?.wrapped_dek).toBe('wrapped-after-retries');
-    expect(fetchMock).toHaveBeenCalledTimes(KMS_MAX_ATTEMPTS);
+      expect(envelope?.wrapped_dek).toBe('wrapped-after-retries');
+      expect(fetchMock).toHaveBeenCalledTimes(KMS_MAX_ATTEMPTS);
+      // The base delay grows with the attempt, plus jitter below one base delay.
+      expect(waits).toHaveLength(KMS_MAX_ATTEMPTS - 1);
+      expect(waits[0]).toBeGreaterThanOrEqual(100);
+      expect(waits[0]).toBeLessThan(200);
+      expect(waits[1]).toBeGreaterThanOrEqual(200);
+      expect(waits[1]).toBeLessThan(300);
+    } finally {
+      restore();
+    }
   });
 
   test('retries the transient 4xx answers 408 and 429', async () => {
@@ -338,13 +363,18 @@ describe('byok kms client', () => {
       });
     });
     global.fetch = fetchMock as unknown as typeof fetch;
+    const { waits, restore } = recordRetryWaits();
 
-    const started = Date.now();
-    const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
+    try {
+      const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
 
-    expect(envelope?.wrapped_dek).toBe('wrapped-after-hint');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(Date.now() - started).toBeGreaterThanOrEqual(900);
+      expect(envelope?.wrapped_dek).toBe('wrapped-after-hint');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      // The header asks for one second, which is longer than the base delay for attempt one.
+      expect(waits).toEqual([1_000]);
+    } finally {
+      restore();
+    }
   });
 
   test('fails at once when Retry-After asks for longer than the time budget', async () => {
@@ -352,21 +382,35 @@ describe('byok kms client', () => {
       async () => new Response('{}', { status: 429, headers: { 'retry-after': '30' } })
     );
     global.fetch = fetchMock as unknown as typeof fetch;
+    const { waits, restore } = recordRetryWaits();
 
-    await expect(
-      encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
-    ).rejects.toThrow('status 429');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    try {
+      await expect(
+        encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
+      ).rejects.toThrow('status 429');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      // The hint reaches past the budget, so the call fails without waiting for it.
+      expect(waits).toEqual([]);
+    } finally {
+      restore();
+    }
   });
 
   test('gives up after the last attempt and throws the final status', async () => {
     const fetchMock = jest.fn(async () => new Response('nope', { status: 503 }));
     global.fetch = fetchMock as unknown as typeof fetch;
+    const { waits, restore } = recordRetryWaits();
 
-    await expect(
-      encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
-    ).rejects.toThrow('status 503');
-    expect(fetchMock).toHaveBeenCalledTimes(KMS_MAX_ATTEMPTS);
+    try {
+      await expect(
+        encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
+      ).rejects.toThrow('status 503');
+      expect(fetchMock).toHaveBeenCalledTimes(KMS_MAX_ATTEMPTS);
+      // Two retries are issued and the third failure ends the sequence without a wait.
+      expect(waits).toHaveLength(KMS_MAX_ATTEMPTS - 1);
+    } finally {
+      restore();
+    }
   });
 
   test('retries a timeout and a network failure before returning a data key', async () => {
@@ -448,7 +492,6 @@ describe('byok kms client', () => {
   test('envelope decrypt fails when the service is not configured', async () => {
     installFakeKms();
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
     delete process.env.BYOK_KMS_SERVICE_URL;
 
     await expect(decryptByokEnvelope(envelope, context)).rejects.toThrow('BYOK_KMS_SERVICE_URL');
@@ -457,7 +500,6 @@ describe('byok kms client', () => {
   test('stored envelope is decryptable with the data key returned by the service', async () => {
     const { fakeFetch } = installFakeKms();
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
 
     const response = await fakeFetch('http://kms.test/decrypt', {
       method: 'POST',
@@ -479,7 +521,6 @@ describe('byok data key cache', () => {
 
   async function storedEnvelope(apiKey = 'sk-secret') {
     const envelope = await encryptByokForStorage({ apiKey, context, actorUserId });
-    if (!envelope) throw new Error('expected envelope');
     return envelope;
   }
 

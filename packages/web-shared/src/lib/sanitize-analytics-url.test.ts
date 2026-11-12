@@ -27,6 +27,29 @@ describe('sanitizeAnalyticsUrl', () => {
     ).toBe('https://app.kilo.ai/users/sign_in?foo=bar');
   });
 
+  it('removes sensitive query params from the page a sign-in returns to', () => {
+    const callbackPath = '/pages-auth?audience=pages&state=secret#top';
+
+    expect(
+      sanitizeAnalyticsUrl(
+        'https://app.kilo.ai',
+        '/users/sign_in',
+        new URLSearchParams({ callbackPath, foo: 'bar' }).toString()
+      )
+    ).toBe(
+      `https://app.kilo.ai/users/sign_in?${new URLSearchParams({
+        callbackPath: '/pages-auth?audience=pages#top',
+        foo: 'bar',
+      }).toString()}`
+    );
+  });
+
+  it('keeps a sign-in return path that has no query', () => {
+    expect(
+      sanitizeAnalyticsUrl('https://app.kilo.ai', '/users/sign_in', 'callbackPath=%2Fcloud')
+    ).toBe('https://app.kilo.ai/users/sign_in?callbackPath=%2Fcloud');
+  });
+
   it('preserves non-sensitive query params', () => {
     expect(sanitizeAnalyticsUrl('https://app.kilo.ai', '/credits', 'tab=usage&page=2')).toBe(
       'https://app.kilo.ai/credits?tab=usage&page=2'

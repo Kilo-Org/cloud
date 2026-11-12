@@ -2,6 +2,10 @@ import { GetObjectCommand, NoSuchKey, PutObjectCommand, type S3Client } from '@a
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { ApiRequestLog } from '@kilocode/db/schema';
+import {
+  EnkryptScanKindSchema,
+  EnkryptScanPartSchema,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { createR2Client } from '@kilocode/web-shared/lib/r2/create-client';
 
@@ -10,9 +14,12 @@ export type ApiRequestLogBlobUpload = {
   uploadError: string | null;
 };
 
-export const enkryptRequestLogSchema = z.object({
+const enkryptRequestLogSchema = z.object({
   guardrail: z.enum(['input', 'output']),
-  scan: z.enum(['blocking', 'log_only']),
+  scan: EnkryptScanKindSchema,
+  part: EnkryptScanPartSchema,
+  /** Which of the input part's chunks the call scanned; each chunk is scanned by its own calls. */
+  chunk: z.object({ index: z.number(), count: z.number() }).optional(),
   request: z.object({
     text: z.string(),
     detectors: z.record(z.string(), z.unknown()),
@@ -30,7 +37,13 @@ export const apiRequestLogBlobSchema = z.object({
   version: z.literal(1),
   request: z.record(z.string(), z.unknown()),
   response: z.string().nullable(),
-  enkrypt: z.array(enkryptRequestLogSchema).optional(),
+  enkrypt: z
+    .array(
+      // Blobs written before scans were split into parts have no `part`, but still hold the
+      // request and response bodies.
+      enkryptRequestLogSchema.extend({ part: enkryptRequestLogSchema.shape.part.optional() })
+    )
+    .optional(),
 });
 
 type ApiRequestLogStorage = { client: S3Client; bucket: string };

@@ -26,6 +26,7 @@ jest.mock('@/lib/integrations/linear-service', () => ({
   fetchLinearOAuthIdentity: jest.fn(),
   getConflictingLinearInstallation: jest.fn(),
   LinearWorkspaceAlreadyConnectedError: class LinearWorkspaceAlreadyConnectedError extends Error {},
+  retirePreviousLinearWorkspace: jest.fn(async () => undefined),
   revokeLinearToken: jest.fn(),
   upsertLinearInstallation: jest.fn(),
 }));

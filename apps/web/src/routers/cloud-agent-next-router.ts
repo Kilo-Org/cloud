@@ -12,8 +12,7 @@ import { releaseRefusedSend } from '@/lib/cloud-agent-next/release-refused-send'
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
-import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
-import type { User } from '@kilocode/db/schema';
+import { createCloudAgentControlToken } from '@/lib/cloud-agent-next/request-control-token';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import { resolveGitHubIntegrationIdForRepository } from '@/lib/cloud-agent/github-integration-resolution';
 import {
@@ -27,6 +26,13 @@ import {
   ProviderBranchListingSchema,
   repositoryFullNameSchema,
 } from '@/lib/cloud-agent/provider-branch-listing';
+import {
+  assertSuppliedRepositoryMatchesParent,
+  resolveStackedWorkspacePreparation,
+  resolveStackedWorkspaceSource,
+  type StackedWorkspaceRepository,
+} from '@/lib/cloud-agent/stacked-workspace-preparation';
+import { runWorktreeBranchOperation } from '@/lib/cloud-agent/worktree-branch-operations';
 import {
   personalPrepareSessionNextSchema,
   basePrepareSessionNextOutputSchema,
@@ -47,10 +53,18 @@ import {
   baseGetEgressAuditNextOutputSchema,
   baseGetSessionMessagesPageNextSchema,
   baseGetSessionMessagesPageNextOutputSchema,
+  baseGetSessionToolPartDetailNextSchema,
+  baseGetSessionToolPartDetailNextOutputSchema,
   baseGetSandboxStatusNextSchema,
   baseGetSandboxStatusNextOutputSchema,
   baseGetPendingInteractionsNextSchema,
   baseGetPendingInteractionsNextOutputSchema,
+  baseGetStackedWorkspaceSourceNextSchema,
+  baseStackedWorkspaceSourceNextOutputSchema,
+  baseSyncWorktreeBranchNextSchema,
+  baseSyncWorktreeBranchNextOutputSchema,
+  baseRestackWorktreeBranchNextSchema,
+  baseRestackWorktreeBranchNextOutputSchema,
   baseWorktreeChangesNextSchema,
   baseWorktreeFileNextSchema,
   baseAnswerQuestionNextSchema,
@@ -68,6 +82,9 @@ import {
   baseCreatePreviewNextOutputSchema,
   basePreviewOptionsNextOutputSchema,
   basePreviewOptionsNextSchema,
+  previewTargetFromInput,
+  baseListPreviewServicesNextOutputSchema,
+  baseListPreviewServicesNextSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
   cloudAgentReleasePendingUploadsSchema,
@@ -84,6 +101,7 @@ import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { signPreviewTicket, signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
 import { buildPreviewOpenUrl, buildPreviewUrlTemplate } from '@/lib/cloud-agent/preview-open-url';
+import { verifyUserOwnsPreviewWorktree } from '@/lib/cloud-agent-next/preview-worktree-access';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
@@ -158,15 +176,6 @@ async function assertUserOwnsSession(
   }
 }
 
-async function createCloudAgentControlToken(user: User, headersList?: Headers): Promise<string> {
-  return (
-    await createControlTokenForRequest(user, 'cloud-agent-next', {
-      headers: headersList,
-      tokenSource: 'cloud-agent',
-    })
-  ).token;
-}
-
 /**
  * Cloud Agent Next Router (Personal Context)
  *
@@ -221,9 +230,21 @@ export const cloudAgentNextRouter = createTRPCRouter({
         githubRepo,
         githubIntegrationId,
         publicRepoUrl,
+        baseBranch,
+        stackOnWorktreeId,
         attachments,
         ...restInput
       } = input;
+
+      const stackedParent =
+        stackOnWorktreeId === undefined
+          ? undefined
+          : await resolveStackedWorkspaceSource({
+              db,
+              client,
+              userId: ctx.user.id,
+              worktreeId: stackOnWorktreeId,
+            });
 
       // Tokens are resolved inside cloud-agent-next via GIT_TOKEN_SERVICE.
       // Profile resolution (repo binding + default + explicit override) also
@@ -233,13 +254,56 @@ export const cloudAgentNextRouter = createTRPCRouter({
         githubRepo?: string;
         githubIntegrationId?: string;
         gitUrl?: string;
-        platform?: 'github' | 'gitlab';
+        platform?: 'github' | 'gitlab' | 'bitbucket';
+        bitbucketWorkspaceUuid?: string;
+        bitbucketRepositoryUuid?: string;
       };
+      let repository: StackedWorkspaceRepository | undefined;
 
-      if (gitlabProject) {
+      if (stackedParent) {
+        assertSuppliedRepositoryMatchesParent({
+          supplied: { githubRepo, githubIntegrationId, gitlabProject, publicRepoUrl },
+          parent: stackedParent,
+        });
+        const parent = stackedParent.repository;
+        repository = parent;
+        if (parent.platform === 'github') {
+          gitParams = {
+            githubRepo: parent.fullName,
+            githubIntegrationId: parent.githubIntegrationId,
+            platform: PLATFORM.GITHUB,
+          };
+        } else if (parent.platform === 'gitlab') {
+          gitParams = { gitUrl: parent.canonicalUrl, platform: PLATFORM.GITLAB };
+        } else if (parent.platform === 'bitbucket') {
+          const bitbucket = stackedParent.source.providerInput.bitbucketRepo;
+          if (!bitbucket) {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'That workspace has no Bitbucket repository identity to copy.',
+            });
+          }
+          gitParams = {
+            gitUrl: parent.canonicalUrl,
+            platform: PLATFORM.BITBUCKET,
+            bitbucketWorkspaceUuid: bitbucket.workspaceUuid,
+            bitbucketRepositoryUuid: bitbucket.repositoryUuid,
+          };
+        } else {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'That workspace has no provider branch to stack on.',
+          });
+        }
+      } else if (gitlabProject) {
         const instanceUrl = await getGitLabInstanceUrlForUser(ctx.user.id);
         const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
         gitParams = { gitUrl, platform: PLATFORM.GITLAB };
+        repository = {
+          platform: 'gitlab',
+          fullName: gitlabProject,
+          canonicalUrl: gitUrl,
+        };
       } else if (publicRepoUrl) {
         if (!isPublicRepoUrlEnabled()) {
           throw new TRPCError({
@@ -248,6 +312,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
           });
         }
         gitParams = { gitUrl: publicRepoUrl };
+        repository = { platform: 'git', fullName: publicRepoUrl, canonicalUrl: publicRepoUrl };
       } else {
         // The runtime's repository preflight runs only when the request names
         // the integration that owns the repository, so resolve it for the
@@ -267,7 +332,28 @@ export const cloudAgentNextRouter = createTRPCRouter({
           githubIntegrationId: resolvedIntegrationId ?? undefined,
           platform: PLATFORM.GITHUB,
         };
+        if (githubRepo) {
+          repository = {
+            platform: 'github',
+            fullName: githubRepo,
+            canonicalUrl: `https://github.com/${githubRepo}`,
+            ...(resolvedIntegrationId ? { githubIntegrationId: resolvedIntegrationId } : {}),
+          };
+        }
       }
+
+      // Every provider read that can refuse the create runs before attachment
+      // rows are linked, so a refusal never strands uploaded objects.
+      const stackedFields = await resolveStackedWorkspacePreparation({
+        db,
+        client,
+        userId: ctx.user.id,
+        ...(stackOnWorktreeId !== undefined ? { stackOnWorktreeId } : {}),
+        ...(baseBranch !== undefined ? { baseBranch } : {}),
+        ...(input.upstreamBranch !== undefined ? { upstreamBranch: input.upstreamBranch } : {}),
+        ...(repository ? { repository } : {}),
+        ...(stackedParent ? { parent: stackedParent } : {}),
+      });
 
       let linkedObjectKeys: string[] = [];
       try {
@@ -284,6 +370,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
         return await client.prepareSession({
           ...restInput,
           ...gitParams,
+          ...stackedFields,
           attachments,
           createdOnPlatform: 'cloud-agent-web',
           githubAccessPurpose: 'agent',
@@ -372,21 +459,14 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId, input.expectedWorktreeId);
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
-      // Prompt turns carry their own model; command turns run the session's
-      // stored model, so resolve it to apply the same free/BYOK eligibility
-      // to every follow-up that queues a model-using turn. If the worker
-      // can't return the session model, fall back to the balance-checked
-      // client (the safe default) rather than failing the mutation on a
-      // read-side error.
-      let modelId: string | undefined;
-      if (input.payload.type === 'prompt') {
-        modelId = input.payload.model;
-      } else {
+      let modelId = input.payload.model;
+      if (modelId === undefined) {
         try {
           modelId = (
             await createCloudAgentNextClient(authToken).getSession(input.cloudAgentSessionId)
           ).model;
         } catch {
+          // A failed fallback read must not bypass balance checks.
           modelId = undefined;
         }
       }
@@ -494,6 +574,51 @@ export const cloudAgentNextRouter = createTRPCRouter({
       return await client.getWorktreeFile(input);
     }),
 
+  getStackedWorkspaceSource: baseProcedure
+    .input(baseGetStackedWorkspaceSourceNextSchema)
+    .output(baseStackedWorkspaceSourceNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const client = createCloudAgentNextClient(authToken);
+      const parent = await resolveStackedWorkspaceSource({
+        db,
+        client,
+        userId: ctx.user.id,
+        worktreeId: input.worktreeId,
+      });
+      return parent.source;
+    }),
+
+  syncWorktreeBranch: baseProcedure
+    .input(baseSyncWorktreeBranchNextSchema)
+    .output(baseSyncWorktreeBranchNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const client = createCloudAgentNextClient(authToken);
+      return await runWorktreeBranchOperation({
+        db,
+        client,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        operation: 'sync',
+      });
+    }),
+
+  restackWorktreeBranch: baseProcedure
+    .input(baseRestackWorktreeBranchNextSchema)
+    .output(baseRestackWorktreeBranchNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const client = createCloudAgentNextClient(authToken);
+      return await runWorktreeBranchOperation({
+        db,
+        client,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        operation: 'restack',
+      });
+    }),
+
   createTerminal: baseProcedure
     .input(baseCreateTerminalNextSchema)
     .output(baseCreateTerminalNextOutputSchema)
@@ -524,29 +649,50 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseCreatePreviewNextSchema)
     .output(baseCreatePreviewNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const target = previewTargetFromInput(input);
+      if (target === null) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'A preview target is required' });
+      }
+
+      if (target.worktreeId !== undefined) {
+        const ownsWorktree = await verifyUserOwnsPreviewWorktree(
+          db,
+          ctx.user.id,
+          target.worktreeId
+        );
+        if (!ownsWorktree) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Worktree not found or access denied',
+          });
+        }
+      } else if (target.cloudAgentSessionId !== undefined) {
+        await assertUserOwnsSession(ctx.user.id, target.cloudAgentSessionId);
+      }
 
       const { ticket, expiresAt } = signPreviewTicket({
         userId: ctx.user.id,
-        cloudAgentSessionId: input.cloudAgentSessionId,
         port: input.port,
+        ...target,
       });
       return { url: buildPreviewOpenUrl(ticket, input.path), expiresAt };
     }),
 
   /**
    * Whether the Worker shows preview for this session, and the preview URL with
-   * a `{port}` placeholder. The Worker owns both preview switches. This is only
+   * a `{port}` placeholder. The Worker owns preview availability. This is only
    * a UI gate, so a Worker failure hides preview instead of failing the query.
    */
   getPreviewOptions: baseProcedure
     .input(basePreviewOptionsNextSchema)
     .output(basePreviewOptionsNextOutputSchema)
     .query(async ({ ctx, input }) => {
+      const target = previewTargetFromInput(input);
+      if (target === null) return { enabled: false };
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
       const options = await createCloudAgentNextClient(authToken)
         .getPreviewOptions({
-          cloudAgentSessionId: input.cloudAgentSessionId,
+          ...target,
           organizationId: input.organizationId,
         })
         .catch((error: unknown) => {
@@ -557,6 +703,37 @@ export const cloudAgentNextRouter = createTRPCRouter({
         });
       if (!options.enabled) return { enabled: false };
       return { enabled: true, urlTemplate: buildPreviewUrlTemplate(options.hostTemplate) };
+    }),
+
+  /**
+   * List the live services a preview can open for an owned session. Unlike the
+   * cached availability gate above, this read is on demand and its failures
+   * propagate: a failed scan must not look like "no services".
+   */
+  listPreviewServices: baseProcedure
+    .input(baseListPreviewServicesNextSchema)
+    .output(baseListPreviewServicesNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      const target = previewTargetFromInput(input);
+      if (target === null)
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing preview target' });
+      if (target.worktreeId !== undefined) {
+        const ownsWorktree = await verifyUserOwnsPreviewWorktree(
+          db,
+          ctx.user.id,
+          target.worktreeId
+        );
+        if (!ownsWorktree) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Worktree not found or access denied',
+          });
+        }
+      } else if (target.cloudAgentSessionId !== undefined) {
+        await assertUserOwnsSession(ctx.user.id, target.cloudAgentSessionId);
+      }
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      return await createCloudAgentNextClient(authToken).listPreviewServices(target);
     }),
 
   refreshTerminalTicket: baseProcedure
@@ -667,6 +844,40 @@ export const cloudAgentNextRouter = createTRPCRouter({
     }),
 
   /**
+   * The capture time of the session's workspace snapshot, or null when the
+   * workspace has none. A non-null value is what makes "Start fresh" available
+   * on the failure state of a workspace snapshot start.
+   */
+  getWorkspaceSnapshotRecovery: baseProcedure
+    .input(z.object({ sessionId: z.string().min(1) }).strict())
+    .output(
+      z.union([z.object({ capturedAt: z.number().int().nonnegative().nullable() }), z.null()])
+    )
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList)
+      );
+      return await client.getWorkspaceSnapshotRecovery(input.sessionId);
+    }),
+
+  /**
+   * Remove the session's workspace snapshot so its next start uses the
+   * environment snapshot or the base image. Only an explicit user action may
+   * discard the workspace changes made since the snapshot was captured.
+   */
+  removeWorkspaceSnapshot: baseProcedure
+    .input(z.object({ sessionId: z.string().min(1) }).strict())
+    .output(z.object({ success: z.literal(true) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList)
+      );
+      return await client.removeWorkspaceSnapshot(input.sessionId);
+    }),
+
+  /**
    * Cancel one queued (not yet accepted) message by id. Never interrupts the
    * active run; a missing id or the accepted current message returns
    * `{ dropped: false }`.
@@ -720,8 +931,10 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseGetSessionNextSchema)
     .output(baseGetSessionNextOutputSchema)
     .query(async ({ ctx, input }) => {
-      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
-      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const [, authToken] = await Promise.all([
+        assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId),
+        createCloudAgentControlToken(ctx.user, ctx.headersList),
+      ]);
       const client = createCloudAgentNextClient(authToken);
 
       return await client.getSession(input.cloudAgentSessionId);
@@ -744,6 +957,16 @@ export const cloudAgentNextRouter = createTRPCRouter({
       await assertUserOwnsSession(ctx.user.id, input.sessionId);
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
       return createCloudAgentNextClient(authToken).getSessionMessagesPage(input);
+    }),
+
+  /** Complete stored details for an expanded tool preview; authorized on every read. */
+  getSessionToolPartDetail: baseProcedure
+    .input(baseGetSessionToolPartDetailNextSchema)
+    .output(baseGetSessionToolPartDetailNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      return createCloudAgentNextClient(authToken).getSessionToolPartDetail(input);
     }),
 
   getSandboxStatus: baseProcedure

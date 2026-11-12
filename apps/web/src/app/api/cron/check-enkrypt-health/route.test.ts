@@ -328,8 +328,16 @@ describe('GET /api/cron/check-enkrypt-health', () => {
     expect(vercelConfig.crons.filter(cron => cron.path.includes('enkrypt'))).toEqual([
       { path: '/api/cron/sync-enkrypt', schedule: '0 4 * * *' },
     ]);
-    expect(vercelConfig.crons.filter(cron => cron.path === '/api/cron/sync-model-stats')).toEqual([
-      { path: '/api/cron/sync-model-stats', schedule: '0 */6 * * *' },
-    ]);
+    expect(
+      Object.values(vercelConfig.schedules).filter(schedule => schedule.path.includes('enkrypt'))
+    ).toEqual([]);
+    expect(vercelConfig.crons.filter(cron => cron.path === '/api/cron/sync-model-stats')).toEqual(
+      []
+    );
+    expect(vercelConfig.schedules['sync-model-stats']).toEqual({
+      schedule: '0 */6 * * *',
+      path: '/api/cron/sync-model-stats',
+      requestMethod: 'GET',
+    });
   });
 });

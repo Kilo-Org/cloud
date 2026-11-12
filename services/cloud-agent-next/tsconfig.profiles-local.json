@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["worker-configuration.d.ts", "test/e2e/profiles-local.ts"]
+}

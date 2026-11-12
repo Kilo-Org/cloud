@@ -18,6 +18,10 @@ import {
 } from '../part-content';
 import { MessageErrorBoundary } from '../MessageErrorBoundary';
 import { isPartStreaming } from '../types';
+import { getToolActivity } from '../toolCardUtils';
+import { getVisibleAssistantParts } from '../message-presentation';
+import { groupAssistantParts, summarizeAgentWork } from '../shared-transcript-presentation';
+import { AgentWorkGroup } from './AgentWorkGroup';
 import { CloudToolRenderer } from './CloudToolRenderer';
 import {
   useCloudMessagePresentation,
@@ -95,8 +99,42 @@ function renderCloudPart({ part }: { part: EnrichedPartState }) {
   }
 }
 
-export function CloudMessageParts() {
-  return <MessagePrimitive.Parts>{renderCloudPart}</MessagePrimitive.Parts>;
+export function CloudMessageParts({ collapseTools = false }: { collapseTools?: boolean }) {
+  const presentation = useCloudMessagePresentation();
+  if (!collapseTools) return <MessagePrimitive.Parts>{renderCloudPart}</MessagePrimitive.Parts>;
+
+  const parts = getVisibleAssistantParts(presentation.parts.map(part => part.source));
+  const indices = new Map(parts.map((part, index) => [part, index]));
+  return groupAssistantParts(parts, 'live').map((segment, segmentIndex, segments) => {
+    const content = segment.parts.map(part => {
+      const index = indices.get(part);
+      return index === undefined ? null : <CloudMessagePartByIndex key={part.id} index={index} />;
+    });
+    if (segment.type === 'chat')
+      return <React.Fragment key={segment.parts[0]?.id}>{content}</React.Fragment>;
+    const key = `agent-work:${segments[segmentIndex - 1]?.parts[0]?.id ?? 'start'}`;
+    const activePart = presentation.isStreaming
+      ? segment.parts.findLast(isPartStreaming)
+      : undefined;
+    const working = activePart !== undefined;
+    return (
+      <div key={key} className="py-1">
+        <AgentWorkGroup
+          summary={summarizeAgentWork(segment.parts, working)}
+          working={working}
+          activity={
+            activePart?.type === 'tool'
+              ? getToolActivity(activePart)
+              : working
+                ? 'Thinking'
+                : undefined
+          }
+        >
+          {content}
+        </AgentWorkGroup>
+      </div>
+    );
+  });
 }
 
 export function CloudMessagePartByIndex({ index }: { index: number }) {

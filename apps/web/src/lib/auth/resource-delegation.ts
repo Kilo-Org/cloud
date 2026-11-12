@@ -7,7 +7,7 @@ import {
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { and, eq, isNull, ne } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
 import { headers as nextHeaders } from 'next/headers';
@@ -15,11 +15,11 @@ import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token'
 import {
   AI_ATTRIBUTION_AUDIENCE,
   CLOUD_AGENT_NEXT_AUDIENCE,
-  GASTOWN_AUDIENCE,
   HTML_DEPLOY_AUDIENCE,
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
-  WASTELAND_AUDIENCE,
+  PAGES_AUDIENCE,
+  PAGES_DEV_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   buildModernKiloTokenPayload,
@@ -46,8 +46,20 @@ const LEGACY_DEVICE_SESSION_LIFETIMES_SECONDS: readonly number[] = [
   TOKEN_EXPIRY.default,
 ];
 
-export type DelegableResource = 'api' | 'gateway' | 'attribution' | 'html-deploy';
-export type ControlResource = 'cloud-agent-next' | 'gastown' | 'wasteland';
+export type DelegableResource =
+  | 'api'
+  | 'gateway'
+  | 'attribution'
+  | 'html-deploy'
+  | 'pages'
+  | 'pages-dev';
+type PagesResource = Extract<DelegableResource, 'pages' | 'pages-dev'>;
+const PAGES_TOKEN_MAX_SECONDS = 5 * 60;
+
+export function isPagesResource(resource: DelegableResource): resource is PagesResource {
+  return resource === 'pages' || resource === 'pages-dev';
+}
+export type ControlResource = 'cloud-agent-next';
 type Resource = DelegableResource | ControlResource;
 type CredentialKind = 'human-api' | 'device-access';
 
@@ -93,11 +105,6 @@ export type CreateControlTokenOptions = {
   extra?: {
     botId?: string;
     createdOnPlatform?: string;
-    gastownAccess?: boolean;
-    orgMemberships?: Array<{
-      orgId: string;
-      role: 'owner' | 'admin' | 'member' | 'billing_manager';
-    }>;
   };
 };
 
@@ -115,15 +122,20 @@ function resourceAudience(resource: Resource): string {
     gateway: KILO_GATEWAY_AUDIENCE,
     attribution: AI_ATTRIBUTION_AUDIENCE,
     'html-deploy': HTML_DEPLOY_AUDIENCE,
+    pages: PAGES_AUDIENCE,
+    'pages-dev': PAGES_DEV_AUDIENCE,
     'cloud-agent-next': CLOUD_AGENT_NEXT_AUDIENCE,
-    gastown: GASTOWN_AUDIENCE,
-    wasteland: WASTELAND_AUDIENCE,
   }[resource];
 }
 
 export function isDelegableResource(value: unknown): value is DelegableResource {
   return (
-    value === 'api' || value === 'gateway' || value === 'attribution' || value === 'html-deploy'
+    value === 'api' ||
+    value === 'gateway' ||
+    value === 'attribution' ||
+    value === 'html-deploy' ||
+    value === 'pages' ||
+    value === 'pages-dev'
   );
 }
 
@@ -192,21 +204,6 @@ async function assertActiveDeviceSession(id: string, userId: string): Promise<vo
     ),
   });
   if (!session) unauthorized();
-}
-
-async function membershipsFor(userId: string) {
-  return db
-    .select({
-      orgId: organization_memberships.organization_id,
-      role: organization_memberships.role,
-    })
-    .from(organization_memberships)
-    .where(
-      and(
-        eq(organization_memberships.kilo_user_id, userId),
-        ne(organization_memberships.role, 'billing_manager')
-      )
-    );
 }
 
 async function assertCurrentOrganizationMembership(
@@ -370,8 +367,6 @@ async function createModernControlToken(
     authority.expiresAt ? authority.expiresAt - now : requested
   );
   if (expiresIn <= 0) unauthorized('Resource delegation authority has expired');
-  const memberships =
-    resource === 'cloud-agent-next' ? undefined : await membershipsFor(authority.user.id);
   const payload = buildModernKiloTokenPayload({
     userId: authority.user.id,
     pepper: authority.user.api_token_pepper,
@@ -387,9 +382,7 @@ async function createModernControlToken(
       deviceSessionId: authority.deviceSessionId,
       botId: options?.extra?.botId,
       createdOnPlatform: options?.extra?.createdOnPlatform,
-      gastownAccess: options?.extra?.gastownAccess,
-      orgMemberships: memberships,
-      ...(resource === 'wasteland' ? {} : { runtimeAdmission: authority.runtimeAdmission }),
+      runtimeAdmission: authority.runtimeAdmission,
     },
   });
   const token = jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: 'HS256' });
@@ -475,17 +468,12 @@ export async function createControlTokenForRequest(
         'Shared resource token migration is unavailable'
       );
     }
-    const expiresIn =
-      options?.legacyExpiresIn ??
-      (resource === 'cloud-agent-next' ? TOKEN_EXPIRY.default : ONE_HOUR_SECONDS);
+    const expiresIn = options?.legacyExpiresIn ?? TOKEN_EXPIRY.default;
     const token = generateApiToken(
       authority.user,
       {
         ...options?.extra,
         tokenSource: options?.tokenSource,
-        ...(resource === 'cloud-agent-next'
-          ? {}
-          : { orgMemberships: await membershipsFor(authority.user.id) }),
       },
       { expiresIn }
     );
@@ -504,7 +492,14 @@ export async function createDelegatedResourceToken(
   resource: DelegableResource,
   options?: CreateDelegatedResourceTokenOptions
 ): Promise<{ token: string; expiresAt: string; user: User; tokenSource?: string }> {
+  const forPages = isPagesResource(resource);
+  if (forPages && options?.organizationId) {
+    forbidden('Organization credentials cannot mint Pages tokens');
+  }
   const authority = await getResourceDelegationAuthority(user, { headers: options?.headers });
+  if (forPages && authority.organizationId) {
+    forbidden('Organization credentials cannot mint Pages tokens');
+  }
   let organizationRole = options?.organizationRole;
   if (options?.organizationId) {
     // Explicit delegation follows REST organization access, including inherited and global-admin access.
@@ -537,13 +532,32 @@ export async function createDelegatedResourceToken(
     );
   }
   const now = Math.floor(Date.now() / 1000);
-  const requested = options?.expiresIn ?? 15 * 60;
+  const maxLifetime = forPages ? PAGES_TOKEN_MAX_SECONDS : 15 * 60;
+  const requested = options?.expiresIn ?? maxLifetime;
   const expiresIn = Math.min(
     requested,
-    15 * 60,
+    maxLifetime,
     authority.expiresAt ? authority.expiresAt - now : requested
   );
   if (expiresIn <= 0) unauthorized('Resource delegation authority has expired');
+  if (forPages) {
+    // Pages holds the token only as an opaque bearer and trades it at the exchange for identity,
+    // so it carries no pepper, organization context or token source.
+    const payload = buildModernKiloTokenPayload({
+      userId: authority.user.id,
+      env: process.env.NODE_ENV,
+      audience: resourceAudience(resource),
+      issuedAt: now,
+      expiresAt: now + expiresIn,
+      tokenPurpose: 'delegated-workload',
+      credentialExchange: false,
+    });
+    return {
+      token: jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: 'HS256' }),
+      expiresAt: new Date((now + expiresIn) * 1000).toISOString(),
+      user: authority.user,
+    };
+  }
   const payload = buildModernKiloTokenPayload({
     userId: authority.user.id,
     pepper: authority.user.api_token_pepper,

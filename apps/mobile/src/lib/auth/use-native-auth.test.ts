@@ -8,6 +8,7 @@ import { ADMISSION_CHALLENGE_FAILED, getAdmission } from '@/lib/auth/admission';
 import type * as AdmissionTypes from '@/lib/auth/admission';
 import type * as AuthFetchTypes from '@/lib/auth/auth-fetch';
 import type * as PasskeyClientTypes from '@/lib/auth/passkey-client';
+import { type SignInResponse } from '@react-native-google-signin/google-signin';
 
 import {
   buildChallengeEntry,
@@ -15,6 +16,7 @@ import {
   parseEmailCodeResponse,
   parseTokenPair,
   parseTokenResponse,
+  type PendingLinkOffer,
   selectChallengeId,
 } from '@/lib/auth/native-auth-contract';
 
@@ -137,6 +139,7 @@ const { postAuth } = await import('@/lib/auth/auth-fetch');
 const mockPostAuth = vi.mocked(postAuth);
 const { signInWithPasskey: runPasskeySignIn } = await import('@/lib/auth/passkey-client');
 const mockRunPasskeySignIn = vi.mocked(runPasskeySignIn);
+const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
 
 // ── C12: Config invariant ────────────────────────────────────────────────
 
@@ -868,5 +871,248 @@ describe('useNativeAuth passkey sign-in', () => {
     });
 
     expect(toast.error).toHaveBeenCalledWith('Something went wrong. Please try again.');
+  });
+});
+
+// ── Pending account link ────────────────────────────────────────────────
+
+const pendingOffer: PendingLinkOffer = {
+  token: 'link-token',
+  provider: 'github',
+  email: 'person@example.com',
+  methods: ['google', 'passkey'],
+  emailCode: true,
+  expiresAt: Date.now() + 15 * 60 * 1000,
+};
+
+function BoundNativeAuthHarness({
+  resultRef,
+  pendingLink,
+  onPendingLinkOffer,
+  onPendingLinkResolved,
+}: {
+  resultRef: { current: NativeAuthResult | null };
+  pendingLink: PendingLinkOffer | null;
+  onPendingLinkOffer: (offer: PendingLinkOffer) => void;
+  onPendingLinkResolved: () => void;
+}) {
+  resultRef.current = useNativeAuth({ pendingLink, onPendingLinkOffer, onPendingLinkResolved });
+  return null;
+}
+
+async function mountBoundNativeAuth(
+  pendingLink: PendingLinkOffer | null,
+  onPendingLinkOffer = vi.fn<(offer: PendingLinkOffer) => void>(),
+  onPendingLinkResolved = vi.fn<() => void>()
+): Promise<{ current: NativeAuthResult | null; onResolved: () => void }> {
+  const resultRef: { current: NativeAuthResult | null } = { current: null };
+  await act(async () => {
+    TestRenderer.create(
+      React.createElement(BoundNativeAuthHarness, {
+        resultRef,
+        pendingLink,
+        onPendingLinkOffer,
+        onPendingLinkResolved,
+      })
+    );
+    await Promise.resolve();
+  });
+  return Object.assign(resultRef, { onResolved: onPendingLinkResolved });
+}
+
+function googleChoosesAccount() {
+  const response: SignInResponse = {
+    type: 'success',
+    data: {
+      serverAuthCode: 'server-code',
+      idToken: null,
+      scopes: [],
+      user: {
+        id: 'google-user',
+        name: null,
+        email: 'person@example.com',
+        photo: null,
+        familyName: null,
+        givenName: null,
+      },
+    },
+  };
+  vi.mocked(GoogleSignin.signIn).mockResolvedValue(response);
+}
+
+describe('useNativeAuth pending account link', () => {
+  beforeEach(() => {
+    mockGetAdmission.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('hands the offer a DIFFERENT-OAUTH refusal makes to the screen instead of a toast', async () => {
+    googleChoosesAccount();
+    const offer = { ...pendingOffer };
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'DIFFERENT-OAUTH',
+      ssoOrganizationId: undefined,
+      pendingLink: offer,
+    });
+    const onOffer = vi.fn<(offer: PendingLinkOffer) => void>();
+    const resultRef = await mountBoundNativeAuth(null, onOffer);
+
+    await act(async () => {
+      await resultRef.current?.signInWithGoogle();
+    });
+
+    expect(onOffer).toHaveBeenCalledWith(offer);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(authMock.signIn).not.toHaveBeenCalled();
+  });
+
+  it('keeps the plain refusal toast when the screen takes no offers', async () => {
+    googleChoosesAccount();
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'DIFFERENT-OAUTH',
+      ssoOrganizationId: undefined,
+      pendingLink: { ...pendingOffer },
+    });
+    const resultRef = await mountNativeAuth();
+
+    await act(async () => {
+      await resultRef.current?.signInWithGoogle();
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(mapError('DIFFERENT-OAUTH'));
+  });
+
+  it('keeps the plain refusal toast when an older server sends no offer', async () => {
+    googleChoosesAccount();
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'DIFFERENT-OAUTH',
+      ssoOrganizationId: undefined,
+    });
+    const onOffer = vi.fn<(offer: PendingLinkOffer) => void>();
+    const resultRef = await mountBoundNativeAuth(null, onOffer);
+
+    await act(async () => {
+      await resultRef.current?.signInWithGoogle();
+    });
+
+    expect(onOffer).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(mapError('DIFFERENT-OAUTH'));
+  });
+
+  it('carries the link token on the email code exchange and confirms the added provider', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', pendingLink: { status: 'linked', provider: 'github' } },
+    });
+    const resultRef = await mountBoundNativeAuth(pendingOffer);
+
+    await act(async () => {
+      await resultRef.current?.verifyEmailCode('person@example.com', '123456');
+    });
+
+    expect(mockPostAuth).toHaveBeenCalledWith(
+      '/api/auth/native/token',
+      expect.objectContaining({
+        provider: 'email',
+        email: 'person@example.com',
+        pendingLinkToken: 'link-token',
+      })
+    );
+    expect(authMock.signIn).toHaveBeenCalledWith('at', undefined, undefined);
+    expect(announcingToast.success).toHaveBeenCalledWith('GitHub was added to your account.');
+  });
+
+  it('keeps the person signed in and warns when the link did not happen', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', pendingLink: { status: 'failed', reason: 'WRONG_ACCOUNT' } },
+    });
+    const resultRef = await mountBoundNativeAuth(pendingOffer);
+
+    await act(async () => {
+      const outcome = await resultRef.current?.verifyEmailCode('person@example.com', '123456');
+      expect(outcome).toEqual({ ok: true });
+    });
+
+    expect(authMock.signIn).toHaveBeenCalledTimes(1);
+    expect(announcingToast.warning).toHaveBeenCalledWith(
+      "GitHub wasn't added because you signed in to a different account."
+    );
+  });
+
+  it('sends no link token while no pending link is being resolved', async () => {
+    mockPostAuth.mockResolvedValue({ ok: true, data: { token: 'at' } });
+    const resultRef = await mountBoundNativeAuth(null);
+
+    await act(async () => {
+      await resultRef.current?.verifyEmailCode('person@example.com', '123456');
+    });
+
+    expect(mockPostAuth.mock.calls[0]?.[1]).not.toHaveProperty('pendingLinkToken');
+  });
+
+  it('forwards the link token to the passkey ceremony', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({ status: 'ok', token: 'at' });
+    const resultRef = await mountBoundNativeAuth(pendingOffer);
+
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(mockRunPasskeySignIn).toHaveBeenCalledWith(undefined, 'link-token');
+  });
+
+  it('retires the offer once a sign-in resolved it, and not when no link was open', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({ status: 'ok', token: 'at' });
+    const bound = await mountBoundNativeAuth(pendingOffer);
+
+    await act(async () => {
+      await bound.current?.signInWithPasskey();
+    });
+
+    expect(bound.onResolved).toHaveBeenCalledTimes(1);
+
+    const plain = await mountBoundNativeAuth(null);
+
+    await act(async () => {
+      await plain.current?.signInWithPasskey();
+    });
+
+    expect(plain.onResolved).not.toHaveBeenCalled();
+  });
+
+  it('keeps refusals inline and marks the ones no other method can change', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({
+      status: 'error',
+      failure: 'failed',
+      errorCode: 'BLOCKED',
+    });
+    const resultRef = await mountBoundNativeAuth(pendingOffer);
+
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(resultRef.current?.pendingLinkFailure).toEqual({
+      message: 'This account has been blocked. Please contact support.',
+      retryable: false,
+    });
+
+    mockRunPasskeySignIn.mockResolvedValue({ status: 'error', failure: 'cancelled' });
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(resultRef.current?.pendingLinkFailure).toEqual({
+      message: 'Passkey sign-in was cancelled. Please try again.',
+      retryable: true,
+    });
   });
 });

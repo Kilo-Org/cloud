@@ -2,10 +2,14 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   USAGE_INGEST_URL: 'https://usage.example.test/usage',
   USAGE_INGEST_PUBLISH_SECRET: 'synthetic-publisher-secret',
 }));
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
+import { captureException } from '@sentry/nextjs';
 import { createServer } from 'node:http';
 import {
+  enqueueEnkryptUsage,
+  enqueueExaUsage,
   enqueueUsage,
   USAGE_ENQUEUE_TIMEOUT_MS,
   USAGE_ENQUEUE_MAX_ATTEMPTS,
@@ -13,10 +17,15 @@ import {
   USAGE_ENQUEUE_RETRY_BUDGET_MS,
   USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS,
 } from './usage-publisher';
-import type { UsageRecordRequest } from '@kilocode/usage-contracts';
+import type {
+  EnkryptUsageWriteInput,
+  ExaUsageRecord,
+  LlmUsageQueueMessage,
+  UsageRecordRequest,
+} from '@kilocode/usage-contracts';
 import type * as UsagePublisherModule from './usage-publisher';
 
-const payload: UsageRecordRequest = {
+const payload: LlmUsageQueueMessage = {
   core: {
     id: '3f2504e0-4f89-11d3-9a0c-0305e82c3301',
     kilo_user_id: 'oauth/synthetic',
@@ -90,14 +99,17 @@ const mockFetch = jest.fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>();
 const nativeFetch = globalThis.fetch;
 const originalRegion = process.env.VERCEL_REGION;
 let warn: jest.SpiedFunction<typeof console.warn>;
+let info: jest.SpiedFunction<typeof console.info>;
 
 beforeEach(() => {
   delete process.env.VERCEL_REGION;
   config.USAGE_INGEST_URL = 'https://usage.example.test/usage';
   config.USAGE_INGEST_PUBLISH_SECRET = 'synthetic-publisher-secret';
   mockFetch.mockReset();
+  jest.mocked(captureException).mockClear();
   jest.spyOn(globalThis, 'fetch').mockImplementation(mockFetch);
   warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  info = jest.spyOn(console, 'info').mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -174,7 +186,7 @@ describe('enqueueUsage', () => {
     const event = {
       ...payload,
       bouncer_usage_event: { request_id: 'synthetic-request', payload: { cost: 1234 } },
-    } satisfies UsageRecordRequest;
+    } satisfies LlmUsageQueueMessage;
     const response = new Response(null, { status: 202 });
     const read = jest.spyOn(response, 'text');
     mockFetch.mockResolvedValue(response);
@@ -1179,4 +1191,506 @@ describe('bounded CF confirmation policy', () => {
       }
     }
   );
+});
+
+describe('publisher attempt diagnostics', () => {
+  /** Its stable hash falls in the 1% fast-acceptance sample; `payload.core.id` does not. */
+  const sampledUsageId = '29ccd244-ea35-4e96-98bc-ea9436a9db98';
+  const sampledPayload = {
+    ...payload,
+    core: { ...payload.core, id: sampledUsageId },
+    metadata: { ...payload.metadata, id: sampledUsageId },
+  } satisfies LlmUsageQueueMessage;
+
+  function attemptRows(): Record<string, unknown>[] {
+    return info.mock.calls.flatMap(([line]) => {
+      if (typeof line !== 'string') return [];
+      const parsed: unknown = JSON.parse(line);
+      return typeof parsed === 'object' &&
+        parsed !== null &&
+        'event' in parsed &&
+        parsed.event === 'usage_publisher_attempt'
+        ? [parsed as Record<string, unknown>]
+        : [];
+    });
+  }
+
+  /** Real `AbortSignal.timeout` timers ignore Jest's clock, so drive them from fake timers. */
+  function useFakeClock() {
+    jest.useFakeTimers();
+    return jest.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), ms);
+      return controller.signal;
+    });
+  }
+
+  /** A fetch whose headers arrive, or whose transport fails, after `ms` unless its signal aborts first. */
+  function settleAfter(ms: number, settle: () => Response | Error) {
+    return (_url: Parameters<typeof fetch>[0], init?: RequestInit) =>
+      new Promise<Response>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          const result = settle();
+          if (result instanceof Error) reject(result);
+          else resolve(result);
+        }, ms);
+        init?.signal?.addEventListener(
+          'abort',
+          () => {
+            clearTimeout(timer);
+            reject(new Error('synthetic abort'));
+          },
+          { once: true }
+        );
+      });
+  }
+
+  /** A lost request: only its abort signal ends the attempt. */
+  function neverRespond(_url: Parameters<typeof fetch>[0], init?: RequestInit) {
+    return new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new Error('synthetic abort')), {
+        once: true,
+      });
+    });
+  }
+
+  test('a fast first acceptance is logged only for usage IDs in the stable 1% sample', async () => {
+    useFakeClock();
+    mockFetch.mockImplementation(settleAfter(120, () => new Response(null, { status: 202 })));
+
+    const unsampled = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.advanceTimersByTimeAsync(120);
+    expect(await unsampled).toEqual({ kind: 'accepted' });
+    expect(attemptRows()).toEqual([]);
+
+    const sampled = enqueueUsage(sampledPayload, { retryTransientFailures: true });
+    await jest.advanceTimersByTimeAsync(120);
+    expect(await sampled).toEqual({ kind: 'accepted' });
+    expect(attemptRows()).toEqual([
+      {
+        event: 'usage_publisher_attempt',
+        sample_rate: 0.01,
+        usage_id: sampledUsageId,
+        execution_region: 'unknown',
+        attempt: 1,
+        max_attempts: USAGE_ENQUEUE_MAX_ATTEMPTS,
+        accepted: true,
+        attempt_end: 'response_headers',
+        http_status: 202,
+        duration_ms: 120,
+        timeout_ms: USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS,
+        remaining_budget_ms: USAGE_ENQUEUE_RETRY_BUDGET_MS,
+        start_offset_ms: 0,
+      },
+    ]);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    [999, false],
+    [1_000, true],
+    [15_000, true],
+  ])('a %i ms first acceptance outside the sample is logged: %s', async (ms, logged) => {
+    process.env.VERCEL_REGION = 'sfo1';
+    useFakeClock();
+    mockFetch.mockImplementation(settleAfter(ms, () => new Response(null, { status: 202 })));
+    const result = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.advanceTimersByTimeAsync(ms);
+    expect(await result).toEqual({ kind: 'accepted' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(attemptRows()).toEqual(
+      logged
+        ? [
+            expect.objectContaining({
+              sample_rate: 1,
+              usage_id: payload.core.id,
+              execution_region: 'sfo1',
+              attempt: 1,
+              accepted: true,
+              http_status: 202,
+              duration_ms: ms,
+            }),
+          ]
+        : []
+    );
+  });
+
+  test('logs every attempt of a retried publication with its own clocks and actual backoff', async () => {
+    const timeouts = useFakeClock();
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    mockFetch
+      .mockImplementationOnce(neverRespond)
+      .mockImplementationOnce(
+        settleAfter(300, () => new Response('sensitive upstream body', { status: 503 }))
+      )
+      .mockImplementationOnce(
+        settleAfter(50, () => new Error('synthetic-publisher-secret sensitive network error'))
+      )
+      .mockImplementationOnce(settleAfter(10, () => new Response(null, { status: 202 })));
+
+    const result = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.runAllTimersAsync();
+    expect(await result).toEqual({ kind: 'accepted' });
+
+    const common = {
+      event: 'usage_publisher_attempt',
+      sample_rate: 1,
+      usage_id: payload.core.id,
+      execution_region: 'unknown',
+      max_attempts: USAGE_ENQUEUE_MAX_ATTEMPTS,
+    };
+    // Backoff is full jitter at 0.5: 250, 500 and 1,000 ms before attempts two to four.
+    expect(attemptRows()).toEqual([
+      {
+        ...common,
+        attempt: 1,
+        accepted: false,
+        attempt_end: 'timeout',
+        reason: 'timeout',
+        duration_ms: USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS,
+        timeout_ms: USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS,
+        remaining_budget_ms: USAGE_ENQUEUE_RETRY_BUDGET_MS,
+        start_offset_ms: 0,
+      },
+      {
+        ...common,
+        attempt: 2,
+        accepted: false,
+        attempt_end: 'response_headers',
+        http_status: 503,
+        reason: 'http_503',
+        duration_ms: 300,
+        timeout_ms: USAGE_ENQUEUE_RETRY_TIMEOUT_MS,
+        remaining_budget_ms: 19_750,
+        start_offset_ms: 20_250,
+        prior_backoff_planned_ms: 250,
+        prior_backoff_elapsed_ms: 250,
+      },
+      {
+        ...common,
+        attempt: 3,
+        accepted: false,
+        attempt_end: 'network_error',
+        reason: 'request_failed',
+        duration_ms: 50,
+        timeout_ms: USAGE_ENQUEUE_RETRY_TIMEOUT_MS,
+        remaining_budget_ms: 18_950,
+        start_offset_ms: 21_050,
+        prior_backoff_planned_ms: 500,
+        prior_backoff_elapsed_ms: 500,
+      },
+      {
+        ...common,
+        attempt: 4,
+        accepted: true,
+        attempt_end: 'response_headers',
+        http_status: 202,
+        duration_ms: 10,
+        timeout_ms: USAGE_ENQUEUE_RETRY_TIMEOUT_MS,
+        remaining_budget_ms: 17_900,
+        start_offset_ms: 22_100,
+        prior_backoff_planned_ms: 1_000,
+        prior_backoff_elapsed_ms: 1_000,
+      },
+    ]);
+
+    // The existing policy, request bytes and retry warnings are unchanged.
+    expect(timeouts.mock.calls).toEqual([
+      [USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS],
+      [USAGE_ENQUEUE_RETRY_TIMEOUT_MS],
+      [USAGE_ENQUEUE_RETRY_TIMEOUT_MS],
+      [USAGE_ENQUEUE_RETRY_TIMEOUT_MS],
+    ]);
+    expect(mockFetch.mock.calls.map(([, init]) => init?.body)).toEqual(
+      Array(USAGE_ENQUEUE_MAX_ATTEMPTS).fill(JSON.stringify(payload))
+    );
+    expect(warn.mock.calls.map(([message, fields]) => [message, fields])).toEqual(
+      ['timeout', 'http_503', 'request_failed'].map((reason, index) => [
+        'usage enqueue retrying',
+        {
+          usageId: payload.core.id,
+          execution_region: 'unknown',
+          reason,
+          attempt: index + 1,
+          duplicate_possible: true,
+        },
+      ])
+    );
+    expect(JSON.stringify(info.mock.calls)).not.toMatch(/secret|sensitive|Bearer|https?:/);
+  });
+
+  test('reports the clipped timeout and remaining budget after a runtime stall', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    const timeouts = jest.spyOn(AbortSignal, 'timeout');
+    mockFetch
+      .mockImplementationOnce(async () => {
+        jest.advanceTimersByTime(38_000);
+        return new Response(null, { status: 503 });
+      })
+      .mockResolvedValue(new Response(null, { status: 202 }));
+    const result = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.runAllTimersAsync();
+    expect(await result).toEqual({ kind: 'accepted' });
+    expect(timeouts.mock.calls).toEqual([[USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS], [1_750]]);
+    expect(attemptRows()).toEqual([
+      expect.objectContaining({
+        attempt: 1,
+        http_status: 503,
+        duration_ms: 38_000,
+        timeout_ms: USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS,
+        remaining_budget_ms: USAGE_ENQUEUE_RETRY_BUDGET_MS,
+        start_offset_ms: 0,
+      }),
+      expect.objectContaining({
+        attempt: 2,
+        accepted: true,
+        duration_ms: 0,
+        timeout_ms: 1_750,
+        remaining_budget_ms: 1_750,
+        start_offset_ms: 38_250,
+        prior_backoff_planned_ms: 250,
+        prior_backoff_elapsed_ms: 250,
+      }),
+    ]);
+  });
+
+  test('a single-attempt call reports its two-second window and no retry budget', async () => {
+    mockFetch.mockResolvedValue(new Response('sensitive body', { status: 401 }));
+    expect(await enqueueUsage(payload)).toEqual({ kind: 'unavailable', reason: 'http_401' });
+    const [row] = attemptRows();
+    expect(row).toEqual(
+      expect.objectContaining({
+        attempt: 1,
+        max_attempts: 1,
+        accepted: false,
+        attempt_end: 'response_headers',
+        http_status: 401,
+        reason: 'http_401',
+        timeout_ms: USAGE_ENQUEUE_TIMEOUT_MS,
+        start_offset_ms: expect.any(Number),
+      })
+    );
+    expect(row).not.toHaveProperty('remaining_budget_ms');
+    expect(row).not.toHaveProperty('prior_backoff_elapsed_ms');
+    expectUnavailableWarning('http_401');
+  });
+
+  test('a timed-out or failed transport never reports an HTTP status', async () => {
+    useFakeClock();
+    mockFetch
+      .mockImplementationOnce(neverRespond)
+      .mockImplementationOnce(settleAfter(5, () => new Error('synthetic network failure')));
+    const timedOut = enqueueUsage(payload);
+    await jest.runAllTimersAsync();
+    expect(await timedOut).toEqual({ kind: 'unavailable', reason: 'timeout' });
+    const failed = enqueueUsage(payload);
+    await jest.runAllTimersAsync();
+    expect(await failed).toEqual({ kind: 'unavailable', reason: 'request_failed' });
+    const rows = attemptRows();
+    expect(rows.map(row => [row.attempt_end, row.reason, row.duration_ms])).toEqual([
+      ['timeout', 'timeout', USAGE_ENQUEUE_TIMEOUT_MS],
+      ['network_error', 'request_failed', 5],
+    ]);
+    for (const row of rows) expect(row).not.toHaveProperty('http_status');
+  });
+
+  test('a confirmed 202 is returned without waiting for an unfinished response body', async () => {
+    const body = new ReadableStream({
+      pull: () => new Promise<void>(() => {}),
+      cancel: () => new Promise<void>(() => {}),
+    });
+    mockFetch.mockResolvedValue(new Response(body, { status: 202 }));
+    expect(await enqueueUsage(sampledPayload, { retryTransientFailures: true })).toEqual({
+      kind: 'accepted',
+    });
+    expect(attemptRows()).toEqual([
+      expect.objectContaining({ usage_id: sampledUsageId, accepted: true, http_status: 202 }),
+    ]);
+  });
+
+  test('an Enkrypt publication labels its attempts with the usage kind and write ID', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const usageWrite = {
+      id: 'a8f2c3d4-5e6f-4a1b-9c2d-3e4f5a6b7c8d',
+      occurredAt: '2026-08-05T10:11:12.945Z',
+      organizationId: 'b9e1f2a3-4b5c-4d6e-8f7a-1b2c3d4e5f6a',
+      kiloUserId: 'oauth/synthetic',
+      sessionId: null,
+      apiKind: 'messages',
+      decision: 'blocked',
+      creditsCost: 7,
+      addedLatencyMs: 12,
+    } satisfies EnkryptUsageWriteInput;
+    mockFetch
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValue(new Response(null, { status: 202 }));
+    const result = enqueueEnkryptUsage(usageWrite);
+    await jest.runAllTimersAsync();
+    expect(await result).toEqual({ kind: 'accepted' });
+    expect(mockFetch.mock.calls.map(([url]) => url)).toEqual([
+      'https://usage.example.test/enkrypt-usage',
+      'https://usage.example.test/enkrypt-usage',
+    ]);
+    expect(
+      attemptRows().map(({ usage_id, usage_kind, attempt, http_status }) => ({
+        usage_id,
+        usage_kind,
+        attempt,
+        http_status,
+      }))
+    ).toEqual([
+      { usage_id: usageWrite.id, usage_kind: 'enkrypt_usage', attempt: 1, http_status: 503 },
+      { usage_id: usageWrite.id, usage_kind: 'enkrypt_usage', attempt: 2, http_status: 202 },
+    ]);
+    expect(warn).toHaveBeenCalledWith(
+      'usage enqueue retrying',
+      expect.objectContaining({ usageId: usageWrite.id, usage_kind: 'enkrypt_usage' })
+    );
+  });
+
+  test('a throwing logger changes neither retry classification nor confirmed acceptance', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const loggerFailure = new Error('synthetic logger failure');
+    info.mockImplementation(() => {
+      throw loggerFailure;
+    });
+    mockFetch
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValue(new Response(null, { status: 202 }));
+    const result = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.runAllTimersAsync();
+    expect(await result).toEqual({ kind: 'accepted' });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls).toEqual([
+      [
+        'usage enqueue retrying',
+        {
+          usageId: payload.core.id,
+          execution_region: 'unknown',
+          reason: 'http_503',
+          attempt: 1,
+          duplicate_possible: true,
+        },
+      ],
+    ]);
+    // Both attempt lines were attempted; each failure is reported and publication continues.
+    expect(info).toHaveBeenCalledTimes(2);
+    expect(jest.mocked(captureException).mock.calls).toEqual([
+      [loggerFailure, { level: 'warning', tags: { source: 'usage_publisher_attempt_log' } }],
+      [loggerFailure, { level: 'warning', tags: { source: 'usage_publisher_attempt_log' } }],
+    ]);
+  });
+
+  test('a throwing logger on a terminal failure keeps the terminal outcome', async () => {
+    info.mockImplementation(() => {
+      throw new Error('synthetic logger failure');
+    });
+    mockFetch.mockResolvedValue(new Response(null, { status: 401 }));
+    expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
+      kind: 'unavailable',
+      reason: 'http_401',
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expectUnavailableWarning('http_401');
+    expect(captureException).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('enqueueExaUsage', () => {
+  const record: ExaUsageRecord = {
+    id: '6d1f3c2a-8b4e-4f7a-9c3d-2e5b7a9f1c04',
+    occurredAt: '2026-11-12T12:00:00.000Z',
+    userId: 'oauth/synthetic',
+    organizationId: null,
+    path: '/search',
+    costMicrodollars: 7000,
+    chargedToBalance: true,
+    freeAllowanceMicrodollars: 10_000_000,
+  };
+
+  test('posts the bare record to the /exa-usage sibling of the /usage endpoint', async () => {
+    mockFetch.mockResolvedValue(new Response(null, { status: 202 }));
+
+    expect(await enqueueExaUsage(record)).toEqual({ kind: 'accepted' });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe('https://usage.example.test/exa-usage');
+    expect(init).toMatchObject({
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        Authorization: 'Bearer synthetic-publisher-secret',
+      },
+      redirect: 'manual',
+    });
+    expect(init?.body).toBe(JSON.stringify(record));
+  });
+
+  test.each([
+    'https://usage.example.test/exa-usage',
+    'https://usage.example.test/usage/',
+    'https://usage.example.test/v2/usage',
+    'https://usage.example.test/usage?x=1',
+    'https://usage.example.test/usage#x',
+    'http://usage.example.test/usage',
+    'http://10.0.0.5/usage',
+    'localhost:3000/usage',
+    '',
+  ])('treats USAGE_INGEST_URL %p as not configured without a request', async value => {
+    config.USAGE_INGEST_URL = value;
+
+    expect(await enqueueExaUsage(record)).toEqual({
+      kind: 'unavailable',
+      reason: 'publisher_not_configured',
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith('usage enqueue unavailable', {
+      usageId: record.id,
+      usage_kind: 'exa_usage',
+      execution_region: 'unknown',
+      kind: 'unavailable',
+      reason: 'publisher_not_configured',
+    });
+  });
+
+  test.each([
+    ['http://localhost:8787/usage', 'http://localhost:8787/exa-usage'],
+    ['http://127.0.0.1:8787/usage', 'http://127.0.0.1:8787/exa-usage'],
+    ['http://[::1]:8787/usage', 'http://[::1]:8787/exa-usage'],
+  ])('allows plain HTTP only to loopback %s', async (value, expected) => {
+    config.USAGE_INGEST_URL = value;
+    mockFetch.mockResolvedValue(new Response(null, { status: 202 }));
+
+    expect(await enqueueExaUsage(record)).toEqual({ kind: 'accepted' });
+    expect(mockFetch.mock.calls.map(([url]) => url)).toEqual([expected]);
+  });
+
+  test('does not retry an HTTP 400', async () => {
+    mockFetch.mockResolvedValue(new Response('sensitive body', { status: 400 }));
+
+    expect(await enqueueExaUsage(record)).toEqual({ kind: 'unavailable', reason: 'http_400' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('retries a transient failure with the identical serialized record', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 503 }));
+    mockFetch.mockResolvedValue(new Response(null, { status: 202 }));
+
+    const result = enqueueExaUsage(record);
+    await jest.runAllTimersAsync();
+
+    expect(await result).toEqual({ kind: 'accepted' });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    for (const [url, init] of mockFetch.mock.calls) {
+      expect(url).toBe('https://usage.example.test/exa-usage');
+      expect(init?.body).toBe(JSON.stringify(record));
+    }
+  });
 });

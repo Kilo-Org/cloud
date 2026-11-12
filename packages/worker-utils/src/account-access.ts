@@ -1,5 +1,6 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import {
+  blacklisted_domains,
   organization_memberships,
   organization_user_limits,
   organization_user_usage,
@@ -8,8 +9,7 @@ import {
   type OrganizationUserLimitType,
 } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@kilocode/db/schema-types';
-import { and, eq, isNull, not, sql } from 'drizzle-orm';
-import * as z from 'zod';
+import { and, eq, inArray, isNull, not, sql } from 'drizzle-orm';
 
 // Account access rules shared by the Next.js gateway and Workers that authenticate Kilo users.
 
@@ -173,148 +173,89 @@ export function canSpendPaidUsage(balance: number): boolean {
   return balance > 0;
 }
 
-// Admins maintain the blocked email domains in Redis; an empty list falls back to the
-// deployment's BLACKLIST_DOMAINS setting.
-export const BLACKLISTED_DOMAINS_REDIS_KEY = 'admin:blacklisted-domains';
-// Holds the config's updated_at. The admin save writes both keys in one MSET.
-export const BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY = 'admin:blacklisted-domains:updated-at';
+// Admins maintain the blocked email domains in the blacklisted_domains table. A blocked domain
+// also blocks its subdomains.
 
-// Bounds how long a write that skips the updated_at key, such as a direct Redis edit or a save
-// from a web deployment older than that key, can go unnoticed.
-const BLACKLISTED_DOMAINS_FULL_READ_INTERVAL_MS = 10 * 60_000;
-
-// Every process parses the stored list and builds a lookup index from it, and the admin
-// editor round-trips the whole list through one save. 100k entries covers multi-megabyte
-// imported lists while keeping the payload and the in-process index bounded.
-export const MAX_BLACKLIST_DOMAINS = 100_000;
-
-export const BlacklistDomainsConfigSchema = z.object({
-  domains: z.array(z.string()).max(MAX_BLACKLIST_DOMAINS),
-  // TLDs whose new signups are refused. Optional because configs written
-  // before this field existed must keep parsing; readers fall back to the
-  // deployment default in that case. An empty array means "no TLD blocked".
-  blocked_signup_tlds: z.array(z.string()).optional(),
-  updated_at: z.string().nullable(),
-  updated_by: z.string().nullable(),
-  updated_by_email: z.string().nullable(),
-});
-
-export type BlacklistDomainsConfig = z.infer<typeof BlacklistDomainsConfigSchema>;
-
-export type BlacklistDomainsConfigSnapshot = {
-  config: BlacklistDomainsConfig | null;
-  fullReadAt: number;
-  // Entries a stored list held beyond the cap; 0 when the whole list is used.
-  droppedDomains: number;
-};
-
-export type ParsedBlacklistDomainsConfig = {
-  config: BlacklistDomainsConfig;
-  droppedDomains: number;
-};
+// The longest DNS name. A longer suffix cannot be a blocked domain, so skipping it bounds the
+// lookup for an arbitrarily long address without changing which addresses match.
+const MAX_DOMAIN_LENGTH = 253;
 
 /**
- * Parses one stored blocklist config and keeps its first MAX_BLACKLIST_DOMAINS
- * entries, reporting how many entries it left out so the reader can surface a
- * list that is longer than the cap.
+ * The label-boundary suffixes of an address's host, longest first. An address without '@' only
+ * yields dotted suffixes, because the original matcher needed '@' for an exact-domain match.
  */
-export function parseBlacklistDomainsConfig(value: unknown): ParsedBlacklistDomainsConfig {
-  if (value !== null && typeof value === 'object' && 'domains' in value) {
-    const { domains } = value;
-    if (Array.isArray(domains) && domains.length > MAX_BLACKLIST_DOMAINS) {
-      return {
-        config: BlacklistDomainsConfigSchema.parse({
-          ...value,
-          domains: domains.slice(0, MAX_BLACKLIST_DOMAINS),
-        }),
-        droppedDomains: domains.length - MAX_BLACKLIST_DOMAINS,
-      };
-    }
-  }
-
-  return { config: BlacklistDomainsConfigSchema.parse(value), droppedDomains: 0 };
-}
-
-/**
- * Re-reads the admin blocklist config, downloading it only when it may have changed. An imported
- * domain list is megabytes and every process refreshes it each minute, so an unchanged config
- * costs one read of the small updated_at key instead. Returns `previous` itself when it is still
- * current, which keeps the domain index built for its array.
- */
-export async function refreshBlacklistDomainsConfig(
-  redisGet: (key: string) => Promise<string | null>,
-  previous: BlacklistDomainsConfigSnapshot | null,
-  now: number
-): Promise<BlacklistDomainsConfigSnapshot> {
-  const previousUpdatedAt = previous?.config?.updated_at;
-  if (
-    previous &&
-    previousUpdatedAt != null &&
-    now - previous.fullReadAt < BLACKLISTED_DOMAINS_FULL_READ_INTERVAL_MS &&
-    (await redisGet(BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY)) === previousUpdatedAt
+export function emailDomainSuffixes(email: string): string[] {
+  const normalizedEmail = email.toLowerCase();
+  const at = normalizedEmail.lastIndexOf('@');
+  const host = normalizedEmail.slice(at + 1);
+  const minStart = Math.max(0, host.length - MAX_DOMAIN_LENGTH);
+  const suffixes: string[] = [];
+  if (at !== -1 && minStart === 0 && host.length > 0) suffixes.push(host);
+  for (
+    let dot = host.indexOf('.', Math.max(0, minStart - 1));
+    dot !== -1 && dot + 1 < host.length;
+    dot = host.indexOf('.', dot + 1)
   ) {
-    return previous;
+    suffixes.push(host.slice(dot + 1));
   }
-
-  const raw = await redisGet(BLACKLISTED_DOMAINS_REDIS_KEY);
-  if (!raw) {
-    return { config: null, fullReadAt: now, droppedDomains: 0 };
-  }
-
-  const { config, droppedDomains } = parseBlacklistDomainsConfig(JSON.parse(raw));
-  return { config, fullReadAt: now, droppedDomains };
+  return suffixes;
 }
 
-export function blacklistedDomainsFromConfig(
-  config: BlacklistDomainsConfig | null,
-  fallbackDomains: string[]
-): string[] {
-  return config && config.domains.length > 0 ? config.domains : fallbackDomains;
+/** The given domains that are blocked, in one primary-key lookup. */
+export async function findBlacklistedDomains(
+  db: AccountDb,
+  domains: readonly string[]
+): Promise<Set<string>> {
+  if (domains.length === 0) return new Set();
+  const rows = await db
+    .select({ domain: blacklisted_domains.domain })
+    .from(blacklisted_domains)
+    .where(inArray(blacklisted_domains.domain, [...domains]));
+  return new Set(rows.map(row => row.domain));
 }
 
-export function blockedSignupTldsFromConfig(
-  config: BlacklistDomainsConfig | null,
-  fallbackTlds: string[]
-): string[] {
-  return config?.blocked_signup_tlds ?? fallbackTlds;
+// Access checks may lag an admin change by this long, as they did when every process cached
+// the whole list for a minute.
+export const EMAIL_DOMAIN_BLACKLIST_CACHE_TTL_MS = 60_000;
+const EMAIL_DOMAIN_BLACKLIST_CACHE_LIMIT = 10_000;
+
+/**
+ * Caches blacklist answers in process, keyed by an address's longest suffix, which determines
+ * all its other suffixes. Only answers are cached, never a pending lookup, because a Worker
+ * cannot share one request's database I/O with another.
+ */
+export function createEmailDomainBlacklistCache({ now = () => Date.now() } = {}) {
+  const cache = new Map<string, { expiresAt: number; blocked: boolean }>();
+
+  return {
+    async isBlacklisted(db: AccountDb, email: string): Promise<boolean> {
+      const suffixes = emailDomainSuffixes(email);
+      if (suffixes.length === 0) return false;
+      const key = suffixes[0];
+      const hit = cache.get(key);
+      if (hit && hit.expiresAt > now()) return hit.blocked;
+
+      const blocked = (await findBlacklistedDomains(db, suffixes)).size > 0;
+      cache.delete(key);
+      cache.set(key, { expiresAt: now() + EMAIL_DOMAIN_BLACKLIST_CACHE_TTL_MS, blocked });
+      if (cache.size > EMAIL_DOMAIN_BLACKLIST_CACHE_LIMIT) {
+        const oldest = cache.keys().next().value;
+        if (oldest !== undefined) cache.delete(oldest);
+      }
+      return blocked;
+    },
+    clear(): void {
+      cache.clear();
+    },
+  };
 }
 
-// The admin config is cached for a minute, so auth checks keep re-using the same
-// array. Index it once per array reference instead of scanning it per call: a
-// list with tens of thousands of entries costs one Set build per cache refresh,
-// not one scan per sign-in.
-const blacklistIndexCache = new WeakMap<readonly string[], Set<string>>();
-
-function blacklistIndex(domains: readonly string[]): Set<string> {
-  const cached = blacklistIndexCache.get(domains);
-  if (cached) return cached;
-
-  const index = new Set(domains.map(domain => domain.toLowerCase()));
-  blacklistIndexCache.set(domains, index);
-  return index;
-}
-
-// A blocked domain also blocks its subdomains.
+// Matches an address against an in-memory list, such as the signup TLD blocklist.
 export function isEmailBlacklistedByDomain(
   email: string,
   blacklistedDomains: readonly string[] | undefined
 ): boolean {
   if (!blacklistedDomains?.length) return false;
-
-  const index = blacklistIndex(blacklistedDomains);
-  const normalizedEmail = email.toLowerCase();
-  const at = normalizedEmail.lastIndexOf('@');
-  const host = at === -1 ? normalizedEmail : normalizedEmail.slice(at + 1);
-  const labels = host.split('.');
-
-  // An address without '@' can only match on a dotted suffix, because the
-  // previous implementation needed '@' for an exact-domain match.
-  const firstLabel = at === -1 ? 1 : 0;
-
-  // Every label-boundary suffix of the host. '@' cannot appear inside a label,
-  // so these are exactly the strings the previous endsWith checks matched.
-  for (let i = firstLabel; i < labels.length; i++) {
-    if (index.has(labels.slice(i).join('.'))) return true;
-  }
-  return false;
+  const index = new Set(blacklistedDomains.map(domain => domain.toLowerCase()));
+  return emailDomainSuffixes(email).some(suffix => index.has(suffix));
 }

@@ -9,8 +9,11 @@ import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/or
 import type { Organization } from '@kilocode/db/schema';
 import { redirect } from 'next/navigation';
 import type { JSX } from 'react';
+import { getLiveOrganizationName } from '@/lib/organizations/organization-name';
+import { supportAccessNeededContent } from '@/lib/organizations/support-access-needed-content';
 import { OrganizationTrialWrapper } from './OrganizationTrialWrapper';
 import { SupportAccessBanner } from './SupportAccessBanner';
+import { SupportAccessNeeded } from './SupportAccessNeeded';
 
 export async function OrganizationByPageLayout({
   params,
@@ -35,7 +38,7 @@ export async function OrganizationByPageLayout({
    * pages require membership.
    */
   supportRead?: boolean;
-  /** When true, skip the PageContainer wrapper (used by gastown fullscreen pages). */
+  /** When true, skip the PageContainer wrapper. */
   fullBleed?: boolean;
 }) {
   const { id } = await params;
@@ -51,6 +54,28 @@ export async function OrganizationByPageLayout({
     if (result.nextResponse.status === 401) {
       redirect(await signInUrlWithCallbackPath());
     }
+    const denial = result.denial;
+    if (
+      denial !== undefined &&
+      denial.isPlatformAdmin &&
+      isSupportAccessEnabled() &&
+      (denial.status === 403 || denial.status === 503)
+    ) {
+      const organizationName = await getLiveOrganizationName(organizationId);
+      const content = supportAccessNeededContent({
+        organizationId,
+        organizationName,
+        reason: denial.reason,
+        dashboardIsCurrent: supportRead,
+      });
+      return (
+        <SupportAccessNeeded
+          organizationId={organizationId}
+          organizationName={organizationName}
+          content={content}
+        />
+      );
+    }
     redirect('/profile');
   }
   const { user, organization, access } = result.data;
@@ -58,7 +83,7 @@ export async function OrganizationByPageLayout({
   const role =
     isSupportAccessEnabled() || isSupport ? user.role : user.is_admin ? 'owner' : user.role;
   return (
-    <OrganizationTrialWrapper organizationId={organization.id} fullBleed={fullBleed}>
+    <OrganizationTrialWrapper organizationId={organization.id} role={role} fullBleed={fullBleed}>
       {access.kind === 'support' && <SupportAccessBanner access={access} />}
       {render({ role, organization, isGlobalAdmin: user.is_admin && !isSupport })}
     </OrganizationTrialWrapper>

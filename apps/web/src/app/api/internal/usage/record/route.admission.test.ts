@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { UsageRecordRequestSchema } from '@kilocode/usage-contracts';
-import { recordUsage } from '@kilocode/worker-utils/usage-writer-client';
+import { recordLlmUsage } from '@kilocode/worker-utils/usage-writer-client';
 import { saveUsageRelatedDataLocally } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { queueWriterAdmission } from '@kilocode/web-shared/lib/ai-gateway/usage-writer-admission';
 import { POST } from './route';
@@ -136,9 +136,59 @@ it.each(['queue', 'queue_vercel'])(
   }
 );
 
+it('awaits a delayed slot grant and persists once a held writer completes', async () => {
+  const held = await holdWrites(8);
+  try {
+    const acquire = jest.spyOn(queueWriterAdmission, 'acquire');
+    let settled = false;
+    const waiting = POST(request('queue')).finally(() => {
+      settled = true;
+    });
+    while (acquire.mock.calls.length === 0) await new Promise(resolve => setImmediate(resolve));
+    await new Promise(resolve => setImmediate(resolve));
+    expect(settled).toBe(false);
+    expect(persist).toHaveBeenCalledTimes(8);
+    held.pending[0].resolve(recorded);
+    const response = await waiting;
+    expect(response.status).toBe(200);
+    expect(persist).toHaveBeenCalledTimes(9);
+    expect(acquire).toHaveBeenCalledWith('queue', payload.core.id, {
+      maxWaitMs: 250,
+      signal: expect.any(AbortSignal),
+    });
+  } finally {
+    await held.drain();
+  }
+});
+
+it('returns the unchanged 429 body when no slot frees within the wait', async () => {
+  const held = await holdWrites(8);
+  try {
+    const startedAt = Date.now();
+    const response = await POST(request('queue_vercel'));
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(200);
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Usage writer overloaded',
+      reason: 'queue_limit',
+    });
+    expect(persist).toHaveBeenCalledTimes(8);
+    expect(JSON.parse(jest.mocked(console.warn).mock.calls[0][0])).toMatchObject({
+      writer_caller: 'queue_vercel',
+      reason: 'queue_limit',
+      usage_id: payload.core.id,
+      waited: true,
+      slot_wait_ms: expect.any(Number),
+    });
+  } finally {
+    await held.drain();
+  }
+  expect((await POST(request('queue'))).status).toBe(200);
+});
+
 it('keeps auth and validation ahead of admission even when the pool is overloaded', async () => {
   writerPool.waitingCount = 1;
-  const acquire = jest.spyOn(queueWriterAdmission, 'tryAcquire');
+  const acquire = jest.spyOn(queueWriterAdmission, 'acquire');
   const unauthorized = request('queue', 'wrong-secret');
   const json = jest.spyOn(unauthorized, 'json');
   expect((await POST(unauthorized)).status).toBe(401);
@@ -172,7 +222,7 @@ it.each([undefined, 'region_handoff', 'unknown', 'QUEUE', 'sensitive-arbitrary-s
     const held = await holdWrites(8);
     try {
       writerPool.waitingCount = 1;
-      const acquire = jest.spyOn(queueWriterAdmission, 'tryAcquire');
+      const acquire = jest.spyOn(queueWriterAdmission, 'acquire');
       const response = await POST(request(source));
       expect(response.status).toBe(200);
       expect(acquire).not.toHaveBeenCalled();
@@ -227,7 +277,7 @@ it('composes actual route429 with the queue writer client without acknowledgemen
   writerPool.waitingCount = 1;
   const fetchWriter: typeof fetch = async (url, init) =>
     POST(new NextRequest(new Request(url, init)));
-  const outcome = await recordUsage(
+  const outcome = await recordLlmUsage(
     payload,
     {
       url: 'http://localhost/api/internal/usage/record',
@@ -260,14 +310,18 @@ it('emits redacted bounded admission diagnostics and preserves writes when loggi
   expect(admission.map(line => line.outcome)).toEqual(['admitted', 'rejected']);
   expect(Object.keys(admission[0]).sort()).toEqual([
     'active',
+    'active_non_llm',
     'event',
     'limit',
+    'non_llm_limit',
     'outcome',
     'pool',
     'pool_max',
     'reason',
     'sample_rate',
+    'slot_wait_ms',
     'writer_caller',
+    'writer_class',
   ]);
   expect(admission[1]).toEqual({
     ...admission[0],

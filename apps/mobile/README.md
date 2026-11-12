@@ -6,10 +6,11 @@ Humans: follow instructions below or talk to [@iscekic](https://github.com/iscek
 
 ## Feature availability
 
-- Chat and PR Review always appear in signed-in navigation.
+- The four signed-in tabs are Home, Agents, Chat, and Profile. Home and Profile include PR Review.
+- Quick Chat runs conversations on Kilo, custom backends, or supported on-device models.
+- Profile retains account, device sessions, notification preferences, and billing settings.
 - The `mobile-chat` and `mobile-pr-review` flags no longer control these features.
 - PostHog feature flag infrastructure and the version-aware registry remain available for future flags.
-- KiloClaw tab visibility still depends on instance ownership.
 
 ## Profile credits
 
@@ -33,6 +34,23 @@ current account. Route recording pauses while the root layout remounts, so its
 temporary Home route cannot replace the recovery destination. Credential
 preloads are used only for the first auth-provider mount; recovery reads the
 current stored credentials through the normal bounded retry path.
+
+## Voice-input terminal ownership
+
+Stop, cancel, and a queued next start wait for a terminal event with a 60-second
+silence bound. Completed gateway segments and final transcripts extend that
+window; interim text does not. A timed-out stop reports the retryable stopped
+message, while cancel stays silent.
+
+The OS adapter assigns each start a numeric `kiloSessionId` and consumes only
+the patched recognizer's `kiloEvent` channel. Native callbacks retain their
+originating run identity, and old teardown owns only that run's resources.
+Foreign-run events are dropped before controller delivery and iOS transcript
+deduplication. A genuine failed-start error and end remain valid without start.
+
+The versioned `expo-speech-recognition@57.1.1` patch, its workspace registration,
+and its lockfile hash form one native compatibility change. Rebuild both native
+clients; reloading JavaScript onto an older recognizer binary is not supported.
 
 ## New-session model choice
 
@@ -161,6 +179,48 @@ A mutation promise can settle before React Query publishes its observer state.
 Use `waitFor` from `@/test/render-with-providers` before asserting a rendered mutation result.
 Awaiting `mutateAsync` inside `act` does not replace that wait.
 
+## Remote native verification
+
+Keep `KILO_REMOTE_NATIVE=required` when a local iOS build is prohibited.
+Compatible producers are joined before another workflow is dispatched.
+Unknown producer evidence stops the request without dispatching another build.
+Dispatch rechecks the requested local and remote head after a producer wait.
+
+The cache records the simulator SDK from the executable's load commands.
+Old cache identities refresh through the remote artifact path.
+A failed producer or unsupported simulator runtime never supplies an installable artifact.
+
+## Design proof comparisons
+
+Prepare exact base and head revisions before comparing a changed screen:
+
+```sh
+pnpm dev:mobile:design-gate prepare --base <base-sha> --head <head-sha> --targets <manifest.json> --out <new-directory>
+```
+
+The manifest names each target's link, route, focused screen, and readiness test ID.
+An optional diagnostic wrapper imports each revision's own component with identical declared props.
+Preparation never copies head product code into the base.
+
+Start an isolated development stack in each prepared worktree.
+Run the tool from that worktree with its preparation receipt:
+
+```sh
+pnpm exec tsx <tool-checkout>/dev/local/design-gate/cli.ts run --preparation <preparation.json> --revision base --targets <manifest.json> --platform android --device <serial> --metro <url> --out <base-run>
+pnpm exec tsx <tool-checkout>/dev/local/design-gate/cli.ts run --preparation <preparation.json> --revision head --targets <manifest.json> --platform android --device <serial> --metro <url> --out <head-run>
+pnpm dev:mobile:design-gate compare --preparation <preparation.json> --base-run <base-run> --head-run <head-run> --out <comparison>
+```
+
+Login, splash, unopened, or mismatched targets make the comparison inconclusive.
+They do not establish an introduced defect.
+The runtime marker binds the loaded source to the preparation receipt.
+
+Captures retain the original screenshot and a `.capture.json` alignment record.
+Matching probe states bracket the screenshot but do not certify native paint.
+Uncertain alignment skips pixel-to-tree rules; unsettled state skips single-frame geometry rules.
+Timeline shifts still use their own resting-state checks.
+Possible blank frames remain visible as observations, not confirmed defects.
+
 ## Getting started
 
 Generally speaking, you only need a new dev build if making dependency/native changes.
@@ -197,8 +257,6 @@ Native compatibility requirements:
 
 Native permission translations live in `plugins/permission-prompt-copy.json` for all 87 supported languages.
 The camera and photo library prompts explain AI agent attachments and include specific examples.
-Background location descriptions remain disabled because the app does not request background location.
-Apple requires a localized motion description for the location library's linked APIs, even though Kilo does not use or collect motion activity.
 Every build localizes the local-network prompt, because Chat can connect to a local model server.
 Changes require a new iOS build; an over-the-air update cannot change the native permission prompt.
 
@@ -239,6 +297,8 @@ their default resource classes. The production builder requires a paid EAS plan.
 - Sign local simulator builds with an Apple Development identity and its correct team ID.
 - Unsigned builds cannot restore the local account from the keychain on this simulator.
 - Check both displays, all three fold poses, and each orientation after the rebuild.
+- `ios.requireFullScreen` is false, so an iOS 27 window resizes continuously.
+- Expo's config plugin then writes the four `UISupportedInterfaceOrientations~ipad` values for App Store validation.
 
 #### Widget layout checks
 
@@ -260,6 +320,9 @@ their default resource classes. The production builder requires a paid EAS plan.
 - Use `--display=1` for the outer display and `--display=3` for the inner display.
 - An inactive display produces a black screenshot.
 - Type a draft, change the appearance in both directions, and verify the draft stays readable.
+- Resize the window to a narrow size and to a wide size; keep headers, tab labels, lists and transcript controls inside the horizontal safe areas.
+- Resize with an open sheet and the keyboard shown; keep every field and action visible and tappable.
+- Type a draft, resize the window, then background and foreground the app; keep the draft, the route and the transcript position.
 
 ## Diagram host checks
 

@@ -4,10 +4,8 @@ import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
 import { findUserByNormalizedEmail, getWorkOSOrganization } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
-import {
-  isEmailBlacklistedByDomainAsync,
-  isBlockedTLD,
-} from '@kilocode/web-shared/lib/user/server';
+import { isBlockedTLD } from '@kilocode/web-shared/lib/user/server';
+import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
@@ -36,10 +34,10 @@ function getMagicLinkEmailRateLimitKey(email: string): string {
 /**
  * The caller address the firewall rule counts against. `x-vercel-forwarded-for`
  * is the header Vercel's edge sets for the request's source address, so it is
- * read first; `clientIpFromHeaders` in
- * packages/web-shared/src/lib/admin/admin-access-log.ts reads the same header
- * as its fallback. `x-real-ip` covers requests that arrive without the edge
- * header, and `unknown` keeps the bucket key non-empty.
+ * read first, matching `clientIpFromHeaders` in
+ * packages/web-shared/src/lib/admin/admin-access-log.ts. `x-real-ip` covers
+ * requests that arrive without the edge header, and `unknown` keeps the bucket
+ * key non-empty.
  */
 function clientIpAddress(request: NextRequest): string {
   const forwarded = request.headers.get('x-vercel-forwarded-for');
@@ -105,7 +103,7 @@ export type DomainSignInEligibility =
 export async function checkDomainSignInEligibility(
   email: string
 ): Promise<DomainSignInEligibility> {
-  if (await isEmailBlacklistedByDomainAsync(email)) {
+  if (await isEmailBlacklisted(email)) {
     return { ok: false, status: 403, errorCode: 'BLOCKED' };
   }
 
@@ -165,7 +163,7 @@ export async function isNewAccountEligibleForMagicLink(email: string): Promise<b
     return false;
   }
 
-  if (await isEmailBlacklistedByDomainAsync(email)) {
+  if (await isEmailBlacklisted(email)) {
     return false;
   }
 

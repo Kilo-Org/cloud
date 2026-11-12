@@ -1,5 +1,7 @@
 /* eslint-disable max-lines -- cohesive mounted suite: all FilePart tap/preview/share states share one harness */
-import { type FilePart } from '@kilocode/cloud-agent-sdk';
+import { type FilePart, type NativeSessionState } from '@kilocode/cloud-agent-sdk';
+import { readNativeConversation } from '@kilocode/cloud-agent-sdk/native-conversation-source';
+import { kilo2AssetKey } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -20,6 +22,10 @@ type FileInstance = {
   write: (content: string, options?: { encoding?: string }) => Promise<void>;
   writeSync: (content: string, options?: { encoding?: string }) => void;
   text: ReturnType<typeof vi.fn>;
+  canPreview: ReturnType<typeof vi.fn>;
+  preview: ReturnType<typeof vi.fn>;
+  copy: ReturnType<typeof vi.fn>;
+  delete: ReturnType<typeof vi.fn>;
   filename?: string;
 };
 
@@ -28,6 +34,12 @@ const fileInstances: FileInstance[] = [];
 const expoFileSystemMock = vi.hoisted(() => {
   const directoryCreate = vi.fn();
   const fileText = vi.fn();
+  // The native preview flow: a test switches the verdict per case.
+  const previewBehavior = {
+    canPreview: true,
+    previewError: null as Error | null,
+    exists: true,
+  };
   const Directory = vi.fn(function DirectoryMock(_base: unknown, name: string) {
     return {
       name,
@@ -40,9 +52,24 @@ const expoFileSystemMock = vi.hoisted(() => {
         typeof directoryOrUri === 'string'
           ? directoryOrUri
           : `file:///cache/session-file-parts/${filename}`,
+      get exists() {
+        return previewBehavior.exists;
+      },
+      get extension() {
+        const dot = instance.uri.lastIndexOf('.');
+        return dot === -1 ? '' : instance.uri.slice(dot);
+      },
       write: vi.fn().mockResolvedValue(undefined),
       writeSync: vi.fn(),
       text: fileText,
+      canPreview: vi.fn(() => Promise.resolve(previewBehavior.canPreview)),
+      preview: vi.fn(() =>
+        previewBehavior.previewError !== null
+          ? Promise.reject(previewBehavior.previewError)
+          : Promise.resolve()
+      ),
+      copy: vi.fn(() => Promise.resolve()),
+      delete: vi.fn(),
       filename,
     };
     fileInstances.push(instance);
@@ -54,6 +81,7 @@ const expoFileSystemMock = vi.hoisted(() => {
     Paths: { cache: 'file:///cache' },
     directoryCreate,
     fileText,
+    previewBehavior,
   };
 });
 
@@ -80,7 +108,11 @@ vi.mock('@/lib/share-remote-file', () => ({
   shareRemoteFile: shareRemoteFileMock.shareRemoteFile,
 }));
 
-const showActionSheetWithOptions = vi.hoisted(() => vi.fn());
+type ActionSheetConfig = { options: string[]; cancelButtonIndex: number };
+
+const showActionSheetWithOptions = vi.hoisted(() =>
+  vi.fn<(config: ActionSheetConfig, callback?: (index?: number) => void) => void>()
+);
 
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions }),
@@ -180,6 +212,9 @@ beforeEach(() => {
     expiresAt: '2099-01-01T00:00:00Z',
   });
   expoFileSystemMock.fileText.mockReset();
+  expoFileSystemMock.previewBehavior.canPreview = true;
+  expoFileSystemMock.previewBehavior.previewError = null;
+  expoFileSystemMock.previewBehavior.exists = true;
   shareRemoteFileMock.getSafeCacheFilename.mockImplementation(
     ({ id, filename }: { id: string; filename: string }) => `${id}-${filename}`
   );
@@ -299,6 +334,27 @@ async function selectActionSheet(index: number): Promise<void> {
   });
 }
 
+function actionSheetConfig(): ActionSheetConfig {
+  const call = showActionSheetWithOptions.mock.calls.at(-1);
+  if (!call) {
+    throw new Error('action sheet was not shown');
+  }
+  return call[0];
+}
+
+function actionSheetOptions(): string[] {
+  return actionSheetConfig().options;
+}
+
+async function selectActionSheetOption(label: string): Promise<void> {
+  const options = actionSheetOptions();
+  const index = options.indexOf(label);
+  if (index === -1) {
+    throw new Error(`option "${label}" missing from ${options.join(' | ')}`);
+  }
+  await selectActionSheet(index);
+}
+
 describe('FilePartRenderer mounted', () => {
   it('shows a loading image instead of the inline payload while the cache write is pending', async () => {
     const write = Promise.withResolvers<undefined>();
@@ -311,9 +367,15 @@ describe('FilePartRenderer mounted', () => {
           typeof directoryOrUri === 'string'
             ? directoryOrUri
             : `file:///cache/session-file-parts/${filename}`,
+        exists: true,
         write: vi.fn(() => write.promise),
         writeSync: vi.fn(),
         text: expoFileSystemMock.fileText,
+        canPreview: vi.fn(() => Promise.resolve(true)),
+        preview: vi.fn(() => Promise.resolve()),
+        copy: vi.fn(() => Promise.resolve()),
+        extension: '.png',
+        delete: vi.fn(),
         filename,
       };
       fileInstances.push(instance);
@@ -373,7 +435,7 @@ describe('FilePartRenderer mounted', () => {
           'Attachment body'
         );
       } else {
-        await selectActionSheet(0);
+        await selectActionSheetOption('Open as text');
         expect(texts(renderer.root)).toContain('Attachment body');
       }
       expect(selected).toEqual(['message-1']);
@@ -710,7 +772,7 @@ describe('FilePartRenderer mounted', () => {
     await unmount(renderer);
   });
 
-  it('shows the ActionSheet when a non-image, non-markdown FilePart is tapped', async () => {
+  it('offers the native preview beside the text and share choices for a document', async () => {
     cacheFilePart('part-1', {
       url: 'data:application/pdf;base64,QUJD',
       mime: 'application/pdf',
@@ -728,12 +790,32 @@ describe('FilePartRenderer mounted', () => {
     await press(first(buttons));
 
     expect(showActionSheetWithOptions).toHaveBeenCalledTimes(1);
-    const options = showActionSheetWithOptions.mock.calls[0]?.[0] as {
-      options: string[];
-      cancelButtonIndex: number;
-    };
-    expect(options.options).toEqual(['Open as text', 'Open in external app', 'Cancel']);
-    expect(options.cancelButtonIndex).toBe(2);
+    expect(actionSheetOptions()).toEqual([
+      'Preview report.pdf',
+      'Open as text',
+      'Open in external app',
+      'Cancel',
+    ]);
+    expect(actionSheetConfig().cancelButtonIndex).toBe(3);
+
+    await unmount(renderer);
+  });
+
+  it('keeps only the text and share choices for a file that has no document preview', async () => {
+    cacheFilePart('part-1', {
+      url: 'data:application/zip;base64,QUJD',
+      mime: 'application/zip',
+      filename: 'bundle.zip',
+    });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'application/zip', filename: 'bundle.zip', url: '' })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open bundle.zip')));
+
+    expect(actionSheetOptions()).toEqual(['Open as text', 'Open in external app', 'Cancel']);
+    expect(actionSheetConfig().cancelButtonIndex).toBe(2);
 
     await unmount(renderer);
   });
@@ -751,7 +833,7 @@ describe('FilePartRenderer mounted', () => {
     const root = renderer.root;
 
     await press(first(pressableByLabel(root, 'Open report.pdf')));
-    await selectActionSheet(0);
+    await selectActionSheetOption('Open as text');
     await flushAsync();
 
     expect(texts(root)).toContain('plain text body');
@@ -772,7 +854,7 @@ describe('FilePartRenderer mounted', () => {
     const root = renderer.root;
 
     await press(first(pressableByLabel(root, 'Open report.pdf')));
-    await selectActionSheet(1);
+    await selectActionSheetOption('Open in external app');
     await flushAsync();
 
     expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledTimes(1);
@@ -819,7 +901,7 @@ describe('FilePartRenderer mounted', () => {
     const root = renderer.root;
 
     await press(first(pressableByLabel(root, 'Open report.pdf')));
-    await selectActionSheet(1);
+    await selectActionSheetOption('Open in external app');
     await flushAsync();
 
     expect(shareRemoteFileMock.shareLocalFile).toHaveBeenCalledTimes(1);
@@ -881,7 +963,7 @@ describe('FilePartRenderer mounted', () => {
     const root = renderer.root;
 
     await press(first(pressableByLabel(root, 'Open report.pdf')));
-    await selectActionSheet(1);
+    await selectActionSheetOption('Open in external app');
     await flushAsync();
 
     expect(shareRemoteFileMock.shareRemoteFile).toHaveBeenCalledTimes(1);
@@ -930,7 +1012,7 @@ describe('FilePartRenderer mounted', () => {
       const markdown = mime === 'text/markdown';
       await press(first(pressableByLabel(root, `${markdown ? 'Preview' : 'Open'} ${filename}`)));
       if (!markdown) {
-        await selectActionSheet(0);
+        await selectActionSheetOption('Open as text');
       }
       await flushAsync();
 
@@ -1054,10 +1136,102 @@ describe('FilePartRenderer mounted', () => {
     shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce('sharing-unavailable');
 
     await press(first(pressableByLabel(root, 'Open report.pdf')));
-    await selectActionSheet(1);
+    await selectActionSheetOption('Open in external app');
     await flushAsync();
 
     expect(toastMock.error).toHaveBeenCalledWith('File sharing is not available on this device.');
+
+    await unmount(renderer);
+  });
+
+  it('opens a document through the platform preview with the part MIME', async () => {
+    const copyDelete = vi.fn();
+    shareRemoteFileMock.downloadRemoteFile.mockResolvedValue({
+      uri: 'file:///cache/session-file-parts/part-1-report.pdf',
+      delete: copyDelete,
+    });
+    const renderer = await mount(
+      makeFilePart({
+        id: 'part-1',
+        mime: 'application/pdf',
+        filename: 'report.pdf',
+        url: 'https://x/report.pdf',
+      })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open report.pdf')));
+    await selectActionSheetOption('Preview report.pdf');
+    await flushAsync();
+
+    const previewCopy = fileInstances.find(
+      instance => instance.uri === 'file:///cache/session-file-parts/part-1-report.pdf'
+    );
+    expect(previewCopy?.canPreview).toHaveBeenCalledWith({ mimeType: 'application/pdf' });
+    expect(previewCopy?.preview).toHaveBeenCalledWith({
+      mimeType: 'application/pdf',
+      title: 'report.pdf',
+    });
+    expect(copyDelete).not.toHaveBeenCalled();
+    expect(toastMock.error).not.toHaveBeenCalled();
+
+    await unmount(renderer);
+  });
+
+  it('toasts "Preview unavailable" and drops the preview choice when no viewer handles the document', async () => {
+    expoFileSystemMock.previewBehavior.canPreview = false;
+    const copyDelete = vi.fn();
+    shareRemoteFileMock.downloadRemoteFile.mockResolvedValue({
+      uri: 'file:///cache/session-file-parts/part-1-report.pdf',
+      delete: copyDelete,
+    });
+    const renderer = await mount(
+      makeFilePart({
+        id: 'part-1',
+        mime: 'application/pdf',
+        filename: 'report.pdf',
+        url: 'https://x/report.pdf',
+      })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open report.pdf')));
+    await selectActionSheetOption('Preview report.pdf');
+    await flushAsync();
+
+    expect(toastMock.error).toHaveBeenCalledWith('Preview unavailable');
+    expect(copyDelete).toHaveBeenCalledTimes(1);
+    const rejected = fileInstances.find(
+      instance => instance.uri === 'file:///cache/session-file-parts/part-1-report.pdf'
+    );
+    expect(rejected?.preview).not.toHaveBeenCalled();
+
+    showActionSheetWithOptions.mockClear();
+    toastMock.error.mockClear();
+    await press(first(pressableByLabel(root, 'Open report.pdf')));
+    expect(actionSheetOptions()).toEqual(['Open as text', 'Open in external app', 'Cancel']);
+
+    await unmount(renderer);
+  });
+
+  it('toasts a retryable message when the document cannot be downloaded', async () => {
+    shareRemoteFileMock.downloadRemoteFile.mockRejectedValue(new Error('offline'));
+    const renderer = await mount(
+      makeFilePart({
+        id: 'part-1',
+        mime: 'application/pdf',
+        filename: 'report.pdf',
+        url: 'https://x/report.pdf',
+      })
+    );
+    const root = renderer.root;
+
+    await press(first(pressableByLabel(root, 'Open report.pdf')));
+    await selectActionSheetOption('Preview report.pdf');
+    await flushAsync();
+
+    expect(toastMock.error).toHaveBeenCalledWith('Could not load this file. Try again.');
+    expect(findByType(root, 'ActivityIndicator')).toHaveLength(0);
 
     await unmount(renderer);
   });
@@ -1888,4 +2062,88 @@ describe('FilePartRenderer preview sheet surface', () => {
 
     await unmount(renderer);
   });
+});
+
+it('mounts projected native image/PDF results in the real file renderer and opens existing viewers', async () => {
+  const imageURI = `media:${'a'.repeat(64)}`;
+  const pdfURI = `media:${'b'.repeat(64)}`;
+  const imageURL =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jDXsAAAAASUVORK5CYII=';
+  const pdfURL = 'data:application/pdf;base64,JVBERi0xLjcK';
+  const state: NativeSessionState = {
+    connection: 'connected',
+    runnerConnected: true,
+    session: {
+      id: 'ses_native',
+      origin: { directory: '/owned' },
+      time: { created: 1, updated: 2 },
+    },
+    snapshot: { position: 2, revision: 2 },
+    pending: { permissions: [], questions: [] },
+    events: [],
+    commands: {},
+    assetURLs: {
+      [kilo2AssetKey('msg_native_files_000000_file_0', imageURI, 'image/png')]: imageURL,
+      [kilo2AssetKey('msg_native_files_000000_file_1', pdfURI, 'application/pdf')]: pdfURL,
+    },
+    messages: [
+      {
+        seq: 1,
+        message: {
+          id: 'msg_native_files',
+          type: 'assistant',
+          time: { created: 1, completed: 2 },
+          content: [
+            {
+              type: 'tool',
+              id: 'read-files',
+              name: 'read',
+              time: { created: 1, completed: 2 },
+              state: {
+                status: 'completed',
+                input: { path: '/owned' },
+                content: [
+                  { type: 'file', uri: imageURI, mime: 'image/png', name: 'snapshot.png' },
+                  { type: 'file', uri: pdfURI, mime: 'application/pdf', name: 'report.pdf' },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ],
+  };
+  const files = readNativeConversation(state)
+    .messages.flatMap(message => message.parts)
+    .filter(part => part.type === 'file');
+  expect(files).toHaveLength(2);
+  const image = files.find(part => part.mime === 'image/png');
+  const pdf = files.find(part => part.mime === 'application/pdf');
+  if (!image || !pdf) {
+    throw new Error('Native file results were not projected');
+  }
+  const imageRenderer = await mount(image);
+  expect(first(findByType(imageRenderer.root, 'Image')).props.source).toEqual({ uri: imageURL });
+  await press(first(pressableByLabel(imageRenderer.root, 'Open snapshot.png full screen')));
+  expect(first(findByType(imageRenderer.root, 'ImageViewer')).props).toMatchObject({
+    visible: true,
+    uri: imageURL,
+  });
+  await unmount(imageRenderer);
+  const pdfRenderer = await mount(pdf);
+  await press(first(pressableByLabel(pdfRenderer.root, 'Open report.pdf')));
+  await selectActionSheetOption('Preview report.pdf');
+  await flushAsync();
+  const written = fileInstances.find(instance => instance.filename?.endsWith('-report.pdf'));
+  expect(written?.write).toHaveBeenCalledWith('JVBERi0xLjcK', { encoding: 'base64' });
+  const previewed = fileInstances.find(instance => instance.canPreview.mock.calls.length > 0);
+  expect(previewed?.canPreview).toHaveBeenCalledWith({ mimeType: 'application/pdf' });
+  expect(previewed?.preview).toHaveBeenCalledWith({
+    mimeType: 'application/pdf',
+    title: 'report.pdf',
+  });
+  expect(getAttachmentDownloadUrlMutate).not.toHaveBeenCalled();
+  expect(shareRemoteFileMock.downloadRemoteFile).not.toHaveBeenCalled();
+  expect(toastMock.error).not.toHaveBeenCalled();
+  await unmount(pdfRenderer);
 });

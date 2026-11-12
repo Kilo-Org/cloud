@@ -4,6 +4,68 @@ import { classifyAssistantFailure } from '../../../src/shared/assistant-failure.
 import type { KiloFeedEvent } from './kilo-event-feed.js';
 import type { HarnessActivityEvent } from './harness-activity.js';
 
+it('translates native drain proof without session reads or conversation history', async () => {
+  const events: KiloFeedEvent[] = [];
+  let reads = 0;
+  const marker = { sessionID: 'ses_root', token: 'proof-token' };
+  const native = Bun.serve({
+    port: 0,
+    fetch(request) {
+      if (new URL(request.url).pathname !== '/api/event') {
+        reads++;
+        return new Response(null, { status: 503 });
+      }
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            for (const [type, data] of [
+              ['server.connected', {}],
+              ['rpc.kilocode.session-drain.drained', marker],
+            ] as const)
+              controller.enqueue(
+                new TextEncoder().encode(
+                  `data: ${JSON.stringify({ id: `evt_${type}`, type, data, created: 1, location: { directory: '/workspace' } })}\n\n`
+                )
+              );
+          },
+        }),
+        { headers: { 'content-type': 'text/event-stream' } }
+      );
+    },
+  });
+  const received = Promise.withResolvers<void>();
+  const feed = createKilo2EventFeed({
+    source: {
+      server: { url: native.url.origin },
+      directory: '/workspace',
+      nativeRuntimeId: 'rt_v2',
+    },
+    signal: AbortSignal.timeout(5000),
+    onEvent(event) {
+      events.push(event);
+      if (event.type === 'session.drained') received.resolve();
+    },
+    onFailure() {},
+  });
+  try {
+    await feed.open();
+    await received.promise;
+    expect(events).toEqual([
+      { type: 'server.connected', properties: {}, directory: undefined, nativeRuntimeId: 'rt_v2' },
+      {
+        type: 'session.drained',
+        properties: marker,
+        directory: '/workspace',
+        nativeRuntimeId: 'rt_v2',
+      },
+    ]);
+    expect(reads).toBe(0);
+  } finally {
+    feed.close();
+    await native.stop(true);
+  }
+});
+
 it('does not acknowledge a later prompt from an earlier interrupted execution snapshot', async () => {
   const directory = '/workspace';
   const sessionID = 'ses_local';
@@ -62,6 +124,14 @@ it('does not acknowledge a later prompt from an earlier interrupted execution sn
   }
   try {
     await feed.open();
+    controller?.enqueue(frame('command.updated', {}));
+    await until(() => events.some(event => event.type === 'command.updated'));
+    expect(events.find(event => event.type === 'command.updated')).toEqual({
+      type: 'command.updated',
+      properties: {},
+      directory,
+      nativeRuntimeId: 'runtime_local',
+    });
     controller?.enqueue(frame('session.execution.interrupted', { sessionID }));
     await until(() => events.some(event => event.type === 'session.turn.close'));
     expect(messages()).toEqual([]);
@@ -293,4 +363,118 @@ it.each([
   [{ type: 'unknown', message: 'Request failed' }, 'unknown'],
 ] as const)('classifies a native execution error by its status and type', (error, reason) => {
   expect(classifyAssistantFailure(nativeTurnError(error)).reason).toBe(reason);
+});
+
+// Kilo v2 0.0.0-v2-77 reports every model catalog load failure with this text.
+const catalogFailure = (detail: string) =>
+  `Failed to load the Kilo model catalog (${detail}). Check your connection and credentials.`;
+
+it.each([
+  [catalogFailure('HTTP 404'), 'model_catalog_unavailable'],
+  [
+    `SessionRunnerModel.ModelUnavailableError: ${catalogFailure('HTTP 404')}`,
+    'model_catalog_unavailable',
+  ],
+  [catalogFailure('HTTP 503'), 'provider_unavailable'],
+  [catalogFailure('HTTP 401'), 'provider_authentication'],
+  [catalogFailure('network'), 'unknown'],
+  ['No model is selected', 'unknown'],
+] as const)('classifies a native no-route failure %s as %s', (message, reason) => {
+  const failure = classifyAssistantFailure(nativeTurnError({ type: 'provider.no-route', message }));
+  expect(failure.reason).toBe(reason);
+  if (reason === 'model_catalog_unavailable') {
+    expect(failure.safeMessage).toBe('The Kilo model catalog could not be loaded');
+    expect(failure.terminalCode).toBeUndefined();
+  }
+});
+
+it('restricts step starts to their message and emits each pending permission once', async () => {
+  const directory = '/workspace';
+  const sessionID = 'ses_local';
+  const events: KiloFeedEvent[] = [];
+  const activity: HarnessActivityEvent[] = [];
+  let pending = [{ id: 'req_first', sessionID, action: 'shell', resources: ['pwd'] }];
+  let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+  const frame = (type: string, data: Record<string, unknown>) =>
+    new TextEncoder().encode(
+      `data: ${JSON.stringify({ id: `evt_${type}`, type, data, created: 10, location: { directory } })}\n\n`
+    );
+  const native = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch(request) {
+      const pathname = new URL(request.url).pathname;
+      if (pathname === '/api/event')
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(stream) {
+              controller = stream;
+              stream.enqueue(frame('server.connected', {}));
+            },
+          }),
+          { headers: { 'content-type': 'text/event-stream' } }
+        );
+      if (pathname === '/api/permission/request') return Response.json({ data: pending });
+      if (pathname.endsWith('/message'))
+        return Response.json({
+          data: ['msg_old', 'msg_current'].map((id, index) => ({
+            id,
+            type: 'assistant',
+            time: { created: index + 1 },
+            content: [{ type: 'text', text: id }],
+          })),
+          cursor: { next: null },
+        });
+      return Response.json({
+        data: { id: sessionID, location: { directory }, time: { created: 0, updated: 20 } },
+      });
+    },
+  });
+  const feed = createKilo2EventFeed({
+    source: { server: { url: native.url.origin }, directory, nativeRuntimeId: 'runtime_local' },
+    signal: AbortSignal.timeout(5000),
+    onEvent: event => events.push(event),
+    onHarnessActivity: event => activity.push(event),
+    onFailure() {},
+  });
+  async function until(predicate: () => boolean) {
+    const deadline = Date.now() + 2000;
+    while (!predicate()) {
+      if (Date.now() > deadline) throw new Error('Native event did not arrive');
+      await Bun.sleep(5);
+    }
+  }
+  const permissions = () =>
+    events.filter(event => event.type === 'permission.asked').map(event => event.properties.id);
+  try {
+    await feed.open();
+    controller?.enqueue(
+      frame('session.step.started', { sessionID, assistantMessageID: 'msg_current' })
+    );
+    controller?.enqueue(frame('session.renamed', { sessionID }));
+    await until(() => events.some(event => event.type === 'session.updated'));
+    expect(
+      events
+        .filter(event => event.type === 'conversation.message.updated')
+        .map(event => event.properties.message)
+    ).toEqual([expect.objectContaining({ id: 'msg_current' })]);
+    expect(activity.map(event => event.activity.type)).toEqual(['message']);
+    controller?.enqueue(frame('session.step.ended', { sessionID }));
+    await until(() => activity.filter(event => event.activity.type === 'part').length === 2);
+    controller?.enqueue(frame('permission.asked', { sessionID, action: 'shell' }));
+    await until(() => permissions().length === 1);
+    pending.push({ id: 'req_second', sessionID, action: 'shell', resources: ['ls'] });
+    controller?.enqueue(frame('permission.asked', { sessionID, action: 'shell' }));
+    controller?.enqueue(frame('session.renamed', { sessionID }));
+    await until(() => events.filter(event => event.type === 'session.updated').length === 2);
+    expect(permissions()).toEqual(['req_first', 'req_second']);
+    pending = [{ id: 'req_other', sessionID: 'ses_other', action: 'shell', resources: ['ls'] }];
+    controller?.enqueue(frame('permission.asked', { sessionID, action: 'shell' }));
+    controller?.enqueue(frame('session.renamed', { sessionID }));
+    await until(() => events.filter(event => event.type === 'session.updated').length === 3);
+    expect(permissions()).toEqual(['req_first', 'req_second']);
+  } finally {
+    feed.close();
+    await native.stop(true);
+  }
 });

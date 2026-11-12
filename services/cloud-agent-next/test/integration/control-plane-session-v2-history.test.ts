@@ -11,6 +11,7 @@ import {
 } from '../../src/control-plane/session/event-queries.js';
 import {
   MAX_SESSION_PAGE_BYTES,
+  MAX_SESSION_PREVIEW_PAGE_BYTES,
   readSessionMessagesPage,
 } from '../../src/control-plane/session/history.js';
 import {
@@ -1202,6 +1203,10 @@ describe('workspace DO history and mutation cursors', () => {
             lifecycle: { version: 1, timestamp: 1 },
           })
         );
+        await instance.getSessionToolPartDetail({
+          messageId: 'msg_missing',
+          partId: 'prt_missing',
+        });
         await instance.getSessionMessagesPage();
         expect(messages).toHaveBeenCalledTimes(version === 'v1' ? 1 : 0);
       });
@@ -1323,6 +1328,39 @@ describe('workspace DO history and mutation cursors', () => {
     });
   });
 
+  it('retains skipped and failed auto-commit results for each repository across replay', async () => {
+    const { stub } = await fixture();
+    for (const repository of ['org/first', 'org/second']) {
+      await publish(stub, 'autocommit_completed', {
+        messageId: 'msg_multi_repo',
+        repository,
+        skipped: true,
+      });
+      await publish(stub, 'autocommit_completed', {
+        messageId: 'msg_failed_multi_repo',
+        repository,
+        success: false,
+        error: 'Commit failed',
+      });
+    }
+    await runInDurableObject(stub, (_instance, state) => {
+      const rows = drizzle(state.storage).select().from(events).all();
+      const commits = rows
+        .map(row => readNativeEventPayload(row.payload))
+        .filter(event => event?.type === 'autocommit_completed')
+        .map(event => event?.properties);
+      expect(commits).toHaveLength(4);
+      expect(commits).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ messageId: 'msg_multi_repo', repository: 'org/first' }),
+          expect.objectContaining({ messageId: 'msg_multi_repo', repository: 'org/second' }),
+          expect.objectContaining({ messageId: 'msg_failed_multi_repo', repository: 'org/first' }),
+          expect.objectContaining({ messageId: 'msg_failed_multi_repo', repository: 'org/second' }),
+        ])
+      );
+    });
+  });
+
   it('restores full current retry status and bounded commit bootstrap without transcript replay', async () => {
     const { stub, kiloSessionId } = await fixture();
     await publish(stub, 'session.status', {
@@ -1388,5 +1426,312 @@ describe('workspace DO history and mutation cursors', () => {
       expect(readHistoryHydration(state.storage)?.phase).toBe('complete');
       expect(db.select().from(events).all()).toHaveLength(1);
     });
+  });
+});
+
+describe('tool previews and authorized tool details', () => {
+  const largeOutput = 'output line\n'.repeat(4_000);
+  const largeInput = 'c'.repeat(10_000);
+
+  function toolPart(sessionID: string, messageID: string, id: string, output = largeOutput) {
+    const content = output.length > 100 ? largeInput : 'small';
+    return {
+      id,
+      sessionID,
+      messageID,
+      type: 'tool',
+      callID: `call_${id}`,
+      tool: 'write',
+      state: {
+        status: 'completed',
+        input: { filePath: '/repo/a.ts', content },
+        output,
+        title: 'a.ts',
+        metadata: {},
+        time: { start: 1, end: 2 },
+      },
+    };
+  }
+
+  async function publishTool(
+    stub: DurableObjectStub<SandboxSessionV2>,
+    kiloSessionId: string,
+    messageId = 'msg_tool',
+    partId = 'prt_tool',
+    output = largeOutput
+  ) {
+    await publish(stub, 'message.updated', { info: message(kiloSessionId, messageId, 1) });
+    await publish(stub, 'message.part.updated', {
+      part: toolPart(kiloSessionId, messageId, partId, output),
+    });
+  }
+
+  async function rowCursor(stub: DurableObjectStub<SandboxSessionV2>, entityId: string) {
+    return runInDurableObject(stub, (_instance, state) => {
+      const row = drizzle(state.storage)
+        .select({ cursor: events.mutation_cursor })
+        .from(events)
+        .where(eq(events.entity_id, entityId))
+        .get();
+      return row?.cursor;
+    });
+  }
+
+  it('returns bounded previews with a revision only when requested', async () => {
+    const { stub, kiloSessionId } = await fixture();
+    await publishTool(stub, kiloSessionId);
+    await publishTool(stub, kiloSessionId, 'msg_small', 'prt_small', 'small');
+    const full = await stub.getSessionMessagesPage();
+    const preview = await stub.getSessionMessagesPage({ toolDisplay: 'preview' });
+    const fullParts = full?.messages.flatMap(item => ('parts' in item ? item.parts : []));
+    const previewParts = preview?.messages.flatMap(item => ('parts' in item ? item.parts : []));
+    expect(fullParts?.find(item => item.id === 'prt_tool')).toMatchObject({
+      state: { output: largeOutput },
+    });
+    const projected = previewParts?.find(item => item.id === 'prt_tool') as
+      | (ReturnType<typeof toolPart> & { cloudDetail: { revision: number; omitted: string[] } })
+      | undefined;
+    expect(projected?.state.output.length).toBeLessThan(5_000);
+    expect(projected?.state.input.filePath).toBe('/repo/a.ts');
+    expect(projected?.cloudDetail).toMatchObject({
+      revision: await rowCursor(stub, 'part/msg_tool/prt_tool'),
+      omitted: ['output', 'input.content'],
+    });
+    expect(previewParts?.find(item => item.id === 'prt_small')).toEqual(
+      fullParts?.find(item => item.id === 'prt_small')
+    );
+    expect(new TextEncoder().encode(JSON.stringify(preview)).byteLength).toBeLessThan(
+      new TextEncoder().encode(JSON.stringify(full)).byteLength / 4
+    );
+    // The preview still parses through the strict client page schema.
+    expect(cloudSessionMessagesPageSchema.parse(preview)?.messages).toHaveLength(2);
+  });
+
+  it('reads complete stored details for the current revision without waking compute', async () => {
+    const { stub, kiloSessionId, peer } = await fixture();
+    await publishTool(stub, kiloSessionId);
+    const detail = await stub.getSessionToolPartDetail({
+      messageId: 'msg_tool',
+      partId: 'prt_tool',
+    });
+    expect(detail).toMatchObject({
+      kind: 'found',
+      source: { version: 'v1' },
+      revision: await rowCursor(stub, 'part/msg_tool/prt_tool'),
+      part: { id: 'prt_tool', state: { output: largeOutput, input: { content: largeInput } } },
+    });
+    expect(peer.fetchCalls).toEqual([]);
+    expect(peer.statusCalls).toEqual([]);
+    expect(peer.prepareCalls).toEqual([]);
+    // A newer row revision is reported, so a client can retire stale details.
+    await publishTool(stub, kiloSessionId, 'msg_tool', 'prt_tool', `${largeOutput}more`);
+    const newer = await stub.getSessionToolPartDetail({
+      messageId: 'msg_tool',
+      partId: 'prt_tool',
+    });
+    expect(newer?.kind === 'found' && newer.revision).toBeGreaterThan(
+      detail?.kind === 'found' ? detail.revision : Infinity
+    );
+  });
+
+  it('hydrates an ingest-only tool before the first detail read without waking compute', async () => {
+    const { stub, sessionId, kiloSessionId, peer } = await fixture();
+    await runInDurableObject(stub, async (instance, state) => {
+      state.storage.kv.delete('client_history_hydration');
+      const importedPart = toolPart(kiloSessionId, 'msg_imported', 'prt_imported');
+      const readMessages = vi.fn().mockResolvedValue({
+        kiloSessionId,
+        cloudAgentSessionId: sessionId,
+        history: {
+          messages: [{ info: message(kiloSessionId, 'msg_imported', 1), parts: [importedPart] }],
+          nextCursor: null,
+          omittedItemCount: 0,
+        },
+      });
+      const ingest = instance.env.SESSION_INGEST;
+      instance.env.SESSION_INGEST = {
+        getCloudAgentRootSessionSnapshot: vi.fn().mockResolvedValue(null),
+        getCloudAgentRootSessionMessages: readMessages,
+      } as unknown as SessionIngestBinding;
+      Reflect.set(
+        instance,
+        'metadata',
+        parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { sessionId, userId: USER_ID, createdOnPlatform: 'cloud-agent-web' },
+          auth: { kiloSessionId, kilocodeToken: 'test-kilo-token' },
+          agent: { mode: 'code', model: 'test/model' },
+          lifecycle: { version: 1, timestamp: 1 },
+        })
+      );
+      try {
+        expect(
+          await instance.getSessionToolPartDetail({
+            messageId: 'msg_imported',
+            partId: 'prt_imported',
+          })
+        ).toMatchObject({
+          kind: 'found',
+          source: { version: 'v1' },
+          part: {
+            id: importedPart.id,
+            messageID: importedPart.messageID,
+            sessionID: kiloSessionId,
+            state: { input: importedPart.state.input, output: importedPart.state.output },
+          },
+        });
+        expect(readMessages).toHaveBeenCalledTimes(1);
+        expect(readHistoryHydration(state.storage)?.phase).toBe('complete');
+        expect((await instance.getSessionMessagesPage())?.messages).toHaveLength(1);
+        expect(readMessages).toHaveBeenCalledTimes(1);
+      } finally {
+        instance.env.SESSION_INGEST = ingest;
+      }
+    });
+    expect(peer.fetchCalls).toEqual([]);
+    expect(peer.statusCalls).toEqual([]);
+    expect(peer.prepareCalls).toEqual([]);
+  });
+
+  it('keeps a small tool at the hard-cap boundary without reserving an unused marker', async () => {
+    const { stub, kiloSessionId } = await fixture();
+    const messageId = 'msg_boundary';
+    await publish(stub, 'message.updated', { info: message(kiloSessionId, messageId, 1) });
+    const text = 'x'.repeat(Math.floor((MAX_SESSION_PAGE_BYTES - 10_000) / 6));
+    for (let index = 0; index < 6; index++) {
+      await publish(stub, 'message.part.updated', {
+        part: part(kiloSessionId, messageId, `prt_${index}`, text),
+      });
+    }
+    await publish(stub, 'message.part.updated', {
+      part: toolPart(kiloSessionId, messageId, 'prt_ztool', 'small'),
+    });
+
+    const full = await stub.getSessionMessagesPage();
+    const preview = await stub.getSessionMessagesPage({ toolDisplay: 'preview' });
+    expect(full?.messages[0]?.parts).toHaveLength(7);
+    expect(preview?.messages).toEqual(full?.messages);
+    expect(preview?.omittedItemCount).toBe(0);
+    expect(preview?.nextCursor).toBeNull();
+    expect(new TextEncoder().encode(JSON.stringify(preview)).byteLength).toBeLessThanOrEqual(
+      MAX_SESSION_PAGE_BYTES
+    );
+  });
+
+  it('does not reveal removed, foreign-session or non-tool rows', async () => {
+    const { stub, kiloSessionId } = await fixture();
+    const child = nativeId();
+    const foreign = nativeId();
+    await publish(stub, 'session.created', { info: { id: child, parentID: kiloSessionId } });
+    await publish(stub, 'session.updated', { info: { id: foreign } });
+    await publishTool(stub, kiloSessionId);
+    await publish(stub, 'message.part.updated', {
+      part: part(kiloSessionId, 'msg_tool', 'prt_text'),
+    });
+    const read = (input: Parameters<SandboxSessionV2['getSessionToolPartDetail']>[0]) =>
+      stub.getSessionToolPartDetail(input);
+    expect(await read({ messageId: 'msg_tool', partId: 'prt_text' })).toEqual({
+      kind: 'not_found',
+    });
+    expect(await read({ messageId: 'msg_tool', partId: 'prt_missing' })).toEqual({
+      kind: 'not_found',
+    });
+    // The part belongs to the root, not to the selected child.
+    expect(await read({ kiloSessionId: child, messageId: 'msg_tool', partId: 'prt_tool' })).toEqual(
+      { kind: 'not_found' }
+    );
+    expect(await read({ kiloSessionId: foreign, messageId: 'msg_tool', partId: 'prt_tool' })).toBe(
+      null
+    );
+    expect(
+      await read({ expectedRootKiloSessionId: foreign, messageId: 'msg_tool', partId: 'prt_tool' })
+    ).toBeNull();
+    await publish(stub, 'message.part.removed', {
+      sessionID: kiloSessionId,
+      messageID: 'msg_tool',
+      partID: 'prt_tool',
+    });
+    expect(await read({ messageId: 'msg_tool', partId: 'prt_tool' })).toEqual({
+      kind: 'not_found',
+    });
+  });
+
+  it('projects native v2 tool entries and returns one complete call', async () => {
+    const { stub, kiloSessionId } = await fixture();
+    const source = {
+      version: 'v2',
+      session: {
+        id: kiloSessionId,
+        location: { directory: '/workspace/app' },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    await publish(stub, 'conversation.source', { sessionID: kiloSessionId, source });
+    const tool = (id: string) => ({
+      type: 'tool',
+      id,
+      name: 'shell',
+      state: {
+        status: 'completed',
+        input: { command: 'cat big' },
+        content: [{ type: 'text', text: largeOutput }],
+      },
+      time: { created: 1, completed: 2 },
+    });
+    await publish(stub, 'conversation.message.updated', {
+      sessionID: kiloSessionId,
+      source,
+      message: {
+        id: 'msg_v2_tools',
+        type: 'assistant',
+        time: { created: 2 },
+        content: [tool('call_a'), tool('call_b')],
+      },
+    });
+    const revision = await rowCursor(stub, 'message/msg_v2_tools');
+    const preview = await stub.getSessionMessagesPage({ toolDisplay: 'preview' });
+    const first = preview?.messages[0] as
+      | { message: { content: Array<Record<string, unknown>> } }
+      | undefined;
+    const content = first?.message.content ?? [];
+    expect(content.map(item => item.cloudDetail)).toMatchObject([{ revision }, { revision }]);
+    expect(cloudSessionMessagesPageSchema.parse(preview)?.messages[0]?.parts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ callID: 'call_a', cloudDetail: expect.any(Object) }),
+      ])
+    );
+    const detail = await stub.getSessionToolPartDetail({
+      messageId: 'msg_v2_tools',
+      partId: 'unused',
+      callId: 'call_b',
+    });
+    expect(detail).toMatchObject({ kind: 'found', source, revision });
+    const detailContent = (detail as { message: { content: Array<Record<string, unknown>> } })
+      .message.content;
+    expect(detailContent[0]?.cloudDetail).toBeDefined();
+    expect(detailContent[1]).toEqual(tool('call_b'));
+    expect(
+      await stub.getSessionToolPartDetail({ messageId: 'msg_v2_tools', partId: 'unused' })
+    ).toEqual({ kind: 'not_found' });
+  });
+
+  it('continues preview pages at the soft budget instead of omitting messages', async () => {
+    const { stub, kiloSessionId } = await fixture();
+    const text = 'x'.repeat(400_000);
+    for (let index = 0; index < 4; index += 1) {
+      await publish(stub, 'message.updated', {
+        info: message(kiloSessionId, `msg_soft_${index}`, index + 1),
+      });
+      await publish(stub, 'message.part.updated', {
+        part: part(kiloSessionId, `msg_soft_${index}`, `prt_soft_${index}`, text),
+      });
+    }
+    const first = await stub.getSessionMessagesPage({ toolDisplay: 'preview' });
+    expect(new TextEncoder().encode(JSON.stringify(first)).byteLength).toBeLessThanOrEqual(
+      MAX_SESSION_PREVIEW_PAGE_BYTES
+    );
+    expect(first?.omittedItemCount).toBe(0);
+    expect(first?.nextCursor).toBeTruthy();
+    expect((await stub.getSessionMessagesPage())?.messages).toHaveLength(4);
   });
 });

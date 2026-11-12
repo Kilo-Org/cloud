@@ -30,6 +30,11 @@ permissions:
 
 jobs:
   promote:
+    # Guard: this reusable workflow promotes a Vercel deployment to production
+    # using repo secrets. This is defense-in-depth: callers must guard their own
+    # jobs, because a job-level `if:` turns an unguarded call on a fork into a
+    # silently skipped promotion rather than an obvious failure.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production

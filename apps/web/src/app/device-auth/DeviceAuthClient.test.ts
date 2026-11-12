@@ -93,6 +93,7 @@ describe('DeviceAuthClient layout', () => {
         viewerToken: 'v',
         isAppMode: true,
         requestingClient: null,
+        pendingLink: null,
         user,
       })
     );
@@ -146,6 +147,7 @@ describe('DeviceAuthClient requesting app', () => {
         viewerToken: 'v',
         isAppMode: false,
         requestingClient: client,
+        pendingLink: null,
         user: { name: 'Test User', email: 'test@example.com', imageUrl: '' },
       })
     );
@@ -184,6 +186,36 @@ describe('DeviceAuthClient requesting app', () => {
     expect(html).not.toContain('Requesting app');
     expect(html).not.toContain('Confirm the requesting app');
     expect(authorizeButton(html)).not.toContain('disabled=""');
+  });
+});
+
+describe('DeviceAuthClient pending link', () => {
+  const renderWithPendingLink = () =>
+    renderToStaticMarkup(
+      React.createElement(DeviceAuthClient, {
+        code: 'ABC-123',
+        viewerToken: 'v',
+        isAppMode: false,
+        requestingClient: null,
+        pendingLink: { provider: 'github', email: 'octo@example.com', displayName: 'octocat' },
+        user: { name: 'Test User', email: 'test@example.com', imageUrl: '' },
+      })
+    );
+
+  const authorizeButton = (html: string): string =>
+    html.slice(html.lastIndexOf('<button'), html.indexOf('</button>', html.lastIndexOf('<button')));
+
+  test('names the pending identity and offers both choices with none preselected', () => {
+    const html = renderWithPendingLink();
+
+    expect(html).toContain('This app also asks to add GitHub (octocat) to your account');
+    expect(html).toContain('Approve and add it');
+    expect(html).toContain('Approve without adding it');
+    expect(html).toContain('id="pending-link-add"');
+    expect(html).toContain('id="pending-link-skip"');
+    expect(html).not.toContain('checked=""');
+    expect(authorizeButton(html)).toContain('disabled=""');
+    expect(html).toContain('Choose whether to add the sign-in method above to authorize.');
   });
 });
 

@@ -29,6 +29,8 @@ import {
   allowedInferenceProviders,
   apiKindNotSupportedResponse,
   chatGptReconnectResponse,
+  claudeBillingReconnectResponse,
+  claudeBillingUnavailableResponse,
   dataCollectionRequiredResponse,
   directByokCatalogOnlyMessage,
   directByokCatalogOnlyResponse,
@@ -36,7 +38,7 @@ import {
   getOrganizationProviderPrivacy,
   inferenceProvidersNotAllowedResponse,
   managedGatewayDisabledResponse,
-  modelDoesNotExistOnOpenRouterResponse,
+  unknownModelResponse,
   modelNotAllowedResponse,
   organizationAutoConfigurationResponse,
   unavailableModelResponse,
@@ -184,9 +186,21 @@ export async function resolveProviderAndPolicy(
     // instead of silently serving the request through another billing path.
     return reject(chatGptReconnectResponse(providerResult.message));
   }
+  if (providerResult.kind === 'claude-billing-reconnect') {
+    // The organization's shared-services Claude link was connected by a person
+    // who is gone. Only an owner reconnecting it changes the outcome.
+    return reject(claudeBillingReconnectResponse(providerResult.message, input.organizationId));
+  }
+  if (providerResult.kind === 'claude-billing-unavailable') {
+    // The owner's Claude billing connection cannot bill. Never serve it on
+    // another payer's allowance without telling them.
+    return reject(
+      claudeBillingUnavailableResponse(providerResult.message, providerResult.retryable)
+    );
+  }
   if (providerResult.kind === 'custom-llm-unavailable') {
     // Same response as an unknown model id, so callers cannot probe for custom LLMs.
-    return reject(modelDoesNotExistOnOpenRouterResponse(model));
+    return reject(unknownModelResponse(model));
   }
   if (providerResult.kind === 'direct-byok-catalog-only') {
     // Falling through to the managed gateway would fail later with a misleading unknown-model error.
@@ -205,6 +219,9 @@ export async function resolveProviderAndPolicy(
   }
   // A local, so the type guard narrows it rather than `providerResult.provider.type`.
   const providerType = providerResult.provider.type;
+  if (providerType === 'claude-billing' && !(await isDirectByokProviderAllowed('anthropic'))) {
+    return reject(modelNotAllowedResponse());
+  }
   if (isManagedGatewayDisabled(organizationGatewaySettings, providerType)) {
     return reject(managedGatewayDisabledResponse(providerType));
   }

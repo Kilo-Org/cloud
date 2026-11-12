@@ -35,6 +35,7 @@ import {
 export const maxDuration = 150;
 
 const POOL_WAITING_SAMPLE_INTERVAL_MS = 100;
+const QUEUE_ADMISSION_MAX_WAIT_MS = 250;
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const unauthorized = authorizeInternalApiRequest(request);
@@ -92,7 +93,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const source = request.headers.get('x-usage-write-source');
   const admission =
     source === 'queue' || source === 'queue_vercel'
-      ? queueWriterAdmission.tryAcquire(source, core.id)
+      ? await queueWriterAdmission.acquire(source, core.id, {
+          maxWaitMs: QUEUE_ADMISSION_MAX_WAIT_MS,
+          signal: request.signal,
+        })
       : null;
   if (admission && !admission.admitted) {
     return NextResponse.json(
@@ -100,6 +104,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 429 }
     );
   }
+  if (admission) timer.mark('admission');
 
   // Redelivery is handled inside the write, not by a lookup here.
   // Sample on an interval: waiting peaks during the write, not at its endpoints.

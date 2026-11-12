@@ -195,6 +195,7 @@ const context: MicrodollarUsageContext = {
 let sent: UsageRecordRequest[];
 let info: jest.MockedFunction<typeof console.info>;
 let completionLogs: string[];
+let attemptLogs: string[];
 let warn: jest.MockedFunction<typeof console.warn>;
 let error: jest.MockedFunction<typeof console.error>;
 let autoTopUpUser: UserForBalance | null;
@@ -262,9 +263,15 @@ beforeEach(() => {
   autoTopUpUser = null;
   info = jest.fn();
   completionLogs = [];
+  attemptLogs = [];
   jest.spyOn(console, 'info').mockImplementation((...args) => {
     if (typeof args[0] === 'string' && args[0].includes('"event":"usage_record_completion"')) {
       completionLogs.push(args[0]);
+    } else if (
+      typeof args[0] === 'string' &&
+      args[0].includes('"event":"usage_publisher_attempt"')
+    ) {
+      attemptLogs.push(args[0]);
     } else info(...args);
   });
   error = jest.fn();
@@ -1010,7 +1017,30 @@ describe('gateway accounting integration', () => {
       expect(sent[0].core.cache_discount).toBe(0);
       expect(sent[0].metadata.market_cost).toBe(1234);
       expect(sent[0].metadata.is_free).toBe(!byok);
+      expect(sent[0].metadata.is_user_byok).toBe(byok);
       expect(writer).not.toHaveBeenCalled();
+    }
+  );
+
+  test.each(['openai-chatgpt', 'claude-billing'] as const)(
+    'processTokenData logs %s billing as user BYOK while preserving costs',
+    async provider => {
+      configureQueueEnvironment();
+      const lifecycle = requestLifetime();
+      const record = await lifecycle.run(() =>
+        processTokenData({ ...stats }, { ...context, provider })
+      );
+      lifecycle.close();
+      await lifecycle.drain();
+
+      expect(record?.status).toBe('queued');
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toMatchObject({
+        core: { provider, cost: 0, cache_discount: 0 },
+        metadata: { is_user_byok: true, is_free: false, market_cost: 1234 },
+      });
+      expect(writer).not.toHaveBeenCalled();
+      expect(lifecycle.errors).toEqual([]);
     }
   );
 
@@ -1390,6 +1420,18 @@ describe('queued usage accounting', () => {
         expect(sent).toEqual(
           Array.from({ length: attempts }, () => JSON.parse(JSON.stringify(payload)))
         );
+        // Every completed HTTP attempt, and only those, writes one attempt diagnostic.
+        expect(
+          attemptLogs.map(value => {
+            const { usage_id, attempt } = JSON.parse(value);
+            return { usage_id, attempt };
+          })
+        ).toEqual(
+          Array.from({ length: attempts }, (_, index) => ({
+            usage_id: payload.core.id,
+            attempt: index + 1,
+          }))
+        );
         expect(publisher.enqueueUsage).toHaveBeenCalledWith(payload, {
           retryTransientFailures: true,
         });
@@ -1452,7 +1494,12 @@ describe('queued usage accounting', () => {
         expect(bouncer.deliverBouncerUsageEventNow).toHaveBeenCalledTimes(
           region === 'fra1' && failure.startsWith('missing') && reportsUsage ? 1 : 0
         );
-        const logs = JSON.stringify([...error.mock.calls, ...warn.mock.calls, ...info.mock.calls]);
+        const logs = JSON.stringify([
+          ...error.mock.calls,
+          ...warn.mock.calls,
+          ...info.mock.calls,
+          ...attemptLogs,
+        ]);
         for (const sensitive of [
           'sensitive-secret-prompt',
           'synthetic-local-secret',

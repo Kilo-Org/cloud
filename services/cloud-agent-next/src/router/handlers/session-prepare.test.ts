@@ -42,6 +42,7 @@ function environmentLoad(
 
 const {
   mergeProfileConfigurationMock,
+  getBuiltinAgentSettingsMock,
   loadEnvironmentForSessionMock,
   assertKiloModelAvailableMock,
   assertBitbucketRepositoryAccessMock,
@@ -55,6 +56,7 @@ const {
   requireCurrentSessionAccessMock,
 } = vi.hoisted(() => ({
   mergeProfileConfigurationMock: vi.fn().mockResolvedValue({}),
+  getBuiltinAgentSettingsMock: vi.fn().mockResolvedValue({}),
   loadEnvironmentForSessionMock: vi.fn().mockResolvedValue({ status: 'none' }),
   parentSpawnContextMock: vi.fn().mockResolvedValue({
     token: 'trusted-parent-model-token',
@@ -112,6 +114,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
   return {
     ...actual,
     mergeProfileConfiguration: mergeProfileConfigurationMock,
+    getBuiltinAgentSettings: getBuiltinAgentSettingsMock,
     loadEnvironmentForSession: loadEnvironmentForSessionMock,
   };
 });
@@ -221,6 +224,7 @@ describe('prepareSession operation-ledger admission gate', () => {
       getMetadata: parentMetadataMock,
     }));
     mergeProfileConfigurationMock.mockResolvedValue({});
+    getBuiltinAgentSettingsMock.mockResolvedValue({});
     loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     assertBitbucketRepositoryAccessMock.mockResolvedValue(undefined);
@@ -668,7 +672,6 @@ describe('prepareSession operation-ledger admission gate', () => {
         egressAllowlist: ['changed.example.com'],
       },
     });
-    context.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
     context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
     context.cloudAgentAuthority = {
       version: 1,
@@ -1206,6 +1209,27 @@ describe('prepareSession operation-ledger admission gate', () => {
     });
     expect(result).not.toHaveProperty('replayed');
   });
+  it.each([false, true])(
+    'returns the registered worktree ID on a create or replay: %s',
+    async replayed => {
+      const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+      createSessionWithLedgerMock.mockResolvedValueOnce({
+        cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+        kiloSessionId: 'cli-session-abc123',
+        worktreeId,
+        ...(replayed ? { replayed: true } : {}),
+      });
+      const result = await router.createCaller(createContext()).prepareSession({
+        prompt: 'Test prompt',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+        operationKey: OPERATION_KEY,
+      });
+      expect(result.worktreeId).toBe(worktreeId);
+    }
+  );
 
   it('propagates the clone source through createSessionWithLedger and replays on a same-key retry', async () => {
     const caller = router.createCaller(createContext());

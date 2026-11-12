@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   GitLabSessionCapabilityCodec,
   GitLabSessionCapabilityError,
-  parseGitLabCloneUrl,
   validateGitLabSessionCapabilityPath,
 } from './gitlab-session-capability.js';
 
@@ -46,24 +45,29 @@ describe('GitLabSessionCapabilityCodec', () => {
     vi.useRealTimers();
   });
 
-  it('produces and decodes a two-hour legacy unbound v1 capability when the container is omitted', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-05-31T12:00:00.000Z'));
+  it('rejects issuance without a container binding', () => {
     const codec = new GitLabSessionCapabilityCodec(encryptionKey);
-    const { outboundContainerId: _outboundContainerId, ...legacyClaims } = claims;
 
-    const capability = codec.issue(legacyClaims);
+    expect(() => codec.issue({ ...claims, outboundContainerId: '' })).toThrowError(
+      expect.objectContaining({ reason: 'capability_configuration_error' })
+    );
+  });
 
-    expect(capability).toMatch(/^kgl1\./);
-    expect(codec.decode(capability)).toMatchObject({
+  it('rejects a legacy unbound capability', () => {
+    const codec = new GitLabSessionCapabilityCodec(encryptionKey);
+    const issuedAt = Date.now();
+    const { outboundContainerId: _outboundContainerId, ...legacyClaims } = {
+      ...claims,
+      purpose: 'gitlab_scm_session',
       version: 1,
-      userId: 'user_1',
-      projectPath: 'Acme/platform/widgets',
-      issuedAt: Date.parse('2026-05-31T12:00:00.000Z'),
-      expiresAt: Date.parse('2026-05-31T14:00:00.000Z'),
-    });
-    expect(codec.decode(capability)).not.toHaveProperty('outboundContainerId');
-    vi.useRealTimers();
+      issuedAt,
+      expiresAt: issuedAt + 60_000,
+    };
+    const capability = `kgl1.${encryptWithSymmetricKey(JSON.stringify(legacyClaims), encryptionKey)}`;
+
+    expect(() => codec.decode(capability)).toThrowError(
+      expect.objectContaining({ reason: 'invalid_capability' })
+    );
   });
 
   it('binds a new project capability to the encrypted credential generation', () => {
@@ -102,28 +106,21 @@ describe('GitLabSessionCapabilityCodec', () => {
     });
   });
 
-  it.each([
-    ['legacy unbound v1', 'kgl1.', 1, 2 * 60 * 60 * 1000, false],
-    ['container-bound v2', 'kgl2.', 2, 4 * 60 * 60 * 1000, true],
-  ] as const)(
-    'rejects an overlong %s capability',
-    (_description, prefix, version, maximumLifetimeMs, bound) => {
-      const { outboundContainerId: _outboundContainerId, ...legacyClaims } = claims;
-      const issuedAt = Date.now();
-      const serializedClaims = JSON.stringify({
-        purpose: 'gitlab_scm_session',
-        version,
-        ...(bound ? claims : legacyClaims),
-        issuedAt,
-        expiresAt: issuedAt + maximumLifetimeMs + 1,
-      });
-      const capability = `${prefix}${encryptWithSymmetricKey(serializedClaims, encryptionKey)}`;
+  it('rejects an overlong container-bound capability', () => {
+    const issuedAt = Date.now();
+    const serializedClaims = JSON.stringify({
+      purpose: 'gitlab_scm_session',
+      version: 2,
+      ...claims,
+      issuedAt,
+      expiresAt: issuedAt + 4 * 60 * 60 * 1000 + 1,
+    });
+    const capability = `kgl2.${encryptWithSymmetricKey(serializedClaims, encryptionKey)}`;
 
-      expect(() => new GitLabSessionCapabilityCodec(encryptionKey).decode(capability)).toThrowError(
-        expect.objectContaining({ reason: 'invalid_capability' })
-      );
-    }
-  );
+    expect(() => new GitLabSessionCapabilityCodec(encryptionKey).decode(capability)).toThrowError(
+      expect.objectContaining({ reason: 'invalid_capability' })
+    );
+  });
 
   it('rejects expiry, tampering, and another encryption key', () => {
     vi.useFakeTimers();
@@ -163,21 +160,6 @@ describe('GitLabSessionCapabilityCodec', () => {
       expiresAt: Date.now() + 60_000,
     });
     const capability = `kgl2.${encryptWithSymmetricKey(serializedClaims, encryptionKey)}`;
-
-    expect(() => new GitLabSessionCapabilityCodec(encryptionKey).decode(capability)).toThrowError(
-      expect.objectContaining({ reason: 'invalid_capability' })
-    );
-  });
-
-  it('rejects a v2 claim under the legacy marker', () => {
-    const serializedClaims = JSON.stringify({
-      purpose: 'gitlab_scm_session',
-      version: 2,
-      ...claims,
-      issuedAt: Date.now(),
-      expiresAt: Date.now() + 60_000,
-    });
-    const capability = `kgl1.${encryptWithSymmetricKey(serializedClaims, encryptionKey)}`;
 
     expect(() => new GitLabSessionCapabilityCodec(encryptionKey).decode(capability)).toThrowError(
       expect.objectContaining({ reason: 'invalid_capability' })
@@ -331,46 +313,3 @@ describe.each([{ type: 'integration' }, claims.source] as const)(
     });
   }
 );
-
-describe('parseGitLabCloneUrl', () => {
-  const urlWithCredentials = new URL('https://gitlab.example.com/acme/widgets.git');
-  urlWithCredentials.username = 'user';
-  urlWithCredentials.password = 'pass';
-
-  it.each([
-    [
-      'https://gitlab.com/acme/widgets.git',
-      undefined,
-      {
-        instanceOrigin: 'https://gitlab.com',
-        instanceHost: 'gitlab.com',
-        projectPath: 'acme/widgets',
-      },
-    ],
-    [
-      'https://gitlab.example.com:8443/gitlab/Acme/platform/widgets.git',
-      'https://gitlab.example.com:8443/gitlab/',
-      {
-        instanceOrigin: 'https://gitlab.example.com:8443/gitlab',
-        instanceHost: 'gitlab.example.com:8443',
-        projectPath: 'Acme/platform/widgets',
-      },
-    ],
-  ])('accepts canonical nested GitLab clone URL %s', (gitUrl, instanceUrl, expected) => {
-    expect(parseGitLabCloneUrl(gitUrl, instanceUrl)).toEqual({ success: true, ...expected });
-  });
-
-  it.each([
-    ['http://gitlab.com/acme/widgets.git', undefined],
-    ['https://gitlab.example.com:8443/acme/widgets.git', 'https://gitlab.example.com:9443'],
-    ['https://gitlab.example.com/acme/widgets.git', 'https://gitlab.example.com/gitlab'],
-    ['https://gitlab.example.com/acme/widgets.git', 'https://other.example.com'],
-    ['https://gitlab.example.com/acme//widgets.git', 'https://gitlab.example.com'],
-    ['https://gitlab.example.com/acme/../widgets.git', 'https://gitlab.example.com'],
-    ['https://gitlab.example.com/acme%2Fwidgets.git', 'https://gitlab.example.com'],
-    [urlWithCredentials.toString(), 'https://gitlab.example.com'],
-    ['https://gitlab.example.com/acme/widgets.git?token=secret', 'https://gitlab.example.com'],
-  ])('rejects unsafe or unsupported clone URL %s', (gitUrl, instanceUrl) => {
-    expect(parseGitLabCloneUrl(gitUrl, instanceUrl).success).toBe(false);
-  });
-});

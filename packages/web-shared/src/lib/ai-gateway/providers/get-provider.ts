@@ -68,6 +68,7 @@ import type {
   DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { checkClaudeBilling } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import * as z from 'zod';
 import { CustomLlmCredentialsSchema, type CustomLlmCredentials } from '@kilocode/db/schema-types';
@@ -121,6 +122,17 @@ export type DirectByokCatalogOnlyResult = {
 export type GetProviderResult =
   | GetProviderProviderResult
   | { kind: 'chatgpt-reconnect'; message: string }
+  /**
+   * The owner's Claude billing connection cannot bill. Serving the request any
+   * other way would spend a different payer's allowance without telling them.
+   */
+  | { kind: 'claude-billing-unavailable'; message: string; retryable?: boolean }
+  /**
+   * The organization's shared-services Claude connection was linked by a person
+   * who is gone. Only an organization owner reconnecting it changes the
+   * outcome, so the request fails readably instead of on another billing path.
+   */
+  | { kind: 'claude-billing-reconnect'; message: string }
   /** The id is a custom LLM the caller may not use, or its stored credentials are unusable. */
   | { kind: 'custom-llm-unavailable' }
   | DirectByokCatalogOnlyResult;
@@ -437,6 +449,38 @@ async function selectProvider(
     decision.step({ step: 'direct-byok-model', outcome: 'skipped', reason: 'no-match' });
   }
 
+  const claudeBilling = await checkClaudeBilling({
+    request,
+    requestedModel,
+    userId: isAnonymousContext(user) ? null : user.id,
+    requesterEmail: isAnonymousContext(user) ? null : user.google_user_email,
+    organizationId,
+    botId,
+  });
+  if (claudeBilling?.kind === 'reconnect') {
+    decision.step({ step: 'claude-billing', outcome: 'rejected', reason: 'reconnect' });
+    return { kind: 'claude-billing-reconnect', message: claudeBilling.message };
+  }
+  if (claudeBilling?.kind === 'unavailable') {
+    decision.step({ step: 'claude-billing', outcome: 'rejected', reason: 'unavailable' });
+    return {
+      kind: 'claude-billing-unavailable',
+      message: claudeBilling.message,
+      retryable: claudeBilling.retryable,
+    };
+  }
+  if (claudeBilling) {
+    decision.step({ step: 'claude-billing', outcome: 'selected' });
+    return {
+      kind: 'provider',
+      provider: claudeBilling.provider,
+      userByok: null,
+      isFree: isFreeModel(requestedModel),
+      bypassAccessCheck: false,
+      skipBalanceCheck: true,
+    };
+  }
+
   let storedKeys: Promise<StoredByokKeys> | undefined;
   const loadStoredKeys = () =>
     (storedKeys ??= getStoredByokKeys(readDb, byokOwner(user.id, organizationId)));
@@ -454,14 +498,6 @@ async function selectProvider(
   const plan = await planRoutes(planInputs);
   const keySteps = plan.filter(isKeyPlanStep);
   decision.recordByokCandidates(keySteps);
-  const chatGptIndex = plan.findIndex(step => step.route === 'chatgpt');
-  if (
-    plan
-      .slice(0, Math.max(chatGptIndex, 0))
-      .some(step => step.route === 'direct-byok' && step.decision === 'serves')
-  ) {
-    decision.step({ step: 'chatgpt', outcome: 'deferred', reason: 'catalog-key-serves' });
-  }
 
   // Skipped keys explain a route the settings page alone cannot: request-time inputs such as
   // `provider.ignore` or the provider settings decide them. Logged only when the order mattered.

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import { isValidEmail } from '../lib/users';
 import { createSeedStripeCustomer, deleteSeedStripeCustomer } from '../lib/stripe';
@@ -62,6 +62,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error(`email is not a valid address: ${email}`);
   }
 
+  assertLocalSeedDatabase('app:create-user');
   const db = getSeedDb();
   const trimmedName = name.trim();
   const trimmedEmail = email.trim();

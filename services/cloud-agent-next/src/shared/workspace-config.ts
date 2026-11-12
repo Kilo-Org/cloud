@@ -19,7 +19,9 @@ export function workspaceConfigFromSpec(
     | 'startCommands'
     | 'environmentSetupCommandCount'
     | 'runtimeSkills'
+    | 'runtimeInstructions'
     | 'runtimeAgents'
+    | 'builtinAgents'
     | 'kiloCommands'
   >,
   mcp: WorkspaceConfig['mcp']
@@ -34,7 +36,11 @@ export function workspaceConfigFromSpec(
       ? {}
       : { environmentSetupCommandCount: spec.environmentSetupCommandCount }),
     ...(spec.runtimeSkills === undefined ? {} : { runtimeSkills: spec.runtimeSkills }),
+    ...(spec.runtimeInstructions === undefined
+      ? {}
+      : { runtimeInstructions: spec.runtimeInstructions }),
     ...(spec.runtimeAgents === undefined ? {} : { runtimeAgents: spec.runtimeAgents }),
+    ...(spec.builtinAgents === undefined ? {} : { builtinAgents: spec.builtinAgents }),
     ...(spec.kiloCommands === undefined ? {} : { kiloCommands: spec.kiloCommands }),
   };
 }
@@ -48,7 +54,9 @@ export function attachmentSpecFromRouteSpec(spec: ControlPlaneRouteSpec): Attach
     startCommands: _startCommands,
     environmentSetupCommandCount: _environmentSetupCommandCount,
     runtimeSkills: _runtimeSkills,
+    runtimeInstructions: _runtimeInstructions,
     runtimeAgents: _runtimeAgents,
+    builtinAgents: _builtinAgents,
     kiloCommands: _kiloCommands,
     ...attachment
   } = spec;

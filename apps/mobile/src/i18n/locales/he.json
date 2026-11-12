@@ -22,6 +22,8 @@
     "expired": "פג התוקף"
   },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "ביטול",
     "done": "סיום",
     "retry": "ניסיון חוזר",
@@ -129,9 +131,7 @@
     "scheduled": "מתוזמן",
     "keepEditing": "המשך עריכה",
     "keepRunning": "המשך הרצה",
-    "kiloclaw": "KiloClaw",
     "newSession": "סשן חדש",
-    "noKiloclawInstances": "אין מופעי KiloClaw",
     "noModelsAvailable": "אין מודלים זמינים",
     "notFound": "לא נמצא.",
     "online": "מקוון",
@@ -229,6 +229,21 @@
     "pleaseEnterEmail": "הזן את כתובת הדוא״ל שלך.",
     "or": "או"
   },
+  "pendingLink": {
+    "description": "כבר קיים חשבון שמשתמש בכתובת {{email}}. כדי להוסיף את {{provider}}, יש להיכנס באחת משיטות הכניסה שלו.",
+    "emailCode": "שליחת קוד כניסה בדוא״ל",
+    "continueInBrowser": "המשך בדפדפן",
+    "startAgain": "התחלה מחדש",
+    "expired": "תוקף הבקשה להוספת {{provider}} פג.",
+    "noMethods": "לחשבון הזה אין שיטת כניסה אחרת, ולכן אי אפשר להוסיף את {{provider}}.",
+    "linked": "{{provider}} נוסף לחשבון שלך.",
+    "failedExpired": "{{provider}} לא נוסף כי תוקף הבקשה פג.",
+    "failedWrongAccount": "{{provider}} לא נוסף כי נכנסת לחשבון אחר.",
+    "failedAccountAlreadyLinked": "{{provider}} לא נוסף כי הוא כבר מקושר לחשבון אחר.",
+    "failedProviderAlreadyLinked": "{{provider}} לא נוסף כי בחשבון שלך כבר יש כניסה אחרת באמצעות {{provider}}.",
+    "failedLinking": "לא ניתן היה להוסיף את {{provider}} לחשבון שלך.",
+    "notAdded": "נכנסת לחשבון. {{provider}} לא נוסף לחשבון שלך."
+  },
   "profile": {
     "codeReviewerSubtitle": "סקירות PR אוטומטיות",
     "securityAgentSubtitle": "איתור ותיקון של חולשות אבטחה",
@@ -248,6 +263,7 @@
     "confirmDeletion": "אישור המחיקה",
     "credits": "קרדיטים",
     "failedToLoadBalance": "לא ניתן לטעון את היתרה. הקש כדי לנסות שוב.",
+    "balanceLoadFailed": "לא ניתן לטעון את היתרה",
     "hideBalance": "הסתר יתרה",
     "showBalance": "הצג יתרה",
     "balanceHidden": "היתרה מוסתרת",
@@ -266,6 +282,8 @@
     "providerTestAccount": "חשבון בדיקה",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "SSO ארגוני",
     "passkeysTitle": "מפתחות גישה",
     "passkeysSubtitle": "היכנסו בלי סיסמה",
@@ -288,7 +306,8 @@
     "renamePasskey": "שינוי שם מפתח גישה",
     "removePasskey": "הסרת מפתח גישה",
     "removePasskeyTitle": "להסיר את מפתח הגישה?",
-    "removePasskeyMessage": "לא תוכלו עוד להיכנס עם מפתח הגישה הזה."
+    "removePasskeyMessage": "לא תוכלו עוד להיכנס עם מפתח הגישה הזה.",
+    "changelog": "מה חדש"
   },
   "preferences": {
     "general": "כללי",
@@ -354,23 +373,18 @@
     "previewGenericDescription": "ההתראות מציינות שיש עדכון, בלי להציג את התוכן. פתח את Kilo כדי לקרוא אותו.",
     "channel": {
       "agentProgress": "התקדמות הסוכנים",
-      "chat": "הודעות צ׳אט",
-      "kiloclaw": "פעילות KiloClaw",
       "balance": "התראות על היתרה",
       "security": "ממצאי אבטחה",
       "spend": "התראות הוצאות",
       "followedSessions": "הפעלות במעקב"
     },
     "category": {
-      "chatMessagesSubtitle": "תשובות בשיחות שלך",
       "agentAttentionTitle": "הסוכן צריך אותך",
       "agentAttentionSubtitle": "שאלות, בקשות הרשאה ובקשות למידע",
       "agentUpdatesTitle": "עדכוני סוכן",
       "agentUpdatesSubtitle": "הודעות מהסוכן במהלך המשימה",
       "sessionStatusTitle": "מצב הסשן",
       "sessionStatusSubtitle": "הסתיים / נכשל / מוכן לשליטה",
-      "kiloclawActivitySubtitle": "מופע מוכן או שנכשל, פעולות מתוזמנות",
-      "kiloclawActivityUnavailable": "הפעל מופע KiloClaw כדי לקבל פעילות KiloClaw.",
       "balanceAlertsSubtitle": "אזהרות על יתרה נמוכה בארגון",
       "balanceAlertsUnavailable": "הצטרף לארגון כדי לקבל התראות יתרה.",
       "securityFindingsSubtitle": "ממצאים חדשים ותזכורות SLA",
@@ -402,72 +416,23 @@
   },
   "tabs": {
     "home": "ראשי",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, לשונית, {{position}} מתוך {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "החלפת מופע",
-      "couldNotLoadInstances": "לא ניתן לטעון את המופעים.",
-      "noInstancesDescription": "הגדר מופע כדי להתחיל לשוחח.",
-      "setUpKiloclaw": "הגדרת KiloClaw",
-      "currentInstance": "{{title}}, המופע הנוכחי"
+    "errors": {
+      "messageTooLong": "ההודעה ארוכה מדי. יש לקצר אותה לפחות מ-{{limit}} תווים."
     },
     "conversation": {
-      "failedToLoad": "לא ניתן לטעון את השיחה.",
-      "notFound": "השיחה לא נמצאה.",
       "untitled": "ללא כותרת",
-      "leaveTitle": "לעזוב את השיחה?",
-      "leaveMessage": "פעולה זו מסירה אותה מהרשימה שלך.",
-      "openHint": "פתיחת השיחה. לחיצה ארוכה מציגה אפשרויות לשינוי השם ולעזיבת השיחה.",
-      "unread": "לא נקראה",
-      "optionsFor": "אפשרויות לשיחה {{title}}",
-      "options": "אפשרויות שיחה",
-      "renameTitle": "שינוי שם השיחה",
-      "renamePlaceholder": "שם חדש לשיחה",
-      "couldNotReachBot": "לא ניתן ליצור קשר עם הבוט. נסה שוב.",
-      "messageDeliveryFailed": "לא ניתן למסור את ההודעה לבוט.",
-      "couldNotSignIn": "לא ניתן להתחבר לצ׳אט.",
-      "couldNotRefreshMessages": "לא ניתן לרענן את ההודעות.",
-      "couldNotLoadHistory": "לא ניתן לטעון את היסטוריית השיחה.",
-      "leave": "עזיבה",
-      "untitledConversation": "שיחה ללא כותרת",
-      "createFailed": "יצירת השיחה נכשלה.",
-      "leaveFailed": "עזיבת השיחה נכשלה."
-    },
-    "reactions": {
-      "common": "נפוצות",
-      "reactWith": "הוספת תגובה {{reaction}}",
-      "accessibility": "תגובה {{emoji}}, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "בתשובה ל",
-      "cancelReply": "ביטול התשובה",
-      "openInstance": "פתיחת המופע",
-      "attachFile": "צירוף קובץ",
-      "cancelEdit": "ביטול העריכה"
+      "renamePlaceholder": "שם חדש לשיחה"
     },
     "conversationList": {
-      "couldNotLoad": "לא ניתן לטעון את השיחות.",
-      "emptyTitle": "אין עדיין שיחות",
-      "emptyDescription": "צור שיחה כדי להתחיל לשוחח עם מופע ה-KiloClaw שלך.",
-      "create": "יצירת שיחה",
-      "newConversation": "שיחה חדשה",
-      "openInstanceSettings": "פתיחת הגדרות המופע",
       "today": "היום",
       "yesterday": "אתמול",
-      "thisWeek": "השבוע",
       "older": "שיחות קודמות"
     },
     "attachment": {
-      "open": "פתיחת {{filename}}",
-      "openFailed": "לא ניתן לפתוח את הקובץ המצורף. בדוק את החיבור לאינטרנט ונסה שוב.",
       "attachFailed": "צירוף הקובץ נכשל.",
-      "limit": "ניתן לצרף עד {{displayCount}} קבצים.",
-      "sizeRejection": "הקובץ {{filename}} חורג מהגודל המרבי המותר לצירוף: {{limit}}.",
-      "unreadable": "לא ניתן לקרוא את {{filename}}.",
-      "pastedImage": "התמונה שהודבקה",
-      "defaultName": "קובץ מצורף",
       "classificationDenied": "לא ניתן לצרף קובצי הפעלה.",
       "classificationEmpty": "הקובץ ריק.",
       "classificationTooLarge": "גודל הקובץ לא יכול לעלות על 20 MB.",
@@ -477,429 +442,20 @@
       "networkError": "אירעה שגיאת רשת.",
       "uploadFailed": "ההעלאה נכשלה.",
       "nothingToPaste": "אין תוכן להדבקה.",
-      "metadataStripFailed": "לא ניתן להסיר את נתוני המטא של התמונה.",
-      "limit_one": "ניתן לצרף עד {{displayCount}} קובץ.",
-      "limit_other": "ניתן לצרף עד {{displayCount}} קבצים.",
-      "limit_two": "ניתן לצרף עד {{displayCount}} קבצים."
+      "metadataStripFailed": "לא ניתן להסיר את נתוני המטא של התמונה."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, מצב: {{status}}",
-      "retryUploading": "העלאת {{filename}} שוב",
-      "remove": "הסרת {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[הודעה שנמחקה]",
-      "yourMessage": "ההודעה שלך",
-      "messageFrom": "הודעה מאת {{author}}",
-      "moreActions": "פעולות נוספות",
-      "notDelivered": "לא נמסרה",
-      "edited": "(נערכה)",
-      "image": "תמונה"
+      "accessibility": "{{filename}}, מצב: {{status}}"
     },
     "messageActions": {
-      "copied": "הועתק",
-      "copyFailed": "ההעתקה נכשלה.",
-      "title": "פעולות בהודעה",
-      "deleteTitle": "למחוק את ההודעה?",
-      "deleteMessage": "פעולה זו תסיר את ההודעה מהשיחה.",
-      "deleteFailed": "מחיקת ההודעה נכשלה.",
-      "removeReactionFailed": "הסרת התגובה נכשלה.",
-      "addReactionFailed": "הוספת התגובה נכשלה.",
-      "retrySend": "שליחה חוזרת",
-      "moreReactions": "תגובות נוספות",
-      "edit": "עריכה",
-      "sendFailed": "שליחת ההודעה נכשלה.",
-      "retrySendFailed": "השליחה החוזרת נכשלה.",
-      "editFailed": "עריכת ההודעה נכשלה.",
-      "executeFailed": "ביצוע הפעולה נכשל."
+      "edit": "עריכה"
     },
     "attachmentPicker": {
-      "takePhoto": "צילום תמונה",
-      "photoLibrary": "ספריית תמונות",
-      "files": "קבצים",
       "cameraAccessMessage": "כדי לצלם תמונה, צריך לאפשר גישה למצלמה בהגדרות."
     },
-    "typingIndicator": {
-      "someone": "מישהו",
-      "typing_one": "{{name}} מקליד...",
-      "typing": "{{names}} מקלידים...",
-      "typing_other": "{{names}} מקלידים...",
-      "typing_two": "{{names}} מקלידים..."
-    },
     "botStatus": {
-      "offline": "מנותק",
-      "loadingUser": "פרטי המשתמש בטעינה...",
-      "waitingForStatus": "ממתין למצב הבוט...",
-      "offlineMessage": "הבוט מנותק. העברת ההודעות תתחדש כשהוא יתחבר מחדש."
-    },
-    "errors": {
-      "notAllowed": "אין הרשאה לפעולה הזאת.",
-      "messageTooLong": "ההודעה ארוכה מדי. יש לקצר אותה לפחות מ-{{limit}} תווים.",
-      "titleTooLong": "הכותרת ארוכה מדי. יש לקצר אותה לפחות מ-{{limit}} תווים.",
-      "messageEmpty": "לא ניתן לשלוח הודעה ריקה."
+      "offline": "מנותק"
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "לא ניתן היה לטעון את מופעי KiloClaw.",
-    "billing": {
-      "title": "חיובים",
-      "continueMonthToMonth": "המשך במינוי חודשי",
-      "plan": "תוכנית",
-      "finalTermEnds": "סיום התקופה האחרונה",
-      "afterFinalTerm": "לאחר התקופה האחרונה",
-      "ends": "תאריך סיום",
-      "expires": "תאריך תפוגה",
-      "noActivePlan": "אין תוכנית פעילה",
-      "noActivePlanDescription": "אין לך מינוי KiloClaw פעיל.",
-      "managedByAdmin": "החיוב מנוהל על ידי מנהל הארגון שלך.",
-      "couldNotLoad": "לא ניתן היה לטעון את פרטי החיוב.",
-      "manageOnWeb": "ניהול חיובים באתר",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "תקופת ההתחייבות האחרונה שלך בתוכנית Commit מסתיימת ב-{{date}}. המשך בתוכנית Standard במחיר {{price}}, אחרת האירוח יסתיים.",
-      "freeTrial": "תקופת ניסיון בחינם",
-      "hostingEnds": "האירוח מסתיים",
-      "lessThanOneDay": "פחות מיום אחד",
-      "renews": "תאריך חידוש",
-      "standardMonthToMonth": "Standard במינוי חודשי",
-      "standardStartsOn": "תוכנית Standard תתחיל ב-{{date}} במחיר {{price}}.",
-      "yourStandardMonthlyPrice": "המחיר החודשי שלך בתוכנית Standard",
-      "perMonth": "/לחודש",
-      "earlybirdAccessUntil": "הגישה במסגרת Earlybird זמינה עד {{date}}.",
-      "earlybirdEnding": "הזמן שנותר עד סיום Earlybird: {{remaining}}.",
-      "paymentPastDue": "מועד התשלום עבר. עדכן את אמצעי התשלום שלך.",
-      "subscriptionCancels": "המינוי יבוטל ב-{{date}}.",
-      "trialDaysRemaining": "הזמן שנותר בתקופת הניסיון: {{remaining}}.",
-      "trialEndingSoon": "תקופת הניסיון מסתיימת בקרוב. הזמן שנותר: {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "קומיט"
-    },
-    "changelog": {
-      "title": "מה חדש",
-      "couldNotLoad": "לא ניתן היה לטעון את יומן השינויים.",
-      "noUpdates": "אין עדיין עדכונים",
-      "noUpdatesDescription": "כאן יופיע פירוט השינויים.",
-      "recentUpdates": "עדכונים אחרונים",
-      "manageVersion": "ניהול הגרסה",
-      "redeployRequired": "נדרשת פריסה מחדש",
-      "redeploySuggested": "מומלץ לפרוס מחדש",
-      "upgradeRequired": "נדרש שדרוג"
-    },
-    "dashboard": {
-      "title": "לוח בקרה",
-      "couldNotLoad": "לא ניתן היה לטעון את לוח הבקרה.",
-      "renameInstance": "שינוי שם המופע",
-      "renamePlaceholder": "שם חדש (עד 50 תווים)",
-      "someDetailsFailed": "חלק מהנתונים בזמן אמת לא נטענו.",
-      "destroy": "מחיקה לצמיתות",
-      "destroyMessage": "פעולה זו תמחק לצמיתות את מופע ה-KiloClaw שלך ואת כל הנתונים שלו. לא ניתן לבטל את המחיקה.",
-      "destroyTitle": "מחיקת המופע לצמיתות",
-      "instance": "מופע",
-      "couldNotCheckStatus": "לא ניתן היה לבדוק את מצב השירות.",
-      "dangerZone": "פעולות מסוכנות",
-      "destroying": "מחיקה לצמיתות…",
-      "serviceDegraded": "יש שיבושים בשירות — הקשה להצגת המצב",
-      "up": "פעיל"
-    },
-    "channels": {
-      "title": "ערוצים",
-      "couldNotLoad": "לא ניתן היה לטעון את הערוצים.",
-      "noChannels": "אין ערוצים זמינים",
-      "noChannelsDescription": "כאן יופיעו חיבורים לערוצים.",
-      "connected": "{{label}} חובר",
-      "disconnectMessage": "להסיר את {{label}}? הערוץ הזה ינותק.",
-      "disconnectTitle": "ניתוק הערוץ"
-    },
-    "devicePairing": {
-      "title": "צימוד מכשירים",
-      "refreshRequests": "רענון בקשות הצימוד",
-      "couldNotLoad": "לא ניתן היה לטעון את בקשות הצימוד.",
-      "noPending": "אין בקשות ממתינות",
-      "noPendingDescription": "בקשות צימוד של ערוצים ומכשירים יופיעו כאן.",
-      "channelRequests": "בקשות לצימוד ערוצים",
-      "deviceRequests": "בקשות לצימוד מכשירים",
-      "approveDeviceMessage": "לאפשר ל-{{platform}} להתחבר למופע שלך?",
-      "approveDeviceTitle": "אישור מכשיר",
-      "approveMessage": "לאפשר ל-{{label}} (קוד: {{code}}) להתחבר למופע שלך?",
-      "approveTitle": "אישור בקשת צימוד",
-      "unknownDevice": "מכשיר לא ידוע"
-    },
-    "execPolicy": {
-      "title": "מדיניות הרצה",
-      "couldNotLoad": "לא ניתן היה לטעון את מדיניות הרצת הפקודות.",
-      "alwaysAsk": "תמיד לבקש אישור",
-      "alwaysAskDescription": "נדרש אישור לפני הרצת כל פקודה. זו האפשרות הבטוחה ביותר.",
-      "neverAsk": "לא לבקש אישור",
-      "neverAskDescription": "הפקודות יורצו ללא אישור. זו אפשרות מהירה יותר, אך פחות בטוחה."
-    },
-    "google": {
-      "title": "חשבון Google",
-      "couldNotLoad": "לא ניתן היה לטעון את מצב חשבון Google.",
-      "disconnected": "חשבון Google נותק. פרוס מחדש את המופע שלך כדי להחיל את השינוי.",
-      "setupCommand": "פקודת הגדרה",
-      "setupCommandHelp": "כדי לחבר את חשבון Google שלך, הרץ את הפקודה הזו במסוף במחשב שלך. Docker חייב להיות מותקן במחשב.",
-      "failedToLoadCommand": "לא ניתן היה לטעון את פקודת ההגדרה.",
-      "gmailNotifications": "התראות Gmail",
-      "disconnect": "ניתוק חשבון Google",
-      "copied": "הועתק",
-      "copyCommand": "העתקת הפקודה",
-      "disconnectConfirm": "ניתוק",
-      "disconnectMessage": "להסיר את חשבון Google מהמופע הזה? פעולה זו תשבית את התראות Gmail. פרוס מחדש לאחר הניתוק כדי להחיל שינויים.",
-      "disconnectTitle": "ניתוק Google"
-    },
-    "modelList": {
-      "noMatches": "אין מודלים התואמים לחיפוש שלך",
-      "noModelsDescription": "מודלים יופיעו כאן כשיהיו זמינים.",
-      "noResultsFor": "לא נמצאו תוצאות עבור \"{{query}}\"."
-    },
-    "secrets": {
-      "title": "סודות",
-      "couldNotLoad": "לא ניתן היה לטעון את הסודות.",
-      "noSecrets": "אין סודות זמינים",
-      "noSecretsDescription": "כאן יופיעו חיבורים לשירותים באמצעות סודות.",
-      "removeMessage": "להסיר את {{label}}? הכלי הזה יאבד את הגישה לפרטי ההזדהות שלו.",
-      "removeTitle": "הסרת סוד",
-      "saved": "{{label}} נשמר",
-      "allFieldsRequired": "צריך למלא את כל השדות כדי לחבר את {{label}}.",
-      "hide": "הסתרת {{label}}",
-      "removing": "הסרה…",
-      "saving": "שמירה…",
-      "setupGuide": "מדריך להגדרה",
-      "setupGuideA11y": "מדריך להגדרת {{label}}",
-      "setupGuideFallback": "מדריך להגדרה",
-      "show": "הצגת {{label}}",
-      "updateToken": "עדכון האסימון"
-    },
-    "versionPin": {
-      "title": "נעילת גרסה",
-      "couldNotLoad": "לא ניתן היה לטעון את פרטי הגרסה.",
-      "couldNotLoadMore": "לא ניתן היה לטעון גרסאות נוספות.",
-      "loadMore": "טעינת גרסאות נוספות",
-      "showingLatest": "מוצגות 100 הגרסאות האחרונות.",
-      "availableVersions": "גרסאות זמינות",
-      "noVersions": "אין גרסאות זמינות",
-      "noVersionsDescription": "גרסאות OpenClaw זמינות יופיעו כאן.",
-      "unpin": "ביטול ההצמדה",
-      "unpinMessage": "לחזור לגרסה העדכנית ביותר שזמינה?",
-      "unpinTitle": "ביטול הצמדת הגרסה",
-      "confirmPin": "אישור ההצמדה",
-      "followingLatest": "עדכון אוטומטי לגרסה האחרונה",
-      "latest": "העדכנית ביותר",
-      "pin": "הצמדה",
-      "pinnedByAdmin": "מנהל המערכת הצמיד את הגרסה — פנה אליו כדי לשנות אותה.",
-      "pinnedTo": "מוצמד לגרסה {{version}}",
-      "reasonOptional": "סיבה (לא חובה)",
-      "reasonPlaceholder": "הסיבה להצמדת הגרסה",
-      "replaceAdminPin": "החלפת ההצמדה של המנהל",
-      "replacesAdminPin": "פעולה זו תחליף את ההצמדה שהמנהל הגדיר (כרגע {{label}})."
-    },
-    "redeploy": "פריסה מחדש",
-    "redeployMessage": "לפרוס מחדש את המופע הזה?",
-    "redeployTitle": "פריסה מחדש של המופע",
-    "accessRequired": {
-      "iosBody": "בחשבון הזה, הגישה ל-KiloClaw מנוהלת מחוץ לאפליקציה ל-iOS.",
-      "iosContact": "שאלות? צור קשר בכתובת {{supportEmail}}.",
-      "iosTitle": "KiloClaw אינו זמין ב-iOS",
-      "multipleCurrentConflictBody": "מצאנו יותר ממינוי פעיל אחד בחשבון שלך, ולכן השהינו את הפעילות כדי למנוע חיוב כפול.",
-      "multipleCurrentConflictCta": "המשך באתר kilo.ai",
-      "nonCanonicalEarlybirdBody": "תוכנית הגישה המוקדמת שלך דורשת בדיקה ידנית לפני שניתן להשתמש בה בנייד.",
-      "nonCanonicalEarlybirdTitle": "זוהתה תוכנית ישנה",
-      "quarantinedBody": "מופע ה-KiloClaw שלך בודד ולא ניתן להשתמש בו כרגע. נדרשת עזרה מהצוות שלנו כדי להחזיר אותו לפעילות.",
-      "quarantinedTitle": "המופע דורש טיפול",
-      "subscriptionCanceledBody": "כדי להשתמש ב-KiloClaw, פתח את kilo.ai/claw בדפדפן. לא ניתן לרכוש מינוי באפליקציה.",
-      "subscriptionCanceledCta": "פתיחת kilo.ai/claw",
-      "subscriptionCanceledTitle": "רכישת מינוי באתר",
-      "subscriptionPastDueBody": "הייתה בעיה בתשלום האחרון שלך. פתח את kilo.ai/claw בדפדפן כדי לעדכן את אמצעי התשלום. לא ניתן לנהל חיובים באפליקציה.",
-      "subscriptionPastDueTitle": "עדכון אמצעי התשלום באתר",
-      "trialExpiredBody": "כדי להמשיך להשתמש ב-KiloClaw, פתח את kilo.ai/claw בדפדפן. לא ניתן לרכוש מינוי באפליקציה.",
-      "quarantinedCta": "שליחת אימייל לצוות שלנו",
-      "nonCanonicalEarlybirdCta": "בדיקת התוכנית שלך ב-kilo.ai"
-    },
-    "controls": {
-      "redeploying": "פריסה מחדש…",
-      "restart": "הפעלה מחדש",
-      "restartOpenClawMessage": "להפעיל מחדש את תהליך OpenClaw?",
-      "restartOpenClawTitle": "הפעלה מחדש של OpenClaw",
-      "restarting": "הפעלה מחדש…",
-      "start": "הפעלה",
-      "startMessage": "להפעיל את המופע הזה?",
-      "startTitle": "הפעלת המופע",
-      "stop": "עצירה",
-      "stopMessage": "לעצור את המופע הזה?",
-      "stopTitle": "עצירת המופע",
-      "stopping": "עצירה…"
-    },
-    "empty": {
-      "finishingSetup": "ההגדרה מסתיימת",
-      "finishingSetupDescription": "אנחנו מסיימים להגדיר את החשבון שלך. בדרך כלל זה לוקח רק רגע.",
-      "getStarted": "מתחילים",
-      "noInstancesDescription": "צור את המופע הראשון שלך כדי להתחיל להריץ סוכני תכנות."
-    },
-    "instance": {
-      "backToInstances": "חזרה למופעים",
-      "couldNotLoad": "לא ניתן היה לטעון את המופע.",
-      "notFound": "המופע לא נמצא",
-      "notFoundDescription": "ייתכן שהמופע הזה נמחק לצמיתות או שהקישור אינו תקף עוד."
-    },
-    "instanceCard": {
-      "fixOnKiloAi": "טיפול בבעיה באתר kilo.ai: {{label}}",
-      "needsAttention": "{{name}} דורש טיפול: {{label}}",
-      "openSettings": "פתיחת ההגדרות של {{name}}",
-      "openUnread": "פתיחת {{name}}, {{displayCount}} הודעות שלא נקראו",
-      "openUnread_other": "פתיחת {{name}}, {{displayCount}} הודעות שלא נקראו",
-      "openUnread_one": "פתיחת {{name}}, הודעה שלא נקראה: {{displayCount}}",
-      "openUnread_two": "פתיחת {{name}}, {{displayCount}} הודעות שלא נקראו"
-    },
-    "list": {
-      "createInstance": "יצירת מופע",
-      "organizations": "ארגונים",
-      "accessIssue": {
-        "trialExpired": "תקופת הניסיון הסתיימה — רכישת מינוי להמשך השימוש במופע",
-        "subscriptionCanceled": "המינוי אינו פעיל — חידוש המינוי להמשך השימוש במופע",
-        "subscriptionPastDue": "יש בעיה בתשלום — עדכון פרטי החיוב להמשך השימוש במופע",
-        "quarantined": "המופע בודד — נדרשת בדיקה ידנית",
-        "multipleCurrentConflict": "נדרשת בדיקה של החשבון",
-        "nonCanonicalEarlybird": "התוכנית הישנה דורשת בדיקה"
-      }
-    },
-    "modelPicker": {
-      "autoModelA11y": "מודל אוטומטי: {{label}}",
-      "balancedDescription": "איזון חכם בין מהירות ליכולת בעלות נמוכה יותר.",
-      "browseAllModels": "או בחירה מתוך יותר מ-500 מודלים",
-      "browseAllModelsA11y": "עיון בכל המודלים — יותר מ-500",
-      "currentModel": "המודל הנוכחי",
-      "frontierDescription": "הביצועים הגבוהים ביותר. הבקשות מנותבות למודלים המתקדמים ביותר עם יכולת חשיבה.",
-      "frontierLabel": "המתקדמים ביותר",
-      "kiloAuto": "Kilo Auto"
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "שיחה עם {{name}}",
-        "ready": "{{name}} מוכן",
-        "warmedUp": "הכול מוכן. אפשר להגיד שלום מתי שתרצה."
-      },
-      "flow": {
-        "couldNotLoad": "לא ניתן היה לטעון את מצב ההגדרה.",
-        "finishingSetup": "אנחנו משלימים את הגדרת החשבון שלך. זה ייקח עוד רגע.",
-        "genericErrorBody": "לא הצלחנו להשלים את הגדרת המופע שלך כרגע.",
-        "identityTitle": "הזהות של הבוט שלך",
-        "manualReviewBody": "צריך לבדוק את החשבון שלך לפני שנוכל ליצור מופע. המשך ב-kilo.ai.",
-        "manualReviewTitle": "ההגדרה דורשת בדיקה ידנית",
-        "openKiloAi": "פתיחת kilo.ai",
-        "provisioning": "הקצאת משאבים",
-        "ready": "מוכן",
-        "review": "סקירה",
-        "settingUp": "ההגדרה מתבצעת…"
-      },
-      "identity": {
-        "changePersonality": "שינוי האישיות",
-        "chooseAvatar": "בחירת תמונת פרופיל",
-        "location": "מיקום",
-        "locationDeniedMessage": "אפשר גישה למיקום בהגדרות כדי להשתמש במיקום הנוכחי שלך.",
-        "locationDeniedTitle": "הגישה למיקום נדחתה",
-        "locationGetFailed": "לא ניתן היה לקבל את המיקום שלך. הזן אותו ידנית.",
-        "locationPlaceholder": "עיר או אזור (לא חובה)",
-        "locationResolveFailed": "לא ניתן היה לזהות את המיקום שלך. אפשר לערוך אותו ידנית.",
-        "locationValidationFailed": "לא ניתן היה לאמת את המיקום.",
-        "namePlaceholder": "שם הבוט שלך",
-        "nature": {
-          "aiAssistantLabel": "עוזר בינה מלאכותית",
-          "aiAssistantVibe": "מועיל, מוכשר, מקצועי",
-          "digitalCreatureLabel": "יצור דיגיטלי",
-          "digitalCreatureVibe": "יוצא דופן, מלא חיים וקצת לא צפוי",
-          "somethingWeirderLabel": "משהו מוזר יותר…",
-          "somethingWeirderVibe": "בהגדרה אישית",
-          "virtualCompanionLabel": "בן לוויה וירטואלי",
-          "virtualCompanionVibe": "חם, קשוב ובאמת אכפתי"
-        },
-        "personality": "אישיות",
-        "selectAvatar": "בחירת {{name}} כתמונת פרופיל",
-        "useCurrentLocation": "שימוש במיקום הנוכחי"
-      },
-      "notifications": {
-        "couldNotEnable": "לא ניתן היה להפעיל התראות.",
-        "getNotified": "קבל התראה כש-{{name}} מסיים משימה, כדי שלא תפספס אף תשובה.",
-        "mockMessage": "סיימתי! הכנתי את הסיכום שביקשת. אפשר לעבור עליו מתי שתרצה.",
-        "now": "עכשיו",
-        "settingUp": "ההתראות מוגדרות…",
-        "skipForNow": "דילוג בינתיים",
-        "stayInTheLoop": "נשארים מעודכנים"
-      },
-      "provisioning": {
-        "backgroundHint": "בדרך כלל זה לוקח פחות מדקה. אפשר לסגור את המסך הזה — נמשיך לעבוד ברקע.",
-        "connectingToAgent": "התחברות לסוכן",
-        "continueInBackground": "המשך ברקע",
-        "queryErrorBody": "החיבור נותק בזמן בדיקת ההגדרה של {{name}}. ייתכן שההגדרה עדיין מתבצעת. נסה שוב או חזור לבדוק בעוד רגע.",
-        "queryErrorTitle": "לא ניתן היה לבדוק את התקדמות ההגדרה",
-        "settingUp": "הגדרת {{name}}",
-        "stalledBody": "לא הצלחנו להשלים את ההגדרה של {{name}}. נסה שוב, ואם הבעיה חוזרת, שלח אימייל ל-{{supportEmail}}.",
-        "stalledTitle": "משהו נתקע",
-        "startingSandbox": "הפעלת הסביבה המבודדת",
-        "stoppedBody": "המופע של {{name}} נעצר באופן בלתי צפוי במהלך ההגדרה.",
-        "stoppedTitle": "ההגדרה נעצרה",
-        "timeoutBody": "ההגדרה של {{name}} אורכת יותר מהרגיל (מעל {{displayMinutes}} דקות).",
-        "timeoutTitle": "ההגדרה נמשכת יותר מהצפוי"
-      },
-      "unavailableDescription": "נדרש מינוי KiloClaw פעיל כדי ליצור מופע. מופעים ומינויים קיימים ממשיכים לפעול כרגיל.",
-      "unavailableTitle": "מופעי KiloClaw חדשים אינם זמינים"
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "קוד {{code}}",
-      "gatewayProcess": "תהליך שער הגישה",
-      "lastExit": "יציאה אחרונה",
-      "memory": "זיכרון",
-      "region": "אזור",
-      "resources": "משאבים",
-      "restarts": "הפעלות מחדש",
-      "state": "מצב",
-      "uptime": "זמן פעילות",
-      "crashed": "קרס",
-      "destroying": "נמחק לצמיתות",
-      "provisioned": "הוקצה",
-      "restarting": "מופעל מחדש",
-      "running": "בהרצה",
-      "shuttingDown": "בתהליך כיבוי",
-      "starting": "מתחיל",
-      "stopped": "עצור",
-      "stopping": "בתהליך עצירה",
-      "unknown": "לא ידוע",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "אישור בקשות לצימוד מכשירים",
-      "execPolicyDescription": "הגדרות אבטחה",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "בחירת מודל בינה מלאכותית",
-      "secretsDescription": "פרטי הזדהות מוצפנים",
-      "versionPinDescription": "הצמדה לגרסה מסוימת"
-    },
-    "avatar": {
-      "arcade": "ארקייד",
-      "brain": "מוח",
-      "creature": "יצור",
-      "crystal": "גביש",
-      "custom": "תמונת פרופיל מותאמת אישית",
-      "dragon": "דרקון",
-      "explorer": "חוקר",
-      "flame": "להבה",
-      "lightning": "ברק",
-      "magicWand": "שרביט קסמים",
-      "moon": "ירח",
-      "operator": "מפעיל",
-      "orbit": "מסלול",
-      "oracle": "נביא",
-      "rainbow": "קשת בענן",
-      "robot": "רובוט",
-      "satellite": "לוויין",
-      "sparkles": "ניצוצות",
-      "strongArm": "זרוע חזקה",
-      "talisman": "קמע"
-    },
-    "remoteSpawnFilesNotSupported": "המופע הזה אינו יכול לקבל קבצים.",
-    "instanceSwitcherTitle": "מופע KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1730,7 +1286,7 @@
       "costSpoken": "עלות {{cost}}",
       "costSpokenWithTime": "עלות {{cost}}, {{time}}",
       "pullRequest": "בקשת משיכה {{number}}",
-      "spokenJoiner": "ו-"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenMessage": "לא ניתן היה להתחיל את הגדרת אפליקציית GitHub. נסה שוב.",
@@ -1775,11 +1331,12 @@
       "emptyDescription": "שלח הודעה למטה כדי להתחיל.",
       "scrollToBottom": "גלילה לתחתית",
       "emptyTitle": "אין עדיין הודעות",
+      "emptyReadOnlyTitle": "אין הודעות בסשן הזה",
       "renameAccessibility": "שינוי שם הסשן: {{title}}",
       "cloningSession": "משכפל סשן…",
       "couldNotLoadThisSession": "לא ניתן היה לטעון את הסשן הזה.",
       "cloneFailedRetry": "לא ניתן היה לשכפל את הסשן הזה. נסה שוב.",
-      "notEnoughCredits": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent. הוסף קרדיטים ונסה שוב.",
+      "notEnoughCredits": "אין מספיק קרדיטים לבקשה הזו. הוסף קרדיטים ונסה שוב.",
       "previousTaskFinishing": "המשימה הקודמת עדיין לא הסתיימה. המתן רגע.",
       "serviceUnavailable": "השירות אינו זמין כרגע. נסה שוב.",
       "connectionTrouble": "יש בעיה בחיבור. נסה שוב בעוד רגע.",
@@ -1874,7 +1431,7 @@
       "selectRepositoryToStart": "בחר מאגר כדי להתחיל.",
       "enterPromptToStart": "הוסף פרומפט כדי להתחיל.",
       "enterPromptOrFileToStart": "הוסף פרומפט או קובץ כדי להתחיל.",
-      "connectProviderToStart": "חבר ספק כדי להתחיל.",
+      "connectProviderToStart": "מאגרים מגיעים מחשבון מחובר של GitHub, GitLab או Bitbucket.",
       "promptPlaceholder": "על מה תרצה לעבוד?",
       "couldNotLoadModels": "לא ניתן היה לטעון את המודלים.",
       "prefillRepoAndModelUnavailable": "המאגר והמודל מהסשן המקורי כבר אינם זמינים. בחר מאגר ומודל אחרים למטה.",
@@ -1889,7 +1446,7 @@
       "discardWithUploadsMessage": "ההנחיה שלך וכל הקבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
       "discardFailed": "לא ניתן היה למחוק את הטיוטה. נסה שוב.",
       "remoteHint": "כדי להריץ במחשב שלך, הפעל את Kilo שם והשאר אותו פעיל.",
-      "continueFrom": "ממשיך את הסשן {{title}}.",
+      "continueFrom": "ממשיך את הסשן ”{{title}}”.",
       "importingSession": "מייבא סשן…",
       "cliCannotContinue": "ה-CLI הזה אינו יכול להמשיך סשן. בחר ב-Cloud Agent או ב-CLI אחר.",
       "importFailed": "לא ניתן היה לייבא את הסשן הזה.",
@@ -1921,7 +1478,8 @@
       "selectedProfile": "פרופיל נבחר",
       "manualOverrides": "עקיפות ידניות",
       "openSettingsToReview": "פתח את ההגדרות כדי לסקור",
-      "profileSelection": "בחירת פרופיל"
+      "profileSelection": "בחירת פרופיל",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "מספר הקבצים שעודכנו הוא {{displayCount}}.",
@@ -1942,6 +1500,23 @@
       "toolList": "הצגת רשימה",
       "toolPatch": "החלת תיקון",
       "toolTask": "משימה",
+      "toolWebFetch": "הורדת דף אינטרנט",
+      "toolWebSearch": "חיפוש באינטרנט",
+      "toolCodeSearch": "חיפוש בקוד",
+      "toolTodo": "קריאה ועדכון התוכנית",
+      "toolSkill": "טעינת מיומנות",
+      "toolLsp": "שרת שפה",
+      "toolBrowser": "דפדפן מובנה",
+      "toolNotebook": "קובץ מחברת",
+      "toolBoard": "לוח משותף",
+      "toolQuestion": "שאילת שאלה למשתמש",
+      "toolSuggest": "מתן הצעה",
+      "toolRecall": "אחזור זיכרונות שמורים",
+      "toolRepoClone": "שכפול מאגר",
+      "toolRepoOverview": "סקירת מאגר",
+      "toolSemanticSearch": "חיפוש סמנטי",
+      "toolSendFile": "הקובץ נשלח בהצלחה",
+      "toolSendFileAction": "שליחת קובץ",
       "readTodos": "קריאת התוכנית",
       "updateTodos": "עדכון התוכנית",
       "linesBadge": "{{displayCount}} שורות",
@@ -2045,7 +1620,21 @@
       "thought": "מחשבה",
       "showDetails": "הצגת פרטים",
       "pending": "ממתין…",
-      "running": "פועל…"
+      "running": "פועל…",
+      "field": {
+        "filePath": "נתיב קובץ",
+        "path": "נתיב",
+        "offset": "היסט",
+        "limit": "מגבלה",
+        "pattern": "תבנית",
+        "include": "הכללה",
+        "patchText": "טקסט טלאי",
+        "query": "שאילתה",
+        "prompt": "הנחיה",
+        "header": "כותרת",
+        "question": "שאלה",
+        "options": "אפשרויות"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "לא ניתן היה להציג את התוכן."
@@ -2061,6 +1650,7 @@
       "assistantContextOverflow": "השיחה ארוכה מדי עבור המודל.",
       "assistantProviderError": "הספק החזיר שגיאה.",
       "assistantProviderRefused": "הספק סירב לבקשה זו ולא ניתן לנסות אותה שוב.",
+      "assistantCreditsRefusal": "אין מספיק קרדיטים לבקשה הזו.",
       "assistantOutputLimit": "התשובה הגיעה למגבלת הפלט של המודל.",
       "assistantStructuredOutput": "התשובה לא התאימה לפורמט הנדרש.",
       "assistantFailed": "יצירת התשובה נכשלה."
@@ -2093,29 +1683,34 @@
       "preparingEnvironment": "מכין את הסביבה",
       "preparationComplete": "ההכנה הושלמה",
       "preparationFailed": "ההכנה נכשלה",
+      "preparationStageFailed": "{{stage}} נכשל",
       "setupCommand": "פקודת הכנה {{index}}",
       "setupCommandOf": "פקודת הכנה {{index}} מתוך {{displayCount}}",
       "stepWorkspaceSetup": "מגדיר את סביבת העבודה",
       "stepDiskCheck": "בודק את הדיסק",
-      "stepCloning": "משבט את המאגר",
-      "stepBranch": "מגדיר את הענף",
+      "stepCloning": "שיבוט המאגר",
+      "stepBranch": "הגדרת הענף",
       "stepDevcontainerSetup": "מגדיר את קונטיינר הפיתוח",
-      "stepWorkspaceRestore": "משחזר את סביבת העבודה",
-      "stepWorkspaceBackup": "שומר את סביבת העבודה",
-      "stepSandboxProvision": "מקצה ארגז חול",
-      "stepSandboxBoot": "מפעיל את ארגז החול",
+      "stepWorkspaceRestore": "שחזור סביבת העבודה",
+      "stepWorkspaceBackup": "שמירת סביבת העבודה",
+      "stepSandboxProvision": "הקצאת ארגז חול",
+      "stepSandboxBoot": "הפעלת ארגז החול",
       "stepSnapshotFallback": "מנסה שוב ללא תמונת מצב",
-      "stepKiloServer": "מפעיל את Kilo",
-      "stepKiloSession": "מכין את ההפעלה",
+      "stepKiloServer": "הפעלת Kilo",
+      "stepKiloSession": "הכנת ההפעלה",
       "stepRestoreIncomplete": "שחזור ההפעלה לא הושלם",
       "stepReady": "הסביבה מוכנה",
       "stepFailed": "הגדרת הסביבה נכשלה",
       "stepUnknown": "הגדרת סביבה",
       "detailCreatingSandbox": "יוצר ארגז חול",
+      "detailStartingSandbox": "מפעיל את ארגז החול",
+      "detailCloningRepository": "משבט את המאגר",
       "detailUpdatingRepository": "מעדכן את המאגר",
       "detailCheckingOutBranch": "עובר לענף",
+      "detailSettingUpBranch": "מגדיר את הענף",
       "detailRunningSetupCommands": "מריץ פקודות הכנה",
       "detailSavingRepository": "שומר את המאגר להתחלות מהירות יותר",
+      "detailStartingKilo": "מפעיל את Kilo",
       "detailStartingKiloRuntime": "מפעיל את זמן הריצה של Kilo",
       "detailPreparingKiloSession": "מכין את ההפעלה של Kilo",
       "detailWaitingForPreviousSandbox": "ממתין לעצירת ארגז החול הקודם",
@@ -2131,7 +1726,7 @@
       "detailSetupCommandTimedOut": "פקודת ההכנה {{index}} חרגה מהזמן",
       "detailColdRestore": "שחזור קר, תמונת מצב הוחלה, שחזור קבצים: {{applied}} מתוך {{total}}",
       "detailProgressPercent": "{{percent}}% הושלם",
-      "detailRestoreIncompleteReport": "שחזור ההפעלה לא הושלם, קבצים ללא שחזור: {{skipped}} מתוך {{total}} ({{reasons}})",
+      "detailRestoreIncompleteFiles": "קבצים ללא שחזור: {{skipped}} מתוך {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "חסרים: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ועוד {{omitted}}",
       "detailReasonPatchFailed": "הטלאי לא הוחל",
@@ -2163,6 +1758,10 @@
     "permissionCard": {
       "title": "נדרשת הרשאה",
       "allowQuestion": "לאפשר {{permission}}?",
+      "subjectExternalDirectory": "גישה לתיקייה מחוץ לפרויקט",
+      "subjectDoomLoop": "חזרה על אותה קריאת כלי",
+      "subjectAgentManager": "ניהול סוכני משנה",
+      "subjectSandboxEscalation": "הרצת פקודה מחוץ לארגז החול",
       "appliesTo": "ההרשאה חלה על:",
       "denyPermission": "דחיית בקשת ההרשאה",
       "deny": "דחייה",
@@ -2204,7 +1803,7 @@
       "positionHint": "(1 מתוך {{displayCount}})",
       "movedPastPrompt": "הסוכן כבר עבר לשלב הבא. הכרטיס הזה ייסגר כשהסשן יימשך.",
       "waitingForAnswer": "הסוכן ממתין לתשובה שלך. שליחת ההודעה שלך לסוכן מושהית עד שתענה על השאלה הזו.",
-      "waitingForPermission": "הסוכן ממתין להרשאה. שליחת ההודעה שלך לסוכן מושהית כל עוד הבקשה הזו פתוחה."
+      "waitingForPermission": "שליחת ההודעה שלך לסוכן מושהית כל עוד הבקשה הזו פתוחה."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -2293,10 +1892,6 @@
       "uploadFailedRetry": "ההעלאה נכשלה. הקש כדי לנסות שוב.",
       "moveLeft": "הזזת {{filename}} שמאלה",
       "moveRight": "הזזת {{filename}} ימינה"
-    },
-    "attachmentPasteHint": {
-      "accessibility": "הדבקת תמונה מהלוח",
-      "label": "הדבקת התמונה שזוהתה"
     },
     "attachmentPicker": {
       "camera": "מצלמה",
@@ -2388,16 +1983,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "גודל חלון ההקשר אינו זמין",
-      "tapToViewDetails": "הקש כדי לצפות בפרטי ההקשר.",
-      "costSuffix": ", עלות {{cost}}",
-      "tokensWindowUnavailable": "הקשר: {{used}} טוקנים, גודל חלון ההקשר אינו זמין",
-      "tokensUsage": "הקשר: {{used}} מתוך {{window}} טוקנים, {{percentage}} בשימוש",
+      "tapToViewDetails": " הקש כדי לצפות בפרטי ההקשר.",
+      "costClause": ", עלות {{cost}}",
+      "loadingCostSpoken": "עלות {{cost}}.",
+      "tokensWindowUnavailable": "הקשר: {{used}} טוקנים, גודל חלון ההקשר אינו זמין{{costClause}}.",
+      "tokensUsage": "הקשר: {{used}} מתוך {{window}} טוקנים, {{percentage}} בשימוש{{costClause}}.",
       "title": "שימוש בהקשר",
       "used": "בשימוש",
       "provider": "ספק",
       "totalCost": "עלות כוללת",
       "usageReflectsLatest": "נתוני השימוש משקפים את תשובת העוזר האחרונה שהושלמה.",
-      "usageUnavailable": "ניצול ההקשר אינו זמין",
+      "usageUnavailable": "ניצול ההקשר אינו זמין{{costClause}}.",
       "tokenUsage": "שימוש בטוקנים",
       "cacheRate": "שיעור השימוש במטמון",
       "modelsCount": "מודלים ({{displayCount}})",
@@ -2481,7 +2077,6 @@
   },
   "addCredits": {
     "cta": "הוספת קרדיטים",
-    "description": "הוסף קרדיטים כדי להמשיך להשתמש בשירות.",
     "billingPage": "דף החיוב"
   },
   "deviceSessions": {
@@ -2500,7 +2095,8 @@
     "signOutThisDeviceTitle": "להתנתק מהמכשיר הזה?",
     "signOutThisSessionTitle": "לנתק את החיבור הזה?",
     "signOutThisSessionMessage": "{{device}} ינותק מהחשבון. הגישה שלו ל-API יכולה להישאר פעילה למשך עד שעה.",
-    "webBrowser": "דפדפן"
+    "webBrowser": "דפדפן",
+    "unknownDevice": "מכשיר לא ידוע"
   },
   "forceUpdate": {
     "couldNotOpenStore": "לא ניתן היה לפתוח את חנות האפליקציות.",
@@ -2624,6 +2220,8 @@
     "retryHint": "טעינת המצב של Kilo Pass שוב.",
     "cardAccessibility": "{{title}}. {{description}}. פעולה: {{actionLabel}}",
     "purchaseUnavailable": "רכישת Kilo Pass אינה זמינה כרגע.",
+    "purchaseUnavailableTitle": "לא זמין כרגע",
+    "purchaseUnavailableEnded": "ה-Kilo Pass שלך הסתיים.",
     "kiloPassManagement": "ניהול Kilo Pass",
     "kiloPassSetup": "הגדרת Kilo Pass",
     "subscriptionHeaderDescription": "מנוי חודשי שמוסיף קרדיטים ליתרת Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App.",
@@ -2778,10 +2376,10 @@
     },
     "connect": {
       "checkFailedTitle": "לא ניתן היה לבדוק את החיבור ל-GitHub.",
-      "checkFailedMessage": "מצב ההתחברות אינו זמין עד לסיום הטעינה.",
+      "checkFailedMessage": "לא ניתן היה להתחבר אל GitHub. בדוק את החיבור ונסה שוב.",
       "checkFailedTitleGitLab": "לא ניתן היה לבדוק את החיבור ל-GitLab.",
       "checkFailedTitleBitbucket": "לא ניתן היה לבדוק את החיבור ל-Bitbucket.",
-      "providerCheckFailedMessage": "מצב החיבור אינו זמין עד לסיום הטעימה.",
+      "providerCheckFailedMessage": "לא ניתן היה להתחבר לספק. בדוק את החיבור ונסה שוב.",
       "reconnectTitle": "חיבור מחדש ל-GitHub",
       "reconnectTitleGitLab": "חיבור מחדש ל-GitLab",
       "reconnectTitleBitbucket": "חיבור מחדש ל-Bitbucket",
@@ -2928,7 +2526,6 @@
     },
     "fileList": {
       "filesList": "רשימת קבצים",
-      "filesViewed": "קבצים · נצפו {{viewed}} מתוך {{total}}",
       "layout": "פריסה",
       "listed": "(ברשימה)",
       "loadingFiles": "הקבצים נטענים",
@@ -2951,7 +2548,13 @@
       "retryLoadingMoreFiles": "ניסיון נוסף לטעינת קבצים נוספים",
       "title": "קבצים",
       "viewedCount": "נצפו {{viewed}} מתוך {{total}}",
-      "viewedOfListed": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה"
+      "viewedCount_one": "נצפו {{viewed}} מתוך {{total}}",
+      "viewedCount_two": "נצפו {{viewed}} מתוך {{total}}",
+      "viewedCount_other": "נצפו {{viewed}} מתוך {{total}}",
+      "viewedOfListed": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה",
+      "viewedOfListed_one": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה",
+      "viewedOfListed_two": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה",
+      "viewedOfListed_other": "נצפו {{viewed}} מתוך {{total}} הקבצים שברשימה"
     },
     "fileRows": {
       "collapseFile": "כיווץ הקובץ",
@@ -3544,9 +3147,9 @@
       "searching": "חיפוש באינטרנט",
       "thinking": "חשיבה מעמיקה"
     },
-    "planOf": "מתוך",
+    "planProgress": "{{done}} מתוך {{total}}",
     "filesChanged": "קבצים שונו",
-    "finishedIn": "הסתיים תוך",
+    "finishedIn": "הסתיים תוך {{duration}}",
     "noActivityFor": "אין פעילות במשך",
     "prOpened": "בקשת משיכה נפתחה",
     "permissionWants": "רוצה להריץ",
@@ -3855,7 +3458,7 @@
     "reasoningEffort": {
       "modelFlag": "המודל הזה תומך במאמץ חשיבה"
     },
-    "creditsRequired": "אין מספיק קרדיטים לשליחת ההודעה הזו. הוסף קרדיטים ונסה שוב."
+    "creditsRequired": "אין מספיק קרדיטים לשליחת ההודעה הזו."
   },
   "settingsTools": {
     "confirmTitle": "לאשר את השינוי הזה?"
@@ -4054,6 +3657,7 @@
       "namePlaceholder": "הסוכן שלי",
       "promptPlaceholder": "אתה...",
       "tools": "כְּלֵי עֲבוֹדָה",
+      "wholeToolRule": "סוֹכֵן זֶה מְיַשֵּׂם כְּלָל אֶחָד עַל כָּל כְּלִי עֲבוֹדָה בְּבַת אַחַת: {{rule}}. הַמְּתָגִים הָאֵלֶּה לִקְרִיאָה בִּלְבַד.",
       "visibility": "רְאוּת",
       "visibilityPrimary": "ראשי — מוצג בבוחר",
       "visibilitySubagent": "סוכן משנה — ניתן להתקשרות מאחרים בלבד",
@@ -4095,6 +3699,7 @@
     },
     "repoBindings": {
       "title": "פרופילי ברירת מחדל עבור Repos",
+      "entryLabel": "פרופילים המוגדרים כברירת מחדל",
       "add": "הוסף ברירת מחדל",
       "empty": "לא הוגדרו ברירת מחדל",
       "emptyDescription": "הוסף ברירת מחדל להחלה אוטומטית של פרופיל בעת תחילת הפעלות עבור ריפו.",
@@ -4280,7 +3885,7 @@
     "estimate": "הערכת עלות {{estimate}} · מקסימום {{maximum}}",
     "estimateUnavailable": "סיכום בתשלום אינו זמין עבור הגדרות אלה.",
     "confirmPaid": "להפעיל סיכומים בתשלום עבור {{context}}?",
-    "paidDisclosure": "הערכה של {{estimate}}, עד {{maximum}}, עם מגבלה של {{minutes}} דקות. החיוב חל גם אם היצירה נכשלת.",
+    "paidDisclosure": "הערכה של {{estimate}}, עד {{maximum}}, עם מגבלה של {{minutes}} דק׳. החיוב חל גם אם היצירה נכשלת.",
     "enable": "הפעלת סיכומים בתשלום",
     "allContexts": "דוחות אישיים ודוחות ארגון נשמרים בנפרד.",
     "emptyHistory": "אין דוחות שמורים",
@@ -4299,12 +3904,15 @@
     "snapshotSummaryFailed": "סיכום ה-AI נכשל. תמונת המצב המובנית עדיין זמינה.",
     "scheduledContextEnabled": "דוחות מתוזמנים",
     "scheduledContextSettings": "דוחות מתוזמנים · {{context}}",
-    "scheduledContextHint": "הפעלת לכידה מתוזמנת וסיכומי AI בתשלום עבור הקשר זה בלבד. קטעים נבחרים ומושחרים ועובדות מובנות נשלחים למודל שלך. הסיכומים משתמשים בשפת האפליקציה שנשמרת רק בעת שינוי מפורש של הגדרות הדוח. שינוי שפת האפליקציה בלבד אינו מעדכן את שפת הסיכומים. החיובים מתבצעים מהיתרה של הקשר זה. בתמונות מצב ללא פעילות אין שימוש ב־AI.",
+    "scheduledContextHint": "הפעלת לכידה מתוזמנת וסיכומי AI בתשלום עבור הקשר זה בלבד. קטעים נבחרים ומושחרים ועובדות מובנות נשלחים למודל שלך. הסיכומים משתמשים בשפת האפליקציה שנשמרת בעת עדכון הגדרות הדוח. החיובים מתבצעים מהיתרה של הקשר זה. בתמונות מצב ללא פעילות אין שימוש ב־AI.",
     "snapshotSafeguards": "מגבלות הזמן וההוצאה לכל סיכום חלות על כל תמונת מצב מתוזמנת בנפרד, ולא כתקציב יומי.",
     "snapshotEstimateInputTooLarge": "תמונת המצב הזו מכילה יותר מדי ראיות עבור המודל שנבחר.",
-    "quietSnapshot": "לא נבחרה פעילות סשנים לתמונת המצב הזו במסגרת בחירה כמיטב האפשר. לא התבקש סיכום AI, לא בוצעה קריאה למודל ולא נגבה תשלום.",
+    "quietSnapshot": "לא נבחרה פעילות סשנים לתמונת המצב הזו. לא התבקש סיכום AI ולא נגבה תשלום.",
     "noEnabledContexts": "אין הקשרים שבהם מופעלים דוחות מתוזמנים",
     "sourceBlocker": "הסשן דורש תשומת לב",
     "sourceMetadata": "מטא־נתונים של הסשן שנלכדו"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "לא ניתן היה לפתוח את תוצאת החיפוש הזו"
   }
 }

@@ -1,20 +1,21 @@
 import type { EnkryptDetectorId } from '@kilocode/db/schema-types';
 import type {
+  EnkryptFlaggedTool,
   EnkryptGuardrailReport,
+  EnkryptInputScanReport,
   EnkryptOutputGuardrailReport,
-  EnkryptScanReport,
+  EnkryptOutputScanReport,
+  EnkryptToolScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import type { ReactNode } from 'react';
-import {
-  DETECTOR_DETAILS,
-  PII_ENTITY_DETAILS,
-} from '@/components/organizations/guardrails/EnkryptDetectorList';
+import { PII_ENTITY_DETAILS } from '@/components/organizations/guardrails/EnkryptDetectorList';
 import { DetailGrid, DetailSection, ToneBadge, yesNo, type DetailItem } from './detail-primitives';
-import { formatCount, formatDurationMs } from './format';
+import { detectorLabel } from './enkrypt-usage-labels';
+import { ABSENT, formatCount, formatDurationMs } from './format';
 import type { StepTone } from './routing-labels';
 
 type Verdict = EnkryptGuardrailReport['verdict'];
-type Scan = EnkryptScanReport & { verdict_cache_write?: 'written' | 'failed' | 'skipped' };
+type Scan = EnkryptInputScanReport | EnkryptOutputScanReport;
 type Settings = NonNullable<EnkryptGuardrailReport['settings']>;
 type DetectorSetting = Settings['detectors'][number];
 
@@ -31,6 +32,13 @@ const DECISIONS: Record<Scan['decision'], { label: string; tone: StepTone }> = {
   error_fail_closed: { label: 'Error, request blocked', tone: 'rejected' },
   error_logged: { label: 'Error, logged only', tone: 'deferred' },
   client_aborted: { label: 'Client aborted', tone: 'skipped' },
+};
+
+const PART_LABELS: Record<Scan['part'], string | null> = {
+  tools: 'Tool definitions',
+  system: 'System prompt',
+  conversation: 'Conversation',
+  response: null,
 };
 
 const VERDICT_CACHE_LABELS: Record<Scan['verdict_cache'], string> = {
@@ -58,10 +66,6 @@ const NOT_SCANNED_REASON_LABELS: Record<
   held_output_too_large: 'Held-back response too large',
 };
 
-function detectorLabel(detector: EnkryptDetectorId): string {
-  return DETECTOR_DETAILS[detector].label;
-}
-
 function detectorNote(setting: DetectorSetting): string | null {
   if (setting.pii_entities) {
     return setting.pii_entities.map(entity => PII_ENTITY_DETAILS[entity].label).join(', ');
@@ -80,13 +84,100 @@ function DetectorList({ detectors }: { detectors: EnkryptDetectorId[] }) {
   return <>{detectors.map(detectorLabel).join(', ')}</>;
 }
 
+function verdictCacheValue(scan: EnkryptInputScanReport): string {
+  const stored = scan.verdict_cache_write === 'written';
+  return `${VERDICT_CACHE_LABELS[scan.verdict_cache]}${stored ? ', stored' : ''}`;
+}
+
+function flaggedToolName(tool: EnkryptFlaggedTool): string {
+  if (tool.kind === 'response_format') return 'Response format';
+  return tool.name ?? 'Unnamed tool';
+}
+
+function FlaggedTools({ scan }: { scan: EnkryptToolScanReport }) {
+  if (scan.flagged_tools.length === 0) return null;
+  const more = scan.tools_flagged - scan.flagged_tools.length;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-muted-foreground text-xs">Flagged tools</span>
+      <ul className="flex flex-col gap-1">
+        {scan.flagged_tools.map((tool, index) => (
+          <li key={index} className="flex flex-wrap items-baseline gap-x-2 text-xs">
+            <span className="font-mono">{flaggedToolName(tool)}</span>
+            {tool.detectors_fired.length > 0 && (
+              <span className="text-status-destructive">
+                <DetectorList detectors={tool.detectors_fired} />
+              </span>
+            )}
+            {tool.error && <span className="text-status-destructive">{tool.error}</span>}
+          </li>
+        ))}
+      </ul>
+      {more > 0 && (
+        <span className="text-muted-foreground text-xs">and {formatCount(more)} more</span>
+      )}
+    </div>
+  );
+}
+
+/** Counts separators between packed segments and headers of split segments, so it can exceed the part's length. */
+function charactersSent(scan: Scan): DetailItem {
+  return { label: 'Characters sent', value: formatCount(scan.scanned_characters) };
+}
+
+function charactersCached(scan: Scan): DetailItem {
+  return {
+    label: 'Characters cached',
+    value: `${formatCount(scan.cached_characters)} of ${formatCount(scan.total_characters)}`,
+  };
+}
+
+function scanItems(scan: Scan): DetailItem[] {
+  const calls = { label: 'Enkrypt calls', value: formatCount(scan.attempts) };
+  switch (scan.part) {
+    case 'tools':
+      return [
+        {
+          label: 'Tools',
+          value: `${formatCount(scan.tools_total)} total, ${formatCount(scan.tools_cached)} cached, ${formatCount(scan.tools_scanned)} scanned`,
+        },
+        { label: 'Verdict cache', value: verdictCacheValue(scan) },
+        charactersSent(scan),
+        charactersCached(scan),
+        calls,
+      ];
+    case 'system':
+    case 'conversation':
+      return [
+        { label: 'Verdict cache', value: verdictCacheValue(scan) },
+        charactersSent(scan),
+        charactersCached(scan),
+        ...(scan.part === 'conversation'
+          ? [
+              {
+                label: 'Segments cached',
+                value: `${formatCount(scan.cached_segments)} of ${formatCount(scan.total_segments)}`,
+              },
+              { label: 'Attachments omitted', value: formatCount(scan.omitted_attachments) },
+            ]
+          : []),
+        { label: 'Chunks', value: formatCount(scan.chunks) },
+        calls,
+      ];
+    case 'response':
+      return [charactersSent(scan), calls];
+  }
+}
+
 function ScanCard({ scan }: { scan: Scan }) {
   const decision = DECISIONS[scan.decision];
+  const part = PART_LABELS[scan.part];
   return (
     <li className="flex flex-col gap-3 rounded-md border p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium">
           {scan.scan === 'blocking' ? 'Blocking scan' : 'Log-only scan'}
+          {part && <span className="text-muted-foreground font-normal"> · {part}</span>}
         </span>
         <ToneBadge tone={decision.tone}>{decision.label}</ToneBadge>
         <span className="text-muted-foreground ml-auto text-xs tabular-nums">
@@ -107,24 +198,10 @@ function ScanCard({ scan }: { scan: Scan }) {
                 'None'
               ),
           },
-          {
-            label: 'Verdict cache',
-            value: `${VERDICT_CACHE_LABELS[scan.verdict_cache]}${scan.verdict_cache_write === 'written' ? ', stored' : ''}`,
-          },
-          {
-            label: 'Characters scanned',
-            value: `${formatCount(scan.scanned_characters)} of ${formatCount(scan.total_characters)}`,
-          },
-          {
-            label: 'Segments cached',
-            value: `${formatCount(scan.cached_segments)} of ${formatCount(scan.total_segments)}`,
-          },
-          {
-            label: 'Enkrypt calls',
-            value: formatCount(scan.attempts),
-          },
+          ...scanItems(scan),
         ]}
       />
+      {scan.part === 'tools' && <FlaggedTools scan={scan} />}
       {scan.error && <p className="text-status-destructive text-xs">{scan.error}</p>}
     </li>
   );
@@ -133,11 +210,7 @@ function ScanCard({ scan }: { scan: Scan }) {
 type GuardrailReportBodyProps = {
   title: string;
   description: string;
-  verdict: Verdict;
-  unavailableReason: EnkryptGuardrailReport['unavailable_reason'];
-  addedLatencyMs: number | null;
-  settings: Settings | null;
-  scans: Scan[];
+  report: EnkryptGuardrailReport | EnkryptOutputGuardrailReport;
   items?: DetailItem[];
   notice?: ReactNode;
 };
@@ -145,15 +218,12 @@ type GuardrailReportBodyProps = {
 function GuardrailReportBody({
   title,
   description,
-  verdict,
-  unavailableReason,
-  addedLatencyMs,
-  settings,
-  scans,
+  report,
   items = [],
   notice,
 }: GuardrailReportBodyProps) {
-  const verdictDetails = VERDICTS[verdict];
+  const { settings, scans } = report;
+  const verdictDetails = VERDICTS[report.verdict];
   return (
     <DetailSection title={title} description={description}>
       <DetailGrid
@@ -162,16 +232,12 @@ function GuardrailReportBody({
             label: 'Verdict',
             value: <ToneBadge tone={verdictDetails.tone}>{verdictDetails.label}</ToneBadge>,
           },
-          { label: 'Added latency', value: formatDurationMs(addedLatencyMs) },
-          {
-            label: 'Scans tool results',
-            value: settings ? yesNo(settings.scan_tool_results) : '—',
-          },
-          ...(unavailableReason
+          { label: 'Added latency', value: formatDurationMs(report.added_latency_ms) },
+          ...(report.unavailable_reason
             ? [
                 {
                   label: 'Unavailable because',
-                  value: UNAVAILABLE_REASON_LABELS[unavailableReason],
+                  value: UNAVAILABLE_REASON_LABELS[report.unavailable_reason],
                 },
               ]
             : []),
@@ -214,12 +280,8 @@ export function EnkryptReportSection({ report }: { report: EnkryptGuardrailRepor
   return (
     <GuardrailReportBody
       title="Enkrypt input guardrail"
-      description="How the organization's Enkrypt guardrail scanned this request. Prompt text is never stored."
-      verdict={report.verdict}
-      unavailableReason={report.unavailable_reason}
-      addedLatencyMs={report.added_latency_ms}
-      settings={report.settings}
-      scans={report.scans}
+      description="How the organization's Enkrypt guardrail scanned this request."
+      report={report}
       notice={
         report.settings === null && (
           <p className="text-status-destructive text-xs">
@@ -235,18 +297,14 @@ export function EnkryptOutputReportSection({ report }: { report: EnkryptOutputGu
   return (
     <GuardrailReportBody
       title="Enkrypt output guardrail"
-      description="How the organization's Enkrypt guardrail scanned the response. Response text is never stored."
-      verdict={report.verdict}
-      unavailableReason={report.unavailable_reason}
-      addedLatencyMs={report.added_latency_ms}
-      settings={report.settings}
-      scans={report.scans}
+      description="How the organization's Enkrypt guardrail scanned the response."
+      report={report}
       items={[
         { label: 'Held back', value: yesNo(report.held_back) },
         { label: 'Held for', value: formatDurationMs(report.held_ms) },
         {
           label: 'Characters scanned',
-          value: report.output_characters === null ? '—' : formatCount(report.output_characters),
+          value: report.output_characters === null ? ABSENT : formatCount(report.output_characters),
         },
         ...(report.not_scanned_reason
           ? [

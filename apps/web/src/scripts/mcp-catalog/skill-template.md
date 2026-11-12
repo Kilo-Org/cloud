@@ -18,7 +18,7 @@ and `kilo_call`. Parent-scoped Cloud Agent connections instead expose the dedica
 child-session tools described below. Use the tool names published by your client;
 it may prefix them with the MCP server name.
 
-The changes are recorded in `services/kilo-mcp/CHANGELOG.md`.
+See `services/kilo-mcp/CHANGELOG.md`.
 
 ## General API connections
 
@@ -34,15 +34,14 @@ an admin guard carries `admin: true`; an opted-in admin connection also gets
 and `submit_otp`, which runs it once the user approves with their authenticator
 code. A row whose top segment is `debug` carries `debug: true`.
 
-The catalog is `services/kilo-mcp/catalog.json`. This skill is generated from
-it, and the catalog wins when the two disagree — read the catalog, not this
-file, for current detail.
+The catalog at `services/kilo-mcp/catalog.json` is authoritative.
+Read it for current endpoint details.
 
 ## Parent-scoped child sessions
 
 These connections publish `search_models`, `generate_message_id`, `spawn_session`,
 `list_child_sessions`, `get_session`, `get_message_result`, `send_message`, `interrupt_session`,
-`list_folders`, and `assign_workspace_to_folder`.
+`list_environments`, `list_folders`, and `assign_workspace_to_folder`.
 They do not expose API `search` or `call`.
 
 1. Launch only when the user explicitly requests a Cloud Agent session. Children have independent sandboxes/worktrees; use local tools for this worktree.
@@ -53,10 +52,10 @@ They do not expose API `search` or `call`.
 6. `list_folders` discovers existing folder IDs, not workspace membership. Use `assign_workspace_to_folder` with `folderId` and the child's `cloudAgentSessionId`/`worktreeId` from listing or status. It files the whole worktree, including sibling chats; `folderId: null` unfiles it. Only this parent's child workspaces are movable. Folder creation, editing, deletion, and reordering are unavailable.
 7. After an ambiguous mutation failure, reconcile state before retrying. Keep the same `operationKey` or follow-up `messageId` for that same submission.
 8. Omitted `autoCommit` requests no automatic commit/push; follow-ups do not inherit it. Set `true` per authorized message. If publication is forbidden, set `false` and prohibit it in the prompt: `false` cannot restrict agent Git tools or cancel another prompt's request. Request PR creation in the prompt.
+9. Use `list_environments({repository:{platform:"github",fullName:"owner/repo"}})` for scoped summaries. Pass a returned `id` as `spawn_session.requestedEnvironment.id`; never guess IDs.
 
-Callbacks go to the child's canonical parent workspace: `workspace:new-chat` opens
-a sibling chat there; `workspace:<session-id>` queues into an existing chat. Manage
-only direct children, never the parent. No grandchildren.
+Callbacks return to the canonical parent workspace. Manage only direct children,
+never the parent. No grandchildren.
 
 ### Examples
 
@@ -88,8 +87,6 @@ After the callback, or as one bounded check:
 ```js
 await get_message_result({ cloudAgentSessionId: child.cloudAgentSessionId, messageId });
 ```
-
-Retain publication constraints in `followUpTask`.
 
 ## Reporting feedback and bugs
 

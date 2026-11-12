@@ -168,6 +168,31 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
+  it('returns metadata and a small snapshot without serializing message history', async () => {
+    const sessionId = newSessionId();
+    const stub = await registerSession({
+      sessionId,
+      sandboxId: await generateSandboxId(sessionId),
+      kiloSessionId: kiloSessionId(),
+    });
+    const summary = await stub.getSessionMetadataSummary();
+    const snapshot = await stub.getSession();
+    expect(summary.metadata).toEqual(await stub.getMetadata());
+    expect(summary.snapshot.type).toBe('found');
+    expect(snapshot.type).toBe('found');
+    if (snapshot.type !== 'found') throw new Error('Missing snapshot');
+    const { messages, ...expected } = snapshot;
+    expect(summary.snapshot).toEqual(expected);
+    expect(summary.snapshot).not.toHaveProperty('messages');
+    expect(summary.currentMessage).toBeNull();
+    expect(messages).toEqual([]);
+    const missing = sessions.get(sessions.idFromName(newSessionId()));
+    expect(await missing.getSessionMetadataSummary()).toEqual({
+      metadata: null,
+      snapshot: { type: 'session-not-found' },
+      currentMessage: null,
+    });
+  });
   it('exposes interrupt and send without explicit hosted lifecycle operations', () => {
     const procedures = appRouter._def.procedures;
     expect(procedures).not.toHaveProperty('getHostedSessionLifecycle');
@@ -176,6 +201,34 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     expect(procedures.interruptSession._def.type).toBe('mutation');
     expect(procedures.send._def.type).toBe('mutation');
     expect(procedures.listChildSessions._def.type).toBe('query');
+  });
+
+  it('exposes workspace snapshot recovery procedures', () => {
+    const procedures = appRouter._def.procedures;
+    expect(procedures.getWorkspaceSnapshotRecovery._def.type).toBe('query');
+    expect(procedures.removeWorkspaceSnapshot._def.type).toBe('mutation');
+  });
+
+  it('forwards workspace snapshot metadata and removal to the sandbox peer', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId(sessionId);
+    const stub = await registerSession({ sessionId, sandboxId, kiloSessionId: kiloSessionId() });
+    const peer = new FakeSandboxPeer();
+    peer.workspaceSnapshotRecovery = { capturedAt: 1_763_000_000_000 };
+    await installPeer(stub, peer);
+
+    await expect(stub.getWorkspaceSnapshotRecovery()).resolves.toEqual({
+      capturedAt: 1_763_000_000_000,
+    });
+    await expect(stub.removeWorkspaceSnapshot()).resolves.toEqual({ success: true });
+    expect(peer.removeWorkspaceSnapshotCalls).toEqual([sessionId]);
+    await expect(stub.getWorkspaceSnapshotRecovery()).resolves.toBeNull();
+  });
+
+  it('reports nothing to discard without a registered sandbox', async () => {
+    const stub = sessions.getByName(newSessionId());
+    await expect(stub.getWorkspaceSnapshotRecovery()).resolves.toBeNull();
+    await expect(stub.removeWorkspaceSnapshot()).resolves.toEqual({ success: true });
   });
 
   it('interrupts a turn without releasing its route and accepts the next message', async () => {

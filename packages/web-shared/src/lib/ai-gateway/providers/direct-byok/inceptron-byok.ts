@@ -1,5 +1,5 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
+import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
   apiKeyUpstream,
   type DirectByokProvider,
@@ -14,17 +14,5 @@ export default {
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
-  transformRequest() {},
-  models: cachedEnhancedDirectByokModelList({
-    providerId: 'inceptron-byok',
-    recommendedModels: [
-      {
-        id: 'moonshotai/Kimi-K2.6',
-        name: 'Kimi K2.6',
-        flags: ['vision', 'reasoning'],
-        context_length: 262144,
-        max_completion_tokens: 262144,
-      },
-    ],
-  }),
+  models: cachedDirectByokModelList('inceptron-byok'),
 } satisfies DirectByokProvider;

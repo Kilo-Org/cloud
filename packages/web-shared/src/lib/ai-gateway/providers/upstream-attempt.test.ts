@@ -14,13 +14,17 @@ jest.mock('./openrouter', () => ({
   ...jest.requireActual('./openrouter'),
   getRawOpenRouterModels: jest.fn(),
 }));
+jest.mock('./vercel', () => ({
+  ...jest.requireActual('./vercel'),
+  isValidVercelModelId: jest.fn(),
+}));
 jest.mock('./preferred-provider-order-config', () => ({
   getPreferredProviderOrderConfig: jest.fn(),
 }));
 
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
-import type { StoredModel } from '@kilocode/db';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -42,6 +46,7 @@ import {
 } from './gateway-models-cache';
 import { getRawOpenRouterModels } from './openrouter';
 import { getPreferredProviderOrderConfig } from './preferred-provider-order-config';
+import { isValidVercelModelId } from './vercel';
 import { upstreamRequest } from './upstream-request';
 import { sendUpstreamAttempt } from './upstream-attempt';
 
@@ -54,7 +59,7 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 describe('bounded spending provider enforcement', () => {
-  const model: StoredModel = {
+  const model: GatewayModelWithEndpoints = {
     id: 'test/preferred',
     name: 'Preferred model',
     endpoints: [
@@ -85,7 +90,11 @@ describe('bounded spending provider enforcement', () => {
     });
   });
 
-  function attempt(providerId: string, userByok: BYOKResult[] | null) {
+  function attempt(
+    providerId: string,
+    userByok: BYOKResult[] | null,
+    availableBalanceMicrodollars = 2_000_000
+  ) {
     jest.mocked(upstreamRequest).mockResolvedValue({
       type: 'success',
       response: jsonResponse(200, { ok: true }),
@@ -112,9 +121,22 @@ describe('bounded spending provider enforcement', () => {
       isNonTrialEnterprise: false,
       search: '',
       method: 'POST',
-      costLimit: { maximumMicrodollars: '500', availableBalanceMicrodollars: 2_000_000 },
+      costLimit: { maximumMicrodollars: '500', availableBalanceMicrodollars },
     });
   }
+
+  it('serves a connected customer without applying a Kilo debit limit to the external bill', async () => {
+    jest
+      .mocked(applyProviderSpecificLogic)
+      .mockImplementationOnce(async (_provider, _model, request) => {
+        Object.assign(request.body, {
+          billing_policy: { type: 'billing_policy', bill_to: 'user_profile' },
+        });
+      });
+    const result = await attempt('claude-billing', null, 0);
+    expect(result.type).toBe('success');
+    expect(upstreamRequest).toHaveBeenCalledTimes(1);
+  });
 
   it('refuses a managed Vercel route the quoted ceiling cannot cover', async () => {
     const result = await attempt('vercel', null);
@@ -179,12 +201,20 @@ describe('upstream model catalog validation', () => {
     'openai/gpt-4o',
     '~deepseek/deepseek-pro-latest',
   ]);
+  const vercelModels = new Set([...canonicalModels, 'qwen/qwen3.5-flash']);
+  vercelModels.delete('openai/gpt-4o');
+
+  function catalogCheck(providerId: 'openrouter' | 'vercel') {
+    return jest.mocked(providerId === 'vercel' ? isValidVercelModelId : isValidOpenRouterModelId);
+  }
 
   beforeEach(() => {
     jest.mocked(isValidOpenRouterModelId).mockReset();
     jest
       .mocked(isValidOpenRouterModelId)
       .mockImplementation(async model => canonicalModels.has(model));
+    jest.mocked(isValidVercelModelId).mockReset();
+    jest.mocked(isValidVercelModelId).mockImplementation(async model => vercelModels.has(model));
     jest.mocked(applyProviderSpecificLogic).mockReset();
     jest.mocked(upstreamRequest).mockReset();
     jest.mocked(upstreamRequest).mockResolvedValue({
@@ -245,7 +275,9 @@ describe('upstream model catalog validation', () => {
     describe.each(['openrouter', 'vercel'] as const)('%s', providerId => {
       const byokProviderId = providerId === 'vercel' ? 'vercel-ai-gateway' : providerId;
 
-      it.each([false, true])('blocks an invalid catalog ID (BYOK: %s)', async byok => {
+      const otherProviderId = providerId === 'vercel' ? 'openrouter' : 'vercel';
+
+      it.each([false, true])('blocks a model its gateway does not list (BYOK: %s)', async byok => {
         const result = await attempt({
           providerId,
           requestedModel: 'qwen/not-in-catalog',
@@ -254,12 +286,13 @@ describe('upstream model catalog validation', () => {
           userByok: byok ? [{ providerId: byokProviderId, decryptedAPIKey: 'test-key' }] : null,
         });
 
-        expect(result).toEqual({ type: 'invalid-openrouter-model' });
-        expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([['qwen/not-in-catalog']]);
+        expect(result).toEqual({ type: 'unknown-gateway-model' });
+        expect(catalogCheck(providerId).mock.calls).toEqual([['qwen/not-in-catalog']]);
+        expect(catalogCheck(otherProviderId)).not.toHaveBeenCalled();
         expect(upstreamRequest).not.toHaveBeenCalled();
       });
 
-      it.each([false, true])('sends a valid catalog ID (BYOK: %s)', async byok => {
+      it.each([false, true])('sends a model its gateway lists (BYOK: %s)', async byok => {
         const result = await attempt({
           providerId,
           requestedModel: 'qwen/qwen3-coder',
@@ -269,7 +302,8 @@ describe('upstream model catalog validation', () => {
         });
 
         expect(result.type).toBe('success');
-        expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([['qwen/qwen3-coder']]);
+        expect(catalogCheck(providerId).mock.calls).toEqual([['qwen/qwen3-coder']]);
+        expect(catalogCheck(otherProviderId)).not.toHaveBeenCalled();
         expect(upstreamRequest).toHaveBeenCalledTimes(1);
         expect(upstreamRequest).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -290,21 +324,28 @@ describe('upstream model catalog validation', () => {
     ['bytedance-seed/seed-2.0', 'bytedance/seed-2.0'],
     ['openai/gpt-4o', 'override/custom-deployment'],
     ['~deepseek/deepseek-pro-latest', 'deepseek/deepseek-v4-pro-0813'],
-  ])('validates %s before sending Vercel wire ID %s', async (requestedModel, wireModel) => {
-    const result = await attempt({ requestedModel, wireModel });
+  ])(
+    'checks %s against the Vercel catalog before sending wire ID %s',
+    async (requestedModel, wireModel) => {
+      vercelModels.add('openai/gpt-4o');
+      const result = await attempt({ requestedModel, wireModel });
+      vercelModels.delete('openai/gpt-4o');
 
-    expect(result.type).toBe('success');
-    expect(jest.mocked(isValidOpenRouterModelId).mock.calls).toEqual([[requestedModel]]);
-    expect(upstreamRequest).toHaveBeenCalledTimes(1);
-    expect(upstreamRequest).toHaveBeenCalledWith(
-      expect.objectContaining({ body: expect.objectContaining({ model: wireModel }) })
-    );
-  });
+      expect(result.type).toBe('success');
+      expect(jest.mocked(isValidVercelModelId).mock.calls).toEqual([[requestedModel]]);
+      expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
+      expect(upstreamRequest).toHaveBeenCalledTimes(1);
+      expect(upstreamRequest).toHaveBeenCalledWith(
+        expect.objectContaining({ body: expect.objectContaining({ model: wireModel }) })
+      );
+    }
+  );
 
   it.each(['openrouter', 'vercel'] as const)(
     '%s skips catalog validation for the auto small free model',
     async providerId => {
       jest.mocked(isValidOpenRouterModelId).mockResolvedValue(false);
+      jest.mocked(isValidVercelModelId).mockResolvedValue(false);
       const result = await attempt({
         providerId,
         requestedModel: AUTO_SMALL_TARGET_MODELS.free,
@@ -313,6 +354,7 @@ describe('upstream model catalog validation', () => {
 
       expect(result.type).toBe('success');
       expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
+      expect(isValidVercelModelId).not.toHaveBeenCalled();
       expect(upstreamRequest).toHaveBeenCalledTimes(1);
       expect(upstreamRequest).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -322,8 +364,19 @@ describe('upstream model catalog validation', () => {
     }
   );
 
+  it.each([
+    ['qwen/qwen3.5-flash', 'vercel', 'success'],
+    ['qwen/qwen3.5-flash', 'openrouter', 'unknown-gateway-model'],
+    ['openai/gpt-4o', 'openrouter', 'success'],
+    ['openai/gpt-4o', 'vercel', 'unknown-gateway-model'],
+  ] as const)('checks %s against the %s catalog only', async (requestedModel, providerId, type) => {
+    const result = await attempt({ providerId, requestedModel, wireModel: requestedModel });
+
+    expect(result.type).toBe(type);
+  });
+
   it.each(['direct-byok', 'mistral', 'inception', 'custom', 'custom-public', 'dev-tools'] as const)(
-    'does not validate %s models against the OpenRouter catalog',
+    'does not validate %s models against a gateway catalog',
     async providerId => {
       const result = await attempt({
         providerId,
@@ -333,6 +386,7 @@ describe('upstream model catalog validation', () => {
 
       expect(result.type).toBe('success');
       expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
+      expect(isValidVercelModelId).not.toHaveBeenCalled();
       expect(upstreamRequest).toHaveBeenCalledTimes(1);
     }
   );

@@ -21,8 +21,12 @@
 // merge/auto-merge write on `expectedHeadSha`. Auto-merge is
 // GitLab-only: the server answers Bitbucket with `{supported: false,
 // reason}` and the hook must NOT announce a success for it.
+//
+// The update-branch arm is GitHub's alone: its procedure and caches live in
+// the `githubPrReview` namespace, so the hook takes a GitHub pull request ref
+// and a provider ref does not type-check into it.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import type * as OperationKeyModule from '@/lib/operation-key';
@@ -30,9 +34,18 @@ import type * as AnnounceModule from '@/lib/a11y/announce';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { PR_OPERATION_AMBIGUOUS_MESSAGE } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
+import {
+  type BitbucketPrRef,
+  type GitHubPrRef,
+  type GitLabMrRef,
+} from '@kilocode/app-shared/provider-review';
 import type * as ProviderPrRefModule from '@/lib/pr-review/provider-pr-ref';
 import { type ProviderPrRef, type ProviderPrTriple } from '@/lib/pr-review/provider-pr-ref';
-import { useEnableAutoMergeMutation, useMergePullRequestMutation } from './use-pr-merge-mutations';
+import {
+  useEnableAutoMergeMutation,
+  useMergePullRequestMutation,
+  useUpdateBranchMutation,
+} from './use-pr-merge-mutations';
 import { MergeNotCompletedError } from './merge-result-error';
 
 const hoistedKeys = vi.hoisted(() => ({
@@ -77,6 +90,7 @@ type MutationOptions = {
 };
 
 let lastCapturedOptions: MutationOptions | null = null;
+let updateBranchOptions: MutationOptions | null = null;
 const mutateMock = vi.fn();
 const providerMergeMutateMock = vi.fn();
 const providerEnableAutoMergeMutateMock = vi.fn();
@@ -101,6 +115,12 @@ vi.mock('@/lib/trpc', () => ({
       getPullRequest: { queryKey: () => ['githubPrReview', 'getPullRequest'] },
       listChecks: { pathFilter: () => ['githubPrReview', 'listChecks'] },
       listFiles: { pathFilter: () => ['githubPrReview', 'listFiles'] },
+      updateBranch: {
+        mutationOptions: (opts: MutationOptions) => {
+          updateBranchOptions = opts;
+          return opts;
+        },
+      },
     },
     providerReview: {
       getPullRequest: { queryKey: () => ['providerReview', 'getPullRequest'] },
@@ -188,6 +208,7 @@ const PROVIDER_MERGE_VARS = {
 
 function resetMocks() {
   lastCapturedOptions = null;
+  updateBranchOptions = null;
   scopeOverride = null;
   mutateMock.mockReset();
   providerMergeMutateMock.mockReset();
@@ -566,6 +587,41 @@ describe('useEnableAutoMergeMutation (s6 provider arms)', () => {
     ).resolves.toEqual(refusal);
     lastCapturedOptions?.onSuccess?.(refusal);
     expect(announceMock.announceForA11y).not.toHaveBeenCalled();
+  });
+});
+
+describe('useUpdateBranchMutation (github-only arm)', () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('drops the GitHub pull request, checks and files caches on settle', async () => {
+    useUpdateBranchMutation({ platform: 'github', ...REF });
+
+    // Captured only by the GitHub options mock: the provider mock exposes no
+    // update hook, so an arm that read that namespace could not have reached
+    // here.
+    expect(updateBranchOptions).not.toBeNull();
+
+    await updateBranchOptions?.onSettled?.();
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ['githubPrReview', 'getPullRequest'],
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith(['githubPrReview', 'listChecks']);
+    expect(invalidateQueriesMock).toHaveBeenCalledWith(['githubPrReview', 'listFiles']);
+  });
+
+  it('types the ref as a GitHub pull request, so no other provider ref fits', () => {
+    type UpdateBranchRef = Parameters<typeof useUpdateBranchMutation>[0];
+    expectTypeOf<UpdateBranchRef>().toEqualTypeOf<GitHubPrRef>();
+    expectTypeOf<GitLabMrRef>().not.toExtend<UpdateBranchRef>();
+    expectTypeOf<BitbucketPrRef>().not.toExtend<UpdateBranchRef>();
+    expectTypeOf<ProviderPrTriple>().not.toExtend<UpdateBranchRef>();
   });
 });
 

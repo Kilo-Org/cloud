@@ -369,7 +369,6 @@ export async function extractSandboxAnalysis(options: {
             .map(tc => `function:${tc.function.name}`);
 
           emitApiMetrics({
-            clientSecret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
             kiloUserId: userId,
             organizationId,
             isAnonymous: false,

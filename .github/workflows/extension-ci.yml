@@ -5,9 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Cancel in-progress runs when a new commit is pushed to the same PR
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -19,6 +20,14 @@ jobs:
     timeout-minutes: 5
     outputs:
       extension: ${{ steps.filter.outputs.extension == 'true' || steps.workspaces.outputs.extension == 'true' }}
+      # What the Chrome e2e shards read. The bundle holds the extension, the two
+      # workspace packages it imports at run time and the install inputs; the
+      # web sources reach it as declarations only, which `verify` typechecks.
+      # The workspace answer is not part of this gate: the affected detector
+      # selects the extension for a web-source change as well, because the tRPC
+      # declaration program reads the web routers, and that selection would
+      # start the shards for an input the bundle cannot observe.
+      extension_e2e: ${{ steps.filter.outputs.extension_e2e == 'true' }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b
         with:
@@ -35,7 +44,72 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # dorny/paths-filter has no built-in retry: one dropped connection to
+      # api.github.com ("other side closed" while listing the PR's changed
+      # files) fails the step and, with it, every check that needs this job.
+      # The first attempt is allowed to fail so the retry below absorbs
+      # transient resets; a persistent failure still fails the job.
+      - name: Detect dependency-input changes
+        id: filter_resources
+        continue-on-error: true
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            resources:
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'patches/**'
+      - name: Detect dependency-input changes (retry)
+        id: filter_resources_retry
+        if: steps.filter_resources.outcome == 'failure'
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            resources:
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'patches/**'
+
+      # dorny/paths-filter answers from the pull request's own diff (its
+      # merge-base), while scripts/affected-workspaces.mjs diffs the base tip.
+      # On a branch that is behind main the two disagree about a dependency
+      # input main changed after the branch point: only the detector's diff
+      # names it, and its run then calls scripts/changed-dependencies.mjs, which
+      # imports js-yaml. This check diffs the detector's own base for that run.
+      # The input set comes from the detector, so it stays in one place.
+      - name: Detect dependency-input changes against the detector base
+        id: resources_base
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || '' }}
+        run: |
+          # A base that is not a commit in the checkout selects every
+          # workspace, and that selection parses no dependency.
+          if [ -z "$BASE_SHA" ] || ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            echo "manifests=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The input set is asked of the detector, never listed here.
+          answer=$(git diff --name-only "$BASE_SHA" HEAD | node -e '
+            const read = require("node:fs").readFileSync;
+            import("./scripts/affected-workspaces.mjs").then(module => {
+              const files = read(0, "utf8").split("\n").filter(Boolean);
+              console.log(files.some(module.isDependencyInput));
+            });
+          ' 2>/dev/null || true)
+          if [ "$answer" != true ] && [ "$answer" != false ]; then
+            # An unreadable detector cannot prove the diff is clean, so keep the
+            # install rather than risk a run without js-yaml.
+            answer=true
+          fi
+          echo "manifests=$answer" >> "$GITHUB_OUTPUT"
+
+      # The detection steps in this job read the repository, not node_modules:
+      # only scripts/changed-dependencies.mjs imports a package (js-yaml), and
+      # the detector calls it only for a dependency input. A skip without
+      # js-yaml fails the detector, and scripts/changed-workspaces.sh then
+      # selects every workspace with tests, so a wrong skip cannot drop a check.
       - name: Install root dependencies
+        if: steps.filter_resources.outputs.resources == 'true' || steps.filter_resources_retry.outputs.resources == 'true' || steps.resources_base.outputs.manifests == 'true'
         run: pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts
 
       - name: Detect explicit changes
@@ -59,6 +133,22 @@ jobs:
               - '.prettierignore'
               - 'tools/oxlint/**'
               - 'apps/web/src/**'
+            # The inputs the Chrome bundle is built from: the extension and the
+            # workspace sources its build resolves, plus what the install reads.
+            # Listed beside `extension` rather than derived from it, because a
+            # path filter matches a changed-file list, never another filter.
+            extension_e2e:
+              - 'apps/extension/**'
+              - '.github/workflows/extension-ci.yml'
+              - 'packages/cloud-agent-sdk/**'
+              - 'packages/session-ingest-contracts/**'
+              - 'package.json'
+              - '.nvmrc'
+              - '.npmrc'
+              - '.pnpmfile.cjs'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'patches/**'
 
       - name: Detect affected workspaces
         id: workspaces
@@ -66,8 +156,12 @@ jobs:
           matrix=$(scripts/changed-workspaces.sh)
           echo "extension=$(jq -r 'any(.[]; .dir == "apps/extension")' <<< "$matrix")" >> "$GITHUB_OUTPUT"
 
-  # Compiler, linter, formatting and unit tests, via the extension's own `verify`
-  # script so the extension's stricter (type-aware) oxlint config is what runs.
+  # Compiler, linter and unit tests, via the extension's own `verify` script so
+  # the extension's stricter (type-aware) oxlint config is what runs.
+  #
+  # The extension's formatting is gated by the repo-wide `format-check` job in
+  # ci.yml: `oxfmt --list-different .` covers apps/extension on every PR,
+  # merge-queue entry and main push, so `verify` does not format-check it again.
   verify:
     needs: changes
     if: needs.changes.outputs.extension == 'true'
@@ -87,50 +181,63 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the extension's dependency closure, the web closure that the tRPC
+      # declaration build reaches through the aliases in
+      # packages/trpc/tsconfig.json, and the root project are installed. The
+      # extension declares @kilocode/trpc, so the first filter also brings the
+      # declaration program's own workspace inputs. Widen the filter when a
+      # step here imports a workspace outside these closures.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'kilo-extension...' --filter 'web...' --filter kilocode-monorepo
 
       - name: Restore or build tRPC declarations
         uses: ./.github/actions/trpc-declarations
 
-      - name: Verify (typecheck, lint, format, unit tests)
+      # Prove the Firefox MV3 target still builds (the Chrome build runs inside e2e).
+      # It reuses this job's install and tRPC declarations, so it needs no job of
+      # its own: the target is proven on every run without a second workspace install.
+      - name: Build (Firefox MV3)
+        run: pnpm --filter kilo-extension build:firefox
+
+      - name: Verify (typecheck, lint, unit tests)
         env:
           KILO_TYPECHECK_TRPC_BUILT: '1'
         run: pnpm --filter kilo-extension verify
 
-  # Prove the Firefox MV3 target still builds (the Chrome build runs inside e2e).
-  build-firefox:
+  # Chrome end-to-end tests. The Playwright suite runs one worker at a time, so it
+  # is split into two shard jobs; the `e2e-chrome` job below reports their
+  # combined result under the check name this workflow has always published.
+  #
+  # `--shard` divides the suite by whole test file, so the shards do not hold the
+  # same amount of work and the heavier one sets the row's duration. It is still
+  # well under the single job it replaces.
+  #
+  # Each shard builds the Chrome MV3 bundle instead of copying it from a build
+  # job. The build takes a few seconds, while a separate build job would put a
+  # checkout, a whole-workspace install and an artifact round trip in series
+  # before either shard starts — longer than the duplicate build. The Chrome
+  # target is therefore proven twice per run, which costs less than proving it
+  # once and shipping it.
+  #
+  # Firefox Selenium e2e (`e2e:firefox`) is intentionally not run here: it
+  # relies on geckodriver tab detection that is unreliable headless.
+  #
+  # The gate is the shard's own input list, not the `extension` output: a change
+  # under the web sources runs `verify` for its declarations and leaves these two
+  # runners free, because the bundle this job builds resolves no web source.
+  e2e-chrome-shard:
     needs: changes
-    if: needs.changes.outputs.extension == 'true'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 15
-    steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-
-      - name: Mount pnpm store
-        uses: ./.github/actions/pnpm-store
-
-      - name: Setup Node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build (Firefox MV3)
-        run: pnpm --filter kilo-extension build:firefox
-
-  # Chrome end-to-end tests. `e2e:chrome` builds the Chrome MV3 bundle first, so this
-  # also covers the Chrome build. Firefox Selenium e2e (`e2e:firefox`) is intentionally
-  # not run here: it relies on geckodriver tab detection that is unreliable headless.
-  e2e-chrome:
-    needs: changes
-    if: needs.changes.outputs.extension == 'true'
-    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
+    if: needs.changes.outputs.extension_e2e == 'true'
+    name: e2e-chrome (${{ matrix.shard }}/2)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    # The suite drives one browser and one Node process, so it does not use the
+    # large runner the single job used: measured end to end, the heavier shard
+    # takes the same time on 4 vCPU. Repo variables are not exposed to fork pull
+    # requests, so the job falls back to ubuntu-latest there.
+    runs-on: ${{ vars.RUNNER_MEDIUM_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     env:
       CI: 'true'
@@ -148,8 +255,18 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # The whole workspace is installed here on purpose. The Playwright suite
+      # sets this job's duration, and the install is under a tenth of it, so a
+      # closure install cannot save a tenth of this job's wall time. Measured on
+      # this workflow; revisit when the install, not the suite, dominates a shard.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Builds the bundle the shard loads, with the analytics key the analytics
+      # specs need at build time. A build failure fails this shard before the
+      # browser download starts.
+      - name: Build the Chrome MV3 bundle
+        run: pnpm --filter kilo-extension run e2e:build:chrome
 
       # The version comes from the dependency graph this install just built, so
       # a bump to @playwright/test changes the key and downloads the matching
@@ -169,16 +286,35 @@ jobs:
         # No --with-deps: the runner image already ships the Chromium system libraries, and the apt-get behind --with-deps hangs until the job timeout whenever the runner fleet's apt egress degrades (measured: four 20-minute hangs on 2026-08-12). A missing library would fail the browser launch with an explicit list instead.
         run: pnpm --filter kilo-extension exec playwright install chromium
 
-      - name: Run Chrome e2e (builds the Chrome MV3 bundle first)
-        run: pnpm --filter kilo-extension e2e:chrome
+      - name: Run Chrome e2e shard
+        run: pnpm --filter kilo-extension run e2e:chrome:shard --shard=${{ matrix.shard }}/2
 
+      # One artifact name per shard: two uploads under one name collide.
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
-          name: extension-playwright-report
+          name: extension-playwright-report-${{ matrix.shard }}
           path: |
             apps/extension/playwright-report
             apps/extension/test-results
           retention-days: 7
           if-no-files-found: ignore
+
+  # The check name this workflow published before the suite was sharded. A
+  # skipped run (nothing relevant changed) passes; a failed or cancelled shard
+  # fails this job, and `changes` failing reaches it the same way.
+  e2e-chrome:
+    needs: [changes, e2e-chrome-shard]
+    if: ${{ !cancelled() }}
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - name: Check e2e results
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          if jq -e 'any(.[]; . == "failure" or . == "cancelled")' <<< "$RESULTS" > /dev/null; then
+            exit 1
+          fi

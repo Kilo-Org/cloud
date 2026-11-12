@@ -17,6 +17,7 @@ import {
   credit_transactions,
   microdollar_usage,
   exa_usage_log,
+  enkrypt_usage,
   compute_usage_charge,
   type Organization,
 } from '@kilocode/db/schema';
@@ -85,6 +86,20 @@ export async function recomputeOrganizationBalances(args: {
     )
     .orderBy(asc(exa_usage_log.created_at));
 
+  const enkryptUsage = await db
+    .select({
+      cost: enkrypt_usage.charged_microdollars,
+      created_at: enkrypt_usage.created_at,
+    })
+    .from(enkrypt_usage)
+    .where(
+      and(
+        eq(enkrypt_usage.organization_id, args.organizationId),
+        gt(enkrypt_usage.charged_microdollars, 0)
+      )
+    )
+    .orderBy(asc(enkrypt_usage.created_at));
+
   const computeUsage = await db
     .select({
       cost: compute_usage_charge.amount_microdollars,
@@ -99,7 +114,7 @@ export async function recomputeOrganizationBalances(args: {
     )
     .orderBy(asc(compute_usage_charge.created_at));
 
-  const usageRecords = mergeSortedByCreatedAt(llmUsage, exaUsage, computeUsage);
+  const usageRecords = mergeSortedByCreatedAt(llmUsage, exaUsage, enkryptUsage, computeUsage);
 
   // Fetch all credit transactions for this org
   const creditTransactions = await db
@@ -139,7 +154,7 @@ export async function recomputeOrganizationBalances(args: {
       .map(t => t.id)
   );
   // Compute total usage AND original baselines in a single pass.
-  // usageRecords contains LLM, Exa, and metered-compute charges, merge-sorted
+  // usageRecords contains LLM, Exa, Enkrypt guardrail, and metered-compute charges, merge-sorted
   // by created_at, so baselines are computed at the correct points in time.
   const computedOriginalBaselines = new Map<string, number>();
   let usageIdx = 0;

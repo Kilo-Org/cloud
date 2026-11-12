@@ -8,6 +8,7 @@ import {
   modeControlValue,
   needsResumeConfiguration,
   normalizeAlias,
+  resolveSendSelection,
   type CustomModeOption,
 } from './session-config';
 import type { SessionConfig, ResumeConfig } from './types';
@@ -375,5 +376,65 @@ describe('filterSessionCustomModeOptions', () => {
     const options = ensureSelectedCustomOption([], 'inherited');
 
     expect(filterSessionCustomModeOptions(options, undefined)).toEqual([option('inherited')]);
+  });
+});
+
+describe('resolveSendSelection', () => {
+  it('returns the selected mode, model, and variant', () => {
+    expect(
+      resolveSendSelection({
+        mode: 'plan',
+        model: 'anthropic/claude-sonnet',
+        variant: 'high',
+      })
+    ).toEqual({
+      mode: 'plan',
+      model: 'anthropic/claude-sonnet',
+      variant: 'high',
+    });
+  });
+
+  it('normalizes aliases and defaults an empty mode to code', () => {
+    expect(resolveSendSelection({ mode: 'build', model: 'model-a' })).toEqual({
+      mode: 'code',
+      model: 'model-a',
+      variant: undefined,
+    });
+    expect(resolveSendSelection(null)).toEqual({ mode: 'code', model: '', variant: undefined });
+  });
+
+  it("pins the selected runtime agent's model and variant over the session selection", () => {
+    expect(
+      resolveSendSelection({
+        mode: 'reviewer',
+        model: 'session/model',
+        variant: 'session-variant',
+        runtimeAgents: [
+          { slug: 'reviewer', name: 'Reviewer', model: ' pinned/model ', variant: ' pinned ' },
+        ],
+      })
+    ).toEqual({ mode: 'reviewer', model: 'pinned/model', variant: 'pinned' });
+  });
+
+  it('does not apply the session variant when the pinned agent has no variant', () => {
+    expect(
+      resolveSendSelection({
+        mode: 'reviewer',
+        model: 'session/model',
+        variant: 'session-variant',
+        runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', model: 'pinned/model' }],
+      })
+    ).toEqual({ mode: 'reviewer', model: 'pinned/model', variant: undefined });
+  });
+
+  it('ignores an agent variant when the agent does not pin a model', () => {
+    expect(
+      resolveSendSelection({
+        mode: 'reviewer',
+        model: 'session/model',
+        variant: 'session-variant',
+        runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', variant: 'agent-variant' }],
+      })
+    ).toEqual({ mode: 'reviewer', model: 'session/model', variant: 'session-variant' });
   });
 });

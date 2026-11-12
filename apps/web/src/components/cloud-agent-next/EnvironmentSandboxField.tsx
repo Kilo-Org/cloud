@@ -46,6 +46,8 @@ export function EnvironmentSandboxField({
 
   if (!value && !capabilities?.enabled) return null;
 
+  const defaultDestination = capabilities?.effectiveDestination ?? capabilities?.defaultDestination;
+
   return (
     <div className="grid gap-2">
       <Label id={labelId} className="text-xs">
@@ -58,9 +60,8 @@ export function EnvironmentSandboxField({
         )}
         unavailableReason={undefined}
         noneLabel="Use default size"
-        noneDescription={describeDefaultSandbox(
-          capabilities?.effectiveDestination ?? capabilities?.defaultDestination
-        )}
+        noneDescription={describeDefaultSandbox(defaultDestination)}
+        noneDestination={defaultDestination}
         labelledBy={labelId}
         disabled={disabled || isPending}
         onChange={onChange}

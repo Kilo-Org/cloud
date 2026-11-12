@@ -251,6 +251,8 @@ function PaginationHarness({
   scrollElementRef,
   isProgrammaticScrollRef,
   lastScrollTopRef,
+  autoloadOnMount,
+  initialPositionedRef,
 }: {
   ready: boolean;
   isLoadingOlderMessages: boolean;
@@ -260,6 +262,8 @@ function PaginationHarness({
   scrollElementRef: RefObject<HTMLElement | null>;
   isProgrammaticScrollRef: RefObject<boolean>;
   lastScrollTopRef: RefObject<number>;
+  autoloadOnMount?: boolean;
+  initialPositionedRef?: RefObject<boolean>;
 }) {
   const api = useOlderMessagesPagination({
     scrollElementRef,
@@ -272,6 +276,8 @@ function PaginationHarness({
     resetKey,
     overflowCheckKey: resetKey,
     ready,
+    autoloadOnMount,
+    initialPositionedRef,
   });
   onApi(api);
   return null;
@@ -393,6 +399,38 @@ describe('useOlderMessagesPagination readiness', () => {
     render(false);
 
     expect(lastScrollTopRef.current).toBe(150);
+  });
+
+  it('does not autoload a root transcript before anchoring or without a user scroll', () => {
+    const { element } = scrollingElement(() => 50);
+    const onLoad = jest.fn();
+    const positioned = { current: false };
+    const programmatic = { current: false };
+    let api: PaginationApi | null = null;
+    renderPagination({
+      ready: true,
+      isLoadingOlderMessages: false,
+      resetKey: 'root',
+      onLoad,
+      onApi: next => {
+        api = next;
+      },
+      scrollElementRef: { current: element },
+      isProgrammaticScrollRef: programmatic,
+      lastScrollTopRef: { current: 0 },
+      autoloadOnMount: false,
+      initialPositionedRef: positioned,
+    });
+    expect(onLoad).not.toHaveBeenCalled();
+    act(() => api?.tryLoadOlderFromScroll(0));
+    expect(onLoad).not.toHaveBeenCalled();
+    positioned.current = true;
+    programmatic.current = true;
+    act(() => api?.tryLoadOlderFromScroll(0));
+    expect(onLoad).not.toHaveBeenCalled();
+    programmatic.current = false;
+    act(() => api?.tryLoadOlderFromScroll(0));
+    expect(onLoad).toHaveBeenCalledTimes(1);
   });
 
   it('clears a pending prepend restore when the reset key changes', () => {

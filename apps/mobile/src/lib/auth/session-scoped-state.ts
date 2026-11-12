@@ -5,6 +5,7 @@ import { clearUserSessionTitles } from '@/components/agents/session-detail-renam
 import { clearSessionGoalCollapseState } from '@/components/agents/session-goal-collapse';
 import { clearToolCardImageCache } from '@/components/agents/tool-card-image-cache';
 import { clearClipboardImages } from '@/lib/agent-attachments/clipboard-image';
+import { clearSessionCatalogBestEffort } from '@/lib/app-actions/session-catalog';
 import { clearArtifactMirror } from '@/lib/artifacts/artifact-mirror';
 import { resetArtifactMirrorSyncState } from '@/lib/artifacts/artifact-mirror-sync';
 import { notifyArtifactsChanged } from '@/lib/artifacts/artifact-provider-native';
@@ -56,6 +57,13 @@ function clearSearchIndexBestEffort(): void {
  */
 export function clearSystemSearchIndexOnSignedOutLaunch(): void {
   clearSearchIndexBestEffort();
+  // The intent catalog is the same titles in another place, and its clear has
+  // the same one-shot problem: the teardown fired it without awaiting, so a
+  // process killed before it landed would leave the previous account's sessions
+  // named by Siri for the whole signed-out window. The signed-out launch is that
+  // retry, and running it while signed out cannot re-publish anything because
+  // the sync is gated off.
+  clearSessionCatalogBestEffort();
 }
 
 /**
@@ -159,6 +167,12 @@ export function clearSessionScopedState(): void {
   // ledger the indexer diffs against, so the next sync re-indexes whatever the
   // new account can see.
   runClear(clearSearchIndexBestEffort);
+  // The App Intents session catalog is device-wide for the same reason, and it
+  // is the same titles in another place: without this, Shortcuts and Siri would
+  // keep offering the previous account's sessions after a sign-out or an
+  // account switch, and the next sync would republish them from the cache that
+  // has not been cleared yet.
+  runClear(clearSessionCatalogBestEffort);
 }
 
 /** One best-effort clear: a throw never stops the clears that follow it. */

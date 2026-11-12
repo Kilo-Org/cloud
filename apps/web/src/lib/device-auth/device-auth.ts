@@ -5,7 +5,27 @@ import { eq, and, lt, lte, gt, isNull, isNotNull, sql } from 'drizzle-orm';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { randomInt, createHash, randomBytes } from 'node:crypto';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { requestingClientOfRow, type RequestingClient } from './requesting-client';
+import {
+  completePendingLinkByHash,
+  getLivePendingLinkByHash,
+  hashPendingLinkSecret,
+  type PendingLinkResult,
+} from '@/lib/auth/pending-link';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
+
+async function completeStoredPendingLink(
+  secretHash: string | null,
+  userId: string
+): Promise<PendingLinkResult | undefined> {
+  if (!secretHash) return undefined;
+  try {
+    return await completePendingLinkByHash(secretHash, userId);
+  } catch {
+    return { status: 'failed', reason: 'LINKING-FAILED' };
+  }
+}
 
 export type { RequestingClient } from './requesting-client';
 
@@ -16,6 +36,42 @@ export type { RequestingClient } from './requesting-client';
  */
 export const DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE =
   'Device authorization client confirmation does not match';
+
+/**
+ * Refusal when an approval for a request carrying a live pending link does
+ * not say whether to attach it. The approval page offers both choices and
+ * preselects neither, so an approval without the choice is incomplete.
+ */
+export const DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE =
+  'Device authorization pending link choice is required';
+
+export type DeviceAuthPendingLink = {
+  provider: AuthProviderId;
+  email: string;
+  displayName: string | null;
+};
+
+/** The live pending link a device request carries, for the approval page. */
+export async function getDeviceAuthPendingLink(
+  userCode: string
+): Promise<DeviceAuthPendingLink | null> {
+  const request = await getDeviceAuthRequest(userCode);
+  if (
+    !request ||
+    request.status !== 'pending' ||
+    isDeviceAuthRequestExpired(request) ||
+    !request.pending_link_secret_hash
+  ) {
+    return null;
+  }
+  const pending = await getLivePendingLinkByHash(request.pending_link_secret_hash);
+  if (!pending) return null;
+  return {
+    provider: pending.provider,
+    email: pending.email,
+    displayName: pending.display_name,
+  };
+}
 
 const CODE_LENGTH = 8;
 const CODE_EXPIRATION_MINUTES = 10;
@@ -100,6 +156,7 @@ export async function createDeviceAuthRequest(params: {
   userAgent?: string;
   ipAddress?: string;
   requestingClient?: RequestingClient;
+  pendingLinkToken?: string;
 }): Promise<{
   code: string;
   userCode: string;
@@ -161,6 +218,9 @@ export async function createDeviceAuthRequest(params: {
             expires_at: expiresAt.toISOString(),
             user_agent: userAgent,
             ip_address: ipAddress,
+            pending_link_secret_hash: params.pendingLinkToken
+              ? hashPendingLinkSecret(params.pendingLinkToken)
+              : null,
             ...requestingClientColumns(requestingClient),
           })
           .onConflictDoNothing({
@@ -247,19 +307,33 @@ export function isDeviceAuthRequestExpired(request: {
 export async function approveDeviceAuthRequest(
   userCode: string,
   userId: string,
-  options: { confirmedClientId?: string } = {}
+  options: { confirmedClientId?: string; addPendingLink?: boolean } = {}
 ): Promise<void> {
   const now = new Date().toISOString();
   const existing = await getDeviceAuthRequest(userCode);
   const requestingClientId = existing?.requesting_client_id ?? null;
+  const actionable =
+    existing?.status === 'pending' && new Date(existing.expires_at).getTime() > Date.parse(now);
   // An actionable row that names a client requires its confirmation before any
   // other outcome is considered; an expired row reports its expiry below.
   const confirmed =
-    requestingClientId !== null &&
-    existing?.status === 'pending' &&
-    new Date(existing.expires_at).getTime() > Date.parse(now)
+    requestingClientId !== null && actionable
       ? confirmRequestingClient(requestingClientId, options.confirmedClientId)
       : false;
+
+  // A live pending link must never attach silently: an actionable row that
+  // carries one requires the approver's explicit choice. Declining clears
+  // the stored hash so consumption cannot attach it later.
+  let clearPendingLink = false;
+  if (actionable && existing && existing.pending_link_secret_hash) {
+    const livePending = await getLivePendingLinkByHash(existing.pending_link_secret_hash);
+    if (livePending) {
+      if (options.addPendingLink === undefined) {
+        throw new Error(DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE);
+      }
+      clearPendingLink = options.addPendingLink === false;
+    }
+  }
 
   const [approved] = await db
     .update(device_auth_requests)
@@ -268,6 +342,7 @@ export async function approveDeviceAuthRequest(
       kilo_user_id: userId,
       approved_at: now,
       ...(confirmed ? { client_confirmed_at: now } : {}),
+      ...(clearPendingLink ? { pending_link_secret_hash: null } : {}),
     })
     .where(
       and(
@@ -361,6 +436,7 @@ export async function consumeDeviceAuthByDeviceCode(
   expiresIn?: number;
   userId?: string;
   userEmail?: string;
+  pendingLink?: PendingLinkResult;
 }> {
   const deviceCodeHash = hashDeviceSecret(deviceCode);
   const now = new Date().toISOString();
@@ -416,7 +492,7 @@ export async function consumeDeviceAuthByDeviceCode(
       throw new Error('User not found');
     }
 
-    if (user.blocked_reason) {
+    if (isBlockedAccount(user)) {
       await db
         .update(device_auth_requests)
         .set({ status: 'denied' })
@@ -435,6 +511,13 @@ export async function consumeDeviceAuthByDeviceCode(
         deviceAuthRequestId: consumed.id,
       });
       const pair = await issueSessionCredentials(user, sessionId);
+      // The pending link completes only after credentials exist, so a
+      // restored row never reports a link result for an attach that the
+      // retry would then find already consumed.
+      const pendingLink = await completeStoredPendingLink(
+        consumed.pending_link_secret_hash,
+        user.id
+      );
       return {
         status: 'approved',
         token: pair.token,
@@ -442,14 +525,17 @@ export async function consumeDeviceAuthByDeviceCode(
         expiresIn: pair.expiresIn,
         userId: user.id,
         userEmail: user.google_user_email,
+        ...(pendingLink ? { pendingLink } : {}),
       };
     }
 
+    const pendingLink = await completeStoredPendingLink(consumed.pending_link_secret_hash, user.id);
     return {
       status: 'approved',
       token,
       userId: user.id,
       userEmail: user.google_user_email,
+      ...(pendingLink ? { pendingLink } : {}),
     };
   } catch (err) {
     // If a device session was created, delete it to avoid orphans.
@@ -484,6 +570,7 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
   requestingClient?: RequestingClient | null;
   /** Whether the approval confirmed that exact client. */
   clientConfirmed?: boolean;
+  pendingLink?: PendingLinkResult;
 }> {
   const now = new Date().toISOString();
 
@@ -520,7 +607,7 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
         throw new Error('User not found');
       }
 
-      if (user.blocked_reason) {
+      if (isBlockedAccount(user)) {
         await db
           .update(device_auth_requests)
           .set({ status: 'denied' })
@@ -531,6 +618,10 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
       const token = generateApiToken(user, {
         deviceAuthRequestCode: consumed.code,
       });
+      const pendingLink = await completeStoredPendingLink(
+        consumed.pending_link_secret_hash,
+        user.id
+      );
 
       return {
         status: 'approved',
@@ -539,6 +630,7 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
         userEmail: user.google_user_email,
         requestingClient: requestingClientOfRow(consumed),
         clientConfirmed: consumed.client_confirmed_at !== null,
+        ...(pendingLink ? { pendingLink } : {}),
       };
     } catch (err) {
       // Restore the row so the request remains redeemable.

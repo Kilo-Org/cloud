@@ -16,6 +16,11 @@ const TRUNCATED_KEY = '[truncated]';
 // consumed per visited node and per object property, and traversal stops
 // (with a truncation sentinel) the moment it runs out.
 const PROVIDER_HINTS_MAX_NODES = 512;
+// The node budget limits how many values a snapshot holds. This limit caps how
+// long each kept string value and each kept property name may be, so the
+// serialized snapshot stays within the node budget times this length. Routing
+// hints are short identifiers, so ordinary hints are copied unchanged.
+const PROVIDER_HINTS_MAX_STRING_LENGTH = 256;
 // Message content, and the Responses input, are client-supplied JSON of
 // unbounded depth: no schema below `content: z.unknown()` constrains their
 // shape. Every walk this module does over them stays inside a fixed amount of
@@ -49,11 +54,19 @@ const SENSITIVE_KEY_WORDS = [
   'cookie',
   'credential',
   'key',
+  'pass',
+  'passkey',
+  'passphrase',
   'password',
   'passwd',
+  'pwd',
   'secret',
   'token',
 ];
+// A vendor name joined directly to a short password word (`dbpass`, `pgpass`,
+// `mongopass`) is a credential key only when the vendor is listed here, because a
+// broader rule would also classify ordinary words that end in `pass`, such as
+// `compass`. The list holds the products whose clients ship such a key name.
 const SENSITIVE_KEY_QUALIFIERS = [
   'access',
   'account',
@@ -61,20 +74,33 @@ const SENSITIVE_KEY_QUALIFIERS = [
   'app',
   'auth',
   'client',
+  'db',
   'encryption',
   'master',
+  'mongo',
+  'mssql',
+  'mysql',
+  'oracle',
+  'pg',
+  'postgres',
+  'postgresql',
   'private',
   'public',
+  'redis',
   'root',
   'secret',
   'service',
   'session',
   'signing',
+  'sql',
   'subscription',
 ];
 // A qualifier only counts when it ends immediately before a credential word, so
 // the scan before each occurrence never needs more than the longest qualifier.
 const MAX_QUALIFIER_LENGTH = Math.max(...SENSITIVE_KEY_QUALIFIERS.map(q => q.length));
+// These words also begin common English words, so they count only as an exact
+// token or a qualified occurrence, not at any token start.
+const TOKEN_START_EXCLUDED_WORDS: Record<string, true> = { pass: true };
 const REDUNDANT_CONTENT_TYPES = new Set([
   'function_call_output',
   'tool_call_output',
@@ -480,7 +506,13 @@ function toJsonValue(value: unknown, budget: { remaining: number }): JsonValue {
     return null;
   }
 
-  if (typeof value === 'string' || typeof value === 'boolean') {
+  if (typeof value === 'string') {
+    return value.length > PROVIDER_HINTS_MAX_STRING_LENGTH
+      ? value.slice(0, PROVIDER_HINTS_MAX_STRING_LENGTH) + TRUNCATED_VALUE
+      : value;
+  }
+
+  if (typeof value === 'boolean') {
     return value;
   }
 
@@ -514,10 +546,30 @@ function toJsonValue(value: unknown, budget: { remaining: number }): JsonValue {
       break;
     }
     budget.remaining -= 1;
-    result[key] = isSensitiveKey(key) ? REDACTED_VALUE : toJsonValue(value[key], budget);
+    result[keptKey(key)] = isSensitiveKey(key) ? REDACTED_VALUE : toJsonValue(value[key], budget);
   }
 
   return result;
+}
+
+// Property names reach the snapshot too, so the same cap applies to them. The
+// sensitive-key check above still reads the caller's original name. Names that
+// share their first characters keep distinct entries through the fingerprint.
+function keptKey(key: string) {
+  return key.length > PROVIDER_HINTS_MAX_STRING_LENGTH
+    ? `${key.slice(0, PROVIDER_HINTS_MAX_STRING_LENGTH)}[truncated:${keyFingerprint(key)}]`
+    : key;
+}
+
+// FNV-1a over the whole name: synchronous, dependency-free, and stable across
+// the gateway and the worker.
+function keyFingerprint(key: string) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
 }
 
 function isSensitiveKey(key: string) {
@@ -538,8 +590,9 @@ function isSensitiveToken(token: string) {
   if (SENSITIVE_KEY_WORDS.some(word => word === token || word === singular)) return true;
   for (const word of SENSITIVE_KEY_WORDS) {
     for (let index = token.indexOf(word); index !== -1; index = token.indexOf(word, index + 1)) {
-      // A token that starts with a credential word is a credential key.
-      if (index === 0) return true;
+      // A token that starts with a credential word is a credential key, unless
+      // the word is one that also begins ordinary words.
+      if (index === 0 && !TOKEN_START_EXCLUDED_WORDS[word]) return true;
       // A qualifier counts only when it ends immediately before the occurrence,
       // so the last MAX_QUALIFIER_LENGTH characters are the whole window that
       // can match one.

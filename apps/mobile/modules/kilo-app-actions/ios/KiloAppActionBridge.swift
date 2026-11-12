@@ -6,7 +6,7 @@ import Foundation
 /// The App Intents turn these into what Shortcuts shows: `errorDescription` is
 /// the caller-facing line, and the JS `message` is preferred over every
 /// built-in one whenever the pipeline sent it.
-enum KiloAppActionError: Error, LocalizedError {
+public enum KiloAppActionError: Error, LocalizedError {
   /// No JS dispatcher registered inside the bounded wait: the app is still
   /// starting, or its JS runtime never came up.
   case dispatcherUnavailable(seconds: Int)
@@ -19,7 +19,7 @@ enum KiloAppActionError: Error, LocalizedError {
   /// The system declined to open the action's link into the app.
   case linkRefused
 
-  var errorDescription: String? {
+  public var errorDescription: String? {
     switch self {
     case .dispatcherUnavailable(let seconds):
       return "Kilo did not finish starting within \(seconds) seconds, so the action did not run. "
@@ -42,8 +42,8 @@ enum KiloAppActionError: Error, LocalizedError {
 /// for the whole runtime. The bridge owns no action logic — it hands the
 /// payload over and reports the `AppActionResult` back, so the in-app control
 /// and the OS entry points run the exact same code path.
-final class KiloAppActionBridge: @unchecked Sendable {
-  static let shared = KiloAppActionBridge()
+public final class KiloAppActionBridge: @unchecked Sendable {
+  public static let shared = KiloAppActionBridge()
 
   /// How long a run waits for `registerAppActionDispatcher` before it reports a
   /// failure. A background App Intent is killed by the system long before this,
@@ -181,7 +181,7 @@ final class KiloAppActionBridge: @unchecked Sendable {
   /// `AppActionResult` for that request — a successful `StartAgent` reports the
   /// session id it created, and a refused one throws with the pipeline's own
   /// message, so Shortcuts shows a real result instead of a silent success.
-  func perform(payload: [String: String]) async throws -> String {
+  public func perform(payload: [String: String]) async throws -> String {
     let registration = try await waitUntilRegistered()
     do {
       // All JSI access happens on the JS thread; the answer crosses back as a

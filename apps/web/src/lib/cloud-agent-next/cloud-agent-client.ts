@@ -1,4 +1,10 @@
 import type { CloudSessionMessagesWirePage } from '@kilocode/cloud-agent-sdk/schemas';
+import {
+  cloudToolPartDetailInputSchema,
+  cloudToolPartDetailWireSchema,
+  type CloudToolPartDetailInput,
+  type CloudToolPartDetailWire,
+} from '@kilocode/cloud-agent-sdk/tool-part-detail';
 import 'server-only';
 import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
@@ -6,6 +12,7 @@ import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import { TRPC_ERROR_CODES_BY_KEY, type TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
 import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
+import type { GateThreshold } from '@kilocode/app-shared/code-review';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import {
   GetEgressAuditResponseSchema,
@@ -32,7 +39,10 @@ import {
   cloudSessionMessagesPageInputSchema,
   cloudSessionMessagesPageWireSchema,
 } from '@kilocode/cloud-agent-sdk/schemas';
-import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
+import {
+  WORKTREE_MEMBERSHIP_CHANGED,
+  type CloudAgentWorktreeId,
+} from '@kilocode/session-ingest-contracts';
 import {
   getWorktreeChangesOutputSchema,
   getWorktreeFileOutputSchema,
@@ -43,14 +53,18 @@ import {
   type WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SendMessagePayload } from './types.js';
+import type { WorktreeBranchOperationResult } from '@kilocode/worker-utils/cloud-agent-worktree-operations';
 import {
   baseGetMessageResultNextOutputSchema,
+  baseListPreviewServicesNextOutputSchema,
+  type ListPreviewServicesOutput,
   workerPreviewOptionsSchema,
 } from '@/routers/cloud-agent-next-schemas';
 import {
   SandboxStatusSnapshotSchema,
   type SandboxStatusSnapshot,
 } from '../../../../../services/cloud-agent-next/src/shared/sandbox-status';
+import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
 import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 export type { SendMessagePayload } from './types.js';
 
@@ -162,6 +176,12 @@ type PrepareSessionSharedFields = {
   /** Custom agents materialized from the merged profile stack. */
   runtimeAgents?: RuntimeAgentInput[];
   upstreamBranch?: string;
+  /** Start a new branch from this base instead of the repository default. */
+  baseBranch?: string;
+  /** Resolved commit for `baseBranch`; never accepted from a browser. */
+  baseSha?: string;
+  /** The parent worktree when this session starts from another worktree. */
+  parentWorktreeId?: string;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   /** Custom text to append to the system prompt (required when mode is 'custom') */
@@ -174,7 +194,7 @@ type PrepareSessionSharedFields = {
   createdOnPlatform?: string;
   clientProvenance?: 'browser' | 'mobile';
   /** PR gate threshold — when not 'off', the agent reports gateResult in its callback */
-  gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  gateThreshold?: GateThreshold;
   /** Deprecated: true is rejected because devcontainer support is retired. */
   devcontainer?: boolean;
   sandboxAllocation?: SandboxAllocationInput;
@@ -223,6 +243,7 @@ export type PrepareSessionOutput = {
   /** The Kilo CLI session ID */
   kiloSessionId: string;
   cloudAgentSessionId: string;
+  worktreeId?: CloudAgentWorktreeId;
   /** `true` when the response replays an already-settled create for the same `operationKey`. */
   replayed?: boolean;
 };
@@ -246,11 +267,13 @@ export type CreateWorktreeChatOutput = {
 export type DeleteWorktreeInput = {
   worktreeId: CloudAgentWorktreeId;
   kilocodeOrganizationId?: string;
+  onlyIfSoleSessionId?: string;
 };
 
 const deleteWorktreeOutputSchema = z.object({
   success: z.literal(true),
   deletedSessionIds: z.array(z.string()),
+  cleanup: z.enum(['complete', 'pending']).default('complete'),
 });
 
 export type DeleteWorktreeOutput = z.infer<typeof deleteWorktreeOutputSchema>;
@@ -350,6 +373,30 @@ export type ListChildSessionsOutput = {
 
 export type GetSessionMessagesPageInput = z.input<typeof cloudSessionMessagesPageInputSchema>;
 
+/** Input for syncWorktreeBranch; the base and fork boundary are resolved server-side. */
+export type SyncWorktreeBranchInput = {
+  cloudAgentSessionId: string;
+  baseBranch?: string;
+  upstreamSha?: string;
+};
+
+/** Input for restackWorktreeBranch; the target base and upstream are resolved server-side. */
+export type RestackWorktreeBranchInput = {
+  cloudAgentSessionId: string;
+  baseBranch?: string;
+  upstreamSha?: string;
+};
+
+/** Adopts a persisted worktree base into a sibling session's DO metadata. */
+export type AdoptWorktreeBaseInput = {
+  cloudAgentSessionId: string;
+  expectedWorktreeId: string;
+  baseBranch: string;
+  baseSha: string;
+};
+
+export type AdoptWorktreeBaseOutput = { success: true };
+
 /** Interactions a cloud-agent session currently waits on. */
 export type GetPendingInteractionsOutput = {
   questions: unknown[];
@@ -359,6 +406,9 @@ export type GetPendingInteractionsOutput = {
 export type GetWorktreeFileInput = GetSessionInput & WorktreeFileQuery;
 
 export type GetEgressAuditInput = GetSessionInput & EgressAuditPagination;
+
+/** The preview target plus the route organization the Worker uses for its UI gate. */
+export type GetPreviewOptionsInput = PreviewTarget & { organizationId?: string };
 
 /** Execution status for getSession response */
 export type ExecutionStatus = {
@@ -396,6 +446,13 @@ export type GetSessionOutput = {
   githubRepo?: string;
   gitUrl?: string;
   platform?: 'github' | 'gitlab' | 'bitbucket';
+  /** The exact GitHub connection this session's repository was prepared with. */
+  githubIntegrationId?: string;
+  /** Bitbucket repository identity copied from the session's preparation input. */
+  bitbucketWorkspaceUuid?: string;
+  bitbucketRepositoryUuid?: string;
+  /** GitLab project path copied from the session's preparation input. */
+  gitlabProject?: string;
 
   prompt?: string;
   mode?: AgentMode;
@@ -626,12 +683,19 @@ type CloudAgentNextTRPCClient = {
   deleteSession: {
     mutate: (input: { sessionId: string }) => Promise<{ success: boolean; message?: string }>;
   };
+  removeWorkspaceSnapshot: {
+    mutate: (input: { sessionId: string }) => Promise<{ success: true }>;
+  };
+  getWorkspaceSnapshotRecovery: {
+    query: (input: { sessionId: string }) => Promise<{ capturedAt: number | null } | null>;
+  };
   deleteHostedWorkspaceSession: {
-    mutate: (input: {
+    mutate: (input: { workspaceId: string; sessionId: string; operationKey: string }) => Promise<{
+      success: true;
       workspaceId: string;
       sessionId: string;
-      operationKey: string;
-    }) => Promise<{ success: true; workspaceId: string; sessionId: string }>;
+      cleanup: 'complete' | 'pending';
+    }>;
   };
   deleteWorktree: {
     mutate: (input: DeleteWorktreeInput) => Promise<DeleteWorktreeOutput>;
@@ -650,6 +714,9 @@ type CloudAgentNextTRPCClient = {
   };
   getSessionMessagesPage: {
     query: (input: GetSessionMessagesPageInput) => Promise<unknown>;
+  };
+  getSessionToolPartDetail: {
+    query: (input: CloudToolPartDetailInput) => Promise<unknown>;
   };
   getSandboxStatus: {
     query: (input: GetSessionInput) => Promise<unknown>;
@@ -672,11 +739,23 @@ type CloudAgentNextTRPCClient = {
   getWorktreeFile: {
     query: (input: GetWorktreeFileInput) => Promise<unknown>;
   };
+  syncWorktreeBranch: {
+    mutate: (input: SyncWorktreeBranchInput) => Promise<WorktreeBranchOperationResult>;
+  };
+  restackWorktreeBranch: {
+    mutate: (input: RestackWorktreeBranchInput) => Promise<WorktreeBranchOperationResult>;
+  };
+  adoptWorktreeBase: {
+    mutate: (input: AdoptWorktreeBaseInput) => Promise<AdoptWorktreeBaseOutput>;
+  };
   getSandboxSelectionOptions: {
     query: (input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>;
   };
   getPreviewOptions: {
-    query: (input: { cloudAgentSessionId: string; organizationId?: string }) => Promise<unknown>;
+    query: (input: GetPreviewOptionsInput) => Promise<unknown>;
+  };
+  listPreviewServices: {
+    query: (input: GetPreviewOptionsInput) => Promise<unknown>;
   };
   prepareSession: {
     mutate: (input: PrepareSessionInput) => Promise<PrepareSessionOutput>;
@@ -805,6 +884,14 @@ export class CloudAgentNextClient {
           error.shape?.data?.code === 'NOT_FOUND' ||
           error.data?.code === 'CONFLICT' ||
           error.shape?.data?.code === 'CONFLICT' ||
+          error.data?.code === 'FORBIDDEN' ||
+          error.shape?.data?.code === 'FORBIDDEN' ||
+          error.data?.code === 'UNAUTHORIZED' ||
+          error.shape?.data?.code === 'UNAUTHORIZED' ||
+          error.data?.code === 'PRECONDITION_FAILED' ||
+          error.shape?.data?.code === 'PRECONDITION_FAILED' ||
+          error.data?.code === 'BAD_REQUEST' ||
+          error.shape?.data?.code === 'BAD_REQUEST' ||
           error.data?.httpStatus === 404 ||
           error.shape?.data?.httpStatus === 404)
       ) {
@@ -820,11 +907,51 @@ export class CloudAgentNextClient {
     }
   }
 
+  /**
+   * Remove the session's workspace snapshot so its next start uses the
+   * environment snapshot or the base image. This discards workspace changes
+   * made since the snapshot was captured.
+   */
+  async removeWorkspaceSnapshot(sessionId: string): Promise<{ success: true }> {
+    try {
+      return await this.client.removeWorkspaceSnapshot.mutate({ sessionId });
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'removeWorkspaceSnapshot' },
+        extra: { sessionId },
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * The capture time of the session's workspace snapshot, or null when the
+   * workspace has none. A non-null value is what makes "Start fresh" available.
+   */
+  async getWorkspaceSnapshotRecovery(
+    sessionId: string
+  ): Promise<{ capturedAt: number | null } | null> {
+    try {
+      return await this.client.getWorkspaceSnapshotRecovery.query({ sessionId });
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'getWorkspaceSnapshotRecovery' },
+        extra: { sessionId },
+      });
+      throw error;
+    }
+  }
+
   async deleteHostedWorkspaceSession(input: {
     workspaceId: string;
     sessionId: string;
     operationKey: string;
-  }): Promise<{ success: true; workspaceId: string; sessionId: string }> {
+  }): Promise<{
+    success: true;
+    workspaceId: string;
+    sessionId: string;
+    cleanup: 'complete' | 'pending';
+  }> {
     return this.client.deleteHostedWorkspaceSession.mutate(input);
   }
 
@@ -832,6 +959,13 @@ export class CloudAgentNextClient {
     try {
       return deleteWorktreeOutputSchema.parse(await this.client.deleteWorktree.mutate(input));
     } catch (error) {
+      if (
+        error instanceof TRPCClientError &&
+        error.message === WORKTREE_MEMBERSHIP_CHANGED &&
+        (error.data?.code === 'CONFLICT' || error.shape?.data?.code === 'CONFLICT')
+      ) {
+        throw error;
+      }
       captureException(error, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'deleteWorktree' },
         extra: { worktreeId: input.worktreeId },
@@ -946,6 +1080,15 @@ export class CloudAgentNextClient {
     );
   }
 
+  async getSessionToolPartDetail(
+    input: CloudToolPartDetailInput
+  ): Promise<CloudToolPartDetailWire> {
+    const request = cloudToolPartDetailInputSchema.parse(input);
+    return cloudToolPartDetailWireSchema.parse(
+      await this.client.getSessionToolPartDetail.query(request)
+    );
+  }
+
   /** The session's preparation attempts, as its stream replays them. */
   async getPreparationAttempts(cloudAgentSessionId: string): Promise<PreparationAttempt[]> {
     try {
@@ -1038,6 +1181,20 @@ export class CloudAgentNextClient {
     return result;
   }
 
+  async syncWorktreeBranch(input: SyncWorktreeBranchInput): Promise<WorktreeBranchOperationResult> {
+    return await this.client.syncWorktreeBranch.mutate(input);
+  }
+
+  async restackWorktreeBranch(
+    input: RestackWorktreeBranchInput
+  ): Promise<WorktreeBranchOperationResult> {
+    return await this.client.restackWorktreeBranch.mutate(input);
+  }
+
+  async adoptWorktreeBase(input: AdoptWorktreeBaseInput): Promise<AdoptWorktreeBaseOutput> {
+    return await this.client.adoptWorktreeBase.mutate(input);
+  }
+
   async createWorktreeChat(input: CreateWorktreeChatInput): Promise<CreateWorktreeChatOutput> {
     try {
       return await this.client.createWorktreeChat.mutate(input);
@@ -1061,11 +1218,16 @@ export class CloudAgentNextClient {
     );
   }
 
-  async getPreviewOptions(input: {
-    cloudAgentSessionId: string;
-    organizationId?: string;
-  }): Promise<z.infer<typeof workerPreviewOptionsSchema>> {
+  async getPreviewOptions(
+    input: GetPreviewOptionsInput
+  ): Promise<z.infer<typeof workerPreviewOptionsSchema>> {
     return workerPreviewOptionsSchema.parse(await this.client.getPreviewOptions.query(input));
+  }
+
+  async listPreviewServices(input: GetPreviewOptionsInput): Promise<ListPreviewServicesOutput> {
+    return baseListPreviewServicesNextOutputSchema.parse(
+      await this.client.listPreviewServices.query(input)
+    );
   }
 
   /**

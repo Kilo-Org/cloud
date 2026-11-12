@@ -2,6 +2,7 @@ import { resolveIncomingResume } from '@kilocode/app-shared/universal-links';
 
 import { opensAppRoutePath, opensDestination, shellRouteHref } from './deep-link-destination';
 import { resumeDeepLinkHref, setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
+import { isRemovedMobileDeepLink } from './deep-link-policy';
 import { parseGitHubReturnParams, setGitHubInstallReturnOutcome } from './github-install-return';
 import { isSystemSearchFamilyLink } from './system-search-families';
 
@@ -48,6 +49,9 @@ export function redirectSystemPath({
   initial: boolean;
 }): string | null {
   try {
+    if (isRemovedMobileDeepLink(path)) {
+      return initial ? '/' : null;
+    }
     const resume = resolveIncomingResume(path);
     // Not a universal-link route: only the app's own route namespace reaches the
     // navigator. Anything else (a bare `kiloapp:///`, an unknown path, another
@@ -75,9 +79,11 @@ export function redirectSystemPath({
     }
     const { href, anchorMessageId } = resume;
     // A table route that cannot open its destination is not a link either: the
-    // session row accepts any capture, and the session route answers an id that
-    // can never be a session with the composer, which is not what the link
-    // named and not a reason to leave the current screen.
+    // session row accepts any capture, and a capture the session store cannot
+    // address names no session screen, so following it would replace the
+    // current screen with one that cannot exist. A capture the store CAN
+    // address is followed even though it may not resolve: the route owns that
+    // answer and shows its not-found state.
     if (!opensDestination(href)) {
       return null;
     }

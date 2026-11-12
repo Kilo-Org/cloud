@@ -425,6 +425,31 @@ async function startSessionUnified(
 }
 
 /**
+ * Register a callback target on a session created through the unified `start`
+ * procedure. The unified input does not accept `callbackTarget`; the control
+ * plane reads the target from session metadata, and `updateSession` is the
+ * retained internal mutation that rewrites that field.
+ */
+export async function registerSessionCallback(
+  config: DriverConfig,
+  cloudAgentSessionId: string,
+  callbackTarget: CallbackTarget,
+  signal?: AbortSignal
+): Promise<void> {
+  if (!config.internalApiSecret) {
+    throw new Error(
+      'registerSessionCallback requires the e2e INTERNAL_API_SECRET (from .dev.vars for the Docker profile, or the resolved e2e secret for the deployed/local-HTTP profile)'
+    );
+  }
+  await trpcCall<{ success: boolean }>(
+    config,
+    'updateSession',
+    { cloudAgentSessionId, callbackTarget },
+    { internalApiSecret: config.internalApiSecret, signal }
+  );
+}
+
+/**
  * Dispatch the `prepareSession` procedure to the internal
  * `/trpc/prepareSession` endpoint with the shared internal API secret. Both
  * callers of the procedure — the legacy start and the browser-equivalent
@@ -586,36 +611,55 @@ export async function createWorktreeChat(
   return created;
 }
 
-export type HostedWorkspaceCreateResult = {
+type HostedWorkspaceCreateResponse = {
   workspaceId: string;
   cloudAgentSessionId: string;
   kiloSessionId: string;
-  messageId: string;
+  messageId?: string;
   replayed?: boolean;
 };
+
+export type HostedWorkspaceCreateResult = HostedWorkspaceCreateResponse & {
+  messageId: string;
+};
+
+export type EmptyHostedWorkspaceCreateResult = HostedWorkspaceCreateResponse;
 
 export type HostedWorkspaceRepository =
   | { type: 'github'; repo: string }
   | { type: 'git'; url: string };
 
+export type HostedWorkspaceCreateInput = {
+  operationKey?: string;
+  profileId: string;
+  prompt?: string;
+  repository?: HostedWorkspaceRepository;
+};
+
 /**
  * Create a hosted workspace and its first root session through the
  * `agent-manager` mutation. Requires an explicit, authorized Cloud profile.
  *
- * `repository` overrides the driver's repository so the proof can create a
- * workspace for a second repository; omitted keeps the driver's repo.
+ * Omitting `prompt` creates an empty workspace whose first turn is the later
+ * IDE prompt. `repository` overrides the driver's repository so the proof can
+ * create a workspace for a second repository; omitted keeps the driver's repo.
  */
+export function createHostedWorkspace(
+  config: DriverConfig,
+  input: HostedWorkspaceCreateInput & { prompt: string },
+  signal?: AbortSignal
+): Promise<HostedWorkspaceCreateResult>;
+export function createHostedWorkspace(
+  config: DriverConfig,
+  input: HostedWorkspaceCreateInput & { prompt?: undefined },
+  signal?: AbortSignal
+): Promise<EmptyHostedWorkspaceCreateResult>;
 export async function createHostedWorkspace(
   config: DriverConfig,
-  input: {
-    operationKey?: string;
-    profileId: string;
-    prompt: string;
-    repository?: HostedWorkspaceRepository;
-  },
+  input: HostedWorkspaceCreateInput,
   signal?: AbortSignal
-): Promise<HostedWorkspaceCreateResult> {
-  const created = await trpcCall<HostedWorkspaceCreateResult>(
+): Promise<EmptyHostedWorkspaceCreateResult> {
+  const created = await trpcCall<EmptyHostedWorkspaceCreateResult>(
     config,
     'createHostedWorkspace',
     {
@@ -627,7 +671,7 @@ export async function createHostedWorkspace(
           ? { type: 'github', repo: config.githubRepo }
           : { type: 'git', url: config.gitUrl }),
       profile: { id: input.profileId },
-      message: { prompt: input.prompt },
+      ...(input.prompt === undefined ? {} : { message: { prompt: input.prompt } }),
       agent: { mode: 'code', model: config.model },
       ...(config.kilocodeOrganizationId
         ? { options: { kilocodeOrganizationId: config.kilocodeOrganizationId } }
@@ -1204,7 +1248,14 @@ export function resolveStreamTicket(
   sessionId: string
 ): string | Promise<string> {
   if (config.fetchStreamTicket) return config.fetchStreamTicket(sessionId);
-  if (config.nextAuthSecret) return mintStreamTicket(config.user, sessionId, config.nextAuthSecret);
+  if (config.nextAuthSecret)
+    return mintStreamTicket(
+      config.user,
+      sessionId,
+      config.nextAuthSecret,
+      120,
+      config.kilocodeOrganizationId
+    );
   throw new NoStreamTicketSourceError();
 }
 

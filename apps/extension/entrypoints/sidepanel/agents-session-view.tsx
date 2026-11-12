@@ -295,6 +295,7 @@ export const AgentsSessionView = ({
         observedModel,
         remoteModelOverride,
         remoteModelState,
+        sessionConfig,
         sessionModel: sessionConfig?.model,
       }),
     [
@@ -304,7 +305,7 @@ export const AgentsSessionView = ({
       observedModel,
       remoteModelOverride,
       remoteModelState,
-      sessionConfig?.model,
+      sessionConfig,
     ]
   );
   const setLastSelectedMutation = useMutation({
@@ -315,6 +316,9 @@ export const AgentsSessionView = ({
 
   const handleModelChange = useCallback(
     (modelId: string) => {
+      if (picker.disabledReason !== undefined) {
+        return;
+      }
       if (picker.target === 'remote-cli') {
         // The CLI owns this catalog: send its own provider/model, not a gateway id.
         const modelRef = findCliCatalogModelRef(remoteModelState.catalog, modelId);
@@ -338,7 +342,13 @@ export const AgentsSessionView = ({
         setLastSelectedMutation.mutate({ model: modelId });
       }
     },
-    [manager, picker.target, remoteModelState.catalog, setLastSelectedMutation]
+    [
+      manager,
+      picker.disabledReason,
+      picker.target,
+      remoteModelState.catalog,
+      setLastSelectedMutation,
+    ]
   );
 
   // Memoized like the browser tab's own donut slot, so the composer sees a stable node.
@@ -351,7 +361,9 @@ export const AgentsSessionView = ({
       <>
         <ModelPicker
           auth={auth}
-          disabled={isReadOnly || picker.options.length === 0}
+          disabled={
+            isReadOnly || picker.disabledReason !== undefined || picker.options.length === 0
+          }
           model={picker.selectedId}
           modelOptions={picker.options}
           onModelChange={handleModelChange}

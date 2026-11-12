@@ -4,7 +4,9 @@
  * harness because that's where the Drizzle migrations, seed helpers, and
  * Jest setup already live.
  */
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, pool } from '@kilocode/web-shared/lib/drizzle';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import * as schema from '@kilocode/db/schema';
 import {
   agent_environment_profiles,
   agent_environment_profile_vars,
@@ -478,8 +480,9 @@ describe('mergeProfileConfiguration', () => {
         REPO_ONLY: 'repo-val',
         SHARED: 'from-manual',
       });
-      // The environment owns setup: the bound profile's command does not run.
-      expect(result.setupCommands).toEqual(['env-cmd', 'manual-cmd']);
+      // Profile setup commands stay: they are session setup and run beside the
+      // environment's build commands.
+      expect(result.setupCommands).toEqual(['env-cmd', 'repo-cmd', 'manual-cmd']);
       expect(result.environmentSetupCommandCount).toBe(1);
 
       const withoutEnvironment = await mergeProfileConfiguration(db, {
@@ -506,7 +509,7 @@ describe('mergeProfileConfiguration', () => {
         setupCommands: ['manual-cmd'],
       });
 
-      expect(result.setupCommands).toEqual(['install', 'manual-cmd']);
+      expect(result.setupCommands).toEqual(['install', 'default-cmd', 'manual-cmd']);
       expect(result.startCommands).toEqual(['serve']);
 
       const withoutEnvironment = await mergeProfileConfiguration(db, {
@@ -531,7 +534,7 @@ describe('mergeProfileConfiguration', () => {
       expect(result.environmentSetupCommandCount).toBe(0);
     });
 
-    test('an empty environment still replaces profile setup commands, not profile vars', async () => {
+    test('an empty environment keeps profile setup commands, not profile vars', async () => {
       const user = await insertTestUser();
       const owner: ProfileOwner = { type: 'user', id: user.id };
       const repoProfileId = await createProfile(owner, 'repo-profile');
@@ -547,7 +550,7 @@ describe('mergeProfileConfiguration', () => {
         platform: 'github',
         environment: {},
       });
-      expect(withEnvironment.setupCommands).toBeUndefined();
+      expect(withEnvironment.setupCommands).toEqual(['repo-cmd', 'default-cmd']);
       expect(withEnvironment.envVars).toEqual({ FROM_DEFAULT: 'default-val' });
 
       const withoutEnvironment = await mergeProfileConfiguration(db, {
@@ -622,7 +625,9 @@ describe('mergeProfileConfiguration', () => {
         });
 
         expect(result.envVars).toEqual({ FROM_ENV: 'env', FROM_DEFAULT: 'default-val' });
-        expect(result.setupCommands).toEqual(['env-cmd']);
+        // The default profile's setup commands run as session setup after the
+        // environment's build commands; the binding's never apply.
+        expect(result.setupCommands).toEqual(['env-cmd', 'default-cmd']);
         expect(result.resolvedProfileId).toBe(defaultProfileId);
       });
 
@@ -699,8 +704,9 @@ describe('mergeProfileConfiguration', () => {
           FROM_PICKED: 'picked-val',
           FROM_MANUAL: 'manual-val',
         });
-        // The environment owns setup: the picked profile's command does not run.
-        expect(result.setupCommands).toEqual(['env-cmd', 'manual-cmd']);
+        // Profile setup commands are session setup and run beside the
+        // environment's build commands.
+        expect(result.setupCommands).toEqual(['env-cmd', 'picked-cmd', 'manual-cmd']);
         expect(result.resolvedProfileId).toBe(pickedProfileId);
       });
     });
@@ -1114,6 +1120,99 @@ describe('mergeProfileConfiguration', () => {
         API_KEY: inlineEnvelope, // inline wins over profile envelope
         INLINE_ONLY: inlineEnvelope,
       });
+    });
+  });
+
+  describe('profile collection reads', () => {
+    const profileCollectionTables = [
+      'agent_environment_profiles',
+      'agent_environment_profile_vars',
+      'agent_environment_profile_commands',
+      'agent_environment_profile_mcp_servers',
+      'agent_environment_profile_skills',
+      'agent_environment_profile_agents',
+      'agent_environment_profile_kilo_commands',
+      'agent_environment_profile_instructions',
+    ] as const;
+
+    /**
+     * A drizzle client over the shared test pool whose query logger records
+     * every SQL statement, so a test can count how often the merge reads
+     * each profile collection table.
+     */
+    function createQueryCountingDb() {
+      const statements: string[] = [];
+      const countingDb = drizzle(pool, {
+        schema,
+        logger: {
+          logQuery: (query: string) => {
+            statements.push(query);
+          },
+        },
+      });
+      return { countingDb, statements };
+    }
+
+    /** Drizzle inlines the table name as a quoted identifier, e.g. `from "t"`. */
+    function countTableReads(statements: string[], tableName: string): number {
+      const fromClause = `from "${tableName}"`;
+      let matches = 0;
+      for (const statement of statements) {
+        if (statement.includes(fromClause)) {
+          matches += 1;
+        }
+      }
+      return matches;
+    }
+
+    test('resolving the implicit default reads the profile and its collections once', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const profileId = await createProfile(owner, 'default-with-content', { isDefault: true });
+      await addVar(profileId, 'PROFILE_VAR', 'profile-var-value');
+      await addCommands(profileId, ['profile-setup-command']);
+      await addSkill(profileId, 'reviewer-skill', 'profile skill body', { enabled: true });
+      await addAgent(profileId, 'reviewer', 'Reviewer', 'profile reviewer prompt');
+
+      const { countingDb, statements } = createQueryCountingDb();
+
+      const result = await mergeProfileConfiguration(countingDb, { owner });
+
+      expect(result.skills?.map(s => s.name)).toEqual(['reviewer-skill']);
+      expect(
+        result.skills?.[0] && 'rawMarkdown' in result.skills[0]
+          ? result.skills[0].rawMarkdown
+          : null
+      ).toBe('profile skill body');
+      expect(result.envVars).toEqual({ PROFILE_VAR: 'profile-var-value' });
+      expect(result.setupCommands).toEqual(['profile-setup-command']);
+      expect(result.agents?.map(a => a.slug)).toEqual(['reviewer']);
+
+      // The default resolution reads each profile table exactly once: the
+      // session layer transaction holds the only collection reads.
+      for (const name of profileCollectionTables) {
+        expect(`${name}: ${countTableReads(statements, name)}`).toBe(`${name}: 1`);
+      }
+      expect(statements.length).toBeGreaterThanOrEqual(profileCollectionTables.length);
+    });
+
+    test('an explicit profileId reads its collections once', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const defaultId = await createProfile(owner, 'unused-default', { isDefault: true });
+      await addSkill(defaultId, 'default-skill', 'default skill body');
+      const selectedId = await createProfile(owner, 'selected-profile');
+      await addSkill(selectedId, 'selected-skill', 'selected skill body', { enabled: true });
+
+      const { countingDb, statements } = createQueryCountingDb();
+
+      const result = await mergeProfileConfiguration(countingDb, { owner, profileId: selectedId });
+
+      expect(result.skills?.map(s => s.name)).toEqual(['selected-skill']);
+
+      for (const name of profileCollectionTables) {
+        expect(`${name}: ${countTableReads(statements, name)}`).toBe(`${name}: 1`);
+      }
     });
   });
 });

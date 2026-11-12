@@ -22,7 +22,6 @@ const REQUIRED_EXTRA = {
   sessionIngestWsUrl: 'wss://ingest.kilosessions.ai',
   appsFlyerDevKey: 'apps-flyer-dev-key',
   appsFlyerAppId: 'apps-flyer-app-id',
-  kiloChatUrl: 'https://chat.kiloapps.io',
   eventServiceUrl: 'https://events.kiloapps.io',
   notificationsUrl: 'https://notifications.kiloapps.io',
   posthogApiKey: 'posthog-key',
@@ -33,6 +32,7 @@ const PRODUCTION_MCP_URL = 'https://mcp.kiloapps.io';
 beforeEach(() => {
   vi.resetModules();
   vi.stubGlobal('__DEV__', false);
+  vi.stubEnv('EXPO_PUBLIC_SESSION_SYNC_URL', undefined);
 });
 
 afterEach(() => {
@@ -74,32 +74,34 @@ describe('SESSION_SYNC_URL', () => {
     return config.SESSION_SYNC_URL;
   }
 
-  it('uses the public native relay only in production builds', async () => {
-    state.extra = { ...REQUIRED_EXTRA, isProductionBuild: true };
-    await expect(syncUrl()).resolves.toBe('https://session-sync.kiloapps.io');
-  });
+  it.each([undefined, 'https://session-sync.kiloapps.io', 'http://localhost:8817'])(
+    'keeps release preview unavailable with relay override %s',
+    async override => {
+      if (override !== undefined) {
+        vi.stubEnv('EXPO_PUBLIC_SESSION_SYNC_URL', override);
+      }
+      state.extra = { ...REQUIRED_EXTRA, isProductionBuild: true };
+      await expect(syncUrl()).resolves.toBeUndefined();
+    }
+  );
 
-  it('requires an explicit isolated relay outside production', async () => {
-    state.extra = { ...REQUIRED_EXTRA, isProductionBuild: false };
+  it('requires an explicit relay in a development bundle', async () => {
+    vi.stubGlobal('__DEV__', true);
+    state.extra = REQUIRED_EXTRA;
     await expect(syncUrl()).resolves.toBeUndefined();
   });
 
-  it('accepts the local relay only in a development bundle', async () => {
+  it('accepts the local relay in a development bundle', async () => {
     vi.stubGlobal('__DEV__', true);
     vi.stubEnv('EXPO_PUBLIC_SESSION_SYNC_URL', 'http://localhost:8817');
     state.extra = REQUIRED_EXTRA;
     await expect(syncUrl()).resolves.toBe('http://localhost:8817');
   });
 
-  it('rejects an insecure relay in a release bundle', async () => {
-    vi.stubEnv('EXPO_PUBLIC_SESSION_SYNC_URL', 'http://localhost:8817');
-    state.extra = { ...REQUIRED_EXTRA, isProductionBuild: true };
+  it('rejects unsupported development relay schemes', async () => {
+    vi.stubGlobal('__DEV__', true);
+    vi.stubEnv('EXPO_PUBLIC_SESSION_SYNC_URL', 'file:///native-preview');
+    state.extra = REQUIRED_EXTRA;
     await expect(syncUrl()).rejects.toThrow('Invalid scheme');
-  });
-
-  it('rejects a production override outside the host allowlist', async () => {
-    vi.stubEnv('EXPO_PUBLIC_SESSION_SYNC_URL', 'https://unowned.example.com');
-    state.extra = { ...REQUIRED_EXTRA, isProductionBuild: true };
-    await expect(syncUrl()).rejects.toThrow('outside the allowlist');
   });
 });

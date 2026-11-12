@@ -68,6 +68,36 @@ it('admits a session idempotently and rejects a new session at the tenant limit'
   expect((await stub.reserve(input)).ok).toBe(true);
 });
 
+it('leaves a refused registration without stored keys, a wakeup, or an index row', async () => {
+  const principal = personal(`refused-${crypto.randomUUID()}`);
+  const api = client(principal);
+  const tenant = getTenantStub(testEnv, principal.tenant);
+  await runInDurableObject(tenant, (_instance, state) => {
+    state.storage.sql.exec('UPDATE usage SET sessions = ?', LIMITS.userTenantSessions);
+  });
+  const sessionID = newSessionID();
+  const sourceID = crypto.randomUUID();
+  const refused = await api.register(sessionID, sourceID);
+  expect(refused.status).toBe(413);
+  expect(await refused.json()).toMatchObject({
+    error: { code: 'tenant_budget_exceeded', details: { sessions: LIMITS.userTenantSessions } },
+  });
+  const stub = getSessionSyncDOStub(testEnv, { tenant: principal.tenant, sessionID });
+  await runInDurableObject(stub, async (_instance, state) => {
+    expect((await state.storage.list()).size).toBe(0);
+    expect(await state.storage.getAlarm()).toBeNull();
+    expect(drizzle(state.storage).select().from(session).get()).toBeUndefined();
+  });
+  expect(await tenant.listCreatedSessions({ limit: 10 })).toEqual({
+    ok: true,
+    value: { items: [], next: null },
+  });
+  await runInDurableObject(tenant, (_instance, state) => {
+    state.storage.sql.exec('UPDATE usage SET sessions = 0');
+  });
+  expect((await api.register(sessionID, sourceID)).status).toBe(201);
+});
+
 it('rejects lease growth without applying the session mutation', async () => {
   const principal = personal(`bytes-${crypto.randomUUID()}`);
   const api = client(principal);
@@ -292,7 +322,7 @@ it.each([false, true])(
     await accepted.json();
     await runInDurableObject(tenantStub, (_instance, state) => {
       expect(state.storage.sql.exec<{ bytes: number }>('SELECT bytes FROM usage').one().bytes).toBe(
-        LIMITS.tenantLeaseBytes
+        LIMITS.tenantInitialLeaseBytes
       );
     });
   }
@@ -317,7 +347,7 @@ it.each([false, true])(
     const tenantStub = getTenantStub(testEnv, principal.tenant);
     await runInDurableObject(tenantStub, (_instance, state) => {
       expect(state.storage.sql.exec<{ bytes: number }>('SELECT bytes FROM usage').one().bytes).toBe(
-        LIMITS.tenantLeaseBytes
+        LIMITS.tenantInitialLeaseBytes
       );
     });
     if (restart) {

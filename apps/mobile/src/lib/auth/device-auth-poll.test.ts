@@ -192,6 +192,35 @@ describe('startDeviceAuthPoll', () => {
     expect(vi.mocked(dismissBrowser)).not.toHaveBeenCalled();
   });
 
+  it('keeps the pending link result an approval carries for the sign-in to announce', async () => {
+    fetchMock.mockResolvedValue(
+      Response.json({
+        status: 'approved',
+        token: 'access',
+        pendingLink: { status: 'failed', reason: 'WRONG_ACCOUNT' },
+      })
+    );
+    const { setState } = makePoll();
+
+    await vi.advanceTimersByTimeAsync(3000);
+
+    const updater = setState.mock.calls[0]?.[0];
+    const next = updater?.({
+      status: 'pending',
+      code: 'UC',
+      token: undefined,
+      refreshToken: undefined,
+      expiresIn: undefined,
+      error: undefined,
+      verificationUrl: 'https://app.kilo.ai/device-auth?code=UC',
+    });
+    expect(next).toMatchObject({
+      status: 'approved',
+      token: 'access',
+      pendingLink: { status: 'failed', reason: 'WRONG_ACCOUNT' },
+    });
+  });
+
   it('leaves the Android custom tab to the user when approval lands', async () => {
     platformMock.os = 'android';
     try {

@@ -49,6 +49,9 @@ export type SendMessagePayload =
       type: 'command';
       command: string;
       arguments: string;
+      mode?: string;
+      model?: string;
+      variant?: string;
     };
 
 // Branded session ID types — prevent accidental mixing of kilo vs cloud agent IDs
@@ -259,6 +262,8 @@ export type PreparationStepSnapshot = {
   completedAt?: number | undefined;
   revision: number;
   latestDetail?: string | undefined;
+  /** Capture time of the selected snapshot, in Unix epoch milliseconds. */
+  snapshotCapturedAt?: number | undefined;
   safeError?: string | undefined;
   command?: string | undefined;
   commandIndex?: number | undefined;

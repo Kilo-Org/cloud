@@ -118,7 +118,7 @@ export function createRuntimeActivity(options: RuntimeActivityOptions) {
       })
       .catch(() => {
         if (lifetime.signal.aborted) return;
-        supervisor.snapshotFailed(token);
+        supervisor.snapshotFailed(token, options.client.drainSession !== undefined);
         unhealthySince ??= options.now();
       })
       .finally(() => {
@@ -149,6 +149,8 @@ export function createRuntimeActivity(options: RuntimeActivityOptions) {
   }
 
   return {
+    liveTreeExecutions: (root: string) =>
+      lifetime.signal.aborted || faulted ? undefined : supervisor.liveTreeExecutions(root),
     state: (id: string) => supervisor.state(id),
     executions: () =>
       supervisor.observedSessions().flatMap(session => {
@@ -189,7 +191,8 @@ export function createRuntimeActivity(options: RuntimeActivityOptions) {
         if (faulted) return;
       }
       if (options.now() >= nextSnapshotAt) void refresh();
-      supervisor.tick();
+      // A failed snapshot can mean Kilo itself stalled: its missing events are no evidence.
+      if (!options.client.drainSession || unhealthySince === undefined) supervisor.tick();
     },
     holdMemory(held: boolean) {
       supervisor.holdMemory(held);

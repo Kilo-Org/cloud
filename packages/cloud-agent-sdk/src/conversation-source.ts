@@ -9,6 +9,7 @@ import type { CloudAgentEvent } from './cloud-conversation-schemas';
 import {
   readKilo2ContentLayout,
   readKilo2Messages,
+  isCompactionSummaryPart,
   type Kilo2ContentLayout,
 } from './kilo2-source-messages';
 import type { SessionSnapshot } from './types';
@@ -27,25 +28,26 @@ function remember<V>(map: Map<string, V>, key: string, value: V) {
 
 export type ConversationSource = { version: 'v1' } | { version: 'v2' };
 
-/** Select the native reader at the SDK boundary. Renderers receive display events. */
 function positionFromPartId(messageId: string, partId: string): number | undefined {
   const prefix = `${messageId}_`;
   if (!partId.startsWith(prefix)) return undefined;
   const suffix = partId.slice(prefix.length);
-  if (!/^\d{6}$/.test(suffix)) return undefined;
-  return Number(suffix);
+  // Tool-result files are derivative attachments of a native content position.
+  if (!/^\d{6}(?:_file_\d+)?$/.test(suffix)) return undefined;
+  return Number(suffix.slice(0, 6));
 }
 
 function layoutFromProjected(
   message: SessionSnapshot['messages'][number]
 ): Kilo2ContentLayout | undefined {
-  const located = message.parts.map(part => positionFromPartId(message.info.id, part.id));
+  const parts = message.parts.filter(part => !isCompactionSummaryPart(part));
+  const located = parts.map(part => positionFromPartId(message.info.id, part.id));
   if (located.some(position => position === undefined)) return undefined;
   const summary = message.info.role === 'assistant' && message.info.summary === true;
   const ordinals = new Map<string, number>();
   const positions = new Map<string, number>();
   let next = 0;
-  for (const [index, part] of message.parts.entries()) {
+  for (const [index, part] of parts.entries()) {
     const position = located[index];
     if (position === undefined) return undefined;
     next = Math.max(next, position + 1);
@@ -62,6 +64,16 @@ export function createConversationSourceReader() {
   const completed = new Set<string>();
   // Native content order is array position; a text event names its part by ordinal.
   const layouts = new Map<string, Kilo2ContentLayout>();
+  const reasoningStarts = new Map<string, Map<string, number>>();
+  function observeReasoning(
+    messageId: string,
+    parts: SessionSnapshot['messages'][number]['parts']
+  ) {
+    const starts = reasoningStarts.get(messageId) ?? new Map<string, number>();
+    for (const part of parts)
+      if (part.type === 'reasoning' && !starts.has(part.id)) starts.set(part.id, part.time.start);
+    if (starts.size) remember(reasoningStarts, messageId, starts);
+  }
   function positionOf(messageId: string, kind: string, ordinal: number): number {
     const layout = layouts.get(messageId) ?? {
       positions: new Map<string, number>(),
@@ -91,6 +103,7 @@ export function createConversationSourceReader() {
       remember(layouts, message.id, readKilo2ContentLayout(message));
       const display = readKilo2Messages(source.session, [message])[0];
       if (!display) return [];
+      observeReasoning(message.id, display.parts);
       if (display.info.role === 'assistant' && parentID !== undefined)
         display.info.parentID = parentID;
       return [
@@ -132,6 +145,17 @@ export function createConversationSourceReader() {
           delta: data.data.delta ?? '',
         },
       ];
+    let reasoningTime: { start: number; end?: number } | undefined;
+    if (kind === 'reasoning') {
+      const starts = reasoningStarts.get(data.data.assistantMessageID) ?? new Map<string, number>();
+      const start = starts.get(id) ?? event.created ?? 0;
+      starts.set(id, start);
+      remember(reasoningStarts, data.data.assistantMessageID, starts);
+      reasoningTime = {
+        start,
+        ...(event.type.endsWith('.ended') ? { end: event.created ?? start } : {}),
+      };
+    }
     return [
       {
         type: 'message.part.updated',
@@ -140,8 +164,8 @@ export function createConversationSourceReader() {
           sessionID: parsed.data.sessionID,
           messageID: data.data.assistantMessageID,
           text: data.data.text ?? '',
-          ...(kind === 'reasoning'
-            ? ({ type: 'reasoning', time: { start: event.created ?? 0 } } as const)
+          ...(reasoningTime
+            ? ({ type: 'reasoning', time: reasoningTime } as const)
             : ({ type: 'text' } as const)),
         },
       },
@@ -150,6 +174,7 @@ export function createConversationSourceReader() {
   return {
     observeProjected(messages: SessionSnapshot['messages']): void {
       for (const message of messages) {
+        observeReasoning(message.info.id, message.parts);
         const layout = layoutFromProjected(message);
         if (!layout) continue;
         // A page read while the message streams can be older than the live layout.
@@ -162,6 +187,7 @@ export function createConversationSourceReader() {
         remember(layouts, message.info.id, layout);
       }
     },
+    /** Select the native reader at the SDK boundary. Renderers receive display events. */
     read(raw: CloudAgentEvent): { source: ConversationSource; events: NormalizedEvent[] } {
       const envelope = z.object({ type: z.string(), properties: z.unknown() }).safeParse(raw.data);
       if (

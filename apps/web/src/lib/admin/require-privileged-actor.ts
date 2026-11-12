@@ -2,6 +2,7 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
 import { kilocode_users, type User } from '@kilocode/db/schema';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   createAdminAssurance,
@@ -82,7 +83,7 @@ export async function assertPrivilegedPermission(
 ): Promise<User> {
   const currentUser = await loadPrimaryActor(ctx.user.id);
   const rule = permissionRules[permission];
-  if (!currentUser || currentUser.blocked_reason !== null || !rule.allowed(currentUser)) {
+  if (!currentUser || isBlockedAccount(currentUser) || !rule.allowed(currentUser)) {
     throw new TRPCError({ code: 'FORBIDDEN', message: rule.message });
   }
   return currentUser;
@@ -112,11 +113,9 @@ export async function requirePrivilegedActor(
       internalApiUse: ctx.internalApiUse,
     });
 
-  if (
-    credential === 'session' &&
-    ctx.webSessionPepper !== undefined &&
-    !isWebSessionCurrent(ctx.webSessionPepper, currentUser)
-  ) {
+  // `isWebSessionCurrent` normalizes an absent pepper to null, so a session
+  // credential is always compared against the primary row.
+  if (credential === 'session' && !isWebSessionCurrent(ctx.webSessionPepper, currentUser)) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Reauthentication required' });
   }
 

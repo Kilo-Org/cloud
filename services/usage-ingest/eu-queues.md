@@ -13,7 +13,8 @@ trial; batch, fill timeout, parallelism, retries and staging are unchanged.
 Complete the production merge gate below before merge or deployment. Receipt mode at batch1/cap1 belongs
 to the preceding EU plumbing prerequisite, which must be deployed and verified first.
 **Merging this change arms an automatic production queue cutover.** The production
-workflow runs every 20 minutes and selects eligible CI-green main: it will create or
+workflow starts when a main CI run completes and has an hourly catch-up poll; it
+selects eligible CI-green main and will create or
 reuse the EU pair, detach the old consumer if present and deploy the new bindings. Do not
 assume a separate manual deployment will provide a later approval gate.
 
@@ -49,7 +50,9 @@ selected usage-ingest Worker. It reads production's top-level config or staging'
 config, verifies existing queues have explicit `jurisdiction: "eu"`, and creates
 only missing members with that API field (DLQ first, with detail readback). Names
 alone do not prove jurisdiction. Unknown/wrong jurisdiction, incomplete/ambiguous
-lookup or API failures stop upload; reruns reuse compatible resources.
+lookup or API failures stop upload; reruns reuse compatible resources. The helper
+also raises the selected DLQ's message retention to the maximum and reads it back;
+see [Retention](README.md#retention).
 
 Preparation verifies the selected source's consumer ownership before detaching
 only the obsolete source attachment owned by the selected Worker. All supplied
@@ -74,7 +77,7 @@ before `pnpm --filter cloudflare-usage-ingest exec wrangler deploy --experimenta
 Staging keeps `pnpm --filter cloudflare-usage-ingest queues:prepare` before its
 existing deployment commands. The helper requires an already injected
 `CLOUDFLARE_API_TOKEN`; it does not load credentials/dotenv or log token/body values.
-Actual token permissions must support Queue reads/create/consumer removal and
+Actual token permissions must support Queue reads/create/update/consumer removal and
 normal Worker deployment; account admin UI access is not required. See
 [consumer API permissions](https://developers.cloudflare.com/api/resources/queues/subresources/consumers/methods/delete/).
 

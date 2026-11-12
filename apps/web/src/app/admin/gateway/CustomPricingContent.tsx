@@ -97,24 +97,20 @@ export function CustomPricingContent() {
         <CardHeader>
           <CardTitle>Custom Pricing</CardTitle>
           <CardDescription>
-            Prices Kilo bills and shows for specific gateway model IDs, stored in the{' '}
-            <code>custom_pricing</code> column of <code>ai_gateway_config</code>. Each entry has a{' '}
-            <code>model</code> ID and <code>pricing</code> tiers in USD per million tokens; the
-            first tier starts at context length 0 and later tiers start at ascending input lengths.
-            Set <code>input_cache_read_per_million</code> or{' '}
-            <code>input_cache_write_per_million</code> to <code>null</code> to bill cache tokens at
-            the prompt price. The optional <code>discountPercentage</code> is only shown in the
-            model name. With <code>fallbackOnly</code>, the prices apply only when the upstream
-            reports no cost. When no configuration is stored, no custom pricing applies. Changes
-            take effect within one minute on warm instances.
+            Replaces the inference cost Kilo bills for paid, non-BYOK requests to these models.
+            Prices are USD per million tokens; the first tier starts at context length 0 and only it
+            is shown in the catalog. A <code>null</code> cache price bills cache tokens at the
+            prompt price. <code>discountPercentage</code> only labels the model name.{' '}
+            <code>fallbackOnly</code> prices apply only when the upstream reports no cost and are
+            not shown in the catalog. Changes apply within about a minute.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <p className="text-muted-foreground text-sm">
-            {hasStoredConfig
-              ? 'Showing the stored configuration.'
-              : 'No configuration stored. The gateway applies no custom pricing.'}
-          </p>
+          {!hasStoredConfig && (
+            <p className="text-muted-foreground text-sm">
+              No configuration stored. The gateway applies no custom pricing.
+            </p>
+          )}
           <div className="border-input overflow-hidden rounded-md border">
             <Editor
               height="560px"

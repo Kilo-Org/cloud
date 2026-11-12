@@ -1,6 +1,16 @@
+import { organization_group_memberships, organization_groups } from '@kilocode/db/schema';
+import type {
+  EnkryptOutputGuardrailSettings,
+  OrganizationSettings,
+} from '@kilocode/db/schema-types';
 import { createEmptyEnkryptOutputDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   evaluateMcpConnect,
+  getOrganizationGuardrailsPolicy,
   isVersionAtLeast,
   normalizeMcpConnectTarget,
   resolveGuardrailsSettings,
@@ -73,7 +83,7 @@ describe('resolveGuardrailsSettings', () => {
         })
       )
     ).toEqual({
-      inputScan: { enabled: true, scanToolResults: false },
+      inputScan: { enabled: true, scanToolResults: true },
       outputScan: { enabled: true, buffersResponses: false },
       mcpEnforcement: 'shadow',
       skill: { enabled: true, scanBeforeUse: false },
@@ -97,6 +107,92 @@ describe('resolveGuardrailsSettings', () => {
         })
       ).outputScan
     ).toEqual({ enabled: true, buffersResponses: true });
+  });
+});
+
+describe('getOrganizationGuardrailsPolicy', () => {
+  const outputGuardrail: EnkryptOutputGuardrailSettings = {
+    enabled: true,
+    detectors: {
+      ...createEmptyEnkryptOutputDetectors(),
+      toxicity: { enabled: true, action: 'block' },
+    },
+  };
+
+  async function scopedOrganization(enabled: boolean) {
+    const owner = await insertTestUser();
+    const inGroup = await insertTestUser();
+    const outsideGroup = await insertTestUser();
+    const organization = await createTestOrganization(
+      'Group Scoped Guardrails',
+      owner.id,
+      0,
+      { kilo_encrypt: true },
+      false
+    );
+    await addUserToOrganization(organization.id, inGroup.id, 'member');
+    await addUserToOrganization(organization.id, outsideGroup.id, 'member');
+    const [group] = await db
+      .insert(organization_groups)
+      .values({ organization_id: organization.id, name: 'Engineering' })
+      .returning();
+    const [otherGroup] = await db
+      .insert(organization_groups)
+      .values({ organization_id: organization.id, name: 'Support' })
+      .returning();
+    await db.insert(organization_group_memberships).values([
+      { organization_id: organization.id, group_id: group.id, kilo_user_id: inGroup.id },
+      { organization_id: organization.id, group_id: otherGroup.id, kilo_user_id: outsideGroup.id },
+    ]);
+    const settings: OrganizationSettings = {
+      kilo_encrypt: true,
+      enkrypt: {
+        input_guardrail: { enabled, group_id: group.id },
+        output_guardrail: outputGuardrail,
+      },
+    };
+    return { organization: { id: organization.id, settings }, inGroup, outsideGroup };
+  }
+
+  it('scans input only for members of the group the input guardrail is limited to', async () => {
+    const { organization, inGroup, outsideGroup } = await scopedOrganization(true);
+
+    await expect(getOrganizationGuardrailsPolicy(organization, inGroup.id)).resolves.toMatchObject({
+      inputScan: { enabled: true, scanToolResults: true },
+      outputScan: { enabled: true, buffersResponses: true },
+    });
+    await expect(
+      getOrganizationGuardrailsPolicy(organization, outsideGroup.id)
+    ).resolves.toMatchObject({
+      inputScan: { enabled: false, scanToolResults: false },
+      outputScan: { enabled: true, buffersResponses: true },
+    });
+  });
+
+  it('scans input for every member when the input guardrail is not limited to a group', async () => {
+    const { organization, outsideGroup } = await scopedOrganization(true);
+    const unscoped = {
+      ...organization,
+      settings: {
+        ...organization.settings,
+        enkrypt: {
+          ...organization.settings.enkrypt,
+          input_guardrail: { enabled: true, group_id: null },
+        },
+      },
+    };
+
+    await expect(getOrganizationGuardrailsPolicy(unscoped, outsideGroup.id)).resolves.toMatchObject(
+      { inputScan: { enabled: true, scanToolResults: true } }
+    );
+  });
+
+  it('keeps input scanning off for group members while the input guardrail is disabled', async () => {
+    const { organization, inGroup } = await scopedOrganization(false);
+
+    await expect(getOrganizationGuardrailsPolicy(organization, inGroup.id)).resolves.toMatchObject({
+      inputScan: { enabled: false, scanToolResults: false },
+    });
   });
 });
 

@@ -48,12 +48,18 @@ const MIN = 200;
 const MAX = 640;
 
 let widths: number[] = [];
-let controls: { width: number; startDrag: (event: ReactMouseEvent) => void } | undefined;
+let controls:
+  | {
+      width: number;
+      startDrag: (event: ReactMouseEvent) => void;
+      resizeTo: (width: number) => void;
+    }
+  | undefined;
 
 function WidthProbe({ storageKey }: { storageKey?: string }) {
-  const { width, startDrag } = useResizableSidebar(INITIAL, MIN, MAX, storageKey);
+  const { width, startDrag, resizeTo } = useResizableSidebar(INITIAL, MIN, MAX, storageKey);
   widths.push(width);
-  controls = { width, startDrag };
+  controls = { width, startDrag, resizeTo };
   return null;
 }
 
@@ -127,6 +133,60 @@ describe('useResizableSidebar', () => {
     render(KEY);
 
     expect(controls?.width).toBe(MAX);
+  });
+
+  it('clamps a stored width below the minimum', () => {
+    localStorageStub.setItem(KEY, '10');
+
+    render(KEY);
+
+    expect(controls?.width).toBe(MIN);
+  });
+
+  it('resizes to the minimum and persists it when resizeTo goes below the minimum', () => {
+    render(KEY);
+
+    act(() => {
+      controls!.resizeTo(MIN - 1);
+    });
+
+    expect(controls?.width).toBe(MIN);
+    expect(localStorageStub.getItem(KEY)).toBe(String(MIN));
+  });
+
+  it('resizes to the maximum and persists it when resizeTo goes above the maximum', () => {
+    render(KEY);
+
+    act(() => {
+      controls!.resizeTo(MAX + 1);
+    });
+
+    expect(controls?.width).toBe(MAX);
+    expect(localStorageStub.getItem(KEY)).toBe(String(MAX));
+  });
+
+  it('resizes to a width within the bounds and persists it', () => {
+    render(KEY);
+
+    act(() => {
+      controls!.resizeTo(500);
+    });
+
+    expect(controls?.width).toBe(500);
+    expect(localStorageStub.getItem(KEY)).toBe('500');
+  });
+
+  it('does not write storage from resizeTo when the key is omitted', () => {
+    localStorageStub.setItem(KEY, '540');
+
+    render();
+
+    act(() => {
+      controls!.resizeTo(500);
+    });
+
+    expect(controls?.width).toBe(500);
+    expect(localStorageStub.getItem(KEY)).toBe('540');
   });
 
   it('persists the dragged width on mouseup without writing on mousemove or clobbering it on restore', () => {

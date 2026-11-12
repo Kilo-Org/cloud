@@ -50,6 +50,7 @@ vi.mock('./services/user-session-admission', () => ({
   canCreateCliSessionForUser: vi.fn(),
   USER_SESSION_ADMISSION_ERROR: 'User session creation is not allowed',
 }));
+vi.mock('./ingest/metadata', () => ({ applyMetadataChanges: vi.fn() }));
 
 import { getWorkerDb } from '@kilocode/db/client';
 import {
@@ -86,6 +87,49 @@ import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { SessionIngestRPC } from './session-ingest-rpc';
 import { notifyUserSessionEvent } from './session-events';
 import { canCreateCliSessionForUser } from './services/user-session-admission';
+import { applyMetadataChanges } from './ingest/metadata';
+
+describe('publishCloudAgentSessionStatus', () => {
+  const input = {
+    sessionId: 'ses_12345678901234567890123456',
+    kiloUserId: 'oauth/status-test',
+    cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+    status: 'busy',
+    occurredAt: '2026-11-09T12:00:00.000Z',
+    transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+  } as const;
+  const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
+  const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } };
+
+  it('forwards only the validated status projection with an immutable runtime-owner fence', async () => {
+    const rpc = new SessionIngestRPC(ctx, env as never);
+    await rpc.publishCloudAgentSessionStatus(input);
+    expect(applyMetadataChanges).toHaveBeenCalledWith(
+      env,
+      input.kiloUserId,
+      input.sessionId,
+      new Map([
+        ['status', 'busy'],
+        ['statusOccurredAt', input.occurredAt],
+        ['statusTransitionId', input.transitionId],
+      ]),
+      ctx,
+      input.cloudAgentSessionId
+    );
+  });
+
+  it.each([
+    { status: 'invented' },
+    { transitionId: 'invalid' },
+    { occurredAt: 'not-a-date' },
+    { transcript: 'not metadata' },
+  ])('rejects invalid publication %j', async invalid => {
+    const rpc = new SessionIngestRPC(ctx, env as never);
+    await expect(
+      rpc.publishCloudAgentSessionStatus({ ...input, ...invalid } as never)
+    ).rejects.toThrow();
+  });
+});
 
 const sdkSessionInfoFixture = {
   id: 'ses_12345678901234567890123456',
@@ -380,6 +424,8 @@ function makeRootWriteDb(params: {
     insert: vi.fn((table: unknown) => (table === cloud_agent_worktrees ? worktreeInsert : insert)),
     select: vi.fn(() => select),
     update: vi.fn(() => update),
+    // Worktree registration opens a nested transaction (a savepoint) on the root write.
+    transaction: vi.fn(async (callback: (nested: unknown) => unknown) => callback(tx)),
   };
   return {
     db: { transaction: vi.fn(async callback => callback(tx)) },
@@ -416,6 +462,13 @@ describe('createSessionForCloudAgent', () => {
 
   beforeEach(() => {
     vi.mocked(canCreateCliSessionForUser).mockReset().mockResolvedValue(true);
+    // The availability probe runs before every create; default it to an
+    // available destination so each test opts into the refusal.
+    vi.mocked(getSessionIngestDO)
+      .mockReset()
+      .mockReturnValue({
+        isDeleted: vi.fn(async () => false),
+      } as never);
   });
 
   it('creates a root with both Cloud Agent identity columns', async () => {
@@ -778,6 +831,69 @@ describe('createSessionForCloudAgent', () => {
     await expect(
       rpc.createSessionForCloudAgent({ ...params, gitUrl: 'https://github.com/other/repo' })
     ).rejects.toThrow('Cloud Agent root session identity conflict');
+  });
+
+  it('refuses an unavailable destination before writing anything', async () => {
+    const row = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      updated_at: '2026-01-01T00:00:00.000Z',
+    };
+    const fake = makeRootWriteDb({ created: row });
+    const rpc = makeRpc(fake.db as never);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      isDeleted: vi.fn(async () => true),
+    } as never);
+
+    await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
+      status: 'rejected',
+      code: 'session_retired',
+    });
+    expect(fake.values).not.toHaveBeenCalled();
+  });
+
+  it('refuses an unavailable clone destination before reading the source', async () => {
+    const fake = makeRootWriteDb({ created: { session_id: params.sessionId } });
+    const rpc = makeRpc(fake.db as never);
+    const isDeleted = vi.fn(async () => true);
+    vi.mocked(getSessionIngestDO).mockReturnValue({ isDeleted } as never);
+
+    await expect(
+      rpc.createSessionForCloudAgent({
+        ...params,
+        cloneFromKiloSessionId: 'ses_abcdefghijklmnopqrstuvwxyz',
+      })
+    ).resolves.toEqual({ status: 'rejected', code: 'session_retired' });
+    expect(isDeleted).toHaveBeenCalledOnce();
+    expect(fake.values).not.toHaveBeenCalled();
+  });
+
+  it('keeps create available when the ingest probe fails', async () => {
+    const row = {
+      session_id: params.sessionId,
+      kilo_user_id: params.kiloUserId,
+      cloud_agent_session_id: params.cloudAgentSessionId,
+      cloud_agent_session_scope_id: params.cloudAgentSessionId,
+      organization_id: params.organizationId,
+      parent_session_id: null,
+      updated_at: '2026-01-01T00:00:00.000Z',
+    };
+    const fake = makeRootWriteDb({ created: row });
+    const rpc = makeRpc(fake.db as never);
+    vi.mocked(getSessionIngestDO).mockImplementation(() => {
+      throw new Error('probe unavailable');
+    });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: params.sessionId, copiedItemCount: 0 },
+    });
+    error.mockRestore();
   });
 });
 
@@ -1223,7 +1339,7 @@ describe('createSessionForCloudAgent clone path', () => {
         const nextCursor = done
           ? null
           : { ingestedAt: items[lastIndex - 1]?.ingestedAt ?? null, id: lastIndex };
-        return { rows: page, nextCursor, done, digest: 'page-digest' };
+        return { rows: page, nextCursor, done };
       }
     );
     return { exportCloneBatch };
@@ -1238,6 +1354,9 @@ describe('createSessionForCloudAgent clone path', () => {
       nextCursor: null as { ingestedAt: number | null; id: number } | null,
       rollingDigest: '',
       copiedItemCount: 0,
+      verifyCursor: null as { ingestedAt: number | null; id: number } | null,
+      verifyChain: '',
+      verifyRows: 0,
       stagedRows: [] as CloneItem[],
     };
 
@@ -1260,6 +1379,8 @@ describe('createSessionForCloudAgent clone path', () => {
           status: 'complete',
           sourceSessionId: state.sourceSessionId,
           destinationSessionId: state.destinationSessionId,
+          rollingDigest: state.rollingDigest,
+          copiedItemCount: state.copiedItemCount,
         };
       }
       return {
@@ -1269,6 +1390,9 @@ describe('createSessionForCloudAgent clone path', () => {
         nextCursor: state.nextCursor,
         rollingDigest: state.rollingDigest,
         copiedItemCount: state.copiedItemCount,
+        verifyCursor: state.verifyCursor,
+        verifyChain: state.verifyChain,
+        verifyRows: state.verifyRows,
       };
     });
 
@@ -1376,6 +1500,34 @@ describe('createSessionForCloudAgent clone path', () => {
       }
     );
 
+    const stageCloneVerification = vi.fn(
+      (params: {
+        sourceSessionId: string;
+        destinationSessionId: string;
+        upToMessageId?: string;
+        verifyCursor: { ingestedAt: number | null; id: number } | null;
+        verifyChain: string;
+        verifyRows: number;
+      }) => {
+        if (
+          state.kind !== 'in_progress' ||
+          state.sourceSessionId !== params.sourceSessionId ||
+          state.destinationSessionId !== params.destinationSessionId ||
+          state.upToMessageId !== (params.upToMessageId ?? null)
+        ) {
+          return {
+            status: 'mismatch',
+            storedSourceSessionId: state.sourceSessionId,
+            storedDestinationSessionId: state.destinationSessionId,
+          };
+        }
+        state.verifyCursor = params.verifyCursor;
+        state.verifyChain = params.verifyChain;
+        state.verifyRows = params.verifyRows;
+        return { status: 'staged' };
+      }
+    );
+
     const resetCloneStage = vi.fn(async () => {
       state.kind = 'empty';
       state.sourceSessionId = null;
@@ -1384,11 +1536,21 @@ describe('createSessionForCloudAgent clone path', () => {
       state.nextCursor = null;
       state.rollingDigest = '';
       state.copiedItemCount = 0;
+      state.verifyCursor = null;
+      state.verifyChain = '';
+      state.verifyRows = 0;
       state.stagedRows = [];
     });
 
     return {
-      stub: { inspectCloneStage, stageCloneBatch, finalizeCloneStage, resetCloneStage },
+      stub: {
+        isDeleted: vi.fn(async () => false),
+        inspectCloneStage,
+        stageCloneBatch,
+        stageCloneVerification,
+        finalizeCloneStage,
+        resetCloneStage,
+      },
       state,
     };
   }
@@ -1770,11 +1932,193 @@ describe('createSessionForCloudAgent clone path', () => {
     expect(dest.state.kind).toBe('in_progress');
     expect(dest.state.copiedItemCount).toBe(16);
 
+    // The second request finishes the copy and verifies 16 rows; the window cap
+    // ends it before the last 4 rows.
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'in_progress',
+    });
+    expect(dest.state.copiedItemCount).toBe(20);
+    expect(dest.state.verifyRows).toBe(16);
+
     await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
       status: 'ready',
       clone: { sessionId: destinationSessionId, copiedItemCount: 20 },
     });
     expect(dest.state.kind).toBe('complete');
+  });
+
+  const bulkItems = (count: number): CloneItem[] =>
+    Array.from({ length: count }, (_, index) => ({
+      itemId: `message/msg_${String(index).padStart(4, '0')}`,
+      itemType: 'message',
+      itemData: JSON.stringify({
+        id: `msg_${String(index).padStart(4, '0')}`,
+        sessionID: sourceSessionId,
+        role: 'user',
+        time: { created: index },
+        agent: 'build',
+        model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+      }),
+      itemDataR2Key: null,
+      ingestedAt: index,
+    }));
+
+  it('clones a source longer than one request budget over several bounded requests', async () => {
+    // 1700 rows against a 1600-row request budget: the copy needs two requests
+    // and the verification another two, and no request reads past the budget.
+    const items = bulkItems(1700);
+    const sourceStub = makePagedSourceStub(items, 100);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      created: createdRow,
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'in_progress',
+    });
+    const afterFirstRequest = sourceStub.exportCloneBatch.mock.calls.length;
+    expect(dest.state.copiedItemCount).toBe(1600);
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'in_progress',
+    });
+    const afterSecondRequest = sourceStub.exportCloneBatch.mock.calls.length;
+    expect(dest.state.copiedItemCount).toBe(1700);
+    expect(dest.state.verifyRows).toBe(1500);
+
+    // The third request finishes the verification from the recorded progress.
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: destinationSessionId, copiedItemCount: 1700 },
+    });
+    const afterThirdRequest = sourceStub.exportCloneBatch.mock.calls.length;
+
+    expect(dest.state.stagedRows).toHaveLength(1700);
+    // Each request reads at most 16 windows of 100 rows: the copy fills the
+    // first, the second finishes the copy and verifies 1500 rows, and the third
+    // verifies the remaining 200 from the recorded progress.
+    expect(afterFirstRequest).toBe(16);
+    expect(afterSecondRequest - afterFirstRequest).toBe(16);
+    expect(afterThirdRequest - afterSecondRequest).toBe(2);
+  });
+
+  it('splits a window when one batch would exceed the materialized byte budget', async () => {
+    const largeMessage = (id: string, ingestedAt: number): CloneItem => ({
+      itemId: `message/${id}`,
+      itemType: 'message',
+      itemData: JSON.stringify({
+        id,
+        sessionID: sourceSessionId,
+        role: 'assistant',
+        time: { created: ingestedAt },
+        text: 'x'.repeat(3 * 1024 * 1024),
+      }),
+      itemDataR2Key: null,
+      ingestedAt,
+    });
+    const items = [sourceSessionItem(), largeMessage('msg_a', 2), largeMessage('msg_b', 3)];
+    const sourceStub = makePagedSourceStub(items, 100);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      created: createdRow,
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: destinationSessionId, copiedItemCount: 3 },
+    });
+
+    // The third row does not fit the batch that holds the session row plus the
+    // first large message, so the batch stops after two rows and the request
+    // re-exports that prefix for the resume cursor.
+    expect(sourceStub.exportCloneBatch).toHaveBeenCalledWith(null, 2);
+    expect(dest.state.stagedRows.map(row => row.itemId)).toEqual([
+      'session',
+      'message/msg_a',
+      'message/msg_b',
+    ]);
+  });
+
+  it('returns ready for a repeated clone of a complete stage without reading the source', async () => {
+    const sourceStub = makePagedSourceStub([sourceSessionItem(), sourceMessageItem()], 100);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      created: createdRow,
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: destinationSessionId, copiedItemCount: 2 },
+    });
+    const readsAfterFirstClone = sourceStub.exportCloneBatch.mock.calls.length;
+    const stagesAfterFirstClone = dest.stub.stageCloneBatch.mock.calls.length;
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: destinationSessionId, copiedItemCount: 2 },
+    });
+    expect(sourceStub.exportCloneBatch).toHaveBeenCalledTimes(readsAfterFirstClone);
+    expect(dest.stub.stageCloneBatch).toHaveBeenCalledTimes(stagesAfterFirstClone);
+    expect(dest.state.kind).toBe('complete');
+  });
+
+  it('rejects a source whose already-copied inline body changed', async () => {
+    // One row per window, so the first request stages 16 rows and the second
+    // request resumes, copies the last rows, and verifies from row 1 against
+    // the staged digest.
+    const items = [sourceSessionItem(), ...bulkItems(17)];
+    const sourceStub = makePagedSourceStub(items, 1);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db, values } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      created: createdRow,
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'in_progress',
+    });
+    const stagedDigest = dest.state.rollingDigest;
+    expect(stagedDigest).not.toBe('');
+
+    // Rewrite a body that was already copied, without changing the row count,
+    // before the resumed request verifies it against the staged digest.
+    const copiedRow = items[1];
+    if (copiedRow === undefined) throw new Error('missing copied row fixture');
+    copiedRow.itemData = JSON.stringify({
+      id: 'msg_0000',
+      sessionID: sourceSessionId,
+      role: 'user',
+      time: { created: 0 },
+      agent: 'build',
+      model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+      text: 'rewritten after the copy',
+    });
+
+    // The resumed request finishes the copy and verifies 16 of the 18 rows
+    // before the window cap ends it.
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'in_progress',
+    });
+    expect(dest.state.copiedItemCount).toBe(18);
+    expect(dest.state.verifyRows).toBe(16);
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'rejected',
+      code: 'source_digest_changed',
+    });
+    expect(dest.stub.resetCloneStage).toHaveBeenCalled();
+    expect(values).not.toHaveBeenCalled();
   });
 
   it('rejects a destination identity conflict and leaves the claimed session untouched', async () => {
@@ -2009,7 +2353,9 @@ describe('createSessionForCloudAgent clone path', () => {
     const deleteFn = vi.fn(async () => {});
     const r2 = {
       get: vi.fn(async (key: string) =>
-        key === 'items/blob-msg' ? { text: async () => r2MessageBody } : null
+        key === 'items/blob-msg'
+          ? { size: r2MessageBody.length, text: async () => r2MessageBody }
+          : null
       ),
       put,
       delete: deleteFn,
@@ -2027,77 +2373,54 @@ describe('createSessionForCloudAgent clone path', () => {
     expect(values).not.toHaveBeenCalled();
   });
 
-  it('writes no destination R2 body for a byte-budget overflow row before an in_progress return', async () => {
-    const hugeMessageBody = JSON.stringify({
-      id: 'msg_huge',
-      sessionID: sourceSessionId,
-      role: 'user',
-      time: { created: 1761000000200 },
-      agent: 'build',
-      model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
-      text: 'x'.repeat(5 * 1024 * 1024),
-    });
-    const smallMessage = (index: number): CloneItem => ({
-      itemId: `message/msg_${String(index).padStart(2, '0')}`,
-      itemType: 'message',
-      itemData: JSON.stringify({
-        id: `msg_${String(index).padStart(2, '0')}`,
+  it('rejects a first row above the row budget before reading its body', async () => {
+    const hugeMessageText = vi.fn(async () =>
+      JSON.stringify({
+        id: 'msg_huge',
         sessionID: sourceSessionId,
         role: 'user',
-        time: { created: index },
+        time: { created: 1761000000200 },
         agent: 'build',
         model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
-      }),
-      itemDataR2Key: null,
-      ingestedAt: index,
-    });
+        text: 'x'.repeat(5 * 1024 * 1024),
+      })
+    );
     const sourceItems = [
-      sourceSessionItem(),
-      ...Array.from({ length: 30 }, (_, index) => smallMessage(index + 1)),
       {
         itemId: 'message/msg_huge',
         itemType: 'message',
         itemData: '{}',
         itemDataR2Key: 'items/huge-blob',
-        ingestedAt: 32,
+        ingestedAt: 0,
       },
+      sourceSessionItem(),
+      sourceMessageItem(),
     ];
-    const sourceStub = makePagedSourceStub(sourceItems, 2);
+    const sourceStub = makePagedSourceStub(sourceItems, 100);
     const dest = makeDestinationStub();
     const put = vi.fn(async () => {});
     const r2 = {
       get: vi.fn(async (key: string) =>
-        key === 'items/huge-blob' ? { text: async () => hugeMessageBody } : null
+        key === 'items/huge-blob' ? { size: 5 * 1024 * 1024, text: hugeMessageText } : null
       ),
       put,
     };
-    const { db } = makeCloneDb({
+    const { db, values } = makeCloneDb({
       sourceRows: [{ sessionId: sourceSessionId, organizationId }],
       created: createdRow,
     });
     const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
 
     await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
-      status: 'in_progress',
-    });
-    expect(dest.state.kind).toBe('in_progress');
-    expect(dest.state.copiedItemCount).toBe(31);
-    expect(put).not.toHaveBeenCalledWith(
-      `clone/${destinationSessionId}/message/msg_huge`,
-      expect.anything()
-    );
-
-    // A later reject resets the stage and must leave no orphaned body behind.
-    dest.state.rollingDigest = 'stale-digest';
-    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
       status: 'rejected',
-      code: 'source_digest_changed',
+      code: 'clone_setup_failed',
     });
+    // The stored size decides before the body is pulled into the Worker.
+    expect(hugeMessageText).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+    expect(dest.stub.stageCloneBatch).not.toHaveBeenCalled();
     expect(dest.stub.resetCloneStage).toHaveBeenCalled();
-    expect(put).not.toHaveBeenCalledWith(
-      `clone/${destinationSessionId}/message/msg_huge`,
-      expect.anything()
-    );
+    expect(values).not.toHaveBeenCalled();
   });
 
   describe('with cloneUpToMessageId', () => {
@@ -2300,6 +2623,16 @@ describe('createSessionForCloudAgent clone path', () => {
       });
       expect(dest.state.copiedItemCount).toBe(15);
 
+      // The second request finishes the copy and verifies 16 windows before the
+      // window cap ends it.
+      await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
+        status: 'in_progress',
+      });
+      expect(dest.state.copiedItemCount).toBe(15);
+      // The verification counts kept rows only: one row per window ended the
+      // pass at 16 windows with 15 kept rows verified.
+      expect(dest.state.verifyRows).toBe(15);
+
       await expect(rpc.createSessionForCloudAgent(params)).resolves.toEqual({
         status: 'ready',
         clone: { sessionId: destinationSessionId, copiedItemCount: 15 },
@@ -2308,28 +2641,21 @@ describe('createSessionForCloudAgent clone path', () => {
       expect(dest.stub.resetCloneStage).not.toHaveBeenCalled();
     });
 
-    it('resumes after a byte-budget overflow at the right source row when the cut skips rows', async () => {
-      const hugeBody = JSON.stringify({
-        id: 'msg_02',
-        sessionID: sourceSessionId,
-        role: 'assistant',
-        time: { created: 4 },
-        agent: 'build',
-        model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
-        text: 'x'.repeat(5 * 1024 * 1024),
-      });
+    it('never reads a body above the row budget that the cut drops', async () => {
       const items: CloneItem[] = [
         sourceSessionItem(),
-        cutPart('msg_09', 'prt_09', 1),
+        { ...cutPart('msg_09', 'prt_09', 1), itemData: '{}', itemDataR2Key: 'items/huge' },
         sessionDiffItem(2),
         cutMessage('msg_01', 3),
-        { ...cutMessage('msg_02', 4, 'assistant'), itemData: '{}', itemDataR2Key: 'items/huge' },
+        cutMessage('msg_02', 4, 'assistant'),
         cutMessage('msg_09', 5),
         cutPart('msg_02', 'prt_02', 6),
       ];
-      const { rpc, sourceStub, dest, r2 } = makeCutRpc(items, 100);
+      const { rpc, dest, r2 } = makeCutRpc(items, 100);
       r2.get.mockImplementation((async (key: string) =>
-        key === 'items/huge' ? { text: async () => hugeBody } : null) as never);
+        key === 'items/huge'
+          ? { size: 5 * 1024 * 1024, text: async () => JSON.stringify({ text: 'x'.repeat(4096) }) }
+          : null) as never);
 
       await expect(
         rpc.createSessionForCloudAgent(cloneParams({ cloneUpToMessageId: 'msg_02' }))
@@ -2337,10 +2663,7 @@ describe('createSessionForCloudAgent clone path', () => {
         status: 'ready',
         clone: { sessionId: destinationSessionId, copiedItemCount: 4 },
       });
-
-      // The overflow at the huge row re-exports the 4 source rows before it,
-      // including the two skipped rows, so no kept row is staged twice.
-      expect(sourceStub.exportCloneBatch).toHaveBeenCalledWith(null, 4);
+      expect(r2.get).not.toHaveBeenCalled();
       expect(dest.state.stagedRows.map(row => row.itemId)).toEqual([
         'session',
         'message/msg_01',

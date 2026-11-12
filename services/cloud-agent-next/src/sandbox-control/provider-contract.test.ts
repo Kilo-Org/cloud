@@ -1,4 +1,4 @@
-import { preinstalledStartup } from './preinstalled-startup.js';
+import { supervisorStartup } from '../../test/fixtures/supervisor-startup.js';
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import type { AgentSandboxProvider } from '../types.js';
@@ -382,7 +382,7 @@ describe.each(harnessFactories.map(factory => [factory().name, factory] as const
       const ref = await harness.create();
 
       const launched = await harness.adapter.launch(ref, {
-        command: preinstalledStartup(),
+        command: supervisorStartup(),
         env: { CALLER: 'value' },
       });
 
@@ -455,7 +455,7 @@ describe.each(harnessFactories.map(factory => [factory().name, factory] as const
       const harness = factory();
 
       await expect(
-        harness.adapter.launch(harness.foreignRef(), { command: preinstalledStartup(), env: {} })
+        harness.adapter.launch(harness.foreignRef(), { command: supervisorStartup(), env: {} })
       ).rejects.toBeInstanceOf(ProviderCreationError);
       await expect(harness.adapter.observe(harness.foreignRef(), intent)).resolves.toMatchObject({
         status: 'unknown',
@@ -493,7 +493,7 @@ describe('provider-specific contract differences', () => {
     const harness = containersHarness({ startSource: 'repository', failLaunchLease: true });
     const ref = await harness.create();
     await expect(
-      harness.adapter.launch(ref, { command: preinstalledStartup(), env: {} })
+      harness.adapter.launch(ref, { command: supervisorStartup(), env: {} })
     ).resolves.toEqual({ startSource: 'repository' });
     expect(harness.leaseCalls()).toBe(1);
   });
@@ -502,11 +502,22 @@ describe('provider-specific contract differences', () => {
     const harness = containersHarness();
     const ref = await harness.create();
 
-    expect(harness.adapter.environmentSnapshots).toBe(true);
+    expect(harness.adapter.environmentSnapshots).toBe('launch');
     const snapshot = { snapshotId: 'snap-env', baseImage: 'registry.example/app:1' };
-    await harness.adapter.launch(ref, { command: preinstalledStartup(), env: {} }, { snapshot });
+    const snapshotDiagnostic = {
+      allocationId: 'allocation-test',
+      source: 'environment' as const,
+      attempt: 2,
+      startedAt: 10_000,
+    };
+    await harness.adapter.launch(
+      ref,
+      { command: supervisorStartup(), env: {} },
+      { snapshot, snapshotDiagnostic }
+    );
     expect(harness.launchInputs!().at(-1)?.snapshot).toEqual(snapshot);
-    await harness.adapter.launch(ref, { command: preinstalledStartup(), env: {} });
+    expect(harness.launchInputs!().at(-1)?.snapshotDiagnostic).toEqual(snapshotDiagnostic);
+    await harness.adapter.launch(ref, { command: supervisorStartup(), env: {} });
     expect(harness.launchInputs!().at(-1)).not.toHaveProperty('snapshot');
 
     const launchLeases = harness.leaseMs().length;
@@ -528,7 +539,7 @@ describe('provider-specific contract differences', () => {
     const harness = containersHarness();
     const ref = await harness.create();
 
-    await harness.adapter.launch(ref, { command: preinstalledStartup(), env: { CALLER: 'value' } });
+    await harness.adapter.launch(ref, { command: supervisorStartup(), env: { CALLER: 'value' } });
 
     expect(harness.launchedEnv()).toMatchObject({
       CALLER: 'value',
@@ -612,7 +623,7 @@ describe('provider-specific contract differences', () => {
     // Creation reads the authoritative grants exactly once, even when empty.
     expect(harness.grantReads!()).toBe(1);
 
-    await harness.adapter.launch(ref, { command: preinstalledStartup(), env: {} });
+    await harness.adapter.launch(ref, { command: supervisorStartup(), env: {} });
     expect(harness.launchSupervisor()).toBe(CONTROL_SUPERVISOR_PATH);
     expect(harness.launchSudo?.()).toBe(false);
     expect('applyContainedCredentials' in harness.adapter).toBe(true);
@@ -620,7 +631,7 @@ describe('provider-specific contract differences', () => {
     const leases = harness.leaseMs().length;
     await harness.adapter.ensureLeaseAtLeast(harness.foreignRef(), OWNED_LEASE_MS);
     expect(harness.leaseMs()).toHaveLength(leases);
-    expect('environmentSnapshots' in harness.adapter).toBe(false);
+    expect(harness.adapter.environmentSnapshots).toBe('create');
 
     await expect(
       harness.adapter.applyContainedCredentials!(ref, [] as readonly SessionCredentialGrant[])

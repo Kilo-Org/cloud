@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { boundSlashCommandCatalog } from '../../../src/shared/slash-commands.js';
 import { createMessageId } from '../../../src/shared/message-id.js';
-import { kiloServerHeaders, type KiloServer } from '../kilo-server-auth.js';
-import { isKiloServerUnreachableError } from '../kilo-api.js';
+import { fetchKiloServer, kiloServerHeaders, type KiloServer } from '../kilo-server-auth.js';
+import { DrainSessionError, isKiloServerUnreachableError } from '../kilo-api.js';
 import { git, logToFile } from '../utils.js';
 import type { Harness, HarnessSession } from './harness.js';
 import { readSessionSnapshot } from './session-snapshot.js';
@@ -42,6 +42,12 @@ export function createKilo2Harness(options: {
   const { reads, session, list } = createKilo2Reads(api, options.directory);
   const post = (path: string, body: unknown, signal?: AbortSignal) =>
     api.request(path, { method: 'POST', body, signal });
+  // Context can contain a one-shot startup-failure note; never inherit it into a new turn.
+  const replaceCloudAgentContext = (input: HarnessSession, context = '') =>
+    api.request(
+      `/api/experimental/session/${encodeURIComponent(input.sessionId)}/instructions/entries/cloud-agent-context`,
+      { method: 'PUT', body: { value: context }, signal: input.signal }
+    );
   async function select(
     input: HarnessSession & { agent?: string; model?: string; variant?: string }
   ) {
@@ -78,11 +84,21 @@ export function createKilo2Harness(options: {
       return !(input.sessionId in active);
     });
   }
-  async function compact(input: HarnessSession & { model: string }) {
+  async function compact(input: Parameters<Harness['compact']>[0]) {
     await select(input);
     await options.lifecycle.waitForInterrupt(input.sessionId, input.signal);
-    const id = createMessageId();
-    await post(`${kilo2SessionPath(input.sessionId)}/compact`, { id }, input.signal);
+    await replaceCloudAgentContext(input);
+    let outcome: Awaited<ReturnType<Harness['compact']>> = 'executed';
+    try {
+      await post(
+        `${kilo2SessionPath(input.sessionId)}/compact`,
+        { id: input.messageId },
+        input.signal
+      );
+    } catch (error) {
+      if (!(error instanceof Kilo2HttpError && error.status === 409)) throw error;
+      outcome = 'replayed';
+    }
     await post(
       `/api/experimental/session/${encodeURIComponent(input.sessionId)}/wait`,
       undefined,
@@ -90,20 +106,29 @@ export function createKilo2Harness(options: {
     );
     const result = z
       .object({
+        id: z.literal(input.messageId),
         type: z.literal('compaction'),
         status: z.enum(['completed', 'failed']),
-        error: z.object({ message: z.string() }).optional(),
+        error: z.object({ type: z.string().optional(), message: z.string() }).optional(),
       })
       .parse(
-        await api.data(`${kilo2SessionPath(input.sessionId)}/message/${encodeURIComponent(id)}`, {
-          signal: input.signal,
-        })
+        await api.data(
+          `${kilo2SessionPath(input.sessionId)}/message/${encodeURIComponent(input.messageId)}`,
+          { signal: input.signal }
+        )
       );
-    if (result.status === 'failed')
+    // Kilo v2 0.0.0-v2-77 reports an empty compaction with this exact type and message.
+    if (
+      result.status === 'failed' &&
+      !(
+        result.error?.type === 'compaction.unavailable' &&
+        result.error.message === 'Nothing to compact yet'
+      )
+    )
       throw new Error(
         `Kilo v2 compaction failed: ${result.error?.message ?? 'Unknown native failure'}`
       );
-    return true;
+    return outcome;
   }
   async function remove(path: string, signal?: AbortSignal) {
     try {
@@ -193,6 +218,7 @@ export function createKilo2Harness(options: {
     },
   };
   return {
+    supportsHistoryPreload: true,
     async open(input) {
       try {
         const existing = await session(input.sessionId, input.signal);
@@ -217,22 +243,17 @@ export function createKilo2Harness(options: {
     async submit(input) {
       await select(input);
       await options.lifecycle.waitForInterrupt(input.sessionId, input.signal);
+      await replaceCloudAgentContext(input, input.context);
       await post(
         `${kilo2SessionPath(input.sessionId)}/prompt`,
         {
           id: input.messageId,
-          // v2 has no synthetic prompt part, so server context leads the prompt text.
-          text: [
-            input.context,
-            input.parts
-              ? input.parts
-                  .filter(part => part.type === 'text')
-                  .map(part => part.text)
-                  .join('\n')
-              : (input.prompt ?? ''),
-          ]
-            .filter(text => text !== undefined)
-            .join('\n\n'),
+          text: input.parts
+            ? input.parts
+                .filter(part => part.type === 'text')
+                .map(part => part.text)
+                .join('\n')
+            : (input.prompt ?? ''),
           files: input.parts
             ?.filter(part => part.type === 'file')
             .map(part => ({ uri: part.url, name: part.filename })),
@@ -244,22 +265,19 @@ export function createKilo2Harness(options: {
     async command(input) {
       await select(input);
       await options.lifecycle.waitForInterrupt(input.sessionId, input.signal);
+      await replaceCloudAgentContext(input);
       // The native command API has no message id; the command creates its own user message.
       await post(
         `${kilo2SessionPath(input.sessionId)}/command`,
-        { command: input.command, text: input.args ?? '' },
+        { name: input.command, text: input.args ?? '' },
         input.signal
       );
     },
     compact,
     async condense(input) {
       try {
-        const success = await compact(input);
-        return {
-          success,
-          wasAborted: false,
-          ...(success ? {} : { error: 'Kilo v2 compaction failed' }),
-        };
+        await compact({ ...input, messageId: createMessageId() });
+        return { success: true, wasAborted: false };
       } catch (error) {
         return {
           success: false,
@@ -308,6 +326,49 @@ export function createKilo2Harness(options: {
       return true;
     },
     interrupt,
+    async drainSession(input) {
+      let response: Response;
+      try {
+        response = await fetchKiloServer(
+          options.server,
+          `/api/rpc/kilocode.session-drain/drain?${locationQuery(input.directory)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ input: { sessionID: input.sessionId, token: input.token } }),
+            // Drain can wait for arbitrarily long native work. The completion owner bounds
+            // transport failures and missing markers without timing out a running child.
+            signal: input.signal,
+          }
+        );
+      } catch (error) {
+        if (input.signal?.aborted) throw error;
+        throw new DrainSessionError('transient', 'Kilo v2 drain request failed', { cause: error });
+      }
+      if (!response.ok) {
+        const status = response.status;
+        const transient = status === 408 || status === 429 || status >= 500;
+        await response.body?.cancel();
+        throw new DrainSessionError(transient ? 'transient' : 'definitive', `HTTP ${status}`, {
+          status,
+        });
+      }
+      try {
+        const result = z.object({ output: z.boolean() }).parse(await response.json());
+        if (!result.output)
+          throw new DrainSessionError('anomalous', 'Session drain returned false');
+        return true;
+      } catch (error) {
+        if (input.signal?.aborted || error instanceof DrainSessionError) throw error;
+        throw new DrainSessionError(
+          error instanceof TypeError ? 'transient' : 'anomalous',
+          'Kilo v2 drain returned no boolean result',
+          {
+            cause: error,
+          }
+        );
+      }
+    },
     observe: input => readSessionSnapshot({ ...input, client: reads }),
     async release(input) {
       const start = Date.now();

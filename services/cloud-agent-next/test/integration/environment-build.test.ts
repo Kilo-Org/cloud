@@ -1,3 +1,8 @@
+import {
+  ContainerAccountBlockedError,
+  ContainerCapacityUnavailableError,
+} from '../../src/container-concurrency.js';
+import { containerLimitError } from '../../src/container-limit-test-helpers.js';
 import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it } from 'vitest';
 import type {
@@ -16,8 +21,10 @@ import type {
 } from '../../src/environment-build/builder-provider.js';
 import type { BuildStore } from '../../src/environment-build/store.js';
 import type { NativeCaptureResult } from '../../src/sandbox-containers/native-capture.js';
+import { BuilderRetryableError } from '../../src/environment-build/builder-errors.js';
 import { MAX_BUILD_LOG_BYTES } from '../../src/environment-build/policy.js';
-import { isEnvironmentSnapshotsEnabled } from '../../src/environment-build/enrollment.js';
+import type { BuildTargetResolution } from '../../src/environment-build/target.js';
+import { vercelSnapshotBaseImage } from '../../src/byoc/vercel-snapshot-compatibility.js';
 
 const OWNER = { type: 'organization' as const, id: '22222222-2222-4222-8222-222222222222' };
 const REPOSITORY = { platform: 'github' as const, repoFullName: 'acme/widgets' };
@@ -39,12 +46,15 @@ type Harness = {
   captureResult: (captureId: string) => NativeCaptureResult;
   stopResult: 'terminal' | 'retryable';
   launchError: Error | null;
+  accountError?: Error;
+  target: BuildTargetResolution;
+  targetError?: Error;
   /** The image a container would start from now; null when it cannot be read. */
   currentImage: string | null;
   alarms: number[];
   gitUnavailable?: boolean;
   billingAdmission?: (allocation: BuilderAllocation) => Promise<void>;
-  snapshotOrgIds: string;
+  unsupportedReason: string | null;
 };
 
 /** The profile package's reference, the shape `readEnvironmentReference` returns. */
@@ -90,9 +100,13 @@ async function setup(): Promise<Harness> {
     }),
     stopResult: 'terminal',
     launchError: null,
+    target: {
+      ok: true,
+      target: { provider: 'cloudflare-containers', instance: 'standard-4' },
+    },
     currentImage: 'registry.example/runtime-free:1',
     alarms: [],
-    snapshotOrgIds: OWNER.id,
+    unsupportedReason: null,
   };
   const provider: BuilderProvider = {
     admitBilling: async allocation => {
@@ -144,6 +158,7 @@ async function setup(): Promise<Harness> {
                   : { repositories: harness.repositories }),
                 commands: ['pnpm install'],
                 plainVars: { PLAIN: 'value' },
+                sandboxAllocation: null,
                 encryptedSecrets: {
                   TOKEN: {
                     encryptedData: 'x',
@@ -153,7 +168,14 @@ async function setup(): Promise<Harness> {
                   },
                 },
               },
-        actorAccess: async () => harness.environment.access,
+        buildTarget: async () => {
+          if (harness.targetError) throw harness.targetError;
+          return harness.target;
+        },
+        actorAccess: async () => {
+          if (harness.accountError) throw harness.accountError;
+          return harness.environment.access;
+        },
         gitSource: async () =>
           harness.gitUnavailable
             ? { ok: false, reason: 'unavailable' }
@@ -165,7 +187,6 @@ async function setup(): Promise<Harness> {
                   platform: 'github',
                 },
               },
-        capacity: async () => 'ok',
       },
       provider,
       runnerUrl: (environment, build) =>
@@ -182,13 +203,7 @@ async function setup(): Promise<Harness> {
         metadata: { origin: 'environment-build' },
       }),
       builderSandboxId: 'sbx-' + '0'.repeat(48),
-      unsupportedReason: owner =>
-        isEnvironmentSnapshotsEnabled(
-          { ENVIRONMENT_SNAPSHOT_ORG_IDS: harness.snapshotOrgIds },
-          owner
-        )
-          ? null
-          : 'Snapshots are not enabled for this account',
+      unsupportedReason: () => harness.unsupportedReason,
       log: () => undefined,
     };
     host.coordinator = new EnvironmentBuildCoordinator(environmentId, deps);
@@ -257,6 +272,55 @@ afterEach(async () => {
 });
 
 describe('environment build lifecycle', () => {
+  it.each([
+    ['account_blocked', () => new ContainerAccountBlockedError()],
+    ['billing_unavailable', () => new ContainerCapacityUnavailableError()],
+  ] as const)(
+    'settles %s during queue admission and permits a later build',
+    async (reason, error) => {
+      const h = await setup();
+      await manualBuild(h);
+      h.accountError = error();
+      await tick(h);
+      expect(await status(h)).toMatchObject({
+        activeBuild: null,
+        latestBuild: { state: 'failed', failureReason: reason },
+      });
+      expect(h.launches).toHaveLength(0);
+      h.accountError = undefined;
+      await readyBuild(h);
+      expect(h.launches).toHaveLength(1);
+    }
+  );
+
+  it.each([
+    ['account_blocked', () => new ContainerAccountBlockedError()],
+    ['billing_unavailable', () => new ContainerCapacityUnavailableError()],
+  ] as const)(
+    'cleans up %s during publication and permits a later build',
+    async (reason, error) => {
+      const h = await setup();
+      const { auth } = await readyBuild(h);
+      await h.stub.runnerResult(auth, {
+        outcome: 'ready',
+        commit: 'a'.repeat(40),
+        branch: 'main',
+        setupDurationMs: 1,
+      });
+      h.accountError = error();
+      await drive(h);
+      expect(await status(h)).toMatchObject({
+        activeBuild: null,
+        published: null,
+        latestBuild: { state: 'failed', failureReason: reason, cleanup: 'confirmed' },
+      });
+      expect(h.stops.map(stop => stop.allocationId)).toEqual([auth.allocationId]);
+      h.accountError = undefined;
+      await readyBuild(h);
+      expect(h.launches).toHaveLength(2);
+    }
+  );
+
   it('settles a billing admission when cancellation wins before launch', async () => {
     const h = await setup();
     const accepted = await manualBuild(h);
@@ -589,8 +653,13 @@ describe('environment build lifecycle', () => {
           })),
         };
         expect(
-          (await harness.stub.resolveSnapshot({ reference: session, actorUserId: 'user-1' }))
-            .snapshot
+          (
+            await harness.stub.resolveSnapshot({
+              reference: session,
+              actorUserId: 'user-1',
+              provider: 'cloudflare-containers',
+            })
+          ).snapshot
         ).toMatchObject({ buildId });
         const persisted = await runInDurableObject(harness.stub, instance => {
           const host = instance as unknown as { store: BuildStore };
@@ -621,6 +690,7 @@ describe('environment build lifecycle', () => {
                 ),
               },
               actorUserId: 'user-1',
+              provider: 'cloudflare-containers',
             })
           ).snapshot
         ).toBeNull();
@@ -756,22 +826,6 @@ describe('environment build lifecycle', () => {
 });
 
 describe('environment snapshot resolution', () => {
-  it.each(['organization', 'user'] as const)(
-    'uses account-neutral enrollment messaging for owner type %s',
-    async type => {
-      const environmentId = crypto.randomUUID();
-      const result = await namespace.getByName(environmentId).status({
-        environmentId,
-        owner: { type, id: crypto.randomUUID() },
-        configurationRevision: 1,
-      });
-      expect(result).toMatchObject({
-        supported: false,
-        unsupportedReason: 'Snapshots are not enabled for this account',
-      });
-    }
-  );
-
   const sessionReference = (harness: Harness, revision: number) => ({
     environmentId: harness.environmentId,
     owner: OWNER,
@@ -779,9 +833,11 @@ describe('environment snapshot resolution', () => {
     repository: REPOSITORY,
   });
 
-  it('denies manual and automatic builds for an organization outside the allowlist', async () => {
+  const UNSUPPORTED = 'Native containers are not configured';
+
+  it('denies manual and automatic builds while builds are unsupported', async () => {
     const harness = await setup();
-    harness.snapshotOrgIds = 'another-org';
+    harness.unsupportedReason = UNSUPPORTED;
     expect(await manualBuild(harness)).toEqual({
       status: 'rejected',
       reason: 'unsupported_provider',
@@ -790,6 +846,7 @@ describe('environment snapshot resolution', () => {
       await harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 1),
         actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
       })
     ).toEqual({
       snapshot: null,
@@ -798,13 +855,14 @@ describe('environment snapshot resolution', () => {
     });
     expect(await status(harness)).toMatchObject({
       supported: false,
+      unsupportedReason: UNSUPPORTED,
       activeBuild: null,
       published: null,
     });
     expect(harness.launches).toHaveLength(0);
   });
 
-  it('retains a published snapshot but refuses restore after organization access is removed', async () => {
+  it('retains a published snapshot but refuses restore once builds become unsupported', async () => {
     const harness = await setup();
     const { auth } = await readyBuild(harness);
     await harness.stub.runnerResult(auth, {
@@ -815,11 +873,12 @@ describe('environment snapshot resolution', () => {
     });
     await drive(harness);
     expect((await status(harness)).published).not.toBeNull();
-    harness.snapshotOrgIds = '';
+    harness.unsupportedReason = UNSUPPORTED;
     expect(
       await harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 1),
         actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
       })
     ).toMatchObject({
       snapshot: null,
@@ -829,6 +888,31 @@ describe('environment snapshot resolution', () => {
     expect(await status(harness)).toMatchObject({
       supported: false,
       published: expect.any(Object),
+    });
+  });
+
+  it('does not launch a queued build once builds become unsupported', async () => {
+    const harness = await setup();
+    await manualBuild(harness);
+    harness.unsupportedReason = UNSUPPORTED;
+    await drive(harness);
+    expect(harness.launches).toHaveLength(0);
+    expect(await status(harness)).toMatchObject({
+      activeBuild: null,
+      latestBuild: { state: 'obsolete', failureReason: 'snapshots_disabled' },
+    });
+  });
+
+  it('stops a running builder once builds become unsupported', async () => {
+    const harness = await setup();
+    await readyBuild(harness);
+    harness.unsupportedReason = UNSUPPORTED;
+    await drive(harness);
+    expect(harness.stops).toHaveLength(1);
+    expect(harness.captures).toHaveLength(0);
+    expect(await status(harness)).toMatchObject({
+      activeBuild: null,
+      latestBuild: { state: 'obsolete' },
     });
   });
 
@@ -855,40 +939,17 @@ describe('environment snapshot resolution', () => {
     }
   );
 
-  it('does not launch a queued build after organization access is removed', async () => {
-    const harness = await setup();
-    await manualBuild(harness);
-    harness.snapshotOrgIds = '';
-    await drive(harness);
-    expect(harness.launches).toHaveLength(0);
-    expect(await status(harness)).toMatchObject({
-      activeBuild: null,
-      latestBuild: { state: 'obsolete', failureReason: 'snapshots_disabled' },
-    });
-  });
-
-  it('stops a running builder after organization access is removed', async () => {
-    const harness = await setup();
-    await readyBuild(harness);
-    harness.snapshotOrgIds = '';
-    await drive(harness);
-    expect(harness.stops).toHaveLength(1);
-    expect(harness.captures).toHaveLength(0);
-    expect(await status(harness)).toMatchObject({
-      activeBuild: null,
-      latestBuild: { state: 'obsolete' },
-    });
-  });
-
   it('admits one build however many sessions start without a snapshot', async () => {
     const harness = await setup();
     const first = await harness.stub.resolveSnapshot({
       reference: sessionReference(harness, 1),
       actorUserId: 'user-2',
+      provider: 'cloudflare-containers',
     });
     const second = await harness.stub.resolveSnapshot({
       reference: sessionReference(harness, 1),
       actorUserId: 'user-3',
+      provider: 'cloudflare-containers',
     });
 
     expect(first).toMatchObject({
@@ -917,6 +978,7 @@ describe('environment snapshot resolution', () => {
       harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 1),
         actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
       })
     ).resolves.toMatchObject({
       reason: 'eligible',
@@ -928,6 +990,7 @@ describe('environment snapshot resolution', () => {
     const after = await harness.stub.resolveSnapshot({
       reference: sessionReference(harness, 2),
       actorUserId: 'user-1',
+      provider: 'cloudflare-containers',
     });
     expect(after).toMatchObject({
       reason: 'eligible',
@@ -938,7 +1001,7 @@ describe('environment snapshot resolution', () => {
     harness.environment.revision = 1;
   });
 
-  it('skips a snapshot for another sandbox image and admits its replacement', async () => {
+  it('uses an earlier-image snapshot and admits its replacement', async () => {
     const harness = await setup();
     const { auth } = await readyBuild(harness);
     await harness.stub.runnerResult(auth, {
@@ -954,11 +1017,18 @@ describe('environment snapshot resolution', () => {
       harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 1),
         actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
       })
     ).resolves.toMatchObject({
-      reason: 'incompatible',
-      snapshot: null,
+      reason: 'eligible',
+      snapshot: {
+        revision: 1,
+        stale: 'image',
+        baseImage: 'registry.example/runtime-free:1',
+      },
+      currentBaseImage: 'registry.example/runtime-free:2',
       admission: { status: 'admitted' },
+      build: { state: 'queued', outcome: null, failureReason: null },
     });
     const view = await status(harness);
     expect(view.published).toMatchObject({ revision: 1, stale: 'image' });
@@ -972,6 +1042,7 @@ describe('environment snapshot resolution', () => {
       harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 2),
         actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
       })
     ).resolves.toMatchObject({ admission: { status: 'skipped', reason: 'revision_superseded' } });
 
@@ -981,8 +1052,35 @@ describe('environment snapshot resolution', () => {
       harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 3),
         actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
       })
     ).resolves.toMatchObject({ reason: 'deleted', admission: { status: 'skipped' } });
+  });
+
+  it('backs off capacity-refused automatic builds and still permits manual recovery', async () => {
+    const harness = await setup();
+    harness.billingAdmission = async () => {
+      throw containerLimitError();
+    };
+    await harness.stub.resolveSnapshot({
+      reference: sessionReference(harness, 1),
+      actorUserId: 'user-1',
+      provider: 'cloudflare-containers',
+    });
+    await drive(harness);
+    await expect(
+      harness.stub.resolveSnapshot({
+        reference: sessionReference(harness, 1),
+        actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
+      })
+    ).resolves.toMatchObject({ admission: { status: 'skipped', reason: 'backoff' } });
+    expect((await status(harness)).automaticBackoff).toMatchObject({ revision: 1, failures: 1 });
+    expect(harness.launches).toHaveLength(0);
+    await expect(manualBuild(harness)).resolves.toMatchObject({
+      status: 'accepted',
+      created: true,
+    });
   });
 
   it('backs off a failed automatic build while a manual build still admits', async () => {
@@ -990,6 +1088,7 @@ describe('environment snapshot resolution', () => {
     const lookup = await harness.stub.resolveSnapshot({
       reference: sessionReference(harness, 1),
       actorUserId: 'user-1',
+      provider: 'cloudflare-containers',
     });
     const buildId = (lookup.admission as { buildId: string }).buildId;
     await tick(harness);
@@ -1005,6 +1104,7 @@ describe('environment snapshot resolution', () => {
       harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 1),
         actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
       })
     ).resolves.toMatchObject({ admission: { status: 'skipped', reason: 'backoff' } });
     expect((await status(harness)).automaticBackoff).toMatchObject({ revision: 1, failures: 1 });
@@ -1012,5 +1112,135 @@ describe('environment snapshot resolution', () => {
       status: 'accepted',
       created: true,
     });
+  });
+
+  it('pins a Vercel target and publishes its base identity', async () => {
+    const harness = await setup();
+    const target = {
+      provider: 'vercel' as const,
+      credentialId: '44444444-4444-4444-8444-444444444444',
+      teamId: 'team-1',
+      projectId: 'project-1',
+      runtimeBuildId: 'runtime-1',
+      baseSnapshotId: 'snap-base',
+      instance: 'vercel-small' as const,
+    };
+    harness.target = { ok: true, target };
+
+    const { auth } = await readyBuild(harness);
+    expect(harness.launches.at(-1)?.allocation).toMatchObject({ provider: 'vercel', target });
+
+    await harness.stub.runnerResult(auth, {
+      outcome: 'ready',
+      commit: 'a'.repeat(40),
+      branch: 'main',
+      setupDurationMs: 1,
+    });
+    await drive(harness);
+
+    await expect(
+      harness.stub.resolveSnapshot({
+        reference: sessionReference(harness, 1),
+        actorUserId: 'user-1',
+        provider: 'vercel',
+      })
+    ).resolves.toMatchObject({
+      reason: 'eligible',
+      snapshot: { provider: 'vercel', baseImage: vercelSnapshotBaseImage(target) },
+    });
+
+    // A session pinned to native containers cannot use the snapshot, and a
+    // rebuild would target Vercel again, so no replacement build is admitted.
+    await expect(
+      harness.stub.resolveSnapshot({
+        reference: sessionReference(harness, 1),
+        actorUserId: 'user-1',
+        provider: 'cloudflare-containers',
+      })
+    ).resolves.toEqual({
+      snapshot: null,
+      reason: 'provider_mismatch',
+      admission: { status: 'skipped', reason: 'unsupported' },
+    });
+    expect((await status(harness)).activeBuild).toBeNull();
+  });
+
+  it('uses a Vercel snapshot from an earlier base in the same account and admits its replacement', async () => {
+    const harness = await setup();
+    const target = {
+      provider: 'vercel' as const,
+      credentialId: '44444444-4444-4444-8444-444444444444',
+      teamId: 'team-1',
+      projectId: 'project-1',
+      runtimeBuildId: 'runtime-1',
+      baseSnapshotId: 'snap-base',
+      instance: 'vercel-small' as const,
+    };
+    harness.target = { ok: true, target };
+    const { auth } = await readyBuild(harness);
+    await harness.stub.runnerResult(auth, {
+      outcome: 'ready',
+      commit: 'a'.repeat(40),
+      branch: 'main',
+      setupDurationMs: 1,
+    });
+    await drive(harness);
+
+    const otherAccount = { ...target, projectId: 'project-2' };
+    harness.target = { ok: true, target: otherAccount };
+    await expect(
+      harness.stub.resolveSnapshot({
+        reference: sessionReference(harness, 1),
+        actorUserId: 'user-1',
+        provider: 'vercel',
+      })
+    ).resolves.toMatchObject({ snapshot: null, reason: 'incompatible' });
+
+    const rebuiltBase = { ...target, runtimeBuildId: 'runtime-2', baseSnapshotId: 'snap-base-2' };
+    harness.target = { ok: true, target: rebuiltBase };
+    await expect(
+      harness.stub.resolveSnapshot({
+        reference: sessionReference(harness, 1),
+        actorUserId: 'user-1',
+        provider: 'vercel',
+      })
+    ).resolves.toMatchObject({
+      reason: 'eligible',
+      snapshot: { revision: 1, stale: 'image', baseImage: vercelSnapshotBaseImage(target) },
+      currentBaseImage: vercelSnapshotBaseImage(rebuiltBase),
+    });
+    expect((await status(harness)).published).toMatchObject({ revision: 1, stale: 'image' });
+  });
+
+  it('keeps status readable and the snapshot current while the target cannot be resolved', async () => {
+    const harness = await setup();
+    const { auth } = await readyBuild(harness);
+    await harness.stub.runnerResult(auth, {
+      outcome: 'ready',
+      commit: 'a'.repeat(40),
+      branch: 'main',
+      setupDurationMs: 1,
+    });
+    await drive(harness);
+
+    harness.targetError = new Error('resolver unavailable');
+    const read = await status(harness);
+    expect(read.supported).toBe(true);
+    expect(read.published).toMatchObject({ stale: null });
+  });
+
+  it('retries a retryable Vercel builder launch instead of failing the build', async () => {
+    const harness = await setup();
+    harness.launchError = new BuilderRetryableError('lost');
+    const accepted = await manualBuild(harness);
+    if (accepted.status !== 'accepted') throw new Error('not accepted');
+
+    await tick(harness);
+    expect(harness.launches).toHaveLength(0);
+    expect((await status(harness)).activeBuild?.state).toBe('preparing');
+
+    harness.launchError = null;
+    await tick(harness);
+    expect(harness.launches).toHaveLength(1);
   });
 });

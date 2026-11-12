@@ -62,6 +62,11 @@
   --ink2: #3c382f;
   --muted-soft: #a9a39a;
   --hair-soft: rgba(20, 15, 10, 0.05);
+  /* Leading strip of a session row whose eyebrow names its context: the muted
+   * tint at the 30% strength such a row has always painted, so the light page
+   * keeps the group mark it has. The dark block needs a solid step of its own
+   * (see there). */
+  --session-strip: rgba(169, 163, 154, 0.3);
   /* Fill of an inactive icon control — the composer's send circle until there
    * is something to send. Light keeps the muted neutral it has always painted;
    * the dark block needs a step above the near-black page, where that neutral
@@ -72,10 +77,14 @@
    * 1.18:1 off the near-black page, so a placeholder reads as an empty area
    * (see the dark block). */
   --skeleton-fill: #f0eee6;
-  /* Track under the context-usage ring's arc. Light keeps the hairline tint;
-   * the dark block raises it so the ring reads as a circle, still below the
-   * neutral arc so a part-filled arc still reads as a fraction. */
-  --ring-track: rgba(20, 15, 10, 0.05);
+  /* Track under the context-usage ring's arc. Light needs the step the dark
+   * block already carries: the hairline tint sat 1.1:1 off the pill's own
+   * `--secondary` fill, so the ring read as a lone arc with no circle under it.
+   * 30% ink clears 1.97:1 off `--secondary` and 1.98:1 off the sheet's
+   * `--background` — the same presence the dark block gives at 1.92:1 — and
+   * stays far under the neutral arc (4.62:1 on the pill), so a part-filled arc
+   * still reads as a fraction. */
+  --ring-track: rgba(20, 15, 10, 0.3);
   --accent-soft: #ffdd00;
   --accent-soft-foreground: #1a1a10;
   /* Low-emphasis accent control. `--accent-soft` is the full-strength accent
@@ -209,6 +218,12 @@
     --ink2: #c4c1b8;
     --muted-soft: #56544f;
     --hair-soft: rgba(255, 255, 255, 0.04);
+    /* Dark counterpart of the session row's leading strip: a solid warm neutral
+     * that keeps the light block's 30% tint unreadable on the near-black page
+     * (1.23:1). It clears 3:1 off `--background` (3.47:1) and off `--card`
+     * (3.22:1), and stays under the row's muted ink (5.33:1) so a stored row
+     * still reads quieter than the accent strips beside it. */
+    --session-strip: #6b6862;
     /* Dark counterpart of an inactive icon control's fill: 18% white over the
      * page, so the send circle stays a visible disc while its muted ink keeps
      * 3:1 on it and the control still reads as inactive beside the accent fill. */
@@ -320,6 +335,7 @@
   --color-ink2: var(--ink2);
   --color-muted-soft: var(--muted-soft);
   --color-hair-soft: var(--hair-soft);
+  --color-session-strip: var(--session-strip);
   --color-control-idle: var(--control-idle);
   --color-skeleton-fill: var(--skeleton-fill);
   --color-ring-track: var(--ring-track);

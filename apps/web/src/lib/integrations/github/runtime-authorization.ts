@@ -10,6 +10,8 @@ import {
   organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
+import { organizationWorkflowGitHubConnectionSql } from '@kilocode/db';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { and, eq, isNull, notExists, or } from 'drizzle-orm';
 
 export type GitHubRuntimeAuthorizationRejectionReason =
@@ -62,25 +64,48 @@ type RuntimeAssociation = {
   } | null;
   organizationDeletedAt: string | null;
   userRecordId: string | null;
+  userBlockedAt: string | null;
   userBlockedReason: string | null;
+};
+
+/**
+ * How a caller is asking about an association.
+ *
+ * `resolvedOrganizationWorkflowConnection` states that the caller fetched this
+ * association through the organization workflow connection definition, which
+ * also accepts an eligible organization association that no writer gave a role.
+ * The definition is what established that connection, so a missing role there
+ * is not a sharing decision and must not be rejected as one. Personal
+ * associations always store their role, so the flag cannot widen a personal
+ * lookup.
+ */
+type RuntimeAuthorizationOptions = {
+  purpose?: 'workflow' | 'agent' | 'management';
+  resolvedOrganizationWorkflowConnection?: boolean;
 };
 
 export function getGitHubRuntimeAssociationRejectionReason(
   association: RuntimeAssociation | null | undefined,
-  options?: {
-    purpose?: 'workflow' | 'agent' | 'management';
-  }
+  options?: RuntimeAuthorizationOptions
 ): GitHubRuntimeAuthorizationRejectionReason | null {
   if (!association) return 'missing_association';
 
-  const { integration, installation, organizationDeletedAt, userRecordId, userBlockedReason } =
-    association;
+  const {
+    integration,
+    installation,
+    organizationDeletedAt,
+    userRecordId,
+    userBlockedAt,
+    userBlockedReason,
+  } = association;
   const hasUserOwner = integration.owned_by_user_id !== null;
   const hasOrganizationOwner = integration.owned_by_organization_id !== null;
   if (hasUserOwner === hasOrganizationOwner) return 'malformed_owner';
   if (hasUserOwner) {
     if (userRecordId !== integration.owned_by_user_id) return 'missing_personal_owner';
-    if (userBlockedReason !== null) return 'blocked_personal_owner';
+    if (isBlockedAccount({ blocked_at: userBlockedAt, blocked_reason: userBlockedReason })) {
+      return 'blocked_personal_owner';
+    }
   } else if (organizationDeletedAt !== null) {
     return 'deleted_organization';
   }
@@ -90,8 +115,13 @@ export function getGitHubRuntimeAssociationRejectionReason(
   if (integration.auth_invalid_at !== null) return 'auth_invalid';
   if (integration.github_disconnected_at != null) return 'disconnected';
 
+  const isWorkflowConnection =
+    integration.github_connection_role === 'workflow' ||
+    (integration.github_connection_role === null &&
+      integration.owned_by_organization_id !== null &&
+      options?.resolvedOrganizationWorkflowConnection === true);
   if (
-    integration.github_connection_role !== 'workflow' &&
+    !isWorkflowConnection &&
     !(
       integration.github_connection_role === 'agent_only' &&
       (options?.purpose === 'agent' || options?.purpose === 'management')
@@ -115,7 +145,7 @@ export function getGitHubRuntimeAssociationRejectionReason(
 
 export function isGitHubRuntimeAssociationAuthorized(
   association: RuntimeAssociation | null | undefined,
-  options?: { purpose?: 'workflow' | 'agent' | 'management' }
+  options?: RuntimeAuthorizationOptions
 ): boolean {
   return getGitHubRuntimeAssociationRejectionReason(association, options) === null;
 }
@@ -135,6 +165,7 @@ export async function assertGitHubInstallationRuntimeAuthorized(
       installation: github_app_installations,
       organizationDeletedAt: organizations.deleted_at,
       userRecordId: kilocode_users.id,
+      userBlockedAt: kilocode_users.blocked_at,
       userBlockedReason: kilocode_users.blocked_reason,
     })
     .from(platform_integrations)
@@ -147,12 +178,20 @@ export async function assertGitHubInstallationRuntimeAuthorized(
     .where(
       and(
         eq(platform_integrations.platform, PLATFORM.GITHUB),
+        // The workflow branch admits the organization workflow connection
+        // definition next to the stored role, so an installation the product
+        // reports as connected can mint a token for this organization. Any row
+        // it returns without a role was resolved by that definition, which is
+        // what the rejection check is told below.
         allowAgentOnly
           ? or(
               eq(platform_integrations.github_connection_role, 'workflow'),
               eq(platform_integrations.github_connection_role, 'agent_only')
             )
-          : eq(platform_integrations.github_connection_role, 'workflow'),
+          : or(
+              eq(platform_integrations.github_connection_role, 'workflow'),
+              organizationWorkflowGitHubConnectionSql()
+            ),
         eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE),
         isNull(platform_integrations.github_disconnected_at),
         isNull(platform_integrations.suspended_at),
@@ -204,6 +243,10 @@ export async function assertGitHubInstallationRuntimeAuthorized(
       ? 'ambiguous_association'
       : getGitHubRuntimeAssociationRejectionReason(associations[0], {
           purpose: allowAgentOnly ? purpose : 'workflow',
+          // The query above accepted this row on the workflow path, so a row
+          // without a role is the organization workflow connection it
+          // resolved, not a shared association this caller may not use.
+          resolvedOrganizationWorkflowConnection: !allowAgentOnly,
         });
   if (reason) {
     throw new GitHubRuntimeAuthorizationError(reason, {

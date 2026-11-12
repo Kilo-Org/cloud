@@ -12,6 +12,10 @@ import { createTurnManager } from './turn.js';
 import { SESSION_SNAPSHOT_INTERVAL_MS } from './runtime-activity.js';
 import type { ControlPlaneWrapperFrame } from '../../../src/shared/control-plane-protocol.js';
 import {
+  GH_STACK_EXTENSION_NAME,
+  GH_STACK_EXTENSIONS_ROOT,
+} from '../../../src/shared/runtime-distribution.js';
+import {
   cleanupStaleKiloPidfiles,
   createKiloRuntime,
   createKiloRuntimes,
@@ -128,11 +132,16 @@ function createFeedFactory(options: { failOpens?: number } = {}): {
     callbacks: KiloFeedCallbacks
   ) => { open(): Promise<void>; close(): void };
   feeds: FakeFeedRecord[];
+  /** Refuses the next `count` opens, as a dead Kilo listener does. */
+  failOpens(count: number): void;
 } {
   const feeds: FakeFeedRecord[] = [];
   let remainingFailures = options.failOpens ?? 0;
   return {
     feeds,
+    failOpens(count) {
+      remainingFailures = count;
+    },
     openFeed: (source, callbacks) => {
       const record: FakeFeedRecord = {
         callbacks,
@@ -200,6 +209,7 @@ function createRuntime(options: {
   timers?: ControlPlaneTimers;
   onRestart?: KiloRuntimeOptions['onRestart'];
   onEvent?: KiloRuntimeOptions['onEvent'];
+  onFeedInterrupted?: KiloRuntimeOptions['onFeedInterrupted'];
   sampleMemory?: KiloRuntimeOptions['sampleMemory'];
   memoryHolds?: boolean[];
   readSnapshot?: KiloRuntimeOptions['readSnapshot'];
@@ -224,6 +234,7 @@ function createRuntime(options: {
     log: message => logs.push(message),
     onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
     onEvent: options.onEvent,
+    onFeedInterrupted: options.onFeedInterrupted,
     ...(options.isIdle
       ? {
           isIdle: async () => options.isIdle!(),
@@ -279,10 +290,53 @@ describe('prepareKiloFilesystem', () => {
       expect(rules).toContain('# Cloud Agent Environment');
       expect(rules).toContain('Port 3000 is used by the sandbox itself.');
       expect(rules).toContain('no more than 3 minutes 30 seconds');
+      expect(rules).toContain('## Stacked Workspaces and Pull Requests');
+      expect(rules).toContain('an internet search is not needed');
+      expect(rules).toContain('**New stacked workspace**');
+      expect(rules).toContain('gh pr create --base <parent-branch>');
+      expect(rules).toContain('Do not rewrite or push parent or sibling branches.');
       expect(
         await fsp.readFile(path.join(home, '.local', 'share', 'kilo', 'auth.json'), 'utf8')
       ).toBe('{"kilo":{}}');
       expect((await fsp.stat(directory)).isDirectory()).toBe(true);
+    } finally {
+      await fsp.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('links the image-baked gh-stack extension into the runtime HOME', async () => {
+    const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-prepare-'));
+    try {
+      const home = path.join(root, 'home');
+      const dataHome = path.join(home, '.local', 'share');
+      await prepareKiloFilesystem(
+        { HOME: home, XDG_DATA_HOME: dataHome },
+        path.join(root, 'worktree')
+      );
+      const link = path.join(dataHome, 'gh', 'extensions', GH_STACK_EXTENSION_NAME);
+      expect((await fsp.lstat(link)).isSymbolicLink()).toBe(true);
+      expect(await fsp.readlink(link)).toBe(
+        path.join(GH_STACK_EXTENSIONS_ROOT, GH_STACK_EXTENSION_NAME)
+      );
+    } finally {
+      await fsp.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('leaves an existing gh-stack extension link untouched', async () => {
+    const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-prepare-'));
+    try {
+      const home = path.join(root, 'home');
+      const dataHome = path.join(home, '.local', 'share');
+      const extensions = path.join(dataHome, 'gh', 'extensions');
+      await fsp.mkdir(extensions, { recursive: true });
+      const link = path.join(extensions, GH_STACK_EXTENSION_NAME);
+      await fsp.symlink(path.join(root, 'custom-extension'), link, 'dir');
+      await prepareKiloFilesystem(
+        { HOME: home, XDG_DATA_HOME: dataHome },
+        path.join(root, 'worktree')
+      );
+      expect(await fsp.readlink(link)).toBe(path.join(root, 'custom-extension'));
     } finally {
       await fsp.rm(root, { recursive: true, force: true });
     }
@@ -633,6 +687,14 @@ describe('createKiloRuntime', () => {
       });
       const client = await runtime.ensure();
       client.submit = async () => undefined;
+      client.drainSession = async input => {
+        turns.observeKiloEvent({
+          type: 'session.drained',
+          properties: { sessionID: input.sessionId, token: input.token },
+          nativeRuntimeId: runtime.nativeRuntimeId!,
+        });
+        return true;
+      };
       const turns = createTurnManager({
         timers: TEST_TIMERS,
         runtimes: { get: () => runtime },
@@ -703,6 +765,14 @@ describe('createKiloRuntime', () => {
       const submitted: string[] = [];
       client.submit = async input => {
         submitted.push(input.messageId ?? '');
+      };
+      client.drainSession = async input => {
+        turns.observeKiloEvent({
+          type: 'session.drained',
+          properties: { sessionID: input.sessionId, token: input.token },
+          nativeRuntimeId: runtime.nativeRuntimeId!,
+        });
+        return true;
       };
       const turns = createTurnManager({
         timers: TEST_TIMERS,
@@ -983,12 +1053,107 @@ describe('createKiloRuntime', () => {
     await runtime.shutdown();
   });
 
+  it('reports v2 established feed loss synchronously before reconnecting, but not retirement', async () => {
+    const feed = createFeedFactory();
+    const gaps: string[] = [];
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      scheduler: createScheduler(),
+      feed,
+      probe: createProbe(true),
+      onFeedInterrupted: id => gaps.push(id),
+    });
+    const client = await runtime.ensure();
+    client.drainSession = async () => true;
+    const first = feed.feeds[0]!;
+    first.callbacks.onFailure();
+    expect(gaps).toEqual([first.nativeRuntimeId]);
+    await waitFor(() => feed.feeds.length === 2);
+    await runtime.shutdown();
+    expect(gaps).toEqual([first.nativeRuntimeId]);
+  });
+
+  it('does not report an opening failure as established feed history loss', async () => {
+    const gaps: string[] = [];
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      scheduler: createScheduler(),
+      feed: createFeedFactory({ failOpens: 1 }),
+      probe: createProbe(true),
+      onFeedInterrupted: id => gaps.push(id),
+    });
+    expect(await runtime.ensure().catch(error => error)).toBeInstanceOf(Error);
+    expect(gaps).toEqual([]);
+    await runtime.shutdown();
+  });
+
+  it.each([0, 1])(
+    'restarts a crashed Kilo for its exit after %i earlier successful reconnects',
+    async earlierReconnects => {
+      const spawner = createSpawner();
+      const feed = createFeedFactory();
+      const scheduler = createScheduler();
+      const { runtime, logs } = createRuntime({
+        spawner,
+        feed,
+        probe: createProbe(true),
+        scheduler,
+        timers: timers({ sseSilenceMs: 60_000, healthRequestMs: 1_000 }),
+      });
+      const limit = CONTROL_PLANE_TIMERS.wrapper.sseReconnectLimit;
+      const client = await runtime.ensure();
+      client.drainSession = async () => true;
+      if (earlierReconnects > 0) {
+        feed.feeds[0]!.callbacks.onFailure();
+        await waitFor(() => feed.feeds.length === 2);
+        feed.feeds[1]!.callbacks.onEvent({
+          type: 'server.heartbeat',
+          properties: {},
+          nativeRuntimeId: 'r',
+        });
+        await Bun.sleep(1);
+        scheduler.advance(10_000);
+      }
+      feed.failOpens(limit - earlierReconnects);
+      feed.feeds.at(-1)!.callbacks.onFailure();
+      // The listener died first; the spawned process reports its exit a little later.
+      await waitFor(() => feed.feeds.length >= 1 + limit);
+      await Bun.sleep(20);
+      spawner.processes[0]!.exit();
+      await waitFor(() => logs.some(line => line.includes('kilo restarting')));
+      expect(logs.find(line => line.includes('kilo restarting'))).toContain('reason=exit');
+      await runtime.shutdown();
+    }
+  );
+
+  it('restarts a live Kilo as hung when its refused reopens spend the budget', async () => {
+    const spawner = createSpawner();
+    const feed = createFeedFactory();
+    const { runtime, logs } = createRuntime({
+      spawner,
+      feed,
+      probe: createProbe(true),
+      scheduler: createScheduler(),
+      timers: timers({ sseSilenceMs: 60_000, healthRequestMs: 50 }),
+    });
+    await runtime.ensure();
+    feed.failOpens(CONTROL_PLANE_TIMERS.wrapper.sseReconnectLimit);
+    feed.feeds[0]!.callbacks.onFailure();
+    await waitFor(() => logs.some(line => line.includes('kilo restarting')));
+    expect(logs.find(line => line.includes('kilo restarting'))).toContain(
+      '"trigger":"sse_reconnect_budget"'
+    );
+    await runtime.shutdown();
+  });
+
   it('reconnects the stream and counts it when the health probe answers', async () => {
     const spawner = createSpawner();
     const scheduler = createScheduler();
     const feed = createFeedFactory();
     const probe = createProbe(true);
+    const gaps: string[] = [];
     const { runtime, restarts } = createRuntime({
+      onFeedInterrupted: id => gaps.push(id),
       spawner,
       feed,
       probe,
@@ -1014,6 +1179,8 @@ describe('createKiloRuntime', () => {
     expect(feed.feeds[0]!.closed).toBe(1);
     expect(spawner.spawnCount()).toBe(1);
     expect(restarts).toEqual([]);
+    // V1 retains main's reconnect behavior without drain-completion notifications.
+    expect(gaps).toEqual([]);
     await runtime.shutdown();
   });
 
@@ -1613,6 +1780,10 @@ describe('Kilo observation recovery', () => {
     const client = await created.runtime.ensure();
     client.submit = async input => {
       submissions.push(input.messageId ?? '');
+    };
+    client.drainSession = async input => {
+      event('session.drained', { sessionID: input.sessionId, token: input.token });
+      return true;
     };
     client.interrupt = async input => {
       aborts.push(input.sessionId);

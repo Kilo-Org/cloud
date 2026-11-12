@@ -3,7 +3,9 @@ import { environmentSetupCommandCountSchema } from '../shared/setup-script.js';
 import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
+  RuntimeBuiltinAgentsSchema,
   RuntimeKiloCommandsSchema,
+  RuntimeInstructionsSchema,
 } from '../shared/runtime-profile.js';
 export * from '../shared/runtime-profile.js';
 import * as z from 'zod';
@@ -207,34 +209,6 @@ export const MCPServerConfigSchema = z.discriminatedUnion('type', [
   MCPRemoteServerConfigSchema,
 ]);
 
-/**
- * Runtime instruction schema. Each entry is materialized to
- * `${SESSION_HOME}/.kilocode/rules/<name>.md` at preparation time, alongside
- * the Cloud-Agent-owned `cloud-agent.md`. The reserved `cloud-agent` name is
- * rejected here so an imported profile cannot overwrite that rules file.
- */
-export const RuntimeInstructionSchema = z.object({
-  name: z
-    .string()
-    .min(1)
-    .max(Limits.MAX_RUNTIME_INSTRUCTION_NAME_LENGTH)
-    .regex(/^[a-z0-9][a-z0-9-]*$/, 'Instruction name must be a lowercase slug')
-    .refine(name => name !== 'cloud-agent', {
-      message:
-        'Instruction name conflicts with the Cloud-Agent-owned rules file; choose another name',
-    }),
-  content: z.string().min(1).max(Limits.MAX_RUNTIME_INSTRUCTION_CONTENT),
-});
-
-export const RuntimeInstructionsSchema = z
-  .array(RuntimeInstructionSchema)
-  .max(
-    Limits.MAX_RUNTIME_INSTRUCTIONS,
-    `Maximum ${Limits.MAX_RUNTIME_INSTRUCTIONS} runtime instructions allowed`
-  );
-
-export type RuntimeInstructionInput = z.infer<typeof RuntimeInstructionSchema>;
-
 /** Discriminated payload for the initial execution on a newly-prepared session. */
 export const InitialExecutionPayloadSchema = z.discriminatedUnion('type', [
   z.object({
@@ -279,6 +253,7 @@ const SharedSessionProfileFields = {
     .optional(),
   runtimeSkills: RuntimeSkillsSchema.optional(),
   runtimeAgents: RuntimeAgentsSchema.optional(),
+  builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
 };
 
 export const SessionProfileBundleSchema = z.object({

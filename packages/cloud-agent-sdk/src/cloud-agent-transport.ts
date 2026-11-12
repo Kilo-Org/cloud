@@ -5,6 +5,7 @@
  * Snapshots seed the transcript; WebSocket replay closes the snapshot gap while
  * service-state notifications are batched until bootstrap completes.
  */
+import type { ToolDisplayMode } from './tool-detail-marker';
 import { createConnection, type Connection } from './cloud-agent-connection';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import { isChatEvent, type NormalizedEvent } from './normalizer';
@@ -39,7 +40,19 @@ import type {
 } from './transport';
 
 function normalizeCloudAgentPayload(payload: TransportSendPayload): CloudAgentSendPayload {
-  if (payload.type === 'command') return payload;
+  if (payload.type === 'command') {
+    if (payload.model && payload.model.providerID !== 'kilo') {
+      throw new Error('Cloud Agent only supports Kilo models');
+    }
+    return {
+      type: 'command',
+      command: payload.command,
+      arguments: payload.arguments,
+      ...(payload.mode ? { mode: payload.mode } : {}),
+      ...(payload.model ? { model: payload.model.modelID } : {}),
+      ...(payload.variant ? { variant: payload.variant } : {}),
+    };
+  }
   if (!payload.mode) throw new Error('Cloud Agent mode is required');
   if (!payload.model) throw new Error('Cloud Agent model is required');
   if (payload.model.providerID !== 'kilo') {
@@ -79,12 +92,19 @@ type CloudAgentTransportConfig = {
     kiloSessionId: KiloSessionId,
     options: { cursor?: string }
   ) => Promise<SessionSnapshotPageOutcome | null>;
+  /** An independently authorized read started while session metadata was loading. */
+  initialSnapshotRead?: Promise<SnapshotRead> | undefined;
   /** Called after a successful initial bounded page read. */
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
   websocketBaseUrl: string;
   onError?: ((message: string) => void) | undefined;
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
   websocketHeaders?: WebSocketHeaders | undefined;
+  /**
+   * `preview` asks historical replay for the same bounded tool projection as
+   * history pages. Live events always carry complete data.
+   */
+  toolDisplay?: ToolDisplayMode | undefined;
 };
 
 // Snapshot reads run beside the live socket: a failed read costs the transcript
@@ -100,6 +120,18 @@ type SnapshotRead =
   | { kind: 'typed'; outcome: { kind: 'retryable_failure' | 'invalid_data' | 'too_large' } }
   | { kind: 'missing' }
   | { kind: 'rejected'; error: unknown };
+
+async function readCloudSnapshotPage(
+  fetchPage: NonNullable<CloudAgentTransportConfig['fetchCloudSnapshotPage']>,
+  sessionId: CloudAgentSessionId
+): Promise<SnapshotRead> {
+  try {
+    const page = cloudSessionMessagesPageSchema.parse(await fetchPage(sessionId, {}));
+    return page === null ? { kind: 'missing' } : { kind: 'page', page };
+  } catch (error) {
+    return { kind: 'rejected', error };
+  }
+}
 
 function snapshotReadFailureMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
@@ -144,6 +176,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     // episode already reached the error callback (one report per episode).
     let snapshotRetryTimer: ReturnType<typeof setTimeout> | null = null;
     let snapshotFailureReported = false;
+    let initialSnapshotRead = config.initialSnapshotRead;
 
     function cancelSnapshotRetry(): void {
       clearTimeout(snapshotRetryTimer ?? undefined);
@@ -271,6 +304,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       const url = new URL('/stream', websocketBaseUrl);
       url.searchParams.set('cloudAgentSessionId', config.sessionId);
       url.searchParams.set('bootstrap', 'true');
+      if (config.toolDisplay === 'preview') url.searchParams.set('toolDisplay', 'preview');
       if (workspaceSession) {
         url.searchParams.set('afterCursor', String(lastUpdateCursor));
       } else if (lastEventId !== null) {
@@ -342,15 +376,14 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
      */
     async function readSnapshot(): Promise<SnapshotRead> {
       if (workspaceSession) {
-        try {
-          const fetchPage = config.fetchCloudSnapshotPage;
-          if (!fetchPage)
-            throw new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage');
-          const page = cloudSessionMessagesPageSchema.parse(await fetchPage(config.sessionId, {}));
-          return page === null ? { kind: 'missing' } : { kind: 'page', page };
-        } catch (error) {
-          return { kind: 'rejected', error };
+        const fetchPage = config.fetchCloudSnapshotPage;
+        if (!fetchPage) {
+          return {
+            kind: 'rejected',
+            error: new Error('Cloud Agent workspace sessions require fetchCloudSnapshotPage'),
+          };
         }
+        return readCloudSnapshotPage(fetchPage, config.sessionId);
       }
       const fetchPage = config.fetchSnapshotPage;
       if (fetchPage) {
@@ -444,9 +477,21 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     async function fetchAndReplayInitial(
       expectedGeneration: number
     ): Promise<{ ticket: CloudAgentStreamTicketResult } | null> {
+      let ticketFailed = false;
+      const firstRead = initialSnapshotRead ?? readSnapshot();
+      initialSnapshotRead = undefined;
       const [ticket, read] = await Promise.all([
-        Promise.resolve(config.getTicket(config.sessionId)),
-        readSnapshot(),
+        Promise.resolve(config.getTicket(config.sessionId)).catch(error => {
+          ticketFailed = true;
+          throw error;
+        }),
+        firstRead.then(read => {
+          // History is independently access-checked. Paint it without waiting for live auth.
+          if (!ticketFailed && expectedGeneration === lifecycleGeneration && read.kind === 'page') {
+            replayInitialPage(read.page);
+          }
+          return read;
+        }),
       ]);
       if (expectedGeneration !== lifecycleGeneration) return null;
       if (read.kind === 'missing') {
@@ -458,7 +503,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       if (read.kind === 'typed' && read.outcome.kind !== 'retryable_failure') {
         reportSnapshotFailure(sessionSnapshotFailureMessage(read.outcome.kind), expectedGeneration);
       }
-      if (!applySnapshotRead(read, replayInitialPage, expectedGeneration)) {
+      if (!applySnapshotRead(read, () => {}, expectedGeneration)) {
         scheduleSnapshotRetry(replayInitialPage, expectedGeneration, 0);
       }
       // Even on a failed read the websocket is still useful — connect without
@@ -656,5 +701,5 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
   };
 }
 
-export { createCloudAgentTransport };
-export type { CloudAgentTransportConfig };
+export { createCloudAgentTransport, readCloudSnapshotPage };
+export type { CloudAgentTransportConfig, SnapshotRead };

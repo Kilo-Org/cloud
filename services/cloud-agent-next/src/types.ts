@@ -3,6 +3,7 @@ import type { EnvironmentBuild } from './environment-build/environment-build-do.
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import type {
+  GitHubBrokerRejectionProvenance,
   GitHubRepositoryAuthorizationFailureReason,
   GitHubRepositoryAuthorizationResult,
 } from '@kilocode/worker-utils/github-authorization';
@@ -258,6 +259,7 @@ type IssueGitHubSessionCapabilityResult =
     }
   | {
       success: false;
+      rejectionProvenance?: GitHubBrokerRejectionProvenance;
       reason:
         | GitHubRepositoryAuthorizationFailureReason
         | 'capability_configuration_error'
@@ -290,7 +292,7 @@ type RedeemGitHubSessionCapabilityResult =
         | 'integration_mismatch';
     };
 
-type GetGitLabTokenFailureReason =
+export type GetGitLabTokenFailureReason =
   | 'database_not_configured'
   | 'no_integration_found'
   | 'invalid_org_id'
@@ -465,9 +467,6 @@ export type GitTokenService = {
 
 export type Env = {
   AI?: Ai;
-  CLOUD_AGENT_CONTAINER_BILLING_ENABLED?: string;
-  CLOUD_AGENT_CONTAINER_BILLING_USER_IDS?: string;
-  CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS?: string;
   CONTAINER_BILLING_HEARTBEAT_SECONDS?: string;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
@@ -493,15 +492,15 @@ export type Env = {
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
-  /** Optional until a downloaded target provisions its private artifact bucket. */
+  /** Runtime startup requires this private artifact bucket; missing configuration fails preflight. */
   RUNTIME_RELEASE_BUCKET?: R2Bucket;
   RUNTIME_STARTUP_MODE?: string;
   NATIVE_RUNTIME_IMAGE?: string;
-  /** Comma-separated org UUIDs whose interactive web routes use the scoped startup target. */
+  /** Retired rollout setting, retained only to reject stale deployment configuration. */
   RUNTIME_INTERACTIVE_ORG_IDS?: string;
   /** SHA-256 of the private R2 descriptor; existing allocations can retain inline JSON. */
   RUNTIME_RELEASE_DESCRIPTOR?: string;
-  /** Comma-separated org UUIDs whose new downloaded sandboxes run the Kilo v2 harness. */
+  /** Comma-separated org UUIDs whose new downloaded cloud-agent-web sandboxes run Kilo v2. */
   RUNTIME_KILO2_ORG_IDS?: string;
   /** The v2 release for `RUNTIME_KILO2_ORG_IDS`, in the same form as `RUNTIME_RELEASE_DESCRIPTOR`. */
   RUNTIME_RELEASE_DESCRIPTOR_KILO2?: string;
@@ -519,7 +518,7 @@ export type Env = {
   GITHUB_LITE_APP_BOT_USER_ID?: string;
   /** Shared secret for JWT token validation */
   NEXTAUTH_SECRET: SecretBinding;
-  /** Comma-separated list of allowed Origins for /stream WebSocket connections */
+  /** Comma-separated allowed Origins for the /stream and /terminal WebSocket connections */
   WS_ALLOWED_ORIGINS?: string;
   /** Backend base URL (used for balance checks before session spin-up) */
   KILOCODE_BACKEND_BASE_URL?: string;
@@ -552,17 +551,12 @@ export type Env = {
   GITHUB_APP_SLUG?: string;
   /** GitHub App bot user ID for git commit email (e.g., '240665456') */
   GITHUB_APP_BOT_USER_ID?: string;
-  /** 'true' disables the per-account concurrent-container cap. Set only on the disposable e2e Worker. */
+  /** 'true' skips blocked-account admission and the meter's concurrent-container cap marker. Disposable e2e Workers only. */
   CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
-  /** Comma-separated user or org IDs whose Code Reviewer sessions use the Cloudflare Containers runtime. `*` includes personal. */
-  CODE_REVIEW_CONTAINERS_ORG_IDS?: string;
   /** User or organization IDs enrolled in customer-paid Vercel compute. */
   BYOC_VERCEL_IDS?: string;
-  RUNTIME_ISOLATION_ENABLED?: string;
   /** Comma-separated user or org IDs allowed to pick a sandbox destination. `*` includes personal. */
   SANDBOX_SELECTION_IDS?: string;
-  /** Obsolete input accepted for compatibility; cannot disable containment. */
-  CREDENTIAL_CONTAINMENT_ENABLED?: string;
   /**
    * Wrapper-side tool/server memory cgroup partition configuration. See
    * MEMORY_CGROUPS_PLAN.md (W4).
@@ -576,12 +570,8 @@ export type Env = {
   VERCEL_SANDBOX_RUNTIME?: string;
   VERCEL_SANDBOX_INITIAL_TIMEOUT_MS?: string;
   VERCEL_SANDBOX_EXTEND_DURATION_MS?: string;
-  /** Comma-separated org IDs routed to DO-managed Cloudflare containers. Empty is off. `*` includes personal. */
-  CLOUDFLARE_CONTAINERS_ORG_IDS?: string;
-  /** Organization IDs allowed to build and restore environment snapshots. Empty is off. `*` includes personal. */
-  ENVIRONMENT_SNAPSHOT_ORG_IDS?: string;
-  WORKSPACE_SNAPSHOT_ORG_IDS?: string;
-  WORKSPACE_SNAPSHOT_USER_IDS?: string;
+  /** Comma-separated user or organization IDs allowed workspace snapshots; `*` includes everyone. */
+  WORKSPACE_SNAPSHOT_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */
@@ -601,8 +591,6 @@ export type Env = {
    * locally or a dedicated zone in production). Unset disables the feature.
    */
   PREVIEW_HOST_SUFFIX?: string;
-  /** Comma-separated user or org IDs shown the preview UI. `*` includes personal. Unset shows nobody. */
-  PREVIEW_ENABLED_IDS?: string;
 };
 
 export type ValidatedSessionAccess = AccessibleCloudAgentSession & {

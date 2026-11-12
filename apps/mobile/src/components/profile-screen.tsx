@@ -17,6 +17,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Trash2,
+  Users,
 } from '@/components/ui/icons';
 import { type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
@@ -35,9 +36,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
 import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
-import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth/auth-context';
-import { useFeatureFlag } from '@/lib/analytics/posthog';
+import { providerLabel } from '@/lib/auth/provider-label';
 import { SESSION_SYNC_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useAfterIdle } from '@/lib/hooks/use-after-idle';
@@ -54,37 +54,13 @@ import { getSecurityAgentPath } from '@/lib/security-agent';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
-const PROVIDER_LABEL_KEYS = {
-  anaconda: 'profile.providerAnaconda',
-  apple: 'profile.providerApple',
-  discord: 'profile.providerDiscord',
-  email: 'common.email',
-  'fake-login': 'profile.providerTestAccount',
-  github: 'common.github',
-  gitlab: 'common.gitlab',
-  google: 'profile.providerGoogle',
-  linkedin: 'profile.providerLinkedin',
-  workos: 'profile.providerEnterpriseSso',
-} as const;
-
 // The app changelog lives on `main` and is written per store build by the
 // kilo-app Release workflow; never pin it to a version or a per-build copy.
 const CHANGELOG_URL = 'https://github.com/Kilo-Org/cloud/blob/main/apps/mobile/CHANGELOG.md';
 
-/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
-function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
-  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
-}
-
-function providerLabel(provider: string) {
-  const key = lookup(PROVIDER_LABEL_KEYS, provider);
-  return key ? i18n.t(key) : provider;
-}
-
 export function ProfileScreen() {
   const { signOut, token } = useAuth();
   const router = useRouter();
-  const nativeRemoteEnabled = useFeatureFlag('native-remote-mobile', false);
   const trpc = useTRPC();
   const deleteScrollRef = useRef<ScrollViewInstance>(null);
   const [deleteKeyboardOcclusion, setDeleteKeyboardOcclusion] = useState(0);
@@ -290,7 +266,7 @@ export function ProfileScreen() {
             }}
           />
           <ConfigureRow
-            icon={SlidersHorizontal}
+            icon={Users}
             title={t('profiles.title')}
             subtitle={t('profiles.entrySubtitle')}
             // Agents step: the row lists the agent profiles, and its two
@@ -350,7 +326,7 @@ export function ProfileScreen() {
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('profile.app')}
           </Text>
-          {nativeRemoteEnabled && SESSION_SYNC_URL && (
+          {__DEV__ && SESSION_SYNC_URL && (
             <ConfigureRow
               icon={SlidersHorizontal}
               title={t('nativeRemote.title')}
@@ -395,13 +371,13 @@ export function ProfileScreen() {
           />
           <ConfigureRow
             icon={Sparkles}
-            title={t('kiloclaw.changelog.title')}
+            title={t('profile.changelog')}
             hue="sage"
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {
               void openExternalUrl(CHANGELOG_URL, {
-                label: t('kiloclaw.changelog.title'),
+                label: t('profile.changelog'),
               });
             }}
           />

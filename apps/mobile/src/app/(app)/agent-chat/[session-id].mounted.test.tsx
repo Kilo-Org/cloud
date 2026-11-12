@@ -35,6 +35,7 @@ import {
   getAuthenticatedOwner,
   markRestoredAuthenticatedOwner,
 } from '@/lib/context-scope';
+import { _resetLastRouteForTests, noteRestoredRouteOpen } from '@/lib/last-route';
 import SessionDetailScreen from './[session-id]';
 
 const useLocalSearchParamsMock = vi.hoisted(() => vi.fn());
@@ -536,11 +537,13 @@ beforeEach(() => {
     },
     // The POP_TO end state the component relies on: find the destination at or
     // below the current index, truncate everything above it; with no match,
-    // drop the current route and land on the destination.
-    dismissTo: (href: string) => {
-      const index = navigationRoutes.lastIndexOf(href.split('?')[0] ?? href);
+    // drop the current route and land on the destination. An object href lands
+    // on its pathname, as the real router does.
+    dismissTo: (href: string | { pathname: string }) => {
+      const path = typeof href === 'string' ? (href.split('?')[0] ?? href) : href.pathname;
+      const index = navigationRoutes.lastIndexOf(path);
       if (index === -1) {
-        navigationRoutes.splice(0, navigationRoutes.length, href);
+        navigationRoutes.splice(0, navigationRoutes.length, path);
       } else {
         navigationRoutes.splice(index + 1);
       }
@@ -576,6 +579,7 @@ beforeEach(() => {
   queryState.refetch.mockReset();
   secureStoreMock.getItemAsync.mockReset();
   secureStoreMock.getItemAsync.mockResolvedValue(null);
+  _resetLastRouteForTests();
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
 });
@@ -637,6 +641,64 @@ describe('SessionDetailScreen invalid session-id', () => {
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
     expect(findByType(renderer.root, 'NewSessionScreenBody')).toHaveLength(0);
     expect(queryEnabled()).toBe(false);
+  });
+});
+
+describe('SessionDetailScreen relaunch restore', () => {
+  const SESSION_ID = 'ses_12345678901234567890123456';
+  const RECORDED_HREF = `/(app)/agent-chat/${SESSION_ID}`;
+
+  function mountTerminalSession(code: string) {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': SESSION_ID });
+    queryState.data = null;
+    queryState.isError = true;
+    queryState.error = { data: { code } };
+  }
+
+  it.each(['NOT_FOUND', 'UNAUTHORIZED', 'FORBIDDEN'])(
+    'falls back to the start screen when the restored session answers %s',
+    async code => {
+      mountTerminalSession(code);
+      noteRestoredRouteOpen(RECORDED_HREF);
+
+      await mountRoute();
+
+      // The restore replaced itself, so nothing the person did not ask for
+      // stays on screen.
+      expect(navigationRoutes).toEqual(['/(app)/(tabs)/(0_home)']);
+    }
+  );
+
+  it('keeps the not-found screen for a session opened by a tap or a live link', async () => {
+    mountTerminalSession('NOT_FOUND');
+
+    const renderer = await mountRoute();
+
+    expect(navigationRoutes).toEqual(['session-detail']);
+    expect(propOf(findByType(renderer.root, 'QueryError')[0], 'variant')).toBe('not-found');
+  });
+
+  it('takes the restore mark once, so a later open answers for itself', async () => {
+    mountTerminalSession('NOT_FOUND');
+    noteRestoredRouteOpen(RECORDED_HREF);
+    await mountRoute();
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(0_home)']);
+
+    navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+    const renderer = await mountRoute();
+
+    expect(navigationRoutes).toEqual(['session-detail']);
+    expect(propOf(findByType(renderer.root, 'QueryError')[0], 'variant')).toBe('not-found');
+  });
+
+  it('keeps the retryable failure on a restored route', async () => {
+    mountTerminalSession('INTERNAL_SERVER_ERROR');
+    noteRestoredRouteOpen(RECORDED_HREF);
+
+    const renderer = await mountRoute();
+
+    expect(navigationRoutes).toEqual(['session-detail']);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
   });
 });
 

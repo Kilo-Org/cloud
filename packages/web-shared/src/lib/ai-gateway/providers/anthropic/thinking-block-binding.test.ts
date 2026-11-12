@@ -33,6 +33,10 @@ describe('dropThinkingBlocksOnPrefixMismatch', () => {
     'anthropic/claude-opus-6',
     'global.anthropic.claude-haiku-6-1-20270101-v1:0',
     'anthropic/claude-newfamily-6',
+    'anthropic/claude-opus-latest',
+    '~anthropic/claude-sonnet-latest',
+    'bedrock-byok/global.anthropic.claude-sonnet-latest',
+    'vertex-byok/claude-sonnet-latest',
   ])('drops mismatched thinking blocks for %s', model => {
     const { body, extraHeaders } = apply(model, { type: 'adaptive' });
 
@@ -109,6 +113,8 @@ describe('dropThinkingBlocksOnPrefixMismatch', () => {
     'claude-sonnet-5@20260601',
     'anthropic/claude-3.5-sonnet',
     'openai/gpt-5.5',
+    'openai/gpt-5.5-latest',
+    'vendor/model-latest',
   ])('leaves %s untouched', model => {
     const { body, extraHeaders } = apply(model, { type: 'adaptive' });
 

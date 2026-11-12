@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite holds the shared tap-target geometry: the audit floor, every reach, and the wrapped-sentence rules that keep two inline links apart */
 import { describe, expect, it, vi } from 'vitest';
 
 // eslint-disable-next-line import/no-nodejs-modules -- Use the compiler's compatible CommonJS export.
@@ -30,9 +31,11 @@ import {
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
   INLINE_LINK_FACING_HIT_SLOP_DP,
+  INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP,
   INLINE_LINK_LINE_GAP_CLASS,
   INLINE_LINK_LINE_GAP_DP,
   INLINE_LINK_OUTER_HIT_SLOP_DP,
+  INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP,
   INLINE_LINK_ROW_CLASS,
   INLINE_LINK_ROW_MARGIN_DP,
   INLINE_LINK_SENTENCE_LINE_DP,
@@ -50,7 +53,6 @@ import {
   tapTargetReachDp,
   textActionTargetClass,
   TOUCH_TARGET_DP,
-  VOICE_INPUT_LG_HIT_SLOP_DP,
 } from './tap-target';
 
 // `inlineLinkHitSlop` resolves the sentence's ends through the interface
@@ -248,6 +250,13 @@ describe('shared tap-target geometry', () => {
     expect(tapTargetReachDp(MIN_TAP_TARGET_DP, INLINE_LINK_VERTICAL_HIT_SLOP_DP)).toBe(
       TOUCH_TARGET_DP
     );
+    // A link with an inline neighbour splits the same vertical reach by side:
+    // the facing side gives up its half, the far side carries all of it, and the
+    // height is still 28 + 16 = 44.
+    expect(INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP + INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP).toBe(
+      2 * INLINE_LINK_VERTICAL_HIT_SLOP_DP
+    );
+    expect(MIN_TAP_TARGET_DP + INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP).toBe(TOUCH_TARGET_DP);
     // The horizontal reach is asymmetric (4dp toward the neighbour, 12dp away),
     // so it is box + facing + outer rather than tapTargetReachDp's 2 * slop.
     expect(MIN_TAP_TARGET_DP + INLINE_LINK_FACING_HIT_SLOP_DP + INLINE_LINK_OUTER_HIT_SLOP_DP).toBe(
@@ -255,21 +264,30 @@ describe('shared tap-target geometry', () => {
     );
   });
 
-  it('keeps a wrapped sentence line clear of the link box that follows it', async () => {
-    // The regression this guards: in a long locale the legal sentence wraps
-    // (pt-BR measured 6.9dp of collision), the link box's rect overflows its
-    // own flex line by (28 - line) / 2 on each side, and wrapped lines have no
-    // gutter of their own — so the box on the second line reached up into the
-    // first line's prose.
+  it('keeps two wrapped link boxes and their touch regions apart', async () => {
+    // The regression this guards: the legal sentence wraps, its two link boxes
+    // land on adjacent lines, and each box's rect overflows its own flex line by
+    // (28 - line) / 2 on each side. With a 7dp gap the two rects still met by
+    // 3.5dp, and a tap in that strip opened the later link instead of the one
+    // under the finger.
     const overflowDp = (MIN_TAP_TARGET_DP - INLINE_LINK_SENTENCE_LINE_DP) / 2;
     expect(INLINE_LINK_SENTENCE_LINE_DP).toBe(17.5);
     expect(overflowDp).toBe(5.25);
-    expect(INLINE_LINK_LINE_GAP_DP).toBeGreaterThan(overflowDp);
+    // The rects: the gap has to exceed both overflows together.
+    expect(INLINE_LINK_LINE_GAP_DP).toBeGreaterThan(2 * overflowDp);
+    // The touch regions: a facing slop sits on top of each of those overflows,
+    // and the two still stop short of each other inside the same gap.
+    expect(INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP).toBe(0);
+    const facingReachDp = overflowDp + INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP;
+    expect(2 * facingReachDp).toBeLessThan(INLINE_LINK_LINE_GAP_DP);
     expect(INLINE_LINK_LINE_GAP_CLASS).toBe(`gap-y-[${INLINE_LINK_LINE_GAP_DP}px]`);
     expect(INLINE_LINK_ROW_CLASS).toContain(INLINE_LINK_LINE_GAP_CLASS);
-    // The row's own margin is the second literal in that class: it reserves
-    // the gutter the 44pt region needs beyond the line (see the constant's
-    // doc), so it moves with the dp it is spelled from, not on its own.
+    // The far reach is what the row's own margin has to hold clear of the
+    // neighbouring buttons (the screen's 10.5dp gutter plus that margin), so the
+    // two move together rather than on their own.
+    expect(overflowDp + INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP).toBeLessThanOrEqual(
+      10.5 + INLINE_LINK_ROW_MARGIN_DP
+    );
     expect(INLINE_LINK_ROW_CLASS).toContain(`my-[${INLINE_LINK_ROW_MARGIN_DP}px]`);
     // The compiled row gap is what the layout applies, not the constant.
     expect(await compiledDp(INLINE_LINK_ROW_CLASS, 'rowGap')).toBe(INLINE_LINK_LINE_GAP_DP);
@@ -290,34 +308,42 @@ describe('shared tap-target geometry', () => {
     const vertical = INLINE_LINK_VERTICAL_HIT_SLOP_DP;
     const facing = INLINE_LINK_FACING_HIT_SLOP_DP;
     const outer = INLINE_LINK_OUTER_HIT_SLOP_DP;
+    const facingVertical = INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP;
+    const outerVertical = INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP;
+
+    // The vertical split follows the sentence's own order in both directions:
+    // wrapped lines stack downward, so the start link's neighbour is on the same
+    // line or the next one and only the end link can sit below the start one.
+    expect(facingVertical + outerVertical).toBe(2 * vertical);
 
     // LTR: the link at the sentence's start sits on the left and faces right.
     rtl.isRTL = false;
     expect(inlineLinkHitSlop('start')).toEqual({
-      top: vertical,
-      bottom: vertical,
+      top: outerVertical,
+      bottom: facingVertical,
       left: outer,
       right: facing,
     });
     expect(inlineLinkHitSlop('end')).toEqual({
-      top: vertical,
-      bottom: vertical,
+      top: facingVertical,
+      bottom: outerVertical,
       left: facing,
       right: outer,
     });
 
     // RTL: the flex-row mirrors, so the start link sits on the right and faces
-    // left; the two ends swap their physical sides.
+    // left; the two ends swap their physical sides. The vertical sides do not
+    // move, because a wrapped line always sits below the one before it.
     rtl.isRTL = true;
     expect(inlineLinkHitSlop('start')).toEqual({
-      top: vertical,
-      bottom: vertical,
+      top: outerVertical,
+      bottom: facingVertical,
       left: facing,
       right: outer,
     });
     expect(inlineLinkHitSlop('end')).toEqual({
-      top: vertical,
-      bottom: vertical,
+      top: facingVertical,
+      bottom: outerVertical,
       left: outer,
       right: facing,
     });
@@ -396,10 +422,10 @@ describe('composer input row control separation', () => {
   it('leaves positive clearance between two adjacent controls tap areas', () => {
     // The regression this guards: the send/stop control carried no gap, so it
     // rendered flush against the microphone and the two tap areas overlapped.
+    // The voice toggle renders its whole target as its own box, so the row's
+    // slop is the only one the gap has to carry.
     expect(composerControlClearanceDp()).toBeGreaterThan(0);
-    expect(COMPOSER_CONTROL_GAP_DP).toBeGreaterThan(
-      VOICE_INPUT_LG_HIT_SLOP_DP + COMPOSER_CONTROL_HIT_SLOP_DP
-    );
+    expect(COMPOSER_CONTROL_GAP_DP).toBeGreaterThan(COMPOSER_CONTROL_HIT_SLOP_DP);
   });
 
   it('zeroes the slop on the side the nearer control sits on', () => {
@@ -422,12 +448,13 @@ describe('composer input row control separation', () => {
     }
   });
 
-  it('gaps the voice toggle from the send control below the two facing slops', () => {
+  it('gaps the voice toggle from the send control below the send control slop', () => {
     // `ms-1` is 0.25rem at NativeWind's 14pt rem: 3.5dp, narrower than the
-    // two facing slops, which is why both controls zero their facing side.
+    // send control's slop, which is why it zeroes the side that faces the
+    // toggle.
     expect(COMPOSER_VOICE_SEND_GAP_CLASS).toBe('ms-1');
     const voiceSendGapDp = Number(COMPOSER_VOICE_SEND_GAP_CLASS.slice('ms-'.length)) * 0.25 * 14;
     expect(voiceSendGapDp).toBe(3.5);
-    expect(voiceSendGapDp).toBeLessThan(VOICE_INPUT_LG_HIT_SLOP_DP + COMPOSER_CONTROL_HIT_SLOP_DP);
+    expect(voiceSendGapDp).toBeLessThan(COMPOSER_CONTROL_HIT_SLOP_DP);
   });
 });

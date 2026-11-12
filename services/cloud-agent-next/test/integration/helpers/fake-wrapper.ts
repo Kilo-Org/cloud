@@ -1,8 +1,15 @@
 import {
+  RUNTIME_HARNESS_HEADER,
+  RUNTIME_INSTRUCTIONS_HEADER,
+  RUNTIME_INSTRUCTIONS_VERSION,
   WORKSPACE_CONFIGURATION_HEADER,
   WORKSPACE_CONFIGURATION_VERSION,
   WORKTREE_RUNTIME_HEADER,
   WORKTREE_RUNTIME_VERSION,
+} from '../../../src/shared/control-plane-runtime-contract.js';
+import {
+  KILO_CLI_VERSION_HEADER,
+  WRAPPER_VERSION_HEADER,
 } from '../../../src/shared/control-plane-runtime-contract.js';
 import { SELF } from 'cloudflare:test';
 import {
@@ -17,6 +24,11 @@ export type FakeWrapperConnectInput = {
   path?: string;
   runtimeContract?: 'legacy' | 'worktree';
   workspaceConfiguration?: boolean;
+  runtimeInstructions?: boolean;
+  /** Raw `x-kilo-runtime-harness` value, so a test can also send an unknown one. */
+  runtimeHarness?: string;
+  kiloCliVersion?: string;
+  wrapperVersion?: string;
 };
 
 export type FakeWrapperHelloInput = {
@@ -29,6 +41,7 @@ export type FakeWrapperHelloInput = {
   /** The retired capability sent by wrappers built before workspace snapshots. */
   sessionSnapshots?: boolean;
   startCommands?: boolean;
+  worktreeGit?: boolean;
 };
 
 export type FakeNativeEvent = {
@@ -90,6 +103,18 @@ export class FakeWrapper {
         ...(input.workspaceConfiguration
           ? { [WORKSPACE_CONFIGURATION_HEADER]: WORKSPACE_CONFIGURATION_VERSION }
           : {}),
+        ...(input.runtimeInstructions
+          ? { [RUNTIME_INSTRUCTIONS_HEADER]: RUNTIME_INSTRUCTIONS_VERSION }
+          : {}),
+        ...(input.runtimeHarness === undefined
+          ? {}
+          : { [RUNTIME_HARNESS_HEADER]: input.runtimeHarness }),
+        ...(input.kiloCliVersion === undefined
+          ? {}
+          : { [KILO_CLI_VERSION_HEADER]: input.kiloCliVersion }),
+        ...(input.wrapperVersion === undefined
+          ? {}
+          : { [WRAPPER_VERSION_HEADER]: input.wrapperVersion }),
       },
     });
     if (response.status !== 101 || !response.webSocket) {
@@ -176,6 +201,7 @@ export class FakeWrapper {
       ...(input.workspaceSnapshots ? { workspaceSnapshots: true } : {}),
       ...(input.sessionSnapshots ? { sessionSnapshots: true } : {}),
       ...(input.startCommands ? { startCommands: true } : {}),
+      ...(input.worktreeGit ? { worktreeGit: true } : {}),
     });
     return this.next();
   }

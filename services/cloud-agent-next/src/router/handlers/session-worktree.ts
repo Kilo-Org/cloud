@@ -47,9 +47,9 @@ import { buildControlPlaneSandboxSelection } from '../../session/control-plane-s
 import { createMessageId } from '../../session/message-id.js';
 import { preflightAndQueuePromptMessage } from '../../session/queue-message.js';
 import type { MessageResultRPCResponse } from '../../session/message-result.js';
+import { classifyStoredInitialTurn } from '../../session/initial-turn-outcome.js';
 import {
   assertSessionOperationIdentity,
-  assertRuntimeIsolationAdmission,
   SESSION_CREATE_INTENT_FINGERPRINT_KEY,
 } from '../../session/session-registration.js';
 import type { Env, TRPCContext } from '../../types.js';
@@ -264,6 +264,7 @@ async function findOwnershipRow(
       parentSessionId: cli_sessions_v2.parent_session_id,
       cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
       gitUrl: cli_sessions_v2.git_url,
+      profileId: cli_sessions_v2.profile_id,
     })
     .from(cli_sessions_v2)
     .where(
@@ -679,8 +680,8 @@ async function createDestinationRuntimeAuthorization(
   }
 }
 
-async function assertNewDestinationRuntimeIsolation(ctx: TRPCContext): Promise<void> {
-  if (await requiresRuntimeAuthorization(ctx)) assertRuntimeIsolationAdmission(ctx.env);
+async function assertNewDestinationRuntimeAdmission(ctx: TRPCContext): Promise<void> {
+  await requiresRuntimeAuthorization(ctx);
 }
 
 /**
@@ -733,7 +734,7 @@ function buildRegistrationInput(
   const now = Date.now();
   // Explicit field list: a sibling session inherits route/agent/profile but not
   // the parent's callback, clone source, devcontainer runtime or initial
-  // message. `workspace` is the resolved worktree placement.
+  // message. Siblings reuse their workspace's exclusive sandbox, never another workspace's.
   const metadata: SessionMetadata = {
     metadataSchemaVersion: 2,
     allowSubagentSessions:
@@ -1049,6 +1050,18 @@ async function registerWorktreeSession(
   let response: unknown;
 
   try {
+    const initialCommands = await withDORetry(
+      () => getSandboxSessionStub(ctx.env, ctx.userId, source.ownership.cloudAgentSessionId),
+      stub => stub.getAvailableCommands(),
+      'getAvailableCommands'
+    ).catch(() => {
+      logControlDiagnostic(
+        'worktree_chat_command_catalog',
+        { ...diagnostic, result: 'unavailable', reason: 'source_catalog_read_failed' },
+        'warn'
+      );
+      return undefined;
+    });
     response = await withDORetry(
       () => getSandboxSessionStub(ctx.env, ctx.userId, progress.cloudAgentSessionId),
       async stub => {
@@ -1070,9 +1083,6 @@ async function registerWorktreeSession(
           }
         }
         registrationAttempted = true;
-        if (preissuedRuntimeAuthorization === undefined) {
-          await assertNewDestinationRuntimeIsolation(ctx);
-        }
         const runtimeAuthorization =
           preissuedRuntimeAuthorization ??
           (await createDestinationRuntimeAuthorization(
@@ -1080,16 +1090,17 @@ async function registerWorktreeSession(
             progress,
             source.ownership.organizationId ?? undefined
           ));
-        return stub.registerSessionFromMetadata(
-          buildRegistrationInput(
+        return stub.registerSessionFromMetadata({
+          ...buildRegistrationInput(
             source,
             ctx,
             progress,
             runtimeAuthorization,
             options?.agent,
             options?.continuation
-          )
-        );
+          ),
+          initialCommands,
+        });
       },
       'registerSession'
     );
@@ -1226,7 +1237,7 @@ async function executeWorktreeCreate(
 ): Promise<OperationProgress> {
   const startedAt = Date.now();
   if (preissuedRuntimeAuthorization === undefined) {
-    await assertNewDestinationRuntimeIsolation(ctx);
+    await assertNewDestinationRuntimeAdmission(ctx);
   }
   const progress = operationProgressSchema.parse({
     cloudAgentSessionId: options.requestedCloudAgentSessionId ?? generateSessionId(),
@@ -1350,7 +1361,7 @@ async function reconcileWorktreeCreate(
       preissuedRuntimeAuthorization !== undefined
     );
   } else if (preissuedRuntimeAuthorization === undefined) {
-    await assertNewDestinationRuntimeIsolation(ctx);
+    await assertNewDestinationRuntimeAdmission(ctx);
   }
 
   const ownership = await findOwnershipRow(
@@ -1660,8 +1671,9 @@ async function initialTurnState(
   );
   if (result.type === 'state-invalid') throw creationInProgress();
   if (result.type !== 'found') return 'missing';
-  if (result.result.status === 'failed' || result.result.status === 'interrupted') return 'failed';
-  return 'admitted';
+  return classifyStoredInitialTurn(result.result).type === 'terminal-failure'
+    ? 'failed'
+    : 'admitted';
 }
 
 function rpcErrorCode(error: unknown): string {

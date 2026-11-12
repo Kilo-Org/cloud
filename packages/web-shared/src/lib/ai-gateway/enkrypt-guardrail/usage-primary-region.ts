@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { types } from 'node:util';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
@@ -7,7 +8,7 @@ import {
   ENKRYPT_USAGE_WRITE_PATH,
   EnkryptUsageWriteResponseSchema,
   type EnkryptUsageWriteInput,
-} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
+} from '@kilocode/usage-contracts';
 
 /** Must stay below the endpoint's `maxDuration`; matches `recordUsageInPrimaryRegion`. */
 const HANDOFF_TIMEOUT_MS = 90_000;
@@ -55,10 +56,28 @@ async function handOff(usageWrite: EnkryptUsageWriteInput): Promise<string | nul
     return error instanceof Error || error instanceof DOMException ? error.name : 'fetch_failed';
   }
   if (!response.ok) {
-    await response.body?.cancel().catch(() => {});
+    await response.body?.cancel().catch((error: unknown) => {
+      console.warn('[enkrypt-guardrail] failed to cancel the primary region error response body', {
+        usage_id: usageWrite.id,
+        error_name: errorName(error),
+      });
+    });
     return `http_${response.status}`;
   }
 
-  const body: unknown = await response.json().catch(() => null);
-  return EnkryptUsageWriteResponseSchema.safeParse(body).success ? null : 'malformed_response';
+  const body: unknown = await response.json().catch((error: unknown) => {
+    console.warn('[enkrypt-guardrail] failed to parse the primary region response body', {
+      usage_id: usageWrite.id,
+      error_name: errorName(error),
+    });
+    return null;
+  });
+  const parsed = EnkryptUsageWriteResponseSchema.safeParse(body);
+  if (!parsed.success) return 'malformed_response';
+  const { usageId } = parsed.data;
+  return usageId === undefined || usageId === usageWrite.id ? null : 'usage_id_mismatch';
+}
+
+function errorName(error: unknown): string {
+  return types.isNativeError(error) ? error.name : 'unknown';
 }

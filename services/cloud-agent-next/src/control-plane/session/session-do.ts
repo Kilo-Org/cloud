@@ -1,4 +1,9 @@
 import { environmentReferenceSchema } from '../../environment-build/reference.js';
+import {
+  workspaceSnapshotIdentity,
+  type WorkspaceSnapshotIdentity,
+} from '../sandbox/workspace-snapshot.js';
+import { readCustomerBillingFailure } from '../../persistence/customer-billing-failure.js';
 import { DurableObject } from 'cloudflare:workers';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
@@ -23,6 +28,7 @@ import {
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
 import { sessionCallbackContext } from './callback-context.js';
+import { createSessionListStatusOutbox, deriveSessionListStatus } from './list-status.js';
 import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
@@ -33,6 +39,7 @@ import { asc, eq, gt } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
+import { type CustomerBillingFailure } from '@kilocode/session-ingest-contracts';
 import { resolveSecret } from '../../auth.js';
 import type { CallbackTarget } from '../../callbacks/index.js';
 import type { DurableAdmissionAck } from '../../execution/types.js';
@@ -76,7 +83,7 @@ import type {
 } from '../../session/message-result.js';
 import { createSessionEventQueries, type SessionEventQueries } from './event-queries.js';
 import { createPreparationProgressRecorder } from '../../session/preparation-progress.js';
-import { sessionIdFromDoName } from '../../session-identity.js';
+import { isControlSession, sessionIdFromDoName } from '../../session-identity.js';
 import {
   finalizePreparationAttempt,
   getPreparationSnapshots,
@@ -88,6 +95,7 @@ import {
 import type {
   CommandsAvailableData,
   PreparationAttempt,
+  PreparingStep,
   SessionStatus,
 } from '../../shared/protocol.js';
 import {
@@ -118,11 +126,30 @@ import {
   type ControlPlaneRouteUpdate,
   type ControlPlaneRouteView,
   type ControlPlaneSessionRefPayload,
+  type ControlPlaneSetupCommandKind,
   type ControlPlaneSetupEvent,
   type ControlPlaneStatusResult,
   type ControlPlaneTerminalInput,
   type ControlPlaneWorktreeCaptureInput,
 } from '../../shared/control-plane-protocol.js';
+import {
+  worktreeBranchOperationResultSchema,
+  type ControlPlaneWorktreeGitInput,
+  type WorktreeBranchOperationResult,
+} from '../../shared/worktree-git-operations.js';
+import {
+  matchesExpectedWorktree,
+  nextRepositoryBase,
+  withRepositoryBase,
+  type AdoptWorktreeBaseRequest,
+  type AdoptWorktreeBaseResponse,
+  type WorktreeBranchOperationInput,
+  type WorktreeBranchOperationResponse,
+} from '../../session/worktree-branch-operation.js';
+
+/** Bounded wake for a branch operation: idle sandboxes prepare async. */
+const WORKTREE_GIT_PREPARE_TIMEOUT_MS = 90_000;
+const WORKTREE_GIT_PREPARE_POLL_MS = 500;
 import { resolveControlPlaneTimers } from '../../shared/control-plane-timers.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
 import type {
@@ -172,7 +199,13 @@ import {
 } from '../worktree-changes-ready.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
 import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
-import type { PreviewTargetResult, ResolvedPreviewTarget } from '../sandbox/preview-target.js';
+import type {
+  PreviewSandboxScope,
+  PreviewTargetResult,
+  ResolvedPreviewTarget,
+} from '../sandbox/preview-target.js';
+import { isTerminalSessionEligible } from '../../terminal/access.js';
+import type { ListPreviewServicesOutput } from '../../shared/preview-services.js';
 import { readWorktreeChildSessions } from './worktree-child-sessions.js';
 import {
   buildControlPlaneMessageReport,
@@ -207,6 +240,13 @@ import {
   sessionHistoryPageInputSchema,
   type SessionMessagesPage,
 } from './history.js';
+import {
+  readToolPartDetail,
+  toolPartDetailInputSchema,
+  type ToolPartDetail,
+  type ToolPartDetailInput,
+} from './tool-detail.js';
+import type { ToolDisplayMode } from '../../shared/tool-display-projection.js';
 import {
   HISTORY_HYDRATION_WAIT_MS,
   hydrateSessionHistory,
@@ -274,6 +314,51 @@ const SETUP_EVENT_TYPES: ReadonlySet<string> = new Set([
   CONTROL_PLANE_SETUP_EVENTS.output,
   CONTROL_PLANE_SETUP_EVENTS.finished,
 ]);
+
+/**
+ * The command kind a setup event belongs to. Missing on older wrappers, which
+ * only send these events for the fatal, pre-command-policy setup path.
+ */
+type SetupCommandKind = ControlPlaneSetupCommandKind;
+
+const SETUP_COMMAND_PHASES: Record<SetupCommandKind, string> = {
+  build: 'setup_commands',
+  session_setup: 'session_setup_commands',
+  start: 'start_commands',
+};
+const SETUP_COMMAND_PHASE_TITLES: Record<SetupCommandKind, string> = {
+  build: 'Running build commands',
+  session_setup: 'Running session setup',
+  start: 'Running start commands',
+};
+const SETUP_COMMAND_LABELS: Record<SetupCommandKind, string> = {
+  build: 'Build command',
+  session_setup: 'Session setup command',
+  start: 'Start command',
+};
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function setupCommandPhase(kind: SetupCommandKind | undefined): string {
+  return kind === undefined ? 'setup_commands' : SETUP_COMMAND_PHASES[kind];
+}
+
+function setupCommandPhaseTitle(kind: SetupCommandKind | undefined): string {
+  return kind === undefined ? 'Running setup commands' : SETUP_COMMAND_PHASE_TITLES[kind];
+}
+
+function setupCommandLabel(
+  kind: SetupCommandKind | undefined,
+  command: number,
+  commandText: string | undefined
+): string {
+  const name = kind === undefined ? 'Setup command' : SETUP_COMMAND_LABELS[kind];
+  return commandText === undefined
+    ? `${name} ${command}`
+    : `${name} ${command} · \`${commandText}\``;
+}
 
 /** Public `PreparingStep` for a control-plane route preparation step (spec §10). */
 const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
@@ -350,6 +435,16 @@ export const controlPlaneSessionRegistrationSchema = z
   .strict();
 export type ControlPlaneSessionRegistration = z.infer<typeof controlPlaneSessionRegistrationSchema>;
 
+function statusWorkspaceIdentity(registration: ControlPlaneSessionRegistration | null) {
+  return registration === null
+    ? null
+    : workspaceSnapshotIdentity(
+        registration.sandboxId,
+        registration.spec.directory,
+        registration.credentials
+      );
+}
+
 const cloudAgentChildSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
 
 const cloudAgentChildSessionRegistrationSchema = z
@@ -424,6 +519,17 @@ export type ControlPlaneSessionSnapshot =
       title?: string;
     };
 
+type FoundSessionSummary = Omit<
+  Extract<ControlPlaneSessionSnapshot, { type: 'found' }>,
+  'messages'
+>;
+
+export type ControlPlaneSessionMetadataSummary = {
+  metadata: SessionMetadata | null;
+  snapshot: { type: 'session-not-found' } | FoundSessionSummary;
+  currentMessage: { messageId: string; state: 'accepted' | 'queued' } | null;
+};
+
 /**
  * Session DO -> Sandbox DO (spec §10). Resolved from the production
  * `SANDBOX_CONTROL` binding; tests may inject a fake through `sandboxPeerFor`.
@@ -457,18 +563,36 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   } | null>;
   /** B10: forwards one worktree-change request to the wrapper. */
   worktreeCapture(input: ControlPlaneWorktreeCaptureInput): Promise<ControlPlaneControlResult>;
+  /** Forwards one Sync/Restack branch operation to the wrapper. */
+  worktreeGit(input: ControlPlaneWorktreeGitInput): Promise<ControlPlaneControlResult>;
   /** B10: forwards one terminal request to the wrapper. */
   terminal(input: ControlPlaneTerminalInput): Promise<ControlPlaneControlResult>;
   /** B10: forwards one allowlisted native read to the live wrapper. */
   kiloRequest(input: ControlPlaneKiloRequestInput): Promise<ControlPlaneControlResult>;
   /** Resolves the preview provider coordinates for this sandbox (off the op queue). */
-  previewTarget(sessionId: string): Promise<PreviewTargetResult>;
+  previewTarget(scope: PreviewSandboxScope): Promise<PreviewTargetResult>;
+  /** Lists live listening services through the bound wrapper (never wakes an allocation). */
+  previewServices(scope: PreviewSandboxScope): Promise<ListPreviewServicesOutput>;
   /** B10: the wrapper identity bound to the connected allocation. */
   getWrapperId(): Promise<string | null>;
   /** B10: the public sandbox status snapshot projected from the allocation. */
-  getStatusSnapshot(): Promise<SandboxStatusSnapshot>;
+  getStatusSnapshot(identity?: WorkspaceSnapshotIdentity | null): Promise<SandboxStatusSnapshot>;
   /** Passive billing projection for the workspace that owns this sandbox. */
   getWorkspaceBillingProjection(): Promise<WorkspaceBillingProjection | null>;
+  /**
+   * Removes the workspace snapshot descriptor for this session's workspace on
+   * explicit user action ("Start fresh"). The Sandbox DO only deletes on this
+   * call, never as a side effect of work; the next start uses the environment
+   * snapshot or the base image.
+   */
+  removeWorkspaceSnapshot(payload: ControlPlaneSessionRefPayload): Promise<{ success: true }>;
+  /**
+   * The capture time of the workspace snapshot descriptor that a "Start fresh"
+   * action would discard, or null when the workspace has none.
+   */
+  getWorkspaceSnapshotRecovery(
+    payload: ControlPlaneSessionRefPayload
+  ): Promise<{ capturedAt: number | null } | null>;
   fetch(request: Request): Promise<Response>;
 };
 
@@ -520,6 +644,9 @@ function rowToMessage(row: SessionMessageRow): SessionMessage {
     acceptedAt: row.accepted_at,
     settledAt: row.settled_at,
     reason: row.reason,
+    ...(row.billing_failure == null
+      ? {}
+      : { billingFailure: readCustomerBillingFailure(row.billing_failure) }),
     ...(container === undefined ? {} : { container }),
   };
 }
@@ -533,6 +660,8 @@ function messageToRow(message: SessionMessage): SessionMessageRow {
     accepted_at: message.acceptedAt,
     settled_at: message.settledAt,
     reason: message.reason,
+    billing_failure:
+      message.billingFailure === undefined ? null : JSON.stringify(message.billingFailure),
     container: message.container === undefined ? null : JSON.stringify(message.container),
   };
 }
@@ -639,6 +768,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private readonly historyHydrations = new Map<string, Promise<void>>();
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
+  private readonly listStatusOutbox: ReturnType<typeof createSessionListStatusOutbox>;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
   private readonly messageCallbacks: MessageCallbacks;
   /** Worktree-changes projection from the shared event log (plan B10). */
@@ -684,6 +814,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       storage: ctx.storage,
       getQueue: () => this.env.CLOUD_AGENT_REPORT_QUEUE,
     });
+    this.listStatusOutbox = createSessionListStatusOutbox({
+      storage: ctx.storage,
+      publish: update => this.env.SESSION_INGEST.publishCloudAgentSessionStatus(update),
+    });
     this.messageCallbacks = createMessageCallbacks({
       storage: ctx.storage,
       getMetadata: () => this.metadata,
@@ -728,7 +862,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
     this.preview = createControlPlanePreview({
       getMetadata: () => this.metadata,
-      resolveTarget: sandboxId => this.previewTargetFor(sandboxId),
+      resolveTarget: (sandboxId, scope) => this.previewTargetFor(sandboxId, scope),
     });
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
   }
@@ -747,14 +881,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return peer.terminal(input);
   }
 
-  private async previewTargetFor(sandboxId: string): Promise<PreviewTargetResult> {
+  private async previewTargetFor(
+    sandboxId: string,
+    scope: PreviewSandboxScope
+  ): Promise<PreviewTargetResult> {
     const peer = this.sandboxPeerFor(sandboxId);
     if (peer === null) {
       return { status: 'not_running' };
     }
     return withDORetry(
       () => this.sandboxPeerFor(sandboxId) ?? peer,
-      stub => stub.previewTarget(this.sessionId),
+      stub => stub.previewTarget(scope),
       'previewTarget'
     );
   }
@@ -781,6 +918,272 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       };
     }
     return peer.worktreeCapture(input);
+  }
+
+  /**
+   * Runs a Sync or Restack against the worktree's own sandbox.
+   *
+   * The target is derived from this session only: callers cannot name a sandbox
+   * or directory. An idle sandbox is woken through the existing preparation
+   * path (no synthetic turn); preparation is bounded so the caller learns
+   * rather than waiting for the provider. The wrapper owns the active-turn and
+   * directory locks and answers `refused`, so the DO never forces a rewrite
+   * over a running turn.
+   */
+  async syncWorktreeBranch(
+    input: WorktreeBranchOperationInput
+  ): Promise<WorktreeBranchOperationResponse> {
+    return this.runWorktreeBranchOperation('sync', input);
+  }
+
+  async restackWorktreeBranch(
+    input: WorktreeBranchOperationInput
+  ): Promise<WorktreeBranchOperationResponse> {
+    return this.runWorktreeBranchOperation('restack', input);
+  }
+
+  private async runWorktreeBranchOperation(
+    operation: 'sync' | 'restack',
+    input: WorktreeBranchOperationInput
+  ): Promise<WorktreeBranchOperationResponse> {
+    await this.initialized;
+    const metadata = this.metadata;
+    const registration = this.registration;
+    const worktreeId = metadata?.workspace?.worktreeId;
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    const directory = registration?.spec.directory;
+    if (
+      metadata === null ||
+      registration === null ||
+      worktreeId === undefined ||
+      kiloSessionId === undefined ||
+      directory === undefined ||
+      metadata.identity.createdOnPlatform !== 'cloud-agent-web' ||
+      metadata.workspace?.sandboxKind === 'shared' ||
+      metadata.workspace?.sandboxRoute !== undefined
+    ) {
+      return {
+        ok: false,
+        code: 'not_a_worktree_session',
+        message: 'Sync and Restack run only in a browser workspace session with its own sandbox',
+        retryable: false,
+      };
+    }
+
+    const baseBranch = input.baseBranch ?? metadata.repository?.baseBranch;
+    const upstreamSha = input.upstreamSha ?? metadata.repository?.baseSha;
+
+    const ready = await this.ensureReadyForBranchOperation();
+    if (!ready.ok) {
+      return { ok: false, code: 'sandbox_not_ready', message: ready.message, retryable: true };
+    }
+
+    const sandboxId = metadata.workspace?.sandboxId;
+    if (sandboxId === undefined) {
+      return {
+        ok: false,
+        code: 'sandbox_not_ready',
+        message: 'Sandbox is not available',
+        retryable: true,
+      };
+    }
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) {
+      return {
+        ok: false,
+        code: 'sandbox_not_ready',
+        message: 'Sandbox is not available',
+        retryable: true,
+      };
+    }
+    let result: ControlPlaneControlResult;
+    try {
+      result = await peer.worktreeGit({
+        session: {
+          sessionId: this.sessionId,
+          kiloSessionId,
+          directory,
+        },
+        payload: {
+          operation,
+          ...(baseBranch === undefined ? {} : { baseBranch }),
+          ...(upstreamSha === undefined ? {} : { upstreamSha }),
+        },
+      });
+    } catch (error) {
+      // The wrapper may have completed a lease push before the reply was lost.
+      // Surface the ambiguity; the Worker must not retry this mutation.
+      return {
+        ok: false,
+        code: 'operation_outcome_unknown',
+        message: error instanceof Error ? error.message : 'Worktree operation outcome is unknown',
+        retryable: false,
+      };
+    }
+    if (!result.ok) {
+      return {
+        ok: false,
+        code:
+          result.error.code === 'operation_outcome_unknown'
+            ? 'operation_outcome_unknown'
+            : 'operation_failed',
+        message: result.error.message,
+        retryable: result.error.retryable,
+      };
+    }
+    const parsed = worktreeBranchOperationResultSchema.safeParse(result.result);
+    if (!parsed.success) {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .warn('Worktree branch operation returned an invalid result');
+      return {
+        ok: false,
+        code: 'invalid_result',
+        message: 'The sandbox returned an invalid branch operation result',
+        retryable: false,
+      };
+    }
+    const outcome = parsed.data;
+    if (
+      (outcome.status === 'changed' || outcome.status === 'unchanged') &&
+      !(operation === 'restack' && outcome.operation === 'sync')
+    ) {
+      await this.persistWorktreeBranchOperation(outcome);
+    }
+    return { ok: true, result: outcome };
+  }
+
+  private async persistWorktreeBranchOperation(
+    outcome: Extract<WorktreeBranchOperationResult, { status: 'changed' | 'unchanged' }>
+  ): Promise<void> {
+    const metadata = this.metadata;
+    if (metadata?.repository === undefined) return;
+    const nextBase = nextRepositoryBase({
+      current: {
+        ...(metadata.repository.baseBranch === undefined
+          ? {}
+          : { baseBranch: metadata.repository.baseBranch }),
+        ...(metadata.repository.baseSha === undefined
+          ? {}
+          : { baseSha: metadata.repository.baseSha }),
+      },
+      result: { baseBranch: outcome.baseBranch, baseSha: outcome.baseSha },
+    });
+    await this.persistAdoptedBase(nextBase, outcome.branch);
+  }
+
+  /**
+   * Internal metadata-only adoption for a sibling session that shares the
+   * worktree. It never wakes the sandbox or creates a turn: the next capture
+   * reads the updated grouped metadata, so a sibling cannot overwrite the
+   * shared Changes snapshot with its old base.
+   */
+  async adoptWorktreeBase(input: AdoptWorktreeBaseRequest): Promise<AdoptWorktreeBaseResponse> {
+    await this.initialized;
+    if (!matchesExpectedWorktree(this.metadata, input.expectedWorktreeId)) {
+      return {
+        ok: false,
+        code: 'worktree_mismatch',
+        message: 'This session does not belong to the expected worktree',
+      };
+    }
+    const persisted = await this.persistAdoptedBase({
+      baseBranch: input.baseBranch,
+      baseSha: input.baseSha,
+    });
+    return persisted
+      ? { ok: true }
+      : {
+          ok: false,
+          code: 'invalid_metadata',
+          message: 'Adopted base did not produce valid session metadata',
+        };
+  }
+
+  /**
+   * Writes a base + effective prompt + route spec through the queue. Callers
+   * have already resolved the effective values; a null result keeps the
+   * current value upstream in `nextRepositoryBase`.
+   */
+  private async persistAdoptedBase(
+    nextBase: { baseBranch?: string; baseSha?: string },
+    fallbackBranch?: string
+  ): Promise<boolean> {
+    const metadata = this.metadata;
+    if (metadata?.repository === undefined) return false;
+    const next = withRepositoryBase(metadata, nextBase, fallbackBranch);
+    const validated = CurrentSessionMetadataSchema.safeParse(next);
+    if (!validated.success) {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .warn('Worktree base adoption produced invalid session metadata');
+      return false;
+    }
+    await this.enqueue(async () => {
+      await this.ctx.storage.put(SESSION_METADATA_KEY, serializeSessionMetadata(validated.data));
+      this.metadata = validated.data;
+      if (this.registration !== null) {
+        const spec = {
+          ...this.registration.spec,
+          ...(validated.data.repository?.baseBranch === undefined
+            ? {}
+            : { baseBranch: validated.data.repository.baseBranch }),
+          ...(validated.data.repository?.baseSha === undefined
+            ? {}
+            : { baseSha: validated.data.repository.baseSha }),
+        };
+        const registration = { ...this.registration, spec };
+        await this.ctx.storage.put(REGISTRATION_KEY, registration);
+        this.registration = registration;
+      }
+    });
+    return true;
+  }
+
+  /** Wakes an idle sandbox through the ordinary preparation path. */
+  private async ensureReadyForBranchOperation(): Promise<
+    { ok: true } | { ok: false; message: string }
+  > {
+    const prepared = await this.prepareSandbox();
+    if (prepared !== null) {
+      await this.applyView(prepared, this.transportPass());
+      if (prepared.state === 'ready') return { ok: true };
+      if (prepared.state === 'failed') return { ok: false, message: prepared.reason };
+    }
+    const deadline = Date.now() + WORKTREE_GIT_PREPARE_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      if (this.route.state === 'ready') return { ok: true };
+      const failed = this.branchOperationRouteFailure();
+      if (failed !== undefined) return { ok: false, message: failed };
+      const peer = this.sandboxPeer();
+      if (peer !== null) {
+        try {
+          const status = await peer.status({ sessionId: this.sessionId });
+          if (status.view.state !== 'preparing') {
+            await this.applyView(status.view, this.transportPass());
+          }
+        } catch {
+          // A transient Sandbox RPC failure is retried within the bound.
+        }
+        if (this.routeIsReady()) return { ok: true };
+        const afterPoll = this.branchOperationRouteFailure();
+        if (afterPoll !== undefined) return { ok: false, message: afterPoll };
+      }
+      await new Promise(resolve => setTimeout(resolve, WORKTREE_GIT_PREPARE_POLL_MS));
+    }
+    return {
+      ok: false,
+      message: 'Sandbox preparation did not finish within 90 seconds',
+    };
+  }
+
+  private branchOperationRouteFailure(): string | undefined {
+    const route = this.route;
+    return route.state === 'failed' ? route.reason : undefined;
+  }
+
+  private routeIsReady(): boolean {
+    return this.route.state === 'ready';
   }
 
   private async initializeStorage(): Promise<void> {
@@ -940,7 +1343,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     const parsed = controlPlaneSessionRegisterInputSchema.safeParse(input);
     if (!parsed.success) return createFailure('BAD_REQUEST', 'Invalid session register input');
-    const { metadata, sandboxSelection, runtimeAuthorizationSeal } = parsed.data;
+    const { metadata, sandboxSelection, runtimeAuthorizationSeal, initialCommands } = parsed.data;
     // N3: a repeated register (for example a `withDORetry` replay carrying the
     // seal) must not touch the seal again. Match the stored intent and replay
     // success before unsealing; a different intent is rejected.
@@ -970,6 +1373,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const sealed = await this.unsealAuthorization(runtimeAuthorizationSeal, metadata);
     if (sealed.type === 'failure') return sealed.failure;
     await this.enqueue(async () => {
+      // Finish seeding before metadata can make a registration retry return success.
+      if (initialCommands !== undefined) await this.cacheAvailableCommands(initialCommands);
       if (metadata.clone === undefined) markHistoryHydrated(this.ctx.storage);
       await this.ctx.storage.put(REGISTRATION_KEY, registration);
       this.registration = registration;
@@ -987,6 +1392,25 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   async getMetadata(): Promise<SessionMetadata | null> {
     await this.initialized;
     return this.metadata;
+  }
+
+  async getAvailableCommands(): Promise<CommandsAvailableData> {
+    await this.initialized;
+    return this.availableCommands;
+  }
+
+  private async cacheAvailableCommands(data: unknown): Promise<void> {
+    await handleCommandsAvailable(data, {
+      setAvailableCommands: async commands => {
+        await this.ctx.storage.put(AVAILABLE_COMMANDS_KEY, commands);
+        this.availableCommands = commands;
+        this.emitSynthetic('commands.available', commands, 'commands-available');
+      },
+      logger: {
+        info: message => logger.withFields({ sessionId: this.sessionId }).info(message),
+        warn: message => logger.withFields({ sessionId: this.sessionId }).warn(message),
+      },
+    });
   }
 
   async assertCloudAgentManagementAuthority(authority: unknown): Promise<void> {
@@ -1891,7 +2315,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         await this.settleMessages(
           this.messages.filter(m => m.state === 'accepted').map(m => m.messageId),
           'failed',
-          parsed.reason
+          parsed.reason,
+          undefined,
+          'coordinator',
+          parsed.billingFailure
         );
         await this.applyView({ state: 'unknown' });
         await this.armAlarm();
@@ -1943,16 +2370,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       for (const [index, event] of parsed.events.entries()) {
         if (index < nextEvent) continue;
         if (event.type === 'commands.available') {
-          await handleCommandsAvailable(event.properties, {
-            setAvailableCommands: async commands => {
-              this.availableCommands = commands;
-              await this.ctx.storage.put(AVAILABLE_COMMANDS_KEY, commands);
-            },
-            logger: {
-              info: message => logger.withFields({ sessionId: this.sessionId }).info(message),
-              warn: message => logger.withFields({ sessionId: this.sessionId }).warn(message),
-            },
-          });
+          await this.cacheAvailableCommands(event.properties);
           continue;
         }
         if (event.type === CONTROL_PLANE_WRAPPER_FINALIZING_EVENT) {
@@ -2097,6 +2515,39 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * Outbox due times retry failed reporting even once no message is open.
    */
   private async armAlarm(): Promise<void> {
+    let statusDueAt: number | null = null;
+    try {
+      if (
+        this.metadata !== null &&
+        this.registration !== null &&
+        this.env.SESSION_INGEST !== undefined
+      ) {
+        const nativeStatus = this.deriveSessionStatus()?.type;
+        const status = deriveSessionListStatus({
+          messages: this.messages,
+          nativeStatus,
+          pendingInteractions: this.pendingInteractions,
+          routeState: this.route.state,
+        });
+        // Registration alone is not a transition. Native work may start without
+        // a Cloud message, so do not gate those updates on message admission.
+        if (this.messages.length > 0 || nativeStatus !== undefined || status !== 'idle') {
+          this.listStatusOutbox.record(
+            {
+              sessionId: this.registration.spec.kiloSessionId,
+              kiloUserId: this.metadata.identity.userId,
+              cloudAgentSessionId: this.sessionId,
+            },
+            status
+          );
+        }
+        statusDueAt = this.listStatusOutbox.nextDueAt();
+      }
+    } catch {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .warn('Session list status projection failed; execution alarms are unaffected');
+    }
     if (!this.messages.some(message => message.state === 'queued')) {
       await this.clearTransportRecovery();
     }
@@ -2105,21 +2556,70 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       nextBackstopAt(this.messages, this.sessionTimers()),
       this.reportOutbox.nextDueAt() ?? null,
       this.messageCallbacks.nextCallbackDueAt() ?? null,
+      statusDueAt,
     ].filter((value): value is number => value !== null);
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();
       return;
     }
     await this.ctx.storage.setAlarm(Math.min(...candidates));
+    if (statusDueAt !== null && statusDueAt <= Date.now()) {
+      // Metadata publication never holds up preparation, answers, or outcomes.
+      this.ctx.waitUntil(
+        this.listStatusOutbox
+          .repair()
+          .then(() =>
+            this.enqueue(async () => {
+              // The serialized finalizer re-arms the alarm after publication.
+            })
+          )
+          .catch(() => {
+            logger
+              .withFields({ sessionId: this.sessionId })
+              .warn('Session list status repair failed');
+          })
+      );
+    }
   }
 
   async getSession(): Promise<ControlPlaneSessionSnapshot> {
     await this.initialized;
     if (this.registration === null) return { type: 'session-not-found' };
+    return {
+      ...this.readSessionSummary(),
+      messages: this.messages.map(message => ({
+        messageId: message.messageId,
+        state: message.state,
+        createdAt: message.createdAt,
+        acceptedAt: message.acceptedAt,
+        settledAt: message.settledAt,
+        reason: message.reason,
+      })),
+    };
+  }
+
+  /** Management reads need queue identity, not the entire admitted-message history. */
+  async getSessionMetadataSummary(): Promise<ControlPlaneSessionMetadataSummary> {
+    await this.initialized;
+    const message =
+      this.messages.find(message => message.state === 'accepted') ??
+      this.messages.find(message => message.state === 'queued');
+    return {
+      metadata: this.metadata,
+      snapshot:
+        this.registration === null ? { type: 'session-not-found' } : this.readSessionSummary(),
+      currentMessage:
+        message && (message.state === 'accepted' || message.state === 'queued')
+          ? { messageId: message.messageId, state: message.state }
+          : null,
+    };
+  }
+
+  private readSessionSummary(): FoundSessionSummary {
+    const registration = this.registration;
+    if (!registration) throw new Error('Session not registered');
     this.partText.flush();
-    const native = this.eventQueries.findByEntityId(
-      `session/${this.registration.spec.kiloSessionId}`
-    );
+    const native = this.eventQueries.findByEntityId(`session/${registration.spec.kiloSessionId}`);
     const info = z
       .object({ title: z.string().optional() })
       .safeParse(
@@ -2129,19 +2629,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       type: 'found',
       sessionId: this.sessionId,
       route: this.route,
-      messages: this.messages.map(message => ({
-        messageId: message.messageId,
-        state: message.state,
-        createdAt: message.createdAt,
-        acceptedAt: message.acceptedAt,
-        settledAt: message.settledAt,
-        reason: message.reason,
-      })),
       latestEventId: this.eventQueries.getLatestEventId(),
       updateCursor: this.eventQueries.getUpdateCursor(),
       totalCostMicrodollars: this.eventQueries.getTotalCostMicrodollars(
         this.sessionId,
-        this.registration.spec.kiloSessionId
+        registration.spec.kiloSessionId
       ),
       ...(info.success && info.data.title !== undefined ? { title: info.data.title } : {}),
     };
@@ -2153,6 +2645,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       limit?: number;
       kiloSessionId?: string;
       expectedRootKiloSessionId?: string;
+      toolDisplay?: ToolDisplayMode;
     } = {}
   ): Promise<SessionMessagesPage | null> {
     await this.initialized;
@@ -2178,23 +2671,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       }
     }
     const isRoot = kiloSessionId === rootKiloSessionId;
-    const storedLineage = isRoot
-      ? undefined
-      : readStoredHistoryLineage(this.db, rootKiloSessionId, kiloSessionId);
-    const lineage =
-      isRoot || storedLineage !== undefined
-        ? storedLineage
-        : await withTimeout(
-            readOwnedHistoryLineage({
-              env: this.env,
-              userId: registration.credentials.userId,
-              sessionId: this.sessionId,
-              rootKiloSessionId,
-              kiloSessionId,
-            }),
-            5000,
-            'Session history lineage lookup timed out'
-          );
+    const lineage = await this.readHistoryLineage(registration, kiloSessionId);
     if ((!isRoot && lineage == null) || this.registration !== registration) return null;
     await this.ensureClientHistory(kiloSessionId);
     if (this.registration !== registration) return null;
@@ -2212,6 +2689,65 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       omittedItemCount:
         readHistoryHydration(this.ctx.storage, isRoot ? undefined : kiloSessionId)
           ?.omittedItemCount ?? 0,
+    });
+  }
+
+  /** Returns a descendant's lineage under the registered root; the root has none. */
+  private async readHistoryLineage(
+    registration: ControlPlaneSessionRegistration,
+    kiloSessionId: string
+  ) {
+    const rootKiloSessionId = registration.spec.kiloSessionId;
+    if (kiloSessionId === rootKiloSessionId) return undefined;
+    // `null` is a stored denial; only an unknown lineage needs the owned lookup.
+    const stored = readStoredHistoryLineage(this.db, rootKiloSessionId, kiloSessionId);
+    if (stored !== undefined) return stored;
+    return await withTimeout(
+      readOwnedHistoryLineage({
+        env: this.env,
+        userId: registration.credentials.userId,
+        sessionId: this.sessionId,
+        rootKiloSessionId,
+        kiloSessionId,
+      }),
+      5000,
+      'Session history lineage lookup timed out'
+    );
+  }
+
+  /**
+   * Reads one complete stored tool call for an expanded preview. Uses the same
+   * root and lineage authorization as history pages and never wakes compute.
+   */
+  async getSessionToolPartDetail(input: ToolPartDetailInput): Promise<ToolPartDetail | null> {
+    await this.initialized;
+    const parsed = toolPartDetailInputSchema.parse(input);
+    const registration = this.registration;
+    const rootKiloSessionId = registration?.spec.kiloSessionId;
+    if (
+      registration === null ||
+      rootKiloSessionId === undefined ||
+      (parsed.expectedRootKiloSessionId !== undefined &&
+        parsed.expectedRootKiloSessionId !== rootKiloSessionId)
+    )
+      return null;
+    const kiloSessionId = parsed.kiloSessionId ?? rootKiloSessionId;
+    const lineage = await this.readHistoryLineage(registration, kiloSessionId);
+    if (
+      (kiloSessionId !== rootKiloSessionId && lineage == null) ||
+      this.registration !== registration
+    )
+      return null;
+    await this.ensureClientHistory(kiloSessionId);
+    if (this.registration !== registration) return null;
+    this.partText.flush();
+    return readToolPartDetail({
+      queries: this.eventQueries,
+      sessionId: this.sessionId,
+      kiloSessionId,
+      messageId: parsed.messageId,
+      partId: parsed.partId,
+      ...(parsed.callId === undefined ? {} : { callId: parsed.callId }),
     });
   }
 
@@ -2284,7 +2820,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
     if (peer === null) return unavailableStatusSnapshot();
     try {
-      return await peer.getStatusSnapshot();
+      return await peer.getStatusSnapshot(statusWorkspaceIdentity(this.registration));
     } catch {
       return unavailableStatusSnapshot();
     }
@@ -2301,10 +2837,39 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
     if (peer === null) return { sandbox: unavailableStatusSnapshot(), billing: null };
     const [sandbox, billing] = await Promise.all([
-      peer.getStatusSnapshot().catch(() => unavailableStatusSnapshot()),
+      peer
+        .getStatusSnapshot(statusWorkspaceIdentity(this.registration))
+        .catch(() => unavailableStatusSnapshot()),
       peer.getWorkspaceBillingProjection().catch(() => null),
     ]);
     return { sandbox, billing };
+  }
+
+  /**
+   * Explicit user action ("Start fresh"): remove the workspace snapshot
+   * descriptor so the next start uses the environment snapshot or base image.
+   * The Sandbox DO owns the descriptor and never deletes it on its own.
+   * A session with no registered sandbox has nothing to discard.
+   */
+  async removeWorkspaceSnapshot(): Promise<{ success: true }> {
+    await this.initialized;
+    const sandboxId = this.registration?.sandboxId;
+    const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
+    if (peer === null) return { success: true };
+    return await peer.removeWorkspaceSnapshot({ sessionId: this.sessionId });
+  }
+
+  /**
+   * The capture time a "Start fresh" action would discard, or null when the
+   * workspace has no snapshot descriptor. Mirrors the sandbox's descriptor
+   * read; it never mutates it.
+   */
+  async getWorkspaceSnapshotRecovery(): Promise<{ capturedAt: number | null } | null> {
+    await this.initialized;
+    const sandboxId = this.registration?.sandboxId;
+    const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
+    if (peer === null) return null;
+    return await peer.getWorkspaceSnapshotRecovery({ sessionId: this.sessionId });
   }
 
   /** The preparation attempts the stream replays, for the first transcript page. */
@@ -2434,9 +2999,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /**
    * C1c: closes the browser sockets of this session — the event stream and the
-   * browser side of each bridged terminal — and returns how many it closed.
-   * Reads the organization from the same persisted session metadata and only
-   * closes on a match.
+   * browser side of each bridged terminal — releases its route at the Sandbox DO,
+   * and returns how many sockets it closed. Reads the organization from the same
+   * persisted session metadata and only acts on a match. The release retires the
+   * route and its organization-attributed grant, removes the wrapper path and
+   * ends the running turn, so organization-scoped execution stops instead of
+   * continuing on a grant that outlives the membership.
    */
   async closeOrgStreams(organizationId: string): Promise<number> {
     await this.initialized;
@@ -2448,6 +3016,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       closed++;
     }
     closed += this.terminals.closeBrowserSockets(1000, 'session access revoked');
+    const peer = this.sandboxPeer();
+    if (peer !== null) {
+      // No route (an unregistered or already released sandbox) makes this a
+      // no-op. A failed release stays visible to the caller, which reports the
+      // failed revocation close instead of assuming the route is gone.
+      await withDORetry(
+        () => this.sandboxPeer() ?? peer,
+        current => current.release({ sessionId: this.sessionId }),
+        'closeOrgStreams.release'
+      );
+    }
     return closed;
   }
 
@@ -2764,6 +3343,37 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return this.preview.resolve();
   }
 
+  /**
+   * Worker-facing live preview discovery. Eligibility and the sandbox owner are
+   * decided here; the Sandbox DO checks route/allocation state and relays the
+   * scan to the bound wrapper. A stopped or idle sandbox is reported as
+   * `not_running`/`not_ready` and is never started or woken.
+   */
+  async listPreviewServices(): Promise<ListPreviewServicesOutput> {
+    await this.initialized;
+    const metadata = this.metadata;
+    if (metadata === null) return { services: [], status: 'not_ready' };
+    if (!isControlSession(metadata.identity.sessionId) || !isTerminalSessionEligible(metadata)) {
+      return { services: [], status: 'unsupported' };
+    }
+    const sandboxId = metadata.workspace?.sandboxId;
+    if (sandboxId === undefined || sandboxId.length === 0) {
+      return { services: [], status: 'not_ready' };
+    }
+    const scope: PreviewSandboxScope = {
+      ownerId: metadata.identity.userId,
+      organizationId: metadata.identity.orgId ?? null,
+      scopeId: metadata.workspace?.worktreeId ?? metadata.identity.sessionId,
+    };
+    const peer = this.sandboxPeerFor(sandboxId);
+    if (peer === null) return { services: [], status: 'not_running' };
+    return withDORetry(
+      () => this.sandboxPeerFor(sandboxId) ?? peer,
+      stub => stub.previewServices(scope),
+      'previewServices'
+    );
+  }
+
   async fetch(request: Request): Promise<Response> {
     await this.initialized;
     const url = new URL(request.url);
@@ -2790,6 +3400,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       const url = new URL('https://sandbox.internal/status-stream');
       url.searchParams.set('sessionId', this.sessionId);
       url.searchParams.set('ownerId', this.metadata.identity.userId);
+      const identity = statusWorkspaceIdentity(this.registration);
+      if (identity !== null) {
+        url.searchParams.set('workspaceId', identity.workspaceId);
+        url.searchParams.set('directory', identity.directory);
+        if (identity.orgId !== undefined) url.searchParams.set('orgId', identity.orgId);
+      }
       try {
         return await withDORetry(
           () => {
@@ -2927,7 +3543,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             (view.state === 'preparing' ? view.detail : undefined) ??
               (route.step === undefined
                 ? 'Preparing environment'
-                : PREPARING_STEP_MESSAGE[route.step])
+                : PREPARING_STEP_MESSAGE[route.step]),
+            view.state === 'preparing' ? view.snapshotCapturedAt : undefined
           );
         }
         return;
@@ -2962,7 +3579,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           openMessages(this.messages).map(message => message.messageId),
           'failed',
           route.reason,
-          route.subtype === undefined ? undefined : { workspaceSubtype: route.subtype }
+          route.subtype === undefined ? undefined : { workspaceSubtype: route.subtype },
+          'coordinator',
+          route.billingFailure
         );
         return;
     }
@@ -3031,6 +3650,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           fromState: 'queued',
           toState: 'accepted',
           lifecycleEventInserted: false,
+          runtimeHarness: message.container?.runtimeHarness,
         });
       }
       await this.armAlarm();
@@ -3139,7 +3759,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           .filter(message => message.state === 'accepted')
           .map(message => message.messageId),
         'failed',
-        ownerHint.reason
+        ownerHint.reason,
+        undefined,
+        'coordinator',
+        ownerHint.billingFailure
       );
     }
     if (ownerHint && view.state !== 'unknown' && view.attemptId !== this.currentAttemptId()) {
@@ -3266,17 +3889,21 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /**
    * Render a wrapper setup-command lifecycle event into the active preparation
-   * attempt. Each command is its own `setup_command` step under the
-   * `setup_commands` phase (mirroring the legacy bootstrap), so the preparation
-   * UI shows the numbered command, its output, and its terminal state.
+   * attempt. Each command is its own `setup_command` step under the phase for
+   * its kind (`setup_commands` for builds and legacy events,
+   * `session_setup_commands`, `start_commands`), so the preparation UI shows
+   * the numbered command, its text, its output, and its terminal state. Clients
+   * derive the failed-command rows from these steps.
    */
   private recordSetupEvent(event: ControlPlaneSetupEvent): void {
     if (this.route.state !== 'preparing') return;
     const attemptId = this.route.attemptId;
     const attempt = readPreparationAttempt(this.eventQueries, attemptId);
     if (attempt?.status !== 'running') return;
+    const kind = event.properties.kind;
+    const phaseKey = setupCommandPhase(kind);
     let steps = readPreparationSteps(this.eventQueries, attemptId);
-    let phase = steps.findLast(step => step.kind === 'phase' && step.key === 'setup_commands');
+    let phase = steps.findLast(step => step.kind === 'phase' && (step.key as string) === phaseKey);
     const latestPhase = steps.findLast(step => step.kind === 'phase');
     if (
       phase === undefined ||
@@ -3285,18 +3912,31 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           event.type === CONTROL_PLANE_SETUP_EVENTS.output))
     ) {
       this.preparationRecorder(attemptId, attempt.triggerMessageId).onProgress(
-        'setup_commands',
-        'Running setup commands'
+        phaseKey,
+        setupCommandPhaseTitle(kind)
       );
       steps = readPreparationSteps(this.eventQueries, attemptId);
-      phase = steps.findLast(step => step.kind === 'phase' && step.key === 'setup_commands');
+      phase = steps.findLast(step => step.kind === 'phase' && (step.key as string) === phaseKey);
     }
     if (phase === undefined) return;
     const command = event.properties.command;
     const commandId = `setup_command:${command - 1}`;
-    const stepId = phase.id === 'phase:setup_commands' ? commandId : `${phase.id}:${commandId}`;
+    const stepId =
+      phase.id === `phase:${phaseKey}` && phaseKey === 'setup_commands'
+        ? commandId
+        : `${phase.id}:${commandId}`;
     const existingStep = steps.find(step => step.id === stepId);
     if (existingStep !== undefined && existingStep.status !== 'running') return;
+    const commandText =
+      (event.type === CONTROL_PLANE_SETUP_EVENTS.started
+        ? event.properties.commandText
+        : undefined) ?? nonEmptyString(existingStep?.command);
+    const commandCount =
+      existingStep?.commandCount ??
+      (event.type === CONTROL_PLANE_SETUP_EVENTS.started
+        ? event.properties.commandCount
+        : undefined) ??
+      command;
     const base = {
       version: 2 as const,
       attemptId,
@@ -3304,7 +3944,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       revision:
         (readPreparationAttempt(this.eventQueries, attemptId)?.revision ?? attempt.revision) + 1,
       timestamp: Date.now(),
-      step: 'setup_commands' as const,
+      step: phaseKey as PreparingStep,
     };
     const apply = (data: Record<string, unknown>): boolean =>
       applyControlPlanePreparingEvent({
@@ -3315,7 +3955,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       });
 
     if (existingStep === undefined) {
-      const label = `Setup command ${command}`;
+      const label = setupCommandLabel(kind, command, commandText);
       if (
         !apply({
           ...base,
@@ -3325,10 +3965,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           kind: 'setup_command',
           label,
           commandIndex: command - 1,
+          commandCount,
           parentStepId: phase.id,
-          ...(event.type === CONTROL_PLANE_SETUP_EVENTS.started
-            ? { commandCount: event.properties.commandCount }
-            : {}),
+          ...(commandText === undefined ? {} : { command: commandText }),
         })
       )
         return;
@@ -3338,7 +3977,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (event.type === CONTROL_PLANE_SETUP_EVENTS.output) {
       apply({
         ...base,
-        message: `Setup command ${command} output`,
+        message: `${setupCommandLabel(kind, command, undefined)} output`,
         action: 'step_output',
         stepId,
         output: event.properties.output,
@@ -3348,10 +3987,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (event.type === CONTROL_PLANE_SETUP_EVENTS.finished) {
       const { exitCode, safeError } = event.properties;
       const failed = safeError !== undefined || exitCode !== 0;
-      const failedMessage = safeError ?? `Setup command ${command} failed`;
+      const failedMessage = safeError ?? `${setupCommandLabel(kind, command, undefined)} failed`;
       apply({
         ...base,
-        message: failed ? failedMessage : 'Setup command finished',
+        message: failed ? failedMessage : `${setupCommandLabel(kind, command, undefined)} finished`,
         action: failed ? 'step_failed' : 'step_completed',
         stepId,
         ...(failed ? { safeError: failedMessage } : {}),
@@ -3381,10 +4020,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     status: Extract<SessionMessageState, 'completed' | 'failed' | 'cancelled'>,
     reason: string | undefined,
     facts?: ControlPlaneReportFacts,
-    source: ControlPlaneMessageSource = 'coordinator'
+    source: ControlPlaneMessageSource = 'coordinator',
+    billingFailure?: CustomerBillingFailure
   ): Promise<void> {
     await this.applySettlement(
-      settleMessages(this.messages, messageIds, status, reason, Date.now()),
+      settleMessages(this.messages, messageIds, status, reason, Date.now(), billingFailure),
       facts,
       source
     );
@@ -3425,6 +4065,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         terminalAt: message.settledAt,
         lifecycleEventInserted,
         cause: message.reason === null ? undefined : diagnosticCause(message.reason),
+        runtimeHarness: message.container?.runtimeHarness,
       });
     }
     // Persist the callback, attempt delivery now, then arm only what remains:
@@ -3545,6 +4186,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               status: 'failed',
               delivery: accepted ? 'sent' : 'queued',
               accepted,
+              ...(message.billingFailure === undefined
+                ? {}
+                : { billingFailure: message.billingFailure }),
               ...(message.reason === null
                 ? {}
                 : { reason: message.reason, error: messageFailureText(message.reason) }),
@@ -3705,6 +4349,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             status: 'failed',
             delivery: message.acceptedAt === null ? 'queued' : 'sent',
             accepted: message.acceptedAt !== null,
+            ...(message.billingFailure === undefined
+              ? {}
+              : { billingFailure: message.billingFailure }),
             ...(message.reason === null
               ? { error: 'The message failed' }
               : { reason: message.reason, error: messageFailureText(message.reason) }),
@@ -3776,7 +4423,20 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
-    const run = this.operations.tail.then(task, task);
+    const withStatus = async () => {
+      try {
+        return await task();
+      } finally {
+        try {
+          await this.armAlarm();
+        } catch {
+          logger
+            .withFields({ sessionId: this.sessionId })
+            .warn('Session alarm finalization failed; the operation result is unchanged');
+        }
+      }
+    };
+    const run = this.operations.tail.then(withStatus, withStatus);
     this.operations.tail = run.then(
       () => undefined,
       () => undefined

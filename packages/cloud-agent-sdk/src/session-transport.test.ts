@@ -1312,6 +1312,235 @@ describe('workspace DO-only session transport', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
+  it('starts history beside metadata, paints it first, and consumes that read exactly once', async () => {
+    const fixture = workspaceManager();
+    let resolveMetadata!: (value: CloudSessionMetadata) => void;
+    fixture.fetchCloudSession.mockReturnValueOnce(
+      new Promise(resolve => (resolveMetadata = resolve))
+    );
+    try {
+      const opening = fixture.manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(fixture.fetchCloudSnapshotPage).toHaveBeenCalledTimes(1);
+      expect(fixture.fetchCloudSession).toHaveBeenCalledTimes(1);
+      expect(fixture.store.get(fixture.manager.atoms.messagesList).map(row => row.info.id)).toEqual(
+        ['msg_002']
+      );
+      expect(fixture.store.get(fixture.manager.atoms.isLoading)).toBe(false);
+      expect(fixture.store.get(fixture.manager.atoms.cachedTranscriptSessionId)).toBe(routeId);
+      expect(fixture.store.get(fixture.manager.atoms.fetchedSessionData)).toBeNull();
+      resolveMetadata({ sessionId: workspaceId, kiloSessionId: routeId });
+      await opening;
+      await jest.advanceTimersByTimeAsync(0);
+      expect(fixture.fetchCloudSnapshotPage).toHaveBeenCalledTimes(1);
+      expect(fixture.store.get(fixture.manager.atoms.messagesList)).toHaveLength(1);
+      expect(fixture.store.get(fixture.manager.atoms.cachedTranscriptSessionId)).toBeNull();
+    } finally {
+      fixture.manager.destroy();
+    }
+  });
+
+  it.each(['NOT_FOUND', 'FORBIDDEN', 'UNAUTHORIZED'])(
+    'retires an early page immediately on metadata %s',
+    async code => {
+      const fixture = workspaceManager();
+      let rejectMetadata!: (error: unknown) => void;
+      fixture.fetchCloudSession.mockReturnValueOnce(
+        new Promise((_, reject) => (rejectMetadata = reject))
+      );
+      try {
+        const opening = fixture.manager.switchSession(routeId);
+        await jest.advanceTimersByTimeAsync(0);
+        expect(fixture.store.get(fixture.manager.atoms.messagesList)).toHaveLength(1);
+        rejectMetadata({ data: { code } });
+        await opening;
+        await jest.advanceTimersByTimeAsync(0);
+        expect(fixture.store.get(fixture.manager.atoms.messagesList)).toEqual([]);
+        expect(fixture.store.get(fixture.manager.atoms.statusIndicator)?.type).toBe('error');
+        expect(jest.mocked(global.WebSocket)).not.toHaveBeenCalled();
+      } finally {
+        fixture.manager.destroy();
+      }
+    }
+  );
+
+  it('keeps a page denial terminal even when metadata later succeeds', async () => {
+    const fixture = workspaceManager();
+    let resolveMetadata!: (value: CloudSessionMetadata) => void;
+    fixture.fetchCloudSession.mockReturnValueOnce(
+      new Promise(resolve => (resolveMetadata = resolve))
+    );
+    fixture.fetchCloudSnapshotPage.mockRejectedValueOnce({ data: { code: 'FORBIDDEN' } });
+    try {
+      const opening = fixture.manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(fixture.store.get(fixture.manager.atoms.isLoading)).toBe(false);
+      expect(fixture.store.get(fixture.manager.atoms.statusIndicator)?.type).toBe('error');
+      resolveMetadata({ sessionId: workspaceId, kiloSessionId: routeId });
+      await opening;
+      await jest.advanceTimersByTimeAsync(0);
+      expect(fixture.store.get(fixture.manager.atoms.messagesList)).toEqual([]);
+      expect(fixture.store.get(fixture.manager.atoms.fetchedSessionData)).toBeNull();
+      expect(jest.mocked(global.WebSocket)).not.toHaveBeenCalled();
+    } finally {
+      fixture.manager.destroy();
+    }
+  });
+
+  it('retries a failed prestarted read using a new history request', async () => {
+    const fixture = workspaceManager();
+    fixture.fetchCloudSnapshotPage.mockRejectedValueOnce(new Error('temporary history failure'));
+    try {
+      await fixture.manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(fixture.fetchCloudSnapshotPage).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(500);
+      expect(fixture.fetchCloudSnapshotPage).toHaveBeenCalledTimes(2);
+      expect(fixture.store.get(fixture.manager.atoms.messagesList)).toHaveLength(1);
+    } finally {
+      fixture.manager.destroy();
+    }
+  });
+
+  it('drops both early reads after switching away, including a same-session reopen', async () => {
+    const fixture = workspaceManager();
+    let resolveMetadata!: (value: CloudSessionMetadata) => void;
+    let resolvePage!: (value: CloudSessionSnapshotPage) => void;
+    fixture.fetchCloudSession.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveMetadata = resolve;
+      })
+    );
+    fixture.fetchCloudSnapshotPage.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolvePage = resolve;
+      })
+    );
+    try {
+      const stale = fixture.manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      await fixture.manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      resolveMetadata({ sessionId: workspaceId, kiloSessionId: routeId, title: 'stale' });
+      resolvePage(
+        page({
+          messages: [
+            { info: stubUserMessage({ id: 'msg_stale', sessionID: nativeId }), parts: [] },
+          ],
+        })
+      );
+      await stale;
+      await jest.advanceTimersByTimeAsync(0);
+      expect(fixture.store.get(fixture.manager.atoms.messagesList).map(row => row.info.id)).toEqual(
+        ['msg_002']
+      );
+      expect(fixture.store.get(fixture.manager.atoms.fetchedSessionData)?.title).not.toBe('stale');
+    } finally {
+      fixture.manager.destroy();
+    }
+  });
+
+  it('does not rewind older-page pagination when the early page is replayed after metadata', async () => {
+    const fixture = workspaceManager();
+    let resolveMetadata!: (value: CloudSessionMetadata) => void;
+    fixture.fetchCloudSession.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveMetadata = resolve;
+      })
+    );
+    fixture.fetchCloudSnapshotPage.mockResolvedValueOnce(page()).mockResolvedValueOnce(
+      page({
+        nextCursor: null,
+        messages: [{ info: stubUserMessage({ id: 'msg_001', sessionID: nativeId }), parts: [] }],
+      })
+    );
+    try {
+      const opening = fixture.manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      await fixture.manager.loadOlderMessages();
+      expect(fixture.store.get(fixture.manager.atoms.hasOlderMessages)).toBe(false);
+      resolveMetadata({ sessionId: workspaceId, kiloSessionId: routeId });
+      await opening;
+      await jest.advanceTimersByTimeAsync(0);
+      await fixture.manager.loadOlderMessages();
+      expect(fixture.fetchCloudSnapshotPage).toHaveBeenCalledTimes(2);
+      expect(fixture.store.get(fixture.manager.atoms.hasOlderMessages)).toBe(false);
+      expect(fixture.store.get(fixture.manager.atoms.messagesList)).toHaveLength(2);
+    } finally {
+      fixture.manager.destroy();
+    }
+  });
+
+  it('retains an orphan environment step snapshot when bootstrap repeats its event id and cursor', async () => {
+    const { manager, store } = workspaceManager();
+    const base = {
+      version: 2,
+      attemptId: 'attempt-1',
+      triggerMessageId: 'msg_002',
+      step: 'environment_snapshot',
+      message: 'Preparation snapshot',
+    };
+    const stepSnapshot = {
+      id: 'phase:environment_snapshot',
+      key: 'environment_snapshot',
+      kind: 'phase',
+      label: 'Environment snapshot',
+      status: 'completed',
+      startedAt: 1_100,
+      completedAt: 1_500,
+      revision: 3,
+      latestDetail: 'Environment restored',
+    };
+    const step = {
+      ...base,
+      action: 'step_snapshot',
+      revision: 3,
+      timestamp: 1_500,
+      stepId: stepSnapshot.id,
+      stepSnapshot,
+    };
+    const send = (eventId: number, cursor: number, data: Record<string, unknown>) => {
+      mockWs.onmessage?.({
+        data: JSON.stringify({
+          eventId,
+          cursor,
+          sessionId: workspaceId,
+          streamEventType: 'preparing',
+          timestamp: '2026-11-06T11:00:00.000Z',
+          data,
+        }),
+      } as MessageEvent);
+    };
+    try {
+      await manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      mockWs.onopen?.(new Event('open'));
+      send(21, 13, step);
+      send(20, 14, {
+        ...base,
+        action: 'attempt_snapshot',
+        revision: 4,
+        timestamp: 2_000,
+        attempt: {
+          id: base.attemptId,
+          triggerMessageId: base.triggerMessageId,
+          status: 'completed',
+          startedAt: 1_000,
+          completedAt: 2_000,
+          revision: 4,
+        },
+      });
+      sync(14, 'connected', true);
+      send(21, 13, step);
+      sync(14, 'bootstrap.complete');
+      expect(store.get(manager.atoms.preparationAttempts)).toMatchObject([
+        { id: base.attemptId, status: 'completed', steps: [stepSnapshot] },
+      ]);
+    } finally {
+      manager.destroy();
+    }
+  });
+
   it('paints Cloud Agent cache before deferred resolution and metadata, then reconciles the live DO page', async () => {
     const fixture = workspaceManager();
     const { manager, store } = fixture;
@@ -1454,6 +1683,10 @@ describe('workspace DO-only session transport', () => {
     fixture.fetchCloudSession.mockReturnValueOnce(
       new Promise(resolve => (resolveMetadata = resolve))
     );
+    let resolvePage!: (value: CloudSessionSnapshotPage) => void;
+    fixture.fetchCloudSnapshotPage.mockReturnValueOnce(
+      new Promise(resolve => (resolvePage = resolve))
+    );
     fixture.readCachedSnapshotPage.mockResolvedValueOnce({
       info: { id: 'ses_foreign' },
       messages: [
@@ -1467,6 +1700,7 @@ describe('workspace DO-only session transport', () => {
       await jest.advanceTimersByTimeAsync(0);
       expect(store.get(manager.atoms.messagesList)).toEqual([]);
       expect(store.get(manager.atoms.cachedTranscriptSessionId)).toBeNull();
+      resolvePage(page());
       resolveMetadata({ sessionId: workspaceId, kiloSessionId: routeId });
       await opening;
       await jest.advanceTimersByTimeAsync(0);
@@ -1666,6 +1900,33 @@ describe('workspace DO-only session transport', () => {
     }
     expect(eventMap?.size).toBe(0);
   });
+
+  it.each(['12345678-1234-4234-9234-123456789abc', undefined])(
+    'preserves workspace environment %p through metadata loading',
+    async environmentId => {
+      const fixture = workspaceManager();
+      fixture.fetchCloudSession.mockResolvedValue({
+        sessionId: workspaceId,
+        preparedAt: 1,
+        initiatedAt: 1,
+        githubRepo: 'Kilo-Org/cloud',
+        upstreamBranch: 'main',
+        environmentId,
+      });
+      try {
+        await fixture.manager.switchSession(routeId);
+        await jest.advanceTimersByTimeAsync(0);
+        expect(fixture.store.get(fixture.manager.atoms.fetchedSessionData)).toMatchObject({
+          repository: 'Kilo-Org/cloud',
+          gitBranch: 'main',
+          environmentId: environmentId ?? null,
+        });
+        expect(fixture.fetchSession).not.toHaveBeenCalled();
+      } finally {
+        fixture.manager.destroy();
+      }
+    }
+  );
 
   it('preserves DO metadata PR, spend, origin and profile without catalog runtime hydration', async () => {
     const fixture = workspaceManager();

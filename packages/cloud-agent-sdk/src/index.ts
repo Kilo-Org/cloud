@@ -11,7 +11,23 @@ export type {
   NativeSocket,
   NativeSocketConstructor,
 } from './native-sync';
-export type { NativeMessage, NativeSnapshot } from './native-sync-snapshot';
+export { listNativeModels } from './native-sync-discovery';
+export type { NativeDiscoveredModel } from './native-sync-discovery';
+export { projectNativeSnapshot } from './native-sync-snapshot';
+export type {
+  NativeEntity,
+  NativeAssetReader,
+  NativeSnapshot,
+  NativeSnapshotMessage,
+  NativeSnapshotProjection,
+  NativeSnapshotSession,
+} from './native-sync-snapshot';
+export { readNativeConversation } from './native-conversation-source';
+export type {
+  NativeConversation,
+  NativePendingRequests,
+  NativePendingQuestion,
+} from './native-conversation-source';
 
 export { isStreamError, isValidCloudAgentEvent } from './schemas';
 export type { CloudAgentEvent, StreamError, StreamErrorCode } from './schemas';
@@ -36,6 +52,8 @@ export type {
   StandaloneSuggestion,
   ChildSessionHydrationState,
   StoredMessage,
+  DeliveredFailedPrompt,
+  PendingSendConfirmation,
   FetchedSessionData,
   AssociatedPrData,
   PrepareInput,

@@ -60,6 +60,7 @@ const where = jest.fn(async () => enrichmentRows);
 const chain = {
   from: jest.fn((): unknown => chain),
   leftJoin: jest.fn((): unknown => chain),
+  leftJoinLateral: jest.fn((): unknown => chain),
   where,
 };
 const selectMock = jest.fn((): unknown => chain);
@@ -93,7 +94,6 @@ jest.mock('@/routers/cli-sessions-v2-router', () => {
   return {
     associatedPrSchema: z.object({}).passthrough(),
     formatAssociatedPr: () => null,
-    sessionPrJoinPredicate: undefined,
   };
 });
 
@@ -103,6 +103,7 @@ beforeEach(() => {
   selectMock.mockClear();
   chain.from.mockClear();
   chain.leftJoin.mockClear();
+  chain.leftJoinLateral.mockClear();
   where.mockClear();
   for (const session of liveSessions) {
     session.status = 'busy';

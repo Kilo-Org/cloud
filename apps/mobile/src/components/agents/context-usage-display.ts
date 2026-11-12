@@ -75,17 +75,14 @@ export type HeaderPillContent = {
   primary: string | null;
   secondary: string | null;
   /**
-   * What the cost slot paints:
+   * What the cost part of the reading paints:
    *
    * - `label`: the session's cost, as text.
-   * - `loading`: the same dashes, laid out but painted invisible, with one bar
-   *   across the row they take. A bar of fixed width matched the settled row
-   *   only at the default font scale, and a dash beside a bar read as
-   *   half-painted content.
-   * - `unreported`: the dash, in the label's width. The session settled without
-   *   a cost, so nothing will fill the slot; it keeps the width so the pill does
-   *   not shrink when it settles.
-   * - `none`: no cost slot at all.
+   * - `loading`: the session is still resolving, so the pill paints nothing and
+   *   the accessibility label says a cost is coming.
+   * - `unreported`: the session settled without a cost, so nothing will fill
+   *   it and the pill paints only the values it has.
+   * - `none`: no cost to paint.
    */
   costSlot: PillCostSlot;
   tone: ContextTone;
@@ -100,14 +97,6 @@ export type HeaderPillContent = {
 };
 
 type PillCostSlot = 'label' | 'loading' | 'unreported' | 'none';
-
-/**
- * Value-slot placeholder of a session that has not reported usage yet. It marks
- * the slot as unfilled instead of standing in for a number: the pill keeps its
- * two slots while the session resolves, so a settled pill fills the slots it
- * already showed rather than growing a value out of a bare ring.
- */
-const UNKNOWN_WINDOW_LABEL = '—';
 
 /**
  * Single selector for the session-detail header pill. Always returns content
@@ -127,12 +116,12 @@ export function getHeaderPillContent({
   if (info) {
     const tone = getContextTone(info.percentage);
     // The pill reports context usage as a percentage only. While the model's
-    // context window is unresolved there is no honest denominator, so the slot
-    // keeps the dash instead of a token count; the sheet still shows the tokens.
+    // context window is unresolved there is no honest denominator, so the pill
+    // paints nothing for it: the ring's indeterminate arc carries the unknown,
+    // the sheet still shows the tokens, and a marker here would sit right
+    // before the cost and read as a negative amount.
     const primary =
-      info.percentage === undefined
-        ? UNKNOWN_WINDOW_LABEL
-        : formatPercent(info.percentage, i18n.language);
+      info.percentage === undefined ? null : formatPercent(info.percentage, i18n.language);
     const secondary = formatSessionCostBadge(totalCostMicrodollars);
     return {
       primary,
@@ -146,16 +135,13 @@ export function getHeaderPillContent({
   }
 
   const costText = hasMessages ? formatSessionCostBadge(totalCostMicrodollars) : null;
-  // Nothing has reported usage yet. A settled pill keeps both value slots, each
-  // marked with the dash, instead of collapsing to a bare ring: the header then
-  // reads as the same pill before and after the transcript resolves, and the
-  // slots it showed fill in place. Neither dash stands in for a value that has
-  // arrived; while the open resolves they lay out the row the values will take
-  // and the pill paints one bar across it.
+  // Nothing has reported usage yet, so the pill paints nothing beside its ring:
+  // a value that has not arrived is not a value, and painting a dash for it
+  // would read as a reading that is still pending.
   if (!hasMessages) {
     return {
-      primary: UNKNOWN_WINDOW_LABEL,
-      secondary: UNKNOWN_WINDOW_LABEL,
+      primary: null,
+      secondary: null,
       costSlot: loading ? 'loading' : 'unreported',
       tone: 'neutral',
       arcFraction: 0,
@@ -164,13 +150,12 @@ export function getHeaderPillContent({
     };
   }
   // A transcript without usage. The pill keeps the track-only ring and, when
-  // this screen already knows it, the session's cost, and never a dash standing
-  // in for a value that has not arrived; only the dash above, for usage without
-  // a context window, is a real value.
+  // this screen already knows it, the session's cost; no branch of this selector
+  // paints a dash standing in for a value.
   return {
-    primary: costText,
-    secondary: null,
-    costSlot: 'none',
+    primary: null,
+    secondary: costText,
+    costSlot: costText === null ? 'none' : 'label',
     tone: 'neutral',
     arcFraction: 0,
     interactive: false,
@@ -240,11 +225,24 @@ export function getContextSheetContent(
  */
 function getUnknownUsageBody(spoken: string | null, usageUnavailable: boolean): string {
   if (!usageUnavailable) {
-    return spoken ? i18n.t('agents.sessionRow.costSpoken', { cost: spoken }) : '';
+    // The loading placeholder speaks only the cost. Its sentence ends the way
+    // the catalog closes one, so the tap hint after it stays a separate
+    // sentence in a locale that writes no space there.
+    return spoken ? i18n.t('agentChat.contextUsage.loadingCostSpoken', { cost: spoken }) : '';
   }
-  const unavailable = i18n.t('agentChat.contextUsage.usageUnavailable');
-  const costPart = spoken ? i18n.t('agentChat.contextUsage.costSuffix', { cost: spoken }) : '';
-  return `${unavailable}${costPart}.`;
+  return i18n.t('agentChat.contextUsage.usageUnavailable', {
+    costClause: spokenCostClause(spoken),
+  });
+}
+
+/**
+ * The spoken cost as a connecting clause for the context pill's sentences.
+ * Interpolated as `{{costClause}}`, so the catalog places it — and the
+ * sentence terminator — where its grammar puts them; the code adds no
+ * punctuation of its own. An absent cost contributes nothing.
+ */
+function spokenCostClause(spoken: string | null): string {
+  return spoken === null ? '' : i18n.t('agentChat.contextUsage.costClause', { cost: spoken });
 }
 
 export function getMetricsAccessibilityLabel({
@@ -259,23 +257,25 @@ export function getMetricsAccessibilityLabel({
   usageUnavailable?: boolean;
 }): string {
   const spoken = formatSpokenCost(totalCostMicrodollars);
-  const tapPart = interactive ? ` ${i18n.t('agentChat.contextUsage.tapToViewDetails')}` : '';
+  const tapPart = interactive ? i18n.t('agentChat.contextUsage.tapToViewDetails') : '';
 
   if (!info) {
     return `${getUnknownUsageBody(spoken, usageUnavailable)}${tapPart}`.trim();
   }
 
-  const costPart = spoken ? i18n.t('agentChat.contextUsage.costSuffix', { cost: spoken }) : '';
+  const costClause = spokenCostClause(spoken);
   const body =
     info.contextWindow === undefined
-      ? `${i18n.t('agentChat.contextUsage.tokensWindowUnavailable', {
+      ? i18n.t('agentChat.contextUsage.tokensWindowUnavailable', {
           used: formatExactTokens(info.contextTokens),
-        })}${costPart}.`
-      : `${i18n.t('agentChat.contextUsage.tokensUsage', {
+          costClause,
+        })
+      : i18n.t('agentChat.contextUsage.tokensUsage', {
           used: formatExactTokens(info.contextTokens),
           window: formatExactTokens(info.contextWindow),
           percentage: formatPercent(info.percentage ?? 0, i18n.language),
-        })}${costPart}.`;
+          costClause,
+        });
   return `${body}${tapPart}`;
 }
 

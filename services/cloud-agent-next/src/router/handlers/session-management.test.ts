@@ -3,6 +3,7 @@ import type { WorkerDb } from '@kilocode/db/client';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import type { SQL } from 'drizzle-orm';
 import type { TRPCContext } from '../../types.js';
+import type { ControlPlaneSessionMetadataSummary } from '../../control-plane/session/session-do.js';
 
 const { access, getPgDb } = vi.hoisted(() => ({ access: vi.fn(), getPgDb: vi.fn() }));
 vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
@@ -39,17 +40,18 @@ function catalogRow() {
     pr_last_synced_at: timestamp as string | null,
     pr_review_decision: 'approved' as string | null,
     review_decision_pending: false,
+    pr_from_workspace: false as boolean | null,
   };
 }
 
 function database(rows = [catalogRow()]) {
   const limit = vi.fn().mockResolvedValue(rows);
   const where = vi.fn().mockReturnValue({ limit });
-  const leftJoin = vi.fn().mockReturnValue({ where });
-  const from = vi.fn().mockReturnValue({ leftJoin });
+  const leftJoinLateral = vi.fn().mockReturnValue({ where });
+  const from = vi.fn().mockReturnValue({ leftJoinLateral });
   const select = vi.fn().mockReturnValue({ from });
   const db = { select } as unknown as WorkerDb;
-  return { db, select, leftJoin, where, limit };
+  return { db, select, leftJoinLateral, where, limit };
 }
 
 function setup(createdOnPlatform: string | undefined = 'slack', id = sessionId) {
@@ -71,6 +73,21 @@ function setup(createdOnPlatform: string | undefined = 'slack', id = sessionId) 
       title: 'Native title',
       totalCostMicrodollars: 123456,
     }),
+    getSessionMetadataSummary: vi
+      .fn<() => Promise<ControlPlaneSessionMetadataSummary>>()
+      .mockResolvedValue({
+        metadata,
+        snapshot: {
+          type: 'found',
+          sessionId: id,
+          route: { state: 'ready', attemptId: 'attempt-test' },
+          latestEventId: 5,
+          updateCursor: 9,
+          title: 'Native title',
+          totalCostMicrodollars: 123456,
+        },
+        currentMessage: null,
+      }),
     getCurrentMessageWork: vi.fn().mockResolvedValue(null),
     getLatestEventId: vi.fn().mockResolvedValue(null),
   };
@@ -233,6 +250,7 @@ describe('getSession safe auxiliary metadata', () => {
     );
     expect(getPgDb).not.toHaveBeenCalled();
     expect(harness.stub.getMetadata).not.toHaveBeenCalled();
+    expect(harness.stub.getSessionMetadataSummary).not.toHaveBeenCalled();
   });
 
   it('rejects retired session IDs before any catalog or DO reads', async () => {
@@ -243,6 +261,44 @@ describe('getSession safe auxiliary metadata', () => {
     );
     expect(getPgDb).not.toHaveBeenCalled();
     expect(harness.stub.getSession).not.toHaveBeenCalled();
+  });
+});
+
+describe('getSession read concurrency', () => {
+  it('starts optional enrichment before the DO read resolves, using only one DO RPC', async () => {
+    const harness = setup();
+    const result = await harness.stub.getSessionMetadataSummary();
+    harness.stub.getSessionMetadataSummary.mockClear();
+    let resolve!: (value: typeof result) => void;
+    harness.stub.getSessionMetadataSummary.mockReturnValueOnce(
+      new Promise(done => {
+        resolve = done;
+      })
+    );
+    const pg = database();
+    getPgDb.mockReturnValue(pg.db);
+    const reading = harness.caller.getSession({ cloudAgentSessionId: sessionId });
+    await vi.waitFor(() => expect(pg.limit).toHaveBeenCalledTimes(1));
+    expect(harness.stub.getSessionMetadataSummary).toHaveBeenCalledTimes(1);
+    resolve(result);
+    await reading;
+    expect(harness.stub.getMetadata).not.toHaveBeenCalled();
+    expect(harness.stub.getSession).not.toHaveBeenCalled();
+  });
+
+  it('reports missing metadata without waiting for a hung optional read', async () => {
+    const harness = setup();
+    harness.stub.getSessionMetadataSummary.mockResolvedValueOnce({
+      metadata: null,
+      snapshot: { type: 'session-not-found' },
+      currentMessage: null,
+    });
+    const pg = database();
+    pg.limit.mockReturnValueOnce(new Promise(() => {}));
+    getPgDb.mockReturnValue(pg.db);
+    await expect(
+      harness.caller.getSession({ cloudAgentSessionId: sessionId })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });
 
@@ -258,16 +314,34 @@ describe('getSessionAuxiliaryMetadata', () => {
     expect(query.params).toEqual([userId, kiloSessionId, sessionId, ...(orgId ? [orgId] : [])]);
     expect(query.sql).toContain('"cli_sessions_v2"."organization_id"');
     expect(query.sql).toContain(orgId === null ? 'is null' : '= $4');
-    const join = new PgDialect().sqlToQuery(mock.leftJoin.mock.calls[0][1] as SQL).sql;
+    const lateral = mock.leftJoinLateral.mock.calls[0][0] as { _: { sql: SQL } };
+    const join = new PgDialect().sqlToQuery(lateral._.sql).sql;
     expect(join).toContain(
       '"github_branch_pull_requests"."pr_number" = "cli_sessions_v2"."pr_number"'
+    );
+    expect(join).toContain(
+      '"cloud_agent_worktrees"."worktree_id" = "cli_sessions_v2"."cloud_agent_worktree_id"'
     );
     expect(join).toContain('"owned_by_organization_id" = "cli_sessions_v2"."organization_id"');
     expect(join).toContain('"owned_by_user_id" = "cli_sessions_v2"."kilo_user_id"');
     expect(join).toContain('"cli_sessions_v2"."organization_id" is null');
     expect(join).toContain('"cli_sessions_v2"."pr_link_verified_at" is not null');
-    expect(join).not.toContain('git_branch');
     expect(mock.limit).toHaveBeenCalledWith(1);
+  });
+
+  it("shows the workspace's PR without a link of the session's own", async () => {
+    const row = catalogRow();
+    row.session.pr_url = null;
+    row.session.pr_link_verified_at = null;
+    row.session.platform = null;
+    row.pr_from_workspace = true;
+    const result = await getSessionAuxiliaryMetadata(database([row]).db, input);
+    expect(result?.associatedPr).toMatchObject({
+      url: row.pr_url,
+      number: 7,
+      state: 'open',
+      platform: 'github',
+    });
   });
 
   it.each(['pr_url', 'pr_link_verified_at'] as const)(

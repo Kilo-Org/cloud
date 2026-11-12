@@ -30,9 +30,12 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
   accepts only `/api/v1` and rejects the legacy `apps/web` prefixes.
 - `pnpm dev` runs with the web app's environment files. `pnpm dev:start`
   starts it with the web app and points the web app's rewrites at it.
-- The scheduled `deploy-production.yml` and `deploy-staging.yml` deploy this
-  app with the web apps, from the same CI-green commit, after migrations. A
-  release is only recorded as complete once the gateway is live too.
+- The automatic `deploy-production.yml` and `deploy-staging.yml` pipelines
+  deploy this app with the web apps, from the same CI-green commit. Production
+  promotes the gateway only after the migrations finish; staging starts the
+  deploy beside the migration gate, so a slow staging migration can finish after
+  the new gateway is reachable. A release is only recorded as complete once the
+  gateway is live too.
   `redeploy-web.yml` does not touch this app. Crons stay on the web app; do not
   add them to this app's `vercel.mjs`.
 - Server-side Sentry and OpenTelemetry come from
@@ -42,7 +45,7 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
-# This is NOT the Next.js you know
+## This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 

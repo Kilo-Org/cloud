@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import type { WorkerDb } from '@kilocode/db/client';
-import type { OperationLedgerRow } from '@kilocode/db/schema';
+import { cli_sessions_v2, type OperationLedgerRow } from '@kilocode/db/schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SELECTABLE_SANDBOX_ALLOCATIONS,
@@ -38,6 +38,7 @@ const {
   createRuntimeAuthorizationMock,
   sealRuntimeAuthorizationMock,
   verifyKiloTokenForPolicyMock,
+  logControlDiagnosticMock,
 } = vi.hoisted(() => ({
   admitOperationMock: vi.fn(),
   markReconcilePendingMock: vi.fn(),
@@ -53,6 +54,7 @@ const {
   createRuntimeAuthorizationMock: vi.fn(),
   sealRuntimeAuthorizationMock: vi.fn(),
   verifyKiloTokenForPolicyMock: vi.fn(),
+  logControlDiagnosticMock: vi.fn(),
 }));
 
 vi.mock('@kilocode/db/operation-ledger', () => ({
@@ -63,6 +65,10 @@ vi.mock('@kilocode/db/operation-ledger', () => ({
 }));
 
 vi.mock('../../db/pg.js', () => ({ getPgDb: getPgDbMock }));
+
+vi.mock('../../sandbox-control/diagnostics.js', () => ({
+  logControlDiagnostic: logControlDiagnosticMock,
+}));
 
 vi.mock('./organization-membership.js', () => ({
   assertOrganizationMembership: assertOrganizationMembershipMock,
@@ -288,7 +294,6 @@ function fixture(options?: {
   metadata?: SessionMetadata;
   ownershipResults?: unknown[][];
   internalSecret?: string;
-  runtimeIsolationEnabled?: string;
   botId?: string;
   authToken?: string;
 }) {
@@ -306,7 +311,10 @@ function fixture(options?: {
   const db = makeDb(options?.ownershipResults ?? [[source]]);
   getPgDbMock.mockReturnValue(db);
 
-  const sourceStub = { getMetadata: vi.fn().mockResolvedValue(metadata) };
+  const sourceStub = {
+    getMetadata: vi.fn().mockResolvedValue(metadata),
+    getAvailableCommands: vi.fn().mockResolvedValue({ commands: [{ name: 'profile-check' }] }),
+  };
   const destinationStub = {
     getMetadata: vi.fn().mockResolvedValue(null),
     getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('legacy'),
@@ -333,7 +341,6 @@ function fixture(options?: {
     env: {
       INTERNAL_API_SECRET: INTERNAL_SECRET,
       NEXTAUTH_SECRET: 'runtime-authorization-test-secret',
-      RUNTIME_ISOLATION_ENABLED: options?.runtimeIsolationEnabled ?? 'true',
       HYPERDRIVE: { connectionString: 'postgres://worktree-handler-test' },
       SANDBOX_SESSION: sandboxSessionNamespace,
       CLOUD_AGENT_SESSION: legacySessionNamespace,
@@ -502,6 +509,9 @@ describe('createWorktreeChat request validation and authorization', () => {
     });
     expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(1);
     expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledTimes(1);
+    expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({ initialCommands: { commands: [{ name: 'profile-check' }] } })
+    );
   });
 
   it('rejects another owner or a same-organization member without source ownership', async () => {
@@ -879,10 +889,6 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
         organizationId: ORGANIZATION_ID,
       });
       context.env.SANDBOX_SELECTION_IDS = '';
-      Object.assign(context.env, {
-        VERCEL_SANDBOX_ORG_IDS: sandboxAllocation.startsWith('vercel-') ? '' : '*',
-      });
-      context.env.CREDENTIAL_CONTAINMENT_ENABLED = 'true';
       await caller.createWorktreeChat(input);
       const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
       const registered = parseSessionMetadata({
@@ -1085,13 +1091,13 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
 });
 
 describe('createWorktreeChat ownership, metadata, and control-plane routing', () => {
-  it('rejects a new destination before recording ownership when runtime isolation is disabled', async () => {
-    const { caller, input, destinationStub } = fixture({ runtimeIsolationEnabled: 'false' });
-    verifyKiloTokenForPolicyMock.mockResolvedValue({ claims: { runtimeAdmission: {} } });
+  it('rejects a new destination before recording ownership when runtime admission is missing', async () => {
+    const { caller, input, destinationStub } = fixture();
+    verifyKiloTokenForPolicyMock.mockResolvedValue({ claims: { tokenPurpose: 'control' } });
 
     await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
-      code: 'PRECONDITION_FAILED',
-      message: 'runtime_isolation_unavailable',
+      code: 'FORBIDDEN',
+      message: 'Runtime authorization denied',
     });
     expect(recordOperationProgressMock).not.toHaveBeenCalled();
     expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
@@ -1172,6 +1178,7 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
     const {
       caller,
       input,
+      db,
       metadata,
       destinationStub,
       sandboxSessionNamespace,
@@ -1208,6 +1215,9 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
     });
 
     expect(steps).toEqual(['progress', 'ownership', 'register', 'complete']);
+    expect(db.select).toHaveBeenCalledWith(
+      expect.objectContaining({ profileId: cli_sessions_v2.profile_id })
+    );
     expect(admitOperationMock).toHaveBeenCalledWith(expect.anything(), {
       userId: USER_ID,
       orgId: undefined,
@@ -1282,6 +1292,35 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
     expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
     expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
   });
+
+  it.each([false, true])(
+    'creates the sibling when source catalog reads fail (retryable: %s)',
+    async retryable => {
+      const { caller, input, sourceStub, destinationStub } = fixture();
+      sourceStub.getAvailableCommands.mockRejectedValue(
+        Object.assign(new Error('catalog unavailable'), { retryable })
+      );
+
+      await expect(caller.createWorktreeChat(input)).resolves.toMatchObject({
+        cloudAgentSessionId: DESTINATION_WORKSPACE_ID,
+        kiloSessionId: DESTINATION_KILO_SESSION_ID,
+      });
+      expect(sourceStub.getAvailableCommands).toHaveBeenCalledTimes(retryable ? 2 : 1);
+      expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledWith(
+        expect.objectContaining({ initialCommands: undefined })
+      );
+      expect(settleOperationMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ status: 'completed' })
+      );
+      expect(markReconcilePendingMock).not.toHaveBeenCalled();
+      expect(logControlDiagnosticMock).toHaveBeenCalledWith(
+        'worktree_chat_command_catalog',
+        expect.objectContaining({ result: 'unavailable', reason: 'source_catalog_read_failed' }),
+        'warn'
+      );
+    }
+  );
 
   it.each([undefined, { kind: 'vercel', source: { kind: 'platform' } }] as const)(
     'rejects a retired Vercel sibling binding %j without creating customer compute',

@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker from './index';
 import type { Env } from './publish-usage';
 import { usage } from './usage.test-fixture';
+import { enkryptMessage, enkryptRecord } from './enkrypt-usage.test-fixture';
+import { exaMessage, exaRecord } from './exa-usage.test-fixture';
 
 const writerSecret = 'synthetic-writer-secret';
 const env = {
@@ -917,5 +919,415 @@ describe('native retry classification and launch budget', () => {
       expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
       expect(msg.retry).not.toHaveBeenCalled();
     }
+  });
+});
+
+describe('tagged Enkrypt usage messages', () => {
+  const enkryptWriterUrl = 'https://writer.test/api/internal/enkrypt-usage/record';
+  const enkryptAcknowledgement = (status = 'recorded', usageId = enkryptRecord.id) =>
+    Response.json({ status, usageId });
+  const outcomes = (logs: ReturnType<typeof setup>['processingLogs']) =>
+    logs().filter(log => log.event === 'usage_ingest_processing');
+  function expectNoRecordValues(logs: ReturnType<typeof setup>['logs']) {
+    const logged = JSON.stringify(logs.flatMap(log => log.mock.calls));
+    for (const value of [
+      enkryptRecord.kiloUserId,
+      enkryptRecord.sessionId,
+      enkryptRecord.organizationId,
+      enkryptRecord.occurredAt,
+      writerSecret,
+    ])
+      if (value) expect(logged).not.toContain(value);
+  }
+
+  it.each(['recorded', 'duplicate'])(
+    'posts the record to the Enkrypt writer as a queue write and ACKs %s',
+    async status => {
+      const { fetch, logs, processingLogs } = setup();
+      fetch.mockResolvedValue(enkryptAcknowledgement(status));
+      const msg = message(enkryptMessage);
+      await worker.queue(batch([msg]), env);
+      expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
+      expect(msg.retry).not.toHaveBeenCalled();
+      expect(fetch).toHaveBeenCalledExactlyOnceWith(enkryptWriterUrl, {
+        method: 'POST',
+        redirect: 'manual',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': writerSecret,
+          'x-usage-write-source': 'queue',
+          'x-vercel-protection-bypass': env.USAGE_WRITER_PROTECTION_BYPASS,
+        },
+        body: JSON.stringify(enkryptRecord),
+        signal: expect.any(AbortSignal),
+      });
+      expect(
+        processingLogs().find(log => log.event === 'usage_ingest_handler_entry')
+      ).toMatchObject({ usage_id: enkryptRecord.id, usage_kind: 'enkrypt_usage' });
+      expect(outcomes(processingLogs)).toEqual([
+        expect.objectContaining({
+          level: 'info',
+          outcome: status,
+          queue_action: 'ack',
+          usage_id: enkryptRecord.id,
+          usage_kind: 'enkrypt_usage',
+          writer_duration_ms: expect.any(Number),
+        }),
+      ]);
+      expect(outcomes(processingLogs)[0]).not.toHaveProperty('event_age_ms');
+      expectNoRecordValues(logs);
+    }
+  );
+
+  it('retries an admission 429 with the admission delay and reports writer overload', async () => {
+    const { fetch, logs, processingLogs } = setup();
+    fetch.mockResolvedValue(
+      Response.json({ error: 'Usage writer overloaded', reason: 'queue_limit' }, { status: 429 })
+    );
+    const msg = message(enkryptMessage);
+    await expect(worker.queue(batch([msg]), env)).rejects.toThrow(
+      'Usage writer overloaded (HTTP 429/503)'
+    );
+    expect(msg.ack).not.toHaveBeenCalled();
+    expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 1 });
+    expect(outcomes(processingLogs)).toEqual([
+      expect.objectContaining({
+        level: 'warn',
+        outcome: 'unavailable',
+        reason: 'http_error',
+        queue_action: 'retry',
+        retry_class: 'admission',
+        admission_reason: 'queue_limit',
+        writer_status: 429,
+        invocation_failure: 'writer_overloaded',
+        usage_id: enkryptRecord.id,
+        usage_kind: 'enkrypt_usage',
+      }),
+    ]);
+    expectNoRecordValues(logs);
+  });
+
+  it.each([
+    [
+      'another usage id',
+      enkryptAcknowledgement('recorded', '7b2d3f4a-5c6e-4f7a-9b8c-0d1e2f3a4b5c'),
+    ],
+    ['no usage id', Response.json({ status: 'duplicate' })],
+    ['an LLM-shaped acknowledgement', acknowledgement('recorded', enkryptRecord.id)],
+  ])('conservatively retries a response with %s', async (_label, response) => {
+    const { fetch, processingLogs } = setup();
+    fetch.mockResolvedValue(response);
+    const msg = message(enkryptMessage);
+    await worker.queue(batch([msg]), env);
+    expect(msg.ack).not.toHaveBeenCalled();
+    expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
+    expect(outcomes(processingLogs)).toEqual([
+      expect.objectContaining({
+        reason: 'invalid_response',
+        queue_action: 'retry',
+        retry_class: 'conservative',
+        usage_id: enkryptRecord.id,
+        usage_kind: 'enkrypt_usage',
+      }),
+    ]);
+  });
+
+  it.each([
+    [
+      'an unknown kind',
+      { kind: 'other_usage', v: 1, record: enkryptRecord },
+      'unknown',
+      'unsupported_kind',
+    ],
+    [
+      'an Exa kind around an Enkrypt record',
+      { kind: 'exa_usage', v: 1, record: enkryptRecord },
+      'exa_usage',
+      'invalid_event',
+    ],
+    ['an unknown version', { ...enkryptMessage, v: 2 }, 'enkrypt_usage', 'unsupported_kind'],
+    [
+      'a missing version',
+      { kind: 'enkrypt_usage', record: enkryptRecord },
+      'enkrypt_usage',
+      'unsupported_kind',
+    ],
+    [
+      'an invalid record',
+      { ...enkryptMessage, record: { ...enkryptRecord, organizationId: 'not-a-guid' } },
+      'enkrypt_usage',
+      'invalid_event',
+    ],
+    ['an extra envelope key', { ...enkryptMessage, extra: true }, 'enkrypt_usage', 'invalid_event'],
+    ['a null kind', { kind: null, record: enkryptRecord }, 'unknown', 'unsupported_kind'],
+  ])('conservatively retries %s without a writer call', async (_label, body, usageKind, reason) => {
+    const { fetch, logs, processingLogs } = setup();
+    const msg = message(body);
+    await worker.queue(batch([msg]), env);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(msg.ack).not.toHaveBeenCalled();
+    expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
+    expect(outcomes(processingLogs)).toEqual([
+      expect.objectContaining({
+        level: 'warn',
+        outcome: 'unavailable',
+        reason,
+        queue_action: 'retry',
+        retry_class: 'conservative',
+        usage_kind: usageKind,
+      }),
+    ]);
+    expect(outcomes(processingLogs)[0]).not.toHaveProperty('usage_id');
+    expect(outcomes(processingLogs)[0]).not.toHaveProperty('writer_duration_ms');
+    expect(JSON.stringify(logs.flatMap(log => log.mock.calls))).not.toContain('other_usage');
+    expectNoRecordValues(logs);
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['not the documented writer path', 'https://writer.test/api/internal/other'],
+    ['the documented path with a query', 'https://writer.test/api/internal/usage/record?x=1'],
+  ])('retries without network I/O when the writer URL is %s', async (_label, url) => {
+    const { fetch, processingLogs } = setup();
+    const msg = message(enkryptMessage);
+    await worker.queue(batch([msg]), { ...env, USAGE_WRITER_URL: url });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
+    expect(outcomes(processingLogs)).toEqual([
+      expect.objectContaining({ reason: 'missing_config', usage_kind: 'enkrypt_usage' }),
+    ]);
+    expect(outcomes(processingLogs)[0]).not.toHaveProperty('writer_duration_ms');
+  });
+
+  it('routes a mixed batch by kind and leaves the LLM write and logs untouched', async () => {
+    const { fetch, processingLogs } = setup();
+    fetch.mockImplementation(async url =>
+      url === enkryptWriterUrl ? enkryptAcknowledgement() : acknowledgement()
+    );
+    const llm = message(usage);
+    const enkrypt = { ...message(enkryptMessage), id: 'queue-2' };
+    await worker.queue(batch([llm, enkrypt]), env);
+    expect(llm.ack).toHaveBeenCalledOnce();
+    expect(enkrypt.ack).toHaveBeenCalledOnce();
+    expect(fetch.mock.calls.map(([url, init]) => [url, JSON.parse(init?.body as string)])).toEqual([
+      [env.USAGE_WRITER_URL, usage],
+      [enkryptWriterUrl, enkryptRecord],
+    ]);
+    const [llmOutcome, enkryptOutcome] = outcomes(processingLogs);
+    expect(Object.keys(llmOutcome)).toEqual([
+      'level',
+      'event',
+      'queue',
+      'batch_id',
+      'batch_size',
+      'handler_entry_at_ms',
+      'outcome',
+      'queue_action',
+      'queue_message_id',
+      'delivery_attempts',
+      'queue_wait_ms',
+      'usage_id',
+      'event_age_ms',
+      'writer_duration_ms',
+    ]);
+    expect(enkryptOutcome).toMatchObject({
+      usage_id: enkryptRecord.id,
+      usage_kind: 'enkrypt_usage',
+    });
+    const llmEntry = processingLogs().find(
+      log => log.event === 'usage_ingest_handler_entry' && log.usage_id === usage.core.id
+    );
+    expect(llmEntry).toHaveProperty('event_created_at_ms');
+    expect(llmEntry).not.toHaveProperty('usage_kind');
+  });
+});
+
+describe('tagged Exa usage messages', () => {
+  const exaWriterUrl = 'https://writer.test/api/internal/exa-usage/record';
+  const enkryptWriterUrl = 'https://writer.test/api/internal/enkrypt-usage/record';
+  const exaAcknowledgement = (status = 'recorded', usageId = exaRecord.id) =>
+    Response.json({ status, usageId });
+  const outcomes = (logs: ReturnType<typeof setup>['processingLogs']) =>
+    logs().filter(log => log.event === 'usage_ingest_processing');
+  function expectNoRecordValues(logs: ReturnType<typeof setup>['logs']) {
+    const logged = JSON.stringify(logs.flatMap(log => log.mock.calls));
+    for (const value of [
+      exaRecord.userId,
+      exaRecord.organizationId,
+      exaRecord.occurredAt,
+      exaRecord.featureId,
+      exaRecord.type,
+      writerSecret,
+    ])
+      if (value) expect(logged).not.toContain(value);
+  }
+
+  it.each(['recorded', 'duplicate'])(
+    'posts the record to the Exa writer as a queue write and ACKs %s',
+    async status => {
+      const { fetch, logs, processingLogs } = setup();
+      fetch.mockResolvedValue(exaAcknowledgement(status));
+      const msg = message(exaMessage);
+      await worker.queue(batch([msg]), env);
+      expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
+      expect(msg.retry).not.toHaveBeenCalled();
+      expect(fetch).toHaveBeenCalledExactlyOnceWith(exaWriterUrl, {
+        method: 'POST',
+        redirect: 'manual',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': writerSecret,
+          'x-usage-write-source': 'queue',
+          'x-vercel-protection-bypass': env.USAGE_WRITER_PROTECTION_BYPASS,
+        },
+        body: JSON.stringify(exaRecord),
+        signal: expect.any(AbortSignal),
+      });
+      expect(
+        processingLogs().find(log => log.event === 'usage_ingest_handler_entry')
+      ).toMatchObject({ usage_id: exaRecord.id, usage_kind: 'exa_usage' });
+      expect(outcomes(processingLogs)).toEqual([
+        expect.objectContaining({
+          level: 'info',
+          outcome: status,
+          queue_action: 'ack',
+          usage_id: exaRecord.id,
+          usage_kind: 'exa_usage',
+          writer_duration_ms: expect.any(Number),
+        }),
+      ]);
+      expect(outcomes(processingLogs)[0]).not.toHaveProperty('event_age_ms');
+      expectNoRecordValues(logs);
+    }
+  );
+
+  it('retries an admission 429 with the admission delay and reports writer overload', async () => {
+    const { fetch, logs, processingLogs } = setup();
+    fetch.mockResolvedValue(
+      Response.json({ error: 'Usage writer overloaded', reason: 'queue_limit' }, { status: 429 })
+    );
+    const msg = message(exaMessage);
+    await expect(worker.queue(batch([msg]), env)).rejects.toThrow(
+      'Usage writer overloaded (HTTP 429/503)'
+    );
+    expect(msg.ack).not.toHaveBeenCalled();
+    expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 1 });
+    expect(outcomes(processingLogs)).toEqual([
+      expect.objectContaining({
+        level: 'warn',
+        outcome: 'unavailable',
+        reason: 'http_error',
+        queue_action: 'retry',
+        retry_class: 'admission',
+        admission_reason: 'queue_limit',
+        writer_status: 429,
+        invocation_failure: 'writer_overloaded',
+        usage_id: exaRecord.id,
+        usage_kind: 'exa_usage',
+      }),
+    ]);
+    expectNoRecordValues(logs);
+  });
+
+  it.each([
+    ['another usage id', exaAcknowledgement('recorded', '7b2d3f4a-5c6e-4f7a-9b8c-0d1e2f3a4b5c')],
+    ['no usage id', Response.json({ status: 'duplicate' })],
+    ['an LLM-shaped acknowledgement', acknowledgement('recorded', exaRecord.id)],
+  ])('conservatively retries a response with %s', async (_label, response) => {
+    const { fetch, processingLogs } = setup();
+    fetch.mockResolvedValue(response);
+    const msg = message(exaMessage);
+    await worker.queue(batch([msg]), env);
+    expect(msg.ack).not.toHaveBeenCalled();
+    expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
+    expect(outcomes(processingLogs)).toEqual([
+      expect.objectContaining({
+        reason: 'invalid_response',
+        queue_action: 'retry',
+        retry_class: 'conservative',
+        usage_id: exaRecord.id,
+        usage_kind: 'exa_usage',
+      }),
+    ]);
+  });
+
+  it.each([
+    ['an unknown version', { ...exaMessage, v: 2 }, 'unsupported_kind'],
+    ['a missing version', { kind: 'exa_usage', record: exaRecord }, 'unsupported_kind'],
+    [
+      'a non-RFC UUID organization',
+      {
+        ...exaMessage,
+        record: { ...exaRecord, organizationId: '4f4f4f4f-4f4f-4f4f-4f4f-4f4f4f4f4f4f' },
+      },
+      'invalid_event',
+    ],
+    ['an extra envelope key', { ...exaMessage, extra: true }, 'invalid_event'],
+    ['an Enkrypt record', { ...exaMessage, record: enkryptRecord }, 'invalid_event'],
+  ])('conservatively retries %s without a writer call', async (_label, body, reason) => {
+    const { fetch, logs, processingLogs } = setup();
+    const msg = message(body);
+    await worker.queue(batch([msg]), env);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(msg.ack).not.toHaveBeenCalled();
+    expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
+    expect(outcomes(processingLogs)).toEqual([
+      expect.objectContaining({
+        level: 'warn',
+        outcome: 'unavailable',
+        reason,
+        queue_action: 'retry',
+        retry_class: 'conservative',
+        usage_kind: 'exa_usage',
+      }),
+    ]);
+    expect(outcomes(processingLogs)[0]).not.toHaveProperty('usage_id');
+    expect(outcomes(processingLogs)[0]).not.toHaveProperty('writer_duration_ms');
+    expectNoRecordValues(logs);
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['not the documented writer path', 'https://writer.test/api/internal/other'],
+    ['the documented path with a query', 'https://writer.test/api/internal/usage/record?x=1'],
+  ])('retries without network I/O when the writer URL is %s', async (_label, url) => {
+    const { fetch, processingLogs } = setup();
+    const msg = message(exaMessage);
+    await worker.queue(batch([msg]), { ...env, USAGE_WRITER_URL: url });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(msg.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
+    expect(outcomes(processingLogs)).toEqual([
+      expect.objectContaining({ reason: 'missing_config', usage_kind: 'exa_usage' }),
+    ]);
+    expect(outcomes(processingLogs)[0]).not.toHaveProperty('writer_duration_ms');
+  });
+
+  it('routes a mixed LLM, Enkrypt and Exa batch by kind', async () => {
+    const { fetch, processingLogs } = setup();
+    fetch.mockImplementation(async url => {
+      if (url === exaWriterUrl) return exaAcknowledgement();
+      if (url === enkryptWriterUrl)
+        return Response.json({ status: 'recorded', usageId: enkryptRecord.id });
+      return acknowledgement();
+    });
+    const llm = message(usage);
+    const enkrypt = { ...message(enkryptMessage), id: 'queue-2' };
+    const exa = { ...message(exaMessage), id: 'queue-3' };
+    await worker.queue(batch([llm, enkrypt, exa]), env);
+    expect(llm.ack).toHaveBeenCalledOnce();
+    expect(enkrypt.ack).toHaveBeenCalledOnce();
+    expect(exa.ack).toHaveBeenCalledOnce();
+    expect(fetch.mock.calls.map(([url, init]) => [url, JSON.parse(init?.body as string)])).toEqual([
+      [env.USAGE_WRITER_URL, usage],
+      [enkryptWriterUrl, enkryptRecord],
+      [exaWriterUrl, exaRecord],
+    ]);
+    const [llmOutcome, enkryptOutcome, exaOutcome] = outcomes(processingLogs);
+    expect(llmOutcome).not.toHaveProperty('usage_kind');
+    expect(enkryptOutcome).toMatchObject({
+      usage_id: enkryptRecord.id,
+      usage_kind: 'enkrypt_usage',
+    });
+    expect(exaOutcome).toMatchObject({ usage_id: exaRecord.id, usage_kind: 'exa_usage' });
   });
 });

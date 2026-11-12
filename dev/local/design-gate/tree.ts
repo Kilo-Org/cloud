@@ -18,6 +18,8 @@ const ProbeNodeSchema = z.object({
   rect: RectSchema,
   layoutRect: RectSchema.optional(),
   owners: z.array(z.string()).optional(),
+  /** The route file of the screen that renders the node, from the probe. */
+  screen: z.string().optional(),
   text: z.string().optional(),
   testID: z.string().optional(),
   label: z.string().optional(),
@@ -34,6 +36,8 @@ const ProbeEnvSchema = z.object({
   platform: z.string(),
   osVersion: z.string(),
   route: z.string(),
+  /** The focused route with its groups; a URL drops them, so tabs share `/`. */
+  screen: z.string().optional(),
   window: z.object({ width: z.number(), height: z.number() }),
   pixelRatio: z.number().positive(),
   fontScale: z.number(),

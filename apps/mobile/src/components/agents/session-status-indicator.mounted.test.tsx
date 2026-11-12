@@ -70,7 +70,7 @@ describe('SessionStatusIndicator mounted', () => {
         message: 'Assistant request failed: insufficient credits',
         timestamp: 0,
       })
-    ).resolves.toEqual(['Not enough credits to run Cloud Agent. Add credits and try again.']);
+    ).resolves.toEqual(['Not enough credits for this request. Add credits and try again.']);
   });
 
   // The DO's safe projection is already the reader's copy and has no translated
@@ -91,7 +91,7 @@ describe('SessionStatusIndicator mounted', () => {
         message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
         timestamp: 0,
       })
-    ).resolves.toEqual(['Not enough credits to run Cloud Agent. Add credits and try again.']);
+    ).resolves.toEqual(['Not enough credits for this request. Add credits and try again.']);
   });
 
   // The SDK codes the fixed lines it writes itself, so the status line renders
@@ -127,7 +127,7 @@ describe('SessionStatusIndicator mounted', () => {
   it('renders the delivery copy for the SDK delivery status', async () => {
     await expect(
       textNodes({ type: 'error', message: 'Message delivery failed', timestamp: 0 })
-    ).resolves.toEqual(['Failed to deliver']);
+    ).resolves.toEqual(['Message not sent']);
   });
 
   it('renders fixed retry copy, never the provider text, while the agent retries', async () => {

@@ -1,5 +1,12 @@
 /* eslint-disable max-lines -- test-renderer mounts native presentation with mocked bridges. */
-import { createElement, type ElementType, type ReactNode, useEffect, useState } from 'react';
+import {
+  createElement,
+  type ElementType,
+  type ReactNode,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -52,6 +59,34 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 }));
 
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
+// The picker closes itself when the owning screen loses focus (a deep link or a
+// tab switch under an open sheet), so the suite drives the blur through this
+// store; every suite mounts focused and stays focused otherwise.
+const pickerFocus = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  const subscribe = (notify: () => void) => {
+    listeners.add(notify);
+    return () => {
+      listeners.delete(notify);
+    };
+  };
+  return {
+    focused: true,
+    setFocused(next: boolean) {
+      pickerFocus.focused = next;
+      for (const notify of listeners) {
+        notify();
+      }
+    },
+    subscribe,
+  };
+});
+vi.mock('expo-router', () => ({
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    const focused = useSyncExternalStore(pickerFocus.subscribe, () => pickerFocus.focused);
+    useEffect(() => (focused ? effect() : undefined), [effect, focused]);
+  },
+}));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: storage.read,
@@ -106,11 +141,13 @@ function Surface({
   value,
   onSelectionChange,
   variant,
+  failurePlacement,
 }: {
   scope?: ContextDisplayScope;
   value?: string | null;
   onSelectionChange?: (organizationId: string | null) => void;
   variant?: 'inline' | 'field';
+  failurePlacement?: 'rows' | 'row' | 'none';
 }) {
   const { organizationId: id } = useOrganization();
   const [, setVersion] = useState(0);
@@ -122,7 +159,7 @@ function Surface({
   return createElement(
     'GlobalScope',
     { id },
-    createElement(ContextControl, { scope, value, onSelectionChange, variant })
+    createElement(ContextControl, { scope, value, onSelectionChange, variant, failurePlacement })
   );
 }
 
@@ -132,6 +169,7 @@ async function mount(
     value?: string | null;
     onSelectionChange?: (organizationId: string | null) => void;
     variant?: 'inline' | 'field';
+    failurePlacement?: 'rows' | 'row' | 'none';
   } = {}
 ) {
   const result = await renderWithProviders(createElement(Surface, props), {
@@ -242,6 +280,7 @@ beforeEach(() => {
   rerender = undefined;
   platform.OS = 'android';
   appearance.colors = { ...DARK_COLORS };
+  pickerFocus.setFocused(true);
   list.mockReset().mockResolvedValue(orgs);
   storage.read.mockReset().mockResolvedValue(null);
   storage.write.mockReset().mockImplementation(async (key: string, value: string) => {
@@ -514,6 +553,85 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(texts(ui)).toContain(name);
   });
 
+  it('leaves the account-list failure to the surface that draws it, never adding a row', async () => {
+    storage.read.mockResolvedValue('org-a');
+    list.mockRejectedValue(new Error('offline'));
+    const ui = await mount({ failurePlacement: 'none' });
+    // Home draws this failure and its Retry in its live-session card, and both
+    // Retry actions would refetch the same query. Two rows stacked under a
+    // fixed header's single row made that header taller by exactly their height,
+    // so the body moved down while the list failed and back up on recovery.
+    await waitFor(() => ui.renderer.root.findAll(node => node.type === Text).length === 1);
+    expect(texts(ui)).not.toContain("Couldn't load your organizations");
+    expect(texts(ui)).not.toContain('Retry');
+    // The control gives up the failure block only: it still names an account and
+    // stays the same single-row button.
+    expect(picker(ui).props.accessibilityRole).toBe('button');
+    expect(picker(ui).props.accessibilityLabel).toEqual(expect.any(String));
+  });
+
+  it('keeps the account-list failure inside its one row, and a press retries', async () => {
+    storage.read.mockResolvedValue('org-a');
+    list.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(orgs);
+    const ui = await mount({ failurePlacement: 'row' });
+    // The personal scope has no other recovery for this query, so the row itself
+    // becomes it: the label is the message and the press refetches the list.
+    await waitFor(
+      () =>
+        ui.renderer.root.findAll(
+          node =>
+            node.type === Pressable &&
+            node.props.accessibilityLabel === "Couldn't load your organizations"
+        ).length === 1
+    );
+    const failureRow = ui.renderer.root.findAll(
+      node =>
+        node.type === Pressable &&
+        node.props.accessibilityLabel === "Couldn't load your organizations"
+    );
+    // Still one row: the message is the label, and there is no message line, no
+    // second Retry row, and no account picker chevron beside it.
+    expect(texts(ui)).toEqual(["Couldn't load your organizations"]);
+    expect(ui.renderer.root.findAll(node => node.type === Check)).toHaveLength(0);
+    expect(failureRow[0]?.props.accessibilityRole).toBe('button');
+    await press(failureRow[0] as ReactTestInstance);
+    // The retry reaches the list, and the control returns to naming the account
+    // with the picker it has on every healthy frame.
+    await waitFor(() => texts(ui).includes(name));
+    expect(texts(ui)).not.toContain("Couldn't load your organizations");
+    expect(picker(ui).props.accessibilityHint).toBe('Select account');
+  });
+
+  it('keeps the picker on a failed refetch that still has cached memberships', async () => {
+    storage.read.mockResolvedValue('org-a');
+    const ui = await mount({ failurePlacement: 'row' });
+    await waitFor(() => texts(ui).includes(name));
+    // A background refetch fails while the memberships the picker needs are
+    // still cached: the list is usable, so the row stays the picker and opens
+    // the sheet, and the one-row placement only stops adding failure rows below.
+    list.mockRejectedValue(new Error('offline'));
+    await act(async () => {
+      await ui.queryClient.invalidateQueries();
+    });
+    await waitFor(() => texts(ui).includes(name));
+    expect(texts(ui)).not.toContain('Retry');
+    expect(picker(ui).props.accessibilityHint).toBe('Select account');
+    await openSheet(ui);
+    expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
+  });
+
+  it('keeps the stored choice failure in the control even when the list failure moves out', async () => {
+    // Nothing else on the screen reaches the provider's own read/write failure,
+    // so that message and its Retry stay wherever the control is mounted.
+    storage.read.mockRejectedValueOnce(new Error('read failed')).mockResolvedValue('org-a');
+    const ui = await mount({ failurePlacement: 'none' });
+    expect(texts(ui)).toContain('Something went wrong');
+    await press(retry(ui));
+    await waitFor(() => texts(ui).includes(name));
+    expect(texts(ui)).not.toContain('Something went wrong');
+    expect(texts(ui)).not.toContain('Retry');
+  });
+
   it('offers restoration Retry without publishing Personal', async () => {
     storage.read.mockRejectedValueOnce(new Error('read failed')).mockResolvedValue('org-a');
     const ui = await mount();
@@ -612,6 +730,45 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(texts(ui)).toContain('Personal');
     expect(picker(ui).props.disabled).toBe(true);
     expect(list).not.toHaveBeenCalled();
+  });
+
+  it('closes the open sheet when the screen loses focus, and keeps it on refocus', async () => {
+    storage.read.mockResolvedValue('org-a');
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    await openSheet(ui);
+    expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
+
+    // A deep link or a tab switch blurs the owning screen: the sheet must go
+    // with it instead of covering the screen the person was sent to.
+    await act(() => {
+      pickerFocus.setFocused(false);
+    });
+    expect(rows(ui)).toHaveLength(0);
+    expect(texts(ui)).not.toContain('Cancel');
+
+    // Refocusing the screen (the person came back) must not re-present a sheet
+    // nobody asked for.
+    await act(() => {
+      pickerFocus.setFocused(true);
+    });
+    expect(rows(ui)).toHaveLength(0);
+  });
+
+  it('closes the sheet on blur without changing the account', async () => {
+    storage.read.mockResolvedValue('org-a');
+    const onSelectionChange = vi.fn<(organizationId: string | null) => void>();
+    const ui = await mount({ value: 'org-a', onSelectionChange });
+    await waitFor(() => !picker(ui).props.disabled);
+    await openSheet(ui);
+    // Personal plus the listed membership: the sheet really presented.
+    expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
+    await act(() => {
+      pickerFocus.setFocused(false);
+    });
+    expect(rows(ui)).toHaveLength(0);
+    expect(onSelectionChange).not.toHaveBeenCalled();
+    expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-a');
   });
 
   it('renders the field variant as the stacked form triggers do', async () => {

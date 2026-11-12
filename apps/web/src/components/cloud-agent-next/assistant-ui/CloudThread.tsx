@@ -5,7 +5,12 @@ import { useMemo, type ComponentProps, type ComponentType, type ReactNode } from
 import { useAtomValue } from 'jotai';
 import type { SessionManager } from '@kilocode/cloud-agent-sdk';
 import type { ReadOnlyQuestionState } from '../QuestionToolStatus';
-import { MessageNotSentError, ThreadPrimitive, type ThreadMessage } from '@assistant-ui/react';
+import {
+  MessageNotSentError,
+  ThreadPrimitive,
+  useAuiState,
+  type ThreadMessage,
+} from '@assistant-ui/react';
 import type { OpenChildSession } from '../ChildSessionSection';
 import type { StoredMessage } from '../types';
 import { isMessageStreaming } from '../types';
@@ -20,6 +25,7 @@ import { CloudChatRuntimeProvider } from './CloudChatRuntimeProvider';
 
 type CloudThreadProps = {
   active?: boolean;
+  collapseTools?: boolean;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
   onOpenPreparationDetails?: (attemptId: string) => void;
@@ -35,6 +41,7 @@ function ChildMessage() {
 }
 /** Uses the host's viewport. Cloud owns follow, anchors and history position. */
 function CloudThreadBody({
+  collapseTools = false,
   getChildMessages,
   onOpenChildSession,
   onOpenPreparationDetails,
@@ -45,6 +52,7 @@ function CloudThreadBody({
   messageComponent,
   questionState,
 }: CloudThreadProps) {
+  const isRunning = useAuiState(state => state.thread.isRunning);
   const renderMessage = useMemo(() => {
     const Component = messageComponent ?? (child ? ChildMessage : CloudMessage);
     return ({ message }: { message: ThreadMessage }) => {
@@ -62,6 +70,7 @@ function CloudThreadBody({
   }, [messageComponent, child]);
   const actions = useMemo(
     () => ({
+      collapseTools,
       getChildMessages,
       onOpenChildSession,
       onOpenPreparationDetails,
@@ -77,7 +86,7 @@ function CloudThreadBody({
           messages={messages}
           depth={childDepth}
           child
-          isStreaming={messages.some(isMessageStreaming)}
+          isStreaming={isRunning && messages.some(isMessageStreaming)}
           getChildMessages={currentGetter}
           presentationMode={presentationMode}
           questionState={questionState}
@@ -86,12 +95,14 @@ function CloudThreadBody({
       ),
     }),
     [
+      collapseTools,
       getChildMessages,
       onOpenChildSession,
       onOpenPreparationDetails,
       depth,
       presentationMode,
       questionState,
+      isRunning,
     ]
   );
   return (
@@ -113,7 +124,10 @@ export const CloudThread = React.memo(
       <CloudThreadBody {...props} />
     );
   },
-  (previous, next) => previous.active === false && next.active === false
+  (previous, next) =>
+    previous.active === false &&
+    next.active === false &&
+    previous.collapseTools === next.collapseTools
 );
 function CloudThreadWithLiveFacts({
   manager,

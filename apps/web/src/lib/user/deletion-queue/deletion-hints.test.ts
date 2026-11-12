@@ -54,6 +54,9 @@ describe('deletionAttentionHint', () => {
     expect(deletionAttentionHint('completion_email_ambiguous')?.action).toMatch(
       /without resending/
     );
+    expect(deletionAttentionHint('session_worktree_deleting')?.title).toBe(
+      'A worktree deletion keeps refusing session deletes'
+    );
   });
 
   it('distinguishes 403 permission from expiration and explains TOTP reauth', () => {

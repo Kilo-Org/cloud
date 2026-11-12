@@ -34,8 +34,57 @@ export function formatUsd(
     .join('');
 }
 
+/**
+ * Two fraction digits in the locale's money pattern. A balance or a spend the
+ * reader compares across screens wants `formatPrefixedMoney` instead: this one
+ * moves the currency behind the amount in a right-to-left language.
+ */
 export function formatMoney(amount: number, locale: string): string {
   return formatUsd(amount, locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
+ * A USD amount with the symbol in front of the number whatever the locale's
+ * money pattern says. A right-to-left language puts the currency behind the
+ * amount behind a no-break space ("0.00 $"), which reads as a different figure
+ * beside the "$0.00" the same screen paints elsewhere; here the digits and
+ * their separators are the locale's, and the sign the locale writes leads the
+ * symbol (`-$5.00`, or the locale's own minus glyph).
+ */
+export function formatPrefixedUsd(
+  amount: number,
+  locale: string,
+  options: Intl.NumberFormatOptions = {}
+): string {
+  const parts = numberFormat(locale, { ...options, style: 'decimal' }).formatToParts(amount);
+  const sign = parts
+    .filter(candidate => candidate.type === 'minusSign')
+    .map(candidate => candidate.value)
+    .join('');
+  const digits = parts
+    .filter(candidate => candidate.type !== 'minusSign')
+    .map(candidate => candidate.value)
+    .join('');
+  return `${sign}$${digits}`;
+}
+
+/**
+ * A balance or a spend in the shape a reader compares between screens: two
+ * fraction digits, the symbol leading the number whatever the locale's money
+ * pattern says. The locale formatter still writes the digits, their separators
+ * and the minus glyph (`formatPrefixedUsd`); this is the money-shaped twin of
+ * `formatMoney`, so one account never reads `$0,00` on one screen and
+ * `0,00 $` on the next.
+ *
+ * A display still pins the run's own direction: the symbol and a leading sign
+ * are neutral characters, which a right-to-left paragraph may move behind the
+ * number.
+ */
+export function formatPrefixedMoney(amount: number, locale: string): string {
+  return formatPrefixedUsd(amount, locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -164,7 +213,9 @@ export function formatFileSize(bytes: number, locale: string): string {
   return formatNumber(value, locale, {
     style: 'unit',
     unit: units[unit],
-    unitDisplay: 'short',
+    // CLDR has no plural for the abbreviated byte unit ("564 byte"), so a whole
+    // byte count takes the long form: "1 byte", "564 bytes", "564 octets".
+    unitDisplay: unit === 0 ? 'long' : 'short',
     maximumFractionDigits: unit === 0 ? 0 : 2,
   });
 }

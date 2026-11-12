@@ -2,6 +2,7 @@ import { type PreparationAttempt, type PreparationStepSnapshot } from '@kilocode
 import { describe, expect, it } from 'vitest';
 
 import {
+  failedStageStep,
   findRestoreIncompleteStep,
   incompleteRestoreText,
   preparationGroupExpandedByDefault,
@@ -85,6 +86,65 @@ describe('incompleteRestoreText', () => {
   });
 });
 
+describe('failedStageStep', () => {
+  it('names the phase that failed on a failed attempt', () => {
+    const failed = step({ id: 'boot', key: 'sandbox_boot', status: 'failed' });
+    const candidate = attempt({ status: 'failed', steps: [step({ id: 'setup' }), failed] });
+    expect(failedStageStep(candidate)).toBe(failed);
+  });
+
+  it('prefers the failed setup command over the phase it ran under', () => {
+    const phase = step({ id: 'commands', key: 'setup_commands', status: 'failed' });
+    const command = step({
+      id: 'command',
+      key: 'setup_commands',
+      kind: 'setup_command',
+      status: 'failed',
+    });
+    expect(failedStageStep(attempt({ status: 'failed', steps: [phase, command] }))).toBe(command);
+  });
+
+  it('skips the setup-command phase when no command under it failed', () => {
+    const candidate = attempt({
+      status: 'failed',
+      steps: [step({ id: 'commands', key: 'setup_commands', status: 'failed' })],
+    });
+    expect(failedStageStep(candidate)).toBeUndefined();
+  });
+
+  it('does not blame a non-fatal start command when a later stage failed', () => {
+    const startPhase = step({ id: 'start', key: 'start_commands', status: 'completed' });
+    const startCommand = step({
+      id: 'start-command',
+      key: 'start_commands',
+      kind: 'setup_command',
+      parentStepId: 'start',
+      status: 'failed',
+      safeError: 'Start command 1 failed',
+    });
+    const serverFailure = step({ id: 'server', key: 'kilo_server', status: 'failed' });
+    const candidate = attempt({
+      status: 'failed',
+      steps: [startPhase, startCommand, serverFailure],
+    });
+    expect(failedStageStep(candidate)).toBe(serverFailure);
+  });
+
+  it('does not count the incomplete-restore report as a failed stage', () => {
+    const candidate = attempt({
+      status: 'failed',
+      safeError: 'preparation_timeout',
+      steps: [INCOMPLETE_STEP],
+    });
+    expect(failedStageStep(candidate)).toBeUndefined();
+  });
+
+  it('returns undefined unless the attempt itself failed', () => {
+    const candidate = attempt({ steps: [step({ status: 'failed' })] });
+    expect(failedStageStep(candidate)).toBeUndefined();
+  });
+});
+
 describe('preparationGroupExpandedByDefault', () => {
   it('opens every unfinished attempt', () => {
     expect(preparationGroupExpandedByDefault(attempt({ status: 'running' }))).toBe(true);
@@ -97,5 +157,35 @@ describe('preparationGroupExpandedByDefault', () => {
   it('opens a completed attempt that carries the incomplete step', () => {
     const candidate = attempt({ status: 'completed', steps: [INCOMPLETE_STEP] });
     expect(preparationGroupExpandedByDefault(candidate)).toBe(true);
+  });
+
+  it('opens a completed attempt with a non-fatal failed start command', () => {
+    const phase = step({ id: 'start', key: 'start_commands', status: 'completed' });
+    const command = step({
+      id: 'start-command',
+      key: 'start_commands',
+      kind: 'setup_command',
+      status: 'failed',
+      parentStepId: 'start',
+      commandIndex: 0,
+      safeError: 'Start command 1 failed',
+    });
+    expect(
+      preparationGroupExpandedByDefault(attempt({ status: 'completed', steps: [phase, command] }))
+    ).toBe(true);
+  });
+
+  it('keeps a completed attempt collapsed when only build commands failed', () => {
+    const phase = step({ id: 'build', key: 'setup_commands', status: 'completed' });
+    const command = step({
+      id: 'build-command',
+      key: 'setup_commands',
+      kind: 'setup_command',
+      status: 'failed',
+      parentStepId: 'build',
+    });
+    expect(
+      preparationGroupExpandedByDefault(attempt({ status: 'completed', steps: [phase, command] }))
+    ).toBe(false);
   });
 });

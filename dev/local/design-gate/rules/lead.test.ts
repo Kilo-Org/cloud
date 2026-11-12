@@ -177,6 +177,17 @@ test('leading-gap: a centred body whose block holds its text low is placement, n
   );
 });
 
+test('leading-gap: a block near the bottom of a filled body is still an error', () => {
+  // A margin can push the first block down without centring it: more air above
+  // the block than below it is a hole under the title, not placement.
+  const [finding] = platformScreen({
+    block: [14, 600, 372, 120],
+    text: [14, 600, 100, 20],
+  });
+  assert.equal(finding?.measured, 425.52);
+  assert.match(finding?.message ?? '', /top margin/);
+});
+
 test('leading-gap: a taller box inside the first block is an error on a platform dump', () => {
   const [finding] = platformScreen({
     block: [0, 174.48, 400, 350],

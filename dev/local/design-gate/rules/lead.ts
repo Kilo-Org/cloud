@@ -60,8 +60,9 @@ function oneSidedBox(ink: LayoutNode, block: LayoutNode): LayoutNode | undefined
  * The check runs only on a platform dump, where the styles are missing. A body
  * that fills its scroller and keeps more than the allowance of air above the
  * block and at least as much below it centres that block; it does not displace
- * it. A content that runs past the viewport is still a list whose first block
- * sits where the screen put it, so it keeps the finding.
+ * it. A block near the bottom keeps the finding, and so does a content that
+ * runs past the viewport: that is still a list whose first block sits where the
+ * screen put it.
  */
 function centeredBody(
   scroll: LayoutNode,
@@ -75,7 +76,9 @@ function centeredBody(
   const rect = layoutRect(block);
   if (bottom(rect) > bottom(box) + TOLERANCE_DP) return false;
   if (bottom(box) > bottom(layoutRect(scroll)) + TOLERANCE_DP) return false;
-  return rect[1] - box[1] > LEADING_GAP_MAX_DP && bottom(box) - bottom(rect) > LEADING_GAP_MAX_DP;
+  const above = rect[1] - box[1];
+  const below = bottom(box) - bottom(rect);
+  return above > LEADING_GAP_MAX_DP && below > LEADING_GAP_MAX_DP && below >= above - TOLERANCE_DP;
 }
 
 /**

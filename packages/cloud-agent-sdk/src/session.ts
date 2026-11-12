@@ -332,6 +332,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
             messageId: event.messageId,
             sessionId: config.kiloSessionId,
             content: event.content,
+            createdAt: event.createdAt,
           });
         }
       }
@@ -365,6 +366,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           messageId: event.messageId,
           sessionId: config.kiloSessionId,
           content: event.content,
+          createdAt: event.createdAt,
         });
       }
       replayedQueuedMessages.clear();

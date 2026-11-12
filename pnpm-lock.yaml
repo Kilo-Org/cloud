@@ -743,6 +743,9 @@ importers:
       expo-widgets:
         specifier: ~58.0.17
         version: 58.0.17(patch_hash=460b9294721505a0314d95a86cbf0063074e50259180af2d686cad950ef6ab42)(@babel/core@7.29.7)(expo@58.0.10)(react-dom@19.2.6(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=526f7b32450b11fc183bc7384b39076dd9e0d15055b61e372e7a0b73cd930921)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=526f7b32450b11fc183bc7384b39076dd9e0d15055b61e372e7a0b73cd930921)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
       i18next:
         specifier: ^26.4.5
         version: 26.4.7(typescript@7.0.2)
@@ -1393,6 +1396,9 @@ importers:
       sanitize-html:
         specifier: 2.18.1
         version: 2.18.1
+      semver:
+        specifier: 7.7.4
+        version: 7.7.4
       server-only:
         specifier: 0.0.1
         version: 0.0.1
@@ -1469,6 +1475,9 @@ importers:
       '@types/sanitize-html':
         specifier: 2.16.2
         version: 2.16.2
+      '@types/semver':
+        specifier: 7.7.1
+        version: 7.7.1
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260707.2

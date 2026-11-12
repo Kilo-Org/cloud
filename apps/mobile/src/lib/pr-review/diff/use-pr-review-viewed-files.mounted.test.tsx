@@ -47,6 +47,8 @@ vi.mock('expo-secure-store', () => ({
 }));
 
 vi.mock('@/lib/storage-keys', () => ({
+  ACTIVE_USER_ID_KEY: 'active-user-id',
+  ORGANIZATION_STORAGE_KEY: 'organization',
   PR_REVIEW_VIEWED_KEY: 'pr-review-viewed',
 }));
 

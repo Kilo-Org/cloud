@@ -12,6 +12,7 @@ import { getCodeReviewCancellationCopy } from '@/lib/code-reviews/cancellation-c
 import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
 import {
   formatSessionCost,
+  formatSessionTotalCost,
   isRenderableSessionCost,
 } from '@/components/cloud-agent-next/session-cost-breakdown';
 import { ExternalLink, GitPullRequest, Loader2, ArrowLeft, RotateCcw, Ban } from 'lucide-react';
@@ -287,8 +288,14 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
             )}
             {sessionCostMusd != null && isRenderableSessionCost(sessionCostMusd / 1_000_000) && (
               <div>
-                <dt className="text-muted-foreground">Cost</dt>
+                <dt className="text-muted-foreground">Model cost</dt>
                 <dd>{formatSessionCost(sessionCostMusd / 1_000_000)}</dd>
+              </div>
+            )}
+            {data.containerCostMusd != null && (
+              <div>
+                <dt className="text-muted-foreground">Compute cost</dt>
+                <dd>{formatSessionTotalCost(data.containerCostMusd / 1_000_000)}</dd>
               </div>
             )}
             <div>

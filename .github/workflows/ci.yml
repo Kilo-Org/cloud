@@ -1169,7 +1169,11 @@ jobs:
 
       - name: Run Session Ingest Postgres tests
         if: needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_session_ingest == 'true'
-        run: NODE_ENV=development pnpm --filter cloudflare-session-ingest test:postgres
+        # Copies of shared tables and the worktree regressions read the migrated
+        # schema, and this step runs alone when only the detector selects this
+        # service, so it applies the migrations instead of relying on the meter
+        # step above.
+        run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloudflare-session-ingest test:postgres
 
   # In its own job, madge runs beside the script tests instead of before them.
   dependency-cycle-check:
@@ -1555,7 +1559,9 @@ jobs:
   mobile-diagram-host:
     needs: changes
     if: needs.changes.outputs.mobile_diagram_host == 'true'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    # Repo variables are not exposed to fork pull requests, and ubuntu-latest is
+    # now 26.04, where the pinned Playwright has no Chromium build.
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1

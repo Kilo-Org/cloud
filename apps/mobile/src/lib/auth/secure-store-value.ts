@@ -11,6 +11,29 @@ import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 export type SecureStoreReadOptions = SecureStore.SecureStoreOptions;
 
 /**
+ * The class the widget store's items are written with, for the callers that
+ * reach the keychain through this module instead of the widget store: the two
+ * account ids in `lib/auth/account-metadata-write`. Resolved per call, because
+ * the constant is the native module's. Android declares none and has no such
+ * class, and a module that does not answer leaves the platform's own default —
+ * a hint written without the class is still a hint, so this never fails the
+ * write over it.
+ */
+export function widgetStoreOptions(): SecureStoreReadOptions | undefined {
+  try {
+    // Optional on purpose: Android's module declares none of these constants, so
+    // the runtime value can be absent even though the iOS type says otherwise.
+    const constants = SecureStore as {
+      readonly AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY?: number;
+    };
+    const accessible = constants.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY;
+    return accessible === undefined ? undefined : { keychainAccessible: accessible };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Forward `options` only when the caller supplied it. `expo-secure-store`
  * defaults the argument itself, and callers (and the tests that mock them)
  * match on the exact argument list, so a call that passed no options must stay

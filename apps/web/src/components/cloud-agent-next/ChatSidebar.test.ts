@@ -326,6 +326,33 @@ describe('ChatSidebar row rendering', () => {
     expect(dom.container.textContent).toContain('No sessions yet');
   });
 
+  it('rerenders only the two affected workspace rows when selection changes', () => {
+    const sessions = makeSessions(SESSION_COUNT).map((session, index) => ({
+      ...session,
+      worktreeId: `worktree_${index}`,
+    }));
+    const onOpenSession = jest.fn();
+    renderSidebar({ sessions, currentSessionId: sessions[0].sessionId, onOpenSession });
+    tooltipMock.mockClear();
+    renderSidebar({ sessions, currentSessionId: sessions[1].sessionId, onOpenSession });
+    expect(tooltipMock.mock.calls.filter(([props]) => props.delayDuration === 400)).toHaveLength(2);
+  });
+
+  it('uses updated workspace actions even when the row does not rerender', () => {
+    const session = makeSession(0, { worktreeId: 'worktree_actions' });
+    const sessions = [session];
+    const previous = jest.fn();
+    const next = jest.fn();
+    renderSidebar({ sessions, onOpenSession: previous });
+    tooltipMock.mockClear();
+    renderSidebar({ sessions, onOpenSession: next });
+    expect(tooltipMock.mock.calls.filter(([props]) => props.delayDuration === 400)).toHaveLength(0);
+    const button = dom.container.querySelector<HTMLButtonElement>('[data-worktree-id] button');
+    act(() => button?.click());
+    expect(previous).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(session.sessionId);
+  });
+
   it('keeps one skeleton until sessions, names and folders are ready together', () => {
     const session = makeSession(0, { worktreeId: 'worktree_ready' });
     renderSidebar({ sessions: [session], isLoading: true });
@@ -335,6 +362,31 @@ describe('ChatSidebar row rendering', () => {
     renderSidebar({ sessions: [session] });
     expect(dom.container.querySelector('[aria-label="Loading sessions"]')).toBeNull();
     expect(dom.container.querySelector('[data-worktree-id="worktree_ready"]')).not.toBeNull();
+  });
+
+  it('passes the displayed worktree name to the current delete action without rerendering', () => {
+    const sessions = [makeSession(0, { worktreeId: 'worktree_delete' })];
+    const worktreeDetails = {
+      worktree_delete: {
+        name: 'Named workspace',
+        defaultTitle: null,
+        prSession: null,
+        sessions: [],
+      },
+    };
+    const previous = jest.fn();
+    const next = jest.fn();
+    renderSidebar({ sessions, worktreeDetails, onDeleteWorktree: previous });
+    tooltipMock.mockClear();
+    renderSidebar({ sessions, worktreeDetails, onDeleteWorktree: next });
+    expect(tooltipMock.mock.calls.filter(([props]) => props.delayDuration === 400)).toHaveLength(0);
+    const deleteItem = Array.from(
+      dom.container.querySelectorAll<HTMLElement>('[role="menuitem"]')
+    ).find(item => item.textContent === 'Delete worktree');
+    expect(deleteItem).toBeDefined();
+    act(() => deleteItem?.click());
+    expect(previous).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith('worktree_delete', 'Named workspace');
   });
 
   it('shows the full workspace title above the row, away from the sibling PR badge', () => {

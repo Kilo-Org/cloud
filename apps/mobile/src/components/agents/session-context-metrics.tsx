@@ -60,10 +60,10 @@ const RING_STROKE = 3;
  *
  * The box is `items-end`, so the pill keeps the trailing edge the header gives
  * it and the reserve it does not use stays in the gap before it, where the row
- * already has empty space. A pill that hugs its content therefore looks like the
- * rocker it is — a circle around the ring when the session reports nothing, a
- * compact reading when it does — while the Follow control beside the box never
- * moves.
+ * already has empty space. A pill that hugs its content therefore reads as the
+ * compact control it is — a circle around the ring when the session reports
+ * nothing, one short reading when it does — while the Follow control beside the
+ * box never moves.
  *
  * The pill paints the ring alone until a value exists, so it has one silhouette
  * for as long as it has nothing to read. The reserve already holds the row's

@@ -171,7 +171,10 @@ async function lookup(
   }
   try {
     const values = await store.mget(keys);
-    return { status: 'done', verdicts: keys.map((_, index) => cachedVerdict(values[index], config)) };
+    return {
+      status: 'done',
+      verdicts: keys.map((_, index) => cachedVerdict(values[index], config)),
+    };
   } catch (error) {
     warnExceptInTest('[enkrypt-guardrail] verdict cache lookup failed; scanning in full', {
       organization_id: organizationId,
@@ -190,7 +193,8 @@ function keyedUnits(
   const { config } = request;
   return scanUnits(segments).map(unit => ({
     ...unit,
-    key: store && config.status === 'ready' ? verdictCacheKey(request, config, part, unit.text) : null,
+    key:
+      store && config.status === 'ready' ? verdictCacheKey(request, config, part, unit.text) : null,
   }));
 }
 
@@ -393,7 +397,7 @@ async function planSegmentsPart(
     cache: cacheStatus(looked),
     totalCharacters: joinSegments(rendered).length,
     totalSegments: segments.length,
-    cachedCharacters: sum(cachedSegments.map(text => text.length)),
+    cachedCharacters: joinSegments(cachedSegments).length,
     cachedSegments: cachedSegments.length,
     omittedAttachments: segments.filter(segment => segment.body === null).length,
   };
@@ -660,9 +664,7 @@ export async function scanRequestWithVerdictCache(
     planSegmentsPart('conversation', parts.conversation, request, store),
   ]);
   const started = new Map<EnkryptGuardrailScan, Promise<EnkryptGuardrailScanResult>>();
-  const byLength = plans
-    .flatMap(plan => plan.scans)
-    .sort((a, b) => b.text.length - a.text.length);
+  const byLength = plans.flatMap(plan => plan.scans).sort((a, b) => b.text.length - a.text.length);
   for (const scan of byLength) started.set(scan, scanRequest(scan, scanDeps));
   return Promise.all(
     plans.map(async plan =>

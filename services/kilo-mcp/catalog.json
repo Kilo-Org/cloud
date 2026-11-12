@@ -1965,7 +1965,7 @@
   "agentProfiles.instructions": {
     "path": "agentProfiles.instructions",
     "kind": "query",
-    "summary": "Get the instructions (system prompt guidance) attached to an agent profile. Use to view a profile's configured instruction files or custom prompt text, optionally scoped to an organization.",
+    "summary": "Returns the profile's instruction (rules) files: name, content, and enabled flag, ordered by name, optionally scoped to an organization.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -1991,7 +1991,7 @@
       "profileid",
       "organizationid"
     ],
-    "searchBlob": "agentProfiles.instructions Get the instructions (system prompt guidance) attached to an agent profile. Use to view a profile's configured instruction files or custom prompt text, optionally scoped to an organization. agentprofiles instructions profileid organizationid profileId organizationId"
+    "searchBlob": "agentProfiles.instructions Returns the profile's instruction (rules) files: name, content, and enabled flag, ordered by name, optionally scoped to an organization. agentprofiles instructions profileid organizationid profileId organizationId"
   },
   "agentProfiles.kiloCommands": {
     "path": "agentProfiles.kiloCommands",

@@ -8,15 +8,15 @@ import {
 import type { EnkryptGuardrailCall } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import {
   ENKRYPT_DETECTOR_TYPES,
-  ENKRYPT_SUMMARY_DETECTORS,
+  enkryptSummaryDetectorId,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
-import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import type { EnkryptGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import type { EnkryptScanReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 
-type ReadyEnkryptInputGuardrailConfig = Extract<EnkryptInputGuardrailConfig, { status: 'ready' }>;
+type ReadyEnkryptGuardrailConfig = Extract<EnkryptGuardrailConfig, { status: 'ready' }>;
 
 export const ENKRYPT_DETECT_URL = 'https://api.enkryptai.com/guardrails/detect';
 
@@ -83,7 +83,7 @@ export type EnkryptGuardrailScan = {
   clientRequestId: string | null;
   text: string;
   coverage: EnkryptScanCoverage;
-  config: EnkryptInputGuardrailConfig;
+  config: EnkryptGuardrailConfig;
 };
 
 /**
@@ -106,7 +106,7 @@ export type EnkryptUnavailableReason = 'transient' | 'timeout' | 'failed';
  */
 type EnkryptScanKind = 'blocking' | 'log_only';
 
-function scanKind(config: EnkryptInputGuardrailConfig): EnkryptScanKind {
+function scanKind(config: EnkryptGuardrailConfig): EnkryptScanKind {
   return config.status === 'ready' && config.blockingDetectors.length === 0
     ? 'log_only'
     : 'blocking';
@@ -168,9 +168,7 @@ function matchingDetectors(
   matches: (value: unknown) => boolean
 ): EnkryptDetectorId[] {
   return Object.entries(summary).flatMap(([name, value]) => {
-    const detector = Object.hasOwn(ENKRYPT_SUMMARY_DETECTORS, name)
-      ? ENKRYPT_SUMMARY_DETECTORS[name]
-      : undefined;
+    const detector = enkryptSummaryDetectorId(name);
     return detector && matches(value) ? [detector] : [];
   });
 }
@@ -178,7 +176,7 @@ function matchingDetectors(
 /** Detections block only when the organization configured the detector to block. */
 function blockingDetectors(
   fired: EnkryptDetectorId[],
-  config: ReadyEnkryptInputGuardrailConfig
+  config: ReadyEnkryptGuardrailConfig
 ): EnkryptDetectorId[] {
   return fired.filter(detector => config.blockingDetectors.includes(detector));
 }
@@ -381,7 +379,7 @@ export function responseBlockMessage(requestBlockMessage: string): string {
 
 function attemptDecision(
   attempt: DetectAttempt,
-  config: ReadyEnkryptInputGuardrailConfig
+  config: ReadyEnkryptGuardrailConfig
 ): EnkryptGuardrailDecision {
   if (attempt.kind === 'failed') return 'error';
   return blockingDetectors(attempt.firedDetectors, config).length > 0 ? 'blocked' : 'allowed';
@@ -538,7 +536,7 @@ type ScanScope = {
   >;
 };
 
-function enabledDetectors(config: ReadyEnkryptInputGuardrailConfig): EnkryptDetectorId[] {
+function enabledDetectors(config: ReadyEnkryptGuardrailConfig): EnkryptDetectorId[] {
   return ENKRYPT_DETECTOR_IDS.filter(id => config.detectors[id] !== undefined);
 }
 

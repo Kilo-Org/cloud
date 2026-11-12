@@ -104,6 +104,16 @@ export class ProbeScriptError extends Error {
   override name = 'ProbeScriptError';
 }
 
+/**
+ * Metro listed no debugger page for the app. The page window is the whole wait
+ * for it, so a spent window ends the retry chain instead of paying the retry
+ * backoff again.
+ */
+class MissingPageError extends InfraError {
+  // The run log keeps reporting an infrastructure failure, as it did before the
+  // wait existed; only the retry decision reads this class.
+}
+
 function record(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null
     ? (value as Record<string, unknown>)
@@ -297,7 +307,7 @@ export function createProbeClient(options: ProbeClientOptions): ProbeClient {
       page = selectPage(pages, options.names);
     }
     if (page?.webSocketDebuggerUrl === undefined) {
-      throw new InfraError(
+      throw new MissingPageError(
         `No Metro debugger page for ${options.names.join(' / ')} at ${options.metro} (${pages.length} pages listed)`
       );
     }
@@ -312,7 +322,9 @@ export function createProbeClient(options: ProbeClientOptions): ProbeClient {
 
   const call = async (expression: string, budgetMs?: number): Promise<unknown> => {
     // One page window for the whole retry chain, so the reconnect attempts do
-    // not multiply the reload budget, and a caller's own budget shortens it.
+    // not multiply the reload budget, and a caller's own budget shortens it. A
+    // spent window ends the chain: the deadline is fixed, so another attempt
+    // cannot find the page in time and only adds the retry backoff.
     const waitMs = budgetMs === undefined ? pageWaitMs : Math.min(pageWaitMs, budgetMs);
     const pageDeadline = now() + waitMs;
     let lastError: unknown;
@@ -324,6 +336,7 @@ export function createProbeClient(options: ProbeClientOptions): ProbeClient {
         if (error instanceof ProbeScriptError) throw error;
         lastError = error;
         disconnect();
+        if (error instanceof MissingPageError && now() >= pageDeadline) break;
       }
     }
     if (lastError instanceof InfraError) throw lastError;

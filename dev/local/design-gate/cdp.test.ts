@@ -187,10 +187,11 @@ test('probe client spends one page window across its reconnect attempts', async 
     }) as typeof fetch,
   });
   await assert.rejects(client.ready(), (error: unknown) => error instanceof InfraError);
-  // Ten 500 ms polls fill the window; the three reconnect attempts list again
-  // but do not restart it, so a missing app fails in 5 s rather than 20 s.
-  assert.equal(listCalls, 14);
-  assert.deepEqual(delays, [...Array<number>(10).fill(500), ...Array<number>(3).fill(2_000)]);
+  // Ten 500 ms polls fill the window, and the spent window ends the chain, so
+  // the retry backoff is not paid again: 5 s, not 11 s or 20 s.
+  assert.equal(listCalls, 11);
+  assert.deepEqual(delays, Array<number>(10).fill(500));
+  assert.equal(clockMs, 5_000);
 });
 
 test('probe client caps the page wait by the budget its caller declares', async () => {
@@ -212,11 +213,12 @@ test('probe client caps the page wait by the budget its caller declares', async 
     }) as typeof fetch,
   });
   // waitForApp() passes its remaining app-wait budget here, so a 700 ms wait
-  // does not spend the probe's 5 s reload window.
+  // does not spend the probe's 5 s reload window, and the spent budget is the
+  // real bound: no retry backoff is added after it.
   await assert.rejects(client.dump(700), (error: unknown) => error instanceof InfraError);
-  assert.equal(clockMs, 7_000);
-  assert.deepEqual(delays.slice(0, 2), [500, 500]);
-  assert.equal(listCalls, 3 + 3);
+  assert.equal(clockMs, 1_000);
+  assert.deepEqual(delays, [500, 500]);
+  assert.equal(listCalls, 3);
 });
 
 test('probe client retries Metro and socket failures with backoff, re-listing pages', async () => {

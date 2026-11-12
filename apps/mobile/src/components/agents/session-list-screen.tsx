@@ -36,7 +36,7 @@ import {
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
-import { OwnedKeyboardLift } from '@/components/agents/owned-keyboard-lift';
+import { OwnedKeyboardLift, useKeyboardLiftPad } from '@/components/agents/owned-keyboard-lift';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { IconButton } from '@/components/ui/icon-button';
@@ -111,10 +111,16 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const noMatchBody = hasLiveRows && visibleSessions.length === 0;
   const showFab = context.isReady && content !== 'empty' && !noMatchBody;
   const keyboard = useOwnedKeyboard();
+  // The pad the body frame takes. It equals the keyboard height whenever the
+  // window can hold the whole band, and only falls short in a window too short
+  // for it — where the FAB's band must not subtract height the body never gave
+  // up. Both read the same value in the same render, so the reserved band
+  // cannot fall a commit behind the pad.
+  const keyboardLift = useKeyboardLiftPad(keyboard.occlusion);
   const { surfaceBand, rowsFrameBand } = useAgentsBottomBands(
     tabBarHeight,
     showFab,
-    keyboard.occlusion
+    keyboardLift.pad
   );
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -522,9 +528,13 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
         ) : null}
         {/* Android runs edge-to-edge and never resizes the window for the IME,
             so the body clears the IME natively: the shared lift pads by the
-            keyboard this screen's own field raised. */}
+            keyboard this screen's own field raised. The pad is clamped in a
+            window too short to hold the whole band, and the FAB's band above
+            reads the same value in this render. */}
         <SessionListTouchGate>
-          <OwnedKeyboardLift occlusion={keyboard.occlusion}>{region}</OwnedKeyboardLift>
+          <OwnedKeyboardLift pad={keyboardLift.pad} onLayout={keyboardLift.handleLayout}>
+            {region}
+          </OwnedKeyboardLift>
         </SessionListTouchGate>
         {/* Empty content owns its creation action; the no-match body owns the band. */}
         {showFab && <SessionListFab organizationId={organizationId} style={fabStyle} />}

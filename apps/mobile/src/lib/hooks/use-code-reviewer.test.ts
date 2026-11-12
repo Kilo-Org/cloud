@@ -443,12 +443,24 @@ describe('useSaveReviewConfig GitLab webhook warning flag', () => {
     expect(setQueryDataMock).toHaveBeenCalledWith(WARNING_KEY, false);
   });
 
-  it('clears the warning when the mode no longer needs per-repository hooks', async () => {
+  it('leaves the stored warning alone for a mode save, which never syncs hooks', async () => {
     const opts = getSaveOptions('org_42', 'gitlab');
 
     await opts.mutationFn?.({ repositorySelectionMode: 'all' });
 
-    expect(setQueryDataMock).toHaveBeenCalledWith(WARNING_KEY, false);
+    expect(setQueryDataMock).not.toHaveBeenCalled();
+  });
+
+  it('leaves the stored warning alone when a selection save reports no sync', async () => {
+    // The PATCH routers answer `webhookSync: null` when they skip the sync:
+    // no connected integration, or no stored hook secret. Such a save proved
+    // nothing about the stored hooks.
+    orgPatchMutateMock.mockResolvedValue({ success: true, webhookSync: null });
+    const opts = getSaveOptions('org_42', 'gitlab');
+
+    await opts.mutationFn?.({ selectedRepositoryIds: [7] });
+
+    expect(setQueryDataMock).not.toHaveBeenCalled();
   });
 });
 

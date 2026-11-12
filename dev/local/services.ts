@@ -1264,3 +1264,5 @@ export function resolveGroupTransitiveDeps(groupIds: string[]): string[] {
 }
 
 export type { ServiceDef, ServiceType, ServiceGroup };
+
+// Path-filter observation touch for CI: this file is a dev tooling input.

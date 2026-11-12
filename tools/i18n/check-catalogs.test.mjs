@@ -334,7 +334,7 @@ for (const [name, termsPrefix, termsConnector] of [
     assert.equal(result.status, 1, result.stderr);
     assert.match(
       result.stderr,
-      /mobile\/de: "login\.termsPrefix" and "login\.termsConnector" disagree about their separator/
+      /mobile\/de: "login\.termsPrefix" and "login\.termsConnector" disagree about the space before the Terms link/
     );
   });
 }
@@ -361,6 +361,60 @@ test('accepts a spaced catalog that pads both separator keys', context => {
   });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stderr, '');
+});
+
+test('accepts a catalog whose conjunction is a prefix letter joined to the next word', context => {
+  // Arabic writes the waw as a prefix of the noun it governs, so the catalog
+  // pads the space before the conjunction and none after it. Only the junction
+  // before the conjunction is the separator the two keys have to agree on.
+  const english = {
+    login: {
+      termsPrefix: 'By continuing you agree to our ',
+      terms: 'Terms',
+      termsConnector: ' and ',
+    },
+  };
+  const result = runChecker(context, {
+    language: 'ar',
+    english,
+    translated: {
+      login: {
+        termsPrefix: 'بالمتابعة، توافق على ',
+        terms: 'الشروط',
+        termsConnector: ' و',
+      },
+    },
+    source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('rejects a conjunction that starts without the space its prefix carries', context => {
+  const english = {
+    login: {
+      termsPrefix: 'By continuing you agree to our ',
+      terms: 'Terms',
+      termsConnector: ' and ',
+    },
+  };
+  const result = runChecker(context, {
+    language: 'ar',
+    english,
+    translated: {
+      login: {
+        termsPrefix: 'بالمتابعة، توافق على ',
+        terms: 'الشروط',
+        termsConnector: 'و',
+      },
+    },
+    source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ar: "login\.termsPrefix" and "login\.termsConnector" disagree about the space before the Terms link/
+  );
 });
 
 test('rejects a translated $TOKEN expansion token', context => {

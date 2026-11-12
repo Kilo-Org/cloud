@@ -1146,17 +1146,21 @@ for (const catalog of CATALOGS) {
 
     // The separator keys are this catalog's only statement about how it joins
     // one word to the next, and they are allowed to differ from English on
-    // purpose — so they have to agree with each other. A padded prefix with a
-    // bare connector joins "our" to "Terms" but runs the conjunction into the
-    // next noun; the reverse drops the space before the link.
+    // purpose — so they have to agree with each other about the junction before
+    // the Terms link: a padded prefix with a bare connector joins "our" to
+    // "Terms" but runs the conjunction into the next noun; the reverse drops the
+    // space before the link. The junction after the conjunction is the catalog's
+    // own: a language that writes the conjunction as a separate word pads both
+    // of its sides (" and "), and one that writes it as a prefix letter pads only
+    // its start (" و") because the letter joins the noun it governs.
     const prefixValue = translated.get('login.termsPrefix');
     const connectorValue = translated.get('login.termsConnector');
     if (prefixValue !== undefined && connectorValue !== undefined) {
       const paddedPrefix = /\s$/.test(prefixValue);
-      const paddedConnector = /^\s/.test(connectorValue) && /\s$/.test(connectorValue);
-      if (paddedPrefix !== paddedConnector) {
+      const connectorLeads = /^\s/.test(connectorValue);
+      if (paddedPrefix !== connectorLeads) {
         fail(
-          `${label}: "login.termsPrefix" and "login.termsConnector" disagree about their separator; pad both or neither`
+          `${label}: "login.termsPrefix" and "login.termsConnector" disagree about the space before the Terms link; pad the prefix and the conjunction's start together`
         );
       }
     }

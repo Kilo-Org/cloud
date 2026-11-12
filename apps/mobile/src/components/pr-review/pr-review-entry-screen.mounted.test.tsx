@@ -1,4 +1,4 @@
-import { createElement, type ElementType, type ReactNode } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -96,8 +96,6 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { error: vi.fn(
 
 const ORG_A = { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' };
 const ORG_B = { organizationId: 'org-b', organizationName: 'Umbrella', role: 'member' };
-
-const Pressable = 'Pressable' as ElementType;
 
 const mounted: RenderWithProvidersResult[] = [];
 

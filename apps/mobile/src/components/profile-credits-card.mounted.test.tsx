@@ -293,7 +293,7 @@ async function pressLabel(renderer: ReactTestRenderer, label: string) {
  * Applies one account choice, or dismisses without one for `Cancel`: the card
  * presses the choice the route reports, exactly as a row press would.
  */
-async function choose(renderer: ReactTestRenderer, label: string) {
+async function choose(label: string) {
   if (label === 'Cancel') {
     contextPickerSlot.clear(UNFENCED_ROUTE_KEY);
     return;
@@ -508,7 +508,7 @@ describe('CreditsCard balance state', () => {
     const stalled = Promise.withResolvers<undefined>();
     getContextBalanceQueryFn.mockReturnValue(stalled.promise);
     await openSheet(renderer);
-    await choose(renderer, 'Beta');
+    await choose('Beta');
 
     await waitFor(() => texts().includes('SKELETON'));
     expect(texts()).not.toContain('$10.00');
@@ -632,7 +632,7 @@ describe('CreditsCard balance state', () => {
     const pending = Promise.withResolvers<{ creditBlocks: [] }>();
     orgCreditBlocksQueryFn.mockReturnValue(pending.promise);
     await openSheet(renderer);
-    await choose(renderer, 'Beta');
+    await choose('Beta');
     await waitFor(() => texts().includes('$10.00') && texts().includes('SKELETON'));
 
     expect(texts()).not.toContain(previousNote);
@@ -764,12 +764,12 @@ describe('CreditsCard balance state', () => {
     );
     await openSheet(renderer);
     expect(accountLabels()).toEqual(state.options.filter(label => label !== 'Cancel'));
-    await choose(renderer, 'Cancel');
+    await choose('Cancel');
     expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(
       (state.orgs as OrgListEntry[])[0]?.organizationId ?? undefined
     );
     await openSheet(renderer);
-    await choose(renderer, state.label);
+    await choose(state.label);
     expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(state.expected ?? undefined);
     const label = renderer.root.findByProps({ children: state.label });
     expect(label.props).toMatchObject({ numberOfLines: 1, ellipsizeMode: 'tail' });
@@ -792,7 +792,7 @@ describe('CreditsCard balance state', () => {
       storage.write.mockRejectedValueOnce(new Error('write failed'));
       const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
       await openSheet(renderer);
-      await choose(renderer, 'Supplied organization');
+      await choose('Supplied organization');
       expect(texts()).toContain('Could not save setting');
       expect(texts()).toContain('Supplied organization');
       expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
@@ -805,7 +805,7 @@ describe('CreditsCard balance state', () => {
         new Error('latest save failed')
       );
       await openSheet(renderer);
-      await choose(renderer, id === null ? 'Personal' : 'Latest organization');
+      await choose(id === null ? 'Personal' : 'Latest organization');
       const label = id === null ? 'Personal' : 'Latest organization';
       expect(texts()).toContain(label);
       expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');

@@ -34,24 +34,27 @@ export function shouldTriggerOlderMessagesLoad({
   return true;
 }
 
+type ScrollAnchorKey = 'data-scroll-anchor' | 'data-message-id';
+
 type PrependScrollPosition = {
   scrollTop: number;
   scrollHeight: number;
-  anchor: { element: Element; top: number; partId?: string } | null;
+  anchor: { element: Element; top: number; key: ScrollAnchorKey; value: string } | null;
 };
 
 export function capturePrependScrollPosition(el: HTMLElement): PrependScrollPosition {
   const viewport = el.getBoundingClientRect();
   let anchor: PrependScrollPosition['anchor'] = null;
   // A page can regroup assistant messages. Part ids survive that row replacement.
-  for (const selector of ['[data-scroll-anchor]', '[data-message-id]']) {
-    for (const marker of el.querySelectorAll<HTMLElement>(selector)) {
-      const partId = marker.dataset.scrollAnchor;
-      const element = partId ? marker.nextElementSibling : marker;
+  for (const key of ['data-scroll-anchor', 'data-message-id'] as const) {
+    for (const marker of el.querySelectorAll<HTMLElement>(`[${key}]`)) {
+      const value = marker.getAttribute(key);
+      if (!value) continue;
+      const element = key === 'data-scroll-anchor' ? marker.nextElementSibling : marker;
       if (!element || element.hasAttribute('hidden')) continue;
       const rect = element.getBoundingClientRect();
       if (rect.height > 0 && rect.bottom > viewport.top && rect.top < viewport.bottom) {
-        anchor = { element, top: rect.top - viewport.top, ...(partId ? { partId } : {}) };
+        anchor = { element, top: rect.top - viewport.top, key, value };
         break;
       }
     }
@@ -63,12 +66,15 @@ export function capturePrependScrollPosition(el: HTMLElement): PrependScrollPosi
 export function restoreScrollAfterPrepend(el: HTMLElement, previous: PrependScrollPosition): void {
   const anchor = previous.anchor;
   let element = anchor?.element;
-  if (anchor?.partId && element && !el.contains(element)) {
-    const marker = [...el.querySelectorAll<HTMLElement>('[data-scroll-anchor]')].find(
-      marker => marker.dataset.scrollAnchor === anchor.partId
+  if (anchor && element && !el.contains(element)) {
+    const marker = [...el.querySelectorAll<HTMLElement>(`[${anchor.key}]`)].find(
+      marker => marker.getAttribute(anchor.key) === anchor.value
     );
-    const replacement = marker?.nextElementSibling;
-    element = replacement ?? undefined;
+    // Regrouping can retain the old message id on a zero-height span inside the new row.
+    element =
+      anchor.key === 'data-scroll-anchor'
+        ? (marker?.nextElementSibling ?? undefined)
+        : (marker?.closest('[data-message-role]') ?? marker);
   }
   if (anchor && element && el.contains(element)) {
     const top = element.getBoundingClientRect().top - el.getBoundingClientRect().top;
@@ -185,12 +191,17 @@ export function useOlderMessagesPagination({
   const pendingPositionRef = useRef<PrependScrollPosition | null>(null);
   const wasLoadingRef = useRef(isLoadingOlderMessages);
   const restoreFrameRef = useRef(0);
+  const captureFrameRef = useRef<number | null>(null);
 
   useLayoutEffect(() => {
     inFlightRef.current = false;
     pendingPositionRef.current = null;
     wasLoadingRef.current = false;
-    return () => cancelAnimationFrame(restoreFrameRef.current);
+    return () => {
+      cancelAnimationFrame(restoreFrameRef.current);
+      if (captureFrameRef.current !== null) cancelAnimationFrame(captureFrameRef.current);
+      captureFrameRef.current = null;
+    };
   }, [resetKey]);
 
   const requestOlderMessages = useCallback(() => {
@@ -229,6 +240,8 @@ export function useOlderMessagesPagination({
     if (!wasLoading || isLoadingOlderMessages) return;
     const previousPosition = pendingPositionRef.current;
     if (previousPosition == null) return;
+    if (captureFrameRef.current !== null) cancelAnimationFrame(captureFrameRef.current);
+    captureFrameRef.current = null;
     const el = scrollElementRef.current;
     pendingPositionRef.current = null;
     if (!el) return;
@@ -283,8 +296,19 @@ export function useOlderMessagesPagination({
     (scrollTop: number) => {
       if (isProgrammaticScrollRef.current || initialPositionedRef?.current === false) return;
       const el = scrollElementRef.current;
-      if (el && pendingPositionRef.current) {
-        pendingPositionRef.current = capturePrependScrollPosition(el);
+      const position = pendingPositionRef.current;
+      if (el && position && scrollTop !== position.scrollTop) {
+        // Preserve scrolling even if the load completes before the queued capture runs.
+        if (position.anchor) position.anchor.top -= scrollTop - position.scrollTop;
+        position.scrollTop = scrollTop;
+        if (captureFrameRef.current === null) {
+          captureFrameRef.current = requestAnimationFrame(() => {
+            captureFrameRef.current = null;
+            if (pendingPositionRef.current) {
+              pendingPositionRef.current = capturePrependScrollPosition(el);
+            }
+          });
+        }
       }
       if (scrollTop < OLDER_MESSAGES_NEAR_TOP_PX) {
         requestOlderMessages();

@@ -6,17 +6,22 @@ function scrollingTranscript() {
     rowTop: 40,
     rowHeight: 200,
     rowPresent: true,
+    messageId: 'msg_visible',
+    regrouped: false,
     partAnchors: false,
     scrollHeight: 1000,
     viewportTop: 100,
   };
   const marker = {
     dataset: {},
+    getAttribute: () => null,
     hasAttribute: () => false,
     getBoundingClientRect: () => ({ top: 0, bottom: 0, height: 0 }),
   };
   const row = {
     dataset: {},
+    getAttribute: (key: string) => (key === 'data-message-id' ? layout.messageId : null),
+    closest: () => null,
     hasAttribute: () => false,
     getBoundingClientRect: () => {
       const top = layout.viewportTop + layout.rowTop - element.scrollTop;
@@ -26,9 +31,15 @@ function scrollingTranscript() {
   let currentRow = row;
   const partMarker = {
     dataset: { scrollAnchor: 'part_visible' },
+    getAttribute: (key: string) => (key === 'data-scroll-anchor' ? 'part_visible' : null),
     get nextElementSibling() {
       return currentRow;
     },
+  };
+  const groupedMessageMarker = {
+    ...marker,
+    getAttribute: (key: string) => (key === 'data-message-id' ? 'msg_visible' : null),
+    closest: () => currentRow,
   };
   const element = {
     scrollTop: 60,
@@ -43,7 +54,7 @@ function scrollingTranscript() {
           ? layout.partAnchors
             ? [partMarker]
             : []
-          : [marker, currentRow],
+          : [marker, currentRow, ...(layout.regrouped ? [groupedMessageMarker] : [])],
     contains: (child: unknown) => layout.rowPresent && child === currentRow,
   };
   return {
@@ -60,7 +71,12 @@ describe('prepend scroll position', () => {
   it('anchors the visible row, not a zero-height grouped-message marker', () => {
     const { element, row } = scrollingTranscript();
     const position = capturePrependScrollPosition(element);
-    expect(position.anchor).toEqual({ element: row, top: -20 });
+    expect(position.anchor).toEqual({
+      element: row,
+      top: -20,
+      key: 'data-message-id',
+      value: 'msg_visible',
+    });
   });
 
   it('preserves a partially visible message when history prepends', () => {
@@ -121,6 +137,35 @@ describe('prepend scroll position', () => {
     replaceRow();
     layout.rowTop += 300;
     layout.scrollHeight += 480;
+    restoreScrollAfterPrepend(element, position);
+    expect(element.scrollTop).toBe(360);
+  });
+
+  it.each([false, true])(
+    'follows a replaced message row without counting live output (browser anchoring: %s)',
+    browserAnchored => {
+      const { element, layout, replaceRow } = scrollingTranscript();
+      const position = capturePrependScrollPosition(element);
+      replaceRow();
+      layout.rowTop += 300;
+      layout.scrollHeight += 480;
+      if (browserAnchored) element.scrollTop += 300;
+      restoreScrollAfterPrepend(element, position);
+      restoreScrollAfterPrepend(element, position);
+      expect(element.scrollTop).toBe(360);
+    }
+  );
+
+  it('follows the retained message marker when a collapsed assistant group gets a new root id', () => {
+    const { element, layout, replaceRow } = scrollingTranscript();
+    const position = capturePrependScrollPosition(element);
+    replaceRow();
+    layout.messageId = 'msg_older';
+    layout.regrouped = true;
+    layout.rowTop += 300;
+    layout.scrollHeight += 480;
+    element.scrollTop += 300;
+    restoreScrollAfterPrepend(element, position);
     restoreScrollAfterPrepend(element, position);
     expect(element.scrollTop).toBe(360);
   });

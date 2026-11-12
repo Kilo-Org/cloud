@@ -1,8 +1,9 @@
+/* eslint-disable max-lines -- the list, its auto-scroll wiring and the ride-up frame share this file; splitting it further would scatter one behavior across three modules. */
 import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import { ChevronDown } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { AccessibilityInfo, Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Pressable, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

@@ -785,7 +785,9 @@ describe('SessionMessageList chrome ride-up', () => {
       const value = (
         node.props.style as { transform?: readonly { translateY?: number }[] } | undefined
       )?.transform?.[0]?.translateY;
-      if (typeof value === 'number') return value;
+      if (typeof value === 'number') {
+        return value;
+      }
     }
     return null;
   }

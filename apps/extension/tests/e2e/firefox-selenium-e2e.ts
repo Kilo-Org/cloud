@@ -1067,6 +1067,9 @@ const getSelectOptionsText = async (driver: WebDriver, ariaLabel: string): Promi
   return String(result);
 };
 
+const countControls = async (driver: WebDriver, selector: string): Promise<number> =>
+  (await driver.findElements(By.css(selector))).length;
+
 const isControlDisabled = async (driver: WebDriver, selector: string): Promise<boolean> => {
   await waitUntil(
     driver,
@@ -2359,9 +2362,10 @@ const scenarios: FirefoxScenario[] = [
           await session.driver.navigate().refresh();
           assert.equal(await isControlDisabled(session.driver, modelTriggerSelector), true);
           assert.match(await getModelTriggerText(session.driver), /Loading models/u);
+          // The thinking control only exists once the catalog supplies the model's variants.
           assert.equal(
-            await isControlDisabled(session.driver, 'select[aria-label="Thinking effort"]'),
-            true
+            await countControls(session.driver, 'select[aria-label="Thinking effort"]'),
+            0
           );
           await session.driver.findElement(By.css('#agent-message')).sendKeys('Inspect this tab');
           assert.equal(await isControlDisabled(session.driver, 'button[type="submit"]'), true);

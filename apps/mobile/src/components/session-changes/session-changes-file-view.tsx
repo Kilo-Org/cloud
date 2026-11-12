@@ -2,7 +2,7 @@
 // starts a review comment; lines that already carry one keep a marker.
 
 import { FlashList } from '@shopify/flash-list';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -164,6 +164,25 @@ export function SessionChangesFileView({
       ),
     [comments]
   );
+  // `DiffLine` is memoized on `onTap` identity, so each row keeps one handler
+  // for the component's lifetime while the handler itself reads the latest
+  // prop through a ref. Otherwise every state change re-renders every row.
+  const tapLineRef = useRef(onTapLine);
+  tapLineRef.current = onTapLine;
+  const tapHandlers = useRef(new Map<string, () => void>());
+  const tapHandlerFor = (side: 'deletions' | 'additions', lineNumber: number): (() => void) => {
+    const key = `${side}:${lineNumber}`;
+    const existing = tapHandlers.current.get(key);
+    if (existing) {
+      return existing;
+    }
+    const handler = () => {
+      tapLineRef.current({ side, lineNumber });
+    };
+    tapHandlers.current.set(key, handler);
+    return handler;
+  };
+
   const refreshControl = (
     <RowsRefreshControl
       refreshing={refreshing}
@@ -246,13 +265,7 @@ export function SessionChangesFileView({
                 language={language}
                 keyId={item.key}
                 isSelected={commentedLines.has(reviewLineKey(item.reviewSide, item.reviewLine))}
-                onTap={
-                  disabled
-                    ? undefined
-                    : () => {
-                        onTapLine({ side: item.reviewSide, lineNumber: item.reviewLine });
-                      }
-                }
+                onTap={disabled ? undefined : tapHandlerFor(item.reviewSide, item.reviewLine)}
               />
             );
           }}

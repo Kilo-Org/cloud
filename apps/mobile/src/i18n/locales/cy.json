@@ -2739,6 +2739,7 @@
       "empty": "Dim newidiadau i ffeiliau yn y sesiwn hon eto.",
       "openFile": "Agor {{path}}, {{status}}, {{additions}} ychwanegiad, {{deletions}} dilead",
       "truncated": "Dim ond y ffeiliau cyntaf sy'n cael eu dangos. Mae gan y sesiwn fwy o newidiadau nag y gall ffôn symudol eu rhestru.",
+      "partialCounts": "Cyfrif llinellau rhannol",
       "binaryFile": "Deuaidd",
       "fileDiffUnavailable": "Does dim modd dangos gwahaniaethau'r ffeil hon ar ffôn symudol.",
       "binaryNoDiff": "Ffeil ddeuaidd yw hon, felly does dim llinellau testun i roi sylw arnynt.",

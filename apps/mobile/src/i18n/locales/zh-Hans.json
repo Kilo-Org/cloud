@@ -1993,6 +1993,7 @@
       "empty": "此会话中尚无文件更改。",
       "openFile": "打开 {{path}}，{{status}}，{{additions}} 处新增，{{deletions}} 处删除",
       "truncated": "仅显示前面的部分文件。此会话的更改数量超出了移动端可列出的范围。",
+      "partialCounts": "部分行数",
       "binaryFile": "二进制",
       "fileDiffUnavailable": "无法在移动端显示此文件的差异。",
       "binaryNoDiff": "这是二进制文件，没有可评论的文本行。",

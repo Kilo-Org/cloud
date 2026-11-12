@@ -1993,6 +1993,7 @@
       "empty": "このセッションではまだファイルの変更はありません。",
       "openFile": "{{path}}を開く、{{status}}、{{additions}}行追加、{{deletions}}行削除",
       "truncated": "最初のファイルのみ表示しています。このセッションにはモバイルで一覧表示できる数を超える変更があります。",
+      "partialCounts": "行数の一部",
       "binaryFile": "バイナリ",
       "fileDiffUnavailable": "このファイルの差分はモバイルでは表示できません。",
       "binaryNoDiff": "これはバイナリファイルのため、コメントできるテキスト行がありません。",

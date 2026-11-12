@@ -2021,6 +2021,7 @@
       "empty": "Aún no hay cambios en archivos en esta sesión.",
       "openFile": "Abrir {{path}}, {{status}}, {{additions}} adiciones, {{deletions}} eliminaciones",
       "truncated": "Solo se muestran los primeros archivos. La sesión tiene más cambios de los que el móvil puede listar.",
+      "partialCounts": "Recuentos de líneas parciales",
       "binaryFile": "Binario",
       "fileDiffUnavailable": "Las diferencias de este archivo no se pueden mostrar en el móvil.",
       "binaryNoDiff": "Es un archivo binario, así que no hay líneas de texto para comentar.",

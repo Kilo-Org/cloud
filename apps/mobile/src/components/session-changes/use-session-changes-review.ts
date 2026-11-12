@@ -18,7 +18,6 @@ import {
   type SessionChangesDraft,
   type SessionChangesFile,
   type SessionChangesFilePatch,
-  updateSessionChangesComment,
 } from '@/lib/session-changes-review';
 import { trpcClient } from '@/lib/trpc';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
@@ -44,6 +43,7 @@ export function useSessionChangesReview({
   patchState,
   capture,
   commentsForFile,
+  staleCommentIds,
 }: {
   draft: SessionChangesDraft;
   setDraft: (draft: SessionChangesDraft) => void;
@@ -56,6 +56,7 @@ export function useSessionChangesReview({
   patchState: SessionChangesFilePatch | null;
   capture: WorktreeReviewCapture | null;
   commentsForFile: WorktreeReviewComment[];
+  staleCommentIds: ReadonlySet<string>;
 }) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
@@ -105,6 +106,12 @@ export function useSessionChangesReview({
 
   const sendReview = () => {
     if (!mode || !model) {
+      return;
+    }
+    // The capture moved after these comments were written, so their quotes and
+    // line numbers can no longer be presented to the agent as current.
+    if (staleCommentIds.size > 0) {
+      setSendError(t('agentChat.sessionChanges.staleFile'));
       return;
     }
     const built = buildSessionChangesReviewPrompt(draft);
@@ -168,6 +175,8 @@ export function useSessionChangesReview({
       return;
     }
     const trimmed = text.trim();
+    // Editing re-anchors to the capture and line the reader is looking at now;
+    // keeping the old anchor would pin the quote to a capture that has moved.
     const next =
       commentTarget.existingId === undefined
         ? addSessionChangesComment(draft, {
@@ -175,7 +184,10 @@ export function useSessionChangesReview({
             anchor: commentTarget.anchor,
             text: trimmed,
           })
-        : updateSessionChangesComment(draft, commentTarget.existingId, trimmed);
+        : addSessionChangesComment(
+            { comments: draft.comments.filter(comment => comment.id !== commentTarget.existingId) },
+            { id: commentTarget.existingId, anchor: commentTarget.anchor, text: trimmed }
+          );
     if (!next.ok) {
       setCommentError(next.error);
       return;

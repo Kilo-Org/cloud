@@ -2535,6 +2535,7 @@
       "empty": "Tässä istunnossa ei ole vielä muutettu tiedostoja.",
       "openFile": "Avaa {{path}}, {{status}}, {{additions}} lisäystä, {{deletions}} poistoa",
       "truncated": "Vain ensimmäiset tiedostot näytetään. Istunnossa on enemmän muutoksia kuin mobiilissa voidaan listata.",
+      "partialCounts": "Osittaiset rivimäärät",
       "binaryFile": "Binääri",
       "fileDiffUnavailable": "Tämän tiedoston muutosvertailua ei voi näyttää mobiilissa.",
       "binaryNoDiff": "Tämä on binääritiedosto, joten siinä ei ole tekstirivejä kommentoitavaksi.",

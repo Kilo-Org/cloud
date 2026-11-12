@@ -1993,6 +1993,7 @@
       "empty": "이 세션에서 아직 변경된 파일이 없습니다.",
       "openFile": "{{path}} 열기, {{status}}, {{additions}}줄 추가, {{deletions}}줄 삭제",
       "truncated": "처음 일부 파일만 표시됩니다. 이 세션의 변경 사항이 모바일에서 표시할 수 있는 것보다 많습니다.",
+      "partialCounts": "부분 줄 수",
       "binaryFile": "바이너리",
       "fileDiffUnavailable": "이 파일의 변경 내용은 모바일에서 표시할 수 없습니다.",
       "binaryNoDiff": "바이너리 파일이므로 댓글을 달 수 있는 텍스트 줄이 없습니다.",

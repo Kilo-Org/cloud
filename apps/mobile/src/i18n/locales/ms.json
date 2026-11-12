@@ -2535,6 +2535,7 @@
       "empty": "Belum ada perubahan fail dalam sesi ini.",
       "openFile": "Buka {{path}}, {{status}}, {{additions}} penambahan, {{deletions}} pemadaman",
       "truncated": "Hanya fail pertama yang ditunjukkan. Sesi ini mempunyai lebih banyak perubahan daripada yang boleh disenaraikan pada peranti mudah alih.",
+      "partialCounts": "Kiraan baris separa",
       "binaryFile": "Binari",
       "fileDiffUnavailable": "Perbezaan kod fail ini tidak dapat dipaparkan pada peranti mudah alih.",
       "binaryNoDiff": "Ini fail binari, jadi tiada baris teks untuk diulas.",

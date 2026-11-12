@@ -2637,6 +2637,7 @@
       "empty": "V tej seji še ni sprememb datotek.",
       "openFile": "Odpri {{path}}, {{status}}, dodano: {{additions}}, izbrisano: {{deletions}}",
       "truncated": "Prikazane so le prve datoteke. Seja ima več sprememb, kot jih lahko prikaže mobilna naprava.",
+      "partialCounts": "Delna števila vrstic",
       "binaryFile": "Binarna",
       "fileDiffUnavailable": "Razlik te datoteke ni mogoče prikazati na mobilni napravi.",
       "binaryNoDiff": "To je binarna datoteka, zato ni besedilnih vrstic za komentiranje.",

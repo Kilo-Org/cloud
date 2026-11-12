@@ -37,8 +37,9 @@ function SessionChangesFileRow({
       accessibilityLabel={t('agentChat.sessionChanges.openFile', {
         path: file.path,
         status: statusLabel,
-        additions: file.additions,
-        deletions: file.deletions,
+        // A partial capture: the numbers are a floor, never an exact count.
+        additions: file.countsComplete ? file.additions : `~${file.additions}`,
+        deletions: file.countsComplete ? file.deletions : `~${file.deletions}`,
       })}
       className="min-h-[44px] flex-row items-center gap-2 border-b border-hair-soft bg-card px-4 py-3 active:opacity-70"
       testID="session-changes-file-row"
@@ -52,12 +53,20 @@ function SessionChangesFileRow({
           <Text variant="muted" className="text-xs">
             {statusLabel}
           </Text>
-          <Text variant="muted" className="text-xs">
-            {isolateLtrBidiText(`+${file.additions}`)}
-          </Text>
-          <Text variant="muted" className="text-xs">
-            {isolateLtrBidiText(`-${file.deletions}`)}
-          </Text>
+          {file.countsComplete ? (
+            <>
+              <Text variant="muted" className="text-xs">
+                {isolateLtrBidiText(`+${file.additions}`)}
+              </Text>
+              <Text variant="muted" className="text-xs">
+                {isolateLtrBidiText(`-${file.deletions}`)}
+              </Text>
+            </>
+          ) : (
+            <Text variant="muted" className="text-xs">
+              {t('agentChat.sessionChanges.partialCounts')}
+            </Text>
+          )}
           {file.binary ? (
             <Text variant="muted" className="text-xs">
               {t('agentChat.sessionChanges.binaryFile')}

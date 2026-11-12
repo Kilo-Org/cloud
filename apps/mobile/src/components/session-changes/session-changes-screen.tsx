@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { SessionChangesBody } from '@/components/session-changes/session-changes-body';
 import { SessionChangesCommentDialog } from '@/components/session-changes/session-changes-comment-dialog';
@@ -28,6 +29,7 @@ import {
   EMPTY_SESSION_CHANGES_DRAFT,
   type SessionChangesDraft,
   type SessionChangesFile,
+  sessionChangesStaleCommentIds,
 } from '@/lib/session-changes-review';
 
 export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string }>) {
@@ -48,6 +50,25 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
     worktreeId: data.cloudSession?.worktreeId,
     draft,
   });
+  const staleCommentIds = useMemo(
+    () =>
+      sessionChangesStaleCommentIds({
+        draft,
+        snapshot: data.snapshot,
+        userId: data.cloudSession?.userId,
+        organizationId: data.organizationId,
+        cloudAgentSessionId: data.cloudAgentSessionId,
+        worktreeId: data.cloudSession?.worktreeId,
+      }),
+    [
+      draft,
+      data.snapshot,
+      data.cloudSession?.userId,
+      data.cloudSession?.worktreeId,
+      data.organizationId,
+      data.cloudAgentSessionId,
+    ]
+  );
   const review = useSessionChangesReview({
     draft,
     setDraft,
@@ -60,6 +81,7 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
     patchState: file.patchState,
     capture: file.capture,
     commentsForFile: file.commentsForFile,
+    staleCommentIds,
   });
 
   const {
@@ -170,49 +192,58 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
         </View>
       )}
       <View className="flex-1">
-        <SessionChangesBody
-          sessionPending={sessionQuery.isPending}
-          sessionFailed={sessionQuery.isError}
-          onRetrySession={() => {
-            void sessionQuery.refetch();
-          }}
-          readOnly={readOnly}
-          legacyFiles={legacyFiles}
-          legacyTooLarge={legacyDiffQuery.data?.kind === 'too_large'}
-          legacyPending={legacyDiffQuery.isPending}
-          legacyFailed={legacyDiffQuery.isError}
-          onRetryLegacy={() => {
-            void legacyDiffQuery.refetch();
-          }}
-          changesPending={changesQuery.isPending}
-          changesFailed={changesQuery.isError}
-          onRetryChanges={() => {
-            void changesQuery.refetch();
-          }}
-          files={snapshot?.files ?? []}
-          truncated={snapshot?.truncated ?? false}
-          refreshing={refreshing}
-          onRefresh={refresh}
-          openFile={openFile}
-          onOpenFile={next => {
-            setOpenFile(next);
-            resetCommentError();
-          }}
-          patchState={file.patchState}
-          filePending={file.fileQuery.isPending}
-          fileFailed={file.fileQuery.isError}
-          commentsForFile={file.commentsForFile}
-          commentsDisabledReason={commentsDisabledReason}
-          onTapLine={openComment}
-          onRetryFile={() => {
-            refresh();
-            void file.fileQuery.refetch();
-          }}
-        />
+        {data.cloudSessionQuery.isError ? (
+          <QueryError
+            variant="server"
+            onRetry={() => {
+              void data.cloudSessionQuery.refetch();
+            }}
+          />
+        ) : (
+          <SessionChangesBody
+            sessionPending={sessionQuery.isPending}
+            sessionFailed={sessionQuery.isError}
+            onRetrySession={() => {
+              void sessionQuery.refetch();
+            }}
+            readOnly={readOnly}
+            legacyFiles={legacyFiles}
+            legacyTooLarge={legacyDiffQuery.data?.kind === 'too_large'}
+            legacyPending={legacyDiffQuery.isPending}
+            legacyFailed={legacyDiffQuery.isError}
+            onRetryLegacy={() => {
+              void legacyDiffQuery.refetch();
+            }}
+            changesPending={changesQuery.isPending}
+            changesFailed={changesQuery.isError}
+            onRetryChanges={() => {
+              void changesQuery.refetch();
+            }}
+            files={snapshot?.files ?? []}
+            truncated={snapshot?.truncated ?? false}
+            refreshing={refreshing}
+            onRefresh={refresh}
+            openFile={openFile}
+            onOpenFile={next => {
+              setOpenFile(next);
+              resetCommentError();
+            }}
+            patchState={file.patchState}
+            filePending={file.fileQuery.isPending}
+            fileFailed={file.fileQuery.isError}
+            commentsForFile={file.commentsForFile}
+            commentsDisabledReason={commentsDisabledReason}
+            onTapLine={openComment}
+            onRetryFile={() => {
+              refresh();
+              void file.fileQuery.refetch();
+            }}
+          />
+        )}
       </View>
       {draft.comments.length > 0 ? (
         <View
-          className="absolute inset-x-0 bottom-0 flex-row justify-end border-t border-hair-soft bg-background px-4 py-2"
+          className="flex-row justify-end border-t border-hair-soft bg-background px-4 py-2"
           style={{ paddingBottom: Math.max(insets.bottom, 8) }}
         >
           <Button
@@ -227,17 +258,20 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
           </Button>
         </View>
       ) : null}
-      <SessionChangesCommentDialog
-        visible={commentTarget !== null}
-        path={openFile?.path ?? ''}
-        line={commentTarget?.anchor.range.startLine ?? 0}
-        initialText={initialCommentText}
-        onCancel={cancelComment}
-        onSubmit={submitComment}
-      />
+      {commentTarget === null ? null : (
+        <SessionChangesCommentDialog
+          path={openFile?.path ?? ''}
+          line={commentTarget.anchor.range.startLine}
+          initialText={initialCommentText}
+          editing={commentTarget.existingId !== undefined}
+          onCancel={cancelComment}
+          onSubmit={submitComment}
+        />
+      )}
       <SessionChangesReviewSheet
         visible={reviewOpen}
         draft={draft}
+        staleCommentIds={staleCommentIds}
         block={reviewBlock}
         error={sendError}
         sending={sending}

@@ -2637,6 +2637,7 @@
       "empty": "V tejto relácii zatiaľ nie sú žiadne zmeny súborov.",
       "openFile": "Otvoriť {{path}}, {{status}}, pridané: {{additions}}, odstránené: {{deletions}}",
       "truncated": "Zobrazujú sa iba prvé súbory. Relácia obsahuje viac zmien, než dokáže mobil zobraziť.",
+      "partialCounts": "Čiastočné počty riadkov",
       "binaryFile": "Binárny",
       "fileDiffUnavailable": "Prehľad zmien tohto súboru nie je možné zobraziť v mobile.",
       "binaryNoDiff": "Toto je binárny súbor, takže neobsahuje textové riadky na komentovanie.",

@@ -1993,6 +1993,7 @@
       "empty": "Nog geen bestandswijzigingen in deze sessie.",
       "openFile": "{{path}} openen, {{status}}, {{additions}} toevoegingen, {{deletions}} verwijderingen",
       "truncated": "Alleen de eerste bestanden worden getoond. De sessie bevat meer wijzigingen dan mobiel kan weergeven.",
+      "partialCounts": "Gedeeltelijke regeltellingen",
       "binaryFile": "Binair",
       "fileDiffUnavailable": "De diff van dit bestand kan niet op mobiel worden weergegeven.",
       "binaryNoDiff": "Dit is een binair bestand, dus er zijn geen tekstregels om op te reageren.",

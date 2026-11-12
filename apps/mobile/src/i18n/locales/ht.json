@@ -2535,6 +2535,7 @@
       "empty": "Poko gen chanjman nan fichye yo nan sesyon sa a.",
       "openFile": "Louvri {{path}}, {{status}}, {{additions}} ajout, {{deletions}} sipresyon",
       "truncated": "Se sèlman premye fichye yo ki parèt. Sesyon an gen plis chanjman pase sa mobil la ka afiche.",
+      "partialCounts": "Konte liy pasyèl",
       "binaryFile": "Binè",
       "fileDiffUnavailable": "Diferans kòd fichye sa a pa ka afiche sou mobil.",
       "binaryNoDiff": "Sa a se yon fichye binè, kidonk pa gen liy tèks pou kòmante.",

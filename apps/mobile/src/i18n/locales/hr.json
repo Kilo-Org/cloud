@@ -2586,6 +2586,7 @@
       "empty": "U ovoj sesiji još nema izmjena datoteka.",
       "openFile": "Otvori {{path}}, {{status}}, dodavanja: {{additions}}, brisanja: {{deletions}}",
       "truncated": "Prikazane su samo prve datoteke. Sesija ima više izmjena nego što se može prikazati na mobitelu.",
+      "partialCounts": "Djelomični brojevi redaka",
       "binaryFile": "Binarna",
       "fileDiffUnavailable": "Razlike za ovu datoteku ne mogu se prikazati na mobitelu.",
       "binaryNoDiff": "Ovo je binarna datoteka pa nema redaka teksta za komentiranje.",

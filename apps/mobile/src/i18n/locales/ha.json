@@ -2535,6 +2535,7 @@
       "empty": "Babu canje-canjen fayil a wannan zama tukuna.",
       "openFile": "Buɗe {{path}}, {{status}}, ƙari {{additions}}, gogewa {{deletions}}",
       "truncated": "Fayilolin farko kawai ake nunawa. Zaman yana da canje-canje fiye da abin da wayar hannu za ta iya lissafawa.",
+      "partialCounts": "Ƙididdigar layuka na ɓangare",
       "binaryFile": "Binary",
       "fileDiffUnavailable": "Ba za a iya nuna bambancin wannan fayil a wayar hannu ba.",
       "binaryNoDiff": "Wannan fayil ne na binary, don haka babu layukan rubutu da za a yi sharhi a kansu.",

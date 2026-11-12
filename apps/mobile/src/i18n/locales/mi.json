@@ -2535,6 +2535,7 @@
       "empty": "Kāore anō kia huria he kōnae i tēnei wātū.",
       "openFile": "Whakatuwherahia {{path}}, {{status}}, {{additions}} tāpiritanga, {{deletions}} mukunga",
       "truncated": "Ko ngā kōnae tuatahi anake e whakaaturia ana. He maha ake ngā huringa o te wātū i ērā ka taea e te waea pūkoro te whakarārangi.",
+      "partialCounts": "Tatauranga rārangi wāhanga",
       "binaryFile": "Pūrua",
       "fileDiffUnavailable": "Kāore e taea te whakaatu i ngā rerekētanga o tēnei kōnae ki te waea pūkoro.",
       "binaryNoDiff": "He kōnae pūrua tēnei, nō reira kāore he rārangi kuputuhi hei tākupu.",

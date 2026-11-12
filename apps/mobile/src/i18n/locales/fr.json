@@ -1920,6 +1920,7 @@
       "empty": "Aucune modification de fichier dans cette session pour l'instant.",
       "openFile": "Ouvrir {{path}}, {{status}}, {{additions}} ajouts, {{deletions}} suppressions",
       "truncated": "Seuls les premiers fichiers sont affichés. La session contient plus de modifications que le mobile ne peut en lister.",
+      "partialCounts": "Décomptes de lignes partiels",
       "binaryFile": "Binaire",
       "fileDiffUnavailable": "Les différences de ce fichier ne peuvent pas être affichées sur mobile.",
       "binaryNoDiff": "Ceci est un fichier binaire : il n'y a aucune ligne de texte à commenter.",

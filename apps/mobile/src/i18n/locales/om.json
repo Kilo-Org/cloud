@@ -2535,6 +2535,7 @@
       "empty": "Yeroo kana keessatti hanga ammaatti jijjiiramni faayilii hin jiru.",
       "openFile": "{{path}} bani, {{status}}, dabalata {{additions}}, haqama {{deletions}}",
       "truncated": "Faayiloota jalqabaa qofatu agarsiifame. Yeroon kun jijjiirama moobaayiliin tarreessuu danda'u caalu qaba.",
+      "partialCounts": "Lakkoofsa sarara gartokkee",
       "binaryFile": "Baayinarii",
       "fileDiffUnavailable": "Garaagarummaan faayilii kanaa moobaayilii irratti agarsiifamuu hin danda'u.",
       "binaryNoDiff": "Kun faayilii baayinarii waan ta'eef, sarara barreeffamaa yaadni irratti kennamu hin qabu.",

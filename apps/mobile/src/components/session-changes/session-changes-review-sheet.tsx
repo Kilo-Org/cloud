@@ -55,6 +55,7 @@ function CommentRow({
 export function SessionChangesReviewSheet({
   visible,
   draft,
+  staleCommentIds,
   block,
   error,
   sending,
@@ -65,6 +66,7 @@ export function SessionChangesReviewSheet({
 }: Readonly<{
   visible: boolean;
   draft: SessionChangesDraft;
+  staleCommentIds: ReadonlySet<string>;
   block: SessionChangesReviewBlock | undefined;
   error: string | undefined;
   sending: boolean;
@@ -74,7 +76,7 @@ export function SessionChangesReviewSheet({
   onRemoveComment: (id: string) => void;
 }>) {
   const { t } = useTranslation();
-  const sendDisabled = block !== undefined || sending;
+  const sendDisabled = block !== undefined || sending || draft.comments.length === 0;
   return (
     <Sheet visible={visible} onClose={onClose} dismissGestures={false}>
       <View className="px-4 pb-6">
@@ -97,6 +99,11 @@ export function SessionChangesReviewSheet({
         <Text variant="muted" className="pb-1 text-xs">
           {t('agentChat.sessionChanges.reviewHint')}
         </Text>
+        {staleCommentIds.size === 0 ? null : (
+          <Text className="text-xs text-warn" testID="session-changes-review-stale">
+            {t('agentChat.sessionChanges.staleFile')}
+          </Text>
+        )}
         {block === undefined ? null : (
           <Text className="text-xs text-warn" testID="session-changes-review-block">
             {block.kind === 'read-only'

@@ -2535,6 +2535,7 @@
       "empty": "Azikho izinguquko zamafayela kule seshini okwamanje.",
       "openFile": "Vula {{path}}, {{status}}, okungeziwe okungu-{{additions}}, okususiwe okungu-{{deletions}}",
       "truncated": "Kuboniswa amafayela okuqala kuphela. Iseshini inezinguquko eziningi kunalezo iselula engazibonisa.",
+      "partialCounts": "Izibalo zamalayini ezingaphelele",
       "binaryFile": "Ibhinari",
       "fileDiffUnavailable": "Umehluko waleli fayela awukwazi ukuboniswa kuselula.",
       "binaryNoDiff": "Leli yifayela lebhinari, ngakho-ke ayikho imigqa yombhalo yokuphawula kuyo.",

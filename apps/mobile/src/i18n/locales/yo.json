@@ -2535,6 +2535,7 @@
       "empty": "Kò sí àyípadà fáìlì nínú ìjíròrò yìí síbẹ̀.",
       "openFile": "Ṣí {{path}}, {{status}}, àfikún {{additions}}, ìyọkúrò {{deletions}}",
       "truncated": "Àwọn fáìlì àkọ́kọ́ nìkan ni a fihàn. Ìjíròrò yìí ní àyípadà tó pọ̀ ju èyí tí fóònù lè kà lọ.",
+      "partialCounts": "Iye laini apakan",
       "binaryFile": "Bínárì",
       "fileDiffUnavailable": "Ìyàtọ̀ fáìlì yìí kò ṣeé fihàn lórí fóònù.",
       "binaryNoDiff": "Fáìlì bínárì ni èyí, nítorí náà kò sí ìlà ọ̀rọ̀ láti sọ àsọyé lé lórí.",

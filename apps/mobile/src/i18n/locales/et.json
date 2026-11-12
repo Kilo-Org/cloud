@@ -2535,6 +2535,7 @@
       "empty": "Selles seansis pole veel faile muudetud.",
       "openFile": "Ava {{path}}, {{status}}, {{additions}} lisamist, {{deletions}} kustutamist",
       "truncated": "Kuvatakse ainult esimesed failid. Seansis on rohkem muudatusi, kui mobiilis saab loetleda.",
+      "partialCounts": "Osalised reaarvud",
       "binaryFile": "Binaarne",
       "fileDiffUnavailable": "Selle faili muudatusi ei saa mobiilis kuvada.",
       "binaryNoDiff": "See on binaarfail, seega pole tekstiridu, mida kommenteerida.",

@@ -2535,6 +2535,7 @@
       "empty": "Saio honetan ez dago fitxategi-aldaketarik oraindik.",
       "openFile": "Ireki {{path}}, {{status}}, {{additions}} gehiketa, {{deletions}} ezabaketa",
       "truncated": "Lehen fitxategiak bakarrik erakusten dira. Saioak mugikorrak zerrenda ditzakeenak baino aldaketa gehiago ditu.",
+      "partialCounts": "Lerro-kontaketa partzialak",
       "binaryFile": "Bitarra",
       "fileDiffUnavailable": "Fitxategi honen diferentzia ezin da mugikorrean erakutsi.",
       "binaryNoDiff": "Fitxategi bitarra da hau; beraz, ez dago iruzkintzeko testu-lerrorik.",

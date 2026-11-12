@@ -2592,6 +2592,7 @@
       "empty": "Ainda não há alterações de ficheiros nesta sessão.",
       "openFile": "Abrir {{path}}, {{status}}, {{additions}} adições, {{deletions}} remoções",
       "truncated": "Só são apresentados os primeiros ficheiros. A sessão tem mais alterações do que o telemóvel consegue listar.",
+      "partialCounts": "Contagens parciais de linhas",
       "binaryFile": "Binário",
       "fileDiffUnavailable": "Não é possível apresentar as diferenças deste ficheiro no telemóvel.",
       "binaryNoDiff": "Este é um ficheiro binário, por isso não há linhas de texto para comentar.",

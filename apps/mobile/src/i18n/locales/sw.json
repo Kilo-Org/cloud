@@ -2535,6 +2535,7 @@
       "empty": "Bado hakuna mabadiliko ya faili katika kipindi hiki.",
       "openFile": "Fungua {{path}}, {{status}}, nyongeza {{additions}}, ufutaji {{deletions}}",
       "truncated": "Faili za kwanza pekee ndizo zinaonyeshwa. Kipindi kina mabadiliko mengi kuliko simu inavyoweza kuorodhesha.",
+      "partialCounts": "Hesabu za mistari kwa kiasi",
       "binaryFile": "Binary",
       "fileDiffUnavailable": "Tofauti za faili hii haziwezi kuonyeshwa kwenye simu.",
       "binaryNoDiff": "Hii ni faili ya binary, kwa hivyo hakuna mistari ya maandishi ya kutolea maoni.",

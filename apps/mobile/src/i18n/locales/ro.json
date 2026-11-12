@@ -2586,6 +2586,7 @@
       "empty": "Nicio modificare de fișiere în această sesiune încă.",
       "openFile": "Deschide {{path}}, {{status}}, {{additions}} adăugări, {{deletions}} ștergeri",
       "truncated": "Sunt afișate doar primele fișiere. Sesiunea are mai multe modificări decât pot fi listate pe mobil.",
+      "partialCounts": "Numărări parțiale de linii",
       "binaryFile": "Binar",
       "fileDiffUnavailable": "Diferențele acestui fișier nu pot fi afișate pe mobil.",
       "binaryNoDiff": "Acesta este un fișier binar, deci nu există linii de text de comentat.",

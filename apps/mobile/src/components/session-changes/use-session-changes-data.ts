@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 
 import { sessionDiffFileToPrReviewFile } from '@/lib/session-changes';
+import { type SessionChangesSnapshot } from '@/lib/session-changes-review';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 export function useSessionChangesData(sessionId: string) {
@@ -81,9 +82,18 @@ export function useSessionChangesData(sessionId: string) {
           })
         : trpcClient.cloudAgentNext.refreshWorktreeChanges.mutate({ cloudAgentSessionId });
     },
+    // A `getWorktreeChanges` fetch already in flight resolves after this write
+    // and would replace the fresher snapshot with the older one, so the refresh
+    // cancels it and then keeps the higher revision.
+    onMutate: () => queryClient.cancelQueries({ queryKey: changesKey }),
     onSuccess: result => {
       if (result.snapshot) {
-        queryClient.setQueryData(changesKey, { snapshot: result.snapshot });
+        const current = queryClient.getQueryData<{ snapshot: SessionChangesSnapshot | null }>(
+          changesKey
+        );
+        if (result.snapshot.revision >= (current?.snapshot?.revision ?? 0)) {
+          queryClient.setQueryData(changesKey, { snapshot: result.snapshot });
+        }
       }
       setRefreshFailed(result.status !== 'refreshed');
     },

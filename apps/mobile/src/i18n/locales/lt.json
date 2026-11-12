@@ -2637,6 +2637,7 @@
       "empty": "Šioje sesijoje failų pakeitimų dar nėra.",
       "openFile": "Atidaryti {{path}}, {{status}}, pridėta eilučių: {{additions}}, pašalinta eilučių: {{deletions}}",
       "truncated": "Rodomi tik pirmieji failai. Sesijoje yra daugiau pakeitimų, nei galima parodyti mobiliajame įrenginyje.",
+      "partialCounts": "Dalinis eilučių skaičius",
       "binaryFile": "Dvejetainis",
       "fileDiffUnavailable": "Šio failo pakeitimų negalima parodyti mobiliajame įrenginyje.",
       "binaryNoDiff": "Tai dvejetainis failas, todėl nėra teksto eilučių, kurias būtų galima komentuoti.",

@@ -2049,6 +2049,7 @@
       "empty": "W tej sesji nie zmieniono jeszcze żadnych plików.",
       "openFile": "Otwórz {{path}}, {{status}}, dodane wiersze: {{additions}}, usunięte wiersze: {{deletions}}",
       "truncated": "Wyświetlane są tylko pierwsze pliki. Sesja zawiera więcej zmian, niż można wyświetlić na urządzeniu mobilnym.",
+      "partialCounts": "Częściowe liczby wierszy",
       "binaryFile": "Binarny",
       "fileDiffUnavailable": "Nie można wyświetlić różnic tego pliku na urządzeniu mobilnym.",
       "binaryNoDiff": "To plik binarny, więc nie ma w nim wierszy tekstu do skomentowania.",

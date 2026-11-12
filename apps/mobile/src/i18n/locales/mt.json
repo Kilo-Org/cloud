@@ -2688,6 +2688,7 @@
       "empty": "Għad m'hemm l-ebda bidla fil-fajls f'din is-sessjoni.",
       "openFile": "Iftaħ {{path}}, {{status}}, {{additions}} żidiet, {{deletions}} tneħħijiet",
       "truncated": "Qed jintwerew biss l-ewwel fajls. Is-sessjoni għandha aktar bidliet milli jista' jelenka l-mobile.",
+      "partialCounts": "Għadd parzjali tal-linji",
       "binaryFile": "Binarju",
       "fileDiffUnavailable": "Id-differenzi ta' dan il-fajl ma jistgħux jintwerew fuq il-mobile.",
       "binaryNoDiff": "Dan huwa fajl binarju, għalhekk m'hemmx linji ta' test biex tikkummenta fuqhom.",

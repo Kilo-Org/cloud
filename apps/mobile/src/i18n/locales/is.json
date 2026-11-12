@@ -2535,6 +2535,7 @@
       "empty": "Engar breytingar á skrám í þessari lotu enn.",
       "openFile": "Opna {{path}}, {{status}}, {{additions}} viðbætur, {{deletions}} eyðingar",
       "truncated": "Aðeins fyrstu skrárnar eru sýndar. Lotan hefur fleiri breytingar en hægt er að birta í farsíma.",
+      "partialCounts": "Hlutbundnar línutölur",
       "binaryFile": "Tvíundaskrá",
       "fileDiffUnavailable": "Ekki er hægt að birta breytingar þessarar skrár í farsíma.",
       "binaryNoDiff": "Þetta er tvíundaskrá og því engar textalínur til að gera athugasemdir við.",

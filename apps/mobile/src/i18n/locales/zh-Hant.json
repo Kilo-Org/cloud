@@ -1993,6 +1993,7 @@
       "empty": "此工作階段尚無檔案變更。",
       "openFile": "開啟 {{path}}，{{status}}，新增 {{additions}} 行，刪除 {{deletions}} 行",
       "truncated": "僅顯示前幾個檔案。此工作階段的變更數量超過行動裝置可列出的上限。",
+      "partialCounts": "部分行數",
       "binaryFile": "二進位檔",
       "fileDiffUnavailable": "此檔案的差異無法在行動裝置上顯示。",
       "binaryNoDiff": "這是二進位檔案，沒有可留言的文字行。",

@@ -137,10 +137,10 @@ const worktreeReviewComparisonSchema = z
 const worktreeReviewScopeSchema = z.enum(['uncommitted', 'against-base-branch']);
 
 const worktreeReviewCaptureSchema = z.object({
-  userId: worktreeReviewIdentitySchema,
+  userId: boundedIdentitySchema,
   organizationId: worktreeReviewIdentitySchema.optional(),
-  workspaceScope: worktreeReviewIdentitySchema,
-  sourceCloudAgentSessionId: worktreeReviewIdentitySchema,
+  workspaceScope: boundedIdentitySchema,
+  sourceCloudAgentSessionId: boundedIdentitySchema,
   revision: worktreeReviewRevisionSchema,
   scope: worktreeReviewScopeSchema.optional(),
   capturedAt: worktreeReviewCapturedAtSchema,

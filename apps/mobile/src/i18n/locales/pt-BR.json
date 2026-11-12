@@ -1994,6 +1994,7 @@
       "empty": "Nenhum arquivo foi alterado nesta sessão ainda.",
       "openFile": "Abrir {{path}}, {{status}}, {{additions}} adições, {{deletions}} remoções",
       "truncated": "Apenas os primeiros arquivos são exibidos. A sessão tem mais alterações do que o celular consegue listar.",
+      "partialCounts": "Contagens parciais de linhas",
       "binaryFile": "Binário",
       "fileDiffUnavailable": "A comparação deste arquivo não pode ser exibida no celular.",
       "binaryNoDiff": "Este é um arquivo binário, então não há linhas de texto para comentar.",

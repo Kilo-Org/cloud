@@ -2628,6 +2628,7 @@
       "empty": "No file changes in this session yet.",
       "openFile": "Open {{path}}, {{status}}, {{additions}} additions, {{deletions}} deletions",
       "truncated": "Only the first files are shown. The session has more changes than mobile can list.",
+      "partialCounts": "Partial line counts",
       "binaryFile": "Binary",
       "fileDiffUnavailable": "This file's diff can't be shown on mobile.",
       "binaryNoDiff": "This is a binary file, so there are no text lines to comment on.",

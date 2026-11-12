@@ -1993,6 +1993,7 @@
       "empty": "Belum ada perubahan file dalam sesi ini.",
       "openFile": "Buka {{path}}, {{status}}, {{additions}} penambahan, {{deletions}} penghapusan",
       "truncated": "Hanya file pertama yang ditampilkan. Sesi ini memiliki lebih banyak perubahan daripada yang dapat dicantumkan di perangkat seluler.",
+      "partialCounts": "Jumlah baris sebagian",
       "binaryFile": "Biner",
       "fileDiffUnavailable": "Perbedaan kode file ini tidak dapat ditampilkan di perangkat seluler.",
       "binaryNoDiff": "Ini adalah file biner, jadi tidak ada baris teks untuk dikomentari.",

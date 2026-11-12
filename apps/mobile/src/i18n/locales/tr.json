@@ -1993,6 +1993,7 @@
       "empty": "Bu oturumda henüz dosya değişikliği yok.",
       "openFile": "{{path}} dosyasını aç, {{status}}, {{additions}} ekleme, {{deletions}} silme",
       "truncated": "Yalnızca ilk dosyalar gösteriliyor. Oturumda mobilde listelenebilecekten daha fazla değişiklik var.",
+      "partialCounts": "Kısmi satır sayıları",
       "binaryFile": "İkili",
       "fileDiffUnavailable": "Bu dosyanın farkı mobilde gösterilemiyor.",
       "binaryNoDiff": "Bu bir ikili dosya, bu yüzden yorum yapılacak metin satırı yok.",

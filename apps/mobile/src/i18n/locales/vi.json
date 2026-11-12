@@ -1993,6 +1993,7 @@
       "empty": "Phiên này chưa có thay đổi tệp nào.",
       "openFile": "Mở {{path}}, {{status}}, {{additions}} dòng thêm, {{deletions}} dòng xóa",
       "truncated": "Chỉ hiển thị các tệp đầu tiên. Phiên này có nhiều thay đổi hơn mức thiết bị di động có thể liệt kê.",
+      "partialCounts": "Số dòng một phần",
       "binaryFile": "Nhị phân",
       "fileDiffUnavailable": "Không thể hiển thị bản so sánh của tệp này trên thiết bị di động.",
       "binaryNoDiff": "Đây là tệp nhị phân nên không có dòng văn bản nào để bình luận.",

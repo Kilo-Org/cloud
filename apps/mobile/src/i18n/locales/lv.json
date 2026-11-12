@@ -2586,6 +2586,7 @@
       "empty": "Šajā sesijā vēl nav izmaiņu failos.",
       "openFile": "Atvērt {{path}}, {{status}}, pievienojumi: {{additions}}, dzēsumi: {{deletions}}",
       "truncated": "Parādīti tikai pirmie faili. Sesijā ir vairāk izmaiņu, nekā mobilajā ierīcē var parādīt.",
+      "partialCounts": "Daļējs rindu skaits",
       "binaryFile": "Binārs",
       "fileDiffUnavailable": "Šī faila izmaiņu salīdzinājumu nevar parādīt mobilajā ierīcē.",
       "binaryNoDiff": "Šis ir binārs fails, tāpēc tajā nav teksta rindu, ko komentēt.",

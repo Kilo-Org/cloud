@@ -2586,6 +2586,7 @@
       "empty": "Encara no hi ha canvis de fitxers en aquesta sessió.",
       "openFile": "Obre {{path}}, {{status}}, {{additions}} addicions, {{deletions}} supressions",
       "truncated": "Només es mostren els primers fitxers. La sessió té més canvis dels que es poden llistar al mòbil.",
+      "partialCounts": "Recomptes de línies parcials",
       "binaryFile": "Binari",
       "fileDiffUnavailable": "Les diferències d'aquest fitxer no es poden mostrar al mòbil.",
       "binaryNoDiff": "Aquest fitxer és binari, de manera que no hi ha línies de text per comentar.",

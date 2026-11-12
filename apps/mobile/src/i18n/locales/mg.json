@@ -2535,6 +2535,7 @@
       "empty": "Mbola tsy misy rakitra niova tamin'ity fotoam-piasana ity.",
       "openFile": "Sokafy {{path}}, {{status}}, {{additions}} nampiana, {{deletions}} nesorina",
       "truncated": "Ireo rakitra voalohany ihany no aseho. Manana fiovana betsaka kokoa noho izay azon'ny finday asehoina ity fotoam-piasana ity.",
+      "partialCounts": "Isa isa andalana ampahany",
       "binaryFile": "Binera",
       "fileDiffUnavailable": "Tsy azo aseho amin'ny finday ny fahasamihafan'ity rakitra ity.",
       "binaryNoDiff": "Rakitra binera ity, ka tsy misy andalana soratra azo hanehoana hevitra.",

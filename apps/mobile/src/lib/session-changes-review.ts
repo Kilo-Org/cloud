@@ -7,6 +7,7 @@ import {
   addWorktreeReviewComment,
   createWorktreeReviewAnchorFromPatch,
   removeWorktreeReviewComment,
+  sameWorktreeReviewCapture,
   serializeWorktreeReview,
   updateWorktreeReviewComment,
   type WorktreeReviewAnchor,
@@ -91,6 +92,48 @@ export function sessionChangesCaptureForFile({
     capturedAt: snapshot.capturedAt,
     comparison: snapshot.comparison,
   };
+}
+
+/**
+ * Comments whose saved capture no longer matches the session's current one: the
+ * capture moved since they were written, so the quote and line number the agent
+ * would receive are no longer provably current. The review cannot be sent until
+ * those comments are re-anchored by adding them again on the current diff.
+ */
+export function sessionChangesStaleCommentIds({
+  draft,
+  snapshot,
+  userId,
+  organizationId,
+  cloudAgentSessionId,
+  worktreeId,
+}: {
+  draft: SessionChangesDraft;
+  snapshot: SessionChangesSnapshot | null;
+  userId: string | undefined;
+  organizationId: string | undefined;
+  cloudAgentSessionId: string | null;
+  worktreeId: string | null | undefined;
+}): ReadonlySet<string> {
+  const stale = new Set<string>();
+  if (snapshot === null || cloudAgentSessionId === null || userId === undefined) {
+    return stale;
+  }
+  for (const comment of draft.comments) {
+    const scope = comment.anchor.capture.scope;
+    const current = sessionChangesCaptureForFile({
+      userId,
+      organizationId,
+      cloudAgentSessionId,
+      worktreeId,
+      snapshot,
+      file: { path: comment.anchor.path, ...(scope === undefined ? {} : { scope }) },
+    });
+    if (current === null || !sameWorktreeReviewCapture(comment.anchor.capture, current)) {
+      stale.add(comment.id);
+    }
+  }
+  return stale;
 }
 
 export function sessionChangesAnchorForLine({

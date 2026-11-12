@@ -2535,6 +2535,7 @@
       "empty": "Aínda non hai cambios en ficheiros nesta sesión.",
       "openFile": "Abrir {{path}}, {{status}}, {{additions}} adicións, {{deletions}} eliminacións",
       "truncated": "Só se amosan os primeiros ficheiros. A sesión ten máis cambios dos que o móbil pode listar.",
+      "partialCounts": "Reconto de liñas parcial",
       "binaryFile": "Binario",
       "fileDiffUnavailable": "Non se poden amosar no móbil as diferenzas deste ficheiro.",
       "binaryNoDiff": "Este é un ficheiro binario, polo que non hai liñas de texto que comentar.",

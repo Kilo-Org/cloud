@@ -2535,6 +2535,7 @@
       "empty": "Ende nuk ka ndryshime skedarësh në këtë sesion.",
       "openFile": "Hap {{path}}, {{status}}, {{additions}} shtime, {{deletions}} fshirje",
       "truncated": "Shfaqen vetëm skedarët e parë. Sesioni ka më shumë ndryshime nga sa mund të listohen në celular.",
+      "partialCounts": "Numërime të pjesshme rreshtash",
       "binaryFile": "Binar",
       "fileDiffUnavailable": "Ndryshimet e këtij skedari nuk mund të shfaqen në celular.",
       "binaryNoDiff": "Ky është skedar binar, ndaj nuk ka rreshta teksti për të komentuar.",

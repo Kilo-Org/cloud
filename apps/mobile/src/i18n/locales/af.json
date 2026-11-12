@@ -2535,6 +2535,7 @@
       "empty": "Nog geen lêerwysigings in hierdie sessie nie.",
       "openFile": "Maak {{path}} oop, {{status}}, {{additions}} byvoegings, {{deletions}} skrappings",
       "truncated": "Slegs die eerste lêers word gewys. Die sessie het meer wysigings as wat mobiel kan lys.",
+      "partialCounts": "Gedeeltelike reëltellings",
       "binaryFile": "Binêr",
       "fileDiffUnavailable": "Hierdie lêer se verskille kan nie op mobiel vertoon word nie.",
       "binaryNoDiff": "Dit is 'n binêre lêer, so daar is geen teksreëls om op kommentaar te lewer nie.",

@@ -1988,6 +1988,7 @@
       "empty": "Ancora nessuna modifica ai file in questa sessione.",
       "openFile": "Apri {{path}}, {{status}}, {{additions}} aggiunte, {{deletions}} eliminazioni",
       "truncated": "Vengono mostrati solo i primi file. La sessione contiene più modifiche di quante se ne possano elencare su dispositivi mobili.",
+      "partialCounts": "Conteggi parziali delle righe",
       "binaryFile": "Binario",
       "fileDiffUnavailable": "Il confronto di questo file non può essere visualizzato su dispositivi mobili.",
       "binaryNoDiff": "Questo è un file binario, quindi non ci sono righe di testo da commentare.",

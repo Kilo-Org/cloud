@@ -2535,6 +2535,7 @@
       "empty": "Bu sessiyada hələ fayl dəyişikliyi yoxdur.",
       "openFile": "Aç: {{path}}, {{status}}, {{additions}} əlavə, {{deletions}} silinmə",
       "truncated": "Yalnız ilk fayllar göstərilir. Sessiyada mobil cihazın göstərə biləcəyindən daha çox dəyişiklik var.",
+      "partialCounts": "Qismən sətir sayları",
       "binaryFile": "Binar",
       "fileDiffUnavailable": "Bu faylın dəyişikliklərini mobil cihazda göstərmək mümkün deyil.",
       "binaryNoDiff": "Bu binar fayldır, ona görə şərh yazmaq üçün mətn sətirləri yoxdur.",

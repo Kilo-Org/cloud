@@ -1993,6 +1993,7 @@
       "empty": "In dieser Sitzung wurden noch keine Dateien geändert.",
       "openFile": "{{path}} öffnen, {{status}}, {{additions}} Hinzufügungen, {{deletions}} Löschungen",
       "truncated": "Es werden nur die ersten Dateien angezeigt. Die Sitzung enthält mehr Änderungen, als auf dem Mobilgerät aufgelistet werden können.",
+      "partialCounts": "Teilweise Zeilenzahlen",
       "binaryFile": "Binär",
       "fileDiffUnavailable": "Der Diff dieser Datei kann auf dem Mobilgerät nicht angezeigt werden.",
       "binaryNoDiff": "Dies ist eine Binärdatei, daher gibt es keine Textzeilen zum Kommentieren.",

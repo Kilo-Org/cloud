@@ -1,7 +1,7 @@
 // The comment composer for one diff line: a card with a multiline field and the
 // add/save action. Dismissing keeps the draft comment list untouched.
 
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -12,34 +12,28 @@ import { Text } from '@/components/ui/text';
 import { MAX_WORKTREE_REVIEW_COMMENT_LENGTH } from '@kilocode/app-shared/worktree-review';
 
 export function SessionChangesCommentDialog({
-  visible,
   path,
   line,
   initialText,
+  editing,
   onCancel,
   onSubmit,
 }: Readonly<{
-  visible: boolean;
   path: string;
   line: number;
   initialText: string;
+  editing: boolean;
   onCancel: () => void;
   onSubmit: (text: string) => void;
 }>) {
   const { t } = useTranslation();
-  const [text, setText] = useState(initialText);
-
-  useEffect(() => {
-    if (visible) {
-      setText(initialText);
-    }
-  }, [visible, initialText]);
-
-  if (!visible) {
-    return null;
-  }
-  const trimmed = text.trim();
-  const tooLong = text.length > MAX_WORKTREE_REVIEW_COMMENT_LENGTH;
+  // iOS: the field stays uncontrolled (ref + defaultValue). The component is
+  // mounted per open, so `defaultValue` reseeds without a state write, and the
+  // state below feeds only the derived submit/too-long UI.
+  const textRef = useRef(initialText);
+  const [length, setLength] = useState(initialText.length);
+  const [trimmedLength, setTrimmedLength] = useState(initialText.trim().length);
+  const tooLong = length > MAX_WORKTREE_REVIEW_COMMENT_LENGTH;
   return (
     <DialogCard onClose={onCancel}>
       <View className="gap-1">
@@ -54,8 +48,12 @@ export function SessionChangesCommentDialog({
         multiline
         numberOfLines={4}
         autoFocus
-        value={text}
-        onChangeText={setText}
+        defaultValue={initialText}
+        onChangeText={next => {
+          textRef.current = next;
+          setLength(next.length);
+          setTrimmedLength(next.trim().length);
+        }}
         placeholder={t('agentChat.sessionChanges.commentPlaceholder')}
         accessibilityLabel={t('prReview.composer.commentBody')}
         className="min-h-[96px] text-base"
@@ -73,13 +71,13 @@ export function SessionChangesCommentDialog({
           <Text>{t('common.cancel')}</Text>
         </Button>
         <Button
-          disabled={trimmed.length === 0 || tooLong}
+          disabled={trimmedLength === 0 || tooLong}
           onPress={() => {
-            onSubmit(text);
+            onSubmit(textRef.current);
           }}
           testID="session-changes-comment-save"
         >
-          <Text>{t('prReview.composer.addTitle')}</Text>
+          <Text>{editing ? t('common.save') : t('prReview.composer.addTitle')}</Text>
         </Button>
       </View>
     </DialogCard>

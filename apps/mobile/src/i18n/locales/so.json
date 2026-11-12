@@ -2535,6 +2535,7 @@
       "empty": "Weli wax isbeddel ah oo fayl ah kuma jiraan fadhigan.",
       "openFile": "Fur {{path}}, {{status}}, {{additions}} ku darid, {{deletions}} tirtirid",
       "truncated": "Faylasha ugu horreeya oo keliya ayaa la muujiyay. Fadhigu wuxuu leeyahay isbeddello ka badan inta mobilku liis gareyn karo.",
+      "partialCounts": "Tirkoobka safka qayb ahaan",
       "binaryFile": "Binary",
       "fileDiffUnavailable": "Kala duwanaanshaha faylkan laguma muujin karo mobilka.",
       "binaryNoDiff": "Kani waa fayl binary ah, sidaas darteed ma jiraan saf qoraal ah oo faallo laga bixin karo.",

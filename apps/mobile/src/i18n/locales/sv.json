@@ -2535,6 +2535,7 @@
       "empty": "Inga filändringar i den här sessionen än.",
       "openFile": "Öppna {{path}}, {{status}}, {{additions}} tillägg, {{deletions}} borttagningar",
       "truncated": "Endast de första filerna visas. Sessionen har fler ändringar än vad mobilen kan lista.",
+      "partialCounts": "Partiella radantal",
       "binaryFile": "Binär",
       "fileDiffUnavailable": "Diffen för den här filen kan inte visas på mobilen.",
       "binaryNoDiff": "Det här är en binärfil, så det finns inga textrader att kommentera.",

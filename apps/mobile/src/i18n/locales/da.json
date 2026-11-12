@@ -2535,6 +2535,7 @@
       "empty": "Ingen filændringer i denne session endnu.",
       "openFile": "Åbn {{path}}, {{status}}, {{additions}} tilføjelser, {{deletions}} sletninger",
       "truncated": "Kun de første filer vises. Sessionen har flere ændringer, end der kan vises på mobil.",
+      "partialCounts": "Delvise linjetællinger",
       "binaryFile": "Binær",
       "fileDiffUnavailable": "Ændringerne i denne fil kan ikke vises på mobil.",
       "binaryNoDiff": "Dette er en binær fil, så der er ingen tekstlinjer at kommentere.",

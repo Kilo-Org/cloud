@@ -92,7 +92,7 @@ describe('GET /api/v1/embedding-models', () => {
     await expect(response.json()).resolves.toEqual(catalog);
   });
 
-  test('returns a retryable unavailable response when no stored catalog exists', async () => {
+  test('returns a retryable unavailable response when stored metadata and upstream fallback fail', async () => {
     jest.mocked(getKiloEmbeddingModelCatalogFromDatabase).mockResolvedValue(null);
 
     const response = await handleEmbeddingModelsRequest();

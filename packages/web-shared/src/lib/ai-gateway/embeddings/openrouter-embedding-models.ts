@@ -7,7 +7,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/embeddings/kilo-embedding-models';
 import {
   assertMinimumCount,
-  readStoredMetadata,
+  getMetadata,
   type MetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
@@ -26,6 +26,7 @@ const EMBEDDING_MODELS_URL = 'https://openrouter.ai/api/v1/embeddings/models';
 export const openRouterEmbeddingModelsMetadataSource: MetadataSource<OpenRouterEmbeddingModels> = {
   // Omitting both pagination parameters requests the full inventory, not the default page size.
   url: EMBEDDING_MODELS_URL,
+  timeoutMs: 15_000,
   parse: raw => {
     const parsed = OpenRouterEmbeddingModelsSchema.parse(raw);
     assertMinimumCount(EMBEDDING_MODELS_URL, parsed.data.length, 1);
@@ -67,12 +68,10 @@ function buildCatalog(stored: OpenRouterEmbeddingModels): KiloEmbeddingModelCata
 function createCatalogReader() {
   return createCachedFetch<KiloEmbeddingModelCatalog | null>(
     async () => {
-      const stored = await readStoredMetadata(openRouterEmbeddingModelsMetadataSource, readDb);
-      // Missing, corrupt, and failed reads all retain the LKG and use failure backoff. Never
-      // fetch upstream or write metadata on the request path; the refresh job owns that work.
-      if (stored === null)
-        throw new Error('Stored OpenRouter embedding model inventory unavailable');
-      return buildCatalog(stored);
+      // Any valid stored snapshot wins, regardless of age. Missing or unusable rows fall back
+      // upstream without writing metadata; both sources share this cache's LKG and backoff.
+      const metadata = await getMetadata(openRouterEmbeddingModelsMetadataSource, readDb);
+      return buildCatalog(metadata);
     },
     300_000,
     null,

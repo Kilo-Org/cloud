@@ -146,10 +146,7 @@ import {
 } from '@/components/agents/session-slow-load';
 import { getLanguageSnapshot } from '@/i18n';
 import { SessionMessageList } from '@/components/agents/session-message-list';
-import {
-  composerInsetForSession,
-  resolveTranscriptFrame,
-} from '@/components/agents/session-message-list-anchor';
+import { composerInsetForSession } from '@/components/agents/session-message-list-anchor';
 import {
   collectTranscriptItemKeysByPart,
   condenseTranscriptToolRuns,
@@ -2160,11 +2157,11 @@ export function SessionDetailContent({
   const isReadOnlyContinueVisible =
     isReadOnlySession && !hasBlockingInteraction && !isSessionChromePending;
   // A blocking card or the read-only footer replaces the composer with chrome of
-  // another height on purpose, so its reservation only applies while the
+  // another height on purpose, so its measurement only applies while the
   // composer it was measured for is the chrome on screen.
-  const transcriptFrame = resolveTranscriptFrame(
-    isComposerVisible ? composerInsetForSession(composerBottomInset, sessionId) : 0
-  );
+  const transcriptChromeGrowth = isComposerVisible
+    ? composerInsetForSession(composerBottomInset, sessionId)
+    : 0;
   // The pending slot holds the shape its session will end in. The kind is only
   // set once the transport answers, but the metadata read lands before that and
   // names a cloud-agent session, which is writable by construction; the id
@@ -3070,35 +3067,33 @@ export function SessionDetailContent({
       // No entrance animation: the transcript body must paint on its own, not
       // after a `FadeIn` (which starts at `opacity: 0`) completes. The
       // skeleton is swapped for the rows in one commit, so it needs none.
-      // The composer's input growth is reserved here, in the same commit that
-      // grows it, so the transcript's bottom edge stays on the composer's top
-      // edge. Correcting from the list's own `onLayout` painted the transcript
-      // clipped for the frames before that callback reached JS, then moved it.
-      <View className="flex-1" style={transcriptFrame.holder}>
-        <View style={transcriptFrame.content}>
-          <SessionMessageList
-            sessionId={sessionId}
-            items={transcript}
-            keyExtractor={getSessionTranscriptItemKey}
-            getItemType={getSessionTranscriptItemType}
-            hasOlderMessages={hasOlderMessages}
-            isLoadingOlderMessages={isLoadingOlderMessages}
-            olderMessagesError={olderMessagesError}
-            olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
-            onLoadOlderMessages={() => {
-              void manager.loadOlderMessages();
-            }}
-            onReachedBottom={() => {
-              manager.trimRetainedHistory();
-            }}
-            onAnchorChange={handleAnchorChange}
-            onOpenSettledChange={handleOpenSettledChange}
-            renderItem={renderItem}
-            resumeAt={resumeAnchor}
-            followTailNonce={followTailNonce}
-          />
-        </View>
-      </View>
+      // The composer's input growth reaches the list as a paint offset on its
+      // content, applied in the same commit that grows the composer, so the
+      // transcript's bottom edge stays on the composer's top edge. Correcting
+      // from the list's own `onLayout` painted the transcript clipped for the
+      // frames before that callback reached JS, then moved it.
+      <SessionMessageList
+        sessionId={sessionId}
+        chromeGrowthDp={transcriptChromeGrowth}
+        items={transcript}
+        keyExtractor={getSessionTranscriptItemKey}
+        getItemType={getSessionTranscriptItemType}
+        hasOlderMessages={hasOlderMessages}
+        isLoadingOlderMessages={isLoadingOlderMessages}
+        olderMessagesError={olderMessagesError}
+        olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
+        onLoadOlderMessages={() => {
+          void manager.loadOlderMessages();
+        }}
+        onReachedBottom={() => {
+          manager.trimRetainedHistory();
+        }}
+        onAnchorChange={handleAnchorChange}
+        onOpenSettledChange={handleOpenSettledChange}
+        renderItem={renderItem}
+        resumeAt={resumeAnchor}
+        followTailNonce={followTailNonce}
+      />
     );
   }
 }

@@ -1,34 +1,27 @@
 import { describe, expect, it } from 'vitest';
 
-import { composerInsetForSession, resolveTranscriptFrame } from './session-message-list-anchor';
+import { composerInsetForSession, resolveTranscriptRideUp } from './session-message-list-anchor';
 
-describe('resolveTranscriptFrame', () => {
-  it('fills the region exactly when the chrome has not grown', () => {
-    expect(resolveTranscriptFrame(0)).toEqual({ holder: { flex: 1 }, content: { flex: 1 } });
+describe('resolveTranscriptRideUp', () => {
+  it('keeps the transcript still when the chrome has not grown', () => {
+    expect(resolveTranscriptRideUp(0, true)).toBe(0);
   });
 
-  it('reuses the shared fill so an unchanging frame keeps its identity', () => {
-    expect(resolveTranscriptFrame(0).content).toBe(resolveTranscriptFrame(0).holder);
+  it('shifts the transcript by the growth while it is anchored at its bottom', () => {
+    // The shift is the paint offset the list applies to its content, so the
+    // newest row keeps the chrome's top edge without moving any row's frame.
+    expect(resolveTranscriptRideUp(64, true)).toBe(64);
   });
 
-  it('keeps the transcript height and rides it up by the growth', () => {
-    const frame = resolveTranscriptFrame(64);
-    // `top` and `bottom` together give the content the holder's previous
-    // height, which is what keeps the list's viewport, content height, scroll
-    // offset and at-bottom verdict describing the same rows: no scroll needed.
-    expect(frame.content).toEqual({
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
-      top: -64,
-    });
-    expect(frame.holder).toEqual({ flex: 1, overflow: 'hidden' });
+  it('keeps the transcript still once the reader scrolled away from the bottom', () => {
+    // A shift while the reader is above the tail would hide the top rows of the
+    // window they are reading, and only a scroll back down would restore them.
+    expect(resolveTranscriptRideUp(64, false)).toBe(0);
   });
 
   it('treats a non-finite or shrinking chrome as no growth', () => {
-    expect(resolveTranscriptFrame(Number.NaN).holder).toEqual({ flex: 1 });
-    expect(resolveTranscriptFrame(-20).holder).toEqual({ flex: 1 });
+    expect(resolveTranscriptRideUp(Number.NaN, true)).toBe(0);
+    expect(resolveTranscriptRideUp(-20, true)).toBe(0);
   });
 });
 
@@ -38,8 +31,8 @@ describe('composerInsetForSession', () => {
   });
 
   it('reserves nothing from another session', () => {
-    // The previous session's growth must not offset the next transcript before
-    // the new composer publishes its floor.
+    // The next session's composer publishes its own floor on mount; until that
+    // publish lands, a carried-over value would offset its transcript.
     expect(composerInsetForSession({ sessionId: 'ses-a', dp: 64 }, 'ses-b')).toBe(0);
   });
 });

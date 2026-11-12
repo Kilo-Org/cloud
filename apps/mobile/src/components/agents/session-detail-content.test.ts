@@ -12,7 +12,7 @@ import {
 import { createStore, Provider } from 'jotai';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
-import { type Pressable, type ViewStyle } from 'react-native';
+import { type Pressable } from 'react-native';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   type AssociatedPrData,
@@ -5242,56 +5242,42 @@ function indicatorNodes(view: Awaited<ReturnType<typeof mountDetails>>) {
   return view.renderer.root.findAll(node => Object.is(node.type, 'SessionStatusIndicator'));
 }
 
-describe('SessionDetailContent transcript frame', () => {
-  /** The reserved top offset of the transcript's content frame, or null when none. */
-  function anchoredTop(view: { renderer: ReactTestRenderer }): number | null {
-    const reserved = view.renderer.root
-      .findAll(() => true)
-      .find(node => {
-        const style = node.props.style as ViewStyle | null;
-        return style?.position === 'absolute' && typeof style.top === 'number' && style.top !== 0;
-      });
-    const style = reserved?.props.style as ViewStyle | undefined;
-    return typeof style?.top === 'number' ? style.top : null;
+describe('SessionDetailContent transcript chrome growth', () => {
+  /** The growth the host hands the transcript, or null when it hands none. */
+  function chromeGrowth(view: { renderer: ReactTestRenderer }): number {
+    const list = view.renderer.root.find(node => Object.is(node.type, SessionMessageList));
+    return (list.props as { chromeGrowthDp?: number }).chromeGrowthDp ?? 0;
   }
 
-  function clippingHolders(view: { renderer: ReactTestRenderer }) {
-    return view.renderer.root.findAll(
-      node => (node.props.style as ViewStyle | null)?.overflow === 'hidden'
-    );
-  }
-
-  it('reserves the composer input growth in the same commit and gives it back', async () => {
+  it('hands the composer input growth to the transcript in the same commit and gives it back', async () => {
     goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([taskMessage(ROOT_ID, CHILD_IDS)]);
-    // Nothing is reserved while the input sits on its one-line floor.
-    expect(anchoredTop(view)).toBeNull();
+    // Nothing rides up while the input sits on its one-line floor.
+    expect(chromeGrowth(view)).toBe(0);
 
     act(() => {
       (composerPropsWithInset(view).onInputBottomInsetChange as (dp: number) => void)(64);
     });
-    // The transcript keeps its previous height and rides up by the growth, so
-    // its bottom edge tracks the composer without a scroll command.
-    expect(anchoredTop(view)).toBe(-64);
-    expect(clippingHolders(view).length).toBeGreaterThan(0);
+    // The list shifts its content by the growth, so its newest row keeps the
+    // composer's top edge without a scroll command.
+    expect(chromeGrowth(view)).toBe(64);
 
     act(() => {
       (composerPropsWithInset(view).onInputBottomInsetChange as (dp: number) => void)(0);
     });
-    expect(anchoredTop(view)).toBeNull();
-    expect(clippingHolders(view)).toHaveLength(0);
+    expect(chromeGrowth(view)).toBe(0);
   });
 
-  it('drops the reservation when the composer is replaced by other chrome', async () => {
+  it('withholds the growth when the composer is replaced by other chrome', async () => {
     goalMountOptions = { resolvedType: 'remote' };
     const view = await mountDetails([taskMessage(ROOT_ID, CHILD_IDS)]);
     act(() => {
       (composerPropsWithInset(view).onInputBottomInsetChange as (dp: number) => void)(64);
     });
-    expect(anchoredTop(view)).not.toBeNull();
+    expect(chromeGrowth(view)).toBe(64);
 
-    // The read-only footer is chrome of another height, so its reservation is
-    // dropped while it is up.
+    // The read-only footer is chrome of another height, so nothing rides up
+    // while it is on screen.
     act(() => {
       view.store.set(view.manager.atoms.activeSessionType, 'read-only');
       view.store.set(view.manager.atoms.isReadOnly, true);
@@ -5299,7 +5285,7 @@ describe('SessionDetailContent transcript frame', () => {
     expect(
       view.renderer.root.findAll(candidate => Object.is(candidate.type, 'ChatComposer'))
     ).toHaveLength(0);
-    expect(anchoredTop(view)).toBeNull();
+    expect(chromeGrowth(view)).toBe(0);
 
     // The measurement survives the swap: once the composer is back, a
     // multi-line draft keeps its anchor without waiting for another line.
@@ -5307,7 +5293,7 @@ describe('SessionDetailContent transcript frame', () => {
       view.store.set(view.manager.atoms.activeSessionType, 'remote');
       view.store.set(view.manager.atoms.isReadOnly, false);
     });
-    expect(anchoredTop(view)).toBe(-64);
+    expect(chromeGrowth(view)).toBe(64);
   });
 });
 

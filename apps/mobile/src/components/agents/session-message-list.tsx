@@ -12,6 +12,7 @@ import { useSessionListAnchorReport } from '@/components/agents/use-session-list
 import { useSessionListOpenSettle } from '@/components/agents/use-session-list-open-settle';
 import { useSessionListResumeScroll } from '@/components/agents/use-session-list-resume-scroll';
 import { SessionPaginationHeader } from '@/components/agents/session-pagination-header';
+import { resolveTranscriptRideUp } from '@/components/agents/session-message-list-anchor';
 import { SessionTranscriptOpenGate } from '@/components/agents/session-transcript-open-gate';
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
 import {
@@ -99,6 +100,13 @@ type SessionMessageListProps<T> = {
    * caller byte-identical.
    */
   onOpenSettledChange?: (sessionId: string, settled: boolean) => void;
+  /**
+   * How far the chrome under the transcript has grown past its resting height,
+   * in dp. The list shifts its content up by this amount while it is anchored at
+   * its bottom, so the newest row stays on that chrome's top edge in the same
+   * commit that grows it. Absent or 0 keeps every other caller byte-identical.
+   */
+  chromeGrowthDp?: number;
 };
 
 export function SessionMessageList<T>({
@@ -119,6 +127,7 @@ export function SessionMessageList<T>({
   onOpenSettledChange,
   resumeAt,
   followTailNonce,
+  chromeGrowthDp,
 }: Readonly<SessionMessageListProps<T>>) {
   // Rows are already present when the list mounts (the resume never mounts a
   // blank list), so the resume decision is derivable at render.
@@ -149,6 +158,7 @@ export function SessionMessageList<T>({
   const newestItemKey = newestItem === undefined ? null : keyExtractor(newestItem);
   const {
     isAtBottom,
+    isScrollable,
     listRef,
     scrollToLatestAnimated,
     suppressAutoFollow,
@@ -169,6 +179,7 @@ export function SessionMessageList<T>({
     resetKey: sessionId,
     initialAutoScroll: followTailAtMount,
     resumeKey: resumeAnchor,
+    coveredViewportGrowthDp: chromeGrowthDp ?? 0,
   });
   // The transcript stays behind the loading skeleton until its rows stop
   // measuring, so the position it is first seen in is the position it keeps.
@@ -325,6 +336,12 @@ export function SessionMessageList<T>({
     olderArrivalNewestKeyRef.current = newestItemKey;
   }, [items, newestItemKey]);
 
+  // The transcript rides up by the chrome's growth while it is anchored at its
+  // bottom, so the newest row keeps the chrome's top edge in the same commit
+  // that grows the chrome. A list that cannot scroll has no row to bring back,
+  // so it never shifts.
+  const chromeRideUp = resolveTranscriptRideUp(chromeGrowthDp ?? 0, isAtBottom && isScrollable);
+
   // When the optional `contentBottomInset` is omitted and the landscape side
   // insets are 0 (portrait) we return the original module-level
   // `listContentContainerStyle` reference so the default-prop path is
@@ -332,9 +349,10 @@ export function SessionMessageList<T>({
   // extend the bottom padding to clear safe areas such as the home indicator
   // on curved-bottom iPhones, and the side padding keeps transcript text clear
   // of the landscape sensor housing; portrait insets are 0, keeping the
-  // geometry unchanged.
-  const resolvedContentContainerStyle = useMemo<ViewStyle>(
-    () =>
+  // geometry unchanged. A ride-up is a paint offset on the content, so the rows
+  // keep their frames, offsets and at-bottom verdict.
+  const resolvedContentContainerStyle = useMemo<ViewStyle>(() => {
+    const base =
       !contentBottomInset && left === 0 && right === 0
         ? listContentContainerStyle
         : {
@@ -342,9 +360,9 @@ export function SessionMessageList<T>({
             paddingBottom: 8 + (contentBottomInset ?? 0),
             paddingLeft: left,
             paddingRight: right,
-          },
-    [contentBottomInset, left, right]
-  );
+          };
+    return chromeRideUp > 0 ? { ...base, transform: [{ translateY: -chromeRideUp }] } : base;
+  }, [contentBottomInset, left, right, chromeRideUp]);
 
   // The host passes a fresh inline arrow for `onLoadOlderMessages` on every
   // render, so the handler is held in a ref (the same pattern as

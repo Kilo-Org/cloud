@@ -768,3 +768,46 @@ describe('SessionMessageList anchor reporting', () => {
     expect(onAnchorChange).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('SessionMessageList chrome ride-up', () => {
+  function contentTransformY(): number | null {
+    const style = flashListProps.current?.contentContainerStyle as
+      | { transform?: readonly { translateY?: number }[] }
+      | undefined;
+    const value = style?.transform?.[0]?.translateY;
+    return typeof value === 'number' ? value : null;
+  }
+
+  it('shifts the content by the chrome growth while the transcript is anchored', () => {
+    mountList({ chromeGrowthDp: 64 });
+    settleAtBottom();
+    expect(contentTransformY()).toBe(-64);
+  });
+
+  it('applies the shift in the render that publishes the growth', () => {
+    const renderer = mountList({ chromeGrowthDp: 0 });
+    settleAtBottom();
+    expect(contentTransformY()).toBeNull();
+    rerenderList(renderer, { chromeGrowthDp: 64 });
+    expect(contentTransformY()).toBe(-64);
+  });
+
+  it('keeps the content still once the reader is above the tail', () => {
+    mountList({ chromeGrowthDp: 64 });
+    settleAtBottom();
+    scrollAwayFromBottom();
+    expect(contentTransformY()).toBeNull();
+  });
+
+  it('keeps a transcript that cannot scroll still', () => {
+    mountList({ chromeGrowthDp: 64 });
+    fire('onScrollEndDrag', {
+      nativeEvent: {
+        contentOffset: { y: 0 },
+        contentSize: { height: 400, width: 0 },
+        layoutMeasurement: { height: 500, width: 0 },
+      },
+    });
+    expect(contentTransformY()).toBeNull();
+  });
+});

@@ -1,7 +1,5 @@
-import { type ViewStyle } from 'react-native';
-
 /**
- * The frame that holds a transcript above chrome which grows.
+ * How far the transcript rides up while the chrome under it grows.
  *
  * A transcript keeps its newest row on the bottom edge of its viewport. When
  * the chrome under it grows, the viewport shrinks in the layout pass and the
@@ -9,31 +7,23 @@ import { type ViewStyle } from 'react-native';
  * that pass; the scroll it issues lands later still. The transcript is then
  * painted clipped and jumps once it catches up.
  *
- * So the growth is reserved in the layout instead: the transcript keeps the
- * height it had before the growth and rides up, so its bottom edge stays on the
- * chrome's top edge — `top` and `bottom` together give the frame exactly that
- * previous height. Nothing inside the transcript changes, so its viewport,
- * content height, scroll offset and at-bottom verdict keep describing the same
- * rows, and no scroll command is issued at all.
+ * So the transcript's content is shifted up by the growth itself, in the same
+ * commit that grows the chrome: the rows keep their order and their offsets, no
+ * scroll command is issued, and the newest row stays on the chrome's top edge.
+ * The shift is a paint offset on the list's content, which a scroll view clips
+ * exactly as it clips the rows a scroll moves past its edge.
  *
- * The frame is taller than its holder by the inset, so the holder clips the
- * strip the ride pushes above its top edge. That strip holds the padding and
- * the start of the oldest rows: at the tail of a transcript that overflows the
- * region it lies far above the viewport, and it is the first rows only when the
- * list is scrolled to its very top.
+ * The shift applies only while the transcript is anchored at its bottom and its
+ * content overflows the viewport. The rows the shift hides are the ones a
+ * scroll to the same position would hide, and the list keeps enough scroll range
+ * to bring them back; a transcript that cannot scroll has no anchoring problem
+ * to solve, so it never shifts.
  */
-export type TranscriptFrame = Readonly<{ holder: ViewStyle; content: ViewStyle }>;
-
-const FILL: ViewStyle = { flex: 1 };
-
-export function resolveTranscriptFrame(chromeGrowth: number): TranscriptFrame {
-  if (!(chromeGrowth > 0)) {
-    return { holder: FILL, content: FILL };
+export function resolveTranscriptRideUp(chromeGrowth: number, anchoredAtBottom: boolean): number {
+  if (!anchoredAtBottom || !(chromeGrowth > 0) || !Number.isFinite(chromeGrowth)) {
+    return 0;
   }
-  return {
-    holder: { flex: 1, overflow: 'hidden' },
-    content: { position: 'absolute', left: 0, right: 0, bottom: 0, top: -chromeGrowth },
-  };
+  return chromeGrowth;
 }
 
 /**

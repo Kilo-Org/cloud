@@ -60,6 +60,7 @@ const AUTOMATIC_RETRY_TERMINAL_REASON_LIST = [
   'timeout',
   'assistant_timeout',
   'assistant_unavailable',
+  'assistant_unauthorized',
   'assistant_gateway_unavailable',
   'assistant_provider_disconnect',
   'upstream_error',

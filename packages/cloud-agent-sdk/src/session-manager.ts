@@ -2626,7 +2626,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   /**
    * Remember a prompt a failed send could not deliver, and the message id it
-   * was sent under, for the session that owned the optimistic row (see
+   * was sent under, for the session that sent it (see
    * `failedPromptBySession`). Refreshes insertion order so the most recently
    * touched sessions survive eviction.
    */
@@ -2677,7 +2677,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   /**
    * Remember a failed send whose outcome is unknown, under the session that
-   * owned the optimistic row (see `pendingConfirmationBySession`), and persist
+   * sent it (see `pendingConfirmationBySession`), and persist
    * it so an open after this route is gone still settles it.
    */
   function rememberPendingConfirmation(
@@ -3967,7 +3967,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         (detail.code === 'connection-failed' ||
           detail.code === 'connection-lost' ||
           detail.code === 'generic-error');
-      if (insertedOptimisticRow && kiloSessionId) {
+      if (kiloSessionId) {
         if (delivered) {
           failedPromptBySession.delete(kiloSessionId);
         } else {

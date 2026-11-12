@@ -3386,6 +3386,60 @@ describe('createSessionManager', () => {
       expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('/review main');
     });
 
+    it('withdraws an ambiguous command draft when the queue confirms its submission', async () => {
+      const persistPendingSendConfirmation = jest.fn();
+      const clearPendingSendConfirmation = jest.fn();
+      const config = createMockConfig({
+        persistPendingSendConfirmation,
+        clearPendingSendConfirmation,
+      });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSession.send.mockRejectedValue(new Error('ECONNRESET'));
+      await expect(
+        mgr.send({ payload: { type: 'command', command: 'review', arguments: 'main' } })
+      ).resolves.toBe(false);
+      const messageId = mockSession.send.mock.calls[0][0].messageId;
+      if (!messageId || !mockSession.storage)
+        throw new Error('Expected command submission and storage');
+      expect(persistPendingSendConfirmation).toHaveBeenCalledWith(
+        kiloId('ses-1'),
+        messageId,
+        '/review main'
+      );
+      createChatProcessor(mockSession.storage).synthesizeQueuedUserMessage({
+        messageId,
+        sessionId: 'ses-1',
+        content: '/review main',
+      });
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBeNull();
+      expect(atomValue(config.store, mgr.atoms.deliveredFailedPrompt)).toEqual({
+        messageId,
+        text: '/review main',
+        sequence: 1,
+      });
+      expect(clearPendingSendConfirmation).toHaveBeenCalledWith(kiloId('ses-1'), messageId);
+    });
+
+    it('keeps a refused command draft across session switches without pending confirmation', async () => {
+      const persistPendingSendConfirmation = jest.fn();
+      const config = createMockConfig({ persistPendingSendConfirmation });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSession.send.mockRejectedValueOnce(
+        Object.assign(new Error('Insufficient credits'), {
+          data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 },
+        })
+      );
+      await expect(
+        mgr.send({ payload: { type: 'command', command: 'review', arguments: 'main' } })
+      ).resolves.toBe(false);
+      expect(persistPendingSendConfirmation).not.toHaveBeenCalled();
+      await mgr.switchSession(kiloId('ses-2'));
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('/review main');
+    });
+
     it('inserts one optimistic row before cloud.message.queued arrives', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

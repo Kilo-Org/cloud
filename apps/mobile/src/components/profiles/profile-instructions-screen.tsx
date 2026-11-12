@@ -59,9 +59,9 @@ function hasUsableMessage(error: unknown): boolean {
 
 /**
  * One instruction row: the rules file name in mono, the path it is applied as,
- * the enabled switch, and delete plus edit. The name is painted only and hidden
- * from assistive technology, so the switch's label stays the only element a
- * screen reader matches by the file name.
+ * the enabled switch, and delete plus edit. Both painted lines are hidden from
+ * assistive technology — the path repeats the name — so the switch's label
+ * stays the only element a screen reader matches by the file name.
  */
 function InstructionRow({
   instruction,
@@ -77,7 +77,7 @@ function InstructionRow({
         <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
           {instruction.name}
         </Text>
-        <Text variant="muted" className="text-xs" numberOfLines={1}>
+        <Text variant="muted" className="text-xs" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
           {`.kilocode/rules/${instruction.name}.md`}
         </Text>
       </View>

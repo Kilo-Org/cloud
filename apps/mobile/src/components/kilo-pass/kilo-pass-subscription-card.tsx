@@ -90,11 +90,10 @@ export function KiloPassSubscriptionCard({
         // (2026-11-05). The earlier 66 assumed a 16 pt rem and left every
         // section below the card moving 8 dp when the card arrived.
         //
-        // The stacked reserve is the resolved card: p-3 (21) + borders (2) +
-        // the h-10 icon row (35) + the gap (7) + the title and one-line
-        // description (35). The description is now a single status word, so
-        // the old 114 dp reserve would have moved the sections below by it.
-        <View className={narrow ? 'h-[100px]' : 'h-[58px]'} />
+        // The stacked reserve holds the tallest state: p-3 (21) + borders (2)
+        // + the h-10 icon row (35) + the gap (7) + the title (21) and the two
+        // lines the no-pass and ended sentences wrap to at a narrow width (28).
+        <View className={narrow ? 'h-[114px]' : 'h-[58px]'} />
       ) : null}
 
       {contentState.kind === 'loading' && !hideLoadingSkeleton ? (

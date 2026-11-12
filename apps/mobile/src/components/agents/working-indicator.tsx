@@ -91,6 +91,8 @@ export function WorkingIndicator({
     <Animated.View
       entering={FadeIn.duration(200)}
       exiting={FadeOut.duration(150)}
+      // The design gate's proof readiness marker for this row.
+      testID="agent-activity-row"
       className={`flex-row items-center gap-2 ${SESSION_FOOTER_ROW_ITEM_PADDING}`}
     >
       <ActivityIndicator size="small" color={colors.mutedForeground} />

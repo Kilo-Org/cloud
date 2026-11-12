@@ -33,7 +33,10 @@ import {
   type WorktreeChangesRefresh,
 } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
-import { cloudAgentId, kiloId } from '@kilocode/cloud-agent-sdk/test-helpers';
+import { cloudAgentId } from '@kilocode/cloud-agent-sdk/test-helpers';
+
+import { AGENT_CHAT_FIXTURE_SESSION_ID } from './agent-chat-fixture-session';
+import { BLOCKED_BASH_COMMAND, PENDING_BASH_ASK } from './agent-chat-fixture-states';
 
 /**
  * The agent chat screen — transcript and composer — against one fixed
@@ -50,9 +53,6 @@ import { cloudAgentId, kiloId } from '@kilocode/cloud-agent-sdk/test-helpers';
  * writing into that account's drafts. That state is proven by device captures
  * and the component suites instead.
  */
-export const AGENT_CHAT_FIXTURE_SESSION_ID: KiloSessionId = kiloId(
-  'ses_designGateAgentChatFixture0001'
-);
 
 /** The prompt the refused message carries. */
 const FIXTURE_PROMPT = 'Deploy the fix to staging';
@@ -122,36 +122,6 @@ const refused: StoredMessage = {
       text: FIXTURE_PROMPT,
     },
   ],
-};
-
-/** The command the pending ask holds: a running bash part the agent cannot start. */
-const blockedCommand: StoredMessage = {
-  info: {
-    ...answer.info,
-    id: 'msg_designGateBlocked',
-    time: { created: 1_700_000_120_000 },
-    parentID: 'msg_designGateAnswer',
-  },
-  parts: [
-    {
-      id: 'prt_designGateBlocked',
-      sessionID: AGENT_CHAT_FIXTURE_SESSION_ID,
-      messageID: 'msg_designGateBlocked',
-      type: 'tool',
-      callID: 'call_designGateBlocked',
-      tool: 'bash',
-      state: { status: 'running', input: { command: 'pnpm test' }, time: { start: 1 } },
-    },
-  ],
-};
-
-/** The bash ask the `pending-permission` state waits on, scoped like a real one. */
-const pendingBashAsk: StandalonePermission = {
-  requestId: 'per_designGateBash',
-  permission: 'bash',
-  patterns: ['pnpm test'],
-  metadata: {},
-  always: [],
 };
 
 const fetched: FetchedSessionData = {
@@ -227,9 +197,10 @@ function fixed<T>(value: T) {
  * The still states the fixture can hold, one per design-gate target. The plain
  * agent chat screen is `idle`; `pending-permission` holds the same screen behind
  * a bash ask, so the row that reports the agent's activity can be compared
- * while the agent waits for the answer.
+ * while the agent waits for the answer; `running` holds the same blocked
+ * transcript with the ask answered, which is the row the wait returns to.
  */
-export type AgentChatFixtureState = 'idle' | 'pending-permission';
+export type AgentChatFixtureState = 'idle' | 'pending-permission' | 'running';
 
 /**
  * The session manager the real screen mounts against, typed as the product's own
@@ -239,10 +210,11 @@ export function createAgentChatFixtureManager(
   state: AgentChatFixtureState = 'idle'
 ): SessionManager {
   const waitingForPermission = state === 'pending-permission';
-  const messages: StoredMessage[] = waitingForPermission
-    ? [opening, answer, blockedCommand]
+  const streaming = state !== 'idle';
+  const messages: StoredMessage[] = streaming
+    ? [opening, answer, BLOCKED_BASH_COMMAND]
     : [opening, answer, refused];
-  const pending = waitingForPermission
+  const pending = streaming
     ? new Map<string, MessageDeliveryState>()
     : new Map<string, MessageDeliveryState>([[refused.info.id, undeliveredEntry]]);
   const idle = async (): Promise<void> => undefined;
@@ -275,7 +247,7 @@ export function createAgentChatFixtureManager(
     clearError: () => undefined,
     destroy: () => undefined,
     atoms: {
-      isStreaming: fixed(waitingForPermission),
+      isStreaming: fixed(streaming),
       isLoading: fixed(false),
       isRefreshingCachedTranscript: fixed(false),
       cachedTranscriptSessionId: fixed<KiloSessionId | null>(null),
@@ -303,7 +275,7 @@ export function createAgentChatFixtureManager(
       question: fixed<QuestionState | null>(null),
       sessionInfo: fixed<SessionInfo | null>({ id: AGENT_CHAT_FIXTURE_SESSION_ID }),
       sessionId: fixed<CloudAgentSessionId | null>(cloudAgentId('cag_designGateAgentChat')),
-      activity: fixed<SessionActivity>(waitingForPermission ? { type: 'busy' } : { type: 'idle' }),
+      activity: fixed<SessionActivity>(streaming ? { type: 'busy' } : { type: 'idle' }),
       agentStatus: fixed<AgentStatus>({ type: 'idle' }),
       cloudStatus: fixed<CloudStatus | null>(null),
       setupLog: fixed<readonly string[]>([]),
@@ -315,11 +287,11 @@ export function createAgentChatFixtureManager(
       activeQuestion: fixed<StandaloneQuestion | null>(null),
       permission: fixed<PermissionState | null>(null),
       activePermission: fixed<StandalonePermission | null>(
-        waitingForPermission ? pendingBashAsk : null
+        waitingForPermission ? PENDING_BASH_ASK : null
       ),
       pendingQuestions: fixed<readonly StandaloneQuestion[]>([]),
       pendingPermissions: fixed<readonly StandalonePermission[]>(
-        waitingForPermission ? [pendingBashAsk] : []
+        waitingForPermission ? [PENDING_BASH_ASK] : []
       ),
       unreadablePermissions: fixed<readonly UnreadablePermissionState[]>([]),
       suggestion: fixed<SuggestionState | null>(null),

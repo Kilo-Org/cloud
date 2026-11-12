@@ -56,16 +56,13 @@ import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/
 import { getCodingPlanManagedKeyLabel } from '@/components/subscriptions/coding-plans/coding-plan-provider';
 import { BYOKRoutingPreview } from '@/components/organizations/byok/BYOKRoutingPreview';
 import {
+  ADD_BYOK_PROVIDERS,
   BYOK_PROVIDERS,
   DIRECT_BYOK_PROVIDERS_LIST,
   getByokProviderDisplayName,
 } from '@/lib/byok/provider-names';
 import { cn } from '@/lib/utils';
 import * as z from 'zod';
-
-const ADD_BYOK_PROVIDERS = BYOK_PROVIDERS.filter(
-  provider => provider.id !== DirectUserByokInferenceProviderIdSchema.enum.codestral
-);
 
 type StructuredCredentialKind = 'azure' | 'bedrock' | 'vertex';
 

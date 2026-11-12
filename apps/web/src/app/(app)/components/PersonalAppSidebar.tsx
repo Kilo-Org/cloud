@@ -46,8 +46,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     })
   );
 
-  // Dashboard group
-  const dashboardItems: Array<{
+  const overviewItems: Array<{
     title: string;
     icon: React.ElementType;
     url: string;
@@ -111,7 +110,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     },
   ];
 
-  // Cloud group
   const cloudItems: Array<{
     title: string;
     icon: React.ElementType;
@@ -145,8 +143,25 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     },
   ];
 
-  // Account group
-  const accountItems: Array<{
+  const settingsItems: Array<{
+    title: string;
+    icon: React.ElementType;
+    url: string;
+    className?: string;
+  }> = [
+    {
+      title: 'Integrations',
+      icon: Cable,
+      url: '/integrations',
+    },
+    {
+      title: 'Bring Your Own Key (BYOK)',
+      icon: Key,
+      url: '/byok',
+    },
+  ];
+
+  const billingItems: Array<{
     title: string;
     icon: React.ElementType;
     url: string;
@@ -158,11 +173,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       url: '/subscriptions',
     },
     {
-      title: 'Integrations',
-      icon: Cable,
-      url: '/integrations',
-    },
-    {
       title: 'Invoices',
       icon: Receipt,
       url: '/invoices',
@@ -171,11 +181,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       title: 'Credits',
       icon: Coins,
       url: '/credits',
-    },
-    {
-      title: 'Bring Your Own Key (BYOK)',
-      icon: Key,
-      url: '/byok',
     },
   ];
 
@@ -244,10 +249,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
 
   const allUrls = [
     kiloClawBaseUrl,
-    ...dashboardItems,
+    ...overviewItems,
     ...kiloClawItems,
     ...cloudItems,
-    ...accountItems,
+    ...settingsItems,
+    ...billingItems,
   ].map(i => (typeof i === 'string' ? i : i.url));
 
   return (
@@ -271,14 +277,21 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
           </>
         ) : (
           <>
-            <SidebarMenuList label="Dashboard" items={dashboardItems} allUrls={allUrls} />
+            {overviewItems.length > 0 && (
+              <SidebarMenuList label="Overview" items={overviewItems} allUrls={allUrls} />
+            )}
             {kiloClawEntryItems.length > 0 && (
               <SidebarMenuList label={null} items={kiloClawEntryItems} allUrls={allUrls} />
             )}
             {cloudItems.length > 0 && (
               <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
             )}
-            <SidebarMenuList label="Account" items={accountItems} allUrls={allUrls} />
+            {settingsItems.length > 0 && (
+              <SidebarMenuList label="Settings" items={settingsItems} allUrls={allUrls} />
+            )}
+            {billingItems.length > 0 && (
+              <SidebarMenuList label="Billing" items={billingItems} allUrls={allUrls} />
+            )}
           </>
         )}
       </SidebarContent>

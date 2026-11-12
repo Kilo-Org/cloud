@@ -95,8 +95,7 @@ export default function OrganizationAppSidebar({
 
   const hasOwnerLevelAccess = canManageOrganizationBilling(currentRole);
 
-  // Dashboard group
-  const dashboardItems: Array<{
+  const overviewItems: Array<{
     title: string;
     icon: React.ElementType;
     url: string;
@@ -127,15 +126,6 @@ export default function OrganizationAppSidebar({
             title: 'Request Logs',
             icon: ScrollText,
             url: `/organizations/${organizationId}/request-logs`,
-          },
-        ]
-      : []),
-    ...(hasOwnerLevelAccess && currentOrg?.parent_organization_id === null
-      ? [
-          {
-            title: 'Sub-organizations',
-            icon: Network,
-            url: `/organizations/${organizationId}/sub-organizations`,
           },
         ]
       : []),
@@ -175,7 +165,6 @@ export default function OrganizationAppSidebar({
     },
   ];
 
-  // Cloud group
   const cloudItems: Array<{
     title: string;
     icon: React.ElementType;
@@ -209,8 +198,37 @@ export default function OrganizationAppSidebar({
     },
   ];
 
-  // Account group
-  const accountItems: Array<{
+  const settingsItems: Array<{
+    title: string;
+    icon: React.ElementType;
+    url: string;
+    className?: string;
+  }> = [
+    {
+      title: 'Integrations',
+      icon: Cable,
+      url: `/organizations/${organizationId}/integrations`,
+    },
+    {
+      title: 'Custom Modes',
+      icon: Sliders,
+      url: `/organizations/${organizationId}/custom-modes`,
+    },
+    // The ChatGPT connection is personal, so any member can manage their own for
+    // the organization and sees only that card. The pasted-key manager stays
+    // owner/admin only.
+    ...(hasOwnerLevelAccess || isChatGptSignInEnabled === true
+      ? [
+          {
+            title: 'Bring Your Own Key (BYOK)',
+            icon: Key,
+            url: `/organizations/${organizationId}/byok`,
+          },
+        ]
+      : []),
+  ];
+
+  const adminItems: Array<{
     title: string;
     icon: React.ElementType;
     url: string;
@@ -225,20 +243,6 @@ export default function OrganizationAppSidebar({
           },
         ]
       : []),
-    ...(hasOwnerLevelAccess
-      ? [
-          {
-            title: 'Subscriptions',
-            icon: Users,
-            url: `/organizations/${organizationId}/subscriptions`,
-          },
-        ]
-      : []),
-    {
-      title: 'Integrations',
-      icon: Cable,
-      url: `/organizations/${organizationId}/integrations`,
-    },
     ...(hasOwnerLevelAccess && currentOrg?.plan === 'enterprise'
       ? [
           {
@@ -246,15 +250,6 @@ export default function OrganizationAppSidebar({
             icon: Layers,
             url: `/organizations/${organizationId}/providers-and-models`,
           },
-        ]
-      : []),
-    {
-      title: 'Custom Modes',
-      icon: Sliders,
-      url: `/organizations/${organizationId}/custom-modes`,
-    },
-    ...(hasOwnerLevelAccess && currentOrg?.plan === 'enterprise'
-      ? [
           {
             title: 'Audit Logs',
             icon: Activity,
@@ -262,24 +257,34 @@ export default function OrganizationAppSidebar({
           },
         ]
       : []),
+    ...(hasOwnerLevelAccess && currentOrg?.parent_organization_id === null
+      ? [
+          {
+            title: 'Sub-organizations',
+            icon: Network,
+            url: `/organizations/${organizationId}/sub-organizations`,
+          },
+        ]
+      : []),
+  ];
+
+  const billingItems: Array<{
+    title: string;
+    icon: React.ElementType;
+    url: string;
+    className?: string;
+  }> = [
     ...(hasOwnerLevelAccess
       ? [
+          {
+            title: 'Subscriptions',
+            icon: Users,
+            url: `/organizations/${organizationId}/subscriptions`,
+          },
           {
             title: 'Invoices',
             icon: CreditCard,
             url: `/organizations/${organizationId}/payment-details`,
-          },
-        ]
-      : []),
-    // The ChatGPT connection is personal, so any member can manage their own for
-    // the organization and sees only that card. The pasted-key manager stays
-    // owner/admin only.
-    ...(hasOwnerLevelAccess || isChatGptSignInEnabled === true
-      ? [
-          {
-            title: 'Bring Your Own Key (BYOK)',
-            icon: Key,
-            url: `/organizations/${organizationId}/byok`,
           },
         ]
       : []),
@@ -337,10 +342,12 @@ export default function OrganizationAppSidebar({
 
   const allUrls = [
     kiloClawBaseUrl,
-    ...dashboardItems,
+    ...overviewItems,
     ...kiloClawItems,
     ...cloudItems,
-    ...accountItems,
+    ...settingsItems,
+    ...adminItems,
+    ...billingItems,
   ].map(item => (typeof item === 'string' ? item : item.url));
 
   // Determine if we should show the OrganizationSwitcher
@@ -370,15 +377,23 @@ export default function OrganizationAppSidebar({
           </>
         ) : (
           <>
-            <SidebarMenuList label="Dashboard" items={dashboardItems} allUrls={allUrls} />
+            {overviewItems.length > 0 && (
+              <SidebarMenuList label="Overview" items={overviewItems} allUrls={allUrls} />
+            )}
             {kiloClawEntryItems.length > 0 && (
               <SidebarMenuList label={null} items={kiloClawEntryItems} allUrls={allUrls} />
             )}
             {cloudItems.length > 0 && (
               <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
             )}
-            {accountItems.length > 0 && (
-              <SidebarMenuList label="Account" items={accountItems} allUrls={allUrls} />
+            {settingsItems.length > 0 && (
+              <SidebarMenuList label="Settings" items={settingsItems} allUrls={allUrls} />
+            )}
+            {adminItems.length > 0 && (
+              <SidebarMenuList label="Admin" items={adminItems} allUrls={allUrls} />
+            )}
+            {billingItems.length > 0 && (
+              <SidebarMenuList label="Billing" items={billingItems} allUrls={allUrls} />
             )}
           </>
         )}

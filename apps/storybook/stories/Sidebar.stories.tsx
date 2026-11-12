@@ -18,7 +18,6 @@ import {
   Shield,
   Sparkles,
   User,
-  UserCog,
   Webhook,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
@@ -88,7 +87,7 @@ const mockOrganizations = [
   },
 ] satisfies OrganizationSwitcherOrganization[];
 
-const dashboardItems: SidebarStoryItem[] = [
+const overviewItems: SidebarStoryItem[] = [
   {
     title: 'Your Profile',
     icon: User,
@@ -162,16 +161,24 @@ const cloudItems: SidebarStoryItem[] = [
   },
 ];
 
-const accountItems: SidebarStoryItem[] = [
-  {
-    title: 'Subscriptions',
-    icon: CreditCard,
-    url: '/subscriptions',
-  },
+const settingsItems: SidebarStoryItem[] = [
   {
     title: 'Integrations',
     icon: Cable,
     url: '/integrations',
+  },
+  {
+    title: 'Bring Your Own Key (BYOK)',
+    icon: Key,
+    url: '/byok',
+  },
+];
+
+const billingItems: SidebarStoryItem[] = [
+  {
+    title: 'Subscriptions',
+    icon: CreditCard,
+    url: '/subscriptions',
   },
   {
     title: 'Invoices',
@@ -182,16 +189,6 @@ const accountItems: SidebarStoryItem[] = [
     title: 'Credits',
     icon: Coins,
     url: '/credits',
-  },
-  {
-    title: 'Connected Accounts',
-    icon: UserCog,
-    url: '/connected-accounts',
-  },
-  {
-    title: 'Bring Your Own Key (BYOK)',
-    icon: Key,
-    url: '/byok',
   },
 ];
 
@@ -215,10 +212,11 @@ const backItems: SidebarStoryItem[] = [
 
 const allUrls = [
   '/claw',
-  ...dashboardItems,
+  ...overviewItems,
   ...kiloClawItems,
   ...cloudItems,
-  ...accountItems,
+  ...settingsItems,
+  ...billingItems,
 ].flatMap(item => (typeof item === 'string' ? [item] : item.url ? [item.url] : []));
 
 function StoryOrganizationSwitcher() {
@@ -296,10 +294,11 @@ function PersonalSidebar({ menu }: { menu: 'main' | 'kiloClaw' }) {
           </>
         ) : (
           <>
-            <SidebarMenuList label="Dashboard" items={dashboardItems} allUrls={allUrls} />
+            <SidebarMenuList label="Overview" items={overviewItems} allUrls={allUrls} />
             <SidebarMenuList label={null} items={kiloClawEntryItems} allUrls={allUrls} />
             <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
-            <SidebarMenuList label="Account" items={accountItems} allUrls={allUrls} />
+            <SidebarMenuList label="Settings" items={settingsItems} allUrls={allUrls} />
+            <SidebarMenuList label="Billing" items={billingItems} allUrls={allUrls} />
           </>
         )}
       </SidebarContent>

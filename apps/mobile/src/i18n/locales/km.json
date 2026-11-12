@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "កំពុងផ្ទុកការជាវ Kilo Pass",
     "retryHint": "ព្យាយាមផ្ទុកស្ថានភាព Kilo Pass ម្តងទៀត។",
     "cardAccessibility": "{{title}}។ {{description}}។ {{actionLabel}}",
-    "cardLabel": "{{title}}។ {{description}}",
     "purchaseUnavailableEnded": "Kilo Pass របស់អ្នកបានបញ្ចប់ហើយ។",
     "notAvailableInApp": "Kilo Pass មិនមាននៅក្នុងកម្មវិធីទេ។",
     "statusActive": "សកម្ម",

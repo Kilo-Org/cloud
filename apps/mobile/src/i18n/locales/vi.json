@@ -2166,7 +2166,6 @@
     "subscriptionLoading": "Đang tải gói đăng ký Kilo Pass",
     "retryHint": "Thử tải lại trạng thái Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Kilo Pass của bạn đã kết thúc.",
     "notAvailableInApp": "Kilo Pass không khả dụng trong ứng dụng.",
     "statusActive": "Đang hoạt động",

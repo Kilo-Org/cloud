@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Kilo Pass စာရင်းသွင်းမှုအချက်အလက်ကို ရယူနေသည်",
     "retryHint": "Kilo Pass အခြေအနေကို ပြန်ရယူသည်။",
     "cardAccessibility": "{{title}}။ {{description}}။ {{actionLabel}}",
-    "cardLabel": "{{title}}။ {{description}}",
     "purchaseUnavailableEnded": "သင့် Kilo Pass ကုန်ဆုံးသွားပါပြီ။",
     "notAvailableInApp": "Kilo Pass ကို အက်ပ်တွင် မရရှိနိုင်ပါ။",
     "statusActive": "သက်ဝင်",

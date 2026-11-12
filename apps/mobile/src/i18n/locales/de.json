@@ -2166,7 +2166,6 @@
     "subscriptionLoading": "Abo für Kilo Pass wird geladen",
     "retryHint": "Ruft den Status von Kilo Pass erneut ab.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Dein Kilo Pass ist beendet.",
     "notAvailableInApp": "Kilo Pass ist in der App nicht verfügbar.",
     "statusActive": "Aktiv",

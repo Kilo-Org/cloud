@@ -2814,7 +2814,6 @@
     "subscriptionLoading": "Įkeliama Kilo Pass prenumerata",
     "retryHint": "Bando iš naujo gauti Kilo Pass būseną.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Jūsų Kilo Pass prenumerata baigėsi.",
     "notAvailableInApp": "Kilo Pass nepasiekiamas programėlėje.",
     "statusActive": "Aktyvi",

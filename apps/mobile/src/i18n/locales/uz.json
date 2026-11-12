@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Kilo Pass obunasi yuklanmoqda",
     "retryHint": "Kilo Pass holatini qayta yuklashga urinadi.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Kilo Passingiz muddati tugadi.",
     "notAvailableInApp": "Kilo Pass ilovada mavjud emas.",
     "statusActive": "Faol",

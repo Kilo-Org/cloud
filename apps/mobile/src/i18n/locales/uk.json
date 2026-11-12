@@ -2226,7 +2226,6 @@
     "subscriptionLoading": "Завантаження даних підписки Kilo Pass",
     "retryHint": "Повторно перевіряє стан Kilo Pass.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}: {{description}}",
     "purchaseUnavailableEnded": "Термін дії вашого Kilo Pass завершився.",
     "notAvailableInApp": "Kilo Pass недоступний у застосунку.",
     "statusActive": "Активний",

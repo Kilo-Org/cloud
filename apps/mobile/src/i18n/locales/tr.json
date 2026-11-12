@@ -2166,7 +2166,6 @@
     "subscriptionLoading": "Kilo Pass aboneliği yükleniyor",
     "retryHint": "Kilo Pass durumunu almayı tekrar dener.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Kilo Pass'inizin süresi doldu.",
     "notAvailableInApp": "Kilo Pass uygulamada kullanılamıyor.",
     "statusActive": "Aktif",

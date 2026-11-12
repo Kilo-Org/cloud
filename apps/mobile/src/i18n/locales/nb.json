@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Laster inn Kilo Pass-abonnementet",
     "retryHint": "Prøver å hente statusen for Kilo Pass på nytt.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Kilo Pass-abonnementet ditt er avsluttet.",
     "notAvailableInApp": "Kilo Pass er ikke tilgjengelig i appen.",
     "statusActive": "Aktiv",

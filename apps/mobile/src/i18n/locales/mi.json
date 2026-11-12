@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Kei te uta i te ohaurunga Kilo Pass",
     "retryHint": "Ka whakamātau anō ki te tiki i te tūnga Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Kua mutu tō Kilo Pass.",
     "notAvailableInApp": "Kāore a Kilo Pass e wātea ana i te taupānga.",
     "statusActive": "Hohe",

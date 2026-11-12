@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Waxaa la soo dejinayaa rukumashada Kilo Pass",
     "retryHint": "Wuxuu mar kale isku dayaa inuu soo dejiyo xaaladda Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Kilo Pass-kaaga wuu dhammaaday.",
     "notAvailableInApp": "Kilo Pass lagama heli karo abka.",
     "statusActive": "Firfircoon",

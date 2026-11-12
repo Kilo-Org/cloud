@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Բեռնվում է Kilo Pass-ի բաժանորդագրությունը",
     "retryHint": "Նորից բեռնում է Kilo Pass-ի կարգավիճակը։",
     "cardAccessibility": "{{title}}։ {{description}}։ {{actionLabel}}",
-    "cardLabel": "{{title}}։ {{description}}",
     "purchaseUnavailableEnded": "Ձեր Kilo Pass-ը ավարտվել է։",
     "notAvailableInApp": "Kilo Pass-ը հասանելի չէ հավելվածում։",
     "statusActive": "Ակտիվ",

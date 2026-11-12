@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Kilo Pass નું સબસ્ક્રિપ્શન લોડ થઈ રહ્યું છે",
     "retryHint": "Kilo Pass ની સ્થિતિ ફરી મેળવવાનો પ્રયાસ કરે છે.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}: {{description}}",
     "purchaseUnavailableEnded": "તમારો Kilo Pass સમાપ્ત થઈ ગયો છે.",
     "notAvailableInApp": "Kilo Pass એપમાં ઉપલબ્ધ નથી.",
     "statusActive": "સક્રિય",

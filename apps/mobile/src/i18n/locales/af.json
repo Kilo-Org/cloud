@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Die Kilo Pass-intekening word gelaai",
     "retryHint": "Probeer die Kilo Pass-status weer laai.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}: {{description}}",
     "purchaseUnavailableEnded": "Jou Kilo Pass het verstryk.",
     "notAvailableInApp": "Kilo Pass is nie in die app beskikbaar nie.",
     "statusActive": "Aktief",

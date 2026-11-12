@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Maamilummaa Kilo Pass fe'aa jira",
     "retryHint": "Haala Kilo Pass fe'uu irra deebi'ee yaala.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Kilo Pass kee xumurame.",
     "notAvailableInApp": "Kilo Pass appii keessatti hin argamu.",
     "statusActive": "Socho'aa",

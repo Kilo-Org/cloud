@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Kilo Pass చందా లోడ్ అవుతోంది",
     "retryHint": "Kilo Pass స్థితిని మళ్లీ పొందడానికి ప్రయత్నిస్తుంది.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "మీ Kilo Pass ముగిసింది.",
     "notAvailableInApp": "Kilo Pass యాప్‌లో అందుబాటులో లేదు.",
     "statusActive": "క్రియాశీలం",

@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Kilo Pass സബ്സ്ക്രിപ്ഷൻ ലോഡ് ചെയ്യുന്നു",
     "retryHint": "Kilo Pass-ന്റെ നില വീണ്ടും പരിശോധിക്കുന്നു.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}: {{description}}",
     "purchaseUnavailableEnded": "നിങ്ങളുടെ Kilo Pass അവസാനിച്ചു.",
     "notAvailableInApp": "Kilo Pass ആപ്പിൽ ലഭ്യമല്ല.",
     "statusActive": "സജീവം",

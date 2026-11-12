@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Sedang memuatkan langganan Kilo Pass",
     "retryHint": "Mencuba semula untuk mendapatkan status Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Kilo Pass anda telah tamat.",
     "notAvailableInApp": "Kilo Pass tidak tersedia dalam aplikasi.",
     "statusActive": "Aktif",

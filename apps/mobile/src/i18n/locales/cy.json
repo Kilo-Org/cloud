@@ -2920,7 +2920,6 @@
     "subscriptionLoading": "Yn llwytho tanysgrifiad Kilo Pass",
     "retryHint": "Mae hwn yn ceisio llwytho statws Kilo Pass eto.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Mae eich Kilo Pass wedi dod i ben.",
     "notAvailableInApp": "Nid yw Kilo Pass ar gael yn yr ap.",
     "statusActive": "Gweithredol",

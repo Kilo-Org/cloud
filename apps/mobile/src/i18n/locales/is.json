@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Sæki Kilo Pass-áskrift",
     "retryHint": "Reynir aftur að sækja stöðu Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Kilo Pass þínu er lokið.",
     "notAvailableInApp": "Kilo Pass er ekki tiltækt í appinu.",
     "statusActive": "Virkt",

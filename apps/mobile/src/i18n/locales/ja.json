@@ -2166,7 +2166,6 @@
     "subscriptionLoading": "Kilo Passのサブスクリプションを読み込み中",
     "retryHint": "Kilo Passの状態の取得を再試行します。",
     "cardAccessibility": "{{title}}。{{description}}。{{actionLabel}}",
-    "cardLabel": "{{title}}。{{description}}",
     "purchaseUnavailableEnded": "Kilo Passは終了しました。",
     "notAvailableInApp": "Kilo Passはアプリでは利用できません。",
     "statusActive": "有効",

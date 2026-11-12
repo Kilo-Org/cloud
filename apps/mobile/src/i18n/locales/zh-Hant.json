@@ -2166,7 +2166,6 @@
     "subscriptionLoading": "正在載入 Kilo Pass 訂閱",
     "retryHint": "重新取得 Kilo Pass 狀態。",
     "cardAccessibility": "{{title}}。{{description}}。{{actionLabel}}",
-    "cardLabel": "{{title}}。{{description}}",
     "purchaseUnavailableEnded": "你的 Kilo Pass 已結束。",
     "notAvailableInApp": "Kilo Pass 無法在應用程式內使用。",
     "statusActive": "使用中",

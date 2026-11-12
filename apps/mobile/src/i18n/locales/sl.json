@@ -2814,7 +2814,6 @@
     "subscriptionLoading": "Nalaganje naročnine Kilo Pass",
     "retryHint": "Znova poskusi naložiti stanje naročnine Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Tvoj Kilo Pass je potekel.",
     "notAvailableInApp": "Kilo Pass v aplikaciji ni na voljo.",
     "statusActive": "Aktiven",

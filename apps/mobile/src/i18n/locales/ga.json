@@ -2867,7 +2867,6 @@
     "subscriptionLoading": "Ag lódáil shíntiús Kilo Pass",
     "retryHint": "Déanann sé iarracht eile stádas Kilo Pass a lódáil.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Tá do Kilo Pass críochnaithe.",
     "notAvailableInApp": "Níl Kilo Pass ar fáil san aip.",
     "statusActive": "Gníomhach",

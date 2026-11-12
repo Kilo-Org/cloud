@@ -2761,7 +2761,6 @@
     "subscriptionLoading": "Se încarcă abonamentul Kilo Pass",
     "retryHint": "Încearcă din nou să încarce starea Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Kilo Pass-ul tău s-a încheiat.",
     "notAvailableInApp": "Kilo Pass nu este disponibil în aplicație.",
     "statusActive": "Activ",

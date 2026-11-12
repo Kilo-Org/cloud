@@ -2761,7 +2761,6 @@
     "subscriptionLoading": "Učitavanje pretplate na Kilo Pass",
     "retryHint": "Ponovo učitava stanje pretplate na Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Vaš Kilo Pass je završen.",
     "notAvailableInApp": "Kilo Pass nije dostupan u aplikaciji.",
     "statusActive": "Aktivan",

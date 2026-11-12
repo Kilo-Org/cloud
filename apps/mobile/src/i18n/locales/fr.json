@@ -2124,7 +2124,6 @@
     "subscriptionLoading": "Chargement de l'abonnement Kilo Pass",
     "retryHint": "Actualise à nouveau l'état de Kilo Pass.",
     "cardAccessibility": "{{title}} : {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}} : {{description}}",
     "purchaseUnavailableEnded": "Votre Kilo Pass a pris fin.",
     "notAvailableInApp": "Kilo Pass n'est pas disponible dans l'application.",
     "statusActive": "Actif",

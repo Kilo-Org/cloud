@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Kilo Pass சந்தா விவரங்கள் ஏற்றப்படுகின்றன",
     "retryHint": "Kilo Pass நிலையை மீண்டும் பெற முயற்சிக்கும்.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "உங்கள் Kilo Pass முடிந்துவிட்டது.",
     "notAvailableInApp": "Kilo Pass ஆப்பில் கிடைக்கவில்லை.",
     "statusActive": "செயலில்",

@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Зареждане на абонамента за Kilo Pass",
     "retryHint": "Повтаря зареждането на състоянието на Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Твоят Kilo Pass приключи.",
     "notAvailableInApp": "Kilo Pass не е достъпен в приложението.",
     "statusActive": "Активен",

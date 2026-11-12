@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "ກຳລັງໂຫຼດຂໍ້ມູນການສະໝັກ Kilo Pass",
     "retryHint": "ລອງໂຫຼດສະຖານະ Kilo Pass ອີກຄັ້ງ.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Kilo Pass ຂອງທ່ານໄດ້ສິ້ນສຸດແລ້ວ.",
     "notAvailableInApp": "ບໍ່ສາມາດໃຊ້ Kilo Pass ໃນແອັບໄດ້.",
     "statusActive": "ເປີດໃຊ້ງານ",

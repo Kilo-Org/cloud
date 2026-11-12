@@ -2867,7 +2867,6 @@
     "subscriptionLoading": "Qed titgħabba s-sottoskrizzjoni ta' Kilo Pass",
     "retryHint": "Jerġa' jipprova jgħabbi l-istat ta' Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Il-Kilo Pass tiegħek intemm.",
     "notAvailableInApp": "Kilo Pass mhux disponibbli fl-app.",
     "statusActive": "Attiv",

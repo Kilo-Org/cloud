@@ -47,17 +47,6 @@ const CADENCE_LABEL_KEYS = {
   yearly: 'kiloPass.cadenceYearly',
 } as const satisfies Record<KiloPassSubscription['cadence'], string>;
 
-/** A provider status not listed here presents as an active pass. */
-const STATUS_LABEL_KEYS = {
-  active: 'kiloPass.statusActive',
-  trialing: 'kiloPass.statusTrialing',
-  past_due: 'kiloPass.statusPastDue',
-  incomplete: 'kiloPass.statusIncomplete',
-  paused: 'kiloPass.statusPaused',
-} as const;
-
-type KnownKiloPassStatus = keyof typeof STATUS_LABEL_KEYS;
-
 type KiloPassRow = {
   id: 'renewal' | 'usage' | 'bonus';
   label: string;
@@ -104,19 +93,25 @@ function statusLabel(subscription: KiloPassSubscription): string {
   if (subscription.cancelAtPeriodEnd) {
     return i18n.t('organization.kiloPass.canceling');
   }
-  const status: string = subscription.status;
-  const key =
-    status in STATUS_LABEL_KEYS
-      ? STATUS_LABEL_KEYS[status as KnownKiloPassStatus]
-      : 'kiloPass.statusActive';
-  return i18n.t(key);
+  switch (subscription.status) {
+    case 'trialing': {
+      return i18n.t('kiloPass.statusTrialing');
+    }
+    case 'past_due': {
+      return i18n.t('kiloPass.statusPastDue');
+    }
+    case 'incomplete': {
+      return i18n.t('kiloPass.statusIncomplete');
+    }
+    case 'paused': {
+      return i18n.t('kiloPass.statusPaused');
+    }
+    default: {
+      return i18n.t('kiloPass.statusActive');
+    }
+  }
 }
 
-/**
- * The month's bonus share, mirroring the web card: an issued bonus shows the
- * amount actually granted (a referral bonus replaces the formula), an available
- * bonus shows the projection, and a non-positive amount hides the row.
- */
 function currentPeriodBonus(
   subscription: KiloPassSubscription
 ): { label: string; amountUsd: number } | null {
@@ -209,25 +204,27 @@ function activeRows(subscription: KiloPassSubscription): KiloPassRow[] {
  * sells a pass, so only the pass details and the no-pass message can show.
  */
 export function getKiloPassDetailState(params: KiloPassQueryFields): KiloPassDetailState {
-  if (params.isPending) {
-    return { kind: 'loading' };
+  const subscription = params.subscription;
+  // Cached data beats a background refetch failure: a pass already on screen
+  // must not turn into an error row every time a foreground refetch fails.
+  if (subscription) {
+    if (ENDED_STATUSES.has(subscription.status)) {
+      return { kind: 'ended' };
+    }
+    return {
+      kind: 'active',
+      planLabel: planLabel(subscription),
+      statusLabel: statusLabel(subscription),
+      rows: activeRows(subscription),
+    };
   }
   if (params.isError) {
     return { kind: 'error' };
   }
-  const subscription = params.subscription;
-  if (!subscription) {
-    return { kind: 'none' };
+  if (params.isPending) {
+    return { kind: 'loading' };
   }
-  if (ENDED_STATUSES.has(subscription.status)) {
-    return { kind: 'ended' };
-  }
-  return {
-    kind: 'active',
-    planLabel: planLabel(subscription),
-    statusLabel: statusLabel(subscription),
-    rows: activeRows(subscription),
-  };
+  return { kind: 'none' };
 }
 
 export type KiloPassCardContentState =
@@ -271,9 +268,6 @@ function cardState(description: string): KiloPassCardContentState {
     kind: 'card',
     title: KILO_PASS_TITLE,
     description,
-    accessibilityLabel: i18n.t('kiloPass.cardLabel', {
-      title: KILO_PASS_TITLE,
-      description,
-    }),
+    accessibilityLabel: [KILO_PASS_TITLE, description].join(i18n.t('common.sentenceJoiner')),
   };
 }

@@ -39,10 +39,23 @@ describe('getKiloPassDetailState', () => {
     ).toEqual({ kind: 'loading' });
   });
 
-  it('keeps a failed query retryable, even with stale data', () => {
+  it('keeps a failed query retryable when it has no data', () => {
     expect(
-      getKiloPassDetailState({ subscription: subscription(), isError: true, isPending: false })
+      getKiloPassDetailState({ subscription: undefined, isError: true, isPending: false })
     ).toEqual({ kind: 'error' });
+  });
+
+  it('keeps the rendered pass when a background refetch fails', () => {
+    const detail = getKiloPassDetailState({
+      subscription: subscription(),
+      isError: true,
+      isPending: false,
+    });
+
+    if (detail.kind !== 'active') {
+      throw new Error(`unexpected state: ${detail.kind}`);
+    }
+    expect(detail.rows[0]).toEqual({ id: 'renewal', label: 'Renews', value: 'Dec 5, 2026' });
   });
 
   it('reports the no-pass state when the account has never subscribed', () => {

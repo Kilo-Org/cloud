@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "بارکردنی بەشداربوونی Kilo Pass",
     "retryHint": "دووبارە هەوڵی وەرگرتنی دۆخی Kilo Pass دەدات.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Kilo Passەکەت بەسەرچووە.",
     "notAvailableInApp": "Kilo Pass لە ئەپدا بەردەست نییە.",
     "statusActive": "چالاک",

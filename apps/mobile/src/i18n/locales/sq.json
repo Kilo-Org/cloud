@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Po ngarkohet abonimi Kilo Pass",
     "retryHint": "Riprovohet ngarkimi i gjendjes së Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Kilo Pass juaj ka përfunduar.",
     "notAvailableInApp": "Kilo Pass nuk është i disponueshëm në aplikacion.",
     "statusActive": "Aktiv",

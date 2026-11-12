@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Usajili wa Kilo Pass unapakiwa",
     "retryHint": "Hujaribu kupakia hali ya Kilo Pass tena.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Kilo Pass yako imeisha.",
     "notAvailableInApp": "Kilo Pass haipatikani kwenye programu.",
     "statusActive": "Inatumika",

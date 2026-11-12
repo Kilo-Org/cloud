@@ -2166,7 +2166,6 @@
     "subscriptionLoading": "Kilo Pass 구독 정보 불러오는 중",
     "retryHint": "Kilo Pass 상태를 다시 확인합니다.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}: {{description}}",
     "purchaseUnavailableEnded": "Kilo Pass가 종료되었습니다.",
     "notAvailableInApp": "Kilo Pass는 앱에서 사용할 수 없습니다.",
     "statusActive": "활성",

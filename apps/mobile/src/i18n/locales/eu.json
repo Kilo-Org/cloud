@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Kilo Pass-en harpidetza kargatzen",
     "retryHint": "Kilo Pass-en egoera berriro kargatzen saiatzen da.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Zure Kilo Pass amaitu da.",
     "notAvailableInApp": "Kilo Pass ez dago aplikazioan erabilgarri.",
     "statusActive": "Aktibo",

@@ -2286,7 +2286,6 @@
     "subscriptionLoading": "جارٍ تحميل اشتراك Kilo Pass",
     "retryHint": "يعيد محاولة التحقق من حالة Kilo Pass.",
     "cardAccessibility": "{{title}}؛ {{description}}؛ {{actionLabel}}",
-    "cardLabel": "{{title}}؛ {{description}}",
     "purchaseUnavailableEnded": "انتهى اشتراك Kilo Pass الخاص بك.",
     "notAvailableInApp": "Kilo Pass غير متاح في التطبيق.",
     "statusActive": "نشط",

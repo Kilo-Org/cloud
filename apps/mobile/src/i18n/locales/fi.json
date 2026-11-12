@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Ladataan Kilo Pass -tilausta",
     "retryHint": "Yrittää hakea Kilo Passin tilan uudelleen.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}: {{description}}",
     "purchaseUnavailableEnded": "Kilo Pass -tilauksesi on päättynyt.",
     "notAvailableInApp": "Kilo Pass ei ole saatavilla sovelluksessa.",
     "statusActive": "Aktiivinen",

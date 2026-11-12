@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Kilo Pass දායකත්වය පූරණය කරමින් පවතී",
     "retryHint": "Kilo Pass තත්ත්වය නැවත ලබාගැනීමට උත්සාහ කරයි.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "ඔබේ Kilo Pass අවසන් වී ඇත.",
     "notAvailableInApp": "Kilo Pass යෙදුමේ ලබාගත නොහැක.",
     "statusActive": "සක්‍රීය",

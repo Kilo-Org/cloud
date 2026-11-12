@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Cargando a subscrición de Kilo Pass",
     "retryHint": "Volve consultar o estado de Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "O teu Kilo Pass rematou.",
     "notAvailableInApp": "Kilo Pass non está dispoñible na aplicación.",
     "statusActive": "Activo",

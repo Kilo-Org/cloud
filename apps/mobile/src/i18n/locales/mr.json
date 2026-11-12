@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Kilo Pass चे सदस्यत्व लोड होत आहे",
     "retryHint": "Kilo Pass ची स्थिती पुन्हा मिळवण्याचा प्रयत्न करते.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "तुमचा Kilo Pass संपला आहे.",
     "notAvailableInApp": "Kilo Pass ॲपमध्ये उपलब्ध नाही।",
     "statusActive": "सक्रिय",

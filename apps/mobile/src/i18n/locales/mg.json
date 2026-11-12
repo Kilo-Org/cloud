@@ -2708,7 +2708,6 @@
     "subscriptionLoading": "Mampiditra ny famandrihana Kilo Pass",
     "retryHint": "Manandrana maka indray ny satan'ny Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
-    "cardLabel": "{{title}}. {{description}}",
     "purchaseUnavailableEnded": "Efa tapitra ny Kilo Pass anao.",
     "notAvailableInApp": "Tsy azo ampiasaina ao amin'ny rindranasa ny Kilo Pass.",
     "statusActive": "Mavitrika",

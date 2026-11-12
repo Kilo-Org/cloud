@@ -221,7 +221,8 @@ export function readKilo2Messages(
         auto: message['reason'] === 'auto',
       });
       // The summary is outside native content; do not shift streamed content IDs.
-      if (message.status === 'completed' && message.summary?.trim())
+      // Use the same completion signal as the transcript's completed state.
+      if (info.time.completed !== undefined && !error && message.summary?.trim())
         parts.push({
           id: `${kilo2PartId(message.id, 0)}_summary`,
           messageID: message.id,

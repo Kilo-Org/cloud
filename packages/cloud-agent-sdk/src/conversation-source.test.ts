@@ -4,6 +4,7 @@ import type { CloudAgentEvent } from './cloud-conversation-schemas';
 import type { MessageInfo } from './types';
 import {
   hasUnresolvedKilo2Assets,
+  isCompactionSummaryPart,
   kilo2AssetKey,
   kilo2ToolFileId,
   readKilo2Messages,
@@ -284,6 +285,25 @@ describe('versioned native conversation sources', () => {
     expect(message.parts).toHaveLength(1);
     expect(message.parts[0].type).toBe('compaction');
   });
+
+  it.each([
+    ['a completed time without status', { time: { created: 4, completed: 5 } }, true],
+    ['a failed status', { status: 'failed', time: { created: 4, completed: 5 } }, false],
+    [
+      'an error',
+      { time: { created: 4, completed: 5 }, error: { type: 'unknown', message: 'x' } },
+      false,
+    ],
+  ])(
+    'projects the summary for a compaction with %s only when it is displayed as completed',
+    (_, fields, shown) => {
+      const [message] = readKilo2Messages(session, [
+        { id: 'msg_compaction', type: 'compaction', summary: 'Saved summary', ...fields },
+      ]);
+      expect(message.info.role === 'assistant' && message.info.time.completed).toBe(5);
+      expect(message.parts.some(isCompactionSummaryPart)).toBe(shown);
+    }
+  );
 
   it('does not count the displayed summary as native text when restoring a live layout', () => {
     const reader = createConversationSourceReader();

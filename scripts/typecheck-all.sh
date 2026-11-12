@@ -64,6 +64,16 @@ selection_reaches() {
   ' "$1"
 }
 
+# Whether the detector read a base for this document. A base the checkout cannot
+# read selects every workspace to stay safe, and that widening says nothing
+# about what another workflow selects from its own fallback.
+selection_base_valid() {
+  node -e '
+    const selection = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+    process.stdout.write(selection.base_valid === true ? "true" : "false");
+  '
+}
+
 # Whether a selected workspace declares a dependency on one whose built
 # declarations it compiles against. Such a workspace typechecks against that
 # package's dist, so the build must run even when the package's own sources did
@@ -104,15 +114,17 @@ if [ -n "$group" ]; then
   # workflow runs on a pull request and a main push and has no merge-queue
   # trigger; its `verify` job starts whenever its own selection reaches
   # apps/extension, which is the `dirs` list this document carries. One of the
-  # two workflows owns the compile, never both. Any other event, and any
-  # unreadable answer, keeps the leg here.
+  # two workflows owns the compile, never both. A document whose base the
+  # detector could not read selects every workspace without attributing
+  # anything, and that workflow resolves its own fallback base, so such a run
+  # keeps the leg here too, as does any other event.
   extension_ci_typechecks() {
     case "${GITHUB_EVENT_NAME:-}" in
-      pull_request | push)
-        [ "$(selection_reaches apps/extension <<< "$selection")" = true ]
-        ;;
+      pull_request | push) ;;
       *) return 1 ;;
     esac
+    [ "$(selection_base_valid <<< "$selection")" = true ] &&
+      [ "$(selection_reaches apps/extension <<< "$selection")" = true ]
   }
   case "$group" in
     web)

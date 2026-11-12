@@ -1797,9 +1797,11 @@ test('the extension matrix row defers to extension CI outside the merge queue', 
 });
 
 // A selection document from scripts/affected-workspaces.mjs, as the root script
-// reads it.
+// reads it. `base_valid` is true for a normal run: the detector read the base and
+// attributed the change.
 const selection = (overrides = {}) => ({
   base: 'base',
+  base_valid: true,
   full: false,
   reasons: [],
   full_checks: [],
@@ -2220,6 +2222,26 @@ test('the trpc group typechecks the extension when the event is unknown', t => {
     group: 'trpc',
     built: '1',
     affected: selection({ full: true, dirs: ['apps/extension'] }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.commands, ['pnpm --filter kilo-extension run typecheck']);
+});
+
+// A base the checkout cannot read selects every workspace without attributing
+// the change, and extension-ci.yml resolves its own fallback base for that
+// event, so the document cannot answer for it.
+test('the trpc group keeps the extension when the detector read no base', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    group: 'trpc',
+    event: 'push',
+    built: '1',
+    affected: selection({
+      base: '0000000000000000000000000000000000000000',
+      base_valid: false,
+      full: true,
+      dirs: ['apps/extension', 'apps/web'],
+    }),
   });
   assert.equal(result.status, 0);
   assert.deepEqual(result.commands, ['pnpm --filter kilo-extension run typecheck']);

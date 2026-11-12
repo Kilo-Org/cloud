@@ -3,9 +3,11 @@
 //
 // Usage: node scripts/affected-workspaces.mjs <base-sha> [--worktree]
 //        node scripts/affected-workspaces.mjs --groups
-// Prints JSON: { base, full, reasons, full_checks, dirs, packages,
+// Prints JSON: { base, base_valid, full, reasons, full_checks, dirs, packages,
 // test_only_dirs, test_only_packages, test_only_files }, where `base` is the
-// revision the selection was computed for. `dirs` is also the selection the test
+// revision the selection was computed for and `base_valid` is false when the
+// checkout could not read it, so the selection widened to every workspace
+// instead of attributing the change. `dirs` is also the selection the test
 // matrix consumes (scripts/changed-workspaces.sh), and `full`, `full_checks` and
 // `packages` are the selection scripts/typecheck-all.sh checks, so a consumer
 // reads this document instead of selecting a second time: changed-workspaces.sh
@@ -456,6 +458,10 @@ function detect(base, worktree) {
   console.log(
     JSON.stringify({
       base,
+      // A base the checkout cannot read selects every workspace instead of
+      // attributing the change, so a consumer that compares this document with
+      // another workflow's selection must not read that widening as an answer.
+      base_valid: valid,
       ...selectAffected({ items, changedFiles, dependencyDirs, references }),
     })
   );

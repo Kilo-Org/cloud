@@ -385,10 +385,14 @@ const AttachmentChip = memo(function AttachmentChip({
         <View
           className={cn(
             'h-full w-full flex-row items-center gap-2',
-            // Row 3.3: the Retry control sits in the bottom-LEFT corner, so
-            // the retryable chip's file content shifts right of its badge
-            // instead of being hidden underneath it.
-            description.showRetry ? 'pl-10 pr-2' : 'px-2'
+            // Row 3.3: the Retry control sits in the bottom-start corner and
+            // the Remove badge on the end edge, so the file content reserves
+            // both instead of being laid out underneath a control. The end
+            // reserve is the 28 dp badge plus the badge row's own `pe-2`
+            // (7 dp) inset. Logical properties keep each reserve on its
+            // control's side in both writing directions.
+            description.showRetry ? 'ps-10' : 'ps-2',
+            description.showRemove ? 'pe-10' : 'pe-2'
           )}
         >
           {isErrored ? (
@@ -513,8 +517,10 @@ const AttachmentChip = memo(function AttachmentChip({
             // height in both shapes — the 46 dp document chip and the 64 dp
             // image thumbnail — instead of pinning to a corner. `box-none`
             // leaves the chip body's tap target whole; only the badge itself
-            // takes a touch. Its end inset matches the content's own `px-2`
-            // start inset, so the badge clears the surface's rounded corner.
+            // takes a touch. Its `pe-2` end inset matches the content's own
+            // `ps-2` inner inset, so the badge clears the surface's rounded
+            // corner, and the content reserves that inset plus the badge
+            // (`pe-10`) so no filename runs underneath it.
             <View
               className="absolute inset-0 items-end justify-center pe-2"
               pointerEvents="box-none"

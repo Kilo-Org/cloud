@@ -1293,6 +1293,82 @@ describe('AttachmentPreviewStrip — control hit targets', () => {
 
     renderer.unmount();
   });
+
+  // NativeWind's rem is 14, so one spacing unit is 3.5 dp.
+  const DP_PER_SPACING_UNIT = 3.5;
+
+  /** Resolved dp of one logical spacing class (`pe-10` → 35 dp), or null. */
+  function spacingDp(className: unknown, token: 'ps' | 'pe'): number | null {
+    const match = new RegExp(`(?:^|\\s)${token}-(\\d+(?:\\.\\d+)?)(?=\\s|$)`).exec(
+      String(className)
+    );
+    return match ? Number(match[1]) * DP_PER_SPACING_UNIT : null;
+  }
+
+  /** The file row of the document chip: the filename Text's grandparent. */
+  function fileRow(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+    const filename = root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === 'a-rather-long-document.pdf'
+    );
+    const row = filename.parent?.parent;
+    if (!row || !String(row.props.className).includes('flex-row')) {
+      throw new Error('file row missing');
+    }
+    return row;
+  }
+
+  function removeBadgeRow(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+    return root.find(
+      node =>
+        typeof node.type === 'string' &&
+        String(node.props.className).includes('items-end justify-center')
+    );
+  }
+
+  /** The document chip's filename column and the badge box, measured in dp. */
+  async function fileRowReserve(status: 'uploaded' | 'error'): Promise<{
+    badgeEndDp: number;
+    endReserveDp: number;
+    startReserveDp: number;
+  }> {
+    reactNativeMock.Platform.OS = 'android';
+    const attachment = makeAttachment({
+      filename: 'a-rather-long-document.pdf',
+      status,
+      // Only an explicit `terminal: false` failure offers Retry.
+      terminal: status === 'error' ? false : undefined,
+      progress: null,
+    });
+    const renderer = await mount([attachment]);
+    const badgeEndDp = spacingDp(removeBadgeRow(renderer.root).props.className, 'pe');
+    expect(badgeEndDp).not.toBeNull();
+    const rowClass = fileRow(renderer.root).props.className;
+    // A row with no reserve on a side resolves to 0 dp.
+    const endReserveDp = spacingDp(rowClass, 'pe') ?? 0;
+    const startReserveDp = spacingDp(rowClass, 'ps') ?? 0;
+    renderer.unmount();
+    return { badgeEndDp: Number(badgeEndDp), endReserveDp, startReserveDp };
+  }
+
+  it('reserves the Remove badge box at the end of the document file row', async () => {
+    const { badgeEndDp, endReserveDp, startReserveDp } = await fileRowReserve('uploaded');
+
+    // The text column must end where the 28 dp badge starts, never under it.
+    expect(endReserveDp).toBeGreaterThanOrEqual(28 + badgeEndDp);
+    // No Retry control means no start reserve, so a filename keeps the width.
+    expect(startReserveDp).toBeLessThan(28);
+  });
+
+  it('reserves both control corners when the chip also offers Retry', async () => {
+    const { badgeEndDp, endReserveDp, startReserveDp } = await fileRowReserve('error');
+
+    expect(endReserveDp).toBeGreaterThanOrEqual(28 + badgeEndDp);
+    // Retry's badge is 24.5 dp inside a `p-1` inset, so its box is 28 dp.
+    expect(startReserveDp).toBeGreaterThanOrEqual(28);
+  });
 });
 
 describe('AttachmentPreviewStrip — chip render stability', () => {

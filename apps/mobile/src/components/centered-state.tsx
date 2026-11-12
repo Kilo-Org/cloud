@@ -33,6 +33,15 @@ type CenteredStateProps = {
   contentContainerClassName?: string;
   testID?: string;
   refreshControl?: ScrollViewProps['refreshControl'];
+  /**
+   * The frame the state centers in. `surface` (the default) centers on the
+   * surface's own frame, which keeps a state steady when the scroller around it
+   * grows or shrinks. `viewport` centers in the band this scroller fills — for a
+   * state whose scroller sits between chrome the surface does not describe (a
+   * chat body between a header and a composer), where centering on the surface
+   * moves the state whenever the surface's own measurement arrives.
+   */
+  band?: 'surface' | 'viewport';
 };
 
 type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
@@ -53,6 +62,7 @@ export function CenteredState({
   contentContainerClassName,
   testID = 'centered-state',
   refreshControl,
+  band = 'surface',
 }: CenteredStateProps) {
   const surface = useStateSurface();
   const windowSize = useWindowDimensions();
@@ -68,10 +78,10 @@ export function CenteredState({
   // moves the state by a pixel for no visual reason. Round the band to whole
   // pixels so repeated measurements of one layout place the state identically.
   const frame = useMemo(() => {
-    const band = liveFrame ?? { top: 0, bottom: windowSize.height };
+    const live = liveFrame ?? { top: 0, bottom: windowSize.height };
     return {
-      top: PixelRatio.roundToNearestPixel(band.top),
-      bottom: PixelRatio.roundToNearestPixel(band.bottom),
+      top: PixelRatio.roundToNearestPixel(live.top),
+      bottom: PixelRatio.roundToNearestPixel(live.bottom),
     };
   }, [liveFrame, windowSize.height]);
   const topInset = surface?.frame ? surface.topInset : 0;
@@ -178,9 +188,11 @@ export function CenteredState({
       bottomInset,
       nativeViewportFillsSurface,
       nativeViewportBottom: boundsBottom,
+      band,
       roundToPixel: value => PixelRatio.roundToNearestPixel(value),
     });
   }, [
+    band,
     boundsBottom,
     bottomInset,
     contentHeight,

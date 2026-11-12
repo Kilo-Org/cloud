@@ -91,18 +91,24 @@ describe('signedInBouncerRequest', () => {
   it('reports a sub-organization against its family root on both the decide and the usage row', async () => {
     const bouncer = signedIn();
     const payer = {
-      rootOrganizationId: 'org-root',
-      createdAt: '2026-01-01T00:00:00.000Z',
-      microdollarsUsed: 500,
-      totalMicrodollarsAcquired: 5_000,
+      // The member's own organization: no credit of its own.
+      createdAt: '2026-02-01T00:00:00.000Z',
+      microdollarsUsed: 0,
+      totalMicrodollarsAcquired: 0,
+      bouncer: {
+        rootOrganizationId: 'org-root',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        microdollarsUsed: 500,
+        totalMicrodollarsAcquired: 5_000,
+      },
     };
     await bouncer.decide({ tier: 'team', payer });
 
     expect(mockedDecide.mock.calls[0]?.[0]).toMatchObject({
       accountId: 'org:org-root',
-      accountCreatedAt: payer.createdAt,
-      usedMicrodollars: payer.microdollarsUsed,
-      acquiredMicrodollars: payer.totalMicrodollarsAcquired,
+      accountCreatedAt: payer.bouncer.createdAt,
+      usedMicrodollars: payer.bouncer.microdollarsUsed,
+      acquiredMicrodollars: payer.bouncer.totalMicrodollarsAcquired,
     });
     expect(await bouncer.usage(usageFields, payer)).toMatchObject({
       accountId: 'org:org-root',
@@ -111,13 +117,34 @@ describe('signedInBouncerRequest', () => {
     expect(mockedReleaseDecideLease).not.toHaveBeenCalled();
   });
 
+  it('sends the own facts of a payer with no bouncer family', async () => {
+    const bouncer = signedIn();
+    const payer = {
+      createdAt: '2026-01-01T00:00:00.000Z',
+      microdollarsUsed: 500,
+      totalMicrodollarsAcquired: 5_000,
+    };
+    await bouncer.decide({ tier: 'paid', payer });
+
+    expect(mockedDecide.mock.calls[0]?.[0]).toMatchObject({
+      accountCreatedAt: payer.createdAt,
+      usedMicrodollars: payer.microdollarsUsed,
+      acquiredMicrodollars: payer.totalMicrodollarsAcquired,
+    });
+  });
+
   it('accepts a payer promise so the usage row can wait for the balance check', async () => {
     const bouncer = signedIn();
     const payer = {
-      rootOrganizationId: 'org-root',
-      createdAt: '2026-01-01T00:00:00.000Z',
+      createdAt: '2026-02-01T00:00:00.000Z',
       microdollarsUsed: 0,
       totalMicrodollarsAcquired: 0,
+      bouncer: {
+        rootOrganizationId: 'org-root',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        microdollarsUsed: 0,
+        totalMicrodollarsAcquired: 0,
+      },
     };
     expect(await bouncer.usage(usageFields, Promise.resolve(payer))).toMatchObject({
       accountId: 'org:org-root',

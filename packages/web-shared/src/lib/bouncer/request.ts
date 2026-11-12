@@ -80,7 +80,7 @@ export function bouncerPayerKey(
   payer: BalancePayer | undefined
 ): string {
   return organizationId
-    ? bouncerAccountId(userId, payer?.rootOrganizationId ?? organizationId)
+    ? bouncerAccountId(userId, payer?.bouncer?.rootOrganizationId ?? organizationId)
     : bouncerAccountId(userId);
 }
 

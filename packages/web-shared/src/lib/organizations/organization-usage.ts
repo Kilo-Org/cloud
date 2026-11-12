@@ -42,17 +42,24 @@ import {
 
 /**
  * The paying account's row as the balance check read it: the user for a personal request, the
- * organization for an org request. Bouncer's decide uses it to judge whether an account is
- * established. For an organization payer the facts describe the organization family — the root
- * organization and the sums over it and its children — while the balance check itself stays on the
- * organization the member belongs to.
+ * organization for an org request. The top-level facts are always the payer's own, so the guardrail
+ * admission reads them as that organization's balance. An organization payer also carries the
+ * organization family that bouncer reports.
  */
 export type BalancePayer = {
-  /** The family root bouncer keys this payer on. Absent for a personal payer. */
-  rootOrganizationId?: string;
   createdAt: string;
   microdollarsUsed: number;
   totalMicrodollarsAcquired: number;
+  /**
+   * The organization family bouncer reports for an org payer: the root organization, with the sums
+   * over it and its children. Absent for a personal payer.
+   */
+  bouncer?: {
+    rootOrganizationId: string;
+    createdAt: string;
+    microdollarsUsed: number;
+    totalMicrodollarsAcquired: number;
+  };
 };
 
 export type BalanceAndOrgSettings = {
@@ -176,15 +183,21 @@ export async function getBalanceForOrganizationUser(
     );
   }
 
-  // The family sums were read before any expiry above; swap in this organization's current totals.
+  // The family sums were read before any expiry above; the bouncer facts swap in this
+  // organization's current totals.
   const payer: BalancePayer = {
-    rootOrganizationId: row.payerRootOrganizationId,
-    createdAt: row.payerRootCreatedAt,
-    microdollarsUsed: row.payerMicrodollarsUsed - row.microdollars_used + microdollars_used,
-    totalMicrodollarsAcquired:
-      row.payerTotalMicrodollarsAcquired -
-      row.total_microdollars_acquired +
-      total_microdollars_acquired,
+    createdAt: row.created_at,
+    microdollarsUsed: microdollars_used,
+    totalMicrodollarsAcquired: total_microdollars_acquired,
+    bouncer: {
+      rootOrganizationId: row.payerRootOrganizationId,
+      createdAt: row.payerRootCreatedAt,
+      microdollarsUsed: row.payerMicrodollarsUsed - row.microdollars_used + microdollars_used,
+      totalMicrodollarsAcquired:
+        row.payerTotalMicrodollarsAcquired -
+        row.total_microdollars_acquired +
+        total_microdollars_acquired,
+    },
   };
 
   const organization_balance = accountBalanceMicrodollars({

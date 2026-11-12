@@ -386,10 +386,19 @@ describe.each(['personal', 'organization'] as const)('%s locked credit expiratio
       const balance = await result;
       expect(balance.balance).toBe(0.001);
       expect(balance.payer).toEqual({
-        ...(account.org ? { rootOrganizationId: account.org.id } : {}),
         createdAt: account.org?.created_at ?? account.user.created_at,
         microdollarsUsed: 900,
         totalMicrodollarsAcquired: 1_900,
+        ...(account.org
+          ? {
+              bouncer: {
+                rootOrganizationId: account.org.id,
+                createdAt: account.org.created_at,
+                microdollarsUsed: 900,
+                totalMicrodollarsAcquired: 1_900,
+              },
+            }
+          : {}),
       });
       expect(balance.balanceLimitedByUserAllowance).toBe(false);
     } finally {

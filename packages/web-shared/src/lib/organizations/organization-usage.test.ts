@@ -1415,12 +1415,17 @@ describe('microdollars_used tracking', () => {
 
       const result = await getBalanceForOrganizationUser(child.id, member.id);
 
-      expect(result.payer).toMatchObject({
+      expect(result.payer?.bouncer).toMatchObject({
         rootOrganizationId: parent.id,
         microdollarsUsed: 31_500,
         totalMicrodollarsAcquired: 105_000,
       });
-      expect(new Date(result.payer?.createdAt ?? 0).toISOString()).toBe(PARENT_CREATED_AT);
+      expect(new Date(result.payer?.bouncer?.createdAt ?? 0).toISOString()).toBe(PARENT_CREATED_AT);
+      // The top-level facts stay the child's own.
+      expect(result.payer).toMatchObject({
+        microdollarsUsed: 1_500,
+        totalMicrodollarsAcquired: 5_000,
+      });
     });
 
     test('keeps a child member on the child organization balance', async () => {
@@ -1429,7 +1434,22 @@ describe('microdollars_used tracking', () => {
       const result = await getBalanceForOrganizationUser(child.id, member.id);
 
       expect(result.balance).toBe(0.0035);
-      expect(result.payer?.microdollarsUsed).toBe(31_500);
+      expect(result.payer?.bouncer?.microdollarsUsed).toBe(31_500);
+    });
+
+    test('keeps the child organization own balance when the parent is funded', async () => {
+      const { member, child } = await familyChild();
+      await db
+        .update(organizations)
+        .set({ microdollars_used: 0, total_microdollars_acquired: 0 })
+        .where(eq(organizations.id, child.id));
+
+      const result = await getBalanceForOrganizationUser(child.id, member.id);
+      const payer = result.payer;
+      const ownBalance = payer ? payer.totalMicrodollarsAcquired - payer.microdollarsUsed : null;
+
+      expect(ownBalance).toBe(0);
+      expect(payer?.bouncer?.totalMicrodollarsAcquired).toBe(100_000);
     });
 
     test('keeps the child member allowance as the admission limit', async () => {
@@ -1452,12 +1472,15 @@ describe('microdollars_used tracking', () => {
 
       const result = await getBalanceForOrganizationUser(organization.id, owner.id);
 
-      expect(result.payer).toMatchObject({
+      expect(result.payer?.bouncer).toMatchObject({
         rootOrganizationId: organization.id,
         microdollarsUsed: 0,
         totalMicrodollarsAcquired: 40_000,
       });
-      expect(new Date(result.payer?.createdAt ?? 0).toISOString()).toBe(PARENT_CREATED_AT);
+      expect(result.payer).toMatchObject({
+        microdollarsUsed: 0,
+        totalMicrodollarsAcquired: 40_000,
+      });
     });
 
     test('sums every child organization into the parent payer', async () => {
@@ -1480,7 +1503,7 @@ describe('microdollars_used tracking', () => {
 
       const result = await getBalanceForOrganizationUser(parent.id, owner.id);
 
-      expect(result.payer).toMatchObject({
+      expect(result.payer?.bouncer).toMatchObject({
         rootOrganizationId: parent.id,
         microdollarsUsed: 5_500,
         totalMicrodollarsAcquired: 15_000,

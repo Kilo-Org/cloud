@@ -103,8 +103,8 @@ export type BouncerDecideParams = {
     userId: string;
     tier: Exclude<DecideTier, 'anonymous'>;
     /**
-     * The paying user's row, or for an org payer the root organization of its family, with the
-     * family's totals, as the balance check read it.
+     * The paying user's row, or the member's organization as the balance check read it. An
+     * organization payer also carries `bouncer`, the family the decide reports against.
      */
     payer?: BalancePayer;
   };
@@ -135,9 +135,12 @@ export function startBouncerDecide(
             userId: account.userId,
             ip,
             ja4,
-            accountCreatedAt: account.payer?.createdAt,
-            usedMicrodollars: account.payer?.microdollarsUsed,
-            acquiredMicrodollars: account.payer?.totalMicrodollarsAcquired,
+            accountCreatedAt: account.payer?.bouncer?.createdAt ?? account.payer?.createdAt,
+            usedMicrodollars:
+              account.payer?.bouncer?.microdollarsUsed ?? account.payer?.microdollarsUsed,
+            acquiredMicrodollars:
+              account.payer?.bouncer?.totalMicrodollarsAcquired ??
+              account.payer?.totalMicrodollarsAcquired,
           },
           { timeoutMs: BOUNCER_DECIDE_TIMEOUT_MS }
         );

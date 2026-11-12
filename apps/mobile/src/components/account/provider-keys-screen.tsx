@@ -31,6 +31,13 @@ const ADD_KEY_ROUTE = '/(app)/(tabs)/(3_profile)/provider-key-add' as Href;
 const SKELETON_ROWS = [0, 1];
 
 /**
+ * The height the pending band already occupies: two 104 dp skeletons and the gap
+ * between them. Every state that is not the key list keeps it, so the Add key
+ * action below never moves when the skeletons are replaced by the settled state.
+ */
+const BODY_BAND_CLASS = 'min-h-[220px]';
+
+/**
  * The row's second line. A key the coding plan installed says so instead of
  * reporting the switch, because the switch cannot move for it.
  */
@@ -253,7 +260,7 @@ export function ProviderKeysScreen() {
         <Text variant="muted" className="text-xs">
           {t('profile.providerKeys.description')}
         </Text>
-        {body}
+        <View className={BODY_BAND_CLASS}>{body}</View>
         <View className="pt-3">
           <Button
             variant="outline"

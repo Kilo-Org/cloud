@@ -43,6 +43,7 @@ import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { getTaskToolSessionId } from '@/components/agents/child-session-card-state';
 import { SessionManagerContext } from '@/components/agents/session-manager-context';
 import { MessageBubble } from '@/components/agents/message-bubble';
+import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
 import { assistantMessage, userMessage } from '@/components/agents/message-bubble-test-utils';
 import {
   exitRemoteSessionWithFeedback,
@@ -4235,6 +4236,67 @@ describe('hide thinking preference', () => {
     const bubbleAfter = bubblePropsFor(retryUserId);
     expect(bubbleAfter.onRetryMessage).toBe(bubbleBefore.onRetryMessage);
     expect(bubbleAfter.getChildMessages).toBe(bubbleBefore.getChildMessages);
+  });
+
+  // The row's Add credits settles the balance the session records. Until the
+  // current session's metadata is the loaded one, that record is unknown: the
+  // cached transcript still paints, so reading no organization there would send
+  // an organization's refusal to the person's own purchase screen.
+  it('withholds Add credits until the session metadata is the loaded one', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const row: StoredMessage = {
+      info: { ...userMessage('msg_1761000000002_credits').info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'msg_1761000000002_credits-text',
+          sessionID: ROOT_ID,
+          messageID: 'msg_1761000000002_credits',
+          text: 'a refused question',
+        }),
+      ],
+    };
+    const view = await mountDetails([row], {
+      metadataReady: metadata.promise,
+      cachedRows: [row],
+      sessionOrganizationId: 'org-a',
+    });
+
+    const creditsOf = () => {
+      const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+      if (!list) {
+        throw new Error('No transcript list');
+      }
+      const props = list.props as {
+        items: readonly SessionTranscriptItem[];
+        renderItem: (args: { item: SessionTranscriptItem }) => ReactElement<{
+          children: ReactNode;
+        }>;
+      };
+      const item = props.items.find(
+        candidate => candidate.type === 'message' && candidate.message.info.id === row.info.id
+      );
+      if (!item) {
+        throw new Error('No transcript item for the question');
+      }
+      const bubble = (props.renderItem({ item }).props as { children: ReactNode[] }).children.find(
+        (child): child is ReactElement => isValidElement(child) && child.type === MessageBubble
+      );
+      if (!bubble) {
+        throw new Error('No bubble for the question');
+      }
+      return (bubble.props as { addCredits?: { kind: string; url?: string } }).addCredits;
+    };
+
+    expect(creditsOf()).toBeUndefined();
+
+    await act(async () => {
+      metadata.resolve(undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => creditsOf() !== undefined);
+
+    expect(creditsOf()).toEqual({ kind: 'organization', url: organizationBillingUrl('org-a') });
   });
 
   it('renders no empty padded row for a reasoning-only child message', async () => {

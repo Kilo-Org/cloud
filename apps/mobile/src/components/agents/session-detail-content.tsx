@@ -37,6 +37,7 @@ import {
 import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
+import { addCreditsDestinationFor } from '@/lib/credits/add-credits-destination';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { MessageErrorBoundary } from '@/components/agents/message-error-boundary';
@@ -1445,6 +1446,19 @@ export function SessionDetailContent({
     routerRef.current.push('/(app)/credits' as Href);
   }, []);
 
+  // One destination object for every row: a fresh one per render would
+  // re-create each memoized row's props. The session records the balance that
+  // pays for it, so an organization's session is settled on that organization's
+  // billing page and a personal one on the in-app purchase screen. Until the
+  // CURRENT session's metadata is the loaded one, that record is unknown, so the
+  // row offers no action rather than reading "no organization" from a load that
+  // has not answered yet — the fallback would be the personal balance.
+  const addCredits = useMemo(
+    () =>
+      sessionDataLoaded ? addCreditsDestinationFor(organizationId, handleAddCredits) : undefined,
+    [handleAddCredits, organizationId, sessionDataLoaded]
+  );
+
   const handleRetryMessage = useCallback(
     (message: StoredMessage) => {
       // Read the live capability at tap time: a stale row could outlive the
@@ -1704,7 +1718,7 @@ export function SessionDetailContent({
           onLongPressDetails={handleOpenDetails}
           holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
           onRetryMessage={retryPrompt !== null ? handleRetryMessage : undefined}
-          onAddCredits={handleAddCredits}
+          addCredits={addCredits}
           retryAvailable={retryAvailable}
           onCopyToComposer={handleCopyToComposer}
           failureStatedByPreparation={preparationFailureTriggers.has(item.message.info.id)}
@@ -1742,7 +1756,7 @@ export function SessionDetailContent({
       retryAvailable,
       preparationFailureTriggers,
       handleRetryMessage,
-      handleAddCredits,
+      addCredits,
       handleCopyToComposer,
       handleOpenDetails,
       handleRestoreQueued,

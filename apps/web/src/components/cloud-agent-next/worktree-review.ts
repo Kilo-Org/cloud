@@ -15,6 +15,8 @@ import {
   sameWorktreeReviewCapture,
   sameWorktreeReviewScope,
   updateWorktreeReviewComment,
+  isValidWorktreeReviewPath,
+  worktreeReviewPayloadSchema,
   type ParsedWorktreeReview,
   type WorktreeReviewAnchor,
   type WorktreeReviewCapture,
@@ -24,17 +26,9 @@ import {
   type WorktreeReviewRange,
   type WorktreeReviewResult,
 } from '@kilocode/app-shared/worktree-review';
-import {
-  worktreeChangesCapturedAtSchema,
-  worktreeChangesComparisonSchema,
-  worktreeChangesFileSchema,
-  worktreeChangesRevisionSchema,
-  worktreeChangesScopeSchema,
-  type WorktreeFileRecord,
-} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import type { WorktreeFileRecord } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { FileDiffMetadata, SelectedLineRange } from '@pierre/diffs';
 import { iterateOverDiff } from '../../../node_modules/@pierre/diffs/dist/utils/iterateOverDiff.js';
-import { z } from 'zod';
 
 export {
   MAX_WORKTREE_REVIEW_COMMENTS,
@@ -72,80 +66,6 @@ type UnifiedRow = {
 };
 
 export type WorktreeReviewFreshness = 'current' | 'stale' | 'unknown';
-
-const boundedIdentitySchema = z
-  .string()
-  .min(1)
-  .max(1_024)
-  .refine(value => !value.includes('\0'));
-
-const worktreeReviewCaptureSchema = z
-  .object({
-    userId: boundedIdentitySchema,
-    organizationId: boundedIdentitySchema.optional(),
-    workspaceScope: boundedIdentitySchema,
-    sourceCloudAgentSessionId: boundedIdentitySchema,
-    revision: worktreeChangesRevisionSchema,
-    scope: worktreeChangesScopeSchema.optional(),
-    capturedAt: worktreeChangesCapturedAtSchema,
-    comparison: worktreeChangesComparisonSchema,
-  })
-  .strict();
-
-const worktreeReviewRangeSchema = z
-  .object({
-    side: z.enum(['deletions', 'additions']),
-    startLine: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-    endLine: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-  })
-  .strict();
-
-const worktreeReviewQuoteLineSchema = z
-  .object({
-    lineNumber: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-    kind: z.enum(['addition', 'deletion', 'context']),
-    text: z.string().min(1),
-  })
-  .strict();
-
-export const worktreeReviewAnchorSchema = z
-  .object({
-    capture: worktreeReviewCaptureSchema,
-    path: worktreeChangesFileSchema.shape.path,
-    range: worktreeReviewRangeSchema,
-    quote: z
-      .object({
-        source: z.enum(['saved-patch', 'validated-expanded-diff']),
-        lines: z.array(worktreeReviewQuoteLineSchema).max(MAX_WORKTREE_REVIEW_SELECTION_LINES),
-      })
-      .strict(),
-  })
-  .strict();
-
-export const worktreeReviewCommentSchema = z
-  .object({
-    id: boundedIdentitySchema,
-    anchor: worktreeReviewAnchorSchema,
-    text: z.string().min(1).max(MAX_WORKTREE_REVIEW_COMMENT_LENGTH),
-  })
-  .strict();
-
-const worktreeReviewPayloadCommentSchema = z
-  .object({
-    id: boundedIdentitySchema,
-    contextStatus: z.enum(['current-saved-capture', 'older-or-unverified-capture']),
-    anchor: worktreeReviewAnchorSchema,
-    text: z.string().min(1).max(MAX_WORKTREE_REVIEW_COMMENT_LENGTH),
-  })
-  .strict();
-
-const worktreeReviewPayloadSchema = z
-  .object({
-    version: z.literal(1),
-    overall: z.string().max(MAX_WORKTREE_REVIEW_COMMENT_LENGTH).optional(),
-    comments: z.array(worktreeReviewPayloadCommentSchema).min(1).max(MAX_WORKTREE_REVIEW_COMMENTS),
-  })
-  .strict();
 
 export function getSelectionError(selection: SelectedLineRange): string | undefined {
   if (
@@ -246,7 +166,7 @@ function fileDiffError(
     file.scope !== capture.scope ||
     diff.name !== file.path ||
     diff.prevName !== undefined ||
-    !worktreeChangesFileSchema.shape.path.safeParse(file.path).success
+    !isValidWorktreeReviewPath(file.path)
   ) {
     return 'The saved file does not match this review capture.';
   }

@@ -1,13 +1,16 @@
 // The worktree review message: the one format by which a diff review collected
 // in an app is sent to a Cloud Agent as a single message. The web chat renders
-// it back as a review card, so the encoding, the limits, and the anchor shape
-// live here and every surface that composes or reads a review shares them.
+// it back as a review card, so the encoding, the limits, the anchor shape, and
+// the runtime schemas live here and every surface that composes or reads a
+// review shares them.
 //
-// Pure: no React, no platform APIs, no environment reads. The contracts this
-// module validates are declared here rather than imported from
-// `@kilocode/worker-utils` because that package depends on this one; the
-// validators below mirror its worktree-changes schemas, and the web app keeps
-// its matching Zod schemas so a parsed message is also schema-checked there.
+// Pure: no React, no platform APIs, no environment reads. The schemas mirror
+// the ones in `@kilocode/worker-utils/cloud-agent-worktree-changes` but are
+// declared here rather than imported from it, because that package depends on
+// this one. They keep that package's limits and refine messages, so a capture
+// or a path this module accepts is exactly what the worker accepts.
+
+import { z } from 'zod';
 
 export const WORKTREE_REVIEW_MESSAGE_VERSION = 1;
 export const MAX_WORKTREE_REVIEW_COMMENTS = 50;
@@ -95,12 +98,136 @@ export type ParsedWorktreeReview = {
 
 export type WorktreeReviewResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
-const COMMIT_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
-const CAPTURED_AT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
+const worktreeReviewIdentitySchema = z
+  .string()
+  .min(1)
+  .max(1_024)
+  .refine(value => !value.includes('\0'));
 
-function isBoundedIdentity(value: string): boolean {
-  return value.trim().length > 0 && value.length <= 1_024 && !value.includes('\0');
-}
+/** An identity that is not only whitespace: the check the review error messages use. */
+const boundedIdentitySchema = worktreeReviewIdentitySchema.refine(value => value.trim().length > 0);
+
+const worktreeReviewRevisionSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+
+const worktreeReviewCapturedAtSchema = z.string().datetime({ offset: true });
+
+const worktreeReviewCommitSchema = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/);
+
+const worktreeReviewBaseRefSchema = z
+  .string()
+  .min(1)
+  .max(1_024)
+  .refine(ref => !ref.startsWith('-') && !ref.includes('\0'), 'Invalid comparison ref');
+
+const worktreeReviewComparisonSchema = z
+  .object({
+    baseRef: worktreeReviewBaseRefSchema,
+    mergeBase: worktreeReviewCommitSchema,
+    head: worktreeReviewCommitSchema,
+    baseRefFallback: z
+      .object({
+        requested: worktreeReviewBaseRefSchema,
+        used: worktreeReviewBaseRefSchema,
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+const worktreeReviewScopeSchema = z.enum(['uncommitted', 'against-base-branch']);
+
+const worktreeReviewCaptureSchema = z
+  .object({
+    userId: worktreeReviewIdentitySchema,
+    organizationId: worktreeReviewIdentitySchema.optional(),
+    workspaceScope: worktreeReviewIdentitySchema,
+    sourceCloudAgentSessionId: worktreeReviewIdentitySchema,
+    revision: worktreeReviewRevisionSchema,
+    scope: worktreeReviewScopeSchema.optional(),
+    capturedAt: worktreeReviewCapturedAtSchema,
+    comparison: worktreeReviewComparisonSchema,
+  })
+  .strict();
+
+/** A repository-relative path: no empty, `.` or `..` segment, no NUL. */
+const worktreeReviewPathSchema = z
+  .string()
+  .min(1)
+  .max(4_096)
+  .refine(
+    path =>
+      !path.includes('\0') &&
+      path.split('/').every(part => part !== '' && part !== '.' && part !== '..'),
+    'Expected a repository-relative path'
+  );
+
+const worktreeReviewRangeSchema = z
+  .object({
+    side: z.enum(['deletions', 'additions']),
+    startLine: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    endLine: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  })
+  .strict();
+
+/** One quoted source line: never empty, and newline-terminated unless it ends the file. */
+const worktreeReviewQuoteLineSchema = z
+  .object({
+    lineNumber: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    kind: z.enum(['addition', 'deletion', 'context']),
+    text: z
+      .string()
+      .min(1)
+      .refine(text => {
+        const newline = text.indexOf('\n');
+        return newline === -1 || newline === text.length - 1;
+      }),
+  })
+  .strict();
+
+const worktreeReviewQuoteSchema = z
+  .object({
+    source: z.enum(['saved-patch', 'validated-expanded-diff']),
+    lines: z
+      .array(worktreeReviewQuoteLineSchema)
+      .min(1)
+      .max(MAX_WORKTREE_REVIEW_SELECTION_LINES)
+      .refine(lines => lines.slice(0, -1).every(line => line.text.endsWith('\n'))),
+  })
+  .strict();
+
+export const worktreeReviewAnchorSchema = z
+  .object({
+    capture: worktreeReviewCaptureSchema,
+    path: worktreeReviewPathSchema,
+    range: worktreeReviewRangeSchema,
+    quote: worktreeReviewQuoteSchema,
+  })
+  .strict();
+
+export const worktreeReviewCommentSchema = z
+  .object({
+    id: worktreeReviewIdentitySchema,
+    anchor: worktreeReviewAnchorSchema,
+    text: z.string().min(1).max(MAX_WORKTREE_REVIEW_COMMENT_LENGTH),
+  })
+  .strict();
+
+const worktreeReviewPayloadCommentSchema = z
+  .object({
+    id: worktreeReviewIdentitySchema,
+    contextStatus: z.enum(['current-saved-capture', 'older-or-unverified-capture']),
+    anchor: worktreeReviewAnchorSchema,
+    text: z.string().min(1).max(MAX_WORKTREE_REVIEW_COMMENT_LENGTH),
+  })
+  .strict();
+
+export const worktreeReviewPayloadSchema = z
+  .object({
+    version: z.literal(WORKTREE_REVIEW_MESSAGE_VERSION),
+    overall: z.string().max(MAX_WORKTREE_REVIEW_COMMENT_LENGTH).optional(),
+    comments: z.array(worktreeReviewPayloadCommentSchema).min(1).max(MAX_WORKTREE_REVIEW_COMMENTS),
+  })
+  .strict();
 
 /**
  * UTF-8 byte length without `TextEncoder`, which the shared package's lib does
@@ -116,72 +243,18 @@ function utf8ByteLength(value: string): number {
   return bytes;
 }
 
-function isValidBaseRef(value: string): boolean {
-  return (
-    value.length > 0 && value.length <= 1_024 && !value.startsWith('-') && !value.includes('\0')
-  );
-}
-
-function isValidCommit(value: string): boolean {
-  return COMMIT_PATTERN.test(value);
-}
-
-function isValidCapturedAt(value: string): boolean {
-  return CAPTURED_AT_PATTERN.test(value) && !Number.isNaN(Date.parse(value));
-}
-
-/** A repository-relative path: no empty, `.` or `..` segment, no NUL. */
 export function isValidWorktreeReviewPath(value: string): boolean {
-  if (value.length === 0 || value.length > 4_096 || value.includes('\0')) return false;
-  return value.split('/').every(part => part !== '' && part !== '.' && part !== '..');
-}
-
-function isWorktreeReviewScopeName(value: string): value is WorktreeReviewScope {
-  return value === 'uncommitted' || value === 'against-base-branch';
-}
-
-function getComparisonError(comparison: WorktreeReviewComparison): string | undefined {
-  if (
-    !isValidBaseRef(comparison.baseRef) ||
-    !isValidCommit(comparison.mergeBase) ||
-    !isValidCommit(comparison.head)
-  ) {
-    return 'The saved review capture is invalid.';
-  }
-  const fallback = comparison.baseRefFallback;
-  if (
-    fallback !== undefined &&
-    (!isValidBaseRef(fallback.requested) || !isValidBaseRef(fallback.used))
-  ) {
-    return 'The saved review capture is invalid.';
-  }
-  return undefined;
+  return worktreeReviewPathSchema.safeParse(value).success;
 }
 
 export function getWorktreeReviewCaptureError(capture: WorktreeReviewCapture): string | undefined {
-  if (
-    !isBoundedIdentity(capture.userId) ||
-    (capture.organizationId !== undefined && !isBoundedIdentity(capture.organizationId)) ||
-    !isBoundedIdentity(capture.workspaceScope) ||
-    !isBoundedIdentity(capture.sourceCloudAgentSessionId) ||
-    !Number.isSafeInteger(capture.revision) ||
-    capture.revision <= 0 ||
-    (capture.scope !== undefined && !isWorktreeReviewScopeName(capture.scope)) ||
-    !isValidCapturedAt(capture.capturedAt)
-  ) {
-    return 'The saved review capture is invalid.';
-  }
-  return getComparisonError(capture.comparison);
+  return worktreeReviewCaptureSchema.safeParse(capture).success
+    ? undefined
+    : 'The saved review capture is invalid.';
 }
 
 export function getWorktreeReviewRangeError(range: WorktreeReviewRange): string | undefined {
-  if (
-    (range.side !== 'deletions' && range.side !== 'additions') ||
-    !Number.isSafeInteger(range.startLine) ||
-    !Number.isSafeInteger(range.endLine) ||
-    range.startLine <= 0 ||
-    range.endLine < range.startLine
-  ) {
+  if (!worktreeReviewRangeSchema.safeParse(range).success || range.endLine < range.startLine) {
     return 'Select a valid line range on one side of the diff.';
   }
   return undefined;
@@ -212,26 +285,11 @@ export function getWorktreeReviewAnchorError(anchor: WorktreeReviewAnchor): stri
   if (!isValidWorktreeReviewPath(anchor.path)) {
     return 'The saved review path is invalid.';
   }
-  if (
-    (anchor.quote.source !== 'saved-patch' && anchor.quote.source !== 'validated-expanded-diff') ||
-    anchor.quote.lines.length < 1 ||
-    anchor.quote.lines.length > MAX_WORKTREE_REVIEW_SELECTION_LINES
-  ) {
+  if (!worktreeReviewQuoteSchema.safeParse(anchor.quote).success) {
     return 'The selected lines are not fully available in this saved diff.';
   }
   let bytes = 0;
-  for (const [index, line] of anchor.quote.lines.entries()) {
-    const newline = line.text.indexOf('\n');
-    if (
-      !Number.isSafeInteger(line.lineNumber) ||
-      line.lineNumber <= 0 ||
-      (line.kind !== 'context' && line.kind !== 'addition' && line.kind !== 'deletion') ||
-      line.text.length === 0 ||
-      (newline !== -1 && newline !== line.text.length - 1) ||
-      (index < anchor.quote.lines.length - 1 && newline === -1)
-    ) {
-      return 'The selected lines are not fully available in this saved diff.';
-    }
+  for (const line of anchor.quote.lines) {
     bytes += utf8ByteLength(line.text);
     if (bytes > MAX_WORKTREE_REVIEW_QUOTE_BYTES) {
       return `The selected text exceeds the ${MAX_WORKTREE_REVIEW_QUOTE_BYTES}-byte review limit.`;
@@ -266,7 +324,7 @@ export function getWorktreeReviewCommentsError(
   const first = comments[0];
   const ids = new Set<string>();
   for (const comment of comments) {
-    if (!isBoundedIdentity(comment.id) || ids.has(comment.id)) {
+    if (!boundedIdentitySchema.safeParse(comment.id).success || ids.has(comment.id)) {
       return 'Each review comment must have a unique identifier.';
     }
     ids.add(comment.id);
@@ -395,6 +453,9 @@ export function serializeWorktreeReview(
       text: comment.text,
     })),
   };
+  if (!worktreeReviewPayloadSchema.safeParse(payload).success) {
+    return { ok: false, error: 'This review cannot be sent. Remove or shorten the comments.' };
+  }
   // The payload is JSON; the envelope's own characters are constant.
   const message = `${WORKTREE_REVIEW_PROMPT_INTRO}\n\n${JSON.stringify(payload, null, 2)}`;
   if (message.length > MAX_WORKTREE_REVIEW_PROMPT_LENGTH) {

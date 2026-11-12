@@ -1223,7 +1223,14 @@ export function resolveStreamTicket(
   sessionId: string
 ): string | Promise<string> {
   if (config.fetchStreamTicket) return config.fetchStreamTicket(sessionId);
-  if (config.nextAuthSecret) return mintStreamTicket(config.user, sessionId, config.nextAuthSecret);
+  if (config.nextAuthSecret)
+    return mintStreamTicket(
+      config.user,
+      sessionId,
+      config.nextAuthSecret,
+      120,
+      config.kilocodeOrganizationId
+    );
   throw new NoStreamTicketSourceError();
 }
 

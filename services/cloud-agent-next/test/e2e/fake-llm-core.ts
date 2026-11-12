@@ -627,14 +627,17 @@ export function extractLastUserMessageText(body: unknown): string {
     const msg = messages[i] as Message;
     if (msg?.role !== 'user') continue;
     const content = msg.content;
-    if (typeof content === 'string') return content;
-    if (Array.isArray(content)) {
-      return content
-        .filter(part => part?.type === 'text' || part?.type === undefined)
-        .map(part => part.text ?? '')
-        .join('');
-    }
-    return '';
+    const text =
+      typeof content === 'string'
+        ? content
+        : Array.isArray(content)
+          ? content
+              .filter(part => part?.type === 'text' || part?.type === undefined)
+              .map(part => part.text ?? '')
+              .join('')
+          : '';
+    if (/^\s*<system-reminder>[\s\S]*<\/system-reminder>\s*$/.test(text)) continue;
+    return text;
   }
   return '';
 }
@@ -1683,7 +1686,14 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
             index: 0,
             id,
             type: 'function',
-            function: { name: tool.name, arguments: JSON.stringify({ name }) },
+            function: {
+              name: tool.name,
+              arguments: JSON.stringify(
+                isRecord(tool.parameters.properties) && 'id' in tool.parameters.properties
+                  ? { id: name }
+                  : { name }
+              ),
+            },
           },
         ],
       })

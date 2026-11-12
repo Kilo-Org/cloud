@@ -655,21 +655,12 @@ export const workspaceFoldersRouter = createTRPCRouter({
           organizationId: cloud_agent_worktrees.organization_id,
           deletionStartedAt: cloud_agent_worktrees.deletion_started_at,
           deletionCompletedAt: cloud_agent_worktrees.deletion_completed_at,
-          cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
         })
         .from(cloud_agent_worktrees)
-        .leftJoin(
-          cli_sessions_v2,
-          and(
-            eq(cli_sessions_v2.cloud_agent_worktree_id, cloud_agent_worktrees.worktree_id),
-            ownerScopeCondition(cli_sessions_v2, ctx.sidebarScope),
-            isNull(cli_sessions_v2.parent_session_id)
-          )
-        )
         .where(inArray(cloud_agent_worktrees.worktree_id, input.worktreeIds))
         .orderBy(asc(cloud_agent_worktrees.worktree_id))
-        .for('share', { of: cloud_agent_worktrees });
-      const eligibleIds = new Set<string>();
+        .for('share');
+      const deletingIds = new Set<string>();
       for (const row of rows) {
         if (
           row.userId !== ctx.sidebarScope.userId ||
@@ -677,17 +668,31 @@ export const workspaceFoldersRouter = createTRPCRouter({
         ) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
         }
-        if (
-          row.deletionStartedAt === null &&
-          row.deletionCompletedAt === null &&
-          workspaceSessionIdSchema.safeParse(row.cloudAgentSessionId).success
-        ) {
-          eligibleIds.add(row.worktreeId);
+        if (row.deletionStartedAt !== null || row.deletionCompletedAt !== null) {
+          deletingIds.add(row.worktreeId);
         }
       }
+      // Order keys need owned roots, not runtime metadata or control-plane session IDs.
+      const roots = await ctx.sidebarDb
+        .select({ worktreeId: cli_sessions_v2.cloud_agent_worktree_id })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            ownerScopeCondition(cli_sessions_v2, ctx.sidebarScope),
+            inArray(cli_sessions_v2.cloud_agent_worktree_id, input.worktreeIds),
+            isNull(cli_sessions_v2.parent_session_id)
+          )
+        )
+        .orderBy(asc(cli_sessions_v2.cloud_agent_worktree_id), asc(cli_sessions_v2.session_id))
+        .for('share');
+      const eligibleIds = new Set(roots.map(root => root.worktreeId));
       await ctx.sidebarDb
         .update(cloud_agent_workspace_folders)
-        .set({ manual_worktree_order: input.worktreeIds.filter(id => eligibleIds.has(id)) })
+        .set({
+          manual_worktree_order: input.worktreeIds.filter(
+            id => eligibleIds.has(id) && !deletingIds.has(id)
+          ),
+        })
         .where(eq(cloud_agent_workspace_folders.id, input.folderId));
       return { success: true };
     }),

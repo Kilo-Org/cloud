@@ -356,6 +356,17 @@ describe('workspaceFolders persistence and validation', () => {
     await expect(
       callerFor().reorderWorktrees({ ...input, worktreeIds: [WORKTREE_ID, foreignId] })
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    for (const metadata of [
+      { kilo_user_id: OTHER_USER_ID },
+      { organization_id: ORGANIZATION_ID },
+    ]) {
+      const worktreeId = newWorktreeId();
+      await insertSession({ cloud_agent_worktree_id: worktreeId });
+      await insertWorktree({ worktree_id: worktreeId, ...metadata });
+      await expect(
+        callerFor().reorderWorktrees({ ...input, worktreeIds: [WORKTREE_ID, worktreeId] })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    }
     expect(
       (await readFolders()).find(folder => folder.id === smart.id)?.manual_worktree_order
     ).toEqual([]);
@@ -390,7 +401,6 @@ describe('workspaceFolders persistence and validation', () => {
         cloud_agent_worktree_id: missingMetadataId,
         organization_id: organizationId,
       });
-      skipped.push(missingMetadataId);
       const hidden = [
         { metadata: { deletion_started_at: INITIAL_TIME }, session: {} },
         {
@@ -403,7 +413,6 @@ describe('workspaceFolders persistence and validation', () => {
           session: { organization_id: organizationId === null ? ORGANIZATION_ID : null },
         },
         { metadata: {}, session: { parent_session_id: SESSION_ID } },
-        { metadata: {}, session: { cloud_agent_session_id: 'agent_legacy' } },
       ] satisfies { metadata: Partial<WorktreeInsert>; session: Partial<NewCliSessionV2> }[];
       for (const item of hidden) {
         const worktreeId = newWorktreeId();
@@ -419,6 +428,19 @@ describe('workspaceFolders persistence and validation', () => {
           ...item.session,
         });
       }
+      for (const session of [
+        { kilo_user_id: OTHER_USER_ID },
+        { organization_id: organizationId === null ? ORGANIZATION_ID : null },
+        { parent_session_id: SESSION_ID },
+      ]) {
+        const worktreeId = newWorktreeId();
+        skipped.push(worktreeId);
+        await insertSession({
+          cloud_agent_worktree_id: worktreeId,
+          organization_id: organizationId,
+          ...session,
+        });
+      }
       const rootlessId = newWorktreeId();
       await insertWorktree({ worktree_id: rootlessId, organization_id: organizationId });
       const worktreesBefore = await db
@@ -430,11 +452,11 @@ describe('workspaceFolders persistence and validation', () => {
       await callerFor().reorderWorktrees({
         organizationId,
         folderId: smart.id,
-        worktreeIds: [secondId, ...skipped, rootlessId, firstId],
+        worktreeIds: [secondId, missingMetadataId, ...skipped, rootlessId, firstId],
       });
 
       expect((await callerFor().list({ organizationId })).folders).toEqual([
-        { ...smart, manualWorktreeOrder: [secondId, firstId] },
+        { ...smart, manualWorktreeOrder: [secondId, missingMetadataId, firstId] },
       ]);
       expect(
         await db
@@ -445,6 +467,57 @@ describe('workspaceFolders persistence and validation', () => {
       ).toEqual(worktreesBefore);
       await callerFor().reorderWorktrees({ organizationId, folderId: smart.id, worktreeIds: [] });
       expect((await readFolders(organizationId))[0]?.manual_worktree_order).toEqual([]);
+    }
+  );
+
+  it.each([null, ORGANIZATION_ID])(
+    'preserves smart-folder order for owned roots without metadata or modern session IDs in scope %p',
+    async organizationId => {
+      const smart = await callerFor().create({
+        organizationId,
+        name: 'Needs you',
+        color: 'orange',
+        smartPreset: 'needs_you',
+      });
+      const worktreeIds: CloudAgentWorktreeId[] = [];
+      for (const hasMetadata of [false, true]) {
+        for (const cloudAgentSessionId of [
+          null,
+          `agent_legacy_${crypto.randomUUID()}`,
+          newWorkspaceId(),
+        ]) {
+          const worktreeId = newWorktreeId();
+          worktreeIds.unshift(worktreeId);
+          await insertSession({
+            cloud_agent_worktree_id: worktreeId,
+            cloud_agent_session_id: cloudAgentSessionId,
+            organization_id: organizationId,
+          });
+          if (hasMetadata) {
+            await insertWorktree({ worktree_id: worktreeId, organization_id: organizationId });
+          }
+        }
+      }
+      const worktreesBefore = await db
+        .select()
+        .from(cloud_agent_worktrees)
+        .where(eq(cloud_agent_worktrees.kilo_user_id, USER_ID))
+        .orderBy(asc(cloud_agent_worktrees.worktree_id));
+
+      await expect(
+        callerFor().reorderWorktrees({ organizationId, folderId: smart.id, worktreeIds })
+      ).resolves.toEqual({ success: true });
+
+      expect((await callerFor().list({ organizationId })).folders).toEqual([
+        { ...smart, manualWorktreeOrder: worktreeIds },
+      ]);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_worktrees)
+          .where(eq(cloud_agent_worktrees.kilo_user_id, USER_ID))
+          .orderBy(asc(cloud_agent_worktrees.worktree_id))
+      ).toEqual(worktreesBefore);
     }
   );
 

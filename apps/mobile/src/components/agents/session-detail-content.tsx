@@ -1191,7 +1191,7 @@ export function SessionDetailContent({
   // transport, the next build restores the normal streaming behavior.
   const dropUnrenderableUserRows = activeSessionType === 'read-only';
 
-  const baseTranscript = useMemo(() => {
+  const { transcript: baseTranscript, preparationFailureTriggers } = useMemo(() => {
     // A superseded submission's preparation goes with its row: dropping only
     // the row would leave `mergeSessionTranscript` re-emitting the attempt at
     // the end (its trigger id is no longer in the message list).
@@ -1201,10 +1201,22 @@ export function SessionDetailContent({
         : preparationAttempts.filter(
             attempt => !supersededMessageIds.has(attempt.triggerMessageId)
           );
-    return mergeSessionTranscript(displayedMessages, attempts, {
-      deliveryStates: pendingMessages,
-      dropUnrenderableUserRows,
-    });
+    // A failed attempt states its own failure in the group it renders, with the
+    // stage and the reason. The question that triggered it must not repeat the
+    // generic response failure on top of that statement.
+    const failed = new Set<string>();
+    for (const attempt of attempts) {
+      if (attempt.status === 'failed') {
+        failed.add(attempt.triggerMessageId);
+      }
+    }
+    return {
+      transcript: mergeSessionTranscript(displayedMessages, attempts, {
+        deliveryStates: pendingMessages,
+        dropUnrenderableUserRows,
+      }),
+      preparationFailureTriggers: failed,
+    };
   }, [
     displayedMessages,
     preparationAttempts,
@@ -1391,6 +1403,38 @@ export function SessionDetailContent({
   const handleCopyToComposer = useCallback((text: string) => {
     composerControlRef.current?.setText(text);
   }, []);
+
+  // A failed send the server accepted after all: its response was lost, so the
+  // composer put the text back, and the confirmed message then reached the
+  // transcript. The transcript owns the message now, so the restored draft is
+  // withdrawn — otherwise the same text sits in two places and the next Send
+  // posts it twice. The composer keeps a draft the reader has since edited, and
+  // the record's `sequence` makes this effect run once per delivery.
+  const deliveredFailedPrompt = useAtomValue(manager.atoms.deliveredFailedPrompt);
+  const appliedDeliveredFailedPromptSequence = useRef(0);
+  // The load each record was published for. The draft suppression lasts only
+  // until the composer consumes that one load, so a draft the reader stores
+  // afterwards with the same words is never taken for the delivered message.
+  const [consumedDeliveredSequence, setConsumedDeliveredSequence] = useState(0);
+  useEffect(() => {
+    if (deliveredFailedPrompt === null) {
+      return;
+    }
+    if (deliveredFailedPrompt.sequence <= appliedDeliveredFailedPromptSequence.current) {
+      return;
+    }
+    appliedDeliveredFailedPromptSequence.current = deliveredFailedPrompt.sequence;
+    composerControlRef.current?.withdrawRestoredSend(deliveredFailedPrompt.text);
+  }, [deliveredFailedPrompt, setConsumedDeliveredSequence]);
+  const consumableDeliveredDraft =
+    deliveredFailedPrompt !== null && deliveredFailedPrompt.sequence > consumedDeliveredSequence
+      ? deliveredFailedPrompt.text
+      : null;
+  const consumeDeliveredDraft = useCallback(() => {
+    if (deliveredFailedPrompt !== null) {
+      setConsumedDeliveredSequence(deliveredFailedPrompt.sequence);
+    }
+  }, [deliveredFailedPrompt]);
 
   // Where the account settles a turn its balance refused. The action reads no
   // session state, so it stays wired for a read-only transcript too. It reads
@@ -1663,6 +1707,7 @@ export function SessionDetailContent({
           onAddCredits={handleAddCredits}
           retryAvailable={retryAvailable}
           onCopyToComposer={handleCopyToComposer}
+          failureStatedByPreparation={preparationFailureTriggers.has(item.message.info.id)}
           onRestoreQueued={
             canceledQueuedMessages.has(item.message.info.id) ? handleRestoreQueued : undefined
           }
@@ -1695,6 +1740,7 @@ export function SessionDetailContent({
       pendingMessages,
       heldQueuedIds,
       retryAvailable,
+      preparationFailureTriggers,
       handleRetryMessage,
       handleAddCredits,
       handleCopyToComposer,
@@ -2025,9 +2071,9 @@ export function SessionDetailContent({
   // header pill to show and nothing for its sheet to do: it reports no usage,
   // and a session opened read-only cannot auto-approve, so the pill would only
   // paint its two dash placeholders beside the finished empty state (design
-  // gate, empty read-only fixture). The pill keeps its reserved box instead,
-  // exactly like the unresolved placeholder; a failed open keeps the live
-  // control, whose sheet still offers the connection reading and its Retry.
+  // gate, empty read-only fixture). The pill hides instead, exactly like the
+  // unresolved placeholder; a failed open keeps the live control, whose sheet
+  // still offers the connection reading and its Retry.
   const contextPillHasNothingToReport =
     isReadOnly &&
     messages.length === 0 &&
@@ -2035,14 +2081,18 @@ export function SessionDetailContent({
     terminalError === null &&
     !isSessionChromePending;
   const headerRight = (
+    // The pill leads and the Follow control takes the trailing edge. The pill
+    // grows by one reading when the session starts reporting usage, and a
+    // control after it would move by that width; at the end of the row it keeps
+    // one position instead. The growth comes out of the heading beside it, which
+    // keeps its own line cap and tail ellipsis — the trade this row makes to
+    // leave the title the width up to the pill's painted size.
     <View className="min-w-0 shrink flex-row items-center gap-2">
-      <SessionFollowButton sessionId={sessionId} />
       <SessionContextMetrics
         info={contextInfo}
         totalCostMicrodollars={totalMicrodollars}
-        // The pill's value slots read as a settled session. While the body is
-        // still a skeleton they belong to the loading shape instead, so the
-        // pill keeps the bars that hold the row the values will take.
+        // The pill's values read as a settled session. While the body is still
+        // a skeleton no reading has arrived, so the pill paints its ring alone.
         hasMessages={messages.length > 0 && !isSessionChromePending}
         autoApproveAvailable={autoApproveAvailable}
         loading={isSessionChromePending}
@@ -2064,6 +2114,7 @@ export function SessionDetailContent({
               }
         }
       />
+      <SessionFollowButton sessionId={sessionId} />
     </View>
   );
   const associatedPr = fetchedData?.associatedPr ?? null;
@@ -2918,6 +2969,8 @@ export function SessionDetailContent({
                 autoSend={autoSend}
                 draftKey={userId ? sessionComposerDraftKey : undefined}
                 initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
+                deliveredDraft={consumableDeliveredDraft}
+                onDeliveredDraftConsumed={consumeDeliveredDraft}
                 sessionId={sessionId}
                 suggestion={activeSuggestion}
                 onAcceptSuggestion={async (requestId, index) => {

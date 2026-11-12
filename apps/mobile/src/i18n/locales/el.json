@@ -1810,7 +1810,7 @@
       "costSpoken": "κόστος {{cost}}",
       "costSpokenWithTime": "κόστος {{cost}}, {{time}}",
       "pullRequest": "αίτημα ενσωμάτωσης {{number}}",
-      "spokenJoiner": "και"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Δεν ήταν δυνατό το άνοιγμα του GitHub",
@@ -2208,10 +2208,14 @@
       "stepFailed": "Η ρύθμιση περιβάλλοντος απέτυχε",
       "stepUnknown": "Ρύθμιση περιβάλλοντος",
       "detailCreatingSandbox": "Δημιουργία sandbox",
+      "detailStartingSandbox": "Εκκίνηση sandbox",
+      "detailCloningRepository": "Κλωνοποίηση αποθετηρίου",
       "detailUpdatingRepository": "Ενημέρωση αποθετηρίου",
       "detailCheckingOutBranch": "Checkout κλάδου",
+      "detailSettingUpBranch": "Ρύθμιση κλάδου",
       "detailRunningSetupCommands": "Εκτέλεση εντολών ρύθμισης",
       "detailSavingRepository": "Αποθήκευση αποθετηρίου για ταχύτερες εκκινήσεις",
+      "detailStartingKilo": "Εκκίνηση Kilo",
       "detailStartingKiloRuntime": "Εκκίνηση runtime του Kilo",
       "detailPreparingKiloSession": "Προετοιμασία συνεδρίας Kilo",
       "detailWaitingForPreviousSandbox": "Αναμονή να σταματήσει το προηγούμενο sandbox",
@@ -2709,6 +2713,8 @@
     "retryHint": "Επαναλαμβάνει τη φόρτωση της κατάστασης του Kilo Pass.",
     "cardAccessibility": "{{title}} — {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Η αγορά του Kilo Pass δεν είναι διαθέσιμη αυτή τη στιγμή.",
+    "purchaseUnavailableTitle": "Μη διαθέσιμο αυτή τη στιγμή",
+    "purchaseUnavailableEnded": "Το Kilo Pass σας έχει λήξει.",
     "kiloPassManagement": "Διαχείριση του Kilo Pass",
     "kiloPassSetup": "Ρύθμιση του Kilo Pass",
     "subscriptionHeaderDescription": "Μια μηνιαία συνδρομή που προσθέτει πιστώσεις στο υπόλοιπό σας Kilo για την εκτέλεση συνεδριών προγραμματισμού με AI στην Εφαρμογή Kilo.",

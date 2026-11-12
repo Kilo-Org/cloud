@@ -63,6 +63,18 @@ describe('sessionLiveActivityTitle', () => {
       buildHomeWidgetDetails([{ status: 'permission', title: capped }]).waitingAgents[0]?.title
     ).toBe(visible);
   });
+
+  it('keeps a long title that starts with the backend placeholder', () => {
+    // The placeholder rule matches the whole stored title, so a user title that
+    // merely begins with the same words stays a title after the shared cut.
+    const placeholder = 'New session - 2026-09-22T01:09:45.623Z';
+    expect(sessionLiveActivityTitle(placeholder)).toBeNull();
+    expect(sessionLiveActivityTitle(`${placeholder} about the deploy`)).toBe(
+      `${placeholder} about the deploy`
+    );
+    const long = `${placeholder} ${'x'.repeat(HOME_WIDGET_TITLE_LIMIT)}`;
+    expect(sessionLiveActivityTitle(long)).toBe(long.slice(0, HOME_WIDGET_TITLE_LIMIT));
+  });
 });
 
 describe('buildSessionLiveActivityContentState', () => {

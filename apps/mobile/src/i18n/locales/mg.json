@@ -1810,7 +1810,7 @@
       "costSpoken": "sarany {{cost}}",
       "costSpokenWithTime": "sarany {{cost}}, {{time}}",
       "pullRequest": "fangatahana fampiraisana {{number}}",
-      "spokenJoiner": "sy"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Tsy afaka nanokatra ny GitHub",
@@ -2208,10 +2208,14 @@
       "stepFailed": "Tsy nahomby ny fanamboarana ny tontolo fiasana",
       "stepUnknown": "Fanamboarana ny tontolo fiasana",
       "detailCreatingSandbox": "Famoronana sandbox",
+      "detailStartingSandbox": "Fanombohana ny sandbox",
+      "detailCloningRepository": "Famadikana ny tahiry",
       "detailUpdatingRepository": "Fanavaozana ny tahiry",
       "detailCheckingOutBranch": "Fakana ny sampana",
+      "detailSettingUpBranch": "Fanamboarana ny sampana",
       "detailRunningSetupCommands": "Fanatanterahana ny baiko fanomanana",
       "detailSavingRepository": "Fitahirizana ny tahiry mba hanafainganana ny fanombohana",
+      "detailStartingKilo": "Fanombohana an'i Kilo",
       "detailStartingKiloRuntime": "Fanombohana ny runtime Kilo",
       "detailPreparingKiloSession": "Fanomanana ny session Kilo",
       "detailWaitingForPreviousSandbox": "Miandry hitsahatra ny sandbox teo aloha",
@@ -2709,6 +2713,8 @@
     "retryHint": "Manandrana maka indray ny satan'ny Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Tsy azo vidina ny Kilo Pass amin'izao fotoana izao.",
+    "purchaseUnavailableTitle": "Tsy azo vidina amin'izao fotoana izao",
+    "purchaseUnavailableEnded": "Efa tapitra ny Kilo Pass anao.",
     "kiloPassManagement": "Fitantanana ny Kilo Pass",
     "kiloPassSetup": "Fametrahana ny Kilo Pass",
     "subscriptionHeaderDescription": "Abonnement isam-bolana manampy crédits amin'ny balan Kilo anao ho an'ny session coding AI ao amin'ny Kilo App.",

@@ -1253,7 +1253,7 @@
       "costSpoken": "costo {{cost}}",
       "costSpokenWithTime": "costo {{cost}}, {{time}}",
       "pullRequest": "pull request n. {{number}}",
-      "spokenJoiner": "e"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenMessage": "Impossibile avviare la configurazione dell'app per GitHub. Riprova.",
@@ -1655,10 +1655,14 @@
       "stepFailed": "Configurazione dell'ambiente non riuscita",
       "stepUnknown": "Configurazione dell'ambiente",
       "detailCreatingSandbox": "Creazione della sandbox",
+      "detailStartingSandbox": "Avvio della sandbox",
+      "detailCloningRepository": "Clonazione del repository",
       "detailUpdatingRepository": "Aggiornamento del repository",
       "detailCheckingOutBranch": "Checkout del branch",
+      "detailSettingUpBranch": "Configurazione del branch",
       "detailRunningSetupCommands": "Esecuzione dei comandi di configurazione",
       "detailSavingRepository": "Salvataggio del repository per avvii più rapidi",
+      "detailStartingKilo": "Avvio di Kilo",
       "detailStartingKiloRuntime": "Avvio del runtime Kilo",
       "detailPreparingKiloSession": "Preparazione della sessione Kilo",
       "detailWaitingForPreviousSandbox": "In attesa dell'arresto della sandbox precedente",
@@ -2197,6 +2201,8 @@
     "retryHint": "Riprova a caricare lo stato di Kilo Pass.",
     "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "L'acquisto di Kilo Pass non è disponibile al momento.",
+    "purchaseUnavailableTitle": "Non disponibile al momento",
+    "purchaseUnavailableEnded": "Il tuo Kilo Pass è terminato.",
     "kiloPassManagement": "Gestione di Kilo Pass",
     "kiloPassSetup": "Configurazione di Kilo Pass",
     "subscriptionHeaderDescription": "Un abbonamento mensile che aggiunge crediti al tuo saldo Kilo per eseguire sessioni di coding AI in Kilo App.",

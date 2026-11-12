@@ -291,6 +291,7 @@ async function renderBubbleWithHandlers(
     onRetryMessage?: (m: StoredMessage) => void;
     onAddCredits?: () => void;
     retryAvailable?: boolean;
+    failureStatedByPreparation?: boolean;
     onCopyToComposer?: (text: string) => void;
     onRestoreQueued?: (m: StoredMessage) => void;
     onLongPressDetails?: (m: StoredMessage) => void;
@@ -485,6 +486,52 @@ describe('MessageBubble failure footer', () => {
       String(executionFooter?.props.className),
     ];
     expect(footerClasses.filter(name => /\btext-(start|end)\b/.test(name))).toEqual([]);
+  });
+
+  it('keeps the actions and drops the generic statement a preparation group already states', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-prep-failed'), {
+      deliveryState: { status: 'failed', error: 'boom', reason: 'execution' },
+      failureStatedByPreparation: true,
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+
+    // The group names the stage and the reason, so neither generic line is
+    // drawn a second time above it.
+    expect(findText(tree, t => t === 'Response failed')).toBe(false);
+    expect(findText(tree, t => t === 'The agent could not run this message.')).toBe(false);
+    // The turn keeps the recovery it had, in the column of the failed response.
+    expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).not.toBeNull();
+    expect(
+      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Copy to composer')
+    ).not.toBeNull();
+    expect(footerOf(tree)).not.toBeNull();
+  });
+
+  it('draws no footer when the group states the failure and no action can render', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-prep-empty'), {
+      deliveryState: { status: 'failed', error: '', reason: 'execution' },
+      failureStatedByPreparation: true,
+      retryAvailable: false,
+    });
+
+    // Nothing but a padded block would be left above the group, so the footer
+    // is skipped rather than drawn empty.
+    expect(footerOf(tree)).toBeNull();
+    expect(findText(tree, t => t === 'Response failed')).toBe(false);
+  });
+
+  it('keeps a classified statement on a turn whose preparation also failed', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-prep-credits'), {
+      deliveryState: { status: 'failed', error: '', reason: 'credits' },
+      failureStatedByPreparation: true,
+      onAddCredits: vi.fn<() => void>(),
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+
+    // The balance refusal is a cause the preparation group does not carry, so
+    // its statement stays.
+    expect(findText(tree, t => t === 'Not enough credits to send this message.')).toBe(true);
   });
 
   it('states a refused send under the person’s bubble with Add credits and no Retry', async () => {

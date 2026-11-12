@@ -16,7 +16,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { ENKRYPT_GUARDRAIL_TIMEOUT_MS } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import { extractRequestParts } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
-import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import type { EnkryptGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import {
   rememberRequestVerdict,
   scanRequestWithVerdictCache,
@@ -36,7 +36,7 @@ mkdirSync(outputDir, { recursive: true });
 const detectors = createKiloDefaultEnkryptInputDetectors();
 detectors.injection_attack.action = 'block';
 detectors.pii = { enabled: true, action: 'log', entities: ['secrets'] };
-const config: EnkryptInputGuardrailConfig = {
+const config: EnkryptGuardrailConfig = {
   status: 'ready',
   detectors: buildEnkryptDetectRequestDetectors(detectors),
   blockingDetectors: ['injection_attack'],

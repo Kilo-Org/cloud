@@ -1851,7 +1851,7 @@
       "costSpoken": "trošak {{cost}}",
       "costSpokenWithTime": "cena {{cost}}, {{time}}",
       "pullRequest": "zahtev za spajanje {{number}}",
-      "spokenJoiner": "i"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub se ne može otvoriti",
@@ -2253,10 +2253,14 @@
       "stepFailed": "Podešavanje okruženja nije uspelo",
       "stepUnknown": "Podešavanje okruženja",
       "detailCreatingSandbox": "Kreiranje sandbox-a",
+      "detailStartingSandbox": "Pokretanje sandbox-a",
+      "detailCloningRepository": "Kloniranje repozitorijuma",
       "detailUpdatingRepository": "Ažuriranje repozitorijuma",
       "detailCheckingOutBranch": "Prebacivanje na granu",
+      "detailSettingUpBranch": "Podešavanje grane",
       "detailRunningSetupCommands": "Pokretanje komandi za podešavanje",
       "detailSavingRepository": "Čuvanje repozitorijuma za brže pokretanje",
+      "detailStartingKilo": "Pokretanje Kilo-a",
       "detailStartingKiloRuntime": "Pokretanje izvršnog okruženja Kilo",
       "detailPreparingKiloSession": "Priprema Kilo sesije",
       "detailWaitingForPreviousSandbox": "Čekanje da se prethodni sandbox zaustavi",
@@ -2762,6 +2766,8 @@
     "retryHint": "Ponovo učitava stanje pretplate na Kilo Pass.",
     "cardAccessibility": "{{title}} — {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Kupovina pretplate na Kilo Pass trenutno nije dostupna.",
+    "purchaseUnavailableTitle": "Trenutno nije dostupno",
+    "purchaseUnavailableEnded": "Vaš Kilo Pass je istekao.",
     "kiloPassManagement": "Upravljanje pretplatom na Kilo Pass",
     "kiloPassSetup": "Podešavanje pretplate na Kilo Pass",
     "subscriptionHeaderDescription": "Mesečna pretplata koja dodaje kredite vašem Kilo saldu za pokretanje AI sesija kodiranja u Kilo aplikaciji.",

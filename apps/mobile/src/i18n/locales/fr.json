@@ -1587,10 +1587,14 @@
       "stepFailed": "Échec de la configuration de l'environnement",
       "stepUnknown": "Configuration de l'environnement",
       "detailCreatingSandbox": "Création du bac à sable",
+      "detailStartingSandbox": "Démarrage du bac à sable",
+      "detailCloningRepository": "Clonage du dépôt",
       "detailUpdatingRepository": "Mise à jour du dépôt",
       "detailCheckingOutBranch": "Extraction de la branche",
+      "detailSettingUpBranch": "Configuration de la branche",
       "detailRunningSetupCommands": "Exécution des commandes de configuration",
       "detailSavingRepository": "Enregistrement du dépôt pour des démarrages plus rapides",
+      "detailStartingKilo": "Démarrage de Kilo",
       "detailStartingKiloRuntime": "Démarrage du runtime Kilo",
       "detailPreparingKiloSession": "Préparation de la session Kilo",
       "detailWaitingForPreviousSandbox": "En attente de l'arrêt du bac à sable précédent",
@@ -2126,6 +2130,8 @@
     "retryHint": "Actualise à nouveau l'état de Kilo Pass.",
     "cardAccessibility": "{{title}} : {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Il n'est pas possible d'acheter Kilo Pass pour le moment.",
+    "purchaseUnavailableTitle": "Indisponible pour le moment",
+    "purchaseUnavailableEnded": "Votre Kilo Pass a pris fin.",
     "kiloPassManagement": "Gestion de Kilo Pass",
     "kiloPassSetup": "Configuration de Kilo Pass",
     "subscriptionHeaderDescription": "Un abonnement mensuel qui ajoute des crédits à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App.",
@@ -2272,7 +2278,7 @@
       "costSpoken": "coût de {{cost}}",
       "costSpokenWithTime": "coût : {{cost}}, {{time}}",
       "pullRequest": "demande de fusion {{number}}",
-      "spokenJoiner": "et"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenMessage": "Impossible de lancer la configuration de l'application GitHub. Réessayez.",

@@ -371,6 +371,16 @@ patchedDependencies:
   # out of the modules provider and the iOS build fails. Keep src/ and build/
   # aligned: the build/ copy is the one autolinking runs.
   expo-modules-autolinking@58.0.13: patches/expo-modules-autolinking@58.0.13.patch
+  # Session list, agent transcript and the other recycling lists. FlashList
+  # reads a row key and an item type from its engaged index range and from the
+  # maintainVisibleContentPosition anchor, and both come from the layout
+  # manager, so a commit after a shrink (pagination, search, filter, deletion,
+  # the reserved skeleton rows swapping to real rows) can still name indices
+  # past the rows that arrived. The patch bounds the engaged-index passes and
+  # answers an out-of-range key and type without calling the list's callbacks,
+  # so those are never handed an undefined row that keyExtractor would
+  # dereference. Remove once an upstream release carries both guards.
+  '@shopify/flash-list@2.3.3': patches/@shopify+flash-list@2.3.3.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

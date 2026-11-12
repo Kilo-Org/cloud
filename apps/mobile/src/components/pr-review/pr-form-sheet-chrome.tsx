@@ -30,7 +30,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
-import { useRouteIsStackRoot } from '@/lib/navigation/route-focus';
+import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 
 export function useFormSheetKeyboardVisible(): boolean {
   const [visible, setVisible] = useState(false);
@@ -54,10 +54,7 @@ export function useFormSheetKeyboardVisible(): boolean {
 }
 
 export function PrFormSheetHeader(props: { title: string; eyebrow: string; onBack: () => void }) {
-  const isStackRoot = useRouteIsStackRoot();
-  const topClearance = useSheetHeaderTopClearance(
-    isStackRoot ? 'android-window-top' : 'bottom-form-sheet'
-  );
+  const topClearance = useSheetHeaderTopClearance(useFormSheetHeaderTopInset());
   return (
     <View
       collapsable={false}

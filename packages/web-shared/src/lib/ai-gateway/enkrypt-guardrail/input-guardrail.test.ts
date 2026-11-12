@@ -20,8 +20,8 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import {
   ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
+  mostSevereVerdict,
   verdictCacheKey,
-  type EnkryptCachedScanResult,
   type EnkryptGuardrailRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/verdict-cache';
 import { scanUnits } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/scan-chunks';
@@ -32,11 +32,7 @@ import type {
   EnkryptToolScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import type { EnkryptDetectRequestDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
-import {
-  combinedVerdict,
-  recordEnkryptUsageRecords,
-  startEnkryptInputGuardrail,
-} from './input-guardrail';
+import { recordEnkryptUsageRecords, startEnkryptInputGuardrail } from './input-guardrail';
 
 jest.mock('next/server', () => ({
   ...jest.requireActual<Record<string, unknown>>('next/server'),
@@ -1404,11 +1400,7 @@ describe('recordEnkryptUsageRecords', () => {
   });
 });
 
-describe('combinedVerdict', () => {
-  function result(verdict: EnkryptGuardrailScanResult['verdict']): EnkryptCachedScanResult {
-    return { verdict, usageRecords: [], report: null, cacheEntries: [] };
-  }
-
+describe('mostSevereVerdict', () => {
   const block = { action: 'block', message: 'blocked' } as const;
   const unavailable = { action: 'unavailable', reason: 'transient' } as const;
   const allow = { action: 'allow' } as const;
@@ -1423,6 +1415,6 @@ describe('combinedVerdict', () => {
       ['a block over an allow', [block, allow], block],
     ]
   )('acts on %s', (_name, verdicts, expected) => {
-    expect(combinedVerdict(verdicts.map(result))).toEqual(expected);
+    expect(mostSevereVerdict(verdicts)).toEqual(expected);
   });
 });

@@ -14,7 +14,6 @@ import {
 import {
   guardrailSettings,
   type EnkryptOutputGuardrailReport,
-  type EnkryptScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import {
   recordEnkryptUsageRecords,
@@ -65,15 +64,11 @@ const HELD_OUTPUT_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail 
 
 export const RESPONSE_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of model output at once, so this response was withheld. ${SHORTER_RESPONSE_ADVICE}`;
 
-type OutputScanResult = Omit<EnkryptGuardrailScanResult, 'report'> & {
-  /** Null when Enkrypt was not asked. */
-  report: EnkryptScanReport | null;
-};
+type OutputScanResult = Omit<EnkryptGuardrailScanResult, 'report'>;
 
 const outputTooLarge: OutputScanResult = {
   verdict: { action: 'block', message: RESPONSE_TOO_LARGE_MESSAGE },
   usageRecords: [],
-  report: null,
 };
 
 /**
@@ -107,7 +102,6 @@ type OutputDecision =
 const notScanned: OutputScanResult = {
   verdict: { action: 'skip' },
   usageRecords: [],
-  report: null,
 };
 
 /** A response is scanned whole; output scans never use the verdict cache. */
@@ -461,7 +455,6 @@ export async function guardEnkryptOutput({
         return {
           verdict: { action: 'unavailable', reason: 'failed' },
           usageRecords: [],
-          report: null,
         };
       });
     const logOnlyResult = text

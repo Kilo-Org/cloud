@@ -17,7 +17,6 @@ import {
   type EnkryptGuardrailReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import {
-  ENKRYPT_VERDICT_CACHE_ENABLED,
   mostSevereVerdict,
   rememberRequestVerdict,
   scanRequestWithVerdictCache,
@@ -28,8 +27,6 @@ import { createEnkryptCallLimiter } from '@kilocode/web-shared/lib/ai-gateway/en
 import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
-
-const verdictCacheStore = ENKRYPT_VERDICT_CACHE_ENABLED ? redisClient : null;
 
 export type EnkryptInputGuardrail = {
   /**
@@ -47,11 +44,6 @@ export type EnkryptInputGuardrail = {
 };
 
 type VerdictCacheWrite = EnkryptGuardrailReport['scans'][number]['verdict_cache_write'];
-
-/** A request's verdict acts on its most severe part: a block, then an unavailable scan. */
-export function combinedVerdict(results: EnkryptCachedScanResult[]): EnkryptGuardrailVerdict {
-  return mostSevereVerdict(results.map(result => result.verdict));
-}
 
 /** For tool definitions: `failed` if any write failed, else `written` if any was written. */
 function combinedWrite(writes: VerdictCacheWrite[]): VerdictCacheWrite {
@@ -147,7 +139,7 @@ export function startEnkryptInputGuardrail(
           timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
           limiter,
           signal,
-          store: verdictCacheStore,
+          store: redisClient,
           requestLog: {
             guardrail: 'input',
             capture: entry => requestLogs.push(entry),
@@ -186,13 +178,11 @@ export function startEnkryptInputGuardrail(
   const cacheWrites = [blockingResults, logOnlyResults].map(results =>
     results.then(each =>
       Promise.all(
-        each.map(async ({ cacheEntries }): Promise<VerdictCacheWrite> => {
-          const store = verdictCacheStore;
-          if (!store) return 'skipped';
-          return combinedWrite(
-            await Promise.all(cacheEntries.map(entry => rememberRequestVerdict(entry, store)))
-          );
-        })
+        each.map(async ({ cacheEntries }) =>
+          combinedWrite(
+            await Promise.all(cacheEntries.map(entry => rememberRequestVerdict(entry, redisClient)))
+          )
+        )
       )
     )
   );
@@ -215,7 +205,7 @@ export function startEnkryptInputGuardrail(
     },
     async awaitVerdict() {
       const waitStartedAt = performance.now();
-      const verdict = combinedVerdict(await blockingResults);
+      const verdict = mostSevereVerdict((await blockingResults).map(result => result.verdict));
       if (verdict.action === 'block') await cacheWrites[0];
       addedLatencyMs = Math.round(performance.now() - waitStartedAt);
       return verdict;
@@ -227,8 +217,8 @@ export function startEnkryptInputGuardrail(
         logOnlyResults,
         Promise.all(cacheWrites),
       ]);
-      const verdict = combinedVerdict(blocking);
-      const scanReports = (results: EnkryptCachedScanResult[], writes: VerdictCacheWrite[] = []) =>
+      const verdict = mostSevereVerdict(blocking.map(result => result.verdict));
+      const scanReports = (results: EnkryptCachedScanResult[], writes: VerdictCacheWrite[]) =>
         results.flatMap(({ report }, index) =>
           report ? [{ ...report, verdict_cache_write: writes[index] ?? 'skipped' }] : []
         );

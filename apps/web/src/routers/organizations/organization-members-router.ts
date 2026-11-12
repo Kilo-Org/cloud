@@ -32,8 +32,10 @@ import {
 } from '@kilocode/web-shared/routers/organizations/utils';
 import {
   ORGANIZATION_BILLING_ROLES,
+  ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
   ORGANIZATION_MANAGE_ROLES,
 } from '@kilocode/app-shared/organizations';
+import { assertInviteSeatCapacity } from '@/lib/organizations/organization-seats';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import {
   getOrganizationMembershipRoles,
@@ -605,6 +607,10 @@ export const organizationsMembersRouter = createTRPCRouter({
       // Owners and Kilo admins can invite any role. Billing managers can invite members only.
       try {
         const result = await db.transaction(async tx => {
+          // Refuse before writing anything when the organization has no free
+          // seat: the advisory lock it takes makes two concurrent invites
+          // serialize, so neither can take the last seat twice.
+          await assertInviteSeatCapacity(tx, organizationId, role);
           const invitation = await inviteUserToOrganization(
             organizationId,
             user.id,
@@ -677,6 +683,12 @@ export const organizationsMembersRouter = createTRPCRouter({
             throw new TRPCError({
               code: 'PRECONDITION_FAILED',
               message: CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER,
+            });
+          }
+          if (error.message === ORGANIZATION_INVITE_SEAT_LIMIT_REACHED) {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
             });
           }
           if (error.message === 'User must join this organization through SSO') {

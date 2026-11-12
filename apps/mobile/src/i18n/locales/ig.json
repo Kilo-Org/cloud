@@ -2901,7 +2901,10 @@
       "alreadyInvited": "E tinyela ya òkù ma ọ bụ ọ abụrụla onye otu.",
       "sendError": "Enweghị ike iziga òkù.",
       "pendingInvitation": "Adreesị ozi ịntanetị a enwetala òkù na-echere.",
-      "alreadyMember": "Onye a abụrụla onye otu nke òtù a."
+      "alreadyMember": "Onye a abụrụla onye otu nke òtù a.",
+      "seatsFull": "A na-eji oche niile ugbu a ({{used}}/{{total}}). Rịọ onye nwe òtù ka ọ tinyekwuo oche tupu ị kpọọ ndị otu ọzọ òkù.",
+      "seatsFullCanInviteBilling": "A na-eji oche niile ugbu a ({{used}}/{{total}}). Ị ka nwere ike ịkpọ ndị njikwa ịkwụ ụgwọ òkù, ndị anaghị eji oche ọ bụla.",
+      "noSeatsAvailable": "A na-eji oche niile ugbu a. Rịọ onye nwe òtù ka ọ tinyekwuo oche tupu ị kpọọ ndị otu ọzọ òkù."
     },
     "invoices": {
       "downloadA11y": "Budata akwụkwọ ịgba ụgwọ {{number}}",

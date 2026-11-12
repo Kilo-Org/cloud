@@ -30,10 +30,58 @@ import {
 import { sendOrganizationInviteEmail } from '@kilocode/web-shared/lib/email';
 import { dispatchQueuedInviteEmails } from '@/lib/organizations/dispatch-invite-email-outbox';
 import { resetInviteEmailForResend } from '@kilocode/db/external-side-effect-outbox';
+import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
+import { ORGANIZATION_INVITE_SEAT_LIMIT_REACHED } from '@kilocode/app-shared/organizations';
 
 function enableSupportAccess(enabled: boolean) {
   if (enabled) process.env.SUPPORT_ACCESS_ENABLED = 'true';
   else delete process.env.SUPPORT_ACCESS_ENABLED;
+}
+
+/**
+ * Runs `run` with the fixture organization's plan and seat state overridden,
+ * then restores the row. Every test in this file shares one organization, so a
+ * seat limit set for one case must not leak into the next.
+ */
+async function withOrganizationSeats(
+  override: { seat_count: number; require_seats?: boolean; plan?: 'teams' | 'enterprise' },
+  run: () => Promise<void>
+): Promise<void> {
+  const [before] = await db
+    .select({
+      seat_count: organizations.seat_count,
+      require_seats: organizations.require_seats,
+      plan: organizations.plan,
+    })
+    .from(organizations)
+    .where(eq(organizations.id, testOrganization.id))
+    .limit(1);
+  if (!before) throw new Error('Missing test organization');
+
+  await db.update(organizations).set(override).where(eq(organizations.id, testOrganization.id));
+  try {
+    await run();
+  } finally {
+    await db.update(organizations).set(before).where(eq(organizations.id, testOrganization.id));
+  }
+}
+
+/**
+ * An organization that has bought seats. A freshly created one has none, and
+ * the invite procedure refuses a seat-consuming invitation to a full
+ * organization, so a test about another rule buys the seats it needs.
+ */
+async function createOrganizationWithSeats(
+  name: string,
+  ownerId: string,
+  seats = 20
+): Promise<Organization> {
+  const organization = await createOrganization(name, ownerId);
+  await db
+    .update(organizations)
+    .set({ seat_count: seats })
+    .where(eq(organizations.id, organization.id));
+  return organization;
 }
 
 jest.mock('@/lib/session-ingest-client', () => ({
@@ -125,6 +173,13 @@ describe('organizations members trpc router', () => {
 
     // Create test organization using the CRUD method
     testOrganization = await createOrganization('Test Members Organization', regularUser.id);
+    // The invite procedure refuses a seat-consuming invitation when the
+    // organization has no free seat, so the fixture buys enough for the invite
+    // tests; the seat-limit tests shrink it to its used count themselves.
+    await db
+      .update(organizations)
+      .set({ seat_count: 50 })
+      .where(eq(organizations.id, testOrganization.id));
 
     // Add member user to organization using CRUD method
     await addUserToOrganization(testOrganization.id, memberUser.id, 'member');
@@ -195,7 +250,7 @@ describe('organizations members trpc router', () => {
 
     it('records role changes and self-invites by a non-member Kilo admin', async () => {
       const owner = await insertTestUser({ is_admin: false });
-      const organization = await createOrganization('Elevated Audit Org', owner.id);
+      const organization = await createOrganizationWithSeats('Elevated Audit Org', owner.id);
       const member = await insertTestUser({ is_admin: false });
       await addUserToOrganization(organization.id, member.id, 'member');
       const caller = await createCallerForUser(adminUser.id);
@@ -236,7 +291,7 @@ describe('organizations members trpc router', () => {
 
     it('records owner-authority actions by a Kilo admin who only holds the admin role', async () => {
       const owner = await insertTestUser({ is_admin: false });
-      const organization = await createOrganization('Owner Authority Org', owner.id);
+      const organization = await createOrganizationWithSeats('Owner Authority Org', owner.id);
       const member = await insertTestUser({ is_admin: false });
       await addUserToOrganization(organization.id, member.id, 'member');
       const kiloAdmin = await insertTestUser({
@@ -2202,6 +2257,79 @@ describe('organizations members trpc router', () => {
   });
 
   describe('invite procedure', () => {
+    it('refuses a seat-consuming invitation when every seat is used', async () => {
+      const { used } = await getOrganizationSeatUsage(testOrganization.id);
+      const caller = await createCallerForUser(regularUser.id);
+      const email = `${crypto.randomUUID()}@seats-full.example.com`;
+
+      await withOrganizationSeats({ seat_count: used }, async () => {
+        await expect(
+          caller.organizations.members.invite({
+            organizationId: testOrganization.id,
+            email,
+            role: 'member',
+          })
+        ).rejects.toMatchObject({
+          code: 'PRECONDITION_FAILED',
+          message: ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
+        });
+      });
+
+      const invitations = await db
+        .select({ id: organization_invitations.id })
+        .from(organization_invitations)
+        .where(
+          and(
+            eq(organization_invitations.organization_id, testOrganization.id),
+            eq(organization_invitations.email, email)
+          )
+        );
+      expect(invitations).toHaveLength(0);
+
+      const queued = await db
+        .select({ id: external_side_effect_outbox.id })
+        .from(external_side_effect_outbox)
+        .where(sql`${external_side_effect_outbox.payload}->>'to' = ${email}`);
+      expect(queued).toHaveLength(0);
+    });
+
+    it('still invites a billing manager when every seat is used', async () => {
+      const { used } = await getOrganizationSeatUsage(testOrganization.id);
+      const caller = await createCallerForUser(regularUser.id);
+      const email = `${crypto.randomUUID()}@seats-full-billing.example.com`;
+
+      await withOrganizationSeats({ seat_count: used }, async () => {
+        const result = await caller.organizations.members.invite({
+          organizationId: testOrganization.id,
+          email,
+          role: 'billing_manager',
+        });
+        expect(result).toHaveProperty('invitationId');
+      });
+    });
+
+    it('does not limit invitations when the plan does not require seats or is enterprise', async () => {
+      const { used } = await getOrganizationSeatUsage(testOrganization.id);
+      const caller = await createCallerForUser(regularUser.id);
+
+      const unrestrictedPlans = [
+        { seat_count: used, require_seats: false },
+        { seat_count: used, require_seats: true, plan: 'enterprise' as const },
+      ];
+
+      for (const override of unrestrictedPlans) {
+        const email = `${crypto.randomUUID()}@unlimited-seats.example.com`;
+        await withOrganizationSeats(override, async () => {
+          const result = await caller.organizations.members.invite({
+            organizationId: testOrganization.id,
+            email,
+            role: 'member',
+          });
+          expect(result).toHaveProperty('invitationId');
+        });
+      }
+    });
+
     it('should invite member for organization owner', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
@@ -2622,7 +2750,7 @@ describe('organizations members trpc router', () => {
     });
 
     it('should reject inviting someone who is not a parent organization member', async () => {
-      const childOrg = await createOrganization('Child Members Organization', regularUser.id);
+      const childOrg = await createOrganizationWithSeats('Child Members Organization', regularUser.id);
       await db
         .update(organizations)
         .set({ parent_organization_id: testOrganization.id })
@@ -2642,7 +2770,7 @@ describe('organizations members trpc router', () => {
     });
 
     it('should invite a parent organization member into a child organization', async () => {
-      const childOrg = await createOrganization(
+      const childOrg = await createOrganizationWithSeats(
         'Child Members Invite Organization',
         regularUser.id
       );

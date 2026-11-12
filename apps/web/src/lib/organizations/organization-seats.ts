@@ -1,5 +1,10 @@
 import type { Organization } from '@kilocode/db/schema';
-import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
+import {
+  canManageOrganizationBilling,
+  hasInviteSeatCapacity,
+  inviteConsumesSeat,
+  ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
+} from '@kilocode/app-shared/organizations';
 import {
   kilocode_users,
   organization_invitations,
@@ -9,6 +14,7 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { eq, desc, and, count, gt, isNull, ne, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import type Stripe from 'stripe';
@@ -35,7 +41,10 @@ import {
   sendOrgSubscriptionEmail,
 } from '@kilocode/web-shared/lib/email';
 import { IS_IN_AUTOMATED_TEST } from '@kilocode/web-shared/lib/config.server';
-import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type {
+  OrganizationPlan,
+  OrganizationRole,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { OrganizationPlanSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { isSeatLineItem } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
@@ -69,10 +78,12 @@ const SubscriptionMetadataSchema = z.object({
 export type SubscriptionMetadata = z.infer<typeof SubscriptionMetadataSchema>;
 
 export async function getOrganizationSeatUsage(
-  organizationId: Organization['id']
+  organizationId: Organization['id'],
+  txn?: DrizzleTransaction
 ): Promise<{ used: number; total: number }> {
+  const reader = txn ?? db;
   const [activeMembers, pendingInvitations, organization] = await Promise.all([
-    db
+    reader
       .select({ value: count() })
       .from(organization_memberships)
       .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
@@ -83,7 +94,7 @@ export async function getOrganizationSeatUsage(
           eq(kilocode_users.is_bot, false)
         )
       ),
-    db
+    reader
       .select({ value: count() })
       .from(organization_invitations)
       .where(
@@ -94,11 +105,65 @@ export async function getOrganizationSeatUsage(
           gt(organization_invitations.expires_at, sql`NOW()`)
         )
       ),
-    getOrganizationById(organizationId),
+    reader
+      .select({
+        plan: organizations.plan,
+        requireSeats: organizations.require_seats,
+        seatCount: organizations.seat_count,
+      })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .limit(1),
   ]);
   const used = (activeMembers[0]?.value ?? 0) + (pendingInvitations[0]?.value ?? 0);
-  const total = organization?.seat_count || 0;
+  const total = organization[0]?.seatCount || 0;
   return { used, total };
+}
+
+/**
+ * Refuses an invitation that would take a seat the organization does not have,
+ * using the same rule the invite dialogs show (`hasInviteSeatCapacity`). A
+ * billing manager takes no seat, so that role is never gated.
+ *
+ * The invitation is serialized by an advisory lock on the organization, so two
+ * concurrent invites cannot both read the same free seat: the second waits for
+ * the first to commit and then counts the invitation it wrote. The lock is
+ * advisory rather than a row lock on `organizations`, so it orders only the
+ * seat check and leaves unrelated writes to that row alone.
+ */
+export async function assertInviteSeatCapacity(
+  tx: DrizzleTransaction,
+  organizationId: Organization['id'],
+  role: OrganizationRole
+): Promise<void> {
+  if (!inviteConsumesSeat(role)) {
+    return;
+  }
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended(${organizationId} || ':invite-seat', 0))`
+  );
+  const [organization] = await tx
+    .select({
+      plan: organizations.plan,
+      requireSeats: organizations.require_seats,
+    })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  if (!organization) {
+    throw new Error('Organization not found');
+  }
+  const { used, total } = await getOrganizationSeatUsage(organizationId, tx);
+  if (
+    !hasInviteSeatCapacity({
+      plan: organization.plan,
+      requireSeats: organization.requireSeats,
+      usedSeats: used,
+      totalSeats: total,
+    })
+  ) {
+    throw new Error(ORGANIZATION_INVITE_SEAT_LIMIT_REACHED);
+  }
 }
 
 /**

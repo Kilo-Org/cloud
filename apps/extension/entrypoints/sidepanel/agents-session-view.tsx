@@ -140,10 +140,10 @@ export const AgentsSessionView = ({
   const errorMessage =
     error ?? (statusIndicator?.type === 'error' ? statusIndicator.message : null);
 
-  // A fresh failure is new information: the previous retry verdict no longer applies.
+  // A fresh failure, or another session, is new information: the old verdict no longer applies.
   useEffect(() => {
     setRetryFailed(false);
-  }, [errorMessage]);
+  }, [errorMessage, kiloSessionId]);
 
   // Single session lifecycle: clear error + switch on setup, destroy on cleanup.
   // On id change cleanup runs first (destroy old), then setup reconnects fresh.

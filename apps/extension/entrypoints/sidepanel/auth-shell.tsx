@@ -24,6 +24,7 @@ import {
   resolveAnalyticsOptOutIdentity,
   shouldShowFirefoxUsageDataHint,
 } from './analytics-settings-logic';
+import { ErrorNotice } from './error-notice';
 import { MemorySettings } from './memory-settings';
 import { OrganizationCreditAccountSelect } from './organization-credit-account';
 import { RemoteMcpSettings } from './remote-mcp-settings';
@@ -51,8 +52,14 @@ const IconButton = ({
   </button>
 );
 
-const AnalyticsSettingsRow = ({ userEmail }: { userEmail: string | undefined }): JSX.Element => {
+export const AnalyticsSettingsRow = ({
+  userEmail,
+}: {
+  userEmail: string | undefined;
+}): JSX.Element => {
   const [state, setState] = useState<AnalyticsSettingsState>(createInitialAnalyticsSettingsState);
+  const [loadError, setLoadError] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const interactive = isAnalyticsSettingsInteractive(state);
   const showFirefoxHint = shouldShowFirefoxUsageDataHint(state.firefoxUsageDataGranted);
 
@@ -60,27 +67,36 @@ const AnalyticsSettingsRow = ({ userEmail }: { userEmail: string | undefined }):
     let cancelled = false;
 
     void (async () => {
-      const [optedOut, firefoxUsageDataGranted] = await Promise.all([
-        loadAnalyticsOptOut(storage),
-        getFirefoxUsageDataGranted(),
-      ]);
+      try {
+        const [optedOut, firefoxUsageDataGranted] = await Promise.all([
+          loadAnalyticsOptOut(storage),
+          getFirefoxUsageDataGranted(),
+        ]);
 
-      if (cancelled) {
-        return;
+        if (cancelled) {
+          return;
+        }
+
+        setLoadError(false);
+        setState(
+          applyAnalyticsSettingsLoaded({
+            firefoxUsageDataGranted,
+            optedOut,
+          })
+        );
+      } catch {
+        if (cancelled) {
+          return;
+        }
+
+        setLoadError(true);
       }
-
-      setState(
-        applyAnalyticsSettingsLoaded({
-          firefoxUsageDataGranted,
-          optedOut,
-        })
-      );
     })();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAttempt]);
 
   const onToggle = (): void => {
     const started = beginAnalyticsSettingsFlip(state);
@@ -143,6 +159,17 @@ const AnalyticsSettingsRow = ({ userEmail }: { userEmail: string | undefined }):
           />
         </button>
       </div>
+      {loadError ? (
+        <div className="mt-2">
+          <ErrorNotice
+            onRetry={() => {
+              setLoadAttempt(current => current + 1);
+            }}
+            retryable
+            title="Couldn't load the analytics setting."
+          />
+        </div>
+      ) : null}
     </div>
   );
 };

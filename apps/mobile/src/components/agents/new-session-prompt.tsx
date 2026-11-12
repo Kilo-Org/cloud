@@ -495,6 +495,12 @@ export function NewSessionPrompt({
         <View>
           <AnimatedPromptInput
             ref={promptInputRef}
+            // The placeholder is the field's accessible name. Android reports a
+            // TextInput's hint only while the field is empty, so without this
+            // the name became whatever was typed: the draft once it held text,
+            // and spaces when it held only spaces. The typed draft stays the
+            // field's value.
+            accessibilityLabel={t('agentChat.newSession.promptPlaceholder')}
             placeholder={t('agentChat.newSession.promptPlaceholder')}
             placeholderTextColor={colors.mutedForeground}
             multiline

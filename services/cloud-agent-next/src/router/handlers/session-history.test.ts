@@ -2,20 +2,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRPCError } from '@trpc/server';
 import type { TRPCContext } from '../../types.js';
 
-const { requireAccess, getStub, getPage } = vi.hoisted(() => ({
+const { requireAccess, getStub, getPage, getDetail } = vi.hoisted(() => ({
   requireAccess: vi.fn(),
   getStub: vi.fn(),
   getPage: vi.fn(),
+  getDetail: vi.fn(),
 }));
 vi.mock('../../session-access.js', () => ({ requireCurrentSessionAccess: requireAccess }));
 vi.mock('../../sandbox-session/session-stub.js', () => ({ getSandboxSessionStub: getStub }));
 import { router } from '../auth.js';
-import { getSessionMessagesPage } from './session-history.js';
+import { getSessionMessagesPage, getSessionToolPartDetail } from './session-history.js';
 
 const SESSION_ID = 'workspace_11111111-1111-4111-8111-111111111111';
 const ROOT = 'ses_12345678901234567890123456';
 const CHILD = 'ses_abcdefghijklmnopqrstuvwxyz';
-const historyRouter = router({ getSessionMessagesPage });
+const historyRouter = router({ getSessionMessagesPage, getSessionToolPartDetail });
 
 function caller(overrides: Partial<TRPCContext> = {}) {
   return historyRouter.createCaller({
@@ -30,7 +31,10 @@ function caller(overrides: Partial<TRPCContext> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   requireAccess.mockResolvedValue({ kiloSessionId: ROOT, organizationId: null });
-  getStub.mockReturnValue({ getSessionMessagesPage: getPage });
+  getStub.mockReturnValue({
+    getSessionMessagesPage: getPage,
+    getSessionToolPartDetail: getDetail,
+  });
   getPage.mockResolvedValue({
     kind: 'success',
     info: { id: ROOT },
@@ -55,6 +59,7 @@ describe('workspace history route', () => {
       cursor: undefined,
       kiloSessionId: undefined,
       expectedRootKiloSessionId: ROOT,
+      toolDisplay: 'full',
     });
   });
 
@@ -130,5 +135,67 @@ describe('workspace history route', () => {
       caller().getSessionMessagesPage({ sessionId: SESSION_ID, cursor })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(getPage).not.toHaveBeenCalled();
+  });
+});
+
+describe('workspace tool detail route', () => {
+  const input = { sessionId: SESSION_ID, messageId: 'msg_1', partId: 'prt_1' } as const;
+
+  it('forwards preview requests to the DO', async () => {
+    await caller().getSessionMessagesPage({ sessionId: SESSION_ID, toolDisplay: 'preview' });
+    expect(getPage).toHaveBeenCalledWith(expect.objectContaining({ toolDisplay: 'preview' }));
+  });
+
+  it('authorizes every read and pins the ledger root', async () => {
+    getDetail.mockResolvedValue({
+      kind: 'found',
+      source: { version: 'v1' },
+      revision: 3,
+      part: {},
+    });
+    expect(
+      await caller().getSessionToolPartDetail({ ...input, kiloSessionId: CHILD, callId: 'call_1' })
+    ).toMatchObject({ kind: 'found', revision: 3 });
+    expect(requireAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ kiloUserId: 'history-user', cloudAgentSessionId: SESSION_ID })
+    );
+    expect(getDetail).toHaveBeenCalledWith({
+      kiloSessionId: CHILD,
+      expectedRootKiloSessionId: ROOT,
+      messageId: 'msg_1',
+      partId: 'prt_1',
+      callId: 'call_1',
+    });
+  });
+
+  it('fails closed before reading the DO when access is denied', async () => {
+    requireAccess.mockRejectedValue(new TRPCError({ code: 'FORBIDDEN' }));
+    await expect(caller().getSessionToolPartDetail(input)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    expect(getStub).not.toHaveBeenCalled();
+  });
+
+  it('rejects caller-supplied root authorization', async () => {
+    await expect(
+      caller().getSessionToolPartDetail({ ...input, expectedRootKiloSessionId: CHILD } as never)
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(getStub).not.toHaveBeenCalled();
+  });
+
+  it('reports an unowned selector as not found and DO failures as unavailable', async () => {
+    getDetail.mockResolvedValue(null);
+    await expect(caller().getSessionToolPartDetail(input)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    getDetail.mockRejectedValue(new Error('storage reset'));
+    await expect(caller().getSessionToolPartDetail(input)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+    });
+  });
+
+  it('returns stored absence as a typed result rather than empty output', async () => {
+    getDetail.mockResolvedValue({ kind: 'not_found' });
+    expect(await caller().getSessionToolPartDetail(input)).toEqual({ kind: 'not_found' });
   });
 });

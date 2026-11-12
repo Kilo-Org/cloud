@@ -99,14 +99,6 @@ export type HeaderPillContent = {
 type PillCostSlot = 'label' | 'loading' | 'unreported' | 'none';
 
 /**
- * The reading of a session whose usage has no denominator: it reported tokens
- * but no context window to divide them by. It is a real value, not a
- * placeholder, so the pill paints it; a value that has not arrived paints
- * nothing at all.
- */
-const UNKNOWN_WINDOW_LABEL = '—';
-
-/**
  * Single selector for the session-detail header pill. Always returns content
  * so the pill can reserve a fixed height before context usage resolves.
  */
@@ -124,12 +116,12 @@ export function getHeaderPillContent({
   if (info) {
     const tone = getContextTone(info.percentage);
     // The pill reports context usage as a percentage only. While the model's
-    // context window is unresolved there is no honest denominator, so the slot
-    // keeps the dash instead of a token count; the sheet still shows the tokens.
+    // context window is unresolved there is no honest denominator, so the pill
+    // paints nothing for it: the ring's indeterminate arc carries the unknown,
+    // the sheet still shows the tokens, and a marker here would sit right
+    // before the cost and read as a negative amount.
     const primary =
-      info.percentage === undefined
-        ? UNKNOWN_WINDOW_LABEL
-        : formatPercent(info.percentage, i18n.language);
+      info.percentage === undefined ? null : formatPercent(info.percentage, i18n.language);
     const secondary = formatSessionCostBadge(totalCostMicrodollars);
     return {
       primary,
@@ -158,9 +150,8 @@ export function getHeaderPillContent({
     };
   }
   // A transcript without usage. The pill keeps the track-only ring and, when
-  // this screen already knows it, the session's cost; it never paints a dash
-  // standing in for a value that has not arrived. Only the dash above, for
-  // usage without a context window, is a real value.
+  // this screen already knows it, the session's cost; no branch of this selector
+  // paints a dash standing in for a value.
   return {
     primary: null,
     secondary: costText,

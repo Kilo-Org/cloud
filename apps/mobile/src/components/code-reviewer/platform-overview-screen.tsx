@@ -126,6 +126,10 @@ export function PlatformOverviewScreen({
 
   const isLoading = providerState.status === 'loading' || permission.status === 'loading';
   const connected = providerState.status === 'connected';
+  // The account line under the Automatic reviews label is optional: a provider
+  // that reports no login paints the label alone, so the row keeps one line and
+  // matches the sibling Follow REVIEW.md row.
+  const autoReviewsAccount = status.data?.integration?.accountLogin;
 
   // A connected provider whose config read failed (no cache to fall back on),
   // or whose idle read could not be restarted, has nothing to show: surface a
@@ -269,9 +273,11 @@ export function PlatformOverviewScreen({
                 <View className="flex-row items-center justify-between">
                   <View className="flex-1 pe-3">
                     <Text className="text-sm font-medium">{t('codeReviewer.autoReviews')}</Text>
-                    <Text variant="muted" className="text-xs">
-                      {status.data?.integration?.accountLogin ?? ''}
-                    </Text>
+                    {autoReviewsAccount ? (
+                      <Text variant="muted" className="text-xs">
+                        {autoReviewsAccount}
+                      </Text>
+                    ) : null}
                   </View>
                   <Switch
                     accessibilityLabel={t('codeReviewer.autoReviews')}

@@ -67,6 +67,50 @@ export function walk(node, visit) {
 }
 
 /**
+ * Whether `callee` is the translation function the copy audits read: a bare
+ * `t`, or the initialised instance's `i18n.t`. A method of another object is a
+ * different function that happens to be named `t`, so its arguments say nothing
+ * about a message.
+ */
+export function isTranslateCallee(callee) {
+  if (callee.type === 'Identifier') {
+    return callee.name === 't';
+  }
+  if (callee.type !== 'MemberExpression' || callee.computed) {
+    return false;
+  }
+  return (
+    callee.property.type === 'Identifier' &&
+    callee.property.name === 't' &&
+    callee.object.type === 'Identifier' &&
+    callee.object.name === 'i18n'
+  );
+}
+
+/** The wrapper nodes that only hold an expression, so a rule reads through them. */
+const TS_WRAPPERS = new Set([
+  'TSAsExpression',
+  'TSSatisfiesExpression',
+  'TSTypeAssertion',
+  'TSNonNullExpression',
+  'TSInstantiationExpression',
+  'ParenthesizedExpression',
+]);
+
+/**
+ * The node a TypeScript-only wrapper holds, so `{ … } satisfies X` reads as an
+ * object and `'key' as const` reads as a string. The parser drops parentheses
+ * by default; the entry for them holds if a caller ever keeps them.
+ */
+export function unwrap(node) {
+  let current = node;
+  while (TS_WRAPPERS.has(current.type)) {
+    current = current.expression;
+  }
+  return current;
+}
+
+/**
  * The 1-based line of any offset in `text`. A diagnostic names the line its
  * node starts on, and the rules map a match inside one string or template
  * chunk back through the chunk's own offset, so the line is computed once from

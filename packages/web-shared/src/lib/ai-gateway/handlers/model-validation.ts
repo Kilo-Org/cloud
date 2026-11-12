@@ -7,6 +7,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { customRouterModelId, isCustomRouterModelId } from '@kilocode/auto-routing-contracts';
@@ -41,6 +42,7 @@ export async function handleModelValidationRequest(request: NextRequest) {
   try {
     const models = await getEnhancedOpenRouterModels({
       countryCode: requestCountryCode(request.headers),
+      fromDb: readDb,
     });
     if (!Array.isArray(models.data)) {
       throw new Error('Model catalog returned invalid data');

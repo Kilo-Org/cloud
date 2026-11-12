@@ -4,6 +4,8 @@ import type { UserDeletionStepKey, UserDeletionTaskProgress } from '@kilocode/db
 export type DeletionHandlerContinue = {
   kind: 'continue';
   progress?: UserDeletionTaskProgress;
+  /** Wait before the step is claimable again. Defaults to USER_DELETION_CONTINUE_DELAY_MS. */
+  delayMs?: number;
 };
 
 export type DeletionHandlerRetry = {

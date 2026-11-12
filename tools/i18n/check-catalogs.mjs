@@ -13,10 +13,18 @@
  *
  * Usage: node tools/i18n/check-catalogs.mjs
  */
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  isTranslateCallee,
+  lineIndex,
+  parseProblems,
+  parseSourceFile,
+  unwrap,
+  walk,
+} from '../lib/ast.mjs';
 import { countPlaceholderBases, flattenCatalog, pluralParts } from '../lib/catalogs.mjs';
 import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
@@ -541,6 +549,10 @@ function holdsLabel(values, run) {
  * - `referenced`: every string literal in the source. A key named in a lookup
  *   table and passed to t() through a variable is used, so the dead-key check
  *   reads this wider set and never asks anyone to delete a live key.
+ *
+ * Both come from the syntax tree (tools/lib/ast.mjs), so text that only looks
+ * like a call — in a comment, in a string, in a type annotation — moves no key,
+ * and an apostrophe in prose cannot throw the quote pairing out of step.
  */
 function scanSource() {
   const called = new Set();
@@ -548,21 +560,36 @@ function scanSource() {
   for (const dir of SOURCE_DIRS) {
     for (const file of sourceFiles(dir, isTestArtifact)) {
       const text = readFileSync(file, 'utf8');
-      for (const match of text.matchAll(/\b(?:i18n\.)?t\(\s*'([^']+)'/g)) {
-        called.add(match[1]);
+      const { program, errors } = parseSourceFile(file, text);
+      // A file the parser refused has an empty tree, so its keys would leave
+      // both sets without a word. `check:i18n` runs oxlint first, so this
+      // normally reports nothing.
+      const path = relativePath(ROOT, file).split(sep).join('/');
+      for (const problem of parseProblems(path, errors, lineIndex(text))) {
+        fail(problem);
       }
-      // `*`, not `+`: an empty '' must consume both quotes, or the scan pairs
-      // its closing quote with the next string's opening quote and desyncs.
-      for (const match of text.matchAll(/'([^'\\\n]*)'|"([^"\\\n]*)"/g)) {
-        const literal = match[1] ?? match[2];
-        if (literal !== '') {
-          referenced.add(literal);
+      walk(program, node => {
+        if (node.type === 'Literal' && typeof node.value === 'string') {
+          if (node.value !== '') {
+            referenced.add(node.value);
+          }
+          return;
         }
-      }
-      // A template-literal key would make the both-ways check unsound.
-      if (/\b(?:i18n\.)?t\(\s*`/.test(text)) {
-        fail(`${file}: t() called with a template literal; the key check cannot see it`);
-      }
+        if (node.type !== 'CallExpression' || !isTranslateCallee(node.callee)) {
+          return;
+        }
+        const [first] = node.arguments;
+        if (first === undefined) {
+          return;
+        }
+        // A template-literal key would make the both-ways check unsound.
+        const key = unwrap(first);
+        if (key.type === 'TemplateLiteral') {
+          fail(`${file}: t() called with a template literal; the key check cannot see it`);
+        } else if (key.type === 'Literal' && typeof key.value === 'string' && key.value !== '') {
+          called.add(key.value);
+        }
+      });
     }
   }
   return { called, referenced };
@@ -723,7 +750,127 @@ function addsFamilyPlaceholderOnly(english, key, actual, expected) {
   return true;
 }
 
+const NOTIFICATION_CATALOG_DIR = join(ROOT, 'packages/notifications/src/locales');
+const NOTIFICATION_LOCALE_MODULE = join(ROOT, 'packages/notifications/src/i18n.ts');
+
+/**
+ * The push runtime resolves a token locale and reads translations from one
+ * registry. Its imports and that registry are hand-written, so this check holds
+ * them together with the catalog folder: every catalog file is imported, every
+ * import is in the registry, and the registry names nothing else. A catalog
+ * that only sat in the folder used to render in English with no gate saying so;
+ * a registry entry with no import would translate nothing.
+ */
+function checkPushLocaleRegistry() {
+  const relativeModule = relativePath(ROOT, NOTIFICATION_LOCALE_MODULE);
+  if (!existsSync(NOTIFICATION_LOCALE_MODULE)) {
+    fail(`notifications: no push locale registry at ${relativeModule}`);
+    return;
+  }
+  const present = new Set(
+    readdirSync(NOTIFICATION_CATALOG_DIR)
+      .filter(name => name.endsWith('.json'))
+      .map(name => name.replace(/\.json$/, ''))
+  );
+  const text = readFileSync(NOTIFICATION_LOCALE_MODULE, 'utf8');
+  const { program, errors } = parseSourceFile(relativeModule, text);
+  const lineOf = lineIndex(text);
+  for (const problem of parseProblems(relativeModule, errors, lineOf)) {
+    fail(problem);
+  }
+
+  const imported = new Map();
+  const registered = new Map();
+  let registryFound = false;
+  walk(program, node => {
+    if (node.type === 'ImportDeclaration') {
+      const source = node.source.value;
+      const prefix = './locales/';
+      if (typeof source === 'string' && source.startsWith(prefix) && source.endsWith('.json')) {
+        const tag = source.slice(prefix.length, -'.json'.length);
+        const binding = node.specifiers.find(
+          specifier => specifier.type === 'ImportDefaultSpecifier'
+        );
+        imported.set(tag, binding ? binding.local.name : null);
+      }
+      return;
+    }
+    if (
+      node.type !== 'VariableDeclarator' ||
+      node.id.type !== 'Identifier' ||
+      node.id.name !== 'pushCatalogs'
+    ) {
+      return;
+    }
+    registryFound = true;
+    if (node.init === null) {
+      fail(`${relativeModule}: the push locale registry has no initializer`);
+      return;
+    }
+    const init = unwrap(node.init);
+    if (init?.type !== 'ObjectExpression') {
+      fail(`${relativeModule}: the push locale registry is not an object literal`);
+      return;
+    }
+    for (const property of init.properties) {
+      if (property.type !== 'Property') {
+        fail(`${relativeModule}: the push locale registry contains a ${property.type}`);
+        continue;
+      }
+      const key = unwrap(property.key);
+      let tag;
+      if (key.type === 'Identifier') {
+        tag = key.name;
+      } else if (key.type === 'Literal' && typeof key.value === 'string') {
+        tag = key.value;
+      } else {
+        fail(`${relativeModule}: the push locale registry has a key this check cannot read`);
+        continue;
+      }
+      const value = unwrap(property.value);
+      if (value.type !== 'Identifier') {
+        fail(`${relativeModule}: the push locale registry entry "${tag}" is not a catalog import`);
+        continue;
+      }
+      registered.set(tag, value.name);
+    }
+  });
+  if (!registryFound) {
+    fail(`${relativeModule}: no push locale registry named "pushCatalogs"`);
+    return;
+  }
+
+  for (const tag of [...present].sort()) {
+    if (!imported.has(tag)) {
+      fail(`notifications: catalog "${tag}.json" has no import in ${relativeModule}`);
+    }
+    if (!registered.has(tag)) {
+      fail(`notifications: catalog "${tag}.json" has no push locale registry entry`);
+    }
+  }
+  for (const tag of [...imported.keys()].sort()) {
+    if (!present.has(tag)) {
+      fail(`notifications: ${relativeModule} imports "./locales/${tag}.json" with no catalog file`);
+    }
+  }
+  for (const [tag, binding] of [...registered].sort((left, right) =>
+    left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0
+  )) {
+    if (!imported.has(tag)) {
+      fail(`notifications: the push locale registry names "${tag}" with no catalog import`);
+      continue;
+    }
+    if (binding !== imported.get(tag)) {
+      fail(
+        `notifications: the push locale registry binds "${tag}" to "${binding}" instead of the "${tag}" catalog import`
+      );
+    }
+  }
+}
+
 const tags = supportedLanguages();
+
+checkPushLocaleRegistry();
 
 for (const catalog of CATALOGS) {
   const present = readdirSync(catalog.dir)

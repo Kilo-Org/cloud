@@ -170,31 +170,3 @@ export function groupWorkspaceGroupsByDestination(
 
   return { manual, smart, unfiled };
 }
-
-function waitingTime(group: SidebarWorkspaceGroup): number {
-  const waiting = [group.root, ...group.layers].filter(
-    row =>
-      row.hasPendingQuestion ||
-      row.lastTurnFailed ||
-      row.status === 'question' ||
-      row.status === 'permission' ||
-      row.status === 'failed' ||
-      row.status === 'system_interrupted'
-  );
-  const times = waiting.map(row => (row.statusUpdatedAt ? time(row.statusUpdatedAt) : Infinity));
-  return times.length > 0 ? Math.min(...times) : Infinity;
-}
-
-export function sortSmartFolderGroups(
-  groups: readonly SidebarWorkspaceGroup[],
-  preset: SmartFolderPreset,
-  sortMode: WorkspaceFolderSortMode
-): SidebarWorkspaceGroup[] {
-  if (preset !== 'needs_you') return sortWorkspaceGroups(groups, sortMode);
-  return [...groups].sort((a, b) => {
-    const aTime = waitingTime(a);
-    const bTime = waitingTime(b);
-    if (aTime !== bTime) return aTime - bTime;
-    return comparePositionKeys(a.root.worktreeId, b.root.worktreeId);
-  });
-}

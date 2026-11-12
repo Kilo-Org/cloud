@@ -16,10 +16,12 @@ import { captureException } from '@sentry/nextjs';
 import { describeDatabaseError } from '@kilocode/web-shared/lib/ai-gateway/usage-record-diagnostics';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { buildExaUsageRecord } from '@/lib/exa-usage-record';
+import { queueExaUsageAfterFailedWrite } from '@/lib/exa-usage-fallback';
 import {
   EXA_ALLOWED_PATHS,
   isExaAllowedPath,
   type ExaAllowedPath,
+  type ExaUsageRecord,
 } from '@kilocode/usage-contracts';
 import { z } from 'zod';
 
@@ -134,26 +136,25 @@ export async function POST(request: NextRequest) {
       return;
     }
 
-    let costMicrodollars: number | undefined;
+    let record: ExaUsageRecord | undefined;
     try {
       const body: unknown = await cloned.json();
-      costMicrodollars = extractCostMicrodollars(body);
+      const costMicrodollars = extractCostMicrodollars(body);
       if (costMicrodollars === undefined) return;
 
-      await recordExaUsage(
-        buildExaUsageRecord({
-          id: usageId,
-          occurredAt,
-          userId: user.id,
-          organizationId,
-          path: exaPath,
-          costMicrodollars,
-          chargedToBalance: isPaidRequest,
-          freeAllowanceMicrodollars: allowance,
-          featureId,
-          type,
-        })
-      );
+      record = buildExaUsageRecord({
+        id: usageId,
+        occurredAt,
+        userId: user.id,
+        organizationId,
+        path: exaPath,
+        costMicrodollars,
+        chargedToBalance: isPaidRequest,
+        freeAllowanceMicrodollars: allowance,
+        featureId,
+        type,
+      });
+      await recordExaUsage(record);
     } catch (error) {
       captureException(error, {
         tags: {
@@ -165,6 +166,8 @@ export async function POST(request: NextRequest) {
           responseStatus: response.status,
         },
       });
+      const fallback =
+        record === undefined ? undefined : await queueExaUsageAfterFailedWrite(record);
       const described = describeDatabaseError(error);
       const code =
         described.code !== null && /^[0-9A-Z]{5}$/.test(described.code) ? described.code : null;
@@ -172,8 +175,8 @@ export async function POST(request: NextRequest) {
         exa_path: exaPath,
         payer_kind: organizationId ? 'organization' : 'personal',
         charged_to_balance: isPaidRequest,
-        ...(costMicrodollars === undefined ? {} : { cost_microdollars: costMicrodollars }),
-        stage: costMicrodollars === undefined ? 'cost_parse' : 'record_write',
+        ...(record === undefined ? {} : { cost_microdollars: record.costMicrodollars }),
+        stage: record === undefined ? 'cost_parse' : 'record_write',
         error:
           code === null
             ? {
@@ -185,6 +188,7 @@ export async function POST(request: NextRequest) {
                       : 'unknown',
               }
             : { type: 'database', code },
+        ...fallback,
       });
     }
   });

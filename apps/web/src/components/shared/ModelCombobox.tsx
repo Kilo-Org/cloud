@@ -43,6 +43,8 @@ export type ModelComboboxProps = {
   value?: string;
   onValueChange: (value: string) => void;
   isLoading?: boolean;
+  /** Start loading a deferred catalog on pointer, keyboard, or open intent. */
+  onLoadModels?: () => void;
   error?: string;
   placeholder?: string;
   searchPlaceholder?: string;
@@ -78,6 +80,7 @@ export function ModelCombobox({
   value,
   onValueChange,
   isLoading,
+  onLoadModels,
   error,
   placeholder = 'Select a model',
   searchPlaceholder = 'Search models...',
@@ -94,6 +97,10 @@ export function ModelCombobox({
   id = 'model-combobox',
 }: ModelComboboxProps) {
   const [open, setOpen] = useState(false);
+  const handleOpenChange = (value: boolean) => {
+    if (value) onLoadModels?.();
+    setOpen(value);
+  };
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -198,7 +205,7 @@ export function ModelCombobox({
     return (
       <Popover
         open={disabled ? false : open}
-        onOpenChange={disabled ? undefined : setOpen}
+        onOpenChange={disabled ? undefined : handleOpenChange}
         modal={modal}
       >
         <PopoverTrigger asChild>
@@ -212,6 +219,8 @@ export function ModelCombobox({
             disabled={disabled}
             className={cn('h-9 justify-between gap-1.5', className)}
             ref={triggerRef}
+            onPointerEnter={onLoadModels}
+            onFocus={onLoadModels}
           >
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="min-w-0 truncate">
@@ -261,12 +270,14 @@ export function ModelCombobox({
       )}
       <Popover
         open={disabled ? false : open}
-        onOpenChange={disabled ? undefined : setOpen}
+        onOpenChange={disabled ? undefined : handleOpenChange}
         modal={modal}
       >
         <PopoverTrigger asChild>
           <Button
             id={id}
+            onPointerEnter={onLoadModels}
+            onFocus={onLoadModels}
             type="button"
             variant="outline"
             role="combobox"

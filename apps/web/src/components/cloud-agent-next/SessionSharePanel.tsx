@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
+import { useSessionSharing } from './hooks/useSessionSharing';
 
 const durations = [
   { value: '1h', label: '1 hour' },
@@ -30,10 +31,16 @@ const durations = [
 
 export function SessionSharePanel({
   kiloSessionId,
+  cloudAgentSessionId,
+  organizationId,
+  open,
   isSharing,
   onSharingChange,
 }: {
   kiloSessionId?: string;
+  cloudAgentSessionId?: string | null;
+  organizationId?: string;
+  open: boolean;
   isSharing: boolean;
   onSharingChange: (isSharing: boolean) => void;
 }) {
@@ -43,12 +50,15 @@ export function SessionSharePanel({
   const [share, setShare] = useState<({ url: string } & SessionShareOptions) | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const trpc = useRawTRPCClient();
+  const sharingDisabledReason = useSessionSharing({
+    kiloSessionId,
+    cloudAgentSessionId,
+    organizationId,
+    enabled: open,
+  });
 
   const handleShare = async () => {
-    if (!kiloSessionId) {
-      toast.error('Session ID is missing');
-      return;
-    }
+    if (!kiloSessionId || sharingDisabledReason) return;
     onSharingChange(true);
     const options = { duration, include_new_messages: includeNewMessages };
     try {
@@ -78,6 +88,14 @@ export function SessionSharePanel({
       toast.error('Failed to copy link');
     }
   };
+
+  if (sharingDisabledReason) {
+    return (
+      <p className="text-muted-foreground text-sm" role="status">
+        {sharingDisabledReason}
+      </p>
+    );
+  }
 
   if (share) {
     const label = durations.find(option => option.value === share.duration)?.label;

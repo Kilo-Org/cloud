@@ -228,13 +228,14 @@ describe('getHeaderPillContent', () => {
     expect(result.interactive).toBe(true);
   });
 
-  it('falls back to compact tokens and neutral tone when capacity is unknown', () => {
+  it('paints no percentage when capacity is unknown, so nothing reads as a minus', () => {
     const result = pill({
       info: info({ contextWindow: undefined, percentage: undefined, contextTokens: 32_418 }),
       totalCostMicrodollars: 120_000,
       hasMessages: true,
     });
     expect(result).toMatchObject({
+      primary: null,
       secondary: '$0.12',
       costSlot: 'label',
       tone: 'neutral',
@@ -252,6 +253,7 @@ describe('getHeaderPillContent', () => {
         hasMessages: true,
       })
     ).toMatchObject({
+      primary: null,
       secondary: null,
       costSlot: 'none',
       tone: 'neutral',

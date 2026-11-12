@@ -95,8 +95,8 @@ import {
   isLocalFakeLlmEnabled,
 } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 
-export type GetProviderProviderResult = {
-  kind: 'provider';
+/** One way to serve the request: the upstream provider and the credential that pays for it. */
+export type ProviderRoute = {
   provider: Provider;
   userByok: BYOKResult[] | null;
   readonly isFree: boolean;
@@ -110,6 +110,24 @@ export type GetProviderProviderResult = {
    *  subscription, while abuse and organization policy checks still apply. */
   skipBalanceCheck?: boolean;
 };
+
+/** Resolves a route. A BYOK key is decrypted only when its route is resolved. */
+export type ResolveProviderRoute = () => Promise<ProviderRoute>;
+
+export type GetProviderProviderResult = {
+  kind: 'provider';
+  /**
+   * The routes that can serve the request, in order. The first takes it; a later route is tried
+   * only when the upstream of every route before it failed. Only the owner's BYOK keys follow the
+   * first route, never the ChatGPT connection or Kilo's route, so a failing key never makes another
+   * payer, or Kilo, pay.
+   */
+  routes: readonly [ResolveProviderRoute, ...ResolveProviderRoute[]];
+};
+
+function servedBy(route: ProviderRoute): GetProviderProviderResult {
+  return { kind: 'provider', routes: [async () => route] };
+}
 
 /** A bespoke direct BYOK id whose key serves only catalog ids. */
 export type DirectByokCatalogOnlyResult = {
@@ -137,14 +155,14 @@ export type GetProviderResult =
   | { kind: 'custom-llm-unavailable' }
   | DirectByokCatalogOnlyResult;
 
-async function directByokProviderResult(
+async function directByokRoute(
   directByok: DirectByokProvider,
   directByokModel: DirectByokModel,
   credential: BYOKResult,
   requestedModel: string,
   request: GatewayRequest,
   servesCatalogId: boolean
-): Promise<GetProviderProviderResult> {
+): Promise<ProviderRoute> {
   const upstream = await directByok.resolveUpstream({
     credential: credential.decryptedAPIKey,
     model: directByokModel,
@@ -152,7 +170,6 @@ async function directByokProviderResult(
   });
 
   return {
-    kind: 'provider',
     provider: {
       type: 'direct-byok',
       ...upstream,
@@ -207,13 +224,8 @@ async function resolveDirectByokModel(
     return { kind: 'direct-byok-catalog-only', providerId, catalogModelId };
   }
   decision.step({ step: 'direct-byok-model', outcome: 'selected', provider_id: providerId });
-  return directByokProviderResult(
-    directByok,
-    directByokModel,
-    credential,
-    requestedModel,
-    request,
-    false
+  return servedBy(
+    await directByokRoute(directByok, directByokModel, credential, requestedModel, request, false)
   );
 }
 
@@ -301,13 +313,12 @@ async function resolveCustomLlmProvider(
     definition,
     await resolveCustomLlmAuth(credentials)
   );
-  return {
-    kind: 'provider',
+  return servedBy({
     provider: isPublic ? withoutPaidServerFeatures(provider) : provider,
     userByok: null,
     isFree: isFreeModel(customLlm.public_id),
     bypassAccessCheck: !isPublic,
-  };
+  });
 }
 
 /**
@@ -325,13 +336,12 @@ function withoutPaidServerFeatures(provider: Provider): Provider {
   };
 }
 
-function gatewayRoutedByokResult(
+function gatewayRoutedByokRoute(
   step: VercelByokPlanStep | GatewayByokPlanStep,
   key: BYOKResult,
   requestedModel: string
-): GetProviderProviderResult {
+): ProviderRoute {
   return {
-    kind: 'provider',
     provider:
       step.route === 'vercel-byok'
         ? VERCEL_AI_GATEWAY
@@ -387,8 +397,12 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   });
   const result = await selectProvider(input, decision);
   if (input.onDecision) {
+    const decided =
+      result.kind === 'provider'
+        ? { kind: 'provider' as const, ...(await result.routes[0]()) }
+        : result;
     try {
-      input.onDecision(decision.finish(result));
+      input.onDecision(decision.finish(decided));
     } catch (error) {
       console.error('[getProvider] failed to report the routing decision', {
         errorType: error instanceof Error ? error.name : 'unknown',
@@ -421,13 +435,12 @@ async function selectProvider(
     const localFakeProvider = getLocalFakeLlmProvider();
     if (localFakeProvider) {
       decision.step({ step: 'local-fake-llm', outcome: 'selected' });
-      return {
-        kind: 'provider',
+      return servedBy({
         provider: localFakeProvider,
         userByok: null,
         isFree: true,
         bypassAccessCheck: true,
-      };
+      });
     }
   }
 
@@ -471,14 +484,13 @@ async function selectProvider(
   }
   if (claudeBilling) {
     decision.step({ step: 'claude-billing', outcome: 'selected' });
-    return {
-      kind: 'provider',
+    return servedBy({
       provider: claudeBilling.provider,
       userByok: null,
       isFree: isFreeModel(requestedModel),
       bypassAccessCheck: false,
       skipBalanceCheck: true,
-    };
+    });
   }
 
   let storedKeys: Promise<StoredByokKeys> | undefined;
@@ -515,8 +527,25 @@ async function selectProvider(
   const decryptKey = async (step: KeyPlanStep) =>
     (await loadStoredKeys()).decrypt(step.key.providerId);
 
-  const takeKey = async (step: KeyPlanStep): Promise<GetProviderProviderResult> => {
+  const resolveKey = async (step: KeyPlanStep): Promise<ProviderRoute> => {
     const credential = await decryptKey(step);
+    return step.route === 'direct-byok'
+      ? directByokRoute(step.provider, step.model, credential, requestedModel, request, true)
+      : gatewayRoutedByokRoute(step, credential, requestedModel);
+  };
+
+  /** The serving keys after `planIndex`, then the key the request ignores. */
+  const failoverStepsAfter = (planIndex: number): KeyPlanStep[] =>
+    plan.slice(planIndex + 1).flatMap(step => {
+      if (step.route === 'ignored-key-fallback') return [step.step];
+      return isKeyPlanStep(step) && !reasonToPass(step) ? [step] : [];
+    });
+
+  const takeKey = async (
+    step: KeyPlanStep,
+    planIndex: number
+  ): Promise<GetProviderProviderResult> => {
+    const route = await resolveKey(step);
     const { providerId } = step.key;
     logSelection(providerId);
     decision.markByokCandidate(step, 'selected');
@@ -526,16 +555,13 @@ async function selectProvider(
       route: step.route,
       provider_id: providerId,
     });
-    return step.route === 'direct-byok'
-      ? directByokProviderResult(
-          step.provider,
-          step.model,
-          credential,
-          requestedModel,
-          request,
-          true
-        )
-      : gatewayRoutedByokResult(step, credential, requestedModel);
+    return {
+      kind: 'provider',
+      routes: [
+        async () => route,
+        ...failoverStepsAfter(planIndex).map(failoverStep => () => resolveKey(failoverStep)),
+      ],
+    };
   };
 
   // A connection whose credential is terminally dead must fail readably instead of resolving to
@@ -558,7 +584,14 @@ async function selectProvider(
     }
     decision.step({ step: 'chatgpt', outcome: 'selected' });
     logSelection(OPENAI_CHATGPT_PROVIDER_ID);
-    return { ...openAiChatGptByok, isFree: isFreeModel(requestedModel) };
+    const { provider, userByok, bypassAccessCheck, skipBalanceCheck } = openAiChatGptByok;
+    return servedBy({
+      provider,
+      userByok,
+      bypassAccessCheck,
+      skipBalanceCheck,
+      isFree: isFreeModel(requestedModel),
+    });
   };
 
   const recordNoKeyServed = () =>
@@ -568,13 +601,13 @@ async function selectProvider(
       reason: keySteps.length === 0 ? 'no-candidates' : 'none-served',
     });
 
-  for (const step of plan) {
+  for (const [planIndex, step] of plan.entries()) {
     switch (step.route) {
       case 'direct-byok':
       case 'vercel-byok':
       case 'gateway-byok': {
         const reason = reasonToPass(step);
-        if (!reason) return await takeKey(step);
+        if (!reason) return await takeKey(step, planIndex);
         skipped.push({ providerId: step.key.providerId, reason });
         decision.markByokCandidate(step, 'skipped', reason);
         break;
@@ -589,7 +622,7 @@ async function selectProvider(
           '[getProvider] Using a BYOK key the request ignores, since no other key serves',
           { requestedModel, providerId: step.step.key.providerId }
         );
-        return await takeKey(step.step);
+        return await takeKey(step.step, planIndex);
       case 'unsupported-api-kind': {
         recordNoKeyServed();
         const { provider, model, key } = step.step;
@@ -601,7 +634,9 @@ async function selectProvider(
           provider_id: key.providerId,
           supported_api_kinds: [...getDirectByokModelChatApis(provider, model)],
         });
-        return directByokProviderResult(provider, model, credential, requestedModel, request, true);
+        return servedBy(
+          await directByokRoute(provider, model, credential, requestedModel, request, true)
+        );
       }
       case 'kilo': {
         recordNoKeyServed();
@@ -620,13 +655,12 @@ async function selectProvider(
           organization_disabled_vercel_ai_gateway: organizationDisabledVercelAiGateway,
           kilo_ignored_providers: kiloIgnoredProviders,
         });
-        return {
-          kind: 'provider',
+        return servedBy({
           provider: routesToVercel ? VERCEL_AI_GATEWAY : OPENROUTER,
           userByok: null,
           isFree: isFreeModel(requestedModel),
           bypassAccessCheck: false,
-        };
+        });
       }
     }
   }

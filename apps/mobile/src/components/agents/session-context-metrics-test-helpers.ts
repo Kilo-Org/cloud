@@ -66,6 +66,7 @@ export type TestProps = {
   numberOfLines?: number;
   children?: unknown;
   onPress?: () => void;
+  arcFraction?: number;
 };
 
 /**

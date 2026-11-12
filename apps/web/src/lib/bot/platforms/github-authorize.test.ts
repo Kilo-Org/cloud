@@ -104,8 +104,7 @@ describe('createGitHubBotPlatform.authorizeBotActions', () => {
       'on-call',
       'rso-dev',
       'standard',
-      'pi_1',
-      'workflow'
+      'pi_1'
     );
   });
 

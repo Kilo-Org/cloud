@@ -216,9 +216,7 @@ describe('permission-denied query removal', () => {
     ).toBeUndefined();
     // The observed variant keeps its slot and loses only the denied rows.
     expect(queryClient.getQueryData(observedKey)).toBeUndefined();
-    expect(
-      queryClient.getQueryCache().find({ queryKey: observedKey, exact: true })
-    ).toBeDefined();
+    expect(queryClient.getQueryCache().find({ queryKey: observedKey, exact: true })).toBeDefined();
     // Another organization is another prefix.
     expect(queryClient.getQueryData(otherOrgKey)).toEqual({ members: ['b'] });
     expect(signOut).not.toHaveBeenCalled();

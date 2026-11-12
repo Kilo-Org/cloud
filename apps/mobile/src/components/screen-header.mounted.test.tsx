@@ -48,6 +48,8 @@ const navigationContainer = vi.hoisted(() => {
 });
 const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const platform = vi.hoisted(() => ({ OS: 'ios' as 'ios' | 'android' }));
+/** The window-top clearance the shared sheet rule resolves for this surface. */
+const formSheet = vi.hoisted(() => ({ windowTopClearance: 0 }));
 /** A normal phone window: wide enough for the title and its actions to share a row. */
 const layout = vi.hoisted(() => ({ width: 390, fontScale: 1 }));
 
@@ -65,6 +67,11 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeArea,
+}));
+// The header takes the window-top clearance from the shared sheet rule, which
+// owns the platform split; that rule is covered by its own `form-sheet.test.ts`.
+vi.mock('@/lib/form-sheet', () => ({
+  useSheetHeaderTopClearance: () => formSheet.windowTopClearance,
 }));
 vi.mock('@/components/ui/icons', () => ({
   ChevronDown: 'ChevronDown',
@@ -283,6 +290,7 @@ describe('ScreenHeader mounted', () => {
     platform.OS = 'ios';
     Object.assign(safeArea, { top: 0, bottom: 0, left: 0, right: 0 });
     Object.assign(layout, { width: 390, fontScale: 1 });
+    formSheet.windowTopClearance = 0;
   });
 
   it('gives the back control the 48dp icon target and no hit slop', () => {
@@ -1127,7 +1135,7 @@ describe('ScreenHeader mounted', () => {
     });
   });
 
-  it('pads a modal header by the same value on iOS and Android', () => {
+  it('pads a modal header by the grabber clearance when the sheet owns the window top', () => {
     const iosStyle = findOuterContainer(renderHeader({ title: 'Sessions', modal: true }).root).props
       .style;
 
@@ -1135,29 +1143,36 @@ describe('ScreenHeader mounted', () => {
     const androidStyle = findOuterContainer(renderHeader({ title: 'Sessions', modal: true }).root)
       .props.style;
 
-    // A zero safe-area top: the sheet's grabber clearance is the floor on both.
+    // The shared sheet rule resolves zero where the sheet presents below the
+    // status bar, so the grabber clearance is the whole padding on both.
     expect(iosStyle).toEqual({ paddingTop: 32 });
     expect(androidStyle).toEqual(iosStyle);
   });
 
-  it('pads a modal by the fixed sheet clearance and a pinned header by the inset, on either platform', () => {
+  it('adds the window-top clearance a modal surface needs above the grabber clearance', () => {
+    // The Android route's sheet edge reaches the window top, so the shared rule
+    // resolves the status-bar inset and the header clears it itself.
+    formSheet.windowTopClearance = 51.8;
+    platform.OS = 'android';
+    const androidModal = findOuterContainer(renderHeader({ title: 'Sessions', modal: true }).root)
+      .props.style;
+
+    expect(androidModal).toEqual({ paddingTop: 51.8 + 32 });
+  });
+
+  it('pads a pinned header by the window inset and leaves a sheet to its own clearance', () => {
     safeArea.top = 48;
     const iosModal = findOuterContainer(renderHeader({ title: 'Sessions', modal: true }).root).props
       .style;
     const iosPinned = findOuterContainer(renderHeader({ title: 'Sessions' }).root).props.style;
 
     platform.OS = 'android';
-    const androidModal = findOuterContainer(renderHeader({ title: 'Sessions', modal: true }).root)
-      .props.style;
     const androidPinned = findOuterContainer(renderHeader({ title: 'Sessions' }).root).props.style;
 
-    // A modal is a native sheet whose own window reports its top inset, so the
-    // header keeps the fixed grabber clearance rather than re-adding the app
-    // window's inset. A pinned header adds the reported inset. Neither branches
-    // on the platform.
+    // A pinned header adds the reported inset plus the standard 8 on either
+    // platform, while the modal's own clearance comes from the sheet rule.
     expect(iosModal).toEqual({ paddingTop: 32 });
     expect(iosPinned).toEqual({ paddingTop: 56 });
-    expect(androidModal).toEqual(iosModal);
     expect(androidPinned).toEqual(iosPinned);
   });
 

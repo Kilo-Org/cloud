@@ -14,15 +14,16 @@ import { useHeaderBack } from '@/lib/hooks/use-header-back';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { offlineHeaderReservation } from '@/lib/offline-banner-state';
 import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
+import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
 import { HEADER_TITLE_TARGET_CLASS, ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /**
- * Top padding a modal header keeps above the native sheet's edge, clear of the
- * grabber. A sheet is its own window: the OS reports the inset it needs there
- * (zero for an inset card, the status-bar height for an edge-to-edge sheet), so
- * the header keeps this fixed clearance on iOS and Android alike instead of
- * re-adding the app window's safe-area inset.
+ * Top padding a modal header keeps above the surface edge that owns the window
+ * top, clear of the grabber. The inset the surface needs is added on top by
+ * `useSheetHeaderTopClearance('android-window-top')`: zero where the native
+ * sheet presents below the status bar (iOS), the window inset where the sheet
+ * edge reaches the window top (the Android route).
  */
 const MODAL_HEADER_TOP_PADDING = 32;
 
@@ -338,11 +339,16 @@ export function ScreenHeader({
     inlineActions != null &&
     shouldStackHeaderActions(windowWidth, fontScale, inlineActionsWidth ?? 0);
 
-  // A modal is a native sheet that owns its own top inset; the header keeps the
-  // fixed grabber clearance on both platforms. A pinned header adds the app
-  // window's safe-area top inset plus the standard 8. One expression, no
-  // platform branch: both platforms have the same native-sheet capability.
-  const baseTopPadding = modal ? MODAL_HEADER_TOP_PADDING : insets.top + 8;
+  // A modal is a native sheet, and which surface owns the window top differs by
+  // platform: iOS presents the page sheet below the status bar, so the header
+  // keeps only the fixed grabber clearance; the Android route's sheet edge
+  // reaches the window top, so the header must clear the status bar itself.
+  // `useSheetHeaderTopClearance('android-window-top')` answers that in the one
+  // rule the form-sheet chrome already uses — the window inset on Android, zero
+  // on iOS — so the two sheet headers cannot disagree. A pinned header adds the
+  // app window's safe-area top inset plus the standard 8.
+  const modalTopClearance = useSheetHeaderTopClearance('android-window-top');
+  const baseTopPadding = modal ? modalTopClearance + MODAL_HEADER_TOP_PADDING : insets.top + 8;
 
   // The offline banner is an absolute overlay pinned at the safe-area top of
   // the app window, so a pinned header must reserve its height while it is

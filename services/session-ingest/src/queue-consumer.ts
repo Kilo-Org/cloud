@@ -32,6 +32,18 @@ export interface IngestQueueMessage {
 }
 
 export const QUEUE_RETRY_DELAY_SECONDS = 5 * 60;
+// The session-ingest-processing consumer's `max_retries` in wrangler.jsonc.
+export const QUEUE_MAX_RETRIES = 3;
+
+export class MalformedIngestPayloadError extends Error {
+  constructor(
+    readonly r2Key: string,
+    readonly parseError: Error
+  ) {
+    super(`Malformed JSON in staging object ${r2Key}: ${parseError.message}`);
+    this.name = 'MalformedIngestPayloadError';
+  }
+}
 
 // A queue message is an envelope for one POST's R2 payload for one session.
 // That payload can contain many session items. Batch those items into chunked
@@ -142,7 +154,7 @@ async function ingestStagedSessionItems(
   const parseError = await streamSessionItems(msg.r2Key, body, rawItem => chunker.stage(rawItem));
 
   if (parseError) {
-    throw new Error(`Malformed JSON in staging object ${msg.r2Key}: ${parseError.message}`);
+    throw new MalformedIngestPayloadError(msg.r2Key, parseError);
   }
 
   // Handle any remaining items not flushed yet.
@@ -605,12 +617,40 @@ export async function queue(
       await processMessage(env, msg.body, ctx);
       msg.ack();
     } catch (err) {
+      if (err instanceof MalformedIngestPayloadError) {
+        console.error('Staged ingest object is not parseable JSON; object removed and message acknowledged', {
+          r2Key: msg.body.r2Key,
+          sessionId: msg.body.sessionId,
+          error: err.message,
+        });
+        await deleteStagedObject(env, msg.body.r2Key);
+        msg.ack();
+        continue;
+      }
+
+      const isLastAttempt = msg.attempts >= QUEUE_MAX_RETRIES + 1;
       console.error('Queue message processing failed, will retry', {
         r2Key: msg.body.r2Key,
         sessionId: msg.body.sessionId,
+        attempts: msg.attempts,
+        isLastAttempt,
         error: err instanceof Error ? err.message : String(err),
       });
+      if (isLastAttempt) {
+        await deleteStagedObject(env, msg.body.r2Key);
+      }
       msg.retry({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
     }
+  }
+}
+
+async function deleteStagedObject(env: Env, r2Key: string): Promise<void> {
+  try {
+    await env.SESSION_INGEST_R2.delete(r2Key);
+  } catch (error) {
+    console.error('Failed to delete a staged ingest object', {
+      r2Key,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }

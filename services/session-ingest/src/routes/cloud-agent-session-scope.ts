@@ -1,5 +1,6 @@
 import { and, eq, isNull, or } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 
 import { getWorkerDb } from '@kilocode/db/client';
@@ -628,7 +629,7 @@ cloudAgentSessionScopeApi.get('/session/:sessionId/export', async c => {
   });
 });
 
-cloudAgentSessionScopeApi.post('/session/:sessionId/title', async c => {
+cloudAgentSessionScopeApi.post('/session/:sessionId/title', bodyLimit({ maxSize: 1024 }), async c => {
   const assertion = getScopeAssertion(c);
   if (assertion.kind !== 'v2') {
     return c.json({ success: false, error: 'Cloud Agent session scope protocol v2 required' }, 400);

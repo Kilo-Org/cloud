@@ -127,6 +127,7 @@ export function ChildSessionDrawer({
   const delayedAutoScrollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollToBottomNow = useCallback(() => {
+    if (!shouldAutoScrollRef.current) return;
     const el = scrollContainerRef.current;
     if (!el) return;
 
@@ -354,6 +355,7 @@ export function ChildSessionDrawer({
               </div>
               {hydrationState.status === 'ready' && (
                 <OlderMessagesHeader
+                  hasOlderMessages={readyPagination.hasOlder}
                   isLoadingOlderMessages={readyPagination.isLoadingOlder}
                   olderMessagesError={readyPagination.olderError}
                   olderMessagesOmittedItemCount={readyPagination.omittedItemCount}

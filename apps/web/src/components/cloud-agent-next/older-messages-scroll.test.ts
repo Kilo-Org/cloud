@@ -499,6 +499,61 @@ describe('useOlderMessagesPagination readiness', () => {
     expect(onLoad).toHaveBeenCalledTimes(2);
   });
 
+  it.each([50, 40])(
+    'stops autoloading when a page does not grow the height (%s)',
+    async nextHeight => {
+      let height = 50;
+      const { element } = scrollingElement(() => height);
+      const onLoad = jest.fn();
+      let api: PaginationApi | null = null;
+      const scrollElementRef = { current: element };
+      const isProgrammaticScrollRef = { current: false };
+      const lastScrollTopRef = { current: 0 };
+      const render = (loading: boolean, resetKey = 'no-progress') =>
+        renderPagination({
+          ready: true,
+          isLoadingOlderMessages: loading,
+          resetKey,
+          onLoad,
+          onApi: next => {
+            api = next;
+          },
+          scrollElementRef,
+          isProgrammaticScrollRef,
+          lastScrollTopRef,
+        });
+
+      render(false);
+      dom.flushFrame();
+      expect(onLoad).toHaveBeenCalledTimes(1);
+      await act(async () => undefined);
+      render(true);
+      height = nextHeight;
+      render(false);
+      dom.flushFrame();
+      dom.resize();
+      dom.flushFrame();
+      expect(onLoad).toHaveBeenCalledTimes(1);
+
+      act(() => api?.requestOlderMessages());
+      expect(onLoad).toHaveBeenCalledTimes(2);
+      await act(async () => undefined);
+      render(true);
+      render(false);
+      dom.flushFrame();
+      expect(onLoad).toHaveBeenCalledTimes(2);
+
+      height += 10;
+      dom.resize();
+      dom.flushFrame();
+      expect(onLoad).toHaveBeenCalledTimes(3);
+      await act(async () => undefined);
+      render(false, 'another-session');
+      dom.flushFrame();
+      expect(onLoad).toHaveBeenCalledTimes(4);
+    }
+  );
+
   it('checks visibility again when the viewport grows without a scroll event', () => {
     const { element } = scrollingElement(() => 600);
     element.scrollTop = 500;

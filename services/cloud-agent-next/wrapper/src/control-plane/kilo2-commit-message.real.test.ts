@@ -14,7 +14,7 @@ const binary = process.env.KILO2_BINARY;
 const suite = binary ? describe : describe.skip;
 
 suite('real Kilo v2 commit messages', () => {
-  it('uses the configured small model and commits its message instead of wip', async () => {
+  it('uses the small model and repository prompt below a non-Git runtime directory', async () => {
     if (!binary) throw new Error('KILO2_BINARY is required');
     if (process.env.KILO_RUNTIME_HARNESS !== 'kilo2')
       throw new Error('Run this suite with KILO_RUNTIME_HARNESS=kilo2');
@@ -25,14 +25,10 @@ suite('real Kilo v2 commit messages', () => {
     expect(await version.exited).toBe(0);
 
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'kilo2-commit-message-'));
-    const directory = path.join(root, 'workspace');
+    const runtimeDirectory = path.join(root, 'workspace');
+    const directory = path.join(runtimeDirectory, 'repository');
     const remote = path.join(root, 'remote.git');
-    await fs.mkdir(directory);
-    const command = async (args: string[], cwd = directory) => {
-      const result = await git(args, { cwd, timeoutMs: 10_000 });
-      expect(result.exitCode).toBe(0);
-      return result.stdout.trim();
-    };
+    await fs.mkdir(directory, { recursive: true });
     const generatedMessage = 'docs: explain local commit verification';
     const customPrompt = 'Describe the documentation change with a concise conventional commit.';
     const requests: Array<{ model: string; prompt: string }> = [];
@@ -101,13 +97,20 @@ suite('real Kilo v2 commit messages', () => {
       }),
       KILO_DISABLE_MODELS_FETCH: '1',
       KILO_DISABLE_FFF: '1',
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: '/dev/null',
       GIT_AUTHOR_NAME: 'Local Test',
       GIT_AUTHOR_EMAIL: 'local-test@example.com',
       GIT_COMMITTER_NAME: 'Local Test',
       GIT_COMMITTER_EMAIL: 'local-test@example.com',
     };
+    const command = async (args: string[], cwd = directory) => {
+      const result = await git(args, { cwd, env, inheritEnv: false, timeoutMs: 10_000 });
+      expect(result.exitCode).toBe(0);
+      return result.stdout.trim();
+    };
     const runtime = createKiloRuntime({
-      directory,
+      directory: runtimeDirectory,
       env,
       timers: CONTROL_PLANE_TIMERS,
       pidfileDirectory: path.join(root, 'pids'),

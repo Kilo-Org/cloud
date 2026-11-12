@@ -2061,7 +2061,7 @@
     "thisDevice": "Dit apparaat",
     "viewProfile": "Profiel bekijken",
     "signOutThisDevice": "Dit apparaat afmelden",
-    "signOutSessionLabel": "{{device}} afmelden, aangemeld {{signedIn}}, Laatst gezien {{lastSeen}}",
+    "signOutSessionLabel": "{{device}} afmelden, aangemeld {{signedIn}}, laatst gezien {{lastSeen}}",
     "sessionSignedOut": "Sessie afgemeld.",
     "signOutThisDeviceTitle": "Dit apparaat afmelden?",
     "signOutThisSessionTitle": "Deze sessie afmelden?",

@@ -2707,7 +2707,7 @@
     "thisDevice": "Šis įrenginys",
     "viewProfile": "Peržiūrėti profilį",
     "signOutThisDevice": "Atsijungti šiame įrenginyje",
-    "signOutSessionLabel": "Atsijungti „{{device}}“, prisijungta {{signedIn}}, Paskutinė veikla {{lastSeen}}",
+    "signOutSessionLabel": "Atsijungti „{{device}}“, prisijungta {{signedIn}}, paskutinė veikla {{lastSeen}}",
     "sessionSignedOut": "Sesija baigta.",
     "signOutThisDeviceTitle": "Atsijungti šiame įrenginyje?",
     "signOutThisSessionTitle": "Baigti šią sesiją?",

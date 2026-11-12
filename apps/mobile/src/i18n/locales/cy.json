@@ -2811,7 +2811,7 @@
     "thisDevice": "Y ddyfais hon",
     "viewProfile": "Gweld y proffil",
     "signOutThisDevice": "Allgofnodi'r ddyfais hon",
-    "signOutSessionLabel": "Allgofnodi {{device}}, wedi mewngofnodi {{signedIn}}, Gwelwyd ddiwethaf {{lastSeen}}",
+    "signOutSessionLabel": "Allgofnodi {{device}}, wedi mewngofnodi {{signedIn}}, gwelwyd ddiwethaf {{lastSeen}}",
     "sessionSignedOut": "Allgofnodwyd y sesiwn.",
     "signOutThisDeviceTitle": "Allgofnodi'r ddyfais hon?",
     "signOutThisSessionTitle": "Allgofnodi'r sesiwn hon?",

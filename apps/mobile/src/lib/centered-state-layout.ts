@@ -145,6 +145,13 @@ export function getCenteredStateLayout({
     topInset,
     bottomInset,
   });
+  // Center in the band, and center alone: `getCenteredStateBandStyle` paints the
+  // same point before the content height is known, so a state never moves once
+  // it is painted. A rule that pushes the content off-centre to keep it clear of
+  // a crowded band edge would have no counterpart in that first paint, and the
+  // content would jump by the amount it pushed when the height landed. A band
+  // narrow enough to crowd the state is also short enough that the state
+  // scrolls there, and both placements center it.
   const bandHeight = bottom - top;
   const fits = contentHeight <= roundToPixel(bandHeight);
   const contentTop = fits ? top + (bandHeight - contentHeight) / 2 : top + STATE_GAP;

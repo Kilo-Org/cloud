@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- one follow-controller suite sharing the fake ActivityKit harness */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GLANCEABLE_STALE_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { sessionLiveActivityRelevance } from '@kilocode/notifications/schemas';
@@ -9,6 +9,7 @@ import {
   setLiveActivityEnabledValue,
   setNotificationPermissionGrantedValue,
 } from '@/lib/glanceable/live-activity-switch';
+import { setProtectedDataAvailable } from '@/lib/protected-data';
 
 import {
   _resetSessionCardScopeStoreForTests,
@@ -273,6 +274,47 @@ describe('the follow scope record', () => {
 
     const cleared = await readSessionCardScopes();
     expect(cleared?.size).toBe(0);
+  });
+
+  describe('while the device is locked', () => {
+    afterEach(() => {
+      setProtectedDataAvailable(true);
+    });
+
+    it('reads the records as unavailable instead of calling the keychain', async () => {
+      rememberSessionCardScope('session-1', CTX);
+      await _settleSessionCardScopeWritesForTests();
+      const read = vi.fn(scopeStore.getItemAsync);
+      _setSessionCardScopeStoreForTests({
+        getItemAsync: read,
+        setItemAsync: scopeStore.setItemAsync,
+      });
+
+      setProtectedDataAvailable(false);
+      const records = await readSessionCardScopes();
+
+      // Unavailable, never empty: an empty map would make every followed card
+      // out of scope and end it.
+      expect(records).toBeNull();
+      expect(read).not.toHaveBeenCalled();
+    });
+
+    it('does not write a follow it could only half record', async () => {
+      const write = vi.fn(scopeStore.setItemAsync);
+      _setSessionCardScopeStoreForTests({
+        getItemAsync: scopeStore.getItemAsync,
+        setItemAsync: write,
+      });
+
+      setProtectedDataAvailable(false);
+      rememberSessionCardScope('session-1', CTX);
+      await _settleSessionCardScopeWritesForTests();
+
+      // The card stays followed; only the record it cannot write is skipped, and
+      // the next follow or restore writes it.
+      expect(write).not.toHaveBeenCalled();
+      expect(storedScopes.has('session-1')).toBe(false);
+    });
   });
 });
 

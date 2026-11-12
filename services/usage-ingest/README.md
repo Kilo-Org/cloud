@@ -829,3 +829,52 @@ The log's own fields intentionally contain no raw request/headers or request ID.
 After a separately authorized rollout, an operator still needs to capture an
 actual rejection and its invocation/version to establish a production cause.
 This diagnostic does not recover missing usage or explain HTTP 409 responses.
+
+## Controlled first admission retry trial (inactive)
+
+`USAGE_INGEST_ADMISSION_FIRST_RETRY_MAX_SECONDS` is an optional Worker variable.
+Only the exact string `"4"` selects treatment: uniformly distributed integer delays
+of 1–4 seconds for the first consumer retry after a recognized writer-admission
+HTTP 429 (`queue_limit`, `pool_busy` or `pool_waiting`). Missing or invalid values,
+including `"2"`, retain the baseline uniform 1–2 seconds. Both committed environments
+omit this variable and retain baseline; this PR does not activate a trial.
+
+The selector applies only when the normalized delivery attempt is 1 and admission
+is recognized. Invalid attempt metadata still normalizes to 1. Each retry consumes
+one random draw. Later admission retries keep their existing exponential jitter;
+generic 429, 503, invalid events, missing configuration and other conservative
+failures keep their minimum 60-second delay. All usage kinds share the same native
+20-retry budget and DLQ policy. Individual ACK/retry and overload invocation feedback,
+payloads, identity and writer admission are unchanged.
+
+A separately authorized experiment should use baseline → treatment → return to
+baseline, changing only this control. Record the effective variable value (including
+absence), environment, exact deployed revision/version and UTC transition bounds in
+the experiment record; existing `retry_delay_seconds`, `admission_reason` and
+`delivery_attempts` identify affected retries without adding all-request events.
+Keep publisher timeouts at 20/5/40/4, batch6/parallelism2/cap225 in production,
+admission wait250ms, shared limits, source retention and DLQ policy fixed. Staging
+keeps its existing capacity. Do not activate the LLM direct lane.
+
+Before starting, choose matched accepted-volume and usage-kind/producer-region
+cohorts, pressure profiles and equal observation durations, plus numerical stop
+thresholds against the matched baseline. Include quiet periods and short pressure
+pulses. Compare mature creation cohorts only after completion/retry observation
+windows close; report censored or unmatched IDs separately. Four mature post-deploy
+minutes and late accepted publisher sends/duplicate deliveries do not select a
+winning timeout or retry value. Logs are not a persistence ledger.
+
+Measure rejection rows per unique usage ID and repeat rejections beyond the first,
+end-to-end creation-to-recorded age p95/p99, first-reject-to-recorded latency, quiet
+latency, drain time, native backlog slope/size, oldest message age and DLQ arrivals.
+Use the same definitions and volume matching for all three phases; retain duplicate
+and terminal outcomes. Stop treatment and return to baseline on any new unexplained
+DLQ arrival or terminal/loss signal, a sustained growing backlog/oldest age, or
+p95/p99, quiet latency or drain time exceeding the predeclared limits. Investigate
+and reconcile unresolved IDs; do not purge or replay as part of this trial.
+
+A wider first delay can worsen recovery after a short pressure pulse: a message
+may wait after the writer has recovered. Fewer repeated rejects alone is not a win.
+This prepares a comparison and makes no claim of measured production latency
+improvement. Returning the variable to absence (or `"2"`) restores baseline for
+subsequent retry decisions; already scheduled delayed deliveries remain scheduled.

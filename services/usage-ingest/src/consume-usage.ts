@@ -201,7 +201,12 @@ async function processMessage(
       : undefined;
   const retryDelaySeconds = acknowledged
     ? undefined
-    : usageRetryDelaySeconds(message.attempts, admissionReason !== undefined);
+    : usageRetryDelaySeconds(
+        message.attempts,
+        admissionReason !== undefined,
+        Math.random,
+        env.USAGE_INGEST_ADMISSION_FIRST_RETRY_MAX_SECONDS
+      );
   const level = acknowledged ? 'info' : 'warn';
   logSafely(level, () => ({
     event: 'usage_ingest_processing',

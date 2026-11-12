@@ -1,6 +1,6 @@
 import { unstable_readConfig } from 'wrangler';
 import { fileURLToPath } from 'node:url';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { usageRetryDelaySeconds } from './retry-policy';
 
 it.each([
@@ -57,5 +57,42 @@ it.each([undefined, 'staging'])(
       }),
     ]);
     expect(config.vars.USAGE_INGEST_PARALLELISM).toBe('2');
+    expect(config.vars.USAGE_INGEST_ADMISSION_FIRST_RETRY_MAX_SECONDS).toBeUndefined();
+  }
+);
+
+it.each([undefined, '2', '4', '', '3', '04', '4 ', 'invalid'])(
+  'selects first admission retry buckets only for exact opt-in %s',
+  config => {
+    const max = config === '4' ? 4 : 2;
+    for (const randomValue of [0, 0.25 - Number.EPSILON, 0.25, 0.5, 0.75, 1 - Number.EPSILON]) {
+      const random = vi.fn(() => randomValue);
+      expect(usageRetryDelaySeconds(1, true, random, config)).toBe(
+        1 + Math.floor(randomValue * max)
+      );
+      expect(random).toHaveBeenCalledTimes(1);
+    }
+  }
+);
+
+it('preserves later attempts and conservative failures with one random draw', () => {
+  for (const attempt of [1, 2, 3, 6, 9, 10, 20, 21, Number.MAX_SAFE_INTEGER]) {
+    for (const admission of [true, false]) {
+      if (attempt === 1 && admission) continue;
+      for (const value of [0, 0.5, 1 - Number.EPSILON]) {
+        const random = vi.fn(() => value);
+        expect(usageRetryDelaySeconds(attempt, admission, random, '4')).toBe(
+          usageRetryDelaySeconds(attempt, admission, () => value)
+        );
+        expect(random).toHaveBeenCalledTimes(1);
+      }
+    }
+  }
+});
+
+it.each([undefined, null, '1', 0, -1, 1.5, NaN, Infinity])(
+  'applies the opt-in to normalized initial metadata %s',
+  attempts => {
+    expect(usageRetryDelaySeconds(attempts, true, () => 1 - Number.EPSILON, '4')).toBe(4);
   }
 );

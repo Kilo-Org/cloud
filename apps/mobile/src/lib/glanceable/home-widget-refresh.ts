@@ -22,7 +22,11 @@ import { isAlreadyReportedNetworkError } from '@/lib/telemetry/app-error-reporti
 import { trpcClient } from '@/lib/trpc';
 import { isTrpcClientError, readTrpcErrorField } from '@/lib/trpc-error';
 
-import { getTerminalBlankEpoch, isGlanceableOrgLost } from './cleanup';
+import {
+  getGlanceableOrgConfirmationEpoch,
+  getTerminalBlankEpoch,
+  isGlanceableOrgLost,
+} from './cleanup';
 import { isGlanceableFixtureHeld } from './fixture-hold';
 import { getHomeWidgetCopy } from './home-widget-copy';
 import {
@@ -86,8 +90,15 @@ function report(error: unknown, operation: string): void {
  * another event and still leave the widget unable to refresh. The pair is the
  * signal the app already uses for "signed-in credentials changed": a new auth
  * epoch (sign-in after sign-out) or a different account/organization scope.
+ * The refusal also covers a missing organization membership, which the
+ * glanceable layer treats as recoverable, so the latch names the org
+ * confirmation epoch it was taken at and a restored org releases it.
  */
-let revokedCredential: { scopeKey: string; authEpoch: number } | null = null;
+let revokedCredential: {
+  scopeKey: string;
+  authEpoch: number;
+  orgConfirmationEpoch: number;
+} | null = null;
 let reportedRevocationAuthEpoch: number | null = null;
 
 /** Test seam: forget this process's credential and configuration state. */
@@ -111,7 +122,7 @@ async function handleRefreshFailure(
   state: { scopeKey: string; authEpoch: number }
 ): Promise<void> {
   if (isTrpcClientError(error) && readTrpcErrorField(error, 'code') === 'UNAUTHORIZED') {
-    revokedCredential = state;
+    revokedCredential = { ...state, orgConfirmationEpoch: getGlanceableOrgConfirmationEpoch() };
     // `clear` also drops the cached credential, so the next allowed attempt
     // starts from a fresh query instead of the dead token.
     await clearHomeWidgetRefresh();
@@ -206,7 +217,11 @@ export async function syncHomeWidgetRefresh(context: {
     isGlanceableOrgLost() ||
     isGlanceableFixtureHeld() ||
     getLastHomeWidgetData()?.snapshot.scopeKey !== scopeKey;
-  if (revokedCredential?.scopeKey === scopeKey && revokedCredential.authEpoch === authEpoch) {
+  if (
+    revokedCredential?.scopeKey === scopeKey &&
+    revokedCredential.authEpoch === authEpoch &&
+    revokedCredential.orgConfirmationEpoch === getGlanceableOrgConfirmationEpoch()
+  ) {
     return;
   }
   try {

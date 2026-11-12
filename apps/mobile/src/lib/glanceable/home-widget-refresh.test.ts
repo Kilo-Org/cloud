@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => {
     clear,
     getOperationEpoch,
     data: null as { snapshot: { status: string; scopeKey: string } } | null,
+    orgConfirmationEpoch: 0,
     native: {
       configure,
       clear,
@@ -56,6 +57,7 @@ vi.mock('@/lib/trpc', () => ({
 
 vi.mock('./cleanup', () => ({
   getTerminalBlankEpoch: () => 0,
+  getGlanceableOrgConfirmationEpoch: () => mocks.orgConfirmationEpoch,
   isGlanceableOrgLost: () => false,
 }));
 
@@ -105,6 +107,7 @@ beforeEach(() => {
   mocks.configure.mockReset().mockResolvedValue(undefined);
   mocks.clear.mockReset().mockResolvedValue(undefined);
   mocks.getOperationEpoch.mockReturnValue(0);
+  mocks.orgConfirmationEpoch = 0;
   mocks.data = { snapshot: { status: 'active', scopeKey: SCOPE_KEY } };
 });
 
@@ -141,6 +144,34 @@ describe('syncHomeWidgetRefresh', () => {
 
     expect(mocks.widgetCredential).toHaveBeenCalledTimes(2);
     expect(mocks.configure).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers once when a lost organization is confirmed again, without a sign-in', async () => {
+    // A refusal can mean the organization membership is gone; that is
+    // recoverable, so a confirmation releases the latch for the same session.
+    mocks.widgetCredential.mockRejectedValue(
+      trpcError('UNAUTHORIZED', 'Widget credential is no longer authorized')
+    );
+    await syncHomeWidgetRefresh(CONTEXT);
+    await syncHomeWidgetRefresh(CONTEXT);
+    expect(mocks.widgetCredential).toHaveBeenCalledTimes(1);
+    expect(mocks.captureException).toHaveBeenCalledTimes(1);
+
+    mocks.orgConfirmationEpoch += 1;
+    mocks.widgetCredential.mockResolvedValue({
+      token: 'restored-token',
+      expiresAt: Date.now() + 30 * 86_400_000,
+    });
+
+    await syncHomeWidgetRefresh(CONTEXT);
+    expect(mocks.widgetCredential).toHaveBeenCalledTimes(2);
+    expect(mocks.configure).toHaveBeenCalledTimes(1);
+
+    // The renewed credential is cached, so later publishes configure without
+    // asking again: the released latch does not turn into a request loop.
+    await syncHomeWidgetRefresh(CONTEXT);
+    expect(mocks.widgetCredential).toHaveBeenCalledTimes(2);
+    expect(mocks.configure).toHaveBeenCalledTimes(2);
   });
 
   it('reports a non-tRPC error carrying an UNAUTHORIZED code and keeps publishing', async () => {

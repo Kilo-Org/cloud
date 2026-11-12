@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the spend display and the action/role menus share the row's mounted harness. */
 import { act } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -65,6 +66,7 @@ async function renderRow(overrides: Partial<Parameters<typeof MemberRow>[0]> = {
     <MemberRow
       member={member}
       canManage
+      callerRole="owner"
       enableUsageLimits
       isSalesDemo={false}
       organizationId="org-1"
@@ -268,6 +270,25 @@ describe('MemberRow menu', () => {
       { memberId: 'membership-1', role: 'admin' },
       expect.objectContaining({ onSuccess: expect.any(Function) })
     );
+  });
+
+  it('offers an admin every role but owner, which the server reserves for owners', async () => {
+    const renderer = await renderRow({ callerRole: 'admin' });
+    await act(() => {
+      (renderer.root.findByType('Pressable').props.onPress as () => void)();
+    });
+    await act(() => {
+      actionsMenu().onSelect(0);
+    });
+    await act(() => {
+      actionsMenu().onDismiss();
+    });
+
+    expect(roleMenu().options.map(option => option.label)).toEqual([
+      i18n.t('organization.members.roles.admin'),
+      i18n.t('organization.members.roles.member'),
+      i18n.t('organization.members.roles.billingManager'),
+    ]);
   });
 
   it('closes the menu without navigating when it is dismissed', async () => {

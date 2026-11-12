@@ -2901,7 +2901,10 @@
       "alreadyInvited": "Isaga ama iyadu horeba waa la casuumay ama horeba waa xubin.",
       "sendError": "Casuumaadda lama diri karin.",
       "pendingInvitation": "Iimaylkani horeyba wuxuu leeyahay casuumaad sugaysa.",
-      "alreadyMember": "Qofkani horeyba waa xubin ka mid ah ururkan."
+      "alreadyMember": "Qofkani horeyba waa xubin ka mid ah ururkan.",
+      "seatsFull": "Dhammaan kuraasta waa la wada isticmaalayaa ({{used}}/{{total}}). Ka codso milkiilaha ururka inuu kuraas ku daro ka hor intaadan casuumin xubno kale.",
+      "seatsFullCanInviteBilling": "Dhammaan kuraasta waa la wada isticmaalayaa ({{used}}/{{total}}). Weli waad casuumi kartaa maareeyayaasha biilasha, kuwaas oo aan qaadan kursi.",
+      "noSeatsAvailable": "Dhammaan kuraasta waa la wada isticmaalayaa. Ka codso milkiilaha ururka inuu kuraas ku daro ka hor intaadan casuumin xubno kale."
     },
     "invoices": {
       "downloadA11y": "Soo deji qaansheegta {{number}}",

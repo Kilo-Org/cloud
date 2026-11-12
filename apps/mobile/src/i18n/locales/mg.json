@@ -2901,7 +2901,10 @@
       "alreadyInvited": "Efa voasa na efa mpikambana izy.",
       "sendError": "Tsy azo nalefa ny fanasana.",
       "pendingInvitation": "Efa manana fanasana miandry ity mailaka ity.",
-      "alreadyMember": "Efa mpikambana ao amin'ity fikambanana ity ity olona ity."
+      "alreadyMember": "Efa mpikambana ao amin'ity fikambanana ity ity olona ity.",
+      "seatsFull": "Efa ampiasaina avokoa ny toerana rehetra ({{used}}/{{total}}). Angataho amin'ny tompon'ny fikambanana iray ny hanampy toerana alohan'ny hanasanao mpikambana fanampiny.",
+      "seatsFullCanInviteBilling": "Efa ampiasaina avokoa ny toerana rehetra ({{used}}/{{total}}). Mbola afaka manasa mpitantana ny fandoavam-bola ianao, izay tsy mibodo toerana.",
+      "noSeatsAvailable": "Efa ampiasaina avokoa ny toerana rehetra. Angataho amin'ny tompon'ny fikambanana iray ny hanampy toerana alohan'ny hanasanao mpikambana fanampiny."
     },
     "invoices": {
       "downloadA11y": "Alao ny faktiora {{number}}",

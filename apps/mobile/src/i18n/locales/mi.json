@@ -2901,7 +2901,10 @@
       "alreadyInvited": "Kua pōwhiritia kē, kua mema kē rānei.",
       "sendError": "Kāore i taea te tuku i te pōwhiri.",
       "pendingInvitation": "Kua whai kē tēnei īmēra i tētahi pōwhiri e tatari ana.",
-      "alreadyMember": "He mema kē tēnei tangata o tēnei whakahaerenga."
+      "alreadyMember": "He mema kē tēnei tangata o tēnei whakahaerenga.",
+      "seatsFull": "Kei te whakamahia ngā tūru katoa ({{used}}/{{total}}). Tonoa tētahi rangatira o te whakahaerenga kia tāpiri tūru anō i mua i te pōwhiri i ētahi atu mema.",
+      "seatsFullCanInviteBilling": "Kei te whakamahia ngā tūru katoa ({{used}}/{{total}}). Ka taea tonu e koe te pōwhiri i ngā kaiwhakahaere pire, i te mea kāore rātou e whakapau i tētahi tūru.",
+      "noSeatsAvailable": "Kei te whakamahia ngā tūru katoa. Tonoa tētahi rangatira o te whakahaerenga kia tāpiri tūru anō i mua i te pōwhiri i ētahi atu mema."
     },
     "invoices": {
       "downloadA11y": "Tīkina ake te nama {{number}}",

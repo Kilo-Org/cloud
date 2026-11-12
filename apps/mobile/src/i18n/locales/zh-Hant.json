@@ -2906,7 +2906,10 @@
       "alreadyInvited": "該電子郵件地址已有待處理的邀請，或已是成員。",
       "sendError": "無法傳送邀請。",
       "pendingInvitation": "這個電子郵件地址已有待處理的邀請。",
-      "alreadyMember": "這個人已經是此組織的成員。"
+      "alreadyMember": "這個人已經是此組織的成員。",
+      "seatsFull": "所有席位皆已使用（{{used}}/{{total}}）。請先請組織擁有者增加席位，再邀請更多成員。",
+      "seatsFullCanInviteBilling": "所有席位皆已使用（{{used}}/{{total}}）。你仍可邀請帳務管理員，他們不會佔用席位。",
+      "noSeatsAvailable": "所有席位皆已使用。請先請組織擁有者增加席位，再邀請更多成員。"
     },
     "invoices": {
       "downloadA11y": "下載發票 {{number}}",

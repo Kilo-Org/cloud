@@ -2906,7 +2906,10 @@
       "alreadyInvited": "Địa chỉ email này đã được mời hoặc đã là thành viên.",
       "sendError": "Không gửi được lời mời.",
       "pendingInvitation": "Email này đã có lời mời đang chờ xử lý.",
-      "alreadyMember": "Người này đã là thành viên của tổ chức này."
+      "alreadyMember": "Người này đã là thành viên của tổ chức này.",
+      "seatsFull": "Tất cả chỗ đã được sử dụng ({{used}}/{{total}}). Hãy yêu cầu chủ sở hữu tổ chức thêm chỗ trước khi mời thêm thành viên.",
+      "seatsFullCanInviteBilling": "Tất cả chỗ đã được sử dụng ({{used}}/{{total}}). Bạn vẫn có thể mời người quản lý thanh toán vì họ không chiếm chỗ.",
+      "noSeatsAvailable": "Tất cả chỗ đã được sử dụng. Hãy yêu cầu chủ sở hữu tổ chức thêm chỗ trước khi mời thêm thành viên."
     },
     "invoices": {
       "downloadA11y": "Tải xuống hóa đơn {{number}}",

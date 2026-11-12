@@ -2901,7 +2901,10 @@
       "alreadyInvited": "Personen er allerede invitert eller allerede medlem.",
       "sendError": "Kunne ikke sende invitasjonen.",
       "pendingInvitation": "Denne e-postadressen har allerede en ventende invitasjon.",
-      "alreadyMember": "Denne personen er allerede medlem av denne organisasjonen."
+      "alreadyMember": "Denne personen er allerede medlem av denne organisasjonen.",
+      "seatsFull": "Alle plasser er i bruk ({{used}}/{{total}}). Be en organisasjonseier om å legge til plasser før du inviterer flere medlemmer.",
+      "seatsFullCanInviteBilling": "Alle plasser er i bruk ({{used}}/{{total}}). Du kan fortsatt invitere faktureringsansvarlige, som ikke bruker en plass.",
+      "noSeatsAvailable": "Alle plasser er i bruk. Be en organisasjonseier om å legge til plasser før du inviterer flere medlemmer."
     },
     "invoices": {
       "downloadA11y": "Last ned faktura {{number}}",

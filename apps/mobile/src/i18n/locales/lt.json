@@ -3007,7 +3007,10 @@
       "alreadyInvited": "Vartotojas jau pakviestas arba jau yra narys.",
       "sendError": "Nepavyko išsiųsti kvietimo.",
       "pendingInvitation": "Šiam el. pašto adresui jau išsiųstas laukiantis kvietimas.",
-      "alreadyMember": "Šis asmuo jau yra šios organizacijos narys."
+      "alreadyMember": "Šis asmuo jau yra šios organizacijos narys.",
+      "seatsFull": "Visos vietos užimtos ({{used}}/{{total}}). Paprašykite organizacijos savininko pridėti vietų, prieš kviesdami daugiau narių.",
+      "seatsFullCanInviteBilling": "Visos vietos užimtos ({{used}}/{{total}}). Vis tiek galite kviesti atsiskaitymų tvarkytojus, nes jie neužima vietos.",
+      "noSeatsAvailable": "Visos vietos užimtos. Paprašykite organizacijos savininko pridėti vietų, prieš kviesdami daugiau narių."
     },
     "invoices": {
       "downloadA11y": "Atsisiųsti sąskaitą {{number}}",

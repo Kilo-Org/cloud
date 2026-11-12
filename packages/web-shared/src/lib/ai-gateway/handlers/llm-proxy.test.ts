@@ -44,6 +44,7 @@ import {
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
   getOpenRouterModelsFromDatabase,
+  getVercelModelsFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
@@ -343,6 +344,14 @@ const mockedGetProvider = jest.mocked(getProvider);
 const mockedUpstreamRequest = jest.mocked(upstreamRequest);
 const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromDatabase);
 const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
+const mockedGetVercelModels = jest.mocked(getVercelModelsFromDatabase);
+
+/** Like the OpenRouter catalog stub, Vercel's list accepts every model unless a test narrows it. */
+const everyVercelModel = { has: () => true } as unknown as ReadonlySet<string>;
+
+beforeEach(() => {
+  mockedGetVercelModels.mockResolvedValue(everyVercelModel);
+});
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
 function usageAccountingResult(
@@ -2237,6 +2246,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
     'returns 404 when the %s model id is unknown',
     async providerType => {
       mockedIsValidOpenRouterModelId.mockResolvedValue(false);
+      mockedGetVercelModels.mockResolvedValue(new Set(['vendor/other-model']));
       mockedGetProvider.mockResolvedValue({
         kind: 'provider',
         provider: { ...provider, type: providerType },

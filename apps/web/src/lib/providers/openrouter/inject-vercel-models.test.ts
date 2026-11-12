@@ -1,8 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-import {
-  injectExtraProviderModels,
-  injectVercelOnlyProviders,
-} from '@/lib/providers/openrouter/inject-extra-provider-models';
+import { injectVercelModels } from '@/lib/providers/openrouter/inject-vercel-models';
 import {
   modelRetainsPrompts,
   modelTrains,
@@ -14,6 +11,24 @@ import type {
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 
 const MODEL_SLUG = 'nvidia/nemotron-3-super-120b-a12b';
+
+type ProviderModelData = Parameters<typeof injectVercelModels>[0]['providerModelData'];
+
+/** Injects Vercel endpoints of snapshot models; the fixtures have no Vercel-only models. */
+function injectSnapshotModels(
+  vercelModels: Record<string, GatewayModelWithEndpoints>,
+  providerModelData: ProviderModelData,
+  vercelModelIdOverrides: ReadonlyMap<string, string> = new Map()
+) {
+  injectVercelModels({
+    vercelModels,
+    openRouterCatalogModels: [],
+    openRouterModelIds: providerModelData.flatMap(({ models }) => models.map(m => m.slug)),
+    providerModelData,
+    vercelModelIdOverrides,
+    updatedAt: '2026-11-02T00:00:00.000Z',
+  });
+}
 
 function provider(
   slug: string,
@@ -48,7 +63,7 @@ function nvidiaModel(): OpenRouterModel {
   };
 }
 
-describe('injectExtraProviderModels', () => {
+describe('injectVercelModels under OpenRouter providers', () => {
   test('does not copy the source provider data policy onto injected offerings', () => {
     const nvidia = nvidiaModel();
     const providerModelData = [
@@ -87,7 +102,7 @@ describe('injectExtraProviderModels', () => {
       },
     };
 
-    injectExtraProviderModels(vercelModels, providerModelData, new Map());
+    injectSnapshotModels(vercelModels, providerModelData);
 
     const injected = providerModelData[1]?.models[0];
     expect(injected?.slug).toBe(MODEL_SLUG);
@@ -134,7 +149,7 @@ describe('injectExtraProviderModels', () => {
       },
     };
 
-    injectExtraProviderModels(vercelModels, providerModelData, new Map());
+    injectSnapshotModels(vercelModels, providerModelData);
 
     expect(providerModelData[1]?.models[0]?.slug).toBe(MODEL_SLUG);
     expect(providerModelData[1]?.models[0]?.context_length).toBe(128_000);
@@ -169,19 +184,15 @@ describe('injectExtraProviderModels', () => {
       },
     };
 
-    injectExtraProviderModels(vercelModels, providerModelData, new Map());
+    injectSnapshotModels(vercelModels, providerModelData);
     expect(providerModelData[1]?.models).toEqual([]);
 
-    injectExtraProviderModels(
-      vercelModels,
-      providerModelData,
-      new Map([[MODEL_SLUG, vercelModelId]])
-    );
+    injectSnapshotModels(vercelModels, providerModelData, new Map([[MODEL_SLUG, vercelModelId]]));
     expect(providerModelData[1]?.models[0]?.slug).toBe(MODEL_SLUG);
   });
 });
 
-describe('injectVercelOnlyProviders', () => {
+describe('injectVercelModels with providers only Vercel lists', () => {
   function nvidiaProviderModelData() {
     return [
       {
@@ -223,7 +234,7 @@ describe('injectVercelOnlyProviders', () => {
       },
     };
 
-    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
+    injectSnapshotModels(vercelModels, providerModelData);
 
     expect(providerModelData.map(({ provider }) => provider.slug)).toEqual([
       'nvidia',
@@ -271,7 +282,7 @@ describe('injectVercelOnlyProviders', () => {
       },
     };
 
-    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
+    injectSnapshotModels(vercelModels, providerModelData);
 
     const synthesized = providerModelData.find(({ provider }) => provider.slug === providerId);
     expect(synthesized?.provider).toMatchObject({
@@ -292,7 +303,7 @@ describe('injectVercelOnlyProviders', () => {
       },
     };
 
-    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
+    injectSnapshotModels(vercelModels, providerModelData);
 
     const futureProvider = providerModelData.find(
       ({ provider }) => provider.slug === 'future-provider'
@@ -318,7 +329,7 @@ describe('injectVercelOnlyProviders', () => {
       },
     };
 
-    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
+    injectSnapshotModels(vercelModels, providerModelData);
 
     const boundless = providerModelData.find(({ provider }) => provider.slug === 'boundless');
     expect(boundless?.provider.dataPolicy).toEqual({
@@ -344,7 +355,7 @@ describe('injectVercelOnlyProviders', () => {
       },
     };
 
-    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
+    injectSnapshotModels(vercelModels, providerModelData);
 
     expect(providerModelData.map(({ provider }) => provider.slug)).toEqual([
       'nvidia',
@@ -362,7 +373,7 @@ describe('injectVercelOnlyProviders', () => {
       },
     };
 
-    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
+    injectSnapshotModels(vercelModels, providerModelData);
 
     expect(providerModelData).toHaveLength(2);
   });
@@ -377,8 +388,228 @@ describe('injectVercelOnlyProviders', () => {
       },
     };
 
-    injectVercelOnlyProviders(vercelModels, providerModelData, new Map());
+    injectSnapshotModels(vercelModels, providerModelData);
 
     expect(providerModelData).toHaveLength(2);
+  });
+});
+
+describe('injectVercelModels with models only Vercel serves', () => {
+  /** The fields Vercel's model list describes each model with. */
+  const described = {
+    type: 'language',
+    description: 'Qwen3.5 Flash description',
+    created: 1_790_000_000,
+    context_window: 1_000_000,
+    modalities: { input: ['text', 'image'], output: ['text'] },
+    pricing: { input: '0.0000001', output: '0.0000004' },
+  } satisfies Partial<GatewayModelWithEndpoints>;
+  const freeDescribed = { ...described, pricing: { input: '0', output: '0' } };
+
+  function providerModelData() {
+    return [
+      {
+        provider: provider('amazon-bedrock', 'Amazon Bedrock', {
+          training: false,
+          retainsPrompts: false,
+          canPublish: false,
+        }),
+        models: [] as OpenRouterModel[],
+      },
+    ];
+  }
+
+  test('lists a Vercel-only model under existing and new providers', () => {
+    const data = providerModelData();
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
+      'alibaba/qwen3.5-flash': {
+        id: 'alibaba/qwen3.5-flash',
+        name: 'Qwen3.5 Flash',
+        ...described,
+        endpoints: [
+          {
+            provider_name: 'bedrock',
+            context_length: 500_000,
+            pricing: { prompt: '0.0000002', completion: '0.0000008' },
+            has_zdr: true,
+            has_no_training: true,
+          },
+          { provider_name: 'alibaba' },
+        ],
+      },
+      'alibaba/qwen3-max': {
+        id: 'alibaba/qwen3-max',
+        name: 'Qwen3 Max',
+        ...described,
+        endpoints: [{ provider_name: 'alibaba' }],
+      },
+    };
+
+    injectVercelModels({
+      vercelModels,
+      openRouterCatalogModels: [{ id: 'qwen/qwen3-max', name: 'Qwen: Qwen3 Max' }],
+      openRouterModelIds: ['qwen/qwen3-max'],
+      providerModelData: data,
+      vercelModelIdOverrides: new Map(),
+      updatedAt: '2026-11-02T00:00:00.000Z',
+    });
+
+    expect(data.map(({ provider }) => provider.slug)).toEqual(['amazon-bedrock', 'alibaba']);
+    expect(data[0]?.provider.dataPolicy).toEqual({
+      training: false,
+      retainsPrompts: false,
+      canPublish: false,
+    });
+    expect(data[0]?.models).toEqual([
+      {
+        slug: 'qwen/qwen3.5-flash',
+        name: 'Qwen: Qwen3.5 Flash',
+        author: 'qwen',
+        description: 'Qwen3.5 Flash description',
+        context_length: 500_000,
+        input_modalities: ['text', 'image'],
+        output_modalities: ['text'],
+        group: 'Other',
+        updated_at: '2026-11-02T00:00:00.000Z',
+        endpoint: {
+          provider_display_name: 'Amazon Bedrock',
+          is_free: false,
+          pricing: { prompt: '0.0000002', completion: '0.0000008' },
+        },
+      },
+    ]);
+    expect(data[1]?.provider.dataPolicy).toMatchObject({ training: true, retainsPrompts: true });
+    expect(data[1]?.models.map(model => [model.slug, model.endpoint?.pricing])).toEqual([
+      ['qwen/qwen3.5-flash', { prompt: '0.0000001', completion: '0.0000004' }],
+    ]);
+  });
+
+  test("skips a Vercel-only model that Vercel's model list does not describe", () => {
+    const data = providerModelData();
+    injectVercelModels({
+      vercelModels: {
+        'runinfra/fast-1': {
+          id: 'runinfra/fast-1',
+          name: 'Fast 1',
+          type: 'language',
+          endpoints: [{ provider_name: 'runinfra' }],
+        },
+      },
+      openRouterCatalogModels: [],
+      openRouterModelIds: [],
+      providerModelData: data,
+      vercelModelIdOverrides: new Map(),
+      updatedAt: '2026-11-02T00:00:00.000Z',
+    });
+
+    expect(data.map(({ provider }) => provider.slug)).toEqual(['amazon-bedrock']);
+  });
+
+  test('marks a free Vercel-only model free and assumes it trains on prompts', () => {
+    const data = providerModelData();
+    injectVercelModels({
+      vercelModels: {
+        'reflection/beam-free': {
+          id: 'reflection/beam-free',
+          name: 'Beam (Free)',
+          ...freeDescribed,
+          endpoints: [
+            {
+              provider_name: 'reflection',
+              pricing: { prompt: '0', completion: '0' },
+              has_zdr: true,
+              has_no_training: true,
+            },
+          ],
+        },
+      },
+      openRouterCatalogModels: [],
+      openRouterModelIds: [],
+      providerModelData: data,
+      vercelModelIdOverrides: new Map(),
+      updatedAt: '2026-11-02T00:00:00.000Z',
+    });
+
+    const reflection = data.find(({ provider }) => provider.slug === 'reflection');
+    expect(reflection?.provider.dataPolicy).toMatchObject({
+      training: false,
+      retainsPrompts: false,
+    });
+    expect(reflection?.models[0]?.endpoint).toEqual({
+      provider_display_name: 'Reflection',
+      is_free: true,
+      pricing: { prompt: '0', completion: '0' },
+      data_policy: { training: true, retainsPrompts: true },
+    });
+  });
+
+  test('assumes a free Vercel-only model trains on prompts under an OpenRouter provider too', () => {
+    const data = providerModelData();
+    injectVercelModels({
+      vercelModels: {
+        'reflection/beam-free': {
+          id: 'reflection/beam-free',
+          name: 'Beam (Free)',
+          ...freeDescribed,
+          endpoints: [{ provider_name: 'bedrock', has_zdr: true, has_no_training: true }],
+        },
+      },
+      openRouterCatalogModels: [],
+      openRouterModelIds: [],
+      providerModelData: data,
+      vercelModelIdOverrides: new Map(),
+      updatedAt: '2026-11-02T00:00:00.000Z',
+    });
+
+    expect(data.map(({ provider }) => provider.slug)).toEqual(['amazon-bedrock']);
+    expect(data[0]?.models[0]?.endpoint).toEqual({
+      provider_display_name: 'Amazon Bedrock',
+      is_free: true,
+      pricing: { prompt: '0', completion: '0' },
+      data_policy: { training: true, retainsPrompts: true },
+    });
+  });
+
+  test('lists snapshot and Vercel-only models under one new provider', () => {
+    const data = [
+      ...providerModelData(),
+      {
+        provider: provider('nvidia', 'NVIDIA', {
+          training: true,
+          retainsPrompts: true,
+          canPublish: false,
+        }),
+        models: [nvidiaModel()],
+      },
+    ];
+    injectVercelModels({
+      vercelModels: {
+        [MODEL_SLUG]: {
+          id: MODEL_SLUG,
+          name: 'NVIDIA Nemotron 3 Super',
+          endpoints: [{ provider_name: 'nvidia' }, { provider_name: 'runinfra' }],
+        },
+        'runinfra/fast-1': {
+          id: 'runinfra/fast-1',
+          name: 'Fast 1',
+          ...described,
+          endpoints: [{ provider_name: 'runinfra', has_zdr: true, has_no_training: true }],
+        },
+      },
+      openRouterCatalogModels: [],
+      openRouterModelIds: [MODEL_SLUG],
+      providerModelData: data,
+      vercelModelIdOverrides: new Map(),
+      updatedAt: '2026-11-02T00:00:00.000Z',
+    });
+
+    const runinfra = data.filter(({ provider }) => provider.slug === 'runinfra');
+    expect(runinfra).toHaveLength(1);
+    expect(runinfra[0]?.models.map(model => model.slug)).toEqual([MODEL_SLUG, 'runinfra/fast-1']);
+    expect(runinfra[0]?.provider.dataPolicy).toMatchObject({
+      training: true,
+      retainsPrompts: true,
+    });
+    expect(data.at(-1)?.provider.slug).toBe('runinfra');
   });
 });

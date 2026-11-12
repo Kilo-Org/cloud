@@ -56,6 +56,7 @@ import {
   type MetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/metadata-cache';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { getVercelOnlyCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
 
 const OPENROUTER_MODELS_CACHE_TTL_MS = 5 * 60 * 1000;
 const OPENROUTER_MODELS_FETCH_TIMEOUT_MS = 15_000;
@@ -204,16 +205,20 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
   const publicCustomLlmModels = publicCustomLlms.map(({ public_id, definition }) =>
     convertCustomLlmToCatalogModel(public_id, definition)
   );
+  const isListableGatewayModelId = (modelId: string) =>
+    // OpenRouter may add a model after a custom LLM claimed its id, and
+    // routing serves the custom LLM.
+    !customLlmsById.has(modelId.toLowerCase()) && !unavailableModelIds.has(modelId);
+  const [vercelOnlyCatalogModels, summaries] = await Promise.all([
+    getVercelOnlyCatalogModels({ openRouterModels: models, openRouterMetadata: endpointsMetadata }),
+    getTerminalBenchSummaries(),
+  ]);
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
-  const summaries = await getTerminalBenchSummaries();
   const catalogModels = models
     .filter(
       model =>
         (!hasEndpointsMetadata || endpointsMetadata[model.id] !== undefined) &&
-        // OpenRouter may add a model after a custom LLM claimed its id, and
-        // routing serves the custom LLM.
-        !customLlmsById.has(model.id.toLowerCase()) &&
-        !unavailableModelIds.has(model.id) &&
+        isListableGatewayModelId(model.id) &&
         !model.id.endsWith(':batch')
     )
     .map((model): OpenRouterModel => {
@@ -229,6 +234,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
         alias_target: aliasTarget,
       };
     })
+    .concat(vercelOnlyCatalogModels.filter(model => isListableGatewayModelId(model.id)))
     .concat(autoModels)
     .map(model => applyCustomPricingToModel(customPricingConfig, model))
     // Public custom LLMs are complete as defined; id-based pricing, PDF, and

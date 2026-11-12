@@ -82,6 +82,20 @@ describe('parseDirective', () => {
 });
 
 describe('extractLastUserMessageText', () => {
+  it.each([
+    '<system-reminder>Agent changed</system-reminder>',
+    [{ type: 'text', text: '<system-reminder>Agent changed</system-reminder>' }],
+  ])('ignores a native agent-switch reminder after the command', content => {
+    expect(
+      extractLastUserMessageText({
+        messages: [
+          { role: 'user', content: '__fake__:echo:command-argument' },
+          { role: 'user', content },
+        ],
+      })
+    ).toBe('__fake__:echo:command-argument');
+  });
+
   it('returns empty when messages is missing or not an array', () => {
     expect(extractLastUserMessageText({})).toBe('');
     expect(extractLastUserMessageText({ messages: 'nope' })).toBe('');
@@ -912,6 +926,33 @@ describe('fake-llm-server HTTP', () => {
     expect(completedA[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'only_root_a' } }),
     ]);
+  });
+
+  it.each(['name', 'id'])('uses the advertised skill %s argument', async key => {
+    const h = await start();
+    const response = await postToolChat(
+      h.url,
+      '__fake__:skill:profile-test:profile-review',
+      [],
+      [
+        {
+          type: 'function',
+          function: {
+            name: 'skill',
+            parameters: {
+              type: 'object',
+              properties: { [key]: { type: 'string' } },
+              required: [key],
+            },
+          },
+        },
+      ]
+    );
+    const chunks = await parseSse(response);
+    expect(chunks[0]?.choices[0]?.delta?.tool_calls?.[0]?.function).toMatchObject({
+      name: 'skill',
+      arguments: JSON.stringify({ [key]: 'profile-review' }),
+    });
   });
 
   it('streams a real write call and gates only after its tool result', async () => {

@@ -305,7 +305,10 @@ function fixture(options?: {
   const db = makeDb(options?.ownershipResults ?? [[source]]);
   getPgDbMock.mockReturnValue(db);
 
-  const sourceStub = { getMetadata: vi.fn().mockResolvedValue(metadata) };
+  const sourceStub = {
+    getMetadata: vi.fn().mockResolvedValue(metadata),
+    getAvailableCommands: vi.fn().mockResolvedValue({ commands: [{ name: 'profile-check' }] }),
+  };
   const destinationStub = {
     getMetadata: vi.fn().mockResolvedValue(null),
     getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('legacy'),
@@ -500,6 +503,9 @@ describe('createWorktreeChat request validation and authorization', () => {
     });
     expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(1);
     expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledTimes(1);
+    expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({ initialCommands: { commands: [{ name: 'profile-check' }] } })
+    );
   });
 
   it('rejects another owner or a same-organization member without source ownership', async () => {

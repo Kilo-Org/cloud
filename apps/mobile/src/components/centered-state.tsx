@@ -14,6 +14,7 @@ import { useStateSurface } from '@/components/centered-state-surface';
 import { RefreshProgress } from '@/components/ui/refresh-progress';
 import {
   getCenteredStateLayout,
+  getPendingCenteredStateStyle,
   isShortViewport,
   type StateFrame,
 } from '@/lib/centered-state-layout';
@@ -42,10 +43,12 @@ type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
  * reserves.
  *
  * The state paints from its first frame: a hidden data state is a blank body,
- * which reads as a broken screen. The first frame sits at the pending placement
- * — centered in the band the surface reports, or in the window minus the
- * reservation the caller already knows — and the measured placement replaces it
- * once the surface and the content have reported their sizes.
+ * which reads as a broken screen. That first frame and the measured one use one
+ * placement — centered in the band the scroller shows, above the surface's
+ * bottom reserve — so a state never moves after it is first painted. The layout
+ * engine produces the pending placement from the caller's reserve alone, and
+ * `getCenteredStateLayout` produces the same numbers once the surface, the
+ * scroller and the content have reported their sizes.
  */
 export function CenteredState({
   children,
@@ -57,23 +60,18 @@ export function CenteredState({
   const surface = useStateSurface();
   const windowSize = useWindowDimensions();
   const shortBand = isShortViewport(windowSize.width, windowSize.height);
-  // A screen whose surface is not published yet still covers the window it
-  // fills: its band is the window minus the reservation the caller already
-  // knows. Placing against that band is exact for a full-screen state, so a
-  // first mount paints where it will be measured instead of at the pending
-  // centering and then lifting when the surface arrives.
-  const liveFrame = surface?.frame ?? null;
-  // Measured bands carry sub-pixel noise: a re-measure of the same layout can
-  // report a different fraction of a point, and a placement derived from it
-  // moves the state by a pixel for no visual reason. Round the band to whole
-  // pixels so repeated measurements of one layout place the state identically.
-  const frame = useMemo(() => {
-    const band = liveFrame ?? { top: 0, bottom: windowSize.height };
-    return {
-      top: PixelRatio.roundToNearestPixel(band.top),
-      bottom: PixelRatio.roundToNearestPixel(band.bottom),
-    };
-  }, [liveFrame, windowSize.height]);
+  // The clip the band lives in: the window, in the same window coordinates the
+  // scroller reports through `measureInWindow`. Measured bands carry sub-pixel
+  // noise — a re-measure of the same layout can report a different fraction of
+  // a point — so round it to whole pixels and place every measurement of one
+  // layout identically.
+  const frame = useMemo(
+    () => ({
+      top: PixelRatio.roundToNearestPixel(0),
+      bottom: PixelRatio.roundToNearestPixel(windowSize.height),
+    }),
+    [windowSize.height]
+  );
   const topInset = surface?.frame ? surface.topInset : 0;
   const bottomInset = surface?.frame ? surface.bottomInset : (surface?.bottomReservation ?? 0);
   const boundsBottom = surface?.frame ? surface.bounds?.bottom : frame.bottom;
@@ -171,7 +169,7 @@ export function CenteredState({
     }
     const measuredFrame = measured.frame;
     return getCenteredStateLayout({
-      surface: frame,
+      window: frame,
       viewport: measuredFrame,
       contentHeight,
       topInset,
@@ -189,21 +187,17 @@ export function CenteredState({
     topInset,
     viewport,
   ]);
-  // While the measured layout is pending, the fallback must still keep the band
-  // the surface reserved (the fixed tab bar) free: without it the body centers
-  // in the full viewport, which runs under the bar, and the bar clips the
-  // body's lower lines and its action. This padding is the only reservation —
-  // a caller that also shrinks the scroller frame by the same band clears it
-  // twice and pushes the body above the centre of the visible area.
-  const bottomReservation = surface?.bottomReservation ?? 0;
-  const contentStyle = useMemo(() => {
-    const style = layout ?? {
-      justifyContent: 'center' as const,
-      paddingTop: 16,
-      paddingBottom: 16 + bottomReservation,
-    };
-    return { flexGrow: 1, ...style };
-  }, [bottomReservation, layout]);
+  // While the measured layout is pending, the state paints with the layout
+  // engine's own centering and the same bottom reserve the measured layout
+  // applies, so the band the surface reserved (the fixed tab bar) stays free
+  // and the position it paints is the position the measurement confirms. This
+  // padding is the only reservation — a caller that also shrinks the scroller
+  // frame by the same band clears it twice and pushes the body above the centre
+  // of the visible area.
+  const contentStyle = useMemo(
+    () => ({ flexGrow: 1, ...(layout ?? getPendingCenteredStateStyle(bottomInset)) }),
+    [bottomInset, layout]
+  );
 
   if (!surface) {
     throw new Error('CenteredState requires a StateSurface');

@@ -299,7 +299,31 @@ describe('CenteredState measurements', () => {
     mounted.unmount();
   });
 
-  it('keeps a revealed state on screen and drops stale geometry after the surface changes', async () => {
+  it('keeps its placement when the surface frame changes under it', async () => {
+    // The band lives in the window, so a surface that re-measures — a returning
+    // scene re-attaching its host view, a native clip edge arriving late — is no
+    // reason to move a state that is already on screen.
+    const mounted = await mount();
+    mounted.settle(80, 340);
+    act(() => {
+      mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
+    });
+    const placed = mounted.scroll().contentContainerStyle;
+    const stale = native.measurements.splice(0);
+    native.surface.frame = { top: 300, bottom: 800 };
+    mounted.rerender();
+    expectPainted(mounted);
+    act(() => {
+      for (const onMeasure of stale) {
+        onMeasure(0, 80, 400, 340);
+      }
+    });
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
+    mounted.unmount();
+  });
+
+  it('drops a stale viewport when the window it was measured in changes', async () => {
     const mounted = await mount();
     mounted.settle();
     act(() => {
@@ -307,9 +331,9 @@ describe('CenteredState measurements', () => {
     });
     expect(mounted.scroll().contentContainerStyle).toMatchObject({ minHeight: 340 });
     const stale = native.measurements.splice(0);
-    native.surface.frame = { top: 300, bottom: 800 };
+    native.window = { width: 400, height: 700 };
     mounted.rerender();
-    // The band moved under the state: it still paints, at the pending
+    // The window changed under the state: it still paints, at the pending
     // placement, while it waits for a measurement of the new band.
     expectPainted(mounted);
     act(() => {
@@ -317,16 +341,18 @@ describe('CenteredState measurements', () => {
         onMeasure(0, 80, 400, 340);
       }
     });
-    // A viewport measured against the old frame is not reused for the new one.
+    // A viewport measured against the old window is not reused for the new one.
     expectPainted(mounted);
     expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
     mounted.settle(380, 340);
     expectPainted(mounted);
+    // Content taller than the shortened band scrolls from its top, and the
+    // bottom padding keeps the end of it reachable past the window clip.
     expect(mounted.scroll().contentContainerStyle).toEqual({
       flexGrow: 1,
       minHeight: 340,
       paddingTop: 16,
-      paddingBottom: 16,
+      paddingBottom: 36,
     });
     mounted.unmount();
   });
@@ -370,7 +396,7 @@ describe('CenteredState measurements', () => {
     mounted.unmount();
   });
 
-  it('keeps the state painted while the surface re-measures', async () => {
+  it('keeps the state painted and placed while the surface re-measures', async () => {
     const mounted = await mount();
     mounted.settle();
     expectPainted(mounted);
@@ -378,10 +404,10 @@ describe('CenteredState measurements', () => {
     const frame = native.surface.frame;
     native.surface.frame = null;
     mounted.rerender();
-    // The band is unknown for a moment: the state still paints, at the pending
-    // placement, instead of disappearing from the body.
+    // The surface has no frame for a moment: the state keeps painting in the
+    // window band it already measured, so it does not move.
     expectPainted(mounted);
-    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     native.surface.frame = frame;
     mounted.rerender();
     mounted.settle();

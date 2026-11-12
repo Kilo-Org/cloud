@@ -1,7 +1,7 @@
 export type StateFrame = Readonly<{ top: number; bottom: number }>;
 
 type CenteredStateLayoutInput = {
-  surface: StateFrame;
+  window: StateFrame;
   viewport: StateFrame;
   contentHeight: number;
   topInset?: number;
@@ -12,7 +12,6 @@ type CenteredStateLayoutInput = {
 };
 
 const STATE_GAP = 16;
-const PREFERRED_CLEARANCE = 48;
 
 export function getStateSurfaceInsets({
   surface,
@@ -80,25 +79,32 @@ export function intersectStateFrames(frame: StateFrame, clip: StateFrame): State
 }
 
 /**
- * The band a centered state may occupy: the measured viewport clipped to the
- * surface and to the reserved top/bottom insets. `getCenteredStateLayout`
+ * The band a centered state may occupy: the scroller's viewport clipped to the
+ * window and to the reserved top/bottom insets. `getCenteredStateLayout`
  * centers inside it; a state that cannot fit it renders its compact form, so
  * the two must read the same numbers.
+ *
+ * Both frames are window coordinates, the space `measureInWindow` reports, so
+ * the clip cannot move the band for a reason the state cannot see. The
+ * surface's own frame is not part of the band: it comes from the native
+ * observer, whose clip edges are measured in the window root's screen space and
+ * differ from the child frames by that root's offset on an edge-to-edge
+ * window.
  */
 export function getCenteredStateBand({
-  surface,
+  window,
   viewport,
   topInset = 0,
   bottomInset = 0,
 }: {
-  surface: StateFrame;
+  window: StateFrame;
   viewport: StateFrame;
   topInset?: number;
   bottomInset?: number;
 }) {
-  const visible = intersectStateFrames(viewport, surface);
-  const top = Math.max(visible.top, surface.top + topInset);
-  const bottom = Math.min(visible.bottom, surface.bottom - bottomInset);
+  const visible = intersectStateFrames(viewport, window);
+  const top = Math.max(visible.top, window.top + topInset);
+  const bottom = Math.min(visible.bottom, window.bottom - bottomInset);
   return { top, bottom, band: Math.max(0, bottom - top) };
 }
 
@@ -120,28 +126,30 @@ export function getBottomReservation({
 }
 
 export function getCenteredStateLayout({
-  surface,
+  window: windowFrame,
   viewport,
   contentHeight,
   topInset = 0,
   bottomInset = 0,
   nativeViewportFillsSurface = false,
-  nativeViewportBottom = surface.bottom,
+  nativeViewportBottom = windowFrame.bottom,
   roundToPixel = (value: number) => value,
 }: CenteredStateLayoutInput) {
   const viewportBottom = nativeViewportFillsSurface ? nativeViewportBottom : viewport.bottom;
   const { top, bottom } = getCenteredStateBand({
-    surface,
+    window: windowFrame,
     viewport,
     topInset,
     bottomInset,
   });
-  const idealTop = (surface.top + surface.bottom - contentHeight) / 2;
-  const fits = contentHeight <= roundToPixel(bottom - top);
-  const clearance = Math.min(PREFERRED_CLEARANCE, Math.max(0, (bottom - top - contentHeight) / 2));
-  const contentTop = fits
-    ? Math.max(top + clearance, Math.min(idealTop, bottom - contentHeight - clearance))
-    : top + STATE_GAP;
+  const bandHeight = bottom - top;
+  const fits = contentHeight <= roundToPixel(bandHeight);
+  // A state that fits centers in the band the scroller shows. The pending style
+  // (`getPendingCenteredStateStyle`) leaves that centering to the layout engine,
+  // so the first painted position already equals this one and a state that
+  // mounted before its band was measurable does not move when the measurement
+  // lands.
+  const contentTop = fits ? top + (bandHeight - contentHeight) / 2 : top + STATE_GAP;
 
   const paddingTop = Math.max(0, contentTop - viewport.top);
   const paddingBottom = fits
@@ -153,5 +161,21 @@ export function getCenteredStateLayout({
     minHeight: roundToPixel(Math.max(0, viewportBottom - viewport.top)),
     paddingTop: roundedPaddingTop,
     paddingBottom: roundToPixel(paddingTop + paddingBottom) - roundedPaddingTop,
+  };
+}
+
+/**
+ * The content style a centered state paints before its band and its content
+ * height are measurable: the layout engine centers the content in the scroller
+ * and the bottom reserve keeps it above the tab bar, which is the same placement
+ * `getCenteredStateLayout` computes for the band once the measurement lands.
+ * The top and bottom constants cancel in the centering, so only the bottom
+ * reserve moves the content.
+ */
+export function getPendingCenteredStateStyle(bottomInset: number) {
+  return {
+    justifyContent: 'center' as const,
+    paddingTop: STATE_GAP,
+    paddingBottom: STATE_GAP + bottomInset,
   };
 }

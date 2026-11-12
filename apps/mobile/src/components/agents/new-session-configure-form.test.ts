@@ -607,15 +607,16 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: true,
       runOnInstance: INSTANCE,
     });
-    // The bound instance already runs Kilo: the line names it instead of
-    // asking the person to start Kilo there.
+    // The bound instance already runs Kilo, and the Run on row and the Folder
+    // field above already name the computer, its project and its folder, so the
+    // slot stays empty instead of repeating them.
     expect(
       findTextContent(
         element,
         t => t === 'To run on your computer, start Kilo there and leave it running.'
       )
     ).toBe(false);
-    expect(findTextContent(element, t => t === 'laptop on kilo')).toBe(true);
+    expect(findTextContent(element, t => t === 'laptop on kilo')).toBe(false);
   });
 
   // ── Case 3b: a refused spawn resets the target, and the disconnected note owns the copy ──
@@ -1144,7 +1145,7 @@ describe('NewSessionConfigureForm', () => {
       showRunOnSelector: false,
     }) as Node;
     expect(findTextContent(remote, t => t === helpSentence)).toBe(false);
-    expect(findTextContent(remote, t => t === 'laptop on kilo')).toBe(true);
+    expect(findTextContent(remote, t => t === 'laptop on kilo')).toBe(false);
   });
 
   // ── Case 13: reorder wiring lock ──

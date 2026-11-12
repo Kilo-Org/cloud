@@ -343,21 +343,16 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
-      {/* Under the folder field: while the computer target has no instance, the
-          setup sentence; once one is bound, the instance the session runs on.
-          A bound instance already runs Kilo, so the setup sentence never sits
-          under it and contradicts the pick. A refused spawn resets the target
-          and raises the disconnected note, which owns that copy, so the setup
-          sentence stays away there too. The line keeps its place otherwise, so
-          the fields above do not move as the target changes. */}
-      {isRemote && (runOnInstance !== null || !showInstanceDisconnectedNote) ? (
+      {/* Under the folder field: only the computer target with no instance yet
+          carries the setup sentence, because that is the one state where it is
+          the instruction for connecting a computer. A bound instance already
+          runs Kilo, and the Run on row and Folder field above it already name
+          the computer, its project and its folder, so an empty slot repeats
+          nothing. A refused spawn resets the target and raises the
+          disconnected note, which owns that copy. */}
+      {isRemote && runOnInstance === null && !showInstanceDisconnectedNote ? (
         <Text className="mt-2 text-sm text-muted-foreground">
-          {runOnInstance === null
-            ? stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))
-            : t('agentChat.instancePicker.instanceOnProject', {
-                name: runOnInstance.name,
-                project: runOnInstance.projectName,
-              })}
+          {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
         </Text>
       ) : null}
 

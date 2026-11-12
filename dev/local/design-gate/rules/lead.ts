@@ -1,6 +1,13 @@
 import { finding, type Finding } from '../findings';
-import { bottom, contentBox, layoutRect, type LayoutNode, type LayoutTree } from '../tree';
-import { LEADING_GAP_MAX_DP } from './thresholds';
+import {
+  bottom,
+  contentBox,
+  layoutRect,
+  type LayoutNode,
+  type LayoutTree,
+  type ProbeEnv,
+} from '../tree';
+import { LEADING_GAP_MAX_DP, TOLERANCE_DP } from './thresholds';
 
 const fmt = (value: number) => `${Math.round(value * 10) / 10} dp`;
 
@@ -43,12 +50,49 @@ function oneSidedBox(ink: LayoutNode, block: LayoutNode): LayoutNode | undefined
 }
 
 /**
+ * Whether the content places its first block between two empty bands of its own
+ * box, the shape a screen that centres a body leaves behind. `CenteredState`
+ * centres through a measured `paddingTop` and `paddingBottom` on its scroll
+ * content, and a platform dump reports no styles: the padding is invisible, so
+ * the block reads as pushed down by a margin even though the content chose
+ * where it sits.
+ *
+ * The check runs only on a platform dump, where the styles are missing. A body
+ * that fills its scroller and keeps more than the allowance of air above the
+ * block and at least as much below it centres that block; it does not displace
+ * it. A block near the bottom keeps the finding, and so does a content that
+ * runs past the viewport: that is still a list whose first block sits where the
+ * screen put it.
+ */
+function centeredBody(
+  scroll: LayoutNode,
+  content: LayoutNode,
+  block: LayoutNode,
+  isRTL: boolean,
+  env: ProbeEnv
+): boolean {
+  if (env.source !== 'uiautomator' && env.source !== 'agent-device') return false;
+  const box = contentBox(content, isRTL, layoutRect(content));
+  const rect = layoutRect(block);
+  if (bottom(rect) > bottom(box) + TOLERANCE_DP) return false;
+  if (bottom(box) > bottom(layoutRect(scroll)) + TOLERANCE_DP) return false;
+  const above = rect[1] - box[1];
+  const below = bottom(box) - bottom(rect);
+  return above > LEADING_GAP_MAX_DP && below > LEADING_GAP_MAX_DP && below >= above - TOLERANCE_DP;
+}
+
+/**
  * The top of a vertically scrolling screen must start with what it shows. The
  * scroll content's own top padding is the screen's chosen gap below its header.
  * Two things add a hole under the title on top of it: a first block pushed down
  * by a margin, and a box in the first block that holds its content at its
  * bottom, usually a control's touch frame grown to the target size instead of
  * reaching it with `hitSlop`. Both are errors.
+ *
+ * A screen may also place its whole body in the middle of a filled surface on
+ * purpose (`CenteredState` does, with measured padding a platform dump cannot
+ * report). That is the content's choice, not a hole under the title, so
+ * `centeredBody` recognises it.
  */
 export function checkLeadingGap(tree: LayoutTree): Finding[] {
   const findings: Finding[] = [];
@@ -66,6 +110,7 @@ export function checkLeadingGap(tree: LayoutTree): Finding[] {
     const margin = layoutRect(block)[1] - start;
     const holder = margin > LEADING_GAP_MAX_DP ? undefined : oneSidedBox(ink, block);
     if (margin <= LEADING_GAP_MAX_DP && !holder) continue;
+    if (!holder && centeredBody(scroll, content, block, tree.env.isRTL, tree.env)) continue;
     const measured = layoutRect(ink)[1] - start;
     const cause = holder
       ? `${holder.path} holds it at the bottom of a taller box; reach a control's touch size with hitSlop instead of a taller box.`

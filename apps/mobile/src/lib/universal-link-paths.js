@@ -26,4 +26,5 @@ export const UNIVERSAL_LINK_PATH_PATTERNS = [
   '/pr-review/gitlab/.*',
   '/pr-review/bitbucket/.*',
   '/pr-review/.*/.*/.*',
+  '/s/.*',
 ];

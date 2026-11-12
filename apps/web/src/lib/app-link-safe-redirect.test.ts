@@ -50,7 +50,12 @@ describe('browserLandingPath', () => {
       '/organizations/*/security-agent/findings': '/organizations/o1/security-agent/findings',
       '/organizations/*/code-reviews': '/organizations/o1/code-reviews',
       '/organizations/*/code-reviews/*': '/organizations/o1/code-reviews/r2',
+<<<<<<< HEAD
       '/organizations/*': '/organizations/o1',
+||||||| b5436850d4
+=======
+      '/s/*': '/s/abc',
+>>>>>>> origin/main
     };
 
     for (const [pattern, concrete] of Object.entries(wildcardInstantiations)) {

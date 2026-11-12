@@ -147,6 +147,7 @@ const {
 const secret = 'test-secret';
 
 type MockEnv = {
+  CONTAINER_USAGE_METER?: { getBillingMode: ReturnType<typeof vi.fn> };
   BYOC_VERCEL_IDS?: string;
   VERCEL_SNAPSHOT_BUILD: { getByName: ReturnType<typeof vi.fn> };
   NEXTAUTH_SECRET: string;
@@ -2774,6 +2775,43 @@ describe('server preview host dispatch', () => {
     const previewHost = await fetchWorker(new Request(`http://${HOST}/preview/open`), env);
     expect(previewHost.status).toBe(401);
     expect(previewHost.headers.get('cache-control')).toBeNull();
+  });
+});
+
+describe('server code-review billing status', () => {
+  const path = 'http://worker.test/internal/code-review/billing/user/oauth%2Fprovider%2Fuser';
+
+  it('requires internal authentication', async () => {
+    expect((await fetchWorker(new Request(path), createEnv())).status).toBe(401);
+  });
+
+  it.each(['paid', 'shadow'] as const)('uses the meter decision: %s', async mode => {
+    const env = createEnv();
+    const getBillingMode = vi.fn().mockResolvedValue(mode);
+    env.CONTAINER_USAGE_METER = { getBillingMode };
+    const response = await fetchWorker(
+      new Request(path, {
+        headers: { 'x-internal-api-key': 'test-internal-secret' },
+      }),
+      env
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({ enabled: mode === 'paid' });
+    expect(getBillingMode).toHaveBeenCalledWith({
+      service: 'cloud-agent-next-sandbox-containers-code-review',
+      subject: { type: 'user', id: 'oauth/provider/user' },
+    });
+  });
+
+  it('rejects invalid owner types', async () => {
+    const response = await fetchWorker(
+      new Request(path.replace('/user/', '/bot/'), {
+        headers: { 'x-internal-api-key': 'test-internal-secret' },
+      }),
+      createEnv()
+    );
+    expect(response.status).toBe(400);
   });
 });
 

@@ -16,6 +16,7 @@ import {
   shareSession,
   SessionShareTooLargeError,
   unshareSession,
+  fetchSharedSession,
   fetchSharedSessionMetadata,
   fetchSharedSessionSnapshot,
   invalidateOrganizationSessionAccess,
@@ -718,6 +719,131 @@ describe('fetchSharedSessionSnapshot', () => {
       'Session ingest snapshot response was malformed'
     );
     expect(JSON.stringify(mockCaptureException.mock.calls)).not.toContain('secret.share.jwt.token');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchSharedSession
+// ---------------------------------------------------------------------------
+
+describe('fetchSharedSession', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCaptureException.mockReset();
+  });
+
+  const metadata = {
+    success: true,
+    title: 'Fix the redirect',
+    owner_name: 'Sam',
+    git_url: 'https://github.com/kilo/cloud.git',
+    git_branch: 'main',
+    created_at: '2026-11-01T10:00:00.000Z',
+  };
+
+  const transcriptMessage = {
+    info: {
+      id: 'msg_1',
+      sessionID: 'ses_test',
+      role: 'user',
+      time: { created: 1_700_000_000_000 },
+      agent: 'build',
+      model: { providerID: 'anthropic', modelID: 'claude' },
+    },
+    parts: [
+      {
+        id: 'prt_1',
+        sessionID: 'ses_test',
+        messageID: 'msg_1',
+        type: 'text',
+        text: 'hello',
+      },
+    ],
+  };
+
+  function respondPerRoute(snapshotResponse: unknown) {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.endsWith('/metadata')) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(metadata) });
+      }
+      return Promise.resolve(snapshotResponse);
+    });
+  }
+
+  it('returns the metadata and the renderable transcript', async () => {
+    respondPerRoute({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          info: {},
+          messages: [transcriptMessage, { info: { id: 'msg_2' }, parts: [] }],
+        }),
+    });
+
+    const shared = await fetchSharedSession('share.jwt.token');
+
+    expect(shared?.metadata).toEqual({
+      title: 'Fix the redirect',
+      ownerName: 'Sam',
+      gitUrl: 'https://github.com/kilo/cloud.git',
+      gitBranch: 'main',
+      createdAt: '2026-11-01T10:00:00.000Z',
+    });
+    expect(shared?.transcriptUnavailable).toBe(false);
+    expect(shared?.messages.map(message => message.info.id)).toEqual(['msg_1']);
+  });
+
+  it('returns null when the token names no live share', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 404, statusText: 'Not Found' });
+
+    await expect(fetchSharedSession('expired.jwt.token')).resolves.toBeNull();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('reads the metadata and the snapshot together, not one after the other', async () => {
+    const metadataGate = Promise.withResolvers<unknown>();
+    const snapshotGate = Promise.withResolvers<unknown>();
+    mockFetch.mockImplementation((url: string) =>
+      url.endsWith('/metadata') ? metadataGate.promise : snapshotGate.promise
+    );
+
+    const outcome = fetchSharedSession('share.jwt.token');
+    await Promise.resolve();
+
+    // Both requests are in flight before either answer exists. A sequential
+    // read would not have issued the snapshot request yet.
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    snapshotGate.resolve({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ info: {}, messages: [transcriptMessage] }),
+    });
+    metadataGate.resolve({ ok: true, status: 200, json: () => Promise.resolve(metadata) });
+
+    const shared = await outcome;
+    expect(shared?.messages.map(message => message.info.id)).toEqual(['msg_1']);
+  });
+
+  it('answers null for a dead link even when the snapshot read failed', async () => {
+    mockFetch.mockImplementation((url: string) =>
+      url.endsWith('/metadata')
+        ? Promise.resolve({ ok: false, status: 404, statusText: 'Not Found' })
+        : Promise.resolve({ ok: false, status: 500, statusText: 'Internal Server Error' })
+    );
+
+    await expect(fetchSharedSession('expired.jwt.token')).resolves.toBeNull();
+  });
+
+  it('keeps the session and flags the transcript when the snapshot read fails', async () => {
+    respondPerRoute({ ok: false, status: 503, statusText: 'Service Unavailable' });
+
+    const shared = await fetchSharedSession('share.jwt.token');
+
+    expect(shared?.metadata.ownerName).toBe('Sam');
+    expect(shared?.messages).toEqual([]);
+    expect(shared?.transcriptUnavailable).toBe(true);
   });
 });
 

@@ -92,6 +92,20 @@ export async function listInstructionsForProfile(
   return rows.map(toResponse);
 }
 
+/**
+ * A profile's instruction files for a caller who holds the profile, ownership
+ * checked. The profile editor's Instructions screen renders these and nothing
+ * else the profile carries.
+ */
+export async function getProfileInstructions(
+  db: WorkerDb,
+  profileId: string,
+  owner: ProfileOwner
+): Promise<ProfileInstructionResponse[]> {
+  await verifyProfileOwnership(db, profileId, owner);
+  return listInstructionsForProfile(db, profileId);
+}
+
 export async function createInstruction(
   db: WorkerDb,
   profileId: string,

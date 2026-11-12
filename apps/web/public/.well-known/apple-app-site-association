@@ -26,7 +26,8 @@
           { "/": "/organizations/*" },
           { "/": "/pr-review/gitlab/**" },
           { "/": "/pr-review/bitbucket/**" },
-          { "/": "/pr-review/*/*/*" }
+          { "/": "/pr-review/*/*/*" },
+          { "/": "/s/*" }
         ]
       }
     ]

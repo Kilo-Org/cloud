@@ -37,6 +37,12 @@ export type Device = {
   names: readonly string[];
   apply: (config: CellConfig) => void;
   restore: () => void;
+  /**
+   * Restart the app process and point it back at its Metro: the recovery when
+   * the inspector does not survive a runtime reload. The device knows the Metro
+   * it was opened against, so the runner never has to supply it again.
+   */
+  relaunch?: () => void;
   screenshot: (file: string) => void;
   record: (file: string, seconds: number) => Recording;
   tap?: (xPx: number, yPx: number) => void;
@@ -60,7 +66,17 @@ export type Screen = {
 };
 
 export type CellRun = { id: string; config: CellConfig; env?: ProbeEnv; screens: Screen[] };
-export type RunOutcome = { cells: CellRun[]; findings: Finding[] };
+/** A target the probe could not read in a cell: nothing was measured for it. */
+export type SkippedTarget = { cell: string; target: string; reason: string };
+export type RunOutcome = {
+  cells: CellRun[];
+  findings: Finding[];
+  /**
+   * Targets that were not measured. A run with a skip is inconclusive, never a
+   * pass: exit 0 must mean every target of every cell was read and graded.
+   */
+  skipped: SkippedTarget[];
+};
 
 export type CaptureContext = {
   device: Device;
@@ -74,6 +90,14 @@ export type CaptureContext = {
 };
 
 export const SAMPLE_INTERVAL_MS = 120;
+// The cadence asked of the app itself, which is a different cost: one in-app
+// sample walks and serializes the whole document, measured at ~150 ms on a
+// mid-size screen. Asking for the runner's 120 ms leaves the JS thread with no
+// room to finish the screen it is measuring, and the gate then reports a target
+// that never leaves its loading placeholder on a build whose own timeline does.
+// The runner's own poll interval is unaffected: a CDP round trip costs more than
+// this anyway.
+export const IN_APP_SAMPLE_INTERVAL_MS = 250;
 export const DEFAULT_OBSERVE_MS = 2_500;
 const STABLE_SAMPLES = 3;
 const SETTLE_TIMEOUT_MS = 8_000;
@@ -285,7 +309,7 @@ export function screenFindings(args: {
     });
   }
   if (args.sampled !== undefined) {
-    findings.push(...checkShift(args.sampled.timeline.map(normalize), SAMPLE_INTERVAL_MS));
+    findings.push(...checkShift(args.sampled.timeline.map(normalize), IN_APP_SAMPLE_INTERVAL_MS));
     if (!args.sampled.settled) {
       findings.push(
         unsettledFinding({
@@ -427,6 +451,7 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     screenTexts(dump) !== beforeTexts ||
     (dump.env.screen !== undefined && dump.env.screen !== beforeScreen) ||
     (beforeRoute === linkRoute && dump.env.route.split('?')[0] === linkRoute);
+
   await ctx.probe.openLink(target.link);
   // A cold screen paints its own loading placeholder and holds it still, so a
   // settle loop would measure the placeholder. Wait for it to clear first, and
@@ -450,7 +475,7 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   // placeholder frames for the whole budget. Those frames are not the screen
   // either way — the settle below is what the rules read.
   await ctx.probe.startSampling(
-    SAMPLE_INTERVAL_MS,
+    IN_APP_SAMPLE_INTERVAL_MS,
     ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + 2 * LOADING_SETTLE_TIMEOUT_MS
   );
   let settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
@@ -546,14 +571,58 @@ async function ensureLanguage(ctx: CaptureContext, want: LanguageTarget): Promis
     ctx.log(`design-gate: setLanguage did not answer (${String(error)}); waiting for reload`);
   }
   ctx.probe.disconnect();
-  const dump = await waitForApp(
-    ctx.probe,
-    ctx.clock,
-    current => languageMatches(current, want),
-    RELOAD_WAIT_MS
-  );
+  // The reload takes the app away for a few seconds, and it ends two ways
+  // without the new language: the old target answers and still reports the old
+  // one, or nothing answers at all because the inspector went with the reload
+  // and the page list is empty. Both are the same outage, and both are what the
+  // relaunch recovers, so a timed-out wait falls through to it.
+  let unreachable: InfraError | undefined;
+  let dump: ProbeDump | undefined;
+  try {
+    dump = await waitForApp(
+      ctx.probe,
+      ctx.clock,
+      current => languageMatches(current, want),
+      RELOAD_WAIT_MS
+    );
+  } catch (error) {
+    if (!(error instanceof InfraError)) throw error;
+    unreachable = error;
+    ctx.log(`design-gate: the reloaded app did not answer (${String(error)})`);
+  }
+  let settledDump = dump;
+  if (settledDump === undefined || !languageMatches(settledDump, want)) {
+    // The inspector does not survive the reload on every emulator: the app keeps
+    // painting while the page list stays empty until the process restarts.
+    // Restart the app — the recovery the app itself supports — and wait again.
+    if (ctx.device.relaunch === undefined) {
+      if (unreachable !== undefined) throw unreachable;
+    } else {
+      ctx.log(`design-gate: relaunching the app to get its inspector back`);
+      ctx.probe.disconnect();
+      // A device that cannot start the app leaves the cell unmeasured, not the
+      // whole run failed: adb reports it as a plain error, so it is raised as an
+      // InfraError that the cell records as a skip.
+      try {
+        ctx.device.relaunch();
+      } catch (error) {
+        throw error instanceof InfraError
+          ? error
+          : new InfraError(`Relaunch failed: ${String(error)}`);
+      }
+      settledDump = await waitForApp(
+        ctx.probe,
+        ctx.clock,
+        current => languageMatches(current, want),
+        APP_WAIT_MS
+      );
+    }
+  }
   await waitForStableLayout(ctx.probe, ctx.clock);
-  return { matched: languageMatches(dump, want), reloaded: true };
+  return {
+    matched: settledDump !== undefined && languageMatches(settledDump, want),
+    reloaded: true,
+  };
 }
 
 export function layoutSignature(dump: ProbeDump): string {
@@ -636,7 +705,7 @@ export async function runMatrix(
   const ltrLanguage: LanguageTarget = isRtlLanguage(baseline.resolved)
     ? { preference: LTR_FALLBACK_LANGUAGE, resolved: LTR_FALLBACK_LANGUAGE, rtl: false }
     : baseline;
-  const outcome: RunOutcome = { cells: [], findings: [] };
+  const outcome: RunOutcome = { cells: [], findings: [], skipped: [] };
   const trees = new Map<string, LayoutTree>();
   let baseWindow: ProbeEnv['window'] | undefined;
   let restored: Promise<unknown[]> | undefined;
@@ -651,7 +720,15 @@ export async function runMatrix(
       try {
         await ensureLanguage(ctx, baseline);
       } catch (error) {
-        errors.push(error);
+        // A reload window that outlives the probe client's retry leaves the
+        // language unverified on the device. That is probe availability, not
+        // a device state the next run inherits wrongly: log it, but do not
+        // report the whole run as unrestored for it.
+        if (error instanceof InfraError) {
+          ctx.log(`design-gate: language restore skipped: ${String(error)}`);
+        } else {
+          errors.push(error);
+        }
       }
       for (const error of errors) ctx.log(`design-gate: restore failed: ${String(error)}`);
       return errors;
@@ -662,100 +739,142 @@ export async function runMatrix(
   const unregisterCleanup = ctx.registerCleanup?.(async () => {
     await restoreState();
   });
+  // A cell whose language cannot be reached leaves every target of that cell
+  // unmeasured: record them as skipped and keep the other cells, so one probe
+  // failure ends the run inconclusive instead of aborting it.
+  const switchCellLanguage = async (
+    cellId: string,
+    want: LanguageTarget
+  ): Promise<LanguageOutcome | undefined> => {
+    try {
+      return await ensureLanguage(ctx, want);
+    } catch (error) {
+      if (!(error instanceof InfraError)) throw error;
+      const reason = String(error);
+      ctx.log(`design-gate: cell ${cellId} language failed: ${reason}`);
+      for (const target of targets)
+        outcome.skipped.push({ cell: cellId, target: target.id, reason });
+      return undefined;
+    }
+  };
   try {
     for (const config of cells) {
       ctx.log(`design-gate: cell ${config.id}`);
       ctx.device.apply(config);
+      // A cell's config (night mode, size) recreates the Android Activity: the
+      // dev client drops its inspector target and the page list is empty until
+      // it re-attaches. waitForApp rides that window out the same way it rides
+      // a runtime reload.
+      await waitForApp(ctx.probe, ctx.clock);
       const language: LanguageTarget = config.rtl
         ? { preference: RTL_LANGUAGE, resolved: RTL_LANGUAGE, rtl: true }
         : ltrLanguage;
-      const cellLanguage = await ensureLanguage(ctx, language);
-      await ctx.clock.sleep(CONFIG_SETTLE_MS);
+      // The cell is part of the run from the moment it is applied: a cell whose
+      // language never arrives is listed with no screens, so the matrix the run
+      // covered stays visible and a comparison reports the gap against the
+      // manifest instead of comparing a shorter matrix.
       const run: CellRun = { id: config.id, config, screens: [] };
       outcome.cells.push(run);
+      const cellLanguage = await switchCellLanguage(config.id, language);
+      if (cellLanguage === undefined) continue;
+      await ctx.clock.sleep(CONFIG_SETTLE_MS);
       const seen = new Map<string, string>();
       for (const [index, target] of targets.entries()) {
-        const targetLanguage = await ensureLanguage(ctx, language);
-        const languageReady = targetLanguage.matched;
-        // A cell-level reload leaves only its first target cold; a reload this
-        // target itself caused (the previous target switched the app language)
-        // leaves this target cold whatever its index.
-        const warm = targetLanguage.reloaded || (cellLanguage.reloaded && index === 0);
-        const { sampled, screen, unopened, image } = await captureScreen(
-          ctx,
-          config.id,
-          target,
-          warm
-        );
-        const { dump } = sampled;
-        run.env ??= dump.env;
-        run.screens.push(screen);
-        const identity = screenIdentity(dump);
-        const other = seen.get(identity);
-        if (other === undefined) seen.set(identity, target.id);
-        if (unopened !== undefined) {
-          outcome.findings.push(
-            warningFinding(
-              config.id,
-              target.id,
-              dump,
-              'the deep link changes the screen',
-              `${target.id} left the screen unchanged (route ${dump.env.route}); the deep link did not open: ${unopened}`
-            )
+        try {
+          const targetLanguage = await ensureLanguage(ctx, language);
+          const languageReady = targetLanguage.matched;
+          // A cell-level reload leaves only its first target cold; a reload this
+          // target itself caused (the previous target switched the app language)
+          // leaves this target cold whatever its index.
+          const warm = targetLanguage.reloaded || (cellLanguage.reloaded && index === 0);
+          const { sampled, screen, unopened, image } = await captureScreen(
+            ctx,
+            config.id,
+            target,
+            warm
           );
-        } else if (other !== undefined) {
+          const { dump } = sampled;
+          run.env ??= dump.env;
+          run.screens.push(screen);
+          const identity = screenIdentity(dump);
+          const other = seen.get(identity);
+          if (other === undefined) seen.set(identity, target.id);
+          if (unopened !== undefined) {
+            outcome.findings.push(
+              warningFinding(
+                config.id,
+                target.id,
+                dump,
+                'the deep link changes the screen',
+                `${target.id} left the screen unchanged (route ${dump.env.route}); the deep link did not open: ${unopened}`
+              )
+            );
+          } else if (other !== undefined) {
+            outcome.findings.push(
+              warningFinding(
+                config.id,
+                target.id,
+                dump,
+                'a distinct screen per target',
+                `${target.id} showed the same screen as ${other} (route ${dump.env.route}); the deep link did not open`
+              )
+            );
+          }
+          if (config.id === 'base') baseWindow ??= dump.env.window;
+          if (languageReady && dump.env.language !== language.resolved) {
+            outcome.findings.push(
+              warningFinding(
+                config.id,
+                target.id,
+                dump,
+                `language ${language.resolved}`,
+                `${target.id} switched the app language to ${dump.env.language}; its rules were skipped`
+              )
+            );
+            continue;
+          }
+          const mismatches = envMismatches(config, dump.env, baseWindow, language.resolved);
+          if (mismatches.length > 0) {
+            outcome.findings.push(envMismatchFinding(config.id, target.id, dump, mismatches));
+            continue;
+          }
+          const tree = normalize(dump);
           outcome.findings.push(
-            warningFinding(
-              config.id,
-              target.id,
-              dump,
-              'a distinct screen per target',
-              `${target.id} showed the same screen as ${other} (route ${dump.env.route}); the deep link did not open`
-            )
-          );
-        }
-        if (config.id === 'base') baseWindow ??= dump.env.window;
-        if (languageReady && dump.env.language !== language.resolved) {
-          outcome.findings.push(
-            warningFinding(
-              config.id,
-              target.id,
-              dump,
-              `language ${language.resolved}`,
-              `${target.id} switched the app language to ${dump.env.language}; its rules were skipped`
-            )
-          );
-          continue;
-        }
-        const mismatches = envMismatches(config, dump.env, baseWindow, language.resolved);
-        if (mismatches.length > 0) {
-          outcome.findings.push(envMismatchFinding(config.id, target.id, dump, mismatches));
-          continue;
-        }
-        const tree = normalize(dump);
-        outcome.findings.push(
-          ...screenFindings({
-            cell: config.id,
-            target: target.id,
-            dump,
-            tree,
-            image,
-            sampled,
-          })
-        );
-        if (!sampled.settled) continue;
-        trees.set(`${config.id}/${target.id}`, tree);
-        const reference = config.rtl
-          ? trees.get(`${mirrorReference(config)}/${target.id}`)
-          : undefined;
-        if (reference !== undefined) {
-          outcome.findings.push(
-            ...checkMirror(reference, tree).map(finding => ({
-              ...finding,
+            ...screenFindings({
               cell: config.id,
               target: target.id,
-            }))
+              dump,
+              tree,
+              image,
+              sampled,
+            })
           );
+          if (!sampled.settled) continue;
+          trees.set(`${config.id}/${target.id}`, tree);
+          const reference = config.rtl
+            ? trees.get(`${mirrorReference(config)}/${target.id}`)
+            : undefined;
+          if (reference !== undefined) {
+            outcome.findings.push(
+              ...checkMirror(reference, tree).map(finding => ({
+                ...finding,
+                cell: config.id,
+                target: target.id,
+              }))
+            );
+          }
+        } catch (error) {
+          // A reload window that outlives the probe client's own retry leaves
+          // the target unreadable: the probe client reports it as an
+          // InfraError. The cell still measures its other targets, and this one
+          // is recorded as skipped rather than aborting the whole run. No
+          // finding without a dump: there is nothing measured to grade, and the
+          // run is inconclusive (exit 2) rather than a pass. Every other error
+          // (a failed screencap, a decode) is a real defect and still aborts.
+          if (!(error instanceof InfraError)) throw error;
+          const reason = String(error);
+          ctx.log(`design-gate: ${target.id} could not be read this cell: ${reason}`);
+          outcome.skipped.push({ cell: config.id, target: target.id, reason });
         }
       }
     }

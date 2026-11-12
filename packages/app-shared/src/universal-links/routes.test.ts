@@ -80,6 +80,10 @@ const ROW_CASES = [
     path: '/pr-review/acme/api/42',
     app: '/(app)/pr-review/acme/api/42',
   },
+  {
+    path: '/s/share-token-opaque',
+    app: '/(app)/shared/share-token-opaque',
+  },
 ] as const;
 
 describe('UNIVERSAL_LINK_ROUTES', () => {
@@ -306,7 +310,8 @@ describe('deliberately unmapped paths', () => {
     '/vscode-marketplace',
     '/claw',
     '/claw/chat/conv_1',
-    '/s/sess_1',
+    // The legacy `/share/<shareId>` blob viewer stays on the web: mobile has no
+    // v1 transcript renderer, and the link opens in the browser instead.
     '/share/sh_1',
     '/',
     '/login',
@@ -366,8 +371,16 @@ describe('parseKiloWebPath', () => {
 });
 
 describe('aasaComponents', () => {
+<<<<<<< HEAD
   it('returns 23 entries (18 rows + 5 exclusions)', () => {
     expect(aasaComponents()).toHaveLength(23);
+||||||| b5436850d4
+  it('returns 19 entries (17 rows + 2 exclusions)', () => {
+    expect(aasaComponents()).toHaveLength(19);
+=======
+  it('returns 20 entries (18 rows + 2 exclusions)', () => {
+    expect(aasaComponents()).toHaveLength(20);
+>>>>>>> origin/main
   });
 
   it('every entry has a "/" key', () => {
@@ -462,6 +475,7 @@ describe('androidPathPatterns', () => {
       '/pr-review/gitlab/.*',
       '/pr-review/bitbucket/.*',
       '/pr-review/.*/.*/.*',
+      '/s/.*',
     ]);
   });
 

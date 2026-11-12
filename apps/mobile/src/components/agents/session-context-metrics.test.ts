@@ -236,9 +236,10 @@ describe('SessionContextMetrics', () => {
     const runs = findAll(pill, el => propsOf(el).numberOfLines === 1);
     expect(runs).toHaveLength(2);
     const [percentage, cost] = runs;
-    expect(classNameOf(percentage ?? root)).toContain('shrink-0');
-    expect(classNameOf(cost ?? root)).toContain('shrink');
-    expect(classNameOf(cost ?? root)).toContain('min-w-0');
+    expect(classNameOf(percentage ?? root).split(' ')).toContain('shrink-0');
+    const costClasses = classNameOf(cost ?? root).split(' ');
+    expect(costClasses).not.toContain('shrink-0');
+    expect(costClasses).toEqual(expect.arrayContaining(['shrink', 'min-w-0']));
   });
 
   // A transcript that reports no usage and no cost paints a bare ring: the pill

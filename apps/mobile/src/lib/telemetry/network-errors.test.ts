@@ -160,6 +160,21 @@ describe('readTrpcErrorContext', () => {
     });
   });
 
+  it('reads a top-level code only when it names a tRPC error code', () => {
+    // The edge firewall's block page puts a status in `code`; a real tRPC body
+    // puts one of tRPC's code names there.
+    expect(readTrpcErrorContext({ code: '403' })).toEqual({
+      code: undefined,
+      httpStatus: undefined,
+      path: undefined,
+    });
+    expect(readTrpcErrorContext({ code: 'FORBIDDEN' })).toEqual({
+      code: 'FORBIDDEN',
+      httpStatus: undefined,
+      path: undefined,
+    });
+  });
+
   it('returns an empty context for an unrecognized value', () => {
     expect(readTrpcErrorContext('not an error')).toEqual({
       code: undefined,
@@ -647,22 +662,31 @@ describe('createNetworkErrorFetch', () => {
     });
   });
 
-  it('(i4) falls back to the URL remainder when the body names no procedure', async () => {
+  it('(i4) names a batch whose body names no item once, not after its procedures', async () => {
     const response = Response.json([{ error: { data: { code: 'TIMEOUT', path: '' } } }], {
       status: 207,
     });
-    const wrapped = createNetworkErrorFetch(resolvingFetch(response), {
-      source: 'trpc',
-      isResponseError: status => status >= 400 || status === 207,
-      readResponseError: readTrpcResponseError,
-    });
+    const report = async (procedures: string) => {
+      const wrapped = createNetworkErrorFetch(resolvingFetch(response), {
+        source: 'trpc',
+        isResponseError: status => status >= 400 || status === 207,
+        readResponseError: readTrpcResponseError,
+      });
+      await wrapped(`https://example.com/api/trpc/${procedures}?batch=1`, { method: 'POST' });
+      return reportedEvent();
+    };
 
-    await wrapped('https://example.com/api/trpc/a.b,c.d?batch=1', { method: 'POST' });
+    const first = await report('a.b,c.d');
+    // Each shape is another process's first report of this outcome.
+    resetNetworkErrorReports();
+    const second = await report('b.e,c.d,d.f');
 
-    const event = reportedEvent();
-    expect(event?.tags).toMatchObject({ 'trpc.procedure': 'a.b,c.d' });
-    expect(event?.fingerprint).toEqual(['network-error', 'trpc', 'a.b,c.d', 'TIMEOUT']);
-    expect(errorMessageOf(event)).toBe('POST /api/trpc/a.b,c.d -> TIMEOUT');
+    expect(first?.tags).toMatchObject({ 'trpc.procedure': '<batch>' });
+    expect(first?.fingerprint).toEqual(['network-error', 'trpc', '<batch>', 'TIMEOUT']);
+    expect(errorMessageOf(first)).toBe('POST /api/trpc/<batch> -> TIMEOUT');
+    // The procedures a batch carries are its composition, not the defect: the
+    // same outcome from another combination is the same issue.
+    expect(second?.fingerprint).toEqual(first?.fingerprint);
   });
 
   it('(j) ignores a 207 when no options opt it in', async () => {
@@ -805,6 +829,32 @@ describe('createNetworkErrorFetch status policy', () => {
     expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
       'POST /api/trpc/user.getMe -> 403',
     ]);
+  });
+
+  it('leaves an edge-firewall 403 whose body wraps a status in `code` as a breadcrumb', async () => {
+    // KILO-APP-3E5 and its siblings: the firewall answers a blocked region with
+    // this body, and "403" is a status, not a tRPC code, so no app code failed.
+    await respond(
+      'https://example.com/api/trpc/user.getMe,user.getSettings?batch=1',
+      Response.json({ error: { code: '403' } }, { status: 403 })
+    );
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
+      'POST /api/trpc/<batch> -> 403',
+    ]);
+  });
+
+  it('reports a 403 whose body carries a tRPC error code', async () => {
+    await respond(
+      'https://example.com/api/trpc/user.getMe?batch=1',
+      Response.json({ error: { code: 'FORBIDDEN' } }, { status: 403 })
+    );
+
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'trpc', 'user.getMe', 'http.403'],
+    ]);
+    expect(breadcrumbs).toHaveLength(0);
   });
 
   it('reports a 403 that a tRPC procedure returned, direct or batched', async () => {

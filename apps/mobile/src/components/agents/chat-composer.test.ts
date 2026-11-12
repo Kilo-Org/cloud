@@ -868,19 +868,23 @@ describe('ChatComposer reduced motion', () => {
 });
 
 describe('ChatComposer toolbar row', () => {
+  function maxHeightOf(style: unknown): number | null {
+    if (typeof style !== 'object' || style === null || !('maxHeight' in style)) {
+      return null;
+    }
+    const value: unknown = style.maxHeight;
+    return typeof value === 'number' ? value : null;
+  }
+
   function toolbarRow(render: React.ReactElement) {
     const row = findNode(
       render,
-      (type, props) =>
-        type === 'Animated.View' &&
-        typeof props.style === 'object' &&
-        props.style !== null &&
-        typeof props.style.maxHeight === 'number'
+      (type, props) => type === 'Animated.View' && maxHeightOf(props.style) !== null
     );
     if (row === null) {
       return null;
     }
-    return { maxHeight: row.props.style.maxHeight as number };
+    return { maxHeight: maxHeightOf(row.props.style) ?? 0 };
   }
 
   it('keeps the row while the chip is available, whatever the keyboard does', async () => {

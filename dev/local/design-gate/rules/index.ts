@@ -3,6 +3,7 @@ import type { Rgba } from '../pixels';
 import type { LayoutTree } from '../tree';
 import { checkInkCentering } from './ink';
 import { checkInsetAsymmetry } from './inset';
+import { checkLeadingGap } from './lead';
 import {
   checkClipped,
   checkCutOff,
@@ -28,5 +29,6 @@ export function checkScreen(tree: LayoutTree, image?: Rgba): Finding[] {
     ...checkTouchTargets(tree),
     ...checkInsetAsymmetry(tree),
     ...checkSafeArea(tree),
+    ...checkLeadingGap(tree),
   ];
 }

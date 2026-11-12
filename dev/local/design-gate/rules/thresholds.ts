@@ -18,3 +18,9 @@ export const INSET_MIN_ASYMMETRY_DP = 2;
 export const INSET_ASYMMETRY_RATIO = 0.15;
 export const INSET_MAX_HEIGHT_SHARE = 0.5;
 export const INSET_MIN_WIDTH_SHARE = 0.6;
+/**
+ * Empty space allowed between a scrolling screen's top padding and its first
+ * painted node. Above it, a box that draws nothing (a control's touch frame,
+ * usually) is adding a hole under the header.
+ */
+export const LEADING_GAP_MAX_DP = 12;

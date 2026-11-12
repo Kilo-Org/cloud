@@ -288,27 +288,16 @@ function snapshotAllowed(
 }
 
 /**
- * True when a snapshot of this query may enter the persisted cache: an
- * allowlisted key whose input and payload the entry accepts, holding the first
- * page only.
+ * True when a snapshot of this query may enter — or leave — the persisted
+ * cache: an allowlisted key whose input and payload the entry accepts, holding
+ * the first page only. The restore applies the same rule, so a stored entry the
+ * write path would not keep never hydrates.
  */
 function isPersistableSnapshot(
   queryKey: unknown,
   state: { status: string; data: unknown }
 ): boolean {
   return snapshotAllowed(admittedProcedure, queryKey, state);
-}
-
-/**
- * True when a stored snapshot may hydrate. The restore checks the query path
- * and the payload rule; the input shape was validated when the entry was
- * written, and serialization drops `undefined` fields.
- */
-function isRestorableSnapshot(
-  queryKey: unknown,
-  state: { status: string; data: unknown }
-): boolean {
-  return snapshotAllowed(allowedProcedureFor, queryKey, state);
 }
 
 /** Persist only successful queries whose snapshot this build restores. */
@@ -392,7 +381,7 @@ let coldStartRestoredScope: string | null = null;
  */
 function withoutUnrestorableQueries(persisted: PersistedClient): PersistedClient {
   const { queries } = persisted.clientState;
-  const restorable = queries.filter(query => isRestorableSnapshot(query.queryKey, query.state));
+  const restorable = queries.filter(query => isPersistableSnapshot(query.queryKey, query.state));
   if (restorable.length === queries.length) {
     return persisted;
   }

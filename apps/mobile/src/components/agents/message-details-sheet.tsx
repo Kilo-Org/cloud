@@ -1,6 +1,5 @@
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { useMutation } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -10,7 +9,6 @@ import { getLanguageSnapshot } from '@/i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { reportReceiptRoute } from '@/lib/report-receipt-route';
 import { useTRPC } from '@/lib/trpc';
 import { SheetHeader } from '@/components/sheet-header';
 import { Text } from '@/components/ui/text';
@@ -70,7 +68,6 @@ export function MessageDetailsSheet({
   const colors = useThemeColors();
   const trpc = useTRPC();
   const { t } = useTranslation();
-  const router = useRouter();
   const { confirm, dialog } = useConfirmDialog();
   const [reportedMessageId, setReportedMessageId] = useState<string | null>(null);
   const [selectVisible, setSelectVisible] = useState(false);
@@ -88,19 +85,7 @@ export function MessageDetailsSheet({
     trpc.moderation.reportContent.mutationOptions({
       onSuccess: (result, input) => {
         setReportedMessageId(input.targetId);
-        const receiptId = result.receiptId;
-        announcingToast.success(reportAiResponseSubmittedToast(receiptId), {
-          action: {
-            label: t('profile.reportReceipt.viewReceipt'),
-            onClick: () => {
-              // The receipt is a pushed screen and this sheet is a native one on
-              // top of it, so the sheet closes first: the push then lands on the
-              // session the sheet covered instead of underneath it.
-              onClose();
-              router.push(reportReceiptRoute(receiptId));
-            },
-          },
-        });
+        announcingToast.success(reportAiResponseSubmittedToast(result.receiptId));
       },
       onError: (error, input) => {
         const failure = classifyReportAiResponseFailure(error);

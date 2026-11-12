@@ -1,6 +1,6 @@
 import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -102,7 +102,9 @@ export function LoginMethodsScreen() {
       },
       // The server's message is the account of why it refused (the last method),
       // so it is shown as written.
-      onError: error => setUnlinkError(error.message),
+      onError: error => {
+        setUnlinkError(error.message);
+      },
     })
   );
 
@@ -112,11 +114,13 @@ export function LoginMethodsScreen() {
       title: t('profile.signInMethods.unlinkTitle', { provider: label }),
       message: t('profile.signInMethods.unlinkMessage', { provider: label }),
       confirmLabel: t('profile.signInMethods.unlink'),
-      onConfirm: () => unlink.mutate({ provider }),
+      onConfirm: () => {
+        unlink.mutate({ provider });
+      },
     });
   };
 
-  let body;
+  let body: ReactNode = null;
   if (providers.isPending) {
     body = (
       <View className="gap-3">
@@ -146,7 +150,9 @@ export function LoginMethodsScreen() {
             provider={provider.provider}
             email={provider.email}
             disabled={unlink.isPending}
-            onUnlink={() => confirmUnlink(provider.provider)}
+            onUnlink={() => {
+              confirmUnlink(provider.provider);
+            }}
           />
         ))}
       </View>

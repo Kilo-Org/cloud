@@ -1,6 +1,6 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -128,7 +128,9 @@ export function DataExportScreen() {
           t('profile.dataExport.codeSent', { minutes: result.expiresInMinutes })
         );
       },
-      onError: error => setCodeError(error.message),
+      onError: error => {
+        setCodeError(error.message);
+      },
     })
   );
 
@@ -142,7 +144,9 @@ export function DataExportScreen() {
           toast.error(getDataExportFailureMessage(error));
         }
       },
-      onError: error => setCodeError(error.message),
+      onError: error => {
+        setCodeError(error.message);
+      },
     })
   );
 
@@ -183,7 +187,7 @@ export function DataExportScreen() {
     );
   }
 
-  let body;
+  let body: ReactNode = null;
   if (exportsQuery.isPending) {
     body = (
       <View className="gap-3">
@@ -244,7 +248,9 @@ export function DataExportScreen() {
           className={STATE_ACTION_CLASS}
           loading={request.isPending}
           disabled={request.isPending}
-          onPress={() => request.mutate(undefined)}
+          onPress={() => {
+            request.mutate(undefined);
+          }}
         >
           <FileText size={16} />
           <Text>{t('profile.dataExport.request')}</Text>

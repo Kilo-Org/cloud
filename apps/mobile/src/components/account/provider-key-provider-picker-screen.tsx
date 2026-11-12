@@ -2,7 +2,7 @@ import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobil
 import { useQuery } from '@tanstack/react-query';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, type TextInput, View, type ViewStyle } from 'react-native';
 
@@ -77,7 +77,9 @@ export function ProviderKeyProviderPickerScreen() {
   const filtered = useMemo(() => {
     const rows = providers.data ?? [];
     const needle = query.trim().toLowerCase();
-    if (needle === '') return rows;
+    if (needle === '') {
+      return rows;
+    }
     return rows.filter(
       provider => provider.name.toLowerCase().includes(needle) || provider.id.includes(needle)
     );
@@ -88,7 +90,7 @@ export function ProviderKeyProviderPickerScreen() {
     []
   );
 
-  let body;
+  let body: ReactNode = null;
   if (providers.isPending) {
     body = (
       <View className="gap-2 px-4 pt-3">

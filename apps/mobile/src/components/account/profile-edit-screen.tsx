@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -157,7 +157,7 @@ export function ProfileEditScreen() {
   const trpc = useTRPC();
   const links = useQuery(trpc.user.getProfileLinks.queryOptions());
 
-  let body;
+  let body: ReactNode = null;
   if (links.isPending) {
     body = (
       <View className="gap-6">

@@ -1,7 +1,7 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -188,7 +188,7 @@ export function ProviderKeysScreen() {
     });
   };
 
-  let body;
+  let body: ReactNode = null;
   if (keys.isPending) {
     body = (
       <View className="gap-3">
@@ -224,7 +224,9 @@ export function ProviderKeysScreen() {
             onToggle={enabled => {
               setEnabled.mutate({ id: providerKey.id, is_enabled: enabled });
             }}
-            onDelete={() => confirmRemove(providerKey)}
+            onDelete={() => {
+              confirmRemove(providerKey);
+            }}
           />
         ))}
       </View>
@@ -247,7 +249,9 @@ export function ProviderKeysScreen() {
           <Button
             variant="outline"
             className={STATE_ACTION_CLASS}
-            onPress={() => router.push(ADD_KEY_ROUTE)}
+            onPress={() => {
+              router.push(ADD_KEY_ROUTE);
+            }}
           >
             <Plus size={16} />
             <Text>{t('profile.providerKeys.add')}</Text>

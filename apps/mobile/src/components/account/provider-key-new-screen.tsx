@@ -60,7 +60,9 @@ export function ProviderKeyNewScreen() {
       },
       // The server applies the same credential rules it applies to every stored
       // key, so its message is the specific account of the refusal.
-      onError: error => setSubmitError(error.message),
+      onError: error => {
+        setSubmitError(error.message);
+      },
     })
   );
 

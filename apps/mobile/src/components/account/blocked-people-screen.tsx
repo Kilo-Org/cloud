@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -57,7 +58,6 @@ function HiddenLoginsSection({
   actionLabel,
   actionA11y,
   busyLogin,
-  pending,
   onAction,
 }: Readonly<{
   title: string;
@@ -65,7 +65,6 @@ function HiddenLoginsSection({
   actionLabel: string;
   actionA11y: (login: string) => string;
   busyLogin: string | null;
-  pending: boolean;
   onAction: (login: string) => void;
 }>) {
   if (logins.length === 0) {
@@ -83,8 +82,10 @@ function HiddenLoginsSection({
             login={login}
             actionLabel={actionLabel}
             actionA11y={actionA11y(login)}
-            busy={pending && busyLogin === login}
-            onAction={() => onAction(login)}
+            busy={busyLogin === login}
+            onAction={() => {
+              onAction(login);
+            }}
           />
         ))}
       </View>
@@ -105,6 +106,7 @@ export function BlockedPeopleScreen() {
   const { t } = useTranslation();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const [busyLogin, setBusyLogin] = useState<string | null>(null);
   const listKey = trpc.moderation.listHiddenUsers.queryKey();
   const hidden = useQuery(trpc.moderation.listHiddenUsers.queryOptions());
 
@@ -117,6 +119,9 @@ export function BlockedPeopleScreen() {
         announcingToast.success(t('profile.blockedPeople.unblocked', { login: input.githubLogin }));
       },
       onError: error => toast.error(error.message),
+      onSettled: () => {
+        setBusyLogin(null);
+      },
     })
   );
 
@@ -127,10 +132,13 @@ export function BlockedPeopleScreen() {
         announcingToast.success(t('profile.blockedPeople.unmuted', { login: input.githubLogin }));
       },
       onError: error => toast.error(error.message),
+      onSettled: () => {
+        setBusyLogin(null);
+      },
     })
   );
 
-  let body;
+  let body: ReactNode = null;
   if (hidden.isPending) {
     body = (
       <View className="gap-3">
@@ -157,18 +165,22 @@ export function BlockedPeopleScreen() {
           logins={hidden.data.blockedLogins}
           actionLabel={t('profile.blockedPeople.unblock')}
           actionA11y={login => t('profile.blockedPeople.unblockA11y', { login })}
-          busyLogin={unblock.isPending ? (unblock.variables?.githubLogin ?? null) : null}
-          pending={unblock.isPending}
-          onAction={login => unblock.mutate({ githubLogin: login })}
+          busyLogin={busyLogin}
+          onAction={login => {
+            setBusyLogin(login);
+            unblock.mutate({ githubLogin: login });
+          }}
         />
         <HiddenLoginsSection
           title={t('profile.blockedPeople.mutedSection')}
           logins={hidden.data.mutedLogins}
           actionLabel={t('profile.blockedPeople.unmute')}
           actionA11y={login => t('profile.blockedPeople.unmuteA11y', { login })}
-          busyLogin={unmute.isPending ? (unmute.variables?.githubLogin ?? null) : null}
-          pending={unmute.isPending}
-          onAction={login => unmute.mutate({ githubLogin: login })}
+          busyLogin={busyLogin}
+          onAction={login => {
+            setBusyLogin(login);
+            unmute.mutate({ githubLogin: login });
+          }}
         />
       </View>
     );

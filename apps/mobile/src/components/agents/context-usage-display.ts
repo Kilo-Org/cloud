@@ -123,8 +123,7 @@ const COST_SLOT_SIZER_TWO_DECIMALS_MICRODOLLARS = 12_340_000;
 const COST_SLOT_SIZER_FOUR_DECIMALS_MICRODOLLARS = 4_999;
 
 export function getPillSlotSizers() {
-  const twoDecimals =
-    formatSessionCostBadge(COST_SLOT_SIZER_TWO_DECIMALS_MICRODOLLARS) ?? '$0.00';
+  const twoDecimals = formatSessionCostBadge(COST_SLOT_SIZER_TWO_DECIMALS_MICRODOLLARS) ?? '$0.00';
   const fourDecimals =
     formatSessionCostBadge(COST_SLOT_SIZER_FOUR_DECIMALS_MICRODOLLARS) ?? '$0.0000';
   return {

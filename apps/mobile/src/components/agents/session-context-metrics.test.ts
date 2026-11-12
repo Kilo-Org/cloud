@@ -17,7 +17,6 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('./context-usage-ring', () => ({ ContextUsageRing: 'ContextUsageRing' }));
 
-
 /** The texts the pill paints: everything except the invisible slot sizers. */
 function visibleTextsOf(pill: React.ReactElement): React.ReactElement[] {
   return findAll(pill, el => el.type === 'Text' && !classNameOf(el).includes('opacity-0'));

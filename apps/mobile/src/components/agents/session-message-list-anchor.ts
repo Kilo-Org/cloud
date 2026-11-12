@@ -3,13 +3,15 @@ import { type ViewStyle } from 'react-native';
 /**
  * How far the transcript rides up while the chrome under it grows.
  *
- * The shift applies only while the transcript's content overflows the viewport:
- * a transcript that cannot scroll has no anchoring problem to solve, and
- * shifting it would hide its first rows behind the holder with no way to
- * scroll them back.
+ * The shift is not gated on the transcript's scrollability: the frame keeps the
+ * list's own height by taking the growth back with a negative margin, so a
+ * verdict measured from that height would flip the reservation it measures. A
+ * transcript whose content fits still ends its last row on the chrome's top
+ * edge, and only a transcript with less headroom than the growth hides its own
+ * first rows.
  */
-export function resolveTranscriptRideUp(chromeGrowth: number, scrollable: boolean): number {
-  if (!scrollable || !(chromeGrowth > 0) || !Number.isFinite(chromeGrowth)) {
+export function resolveTranscriptRideUp(chromeGrowth: number): number {
+  if (!(chromeGrowth > 0) || !Number.isFinite(chromeGrowth)) {
     return 0;
   }
   return chromeGrowth;

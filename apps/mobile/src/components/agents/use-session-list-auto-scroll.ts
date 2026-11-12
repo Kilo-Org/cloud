@@ -71,10 +71,6 @@ export function useSessionListAutoScroll<ItemT>({
   const [isAtBottom, setIsAtBottom] = useState<boolean>(
     getInitialSessionListAutoScrollVisibility().isAtBottom
   );
-  // Whether the content is taller than the viewport, so the list can scroll at
-  // all. Change-gated like `isAtBottom`: a transcript that cannot scroll has no
-  // rows to bring back into view, and no caller may shift it.
-  const [isScrollable, setIsScrollable] = useState(false);
   const isAutoScrollingRef = useRef(false);
   // Tracks whether the user is currently dragging or the list is still in a
   // momentum fling. While this is true we must not programmatically scroll —
@@ -312,15 +308,9 @@ export function useSessionListAutoScroll<ItemT>({
     [clearAutoScrollResetTimeout, clearAutoScrollRetryTimeout, clearUserScrollingTimeout]
   );
 
-  const updateScrollableFromSizes = useCallback((contentHeight: number, viewportHeight: number) => {
-    const nextIsScrollable = contentHeight > viewportHeight + 1;
-    setIsScrollable(prev => (prev === nextIsScrollable ? prev : nextIsScrollable));
-  }, []);
-
   const updateAutoScrollFromEvent = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-      updateScrollableFromSizes(contentSize.height, layoutMeasurement.height);
       const nextIsAtBottom = isSessionListAtBottom({
         contentHeight: contentSize.height,
         viewportHeight: layoutMeasurement.height,
@@ -333,7 +323,7 @@ export function useSessionListAutoScroll<ItemT>({
       // frame while the user holds a steady position.
       setIsAtBottom(prev => (prev === nextIsAtBottom ? prev : nextIsAtBottom));
     },
-    [updateScrollableFromSizes]
+    []
   );
 
   const handleScroll = useCallback(
@@ -393,7 +383,6 @@ export function useSessionListAutoScroll<ItemT>({
     (_width: number, height: number) => {
       const didContentHeightChange = height !== lastContentHeightRef.current;
       lastContentHeightRef.current = height;
-      updateScrollableFromSizes(height, lastViewportHeightRef.current);
       // Content-size follow must not gate on `isAutoScrolling`: rapid
       // streaming content-size changes that arrive during the 150ms
       // programmatic-scroll window must still keep the viewport pinned
@@ -412,7 +401,7 @@ export function useSessionListAutoScroll<ItemT>({
         tailRepin.push(null);
       }
     },
-    [tailRepin, updateScrollableFromSizes]
+    [tailRepin]
   );
 
   const handleListLayout = useCallback(
@@ -420,7 +409,6 @@ export function useSessionListAutoScroll<ItemT>({
       const { height } = event.nativeEvent.layout;
       const didViewportHeightChange = height !== lastViewportHeightRef.current;
       lastViewportHeightRef.current = height;
-      updateScrollableFromSizes(lastContentHeightRef.current, height);
       // A viewport resize is the same hazard as a content-size change: the
       // fixed status rows mount OUTSIDE the list, so the list gets shorter
       // while its offset stays put and the newest row is left below the fold,
@@ -449,12 +437,11 @@ export function useSessionListAutoScroll<ItemT>({
         scheduleScrollToLatestMessage();
       }
     },
-    [scheduleScrollToLatestMessage, tailRepin, updateScrollableFromSizes]
+    [scheduleScrollToLatestMessage, tailRepin]
   );
 
   return {
     isAtBottom,
-    isScrollable,
     listRef,
     scrollToLatestAnimated,
     suppressAutoFollow,

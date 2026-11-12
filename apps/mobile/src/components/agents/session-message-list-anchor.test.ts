@@ -8,20 +8,16 @@ import {
 
 describe('resolveTranscriptRideUp', () => {
   it('keeps the transcript still when the chrome has not grown', () => {
-    expect(resolveTranscriptRideUp(0, true)).toBe(0);
+    expect(resolveTranscriptRideUp(0)).toBe(0);
   });
 
-  it('rides the transcript up by the growth while the content can scroll', () => {
-    expect(resolveTranscriptRideUp(64, true)).toBe(64);
-  });
-
-  it('keeps a transcript whose content fits the viewport still', () => {
-    expect(resolveTranscriptRideUp(64, false)).toBe(0);
+  it('rides the transcript up by the growth', () => {
+    expect(resolveTranscriptRideUp(64)).toBe(64);
   });
 
   it('treats a non-finite or shrinking chrome as no growth', () => {
-    expect(resolveTranscriptRideUp(Number.NaN, true)).toBe(0);
-    expect(resolveTranscriptRideUp(-20, true)).toBe(0);
+    expect(resolveTranscriptRideUp(Number.NaN)).toBe(0);
+    expect(resolveTranscriptRideUp(-20)).toBe(0);
   });
 });
 

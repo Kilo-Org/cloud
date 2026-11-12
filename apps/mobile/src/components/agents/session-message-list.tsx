@@ -163,7 +163,6 @@ export function SessionMessageList<T>({
   const newestItemKey = newestItem === undefined ? null : keyExtractor(newestItem);
   const {
     isAtBottom,
-    isScrollable,
     listRef,
     scrollToLatestAnimated,
     suppressAutoFollow,
@@ -340,13 +339,14 @@ export function SessionMessageList<T>({
     olderArrivalNewestKeyRef.current = newestItemKey;
   }, [items, newestItemKey]);
 
-  // The transcript rides up by the chrome's growth while its content overflows
-  // the viewport, so the newest row keeps the chrome's top edge in the same
-  // commit that grows the chrome. A list that cannot scroll has no row to bring
-  // back, so it never shifts. The frame holds that growth out of the list's own
-  // height, which costs the top of the content the same amount until the chrome
-  // shrinks again; releasing the shift instead would move every row at once.
-  const chromeRideUp = resolveTranscriptRideUp(chromeGrowthDp ?? 0, isScrollable);
+  // The transcript rides up by the chrome's growth, so the newest row keeps the
+  // chrome's top edge in the same commit that grows the chrome. The frame holds
+  // that growth out of the list's own height, which costs the top of the content
+  // the same amount until the chrome shrinks again; releasing the shift instead
+  // would move every row at once. The shift cannot be gated on the list's own
+  // scrollability: reserving the growth keeps the list's height, so the verdict
+  // would flip the reservation it is measuring against.
+  const chromeRideUp = resolveTranscriptRideUp(chromeGrowthDp ?? 0);
   // Memoized by the growth so the frame's style objects keep their identity: a
   // fresh style object on every render re-applies the native transform, and the
   // list re-lays-out each time it lands.

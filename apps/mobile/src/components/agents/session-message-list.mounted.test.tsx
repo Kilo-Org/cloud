@@ -808,7 +808,12 @@ describe('SessionMessageList chrome ride-up', () => {
     expect(shiftStyle(renderer)).toBe(-64);
   });
 
-  it('keeps a transcript that cannot scroll still', () => {
+  it('keeps the shift when the content is shorter than the list', () => {
+    // The reservation keeps the list's height, so a scrollability verdict read
+    // from that height would release the reservation that produced it: the
+    // transcript would alternate between the two frames on every layout it
+    // caused. A transcript whose content fits keeps its last row on the
+    // chrome's top edge instead.
     const renderer = mountList({ chromeGrowthDp: 64 });
     fire('onScrollEndDrag', {
       nativeEvent: {
@@ -817,6 +822,7 @@ describe('SessionMessageList chrome ride-up', () => {
         layoutMeasurement: { height: 500, width: 0 },
       },
     });
-    expect(shiftStyle(renderer)).toBeNull();
+    expect(shiftStyle(renderer)).toBe(-64);
+    expect(holderStyle(renderer)?.marginBottom).toBe(-64);
   });
 });

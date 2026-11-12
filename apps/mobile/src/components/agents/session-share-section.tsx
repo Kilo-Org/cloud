@@ -74,7 +74,9 @@ export function SessionShareSection({
   // link is unknown — and treating that as "no link" offers a create action
   // whose mutation rotates the share generation and revokes the previous link.
   const shareStateLoaded = !shareStateQuery.isPending && !shareStateQuery.isError;
-  const hasActiveLink = shareStateQuery.data?.public_id != null;
+  // Existence only: the row records that a link was issued, not whether it has
+  // since expired.
+  const hasPublicLink = shareStateQuery.data?.public_id != null;
 
   // Closing the sheet drops the transient outcomes, so a reopen starts from the
   // action rather than from the last attempt's feedback. The created URL is one
@@ -209,6 +211,46 @@ export function SessionShareSection({
     label: t(DURATION_LABEL_KEYS[value]),
   }));
 
+  // The configuration a link is created with: its duration and whether later
+  // messages join the share. It is shown in both the create state and the
+  // existing-link state, because replacing an existing link uses exactly this
+  // choice — hiding it there would replace the link with the defaults instead
+  // of what the person picked.
+  const shareConfiguration = (
+    <View className="gap-3">
+      <View className="gap-2">
+        <Text className="text-xs uppercase tracking-wide text-muted-foreground">
+          {t('sessionShare.durationLabel')}
+        </Text>
+        <SegmentedControl
+          options={durationLabels}
+          value={duration}
+          onChange={setDuration}
+          accessibilityLabel={t('sessionShare.durationLabel')}
+        />
+      </View>
+      <View className="flex-row items-center justify-between gap-3">
+        <View className="flex-1 gap-1">
+          <Text className="text-sm font-medium text-foreground">
+            {t('sessionShare.includeNewMessages')}
+          </Text>
+          <Text variant="muted" className="text-xs">
+            {includeNewMessages
+              ? t('sessionShare.includeNewMessagesOn')
+              : t('sessionShare.includeNewMessagesOff')}
+          </Text>
+        </View>
+        <Switch
+          testID="session-share-include-new"
+          accessibilityLabel={t('sessionShare.includeNewMessages')}
+          value={includeNewMessages}
+          disabled={busy}
+          onValueChange={setIncludeNewMessages}
+        />
+      </View>
+    </View>
+  );
+
   let actions: ReactNode = null;
   if (createdUrl !== null) {
     actions = (
@@ -255,15 +297,20 @@ export function SessionShareSection({
         {t('common.loading')}
       </Text>
     );
-  } else if (hasActiveLink) {
+  } else if (hasPublicLink) {
+    // The state names that a link exists, not that it works: `cli_sessions_v2`
+    // stores only `public_id`, and a share token's expiry never reaches the
+    // client, so an expired link is indistinguishable from a live one here.
+    // Replacing it uses the configuration above instead of silent defaults.
     actions = (
       <View className="gap-3">
-        <Text className="text-sm font-medium text-foreground" testID="session-share-active">
-          {t('sessionShare.activeTitle')}
+        <Text className="text-sm font-medium text-foreground" testID="session-share-existing">
+          {t('sessionShare.existingTitle')}
         </Text>
         <Text variant="muted" className="text-xs">
-          {t('sessionShare.activeDescription')}
+          {t('sessionShare.existingDescription')}
         </Text>
+        {shareConfiguration}
         <Button
           variant="outline"
           className="w-full"
@@ -289,36 +336,7 @@ export function SessionShareSection({
   } else {
     actions = (
       <View className="gap-3">
-        <View className="gap-2">
-          <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-            {t('sessionShare.durationLabel')}
-          </Text>
-          <SegmentedControl
-            options={durationLabels}
-            value={duration}
-            onChange={setDuration}
-            accessibilityLabel={t('sessionShare.durationLabel')}
-          />
-        </View>
-        <View className="flex-row items-center justify-between gap-3">
-          <View className="flex-1 gap-1">
-            <Text className="text-sm font-medium text-foreground">
-              {t('sessionShare.includeNewMessages')}
-            </Text>
-            <Text variant="muted" className="text-xs">
-              {includeNewMessages
-                ? t('sessionShare.includeNewMessagesOn')
-                : t('sessionShare.includeNewMessagesOff')}
-            </Text>
-          </View>
-          <Switch
-            testID="session-share-include-new"
-            accessibilityLabel={t('sessionShare.includeNewMessages')}
-            value={includeNewMessages}
-            disabled={busy}
-            onValueChange={setIncludeNewMessages}
-          />
-        </View>
+        {shareConfiguration}
         <Button
           className="w-full"
           loading={shareMutation.isPending}

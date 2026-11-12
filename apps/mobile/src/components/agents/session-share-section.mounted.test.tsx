@@ -19,11 +19,19 @@ type ShareQueryState = {
 
 type ShareHandler = (created: { share_token: string }) => Promise<void> | void;
 
+/** What the section asks the share mutation to create. */
+type ShareInput = {
+  session_id: string;
+  duration: string;
+  include_new_messages: boolean;
+};
+
 const holder = vi.hoisted(
   (): {
     queryState: ShareQueryState;
     shareSuccess: ShareHandler | null;
     unshareSuccess: (() => void) | null;
+    lastShareInput: ShareInput | null;
   } => ({
     queryState: {
       data: undefined,
@@ -35,6 +43,7 @@ const holder = vi.hoisted(
     },
     shareSuccess: null,
     unshareSuccess: null,
+    lastShareInput: null,
   })
 );
 
@@ -48,7 +57,12 @@ vi.mock('@tanstack/react-query', () => ({
   }) => {
     if (options.share) {
       holder.shareSuccess = options.onSuccess ?? null;
-      return { mutate: () => undefined, isPending: false };
+      return {
+        mutate: (input: ShareInput) => {
+          holder.lastShareInput = input;
+        },
+        isPending: false,
+      };
     }
     holder.unshareSuccess = options.onSuccess as never;
     return { mutate: () => undefined, isPending: false };
@@ -142,6 +156,7 @@ beforeEach(() => {
   };
   holder.shareSuccess = null;
   holder.unshareSuccess = null;
+  holder.lastShareInput = null;
 });
 
 describe('SessionShareSection state gates', () => {
@@ -174,7 +189,7 @@ describe('SessionShareSection state gates', () => {
     expect(findByTestID(renderer.root, 'session-share-state-loading')).toHaveLength(0);
   });
 
-  it('shows the existing-link actions when the read reports a live link', () => {
+  it('shows the existing-link state with the controls a replacement uses', () => {
     holder.queryState = {
       ...holder.queryState,
       data: { public_id: 'share_1' },
@@ -183,8 +198,59 @@ describe('SessionShareSection state gates', () => {
     };
     const renderer = renderSection();
 
-    expect(findByTestID(renderer.root, 'session-share-active')).toHaveLength(1);
+    expect(findByTestID(renderer.root, 'session-share-existing')).toHaveLength(1);
+    expect(textContent(renderer.root)).toContain(i18n.t('sessionShare.existingTitle'));
+    // The replacement takes the person's choice, so the duration and scope
+    // controls stay on screen beside the replace action.
+    expect(
+      renderer.root.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'SegmentedControl'
+      )
+    ).toHaveLength(1);
+    expect(findByTestID(renderer.root, 'session-share-include-new')).toHaveLength(1);
+    expect(findByTestID(renderer.root, 'session-share-rotate')).toHaveLength(1);
+    expect(findByTestID(renderer.root, 'session-share-revoke')).toHaveLength(1);
     expect(findByTestID(renderer.root, 'session-share-create')).toHaveLength(0);
+  });
+
+  it('replaces the existing link with the chosen duration and scope', () => {
+    holder.queryState = {
+      ...holder.queryState,
+      data: { public_id: 'share_1' },
+      isPending: false,
+      dataUpdatedAt: 1,
+    };
+    const renderer = renderSection();
+
+    const duration = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'SegmentedControl'
+    )[0];
+    if (!duration) {
+      throw new Error('missing duration control');
+    }
+    act(() => {
+      (duration.props.onChange as (value: string) => void)('1d');
+    });
+    const include = findByTestID(renderer.root, 'session-share-include-new')[0];
+    if (!include) {
+      throw new Error('missing include switch');
+    }
+    act(() => {
+      (include.props.onValueChange as (value: boolean) => void)(true);
+    });
+    const replace = findByTestID(renderer.root, 'session-share-rotate')[0];
+    if (!replace) {
+      throw new Error('missing replace action');
+    }
+    act(() => {
+      (replace.props.onPress as () => void)();
+    });
+
+    expect(holder.lastShareInput).toEqual({
+      session_id: 'ses-123',
+      duration: '1d',
+      include_new_messages: true,
+    });
   });
 });
 

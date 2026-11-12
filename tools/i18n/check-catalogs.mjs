@@ -13,7 +13,7 @@
  *
  * Usage: node tools/i18n/check-catalogs.mjs
  */
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -750,7 +750,103 @@ function addsFamilyPlaceholderOnly(english, key, actual, expected) {
   return true;
 }
 
+const NOTIFICATION_CATALOG_DIR = join(ROOT, 'packages/notifications/src/locales');
+const NOTIFICATION_LOCALE_MODULE = join(ROOT, 'packages/notifications/src/i18n.ts');
+
+/**
+ * The push runtime resolves a token locale and reads translations from one
+ * registry. Its imports and that registry are hand-written, so this check holds
+ * them together with the catalog folder: every catalog file is imported, every
+ * import is in the registry, and the registry names nothing else. A catalog
+ * that only sat in the folder used to render in English with no gate saying so;
+ * a registry entry with no import would translate nothing.
+ */
+function checkPushLocaleRegistry() {
+  const relativeModule = relativePath(ROOT, NOTIFICATION_LOCALE_MODULE);
+  if (!existsSync(NOTIFICATION_LOCALE_MODULE)) {
+    fail(`notifications: no push locale registry at ${relativeModule}`);
+    return;
+  }
+  const present = new Set(
+    readdirSync(NOTIFICATION_CATALOG_DIR)
+      .filter(name => name.endsWith('.json'))
+      .map(name => name.replace(/\.json$/, ''))
+  );
+  const text = readFileSync(NOTIFICATION_LOCALE_MODULE, 'utf8');
+  const { program, errors } = parseSourceFile(relativeModule, text);
+  const lineOf = lineIndex(text);
+  for (const problem of parseProblems(relativeModule, errors, lineOf)) {
+    fail(problem);
+  }
+
+  const imported = new Set();
+  const registered = new Set();
+  let registryFound = false;
+  walk(program, node => {
+    if (node.type === 'ImportDeclaration') {
+      const source = node.source.value;
+      const prefix = './locales/';
+      if (typeof source === 'string' && source.startsWith(prefix) && source.endsWith('.json')) {
+        imported.add(source.slice(prefix.length, -'.json'.length));
+      }
+      return;
+    }
+    if (
+      node.type !== 'VariableDeclarator' ||
+      node.id.type !== 'Identifier' ||
+      node.id.name !== 'pushCatalogs'
+    ) {
+      return;
+    }
+    registryFound = true;
+    const init = unwrap(node.init);
+    if (init?.type !== 'ObjectExpression') {
+      fail(`${relativeModule}: the push locale registry is not an object literal`);
+      return;
+    }
+    for (const property of init.properties) {
+      if (property.type !== 'Property') {
+        fail(`${relativeModule}: the push locale registry contains a ${property.type}`);
+        continue;
+      }
+      const key = unwrap(property.key);
+      if (key.type === 'Identifier') {
+        registered.add(key.name);
+      } else if (key.type === 'Literal' && typeof key.value === 'string') {
+        registered.add(key.value);
+      } else {
+        fail(`${relativeModule}: the push locale registry has a key this check cannot read`);
+      }
+    }
+  });
+  if (!registryFound) {
+    fail(`${relativeModule}: no push locale registry named "pushCatalogs"`);
+    return;
+  }
+
+  for (const tag of [...present].sort()) {
+    if (!imported.has(tag)) {
+      fail(`notifications: catalog "${tag}.json" has no import in ${relativeModule}`);
+    }
+    if (!registered.has(tag)) {
+      fail(`notifications: catalog "${tag}.json" has no push locale registry entry`);
+    }
+  }
+  for (const tag of [...imported].sort()) {
+    if (!present.has(tag)) {
+      fail(`notifications: ${relativeModule} imports "./locales/${tag}.json" with no catalog file`);
+    }
+  }
+  for (const tag of [...registered].sort()) {
+    if (!imported.has(tag)) {
+      fail(`notifications: the push locale registry names "${tag}" with no catalog import`);
+    }
+  }
+}
+
 const tags = supportedLanguages();
+
+checkPushLocaleRegistry();
 
 for (const catalog of CATALOGS) {
   const present = readdirSync(catalog.dir)

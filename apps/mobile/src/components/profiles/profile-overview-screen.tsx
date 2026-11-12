@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -13,7 +13,6 @@ import {
   type OverviewSectionKey,
   overviewSectionRows,
 } from '@/components/profiles/profile-overview-model';
-import { ProfileConfigImportSheet } from '@/components/profiles/profile-config-import-sheet';
 import { ProfileMetadataForm } from '@/components/profiles/profile-metadata-form';
 import { ProfileOverviewSkeleton } from '@/components/profiles/profile-overview-skeleton';
 import { ProfileRepoPinsSection } from '@/components/profiles/profile-repo-pins-section';
@@ -82,6 +81,18 @@ const SECTION_PATHS = {
   OverviewSectionKey,
   (profileId: string, organizationId: string | undefined, stack: ProfileManagementStack) => Href
 >;
+
+/**
+ * The import sheet pulls in the page-sheet surface and the state-geometry hook
+ * behind it, which reach expo-router and `@sentry/react-native`'s native
+ * initialization: modules the mounted overview suites' Node environment cannot
+ * load. Lazy-loading the sheet keeps them out of this screen's graph until the
+ * reader opens Import config, and mounts the same sheet once they do.
+ */
+const LazyProfileConfigImportSheet = lazy(async () => {
+  const { ProfileConfigImportSheet } = await import('./profile-config-import-sheet');
+  return { default: ProfileConfigImportSheet };
+});
 
 /**
  * The mutation hook toasts `error.message`; the screen only supplies a
@@ -329,13 +340,15 @@ export function ProfileOverviewScreen({
       {dialog}
       {metadataGuard.dialog}
       {importOpen ? (
-        <ProfileConfigImportSheet
-          profileId={profileId}
-          organizationId={organizationId}
-          onClose={() => {
-            setImportOpen(false);
-          }}
-        />
+        <Suspense fallback={null}>
+          <LazyProfileConfigImportSheet
+            profileId={profileId}
+            organizationId={organizationId}
+            onClose={() => {
+              setImportOpen(false);
+            }}
+          />
+        </Suspense>
       ) : null}
     </View>
   );

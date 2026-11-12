@@ -5,7 +5,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import {
   canAutoloadOlderMessages,
-  restoreScrollAfterPrepend,
   selectOlderMessagesHeaderState,
   shouldAnnounceOlderMessagesArrival,
   shouldTriggerOlderMessagesLoad,
@@ -117,20 +116,6 @@ describe('canAutoloadOlderMessages', () => {
 
   it('returns true when the scroller is visible and has height', () => {
     expect(canAutoloadOlderMessages({ hidden: false, clientHeight: 400 })).toBe(true);
-  });
-});
-
-describe('restoreScrollAfterPrepend', () => {
-  it('adds the height delta to scrollTop', () => {
-    const el = { scrollTop: 12, scrollHeight: 800 };
-    restoreScrollAfterPrepend(el, 500);
-    expect(el.scrollTop).toBe(312);
-  });
-
-  it('leaves scrollTop unchanged when height did not grow', () => {
-    const el = { scrollTop: 40, scrollHeight: 400 };
-    restoreScrollAfterPrepend(el, 400);
-    expect(el.scrollTop).toBe(40);
   });
 });
 
@@ -310,6 +295,8 @@ describe('useOlderMessagesPagination readiness', () => {
       hidden: false,
       clientHeight: 100,
       scrollTop: 0,
+      getBoundingClientRect: () => ({ top: 0, bottom: 100 }),
+      querySelectorAll: () => [],
       get scrollHeight() {
         reads += 1;
         return height();
@@ -399,6 +386,60 @@ describe('useOlderMessagesPagination readiness', () => {
     render(false);
 
     expect(lastScrollTopRef.current).toBe(150);
+  });
+
+  it('keeps the latest reading position when the user scrolls and the live tail grows during a load', () => {
+    let rowTop = 40;
+    let height = 1000;
+    const element = document.createElement('div');
+    const row = document.createElement('div');
+    row.dataset.messageId = 'msg_visible';
+    element.append(row);
+    element.scrollTop = 60;
+    Object.defineProperties(element, {
+      clientHeight: { value: 100 },
+      scrollHeight: { get: () => height },
+      getBoundingClientRect: { value: () => ({ top: 0, bottom: 100 }) },
+    });
+    row.getBoundingClientRect = () =>
+      ({
+        top: rowTop - element.scrollTop,
+        bottom: rowTop - element.scrollTop + 200,
+        height: 200,
+      }) as DOMRect;
+    const onLoad = jest.fn();
+    const scrollElementRef = { current: element };
+    const isProgrammaticScrollRef = { current: false };
+    const lastScrollTopRef = { current: 0 };
+    let api: PaginationApi | null = null;
+    const render = (loading: boolean): void =>
+      renderPagination({
+        ready: true,
+        isLoadingOlderMessages: loading,
+        resetKey: 'reading',
+        onLoad,
+        onApi: next => {
+          api = next;
+        },
+        scrollElementRef,
+        isProgrammaticScrollRef,
+        lastScrollTopRef,
+        autoloadOnMount: false,
+      });
+
+    render(false);
+    act(() => api?.requestOlderMessages());
+    render(true);
+    element.scrollTop = 160;
+    act(() => api?.tryLoadOlderFromScroll(160));
+    rowTop += 300;
+    height += 480;
+    render(false);
+
+    expect(element.scrollTop).toBe(460);
+    expect(lastScrollTopRef.current).toBe(460);
+    expect(row.getBoundingClientRect().top).toBe(-120);
+    expect(onLoad).toHaveBeenCalledTimes(1);
   });
 
   it('does not autoload a root transcript before anchoring or without a user scroll', () => {

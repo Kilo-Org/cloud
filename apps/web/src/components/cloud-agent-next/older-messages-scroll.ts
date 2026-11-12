@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
+import { useCallback, useLayoutEffect, useRef, type RefObject } from 'react';
 import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 
 export const OLDER_MESSAGES_NEAR_TOP_PX = 80;
@@ -34,11 +34,49 @@ export function shouldTriggerOlderMessagesLoad({
   return true;
 }
 
-export function restoreScrollAfterPrepend(
-  el: { scrollTop: number; scrollHeight: number },
-  previousScrollHeight: number
-): void {
-  el.scrollTop += el.scrollHeight - previousScrollHeight;
+type PrependScrollPosition = {
+  scrollTop: number;
+  scrollHeight: number;
+  anchor: { element: Element; top: number; partId?: string } | null;
+};
+
+export function capturePrependScrollPosition(el: HTMLElement): PrependScrollPosition {
+  const viewport = el.getBoundingClientRect();
+  let anchor: PrependScrollPosition['anchor'] = null;
+  // A page can regroup assistant messages. Part ids survive that row replacement.
+  for (const selector of ['[data-scroll-anchor]', '[data-message-id]']) {
+    for (const marker of el.querySelectorAll<HTMLElement>(selector)) {
+      const partId = marker.dataset.scrollAnchor;
+      const element = partId ? marker.nextElementSibling : marker;
+      if (!element || element.hasAttribute('hidden')) continue;
+      const rect = element.getBoundingClientRect();
+      if (rect.height > 0 && rect.bottom > viewport.top && rect.top < viewport.bottom) {
+        anchor = { element, top: rect.top - viewport.top, ...(partId ? { partId } : {}) };
+        break;
+      }
+    }
+    if (anchor) break;
+  }
+  return { scrollTop: el.scrollTop, scrollHeight: el.scrollHeight, anchor };
+}
+
+export function restoreScrollAfterPrepend(el: HTMLElement, previous: PrependScrollPosition): void {
+  const anchor = previous.anchor;
+  let element = anchor?.element;
+  if (anchor?.partId && element && !el.contains(element)) {
+    const marker = [...el.querySelectorAll<HTMLElement>('[data-scroll-anchor]')].find(
+      marker => marker.dataset.scrollAnchor === anchor.partId
+    );
+    const replacement = marker?.nextElementSibling;
+    element = replacement ?? undefined;
+  }
+  if (anchor && element && el.contains(element)) {
+    const top = element.getBoundingClientRect().top - el.getBoundingClientRect().top;
+    // Measure only movement above the reader, including any browser scroll anchoring.
+    el.scrollTop += top - anchor.top;
+    return;
+  }
+  el.scrollTop = previous.scrollTop + el.scrollHeight - previous.scrollHeight;
 }
 
 export function canAutoloadOlderMessages(
@@ -144,13 +182,15 @@ export function useOlderMessagesPagination({
   tryLoadOlderFromScroll: (scrollTop: number) => void;
 } {
   const inFlightRef = useRef(false);
-  const pendingHeightRef = useRef<number | null>(null);
+  const pendingPositionRef = useRef<PrependScrollPosition | null>(null);
   const wasLoadingRef = useRef(isLoadingOlderMessages);
+  const restoreFrameRef = useRef(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     inFlightRef.current = false;
-    pendingHeightRef.current = null;
+    pendingPositionRef.current = null;
     wasLoadingRef.current = false;
+    return () => cancelAnimationFrame(restoreFrameRef.current);
   }, [resetKey]);
 
   const requestOlderMessages = useCallback(() => {
@@ -166,7 +206,7 @@ export function useOlderMessagesPagination({
       return;
     }
     const el = scrollElementRef.current;
-    if (el) pendingHeightRef.current = el.scrollHeight;
+    if (el) pendingPositionRef.current = capturePrependScrollPosition(el);
     inFlightRef.current = true;
     void Promise.resolve(onLoad()).finally(() => {
       queueMicrotask(() => {
@@ -187,16 +227,19 @@ export function useOlderMessagesPagination({
     const wasLoading = wasLoadingRef.current;
     wasLoadingRef.current = isLoadingOlderMessages;
     if (!wasLoading || isLoadingOlderMessages) return;
-    const previousHeight = pendingHeightRef.current;
-    if (previousHeight == null) return;
+    const previousPosition = pendingPositionRef.current;
+    if (previousPosition == null) return;
     const el = scrollElementRef.current;
-    pendingHeightRef.current = null;
+    pendingPositionRef.current = null;
     if (!el) return;
     if (olderMessagesError != null) return;
     isProgrammaticScrollRef.current = true;
-    restoreScrollAfterPrepend(el, previousHeight);
+    restoreScrollAfterPrepend(el, previousPosition);
     lastScrollTopRef.current = el.scrollTop;
-    requestAnimationFrame(() => {
+    restoreFrameRef.current = requestAnimationFrame(() => {
+      // The transcript runtime can commit its rows after the loading-state layout effect.
+      restoreScrollAfterPrepend(el, previousPosition);
+      lastScrollTopRef.current = el.scrollTop;
       isProgrammaticScrollRef.current = false;
       if (
         canAutoloadOlderMessages(el) &&
@@ -239,11 +282,15 @@ export function useOlderMessagesPagination({
   const tryLoadOlderFromScroll = useCallback(
     (scrollTop: number) => {
       if (isProgrammaticScrollRef.current || initialPositionedRef?.current === false) return;
+      const el = scrollElementRef.current;
+      if (el && pendingPositionRef.current) {
+        pendingPositionRef.current = capturePrependScrollPosition(el);
+      }
       if (scrollTop < OLDER_MESSAGES_NEAR_TOP_PX) {
         requestOlderMessages();
       }
     },
-    [requestOlderMessages, initialPositionedRef, isProgrammaticScrollRef]
+    [requestOlderMessages, initialPositionedRef, isProgrammaticScrollRef, scrollElementRef]
   );
 
   return { requestOlderMessages, tryLoadOlderFromScroll };

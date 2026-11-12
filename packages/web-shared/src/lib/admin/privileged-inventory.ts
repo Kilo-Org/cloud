@@ -102,6 +102,7 @@ const adminAreaPolicies: Record<string, AdminAreaPolicy> = {
   github: platform,
   impactReferrals: { read: 'platform_read', write: 'sensitive_write', target: 'user' },
   internalBotUsers: { read: 'platform_read', write: 'sensitive_write', target: 'user' },
+  kiloclawCreditRenewals: { read: 'platform_read', write: 'sensitive_write', target: 'none' },
   kiloclawInstances: platform,
   kiloclawProviders: platform,
   kiloclawRegions: platform,

@@ -18,7 +18,8 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-audit-logs', () =
 }));
 jest.mock('@/lib/auth/resource-delegation', () => ({
   isDelegableResource: (value: string) =>
-    ['api', 'gateway', 'attribution', 'html-deploy'].includes(value),
+    ['api', 'gateway', 'attribution', 'html-deploy', 'pages', 'pages-dev'].includes(value),
+  isPagesResource: (value: string) => value === 'pages' || value === 'pages-dev',
   canIssueLegacyOrganizationToken: jest.fn(async () => true),
   createDelegatedResourceToken: jest.fn(async () => ({ token: 'delegated', expiresAt: 'expiry' })),
 }));
@@ -64,4 +65,16 @@ it('retains legacy session issuance while the family gate is false', async () =>
   expect(response.status).toBe(200);
   expect(generateOrganizationApiToken).toHaveBeenCalled();
   expect(createDelegatedResourceToken).not.toHaveBeenCalled();
+});
+
+it.each(['pages', 'pages-dev'])('refuses %s tokens for organizations', async resource => {
+  jest.mocked(isResourceTokenIssuanceEnabled).mockReturnValue(true);
+  const request = new NextRequest('http://localhost/api/organizations/org/user-tokens', {
+    method: 'POST',
+    body: JSON.stringify({ resource }),
+  });
+  const response = await POST(request, { params: Promise.resolve({ id: 'org' }) });
+  expect(response.status).toBe(403);
+  expect(createDelegatedResourceToken).not.toHaveBeenCalled();
+  expect(generateOrganizationApiToken).not.toHaveBeenCalled();
 });

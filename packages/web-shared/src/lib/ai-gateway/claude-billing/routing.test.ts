@@ -276,6 +276,82 @@ describe('Claude customer-billed routing', () => {
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
   });
 
+  function sharedOnly() {
+    jest
+      .mocked(getGrantedClaudeBillingConnection)
+      .mockImplementation(async owner => (owner.kind === 'shared_services' ? SHARED_ROW : null));
+  }
+
+  it.each([
+    [
+      'a soft-deleted account',
+      {
+        id: 'connector',
+        google_user_email: 'deleted+c@deleted.invalid',
+        blocked_reason: 'soft-deleted at 2026-01-01T00:00:00.000Z',
+      },
+    ],
+    [
+      'an account being deleted',
+      {
+        id: 'connector',
+        google_user_email: 'connector@kilocode.ai',
+        blocked_reason: 'deletion-in-progress at 2026-01-01T00:00:00.000Z',
+      },
+    ],
+    ['an account with no email', { id: 'connector', google_user_email: '', blocked_reason: null }],
+    ['a missing account', undefined],
+  ])('requires a reconnect for the shared connection when the connector is %s', async (_, user) => {
+    sharedOnly();
+    jest.mocked(findUserById).mockResolvedValue(user as never);
+
+    const result = await checkClaudeBilling({
+      ...input(),
+      requesterEmail: 'code-review-bot@kilocode.local',
+      organizationId: SHARED_ORG_ID,
+      botId: 'reviewer',
+    });
+
+    expect(result).toEqual({
+      kind: 'reconnect',
+      message: expect.stringContaining('is no longer available'),
+    });
+    expect(getGrantedClaudeBillingConnection).toHaveBeenCalledTimes(1);
+    expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
+    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+  });
+
+  it('keeps the requester fallback when the row records no connector', async () => {
+    jest
+      .mocked(getGrantedClaudeBillingConnection)
+      .mockImplementation(async owner =>
+        owner.kind === 'shared_services' ? { ...SHARED_ROW, created_by: null as never } : null
+      );
+
+    expect(
+      await checkClaudeBilling({
+        ...input(),
+        organizationId: SHARED_ORG_ID,
+        botId: 'reviewer',
+      })
+    ).toMatchObject({ kind: 'provider' });
+    expect(findUserById).not.toHaveBeenCalled();
+    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('requester@kilocode.ai');
+  });
+
+  it('serves a personal connection even when the recorded connector is gone', async () => {
+    jest.mocked(findUserById).mockResolvedValue({
+      id: 'connector',
+      blocked_reason: 'soft-deleted at 2026-01-01',
+    } as never);
+    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(row);
+
+    const result = await checkClaudeBilling(input());
+
+    expect(result?.kind).toBe('provider');
+    expect(findUserById).not.toHaveBeenCalled();
+  });
+
   it('falls back to the caller connection when the organization has no shared one', async () => {
     jest
       .mocked(getGrantedClaudeBillingConnection)

@@ -7,6 +7,7 @@ import {
 import { sendAccountLinkCodeEmail } from '@kilocode/web-shared/lib/email';
 import { AUTH_PROVIDER_DISPLAY_NAMES } from '@kilocode/web-shared/lib/auth/constants';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import {
   claimEmailCodeSend,
@@ -37,7 +38,7 @@ export const POST = withRestTiming(
     if (!user) {
       return NextResponse.json({ error: 'EXPIRED' }, { status: 404 });
     }
-    if (user.blocked_reason) {
+    if (isBlockedAccount(user)) {
       return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
     }
 

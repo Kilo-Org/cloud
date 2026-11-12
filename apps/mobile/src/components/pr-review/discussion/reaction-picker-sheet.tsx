@@ -1,7 +1,5 @@
 // Bottom-sheet picker for GitHub's 8 review-comment reactions.
-// Pattern-copied from kilo-chat's message-reaction-picker-sheet, then
-// converted to the app's native sheet (`@/components/ui/sheet`): the native
-// sheet isolates the background on both platforms and answers the Android back
+// The native sheet (`@/components/ui/sheet`) isolates the background on both platforms and answers the Android back
 // button, and it presents a separate native window so it also stacks above a
 // formSheet route (a JS sheet or a portal overlay would render below it).
 //

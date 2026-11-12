@@ -518,7 +518,7 @@ export type Env = {
   GITHUB_LITE_APP_BOT_USER_ID?: string;
   /** Shared secret for JWT token validation */
   NEXTAUTH_SECRET: SecretBinding;
-  /** Comma-separated list of allowed Origins for /stream WebSocket connections */
+  /** Comma-separated allowed Origins for the /stream and /terminal WebSocket connections */
   WS_ALLOWED_ORIGINS?: string;
   /** Backend base URL (used for balance checks before session spin-up) */
   KILOCODE_BACKEND_BASE_URL?: string;

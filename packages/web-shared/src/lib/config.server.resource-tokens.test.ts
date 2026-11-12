@@ -101,5 +101,44 @@ it.each([
   expect(cloud.exp! - cloud.iat!).toBe(cloudModern ? 3600 : 7200);
   expect(gateway.aud).toBe(gatewayModern ? 'kilo-gateway' : undefined);
   expect(gateway.tokenPurpose).toBe(gatewayModern ? 'delegated-workload' : undefined);
-  expect(gateway.exp! - gateway.iat!).toBe(gatewayModern ? 3600 : 5 * 365 * 24 * 3600);
+  expect(gateway.exp! - gateway.iat!).toBe(3600);
 });
+
+it.each([
+  [undefined, 3600],
+  [300, 300],
+  [7200, 3600],
+  [5 * 365 * 24 * 60 * 60, 3600],
+] as const)(
+  'bounds the legacy gateway token lifetime to one hour (%s -> %s)',
+  (requestedExpiresIn, expectedLifetime) => {
+    const user = { id: 'oauth/legacy-bounded', api_token_pepper: 'legacy-bounded-pepper' } as User;
+    const gateway = jwt.decode(
+      generateWorkflowGatewayToken(user, {
+        organizationId: 'organization-id',
+        tokenSource: 'reviewer',
+        expiresIn: requestedExpiresIn,
+      })
+    ) as jwt.JwtPayload;
+    expect(gateway.aud).toBeUndefined();
+    expect(gateway.tokenPurpose).toBeUndefined();
+    expect(gateway.organizationId).toBe('organization-id');
+    expect(gateway.exp! - gateway.iat!).toBe(expectedLifetime);
+  }
+);
+
+it.each([false, true])(
+  'rejects a nonpositive gateway lifetime in both issuance modes (modern: %s)',
+  modern => {
+    if (modern) {
+      process.env[master] = 'true';
+      process.env[families['workflow-gateway']] = 'true';
+    }
+    const user = { id: 'oauth/nonpositive', api_token_pepper: 'nonpositive-pepper' } as User;
+    for (const expiresIn of [0, -60]) {
+      expect(() =>
+        generateWorkflowGatewayToken(user, { tokenSource: 'reviewer', expiresIn })
+      ).toThrow('Workflow gateway token expiry must be positive');
+    }
+  }
+);

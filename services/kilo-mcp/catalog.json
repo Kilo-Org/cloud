@@ -37094,7 +37094,7 @@
   "user.invoicesPage": {
     "path": "user.invoicesPage",
     "kind": "query",
-    "summary": "Get the signed-in user's personal billing invoices and payment history, optionally limited to a period such as the past week, month, year, or all time. Supports pagination with a cursor and returns invoice entries with a flag and cursor for loading more; users who have never been billed get an empty page.",
+    "summary": "List a user's personal billing invoices from Stripe, filtered to a time period and paginated with a cursor, for showing payment history or past receipts.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -37120,7 +37120,7 @@
       "period",
       "cursor"
     ],
-    "searchBlob": "user.invoicesPage Get the signed-in user's personal billing invoices and payment history, optionally limited to a period such as the past week, month, year, or all time. Supports pagination with a cursor and returns invoice entries with a flag and cursor for loading more; users who have never been billed get an empty page. user invoicespage period cursor period cursor"
+    "searchBlob": "user.invoicesPage List a user's personal billing invoices from Stripe, filtered to a time period and paginated with a cursor, for showing payment history or past receipts. user invoicespage period cursor period cursor"
   },
   "user.linkAuthProvider": {
     "path": "user.linkAuthProvider",

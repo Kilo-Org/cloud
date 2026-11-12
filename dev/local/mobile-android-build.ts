@@ -54,8 +54,9 @@ export type AndroidBuildDeps = {
 // apps/mobile (pnpm patches, pnpm-workspace.yaml, pnpm-lock.yaml) are mixed in
 // as an extra source, and so is the local modules/ tree: Expo hashes an
 // autolinked module by its package identity, which a module under modules/ has
-// none of, so its Android sources would otherwise never key a build. iOS code
-// and module JS in modules/ do not reach the Android binary and stay out.
+// none of, so its native sources would otherwise never key a build. Module JS
+// and tests stay out; the native sources of one platform for another platform
+// only over-key the hash, which is the safe direction.
 export function buildAndroidFingerprintOptions(): {
   platforms: ['android'];
   sourceSkips: number;
@@ -69,7 +70,7 @@ export function buildAndroidFingerprintOptions(): {
     // The generated android/ tree is output, not an input: its bytes differ
     // per worktree. Pin it out of the hash so no fingerprint version can key
     // builds on it.
-    ignorePaths: ['android/**', 'modules/**/ios/**', 'modules/*/src/**', 'modules/**/*.test.ts'],
+    ignorePaths: ['android/**', 'modules/*/src/**', 'modules/**/*.test.ts'],
     extraSources: [
       {
         type: 'contents',

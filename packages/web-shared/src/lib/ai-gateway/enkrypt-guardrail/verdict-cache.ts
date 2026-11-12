@@ -14,6 +14,7 @@ import {
   type EnkryptScanCoverage,
   scanKind,
   scanLogFields,
+  totalCredits,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import {
   joinSegments,
@@ -313,13 +314,6 @@ function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
 
-function totalCredits(reports: { credits_cost: number | null }[]): number | null {
-  const credits = reports.flatMap(report =>
-    report.credits_cost === null ? [] : [report.credits_cost]
-  );
-  return credits.length === 0 ? null : sum(credits);
-}
-
 /**
  * The result of a part scanned in chunks: it blocks when any chunk blocks, and is otherwise
  * unavailable when any chunk's scan is, so a chunk that fails never lets the part through.
@@ -341,7 +335,7 @@ function combineChunks(results: EnkryptGuardrailScanResult[]): EnkryptGuardrailS
         reports.some(report => report.detectors_fired.includes(id))
       ),
       attempts: sum(reports.map(report => report.attempts)),
-      credits_cost: totalCredits(reports),
+      credits_cost: totalCredits(reports.map(report => report.credits_cost)),
       latency_ms: Math.max(...reports.map(report => report.latency_ms)),
     },
   };
@@ -525,7 +519,7 @@ function toolsReport(
       flagged.some(each => each.detectors_fired.includes(id))
     ),
     attempts: sum(reports.map(report => report.attempts)),
-    credits_cost: totalCredits(reports),
+    credits_cost: totalCredits(reports.map(report => report.credits_cost)),
     latency_ms: reports.reduce((latest, report) => Math.max(latest, report.latency_ms), 0),
     flagged_tools: flagged.slice(0, MAX_REPORTED_FLAGGED_TOOLS).map(each => ({
       kind: each.kind,

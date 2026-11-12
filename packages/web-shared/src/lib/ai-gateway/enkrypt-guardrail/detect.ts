@@ -606,7 +606,7 @@ function scanReport(
     error: outcome.error ?? null,
     detectors_fired: outcome.detectorsFired ?? [],
     attempts: usageRecords.length,
-    credits_cost: totalCredits(usageRecords),
+    credits_cost: totalCredits(usageRecords.map(usageRecord => usageRecord.creditsCost)),
     latency_ms: outcome.latencyMs,
   };
 }
@@ -619,11 +619,10 @@ function logDecision(scope: ScanScope, report: EnkryptScanReport): void {
   else console.debug('[enkrypt-guardrail] decision', fields);
 }
 
-function totalCredits(usageRecords: EnkryptGuardrailCall[]): number | null {
-  const costs = usageRecords.flatMap(usageRecord =>
-    usageRecord.creditsCost === null ? [] : [usageRecord.creditsCost]
-  );
-  return costs.length === 0 ? null : costs.reduce((sum, cost) => sum + cost, 0);
+/** The sum of the reported costs, or null when none was reported. */
+export function totalCredits(costs: (number | null)[]): number | null {
+  const reported = costs.filter(cost => cost !== null);
+  return reported.length === 0 ? null : reported.reduce((sum, cost) => sum + cost, 0);
 }
 
 function unavailableReason(error: ScanError): EnkryptUnavailableReason {

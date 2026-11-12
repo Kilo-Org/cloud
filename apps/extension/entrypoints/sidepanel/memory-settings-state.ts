@@ -10,13 +10,13 @@ export type MemoriesSettingsView =
   | { kind: 'noMatches' }
   | { kind: 'list'; items: readonly MemorySettingsListItem[] };
 
-export type MemorySettingsListItem = {
+export interface MemorySettingsListItem {
   id: string;
   preview: string;
   domain: string | undefined;
   dateLabel: string;
   deleteAriaLabel: string;
-};
+}
 
 export const MEMORY_FILTER_MIN_COUNT = 3;
 

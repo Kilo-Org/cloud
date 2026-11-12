@@ -8,7 +8,7 @@ let storedDrafts: Record<string, string> = {};
 let isHydrated = false;
 const localWrites = new Map<string, string | undefined>();
 
-const getDraftSnapshot = (): Record<string, string> => {
+const getDraftSnapshot = () => {
   const snapshot = { ...storedDrafts };
 
   for (const [conversationId, text] of localWrites) {

@@ -10,8 +10,9 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
-const listFocusableElements = (root: HTMLElement): HTMLElement[] =>
-  Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+const listFocusableElements = (root: HTMLElement): HTMLElement[] => [
+  ...root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+];
 
 const useLatestRef = <TValue>(value: TValue): RefObject<TValue> => {
   const valueRef = useRef(value);
@@ -129,7 +130,7 @@ export const useModalDialog = ({
       }
 
       const focusable = listFocusableElements(dialog);
-      const first = focusable[0];
+      const [first] = focusable;
       const last = focusable.at(-1);
 
       if (first === undefined || last === undefined) {

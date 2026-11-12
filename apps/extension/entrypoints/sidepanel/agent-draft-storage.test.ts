@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const draftStorage = new Map<string, unknown>();
 
@@ -16,61 +16,61 @@ vi.mock('#imports', () => ({
 }));
 
 const draftStorageKey = 'local:kiloAgentDrafts';
-type DraftStorage = {
+interface DraftStorage {
   hydrateStoredDrafts: () => Promise<Record<string, string>>;
   persistDraft: (conversationId: string, text: string) => void;
-};
-const loadDraftStorage = async (): Promise<DraftStorage> => {
+}
+const loadDraftStorage = (): Promise<DraftStorage> => {
   vi.resetModules();
 
   return import('./agent-draft-storage');
 };
 
-beforeEach(() => {
-  draftStorage.clear();
-});
-
 describe('agent draft storage', () => {
   it('keeps a draft across a module reload', async () => {
+    draftStorage.clear();
     const before = await loadDraftStorage();
     await before.hydrateStoredDrafts();
     before.persistDraft('conversation-1', 'half typed question');
 
     const after = await loadDraftStorage();
 
-    expect(await after.hydrateStoredDrafts()).toEqual({
+    await expect(after.hydrateStoredDrafts()).resolves.toStrictEqual({
       'conversation-1': 'half typed question',
     });
   });
 
   it('drops a cleared draft', async () => {
+    draftStorage.clear();
     const drafts = await loadDraftStorage();
     await drafts.hydrateStoredDrafts();
     drafts.persistDraft('conversation-1', 'sent text');
     drafts.persistDraft('conversation-1', '');
 
-    expect(draftStorage.get(draftStorageKey)).toEqual({});
+    expect(draftStorage.get(draftStorageKey)).toStrictEqual({});
   });
 
   it('keeps stored drafts when an edit lands before hydration finishes', async () => {
+    draftStorage.clear();
     draftStorage.set(draftStorageKey, { 'conversation-1': 'typed before reload' });
     const drafts = await loadDraftStorage();
     drafts.persistDraft('conversation-2', 'typed immediately');
 
-    expect(await drafts.hydrateStoredDrafts()).toEqual({
+    await expect(drafts.hydrateStoredDrafts()).resolves.toStrictEqual({
       'conversation-1': 'typed before reload',
       'conversation-2': 'typed immediately',
     });
-    expect(draftStorage.get(draftStorageKey)).toEqual({
+    expect(draftStorage.get(draftStorageKey)).toStrictEqual({
       'conversation-1': 'typed before reload',
       'conversation-2': 'typed immediately',
     });
   });
 
   it('ignores a malformed store instead of throwing', async () => {
+    draftStorage.clear();
     draftStorage.set(draftStorageKey, ['not', 'a', 'map']);
     const drafts = await loadDraftStorage();
 
-    expect(await drafts.hydrateStoredDrafts()).toEqual({});
+    await expect(drafts.hydrateStoredDrafts()).resolves.toStrictEqual({});
   });
 });

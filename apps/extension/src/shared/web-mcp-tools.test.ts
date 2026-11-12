@@ -174,10 +174,10 @@ describe('webMCP tools', () => {
   it('signs the same definition regardless of JSON key order', () => {
     // The page rebuilds this signature itself, and key order changes through extension messaging.
     const reorderedSchema = {
-      type: 'object',
-      required: ['query'],
-      properties: { query: { type: 'string' } },
       additionalProperties: false,
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+      type: 'object',
     };
 
     const result = build([createTool({ inputSchema: reorderedSchema })]);

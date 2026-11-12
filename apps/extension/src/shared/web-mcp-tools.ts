@@ -77,18 +77,20 @@ const isWebMcpGatewayToolName = (name: string): name is WebMcpGatewayToolName =>
  * messaging reorders object keys, so both sides sort keys before comparing:
  * JSON key order is not part of a tool definition.
  */
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- recursive canonicalizer over arbitrary third-party tool data: it mirrors an unknown input, so no narrower named type can describe the output.
 const canonicalize = (value: unknown): unknown => {
   if (Array.isArray(value)) {
-    return value.map(canonicalize);
+    return value.map(entry => canonicalize(entry));
   }
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the descriptor's schema travels as untyped tool data, so this is the boundary that decides whether to canonicalize it.
   if (value === null || typeof value !== 'object') {
     return value;
   }
 
   return Object.fromEntries(
     Object.entries(value)
-      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .toSorted(([left], [right]) => (left < right ? -1 : Number(left > right)))
       .map(([key, entry]) => [key, canonicalize(entry)])
   );
 };

@@ -124,14 +124,14 @@ const webMcpDefinitionSignature = (tool: {
     typeof schema === 'object' && schema !== null && !Array.isArray(schema) ? schema : undefined;
   const canonicalize = (value: unknown): unknown => {
     if (Array.isArray(value)) {
-      return value.map(canonicalize);
+      return value.map(entry => canonicalize(entry));
     }
     if (value === null || typeof value !== 'object') {
       return value;
     }
     return Object.fromEntries(
       Object.entries(value)
-        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+        .toSorted(([left], [right]) => (left < right ? -1 : Number(left > right)))
         .map(([key, entry]) => [key, canonicalize(entry)])
     );
   };
@@ -1064,7 +1064,7 @@ describe('tab debugger helpers', () => {
         resolved([
           {
             description: 'D',
-            inputSchema: { type: 'object', properties: { value: { type: 'number' } } },
+            inputSchema: { properties: { value: { type: 'number' } }, type: 'object' },
             name: 'double',
             origin: 'https://example.com',
             title: 'Double',

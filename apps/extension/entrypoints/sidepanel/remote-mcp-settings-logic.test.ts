@@ -46,7 +46,7 @@ describe('remote-mcp-settings pure logic', () => {
     });
   });
 
-  describe('needsCredentials', () => {
+  describe('credential requirement', () => {
     it('routes a 401 server without OAuth to adding credentials', () => {
       expect(needsCredentials(makeServer({ status: 'needs_auth' }))).toBe(true);
     });

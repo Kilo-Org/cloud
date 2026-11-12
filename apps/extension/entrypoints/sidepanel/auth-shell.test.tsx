@@ -1,4 +1,4 @@
-/* eslint-disable import/first, jest/no-hooks, jest/no-untyped-mock-factory, no-unsafe-type-assertion -- test fixture constraints */
+/* eslint-disable import/first, jest/no-hooks, jest/no-untyped-mock-factory, no-unsafe-type-assertion, vitest/prefer-import-in-mock -- test fixture constraints */
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

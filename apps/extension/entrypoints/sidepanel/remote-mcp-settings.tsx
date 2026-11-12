@@ -320,6 +320,30 @@ const ServerForm = ({
   );
 };
 
+const connectControlLabel = (
+  busy: boolean,
+  addCredentials: boolean,
+  status: RemoteMcpServer['status']
+): string => {
+  if (busy) {
+    return 'Connecting…';
+  }
+
+  return addCredentials ? 'Add credentials' : getConnectButtonLabel(status);
+};
+
+const connectControlIcon = (busy: boolean, addCredentials: boolean): JSX.Element => {
+  if (busy) {
+    return <RefreshCw aria-hidden="true" className="size-3 animate-spin" />;
+  }
+
+  return addCredentials ? (
+    <KeyRound aria-hidden="true" className="size-3" />
+  ) : (
+    <RefreshCw aria-hidden="true" className="size-3" />
+  );
+};
+
 const ServerRow = ({
   busy,
   onConnect,
@@ -387,18 +411,8 @@ const ServerRow = ({
             }}
             type="button"
           >
-            {busy ? (
-              <RefreshCw aria-hidden="true" className="size-3 animate-spin" />
-            ) : addCredentials ? (
-              <KeyRound aria-hidden="true" className="size-3" />
-            ) : (
-              <RefreshCw aria-hidden="true" className="size-3" />
-            )}
-            {busy
-              ? 'Connecting…'
-              : addCredentials
-                ? 'Add credentials'
-                : getConnectButtonLabel(server.status)}
+            {connectControlIcon(busy, addCredentials)}
+            {connectControlLabel(busy, addCredentials, server.status)}
           </button>
           <button
             aria-label={`Edit ${server.displayName}`}

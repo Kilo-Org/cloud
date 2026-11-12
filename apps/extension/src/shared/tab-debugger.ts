@@ -1044,9 +1044,10 @@ const runInjectedWebMcpExecute = async (
    * JSON key order is not part of a tool definition, and it changes when the
    * tool travels through extension messaging, so sort keys before comparing.
    */
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- recursive canonicalizer over arbitrary third-party tool data: it mirrors an unknown input, so no narrower named type can describe the output.
   const canonicalize = (value: unknown): unknown => {
     if (isArray(value)) {
-      return value.map(canonicalize);
+      return value.map(entry => canonicalize(entry));
     }
 
     if (!isPlainObject(value)) {
@@ -1055,7 +1056,7 @@ const runInjectedWebMcpExecute = async (
 
     return Object.fromEntries(
       Object.entries(value)
-        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+        .toSorted(([left], [right]) => (left < right ? -1 : Number(left > right)))
         .map(([key, entry]) => [key, canonicalize(entry)])
     );
   };
@@ -1312,10 +1313,12 @@ const isWebMcpToolDescriptorArray = (value: unknown): value is WebMcpToolDescrip
  * a successful call.
  */
 const isWebMcpExecuteEnvelope = (value: unknown): value is WebMcpExecuteEnvelope =>
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- this guard is the parse boundary for the injected function's untrusted response; there is no schema to hand it to.
   typeof value === 'object' &&
   value !== null &&
   'ok' in value &&
   ((value.ok === true && 'value' in value) ||
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- same boundary: the envelope's error text arrives as an untyped injected value.
     (value.ok === false && 'error' in value && typeof value.error === 'string'));
 
 export const discoverWebMcpToolsInTab = async ({

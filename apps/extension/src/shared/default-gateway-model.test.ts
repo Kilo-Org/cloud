@@ -9,7 +9,7 @@ const model = (id: string, isPreferred = false): KiloGatewayModelOption => ({
   variants: [],
 });
 
-describe('getDefaultGatewayModelId', () => {
+describe('default gateway model', () => {
   it('prefers the frontier auto route', () => {
     expect(
       getDefaultGatewayModelId([

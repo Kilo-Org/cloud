@@ -5,6 +5,16 @@ import type { AgentMode } from '@/src/shared/agent-conversation';
 import { draftAtomFamily, queuedMessageAtomFamily } from './agent-chat-atoms';
 import { persistDraft } from './agent-draft-storage';
 
+const getComposerPlaceholder = (isRunning: boolean, mode: AgentMode): string => {
+  if (isRunning) {
+    return 'Queue a message for the next turn...';
+  }
+
+  return mode === 'dangerous'
+    ? 'Ask Kilo to act on this page...'
+    : 'Ask Kilo to inspect this tab...';
+};
+
 export const MessageComposer = ({
   activeConversationId,
   blockedReason,
@@ -25,11 +35,7 @@ export const MessageComposer = ({
   const [draft, setDraft] = useAtom(draftAtomFamily(activeConversationId));
   const [queuedMessage, setQueuedMessage] = useAtom(queuedMessageAtomFamily(activeConversationId));
   const isSendDisabled = !canSend || draft.trim() === '';
-  const placeholder = isRunning
-    ? 'Queue a message for the next turn...'
-    : mode === 'dangerous'
-      ? 'Ask Kilo to act on this page...'
-      : 'Ask Kilo to inspect this tab...';
+  const placeholder = getComposerPlaceholder(isRunning, mode);
 
   return (
     <form

@@ -79,6 +79,7 @@ describe('modal dialog focus and dismissal', () => {
 
     fireEvent.keyDown(document, { key: 'Escape' });
 
+    // eslint-disable-next-line vitest/prefer-called-times -- vitest/prefer-called-once is also enabled and prefers the singular matcher.
     expect(onClose).toHaveBeenCalledOnce();
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(opener);

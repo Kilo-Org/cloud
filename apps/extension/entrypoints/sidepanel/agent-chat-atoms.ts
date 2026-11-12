@@ -10,9 +10,11 @@ import type { RemoteMcpStore } from '@/src/shared/remote-mcp';
  */
 export const remoteMcpStoreAtom = atom<RemoteMcpStore>({ servers: [] });
 
-// Per-conversation draft text, mirrored to storage (`local:kiloAgentDrafts`) on every edit so a
-// panel reload keeps it. Keys for closed-but-not-deleted conversations are kept so their drafts
-// survive reopen; the stored copy is dropped when the conversation is deleted or closed empty.
+/*
+ * Per-conversation draft text, mirrored to storage (`local:kiloAgentDrafts`) on every edit so a
+ * panel reload keeps it. Keys for closed-but-not-deleted conversations are kept so their drafts
+ * survive reopen; the stored copy is dropped when the conversation is deleted or closed empty.
+ */
 export const draftAtomFamily = atomFamily((_conversationId: string) => atom(''));
 
 // Per-conversation pending message, sent as the next turn when the current run ends.

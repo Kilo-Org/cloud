@@ -140,8 +140,10 @@ export const getInitialInspectableTabId = ({
   const activeTab =
     activeTabId === undefined ? undefined : inspectableTabs.find(tab => tab.id === activeTabId);
 
-  // Kilo's own sign-in and device-auth pages are leftovers, not pages to read: prefer the first
-  // real page and fall back to them only when nothing else is open.
+  /*
+   * Kilo's own sign-in and device-auth pages are leftovers, not pages to read: prefer the first
+   * real page and fall back to them only when nothing else is open.
+   */
   if (activeTab !== undefined && !isSignInPageUrl(activeTab.url)) {
     return activeTab.id;
   }
@@ -191,6 +193,32 @@ export const formatSelectedTabSystemEnvironment = ({
   readonly url: string;
 }): string =>
   formatSystemEnvironment({ memories: [], selectedTab: { title, url }, workflows: [] }) ?? '';
+
+const getSendBlockedReason = ({
+  isCompacting,
+  isModelSelected,
+  isStoreLoaded,
+  isTabSelected,
+}: {
+  readonly isCompacting: boolean;
+  readonly isModelSelected: boolean;
+  readonly isStoreLoaded: boolean;
+  readonly isTabSelected: boolean;
+}): string | undefined => {
+  if (!isStoreLoaded) {
+    return undefined;
+  }
+
+  if (!isTabSelected) {
+    return 'Pick a tab to send a message.';
+  }
+
+  if (!isModelSelected) {
+    return 'Choose a model to send a message.';
+  }
+
+  return isCompacting ? 'Kilo is compacting this conversation.' : undefined;
+};
 
 export const AgentChatPanel = ({
   auth,
@@ -395,15 +423,12 @@ export const AgentChatPanel = ({
     selectedModel !== undefined &&
     selectedTabId !== undefined &&
     !isCompacting;
-  const sendBlockedReason = !isConversationStoreLoaded
-    ? undefined
-    : selectedTabId === undefined
-      ? 'Pick a tab to send a message.'
-      : selectedModel === undefined
-        ? 'Choose a model to send a message.'
-        : isCompacting
-          ? 'Kilo is compacting this conversation.'
-          : undefined;
+  const sendBlockedReason = getSendBlockedReason({
+    isCompacting,
+    isModelSelected: selectedModel !== undefined,
+    isStoreLoaded: isConversationStoreLoaded,
+    isTabSelected: selectedTabId !== undefined,
+  });
 
   conversationStoreRef.current = conversationStore;
   memoriesRef.current = memories;
@@ -493,9 +518,11 @@ export const AgentChatPanel = ({
       return;
     }
 
-    // A conversation keeps whatever target the user picked. Only a conversation that
-    // never had one adopts the active tab, and a target that stops being inspectable
-    // (closed, or navigated to a chrome:// page) leaves the selection empty.
+    /*
+     * A conversation keeps whatever target the user picked. Only a conversation that
+     * never had one adopts the active tab, and a target that stops being inspectable
+     * (closed, or navigated to a chrome:// page) leaves the selection empty.
+     */
     if (activeConversation.selectedTabId !== undefined) {
       return;
     }
@@ -915,14 +942,18 @@ export const AgentChatPanel = ({
       return;
     }
 
-    const events = conversation.events.filter(
+    const remainingEvents = conversation.events.filter(
       event => !(event.type === 'error' && event.id === errorEventId)
     );
 
     setConversationStore(currentStore =>
-      updateStoredConversationEvents(currentStore, conversationId, () => events)
+      updateStoredConversationEvents(currentStore, conversationId, () => remainingEvents)
     );
-    void startTurn(conversationId, events, createRunState(conversationId, runSelectedTabId));
+    void startTurn(
+      conversationId,
+      remainingEvents,
+      createRunState(conversationId, runSelectedTabId)
+    );
   };
 
   const retryError = (event: ConversationErrorEvent): void => {
@@ -1252,10 +1283,12 @@ export const AgentChatPanel = ({
       conversationStoreRef.current = nextStore;
       setConversationStore(nextStore);
 
-      // Evict outside the state updater (StrictMode may double-invoke updaters).
-      // Empty closed tabs are deleted: always free their atoms and stored draft, including when
-      // ensureOpen recreates a fallback with the same id so drafts do not survive onto the fresh tab.
-      // Non-empty closed tabs keep drafts for History reopen.
+      /*
+       * Evict outside the state updater (StrictMode may double-invoke updaters).
+       * Empty closed tabs are deleted: always free their atoms and stored draft, including when
+       * ensureOpen recreates a fallback with the same id so drafts do not survive onto the fresh tab.
+       * Non-empty closed tabs keep drafts for History reopen.
+       */
       const idsToEvict = new Set<string>();
       if (wasEmpty) {
         idsToEvict.add(conversationId);

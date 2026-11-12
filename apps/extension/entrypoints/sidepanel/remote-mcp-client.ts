@@ -1,3 +1,4 @@
+/* eslint-disable import/max-dependencies, max-lines -- one transport adapter per MCP concern; the connect/retry flow reads better in one file */
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import {
@@ -52,9 +53,7 @@ const extractServerReason = (message: string): string | undefined => {
  * A remote MCP server is a third party, so the copy names it rather than Kilo:
  * the user's next step is the server URL, its credentials, or its health.
  */
-const describeConnectFailure = (
-  error: unknown
-): { readonly message: string; readonly needsAuth: boolean } => {
+const describeConnectFailure = (error: unknown) => {
   const needsAuth =
     (error instanceof StreamableHTTPError && error.code === 401) ||
     error instanceof UnauthorizedError;
@@ -186,7 +185,7 @@ export const connectRemoteMcpServer = async ({
       }
       const code = authProvider.takeAuthorizationCode();
       if (code === undefined) {
-        throw new Error(AUTH_INCOMPLETE_MESSAGE);
+        throw new Error(AUTH_INCOMPLETE_MESSAGE, { cause: error });
       }
       await transport.finishAuth(code);
       await client.connect(asTransport(makeTransport(server, fetchFn, authProvider)), {

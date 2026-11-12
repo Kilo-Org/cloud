@@ -1,4 +1,4 @@
-/* eslint-disable import/max-dependencies */
+/* eslint-disable import/max-dependencies, max-lines -- the header owns sign-in, identity, organization picker and the settings dialog; splitting it would spread one state machine across files */
 import { storage } from '#imports';
 import { useAtom } from 'jotai';
 import { useEffect, useState } from 'react';
@@ -193,7 +193,7 @@ const HeaderActions = ({
   const closeSettings = (): void => {
     setIsSettingsOpen(false);
   };
-  const settingsDialogRef = useModalDialog({ open: isSettingsOpen, onClose: closeSettings });
+  const settingsDialogRef = useModalDialog({ onClose: closeSettings, open: isSettingsOpen });
 
   return (
     <div className="relative flex shrink-0 items-center justify-end gap-2">

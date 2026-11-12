@@ -87,13 +87,20 @@ describe('Cloud Agent upload-only access', () => {
     ['GET', '/entities'],
     ['GET', `/blobs/${'a'.repeat(64)}`],
     ['DELETE', ''],
-    ['POST', '/commands'],
-    ['POST', '/live-ticket'],
-  ])(
-    'refuses %s %s without granting transcript, deletion or control access',
-    async (method, suffix) => {
+  ])('refuses %s %s without granting transcript or deletion access', async (method, suffix) => {
+    const f = await fixture();
+    const response = await f.request(method, `/v1/sessions/${f.id}${suffix}`, {});
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: { code: 'upload_only' } });
+    expect(f.authorizeUpload).not.toHaveBeenCalled();
+  });
+
+  it.each(['/commands', '/live-ticket'])(
+    'refuses control route %s because live routes accept only sync grants',
+    async suffix => {
       const f = await fixture();
-      expect((await f.request(method, `/v1/sessions/${f.id}${suffix}`, {})).ok).toBe(false);
+      const response = await f.request('POST', `/v1/sessions/${f.id}${suffix}`, {});
+      expect(response.status).toBe(401);
       expect(f.authorizeUpload).not.toHaveBeenCalled();
     }
   );

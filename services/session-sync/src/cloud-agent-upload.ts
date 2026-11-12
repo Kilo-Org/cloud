@@ -41,7 +41,11 @@ async function resolve(env: CloudAgentUploadEnv, handle: string, sessionID?: str
     if (!parsed.success || parsed.data.expiresAt <= Date.now())
       return failure(503, 'auth_unavailable', 'Cloud Agent upload authorization is unavailable');
     return parsed.data;
-  } catch {
+  } catch (error) {
+    console.error('Session sync auth dependency failure', {
+      operation: 'cloud-agent-upload',
+      errorClass: error instanceof Error ? error.name : typeof error,
+    });
     return failure(503, 'auth_unavailable', 'Cloud Agent upload authorization is unavailable');
   }
 }

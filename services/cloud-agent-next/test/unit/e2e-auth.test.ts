@@ -77,7 +77,7 @@ describe('E2E API token', () => {
       await expect(
         verifyKiloBearerAgainstCurrentPepper({
           ...auth,
-          getUserPepper: async () => ({ pepper, blockedReason: null }),
+          getUserPepper: async () => ({ pepper, blocked: false }),
         })
       ).resolves.toEqual({ userId: user.id });
       await expect(
@@ -85,7 +85,7 @@ describe('E2E API token', () => {
           ...auth,
           getUserPepper: async () => ({
             pepper: pepper === null ? '' : null,
-            blockedReason: null,
+            blocked: false,
           }),
         })
       ).resolves.toBeNull();
@@ -94,6 +94,23 @@ describe('E2E API token', () => {
 });
 
 describe('E2E stream ticket', () => {
+  it('carries the organization scope needed by Kilo v2 local sessions', () => {
+    const organizationId = '11111111-1111-4111-8111-111111111111';
+    const secret = 'synthetic-secret';
+    const payload = jwt.verify(
+      mintStreamTicket(
+        { id: 'synthetic-user' },
+        'workspace_synthetic',
+        secret,
+        120,
+        organizationId
+      ),
+      secret,
+      { algorithms: ['HS256'], audience: 'cloud-agent-stream' }
+    );
+    expect(payload).toMatchObject({ organizationId });
+  });
+
   it('uses the Cloud Agent stream audience', () => {
     const secret = 'test-secret';
     const user: TestUser = {

@@ -330,6 +330,34 @@ export function messageFailureLabel(
   return template === '' ? i18n.t(key, { title }) : composeFailureLabel(title, template);
 }
 
+/**
+ * The detail keys of the statement that says only that the response failed: an
+ * unclassified assistant error carries none, and a question whose run failed
+ * carries `deliveryExecution`. Every classified cause — a provider refusal, a
+ * spent balance, an aborted or overflowing turn — names something the reader
+ * cannot get anywhere else, so it is not generic.
+ */
+const GENERIC_RESPONSE_FAILURE_DETAIL_KEYS: ReadonlySet<string | null> = new Set([
+  null,
+  'agentChat.messageFailure.deliveryExecution',
+]);
+
+/**
+ * Whether this failure states only that the response failed. A question whose
+ * preparation failed states that failure in its preparation group, which sits
+ * with the turn, so this statement above it would repeat one failure in the
+ * same turn. The row keeps its actions; a classified statement is never
+ * hidden.
+ */
+export function isGenericResponseFailure(
+  failure: Pick<MessageFailure, 'titleKey' | 'detailKey'>
+): boolean {
+  return (
+    failure.titleKey === 'agentChat.messageFailure.assistantTitle' &&
+    GENERIC_RESPONSE_FAILURE_DETAIL_KEYS.has(failure.detailKey)
+  );
+}
+
 export function selectMessageFailure(input: {
   deliveryState?: MessageDeliveryStatement;
   info: MessageInfo;

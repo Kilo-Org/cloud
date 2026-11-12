@@ -53,7 +53,6 @@ import {
   tapTargetReachDp,
   textActionTargetClass,
   TOUCH_TARGET_DP,
-  VOICE_INPUT_LG_HIT_SLOP_DP,
 } from './tap-target';
 
 // `inlineLinkHitSlop` resolves the sentence's ends through the interface
@@ -423,10 +422,10 @@ describe('composer input row control separation', () => {
   it('leaves positive clearance between two adjacent controls tap areas', () => {
     // The regression this guards: the send/stop control carried no gap, so it
     // rendered flush against the microphone and the two tap areas overlapped.
+    // The voice toggle renders its whole target as its own box, so the row's
+    // slop is the only one the gap has to carry.
     expect(composerControlClearanceDp()).toBeGreaterThan(0);
-    expect(COMPOSER_CONTROL_GAP_DP).toBeGreaterThan(
-      VOICE_INPUT_LG_HIT_SLOP_DP + COMPOSER_CONTROL_HIT_SLOP_DP
-    );
+    expect(COMPOSER_CONTROL_GAP_DP).toBeGreaterThan(COMPOSER_CONTROL_HIT_SLOP_DP);
   });
 
   it('zeroes the slop on the side the nearer control sits on', () => {
@@ -449,12 +448,13 @@ describe('composer input row control separation', () => {
     }
   });
 
-  it('gaps the voice toggle from the send control below the two facing slops', () => {
+  it('gaps the voice toggle from the send control below the send control slop', () => {
     // `ms-1` is 0.25rem at NativeWind's 14pt rem: 3.5dp, narrower than the
-    // two facing slops, which is why both controls zero their facing side.
+    // send control's slop, which is why it zeroes the side that faces the
+    // toggle.
     expect(COMPOSER_VOICE_SEND_GAP_CLASS).toBe('ms-1');
     const voiceSendGapDp = Number(COMPOSER_VOICE_SEND_GAP_CLASS.slice('ms-'.length)) * 0.25 * 14;
     expect(voiceSendGapDp).toBe(3.5);
-    expect(voiceSendGapDp).toBeLessThan(VOICE_INPUT_LG_HIT_SLOP_DP + COMPOSER_CONTROL_HIT_SLOP_DP);
+    expect(voiceSendGapDp).toBeLessThan(COMPOSER_CONTROL_HIT_SLOP_DP);
   });
 });

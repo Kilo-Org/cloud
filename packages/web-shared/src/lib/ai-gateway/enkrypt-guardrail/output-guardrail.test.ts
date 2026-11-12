@@ -4,6 +4,7 @@ import type { EnkryptOutputDetectors, OrganizationSettings } from '@kilocode/db/
 import {
   ENKRYPT_DETECT_URL,
   ENKRYPT_MAX_SCAN_CHARACTERS,
+  RESPONSE_TOO_LARGE_MESSAGE,
   type EnkryptGuardrailVerdict,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import { createEmptyEnkryptOutputDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
@@ -321,6 +322,7 @@ const blockingPiiSettings = {
 function scanReport(overrides: Record<string, unknown>) {
   return {
     scan: 'blocking',
+    part: 'response',
     detectors_enabled: ['pii'],
     detectors_blocking: ['pii'],
     verdict_cache: 'off',
@@ -328,6 +330,7 @@ function scanReport(overrides: Record<string, unknown>) {
     total_segments: 1,
     cached_characters: 0,
     cached_segments: 0,
+    omitted_attachments: 0,
     scanned_characters: MODEL_OUTPUT.length,
     decision: 'allowed',
     error: null,
@@ -849,7 +852,7 @@ describe('guardEnkryptOutput', () => {
       expect(client.status).toBe(400);
       expect(await client.json()).toMatchObject({
         error: {
-          message: expect.stringContaining('250,000 characters of model output'),
+          message: RESPONSE_TOO_LARGE_MESSAGE,
           code: 'guardrail_blocked',
         },
       });

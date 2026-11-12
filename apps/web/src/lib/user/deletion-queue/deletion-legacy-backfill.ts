@@ -8,6 +8,7 @@ import {
 } from '@kilocode/db/schema-types';
 import { SOFT_DELETED_BLOCK_REASON_PREFIX } from '@kilocode/db/user-soft-delete-reasons';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { assertNoLiveSubscriptionsForSoftDelete, SoftDeletePreconditionError } from '@/lib/user';
 import { writeDeletionAudit } from '@/lib/user/deletion-queue/deletion-audit';
 import { catalogForVersion } from '@/lib/user/deletion-queue/deletion-catalog';
@@ -43,12 +44,13 @@ export async function enqueueHistoricalUserDeletion(params: {
       .select({
         is_admin: kilocode_users.is_admin,
         is_super_admin: kilocode_users.is_super_admin,
+        blocked_at: kilocode_users.blocked_at,
         blocked_reason: kilocode_users.blocked_reason,
       })
       .from(kilocode_users)
       .where(eq(kilocode_users.id, params.adminUserId))
       .limit(1);
-    if (!admin || (!admin.is_admin && !admin.is_super_admin) || admin.blocked_reason !== null) {
+    if (!admin || (!admin.is_admin && !admin.is_super_admin) || isBlockedAccount(admin)) {
       return { status: 'refused', code: 'active_admin_required' };
     }
 

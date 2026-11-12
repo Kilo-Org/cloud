@@ -300,7 +300,7 @@ describe('useScreenTracking', () => {
   it('does not log when capture is skipped', () => {
     vi.stubGlobal('__DEV__', true);
     const logSpy = vi.spyOn(console, 'log').mockReturnValue(undefined);
-    mocks.state.segments = ['(app)', '(tabs)', '(1_kiloclaw)'];
+    mocks.state.segments = ['(app)'];
 
     mount();
     advanceSettleWindow();

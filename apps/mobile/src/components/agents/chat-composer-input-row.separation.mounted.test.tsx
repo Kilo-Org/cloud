@@ -70,8 +70,8 @@ function hasGapWrapper(
   return false;
 }
 
-function hitSlopOf(control: TestRenderer.ReactTestInstance | null | undefined): Insets {
-  return control?.props.hitSlop as Insets;
+function hitSlopOf(control: TestRenderer.ReactTestInstance | null | undefined): Insets | undefined {
+  return control?.props.hitSlop as Insets | undefined;
 }
 
 describe('ChatComposerInputRow mounted — control separation', () => {
@@ -108,14 +108,15 @@ describe('ChatComposerInputRow mounted — control separation', () => {
     expect(COMPOSER_VOICE_SEND_GAP_CLASS).toMatch(/^ms-\d/);
   });
 
-  // The voice/send gap is narrower than the two facing slops, so each control
-  // drops the slop on the side it faces the other on, or a tap on the
-  // microphone's edge would send the message.
+  // The voice/send gap is narrower than the send control's slop, so the send
+  // control drops the slop on the side it faces the microphone on, or a tap on
+  // the microphone's edge would send the message. The microphone adds no slop
+  // at all: its pressable already renders the whole touch target.
   it.each([
     { isRTL: false, micFacing: 'right', sendFacing: 'left' },
     { isRTL: true, micFacing: 'left', sendFacing: 'right' },
   ] as const)(
-    'zeroes the mic and send slops on their facing sides (RTL: $isRTL)',
+    'keeps the mic and send tap areas apart across the voice/send gap (RTL: $isRTL)',
     async ({ isRTL, micFacing, sendFacing }) => {
       layoutDirection.isRTL = isRTL;
       try {
@@ -124,10 +125,12 @@ describe('ChatComposerInputRow mounted — control separation', () => {
         const [mic] = findAllByType(renderer.root, 'VoiceInputButton');
         const send = findByAccessibilityLabel(renderer.root, 'Send message');
         expect(hasGapWrapper(send, COMPOSER_VOICE_SEND_GAP_CLASS)).toBe(true);
-        expect(hitSlopOf(mic)[micFacing]).toBe(0);
-        expect(hitSlopOf(mic)[sendFacing]).toBeGreaterThan(0);
-        expect(hitSlopOf(send)[sendFacing]).toBe(0);
-        expect(hitSlopOf(send)[micFacing]).toBeGreaterThan(0);
+        expect(mic?.props.size).toBe('lg');
+        // The toggle's pressable is the whole target, so it has no slop that
+        // could reach across the gap into the send control.
+        expect(hitSlopOf(mic)).toBeUndefined();
+        expect(hitSlopOf(send)?.[sendFacing]).toBe(0);
+        expect(hitSlopOf(send)?.[micFacing]).toBeGreaterThan(0);
 
         renderer.unmount();
       } finally {
@@ -149,7 +152,7 @@ describe('ChatComposerInputRow mounted — control separation', () => {
     expect(stop).not.toBeNull();
     expect(hasGapWrapper(mic ?? null)).toBe(true);
     expect(hasGapWrapper(stop, COMPOSER_VOICE_SEND_GAP_CLASS)).toBe(true);
-    expect(hitSlopOf(stop).left).toBe(0);
+    expect(hitSlopOf(stop)?.left).toBe(0);
 
     renderer.unmount();
   });

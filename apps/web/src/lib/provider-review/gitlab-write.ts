@@ -80,10 +80,10 @@ export const GITLAB_AUTO_MERGE_NO_PIPELINE_REASON =
  * s4 router must surface this list for GitLab, not the generic one.
  */
 export const GITLAB_MR_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
-  canComment: true,
+  canComment: { supported: true, reason: '' },
   reviewEvents: ['approve', 'comment'],
-  canResolveThreads: true,
-  canMerge: true,
+  canResolveThreads: { supported: true, reason: '' },
+  canMerge: { supported: true, reason: '' },
   autoMerge: { supported: true, reason: '' },
   reactions: { supported: true, reason: '' },
   reviewStatus: { supported: true, reason: '' },

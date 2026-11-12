@@ -3,6 +3,12 @@ import { runtimeHarness, kilo2RuntimeEnvironment } from './runtime-harness.js';
 import { readKilo2Sse } from './kilo2-event-feed.js';
 
 describe('runtime harness selection', () => {
+  it('uses the v2 background subagent default without changing the v1 environment', () => {
+    const env = { KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'false', KILO_CONFIG_CONTENT: '{}' };
+    expect(kilo2RuntimeEnvironment(env).KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS).toBeUndefined();
+    expect(env.KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS).toBe('false');
+  });
+
   it('passes the disk-backed profile to v2 without putting templates in the environment', () => {
     const result = kilo2RuntimeEnvironment({
       HOME: '/shared',
@@ -26,6 +32,14 @@ describe('runtime harness selection', () => {
     ]);
     expect(kilo2RuntimeEnvironment(result)).toEqual(result);
     expect(JSON.parse(env.KILO_CONFIG_CONTENT).skills).toEqual(skills);
+  });
+
+  it('exposes drain only through the v2 harness', () => {
+    const options = { server: { url: 'http://127.0.0.1:1' }, directory: '/workspace' };
+    expect(runtimeHarness({}).create(options).drainSession).toBeUndefined();
+    expect(
+      runtimeHarness({ KILO_RUNTIME_HARNESS: 'kilo2' }).create(options).drainSession
+    ).toBeFunction();
   });
   it('exposes legacy rule files to V2 once without replacing repository instruction configuration', () => {
     const original = {

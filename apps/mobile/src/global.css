@@ -77,10 +77,14 @@
    * 1.18:1 off the near-black page, so a placeholder reads as an empty area
    * (see the dark block). */
   --skeleton-fill: #f0eee6;
-  /* Track under the context-usage ring's arc. Light keeps the hairline tint;
-   * the dark block raises it so the ring reads as a circle, still below the
-   * neutral arc so a part-filled arc still reads as a fraction. */
-  --ring-track: rgba(20, 15, 10, 0.05);
+  /* Track under the context-usage ring's arc. Light needs the step the dark
+   * block already carries: the hairline tint sat 1.1:1 off the pill's own
+   * `--secondary` fill, so the ring read as a lone arc with no circle under it.
+   * 30% ink clears 1.97:1 off `--secondary` and 1.98:1 off the sheet's
+   * `--background` — the same presence the dark block gives at 1.92:1 — and
+   * stays far under the neutral arc (4.62:1 on the pill), so a part-filled arc
+   * still reads as a fraction. */
+  --ring-track: rgba(20, 15, 10, 0.3);
   --accent-soft: #ffdd00;
   --accent-soft-foreground: #1a1a10;
   /* Low-emphasis accent control. `--accent-soft` is the full-strength accent

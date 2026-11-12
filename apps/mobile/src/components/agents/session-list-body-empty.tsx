@@ -5,13 +5,16 @@ import { useTranslation } from 'react-i18next';
 
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
+import { sessionListNoMatchDescription } from '@/components/agents/session-list-empty-copy';
 import { QueryError } from '@/components/query-error';
 
 type BodyEmptyProps = {
   kind: 'filtered-empty' | 'query-error-empty' | 'no-past-sessions';
   isSearching: boolean;
-  secondaryAction?: 'clear-search' | 'clear-filters' | 'none';
-  clearQueryAction: ReactNode;
+  /** A platform or project filter narrows the list, so it can cause the empty body. */
+  hasActiveFilters: boolean;
+  /** One control per active narrowing input; each clears only what its label names. */
+  clearActions?: ReactNode;
   /** In-flight state of the retry the query-error body offers. */
   isRetrying?: boolean;
   /** The no-history body's next step (start a session). */
@@ -23,8 +26,8 @@ type BodyEmptyProps = {
 export function BodyEmpty({
   kind,
   isSearching,
-  secondaryAction,
-  clearQueryAction,
+  hasActiveFilters,
+  clearActions,
   isRetrying,
   createSessionAction,
   onRetry,
@@ -32,16 +35,15 @@ export function BodyEmpty({
 }: Readonly<BodyEmptyProps>) {
   const { t } = useTranslation();
   if (kind === 'filtered-empty') {
+    // The search field and the filter badge stay visible above this body, so
+    // naming every cause keeps the copy honest: a filter alone can hide the
+    // session, and the row below offers one action per cause.
     return (
       <EmptyState
         icon={SearchX}
         title={t('agents.sessionList.noMatches')}
-        description={
-          isSearching
-            ? t('agents.sessionList.tryDifferentSearch')
-            : t('agents.sessionList.tryAdjustFilters')
-        }
-        action={clearQueryAction}
+        description={sessionListNoMatchDescription(t, { isSearching, hasActiveFilters })}
+        action={clearActions}
         refreshControl={refreshControl}
       />
     );
@@ -61,9 +63,7 @@ export function BodyEmpty({
             onRetry={onRetry}
             isRetrying={isRetrying}
           />
-          {secondaryAction === 'clear-search' || secondaryAction === 'clear-filters'
-            ? clearQueryAction
-            : null}
+          {clearActions}
         </View>
       </CenteredState>
     );

@@ -4,12 +4,15 @@ import {
   ENKRYPT_GUARDRAIL_TIMEOUT_MS,
   ENKRYPT_MAX_SCAN_CHARACTERS,
   guardrailBlockMessage,
+  REQUEST_TOO_LARGE_MESSAGE,
+  RESPONSE_TOO_LARGE_MESSAGE,
   responseBlockMessage,
   scanRequest,
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
   type EnkryptUnavailableReason,
 } from './detect';
+import { createEnkryptCallLimiter, type EnkryptCallLimiter } from './call-limiter';
 import { MAX_ENKRYPT_CREDITS_PER_CALL } from './usage-write';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 
@@ -39,11 +42,13 @@ function makeScan(overrides: Partial<EnkryptGuardrailScan> = {}): EnkryptGuardra
     clientRequestId: 'client-request-1',
     text: 'tool output',
     coverage: {
+      part: 'conversation',
       cache: 'miss',
       totalCharacters: 11,
       totalSegments: 1,
       cachedCharacters: 0,
       cachedSegments: 0,
+      omittedAttachments: 0,
     },
     config,
     ...overrides,
@@ -175,6 +180,7 @@ describe('scanRequest', () => {
 
     expect(result.report).toEqual({
       scan: 'blocking',
+      part: 'conversation',
       detectors_enabled: ['injection_attack', 'pii', 'keyword_detector', 'toxicity'],
       detectors_blocking: ['injection_attack', 'toxicity', 'keyword_detector'],
       verdict_cache: 'miss',
@@ -182,6 +188,7 @@ describe('scanRequest', () => {
       total_segments: 1,
       cached_characters: 0,
       cached_segments: 0,
+      omitted_attachments: 0,
       scanned_characters: 32,
       decision: 'blocked',
       error: null,
@@ -194,6 +201,64 @@ describe('scanRequest', () => {
     expect(console.debug).toHaveBeenCalledWith(
       '[enkrypt-guardrail] decision',
       expect.objectContaining({ ...result.report, organization_id: makeScan().organizationId })
+    );
+  });
+
+  it('labels the report and request log with the scanned part and omitted attachments', async () => {
+    const calls: Promise<EnkryptRequestLog>[] = [];
+    const result = await scanRequest(
+      makeScan({ coverage: { ...makeScan().coverage, part: 'system', omittedAttachments: 3 } }),
+      deps(async () => detectResponse({ summary: {} }), {
+        requestLog: { guardrail: 'input', capture: entry => calls.push(entry) },
+      })
+    );
+
+    expect(result.report).toMatchObject({ part: 'system', omitted_attachments: 3 });
+    expect(await Promise.all(calls)).toEqual([
+      expect.objectContaining({ guardrail: 'input', scan: 'blocking', part: 'system' }),
+    ]);
+  });
+
+  it('records the chunk a scan covers in its request log entry and log fields', async () => {
+    const calls: Promise<EnkryptRequestLog>[] = [];
+    const dependencies = deps(async () => detectResponse({ summary: {} }), {
+      requestLog: { guardrail: 'input', capture: entry => calls.push(entry) },
+    });
+
+    await scanRequest(
+      makeScan({ coverage: { ...makeScan().coverage, chunk: { index: 1, count: 3 } } }),
+      dependencies
+    );
+
+    expect(await Promise.all(calls)).toEqual([
+      expect.objectContaining({
+        guardrail: 'input',
+        scan: 'blocking',
+        part: 'conversation',
+        chunk: { index: 1, count: 3 },
+      }),
+    ]);
+    expect(console.debug).toHaveBeenCalledWith(
+      '[enkrypt-guardrail] decision',
+      expect.objectContaining({ chunk: { index: 1, count: 3 } })
+    );
+  });
+
+  it('leaves the chunk out of the request log entry for an unchunked scan', async () => {
+    const calls: Promise<EnkryptRequestLog>[] = [];
+
+    await scanRequest(
+      makeScan(),
+      deps(async () => detectResponse({ summary: {} }), {
+        requestLog: { guardrail: 'input', capture: entry => calls.push(entry) },
+      })
+    );
+
+    const [entry] = await Promise.all(calls);
+    expect(entry).not.toHaveProperty('chunk');
+    expect(console.debug).not.toHaveBeenCalledWith(
+      '[enkrypt-guardrail] decision',
+      expect.objectContaining({ chunk: expect.anything() })
     );
   });
 
@@ -427,11 +492,13 @@ describe('scanRequest', () => {
 
   it('logs and records how much of the conversation was scanned and how much was cached', async () => {
     const coverage = {
+      part: 'conversation',
       cache: 'hit',
       totalCharacters: 9_000,
       totalSegments: 12,
       cachedCharacters: 8_000,
       cachedSegments: 10,
+      omittedAttachments: 2,
     } as const;
 
     const result = await scanRequest(
@@ -452,6 +519,7 @@ describe('scanRequest', () => {
         verdict_cache: 'hit',
         cached_characters: 8_000,
         cached_segments: 10,
+        omitted_attachments: 2,
       })
     );
   });
@@ -463,11 +531,13 @@ describe('scanRequest', () => {
       makeScan({
         text: '',
         coverage: {
+          part: 'conversation',
           cache: 'hit',
           totalCharacters: 900,
           totalSegments: 3,
           cachedCharacters: 900,
           cachedSegments: 3,
+          omittedAttachments: 0,
         },
       }),
       dependencies
@@ -491,8 +561,8 @@ describe('scanRequest', () => {
     );
   });
 
-  it('sends a request at the 250,000-character scan limit without truncating', async () => {
-    const text = 'a'.repeat(250_000);
+  it('sends a request at the 100,000-character scan limit without truncating', async () => {
+    const text = 'a'.repeat(100_000);
     const dependencies = deps(async () => detectResponse({ summary: {} }));
 
     const result = await scanRequest(makeScan({ text }), dependencies);
@@ -506,26 +576,48 @@ describe('scanRequest', () => {
   describe('a request above the scan limit', () => {
     const text = 'a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 1);
 
-    it('is rejected with the reason, never truncated or sent', async () => {
-      const dependencies = deps(async () => detectResponse({ summary: {} }));
+    it.each([
+      ['tools', REQUEST_TOO_LARGE_MESSAGE],
+      ['system', REQUEST_TOO_LARGE_MESSAGE],
+      ['conversation', REQUEST_TOO_LARGE_MESSAGE],
+      ['response', RESPONSE_TOO_LARGE_MESSAGE],
+    ] as const)(
+      'is rejected for the %s part without truncating or sending it',
+      async (part, message) => {
+        const dependencies = deps(async () => detectResponse({ summary: {} }));
 
-      const result = await scanRequest(makeScan({ text }), dependencies);
+        const result = await scanRequest(
+          makeScan({ text, coverage: { ...makeScan().coverage, part } }),
+          dependencies
+        );
 
-      expect(result).toEqual({
-        report: expect.any(Object),
-        verdict: {
-          action: 'block',
-          message: expect.stringContaining('cannot scan more than 250,000 characters'),
-        },
-        usageRecords: [],
-      });
-      expect(result.verdict).toMatchObject({
-        message: expect.stringContaining('Compact or prune earlier conversation history'),
-      });
-      expect(result.verdict).toMatchObject({
-        message: expect.stringContaining('Retrying the unchanged request will not help.'),
-      });
-      expect(dependencies.fetch).not.toHaveBeenCalled();
+        expect(result).toEqual({
+          report: expect.any(Object),
+          verdict: { action: 'block', message },
+          usageRecords: [],
+        });
+        expect(result.report).toMatchObject({
+          part,
+          decision: 'error_fail_closed',
+          error: 'request_too_large',
+          scanned_characters: ENKRYPT_MAX_SCAN_CHARACTERS + 1,
+        });
+        expect(dependencies.fetch).not.toHaveBeenCalled();
+      }
+    );
+  });
+
+  describe('the too-large messages', () => {
+    it('say that a request is split into scans, and that retrying unchanged will not help', () => {
+      expect(REQUEST_TOO_LARGE_MESSAGE).toContain('100,000 characters');
+      expect(REQUEST_TOO_LARGE_MESSAGE).toContain('splits long requests into scans');
+      expect(REQUEST_TOO_LARGE_MESSAGE).toContain('Retrying the unchanged request will not help.');
+    });
+
+    it('say that a response is withheld above 100,000 characters', () => {
+      expect(RESPONSE_TOO_LARGE_MESSAGE).toContain('100,000 characters');
+      expect(RESPONSE_TOO_LARGE_MESSAGE).toContain('model output');
+      expect(RESPONSE_TOO_LARGE_MESSAGE).toContain('so this response was withheld');
     });
   });
 
@@ -547,7 +639,7 @@ describe('scanRequest', () => {
     ]);
   });
 
-  it('shares a single 5-second deadline across retry attempts', async () => {
+  it('shares a single 60-second deadline across retry attempts', async () => {
     const timeout = jest.spyOn(AbortSignal, 'timeout');
     const responses = [
       detectResponse({ summary: {} }, { status: 502 }),
@@ -561,7 +653,7 @@ describe('scanRequest', () => {
       await scanRequest(makeScan(), dependencies);
 
       expect(timeout).toHaveBeenCalledTimes(1);
-      expect(timeout).toHaveBeenCalledWith(5_000);
+      expect(timeout).toHaveBeenCalledWith(60_000);
       const calls = fetchCalls(dependencies);
       expect(calls).toHaveLength(2);
       expect(calls[0][1].signal).toBe(calls[1][1].signal);
@@ -789,6 +881,7 @@ describe('scanRequest', () => {
         {
           guardrail: 'output',
           scan: 'blocking',
+          part: 'conversation',
           request: {
             text: 'tool output',
             detectors: config.detectors,
@@ -989,6 +1082,266 @@ describe('scanRequest', () => {
       expect(dependencies.fetch).not.toHaveBeenCalled();
     });
   });
+
+  describe('with a shared deadline', () => {
+    it('uses the given deadline instead of starting its own timeout', async () => {
+      const timeout = jest.spyOn(AbortSignal, 'timeout');
+      const deadline = new AbortController();
+      const dependencies = deps(
+        (_input, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
+              once: true,
+            });
+            deadline.abort();
+          }),
+        { timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS, deadline: deadline.signal }
+      );
+
+      const result = await scanRequest(makeScan(), dependencies);
+
+      expect(timeout).not.toHaveBeenCalled();
+      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'timeout' });
+      expect(result.usageRecords).toEqual([expect.objectContaining({ decision: 'error' })]);
+      expect(result.report).toMatchObject({ error: 'timeout', attempts: 1 });
+    });
+
+    it('does not retry after the deadline passed', async () => {
+      const deadline = new AbortController();
+      const dependencies = deps(
+        async () => {
+          deadline.abort();
+          return detectResponse({ summary: {} }, { status: 503 });
+        },
+        { deadline: deadline.signal }
+      );
+
+      const result = await scanRequest(makeScan(), dependencies);
+
+      expect(dependencies.fetch).toHaveBeenCalledTimes(1);
+      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'transient' });
+    });
+  });
+
+  describe('with a call limiter', () => {
+    /** Wraps a real limiter, recording each acquire and release. */
+    function recordingLimiter(
+      events: string[],
+      limiter: EnkryptCallLimiter = createEnkryptCallLimiter()
+    ): EnkryptCallLimiter {
+      return {
+        async acquire(priority, signal) {
+          events.push(`acquire:${priority}`);
+          const slot = await limiter.acquire(priority, signal);
+          return (
+            slot &&
+            (() => {
+              events.push('release');
+              slot();
+            })
+          );
+        },
+      };
+    }
+
+    async function flush() {
+      await new Promise(resolve => setImmediate(resolve));
+    }
+
+    it('holds a slot for each attempt, retry included, and releases it after each', async () => {
+      const events: string[] = [];
+      const responses = [
+        detectResponse({ summary: {} }, { status: 503 }),
+        detectResponse({ summary: {} }),
+      ];
+      const dependencies = deps(
+        async () => {
+          events.push('fetch');
+          return responses.shift() ?? Response.error();
+        },
+        { limiter: recordingLimiter(events) }
+      );
+
+      const result = await scanRequest(makeScan(), dependencies);
+
+      expect(result.verdict).toEqual({ action: 'allow' });
+      expect(events).toEqual([
+        'acquire:blocking',
+        'fetch',
+        'release',
+        'acquire:blocking',
+        'fetch',
+        'release',
+      ]);
+    });
+
+    it('asks for a log-only slot for a log-only scan', async () => {
+      const events: string[] = [];
+
+      await scanRequest(
+        makeScan({
+          config: {
+            status: 'ready',
+            detectors: { pii: { enabled: true, entities: ['secrets'] } },
+            blockingDetectors: [],
+          },
+        }),
+        deps(async () => detectResponse({ summary: {} }), { limiter: recordingLimiter(events) })
+      );
+
+      expect(events).toEqual(['acquire:log_only', 'release']);
+    });
+
+    it('releases the slot when the fetch rejects', async () => {
+      const events: string[] = [];
+      const dependencies = deps(
+        async () => {
+          events.push('fetch');
+          throw new TypeError('fetch failed');
+        },
+        { limiter: recordingLimiter(events) }
+      );
+
+      const result = await scanRequest(makeScan(), dependencies);
+
+      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'transient' });
+      expect(events).toEqual([
+        'acquire:blocking',
+        'fetch',
+        'release',
+        'acquire:blocking',
+        'fetch',
+        'release',
+      ]);
+    });
+
+    it('releases the slot when the attempt throws unexpectedly', async () => {
+      const events: string[] = [];
+      const dependencies = deps(async () => detectResponse({ summary: {} }), {
+        limiter: recordingLimiter(events),
+        requestLog: {
+          guardrail: 'input',
+          capture: () => {
+            throw new Error('capture failed');
+          },
+        },
+      });
+
+      await expect(scanRequest(makeScan(), dependencies)).rejects.toThrow('capture failed');
+      expect(events).toEqual(['acquire:blocking', 'release']);
+    });
+
+    it.each([
+      [
+        'the deadline passes',
+        'timeout',
+        { action: 'unavailable', reason: 'timeout' },
+        'error_fail_closed',
+      ],
+      [
+        'the client disconnects',
+        'client_aborted',
+        { action: 'unavailable', reason: 'failed' },
+        'client_aborted',
+      ],
+    ] as const)(
+      'fails without a call or usage when %s while waiting for a slot',
+      async (_name, error, verdict, decision) => {
+        const limiter = createEnkryptCallLimiter(1);
+        const holder = await limiter.acquire('blocking', new AbortController().signal);
+        const deadline = new AbortController();
+        const client = new AbortController();
+        const dependencies = deps(async () => detectResponse({ summary: {} }), {
+          limiter,
+          deadline: deadline.signal,
+          signal: client.signal,
+        });
+
+        const pending = scanRequest(makeScan(), dependencies);
+        await flush();
+        (error === 'timeout' ? deadline : client).abort();
+        const result = await pending;
+
+        expect(result.verdict).toEqual(verdict);
+        expect(result.usageRecords).toEqual([]);
+        expect(result.report).toMatchObject({ decision, error, attempts: 0, credits_cost: null });
+        expect(dependencies.fetch).not.toHaveBeenCalled();
+        // The abandoned wait took no slot.
+        holder?.();
+        expect(await limiter.acquire('blocking', new AbortController().signal)).not.toBeNull();
+      }
+    );
+
+    it('keeps the first attempt’s usage when the retry runs out of time waiting for a slot', async () => {
+      const limiter = createEnkryptCallLimiter(1);
+      const deadline = new AbortController();
+      const other = Promise.withResolvers<void>();
+      const dependencies = deps(
+        async () => {
+          // Another call queues while this attempt holds the only slot, so it gets the slot next.
+          void limiter.acquire('blocking', new AbortController().signal).then(async slot => {
+            await other.promise;
+            slot?.();
+          });
+          return detectResponse({ summary: {} }, { status: 503, credits: '1' });
+        },
+        { limiter, deadline: deadline.signal }
+      );
+
+      const pending = scanRequest(makeScan(), dependencies);
+      await flush();
+      deadline.abort();
+      const result = await pending;
+      other.resolve();
+
+      expect(dependencies.fetch).toHaveBeenCalledTimes(1);
+      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'timeout' });
+      expect(result.usageRecords).toEqual([
+        expect.objectContaining({ decision: 'error', creditsCost: 1 }),
+      ]);
+      expect(result.report).toMatchObject({ error: 'timeout', attempts: 1, credits_cost: 1 });
+    });
+
+    it('starts a second scan’s call only after the first scan’s call finished with one slot', async () => {
+      const limiter = createEnkryptCallLimiter(1);
+      const responses = [
+        Promise.withResolvers<Response>(),
+        Promise.withResolvers<Response>(),
+      ] as const;
+      let inFlight = 0;
+      let maxInFlight = 0;
+      let calls = 0;
+      const dependencies = deps(
+        async () => {
+          const response = responses[calls++];
+          if (!response) throw new Error('unexpected call');
+          inFlight++;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          try {
+            return await response.promise;
+          } finally {
+            inFlight--;
+          }
+        },
+        { limiter }
+      );
+
+      const first = scanRequest(makeScan(), dependencies);
+      const second = scanRequest(makeScan({ text: 'other output' }), dependencies);
+      await flush();
+      expect(calls).toBe(1);
+
+      responses[0].resolve(detectResponse({ summary: {} }));
+      expect((await first).verdict).toEqual({ action: 'allow' });
+      await flush();
+      expect(calls).toBe(2);
+      responses[1].resolve(detectResponse({ summary: {} }));
+      expect((await second).verdict).toEqual({ action: 'allow' });
+      expect(maxInFlight).toBe(1);
+      expect(JSON.parse(String(fetchCalls(dependencies)[1][1].body)).text).toBe('other output');
+    });
+  });
+
   describe('a log-only scan', () => {
     const logOnlyConfig = {
       status: 'ready',

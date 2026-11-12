@@ -3,6 +3,7 @@ import { JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
 import { cookies, headers } from 'next/headers';
 
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from '@/lib/user';
 import { createOrUpdateUser, findAndSyncExistingUser } from '@/lib/user';
 import { readWatchwoodSignupAssessment } from '@/lib/auth/watchwood';
@@ -1297,7 +1298,7 @@ export const authOptions: NextAuthOptions = {
         // Check if this is an existing user with a different primary email
         const existingUser = await findAndSyncExistingUser(accountInfo);
 
-        if (existingUser?.blocked_reason) {
+        if (existingUser && isBlockedAccount(existingUser)) {
           return redirectUrlForCode('BLOCKED');
         }
 
@@ -1342,9 +1343,14 @@ export const authOptions: NextAuthOptions = {
 
         // A redeemed passkey ticket already proved identity, so a passkey skips
         // both Turnstile and user settlement. This return sits after the domain
-        // blacklist and SSO-authority checks above, so a passkey can never
-        // bypass a domain that enforces SSO. No `user_auth_provider` row is
-        // written for a passkey: the jwt callback resolves it by user id.
+        // blacklist, the account-status gate and the SSO-authority checks above,
+        // so a passkey can never bypass a domain that enforces SSO. The
+        // account-status gate refuses a blocked account for every provider: a
+        // deletion in progress writes its `blocked_reason` through
+        // `disableUserAccessForDeletion`, and the `isBlockedAccount` check right
+        // after `findAndSyncExistingUser` then answers the BLOCKED redirect. No
+        // `user_auth_provider` row is written for a passkey: the jwt callback
+        // resolves it by user id.
         if (accountInfo.provider === 'passkey') {
           return true;
         }
@@ -1510,7 +1516,7 @@ export const authOptions: NextAuthOptions = {
           );
         }
 
-        if (result.user.blocked_reason) {
+        if (isBlockedAccount(result.user)) {
           return redirectUrlForCode(`BLOCKED`);
         }
 

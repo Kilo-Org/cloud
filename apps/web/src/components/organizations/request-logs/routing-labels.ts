@@ -2,6 +2,7 @@ import { apiKindLabel } from '@/lib/api-kind-labels';
 import { byokKeyLabel, getByokProviderDisplayName } from '@/lib/byok/provider-names';
 import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 import type {
+  RequestLogNotSentReason,
   RequestLogRoutingResult,
   RequestLogRoutingStep,
 } from '@/lib/request-logs/routing-details';
@@ -17,6 +18,11 @@ export type DescribedStep = {
 export type DescribedResult = {
   title: string;
   paidBy: string | null;
+};
+
+export type DescribedUnsentResult = {
+  title: string;
+  detail: string | null;
 };
 
 const GATEWAY_NAMES: Record<string, string> = {
@@ -62,8 +68,15 @@ const SENT_TO_LABELS: Record<string, string> = {
 const REJECTED_RESULT_LABELS: Record<string, string> = {
   'chatgpt-reconnect': 'Rejected: the ChatGPT connection must be reconnected',
   'claude-billing-unavailable': 'Rejected: Claude organization billing is unavailable',
+  'claude-billing-reconnect': 'Rejected: the Claude organization link must be reconnected',
   'custom-llm-unavailable': 'Rejected: the promotional model is unavailable',
   'direct-byok-catalog-only': 'Rejected: the key only serves Kilo catalog model IDs',
+};
+
+const NOT_SENT_LABELS: Record<RequestLogNotSentReason, string> = {
+  'enkrypt-block': 'Not sent: blocked by the Enkrypt input guardrail',
+  'enkrypt-unavailable': 'Not sent: the Enkrypt input guardrail was unavailable',
+  'rejected-before-guardrail': 'Not sent: rejected before the Enkrypt input guardrail verdict',
 };
 
 const PROMOTIONAL_MODEL_REJECTION_LABELS: Record<string, string> = {
@@ -118,20 +131,36 @@ function paidByLabel(result: RequestLogRoutingResult): string | null {
   }
 }
 
-function sentToLabel(result: RequestLogRoutingResult): string {
+function selectedProviderName(result: RequestLogRoutingResult): string | null {
   const providerType = result.provider_type;
-  if (!providerType) return 'Provider selected';
+  if (!providerType) return null;
   if (providerType === 'direct-byok') {
     const providerIds = result.byok_provider_ids ?? [];
     return providerIds.length > 0
-      ? `Sent to ${listOf(providerIds.map(getByokProviderDisplayName))}`
-      : 'Sent to the BYOK provider';
+      ? listOf(providerIds.map(getByokProviderDisplayName))
+      : 'the BYOK provider';
   }
-  return `Sent to ${lookup(SENT_TO_LABELS, providerType)}`;
+  return lookup(SENT_TO_LABELS, providerType);
 }
 
 export function describeResult(result: RequestLogRoutingResult): DescribedResult {
-  return { title: sentToLabel(result), paidBy: paidByLabel(result) };
+  const provider = selectedProviderName(result);
+  return {
+    title: provider ? `Sent to ${provider}` : 'Provider selected',
+    paidBy: paidByLabel(result),
+  };
+}
+
+/** Nothing was sent, so nobody paid; the detail names the provider Kilo had selected. */
+export function describeUnsentResult(
+  result: RequestLogRoutingResult,
+  reason: RequestLogNotSentReason
+): DescribedUnsentResult {
+  const provider = selectedProviderName(result);
+  return {
+    title: NOT_SENT_LABELS[reason],
+    detail: provider ? `Would have been sent to ${provider}.` : null,
+  };
 }
 
 function toneOf(outcome: string | undefined): StepTone {

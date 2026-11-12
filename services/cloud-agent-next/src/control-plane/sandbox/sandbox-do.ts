@@ -103,6 +103,7 @@ import {
 import {
   sandboxProviderConfigurationSchema,
   ProviderCreationError,
+  ProviderSnapshotCreationError,
   type ProviderAdapter,
   type ProviderAllocationIntent,
   type ProviderCreateIntent,
@@ -545,11 +546,15 @@ class EnvironmentSnapshotRequiredError extends Error {
   }
 }
 
-type EnvironmentSnapshotUnusableReason = 'provider_no_snapshots' | 'not_isolated';
+type EnvironmentSnapshotUnusableReason =
+  | 'provider_no_snapshots'
+  | 'not_isolated'
+  | 'provider_mismatch';
 
 const ENVIRONMENT_SNAPSHOT_UNUSABLE_DETAIL: Record<EnvironmentSnapshotUnusableReason, string> = {
   provider_no_snapshots: ENVIRONMENT_SNAPSHOT_MESSAGES.unsupported,
   not_isolated: ENVIRONMENT_SNAPSHOT_MESSAGES.newSession,
+  provider_mismatch: ENVIRONMENT_SNAPSHOT_MESSAGES.providerMismatch,
 };
 
 /**
@@ -574,12 +579,36 @@ class SnapshotStartFailureError extends Error {
     readonly source: 'workspace' | 'environment',
     readonly reason: SnapshotStartFailureReason,
     readonly detail: string,
-    readonly environmentBlock?: EnvironmentSnapshotBlock
+    readonly environmentBlock?: EnvironmentSnapshotBlock,
+    readonly diagnostic?: SnapshotLaunchFailureDiagnostic
   ) {
     super('Snapshot start failed');
     this.name = 'SnapshotStartFailureError';
   }
 }
+
+type SnapshotLaunchFailureDiagnostic = {
+  failureStage:
+    | 'launch_deadline'
+    | 'provider_rejection'
+    | 'provider_snapshot'
+    | 'retry_stop'
+    | 'allocation_owned';
+  reason:
+    | SnapshotStartFailureReason
+    | 'launch_deadline'
+    | 'provider_rejected'
+    | 'stop_failed'
+    | 'allocation_owned';
+  errorName: string;
+  cause: string;
+  launchFailureStage?: string;
+  launchErrorName?: string;
+  launchCause?: string;
+  source: 'environment' | 'workspace' | 'image';
+  attempt: number;
+  elapsedMs: number;
+};
 
 type SnapshotStartSelection =
   | { source: 'workspace'; capturedAt: number }
@@ -2876,7 +2905,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const previous = await this.readAllocation();
     const timers = { ...this.sandboxTimers() };
     if (
-      this.currentProvider() === 'cloudflare-containers' &&
+      this.provider.environmentSnapshots !== undefined &&
       (event.type === 'ensure' || event.type === 'tick')
     ) {
       const routes = await listRoutes(this.db);
@@ -5093,6 +5122,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
       let createdRef: string | null = null;
       let billingAdmissionDeadlineAt: number | undefined;
       let billingAdmissionTimedOut = false;
+      let selectedLaunch:
+        | { options: ProviderLaunchOptions; selection: SnapshotStartSelection | null }
+        | undefined;
       try {
         const pin = this.providerPin;
         if (pin === null) throw new ProviderCreationError('invalid_configuration');
@@ -5125,11 +5157,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
         );
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
         if (pin.billing) await assertContainerAccountAvailable(this.env, pin.billing);
+        selectedLaunch =
+          this.provider.environmentSnapshots === 'create'
+            ? await this.environmentSnapshotLaunch(state, allocationId, createDeadline)
+            : undefined;
         const intent: ProviderCreateIntent = {
           intentId: allocationId,
           createdAt: Date.now(),
           allocationName: pin.allocationName ?? this.sandboxId,
           containment: this.resolvedContainment(),
+          ...(selectedLaunch?.options.snapshot === undefined
+            ? {}
+            : { snapshot: selectedLaunch.options.snapshot }),
           ...(pin.billing === null ? {} : { billing: pin.billing }),
         };
         // Serialize admission setup with alarm failure notifications. Start the RPC
@@ -5225,7 +5264,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
         );
         const launch =
           workspaceSnapshot === null
-            ? await this.environmentSnapshotLaunch(current, allocationId, launchDeadline)
+            ? (selectedLaunch ??
+              (await this.environmentSnapshotLaunch(current, allocationId, launchDeadline)))
             : {
                 options: {
                   snapshot: {
@@ -5242,7 +5282,27 @@ export class SandboxControlV2 extends DurableObject<Env> {
         // runs confirms this allocation, and that confirmation outlives the
         // allocation stopping before the launch resolves.
         await beginRepositoryLaunch(this.ctx.storage, allocationId, selection.mode);
-        if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+        if (Date.now() >= launchDeadline) {
+          const error = new Error('Sandbox launch timed out');
+          if (launch.options.snapshot !== undefined) {
+            logControlDiagnostic(
+              'snapshot_launch_failed',
+              {
+                sandboxId: this.sandboxId,
+                allocationId,
+                source: launch.selection?.source ?? 'image',
+                failureStage: 'launch_deadline',
+                reason: 'launch_deadline',
+                errorName: diagnosticCause(error.name),
+                cause: diagnosticCause(error.message),
+                attempt: 1,
+                elapsedMs: 0,
+              },
+              'warn'
+            );
+          }
+          throw error;
+        }
         const launchOptions: ProviderLaunchOptions = {
           ...launch.options,
           ...(pin.provider === 'cloudflare-containers'
@@ -5320,6 +5380,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
           !(error instanceof ProviderCreationError && error.code === 'meter_unavailable')
         ) {
           await clearNativeBillingAdmissionDeadline(this.ctx.storage);
+        }
+        if (error instanceof ProviderSnapshotCreationError) {
+          await this.failSnapshotStart(
+            allocationId,
+            this.snapshotStartFailure(selectedLaunch?.selection ?? null, error.reason)
+          );
+          return;
         }
         if (error instanceof RetiredSandboxProviderError) {
           logControlDiagnostic(
@@ -5629,7 +5696,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // Build commands run only in an environment build. When no environment
       // snapshot can serve this start, rebuilding cannot help: fail at once.
       const unusable =
-        this.provider.environmentSnapshots !== true
+        this.provider.environmentSnapshots === undefined
           ? 'provider_no_snapshots'
           : 'reason' in selected && selected.reason === 'not_isolated'
             ? 'not_isolated'
@@ -5661,8 +5728,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const lookup = await lookupEnvironmentSnapshot({
       namespace: this.env.ENVIRONMENT_BUILD,
       candidate,
+      provider: this.currentProvider() === 'vercel' ? 'vercel' : 'cloudflare-containers',
       launchDeadlineAt,
     });
+    if (lookup.kind === 'resolved' && lookup.resolution.reason === 'provider_mismatch') {
+      log({ reason: 'provider_mismatch' });
+      throw new EnvironmentSnapshotUnusableError(
+        'provider_mismatch',
+        ENVIRONMENT_SNAPSHOT_UNUSABLE_DETAIL.provider_mismatch,
+        candidate.reference.environmentId
+      );
+    }
     const decision = environmentSnapshotDecision(candidate, lookup);
     if (decision.kind === 'blocked') {
       log({
@@ -5791,57 +5867,132 @@ export class SandboxControlV2 extends DurableObject<Env> {
     launchOptions: ProviderLaunchOptions;
   }): Promise<{ result: ProviderLaunchResult; owned: boolean }> {
     const requestedSnapshot = input.launchOptions.snapshot !== undefined;
+    const startedAt = Date.now();
+    const source = input.selection?.source ?? 'image';
+    const recordFailure = (
+      attempt: number,
+      failure: Omit<SnapshotLaunchFailureDiagnostic, 'source' | 'attempt' | 'elapsedMs'>
+    ): SnapshotLaunchFailureDiagnostic => {
+      const diagnostic: SnapshotLaunchFailureDiagnostic = {
+        ...failure,
+        source,
+        attempt,
+        elapsedMs: Math.max(0, Date.now() - startedAt),
+      };
+      if (failure.failureStage !== 'provider_snapshot' || failure.reason === 'unsupported') {
+        logControlDiagnostic(
+          'snapshot_launch_failed',
+          { sandboxId: this.sandboxId, allocationId: input.allocationId, ...diagnostic },
+          'warn'
+        );
+      }
+      return diagnostic;
+    };
     for (let attempt = 1; ; attempt += 1) {
       if (Date.now() >= input.launchDeadline) {
         if (!requestedSnapshot) throw new Error('Sandbox launch timed out');
-        throw this.snapshotStartFailure(input.selection, 'transient');
+        const diagnostic = recordFailure(attempt, {
+          failureStage: 'launch_deadline',
+          reason: 'launch_deadline',
+          errorName: 'Error',
+          cause: 'Sandbox_launch_timed_out',
+        });
+        throw this.snapshotStartFailure(input.selection, 'transient', diagnostic);
       }
       let result: ProviderLaunchResult;
+      let failure:
+        | Omit<SnapshotLaunchFailureDiagnostic, 'source' | 'attempt' | 'elapsedMs'>
+        | undefined;
+      let timedOut = false;
       try {
         result = await withTimeout(
           this.provider.launch(
             input.createdRef,
             { command: input.startupCommand, env: input.launchEnv },
-            input.launchOptions
+            requestedSnapshot
+              ? {
+                  ...input.launchOptions,
+                  snapshotDiagnostic: {
+                    allocationId: input.allocationId,
+                    source,
+                    attempt,
+                    startedAt,
+                  },
+                }
+              : input.launchOptions
           ),
           remainingMs(input.launchDeadline),
-          'Sandbox launch timed out'
+          'Sandbox launch timed out',
+          () => {
+            timedOut = true;
+          }
         );
       } catch (error) {
-        if (!requestedSnapshot) throw error;
-        if (await this.allocationOwnedElsewhere(input.allocationId)) {
-          return {
-            result: { startSource: 'repository' },
-            owned: true,
-          };
-        }
-        if (attempt >= 2 || Date.now() >= input.launchDeadline)
-          throw this.snapshotStartFailure(input.selection, 'transient');
-        const retry = await this.stopForSnapshotRetry(input.createdRef, input.allocationId);
-        if (retry === 'owned') return { result: { startSource: 'repository' }, owned: true };
-        if (retry === 'failed') throw this.snapshotStartFailure(input.selection, 'transient');
-        continue;
+        // A create-time snapshot cannot be retried by launch. Retry creation
+        // through the allocation lifecycle instead.
+        if (!requestedSnapshot || this.provider.environmentSnapshots === 'create') throw error;
+        failure = {
+          failureStage: timedOut ? 'launch_deadline' : 'provider_rejection',
+          reason: timedOut ? 'launch_deadline' : 'provider_rejected',
+          errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
+          cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
+        };
+        result = { startSource: 'repository' };
       }
       const startedFromSnapshot = !result.snapshotFailed && result.startSource === 'repository';
       if (!requestedSnapshot) return { result, owned: false };
-      if (startedFromSnapshot) return { result, owned: false };
-      const reason: SnapshotStartFailureReason = result.snapshotFailed
-        ? (result.snapshotFailureReason ?? 'transient')
-        : 'unsupported';
+      if (failure === undefined && startedFromSnapshot) return { result, owned: false };
+      const reason: SnapshotStartFailureReason =
+        failure !== undefined
+          ? 'transient'
+          : result.snapshotFailed
+            ? (result.snapshotFailureReason ?? 'transient')
+            : 'unsupported';
+      failure ??= {
+        failureStage: 'provider_snapshot',
+        reason,
+        errorName: 'unknown',
+        cause: reason,
+      };
       // An owned allocation fails through `failConnectedSnapshotMiss`, which
       // handles a connected wrapper; the creation fail path does not.
       if (await this.allocationOwnedElsewhere(input.allocationId)) {
+        recordFailure(attempt, {
+          ...failure,
+          failureStage: 'allocation_owned',
+          reason: 'allocation_owned',
+        });
         return { result, owned: true };
       }
       if (
         snapshotStartFailureIsPermanent(reason) ||
         attempt >= 2 ||
         Date.now() >= input.launchDeadline
-      )
-        throw this.snapshotStartFailure(input.selection, reason);
+      ) {
+        throw this.snapshotStartFailure(input.selection, reason, recordFailure(attempt, failure));
+      }
       const retry = await this.stopForSnapshotRetry(input.createdRef, input.allocationId);
-      if (retry === 'owned') return { result, owned: true };
-      if (retry === 'failed') throw this.snapshotStartFailure(input.selection, reason);
+      if (retry.result === 'owned') {
+        recordFailure(attempt, {
+          ...failure,
+          failureStage: 'allocation_owned',
+          reason: 'allocation_owned',
+        });
+        return { result, owned: true };
+      }
+      if (retry.result === 'failed') {
+        const diagnostic = recordFailure(attempt, {
+          failureStage: 'retry_stop',
+          reason: 'stop_failed',
+          errorName: retry.errorName,
+          cause: retry.cause,
+          launchFailureStage: failure.failureStage,
+          launchErrorName: failure.errorName,
+          launchCause: failure.cause,
+        });
+        throw this.snapshotStartFailure(input.selection, reason, diagnostic);
+      }
+      recordFailure(attempt, failure);
     }
   }
 
@@ -5853,28 +6004,33 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async stopForSnapshotRetry(
     createdRef: string,
     allocationId: string
-  ): Promise<'retry' | 'owned' | 'failed'> {
-    if (await this.allocationOwnedElsewhere(allocationId)) return 'owned';
-    const confirmed = await this.stopRef(createdRef, allocationId);
-    return confirmed ? 'retry' : 'failed';
+  ): Promise<
+    { result: 'retry' | 'owned' } | { result: 'failed'; errorName: string; cause: string }
+  > {
+    if (await this.allocationOwnedElsewhere(allocationId)) return { result: 'owned' };
+    const stopped = await this.stopRef(createdRef, allocationId);
+    return stopped.confirmed
+      ? { result: 'retry' }
+      : { result: 'failed', errorName: stopped.errorName, cause: stopped.cause };
   }
 
   private snapshotStartFailure(
     selection: SnapshotStartSelection | null,
-    reason: SnapshotStartFailureReason
+    reason: SnapshotStartFailureReason,
+    diagnostic?: SnapshotLaunchFailureDiagnostic
   ): SnapshotStartFailureError {
     if (selection?.source === 'workspace') {
       const since = `Start fresh discards changes since ${new Date(selection.capturedAt).toISOString()}.`;
       const retry = reason === 'transient' ? ' Send a message to retry.' : '';
       const detail = `Could not restore the workspace snapshot.${retry} ${since}`;
-      return new SnapshotStartFailureError('workspace', reason, detail);
+      return new SnapshotStartFailureError('workspace', reason, detail, undefined, diagnostic);
     }
-    const detail = ENVIRONMENT_SNAPSHOT_MESSAGES.rebuild;
     const block =
       selection?.source === 'environment'
-        ? environmentSnapshotStartBlock(selection.candidate, selection.buildId ?? null)
+        ? environmentSnapshotStartBlock(selection.candidate, selection.buildId, reason)
         : undefined;
-    return new SnapshotStartFailureError('environment', reason, detail, block);
+    const detail = block?.detail ?? ENVIRONMENT_SNAPSHOT_MESSAGES.startFailed;
+    return new SnapshotStartFailureError('environment', reason, detail, block, diagnostic);
   }
 
   private async failWorkspaceSnapshotStart(
@@ -5906,6 +6062,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     logControlDiagnostic('snapshot_start_blocked', {
       sandboxId: this.sandboxId,
       allocationId,
+      source: 'environment',
+      failureStage: 'environment_selection',
       reason: block.reason,
       environmentId: block.environmentId,
       buildId: block.buildId ?? undefined,
@@ -5926,6 +6084,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     logControlDiagnostic('snapshot_start_blocked', {
       sandboxId: this.sandboxId,
       allocationId,
+      source: 'environment',
+      failureStage: 'environment_selection',
       reason: error.reason,
       environmentId: error.environmentId,
     });
@@ -5962,6 +6122,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     logControlDiagnostic('snapshot_start_blocked', {
       sandboxId: this.sandboxId,
       allocationId,
+      ...error.diagnostic,
+      failureReason: error.diagnostic?.reason,
       reason: block.reason,
       environmentId: block.environmentId,
       buildId: block.buildId ?? undefined,
@@ -6056,19 +6218,34 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
-  private async stopRef(ref: string, allocationId: string | null): Promise<boolean> {
+  private async stopRef(
+    ref: string,
+    allocationId: string | null
+  ): Promise<{ confirmed: boolean; errorName: string; cause: string }> {
+    let failure: { errorName: string; cause: string } | undefined;
     const result = await withTimeout(
       this.provider.stop(ref, null),
       this.sandboxTimers().providerStopAttemptMs,
       'Sandbox cleanup stop timed out'
-    ).catch(() => 'retryable' as const);
+    ).catch(error => {
+      failure = {
+        errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
+        cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
+      };
+      return 'retryable' as const;
+    });
     logControlDiagnostic('stop_origin', {
       origin: 'cleanup',
       allocationName: this.providerPin?.allocationName ?? this.sandboxId,
       allocationId,
       result,
+      ...failure,
     });
-    return result === 'terminal';
+    return {
+      confirmed: result === 'terminal',
+      errorName: failure?.errorName ?? 'none',
+      cause: failure?.cause ?? (result === 'terminal' ? 'stop_confirmed' : 'stop_not_confirmed'),
+    };
   }
 
   private async runStop(stopAttempt: number): Promise<void> {

@@ -11,6 +11,7 @@ import {
 import { resolveSecret } from '../../src/util/secret';
 import {
   activationWithNonListDomains,
+  activationWithRejectedBody,
   activationWithoutDomains,
   directoryEvent,
   groupEvent,
@@ -642,6 +643,202 @@ describe('response classes', () => {
 
     expect(io.calls.map(c => c.path)).toEqual(['/api/internal/scim/sub-organizations/dir_grp_01']);
     expect(result.heldFailure?.eventId).toBe('evt_1');
+  });
+});
+
+describe('directory conflict bounds', () => {
+  /** The directory's organization was never bound to the group's directory. */
+  const MISSING_DIRECTORY = (groupPath: string): AppRoute => ({
+    method: 'PUT',
+    path: `/sub-organizations/${groupPath}`,
+    replies: [{ status: 409, code: 'directory_not_found' }],
+  });
+
+  const GROUP_ROUTE = (groupPath: string): string =>
+    `/api/internal/scim/sub-organizations/${groupPath}`;
+
+  it('holds the shared cursor for one window per directory, then continues', async () => {
+    const target = stub('directory-window');
+    const clock = steppingClock(0);
+    const routes = [MISSING_DIRECTORY('dir_grp_01'), MISSING_DIRECTORY('dir_grp_02')];
+
+    // The first conflicting group of a directory: held, with its window open.
+    harness({ pages: [[groupEvent('evt_1')]], routes });
+    const held = await runInDurableObject(target, instance => instance.poll());
+    expect(held.heldFailure?.eventId).toBe('evt_1');
+    expect(held.eventsParked).toBe(0);
+
+    // Half a budget later the same event still holds, which is the per-event
+    // budget doing its work.
+    clock.advanceBy(CONFLICT_RETRY_BUDGET_MS / 2);
+    harness({ pages: [[groupEvent('evt_1')]], routes });
+    const stillHeld = await runInDurableObject(target, instance => instance.poll());
+    expect(stillHeld.heldFailure?.eventId).toBe('evt_1');
+    expect(stillHeld.eventsParked).toBe(0);
+
+    // Past the budget the first event parks, and the same directory's second
+    // conflicting group parks in the same poll, so another directory's group
+    // applies behind both of them.
+    clock.advanceBy(CONFLICT_RETRY_BUDGET_MS);
+    const io = harness({
+      pages: [
+        [
+          groupEvent('evt_1'),
+          groupEvent('evt_2', 'dsync.group.created', { groupId: 'dir_grp_02' }),
+          groupEvent('evt_3', 'dsync.group.created', {
+            directoryId: 'directory_02',
+            groupId: 'dir_grp_03',
+          }),
+        ],
+      ],
+      routes,
+    });
+    const result = await runInDurableObject(target, instance => instance.poll());
+
+    expect(result.heldFailure).toBeNull();
+    expect(result.eventsParked).toBe(2);
+    expect(result.eventsApplied).toBe(1);
+    expect(result.cursor).toBe('evt_3');
+    // All three events were attempted in this poll, so the second conflict cost
+    // no additional window.
+    expect(io.calls.map(call => call.path)).toEqual([
+      GROUP_ROUTE('dir_grp_01'),
+      GROUP_ROUTE('dir_grp_02'),
+      GROUP_ROUTE('dir_grp_03'),
+    ]);
+
+    const state = await readState(target);
+    expect(state.parked).toEqual(['evt_1', 'evt_2']);
+    expect(state.rows[CURSOR_KEY]).toBe('evt_3');
+    // The park records the directory rule alongside the app's answer, so an
+    // operator can tell the two apart.
+    expect(state.parkedReasons['evt_2']).toContain('spent its conflict window');
+    expect(state.parkedClasses['evt_2']).toBe('conflict');
+  });
+
+  it('parks a directory’s missing-organization conflicts once its activation was parked', async () => {
+    const target = stub('parked-activation');
+    const io = harness({
+      pages: [
+        [
+          activationWithRejectedBody('evt_1'),
+          groupEvent('evt_2'),
+          groupEvent('evt_3', 'dsync.group.created', {
+            directoryId: 'directory_02',
+            groupId: 'dir_grp_03',
+          }),
+        ],
+      ],
+      routes: [MISSING_DIRECTORY('dir_grp_01')],
+    });
+
+    const result = await runInDurableObject(target, instance => instance.poll());
+
+    // The activation was rejected before any request, so no organization was
+    // bound for that directory.
+    expect(io.calls.map(call => call.path)).toEqual([
+      GROUP_ROUTE('dir_grp_01'),
+      GROUP_ROUTE('dir_grp_03'),
+    ]);
+    expect(result.heldFailure).toBeNull();
+    expect(result.eventsParked).toBe(2);
+    expect(result.eventsApplied).toBe(1);
+    expect(result.cursor).toBe('evt_3');
+
+    const state = await readState(target);
+    expect(state.parked).toEqual(['evt_1', 'evt_2']);
+    // The later conflict records terminal, and its reason names the activation
+    // that was abandoned.
+    expect(state.parkedClasses['evt_2']).toBe('terminal');
+    expect(state.parkedReasons['evt_2']).toContain('activation was parked');
+    expect((await target.getStatus()).parkedCount).toBe(2);
+  });
+
+  it('holds a directory to one window across the events it applies', async () => {
+    const target = stub('converging-removal');
+    const clock = steppingClock(0);
+    const routes = [MISSING_DIRECTORY('dir_grp_01'), MISSING_DIRECTORY('dir_grp_02')];
+
+    harness({ pages: [[groupEvent('evt_1')]], routes });
+    await runInDurableObject(target, instance => instance.poll());
+
+    // The window opened at `evt_1` stays spent while `evt_2` applies, so both
+    // conflicting groups park in this poll.
+    clock.advanceBy(CONFLICT_RETRY_BUDGET_MS);
+    harness({
+      pages: [
+        [
+          groupEvent('evt_1'),
+          membershipEvent('evt_2', 'dsync.group.user_removed'),
+          groupEvent('evt_3', 'dsync.group.created', { groupId: 'dir_grp_02' }),
+          groupEvent('evt_4', 'dsync.group.created', {
+            directoryId: 'directory_02',
+            groupId: 'dir_grp_03',
+          }),
+        ],
+      ],
+      routes,
+    });
+    const result = await runInDurableObject(target, instance => instance.poll());
+
+    expect(result.heldFailure).toBeNull();
+    expect(result.eventsParked).toBe(2);
+    expect(result.eventsApplied).toBe(2);
+    expect(result.cursor).toBe('evt_4');
+    expect((await readState(target)).parked).toEqual(['evt_1', 'evt_3']);
+  });
+
+  it('gives a directory a fresh window once the event that opened it applies', async () => {
+    const target = stub('window-closed');
+    const clock = steppingClock(0);
+
+    harness({ pages: [[groupEvent('evt_1')]], routes: [MISSING_DIRECTORY('dir_grp_01')] });
+    const held = await runInDurableObject(target, instance => instance.poll());
+    expect(held.heldFailure?.eventId).toBe('evt_1');
+
+    // The dependency arrives behind the cursor, so the held event applies. That
+    // is the only event whose success closes the window, and it does here.
+    clock.advanceBy(CONFLICT_RETRY_BUDGET_MS / 2);
+    harness({
+      pages: [
+        [
+          groupEvent('evt_1'),
+          groupEvent('evt_2', 'dsync.group.created', { groupId: 'dir_grp_02' }),
+        ],
+      ],
+      routes: [
+        {
+          method: 'PUT',
+          path: '/sub-organizations/dir_grp_01',
+          replies: [{ status: 200, body: { id: 'org_2', created: true } }],
+        },
+        MISSING_DIRECTORY('dir_grp_02'),
+      ],
+    });
+    const progressed = await runInDurableObject(target, instance => instance.poll());
+    expect(progressed.eventsApplied).toBe(1);
+    expect(progressed.heldFailure?.eventId).toBe('evt_2');
+
+    // Half a budget into the new window the conflict still holds, so the window
+    // was measured from the event applying.
+    clock.advanceBy(CONFLICT_RETRY_BUDGET_MS / 2);
+    harness({
+      pages: [[groupEvent('evt_2', 'dsync.group.created', { groupId: 'dir_grp_02' })]],
+      routes: [MISSING_DIRECTORY('dir_grp_02')],
+    });
+    const stillHeld = await runInDurableObject(target, instance => instance.poll());
+    expect(stillHeld.eventsParked).toBe(0);
+    expect(stillHeld.heldFailure?.eventId).toBe('evt_2');
+
+    // A whole budget after it opened, it parks.
+    clock.advanceBy(CONFLICT_RETRY_BUDGET_MS);
+    harness({
+      pages: [[groupEvent('evt_2', 'dsync.group.created', { groupId: 'dir_grp_02' })]],
+      routes: [MISSING_DIRECTORY('dir_grp_02')],
+    });
+    const parked = await runInDurableObject(target, instance => instance.poll());
+    expect(parked.eventsParked).toBe(1);
+    expect((await readState(target)).parked).toEqual(['evt_2']);
   });
 });
 

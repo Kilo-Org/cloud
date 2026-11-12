@@ -41,7 +41,7 @@ export function ReasoningPartRenderer({
     // re-lays-out the whole growing text on every tick, and the same pattern
     // in the part detail sheet already swaps to plain text for the stream.
     return (
-      <View className="rounded-xl border-[1.5px] border-dashed border-border p-3">
+      <View className="rounded-xl border-[1.5px] border-dashed border-border p-3 dark:border-neutral-700">
         <Eyebrow>{label}</Eyebrow>
         <View className="mt-2">
           <Text

@@ -28,7 +28,7 @@ describe('sanitizeAnalyticsUrl', () => {
   });
 
   it('removes sensitive query params from the page a sign-in returns to', () => {
-    const callbackPath = '/pages-auth?origin=https%3A%2F%2Fpages.kiloapps.io&state=secret#top';
+    const callbackPath = '/pages-auth?audience=pages&state=secret#top';
 
     expect(
       sanitizeAnalyticsUrl(
@@ -38,7 +38,7 @@ describe('sanitizeAnalyticsUrl', () => {
       )
     ).toBe(
       `https://app.kilo.ai/users/sign_in?${new URLSearchParams({
-        callbackPath: '/pages-auth?origin=https%3A%2F%2Fpages.kiloapps.io#top',
+        callbackPath: '/pages-auth?audience=pages#top',
         foo: 'bar',
       }).toString()}`
     );

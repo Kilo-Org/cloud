@@ -24,6 +24,7 @@ const config = vi.hoisted(() => ({
 const readiness = vi.hoisted(() => ({
   connected: true,
   ready: true as boolean | undefined,
+  workspaceSlug: 'ws' as string | undefined,
   fetchStatus: 'idle' as string,
 }));
 
@@ -103,7 +104,11 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     isError: false,
     isFetching: false,
     fetchStatus: readiness.fetchStatus,
-    data: { connected: readiness.connected, ready: readiness.ready, workspace: { slug: 'ws' } },
+    data: {
+      connected: readiness.connected,
+      ready: readiness.ready,
+      workspace: { slug: readiness.workspaceSlug },
+    },
     refetch: vi.fn(),
   }),
   useSaveReviewConfig: () => ({ isPending: false, mutate: vi.fn() }),
@@ -163,6 +168,7 @@ beforeEach(() => {
   config.refetch.mockReset();
   readiness.connected = true;
   readiness.ready = true;
+  readiness.workspaceSlug = 'ws';
   readiness.fetchStatus = 'idle';
   connectivity.known = true;
   queryError.variants = [];
@@ -213,6 +219,35 @@ describe('BitbucketOverview config body', () => {
     await renderScreen();
 
     expect(queryError.variants).toEqual(['offline']);
+  });
+});
+
+describe('BitbucketOverview Automatic reviews workspace line', () => {
+  /** The muted line painted under the Automatic reviews label, when present. */
+  function accountLines(renderer: TestRenderer.ReactTestRenderer): unknown[] {
+    return renderer.root
+      .findAllByType('Text')
+      .filter(node => node.props.variant === 'muted')
+      .map(node => node.props.children);
+  }
+
+  it('paints the connected workspace under the label', async () => {
+    config.data = makeConfig();
+
+    const renderer = await renderScreen();
+
+    expect(accountLines(renderer)).toEqual(['ws']);
+  });
+
+  it('paints the label alone so the row keeps one line without a workspace slug', async () => {
+    // An empty line here made the card taller than the sibling Follow REVIEW.md
+    // row and lifted the label above the switch's centre.
+    readiness.workspaceSlug = undefined;
+    config.data = makeConfig();
+
+    const renderer = await renderScreen();
+
+    expect(accountLines(renderer)).toEqual([]);
   });
 });
 

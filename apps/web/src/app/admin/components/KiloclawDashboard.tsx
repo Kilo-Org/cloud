@@ -12,6 +12,7 @@ import { KiloclawSecurityAdvisorContentTab } from './KiloclawSecurityAdvisorCont
 import { KiloclawProvidersTab } from './KiloclawProvidersTab';
 import { KiloclawSchedulerTab } from './KiloclawScheduler/KiloclawSchedulerTab';
 import { KiloclawStripeRenewals } from './KiloclawStripeRenewals';
+import { KiloclawCreditRenewals } from './KiloclawCreditRenewals';
 
 const VALID_TABS: readonly string[] = [
   'instances',
@@ -95,6 +96,7 @@ export function KiloclawDashboard() {
   return (
     <div className="flex w-full flex-col gap-y-4">
       <KiloclawStripeRenewals />
+      <KiloclawCreditRenewals />
       <Tabs value={activeTab} onValueChange={onTabChange}>
         <TabsList className="h-auto w-full justify-start gap-6 rounded-none border-b bg-transparent p-0">
           <TabsTrigger value="instances" className={tabTriggerClass}>

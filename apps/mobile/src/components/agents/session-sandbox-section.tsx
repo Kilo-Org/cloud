@@ -79,12 +79,12 @@ export function SessionSandboxSection({
   const removeSnapshot = useMutation({
     mutationFn: async () => {
       if (organizationId) {
-        return await trpcClient.organizations.cloudAgentNext.removeWorkspaceSnapshot.mutate({
+        return trpcClient.organizations.cloudAgentNext.removeWorkspaceSnapshot.mutate({
           sessionId,
           organizationId,
         });
       }
-      return await trpcClient.cloudAgentNext.removeWorkspaceSnapshot.mutate({ sessionId });
+      return trpcClient.cloudAgentNext.removeWorkspaceSnapshot.mutate({ sessionId });
     },
     onSuccess: () => {
       void queryClient.invalidateQueries(

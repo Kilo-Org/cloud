@@ -65,7 +65,7 @@ export function buildStageLabel(summary: EnvironmentBuildSummaryRow, t: TFunctio
   return t(SIMPLE_STAGE_KEYS[summary.state]);
 }
 
-const FAILURE_KEYS: Record<string, string> = {
+const FAILURE_KEYS = {
   clone_failed: 'agentChat.environment.failureClone',
   setup_failed: 'agentChat.environment.failureSetup',
   setup_timeout: 'agentChat.environment.failureTimeout',
@@ -80,7 +80,7 @@ const FAILURE_KEYS: Record<string, string> = {
   billing_blocked: 'agentChat.environment.failureBilling',
   billing_unavailable: 'agentChat.environment.failureBilling',
   configuration_changed: 'agentChat.environment.failureConfiguration',
-};
+} satisfies Record<string, string>;
 
 export function buildFailureText(reason: string | null, t: TFunction): string | null {
   if (reason === null) {
@@ -89,7 +89,12 @@ export function buildFailureText(reason: string | null, t: TFunction): string | 
   if (reason.startsWith('runtime_')) {
     return t('agentChat.environment.failureRuntime');
   }
-  return t(FAILURE_KEYS[reason] ?? 'agentChat.environment.failureGeneric');
+  // The worker's reasons are an open set, so an unknown one keeps web's own
+  // generic sentence rather than leaking a code onto the screen.
+  const key = Object.hasOwn(FAILURE_KEYS, reason)
+    ? FAILURE_KEYS[reason as keyof typeof FAILURE_KEYS]
+    : 'agentChat.environment.failureGeneric';
+  return t(key);
 }
 
 /**

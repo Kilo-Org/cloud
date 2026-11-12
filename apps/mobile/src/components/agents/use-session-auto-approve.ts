@@ -21,7 +21,10 @@ type SessionAutoApproveInput = {
 type SessionAutoApproveResult = {
   /**
    * The request id whose permission card must not render, or null when the
-   * card should show (toggle off, session unavailable, or a failed reply).
+   * card should show: the toggle is off, the session cannot receive asks, or
+   * the reply failed in a retryable way (a thrown error or a `'retryable'`
+   * outcome). A `'terminal'` outcome keeps the card hidden instead of showing
+   * it, because the ask no longer exists and the reply already told the user.
    */
   suppressedRequestId: string | null;
 };
@@ -35,8 +38,13 @@ type SessionAutoApproveResult = {
  *
  * The suppression is derived during render from two refs — ids already
  * answered and ids whose reply failed — so the permission card is gated out on
- * the same frame the ask arrives (never a one-frame flash). A failed reply
- * flips a state counter, re-rendering with the card visible for its Retry CTA.
+ * the same frame the ask arrives (never a one-frame flash). A retryable
+ * failure (a `'retryable'` outcome or a thrown error) flips a state counter,
+ * re-rendering with the card visible for its Retry CTA. A `'terminal'` outcome
+ * keeps the card hidden: the ask no longer exists on the server and the
+ * responder already reported it to the user, so the card could only offer a
+ * reply that cannot succeed.
+ *
  * Both refs remember only the most recent request ids (see
  * `MAX_REMEMBERED_REQUEST_IDS`), so a long session does not retain every ask it
  * ever answered.
@@ -80,6 +88,10 @@ export function useSessionAutoApprove({
     void (async () => {
       try {
         const outcome = await respondRef.current(replyRequestId);
+        // Only a retryable failure un-suppresses the card, so the user can
+        // retry by hand. A 'terminal' outcome keeps it hidden on purpose: the
+        // ask no longer exists on the server, and the responder already
+        // reported that to the user, so a Retry CTA here could not succeed.
         if (outcome === 'retryable') {
           markFailed();
         }

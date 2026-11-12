@@ -7,7 +7,7 @@ import {
   QueryClient,
   type QueryKey,
 } from '@tanstack/react-query';
-import { type PersistedClient } from '@tanstack/react-query-persist-client';
+import { type PersistedClient, persistQueryClientSave } from '@tanstack/react-query-persist-client';
 import * as SecureStore from 'expo-secure-store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -231,6 +231,20 @@ describe('allowlist filter', () => {
             gitUrl: undefined,
             organizationId: undefined,
           },
+        },
+      ])
+    ).toBe(true);
+  });
+
+  it('allows the serialized form of the default list input', () => {
+    // A restored key has been through serialization, which drops the fields the
+    // default builder left `undefined`.
+    expect(
+      isReadCacheAllowedKey([
+        ['cliSessionsV2', 'list'],
+        {
+          type: 'infinite',
+          input: { limit: 30, orderBy: 'updated_at', includeChildren: false, organizationId: null },
         },
       ])
     ).toBe(true);
@@ -820,6 +834,7 @@ describe('cold-start restore and takeover', () => {
         [
           'read-cache',
           storedBlob([
+            persistedEntry(GET_ME_QUERY_KEY, { id: 'u1' }),
             persistedEntry(writtenKey, { pages: [{ cliSessions: [] }], pageParams: [undefined] }),
           ]),
         ],
@@ -830,6 +845,28 @@ describe('cold-start restore and takeover', () => {
     await restorePersistedCacheOnColdStart(queryClient);
 
     expect(queryClient.getQueryData(restoredKey)).toEqual({
+      pages: [{ cliSessions: [] }],
+      pageParams: [null],
+    });
+
+    // The restored key keeps its four-field input, so the next save must accept
+    // it and write the snapshot again: a cold start after that save still
+    // paints the list.
+    await persistQueryClientSave({
+      queryClient,
+      persister: createReadCachePersister({
+        queryClient,
+        userId: 'u1',
+        epoch: currentAuthEpoch(),
+      }),
+      dehydrateOptions: {
+        shouldDehydrateQuery: shouldPersistReadCacheQuery,
+        shouldDehydrateMutation: () => false,
+      },
+    });
+    const resaved = new QueryClient();
+    await restorePersistedCacheOnColdStart(resaved);
+    expect(resaved.getQueryData(restoredKey)).toEqual({
       pages: [{ cliSessions: [] }],
       pageParams: [null],
     });

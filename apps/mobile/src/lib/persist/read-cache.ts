@@ -100,7 +100,6 @@ type AllowedProcedure = {
  * `null`, so the persisted snapshot must match this shape field for field.
  */
 const DEFAULT_SESSION_LIST_INPUT = buildAgentSessionListInput({ organizationId: null });
-const DEFAULT_SESSION_LIST_KEY_COUNT = Object.keys(DEFAULT_SESSION_LIST_INPUT).length;
 
 const briefingListCacheInputSchema = z
   .object({
@@ -201,21 +200,22 @@ const ALLOWED_PROCEDURES: readonly AllowedProcedure[] = [
     // snapshot. The tRPC adapter strips `cursor`/`direction` from infinite
     // keys, so a later page shares this key — the loaded page count is
     // enforced separately in {@link shouldPersistReadCacheQuery}.
+    //
+    // Serialization drops `undefined` fields, so a restored key carries only
+    // the fields the default builder set to a value. A missing field and an
+    // `undefined` field are therefore the same input, and the comparison runs
+    // field by field over the default instead of over the key count.
     isAllowedInput: meta => {
       const input = metaInput(meta);
       if (input === undefined) {
         return false;
       }
-      if (Object.keys(input).length !== DEFAULT_SESSION_LIST_KEY_COUNT) {
-        return false;
-      }
+      const allowedFields = Object.keys(DEFAULT_SESSION_LIST_INPUT);
       return (
-        input.limit === DEFAULT_SESSION_LIST_INPUT.limit &&
-        input.orderBy === DEFAULT_SESSION_LIST_INPUT.orderBy &&
-        input.includeChildren === DEFAULT_SESSION_LIST_INPUT.includeChildren &&
-        input.createdOnPlatform === DEFAULT_SESSION_LIST_INPUT.createdOnPlatform &&
-        input.gitUrl === DEFAULT_SESSION_LIST_INPUT.gitUrl &&
-        (input.organizationId === null || input.organizationId === undefined)
+        Object.keys(input).every(field => allowedFields.includes(field)) &&
+        Object.entries(DEFAULT_SESSION_LIST_INPUT).every(
+          ([field, value]) => (input[field] ?? null) === (value ?? null)
+        )
       );
     },
   },

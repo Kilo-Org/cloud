@@ -8,6 +8,7 @@ import {
   createAssistantMessage,
   createConversationErrorEvent,
   createToolCall,
+  createUserMessage,
 } from '@/src/shared/agent-conversation';
 import type {
   AgentConversationEvent,
@@ -417,28 +418,43 @@ describe('agent tool exchange rendering', () => {
   });
 });
 
-describe('assistant markdown links', () => {
+describe('markdown links', () => {
   const renderAssistantText = (text: string): ReturnType<typeof render> =>
     render(
       <AgentConversationItemView item={{ event: createAssistantMessage(text), type: 'event' }} />
     );
 
-  it('opens a web link elsewhere instead of navigating the panel', () => {
-    const { container } = renderAssistantText('[Example](https://example.com/path)');
+  const renderUserText = (text: string): ReturnType<typeof render> =>
+    render(<AgentConversationItemView item={{ event: createUserMessage(text), type: 'event' }} />);
 
-    const link = container.querySelector('a');
-    expect(link?.getAttribute('href')).toBe('https://example.com/path');
-    expect(link?.getAttribute('target')).toBe('_blank');
-    expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
+  it('opens a web link elsewhere instead of navigating the panel', () => {
+    const assistant = renderAssistantText('[Example](https://example.com/path)');
+    const assistantLink = assistant.container.querySelector('a');
+    expect(assistantLink?.getAttribute('href')).toBe('https://example.com/path');
+    expect(assistantLink?.getAttribute('target')).toBe('_blank');
+    expect(assistantLink?.getAttribute('rel')).toBe('noopener noreferrer');
+
+    const user = renderUserText('[Example](https://example.com/path)');
+    const userLink = user.container.querySelector('a');
+    expect(userLink?.getAttribute('href')).toBe('https://example.com/path');
+    expect(userLink?.getAttribute('target')).toBe('_blank');
+    expect(userLink?.getAttribute('rel')).toBe('noopener noreferrer');
   });
 
   it('keeps a mailto link and refuses any other scheme', () => {
     const mail = renderAssistantText('[Mail](mailto:help@kilo.ai)');
     expect(mail.container.querySelector('a')?.getAttribute('href')).toBe('mailto:help@kilo.ai');
 
+    const userMail = renderUserText('[Mail](mailto:help@kilo.ai)');
+    expect(userMail.container.querySelector('a')?.getAttribute('href')).toBe('mailto:help@kilo.ai');
+
     const script = renderAssistantText('[Run](javascript:alert(1))');
     expect(script.container.querySelector('a')).toBeNull();
     expect(script.container.textContent).toContain('Run');
+
+    const userScript = renderUserText('[Run](javascript:alert(1))');
+    expect(userScript.container.querySelector('a')).toBeNull();
+    expect(userScript.container.textContent).toContain('Run');
   });
 });
 

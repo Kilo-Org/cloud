@@ -90,7 +90,7 @@ const MarkdownLink: Components['a'] = ({ children, href }) =>
   );
 
 // Hoisted so the object reference is stable (react-perf) across renders.
-const thinkingMarkdownComponents: Components = {
+const linkMarkdownComponents: Components = {
   // eslint-disable-next-line id-length -- react-markdown keys its component map by HTML element name.
   a: MarkdownLink,
 };
@@ -159,14 +159,11 @@ const MessageEvent = ({
   streamingMessageId?: string | undefined;
 }): JSX.Element => {
   const isUser = event.role === 'user';
-  // Only assistant messages get collapsible code blocks; user branch keeps default rendering.
-  let assistantComponents: Components | undefined = undefined;
-  if (!isUser) {
-    assistantComponents =
-      event.id === streamingMessageId
-        ? assistantMarkdownComponentsStreaming
-        : assistantMarkdownComponentsFinalized;
-  }
+  const assistantMarkdownComponents =
+    event.id === streamingMessageId
+      ? assistantMarkdownComponentsStreaming
+      : assistantMarkdownComponentsFinalized;
+  const messageMarkdownComponents = isUser ? linkMarkdownComponents : assistantMarkdownComponents;
 
   return (
     <div className={isUser ? 'flex justify-end' : 'flex justify-start'}>
@@ -178,7 +175,7 @@ const MessageEvent = ({
         }
       >
         <div className="agent-message-markdown">
-          <ReactMarkdown components={assistantComponents} remarkPlugins={remarkPlugins}>
+          <ReactMarkdown components={messageMarkdownComponents} remarkPlugins={remarkPlugins}>
             {event.text}
           </ReactMarkdown>
         </div>
@@ -197,7 +194,7 @@ const ThinkingEvent = ({
       thinking
     </summary>
     <div className="agent-message-markdown mt-2 text-xs leading-5 text-foreground-muted">
-      <ReactMarkdown components={thinkingMarkdownComponents} remarkPlugins={remarkPlugins}>
+      <ReactMarkdown components={linkMarkdownComponents} remarkPlugins={remarkPlugins}>
         {event.text}
       </ReactMarkdown>
     </div>

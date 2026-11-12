@@ -421,21 +421,16 @@ export const ConversationList = ({
         </div>
       </section>
       {showJumpButton ? (
-        /*
-         * Overlaid, not a layout row: at small panel heights the fixed chrome
-         * (composer, footer) already squeezes the pane, so a bar would push the
-         * control under the composer and make it unclickable. Overlaying keeps
-         * the pane's height and still shows the label.
-         */
+        // Overlaid, not a layout row: a bar pushes the button under the composer at small panel heights.
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-end px-3 pb-2">
           <button
             aria-label="Jump to latest"
-            className="pointer-events-auto flex h-8 items-center gap-1.5 rounded-full border border-border bg-surface-overlay px-3 type-label text-foreground-on-secondary shadow-lg shadow-black/50 outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
+            className="pointer-events-auto flex size-8 items-center justify-center rounded-full border border-border bg-surface-overlay text-foreground-on-secondary shadow-lg shadow-black/50 outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
             onClick={jumpToLatest}
+            title="Jump to latest"
             type="button"
           >
-            <ArrowDown aria-hidden="true" className="size-3.5" />
-            Jump to latest
+            <ArrowDown aria-hidden="true" className="size-4" />
           </button>
         </div>
       ) : null}

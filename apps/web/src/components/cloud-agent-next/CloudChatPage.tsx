@@ -1459,7 +1459,8 @@ export default function CloudChatPage({
   const composerInputRef = useSessionComposerFocus(
     composerFocusRequest,
     sessionIdFromParams,
-    isCurrentSession && !isLoading && transcriptPhase !== 'opening',
+    transcriptPhase === 'local' ||
+      (isCurrentSession && !isLoading && transcriptPhase !== 'opening'),
     isReadOnly || Boolean(activeQuestion || activePermission) || !chatTabActive || changesViewOpen,
     composerTextareaDisabled
   );

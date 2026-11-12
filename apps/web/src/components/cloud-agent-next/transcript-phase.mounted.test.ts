@@ -8,6 +8,8 @@ import type { StoredMessage } from './types';
 let mockRuntimeMessages: StoredMessage[] = [];
 import type { ResumeAnchor, ResumeAttemptStep } from './resume-anchor';
 import type { SessionStatusIndicator as SessionStatusIndicatorType } from '@kilocode/cloud-agent-sdk';
+import type { LocalSession } from './local-sessions/local-session';
+import type { ComposerFocusRequest } from './useSessionComposerFocus';
 
 Object.assign(globalThis, { React });
 
@@ -18,6 +20,8 @@ let mockChatInput: Record<string, unknown> | null = null;
 let mockChatHeader: ComponentProps<typeof ChatHeader> | null = null;
 let mockWorkspaceTabs: ComponentProps<typeof CloudAgentWorkspaceTabs> | null = null;
 let mockAtomValues: Record<string, unknown>;
+let mockLocalSession: LocalSession | null = null;
+let mockComposerFocusRequest: ComposerFocusRequest | null = null;
 const mockSetAtom = jest.fn();
 const mockUseCloudAgentEnvironment = jest.fn();
 const mockRequestOlderMessages = jest.fn();
@@ -116,6 +120,10 @@ jest.mock('./useSavedWorktreeChanges', () => ({
   useSavedWorktreeChanges: () => ({ saved: { data: undefined }, queryKey: [] }),
 }));
 jest.mock('./use-cached-transcript-page', () => ({ useCachedTranscriptPage: () => null }));
+jest.mock('./local-sessions/LocalSessionsProvider', () => ({
+  useLocalSession: () => mockLocalSession,
+  useLocalSessions: () => ({ restored: true }),
+}));
 jest.mock('./useChatStackInfo', () => ({ useChatStackInfo: () => null }));
 jest.mock('./use-preview', () => ({
   ...jest.requireActual('./use-preview'),
@@ -140,6 +148,7 @@ jest.mock('./CloudSidebarLayout', () => ({
   }),
   useWorktreeChatTabs: () => ({
     selectedWorktreeId: mockWorktreeId,
+    composerFocusRequest: mockComposerFocusRequest,
     worktreeChats: [],
     openWorktreeChats: [],
     closedWorktreeChats: [],
@@ -199,7 +208,11 @@ jest.mock('./WorktreeFilePane', () => ({ WorktreeFilePane: () => null }));
 jest.mock('./assistant-ui/CloudComposer', () => ({
   CloudComposer: (props: Record<string, unknown>) => {
     mockChatInput = props;
-    return createElement('input', { 'data-composer': true });
+    return createElement('textarea', {
+      'data-composer': true,
+      ref: props.inputRef as React.Ref<HTMLTextAreaElement>,
+      disabled: props.textareaDisabled as boolean,
+    });
   },
 }));
 jest.mock('./assistant-ui/CloudChatRuntimeProvider', () => ({
@@ -364,6 +377,8 @@ describe('CloudChatPage route-aware transcript phase', () => {
     mockAtParam = null;
     mockWorktreeId = null;
     mockChatInput = null;
+    mockLocalSession = null;
+    mockComposerFocusRequest = null;
     mockChatHeader = null;
     mockWorkspaceTabs = null;
     mockResizeObserve.mockClear();
@@ -423,6 +438,51 @@ describe('CloudChatPage route-aware transcript phase', () => {
     if (!container) throw new Error('transcript scroll container missing');
     return container;
   }
+
+  it('focuses a new local chat before creation or session loading completes', () => {
+    window.matchMedia = jest.fn(() => ({ matches: true }) as MediaQueryList);
+    const focus = jest.spyOn(window.HTMLElement.prototype, 'focus');
+    mockManager.switchSession.mockClear();
+    const onHandled = jest.fn();
+    mockComposerFocusRequest = { sessionId: 'ses_b', onHandled };
+    mockLocalSession = {
+      kiloSessionId: 'ses_b',
+      operationKey: '11111111-1111-4111-8111-111111111111',
+      organizationId: null,
+      worktreeId: 'worktree_local',
+      request: { kind: 'worktree-chat', sourceKiloSessionId: 'ses_a' },
+      repository: 'example/repository',
+      branch: 'main',
+      composer: { mode: 'code', model: 'example/model', variant: null },
+      firstMessage: null,
+      createdAt: '2026-11-12T00:00:00.000Z',
+      sync: { state: 'syncing' },
+    };
+
+    render();
+
+    expect(skeleton()).toBeNull();
+    expect(mockChatInput).toMatchObject({
+      textareaDisabled: false,
+      disabled: true,
+      sendUnavailableReason: 'Creating session…',
+      mode: 'code',
+    });
+    expect(mockManager.switchSession).not.toHaveBeenCalled();
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(onHandled).toHaveBeenCalledTimes(1);
+
+    mockLocalSession = { ...mockLocalSession, sync: { state: 'synced' } };
+    render();
+    expect(mockManager.switchSession).toHaveBeenCalledWith('ses_b');
+    mockAtomValues.isLoading = false;
+    mockAtomValues.fetchedSessionData = { kiloSessionId: 'ses_b', organizationId: null };
+    render();
+
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(onHandled).toHaveBeenCalledTimes(1);
+    focus.mockRestore();
+  });
 
   it('renders the skeleton instead of a stale error while the started open is loading', () => {
     mockAtomValues.statusIndicator = { type: 'error', message: 'Stale failure' };

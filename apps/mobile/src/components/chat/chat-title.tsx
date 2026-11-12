@@ -25,7 +25,7 @@ type ChatTitleProps = {
  * The name is the screen's identity and the notice is a label about it, so the
  * notice yields first: on a narrow header the pair does not fit together, and
  * the shared row gave the notice its full width while the name shrank to "C…"
- * (measured on the 360dp design-gate cell: 76.19dp of room against 83.04dp of
+ * (measured on the 360dp design-gate cell: 76.19dp of room against 82.04dp of
  * content). Nothing else in the row gives way, and the name is what a person
  * reads to know which screen they are on.
  *

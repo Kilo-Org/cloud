@@ -125,12 +125,7 @@ test('leading-gap: a painted first block at the padding passes in a content box 
  * rule can read. Measured on the Agents tab: the scroller and its content span
  * y 174.48–914.29, the centred block starts at 342.86 and ends at 571.81.
  */
-function platformScreen(options: {
-  content?: Rect;
-  block: Rect;
-  holder?: Rect;
-  text: Rect;
-}) {
+function platformScreen(options: { content?: Rect; block: Rect; holder?: Rect; text: Rect }) {
   const nodes: ProbeNode[] = [
     { parent: 0, tag: 'ScrollView', rect: [0, 174.48, 400, 739.81] },
     { parent: 1, tag: 'ViewGroup', rect: options.content ?? [0, 174.48, 400, 739.81] },

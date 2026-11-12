@@ -481,6 +481,34 @@ function requireInputRowOnChangeText(render: React.ReactElement): (text: string)
   return onChangeText;
 }
 
+function collectNodes(
+  node: Node,
+  predicate: (type: unknown, props: Record<string, unknown>) => boolean,
+  found: { type: unknown; props: Record<string, unknown> }[] = []
+): { type: unknown; props: Record<string, unknown> }[] {
+  if (node === null || typeof node !== 'object') {
+    return found;
+  }
+  const { type, props } = node as {
+    type?: unknown;
+    props?: Record<string, unknown>;
+  };
+  if (props !== undefined && predicate(type, props)) {
+    found.push({ type, props });
+  }
+  if (type === renderText && props !== undefined) {
+    return collectNodes(
+      renderText(props as React.ComponentProps<typeof renderText>),
+      predicate,
+      found
+    );
+  }
+  for (const child of Array.isArray(props?.children) ? props.children : [props?.children]) {
+    collectNodes(child as Node, predicate, found);
+  }
+  return found;
+}
+
 function findNode(
   node: Node,
   predicate: (type: unknown, props: Record<string, unknown>) => boolean
@@ -954,6 +982,19 @@ describe('ChatComposer toolbar row', () => {
 
     toolbarShown.value = false;
     expect(toolbarRow(await rerender(props)).maxHeight).toBe(38);
+  });
+
+  it('renders one chip row, never two, in either container', async () => {
+    const isRow = (type: unknown, props: Record<string, unknown>) =>
+      Object.is(type, 'Animated.View') && typeof props.onLayout === 'function';
+
+    toolbarShown.value = true;
+    keyboardState.height = 0;
+    insidePane.value = false;
+    expect(collectNodes(await mount(makeProps({})), isRow)).toHaveLength(1);
+
+    insidePane.value = true;
+    expect(collectNodes(await mount(makeProps({})), isRow)).toHaveLength(1);
   });
 
   it('holds one height inside the keyboard-follow pane, and follows only the chip', async () => {

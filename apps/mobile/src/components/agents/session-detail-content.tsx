@@ -12,7 +12,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { Platform, type TextInstance, View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -183,6 +182,7 @@ import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { type ContextDisplayScope } from '@/components/context-control';
+import { KeyboardFollowPane } from '@/components/keyboard-follow-pane';
 import { ScreenHeader } from '@/components/screen-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { BlurBar } from '@/components/ui/blur-bar';
@@ -2536,13 +2536,12 @@ export function SessionDetailContent({
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
           <VisibleSessionPublisher sessionId={sessionId} />
 
-          {/* The trailing bottom-chrome spacer below reserves the navigation-bar
-              inset outside this view. The native lift measures the keyboard
-              against this view's own bottom edge, so that inset is never
-              counted twice — the correction the app-aware padding needed. */}
-          <KeyboardAvoidingView className="flex-1" behavior="padding">
-            {renderKeyboardBody()}
-          </KeyboardAvoidingView>
+          {/* The transcript and composer keep their layout while the keyboard
+              moves: the pane translates them with the keyboard on the UI
+              thread, so the list is not resized frame by frame and does not
+              re-pin its tail from those layout events. The trailing spacer
+              below still reserves the navigation-bar inset. */}
+          <KeyboardFollowPane>{renderKeyboardBody()}</KeyboardFollowPane>
 
           {isComposerVisible ? (
             <BlurBar className="border-t-0">

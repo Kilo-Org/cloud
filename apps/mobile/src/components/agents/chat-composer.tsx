@@ -37,13 +37,8 @@ import {
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useKeyboardState, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
-import Animated, {
-  FadeIn,
-  FadeOut,
-  useAnimatedStyle,
-  useSharedValue,
-} from 'react-native-reanimated';
+import { useKeyboardState } from 'react-native-keyboard-controller';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { usePreventRemove } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -455,10 +450,6 @@ export function ChatComposer({
     absoluteMaxHeight: COMPOSER_INPUT_MAX_HEIGHT * fontScale,
   });
 
-  // The provider's keyboard height caps the remaining space and keeps the
-  // toolbar row in place while the IME still owns the bottom of the screen.
-  const keyboardVisible = keyboardHeight > 0;
-
   // The mirror measurement lives in `ChatComposerMeasure`, a leaf that owns the
   // per-keystroke text state. It publishes the height and the line-snapped cap
   // back through `handleMeasureChange`, so this component re-renders only when
@@ -819,31 +810,20 @@ export function ChatComposer({
     voiceInputActive: voiceInput.isActive,
   });
 
-  // The model chip's row and the input are separate rows, and the chip's row
-  // keeps its space for as long as the keyboard has any claim on the composer:
-  // losing it in the same frames the keyboard moved collapsed the chip through
-  // the message field (video V1 ~4.5s and ~19s).
-  const showToolbarRow = control.showToolbar || keyboardVisible;
-
-  // Once the chip is hidden, its row gives its height back in the same frames
-  // as the keyboard. `keyboardVisible` reaches false only after the keyboard
-  // has landed, so unmounting the row on that flag alone shifted the
-  // transcript a second time, after the keyboard had finished moving. The
-  // worklet reads only shared values and always writes `maxHeight`: Reanimated
-  // keeps a style key a worklet stops returning, so a conditional key would
-  // leave the row stuck at its collapsed height.
-  const { progress: keyboardProgress } = useReanimatedKeyboardAnimation();
-  const toolbarRowHeight = useSharedValue(0);
-  const toolbarRowCollapsing = useSharedValue(false);
-  useEffect(() => {
-    toolbarRowCollapsing.value = !control.showToolbar;
-  }, [control.showToolbar, toolbarRowCollapsing]);
-  const toolbarRowStyle = useAnimatedStyle(() => ({
-    maxHeight: toolbarRowCollapsing.value
-      ? toolbarRowHeight.value * keyboardProgress.value
-      : TOOLBAR_ROW_UNCLAMPED_HEIGHT,
-    overflow: 'hidden',
-  }));
+  // The model chip's row and the input are separate rows. The row's height is
+  // a decision of the composer's own state, never of the keyboard: collapsing it
+  // per keyboard frame resized the transcript on every frame, and the list
+  // corrected its tail on each of those layout events. A row that appears or
+  // disappears with the keyboard would move the input after the keyboard had
+  // landed instead, so the row is simply present whenever the chip is available.
+  const showToolbarRow = control.showToolbar;
+  const toolbarRowStyle = useMemo(
+    () => ({
+      maxHeight: TOOLBAR_ROW_UNCLAMPED_HEIGHT,
+      overflow: 'hidden' as const,
+    }),
+    []
+  );
 
   const { paste: pasteClipboard } = useClipboardPaste({
     addFile: async file => {
@@ -1389,14 +1369,7 @@ export function ChatComposer({
         {suggestionRow}
 
         {!suggestionRow && showToolbarRow ? (
-          <Animated.View
-            style={toolbarRowStyle}
-            onLayout={event => {
-              if (!toolbarRowCollapsing.value) {
-                toolbarRowHeight.value = event.nativeEvent.layout.height;
-              }
-            }}
-          >
+          <Animated.View style={toolbarRowStyle}>
             <Animated.View
               // The row is never animated out. An exit animation leaves its
               // snapshot painted while the input row has already moved up into

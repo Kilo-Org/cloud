@@ -78,6 +78,7 @@ vi.mock('react-native-keyboard-controller', () => ({
 vi.mock('@/components/keyboard-motion-provider', () => ({
   KeyboardMotionProvider: 'KeyboardMotionProvider',
   useKeyboardMotionProgress: () => ({ value: 0 }),
+  useKeyboardMotionHeight: () => ({ value: 0 }),
 }));
 
 // `react-native-enriched-markdown` and `react-native-webview` are native views.

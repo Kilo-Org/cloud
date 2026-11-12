@@ -15,6 +15,8 @@ function screen(options: {
   row: Rect;
   text: Rect;
   contentStyle?: ProbeNode['style'];
+  contentHeight?: number;
+  blockStyle?: ProbeNode['style'];
   blockAbsolute?: boolean;
 }) {
   const nodes: ProbeNode[] = [
@@ -22,14 +24,14 @@ function screen(options: {
     {
       parent: 1,
       tag: 'View',
-      rect: [0, 110, 400, 1200],
+      rect: [0, 110, 400, options.contentHeight ?? 1200],
       style: { paddingTop: 14, ...options.contentStyle },
     },
     {
       parent: 2,
       tag: 'View',
       rect: options.block ?? [14, 124, 372, 160],
-      ...(options.blockAbsolute ? { style: { position: 'absolute' } } : {}),
+      style: { ...options.blockStyle, ...(options.blockAbsolute ? { position: 'absolute' } : {}) },
     },
     { parent: 3, tag: 'View', rect: options.row },
     { parent: 4, tag: 'Paragraph', rect: options.text, text: 'Credits' },
@@ -95,4 +97,18 @@ test('leading-gap: an out-of-flow first block is not the first thing shown', () 
   });
   assert.equal(finding?.measured, 176);
   assert.equal(finding?.element.text, undefined);
+});
+
+test('leading-gap: a painted first block at the padding passes in a content box that ends with it', () => {
+  // The walk must stop at the first block when the block itself is the ink:
+  // above it is only the content's own top padding, which the screen chose.
+  assert.deepEqual(
+    screen({
+      contentHeight: 174,
+      blockStyle: { backgroundColor: '#f0eee6' },
+      row: [14, 140, 52, 14],
+      text: [14, 140, 52, 12.6],
+    }),
+    []
+  );
 });

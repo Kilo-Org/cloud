@@ -29,6 +29,7 @@ function topInk(block: LayoutNode): LayoutNode | undefined {
  * past what it draws.
  */
 function oneSidedBox(ink: LayoutNode, block: LayoutNode): LayoutNode | undefined {
+  if (ink === block) return undefined;
   const inkTop = layoutRect(ink)[1];
   const inkBottom = bottom(layoutRect(ink));
   for (let box = ink.parent; box; box = box.parent) {

@@ -666,7 +666,8 @@ export async function runMatrix(
       outcome.cells.push(run);
       const seen = new Map<string, string>();
       for (const [index, target] of targets.entries()) {
-        const targetLanguage = await ensureLanguage(ctx, language);
+        try {
+          const targetLanguage = await ensureLanguage(ctx, language);
         const languageReady = targetLanguage.matched;
         // A cell-level reload leaves only its first target cold; a reload this
         // target itself caused (the previous target switched the app language)
@@ -746,6 +747,19 @@ export async function runMatrix(
               cell: config.id,
               target: target.id,
             }))
+          );
+        }
+        } catch (error) {
+          // A reload window that outlives the probe client's own retry leaves
+          // the target unreadable: the probe client reports it as an
+          // InfraError. The cell still measures its other targets; this one is
+          // logged and skipped rather than aborting the whole run. No finding
+          // without a dump: there is nothing measured to grade. Every other
+          // error (a failed screencap, a decode) is a real defect and still
+          // aborts.
+          if (!(error instanceof InfraError)) throw error;
+          ctx.log(
+            `design-gate: ${target.id} could not be read this cell: ${String(error)}`
           );
         }
       }

@@ -363,7 +363,14 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
         if (!result.success) {
           throw new Error(i18n.t('codeReviewer.configSaveFailed'));
         }
-        if (platform === 'gitlab') {
+        // Webhook health belongs to the repository selection: the PATCH
+        // routers re-sync project hooks only for a patch that carries the
+        // selection, or the mode that decides whether per-repository hooks
+        // apply at all. A save that edits anything else must not dismiss a
+        // warning whose sync was never re-run.
+        const touchesWebhookScope =
+          rawSelectedRepositoryIds !== undefined || patch.repositorySelectionMode !== undefined;
+        if (platform === 'gitlab' && touchesWebhookScope) {
           queryClient.setQueryData<boolean>(
             webhookWarningQueryKey,
             (result.webhookSync?.errors.length ?? 0) > 0

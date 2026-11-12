@@ -1693,11 +1693,7 @@ test('test-scripts starts only for the inputs its two step groups read', () => {
       /needs\.changes\.outputs\.kilocode_backend == 'true'/,
       `${webJob}: gated on the shared filter alone`
     );
-    assert.doesNotMatch(
-      condition,
-      /test_scripts/,
-      `${webJob}: a script input starts no web job`
-    );
+    assert.doesNotMatch(condition, /test_scripts/, `${webJob}: a script input starts no web job`);
   }
 });
 

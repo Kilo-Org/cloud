@@ -12,7 +12,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { Platform, type TextInstance, View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -184,6 +183,7 @@ import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { type ContextDisplayScope } from '@/components/context-control';
+import { KeyboardFollowPane } from '@/components/keyboard-follow-pane';
 import { ScreenHeader } from '@/components/screen-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { BlurBar } from '@/components/ui/blur-bar';
@@ -1386,6 +1386,38 @@ export function SessionDetailContent({
     composerControlRef.current?.setText(text);
   }, []);
 
+  // A failed send the server accepted after all: its response was lost, so the
+  // composer put the text back, and the confirmed message then reached the
+  // transcript. The transcript owns the message now, so the restored draft is
+  // withdrawn — otherwise the same text sits in two places and the next Send
+  // posts it twice. The composer keeps a draft the reader has since edited, and
+  // the record's `sequence` makes this effect run once per delivery.
+  const deliveredFailedPrompt = useAtomValue(manager.atoms.deliveredFailedPrompt);
+  const appliedDeliveredFailedPromptSequence = useRef(0);
+  // The load each record was published for. The draft suppression lasts only
+  // until the composer consumes that one load, so a draft the reader stores
+  // afterwards with the same words is never taken for the delivered message.
+  const [consumedDeliveredSequence, setConsumedDeliveredSequence] = useState(0);
+  useEffect(() => {
+    if (deliveredFailedPrompt === null) {
+      return;
+    }
+    if (deliveredFailedPrompt.sequence <= appliedDeliveredFailedPromptSequence.current) {
+      return;
+    }
+    appliedDeliveredFailedPromptSequence.current = deliveredFailedPrompt.sequence;
+    composerControlRef.current?.withdrawRestoredSend(deliveredFailedPrompt.text);
+  }, [deliveredFailedPrompt, setConsumedDeliveredSequence]);
+  const consumableDeliveredDraft =
+    deliveredFailedPrompt !== null && deliveredFailedPrompt.sequence > consumedDeliveredSequence
+      ? deliveredFailedPrompt.text
+      : null;
+  const consumeDeliveredDraft = useCallback(() => {
+    if (deliveredFailedPrompt !== null) {
+      setConsumedDeliveredSequence(deliveredFailedPrompt.sequence);
+    }
+  }, [deliveredFailedPrompt]);
+
   // Where the account settles a turn its balance refused. The action reads no
   // session state, so it stays wired for a read-only transcript too. It reads
   // the router through the ref `renderItem` already holds its identity across a
@@ -2569,13 +2601,12 @@ export function SessionDetailContent({
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
           <VisibleSessionPublisher sessionId={sessionId} />
 
-          {/* The trailing bottom-chrome spacer below reserves the navigation-bar
-              inset outside this view. The native lift measures the keyboard
-              against this view's own bottom edge, so that inset is never
-              counted twice — the correction the app-aware padding needed. */}
-          <KeyboardAvoidingView className="flex-1" behavior="padding">
-            {renderKeyboardBody()}
-          </KeyboardAvoidingView>
+          {/* The transcript and composer keep their layout while the keyboard
+              moves: the pane translates them with the keyboard on the UI
+              thread, so the list is not resized frame by frame and does not
+              re-pin its tail from those layout events. The trailing spacer
+              below still reserves the navigation-bar inset. */}
+          <KeyboardFollowPane>{renderKeyboardBody()}</KeyboardFollowPane>
 
           {isComposerVisible ? (
             <BlurBar className="border-t-0">
@@ -2907,6 +2938,8 @@ export function SessionDetailContent({
                 autoSend={autoSend}
                 draftKey={userId ? sessionComposerDraftKey : undefined}
                 initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
+                deliveredDraft={consumableDeliveredDraft}
+                onDeliveredDraftConsumed={consumeDeliveredDraft}
                 sessionId={sessionId}
                 suggestion={activeSuggestion}
                 onAcceptSuggestion={async (requestId, index) => {

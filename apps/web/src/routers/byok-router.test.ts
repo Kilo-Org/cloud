@@ -1821,9 +1821,21 @@ describe('BYOK Router', () => {
           data: {
             data: [
               { id: 'anthropic/claude-fixture', name: 'Claude Fixture', type: 'language' },
+              {
+                id: 'acme/vercel-only-fixture',
+                name: 'Vercel Only Fixture',
+                type: 'language',
+                context_window: 128_000,
+                modalities: { input: ['text'], output: ['text'] },
+                pricing: { input: '0.000001', output: '0.000002' },
+              },
               ...fillerModels,
             ],
           },
+        },
+        {
+          url: gatewayModelEndpointsUrl(VERCEL_AI_GATEWAY, 'acme/vercel-only-fixture'),
+          data: { data: { endpoints: [{ provider_name: 'bedrock' }] } },
         },
         {
           url: gatewayModelEndpointsUrl(VERCEL_AI_GATEWAY, 'anthropic/claude-fixture'),
@@ -1840,7 +1852,13 @@ describe('BYOK Router', () => {
         const result = await caller.byok.listSupportedModels();
 
         expect(result.anthropic).toEqual(['Claude Fixture (anthropic/claude-fixture)']);
-        expect(result.bedrock).toEqual(['Claude Fixture (anthropic/claude-fixture)']);
+        expect(result.bedrock).toEqual([
+          'Claude Fixture (anthropic/claude-fixture)',
+          'Vercel Only Fixture (acme/vercel-only-fixture)',
+        ]);
+        expect(result['vercel-ai-gateway']).toContain(
+          'Vercel Only Fixture (acme/vercel-only-fixture)'
+        );
         expect(result['byteplus-coding']).toContain(
           'ByteDance-Seed-Code (byteplus-coding/bytedance-seed-code)'
         );

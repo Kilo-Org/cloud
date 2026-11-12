@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { boundSlashCommandCatalog } from '../../../src/shared/slash-commands.js';
 import { createMessageId } from '../../../src/shared/message-id.js';
-import { kiloServerHeaders, type KiloServer } from '../kilo-server-auth.js';
-import { isKiloServerUnreachableError } from '../kilo-api.js';
+import { fetchKiloServer, kiloServerHeaders, type KiloServer } from '../kilo-server-auth.js';
+import { DrainSessionError, isKiloServerUnreachableError } from '../kilo-api.js';
 import { git, logToFile } from '../utils.js';
 import type { Harness, HarnessSession } from './harness.js';
 import { readSessionSnapshot } from './session-snapshot.js';
@@ -326,6 +326,49 @@ export function createKilo2Harness(options: {
       return true;
     },
     interrupt,
+    async drainSession(input) {
+      let response: Response;
+      try {
+        response = await fetchKiloServer(
+          options.server,
+          `/api/rpc/kilocode.session-drain/drain?${locationQuery(input.directory)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ input: { sessionID: input.sessionId, token: input.token } }),
+            // Drain can wait for arbitrarily long native work. The completion owner bounds
+            // transport failures and missing markers without timing out a running child.
+            signal: input.signal,
+          }
+        );
+      } catch (error) {
+        if (input.signal?.aborted) throw error;
+        throw new DrainSessionError('transient', 'Kilo v2 drain request failed', { cause: error });
+      }
+      if (!response.ok) {
+        const status = response.status;
+        const transient = status === 408 || status === 429 || status >= 500;
+        await response.body?.cancel();
+        throw new DrainSessionError(transient ? 'transient' : 'definitive', `HTTP ${status}`, {
+          status,
+        });
+      }
+      try {
+        const result = z.object({ output: z.boolean() }).parse(await response.json());
+        if (!result.output)
+          throw new DrainSessionError('anomalous', 'Session drain returned false');
+        return true;
+      } catch (error) {
+        if (input.signal?.aborted || error instanceof DrainSessionError) throw error;
+        throw new DrainSessionError(
+          error instanceof TypeError ? 'transient' : 'anomalous',
+          'Kilo v2 drain returned no boolean result',
+          {
+            cause: error,
+          }
+        );
+      }
+    },
     observe: input => readSessionSnapshot({ ...input, client: reads }),
     async release(input) {
       const start = Date.now();

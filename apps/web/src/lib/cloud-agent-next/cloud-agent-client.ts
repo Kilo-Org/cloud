@@ -1,4 +1,10 @@
 import type { CloudSessionMessagesWirePage } from '@kilocode/cloud-agent-sdk/schemas';
+import {
+  cloudToolPartDetailInputSchema,
+  cloudToolPartDetailWireSchema,
+  type CloudToolPartDetailInput,
+  type CloudToolPartDetailWire,
+} from '@kilocode/cloud-agent-sdk/tool-part-detail';
 import 'server-only';
 import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
@@ -6,6 +12,7 @@ import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import { TRPC_ERROR_CODES_BY_KEY, type TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
 import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
+import type { GateThreshold } from '@kilocode/app-shared/code-review';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import {
   GetEgressAuditResponseSchema,
@@ -187,7 +194,7 @@ type PrepareSessionSharedFields = {
   createdOnPlatform?: string;
   clientProvenance?: 'browser' | 'mobile';
   /** PR gate threshold — when not 'off', the agent reports gateResult in its callback */
-  gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  gateThreshold?: GateThreshold;
   /** Deprecated: true is rejected because devcontainer support is retired. */
   devcontainer?: boolean;
   sandboxAllocation?: SandboxAllocationInput;
@@ -708,6 +715,9 @@ type CloudAgentNextTRPCClient = {
   getSessionMessagesPage: {
     query: (input: GetSessionMessagesPageInput) => Promise<unknown>;
   };
+  getSessionToolPartDetail: {
+    query: (input: CloudToolPartDetailInput) => Promise<unknown>;
+  };
   getSandboxStatus: {
     query: (input: GetSessionInput) => Promise<unknown>;
   };
@@ -1067,6 +1077,15 @@ export class CloudAgentNextClient {
     const request = cloudSessionMessagesPageInputSchema.parse(input);
     return cloudSessionMessagesPageWireSchema.parse(
       await this.client.getSessionMessagesPage.query(request)
+    );
+  }
+
+  async getSessionToolPartDetail(
+    input: CloudToolPartDetailInput
+  ): Promise<CloudToolPartDetailWire> {
+    const request = cloudToolPartDetailInputSchema.parse(input);
+    return cloudToolPartDetailWireSchema.parse(
+      await this.client.getSessionToolPartDetail.query(request)
     );
   }
 

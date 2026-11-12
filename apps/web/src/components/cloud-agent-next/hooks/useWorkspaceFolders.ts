@@ -5,9 +5,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
-import type {
-  WorkspaceFolderColor,
-  WorkspaceFolderSortMode,
+import {
+  SMART_FOLDER_WORKTREE_ORDER_LIMIT,
+  type WorkspaceFolderColor,
 } from '@/lib/cloud-agent/workspace-folders';
 import {
   controlPlaneSessionIdSchema,
@@ -48,6 +48,9 @@ export function useWorkspaceFolders(
     trpc.workspaceFolders.moveSession.mutationOptions()
   );
   const { mutateAsync: reorder } = useMutation(trpc.workspaceFolders.reorder.mutationOptions());
+  const { mutateAsync: reorderWorktrees } = useMutation(
+    trpc.workspaceFolders.reorderWorktrees.mutationOptions()
+  );
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
 
@@ -133,15 +136,6 @@ export function useWorkspaceFolders(
     [organizationId, run, updateFolder]
   );
 
-  const setFolderSortMode = useCallback(
-    (folderId: string, sortMode: WorkspaceFolderSortMode) =>
-      run(
-        () => updateFolder({ folderId, sortMode, organizationId: organizationId ?? null }),
-        'Folder order updated'
-      ),
-    [organizationId, run, updateFolder]
-  );
-
   const deleteFolder = useCallback(
     (folderId: string) =>
       run(
@@ -200,6 +194,27 @@ export function useWorkspaceFolders(
         'Folder order updated'
       ),
     [organizationId, reorder, run]
+  );
+
+  const reorderSmartFolderWorktrees = useCallback(
+    async (folderId: string, worktreeIds: readonly string[]) => {
+      if (worktreeIds.length > SMART_FOLDER_WORKTREE_ORDER_LIMIT) {
+        toast.error(
+          `Cannot save workspace order for smart folders with more than ${SMART_FOLDER_WORKTREE_ORDER_LIMIT} workspaces.`
+        );
+        return false;
+      }
+      return run(
+        () =>
+          reorderWorktrees({
+            folderId,
+            worktreeIds: worktreeIds.map(id => cloudAgentWorktreeIdSchema.parse(id)),
+            organizationId: organizationId ?? null,
+          }),
+        'Workspace order saved'
+      );
+    },
+    [organizationId, reorderWorktrees, run]
   );
 
   /**
@@ -265,12 +280,12 @@ export function useWorkspaceFolders(
     toggleFolder,
     saveFolder,
     setFolderColor,
-    setFolderSortMode,
     deleteFolder,
     moveWorktree,
     moveSession,
     initializeWorktreePositions,
     reorderFolders,
+    reorderSmartFolderWorktrees,
     refresh,
   };
 }

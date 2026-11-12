@@ -13,9 +13,15 @@ import {
 
 vi.mock('../sandbox-control/downloaded-startup.js', () => ({ downloadedStartup: vi.fn() }));
 const allocation = {
+  provider: 'cloudflare-containers' as const,
   sandboxId: 'sbx-builder',
   allocationId: 'allocation',
   instance: 'standard-4' as const,
+};
+const lifecycle = {
+  get: async () => null,
+  set: async () => undefined,
+  clear: async () => undefined,
 };
 const runner = { url: 'https://worker.test/environment-build/test', credential: 'synthetic' };
 const command = { argv: ['/bin/sh', '-c', 'download-selected-builder'] };
@@ -65,7 +71,9 @@ describe('environment builder startup selection', () => {
       expect(
         builderRuntimeUnsupportedReason({ ...runtimeEnv, ...overrides } as Env)
       ).not.toBeNull();
-      await expect(provider.launch(allocation, { runner, deadlineAt: 100 })).rejects.toMatchObject({
+      await expect(
+        provider.launch(allocation, { runner, deadlineAt: 100 }, lifecycle)
+      ).rejects.toMatchObject({
         code: 'invalid_configuration',
       });
       expect(downloadedStartup).not.toHaveBeenCalled();
@@ -78,7 +86,7 @@ describe('environment builder startup selection', () => {
       RUNTIME_INTERACTIVE_ORG_IDS: '22222222-2222-4222-8222-222222222222',
     });
     expect(builderRuntimeUnsupportedReason(runtimeEnv as Env)).toBeNull();
-    await provider.launch(allocation, { runner, deadlineAt: 100 });
+    await provider.launch(allocation, { runner, deadlineAt: 100 }, lifecycle);
     expect(downloadedStartup).toHaveBeenCalledWith(
       expect.objectContaining({
         descriptor: 'release',

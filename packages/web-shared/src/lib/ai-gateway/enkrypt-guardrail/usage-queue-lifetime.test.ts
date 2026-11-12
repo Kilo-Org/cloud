@@ -5,13 +5,11 @@ import type * as NextAfter from 'next/dist/server/after/after-context';
 import type * as EnkryptUsage from './usage';
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { randomUUID } from 'crypto';
-import { eq } from 'drizzle-orm';
-import { enkrypt_usage } from '@kilocode/db/schema';
 import { EnkryptUsageWriteSchema } from '@kilocode/usage-contracts';
-import { db } from '@kilocode/web-shared/lib/drizzle';
-import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  enkryptLedgerRows,
+  enkryptUsageRecordForNewOrganization,
+} from '@kilocode/web-shared/tests/helpers/enkrypt-usage.helper';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/drizzle'),
@@ -76,30 +74,6 @@ function requestLifetime() {
   };
 }
 
-async function usageRecordForNewOrganization() {
-  const user = await insertTestUser();
-  const organization = await createTestOrganization(
-    `enkrypt-queue-lifetime-${randomUUID()}`,
-    user.id,
-    10_000_000
-  );
-  return {
-    organizationId: organization.id,
-    kiloUserId: user.id,
-    sessionId: 'ses_guardrail',
-    apiKind: 'messages' as const,
-    decision: 'blocked' as const,
-    creditsCost: 7,
-    scannedCharacters: 2_400,
-    totalCharacters: 10_000,
-    addedLatencyMs: 212,
-  };
-}
-
-async function ledgerRows(organizationId: string) {
-  return db.select().from(enkrypt_usage).where(eq(enkrypt_usage.organization_id, organizationId));
-}
-
 beforeEach(() => {
   mockFetch.mockReset();
   mockFetch.mockImplementation(async () => new Response(null, { status: 202 }));
@@ -115,7 +89,7 @@ afterEach(() => {
 
 describe('recordEnkryptUsage with the real after()', () => {
   it('publishes from inside a gateway after() callback, as the guardrails call it', async () => {
-    const usageRecord = await usageRecordForNewOrganization();
+    const usageRecord = await enkryptUsageRecordForNewOrganization();
     const lifecycle = requestLifetime();
     let settled = false;
 
@@ -135,19 +109,19 @@ describe('recordEnkryptUsage with the real after()', () => {
     expect(
       EnkryptUsageWriteSchema.safeParse(JSON.parse(String(published[0][1]?.body))).success
     ).toBe(true);
-    expect(await ledgerRows(usageRecord.organizationId)).toEqual([]);
+    expect(await enkryptLedgerRows(usageRecord.organizationId)).toEqual([]);
     expect(jest.mocked(console.warn).mock.calls.map(([message]) => message)).not.toContain(
       NO_LIFETIME
     );
   });
 
   it('writes directly, sending nothing, when called outside any request scope', async () => {
-    const usageRecord = await usageRecordForNewOrganization();
+    const usageRecord = await enkryptUsageRecordForNewOrganization();
 
     await recordEnkryptUsage(usageRecord);
 
     expect(mockFetch).not.toHaveBeenCalled();
-    expect(await ledgerRows(usageRecord.organizationId)).toHaveLength(1);
+    expect(await enkryptLedgerRows(usageRecord.organizationId)).toHaveLength(1);
     expect(jest.mocked(console.warn).mock.calls.map(([message]) => message)).toContain(NO_LIFETIME);
   });
 });

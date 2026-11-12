@@ -40,7 +40,14 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { lineIndex, parseProblems, parseSourceFile, walk } from '../lib/ast.mjs';
+import {
+  isTranslateCallee,
+  lineIndex,
+  parseProblems,
+  parseSourceFile,
+  unwrap,
+  walk,
+} from '../lib/ast.mjs';
 import { countPlaceholderBases, flattenCatalog, pluralParts } from '../lib/catalogs.mjs';
 import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
@@ -147,44 +154,6 @@ export const NO_AGREEMENT = new Map([
   ],
   ['profiles.counts.mcp', 'initialism, not agreement: "{{count}} MCP" names no inflected word'],
 ]);
-
-/**
- * Whether `callee` is the audit's `t`: a bare `t`, or the initialised i18n
- * instance's `i18n.t`. A method of any other object is a different function
- * that happens to be named `t`, so its arguments say nothing about a message.
- */
-function isTranslateCallee(callee) {
-  if (callee.type === 'Identifier') {
-    return callee.name === 't';
-  }
-  if (callee.type !== 'MemberExpression' || callee.computed) {
-    return false;
-  }
-  return (
-    callee.property.type === 'Identifier' &&
-    callee.property.name === 't' &&
-    callee.object.type === 'Identifier' &&
-    callee.object.name === 'i18n'
-  );
-}
-
-/** The node a TypeScript-only wrapper holds, so `{ … } satisfies X` reads as an object. */
-const TS_WRAPPERS = new Set([
-  'TSAsExpression',
-  'TSSatisfiesExpression',
-  'TSTypeAssertion',
-  'TSNonNullExpression',
-  'TSInstantiationExpression',
-  'ParenthesizedExpression',
-]);
-
-function unwrap(node) {
-  let current = node;
-  while (TS_WRAPPERS.has(current.type)) {
-    current = current.expression;
-  }
-  return current;
-}
 
 /**
  * The property names written in key position on the options object.

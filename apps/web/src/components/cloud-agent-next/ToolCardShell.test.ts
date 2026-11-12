@@ -123,6 +123,18 @@ describe('ToolCardShell selection click guard', () => {
     }
   });
 
+  it('mounts no measuring content for closed tool cards', () => {
+    expect(container.querySelectorAll('[data-state="closed"][id]')).toHaveLength(0);
+    expect(container.textContent).not.toContain('Plan details');
+    dispatch(trigger, 'click', { detail: 0 });
+    expect(container.textContent).toContain('Plan details');
+    const contentId = trigger.getAttribute('aria-controls');
+    expect(contentId).toBeTruthy();
+    expect(container.querySelector(`[id="${contentId}"]`)).not.toBeNull();
+    dispatch(trigger, 'click', { detail: 0 });
+    expect(container.textContent).not.toContain('Plan details');
+  });
+
   it('preserves both closed and open state after a selected drag', () => {
     dispatch(trigger, 'pointerdown');
     selection = selectionIn(trigger);

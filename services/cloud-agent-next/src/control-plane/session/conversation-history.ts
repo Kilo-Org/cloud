@@ -9,11 +9,13 @@ import {
   decodeSessionHistoryCursor,
   encodeCursor,
   MAX_SESSION_PAGE_BYTES,
+  MAX_SESSION_PREVIEW_PAGE_BYTES,
   type readSessionMessagesPage,
   type HistoryCursor,
 } from './history.js';
 import { isKilocodeRow } from './event-queries.js';
 import { events } from './sqlite-schema.js';
+import { projectKilo2MessageForDisplay } from '../../shared/tool-display-projection.js';
 
 export type Kilo2MessagesPage = {
   kind: 'success';
@@ -33,7 +35,7 @@ export type Kilo2MessagesPage = {
 
 type Input = Parameters<typeof readSessionMessagesPage>[0];
 
-export function readConversationSource(input: Input) {
+export function readConversationSource(input: Pick<Input, 'queries' | 'kiloSessionId'>) {
   const row = input.queries.findByEntityId(`conversation-source/${input.kiloSessionId}`);
   if (row === null) return undefined;
   const value = z
@@ -97,6 +99,8 @@ export function readKilo2MessagesPage(
     totalCostMicrodollars: input.queries.getTotalCostMicrodollars(sessionId, kiloSessionId),
   };
   const size = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  const preview = input.toolDisplay === 'preview';
+  const softBudget = preview ? MAX_SESSION_PREVIEW_PAGE_BYTES : MAX_SESSION_PAGE_BYTES;
   // Reserve the maximum cursor before accepting a native message. Read payloads
   // only after checking their stored size, as in the v1 history reader.
   let bytes = size({ ...page, nextCursor: 'x'.repeat(2048) });
@@ -106,6 +110,7 @@ export function readKilo2MessagesPage(
       id: events.id,
       createdAt,
       messageId,
+      revision: events.mutation_cursor,
       bytes: sql<number>`length(cast(${events.payload} as blob))`,
     })
     .from(events)
@@ -125,25 +130,23 @@ export function readKilo2MessagesPage(
       messageId: row.messageId,
       rowId: row.id,
     };
-    if (page.messages.length && bytes + row.bytes > MAX_SESSION_PAGE_BYTES) {
+    // A stored row above the budget is read only when its projection may fit.
+    const read = () =>
+      db.select({ payload: events.payload }).from(events).where(eq(events.id, row.id)).get();
+    let stored = !preview || bytes + row.bytes <= softBudget ? undefined : read();
+    let parsed = stored === undefined ? undefined : parseMessage(stored.payload, preview, row);
+    const rowBytes = parsed?.success ? size(displayItem(parsed.data.properties)) : row.bytes;
+    if (page.messages.length && bytes + rowBytes > softBudget) {
       more = true;
       break;
     }
     consumed = key;
-    if (bytes + row.bytes > MAX_SESSION_PAGE_BYTES) {
+    if (bytes + rowBytes > MAX_SESSION_PAGE_BYTES) {
       page.omittedItemCount++;
       continue;
     }
-    const stored = db
-      .select({ payload: events.payload })
-      .from(events)
-      .where(eq(events.id, row.id))
-      .get();
-    const parsed = stored
-      ? z
-          .object({ properties: kilo2ConversationMessageSchema })
-          .safeParse(JSON.parse(stored.payload))
-      : undefined;
+    stored ??= read();
+    parsed ??= stored ? parseMessage(stored.payload, preview, row) : undefined;
     if (
       !parsed?.success ||
       parsed.data.properties.sessionID !== kiloSessionId ||
@@ -152,14 +155,39 @@ export function readKilo2MessagesPage(
       page.omittedItemCount++;
       continue;
     }
-    const item = {
-      message: parsed.data.properties.message,
-      ...(parsed.data.properties.parentID ? { parentID: parsed.data.properties.parentID } : {}),
-    };
+    const item = displayItem(parsed.data.properties);
     page.messages.push(item);
     bytes += size(item) + 1;
   }
   if (more && consumed) page.nextCursor = encodeCursor(consumed);
   page.messages.reverse();
   return page;
+}
+
+const storedMessageSchema = z.object({ properties: kilo2ConversationMessageSchema });
+
+function parseMessage(
+  payload: string,
+  preview: boolean,
+  row: { revision: number | null | undefined }
+) {
+  const parsed = storedMessageSchema.safeParse(JSON.parse(payload));
+  if (!parsed.success || !preview || row.revision == null) return parsed;
+  const properties = parsed.data.properties;
+  return {
+    ...parsed,
+    data: {
+      properties: {
+        ...properties,
+        message: projectKilo2MessageForDisplay(properties.message, row.revision) as Kilo2Message,
+      },
+    },
+  };
+}
+
+function displayItem(properties: z.infer<typeof kilo2ConversationMessageSchema>) {
+  return {
+    message: properties.message,
+    ...(properties.parentID ? { parentID: properties.parentID } : {}),
+  };
 }

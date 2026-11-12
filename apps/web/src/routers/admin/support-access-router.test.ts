@@ -11,6 +11,10 @@ import {
   support_access_grants,
 } from '@kilocode/db/schema';
 import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
+import {
+  SUPPORT_READ_MAX_DURATION_SECONDS,
+  SUPPORT_WRITE_MAX_DURATION_SECONDS,
+} from '@kilocode/web-shared/lib/admin/support-access';
 import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -171,6 +175,39 @@ describe('admin.supportAccess request', () => {
       'issued',
       'requested',
     ]);
+  });
+
+  test('the issued write window is capped at the write maximum', async () => {
+    const requester = await insertRequester();
+    const approver = await insertRequester();
+    const { organization } = await orgWithOwner();
+    const caller = await stepUpCaller(requester.id);
+
+    const grant = await caller.admin.supportAccess.request({
+      organizationId: organization.id,
+      actionClass: 'support_write',
+      reason: 'fixing a broken organization setting',
+      durationSeconds: SUPPORT_READ_MAX_DURATION_SECONDS,
+    });
+    const stored = await db.query.support_access_grants.findFirst({
+      where: eq(support_access_grants.id, grant.id),
+    });
+    expect(stored?.requested_duration_seconds).toBe(SUPPORT_WRITE_MAX_DURATION_SECONDS);
+
+    const approved = await (
+      await stepUpCaller(approver.id)
+    ).admin.supportAccess.approve({
+      grantId: grant.id,
+    });
+    expect(approved.status).toBe('active');
+    const lifetime =
+      new Date(approved.expiresAt!).getTime() - new Date(approved.issuedAt!).getTime();
+    expect(lifetime).toBe(SUPPORT_WRITE_MAX_DURATION_SECONDS * 1000);
+
+    const requested = (await eventsFor(grant.id)).find(event => event.event_type === 'requested');
+    expect(requested?.metadata).toMatchObject({
+      durationSeconds: SUPPORT_WRITE_MAX_DURATION_SECONDS,
+    });
   });
 
   test('refuses to approve a grant whose requester has a block timestamp now', async () => {

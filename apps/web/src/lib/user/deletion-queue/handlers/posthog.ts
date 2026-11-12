@@ -8,7 +8,7 @@ import { writeDeletionActivity } from '@/lib/user/deletion-queue/deletion-audit'
 import {
   USER_DELETION_DEFAULT_POSTHOG_HOST,
   USER_DELETION_ID_ONLY_CATALOG_VERSION,
-  USER_DELETION_POSTHOG_MAX_VERIFY_ATTEMPTS,
+  USER_DELETION_POSTHOG_VERIFY_BACKOFF_MS,
 } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import {
   decryptDeletionResourceIds,
@@ -333,18 +333,24 @@ async function verifyPersonsGone(
   if ('gone' in verified) return { kind: 'succeeded', progress };
 
   const nextCount = (progress.verify_attempt_count ?? 0) + 1;
-  if (nextCount <= USER_DELETION_POSTHOG_MAX_VERIFY_ATTEMPTS) {
+  const nextDelayMs = USER_DELETION_POSTHOG_VERIFY_BACKOFF_MS[nextCount - 1];
+  if (nextDelayMs !== undefined) {
     const nextProgress = { ...progress, verify_attempt_count: nextCount };
     const lost = await assertCurrentClaim(context);
     if (lost) return lost;
     await saveProgress(requestId, nextProgress);
-    return { kind: 'continue', progress: nextProgress };
+    return { kind: 'continue', progress: nextProgress, delayMs: nextDelayMs };
   }
 
   const lost = await assertCurrentClaim(context);
   if (lost) return lost;
   await recordPosthogActivity(requestId, 'posthog_verify_unconfirmed');
-  return { kind: 'succeeded', progress };
+  // A manual retry keeps this checkpoint, so start it with a fresh verification window.
+  return {
+    kind: 'needs_attention',
+    errorCode: 'posthog_verify_unconfirmed',
+    progress: { ...progress, verify_attempt_count: 0 },
+  };
 }
 
 export const handlePosthog: DeletionHandler = async ({ request, step, context }) => {

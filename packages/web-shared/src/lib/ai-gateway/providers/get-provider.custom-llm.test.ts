@@ -4,6 +4,7 @@ import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/sch
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { getProviderInput } from '@kilocode/web-shared/tests/helpers/get-provider-input.helper';
+import { onlyRoute } from '@kilocode/web-shared/tests/helpers/get-provider-result.helper';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { insertCustomLlmForTest } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
@@ -65,10 +66,9 @@ describe('getProvider custom LLM credentials', () => {
       },
     });
 
-    const result = await resolveProvider();
+    const result = await onlyRoute(await resolveProvider());
 
     expect(result).toMatchObject({
-      kind: 'provider',
       bypassAccessCheck: true,
       isFree: false,
       provider: {
@@ -87,10 +87,9 @@ describe('getProvider custom LLM credentials', () => {
   it('sends API key credentials straight to base_url', async () => {
     await insertCustomLlm({ type: 'x-api-key', api_key: 'upstream-key' });
 
-    const result = await resolveProvider();
+    const result = await onlyRoute(await resolveProvider());
 
     expect(result).toMatchObject({
-      kind: 'provider',
       isFree: false,
       provider: {
         apiUrl: 'https://secure-proxy.example.com/api/proxy',
@@ -98,7 +97,6 @@ describe('getProvider custom LLM credentials', () => {
         apiKeyHeader: 'x-api-key',
       },
     });
-    if (result.kind !== 'provider') throw new Error('expected a provider');
     expect(result.provider.secureProxy).toBeUndefined();
   });
 
@@ -111,10 +109,9 @@ describe('getProvider custom LLM credentials', () => {
     } as const;
     await insertCustomLlm(credentials);
 
-    const result = await resolveProvider();
+    const result = await onlyRoute(await resolveProvider());
 
     expect(result).toMatchObject({
-      kind: 'provider',
       bypassAccessCheck: true,
       provider: {
         apiUrl: 'https://secure-proxy.example.com/api/proxy',
@@ -123,7 +120,6 @@ describe('getProvider custom LLM credentials', () => {
         awsBedrock: credentials,
       },
     });
-    if (result.kind !== 'provider') throw new Error('expected a provider');
     expect(result.provider.secureProxy).toBeUndefined();
   });
 

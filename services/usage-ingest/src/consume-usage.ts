@@ -1,8 +1,14 @@
-import { ENKRYPT_USAGE_WRITE_PATH, type LlmUsageQueueMessage } from '@kilocode/usage-contracts';
+import {
+  ENKRYPT_USAGE_WRITE_PATH,
+  EXA_USAGE_WRITE_PATH,
+  type LlmUsageQueueMessage,
+} from '@kilocode/usage-contracts';
 import {
   recordLlmUsage,
   recordEnkryptUsage,
+  recordExaUsage,
   type EnkryptUsageWriteOutcome,
+  type ExaUsageWriteOutcome,
   type LlmUsageWriteOutcome,
 } from '@kilocode/worker-utils/usage-writer-client';
 import type { Env } from './publish-usage';
@@ -106,7 +112,7 @@ function writerUrlFor(path: string, llmWriterUrl: string | undefined): string | 
 function recordQueuedUsage(
   usage: Exclude<QueuedUsage, { kind: 'invalid' }>,
   env: Env
-): Promise<LlmUsageWriteOutcome | EnkryptUsageWriteOutcome> {
+): Promise<LlmUsageWriteOutcome | EnkryptUsageWriteOutcome | ExaUsageWriteOutcome> {
   const config = {
     secret: env.USAGE_WRITER_SECRET,
     protectionBypass: env.USAGE_WRITER_PROTECTION_BYPASS,
@@ -114,6 +120,12 @@ function recordQueuedUsage(
   } as const;
   if (usage.kind === 'llm') {
     return recordLlmUsage(usage.usage, { url: env.USAGE_WRITER_URL, ...config });
+  }
+  if (usage.kind === 'exa_usage') {
+    return recordExaUsage(usage.record, {
+      url: writerUrlFor(EXA_USAGE_WRITE_PATH, env.USAGE_WRITER_URL),
+      ...config,
+    });
   }
   return recordEnkryptUsage(usage.record, {
     url: writerUrlFor(ENKRYPT_USAGE_WRITE_PATH, env.USAGE_WRITER_URL),
@@ -124,8 +136,8 @@ function recordQueuedUsage(
 /** LLM logs keep their existing fields; only tagged messages add `usage_kind`. */
 function usageIdentity(parsed: QueuedUsage, llmFields: (usage: LlmUsageQueueMessage) => object) {
   if (parsed.kind === 'llm') return llmFields(parsed.usage);
-  if (parsed.kind === 'enkrypt_usage') {
-    return { usage_id: parsed.record.id, usage_kind: 'enkrypt_usage' };
+  if (parsed.kind === 'enkrypt_usage' || parsed.kind === 'exa_usage') {
+    return { usage_id: parsed.record.id, usage_kind: parsed.kind };
   }
   return parsed.usageKind === 'llm' ? {} : { usage_kind: parsed.usageKind };
 }
@@ -163,6 +175,7 @@ async function processMessage(
   let outcome:
     | LlmUsageWriteOutcome
     | EnkryptUsageWriteOutcome
+    | ExaUsageWriteOutcome
     | { kind: 'unavailable'; reason: 'invalid_event' | 'unsupported_kind' | 'invocation_budget' };
   let writerDurationMs: number | undefined;
   if (parsed.kind === 'invalid') {

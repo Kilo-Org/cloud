@@ -26,6 +26,7 @@ const config = vi.hoisted(() => ({
 }));
 
 const provider = vi.hoisted(() => ({ status: 'connected' }));
+const integrationAccount = vi.hoisted(() => ({ login: 'alice' as string | undefined }));
 const connectivity = vi.hoisted(() => ({ known: true }));
 const platformError = vi.hoisted(() => ({
   variants: [] as string[],
@@ -168,14 +169,14 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     isLoading: false,
     isError: false,
     isFetching: false,
-    data: { connected: true, integration: { accountLogin: 'alice' } },
+    data: { connected: true, integration: { accountLogin: integrationAccount.login } },
     refetch: vi.fn(),
   }),
   useGitLabStatus: () => ({
     isLoading: false,
     isError: false,
     isFetching: false,
-    data: { connected: true, integration: { accountLogin: 'alice' } },
+    data: { connected: true, integration: { accountLogin: integrationAccount.login } },
     refetch: vi.fn(),
   }),
   useGitLabWebhookWarning: () => ({ hasWebhookSyncWarning: webhookWarning.shown }),
@@ -292,6 +293,7 @@ beforeEach(() => {
   saveMutation.isPending = false;
   saveMutation.mutate.mockClear();
   provider.status = 'connected';
+  integrationAccount.login = 'alice';
   connectivity.known = true;
   platformError.variants = [];
   platformError.backFallbacks = [];
@@ -656,6 +658,35 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
     expect(texts).toContain(
       'Only organization owners, admins, and billing managers can change these settings.'
     );
+  });
+});
+
+describe('PlatformOverviewScreen Automatic reviews account line', () => {
+  /** The muted line painted under the Automatic reviews label, when present. */
+  function accountLines(renderer: TestRenderer.ReactTestRenderer): unknown[] {
+    return renderer.root
+      .findAllByType('Text')
+      .filter(node => node.props.variant === 'muted')
+      .map(node => node.props.children);
+  }
+
+  it('paints the connected account under the label', async () => {
+    config.data = makeConfig();
+
+    const renderer = await render('personal', 'gitlab');
+
+    expect(accountLines(renderer)).toEqual(['alice']);
+  });
+
+  it('paints the label alone so the row keeps one line without a login', async () => {
+    // An empty line here made the card taller than the sibling Follow REVIEW.md
+    // row and lifted the label above the switch's centre.
+    integrationAccount.login = undefined;
+    config.data = makeConfig();
+
+    const renderer = await render('personal', 'gitlab');
+
+    expect(accountLines(renderer)).toEqual([]);
   });
 });
 

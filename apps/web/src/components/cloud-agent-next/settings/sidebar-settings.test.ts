@@ -10,6 +10,7 @@ function folder(overrides: Partial<WorkspaceFolder> = {}): WorkspaceFolder {
     kind: 'smart',
     smartPreset: 'needs_you',
     sortMode: 'manual',
+    manualWorktreeOrder: [],
     worktreeIds: [],
     ...overrides,
   };

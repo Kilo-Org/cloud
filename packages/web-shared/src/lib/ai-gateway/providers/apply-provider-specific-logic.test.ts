@@ -411,6 +411,7 @@ describe('applyReasoningDetailsTransform', () => {
             content: 'hi',
             reasoning_details: [
               { type: 'reasoning.text' as const, text: 'thinking ', signature: null },
+              { type: 'reasoning.summary' as const, summary: 'summary must not be transplanted' },
               { type: 'reasoning.encrypted' as const, data: 'opaque-blob' },
               { type: 'reasoning.text' as const, text: 'hard' },
             ],
@@ -589,6 +590,50 @@ describe('applyReasoningDetailsTransform', () => {
     expect(assistant).not.toHaveProperty('reasoning_details');
     expect(assistant.reasoning_content).toBe('legacy thinking');
   });
+
+  it.each([
+    {
+      responseTransform: ReasoningDetailsTransform.ReasoningContent,
+      targetField: 'reasoning_content',
+    },
+    { responseTransform: ReasoningDetailsTransform.Reasoning, targetField: 'reasoning' },
+  ] as const)(
+    'does not transplant summary-only reasoning_details into $targetField',
+    ({ responseTransform, targetField }) => {
+      const request = makeReasoningRequest();
+      const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+      assistant.reasoning_details = [{ type: 'reasoning.summary', summary: 'summarized thought' }];
+
+      applyReasoningDetailsTransform(makeProvider(responseTransform), request);
+
+      expect(assistant).not.toHaveProperty('reasoning_details');
+      expect(assistant).not.toHaveProperty(targetField);
+    }
+  );
+
+  it.each([
+    {
+      responseTransform: ReasoningDetailsTransform.ReasoningContent,
+      targetField: 'reasoning_content',
+    },
+    { responseTransform: ReasoningDetailsTransform.Reasoning, targetField: 'reasoning' },
+  ] as const)(
+    'falls back to legacy raw reasoning when $targetField has no reasoning.text entries',
+    ({ responseTransform, targetField }) => {
+      const request = makeReasoningRequest();
+      const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+      assistant.reasoning_details = [
+        { type: 'reasoning.summary', summary: 'summarized thought' },
+        { type: 'reasoning.encrypted', data: 'opaque-blob' },
+      ];
+      assistant.reasoning = 'legacy raw reasoning';
+
+      applyReasoningDetailsTransform(makeProvider(responseTransform), request);
+
+      expect(assistant).not.toHaveProperty('reasoning_details');
+      expect(assistant).toHaveProperty(targetField, 'legacy raw reasoning');
+    }
+  );
 
   it('keeps an empty target field for a legacy reasoning string when reasoning_details is empty', () => {
     const request = makeReasoningRequest();

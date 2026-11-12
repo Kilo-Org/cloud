@@ -44,18 +44,42 @@ function textValues(node: Node): string[] {
   );
 }
 
-/** The className of the closed selector's value line, the only `flex-1` text. */
-function valueClassName(node: Node): string | undefined {
+/** The props of the closed selector's value line, the only `flex-1` text. */
+function valueProps(node: Node): Record<string, unknown> | undefined {
   if (node === null || typeof node !== 'object') {
     return undefined;
   }
-  const className = node.props?.className;
-  if (typeof className === 'string' && className.includes('flex-1')) {
-    return className;
+  const props = node.props;
+  if (typeof props?.className === 'string' && props.className.includes('flex-1')) {
+    return props;
   }
-  const children = node.props?.children;
+  const children = props?.children;
   for (const child of Array.isArray(children) ? children : [children]) {
-    const found = valueClassName(child as Node);
+    const found = valueProps(child as Node);
+    if (found) {
+      return found;
+    }
+  }
+  return undefined;
+}
+
+function valueClassName(node: Node): string | undefined {
+  const className = valueProps(node)?.className;
+  return typeof className === 'string' ? className : undefined;
+}
+
+/** The props of the closed selector's pressable, the node that carries the label. */
+function pressableProps(node: Node): Record<string, unknown> | undefined {
+  if (node === null || typeof node !== 'object') {
+    return undefined;
+  }
+  const props = node.props;
+  if (typeof props?.accessibilityLabel === 'string') {
+    return props;
+  }
+  const children = props?.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = pressableProps(child as Node);
     if (found) {
       return found;
     }
@@ -112,8 +136,20 @@ describe('InstanceSelector closed label', () => {
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = InstanceSelector(props) as Node;
 
-    expect(textValues(element)).toContain('laptop · kilo');
+    // The one-line value names the computer alone: the Folder field on the same
+    // form already shows its project.
+    expect(textValues(element)).toEqual(['laptop']);
     expect(textValues(element)).not.toContain('No CLI instances connected');
+  });
+
+  it('keeps the whole target in the accessibility label', async () => {
+    const { InstanceSelector } = await import('./instance-selector');
+    const props = { ...baseProps(), value: INSTANCE };
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = InstanceSelector(props) as Node;
+
+    expect(pressableProps(element)?.accessibilityLabel).toBe('Run on: laptop · kilo');
   });
 });
 
@@ -139,5 +175,23 @@ describe('InstanceSelector closed label ink', () => {
     const element = InstanceSelector(props) as Node;
 
     expect(valueClassName(element) ?? '').toContain('text-muted-foreground');
+  });
+});
+
+describe('InstanceSelector closed label truncation', () => {
+  it.each([
+    ['a selected target', () => ({ ...baseProps(), value: INSTANCE })],
+    ['the Cloud Agent default', baseProps],
+    ['the loading copy', () => ({ ...baseProps(), isLoading: true })],
+    ['the unbound computer', () => ({ ...baseProps(), pendingComputer: true })],
+  ])('cuts %s at the tail', async (_name, buildProps) => {
+    const { InstanceSelector } = await import('./instance-selector');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = InstanceSelector(buildProps()) as Node;
+
+    // Every state shows a name or copy read from its start, so the tail cut is
+    // the only one that never hides the words the line begins with.
+    expect(valueProps(element)?.ellipsizeMode).toBe('tail');
   });
 });

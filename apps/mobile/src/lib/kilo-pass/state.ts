@@ -58,7 +58,7 @@ const STATUS_LABEL_KEYS = {
 
 type KnownKiloPassStatus = keyof typeof STATUS_LABEL_KEYS;
 
-export type KiloPassRow = {
+type KiloPassRow = {
   id: 'renewal' | 'usage' | 'bonus';
   label: string;
   value: string;

@@ -8,8 +8,8 @@ import {
   scanRequest,
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
-  type EnkryptUnavailableReason,
 } from './detect';
+import type { EnkryptUnavailableReason } from './report';
 import { createEnkryptCallLimiter, type EnkryptCallLimiter } from './call-limiter';
 import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/usage-contracts';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';

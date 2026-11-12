@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { EnkryptGuardrailDirection } from '@kilocode/db/schema-types';
-import type {
-  EnkryptGuardrailVerdict,
-  EnkryptUnavailableReason,
-} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
+import type { EnkryptGuardrailVerdict } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
+import type { EnkryptUnavailableReason } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';

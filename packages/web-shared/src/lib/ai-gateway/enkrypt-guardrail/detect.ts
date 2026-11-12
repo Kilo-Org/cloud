@@ -11,7 +11,12 @@ import {
   enkryptSummaryDetectorId,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import type { EnkryptGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
-import type { EnkryptScanReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
+import type {
+  EnkryptScanKind,
+  EnkryptScanPart,
+  EnkryptScanReport,
+  EnkryptUnavailableReason,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/usage-contracts';
 import type { EnkryptCallLimiter } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-limiter';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -54,12 +59,6 @@ const detectResponseSchema = z.object({
 });
 
 /**
- * What a scan covers: one of the request's tool definitions or response formats, its system
- * prompt, its conversation, or the model's response.
- */
-export type EnkryptScanPart = 'tools' | 'system' | 'conversation' | 'response';
-
-/**
  * How much of the part `text` covers. Units (segments, or slices of a segment too long for one
  * call) with a cached verdict are left out, and the rest are packed into calls of at most
  * `ENKRYPT_MAX_SCAN_CHARACTERS`; `chunk` locates this call among them. For tool definitions, the
@@ -67,7 +66,7 @@ export type EnkryptScanPart = 'tools' | 'system' | 'conversation' | 'response';
  */
 export type EnkryptScanCoverage = {
   part: EnkryptScanPart;
-  cache: 'off' | 'miss' | 'hit' | 'error';
+  cache: EnkryptScanReport['verdict_cache'];
   totalCharacters: number;
   totalSegments: number;
   cachedCharacters: number;
@@ -114,14 +113,6 @@ export type EnkryptGuardrailVerdict =
   | { action: 'allow' }
   | { action: 'block'; message: string }
   | { action: 'unavailable'; reason: EnkryptUnavailableReason };
-
-export type EnkryptUnavailableReason = 'transient' | 'timeout' | 'failed';
-
-/**
- * A `log_only` scan has no detector that can block, so the request does not wait for it and its
- * failures are only logged: the request is never rejected because of it.
- */
-export type EnkryptScanKind = 'blocking' | 'log_only';
 
 export function scanKind(config: EnkryptGuardrailConfig): EnkryptScanKind {
   return config.status === 'ready' && config.blockingDetectors.length === 0

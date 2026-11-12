@@ -35,6 +35,7 @@ import {
   type EnkryptGuardrailReport,
   type EnkryptInputPartScanReport,
   type EnkryptScanReport,
+  type EnkryptSegmentsPart,
   type EnkryptToolScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -387,7 +388,7 @@ function callScans(
  * never cached; see `isCacheableAllow` for log-only scans.
  */
 async function planSegmentsPart(
-  part: 'system' | 'conversation',
+  part: EnkryptSegmentsPart,
   segments: RequestSegment[],
   request: EnkryptScanContext,
   cache: VerdictCache | null

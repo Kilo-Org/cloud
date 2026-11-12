@@ -10,7 +10,6 @@ import {
   scanRequest,
   type EnkryptGuardrailScan,
   type EnkryptGuardrailScanResult,
-  type EnkryptScanPart,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import {
   joinSegments,
@@ -28,6 +27,7 @@ import { scanUnits } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail
 import { ENKRYPT_MAX_CONCURRENT_CALLS } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-limiter';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import type {
+  EnkryptScanPart,
   EnkryptScanReport,
   EnkryptToolScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';

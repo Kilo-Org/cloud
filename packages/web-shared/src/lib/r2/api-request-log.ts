@@ -2,6 +2,10 @@ import { GetObjectCommand, NoSuchKey, PutObjectCommand, type S3Client } from '@a
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { ApiRequestLog } from '@kilocode/db/schema';
+import {
+  EnkryptScanKindSchema,
+  EnkryptScanPartSchema,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { createR2Client } from '@kilocode/web-shared/lib/r2/create-client';
 
@@ -12,8 +16,8 @@ export type ApiRequestLogBlobUpload = {
 
 const enkryptRequestLogSchema = z.object({
   guardrail: z.enum(['input', 'output']),
-  scan: z.enum(['blocking', 'log_only']),
-  part: z.enum(['tools', 'system', 'conversation', 'response']),
+  scan: EnkryptScanKindSchema,
+  part: EnkryptScanPartSchema,
   /** Which of the input part's chunks the call scanned; each chunk is scanned by its own calls. */
   chunk: z.object({ index: z.number(), count: z.number() }).optional(),
   request: z.object({

@@ -1,10 +1,10 @@
+import type { EnkryptScanKind } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
+
 /**
  * The most Enkrypt calls one gateway request has in flight at once, across the input guardrail's
  * blocking and log-only scans of every part and tool definition, retries included.
  */
 export const ENKRYPT_MAX_CONCURRENT_CALLS = 4;
-
-export type EnkryptCallPriority = 'blocking' | 'log_only';
 
 /** Frees the slot. Calling it again does nothing. */
 export type EnkryptCallSlot = () => void;
@@ -15,14 +15,14 @@ export type EnkryptCallLimiter = {
    * same priority in the order they asked. Resolves null, without a slot, when `signal` aborts
    * first.
    */
-  acquire(priority: EnkryptCallPriority, signal: AbortSignal): Promise<EnkryptCallSlot | null>;
+  acquire(priority: EnkryptScanKind, signal: AbortSignal): Promise<EnkryptCallSlot | null>;
 };
 
 export function createEnkryptCallLimiter(
   maxConcurrent: number = ENKRYPT_MAX_CONCURRENT_CALLS
 ): EnkryptCallLimiter {
   let active = 0;
-  const waiting: Record<EnkryptCallPriority, (() => void)[]> = { blocking: [], log_only: [] };
+  const waiting: Record<EnkryptScanKind, (() => void)[]> = { blocking: [], log_only: [] };
 
   const slot = (): EnkryptCallSlot => {
     let released = false;

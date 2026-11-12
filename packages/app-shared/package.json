@@ -29,7 +29,8 @@
     "./agent-profile": "./src/agent-profile.ts",
     "./approval-key": "./src/approval-key.ts",
     "./home-widget": "./src/home-widget.ts",
-    "./tool-detail": "./src/tool-detail/index.ts"
+    "./tool-detail": "./src/tool-detail/index.ts",
+    "./worktree-review": "./src/worktree-review/index.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit",

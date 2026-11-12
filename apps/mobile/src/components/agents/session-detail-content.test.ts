@@ -1568,11 +1568,12 @@ describe('session detail organization scope', () => {
         Object.is(node.type, 'Button') &&
         node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
     );
-    if (continueControl) {
-      act(() => {
-        (continueControl.props.onPress as () => void)();
-      });
+    if (!continueControl) {
+      throw new Error('the Continue control was expected for a read-only transcript');
     }
+    act(() => {
+      (continueControl.props.onPress as () => void)();
+    });
     expect(navigationRoutes.lastIndexOf('session-detail')).toBe(continueRoute);
     expect(
       navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))

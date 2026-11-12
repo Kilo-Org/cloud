@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tidak dapat membuka hasil carian ini"
+  },
+  "integrations": {
+    "title": "Integrasi",
+    "sectionTitle": "Perkhidmatan yang disambungkan",
+    "entrySubtitle": "GitHub, Slack, Linear dan banyak lagi",
+    "subtitle": "Sambungkan alat dan aliran kerja pembangunan anda kepada Kilo",
+    "emptyHint": "Belum ada integrasi yang disambungkan.",
+    "disconnect": "Putuskan sambungan",
+    "disconnectTitle": "Putuskan sambungan {{provider}}?",
+    "disconnectMessage": "Kilo akan berhenti memberikan respons dalam {{provider}}. Anda boleh menyambung semula pada bila-bila masa.",
+    "connectedTo": "Disambungkan kepada {{account}}",
+    "disconnected": "Sambungan {{provider}} telah diputuskan",
+    "disconnectFailed": "Tidak dapat memutuskan sambungan {{provider}}",
+    "couldNotLoad": "Tidak dapat memuatkan integrasi",
+    "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus integrasi ini.",
+    "memberHint": "Minta pemilik atau pentadbir organisasi untuk menukar sambungan ini.",
+    "connectFailed": "Tidak dapat membuka halaman sambungan",
+    "manageOnWeb": "Urus di web"
   }
 }

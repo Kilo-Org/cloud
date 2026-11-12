@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Enweghị ike imepe nsonaazụ ọchụchọ a"
+  },
+  "integrations": {
+    "title": "Njikọ",
+    "sectionTitle": "Ọrụ ejikọrọ",
+    "entrySubtitle": "GitHub, Slack, Linear na ndị ọzọ",
+    "subtitle": "Jikọọ ngwaọrụ mmepe gị na usoro ọrụ gị na Kilo",
+    "emptyHint": "Enwebeghị njikọ ọ bụla.",
+    "disconnect": "Kwụsị njikọ",
+    "disconnectTitle": "Kwụsị njikọ {{provider}}?",
+    "disconnectMessage": "Kilo agaghị azaghachi ọzọ na {{provider}}. Ị nwere ike ijikọ ọzọ mgbe ọ bụla.",
+    "connectedTo": "Ejikọrọ na {{account}}",
+    "disconnected": "Akwụsịla njikọ {{provider}}",
+    "disconnectFailed": "Enweghị ike ịkwụsị njikọ {{provider}}",
+    "couldNotLoad": "Enweghị ike ibudata njikọ",
+    "permissionDenied": "Ị nweghị ikike ijikwa njikọ ndị a.",
+    "memberHint": "Gwa onye nwe nzukọ ma ọ bụ onye nchịkwa ka ọ gbanwee njikọ ndị a.",
+    "connectFailed": "Enweghị ike imepe ibe njikọ",
+    "manageOnWeb": "Jikwaa na weebụ"
   }
 }

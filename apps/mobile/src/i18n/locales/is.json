@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ekki tókst að opna þessa leitarniðurstöðu"
+  },
+  "integrations": {
+    "title": "Samþættingar",
+    "sectionTitle": "Tengdar þjónustur",
+    "entrySubtitle": "GitHub, Slack, Linear og fleira",
+    "subtitle": "Tengdu þróunartólin þín og vinnuflæði við Kilo",
+    "emptyHint": "Engar samþættingar tengdar enn.",
+    "disconnect": "Aftengja",
+    "disconnectTitle": "Aftengja {{provider}}?",
+    "disconnectMessage": "Kilo hættir að svara í {{provider}}. Þú getur tengt aftur hvenær sem er.",
+    "connectedTo": "Tengt við {{account}}",
+    "disconnected": "{{provider}} aftengt",
+    "disconnectFailed": "Ekki tókst að aftengja {{provider}}",
+    "couldNotLoad": "Ekki tókst að hlaða inn samþættingum",
+    "permissionDenied": "Þú hefur ekki heimild til að stjórna þessum samþættingum.",
+    "memberHint": "Biddu eiganda eða stjórnanda stofnunarinnar um að breyta þessum tengingum.",
+    "connectFailed": "Ekki tókst að opna tengingarsíðuna",
+    "manageOnWeb": "Stjórna á vefnum"
   }
 }

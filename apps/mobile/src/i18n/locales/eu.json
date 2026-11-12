@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ezin izan da bilaketa-emaitza hau ireki"
+  },
+  "integrations": {
+    "title": "Integrazioak",
+    "sectionTitle": "Konektatutako zerbitzuak",
+    "entrySubtitle": "GitHub, Slack, Linear eta gehiago",
+    "subtitle": "Konektatu zure garapen-tresnak eta lan-fluxuak Kilo aplikazioarekin",
+    "emptyHint": "Oraindik ez dago integraziorik konektatuta.",
+    "disconnect": "Deskonektatu",
+    "disconnectTitle": "{{provider}} deskonektatu?",
+    "disconnectMessage": "Kilo aplikazioak ez du gehiago erantzungo {{provider}} zerbitzuan. Edonoiz konekta dezakezu berriro.",
+    "connectedTo": "Konektatuta: {{account}}",
+    "disconnected": "{{provider}} deskonektatu da",
+    "disconnectFailed": "Ezin izan da {{provider}} deskonektatu",
+    "couldNotLoad": "Ezin izan dira integrazioak kargatu",
+    "permissionDenied": "Ez duzu integrazio hauek kudeatzeko baimenik.",
+    "memberHint": "Eskatu erakundearen jabe edo administratzaile bati konexio hauek aldatzeko.",
+    "connectFailed": "Ezin izan da konexio-orria ireki",
+    "manageOnWeb": "Kudeatu webean"
   }
 }

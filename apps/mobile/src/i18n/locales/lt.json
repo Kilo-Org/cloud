@@ -3998,5 +3998,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nepavyko atidaryti šio paieškos rezultato"
+  },
+  "integrations": {
+    "title": "Integracijos",
+    "sectionTitle": "Prijungtos paslaugos",
+    "entrySubtitle": "GitHub, Slack, Linear ir kitos",
+    "subtitle": "Prijunkite savo kūrimo įrankius ir darbo eigas prie Kilo",
+    "emptyHint": "Dar nėra prijungtų integracijų.",
+    "disconnect": "Atjungti",
+    "disconnectTitle": "Atjungti {{provider}}?",
+    "disconnectMessage": "Kilo nebeatsakys {{provider}} platformoje. Bet kada galėsite vėl prijungti.",
+    "connectedTo": "Prijungta: {{account}}",
+    "disconnected": "Atjungta: {{provider}}",
+    "disconnectFailed": "Nepavyko atjungti {{provider}}",
+    "couldNotLoad": "Nepavyko įkelti integracijų",
+    "permissionDenied": "Neturite teisių tvarkyti šių integracijų.",
+    "memberHint": "Paprašykite organizacijos savininko arba administratoriaus pakeisti šias jungtis.",
+    "connectFailed": "Nepavyko atidaryti prijungimo puslapio",
+    "manageOnWeb": "Tvarkyti žiniatinklyje"
   }
 }

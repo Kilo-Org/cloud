@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ይህን የፍለጋ ውጤት መክፈት አልተቻለም"
+  },
+  "integrations": {
+    "title": "ውህደቶች",
+    "sectionTitle": "የተገናኙ አገልግሎቶች",
+    "entrySubtitle": "GitHub፣ Slack፣ Linear እና ሌሎችም",
+    "subtitle": "የልማት መሣሪያዎችዎን እና የሥራ ሂደቶችዎን ከKilo ጋር ያገናኙ",
+    "emptyHint": "እስካሁን ምንም የተገናኘ ውህደት የለም።",
+    "disconnect": "ግንኙነት አቋርጥ",
+    "disconnectTitle": "የ{{provider}} ግንኙነት ይቋረጥ?",
+    "disconnectMessage": "Kilo በ{{provider}} ውስጥ ምላሽ መስጠት ያቆማል። በማንኛውም ጊዜ እንደገና ማገናኘት ይችላሉ።",
+    "connectedTo": "ከ{{account}} ጋር ተገናኝቷል",
+    "disconnected": "የ{{provider}} ግንኙነት ተቋርጧል",
+    "disconnectFailed": "የ{{provider}} ግንኙነትን ማቋረጥ አልተቻለም",
+    "couldNotLoad": "ውህደቶችን መጫን አልተቻለም",
+    "permissionDenied": "እነዚህን ውህደቶች የማስተዳደር ፈቃድ የለዎትም።",
+    "memberHint": "እነዚህን ግንኙነቶች ለመቀየር የድርጅቱን ባለቤት ወይም አስተዳዳሪ ይጠይቁ።",
+    "connectFailed": "የግንኙነት ገጹን መክፈት አልተቻለም",
+    "manageOnWeb": "በድር ላይ ያስተዳድሩ"
   }
 }

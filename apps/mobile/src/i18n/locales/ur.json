@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "یہ تلاش کا نتیجہ کھولا نہیں جا سکا"
+  },
+  "integrations": {
+    "title": "انٹیگریشنز",
+    "sectionTitle": "منسلک سروسز",
+    "entrySubtitle": "GitHub، Slack، Linear اور مزید",
+    "subtitle": "اپنے ڈیولپمنٹ ٹولز اور ورک فلوز کو Kilo سے منسلک کریں",
+    "emptyHint": "ابھی تک کوئی انٹیگریشن منسلک نہیں ہے۔",
+    "disconnect": "منقطع کریں",
+    "disconnectTitle": "{{provider}} کو منقطع کریں؟",
+    "disconnectMessage": "Kilo اب {{provider}} میں جواب نہیں دے گا۔ آپ کسی بھی وقت دوبارہ منسلک کر سکتے ہیں۔",
+    "connectedTo": "{{account}} سے منسلک",
+    "disconnected": "{{provider}} منقطع ہو گیا",
+    "disconnectFailed": "{{provider}} کو منقطع نہیں کیا جا سکا",
+    "couldNotLoad": "انٹیگریشنز لوڈ نہیں ہو سکیں",
+    "permissionDenied": "آپ کو ان انٹیگریشنز کا انتظام کرنے کی اجازت نہیں ہے۔",
+    "memberHint": "ان کنکشنز کو تبدیل کرنے کے لیے تنظیم کے کسی مالک یا ایڈمن سے کہیں۔",
+    "connectFailed": "کنکشن کا صفحہ نہیں کھل سکا",
+    "manageOnWeb": "ویب پر انتظام کریں"
   }
 }

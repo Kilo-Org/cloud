@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "无法打开此搜索结果"
+  },
+  "integrations": {
+    "title": "集成",
+    "sectionTitle": "已连接的服务",
+    "entrySubtitle": "GitHub、Slack、Linear 等",
+    "subtitle": "将你的开发工具和工作流连接到 Kilo",
+    "emptyHint": "尚未连接任何集成。",
+    "disconnect": "断开连接",
+    "disconnectTitle": "要断开 {{provider}} 的连接吗？",
+    "disconnectMessage": "Kilo 将不再在 {{provider}} 中响应。你可以随时重新连接。",
+    "connectedTo": "已连接到 {{account}}",
+    "disconnected": "已断开 {{provider}} 的连接",
+    "disconnectFailed": "无法断开 {{provider}} 的连接",
+    "couldNotLoad": "无法加载集成",
+    "permissionDenied": "你没有管理这些集成的权限。",
+    "memberHint": "请联系组织所有者或管理员更改这些连接。",
+    "connectFailed": "无法打开连接页面",
+    "manageOnWeb": "在网页端管理"
   }
 }

@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu qidiruv natijasini ochib bo'lmadi"
+  },
+  "integrations": {
+    "title": "Integratsiyalar",
+    "sectionTitle": "Ulangan xizmatlar",
+    "entrySubtitle": "GitHub, Slack, Linear va boshqalar",
+    "subtitle": "Ishlab chiqish vositalaringiz va ish jarayonlaringizni Kilo bilan ulang",
+    "emptyHint": "Hali hech qanday integratsiya ulanmagan.",
+    "disconnect": "Uzish",
+    "disconnectTitle": "{{provider}} xizmati uzilsinmi?",
+    "disconnectMessage": "Kilo endi {{provider}} xizmatida javob bermaydi. Istalgan vaqtda qayta ulashingiz mumkin.",
+    "connectedTo": "{{account}} hisobiga ulangan",
+    "disconnected": "{{provider}} xizmati uzildi",
+    "disconnectFailed": "{{provider}} xizmatini uzib boʻlmadi",
+    "couldNotLoad": "Integratsiyalarni yuklab boʻlmadi",
+    "permissionDenied": "Sizda bu integratsiyalarni boshqarish uchun ruxsat yoʻq.",
+    "memberHint": "Bu ulanishlarni oʻzgartirish uchun tashkilot egasi yoki administratoriga murojaat qiling.",
+    "connectFailed": "Ulanish sahifasini ochib boʻlmadi",
+    "manageOnWeb": "Vebda boshqarish"
   }
 }

@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tsy voasokatra ity valim-pikarohana ity"
+  },
+  "integrations": {
+    "title": "Fampifandraisana",
+    "sectionTitle": "Serivisy mifandray",
+    "entrySubtitle": "GitHub, Slack, Linear sy ny hafa",
+    "subtitle": "Ampifandraiso amin'i Kilo ireo fitaovana sy fomba fiasanao amin'ny fampandrosoana",
+    "emptyHint": "Mbola tsy misy fampifandraisana mifandray.",
+    "disconnect": "Esory",
+    "disconnectTitle": "Hanapaka ny fifandraisana amin'i {{provider}}?",
+    "disconnectMessage": "Tsy hamaly intsony ao amin'i {{provider}} i Kilo. Afaka mampifandray indray ianao amin'ny fotoana rehetra.",
+    "connectedTo": "Mifandray amin'i {{account}}",
+    "disconnected": "Tapaka ny fifandraisana amin'i {{provider}}",
+    "disconnectFailed": "Tsy afaka nanapaka ny fifandraisana amin'i {{provider}}",
+    "couldNotLoad": "Tsy afaka nampiditra ireo fampifandraisana",
+    "permissionDenied": "Tsy manana alalana hitantana ireo fampifandraisana ireo ianao.",
+    "memberHint": "Angataho amin'ny tompon'ny fikambanana na mpitantana ny fanovana ireo fifandraisana ireo.",
+    "connectFailed": "Tsy afaka nanokatra ny pejy fampifandraisana",
+    "manageOnWeb": "Tantano amin'ny tranonkala"
   }
 }

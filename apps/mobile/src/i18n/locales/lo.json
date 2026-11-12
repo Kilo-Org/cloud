@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ບໍ່ສາມາດເປີດຜົນການຄົ້ນຫານີ້ໄດ້"
+  },
+  "integrations": {
+    "title": "ການເຊື່ອມໂຍງ",
+    "sectionTitle": "ບໍລິການທີ່ເຊື່ອມຕໍ່ແລ້ວ",
+    "entrySubtitle": "GitHub, Slack, Linear ແລະ ອື່ນໆ",
+    "subtitle": "ເຊື່ອມຕໍ່ເຄື່ອງມືພັດທະນາ ແລະ ຂັ້ນຕອນການເຮັດວຽກຂອງທ່ານກັບ Kilo",
+    "emptyHint": "ຍັງບໍ່ມີການເຊື່ອມໂຍງໃດໆເທື່ອ.",
+    "disconnect": "ຕັດການເຊື່ອມຕໍ່",
+    "disconnectTitle": "ຕັດການເຊື່ອມຕໍ່ {{provider}} ບໍ?",
+    "disconnectMessage": "Kilo ຈະຢຸດຕອບກັບໃນ {{provider}}. ທ່ານສາມາດເຊື່ອມຕໍ່ຄືນໄດ້ທຸກເວລາ.",
+    "connectedTo": "ເຊື່ອມຕໍ່ກັບ {{account}} ແລ້ວ",
+    "disconnected": "ຕັດການເຊື່ອມຕໍ່ {{provider}} ແລ້ວ",
+    "disconnectFailed": "ບໍ່ສາມາດຕັດການເຊື່ອມຕໍ່ {{provider}} ໄດ້",
+    "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການເຊື່ອມໂຍງໄດ້",
+    "permissionDenied": "ທ່ານບໍ່ມີສິດຈັດການການເຊື່ອມໂຍງເຫຼົ່ານີ້.",
+    "memberHint": "ກະລຸນາຂໍໃຫ້ເຈົ້າຂອງ ຫຼື ຜູ້ດູແລອົງກອນປ່ຽນແປງການເຊື່ອມຕໍ່ເຫຼົ່ານີ້.",
+    "connectFailed": "ບໍ່ສາມາດເປີດໜ້າການເຊື່ອມຕໍ່ໄດ້",
+    "manageOnWeb": "ຈັດການຜ່ານເວັບ"
   }
 }

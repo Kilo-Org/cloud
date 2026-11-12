@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ამ ძიების შედეგის გახსნა ვერ მოხერხდა"
+  },
+  "integrations": {
+    "title": "ინტეგრაციები",
+    "sectionTitle": "დაკავშირებული სერვისები",
+    "entrySubtitle": "GitHub, Slack, Linear და სხვა",
+    "subtitle": "დააკავშირეთ თქვენი დეველოპმენტის ხელსაწყოები და სამუშაო პროცესები Kilo-სთან",
+    "emptyHint": "ჯერ არცერთი ინტეგრაცია არ არის დაკავშირებული.",
+    "disconnect": "გათიშვა",
+    "disconnectTitle": "გავთიშოთ {{provider}}?",
+    "disconnectMessage": "Kilo შეწყვეტს პასუხების გაცემას {{provider}}-ში. ხელახლა დაკავშირება ნებისმიერ დროს შეგიძლიათ.",
+    "connectedTo": "დაკავშირებულია ანგარიშთან {{account}}",
+    "disconnected": "{{provider}} გათიშულია",
+    "disconnectFailed": "{{provider}}-ის გათიშვა ვერ მოხერხდა",
+    "couldNotLoad": "ინტეგრაციების ჩატვირთვა ვერ მოხერხდა",
+    "permissionDenied": "ამ ინტეგრაციების მართვის უფლება არ გაქვთ.",
+    "memberHint": "ამ კავშირების შესაცვლელად მიმართეთ ორგანიზაციის მფლობელს ან ადმინისტრატორს.",
+    "connectFailed": "დაკავშირების გვერდის გახსნა ვერ მოხერხდა",
+    "manageOnWeb": "მართვა ვებ-ვერსიაში"
   }
 }

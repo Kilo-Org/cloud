@@ -3998,5 +3998,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nepodarilo sa otvoriť tento výsledok vyhľadávania"
+  },
+  "integrations": {
+    "title": "Integrácie",
+    "sectionTitle": "Pripojené služby",
+    "entrySubtitle": "GitHub, Slack, Linear a ďalšie",
+    "subtitle": "Prepojte svoje vývojárske nástroje a pracovné postupy s Kilo",
+    "emptyHint": "Zatiaľ nie sú pripojené žiadne integrácie.",
+    "disconnect": "Odpojiť",
+    "disconnectTitle": "Odpojiť {{provider}}?",
+    "disconnectMessage": "Kilo prestane reagovať v službe {{provider}}. Kedykoľvek ju môžete znova pripojiť.",
+    "connectedTo": "Pripojené k účtu {{account}}",
+    "disconnected": "Služba {{provider}} bola odpojená",
+    "disconnectFailed": "Službu {{provider}} sa nepodarilo odpojiť",
+    "couldNotLoad": "Integrácie sa nepodarilo načítať",
+    "permissionDenied": "Nemáte oprávnenie spravovať tieto integrácie.",
+    "memberHint": "Požiadajte vlastníka alebo správcu organizácie, aby tieto pripojenia zmenil.",
+    "connectFailed": "Stránku pripojenia sa nepodarilo otvoriť",
+    "manageOnWeb": "Spravovať na webe"
   }
 }

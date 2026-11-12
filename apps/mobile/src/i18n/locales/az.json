@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu axtarış nəticəsi açılmadı"
+  },
+  "integrations": {
+    "title": "İnteqrasiyalar",
+    "sectionTitle": "Qoşulmuş xidmətlər",
+    "entrySubtitle": "GitHub, Slack, Linear və digərləri",
+    "subtitle": "Proqram tərtibatı alətlərinizi və iş proseslərinizi Kilo ilə əlaqələndirin",
+    "emptyHint": "Hələ heç bir inteqrasiya qoşulmayıb.",
+    "disconnect": "Bağlantını kəs",
+    "disconnectTitle": "{{provider}} bağlantısı kəsilsin?",
+    "disconnectMessage": "Kilo {{provider}} daxilində cavab verməyi dayandıracaq. İstənilən vaxt yenidən qoşula bilərsiniz.",
+    "connectedTo": "{{account}} hesabına qoşulub",
+    "disconnected": "{{provider}} bağlantısı kəsildi",
+    "disconnectFailed": "{{provider}} bağlantısını kəsmək mümkün olmadı",
+    "couldNotLoad": "İnteqrasiyaları yükləmək mümkün olmadı",
+    "permissionDenied": "Bu inteqrasiyaları idarə etmək üçün icazəniz yoxdur.",
+    "memberHint": "Bu bağlantıları dəyişmək üçün təşkilatın sahibinə və ya administratoruna müraciət edin.",
+    "connectFailed": "Qoşulma səhifəsini açmaq mümkün olmadı",
+    "manageOnWeb": "Vebdə idarə et"
   }
 }

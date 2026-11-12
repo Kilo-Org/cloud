@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "हा शोध परिणाम उघडता आले नाही"
+  },
+  "integrations": {
+    "title": "इंटिग्रेशन्स",
+    "sectionTitle": "कनेक्ट केलेल्या सेवा",
+    "entrySubtitle": "GitHub, Slack, Linear आणि इतर",
+    "subtitle": "तुमची डेव्हलपमेंट साधने आणि कार्यप्रवाह Kilo शी कनेक्ट करा",
+    "emptyHint": "अद्याप कोणतेही इंटिग्रेशन कनेक्ट केलेले नाही.",
+    "disconnect": "डिस्कनेक्ट करा",
+    "disconnectTitle": "{{provider}} डिस्कनेक्ट करायचे?",
+    "disconnectMessage": "Kilo {{provider}} मध्ये प्रतिसाद देणे थांबवेल. तुम्ही कधीही पुन्हा कनेक्ट करू शकता.",
+    "connectedTo": "{{account}} शी कनेक्ट केलेले",
+    "disconnected": "{{provider}} डिस्कनेक्ट झाले",
+    "disconnectFailed": "{{provider}} डिस्कनेक्ट करता आले नाही",
+    "couldNotLoad": "इंटिग्रेशन्स लोड करता आली नाहीत",
+    "permissionDenied": "तुम्हाला ही इंटिग्रेशन्स व्यवस्थापित करण्याची परवानगी नाही.",
+    "memberHint": "ही कनेक्शन्स बदलण्यासाठी संस्थेच्या मालकाला किंवा अ‍ॅडमिनला विचारा.",
+    "connectFailed": "कनेक्शन पेज उघडता आले नाही",
+    "manageOnWeb": "वेबवर व्यवस्थापित करा"
   }
 }

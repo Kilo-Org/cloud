@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Hindi mabuksan ang resulta ng paghahanap na ito"
+  },
+  "integrations": {
+    "title": "Mga Integration",
+    "sectionTitle": "Mga nakakonektang serbisyo",
+    "entrySubtitle": "GitHub, Slack, Linear at iba pa",
+    "subtitle": "Ikonekta ang iyong mga development tool at workflow sa Kilo",
+    "emptyHint": "Wala pang nakakonektang integration.",
+    "disconnect": "Idiskonekta",
+    "disconnectTitle": "Idiskonekta ang {{provider}}?",
+    "disconnectMessage": "Hihinto na ang Kilo sa pagtugon sa {{provider}}. Maaari kang kumonekta muli anumang oras.",
+    "connectedTo": "Nakakonekta sa {{account}}",
+    "disconnected": "Nadiskonekta ang {{provider}}",
+    "disconnectFailed": "Hindi ma-diskonekta ang {{provider}}",
+    "couldNotLoad": "Hindi ma-load ang mga integration",
+    "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga integration na ito.",
+    "memberHint": "Hilingin sa isang may-ari o admin ng organisasyon na baguhin ang mga koneksyong ito.",
+    "connectFailed": "Hindi mabuksan ang pahina ng koneksyon",
+    "manageOnWeb": "Pamahalaan sa web"
   }
 }

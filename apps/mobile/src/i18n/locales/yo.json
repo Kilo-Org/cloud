@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "A kò lè ṣí àbájọ́ ìwádìí yìí"
+  },
+  "integrations": {
+    "title": "Àwọn Ìsopọ̀",
+    "sectionTitle": "Àwọn iṣẹ́ tí a so pọ̀",
+    "entrySubtitle": "GitHub, Slack, Linear àti àwọn mìíràn",
+    "subtitle": "So àwọn irinṣẹ́ ìdàgbàsókè àti ìlànà iṣẹ́ rẹ pọ̀ mọ́ Kilo",
+    "emptyHint": "Kò tíì sí ìsopọ̀ kankan.",
+    "disconnect": "Já ìsopọ̀",
+    "disconnectTitle": "Ṣé o fẹ́ já ìsopọ̀ {{provider}}?",
+    "disconnectMessage": "Kilo kò ní dáhùn mọ́ nínú {{provider}}. O lè tún un so pọ̀ nígbàkígbà.",
+    "connectedTo": "Ti so pọ̀ mọ́ {{account}}",
+    "disconnected": "A ti já ìsopọ̀ {{provider}}",
+    "disconnectFailed": "Kò ṣeé ṣe láti já ìsopọ̀ {{provider}}",
+    "couldNotLoad": "Kò ṣeé ṣe láti gbé àwọn ìsopọ̀ wá",
+    "permissionDenied": "O kò ní àṣẹ láti ṣàkóso àwọn ìsopọ̀ wọ̀nyí.",
+    "memberHint": "Bèèrè lọ́wọ́ ẹni tó ni àjọ náà tàbí alákòóso láti yí àwọn ìsopọ̀ wọ̀nyí padà.",
+    "connectFailed": "Kò ṣeé ṣe láti ṣí ojú-ìwé ìsopọ̀",
+    "manageOnWeb": "Ṣàkóso lórí wẹ́ẹ̀bù"
   }
 }

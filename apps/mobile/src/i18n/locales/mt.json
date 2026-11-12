@@ -4063,5 +4063,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ma stajniex niftħu dan ir-riżultat tat-tfittxija"
+  },
+  "integrations": {
+    "title": "Integrazzjonijiet",
+    "sectionTitle": "Servizzi konnessi",
+    "entrySubtitle": "GitHub, Slack, Linear u aktar",
+    "subtitle": "Qabbad l-għodod u l-proċessi tax-xogħol tal-iżvilupp tiegħek ma' Kilo",
+    "emptyHint": "Għad m'hemm l-ebda integrazzjoni konnessa.",
+    "disconnect": "Skonnettja",
+    "disconnectTitle": "Tiskonnettja {{provider}}?",
+    "disconnectMessage": "Kilo se jieqaf jirrispondi f'{{provider}}. Tista' terġa' tikkonnettja fi kwalunkwe ħin.",
+    "connectedTo": "Konness ma' {{account}}",
+    "disconnected": "{{provider}} ġie skonnettjat",
+    "disconnectFailed": "L-iskonnettjar ta' {{provider}} ma rnexxiex",
+    "couldNotLoad": "L-integrazzjonijiet ma setgħux jitgħabbew",
+    "permissionDenied": "M'għandekx permess timmaniġġja dawn l-integrazzjonijiet.",
+    "memberHint": "Itlob lil sid jew amministratur tal-organizzazzjoni biex ibiddel dawn il-konnessjonijiet.",
+    "connectFailed": "Il-paġna tal-konnessjoni ma setgħetx tinfetaħ",
+    "manageOnWeb": "Immaniġġja fuq il-web"
   }
 }

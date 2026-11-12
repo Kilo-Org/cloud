@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nuk u hap dot ky rezultat kërkimi"
+  },
+  "integrations": {
+    "title": "Integrimet",
+    "sectionTitle": "Shërbimet e lidhura",
+    "entrySubtitle": "GitHub, Slack, Linear dhe të tjera",
+    "subtitle": "Lidh mjetet dhe proceset e tua të zhvillimit me Kilo",
+    "emptyHint": "Ende nuk ka asnjë integrim të lidhur.",
+    "disconnect": "Shkëput",
+    "disconnectTitle": "Të shkëputet {{provider}}?",
+    "disconnectMessage": "Kilo do të ndalojë së përgjigjuri në {{provider}}. Mund ta lidhësh sërish në çdo kohë.",
+    "connectedTo": "I lidhur me {{account}}",
+    "disconnected": "{{provider}} u shkëput",
+    "disconnectFailed": "{{provider}} nuk mund të shkëputej",
+    "couldNotLoad": "Integrimet nuk mund të ngarkoheshin",
+    "permissionDenied": "Nuk ke leje për të menaxhuar këto integrime.",
+    "memberHint": "Kërkoji një pronari ose administratori të organizatës t'i ndryshojë këto lidhje.",
+    "connectFailed": "Faqja e lidhjes nuk mund të hapej",
+    "manageOnWeb": "Menaxho në ueb"
   }
 }

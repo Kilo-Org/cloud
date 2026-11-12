@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Бұл іздеу нәтижесі ашылмады"
+  },
+  "integrations": {
+    "title": "Интеграциялар",
+    "sectionTitle": "Қосылған қызметтер",
+    "entrySubtitle": "GitHub, Slack, Linear және басқалары",
+    "subtitle": "Әзірлеу құралдары мен жұмыс процестеріңізді Kilo қызметіне қосыңыз",
+    "emptyHint": "Әзірге ешбір интеграция қосылмаған.",
+    "disconnect": "Ажырату",
+    "disconnectTitle": "{{provider}} қызметін ажырату керек пе?",
+    "disconnectMessage": "Kilo {{provider}} ішінде жауап беруді тоқтатады. Кез келген уақытта қайта қоса аласыз.",
+    "connectedTo": "Қосылған тіркелгі: {{account}}",
+    "disconnected": "{{provider}} ажыратылды",
+    "disconnectFailed": "{{provider}} қызметін ажырату мүмкін болмады",
+    "couldNotLoad": "Интеграцияларды жүктеу мүмкін болмады",
+    "permissionDenied": "Бұл интеграцияларды басқаруға рұқсатыңыз жоқ.",
+    "memberHint": "Бұл қосылымдарды өзгертуді ұйым иесінен немесе әкімшісінен сұраңыз.",
+    "connectFailed": "Қосылу бетін ашу мүмкін болмады",
+    "manageOnWeb": "Вебте басқару"
   }
 }

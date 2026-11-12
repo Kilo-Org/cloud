@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Չհաջողվեց բացել այս որոնման արդյունքը"
+  },
+  "integrations": {
+    "title": "Ինտեգրումներ",
+    "sectionTitle": "Միացված ծառայություններ",
+    "entrySubtitle": "GitHub, Slack, Linear և այլն",
+    "subtitle": "Միացրեք ձեր մշակման գործիքներն ու աշխատանքային հոսքերը Kilo-ին",
+    "emptyHint": "Դեռ ոչ մի ինտեգրում միացված չէ։",
+    "disconnect": "Անջատել",
+    "disconnectTitle": "Անջատե՞լ {{provider}} ծառայությունը",
+    "disconnectMessage": "Kilo-ն կդադարի պատասխանել {{provider}} ծառայությունում։ Կարող եք կրկին միացնել ցանկացած ժամանակ։",
+    "connectedTo": "Միացված է {{account}} հաշվին",
+    "disconnected": "{{provider}} ծառայությունն անջատված է",
+    "disconnectFailed": "Չհաջողվեց անջատել {{provider}} ծառայությունը",
+    "couldNotLoad": "Չհաջողվեց բեռնել ինտեգրումները",
+    "permissionDenied": "Դուք այս ինտեգրումները կառավարելու թույլտվություն չունեք։",
+    "memberHint": "Այս միացումները փոխելու համար դիմեք կազմակերպության սեփականատիրոջը կամ ադմինիստրատորին։",
+    "connectFailed": "Չհաջողվեց բացել միացման էջը",
+    "manageOnWeb": "Կառավարել վեբում"
   }
 }

@@ -4063,5 +4063,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Níorbh fhéidir an toradh cuardaigh seo a oscailt"
+  },
+  "integrations": {
+    "title": "Comhtháthuithe",
+    "sectionTitle": "Seirbhísí ceangailte",
+    "entrySubtitle": "GitHub, Slack, Linear agus tuilleadh",
+    "subtitle": "Ceangail d'uirlisí forbartha agus do shreafaí oibre le Kilo",
+    "emptyHint": "Níl aon chomhtháthú ceangailte fós.",
+    "disconnect": "Dícheangail",
+    "disconnectTitle": "An bhfuil fonn ort {{provider}} a dhícheangal?",
+    "disconnectMessage": "Stopfaidh Kilo de bheith ag freagairt in {{provider}}. Is féidir leat athcheangal am ar bith.",
+    "connectedTo": "Ceangailte le {{account}}",
+    "disconnected": "Dícheanglaíodh {{provider}}",
+    "disconnectFailed": "Níorbh fhéidir {{provider}} a dhícheangal",
+    "couldNotLoad": "Níorbh fhéidir na comhtháthuithe a lódáil",
+    "permissionDenied": "Níl cead agat na comhtháthuithe seo a bhainistiú.",
+    "memberHint": "Iarr ar úinéir nó ar riarthóir na heagraíochta na ceangail seo a athrú.",
+    "connectFailed": "Níorbh fhéidir an leathanach ceangail a oscailt",
+    "manageOnWeb": "Bainistigh ar an ngréasán"
   }
 }

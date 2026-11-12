@@ -3933,5 +3933,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nije moguće otvoriti ovaj rezultat pretrage"
+  },
+  "integrations": {
+    "title": "Integracije",
+    "sectionTitle": "Povezane usluge",
+    "entrySubtitle": "GitHub, Slack, Linear i drugo",
+    "subtitle": "Povežite svoje razvojne alate i tokove rada sa platformom Kilo",
+    "emptyHint": "Još nema povezanih integracija.",
+    "disconnect": "Prekini vezu",
+    "disconnectTitle": "Prekinuti vezu sa uslugom {{provider}}?",
+    "disconnectMessage": "Kilo više neće odgovarati u usluzi {{provider}}. Možete se ponovo povezati u bilo kom trenutku.",
+    "connectedTo": "Povezano sa nalogom {{account}}",
+    "disconnected": "Veza sa uslugom {{provider}} je prekinuta",
+    "disconnectFailed": "Prekidanje veze sa uslugom {{provider}} nije uspelo",
+    "couldNotLoad": "Učitavanje integracija nije uspelo",
+    "permissionDenied": "Nemate dozvolu da upravljate ovim integracijama.",
+    "memberHint": "Zamolite vlasnika ili administratora organizacije da promeni ove veze.",
+    "connectFailed": "Otvaranje stranice za povezivanje nije uspelo",
+    "manageOnWeb": "Upravljajte na vebu"
   }
 }

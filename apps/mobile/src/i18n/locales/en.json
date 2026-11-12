@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Could not open this search result"
+  },
+  "integrations": {
+    "title": "Integrations",
+    "sectionTitle": "Connected services",
+    "entrySubtitle": "GitHub, Slack, Linear and more",
+    "subtitle": "Connect your development tools and workflows to Kilo",
+    "emptyHint": "No integrations connected yet.",
+    "disconnect": "Disconnect",
+    "disconnectTitle": "Disconnect {{provider}}?",
+    "disconnectMessage": "Kilo will stop responding in {{provider}}. You can reconnect at any time.",
+    "connectedTo": "Connected to {{account}}",
+    "disconnected": "{{provider}} disconnected",
+    "disconnectFailed": "Could not disconnect {{provider}}",
+    "couldNotLoad": "Could not load integrations",
+    "permissionDenied": "You do not have permission to manage these integrations.",
+    "memberHint": "Ask an organization owner or admin to change these connections.",
+    "connectFailed": "Could not open the connection page",
+    "manageOnWeb": "Manage on the web"
   }
 }

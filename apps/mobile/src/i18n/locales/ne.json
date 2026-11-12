@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "यो खोज परिणाम खोल्न सकिएन"
+  },
+  "integrations": {
+    "title": "एकीकरणहरू",
+    "sectionTitle": "जोडिएका सेवाहरू",
+    "entrySubtitle": "GitHub, Slack, Linear र अन्य",
+    "subtitle": "आफ्ना विकास उपकरण र कार्यप्रवाहहरूलाई Kilo सँग जोड्नुहोस्",
+    "emptyHint": "अहिलेसम्म कुनै एकीकरण जोडिएको छैन।",
+    "disconnect": "विच्छेद गर्नुहोस्",
+    "disconnectTitle": "{{provider}} विच्छेद गर्ने हो?",
+    "disconnectMessage": "Kilo ले {{provider}} मा जवाफ दिन बन्द गर्नेछ। तपाईं जुनसुकै बेला पुनः जोड्न सक्नुहुन्छ।",
+    "connectedTo": "{{account}} मा जोडिएको",
+    "disconnected": "{{provider}} विच्छेद गरियो",
+    "disconnectFailed": "{{provider}} विच्छेद गर्न सकिएन",
+    "couldNotLoad": "एकीकरणहरू लोड गर्न सकिएन",
+    "permissionDenied": "तपाईंसँग यी एकीकरणहरू व्यवस्थापन गर्ने अनुमति छैन।",
+    "memberHint": "यी जडानहरू परिवर्तन गर्न संस्थाका मालिक वा प्रशासकलाई अनुरोध गर्नुहोस्।",
+    "connectFailed": "जडान पृष्ठ खोल्न सकिएन",
+    "manageOnWeb": "वेबमा व्यवस्थापन गर्नुहोस्"
   }
 }

@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Non se puido abrir este resultado da busca"
+  },
+  "integrations": {
+    "title": "Integracións",
+    "sectionTitle": "Servizos conectados",
+    "entrySubtitle": "GitHub, Slack, Linear e moito máis",
+    "subtitle": "Conecta as túas ferramentas e fluxos de traballo de desenvolvemento con Kilo",
+    "emptyHint": "Aínda non hai ningunha integración conectada.",
+    "disconnect": "Desconectar",
+    "disconnectTitle": "Desconectar {{provider}}?",
+    "disconnectMessage": "Kilo deixará de responder en {{provider}}. Podes volver conectalo en calquera momento.",
+    "connectedTo": "Conectado a {{account}}",
+    "disconnected": "{{provider}} desconectado",
+    "disconnectFailed": "Non se puido desconectar {{provider}}",
+    "couldNotLoad": "Non se puideron cargar as integracións",
+    "permissionDenied": "Non tes permiso para xestionar estas integracións.",
+    "memberHint": "Pídelle a unha persoa propietaria ou administradora da organización que cambie estas conexións.",
+    "connectFailed": "Non se puido abrir a páxina de conexión",
+    "manageOnWeb": "Xestionar na web"
   }
 }

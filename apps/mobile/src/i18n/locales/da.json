@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Kunne ikke åbne dette søgeresultat"
+  },
+  "integrations": {
+    "title": "Integrationer",
+    "sectionTitle": "Forbundne tjenester",
+    "entrySubtitle": "GitHub, Slack, Linear og flere",
+    "subtitle": "Forbind dine udviklingsværktøjer og arbejdsgange med Kilo",
+    "emptyHint": "Ingen integrationer er forbundet endnu.",
+    "disconnect": "Afbryd forbindelse",
+    "disconnectTitle": "Afbryd forbindelsen til {{provider}}?",
+    "disconnectMessage": "Kilo holder op med at svare i {{provider}}. Du kan altid oprette forbindelsen igen.",
+    "connectedTo": "Forbundet med {{account}}",
+    "disconnected": "Forbindelsen til {{provider}} er afbrudt",
+    "disconnectFailed": "Forbindelsen til {{provider}} kunne ikke afbrydes",
+    "couldNotLoad": "Integrationerne kunne ikke indlæses",
+    "permissionDenied": "Du har ikke tilladelse til at administrere disse integrationer.",
+    "memberHint": "Bed en ejer eller administrator i organisationen om at ændre disse forbindelser.",
+    "connectFailed": "Siden til oprettelse af forbindelse kunne ikke åbnes",
+    "manageOnWeb": "Administrer på nettet"
   }
 }

@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "මෙම සෙවුම් ප්‍රතිඵලය විවෘත කිරීමට නොහැකි විය"
+  },
+  "integrations": {
+    "title": "ඒකාබද්ධ කිරීම්",
+    "sectionTitle": "සම්බන්ධිත සේවා",
+    "entrySubtitle": "GitHub, Slack, Linear සහ තවත් බොහෝ දේ",
+    "subtitle": "ඔබේ සංවර්ධන මෙවලම් සහ කාර්ය ප්‍රවාහ Kilo වෙත සම්බන්ධ කරන්න",
+    "emptyHint": "තවම කිසිදු ඒකාබද්ධ කිරීමක් සම්බන්ධ කර නැත.",
+    "disconnect": "විසන්ධි කරන්න",
+    "disconnectTitle": "{{provider}} විසන්ධි කරන්නද?",
+    "disconnectMessage": "Kilo {{provider}} තුළ ප්‍රතිචාර දැක්වීම නවත්වනු ඇත. ඔබට ඕනෑම වේලාවක නැවත සම්බන්ධ විය හැක.",
+    "connectedTo": "{{account}} වෙත සම්බන්ධිතයි",
+    "disconnected": "{{provider}} විසන්ධි කරන ලදී",
+    "disconnectFailed": "{{provider}} විසන්ධි කළ නොහැකි විය",
+    "couldNotLoad": "ඒකාබද්ධ කිරීම් පූරණය කළ නොහැකි විය",
+    "permissionDenied": "මෙම ඒකාබද්ධ කිරීම් කළමනාකරණය කිරීමට ඔබට අවසර නැත.",
+    "memberHint": "මෙම සම්බන්ධතා වෙනස් කිරීමට සංවිධානයේ හිමිකරුවෙකුගෙන් හෝ පරිපාලකවරයෙකුගෙන් ඉල්ලා සිටින්න.",
+    "connectFailed": "සම්බන්ධතා පිටුව විවෘත කළ නොහැකි විය",
+    "manageOnWeb": "වෙබ් අඩවියේ කළමනාකරණය කරන්න"
   }
 }

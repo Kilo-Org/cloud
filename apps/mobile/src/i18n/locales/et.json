@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Otsingutulemust ei õnnestunud avada"
+  },
+  "integrations": {
+    "title": "Integratsioonid",
+    "sectionTitle": "Ühendatud teenused",
+    "entrySubtitle": "GitHub, Slack, Linear ja muud",
+    "subtitle": "Ühenda oma arendustööriistad ja töövood Kiloga",
+    "emptyHint": "Ühtegi integratsiooni pole veel ühendatud.",
+    "disconnect": "Katkesta ühendus",
+    "disconnectTitle": "Kas katkestada ühendus teenusega {{provider}}?",
+    "disconnectMessage": "Kilo lõpetab teenuses {{provider}} vastamise. Saad selle igal ajal uuesti ühendada.",
+    "connectedTo": "Ühendatud kontoga {{account}}",
+    "disconnected": "Ühendus teenusega {{provider}} katkestati",
+    "disconnectFailed": "Ühendust teenusega {{provider}} ei õnnestunud katkestada",
+    "couldNotLoad": "Integratsioone ei õnnestunud laadida",
+    "permissionDenied": "Sul pole õigust neid integratsioone hallata.",
+    "memberHint": "Nende ühenduste muutmiseks pöördu organisatsiooni omaniku või administraatori poole.",
+    "connectFailed": "Ühendamise lehte ei õnnestunud avada",
+    "manageOnWeb": "Halda veebis"
   }
 }

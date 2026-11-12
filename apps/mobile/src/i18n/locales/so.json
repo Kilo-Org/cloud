@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Natiijadan raadinta lama furi karin"
+  },
+  "integrations": {
+    "title": "Isku-xidhka",
+    "sectionTitle": "Adeegyada ku xidhan",
+    "entrySubtitle": "GitHub, Slack, Linear iyo kuwo kale",
+    "subtitle": "Ku xidh qalabkaaga horumarinta iyo hababka shaqadaada Kilo",
+    "emptyHint": "Weli wax isku-xidh ah lama samayn.",
+    "disconnect": "Ka goo",
+    "disconnectTitle": "Ka goo {{provider}}?",
+    "disconnectMessage": "Kilo way joojin doontaa ka jawaabista {{provider}}. Waad dib u xidhi kartaa wakhti kasta.",
+    "connectedTo": "Ku xidhan {{account}}",
+    "disconnected": "{{provider}} waa la gooyay",
+    "disconnectFailed": "Lama goyn karo {{provider}}",
+    "couldNotLoad": "Lama soo gelin karo isku-xidhka",
+    "permissionDenied": "Ma haysatid ogolaansho aad ku maamusho isku-xidhkan.",
+    "memberHint": "Weydii milkiilaha ama maamulaha ururka si uu u beddelo isku-xidhkan.",
+    "connectFailed": "Bogga isku-xidhka lama furi karo",
+    "manageOnWeb": "Ku maamul shabakadda"
   }
 }

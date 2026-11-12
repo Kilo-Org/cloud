@@ -3933,5 +3933,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Impossibile aprire questo risultato di ricerca"
+  },
+  "integrations": {
+    "title": "Integrazioni",
+    "sectionTitle": "Servizi collegati",
+    "entrySubtitle": "GitHub, Slack, Linear e altro",
+    "subtitle": "Collega a Kilo i tuoi strumenti e flussi di lavoro di sviluppo",
+    "emptyHint": "Nessuna integrazione collegata.",
+    "disconnect": "Scollega",
+    "disconnectTitle": "Scollegare {{provider}}?",
+    "disconnectMessage": "Kilo smetterà di rispondere in {{provider}}. Puoi ricollegarlo in qualsiasi momento.",
+    "connectedTo": "Collegato a {{account}}",
+    "disconnected": "{{provider}} scollegato",
+    "disconnectFailed": "Impossibile scollegare {{provider}}",
+    "couldNotLoad": "Impossibile caricare le integrazioni",
+    "permissionDenied": "Non hai l'autorizzazione per gestire queste integrazioni.",
+    "memberHint": "Chiedi a un proprietario o a un amministratore dell'organizzazione di modificare questi collegamenti.",
+    "connectFailed": "Impossibile aprire la pagina di collegamento",
+    "manageOnWeb": "Gestisci sul web"
   }
 }

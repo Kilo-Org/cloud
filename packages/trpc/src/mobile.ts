@@ -6,6 +6,11 @@ import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
 import { todosRouter } from '@/routers/todos-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
+import { platformIntegrationsRouter } from '@/routers/platform-integrations-router';
+import { slackRouter } from '@/routers/slack-router';
+import { linearRouter } from '@/routers/linear-router';
+import { discordRouter } from '@/routers/discord-router';
+import { gitlabRouter } from '@/routers/gitlab-router';
 import { codeReviewRouter } from '@/routers/code-reviews/code-reviews-router';
 import { reviewMemoryRouter } from '@/routers/code-reviews/review-memory-router';
 import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
@@ -37,6 +42,11 @@ const mobileRouter = createTRPCRouter({
   todos: todosRouter,
   cloudAgentNext: cloudAgentNextRouter,
   githubApps: githubAppsRouter,
+  platformIntegrations: platformIntegrationsRouter,
+  slack: slackRouter,
+  linear: linearRouter,
+  discord: discordRouter,
+  gitlab: gitlabRouter,
   codeReviews: codeReviewRouter,
   reviewMemory: reviewMemoryRouter,
   personalReviewAgent: personalReviewAgentRouter,

@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Không thể mở kết quả tìm kiếm này"
+  },
+  "integrations": {
+    "title": "Tích hợp",
+    "sectionTitle": "Dịch vụ đã kết nối",
+    "entrySubtitle": "GitHub, Slack, Linear và nhiều dịch vụ khác",
+    "subtitle": "Kết nối các công cụ và quy trình phát triển của bạn với Kilo",
+    "emptyHint": "Chưa có tích hợp nào được kết nối.",
+    "disconnect": "Ngắt kết nối",
+    "disconnectTitle": "Ngắt kết nối {{provider}}?",
+    "disconnectMessage": "Kilo sẽ ngừng phản hồi trong {{provider}}. Bạn có thể kết nối lại bất cứ lúc nào.",
+    "connectedTo": "Đã kết nối với {{account}}",
+    "disconnected": "Đã ngắt kết nối {{provider}}",
+    "disconnectFailed": "Không thể ngắt kết nối {{provider}}",
+    "couldNotLoad": "Không thể tải các tích hợp",
+    "permissionDenied": "Bạn không có quyền quản lý các tích hợp này.",
+    "memberHint": "Hãy yêu cầu chủ sở hữu hoặc quản trị viên của tổ chức thay đổi các kết nối này.",
+    "connectFailed": "Không thể mở trang kết nối",
+    "manageOnWeb": "Quản lý trên web"
   }
 }

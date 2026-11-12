@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Imeshindikana kufungua matokeo haya ya utafutaji"
+  },
+  "integrations": {
+    "title": "Miunganisho",
+    "sectionTitle": "Huduma zilizounganishwa",
+    "entrySubtitle": "GitHub, Slack, Linear na zaidi",
+    "subtitle": "Unganisha zana zako za usanidi na mitiririko yako ya kazi na Kilo",
+    "emptyHint": "Bado hakuna miunganisho iliyounganishwa.",
+    "disconnect": "Tenganisha",
+    "disconnectTitle": "Ungependa kutenganisha {{provider}}?",
+    "disconnectMessage": "Kilo itaacha kujibu kwenye {{provider}}. Unaweza kuunganisha tena wakati wowote.",
+    "connectedTo": "Imeunganishwa na {{account}}",
+    "disconnected": "{{provider}} imetenganishwa",
+    "disconnectFailed": "Imeshindwa kutenganisha {{provider}}",
+    "couldNotLoad": "Imeshindwa kupakia miunganisho",
+    "permissionDenied": "Huna ruhusa ya kudhibiti miunganisho hii.",
+    "memberHint": "Mwombe mmiliki au msimamizi wa shirika abadilishe miunganisho hii.",
+    "connectFailed": "Imeshindwa kufungua ukurasa wa kuunganisha",
+    "manageOnWeb": "Dhibiti kwenye wavuti"
   }
 }

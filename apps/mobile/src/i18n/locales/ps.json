@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "دا د لټون پایله پرانیستل نه شو"
+  },
+  "integrations": {
+    "title": "ادغامونه",
+    "sectionTitle": "نښلول شوي خدمتونه",
+    "entrySubtitle": "GitHub، Slack، Linear او نور",
+    "subtitle": "خپل پراختیايي وسایل او کاري بهیرونه له Kilo سره ونښلوئ",
+    "emptyHint": "تر اوسه هیڅ ادغام نه دی نښلول شوی.",
+    "disconnect": "اړیکه پرې کړئ",
+    "disconnectTitle": "له {{provider}} سره اړیکه پرې کړئ؟",
+    "disconnectMessage": "Kilo به نور په {{provider}} کې ځواب نه ورکوي. تاسو هر وخت بیا نښلولی شئ.",
+    "connectedTo": "له {{account}} سره نښلول شوی",
+    "disconnected": "له {{provider}} سره اړیکه پرې شوه",
+    "disconnectFailed": "له {{provider}} سره اړیکه پرې نه شوه",
+    "couldNotLoad": "ادغامونه راوړل نه شول",
+    "permissionDenied": "تاسو د دې ادغامونو د مدیریت اجازه نه لرئ.",
+    "memberHint": "د دې اړیکو د بدلولو لپاره د سازمان له مالک یا مدیر څخه وغواړئ.",
+    "connectFailed": "د نښلولو پاڼه پرانیستل نه شوه",
+    "manageOnWeb": "په وېب کې یې مدیریت کړئ"
   }
 }

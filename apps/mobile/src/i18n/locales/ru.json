@@ -3998,5 +3998,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Не удалось открыть результат поиска"
+  },
+  "integrations": {
+    "title": "Интеграции",
+    "sectionTitle": "Подключённые сервисы",
+    "entrySubtitle": "GitHub, Slack, Linear и другие",
+    "subtitle": "Подключите к Kilo свои инструменты разработки и рабочие процессы",
+    "emptyHint": "Интеграции пока не подключены.",
+    "disconnect": "Отключить",
+    "disconnectTitle": "Отключить {{provider}}?",
+    "disconnectMessage": "Kilo перестанет отвечать в {{provider}}. Вы можете подключиться снова в любое время.",
+    "connectedTo": "Подключено к {{account}}",
+    "disconnected": "{{provider}} отключён",
+    "disconnectFailed": "Не удалось отключить {{provider}}",
+    "couldNotLoad": "Не удалось загрузить интеграции",
+    "permissionDenied": "У вас нет прав на управление этими интеграциями.",
+    "memberHint": "Чтобы изменить эти подключения, обратитесь к владельцу или администратору организации.",
+    "connectFailed": "Не удалось открыть страницу подключения",
+    "manageOnWeb": "Управлять в веб-версии"
   }
 }

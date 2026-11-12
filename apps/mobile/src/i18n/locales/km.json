@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "មិនអាចបើកលទ្ធផលស្វែងរកនេះបានទេ"
+  },
+  "integrations": {
+    "title": "ការរួមបញ្ចូល",
+    "sectionTitle": "សេវាកម្មដែលបានភ្ជាប់",
+    "entrySubtitle": "GitHub, Slack, Linear និងច្រើនទៀត",
+    "subtitle": "ភ្ជាប់ឧបករណ៍អភិវឌ្ឍន៍ និងលំហូរការងាររបស់អ្នកទៅ Kilo",
+    "emptyHint": "មិនទាន់មានការរួមបញ្ចូលណាមួយត្រូវបានភ្ជាប់នៅឡើយទេ។",
+    "disconnect": "ផ្ដាច់",
+    "disconnectTitle": "ផ្ដាច់ {{provider}}?",
+    "disconnectMessage": "Kilo នឹងឈប់ឆ្លើយតបនៅក្នុង {{provider}}។ អ្នកអាចភ្ជាប់ឡើងវិញបានគ្រប់ពេល។",
+    "connectedTo": "បានភ្ជាប់ទៅ {{account}}",
+    "disconnected": "បានផ្ដាច់ {{provider}}",
+    "disconnectFailed": "មិនអាចផ្ដាច់ {{provider}} បានទេ",
+    "couldNotLoad": "មិនអាចផ្ទុកការរួមបញ្ចូលបានទេ",
+    "permissionDenied": "អ្នកមិនមានសិទ្ធិគ្រប់គ្រងការរួមបញ្ចូលទាំងនេះទេ។",
+    "memberHint": "សូមស្នើម្ចាស់ ឬអ្នកគ្រប់គ្រងស្ថាប័ន ដើម្បីផ្លាស់ប្ដូរការភ្ជាប់ទាំងនេះ។",
+    "connectFailed": "មិនអាចបើកទំព័រភ្ជាប់បានទេ",
+    "manageOnWeb": "គ្រប់គ្រងនៅលើគេហទំព័រ"
   }
 }

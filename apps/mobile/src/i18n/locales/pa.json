@@ -3868,5 +3868,23 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ਇਹ ਖੋਜ ਨਤੀਜਾ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ"
+  },
+  "integrations": {
+    "title": "ਇੰਟੀਗ੍ਰੇਸ਼ਨ",
+    "sectionTitle": "ਕਨੈਕਟ ਕੀਤੀਆਂ ਸੇਵਾਵਾਂ",
+    "entrySubtitle": "GitHub, Slack, Linear ਅਤੇ ਹੋਰ",
+    "subtitle": "ਆਪਣੇ ਡਿਵੈਲਪਮੈਂਟ ਟੂਲ ਅਤੇ ਵਰਕਫ਼ਲੋ ਨੂੰ Kilo ਨਾਲ ਕਨੈਕਟ ਕਰੋ",
+    "emptyHint": "ਹਾਲੇ ਕੋਈ ਇੰਟੀਗ੍ਰੇਸ਼ਨ ਕਨੈਕਟ ਨਹੀਂ ਹੈ।",
+    "disconnect": "ਡਿਸਕਨੈਕਟ ਕਰੋ",
+    "disconnectTitle": "ਕੀ {{provider}} ਨੂੰ ਡਿਸਕਨੈਕਟ ਕਰਨਾ ਹੈ?",
+    "disconnectMessage": "Kilo {{provider}} ਵਿੱਚ ਜਵਾਬ ਦੇਣਾ ਬੰਦ ਕਰ ਦੇਵੇਗਾ। ਤੁਸੀਂ ਕਿਸੇ ਵੀ ਸਮੇਂ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹੋ।",
+    "connectedTo": "{{account}} ਨਾਲ ਕਨੈਕਟ ਹੈ",
+    "disconnected": "{{provider}} ਡਿਸਕਨੈਕਟ ਹੋ ਗਿਆ",
+    "disconnectFailed": "{{provider}} ਨੂੰ ਡਿਸਕਨੈਕਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+    "couldNotLoad": "ਇੰਟੀਗ੍ਰੇਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",
+    "permissionDenied": "ਤੁਹਾਡੇ ਕੋਲ ਇਹਨਾਂ ਇੰਟੀਗ੍ਰੇਸ਼ਨਾਂ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+    "memberHint": "ਇਹਨਾਂ ਕਨੈਕਸ਼ਨਾਂ ਨੂੰ ਬਦਲਣ ਲਈ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਜਾਂ ਐਡਮਿਨ ਨੂੰ ਕਹੋ।",
+    "connectFailed": "ਕਨੈਕਸ਼ਨ ਪੰਨਾ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ",
+    "manageOnWeb": "ਵੈੱਬ 'ਤੇ ਪ੍ਰਬੰਧਿਤ ਕਰੋ"
   }
 }

@@ -375,10 +375,7 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
             ? result.webhookSync
             : null;
         if (webhookSync !== null) {
-          queryClient.setQueryData<boolean>(
-            webhookWarningQueryKey,
-            webhookSync.errors.length > 0
-          );
+          queryClient.setQueryData<boolean>(webhookWarningQueryKey, webhookSync.errors.length > 0);
         }
         return result;
       }),

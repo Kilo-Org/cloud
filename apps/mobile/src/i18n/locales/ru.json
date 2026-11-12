@@ -1304,7 +1304,7 @@
       "costSpoken": "стоимость {{cost}}",
       "costSpokenWithTime": "стоимость {{cost}}, {{time}}",
       "pullRequest": "запрос на слияние {{number}}",
-      "spokenJoiner": "и"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenMessage": "Не удалось начать настройку приложения GitHub. Попробуйте снова.",

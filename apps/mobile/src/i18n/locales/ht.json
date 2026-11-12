@@ -1810,7 +1810,7 @@
       "costSpoken": "pri {{cost}}",
       "costSpokenWithTime": "pri {{cost}}, {{time}}",
       "pullRequest": "demann fizyon {{number}}",
-      "spokenJoiner": "ak"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Pa t ka louvri GitHub",

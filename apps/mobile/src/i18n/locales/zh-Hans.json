@@ -1268,7 +1268,7 @@
       "costSpoken": "费用 {{cost}}",
       "costSpokenWithTime": "费用 {{cost}}，{{time}}",
       "pullRequest": "拉取请求 {{number}}",
-      "spokenJoiner": "和"
+      "spokenJoiner": "，"
     },
     "githubInstall": {
       "couldNotOpenMessage": "无法开始设置 GitHub 应用。请重试。",

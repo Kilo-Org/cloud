@@ -1810,7 +1810,7 @@
       "costSpoken": "xarajati {{cost}}",
       "costSpokenWithTime": "xarajat {{cost}}, {{time}}",
       "pullRequest": "{{number}}-sonli PR",
-      "spokenJoiner": "va"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubni ochib bo'lmadi",

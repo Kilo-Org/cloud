@@ -1286,7 +1286,7 @@
       "costSpoken": "עלות {{cost}}",
       "costSpokenWithTime": "עלות {{cost}}, {{time}}",
       "pullRequest": "בקשת משיכה {{number}}",
-      "spokenJoiner": "ו-"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenMessage": "לא ניתן היה להתחיל את הגדרת אפליקציית GitHub. נסה שוב.",

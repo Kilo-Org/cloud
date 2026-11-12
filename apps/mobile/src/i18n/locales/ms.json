@@ -1810,7 +1810,7 @@
       "costSpoken": "kos {{cost}}",
       "costSpokenWithTime": "kos {{cost}}, {{time}}",
       "pullRequest": "permintaan tarik {{number}}",
-      "spokenJoiner": "dan"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Tidak dapat membuka GitHub",

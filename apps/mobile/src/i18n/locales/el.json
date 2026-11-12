@@ -1810,7 +1810,7 @@
       "costSpoken": "κόστος {{cost}}",
       "costSpokenWithTime": "κόστος {{cost}}, {{time}}",
       "pullRequest": "αίτημα ενσωμάτωσης {{number}}",
-      "spokenJoiner": "και"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Δεν ήταν δυνατό το άνοιγμα του GitHub",

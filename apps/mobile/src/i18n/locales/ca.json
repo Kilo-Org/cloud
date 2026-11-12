@@ -1851,7 +1851,7 @@
       "costSpoken": "import de {{cost}}",
       "costSpokenWithTime": "cost de {{cost}}, {{time}}",
       "pullRequest": "sol·licitud d'integració {{number}}",
-      "spokenJoiner": "i"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "No s'ha pogut obrir GitHub",

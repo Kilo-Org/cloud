@@ -1933,7 +1933,7 @@
       "costSpoken": "costas {{cost}}",
       "costSpokenWithTime": "costas {{cost}}, {{time}}",
       "pullRequest": "iarratas tarraingthe {{number}}",
-      "spokenJoiner": "agus"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Níorbh fhéidir GitHub a oscailt",

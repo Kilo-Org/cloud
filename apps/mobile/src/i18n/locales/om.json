@@ -1810,7 +1810,7 @@
       "costSpoken": "baasii {{cost}}",
       "costSpokenWithTime": "gatii {{cost}}, {{time}}",
       "pullRequest": "gaaffii walitti makuu {{number}}",
-      "spokenJoiner": "fi"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub banuu hin dandeenye",

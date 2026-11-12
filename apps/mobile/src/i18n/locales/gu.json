@@ -1810,7 +1810,7 @@
       "costSpoken": "ખર્ચ {{cost}}",
       "costSpokenWithTime": "ખર્ચ {{cost}}, {{time}}",
       "pullRequest": "પુલ રિક્વેસ્ટ {{number}}",
-      "spokenJoiner": "અને"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ખોલી શકાયું નહીં",

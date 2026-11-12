@@ -1810,7 +1810,7 @@
       "costSpoken": "արժեքը՝ {{cost}}",
       "costSpokenWithTime": "արժեքը՝ {{cost}}, {{time}}",
       "pullRequest": "pull request {{number}}",
-      "spokenJoiner": "և"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Չհաջողվեց բացել GitHub-ը",

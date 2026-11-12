@@ -1810,7 +1810,7 @@
       "costSpoken": "xərc: {{cost}}",
       "costSpokenWithTime": "xərc {{cost}}, {{time}}",
       "pullRequest": "birləşdirmə sorğusu {{number}}",
-      "spokenJoiner": "və"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub açıla bilmədi",

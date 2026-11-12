@@ -1810,7 +1810,7 @@
       "costSpoken": "ወጪ {{cost}}",
       "costSpokenWithTime": "ወጪ {{cost}}፣ {{time}}",
       "pullRequest": "የማዋሃድ ጥያቄ {{number}}",
-      "spokenJoiner": "እና"
+      "spokenJoiner": "፣"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubን መክፈት አልተቻለም",

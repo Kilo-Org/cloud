@@ -1810,7 +1810,7 @@
       "costSpoken": "ကုန်ကျစရိတ် {{cost}}",
       "costSpokenWithTime": "ကုန်ကျစရိတ် {{cost}}၊ {{time}}",
       "pullRequest": "PR အမှတ် {{number}}",
-      "spokenJoiner": "နှင့်"
+      "spokenJoiner": "၊"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ကို ဖွင့်၍မရပါ",

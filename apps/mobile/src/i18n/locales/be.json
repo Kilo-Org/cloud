@@ -1892,7 +1892,7 @@
       "costSpoken": "кошт {{cost}}",
       "costSpokenWithTime": "кошт {{cost}}, {{time}}",
       "pullRequest": "запыт на зліццё {{number}}",
-      "spokenJoiner": "і"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не атрымалася адкрыць GitHub",

@@ -1810,7 +1810,7 @@
       "costSpoken": "ღირებულება {{cost}}",
       "costSpokenWithTime": "ღირებულება {{cost}}, {{time}}",
       "pullRequest": "შერწყმის მოთხოვნა {{number}}",
-      "spokenJoiner": "და"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ის გახსნა ვერ მოხერხდა",

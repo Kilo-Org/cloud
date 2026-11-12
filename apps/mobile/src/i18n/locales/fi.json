@@ -1810,7 +1810,7 @@
       "costSpoken": "kustannus {{cost}}",
       "costSpokenWithTime": "kustannus {{cost}}, {{time}}",
       "pullRequest": "muutospyyntö {{number}}",
-      "spokenJoiner": "ja"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubia ei voitu avata",

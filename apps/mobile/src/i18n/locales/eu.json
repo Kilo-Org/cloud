@@ -1810,7 +1810,7 @@
       "costSpoken": "kostua: {{cost}}",
       "costSpokenWithTime": "kostua: {{cost}}, {{time}}",
       "pullRequest": "{{number}}. bateratze-eskaera",
-      "spokenJoiner": "eta"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ezin izan da GitHub ireki",

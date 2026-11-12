@@ -1851,7 +1851,7 @@
       "costSpoken": "izmaksas {{cost}}",
       "costSpokenWithTime": "izmaksas {{cost}}, {{time}}",
       "pullRequest": "izmaiņu pieprasījums {{number}}",
-      "spokenJoiner": "un"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Neizdevās atvērt GitHub",

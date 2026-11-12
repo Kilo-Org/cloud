@@ -84,8 +84,14 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/button-label-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/button-label-fixture';
     }
-    if (/(?:^|\/)dev\/session-row-fixture\/?(?:[?#].*)?$/.test(path)) {
-      return '/(auth)/session-row-fixture';
+    // The fixture reads `lang` and `rows` from the query, so it forwards them:
+    // a Hindi inspection is the default and another catalog is one link away.
+    const sessionRowFixture = /(?:^|\/)dev\/session-row-fixture\/?(\?.*)?$/.exec(path);
+    if (sessionRowFixture) {
+      return `/(auth)/session-row-fixture${sessionRowFixture[1] ?? ''}`;
+    }
+    if (/(?:^|\/)dev\/system-search-unresolved-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/system-search-unresolved-fixture';
     }
     if (/(?:^|\/)dev\/save-profile-sheet-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/save-profile-sheet-fixture';
@@ -124,8 +130,16 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/transcript-execution-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/transcript-execution-failure-fixture';
     }
+    if (/(?:^|\/)dev\/transcript-preparation-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/transcript-preparation-failure-fixture';
+    }
     if (/(?:^|\/)dev\/transcript-undelivered-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/transcript-undelivered-fixture';
+    }
+    // Dev-only agent chat screen with its composer, for the design gate: a live
+    // session never holds still long enough for a cell to bracket it.
+    if (/(?:^|\/)dev\/agent-chat-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/agent-chat-fixture';
     }
     // Dev-only render-recovery faults: `kiloapp:///dev/render-recovery-fixture/<name>`
     // arms one and opens the fixture route, or clears it without navigating.

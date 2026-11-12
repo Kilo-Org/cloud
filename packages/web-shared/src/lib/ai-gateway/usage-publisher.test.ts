@@ -15,10 +15,10 @@ import {
   USAGE_ENQUEUE_RETRY_BUDGET_MS,
   USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS,
 } from './usage-publisher';
-import type { UsageRecordRequest } from '@kilocode/usage-contracts';
+import type { LlmUsageQueueMessage, UsageRecordRequest } from '@kilocode/usage-contracts';
 import type * as UsagePublisherModule from './usage-publisher';
 
-const payload: UsageRecordRequest = {
+const payload: LlmUsageQueueMessage = {
   core: {
     id: '3f2504e0-4f89-11d3-9a0c-0305e82c3301',
     kilo_user_id: 'oauth/synthetic',
@@ -179,7 +179,7 @@ describe('enqueueUsage', () => {
     const event = {
       ...payload,
       bouncer_usage_event: { request_id: 'synthetic-request', payload: { cost: 1234 } },
-    } satisfies UsageRecordRequest;
+    } satisfies LlmUsageQueueMessage;
     const response = new Response(null, { status: 202 });
     const read = jest.spyOn(response, 'text');
     mockFetch.mockResolvedValue(response);

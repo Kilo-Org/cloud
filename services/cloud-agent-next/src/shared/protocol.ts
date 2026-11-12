@@ -169,6 +169,8 @@ export type PreparationStepSnapshot = {
   completedAt?: number;
   revision: number;
   latestDetail?: string;
+  /** Capture time of the selected snapshot, in Unix epoch milliseconds. */
+  snapshotCapturedAt?: number;
   safeError?: string;
   command?: string;
   commandIndex?: number;
@@ -213,7 +215,7 @@ export type PreparingEventDataV2 = PreparingEventDataV2Base &
         commandCount?: number;
         parentStepId?: string;
       }
-    | { action: 'step_progress'; stepId: string; detail: string }
+    | { action: 'step_progress'; stepId: string; detail: string; snapshotCapturedAt?: number }
     | { action: 'step_output'; stepId: string; output: string }
     | { action: 'step_completed'; stepId: string; exitCode?: number }
     | { action: 'step_failed'; stepId: string; safeError: string; exitCode?: number }

@@ -1,98 +1,63 @@
+import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
+import type { PreviewTarget } from '../../../../../services/cloud-agent-next/src/shared/preview-target';
 import {
   canOpenWorkspacePreview,
-  gatePreviewSessionId,
-  selectPreviewSessionId,
+  gatePreviewTarget,
+  selectPreviewTarget,
 } from './select-preview-session';
-import type { StoredSession } from './types';
 
-function makeChat(sessionId: string, cloudAgentSessionId?: string | null): StoredSession {
-  return {
-    sessionId,
-    repository: 'kilo/repository',
-    prompt: sessionId,
-    mode: 'code',
-    model: 'test-model',
-    status: 'active',
-    createdAt: '2026-08-26T10:00:00.000Z',
-    updatedAt: '2026-08-26T10:00:00.000Z',
-    messages: [],
-    cloudAgentSessionId,
-  };
-}
+const WORKTREE_ID = 'worktree_12345678-1234-4234-9234-123456789abc' as CloudAgentWorktreeId;
+const OTHER_WORKTREE_ID = 'worktree_87654321-4321-4321-8321-cba987654321' as CloudAgentWorktreeId;
+const WORKSPACE_ID = 'workspace_12345678-1234-4234-9234-123456789abc';
 
-describe('selectPreviewSessionId', () => {
-  it('uses a sibling when the viewed route is known not ready in a worktree', () => {
-    const current = makeChat('ses_current', 'agent_current');
-
+describe('selectPreviewTarget', () => {
+  it('uses the grouped worktree regardless of the viewed chat', () => {
     expect(
-      selectPreviewSessionId({
-        selectedWorktreeId: 'worktree_1',
-        routeReady: false,
-        sessionIdFromParams: 'ses_current',
-        sessionId: 'agent_current',
-        worktreeChats: [current, makeChat('ses_sibling', 'agent_sibling')],
+      selectPreviewTarget({
+        selectedWorktreeId: WORKTREE_ID,
+        sessionId: WORKSPACE_ID,
       })
-    ).toBe('agent_sibling');
+    ).toEqual({ worktreeId: WORKTREE_ID } satisfies PreviewTarget);
   });
 
-  it('falls back to the current session when an unready chat has no sibling', () => {
+  it('uses the grouped worktree in a worktree-only view', () => {
     expect(
-      selectPreviewSessionId({
-        selectedWorktreeId: 'worktree_1',
-        routeReady: false,
-        sessionIdFromParams: 'ses_current',
-        sessionId: 'agent_current',
-        worktreeChats: [makeChat('ses_current', 'agent_current')],
+      selectPreviewTarget({
+        selectedWorktreeId: OTHER_WORKTREE_ID,
+        sessionId: null,
       })
-    ).toBe('agent_current');
+    ).toEqual({ worktreeId: OTHER_WORKTREE_ID });
   });
 
-  it('uses the current session without a sibling lookup once its route is ready', () => {
-    const current = makeChat('ses_current', 'agent_current');
-
+  it('uses the grouped worktree for a new sibling even when its session is not ready', () => {
     expect(
-      selectPreviewSessionId({
-        selectedWorktreeId: 'worktree_1',
-        routeReady: true,
-        sessionIdFromParams: 'ses_current',
-        sessionId: 'agent_current',
-        worktreeChats: [current, makeChat('ses_sibling', 'agent_sibling')],
+      selectPreviewTarget({
+        selectedWorktreeId: WORKTREE_ID,
+        sessionId: undefined,
       })
-    ).toBe('agent_current');
+    ).toEqual({ worktreeId: WORKTREE_ID });
   });
 
-  it('does not look for a sibling outside a worktree', () => {
+  it('accepts a standalone workspace session when no worktree is grouped', () => {
     expect(
-      selectPreviewSessionId({
+      selectPreviewTarget({
         selectedWorktreeId: null,
-        routeReady: false,
-        sessionIdFromParams: 'ses_current',
-        sessionId: 'agent_current',
-        worktreeChats: [makeChat('ses_current', 'agent_current')],
+        sessionId: WORKSPACE_ID,
       })
-    ).toBe('agent_current');
+    ).toEqual({ cloudAgentSessionId: WORKSPACE_ID } satisfies PreviewTarget);
   });
 
-  it('uses the first worktree chat with a cloud session when none is selected', () => {
+  it('returns null without a worktree or a control-plane session', () => {
     expect(
-      selectPreviewSessionId({
-        selectedWorktreeId: 'worktree_1',
-        routeReady: undefined,
-        sessionIdFromParams: null,
-        sessionId: null,
-        worktreeChats: [makeChat('ses_first'), makeChat('ses_second', 'agent_second')],
+      selectPreviewTarget({
+        selectedWorktreeId: null,
+        sessionId: 'ses_12345678901234567890123456',
       })
-    ).toBe('agent_second');
-  });
-
-  it('returns null when no worktree chat has a cloud session', () => {
+    ).toBeNull();
     expect(
-      selectPreviewSessionId({
-        selectedWorktreeId: 'worktree_1',
-        routeReady: undefined,
-        sessionIdFromParams: null,
+      selectPreviewTarget({
+        selectedWorktreeId: null,
         sessionId: null,
-        worktreeChats: [makeChat('ses_first'), makeChat('ses_second', null)],
       })
     ).toBeNull();
   });
@@ -108,17 +73,15 @@ describe('canOpenWorkspacePreview', () => {
   });
 });
 
-describe('gatePreviewSessionId', () => {
-  it('passes a workspace session when the viewer may open a terminal', () => {
-    expect(gatePreviewSessionId('workspace_1', true)).toBe('workspace_1');
+describe('gatePreviewTarget', () => {
+  const target: PreviewTarget = { worktreeId: WORKTREE_ID };
+
+  it('passes the target when the viewer may open a terminal', () => {
+    expect(gatePreviewTarget(target, true)).toBe(target);
   });
 
-  it('refuses a workspace session when the viewer may not open a terminal', () => {
-    expect(gatePreviewSessionId('workspace_1', false)).toBeNull();
-  });
-
-  it('refuses a legacy agent session and no session', () => {
-    expect(gatePreviewSessionId('agent_1', true)).toBeNull();
-    expect(gatePreviewSessionId(null, true)).toBeNull();
+  it('refuses the target when the viewer may not open a terminal', () => {
+    expect(gatePreviewTarget(target, false)).toBeNull();
+    expect(gatePreviewTarget(null, true)).toBeNull();
   });
 });

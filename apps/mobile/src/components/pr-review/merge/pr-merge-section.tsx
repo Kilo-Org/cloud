@@ -30,7 +30,7 @@ import {
   useDisableAutoMergeMutation,
   useUpdateBranchMutation,
 } from '@/lib/pr-review/merge/use-pr-merge-mutations';
-import { type ProviderPrTriple } from '@/lib/pr-review/provider-pr-ref';
+import { githubPrRef, type ProviderPrTriple } from '@/lib/pr-review/provider-pr-ref';
 import {
   AutoMergeEnabledBanner,
   BlockedPanel,
@@ -155,7 +155,7 @@ export function PrMergeSection({
   );
 
   const prRef = useMemo(
-    () => ({ owner, repo, number: overview.number }),
+    () => githubPrRef(owner, repo, overview.number),
     [owner, repo, overview.number]
   );
   const updateBranch = useUpdateBranchMutation(prRef);

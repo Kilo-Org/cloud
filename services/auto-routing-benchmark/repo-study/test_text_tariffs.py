@@ -1,7 +1,8 @@
-"""Offline behavioral tests for text_tariffs and the study dispatch guard.
+"""Offline behavioral tests for text_tariffs and the gateway dispatch guard.
 
 All tariff and quantity evidence is synthetic and finite. No network, no
-credentials and no paid inference are used; HTTP is mocked at requests.post.
+real credentials and no paid inference are used; HTTP is mocked at
+requests.post.
 """
 
 from contextlib import nullcontext
@@ -22,50 +23,48 @@ sys.path.insert(0, str(HERE))
 import text_tariffs as tariffs
 import study
 
-CFG = {"max_input_tokens": 1000, "max_output_tokens": 16384, "byok_fee_ceiling_fraction": "0.06", "candidate": {"model": "x/y", "effort": "effort=low"}}
+ORG_ID = "123e4567-e89b-12d3-a456-426614174000"
+CFG = {"max_input_tokens": 1000, "max_output_tokens": 16384, "kilo_organization_id": ORG_ID, "candidate": {"model": "x/y", "effort": "effort=low"}}
 
 
-def account_policy(plugins=None, captured_at=None):
-    return {"source": "synthetic account settings export", "captured_at": time.time() if captured_at is None else captured_at, "raw_sha256": "a" * 64, "default_plugins": [{"id": "web", "enabled": True, "prevent_overrides": False}] if plugins is None else plugins}
+def endpoints(pricing=None):
+    return [{"tag": "fixture", "status": 0, "context_length": 300000, "max_prompt_tokens": 200000, "max_completion_tokens": 16384, "supported_parameters": ["reasoning", "max_tokens"], "pricing": pricing or {"prompt": "0.000001", "completion": "0.000002"}}]
 
 
-def contract_cfg(**overrides):
-    return {**CFG, "account_policy": account_policy(), **overrides}
-
-
-def endpoint(tag="prov", pricing=None, **overrides):
-    value = {"tag": tag, "status": 0, "context_length": 300000, "max_completion_tokens": 50000, "max_prompt_tokens": 1000, "supported_parameters": ["reasoning", "max_tokens"], "service_tier": None, "supports_implicit_caching": False, "pricing": pricing or {"prompt": "0.000001", "completion": "0.000002"}}
+def entry(pricing=None, **overrides):
+    value = {"id": "x/y", "context_length": 300000, "supported_parameters": ["reasoning", "max_tokens"], "architecture": {"output_modalities": ["text"], "input_modalities": ["text"]}, "pricing": pricing or {"prompt": "0.000001", "completion": "0.000002"}}
     value.update(overrides)
     return value
 
 
-class ComponentBounds(unittest.TestCase):
+class CatalogQuote(unittest.TestCase):
     def test_additive_input_output_and_request_fee_with_zero_quantity_media(self):
         pricing = {"prompt": "0.000001", "input_cache_read": "0.0000002", "input_cache_write": "0.0000003", "input_cache_write_1h": "0.0000004", "completion": "0.000002", "internal_reasoning": "0.000003", "request": "0.01", "image": "5", "web_search": "0.014"}
-        quote = tariffs.endpoint_quote([endpoint(pricing=pricing)], CFG)
-        self.assertEqual(Decimal(quote["upstream_bound_usd"]), Decimal("0.2619"))
-        self.assertEqual(Decimal(quote["attempt_bound_usd"]), Decimal("0.2619") * Decimal("1.06"))
-        evidence = quote["endpoint_evidence"][0]
-        self.assertEqual(evidence["pricing_raw"], pricing)
-        self.assertEqual(evidence["components"]["image"]["quantity_bound"], 0)
-        self.assertEqual(Decimal(evidence["components"]["input_cache_write_1h"]["max_charge_usd"]), Decimal("0.0004"))
-        self.assertEqual(set(quote["routing_max_price"]), {"prompt", "completion"})
-        self.assertEqual(quote["public_constraints"]["input_bound"], 1000)
-        without_fee = dict(CFG)
-        without_fee.pop("byok_fee_ceiling_fraction")
-        with self.assertRaisesRegex(tariffs.TariffError, "explicit approved BYOK fee"):
-            tariffs.endpoint_quote([endpoint()], without_fee)
+        quote = tariffs.catalog_quote(entry(pricing=pricing), CFG, endpoints=endpoints())
+        # (1000 + 2048) input at the summed input rates, 16384 output at the
+        # summed output rates, plus the request fee.
+        self.assertEqual(Decimal(quote["solver_bound_usd"]), Decimal("0.0977112"))
+        self.assertEqual(Decimal(quote["attempt_bound_usd"]), Decimal("0.097712"))
+        self.assertEqual(quote["pricing_raw"], pricing)
+        self.assertEqual(quote["components"]["image"]["quantity_bound"], 0)
+        self.assertEqual(Decimal(quote["components"]["input_cache_write_1h"]["max_charge_usd"]), Decimal("0.0012192"))
+        self.assertEqual(quote["quantities"]["input_quantity"], 3048)
+        self.assertEqual(quote["quantities"]["output_tokens"], 16384)
 
-    def test_configured_input_limit_does_not_replace_endpoint_financing_capacity(self):
-        quote = tariffs.endpoint_quote([endpoint(max_prompt_tokens=5000)], CFG)
-        self.assertEqual(quote["public_constraints"]["input_bound"], CFG["max_input_tokens"])
-        self.assertEqual(quote["quantities"]["input_tokens"], 5000)
-        self.assertEqual(Decimal(quote["upstream_bound_usd"]), Decimal("0.105"))
+    def test_attempt_reservation_uses_actual_byte_bound_and_microdollar_ceiling(self):
+        quote = tariffs.catalog_quote(entry(), CFG, endpoints=endpoints())
+        amounts = tariffs.attempt_reservation(quote, estimated_input_tokens=1000)
+        self.assertEqual(amounts["bound_usd"], Decimal(quote["attempt_bound_usd"]))
+        amounts = tariffs.attempt_reservation(quote, estimated_input_tokens=1, request_bytes=5000)
+        self.assertEqual(amounts["input_quantity"], 7048)
+        self.assertEqual(amounts["bound_usd"], Decimal("0.039816"))
+        with self.assertRaises(tariffs.TariffError):
+            tariffs.attempt_reservation(quote, estimated_input_tokens=-1)
 
     def test_xhigh_variant_keeps_full_financial_and_payload_bounds(self):
-        cfg = contract_cfg(candidate={"model": "x/y", "effort": "variant=xhigh"}, variant_catalog={"x/y": {"xhigh": {"reasoning": {"enabled": True, "effort": "xhigh"}, "verbosity": "xhigh"}}})
-        quote = tariffs.endpoint_quote([endpoint()], cfg)
-        self.assertEqual(Decimal(quote["attempt_bound_usd"]), Decimal("0.10706"))
+        cfg = {**CFG, "candidate": {"model": "x/y", "effort": "variant=xhigh"}, "variant_catalog": {"x/y": {"xhigh": {"reasoning": {"enabled": True, "effort": "xhigh"}, "verbosity": "xhigh"}}}}
+        quote = tariffs.catalog_quote(entry(), cfg, endpoints=endpoints())
+        self.assertEqual(Decimal(quote["attempt_bound_usd"]), Decimal("0.035816"))
         candidate = {**cfg["candidate"], "context_length": 300000, "financial_quote": quote, "quote_fetched_at": time.time()}
         contract = tariffs.request_contract(candidate, cfg, quote_fetched_at=candidate["quote_fetched_at"])
         payload = study.build_payload(candidate, [{"role": "user", "content": "task"}], contract, cfg)
@@ -74,65 +73,58 @@ class ComponentBounds(unittest.TestCase):
         with self.assertRaises(tariffs.RequestContractError):
             tariffs.validate_final_payload(payload, contract)
 
-    def test_negative_discount_is_markup_positive_discount_is_forgone(self):
-        for discount, expected in ((-0.5, "0.1515"), (0.5, "0.101")):
+    def test_negative_discount_is_markup_positive_discount_is_undone(self):
+        for discount, expected in ((-0.5, "0.053724"), (0.5, "0.071632")):
             with self.subTest(discount=discount):
-                quote = tariffs.endpoint_quote([endpoint(pricing={"prompt": "0.000001", "completion": "0.000002", "discount": discount})], CFG)
-                self.assertEqual(Decimal(quote["upstream_bound_usd"]), Decimal(expected))
+                quote = tariffs.catalog_quote(entry(pricing={"prompt": "0.000001", "completion": "0.000002", "discount": discount}), CFG, endpoints=endpoints())
+                self.assertEqual(Decimal(quote["solver_bound_usd"]), Decimal(expected))
+
+    def test_dearest_endpoint_price_and_override_tier_bound_the_reservation(self):
+        dear = endpoints(pricing={"prompt": "0.000012", "completion": "0.000002", "overrides": [{"min_prompt_tokens": 100000, "prompt": "0.00002", "completion": "0.000004"}]})
+        quote = tariffs.catalog_quote(entry(), CFG, endpoints=dear)
+        self.assertEqual(Decimal(quote["component_maxima"]["prompt"]), Decimal("0.00002"))
+        self.assertEqual(Decimal(quote["component_maxima"]["completion"]), Decimal("0.000004"))
+        self.assertEqual(Decimal(quote["solver_bound_usd"]), Decimal("0.00002") * 3048 + Decimal("0.000004") * 16384)
+        self.assertEqual(quote["endpoint_evidence"][0]["tag"], "fixture")
+        amounts = tariffs.attempt_reservation(quote, estimated_input_tokens=1000)
+        self.assertEqual(amounts["bound_usd"], Decimal(quote["attempt_bound_usd"]))
+
+    def test_endpoint_discount_is_undone(self):
+        discounted = endpoints(pricing={"prompt": "0.000001", "completion": "0.000002", "discount": 0.5})
+        quote = tariffs.catalog_quote(entry(), CFG, endpoints=discounted)
+        self.assertEqual(Decimal(quote["component_maxima"]["prompt"]), Decimal("0.000002"))
+
+    def test_missing_or_unparseable_endpoint_evidence_fails_the_quote(self):
+        for bad in (None, [], [{"tag": "x"}], endpoints(pricing={"prompt": "not-a-price", "completion": "0.000002"})):
+            with self.subTest(endpoints=bad), self.assertRaises(tariffs.TariffError):
+                tariffs.catalog_quote(entry(), CFG, endpoints=bad)
 
     def test_unknown_nonzero_component_blocks_but_zero_is_recorded(self):
         with self.assertRaises(tariffs.TariffError):
-            tariffs.endpoint_quote([endpoint(pricing={"prompt": "0.000001", "completion": "0.000002", "cache_storage": "0.1"})], CFG)
-        quote = tariffs.endpoint_quote([endpoint(pricing={"prompt": "0.000001", "completion": "0.000002", "cache_storage": "0"})], CFG)
-        self.assertEqual(quote["endpoint_evidence"][0]["unknown_zero_components"], ["cache_storage"])
-        self.assertEqual(quote["endpoint_evidence"][0]["pricing_raw"]["cache_storage"], "0")
+            tariffs.catalog_quote(entry(pricing={"prompt": "0.000001", "completion": "0.000002", "cache_storage": "0.1"}), CFG, endpoints=endpoints())
+        quote = tariffs.catalog_quote(entry(pricing={"prompt": "0.000001", "completion": "0.000002", "cache_storage": "0"}), CFG, endpoints=endpoints())
+        self.assertEqual(quote["unknown_zero_components"], ["cache_storage"])
+        self.assertEqual(quote["pricing_raw"]["cache_storage"], "0")
 
     def test_output_modality_rate_blocks_without_architecture_evidence(self):
         pricing = {"prompt": "0.000001", "completion": "0.000002", "image_output": "1"}
         with self.assertRaisesRegex(tariffs.TariffError, "image_output"):
-            tariffs.endpoint_quote([endpoint(pricing=pricing)], CFG)
-        bare_assertion = {**CFG, "quantity_evidence": {"image_output": {"quantity": 0, "source": "synthetic assertion"}}}
-        with self.assertRaisesRegex(tariffs.TariffError, "image_output"):
-            tariffs.endpoint_quote([endpoint(pricing=pricing)], bare_assertion)
-        architecture = {"output_modalities": ["text"], "input_modalities": ["text"], "tokenizer": "synthetic"}
-        quote = tariffs.endpoint_quote([endpoint(pricing=pricing)], {**CFG, "model_architecture": architecture})
-        record = quote["endpoint_evidence"][0]
-        self.assertEqual(record["components"]["image_output"]["quantity_bound"], 0)
-        self.assertEqual(record["model_architecture"], architecture)
+            tariffs.catalog_quote(entry(pricing=pricing, architecture=None), CFG, endpoints=endpoints())
+        quote = tariffs.catalog_quote(entry(pricing=pricing), CFG, endpoints=endpoints())
+        self.assertEqual(quote["components"]["image_output"]["quantity_bound"], 0)
+        self.assertEqual(quote["model_architecture"]["output_modalities"], ["text"])
 
-    def test_reasoning_max_tokens_and_cfg_overrides_never_tighten_quantities(self):
-        cfg = {**CFG, "candidate": {"model": "x/y", "effort": "variant=cap"}, "variant_catalog": {"x/y": {"cap": {"reasoning": {"effort": "low", "max_tokens": 100}}}}}
-        pricing = {"prompt": "0.000001", "completion": "0.000002", "internal_reasoning": "0.000003"}
-        quote = tariffs.endpoint_quote([endpoint(pricing=pricing)], cfg)
-        self.assertEqual(quote["quantities"]["reasoning_tokens_financial"], 50000)
-        self.assertEqual(Decimal(quote["upstream_bound_usd"]), Decimal("0.251"))
-        with self.assertRaisesRegex(tariffs.TariffError, "financial_output_token_bound"):
-            tariffs.endpoint_quote([endpoint(pricing=pricing)], {**CFG, "financial_output_token_bound": 10})
-
-    def test_financial_input_comes_from_endpoint_capacity_not_estimates(self):
-        quote = tariffs.endpoint_quote([endpoint(max_prompt_tokens=None, context_length=200000)], CFG)
-        self.assertEqual(quote["quantities"]["input_tokens"], 200000)
-        self.assertEqual(Decimal(quote["upstream_bound_usd"]), Decimal("0.3"))
-        amounts = tariffs.attempt_reservation(quote, estimated_input_tokens=1)
-        self.assertEqual(amounts["bound_usd"], Decimal(quote["attempt_bound_usd"]))
-        self.assertEqual(amounts["financial_input_tokens"], 200000)
-
-    def test_attempt_reservation_preserves_endpoint_correlations(self):
-        endpoints = [
-            endpoint("prov", {"prompt": "0.000001", "completion": "0.000002", "request": "0.01"}),
-            endpoint("prov/b", {"prompt": "0.000001", "completion": "0.000002", "input_cache_write": "0.00001"}),
-        ]
-        quote = tariffs.endpoint_quote(endpoints, CFG)
-        self.assertEqual(Decimal(quote["upstream_bound_usd"]), Decimal("0.111"))
-        amounts = tariffs.attempt_reservation(quote, estimated_input_tokens=1000)
-        self.assertEqual(amounts["upstream_usd"], Decimal("0.111"))
-        self.assertEqual(amounts["bound_usd"], Decimal(quote["attempt_bound_usd"]))
+    def test_unavailable_is_only_context_or_parameter_shortfall(self):
+        with self.assertRaises(RuntimeError) as caught:
+            tariffs.catalog_quote(entry(context_length=1000), CFG, endpoints=endpoints())
+        self.assertEqual(str(caught.exception), tariffs.MODEL_UNAVAILABLE)
+        with self.assertRaises(RuntimeError) as caught:
+            tariffs.catalog_quote(entry(supported_parameters=["max_tokens"]), CFG, endpoints=endpoints())
+        self.assertEqual(str(caught.exception), tariffs.MODEL_UNAVAILABLE)
         with self.assertRaises(tariffs.TariffError):
-            tariffs.attempt_reservation(quote, estimated_input_tokens=-1)
-
-    def test_missing_max_completion_is_unknown_not_unavailable(self):
-        quote = tariffs.endpoint_quote([endpoint(max_completion_tokens=None)], CFG)
-        self.assertEqual(quote["quantities"]["output_tokens_financial"], 300000)
+            tariffs.catalog_quote(entry(pricing={"prompt": "0.000001"}), CFG, endpoints=endpoints())
+        with self.assertRaises(tariffs.TariffError):
+            tariffs.catalog_quote(entry(id="z/w"), CFG, endpoints=endpoints())
 
 
 class Schedules(unittest.TestCase):
@@ -164,46 +156,25 @@ class Schedules(unittest.TestCase):
             tariffs.parse_pricing({"prompt": "1", "completion": "1", "overrides": [{"region": "us", "prompt": "2"}]})
 
 
-class Closure(unittest.TestCase):
-    def endpoints(self):
-        return [
-            endpoint("prov"),
-            endpoint("prov/fast", {"prompt": "0.000009", "completion": "0.000009", "discount": 0.9}, service_tier="priority"),
-            endpoint("prov/flex", {"prompt": "0.000008", "completion": "0.000008"}, service_tier="flex"),
-            endpoint("prov/eu", {"prompt": "0.000005", "completion": "0.000002"}),
-            endpoint("prov/dead", {"prompt": "0.000001", "completion": "0.000001"}, status=1),
-            endpoint("other", {"prompt": "0.00002", "completion": "0.00002"}),
-        ]
-
-    def test_descendants_and_tiers_are_financed_without_base_price_exclusion(self):
-        quote = tariffs.endpoint_quote(self.endpoints(), CFG)
-        self.assertEqual(quote["eligible_endpoint_tags"], ["prov"])
-        self.assertEqual(set(quote["financial_endpoint_tags"]), {"prov", "prov/fast", "prov/flex", "prov/eu"})
-        self.assertTrue(quote["routing_uncertainty"])
-
-    def test_workspace_default_tier_narrows_only_with_frozen_evidence(self):
-        pinned = tariffs.endpoint_quote(self.endpoints(), {**CFG, "routing_context": {"workspace_default_service_tier": "default"}})
-        self.assertEqual(set(pinned["financial_endpoint_tags"]), {"prov", "prov/eu"})
-        unset = tariffs.endpoint_quote(self.endpoints(), {**CFG, "routing_context": {"workspace_default_service_tier": None}})
-        self.assertEqual(set(unset["financial_endpoint_tags"]), {"prov", "prov/fast", "prov/eu"})
-
-    def test_empty_eligible_set_is_the_only_unavailable_case(self):
-        with self.assertRaises(RuntimeError) as caught:
-            tariffs.endpoint_quote([endpoint(status=1)], CFG)
-        self.assertEqual(str(caught.exception), tariffs.ENDPOINT_UNAVAILABLE)
-        with self.assertRaises(tariffs.TariffError):
-            tariffs.endpoint_quote([endpoint(pricing={"prompt": "0.000001"})], CFG)
-
-    def test_descendant_without_completion_cap_uses_context_capacity(self):
-        endpoints = [endpoint("prov"), endpoint("prov/region", {"prompt": "0.000001", "completion": "0.000001"}, max_completion_tokens=None, context_length=100000)]
-        quote = tariffs.endpoint_quote(endpoints, CFG)
-        record = next(item for item in quote["endpoint_evidence"] if item["tag"] == "prov/region")
-        self.assertEqual(record["output_token_bound"], 100000)
-        self.assertIn("context_length", record["output_token_bound_source"])
+class WorstCaseQuote(unittest.TestCase):
+    def test_pool_maximum_plus_classifier_allowance(self):
+        cheap = tariffs.catalog_quote(entry(), CFG, endpoints=endpoints())
+        pricey_cfg = {**CFG, "candidate": {"model": "z/w", "effort": "effort=low"}}
+        pricey = tariffs.catalog_quote(entry(id="z/w", pricing={"prompt": "0.000003", "completion": "0.000002", "request": "0.002"}), pricey_cfg, endpoints=endpoints())
+        quote = tariffs.worst_case_quote([cheap, pricey], "kilo-auto/efficient", "effort=", CFG, "0.001")
+        self.assertEqual(quote["candidate"], {"model": "kilo-auto/efficient", "effort": "effort="})
+        self.assertEqual(Decimal(quote["component_maxima"]["prompt"]), Decimal("0.000003"))
+        self.assertEqual(Decimal(quote["classifier_allowance_usd"]), Decimal("0.001"))
+        expected_solver = Decimal("0.000003") * 3048 + Decimal("0.000002") * 16384 + Decimal("0.002")
+        self.assertEqual(Decimal(quote["solver_bound_usd"]), expected_solver)
+        self.assertEqual(Decimal(quote["attempt_bound_usd"]), tariffs.ceil_microdollars(expected_solver + Decimal("0.001")))
+        amounts = tariffs.attempt_reservation(quote, estimated_input_tokens=1000)
+        self.assertEqual(amounts["bound_usd"], Decimal(quote["attempt_bound_usd"]))
+        self.assertEqual(amounts["classifier_allowance_usd"], Decimal("0.001"))
 
 
 def quoted_candidate(fetched_at=None):
-    quote = tariffs.endpoint_quote([endpoint()], CFG)
+    quote = tariffs.catalog_quote(entry(), CFG, endpoints=endpoints())
     return {"model": "x/y", "effort": "effort=low", "context_length": 300000, "financial_quote": quote, "quote_fetched_at": time.time() if fetched_at is None else fetched_at}
 
 
@@ -215,29 +186,29 @@ def valid_payload(contract, candidate=None):
 class FinalPayloadGuard(unittest.TestCase):
     def setUp(self):
         self.candidate = quoted_candidate()
-        self.contract = tariffs.request_contract(self.candidate, contract_cfg(), quote_fetched_at=self.candidate["quote_fetched_at"])
+        self.contract = tariffs.request_contract(self.candidate, CFG, quote_fetched_at=self.candidate["quote_fetched_at"])
 
     def test_valid_payload_serializes_to_exact_hashed_bytes(self):
         raw = tariffs.validate_final_payload(valid_payload(self.contract), self.contract)
         self.assertEqual(json.loads(raw), valid_payload(self.contract))
+        self.assertEqual(set(json.loads(raw)), {"model", "messages", "max_tokens", "stream", "reasoning"})
         self.assertEqual(tariffs.request_bytes_sha256(raw), __import__("hashlib").sha256(raw).hexdigest())
 
     def test_post_mutation_cases_are_rejected(self):
         mutations = []
         payload = valid_payload(self.contract); payload["messages"] = [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": "x"}}]}]; mutations.append(payload)
         payload = valid_payload(self.contract); payload["tools"] = [{"type": "function"}]; mutations.append(payload)
-        payload = valid_payload(self.contract); payload["plugins"] = ["web"]; mutations.append(payload)
+        payload = valid_payload(self.contract); payload["plugins"] = []; mutations.append(payload)
+        payload = valid_payload(self.contract); payload["provider"] = {"only": ["x"]}; mutations.append(payload)
+        payload = valid_payload(self.contract); payload["usage"] = {"include": True}; mutations.append(payload)
         payload = valid_payload(self.contract); payload["messages"][0]["cache_control"] = {"type": "ephemeral"}; mutations.append(payload)
-        payload = valid_payload(self.contract); payload["reasoning"] = {"mode": "pro", "effort": "low"}; mutations.append(payload)
         payload = valid_payload(self.contract); payload["reasoning"] = {"enabled": True, "effort": "high"}; mutations.append(payload)
         payload = valid_payload(self.contract); payload["max_tokens"] = 16385; mutations.append(payload)
         payload = valid_payload(self.contract); payload["model"] = "x/y:nitro"; mutations.append(payload)
-        payload = valid_payload(self.contract); payload["provider"] = {**self.contract["provider"], "allow_fallbacks": True}; mutations.append(payload)
-        payload = valid_payload(self.contract); payload["provider"] = {**self.contract["provider"], "max_price": {"prompt": math.nan, "completion": 2.0}}; mutations.append(payload)
         payload = valid_payload(self.contract); payload["service_tier"] = "flex"; mutations.append(payload)
         payload = valid_payload(self.contract); payload["messages"] = [{"role": "tool", "content": "x"}]; mutations.append(payload)
         payload = valid_payload(self.contract); payload["messages"] = [{"role": "assistant", "content": "prefill"}]; mutations.append(payload)
-        payload = valid_payload(self.contract); payload["plugins"] = []; mutations.append(payload)
+        payload = valid_payload(self.contract); payload["stream"] = True; mutations.append(payload)
         for mutated in mutations:
             with self.subTest(keys=sorted(mutated)), self.assertRaises((tariffs.RequestContractError, tariffs.TariffError)):
                 tariffs.validate_final_payload(mutated, self.contract)
@@ -247,46 +218,38 @@ class FinalPayloadGuard(unittest.TestCase):
         payload["messages"] = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "hello"}, {"role": "user", "content": "solve"}]
         tariffs.validate_final_payload(payload, self.contract)
 
-    def test_payload_mutation_cannot_move_approval_controls(self):
-        payload = valid_payload(self.contract, self.candidate)
-        payload["provider"]["data_collection"] = "allow"
-        payload["reasoning"]["effort"] = "high"
-        payload["plugins"][0]["enabled"] = True
-        self.assertEqual(self.contract["provider"]["data_collection"], "deny")
-        with self.assertRaises((tariffs.RequestContractError, tariffs.TariffError)):
-            tariffs.validate_final_payload(payload, self.contract)
-        mutated_contract = tariffs.request_contract(self.candidate, contract_cfg(), quote_fetched_at=self.candidate["quote_fetched_at"])
-        mutated_contract["provider"]["data_collection"] = "allow"
-        with self.assertRaisesRegex(tariffs.RequestContractError, "mutated"):
-            tariffs.validate_final_payload(valid_payload(self.contract), mutated_contract)
+    def test_outbound_messages_drop_response_fields(self):
+        messages = [
+            {"role": "user", "content": "solve"},
+            {"role": "assistant", "content": "next", "reasoning": "analysis", "reasoning_details": {"text": "analysis"}, "extra": {"cost": 1}},
+            {"role": "user", "content": "observation"},
+        ]
+        projected = study.outbound_messages(messages)
+        self.assertEqual(projected, messages[:1] + [{"role": "assistant", "content": "next"}] + messages[2:])
+        payload = study.build_payload({"model": "x/y", "effort": "effort=low"}, projected, self.contract, CFG)
+        tariffs.validate_final_payload(payload, self.contract)
 
-    def test_contract_binds_quoted_candidate_and_requested_max_tokens(self):
+    def test_contract_binds_quoted_candidate_max_tokens_and_organization(self):
         other = {**self.candidate, "model": "z/w"}
         with self.assertRaisesRegex(tariffs.TariffError, "candidate identity"):
-            tariffs.request_contract(other, contract_cfg(variant_catalog={"z/w": {}}), quote_fetched_at=self.candidate["quote_fetched_at"])
+            tariffs.request_contract(other, CFG, quote_fetched_at=self.candidate["quote_fetched_at"])
         with self.assertRaisesRegex(tariffs.TariffError, "max_tokens"):
-            tariffs.request_contract(self.candidate, contract_cfg(max_output_tokens=8192), quote_fetched_at=self.candidate["quote_fetched_at"])
-
-    def test_account_policy_is_required_and_enforced_plugins_block(self):
-        with self.assertRaisesRegex(tariffs.TariffError, "account policy"):
-            tariffs.request_contract(self.candidate, CFG, quote_fetched_at=self.candidate["quote_fetched_at"])
-        enforced = contract_cfg(account_policy=account_policy(plugins=[{"id": "web", "enabled": True, "prevent_overrides": True}]))
-        with self.assertRaisesRegex(tariffs.TariffError, "enforced"):
-            tariffs.request_contract(self.candidate, enforced, quote_fetched_at=self.candidate["quote_fetched_at"])
-        extra = contract_cfg(account_policy=account_policy(plugins=[{"id": "acme-plugin", "enabled": True, "prevent_overrides": False}]))
-        contract = tariffs.request_contract(self.candidate, extra, quote_fetched_at=self.candidate["quote_fetched_at"])
-        disabled = {item["id"] for item in contract["plugins"]}
-        self.assertIn("acme-plugin", disabled)
-        self.assertTrue(set(tariffs.DOCUMENTED_PLUGIN_IDS) <= disabled)
-        self.assertTrue(all(item["enabled"] is False for item in contract["plugins"]))
+            tariffs.request_contract(self.candidate, {**CFG, "max_output_tokens": 8192}, quote_fetched_at=self.candidate["quote_fetched_at"])
+        for bad in (None, "", "not-a-uuid", 42):
+            with self.subTest(org=bad), self.assertRaisesRegex(tariffs.TariffError, "organization"):
+                tariffs.request_contract(self.candidate, {**CFG, "kilo_organization_id": bad}, quote_fetched_at=self.candidate["quote_fetched_at"])
+        mutated = tariffs.request_contract(self.candidate, CFG, quote_fetched_at=self.candidate["quote_fetched_at"])
+        mutated["kilo_organization_id"] = "123e4567-e89b-12d3-a456-426614174999"
+        with self.assertRaisesRegex(tariffs.RequestContractError, "mutated"):
+            tariffs.validate_final_payload(valid_payload(self.contract), mutated)
 
 
 class FakeResponse:
     status_code = 200
-    headers = {}
+    headers = {"x-request-id": "req-fixture"}
 
     def iter_content(self, chunk_size):
-        yield b'{"id":"gen-fixture","usage":{"cost":0}}'
+        yield b'{"id":"gen-fixture","model":"x/y","usage":{"cost":0,"is_byok":false}}'
 
     def close(self):
         pass
@@ -294,26 +257,74 @@ class FakeResponse:
 
 class CompletionHttp(unittest.TestCase):
     def setUp(self):
+        patcher = mock.patch.dict(os.environ, {"KILO_API_TOKEN": "fixture-only"})
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.candidate = quoted_candidate()
-        self.contract = tariffs.request_contract(self.candidate, contract_cfg(), quote_fetched_at=self.candidate["quote_fetched_at"])
+        self.contract = tariffs.request_contract(self.candidate, CFG, quote_fetched_at=self.candidate["quote_fetched_at"])
         self.payload = valid_payload(self.contract)
         self.raw = tariffs.validate_final_payload(self.payload, self.contract)
 
-    def run_http(self, payload, contract, receipt, admission):
+    def receipt(self):
+        return {"request_sha256": tariffs.request_bytes_sha256(self.raw), "dispatch_entered": False, "reservation_usd": "0.035816"}
+
+    def run_http(self, payload, contract, receipt, admission, env=None):
         with tempfile.TemporaryDirectory() as temporary:
             receipt_path = Path(temporary) / "receipt.json"
             study.save(receipt_path, receipt)
-            with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "fixture-only"}), mock.patch("requests.post", return_value=FakeResponse()) as post:
+            with mock.patch.dict(os.environ, {"KILO_API_TOKEN": "fixture-only"} if env is None else env, clear=env is not None), mock.patch("requests.post", return_value=FakeResponse()) as post:
                 result = study.completion_http(payload, time.monotonic() + 60, receipt, receipt_path, admission=admission, contract=contract)
             return result, post, study.load(receipt_path)
 
-    def test_mutated_payload_dispatches_nothing_and_never_enters_admission(self):
-        mutated = {**self.payload, "plugins": ["web"]}
-        receipt = {"request_sha256": tariffs.request_bytes_sha256(self.raw), "dispatch_entered": False}
+    def test_exact_bytes_gateway_url_and_headers_are_posted(self):
+        (response, body), post, saved = self.run_http(self.payload, self.contract, self.receipt(), lambda: nullcontext())
+        self.assertEqual(post.call_args.args[0], study.GATEWAY_CHAT_COMPLETIONS_URL)
+        self.assertEqual(post.call_args.kwargs["data"], self.raw)
+        headers = post.call_args.kwargs["headers"]
+        self.assertEqual(headers["Authorization"], "Bearer fixture-only")
+        self.assertEqual(headers[study.ORGANIZATION_HEADER], ORG_ID)
+        self.assertEqual(set(headers), {"Authorization", "Content-Type", study.ORGANIZATION_HEADER})
+        self.assertTrue(saved["dispatch_entered"])
+        self.assertEqual(saved["gateway_request_id"], "req-fixture")
+        self.assertEqual(body["id"], "gen-fixture")
+        self.assertNotIn("fixture-only", json.dumps(saved))
+
+    def test_missing_token_fails_closed_before_dispatch_or_admission(self):
+        receipt = self.receipt()
         entered = []
+
         def admission():
             entered.append(True)
             return nullcontext()
+
+        env = {key: value for key, value in os.environ.items() if key != "KILO_API_TOKEN"}
+        with tempfile.TemporaryDirectory() as temporary:
+            receipt_path = Path(temporary) / "receipt.json"
+            study.save(receipt_path, receipt)
+            with mock.patch.dict(os.environ, env, clear=True), mock.patch("requests.post") as post, self.assertRaisesRegex(RuntimeError, "KILO_API_TOKEN"):
+                study.completion_http(self.payload, time.monotonic() + 60, receipt, receipt_path, admission=admission, contract=self.contract)
+            post.assert_not_called()
+        self.assertEqual(entered, [])
+        self.assertFalse(receipt["dispatch_entered"])
+
+    def test_missing_reservation_fails_closed_before_dispatch(self):
+        receipt = {key: value for key, value in self.receipt().items() if key != "reservation_usd"}
+        with tempfile.TemporaryDirectory() as temporary:
+            receipt_path = Path(temporary) / "receipt.json"
+            study.save(receipt_path, receipt)
+            with mock.patch("requests.post") as post, self.assertRaisesRegex(RuntimeError, "local reservation"):
+                study.completion_http(self.payload, time.monotonic() + 60, receipt, receipt_path, admission=lambda: nullcontext(), contract=self.contract)
+            post.assert_not_called()
+
+    def test_mutated_payload_dispatches_nothing_and_never_enters_admission(self):
+        mutated = {**self.payload, "provider": {"only": ["x"]}}
+        receipt = self.receipt()
+        entered = []
+
+        def admission():
+            entered.append(True)
+            return nullcontext()
+
         with self.assertRaises((tariffs.RequestContractError, tariffs.TariffError)):
             with tempfile.TemporaryDirectory() as temporary:
                 receipt_path = Path(temporary) / "receipt.json"
@@ -324,18 +335,10 @@ class CompletionHttp(unittest.TestCase):
         self.assertEqual(entered, [])
         self.assertFalse(receipt["dispatch_entered"])
 
-    def test_exact_bytes_are_posted_and_receipt_bound(self):
-        receipt = {"request_sha256": tariffs.request_bytes_sha256(self.raw), "dispatch_entered": False}
-        (response, body), post, saved = self.run_http(self.payload, self.contract, receipt, lambda: nullcontext())
-        self.assertEqual(post.call_args.kwargs["data"], self.raw)
-        self.assertEqual(post.call_args.kwargs["headers"]["Content-Type"], "application/json")
-        self.assertTrue(saved["dispatch_entered"])
-        self.assertEqual(body["id"], "gen-fixture")
-
     def test_expired_quote_blocks_before_dispatch(self):
         stale = quoted_candidate(fetched_at=time.time() - 100000)
-        contract = tariffs.request_contract(stale, contract_cfg(), quote_fetched_at=stale["quote_fetched_at"])
-        receipt = {"request_sha256": tariffs.request_bytes_sha256(self.raw), "dispatch_entered": False}
+        contract = tariffs.request_contract(stale, CFG, quote_fetched_at=stale["quote_fetched_at"])
+        receipt = self.receipt()
         with tempfile.TemporaryDirectory() as temporary:
             receipt_path = Path(temporary) / "receipt.json"
             study.save(receipt_path, receipt)
@@ -348,7 +351,7 @@ class CompletionHttp(unittest.TestCase):
             study.completion_http(self.payload, time.monotonic() + 60, {}, Path("unused.json"))
 
     def test_missing_admission_never_dispatches(self):
-        receipt = {"request_sha256": tariffs.request_bytes_sha256(self.raw), "dispatch_entered": False}
+        receipt = self.receipt()
         with tempfile.TemporaryDirectory() as temporary:
             receipt_path = Path(temporary) / "receipt.json"
             study.save(receipt_path, receipt)
@@ -358,18 +361,18 @@ class CompletionHttp(unittest.TestCase):
         self.assertFalse(receipt["dispatch_entered"])
 
     def test_one_receipt_dispatches_exactly_once(self):
-        receipt = {"request_sha256": tariffs.request_bytes_sha256(self.raw), "dispatch_entered": False}
+        receipt = self.receipt()
         with tempfile.TemporaryDirectory() as temporary:
             receipt_path = Path(temporary) / "receipt.json"
             study.save(receipt_path, receipt)
-            with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "fixture-only"}), mock.patch("requests.post", return_value=FakeResponse()) as post:
+            with mock.patch.dict(os.environ, {"KILO_API_TOKEN": "fixture-only"}), mock.patch("requests.post", return_value=FakeResponse()) as post:
                 study.completion_http(self.payload, time.monotonic() + 60, receipt, receipt_path, admission=lambda: nullcontext(), contract=self.contract)
                 with self.assertRaisesRegex(RuntimeError, "already dispatched"):
                     study.completion_http(self.payload, time.monotonic() + 60, receipt, receipt_path, admission=lambda: nullcontext(), contract=self.contract)
             self.assertEqual(post.call_count, 1)
 
     def test_freshness_is_rechecked_after_admission_yields(self):
-        receipt = {"request_sha256": tariffs.request_bytes_sha256(self.raw), "dispatch_entered": False}
+        receipt = self.receipt()
         contract = self.contract
 
         class ExpiringAdmission:
@@ -392,35 +395,52 @@ class CompletionHttp(unittest.TestCase):
 
 
 class Settlement(unittest.TestCase):
-    FEE = Decimal("0.06")
-
     def test_zero_and_plain_costs_settle_only_with_affirmative_non_byok(self):
-        evidence = study.charge_evidence({"cost": 0, "is_byok": False}, self.FEE)
+        evidence = study.charge_evidence({"cost": 0, "is_byok": False})
         self.assertEqual((evidence.complete, evidence.actual, evidence.billing_mode), (True, Decimal("0"), "non-byok"))
-        evidence = study.charge_evidence({"cost": "2.5", "is_byok": False, "cost_details": {"upstream_inference_cost": "9"}}, self.FEE)
-        self.assertEqual((evidence.complete, evidence.actual), (True, Decimal("2.5")))
+        evidence = study.charge_evidence({"cost": "2.5", "is_byok": False, "cost_details": {"upstream_inference_cost": "9"}})
+        self.assertEqual((evidence.complete, evidence.actual, evidence.known_floor), (True, Decimal("2.5"), Decimal("2.5")))
 
-    def test_byok_settles_fee_plus_upstream_and_flags_fee_breach(self):
-        usage = {"cost": "0.006", "is_byok": True, "cost_details": {"upstream_inference_cost": "1"}}
-        evidence = study.charge_evidence(usage, self.FEE)
-        self.assertEqual((evidence.complete, evidence.actual, evidence.fee_breach), (True, Decimal("1.006"), False))
-        usage["cost"] = "0.07"
-        evidence = study.charge_evidence(usage, self.FEE)
-        self.assertEqual((evidence.actual, evidence.fee_breach), (Decimal("1.07"), True))
+    def test_router_settlement_records_cost_plus_classifier_allowance(self):
+        evidence = study.charge_evidence({"cost": "0.01", "is_byok": False}, Decimal("0.001"))
+        self.assertEqual((evidence.complete, evidence.actual, evidence.known_floor), (True, Decimal("0.011"), Decimal("0.011")))
+        held = study.charge_evidence({"is_byok": False}, Decimal("0.001"))
+        self.assertEqual((held.complete, held.known_floor), (False, Decimal("0.001")))
 
-    def test_partial_byok_retains_the_known_fee_floor(self):
-        evidence = study.charge_evidence({"cost": "2", "is_byok": True}, self.FEE)
-        self.assertEqual((evidence.complete, evidence.actual, evidence.known_floor, evidence.billing_mode), (False, None, Decimal("2"), "byok-incomplete"))
-        evidence = study.charge_evidence({"is_byok": True, "cost_details": {"upstream_inference_cost": "3"}}, self.FEE)
-        self.assertEqual(evidence.known_floor, Decimal("3"))
+    def test_classifier_bound_prices_every_question_attempt_and_requires_free_output(self):
+        endpoints = [{"tag": "cheap", "status": 0, "context_length": 100000, "supported_parameters": ["reasoning", "max_tokens"], "pricing": {"prompt": "0.000000042", "completion": "0", "request": "0.0001"}}, {"tag": "dear", "status": 0, "context_length": 100000, "supported_parameters": ["reasoning", "max_tokens"], "pricing": {"prompt": "0.0000001", "completion": "0", "discount": 0.5}}]
+        quote = tariffs.classifier_endpoint_quote("typesafe/jev-1.13", endpoints)
+        # Dearest input rate (0.0000001 with its 50% discount undone) times
+        # 32768 tokens, plus the dearest request fee, per question attempt;
+        # six questions, two attempts, no output charge.
+        per_question_attempt = Decimal("0.0000002") * tariffs.CLASSIFIER_INPUT_TOKENS_PER_QUESTION_ATTEMPT + Decimal("0.0001")
+        expected = per_question_attempt * tariffs.CLASSIFIER_QUESTIONS_PER_CLASSIFICATION * tariffs.CLASSIFIER_MAX_ATTEMPTS_PER_CLASSIFICATION
+        self.assertEqual(Decimal(quote["bound_usd"]), tariffs.ceil_microdollars(expected))
+        self.assertEqual((tariffs.CLASSIFIER_INPUT_TOKENS_PER_QUESTION_ATTEMPT, tariffs.CLASSIFIER_QUESTIONS_PER_CLASSIFICATION, tariffs.CLASSIFIER_MAX_ATTEMPTS_PER_CLASSIFICATION), (32768, 6, 2))
+        with self.assertRaises(tariffs.TariffError):
+            tariffs.classifier_endpoint_quote("typesafe/jev-1.13", [])
+        priced_output = [{"tag": "priced", "status": 0, "context_length": 100000, "supported_parameters": ["reasoning", "max_tokens"], "pricing": {"prompt": "0.0000001", "completion": "0.000001"}}]
+        with self.assertRaisesRegex(tariffs.TariffError, "no max_tokens"):
+            tariffs.classifier_endpoint_quote("typesafe/jev-1.13", priced_output)
+        with self.assertRaisesRegex(tariffs.TariffError, "exactly zero"):
+            tariffs.classifier_allowance_bound({"component_maxima": {"prompt": "0.000001", "completion": "0.000001"}})
+
+    def test_byok_true_is_unknown_never_settled(self):
+        evidence = study.charge_evidence({"cost": "0.006", "is_byok": True, "cost_details": {"upstream_inference_cost": "1"}})
+        self.assertEqual((evidence.complete, evidence.actual, evidence.billing_mode), (False, None, "byok-not-allowed"))
+        self.assertEqual(evidence.known_floor, Decimal("0.006"))
 
     def test_missing_null_and_nonboolean_is_byok_is_ambiguous(self):
-        for usage in ({"cost": "0.006", "cost_details": {"upstream_inference_cost": "1"}}, {"cost": "0.006", "is_byok": None, "cost_details": {"upstream_inference_cost": "1"}}, {"cost": "0.006", "is_byok": "yes", "cost_details": {"upstream_inference_cost": "1"}}, {"cost": "0.006", "is_byok": 1, "cost_details": {"upstream_inference_cost": "1"}}):
+        for usage in ({"cost": "1"}, {"cost": "1", "is_byok": None}, {"cost": "1", "is_byok": "yes"}, {"cost": "1", "is_byok": 0}, {"cost": "1", "is_byok": 1}):
             with self.subTest(usage=usage):
-                evidence = study.charge_evidence(usage, self.FEE)
+                evidence = study.charge_evidence(usage)
                 self.assertEqual((evidence.complete, evidence.actual, evidence.billing_mode), (False, None, "ambiguous"))
                 self.assertEqual(evidence.known_floor, Decimal("1"))
-        self.assertEqual(study.charge_evidence({}, self.FEE).known_floor, Decimal("0"))
+        self.assertEqual(study.charge_evidence({}).billing_mode, "ambiguous")
+        self.assertEqual(study.charge_evidence(None).billing_mode, "missing-usage")
+        self.assertEqual(study.charge_evidence({"is_byok": False}).billing_mode, "non-byok-incomplete")
+        self.assertEqual(study.charge_evidence({"is_byok": False, "cost": "nan"}).complete, False)
+        self.assertEqual(study.charge_evidence({"is_byok": False, "cost": -1}).complete, False)
 
     def test_paid_callbacks_are_mandatory(self):
         with self.assertRaises(RuntimeError):
@@ -430,14 +450,30 @@ class Settlement(unittest.TestCase):
     def test_financial_prices_rejects_token_only_quotes(self):
         with self.assertRaises(RuntimeError):
             study.financial_prices({"financial_quote": {"policy": "old", "prompt_per_token": "1", "completion_per_token": "1"}})
-        candidate = quoted_candidate()
-        upstream, attempt = study.financial_prices(candidate)
-        self.assertEqual(attempt, upstream * Decimal("1.06"))
+        solver, attempt = study.financial_prices(quoted_candidate())
+        self.assertEqual((solver, attempt), (Decimal("0.035816"), Decimal("0.035816")))
+
 
 class PaidSettlement(unittest.TestCase):
-    def test_settlement_survives_receipt_observer_and_competing_writer_failures(self):
+    def harness(self, temporary, body, candidate=None, status_code=200):
         import sqlite3
         from types import SimpleNamespace
+
+        out = Path(temporary)
+        receipt_path = out / "receipt.json"
+        with sqlite3.connect(out / "budget.sqlite") as db:
+            db.execute("CREATE TABLE requests (id TEXT PRIMARY KEY, run TEXT, bound TEXT, actual TEXT, tokens INTEGER, state TEXT, receipt TEXT)")
+            db.execute("INSERT INTO requests VALUES ('request','run','1',NULL,NULL,'reserved',?)", (str(receipt_path),))
+
+        def complete(payload, deadline, receipt, path, **options):
+            receipt["dispatch_entered"] = True
+            return SimpleNamespace(status_code=status_code, raise_for_status=lambda: None), body
+
+        return out, receipt_path, complete
+
+    def build_model(self, out, receipt_path, complete, candidate=None):
+        from types import SimpleNamespace
+
         class BaseModel:
             def __init__(self, **kwargs):
                 pass
@@ -449,56 +485,105 @@ class PaidSettlement(unittest.TestCase):
                 return []
 
         modules = {"minisweagent.exceptions": SimpleNamespace(FormatError=ValueError), "minisweagent.models.openrouter_textbased_model": SimpleNamespace(OpenRouterTextbasedModel=BaseModel)}
+        cfg = {**CFG, "wall_seconds": 60, "http_request_timeout_seconds": 30}
+        bounder = SimpleNamespace(bound=lambda messages: 1, observe=mock.Mock())
+        patchers = [mock.patch.dict(sys.modules, modules), mock.patch.object(study, "agent_settings", return_value={"model": {}}), mock.patch.object(study, "completion_http", side_effect=complete)]
+        for patcher in patchers:
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        return study.paid_model(out, "run", candidate or quoted_candidate(), cfg=cfg, input_bounder=bounder, reservation=lambda *args, **kwargs: ("request", receipt_path), transport_admission=lambda *args: nullcontext(), state_guard=lambda *args: nullcontext())
 
-        for failure in (None, "receipt", "observer", "competing_writer", "admission_denied"):
-            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temporary:
-                out = Path(temporary)
-                receipt_path = out / "receipt.json"
-                with sqlite3.connect(out / "budget.sqlite") as db:
-                    db.execute("CREATE TABLE requests (id TEXT PRIMARY KEY, run TEXT, bound TEXT, actual TEXT, tokens INTEGER, state TEXT, receipt TEXT)")
-                    db.execute("INSERT INTO requests VALUES ('request','run','1',NULL,NULL,'reserved',?)", (str(receipt_path),))
-                bounder = SimpleNamespace(bound=lambda messages: 1, observe=mock.Mock(side_effect=RuntimeError("observer failed") if failure == "observer" else None))
-                body = {"usage": {"prompt_tokens": 1, "completion_tokens": 1, "is_byok": False, "cost": "0.01"}, "choices": [{"message": {"role": "assistant", "content": "done"}, "finish_reason": "stop"}]}
+    def row(self, out):
+        import sqlite3
+        with sqlite3.connect(out / "budget.sqlite") as db:
+            return db.execute("SELECT state,actual,tokens,bound FROM requests").fetchone()
 
-                def complete(payload, deadline, receipt, path, **options):
-                    if failure == "admission_denied":
-                        with sqlite3.connect(out / "budget.sqlite") as db:
-                            db.execute("UPDATE requests SET state='settled',bound='0',actual='0',tokens=0 WHERE id='request'")
-                        raise study.BudgetLimited("Dispatch admission denied", {"caps": ["aggregate_money_reservation"]})
-                    receipt["dispatch_entered"] = True
-                    if failure == "competing_writer":
-                        with sqlite3.connect(out / "budget.sqlite") as db:
-                            db.execute("UPDATE requests SET state='settled',actual='0.02',tokens=3 WHERE id='request'")
-                    return SimpleNamespace(raise_for_status=lambda: None), body
+    def test_settles_and_records_routed_model(self):
+        body = {"model": "x/y", "usage": {"prompt_tokens": 1, "completion_tokens": 1, "is_byok": False, "cost": "0.01"}, "choices": [{"message": {"role": "assistant", "content": "done"}, "finish_reason": "stop"}]}
+        with tempfile.TemporaryDirectory() as temporary:
+            out, receipt_path, complete = self.harness(temporary, body)
+            model = self.build_model(out, receipt_path, complete)
+            self.assertEqual(model.query([{"role": "user", "content": "task"}])["content"], "done")
+            self.assertEqual(self.row(out)[:3], ("settled", "0.01", 2))
+            receipt = study.load(receipt_path)
+            self.assertEqual((receipt["requested_model"], receipt["routed_model"]), ("x/y", "x/y"))
 
-                save = study.save
-                def save_receipt(path, value):
-                    if failure == "receipt" and value.get("status") == "settled":
-                        raise OSError("receipt write failed")
-                    save(path, value)
+    def test_router_candidate_records_concrete_routed_model(self):
+        base = quoted_candidate()
+        quote = tariffs.worst_case_quote([base["financial_quote"]], "kilo-auto/efficient", "effort=", CFG, "0.001")
+        candidate = {"model": "kilo-auto/efficient", "effort": "effort=", "context_length": 300000, "pool_models": ["x/y"], "financial_quote": quote, "quote_fetched_at": time.time()}
+        body = {"model": "x/y", "usage": {"prompt_tokens": 1, "completion_tokens": 1, "is_byok": False, "cost": "0.01"}, "choices": [{"message": {"role": "assistant", "content": "done"}, "finish_reason": "stop"}]}
+        with tempfile.TemporaryDirectory() as temporary:
+            out, receipt_path, complete = self.harness(temporary, body)
+            model = self.build_model(out, receipt_path, complete, candidate)
+            model.query([{"role": "user", "content": "task"}])
+            receipt = study.load(receipt_path)
+            self.assertEqual((receipt["requested_model"], receipt["routed_model"]), ("kilo-auto/efficient", "x/y"))
+            self.assertEqual(receipt["classifier_allowance_usd"], "0.001")
+            # Solver cost 0.01 plus classifier allowance 0.001 settles.
+            self.assertEqual(self.row(out)[:3], ("settled", "0.011", 2))
+            self.assertEqual(receipt["charge_evidence"]["solver_cost_usd"], "0.01")
 
-                cfg = {**contract_cfg(), "wall_seconds": 60, "http_request_timeout_seconds": 30}
-                messages = [{"role": "user", "content": "task"}]
-                with mock.patch.dict(sys.modules, modules), mock.patch.object(study, "agent_settings", return_value={"model": {}}), mock.patch.object(study, "completion_http", side_effect=complete), mock.patch.object(study, "save", side_effect=save_receipt):
-                    model = study.paid_model(out, "run", quoted_candidate(), cfg=cfg, input_bounder=bounder, reservation=lambda *args, **kwargs: ("request", receipt_path), transport_admission=lambda *args: nullcontext(), state_guard=lambda *args: nullcontext())
-                    if failure:
-                        with self.assertRaises((RuntimeError, OSError)):
-                            model.query(messages)
-                    else:
-                        self.assertEqual(model.query(messages)["content"], "done")
-                with sqlite3.connect(out / "budget.sqlite") as db:
-                    expected = ("settled", "0", 0) if failure == "admission_denied" else ("settled", "0.02", 3) if failure == "competing_writer" else ("settled", "0.01", 2)
-                    self.assertEqual(db.execute("SELECT state,actual,tokens FROM requests").fetchone(), expected)
-                if failure in (None, "observer"):
-                    receipt = study.load(receipt_path)
-                    self.assertEqual((receipt["status"], receipt["actual_usd"]), ("settled", "0.01"))
-                if failure == "admission_denied":
-                    receipt = study.load(receipt_path)
-                    self.assertEqual((receipt["status"], receipt["retained_bound_usd"]), ("not_dispatched", "0"))
-                    events = [study.load(path) for path in (out / "resource-limits/run").glob("*.json")]
-                    self.assertEqual([event["caps"] for event in events], [["aggregate_money_reservation"]])
+    def test_router_breach_is_computed_on_cost_plus_allowance(self):
+        base = quoted_candidate()
+        quote = tariffs.worst_case_quote([base["financial_quote"]], "kilo-auto/efficient", "effort=", CFG, "0.001")
+        candidate = {"model": "kilo-auto/efficient", "effort": "effort=", "context_length": 300000, "pool_models": ["x/y"], "financial_quote": quote, "quote_fetched_at": time.time()}
+        body = {"model": "x/y", "usage": {"prompt_tokens": 1, "completion_tokens": 1, "is_byok": False, "cost": "0.0355"}, "choices": [{"message": {"role": "assistant", "content": "done"}, "finish_reason": "stop"}]}
+        with tempfile.TemporaryDirectory() as temporary:
+            out, receipt_path, complete = self.harness(temporary, body)
+            model = self.build_model(out, receipt_path, complete, candidate)
+            with self.assertRaisesRegex(RuntimeError, "bound violation"):
+                model.query([{"role": "user", "content": "task"}])
+            self.assertIn(self.row(out)[0], {"unknown", "breach"})
+
+    def test_out_of_pool_routed_model_holds_the_charge(self):
+        base = quoted_candidate()
+        quote = tariffs.worst_case_quote([base["financial_quote"]], "kilo-auto/efficient", "effort=", CFG, "0.001")
+        candidate = {"model": "kilo-auto/efficient", "effort": "effort=", "context_length": 300000, "pool_models": ["x/y"], "financial_quote": quote, "quote_fetched_at": time.time()}
+        body = {"model": "other/model", "usage": {"prompt_tokens": 1, "completion_tokens": 1, "is_byok": False, "cost": "0.01"}, "choices": [{"message": {"role": "assistant", "content": "done"}, "finish_reason": "stop"}]}
+        with tempfile.TemporaryDirectory() as temporary:
+            out, receipt_path, complete = self.harness(temporary, body)
+            model = self.build_model(out, receipt_path, complete, candidate)
+            with self.assertRaisesRegex(RuntimeError, "outside the frozen pool"):
+                model.query([{"role": "user", "content": "task"}])
+            state, _, _, bound = self.row(out)
+            self.assertEqual(state, "unknown")
+            self.assertEqual(Decimal(bound), Decimal(study.load(receipt_path)["reservation_usd"]))
+            self.assertEqual(study.load(receipt_path)["routed_model"], "other/model")
+
+    def test_router_candidate_without_routed_model_holds_the_charge(self):
+        base = quoted_candidate()
+        quote = tariffs.worst_case_quote([base["financial_quote"]], "kilo-auto/efficient", "effort=", CFG, "0.001")
+        candidate = {"model": "kilo-auto/efficient", "effort": "effort=", "context_length": 300000, "financial_quote": quote, "quote_fetched_at": time.time()}
+        body = {"usage": {"prompt_tokens": 1, "completion_tokens": 1, "is_byok": False, "cost": "0.01"}, "choices": [{"message": {"role": "assistant", "content": "done"}, "finish_reason": "stop"}]}
+        with tempfile.TemporaryDirectory() as temporary:
+            out, receipt_path, complete = self.harness(temporary, body)
+            model = self.build_model(out, receipt_path, complete, candidate)
+            with self.assertRaisesRegex(RuntimeError, "routed concrete model"):
+                model.query([{"role": "user", "content": "task"}])
+            self.assertEqual(self.row(out)[0], "unknown")
+
+    def test_byok_and_ambiguous_billing_hold_and_do_not_settle(self):
+        for usage in ({"prompt_tokens": 1, "completion_tokens": 1, "is_byok": True, "cost": "0.01"}, {"prompt_tokens": 1, "completion_tokens": 1, "cost": "0.01"}):
+            body = {"model": "x/y", "usage": usage, "choices": [{"message": {"role": "assistant", "content": "done"}, "finish_reason": "stop"}]}
+            with self.subTest(usage=usage), tempfile.TemporaryDirectory() as temporary:
+                out, receipt_path, complete = self.harness(temporary, body)
+                model = self.build_model(out, receipt_path, complete)
+                with self.assertRaises(RuntimeError):
+                    model.query([{"role": "user", "content": "task"}])
+                self.assertEqual(self.row(out)[0], "unknown")
+
+    def test_rejected_response_after_dispatch_keeps_the_full_hold(self):
+        body = {"error": "Insufficient balance"}
+        with tempfile.TemporaryDirectory() as temporary:
+            out, receipt_path, complete = self.harness(temporary, body, status_code=402)
+            model = self.build_model(out, receipt_path, complete)
+            with self.assertRaisesRegex(RuntimeError, "ambiguous gateway billing evidence"):
+                model.query([{"role": "user", "content": "task"}])
+            state, _, _, bound = self.row(out)
+            self.assertEqual(state, "unknown")
+            self.assertEqual(Decimal(bound), Decimal(study.load(receipt_path)["reservation_usd"]))
 
 
 if __name__ == "__main__":
     unittest.main()
-

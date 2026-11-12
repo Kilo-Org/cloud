@@ -24,7 +24,7 @@ describe('groupAgentSessionsByDate', () => {
       { session_id: 'a', created_at: iso(0), updated_at: iso(5) },
     ];
     const original = [...input];
-    groupAgentSessionsByDate(input, 'updated_at', NOW);
+    groupAgentSessionsByDate(input, 'updated_at', { now: NOW, timeZone: 'UTC' });
     expect(input).toEqual(original);
   });
 
@@ -34,7 +34,7 @@ describe('groupAgentSessionsByDate', () => {
       { session_id: 'fresh', created_at: iso(2), updated_at: iso(0) },
       { session_id: 'mid', created_at: iso(10), updated_at: iso(5) },
     ];
-    const groups = groupAgentSessionsByDate(input, 'updated_at', NOW);
+    const groups = groupAgentSessionsByDate(input, 'updated_at', { now: NOW, timeZone: 'UTC' });
     const flat = groups.flatMap(g => g.sessions);
     expect(flat.map(s => s.session_id)).toEqual(['fresh', 'mid', 'old']);
   });
@@ -45,7 +45,7 @@ describe('groupAgentSessionsByDate', () => {
       { session_id: 'fresh', created_at: iso(2), updated_at: iso(20) },
       { session_id: 'mid', created_at: iso(10), updated_at: iso(5) },
     ];
-    const groups = groupAgentSessionsByDate(input, 'created_at', NOW);
+    const groups = groupAgentSessionsByDate(input, 'created_at', { now: NOW, timeZone: 'UTC' });
     const flat = groups.flatMap(g => g.sessions);
     expect(flat.map(s => s.session_id)).toEqual(['fresh', 'mid', 'old']);
   });
@@ -57,15 +57,16 @@ describe('groupAgentSessionsByDate', () => {
       { session_id: 'this-week', created_at: iso(3, 8), updated_at: iso(3, 8) },
       { session_id: 'ancient', created_at: iso(30, 8), updated_at: iso(30, 8) },
     ];
-    const groups = groupAgentSessionsByDate(input, 'updated_at', NOW);
+    const groups = groupAgentSessionsByDate(input, 'updated_at', { now: NOW, timeZone: 'UTC' });
     const labels = groups.map(g => g.label);
     expect(labels).toContain('Today');
     expect(labels).toContain('Yesterday');
     expect(labels).toContain('Older');
     // The 3-days-ago bucket label is the weekday of that date in en-US.
-    const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(
-      new Date(iso(3, 8))
-    );
+    const weekday = new Intl.DateTimeFormat('en-US', {
+      weekday: 'long',
+      timeZone: 'UTC',
+    }).format(new Date(iso(3, 8)));
     expect(labels).toContain(weekday);
   });
 
@@ -76,7 +77,7 @@ describe('groupAgentSessionsByDate', () => {
       { session_id: 'yesterday', created_at: iso(1), updated_at: iso(1) },
       { session_id: 'today', created_at: iso(0), updated_at: iso(0) },
     ];
-    const groups = groupAgentSessionsByDate(input, 'updated_at', NOW);
+    const groups = groupAgentSessionsByDate(input, 'updated_at', { now: NOW, timeZone: 'UTC' });
     expect(groups.map(g => g.label)).toEqual(['Today', 'Yesterday', expect.any(String), 'Older']);
   });
 
@@ -86,7 +87,7 @@ describe('groupAgentSessionsByDate', () => {
     const input: FakeSession[] = [
       { session_id: 'ancient-created', created_at: iso(60), updated_at: iso(0) },
     ];
-    const groups = groupAgentSessionsByDate(input, 'created_at', NOW);
+    const groups = groupAgentSessionsByDate(input, 'created_at', { now: NOW, timeZone: 'UTC' });
     expect(groups.map(g => g.label)).toEqual(['Older']);
   });
 
@@ -99,8 +100,10 @@ describe('groupAgentSessionsByDate', () => {
       { session_id: 'early', created_at: iso(4, 8), updated_at: iso(4, 8) },
       { session_id: 'mid', created_at: iso(4, 14), updated_at: iso(4, 14) },
     ];
-    const groups = groupAgentSessionsByDate(input, 'updated_at', NOW);
-    const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(new Date(iso(4)));
+    const groups = groupAgentSessionsByDate(input, 'updated_at', { now: NOW, timeZone: 'UTC' });
+    const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(
+      new Date(iso(4))
+    );
     const weekdayGroup = groups.find(g => g.label === weekday);
     expect(weekdayGroup?.sessions.map(s => s.session_id)).toEqual(['late', 'mid', 'early']);
   });
@@ -111,7 +114,7 @@ describe('groupAgentSessionsByDate', () => {
       { session_id: '20d', created_at: iso(20), updated_at: iso(20) },
       { session_id: '90d', created_at: iso(90), updated_at: iso(90) },
     ];
-    const groups = groupAgentSessionsByDate(input, 'updated_at', NOW);
+    const groups = groupAgentSessionsByDate(input, 'updated_at', { now: NOW, timeZone: 'UTC' });
     const older = groups.find(g => g.label === 'Older');
     expect(older?.sessions.map(s => s.session_id)).toEqual(['20d', '60d', '90d']);
   });
@@ -135,8 +138,121 @@ describe('groupAgentSessionsByDate', () => {
       };
     });
 
-    groupAgentSessionsByDate(input, 'updated_at', NOW);
+    groupAgentSessionsByDate(input, 'updated_at', { now: NOW, timeZone: 'UTC' });
 
     expect(reads).toBe(rowCount);
+  });
+});
+
+/**
+ * A section is a calendar day of the zone the device is in now, so the same
+ * session must change section when the local day or the zone moves under a list
+ * that stays open. `useAgentSessions` re-reads the grouping on the shared
+ * relative-time clock; these cases pin the contract that re-read depends on.
+ */
+describe('groupAgentSessionsByDate across a day boundary and a zone move', () => {
+  it('moves a session from Today to Yesterday when local midnight passes', () => {
+    const input: FakeSession[] = [
+      {
+        session_id: 'late',
+        created_at: '2024-06-10T23:30:00.000Z',
+        updated_at: '2024-06-10T23:30:00.000Z',
+      },
+    ];
+
+    expect(
+      groupAgentSessionsByDate(input, 'updated_at', {
+        now: new Date('2024-06-10T23:59:00.000Z'),
+        timeZone: 'UTC',
+      }).map(group => group.label)
+    ).toEqual(['Today']);
+    expect(
+      groupAgentSessionsByDate(input, 'updated_at', {
+        now: new Date('2024-06-11T00:01:00.000Z'),
+        timeZone: 'UTC',
+      }).map(group => group.label)
+    ).toEqual(['Yesterday']);
+  });
+
+  it('moves a session from Yesterday to Today when the zone moves east', () => {
+    // Two hours apart, on different UTC dates but the same local date at
+    // UTC+14: the row changes section only because the zone moved. The zone is
+    // an input, so the process date cache cannot pin the list to the old one.
+    const input: FakeSession[] = [
+      {
+        session_id: 'late',
+        created_at: '2024-06-09T23:00:00.000Z',
+        updated_at: '2024-06-09T23:00:00.000Z',
+      },
+    ];
+    const now = new Date('2024-06-10T01:00:00.000Z');
+
+    expect(
+      groupAgentSessionsByDate(input, 'updated_at', { now, timeZone: 'UTC' }).map(
+        group => group.label
+      )
+    ).toEqual(['Yesterday']);
+    expect(
+      groupAgentSessionsByDate(input, 'updated_at', { now, timeZone: 'Pacific/Kiritimati' }).map(
+        group => group.label
+      )
+    ).toEqual(['Today']);
+  });
+
+  it('does not claim an unreadable timestamp as today', () => {
+    // A row whose timestamp does not parse has no calendar day, so it must not
+    // land in a section that names one, and it must not break the grouping.
+    const input: FakeSession[] = [
+      {
+        session_id: 'good',
+        created_at: '2024-06-10T11:00:00.000Z',
+        updated_at: '2024-06-10T11:00:00.000Z',
+      },
+      { session_id: 'broken', created_at: 'nope', updated_at: 'nope' },
+    ];
+    const groups = groupAgentSessionsByDate(input, 'updated_at', {
+      now: new Date('2024-06-10T12:00:00.000Z'),
+      timeZone: 'UTC',
+    });
+    const today = groups.find(group => group.label === 'Today');
+    expect(today?.sessions.map(session => session.session_id)).toEqual(['good']);
+    expect(groups.find(group => group.label === 'Yesterday')).toBeUndefined();
+  });
+
+  it('keeps a future-dated row out of Today under its own weekday', () => {
+    // 2024-06-12 is Wednesday, two days after the clock: it is not today.
+    const input: FakeSession[] = [
+      {
+        session_id: 'future',
+        created_at: '2024-06-12T09:00:00.000Z',
+        updated_at: '2024-06-12T09:00:00.000Z',
+      },
+    ];
+    const groups = groupAgentSessionsByDate(input, 'updated_at', {
+      now: new Date('2024-06-10T12:00:00.000Z'),
+      timeZone: 'UTC',
+    });
+    expect(groups.map(group => group.label)).toEqual(['Wednesday']);
+  });
+
+  it('names the weekday the device zone shows', () => {
+    // 2024-06-08T12:00Z is Saturday in UTC and Sunday in Kiritimati.
+    const input: FakeSession[] = [
+      {
+        session_id: 'weekend',
+        created_at: '2024-06-08T12:00:00.000Z',
+        updated_at: '2024-06-08T12:00:00.000Z',
+      },
+    ];
+    const now = new Date('2024-06-10T12:00:00.000Z');
+
+    expect(
+      groupAgentSessionsByDate(input, 'updated_at', { now, timeZone: 'UTC' }).map(g => g.label)
+    ).toEqual(['Saturday']);
+    expect(
+      groupAgentSessionsByDate(input, 'updated_at', { now, timeZone: 'Pacific/Kiritimati' }).map(
+        g => g.label
+      )
+    ).toEqual(['Sunday']);
   });
 });

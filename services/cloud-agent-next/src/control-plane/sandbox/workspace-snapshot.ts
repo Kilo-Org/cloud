@@ -2,12 +2,14 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import type { Env } from '../../types.js';
+import { isOrgInList } from '../../sandbox-id.js';
 import type {
   ControlPlaneCredentialSource,
   ControlPlaneRouteSpec,
 } from '../../shared/control-plane-protocol.js';
 import type { ProviderAdapter } from '../../sandbox-control/provider.js';
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
+import { SandboxWorkspaceSnapshotSchema } from '../../shared/sandbox-status.js';
 import type { AllocationState } from './allocation.js';
 import type { RouteDatabase, RouteRecord } from './routes.js';
 import { workspaceDiskAllocation, workspaceDiskSnapshots } from './sqlite-schema.js';
@@ -15,24 +17,24 @@ import { workspaceDiskAllocation, workspaceDiskSnapshots } from './sqlite-schema
 export const WORKSPACE_SNAPSHOT_IDLE_MS = 60_000;
 /** A captured workspace is restorable for 30 days. After that the descriptor is kept but unusable. */
 export const WORKSPACE_SNAPSHOT_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
-const identitySchema = z.object({
+export const workspaceSnapshotIdentitySchema = z.object({
   sandboxId: z.string().min(1),
   workspaceId: cloudAgentWorktreeIdSchema,
   directory: z.string().min(1),
   userId: z.string().min(1),
   orgId: z.string().optional(),
 });
-const descriptorSchema = identitySchema.extend({
+const descriptorSchema = workspaceSnapshotIdentitySchema.extend({
   sourceAllocationId: z.string().min(1),
   snapshotId: z.string().min(1),
   baseImage: z.string().min(1),
   runtimeIdentity: z.string().min(1),
-  capturedAt: z.number().nonnegative(),
+  capturedAt: SandboxWorkspaceSnapshotSchema.shape.capturedAt,
 });
 const allocationSchema = z.object({
   allocationId: z.string().min(1),
   runtimeIdentity: z.string().min(1),
-  owner: identitySchema,
+  owner: workspaceSnapshotIdentitySchema,
   invalidationGeneration: z.number().int().nonnegative().default(0),
   idleConnectionId: z.string().optional(),
   attemptedIdleAt: z.number().optional(),
@@ -55,8 +57,8 @@ const runtimeIdentitySchema = z.object({
   mode: z.enum(['preinstalled', 'downloaded']),
   image: z.enum(['all-in-one', 'runtime-free']),
 });
-export type WorkspaceSnapshotIdentity = z.infer<typeof identitySchema>;
 export type WorkspaceSnapshotDescriptor = z.infer<typeof descriptorSchema>;
+export type WorkspaceSnapshotIdentity = z.infer<typeof workspaceSnapshotIdentitySchema>;
 export type WorkspaceSnapshotAllocation = z.infer<typeof allocationSchema>;
 export type WorkspaceSnapshotSelectionReason =
   | 'missing'
@@ -65,7 +67,6 @@ export type WorkspaceSnapshotSelectionReason =
   | 'runtime_mismatch'
   | 'expired'
   | 'image_unavailable'
-  | 'image_mismatch'
   | 'selected';
 export type WorkspaceSnapshotSelection =
   | { kind: 'selected'; descriptor: WorkspaceSnapshotDescriptor }
@@ -103,19 +104,12 @@ export function sameWorkspaceSnapshotIdentity(
 }
 
 export function workspaceSnapshotsEnabled(
-  env: Pick<Env, 'WORKSPACE_SNAPSHOT_USER_IDS' | 'WORKSPACE_SNAPSHOT_ORG_IDS'>,
+  env: Pick<Env, 'WORKSPACE_SNAPSHOT_IDS'>,
   source: Pick<ControlPlaneCredentialSource, 'userId' | 'orgId'>
 ): boolean {
-  const includes = (raw: string | undefined, id: string | undefined) =>
-    id !== undefined &&
-    id !== '*' &&
-    (raw ?? '')
-      .split(',')
-      .map(value => value.trim())
-      .includes(id);
   return (
-    includes(env.WORKSPACE_SNAPSHOT_USER_IDS, source.userId) ||
-    includes(env.WORKSPACE_SNAPSHOT_ORG_IDS, source.orgId)
+    isOrgInList(env.WORKSPACE_SNAPSHOT_IDS, source.userId) ||
+    isOrgInList(env.WORKSPACE_SNAPSHOT_IDS, source.orgId)
   );
 }
 
@@ -162,15 +156,26 @@ export function readWorkspaceSnapshotRaw(db: RouteDatabase, workspaceId: string)
     .get()?.data;
 }
 
+export function workspaceSnapshotStatus(
+  db: RouteDatabase,
+  identity: WorkspaceSnapshotIdentity | null
+): { workspaceSnapshot?: { capturedAt: number } } {
+  if (identity === null) return {};
+  const descriptor = readWorkspaceSnapshot(db, identity.workspaceId);
+  return descriptor !== null && sameWorkspaceSnapshotIdentity(descriptor, identity)
+    ? { workspaceSnapshot: { capturedAt: descriptor.capturedAt } }
+    : {};
+}
+
 export function deleteWorkspaceSnapshot(
   db: RouteDatabase,
   workspaceId?: string,
   reason = 'invalidated',
   sessionId?: string
-): void {
+): boolean {
   const disk = readWorkspaceSnapshotAllocation(db);
   const currentWorkspaceId = workspaceId ?? disk?.owner.workspaceId;
-  if (currentWorkspaceId === undefined) return;
+  if (currentWorkspaceId === undefined) return false;
   const descriptor = readWorkspaceSnapshot(db, currentWorkspaceId);
   db.delete(workspaceDiskSnapshots)
     .where(eq(workspaceDiskSnapshots.workspace_id, currentWorkspaceId))
@@ -184,6 +189,7 @@ export function deleteWorkspaceSnapshot(
       sourceAllocationId: descriptor.sourceAllocationId,
       reason,
     });
+  return descriptor !== null;
 }
 
 function runtimeIdentitySummary(raw: string) {
@@ -231,9 +237,7 @@ export function selectWorkspaceSnapshotResult(
             ? 'expired'
             : baseImage === null
               ? 'image_unavailable'
-              : descriptor.baseImage !== baseImage
-                ? 'image_mismatch'
-                : 'selected';
+              : 'selected';
   logControlDiagnostic('workspace_snapshot_selection', {
     sandboxId: identity.sandboxId,
     workspaceId: identity.workspaceId,
@@ -404,6 +408,7 @@ export async function captureIdleWorkspaceSnapshot(input: {
   read(): Promise<CaptureContext>;
   enqueue<T>(operation: () => Promise<T>): Promise<T>;
   eligible(route: RouteRecord): boolean;
+  stored(): Promise<void>;
 }): Promise<void> {
   const logCapture = (
     phase: string,
@@ -541,6 +546,7 @@ export async function captureIdleWorkspaceSnapshot(input: {
     // so a pending "Start fresh" can never discard this capture.
     if (current.disk?.recovery !== undefined)
       writeWorkspaceSnapshotAllocation(input.db, { ...current.disk, recovery: undefined });
+    await input.stored();
     logControlDiagnostic('workspace_snapshot_captured', {
       sandboxId: input.sandboxId,
       workspaceId: data.workspaceId,

@@ -3,7 +3,6 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 const mockUseFeatureFlagEnabled = jest.fn();
 const mockUseOrganizationWithMembers = jest.fn();
-const mockUseRequestLogsAvailable = jest.fn();
 
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
@@ -23,10 +22,6 @@ jest.mock('@/contexts/RoleTestingContext', () => ({
 }));
 jest.mock('@/app/api/organizations/hooks', () => ({
   useOrganizationWithMembers: () => mockUseOrganizationWithMembers(),
-}));
-jest.mock('@/hooks/useRequestLogsAvailable', () => ({
-  useRequestLogsAvailable: (organizationId: string, canView: boolean) =>
-    mockUseRequestLogsAvailable(organizationId, canView),
 }));
 jest.mock('@/hooks/useOrgKiloClaw', () => ({
   useOrgKiloClawNavState: () => ({ isSuccess: false }),
@@ -66,23 +61,12 @@ describe('OrganizationAppSidebar Request Logs entry', () => {
     { role: 'admin', canView: true },
     { role: 'billing_manager', canView: true },
     { role: 'member', canView: false },
-  ] as const)('only lets $role check availability when allowed', async ({ role, canView }) => {
+  ] as const)('shows the entry to $role only when authorized', async ({ role, canView }) => {
     mockUseOrganizationWithMembers.mockReturnValue({ data: { callerRole: role } });
-    mockUseRequestLogsAvailable.mockReturnValue(false);
-
-    const { default: OrganizationAppSidebar } = await import('./OrganizationAppSidebar');
-    renderSidebar(OrganizationAppSidebar);
-
-    expect(mockUseRequestLogsAvailable).toHaveBeenCalledWith('test-org', canView);
-  });
-
-  it.each([true, false])('shows the entry only when available (%s)', async available => {
-    mockUseOrganizationWithMembers.mockReturnValue({ data: { callerRole: 'owner' } });
-    mockUseRequestLogsAvailable.mockReturnValue(available);
 
     const { default: OrganizationAppSidebar } = await import('./OrganizationAppSidebar');
     const html = renderSidebar(OrganizationAppSidebar);
 
-    expect(html.includes('/organizations/test-org/request-logs')).toBe(available);
+    expect(html.includes('/organizations/test-org/request-logs')).toBe(canView);
   });
 });

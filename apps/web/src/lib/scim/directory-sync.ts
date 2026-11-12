@@ -5,7 +5,7 @@ import {
   organizations,
   user_auth_provider,
 } from '@kilocode/db/schema';
-import { db, sql } from '@kilocode/web-shared/lib/drizzle';
+import { db, sql, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { randomUUID } from 'node:crypto';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
@@ -21,20 +21,33 @@ import {
 import { and, eq, inArray, isNotNull, isNull, type SQL } from 'drizzle-orm';
 
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
-import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
+import {
+  invalidateMemberSessionAccess,
+  removeUserFromOrganization,
+} from '@/lib/organizations/organization-member-removal';
+import { runAfterResponse } from '@/lib/after-response';
+import { cleanupRemovedClaudeProfilesForUser } from '@/lib/claude-billing/delete';
 import { extractEmailDomain } from '@/lib/email-domain';
 import { createOrUpdateUser, findUserByNormalizedEmail } from '@/lib/user';
+import {
+  listDnsVerifiedDomains,
+  VerifiedDomainLookupError,
+  VerifiedDomainOwnerMissingError,
+} from '@/lib/scim/directory-verified-domains';
 
 import type {
   DirectoryMembership,
   DirectoryMembershipRemovalResult,
   DirectoryMembershipResult,
+  DirectoryMembershipRevokeAllResult,
   DirectoryOrganizationUpsert,
   DirectorySubOrganizationUpsert,
+  DirectorySyncConflictCode,
   DirectorySyncDeleteResult,
   DirectorySyncUpsertResult,
+  DirectoryUserRevokeAll,
   DirectoryUserUpsert,
-} from './directory-sync-contracts';
+} from '@kilocode/scim-contracts';
 
 /**
  * Directory-sync mutations, invoked by the `scim-sync` Worker.
@@ -66,7 +79,22 @@ function directoryOwner(directoryId: string): SQL | undefined {
   );
 }
 
-export class DirectorySyncConflictError extends Error {}
+/**
+ * A directory-sync write the current state cannot accept.
+ *
+ * The `code` is required rather than derived from the message, because it is
+ * what the Worker branches on: a retryable missing dependency keeps the cursor
+ * where it is, a terminal refusal parks the event. A message alone would make
+ * that decision depend on prose.
+ */
+export class DirectorySyncConflictError extends Error {
+  constructor(
+    public readonly code: DirectorySyncConflictCode,
+    message: string
+  ) {
+    super(message);
+  }
+}
 
 /**
  * Bind a WorkOS directory to a parent organization.
@@ -248,11 +276,15 @@ export async function upsertDirectorySubOrganization(
       .where(and(eq(organizations.directory_id, input.directoryId), liveOrganization))
       .limit(1);
     const parented = parentedRows.at(0);
-    throw new DirectorySyncConflictError(
-      parented
-        ? `Organization ${parented.id} is itself a sub-organization and cannot take children`
-        : `No live organization is bound to directory ${input.directoryId}`
-    );
+    throw parented
+      ? new DirectorySyncConflictError(
+          'sub_organization_cannot_nest',
+          `Organization ${parented.id} is itself a sub-organization and cannot take children`
+        )
+      : new DirectorySyncConflictError(
+          'directory_not_found',
+          `No live organization is bound to directory ${input.directoryId}`
+        );
   }
 
   const existingRows = await db
@@ -360,6 +392,7 @@ export async function upsertDirectoryUser(
     // silently rather than conflict.
     if (existing.external_id !== null && existing.external_id !== externalId) {
       throw new DirectorySyncConflictError(
+        'account_bound_to_other_directory_user',
         `A Kilo account for this address is already bound to directory user ${existing.external_id}`
       );
     }
@@ -419,7 +452,10 @@ export async function upsertDirectoryUser(
   );
 
   if (!result.success) {
-    throw new DirectorySyncConflictError(`Could not provision directory user: ${result.error}`);
+    throw new DirectorySyncConflictError(
+      'user_provisioning_failed',
+      `Could not provision directory user: ${result.error}`
+    );
   }
 
   await db
@@ -478,6 +514,7 @@ async function applyDirectoryUserChanges(
     const holder = await findUserByNormalizedEmail(input.email);
     if (holder && holder.id !== bound.id) {
       throw new DirectorySyncConflictError(
+        'address_held_by_another_account',
         `Cannot move directory user ${externalId} to an address another Kilo account already holds`
       );
     }
@@ -509,11 +546,24 @@ async function applyDirectoryUserChanges(
 }
 
 /**
- * Refuses unless the directory's organization has captured the address's
- * domain. Domain capture is what authorizes binding the address at all: the
- * gate runs whether the address matches a pre-existing account or would create
- * a new one, so a directory can neither take over nor mint an account at a
- * domain it does not own. The refusal names that domain, never the address.
+ * Refuses unless the directory's organization has proven it owns the
+ * address's domain. Ownership is what authorizes binding the address at all:
+ * the gate runs whether the address matches a pre-existing account or would
+ * create a new one, so a directory can neither take over nor mint an account
+ * at a domain it does not own. The refusal names that domain, never the
+ * address.
+ *
+ * Two domains satisfy it. The organization's own `sso_domain`, which is the
+ * Effective SSO policy domain and is checked first because it needs no
+ * network call. Failing that, any domain the WorkOS organization has verified
+ * **through DNS** — an enterprise commonly runs several mail domains through
+ * one directory, and only one of them can be the SSO authority under Policy
+ * Resolution rules 4 and 6, so the single column cannot express the set.
+ *
+ * DNS is the bar rather than `state === 'verified'`: WorkOS also reaches that
+ * state by a `manual` tick in the dashboard, which is an assertion by whoever
+ * had access rather than evidence of control. See
+ * `directory-verified-domains.ts`.
  *
  * The policy is read from the directory's organization rather than the
  * address: resolving an authority from the domain alone would let any
@@ -521,48 +571,122 @@ async function applyDirectoryUserChanges(
  * different organization's directory. A misconfigured policy — ambiguous
  * domain, or a child carrying its own — fails closed, under Policy Resolution
  * rule 7.
+ *
+ * Not every refusal is terminal, and the difference decides whether the event
+ * is parked or retried. A directory with no live organization has simply not
+ * been activated yet, which is the arrival-order gap `directory_not_found`
+ * names everywhere else: since this gate runs on every bind rather than only
+ * a takeover, reporting it as `domain_not_captured` would park every
+ * `dsync.user.created` that overtook its `dsync.activated`. An unverified
+ * domain is a real refusal only an administrator clears. An unreachable
+ * WorkOS is neither, and holds the cursor instead.
  */
 async function assertDirectoryOwnsEmailDomain(directoryId: string, email: string): Promise<void> {
-  const refuse = (reason: string): never => {
+  const emailDomain = getLowerDomainFromEmail(email);
+
+  const refuse = (code: DirectorySyncConflictCode, reason: string): never => {
     // The refused bind is the auditable event: it names a directory pushing an
     // address its organization never proved it owns.
     console.warn('[scim] Refused a directory address bind', {
       directoryId,
-      emailDomain: getLowerDomainFromEmail(email),
+      emailDomain,
+      code,
       reason,
     });
     // The domain, not the address: this message is returned in the 409 body and
     // logged again by `directorySyncErrorResponse`, and the directory id plus
     // the reason are what an operator acts on.
     throw new DirectorySyncConflictError(
-      `Directory ${directoryId} has not captured the domain ${getLowerDomainFromEmail(email)}: ${reason}`
+      code,
+      `Directory ${directoryId} has not verified the domain ${emailDomain}: ${reason}`
     );
   };
 
+  // `getLowerDomainFromEmail` answers null for an address carrying no `@`.
+  // The request schema's `.email()` rejects those before this runs, so
+  // reaching here means the two disagree — refuse rather than compare a null
+  // against the verified set and admit the bind by accident.
+  if (emailDomain === null) {
+    return refuse('domain_not_captured', 'the address carries no domain');
+  }
+
   const ownerRows = await db
-    .select({ id: organizations.id })
+    .select({ id: organizations.id, externalOrgId: organizations.external_org_id })
     .from(organizations)
     .where(directoryOwner(directoryId))
     .limit(1);
 
   const owner = ownerRows.at(0);
   if (!owner) {
-    return refuse(`no live organization is bound to directory ${directoryId}`);
-  }
-
-  const policy = await resolveEffectiveOrganizationSsoPolicy(owner.id);
-  if (policy.status !== 'required') {
+    // Retryable: `dsync.activated` may still be behind the cursor.
     return refuse(
-      policy.status === 'misconfigured'
-        ? `the organization's SSO policy is misconfigured (${policy.reason})`
-        : 'the organization has no SSO domain, so it has captured nothing'
+      'directory_not_found',
+      `no live organization is bound to directory ${directoryId}`
     );
   }
 
-  const emailDomain = getLowerDomainFromEmail(email);
-  if (emailDomain !== policy.domain) {
-    return refuse(`the organization's captured domain is ${policy.domain}`);
+  const policy = await resolveEffectiveOrganizationSsoPolicy(owner.id);
+  if (policy.status === 'misconfigured') {
+    // Fails closed even though a DNS-verified domain might match: an ambiguous
+    // or nested policy means we cannot say which authority owns the address.
+    return refuse(
+      'domain_not_captured',
+      `the organization's SSO policy is misconfigured (${policy.reason})`
+    );
   }
+
+  // The SSO domain, when there is one, needs no network call.
+  if (policy.status === 'required' && emailDomain === policy.domain) return;
+
+  // Otherwise the address is allowed only by a DNS-verified organization
+  // domain, and without `external_org_id` there is nothing to ask WorkOS
+  // about.
+  //
+  // Terminal, not retryable: the organization is already bound to this
+  // directory, and `upsertDirectoryOrganization` returns an already-bound
+  // owner as-is without repairing a missing `external_org_id`, so no later
+  // event supplies one. Reporting `directory_not_found` would borrow the
+  // not-yet-activated meaning and make the Worker hold the one shared cursor
+  // for its full conflict budget before parking — an hour of every other
+  // tenant's events waiting on a condition that cannot clear.
+  if (owner.externalOrgId === null) {
+    return refuse(
+      'domain_not_captured',
+      `organization ${owner.id} carries no WorkOS organization id, so no domain can be verified`
+    );
+  }
+
+  let verified: string[];
+  try {
+    verified = await listDnsVerifiedDomains(owner.externalOrgId);
+  } catch (error) {
+    // A WorkOS organization that does not exist is a completed answer, so it
+    // refuses terminally and the event parks. Retrying cannot conjure one, and
+    // holding instead would stall the single shared cursor for every other
+    // directory (rule 7).
+    if (error instanceof VerifiedDomainOwnerMissingError) {
+      return refuse(
+        'domain_not_captured',
+        `the organization's WorkOS record ${owner.externalOrgId} no longer exists, so no domain can be verified`
+      );
+    }
+
+    // Anything else means WorkOS could not be asked, so whether this address
+    // is allowed is still unknown. Rethrown so the route answers 500 and the
+    // caller holds its cursor, rather than parking a bind that may be valid.
+    throw error instanceof VerifiedDomainLookupError
+      ? error
+      : new VerifiedDomainLookupError(String(error));
+  }
+
+  if (verified.includes(emailDomain)) return;
+
+  return refuse(
+    'domain_not_captured',
+    verified.length === 0
+      ? 'the organization has no DNS-verified domain, and a domain verified only by hand does not authorize a bind'
+      : `the organization's DNS-verified domains are ${verified.join(', ')}`
+  );
 }
 
 /**
@@ -589,6 +713,7 @@ export async function addDirectoryMembership(
   const group = groupRows.at(0);
   if (!group) {
     throw new DirectorySyncConflictError(
+      'sub_organization_not_found',
       `No live sub-organization is bound to directory group ${input.directoryGroupId}`
     );
   }
@@ -601,7 +726,10 @@ export async function addDirectoryMembership(
 
   const user = userRows.at(0);
   if (!user) {
-    throw new DirectorySyncConflictError(`No user is bound to directory user ${input.externalId}`);
+    throw new DirectorySyncConflictError(
+      'user_not_found',
+      `No user is bound to directory user ${input.externalId}`
+    );
   }
 
   const targets = group.parent === null ? [group.id] : [group.parent, group.id];
@@ -723,14 +851,29 @@ export async function removeDirectoryMembership(
  * the same parent is not the identity provider's statement about enterprise
  * membership, so a membership there does not keep the parent access alive.
  *
+ * `directoryId`, when given, also requires the remaining sibling to belong to
+ * that directory. It changes nothing today — a sub-organization inherits its
+ * parent's `directory_id`, so every live sibling under a directory's parent
+ * carries the same one — but it states the invariant the revoke-all caller
+ * relies on: that call is scoped to one directory, and a sibling from another
+ * directory must never be what keeps a membership alive. The single-removal
+ * path passes nothing and is unchanged.
+ *
+ * `txn` lets a caller revoking many memberships do the row work in one
+ * transaction; `removeUserFromOrganization` then skips its outbound session
+ * invalidation and the caller performs it after commit.
+ *
  * Idempotent: with the membership already gone `removeUserFromOrganization`
  * reports no rows and this answers false.
  */
 async function revokeParentWhenLastGroupLeft(
   parentOrganizationId: string,
-  kiloUserId: string
+  kiloUserId: string,
+  options: { directoryId?: string; txn?: DrizzleTransaction } = {}
 ): Promise<boolean> {
-  const remaining = await db
+  // Reads through the transaction when one is given, so the sibling test sees
+  // the group memberships this call already deleted inside it.
+  const remaining = await (options.txn ?? db)
     .select({ id: organizations.id })
     .from(organizations)
     .innerJoin(
@@ -741,6 +884,9 @@ async function revokeParentWhenLastGroupLeft(
       and(
         eq(organizations.parent_organization_id, parentOrganizationId),
         isNotNull(organizations.directory_group_id),
+        options.directoryId === undefined
+          ? undefined
+          : eq(organizations.directory_id, options.directoryId),
         liveOrganization,
         eq(organization_memberships.kilo_user_id, kiloUserId)
       )
@@ -749,8 +895,170 @@ async function revokeParentWhenLastGroupLeft(
 
   if (remaining.length > 0) return false;
 
-  const { rowCount } = await removeUserFromOrganization(parentOrganizationId, kiloUserId);
+  const { rowCount } = await removeUserFromOrganization(
+    parentOrganizationId,
+    kiloUserId,
+    undefined,
+    options.txn
+  );
   return (rowCount ?? 0) > 0;
+}
+
+/**
+ * Revoke every membership the account bound to a directory user holds under
+ * `input.directoryId`.
+ *
+ * Applied for `dsync.user.deleted` and for a `dsync.user.updated` that reports
+ * the user `inactive` — most identity providers soft-delete, so `inactive` is
+ * the common offboarding signal and ignoring it would leave a departed user
+ * holding the organization's seats and data.
+ *
+ * The account is never deleted or anonymized (Directory Sync rule 10): the
+ * memberships are the directory's to revoke, the account is not.
+ * `softDeleteUser` would anonymize it, rotate its credentials, and refuse
+ * outright on a live subscription, none of which a directory event authorizes.
+ *
+ * Only that directory's organizations. An account bound to this directory may
+ * also hold a membership under another one — an administrator add, a seat
+ * assignment, and an invitation all write a membership without consulting
+ * `directory_id`, so nothing stops it — and revoking that would delete another
+ * tenant's membership and fence the user out of it with a removal tombstone.
+ *
+ * Each group membership goes through `removeUserFromOrganization`, so the
+ * removal tombstone and the model-access group cascade behave exactly as they
+ * do for a single `dsync.group.user_removed`. The deletions share one
+ * transaction, so a user in many groups is revoked within the caller's request
+ * budget rather than paying a transaction and a session-invalidation round trip
+ * per group; the invalidation runs once per organization after commit.
+ *
+ * The rule-4 parent test then runs over two sets of candidate parents, both
+ * within this directory:
+ *
+ * - the parents of the groups just left, and
+ * - this directory's own organization — its live unparented row — when the user
+ *   holds a membership in it.
+ *
+ * The second set is load-bearing, not defensive. A user whose groups were
+ * deleted before they were — a disbanded group, or a `dsync.group.deleted`
+ * that arrived first — holds no group membership at all, only the parent one.
+ * With the first set alone that user would keep their membership in the
+ * enterprise organization after being deleted from the directory, which is
+ * precisely the access rule 4 exists to revoke.
+ *
+ * Converges like the single removal: an `externalId` no account is bound to has
+ * nothing to revoke, which is the state the event asserts, so it reports a null
+ * user rather than conflicting. `revokedOrganizationIds` lists only the
+ * organizations a row was actually deleted from, so a replay reports an empty
+ * list.
+ */
+export async function revokeAllDirectoryMemberships(
+  externalId: string,
+  input: DirectoryUserRevokeAll
+): Promise<DirectoryMembershipRevokeAllResult> {
+  const userRows = await db
+    .select({ id: kilocode_users.id })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.external_id, externalId))
+    .limit(1);
+
+  const user = userRows.at(0);
+  // No bound account means there is nothing to revoke, which is the state the
+  // event asks for. Provisioning one for a departing user would be absurd, and
+  // a 409 would hold the cursor for an add that may never arrive.
+  if (!user) {
+    return { kiloUserId: null, revokedOrganizationIds: [] };
+  }
+
+  // Both candidate sets are confined to the event's directory. An account bound
+  // to this directory can hold memberships under another one — an administrator
+  // add, a seat assignment, and an invitation all write a membership without
+  // consulting `directory_id` — and those are not this directory's to revoke.
+  const memberships = await db
+    .select({
+      id: organizations.id,
+      parent: organizations.parent_organization_id,
+      directoryGroupId: organizations.directory_group_id,
+    })
+    .from(organizations)
+    .innerJoin(
+      organization_memberships,
+      eq(organization_memberships.organization_id, organizations.id)
+    )
+    .where(
+      and(
+        eq(organizations.directory_id, input.directoryId),
+        liveOrganization,
+        eq(organization_memberships.kilo_user_id, user.id)
+      )
+    );
+
+  const groups = memberships.filter(row => row.directoryGroupId !== null);
+
+  // Parents of the groups being left, plus this directory's own organization
+  // when the user is directly a member of it — the latter is the only candidate
+  // left once the groups themselves are gone. `parent_organization_id IS NULL`
+  // is what identifies the owner: a sub-organization inherits the same
+  // `directory_id`, so the column alone does not.
+  const candidateParents = new Set<string>();
+  for (const group of groups) {
+    if (group.parent !== null) candidateParents.add(group.parent);
+  }
+  for (const row of memberships) {
+    if (row.parent === null) candidateParents.add(row.id);
+  }
+
+  // Sorted so the work, the log, and the response are the same on every run;
+  // the order itself carries no meaning.
+  const groupIds = groups.map(row => row.id).toSorted();
+  const parentIds = [...candidateParents].toSorted();
+
+  // One transaction for every row deletion. Each removal in its own
+  // transaction, with no `txn`, also awaits an outbound session-invalidation
+  // call apiece, and a user in many groups then exceeds the Worker's 15s
+  // request budget — which it reads as `unavailable` and retries, re-walking
+  // the groups that remain. Sharing the transaction keeps the network work out
+  // of the loop; it runs once per organization after commit.
+  const revokedOrganizationIds = await db.transaction(async txn => {
+    const revoked: string[] = [];
+
+    for (const group of groupIds) {
+      const { rowCount } = await removeUserFromOrganization(group, user.id, undefined, txn);
+      if ((rowCount ?? 0) > 0) revoked.push(group);
+    }
+
+    // After the groups, so the sibling test sees the memberships this call
+    // removed. A sibling group the user remains in — one under a different
+    // parent, or one whose membership this call did not touch — still keeps its
+    // parent membership alive. A sub-organization with no directory binding
+    // does not: `revokeParentWhenLastGroupLeft` counts only rows carrying a
+    // `directory_group_id`, which is what rule 4 requires.
+    for (const parent of parentIds) {
+      if (
+        await revokeParentWhenLastGroupLeft(parent, user.id, {
+          directoryId: input.directoryId,
+          txn,
+        })
+      ) {
+        revoked.push(parent);
+      }
+    }
+
+    return revoked;
+  });
+
+  // Best-effort, after commit: a network call must not run inside the
+  // transaction, and `removeUserFromOrganization` skipped it for every removal
+  // above because a `txn` was passed.
+  for (const organizationId of revokedOrganizationIds) {
+    await invalidateMemberSessionAccess(organizationId, user.id);
+  }
+  if (revokedOrganizationIds.length > 0) {
+    await runAfterResponse(async () => {
+      await cleanupRemovedClaudeProfilesForUser(user.id).catch(() => undefined);
+    });
+  }
+
+  return { kiloUserId: user.id, revokedOrganizationIds };
 }
 
 /**

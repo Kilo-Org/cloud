@@ -63,10 +63,13 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
         if (!result.success) {
           throw new Error(i18n.t('codeReviewer.configSaveFailed'));
         }
-        if (platform === 'gitlab') {
+        // Same rule as the full selection save: the flag records a sync
+        // outcome, so a skipped sync (`webhookSync: null`) leaves the stored
+        // warning alone.
+        if (platform === 'gitlab' && result.webhookSync !== null) {
           queryClient.setQueryData<boolean>(
             webhookWarningQueryKey,
-            (result.webhookSync?.errors.length ?? 0) > 0
+            result.webhookSync.errors.length > 0
           );
         }
         return result;

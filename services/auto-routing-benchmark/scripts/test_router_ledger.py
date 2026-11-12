@@ -448,7 +448,7 @@ class FinancingRegistration(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "audit-only"):
                     ledger.financing_for(db, legacy_sha)
             report = ledger.audit(path)
-            self.assertEqual(report["cost_forecasts"], [{"sha256": legacy_sha, "schema": ledger.LEGACY_FINANCING_SCHEMA, "hash_matches": True, "total_envelope_usd": legacy["total_envelope_usd"], "executable_for_v5": False}])
+            self.assertEqual(report["cost_forecasts"], [{"sha256": legacy_sha, "schema": ledger.LEGACY_FINANCING_SCHEMA, "hash_matches": True, "total_envelope_usd": legacy["total_envelope_usd"], "executable_for_current_version": False}])
             self.assertEqual(report["settled_plus_held_usd"], SYNTHETIC_BASELINE)
 
     def test_omitted_extra_duplicate_and_reordered_rows_reject(self):
@@ -534,14 +534,14 @@ class FinancingRegistration(unittest.TestCase):
                 db.execute("COMMIT")
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM campaign_financing_plans").fetchone()[0], 1)
                 self.assertEqual(db.execute("SELECT state,bound FROM requests WHERE id='historical-held'").fetchone(), ("unknown", SYNTHETIC_BASELINE))
-            self.assertFalse(ledger.audit(path)["cost_forecasts"][0]["executable_for_v5"])
+            self.assertFalse(ledger.audit(path)["cost_forecasts"][0]["executable_for_current_version"])
             refreshed = complete_financing(path, manifest, plan)
             refreshed_result = register_financing(path, refreshed)
             with ledger.readonly(path) as db:
                 self.assertEqual(ledger.require_current_financing(db, refreshed_result["financing_sha256"]), refreshed)
             forecasts = {row["sha256"]: row for row in ledger.audit(path)["cost_forecasts"]}
-            self.assertFalse(forecasts[result["financing_sha256"]]["executable_for_v5"])
-            self.assertTrue(forecasts[refreshed_result["financing_sha256"]]["executable_for_v5"])
+            self.assertFalse(forecasts[result["financing_sha256"]]["executable_for_current_version"])
+            self.assertTrue(forecasts[refreshed_result["financing_sha256"]]["executable_for_current_version"])
 
 
 class WriterLock(unittest.TestCase):

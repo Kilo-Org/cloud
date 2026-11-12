@@ -161,6 +161,14 @@ export type ChatComposerControl = {
   setText: (text: string) => void;
   hasContent: () => boolean;
   restoreAttachments: (parts: readonly { filename?: string; mime: string; url: string }[]) => void;
+  /**
+   * Withdraw a draft this composer restored after a failed send, once the server
+   * turns out to have accepted that send: the confirmed message is in the
+   * transcript, so the same text must leave the input. Only the untouched
+   * restore is withdrawn — a draft the reader edited stays, because that is the
+   * next message — and only the attachments that restore put back are removed.
+   */
+  withdrawRestoredSend: (text: string) => void;
 };
 
 /** Optional send extras the composer threads through to the host's `onSend`. */
@@ -257,6 +265,21 @@ type ChatComposerProps = {
    * text the user typed while identity and the draft were still loading.
    */
   initialDraft?: string;
+  /**
+   * A draft whose send the server turned out to accept. The stored draft is the
+   * text of that delivered message, so it must not be applied: the transcript
+   * owns it, and applying it would show the message twice. The host publishes
+   * this when the confirmation arrives, which can be before or after the draft
+   * load settles; the withdrawal path covers the case where the draft was
+   * already applied.
+   */
+  deliveredDraft?: string | null;
+  /**
+   * Called once the composer has consumed `deliveredDraft`. The host clears the
+   * record with it, so the suppression cannot outlive the load it was published
+   * for and take a later draft with the same words.
+   */
+  onDeliveredDraftConsumed?: () => void;
   /** Active session id, used to scope the Android picker launch context. */
   sessionId?: string | null;
   /** Active Remote CLI `suggest` tool request. */
@@ -315,6 +338,8 @@ export function ChatComposer({
   autoSend,
   draftKey,
   initialDraft,
+  deliveredDraft = null,
+  onDeliveredDraftConsumed,
   sessionId = null,
   suggestion = null,
   onAcceptSuggestion,
@@ -384,6 +409,16 @@ export function ChatComposer({
   // mounts with editable=true from the start. Draft text is restored after
   // remount.
   const [inputEpoch, setInputEpoch] = useState(0);
+  // The draft this composer put back after a failed send, with the chips that
+  // restore added. The server can accept a send whose response was lost, and the
+  // confirmed message then appears in the transcript; that makes the restored
+  // text a duplicate, so the host withdraws exactly this restore. It is dropped
+  // as soon as the reader edits the draft, because then the text is their next
+  // message rather than the failed one.
+  const restoredFailedSendRef = useRef<{
+    text: string;
+    attachmentIds: readonly string[];
+  } | null>(null);
   // Armed by handleStop; the remount effect restores the live text once.
   const pendingDraftRestoreRef = useRef(false);
   const stopRemountPhaseRef = useRef<StopRemountPhase>('idle');
@@ -403,6 +438,12 @@ export function ChatComposer({
   // cannot mutate the draft while a send is in flight. A second submit can
   // never slip through the brief window where React has not yet committed
   // `isSending=true`.
+  //
+  // A press that arrives while this lock is held is dropped before it reaches
+  // the host, and the press that holds it empties the draft (the host's
+  // `onOptimisticSend`) before the chat sees the words. So one burst sends
+  // once: a second tap finds the lock held, or an empty draft, and never adds
+  // a second question to the chat behind the composer.
   const sendLockRef = useRef<SubmitLock>(createSubmitLock());
   // `settleVoiceInputBeforeSubmit` expects a `{ current: boolean }` ref-like
   // and writes through it during settle. The adapter routes every read and
@@ -608,11 +649,34 @@ export function ChatComposer({
       return;
     }
     initialDraftAppliedRef.current = true;
+    // The stored draft is the text of a message the server accepted: applying it
+    // would show that message twice, in the transcript and in the input. It is
+    // consumed, not restored — and the durable draft goes with it. Only the one
+    // load the record was published for is consumed: a draft the reader stored
+    // afterwards may carry the same words and is theirs.
+    if (deliveredDraft !== null && initialDraft === deliveredDraft) {
+      if (draftKey && userId) {
+        void clearStoredDraft(userId, draftKey);
+      }
+      onDeliveredDraftConsumed?.();
+      return;
+    }
     if (initialDraft === '' || textRef.current !== '') {
       return;
     }
     restoreTextIntoInput(initialDraft);
-  }, [initialDraft, restoreTextIntoInput]);
+    // A stored draft can be the text of a send whose outcome was unknown when
+    // its route closed. The host publishes that send's confirmation later, and
+    // this draft — loaded, not typed — is what it must withdraw.
+    restoredFailedSendRef.current = { text: initialDraft, attachmentIds: [] };
+  }, [
+    initialDraft,
+    deliveredDraft,
+    draftKey,
+    userId,
+    onDeliveredDraftConsumed,
+    restoreTextIntoInput,
+  ]);
 
   // After Stop, remount the input row once the SDK has restored the composer
   // (Item 14 E2E gate).  The state machine is armed in handleStop and
@@ -677,6 +741,11 @@ export function ChatComposer({
   const restoreFilePartsRef = useRef(upload.restoreFileParts);
   restoreFilePartsRef.current = upload.restoreFileParts;
 
+  const removeAttachmentRef = useRef(upload.removeAttachment);
+  removeAttachmentRef.current = upload.removeAttachment;
+  const clearDraftRef = useRef<() => void>(() => undefined);
+  const onDeliveredDraftConsumedRef = useRef<() => void>(() => undefined);
+
   useImperativeHandle(
     controlRef,
     () => ({
@@ -687,11 +756,34 @@ export function ChatComposer({
       restoreAttachments: parts => {
         restoreFilePartsRef.current(parts);
       },
+      withdrawRestoredSend: (text: string) => {
+        const restored = restoredFailedSendRef.current;
+        if (restored === null || restored.text !== text) {
+          return;
+        }
+        // A draft the reader edited is their next message, not the send that
+        // turned out to be delivered.
+        if (composerPromptText(textRef.current) !== text) {
+          return;
+        }
+        restoredFailedSendRef.current = null;
+        for (const id of restored.attachmentIds) {
+          removeAttachmentRef.current(id);
+        }
+        clearDraftRef.current();
+        // The restore this record was published for is spent: the host must not
+        // keep holding the same words against a later draft.
+        onDeliveredDraftConsumedRef.current();
+      },
     }),
     []
   );
+  onDeliveredDraftConsumedRef.current = onDeliveredDraftConsumed ?? (() => undefined);
 
   function handleChangeText(value: string) {
+    // A keystroke makes the draft the reader's own: a restored failed send is
+    // no longer that exact text, so the host must not withdraw it later.
+    restoredFailedSendRef.current = null;
     textRef.current = value;
     // Any edit clears a stale slash-command rejection: the reader is fixing
     // the input the message is about.
@@ -1028,6 +1120,7 @@ export function ChatComposer({
     // after `submit`'s `flush`). Publishing it here clears `hasPending` so the
     // already-scheduled frame callback becomes a no-op; the direct setters
     // below then override the published value in the same batched commit.
+    restoredFailedSendRef.current = null;
     composerFrameCoalescer.flush();
     textRef.current = '';
     publishDerivedState('', null);
@@ -1040,6 +1133,7 @@ export function ChatComposer({
       void clearStoredDraft(userId, draftKey);
     }
   }
+  clearDraftRef.current = clearDraft;
 
   async function handleSend() {
     // Trim alone keeps zero-width and control characters, which draw nothing:
@@ -1179,6 +1273,13 @@ export function ChatComposer({
                   applyComposerText(prompt);
                 }
                 upload.restoreChips(optimisticChips);
+                // Remember exactly this restore: the send may have been accepted
+                // after all, and the confirmed row then makes the text a
+                // duplicate the host withdraws.
+                restoredFailedSendRef.current = {
+                  text: prompt,
+                  attachmentIds: optimisticChips.map(chip => chip.id),
+                };
               }
               throw error;
             }

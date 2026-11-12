@@ -16,6 +16,14 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
@@ -43,6 +51,7 @@ import {
   type EnkryptGuardrailsConfig,
   type EnkryptGuardrailsDraft,
   type EnkryptGuardrailsIssues,
+  type GuardrailGroup,
 } from './enkrypt-guardrails-draft';
 
 const AUTOSAVE_DELAY_MS = 800;
@@ -112,12 +121,18 @@ function GuardrailsLoader({ organizationId }: { organizationId: string }) {
       </Alert>
     );
   }
-  const { invalid_saved_detectors, invalid_saved_output_detectors, output_available, ...saved } =
-    configQuery.data;
+  const {
+    invalid_saved_detectors,
+    invalid_saved_output_detectors,
+    output_available,
+    groups,
+    ...saved
+  } = configQuery.data;
   return (
     <GuardrailsForm
       organizationId={organizationId}
       saved={saved}
+      groups={groups}
       invalidSavedDetectors={invalid_saved_detectors}
       invalidSavedOutputDetectors={invalid_saved_output_detectors}
       outputAvailable={output_available}
@@ -128,12 +143,14 @@ function GuardrailsLoader({ organizationId }: { organizationId: string }) {
 function GuardrailsForm({
   organizationId,
   saved,
+  groups,
   invalidSavedDetectors,
   invalidSavedOutputDetectors,
   outputAvailable,
 }: {
   organizationId: string;
   saved: EnkryptGuardrailsConfig;
+  groups: GuardrailGroup[];
   invalidSavedDetectors: boolean;
   invalidSavedOutputDetectors: boolean;
   outputAvailable: boolean;
@@ -164,6 +181,7 @@ function GuardrailsForm({
           invalid_saved_detectors: _invalid,
           invalid_saved_output_detectors: _invalidOutput,
           output_available: _outputAvailable,
+          groups: _groups,
           ...savedConfig
         } = result;
         failedKey.current = null;
@@ -299,6 +317,7 @@ function GuardrailsForm({
         <CardContent className="grid gap-6">
           <InputGuardrailSection
             draft={draft}
+            groups={groups}
             issues={issues}
             onChange={setDraft}
             onUpdateDetector={updateDetector}
@@ -386,11 +405,13 @@ function GuardrailSection({
 
 function InputGuardrailSection({
   draft,
+  groups,
   issues,
   onChange,
   onUpdateDetector,
 }: {
   draft: EnkryptGuardrailsDraft;
+  groups: GuardrailGroup[];
   issues: EnkryptGuardrailsIssues;
   onChange: UpdateDraft;
   onUpdateDetector: UpdateEnkryptDetector;
@@ -400,10 +421,17 @@ function InputGuardrailSection({
   return (
     <GuardrailSection
       title="Input guardrails"
-      description="Check every input with Enkrypt AI before it reaches a model, including tool results such as file reads and command output. Requests are blocked while Enkrypt is unavailable."
+      description="Check every input with Enkrypt AI, including tool results such as file reads and command output. Blocking detectors reject requests if Enkrypt is unavailable."
       enabled={draft.enabled}
       onEnabledChange={enabled => onChange(current => ({ ...current, enabled }))}
     >
+      {(groups.length > 0 || draft.group_id !== null) && (
+        <GuardrailGroupSelect
+          groups={groups}
+          groupId={draft.group_id}
+          onChange={group_id => onChange(current => ({ ...current, group_id }))}
+        />
+      )}
       {configurationError && (
         <p className="text-destructive text-sm" role="status">
           {configurationError}
@@ -430,6 +458,53 @@ function InputGuardrailSection({
         }
       />
     </GuardrailSection>
+  );
+}
+
+const ALL_MEMBERS = 'all';
+
+function GuardrailGroupSelect({
+  groups,
+  groupId,
+  onChange,
+}: {
+  groups: GuardrailGroup[];
+  groupId: string | null;
+  onChange: (groupId: string | null) => void;
+}) {
+  const labelId = useId();
+  const descriptionId = useId();
+  const selectedName = groupId
+    ? (groups.find(group => group.id === groupId)?.name ?? 'Unknown group')
+    : 'All members';
+
+  return (
+    <div className="grid gap-2">
+      <Label id={labelId}>Apply to</Label>
+      <Select
+        value={groupId ?? ALL_MEMBERS}
+        onValueChange={value => onChange(value === ALL_MEMBERS ? null : value)}
+      >
+        <SelectTrigger
+          className="w-full sm:w-80"
+          aria-labelledby={labelId}
+          aria-describedby={descriptionId}
+        >
+          <SelectValue>{selectedName}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL_MEMBERS}>All members</SelectItem>
+          {groups.map(group => (
+            <SelectItem key={group.id} value={group.id}>
+              {group.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p id={descriptionId} className="text-muted-foreground text-sm">
+        Only requests from members of the selected group are checked, logged, or blocked.
+      </p>
+    </div>
   );
 }
 

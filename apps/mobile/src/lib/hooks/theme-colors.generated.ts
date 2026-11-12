@@ -24,7 +24,7 @@ export const lightColors = {
   hairSoft: 'rgba(20, 15, 10, 0.05)',
   controlIdle: '#F0EEE6',
   skeletonFill: '#F0EEE6',
-  ringTrack: 'rgba(20, 15, 10, 0.05)',
+  ringTrack: 'rgba(20, 15, 10, 0.3)',
   accentSoft: '#FFDD00',
   accentSoftForeground: '#1A1A10',
   accentSoftTint: '#4F5A1029',

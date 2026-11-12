@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -55,6 +57,12 @@ const MIN_MAX_OUTPUT_TOKENS = 16;
  * OpenAI's deprecated name for `summary`, which the gateway always sets.
  */
 const UNSUPPORTED_REASONING_FIELDS = ['enabled', 'exclude', 'max_tokens', 'generate_summary'];
+
+const reasoningEffortUpdateSchema = z.strictObject({
+  type: z.literal('configuration_update'),
+  id: z.string().optional(),
+  reasoning: z.strictObject({ effort: ReasoningEffortSchema }),
+});
 
 /**
  * Adds the required traceability keys to the request metadata, keeping any
@@ -266,9 +274,9 @@ export async function tagOpenAiChatGptByokModels<
   );
   if (!byokModelIds) return models;
   return models.map(model =>
-    model.hasUserByokAvailable === true || !byokModelIds.has(model.id)
+    model.hasUserByokAvailable !== true && !byokModelIds.has(model.id)
       ? model
-      : { ...model, hasUserByokAvailable: true }
+      : { ...model, hasUserByokAvailable: true, isFree: false }
   );
 }
 
@@ -291,6 +299,7 @@ export function buildOpenAiChatGptProvider(
 
   return {
     type: 'openai-chatgpt',
+    inferenceProviderId: 'openai-chatgpt',
     ...(owner ? { chatGptOwner: owner } : {}),
     apiUrl: OPENAI_CHATGPT_API_URL,
     apiUrlOverrides: {},
@@ -332,6 +341,15 @@ export function buildOpenAiChatGptProvider(
         body.max_output_tokens < MIN_MAX_OUTPUT_TOKENS
       ) {
         body.max_output_tokens = MIN_MAX_OUTPUT_TOKENS;
+      }
+      // Subscription sharing rejects inline updates; changing request-level effort can break cache reuse.
+      if (Array.isArray(body.input)) {
+        body.input = body.input.filter(item => {
+          const update = reasoningEffortUpdateSchema.safeParse(item);
+          if (!update.success) return true;
+          body.reasoning = { ...body.reasoning, effort: update.data.reasoning.effort };
+          return false;
+        });
       }
       if (body.reasoning) {
         for (const field of UNSUPPORTED_REASONING_FIELDS) {

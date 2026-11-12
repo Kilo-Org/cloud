@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { LTR_ISOLATE_CLOSE, LTR_ISOLATE_OPEN } from '@/lib/bidi';
+
 import { CATALOG_LOADERS } from './catalogs';
 import { SUPPORTED_LANGUAGES } from './languages';
 import { stripInlineCodeMarkers } from './plain-copy';
@@ -35,17 +37,50 @@ function valueAt(catalog: unknown, path: string[]): unknown {
   return node;
 }
 
+/** The command as the reader gets it: one isolated, unbreakable left-to-right run. */
+const ISOLATED_COMMAND = `${LTR_ISOLATE_OPEN}kilo\u00A0remote${LTR_ISOLATE_CLOSE}`;
+
 describe('stripInlineCodeMarkers', () => {
-  it('drops the backticks and keeps the command text', () => {
+  it('renders a marked run as one isolated left-to-right run', () => {
     expect(stripInlineCodeMarkers('Run `kilo remote`, or `/remote` in a CLI session.')).toBe(
-      'Run kilo remote, or /remote in a CLI session.'
+      `Run ${ISOLATED_COMMAND}, or ${LTR_ISOLATE_OPEN}/remote${LTR_ISOLATE_CLOSE} in a CLI session.`
     );
+  });
+
+  it('leaves no breakable space inside the run', () => {
+    // A breakable space let a wrapped right-to-left sentence split the command
+    // across two lines, which then read as two fragments. The isolate alone is
+    // zero-width; the no-break space is what keeps the command on one line.
+    const visible = stripInlineCodeMarkers('Run `kilo remote` on your computer.');
+    const inside = visible.slice(
+      visible.indexOf(LTR_ISOLATE_OPEN) + 1,
+      visible.indexOf(LTR_ISOLATE_CLOSE)
+    );
+
+    expect(inside).toBe('kilo\u00A0remote');
+    expect(inside).not.toContain(' ');
+  });
+
+  it('leaves the sentence period outside the isolate', () => {
+    // The Arabic tour card ends with the command and then its period. The
+    // period belongs to the sentence, not to the run: inside the isolate it
+    // would be ordered as left-to-right text and land on the wrong side.
+    const value = valueAt(CATALOG_LOADERS.ar(), ['tour', 'remoteOptionBody']);
+    expect(typeof value, 'tour.remoteOptionBody').toBe('string');
+
+    const visible = stripInlineCodeMarkers(value as string);
+    expect(visible).toBe((value as string).replace('`kilo remote`', ISOLATED_COMMAND));
+    expect(visible.endsWith(`${LTR_ISOLATE_CLOSE}.`)).toBe(true);
   });
 
   it('leaves copy without markers unchanged', () => {
     expect(stripInlineCodeMarkers('Run kilo remote on your computer.')).toBe(
       'Run kilo remote on your computer.'
     );
+  });
+
+  it('drops a lone authoring marker', () => {
+    expect(stripInlineCodeMarkers('Run kilo remote`.')).toBe('Run kilo remote.');
   });
 });
 
@@ -84,7 +119,33 @@ describe('run-location help copy', () => {
       const value = valueAt(catalog, path);
       expect(typeof value, `${tag} ${path.join('.')}`).toBe('string');
       const visible = stripInlineCodeMarkers(value as string);
-      expect(visible, `${tag} ${path.join('.')}`).toContain('kilo remote');
+      // The run's own space is a no-break space, so compare with spaces.
+      expect(visible.replaceAll('\u00A0', ' '), `${tag} ${path.join('.')}`).toContain(
+        'kilo remote'
+      );
+    }
+  });
+
+  // Every wording that embeds the command gets the same treatment: the run is
+  // one isolate with no breakable space inside, and no part of it sits outside.
+  // A catalog that ships the command plain (English) keeps its copy as it is.
+  it.each(SUPPORTED_LANGUAGES)('%s isolates every marked command run', tag => {
+    const catalog = CATALOG_LOADERS[tag]();
+
+    for (const path of COMMAND_COPY_KEYS) {
+      const label = `${tag} ${path.join('.')}`;
+      const value = valueAt(catalog, path);
+      expect(typeof value, label).toBe('string');
+
+      const source = value as string;
+      const visible = stripInlineCodeMarkers(source);
+      const marked = (source.match(/`[^`]*`/g) ?? []).length;
+      expect(visible.split(ISOLATED_COMMAND).length - 1, label).toBe(marked);
+      // The treatment adds marks and unbreakable spaces only: no command text
+      // is lost or duplicated.
+      expect(visible.replaceAll(ISOLATED_COMMAND, 'kilo remote'), label).toBe(
+        source.replaceAll('`', '')
+      );
     }
   });
 

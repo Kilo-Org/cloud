@@ -11,17 +11,51 @@ import type {
 
 type Text = string | null | undefined;
 
-type RequestText = { source: 'input' | 'tool'; text: Text };
+/**
+ * Model-visible text with a header naming who wrote it and what it is, such as `user`,
+ * `tool result`, or `assistant tool call: read_file`. Null `texts` marks content that is never
+ * scanned, such as an image, so the scan still shows that it was there.
+ */
+type Piece = { header: string; texts: Text[] | null };
 
-type RequestSegment = RequestText[];
-
-function inputTexts(texts: Text[]): RequestText[] {
-  return texts.map(text => ({ source: 'input', text }));
+/** Takes an array, not rest parameters: a tool result can have more lines than a call takes. */
+function piece(header: string, texts: Text[]): Piece {
+  return { header, texts };
 }
 
-function toolTexts(texts: Text[]): RequestText[] {
-  return texts.map(text => ({ source: 'tool', text }));
+function omitted(header: string): Piece {
+  return { header, texts: null };
 }
+
+/**
+ * One scanned unit of a request. `body` is null for omitted content, such as an attachment, which
+ * is represented only by its header.
+ */
+export type RequestSegment = { header: string; body: string | null };
+
+/**
+ * One tool definition, or the request's response or output format, which constrains the model's
+ * output like a tool's schema does. Each is scanned and cached on its own.
+ */
+export type RequestToolDefinition = {
+  kind: 'tool' | 'response_format';
+  /** The tool's name; null for a response format or a tool without one. */
+  name: string | null;
+  segments: RequestSegment[];
+};
+
+/**
+ * A request in three parts, each scanned and cached on its own. `tools` holds tool definitions and
+ * response formats, which rarely change within a session; each is cached as a whole, so adding,
+ * removing, or changing one tool rescans only that tool. `system` is the system prompt, which
+ * clients rebuild more often, for example with the date or workspace state, and is cached as a
+ * whole. `conversation` is the message history, which grows request by request.
+ */
+export type RequestScanParts = {
+  tools: RequestToolDefinition[];
+  system: RequestSegment[];
+  conversation: RequestSegment[];
+};
 
 /** Tool inputs and schemas are scanned as the JSON the model reads. */
 function jsonText(value: unknown): Text {
@@ -34,10 +68,20 @@ type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string
 
 /**
  * Clients can send part, item, and tool types newer than the SDK types. Rather than dropping them,
- * scan the fields that carry model-visible text across the APIs.
+ * scan the fields that carry model-visible text across the APIs, under a header naming the type.
  */
-function unrecognizedTexts(value: never): Text[] {
-  return jsonTexts(value);
+function unrecognized(role: string | null, value: never): Piece[] {
+  const type = jsonType(value);
+  return [piece(role ? `${role} ${type}` : type, jsonTexts(value))];
+}
+
+function jsonType(value: JsonValue): string {
+  return typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof value.type === 'string'
+    ? value.type
+    : 'content';
 }
 
 function jsonTexts(value: JsonValue | undefined): Text[] {
@@ -52,116 +96,175 @@ function jsonTexts(value: JsonValue | undefined): Text[] {
   ];
 }
 
+function toolCall(role: string, name: Text, input: Text): Piece {
+  return piece(name ? `${role} tool call: ${name}` : `${role} tool call`, [input]);
+}
+
+function toolDefinition(name: Text, texts: Text[]): Piece {
+  return piece(name ? `tool definition: ${name}` : 'tool definition', texts);
+}
+
+/** The pieces of one `RequestToolDefinition`. */
+type ToolPieces = { kind: RequestToolDefinition['kind']; name: string | null; pieces: Piece[] };
+
+function toolPieces(name: Text, pieces: Piece[]): ToolPieces {
+  return { kind: 'tool', name: name || null, pieces };
+}
+
+function responseFormatPieces(texts: Text[]): ToolPieces {
+  return { kind: 'response_format', name: null, pieces: [piece('response format', texts)] };
+}
+
+function namedFile(header: string, filename: Text): Piece {
+  return omitted(filename ? `${header} "${filename}"` : header);
+}
+
 type ChatContentPart =
   | OpenAI.Chat.ChatCompletionContentPart
   | OpenAI.Chat.ChatCompletionContentPartRefusal;
 
-function chatPartTexts(part: ChatContentPart): Text[] {
+function chatPartPieces(role: string, part: ChatContentPart): Piece[] {
   switch (part.type) {
     case 'text':
-      return [part.text];
+      return [piece(role, [part.text])];
     case 'refusal':
-      return [part.refusal];
+      return [piece(`${role} refusal`, [part.refusal])];
     case 'image_url':
+      return [omitted(`${role} image`)];
     case 'input_audio':
+      return [omitted(`${role} audio`)];
     case 'file':
-      return [];
+      return [namedFile(`${role} file`, part.file.filename)];
     default:
-      return unrecognizedTexts(part);
+      return unrecognized(role, part);
   }
 }
 
-function chatContentTexts(content: string | ChatContentPart[] | null | undefined): Text[] {
-  if (typeof content === 'string') return [content];
-  return content ? content.flatMap(chatPartTexts) : [];
+function chatContentPieces(
+  role: string,
+  content: string | ChatContentPart[] | null | undefined
+): Piece[] {
+  if (typeof content === 'string') return [piece(role, [content])];
+  return content ? content.flatMap(part => chatPartPieces(role, part)) : [];
 }
 
+/** Summaries restate the raw reasoning, and encrypted reasoning cannot be read. */
 function reasoningDetailTexts(detail: ReasoningDetailUnion): Text[] {
   switch (detail.type) {
     case 'reasoning.text':
       return [detail.text];
     case 'reasoning.summary':
-      return [detail.summary];
     case 'reasoning.encrypted':
       return [];
     default:
-      return unrecognizedTexts(detail);
+      return jsonTexts(detail satisfies never);
   }
 }
 
-function chatToolCallTexts(call: OpenAI.Chat.ChatCompletionMessageToolCall): Text[] {
+/** Providers often send the same reasoning in several fields, so identical copies are scanned once. */
+function chatReasoning(message: MessageWithReasoning): Piece {
+  const texts = [
+    message.reasoning,
+    message.reasoning_content,
+    (message.reasoning_details ?? []).flatMap(reasoningDetailTexts).join(''),
+  ].map(text => text?.trim());
+  return piece('assistant reasoning', [...new Set(texts)]);
+}
+
+function chatToolCallPiece(call: OpenAI.Chat.ChatCompletionMessageToolCall): Piece[] {
   switch (call.type) {
     case 'function':
-      return [call.function.name, call.function.arguments];
+      return [toolCall('assistant', call.function.name, call.function.arguments)];
     case 'custom':
-      return [call.custom.name, call.custom.input];
+      return [toolCall('assistant', call.custom.name, call.custom.input)];
     default:
-      return unrecognizedTexts(call);
+      return unrecognized('assistant', call);
   }
 }
 
-function chatMessageTexts(
-  message: OpenAI.Chat.ChatCompletionMessageParam & MessageWithReasoning
-): RequestText[] {
+type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam & MessageWithReasoning;
+
+function chatMessageItems(message: ChatMessage): Item[] {
   switch (message.role) {
     case 'tool':
-      return toolTexts(chatContentTexts(message.content));
+      return [chatContentPieces('tool result', message.content)];
     case 'function':
-      return toolTexts([message.content]);
+      return [[piece(`function result: ${message.name}`, [message.content])]];
     case 'system':
     case 'developer':
     case 'user':
-      return inputTexts(chatContentTexts(message.content));
+      return [chatContentPieces(message.role, message.content)];
     case 'assistant':
-      return inputTexts([
-        ...chatContentTexts(message.content),
-        message.refusal,
-        message.reasoning,
-        message.reasoning_content,
-        ...(message.reasoning_details ?? []).flatMap(reasoningDetailTexts),
-        message.function_call?.name,
-        message.function_call?.arguments,
-        ...(message.tool_calls ?? []).flatMap(chatToolCallTexts),
-      ]);
+      return [
+        [chatReasoning(message)],
+        chatContentPieces('assistant', message.content),
+        [piece('assistant refusal', [message.refusal])],
+        ...(message.function_call
+          ? [[toolCall('assistant', message.function_call.name, message.function_call.arguments)]]
+          : []),
+        ...(message.tool_calls ?? []).map(chatToolCallPiece),
+      ];
     default:
-      return inputTexts(unrecognizedTexts(message));
+      return [unrecognized(null, message)];
   }
 }
 
-function chatToolDefinitionTexts(tool: OpenAI.Chat.ChatCompletionTool): Text[] {
+function chatToolDefinitionPieces(tool: OpenAI.Chat.ChatCompletionTool): ToolPieces {
   switch (tool.type) {
     case 'function':
-      return [tool.function.name, tool.function.description, jsonText(tool.function.parameters)];
+      return toolPieces(tool.function.name, [
+        toolDefinition(tool.function.name, [
+          tool.function.description,
+          jsonText(tool.function.parameters),
+        ]),
+      ]);
     case 'custom': {
       const { format } = tool.custom;
-      return [
-        tool.custom.name,
-        tool.custom.description,
-        format?.type === 'grammar' ? format.grammar.definition : undefined,
-      ];
+      return toolPieces(tool.custom.name, [
+        toolDefinition(tool.custom.name, [
+          tool.custom.description,
+          format?.type === 'grammar' ? format.grammar.definition : undefined,
+        ]),
+      ]);
     }
     default:
-      return unrecognizedTexts(tool);
+      return toolPieces(null, unrecognized('tool definition', tool));
   }
 }
 
-function chatResponseFormatTexts(
+function chatResponseFormatPieces(
   format: OpenRouterChatCompletionRequest['response_format']
-): Text[] {
+): ToolPieces[] {
   if (format?.type !== 'json_schema') return [];
   const { name, description, schema } = format.json_schema;
-  return [name, description, jsonText(schema)];
+  return [responseFormatPieces([name, description, jsonText(schema)])];
 }
 
-function chatCompletionsSegments(body: OpenRouterChatCompletionRequest): RequestSegment[] {
-  return [
-    ...(body.tools ?? []).map(tool => inputTexts(chatToolDefinitionTexts(tool))),
-    ...(body.functions ?? []).map(fn =>
-      inputTexts([fn.name, fn.description, jsonText(fn.parameters)])
-    ),
-    inputTexts(chatResponseFormatTexts(body.response_format)),
-    ...body.messages.map(chatMessageTexts),
-  ];
+function isInstructionRole(role: unknown): boolean {
+  return role === 'system' || role === 'developer';
+}
+
+/** The system prompt is the run of system and developer messages that opens the conversation. */
+function leadingInstructionCount<T>(items: readonly T[], isInstruction: (item: T) => boolean) {
+  const index = items.findIndex(item => !isInstruction(item));
+  return index === -1 ? items.length : index;
+}
+
+function chatCompletionsParts(body: OpenRouterChatCompletionRequest): ScanPieces {
+  const instructions = leadingInstructionCount(body.messages, message =>
+    isInstructionRole(message.role)
+  );
+  return {
+    tools: [
+      ...(body.tools ?? []).map(chatToolDefinitionPieces),
+      ...(body.functions ?? []).map(fn =>
+        toolPieces(fn.name, [toolDefinition(fn.name, [fn.description, jsonText(fn.parameters)])])
+      ),
+      ...chatResponseFormatPieces(body.response_format),
+    ],
+    system: body.messages.slice(0, instructions).flatMap(chatMessageItems),
+    conversation: body.messages.slice(instructions).flatMap(chatMessageItems),
+  };
 }
 
 type AnthropicBlock = Anthropic.Beta.BetaContentBlockParam;
@@ -170,142 +273,185 @@ function anthropicTextBlocksTexts(blocks: Anthropic.Beta.BetaTextBlockParam[]): 
   return blocks.map(block => block.text);
 }
 
-function anthropicDocumentTexts(document: Anthropic.Beta.BetaRequestDocumentBlock): Text[] {
+function anthropicDocumentPieces(
+  header: string,
+  document: Anthropic.Beta.BetaRequestDocumentBlock
+): Piece[] {
   const { source } = document;
   const texts: Text[] = [document.title, document.context];
-  if (source.type === 'text') return texts.concat(source.data);
-  if (source.type !== 'content') return texts;
-  return typeof source.content === 'string'
-    ? texts.concat(source.content)
-    : texts.concat(source.content.map(part => (part.type === 'text' ? part.text : undefined)));
+  switch (source.type) {
+    case 'text':
+      return [piece(header, [...texts, source.data])];
+    case 'content':
+      return [
+        piece(header, [
+          ...texts,
+          ...(typeof source.content === 'string'
+            ? [source.content]
+            : source.content.map(part => (part.type === 'text' ? part.text : undefined))),
+        ]),
+        ...(typeof source.content === 'string'
+          ? []
+          : source.content.flatMap(part =>
+              part.type === 'image' ? [omitted(`${header} image`)] : []
+            )),
+      ];
+    default:
+      return [piece(header, texts), omitted(header)];
+  }
 }
 
-function anthropicSearchResultTexts(result: Anthropic.Beta.BetaSearchResultBlockParam): Text[] {
-  return [result.title, ...anthropicTextBlocksTexts(result.content)];
+function anthropicSearchResultPiece(
+  header: string,
+  result: Anthropic.Beta.BetaSearchResultBlockParam
+): Piece {
+  return piece(header, [result.title, ...anthropicTextBlocksTexts(result.content)]);
 }
 
 type AnthropicToolResultContent = NonNullable<Anthropic.Beta.BetaToolResultBlockParam['content']>;
 
-function anthropicToolResultTexts(content: AnthropicToolResultContent | undefined): Text[] {
-  if (typeof content === 'string') return [content];
+function anthropicToolResultPieces(content: AnthropicToolResultContent | undefined): Piece[] {
+  const header = 'tool result';
+  if (typeof content === 'string') return [piece(header, [content])];
   return (content ?? []).flatMap(part => {
     switch (part.type) {
       case 'text':
-        return [part.text];
+        return [piece(header, [part.text])];
       case 'document':
-        return anthropicDocumentTexts(part);
+        return anthropicDocumentPieces(`${header} document`, part);
       case 'search_result':
-        return anthropicSearchResultTexts(part);
+        return [anthropicSearchResultPiece(`${header} search result`, part)];
       case 'image':
+        return [omitted(`${header} image`)];
       case 'tool_reference':
         return [];
       default:
-        return unrecognizedTexts(part);
+        return unrecognized(header, part);
     }
   });
 }
 
-function anthropicCodeExecutionTexts(
+function anthropicCodeExecutionPieces(
   result:
     | Anthropic.Beta.BetaCodeExecutionToolResultBlockParam['content']
     | Anthropic.Beta.BetaBashCodeExecutionToolResultBlockParam['content']
-): Text[] {
+): Piece[] {
+  const header = 'code execution result';
   switch (result.type) {
     case 'code_execution_result':
     case 'bash_code_execution_result':
-      return [result.stdout, result.stderr];
+      return [piece(header, [result.stdout, result.stderr])];
     case 'encrypted_code_execution_result':
-      return [result.stderr];
+      return [piece(header, [result.stderr])];
     case 'code_execution_tool_result_error':
     case 'bash_code_execution_tool_result_error':
       return [];
     default:
-      return unrecognizedTexts(result);
+      return unrecognized(header, result);
   }
 }
 
-function anthropicTextEditorTexts(
+function anthropicTextEditorPieces(
   result: Anthropic.Beta.BetaTextEditorCodeExecutionToolResultBlockParam['content']
-): Text[] {
+): Piece[] {
+  const header = 'text editor result';
   switch (result.type) {
     case 'text_editor_code_execution_view_result':
-      return [result.content];
+      return [piece(header, [result.content])];
     case 'text_editor_code_execution_str_replace_result':
-      return result.lines ?? [];
+      return [piece(header, result.lines ?? [])];
     case 'text_editor_code_execution_tool_result_error':
-      return [result.error_message];
+      return [piece(header, [result.error_message])];
     case 'text_editor_code_execution_create_result':
       return [];
     default:
-      return unrecognizedTexts(result);
+      return unrecognized(header, result);
   }
 }
 
-function anthropicBlockTexts(block: AnthropicBlock): RequestText[] {
+function anthropicBlockPieces(role: string, block: AnthropicBlock): Piece[] {
   switch (block.type) {
     case 'text':
-      return inputTexts([block.text]);
+      return [piece(role, [block.text])];
     case 'thinking':
-      return inputTexts([block.thinking]);
+      return [piece(`${role} reasoning`, [block.thinking])];
     case 'tool_use':
     case 'server_tool_use':
     case 'mcp_tool_use':
-      return inputTexts([block.name, jsonText(block.input)]);
+      return [toolCall(role, block.name, jsonText(block.input))];
     case 'document':
-      return inputTexts(anthropicDocumentTexts(block));
+      return anthropicDocumentPieces(`${role} document`, block);
     case 'compaction':
-      return inputTexts([block.content]);
+      return [piece('compaction summary', [block.content])];
     case 'mid_conv_system':
-      return inputTexts(anthropicTextBlocksTexts(block.content));
+      return [piece('system', anthropicTextBlocksTexts(block.content))];
     case 'tool_result':
     case 'mcp_tool_result':
-      return toolTexts(anthropicToolResultTexts(block.content));
+      return anthropicToolResultPieces(block.content);
     case 'search_result':
-      return toolTexts(anthropicSearchResultTexts(block));
+      return [anthropicSearchResultPiece(`${role} search result`, block)];
     case 'web_search_tool_result':
-      return toolTexts(
-        Array.isArray(block.content) ? block.content.map(result => result.title) : []
-      );
+      return Array.isArray(block.content)
+        ? [
+            piece(
+              'web search result',
+              block.content.map(result => result.title)
+            ),
+          ]
+        : [];
     case 'web_fetch_tool_result':
-      return toolTexts(
-        block.content.type === 'web_fetch_result'
-          ? anthropicDocumentTexts(block.content.content)
-          : []
-      );
+      return block.content.type === 'web_fetch_result'
+        ? anthropicDocumentPieces('web fetch result', block.content.content)
+        : [];
     case 'code_execution_tool_result':
     case 'bash_code_execution_tool_result':
-      return toolTexts(anthropicCodeExecutionTexts(block.content));
+      return anthropicCodeExecutionPieces(block.content);
     case 'text_editor_code_execution_tool_result':
-      return toolTexts(anthropicTextEditorTexts(block.content));
+      return anthropicTextEditorPieces(block.content);
     case 'tool_search_tool_result':
-      return toolTexts(
-        block.content.type === 'tool_search_tool_result_error' ? [block.content.error_message] : []
-      );
+      return block.content.type === 'tool_search_tool_result_error'
+        ? [piece('tool search result', [block.content.error_message])]
+        : [];
     case 'advisor_tool_result':
-      return toolTexts(block.content.type === 'advisor_result' ? [block.content.text] : []);
+      return block.content.type === 'advisor_result'
+        ? [piece('advisor result', [block.content.text])]
+        : [];
     case 'image':
-    case 'redacted_thinking':
+      return [omitted(`${role} image`)];
     case 'container_upload':
+      return [omitted(`${role} file`)];
+    case 'redacted_thinking':
     case 'fallback':
       return [];
     default:
-      return inputTexts(unrecognizedTexts(block));
+      return unrecognized(role, block);
   }
 }
 
-function anthropicMessageTexts(message: Anthropic.Beta.BetaMessageParam): RequestText[] {
-  return typeof message.content === 'string'
-    ? inputTexts([message.content])
-    : message.content.flatMap(anthropicBlockTexts);
+/** Each block is an item of its own, except that consecutive text blocks are one item. */
+function anthropicMessageItems(message: Anthropic.Beta.BetaMessageParam): Item[] {
+  if (typeof message.content === 'string') return [[piece(message.role, [message.content])]];
+  const items: Item[] = [];
+  let previous: AnthropicBlock | undefined;
+  for (const block of message.content) {
+    const pieces = anthropicBlockPieces(message.role, block);
+    const item = items.at(-1);
+    if (item && block.type === 'text' && previous?.type === 'text') item.push(...pieces);
+    else items.push(pieces);
+    previous = block;
+  }
+  return items;
 }
 
-function anthropicToolDefinitionTexts(tool: Anthropic.Beta.BetaToolUnion): Text[] {
-  return [
-    'name' in tool ? tool.name : undefined,
-    'description' in tool ? tool.description : undefined,
-    'input_schema' in tool ? jsonText(tool.input_schema) : undefined,
-    'input_examples' in tool ? jsonText(tool.input_examples) : undefined,
-  ];
+function anthropicToolDefinitionPieces(tool: Anthropic.Beta.BetaToolUnion): ToolPieces {
+  const name = 'name' in tool ? tool.name : undefined;
+  return toolPieces(name, [
+    toolDefinition(name, [
+      'description' in tool ? tool.description : undefined,
+      'input_schema' in tool ? jsonText(tool.input_schema) : undefined,
+      'input_examples' in tool ? jsonText(tool.input_examples) : undefined,
+    ]),
+  ]);
 }
 
 type AnthropicTextSources = Pick<
@@ -313,18 +459,27 @@ type AnthropicTextSources = Pick<
   'system' | 'messages' | 'tools' | 'output_config' | 'output_format'
 >;
 
-function messagesSegments(request: GatewayMessagesRequest): RequestSegment[] {
+function messagesParts(request: GatewayMessagesRequest): ScanPieces {
   const body: AnthropicTextSources = request;
   const { system } = body;
-  return [
-    ...(body.tools ?? []).map(tool => inputTexts(anthropicToolDefinitionTexts(tool))),
-    inputTexts([
-      jsonText(body.output_format?.schema),
-      jsonText(body.output_config?.format?.schema),
-    ]),
-    inputTexts(typeof system === 'string' ? [system] : anthropicTextBlocksTexts(system ?? [])),
-    ...body.messages.map(anthropicMessageTexts),
-  ];
+  return {
+    system: [
+      [
+        piece(
+          'system',
+          typeof system === 'string' ? [system] : anthropicTextBlocksTexts(system ?? [])
+        ),
+      ],
+    ],
+    tools: [
+      ...(body.tools ?? []).map(anthropicToolDefinitionPieces),
+      responseFormatPieces([
+        jsonText(body.output_format?.schema),
+        jsonText(body.output_config?.format?.schema),
+      ]),
+    ],
+    conversation: body.messages.flatMap(anthropicMessageItems),
+  };
 }
 
 type ResponsesTool = OpenAI.Responses.Tool | OpenAI.Responses.NamespaceTool.Function;
@@ -342,18 +497,27 @@ function responsesFormatTexts(
   }
 }
 
-function responsesToolDefinitionTexts(tool: ResponsesTool): Text[] {
+function responsesToolDefinitionPieces(tool: ResponsesTool): Piece[] {
   switch (tool.type) {
     case 'function':
-      return [tool.name, tool.description, jsonText(tool.parameters), jsonText(tool.output_schema)];
+      return [
+        toolDefinition(tool.name, [
+          tool.description,
+          jsonText(tool.parameters),
+          jsonText(tool.output_schema),
+        ]),
+      ];
     case 'custom':
-      return [tool.name, tool.description, ...responsesFormatTexts(tool.format)];
+      return [toolDefinition(tool.name, [tool.description, ...responsesFormatTexts(tool.format)])];
     case 'namespace':
-      return [tool.name, tool.description, ...tool.tools.flatMap(responsesToolDefinitionTexts)];
+      return [
+        toolDefinition(tool.name, [tool.description]),
+        ...tool.tools.flatMap(responsesToolDefinitionPieces),
+      ];
     case 'tool_search':
-      return [tool.description, jsonText(tool.parameters)];
+      return [toolDefinition('tool_search', [tool.description, jsonText(tool.parameters)])];
     case 'mcp':
-      return [tool.server_description];
+      return [toolDefinition(`MCP server ${tool.server_label}`, [tool.server_description])];
     case 'file_search':
     case 'computer':
     case 'computer_use_preview':
@@ -369,7 +533,30 @@ function responsesToolDefinitionTexts(tool: ResponsesTool): Text[] {
     case 'apply_patch':
       return [];
     default:
-      return unrecognizedTexts(tool);
+      return unrecognized('tool definition', tool);
+  }
+}
+
+/**
+ * Each tool of a namespace is a tool definition of its own, so a namespace holding many tools, such
+ * as an MCP server's, is not scanned and cached as one large item.
+ */
+function responsesToolDefinitionItems(tool: ResponsesTool): ToolPieces[] {
+  switch (tool.type) {
+    case 'namespace':
+      return [
+        toolPieces(tool.name, [toolDefinition(tool.name, [tool.description])]),
+        ...tool.tools.flatMap(responsesToolDefinitionItems),
+      ];
+    case 'function':
+    case 'custom':
+      return [toolPieces(tool.name, responsesToolDefinitionPieces(tool))];
+    case 'tool_search':
+      return [toolPieces('tool_search', responsesToolDefinitionPieces(tool))];
+    case 'mcp':
+      return [toolPieces(`MCP server ${tool.server_label}`, responsesToolDefinitionPieces(tool))];
+    default:
+      return [toolPieces(null, responsesToolDefinitionPieces(tool))];
   }
 }
 
@@ -379,23 +566,26 @@ type ResponsesMessagePart =
   | OpenAI.Responses.ResponseOutputText
   | OpenAI.Responses.ResponseOutputRefusal;
 
-function responsesPartTexts(part: ResponsesMessagePart): Text[] {
+function responsesPartPieces(header: string, part: ResponsesMessagePart): Piece[] {
   switch (part.type) {
     case 'input_text':
     case 'output_text':
-      return [part.text];
+      return [piece(header, [part.text])];
     case 'refusal':
-      return [part.refusal];
+      return [piece(`${header} refusal`, [part.refusal])];
     case 'input_image':
+      return [omitted(`${header} image`)];
     case 'input_file':
-      return [];
+      return [namedFile(`${header} file`, part.filename)];
     default:
-      return unrecognizedTexts(part);
+      return unrecognized(header, part);
   }
 }
 
-function responsesContentTexts(content: string | ResponsesMessagePart[]): Text[] {
-  return typeof content === 'string' ? [content] : content.flatMap(responsesPartTexts);
+function responsesContentPieces(header: string, content: string | ResponsesMessagePart[]): Piece[] {
+  return typeof content === 'string'
+    ? [piece(header, [content])]
+    : content.flatMap(part => responsesPartPieces(header, part));
 }
 
 type ComputerAction = NonNullable<OpenAI.Responses.ResponseComputerToolCall['action']>;
@@ -404,144 +594,226 @@ function computerActionTexts(action: ComputerAction): Text[] {
   return action.type === 'type' ? [action.text] : [];
 }
 
-function responsesItemTexts(item: OpenAI.Responses.ResponseInputItem): RequestText[] {
+function responsesItemPieces(item: OpenAI.Responses.ResponseInputItem): Piece[] {
   switch (item.type) {
     case undefined:
     case null:
     case 'message':
-      return 'content' in item ? inputTexts(responsesContentTexts(item.content)) : [];
+      return 'content' in item ? responsesContentPieces(item.role, item.content) : [];
     case 'reasoning':
-      return inputTexts([
-        ...(item.content ?? []).map(content => content.text),
-        ...item.summary.map(summary => summary.text),
-      ]);
+      return [
+        piece(
+          'assistant reasoning',
+          (item.content ?? []).map(content => content.text)
+        ),
+      ];
     case 'function_call':
-      return inputTexts([item.name, item.arguments]);
+      return [toolCall('assistant', item.name, item.arguments)];
     case 'custom_tool_call':
-      return inputTexts([item.name, item.input]);
+      return [toolCall('assistant', item.name, item.input)];
     case 'mcp_approval_request':
-      return inputTexts([item.name, item.arguments]);
+      return [piece(`assistant MCP approval request: ${item.name}`, [item.arguments])];
     case 'mcp_approval_response':
-      return inputTexts([item.reason]);
+      return [piece('MCP approval response', [item.reason])];
     case 'mcp_call':
-      return [...inputTexts([item.name, item.arguments]), ...toolTexts([item.output, item.error])];
+      return [
+        toolCall('assistant MCP', item.name, item.arguments),
+        piece('MCP tool result', [item.output, item.error]),
+      ];
     case 'tool_search_call':
-      return inputTexts([jsonText(item.arguments)]);
+      return [toolCall('assistant', 'tool_search', jsonText(item.arguments))];
     case 'file_search_call':
       return [
-        ...inputTexts(item.queries),
-        ...toolTexts((item.results ?? []).map(result => result.text)),
+        toolCall('assistant', 'file_search', item.queries.join('\n')),
+        piece(
+          'file search result',
+          (item.results ?? []).map(result => result.text)
+        ),
       ];
     case 'web_search_call':
-      return inputTexts(
-        item.action.type === 'search' ? [item.action.query, ...(item.action.queries ?? [])] : []
-      );
+      return item.action.type === 'search'
+        ? [
+            toolCall(
+              'assistant',
+              'web_search',
+              [item.action.query, ...(item.action.queries ?? [])].join('\n')
+            ),
+          ]
+        : [];
     case 'computer_call':
-      return inputTexts([
-        ...(item.action ? computerActionTexts(item.action) : []),
-        ...(item.actions ?? []).flatMap(computerActionTexts),
-      ]);
+      return [
+        piece('assistant computer call', [
+          ...(item.action ? computerActionTexts(item.action) : []),
+          ...(item.actions ?? []).flatMap(computerActionTexts),
+        ]),
+      ];
     case 'code_interpreter_call':
       return [
-        ...inputTexts([item.code]),
-        ...toolTexts(
+        toolCall('assistant', 'code_interpreter', item.code),
+        piece(
+          'code interpreter result',
           (item.outputs ?? []).map(output => (output.type === 'logs' ? output.logs : undefined))
+        ),
+        ...(item.outputs ?? []).flatMap(output =>
+          output.type === 'image' ? [omitted('code interpreter result image')] : []
         ),
       ];
     case 'local_shell_call':
-      return inputTexts(item.action.command);
+      return [toolCall('assistant', 'local_shell', item.action.command.join(' '))];
     case 'shell_call':
-      return inputTexts(item.action.commands);
+      return [toolCall('assistant', 'shell', item.action.commands.join('\n'))];
     case 'apply_patch_call':
-      return inputTexts(
-        'diff' in item.operation
-          ? [item.operation.path, item.operation.diff]
-          : [item.operation.path]
-      );
+      return [
+        toolCall(
+          'assistant',
+          'apply_patch',
+          'diff' in item.operation
+            ? `${item.operation.path}\n${item.operation.diff}`
+            : item.operation.path
+        ),
+      ];
     case 'program':
-      return inputTexts([item.code]);
+      return [piece('assistant program', [item.code])];
     case 'additional_tools':
-      return inputTexts(item.tools.flatMap(responsesToolDefinitionTexts));
+      return item.tools.flatMap(responsesToolDefinitionPieces);
     case 'function_call_output':
     case 'custom_tool_call_output':
-      return toolTexts(responsesContentTexts(item.output));
+      return responsesContentPieces('tool result', item.output);
     case 'local_shell_call_output':
     case 'apply_patch_call_output':
-      return toolTexts([item.output]);
+      return [piece('tool result', [item.output])];
     case 'shell_call_output':
-      return toolTexts(item.output.flatMap(output => [output.stdout, output.stderr]));
+      return [
+        piece(
+          'tool result',
+          item.output.flatMap(output => [output.stdout, output.stderr])
+        ),
+      ];
     case 'program_output':
-      return toolTexts([item.result]);
+      return [piece('program result', [item.result])];
     case 'mcp_list_tools':
-      return toolTexts([
-        ...item.tools.flatMap(tool => [tool.name, tool.description, jsonText(tool.input_schema)]),
-        item.error,
-      ]);
+      return [
+        ...item.tools.map(tool =>
+          toolDefinition(tool.name, [tool.description, jsonText(tool.input_schema)])
+        ),
+        piece('MCP tool list error', [item.error]),
+      ];
     case 'tool_search_output':
-      return toolTexts(item.tools.flatMap(responsesToolDefinitionTexts));
+      return item.tools.flatMap(responsesToolDefinitionPieces);
     case 'computer_call_output':
+      return [omitted('computer screenshot')];
     case 'image_generation_call':
+      return [omitted('assistant generated image')];
     case 'compaction':
     case 'compaction_trigger':
     case 'item_reference':
       return [];
     default:
-      return inputTexts(unrecognizedTexts(item));
+      return unrecognized(null, item);
   }
 }
 
-function responsesSegments(body: GatewayResponsesRequest): RequestSegment[] {
+function isInstructionItem(item: OpenAI.Responses.ResponseInputItem): boolean {
+  return (item.type === undefined || item.type === null || item.type === 'message') &&
+    'role' in item
+    ? isInstructionRole(item.role)
+    : false;
+}
+
+function responsesParts(body: GatewayResponsesRequest): ScanPieces {
   const { input } = body;
-  return [
-    ...(body.tools ?? []).map(tool => inputTexts(responsesToolDefinitionTexts(tool))),
-    inputTexts(responsesFormatTexts(body.text?.format)),
-    inputTexts([body.instructions]),
-    ...(typeof input === 'string' ? [inputTexts([input])] : (input ?? []).map(responsesItemTexts)),
-  ];
+  const items = typeof input === 'string' ? [] : (input ?? []);
+  const instructions = leadingInstructionCount(items, isInstructionItem);
+  return {
+    tools: [
+      ...(body.tools ?? []).flatMap(responsesToolDefinitionItems),
+      responseFormatPieces(responsesFormatTexts(body.text?.format)),
+    ],
+    system: [
+      [piece('instructions', [body.instructions])],
+      ...items.slice(0, instructions).map(responsesItemPieces),
+    ],
+    conversation:
+      typeof input === 'string'
+        ? [[piece('user', [input])]]
+        : items.slice(instructions).map(responsesItemPieces),
+  };
 }
 
 /**
- * Tool and output-format definitions come first: they rarely change within a session, so the
- * conversation that grows behind them stays a prefix of the next request.
+ * The pieces of one model-visible item: a message's text, one tool call, one tool result, or one
+ * Responses input item. Each item becomes at least one segment of its own.
  */
-function requestSegments(request: GatewayRequest): RequestSegment[] {
+type Item = Piece[];
+
+/** Pieces grouped by the tool definition or item they came from. */
+type ScanPieces = { tools: ToolPieces[]; system: Item[]; conversation: Item[] };
+
+function scanPieces(request: GatewayRequest): ScanPieces {
   switch (request.kind) {
     case 'chat_completions':
-      return chatCompletionsSegments(request.body);
+      return chatCompletionsParts(request.body);
     case 'messages':
-      return messagesSegments(request.body);
+      return messagesParts(request.body);
     case 'responses':
-      return responsesSegments(request.body);
+      return responsesParts(request.body);
   }
 }
 
-const SEGMENT_SEPARATOR = '\n\n';
+export const SEGMENT_SEPARATOR = '\n\n';
 
-export function joinRequestSegments(segments: string[]): string {
+export function joinSegments(segments: string[]): string {
   return segments.join(SEGMENT_SEPARATOR);
+}
+
+export function segmentHeaderLine(header: string): string {
+  return `[${header}]`;
+}
+
+export function renderSegment({ header, body }: RequestSegment): string {
+  return body === null ? `[${header} omitted]` : `${segmentHeaderLine(header)}\n${body}`;
+}
+
+/**
+ * Pieces of one item are segments of their own; consecutive pieces with the same header, such as
+ * two text parts of one message, are merged. Items are never merged, so each tool call and tool
+ * result, including parallel ones, is a segment of its own: segment boundaries are where the
+ * verdict cache can resume and where a long scan is preferably split.
+ */
+function itemSegments(pieces: Item): RequestSegment[] {
+  const groups: { header: string; texts: string[] | null }[] = [];
+  for (const { header, texts } of pieces) {
+    const trimmed =
+      texts &&
+      texts.flatMap(text => {
+        const each = text?.trim();
+        return each ? [each] : [];
+      });
+    if (trimmed?.length === 0) continue;
+    const previous = groups.at(-1);
+    if (previous?.texts && trimmed && previous.header === header) {
+      for (const text of trimmed) previous.texts.push(text);
+    } else {
+      groups.push({ header, texts: trimmed });
+    }
+  }
+  return groups.map(({ header, texts }) => ({ header, body: texts && joinSegments(texts) }));
 }
 
 /**
  * Every request can rewrite history, including assistant and system messages. Scan the full
- * conversation rather than trusting earlier turns, respecting the organization's tool-result scope.
- * Binary media, encrypted content, and transport settings are never scanned.
- *
- * Returns one entry per tool definition, output format, system prompt, and message or input item
- * that has scannable text, in order. Joined with `joinRequestSegments`, they are the scanned text.
+ * conversation, including all textual tool results, rather than trusting earlier turns.
+ * Attachments such as images and files are not scanned but are represented by an omission marker.
+ * Encrypted content, reasoning summaries, and transport settings are never scanned.
  */
-export function extractRequestSegments(
-  request: GatewayRequest,
-  { includeToolResults }: { includeToolResults: boolean }
-): string[] {
-  return requestSegments(request).flatMap(segment => {
-    const joined = joinRequestSegments(
-      segment
-        .filter(({ source }) => includeToolResults || source === 'input')
-        .flatMap(({ text }) => {
-          const trimmed = text?.trim();
-          return trimmed ? [trimmed] : [];
-        })
-    );
-    return joined ? [joined] : [];
-  });
+export function extractRequestParts(request: GatewayRequest): RequestScanParts {
+  const { tools, system, conversation } = scanPieces(request);
+  return {
+    tools: tools.flatMap(({ kind, name, pieces }) => {
+      const segments = itemSegments(pieces);
+      return segments.length > 0 ? [{ kind, name, segments }] : [];
+    }),
+    system: system.flatMap(itemSegments),
+    conversation: conversation.flatMap(itemSegments),
+  };
 }

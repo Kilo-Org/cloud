@@ -24,7 +24,7 @@ const query = vi.hoisted(() => ({
 vi.mock('@/lib/hooks/use-organization-queries', () => ({ useOrgUsageStats: () => query }));
 vi.mock('@kilocode/app-shared/utils', () => ({ fromMicrodollars: (value: number) => value / 1e6 }));
 vi.mock('@/lib/format', () => ({
-  formatMoney: (value: number) => `$${value}`,
+  formatPrefixedMoney: (value: number) => `$${value}`,
   formatNumber: String,
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -98,7 +98,9 @@ describe('Organization usage availability', () => {
       createElement(OrgUsageStats, { organizationId: 'org-1' })
     );
     const text = renderer.root.findAllByType('Text').map(node => node.props.children);
-    expect(text).toEqual(expect.arrayContaining(['$2', '12', '34', '56']));
+    // The cost keeps its own left-to-right run, so its symbol cannot move
+    // behind the number in a right-to-left paragraph.
+    expect(text).toEqual(expect.arrayContaining(['\u2066$2\u2069', '12', '34', '56']));
     expect(renderer.root.findAllByType('Button')).toHaveLength(0);
     unmount();
   });

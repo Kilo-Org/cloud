@@ -7,6 +7,7 @@ import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 import { NewSessionPromptControls as renderPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { Text as renderText } from '@/components/ui/text';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 
 import '@/i18n';
 import * as ReactI18next from 'react-i18next';
@@ -516,19 +517,19 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     const { isCreating, attachmentMax, paperclipDisabled } = options;
     const element = renderPrompt({ ...defaultProps(), isCreating, attachmentMax });
 
-    expect(
-      findElementByType(
-        element,
-        'Pressable',
-        ReactI18next.getI18n().t('agentChat.composer.addAttachment')
-      )
-    ).toMatchObject({
+    const paperclip = findElementByType(
+      element,
+      'Pressable',
+      ReactI18next.getI18n().t('agentChat.composer.addAttachment')
+    );
+    expect(paperclip).toMatchObject({
       disabled: paperclipDisabled,
       accessibilityState: { disabled: paperclipDisabled },
-      // 31.5pt frame (h-9 at NativeWind's 14pt rem) + 8.25pt per side = 48dp,
-      // Android's minimum (WCAG 2.5.8 AA).
-      hitSlop: { top: 8.25, bottom: 8.25, left: 8.25, right: 8.25 },
+      // A control-size audit reads the pressable's own rect, so the shared
+      // 48dp box is the target and no slop is added on top of it.
+      className: expect.stringContaining(ICON_TARGET_BOX_CLASS),
     });
+    expect(paperclip?.hitSlop).toBeUndefined();
     expect(findElementByType(element, ComposerPasteButton)).toMatchObject({ disabled: isCreating });
     // The microphone is part of the row whether or not the OS recognizer
     // answers available; a tap says why it cannot start.

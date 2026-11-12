@@ -7,10 +7,11 @@ import {
   createEmptyEnkryptOutputDetectors,
   createKiloDefaultEnkryptInputDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
-import type { EnkryptGuardrailsConfig } from './enkrypt-guardrails-draft';
+import type { EnkryptGuardrailsConfig, GuardrailGroup } from './enkrypt-guardrails-draft';
 import type { OrganizationGuardrailsPage as PageComponent } from './OrganizationGuardrailsPage';
 
 type GuardrailsResponse = EnkryptGuardrailsConfig & {
+  groups: GuardrailGroup[];
   output_available: boolean;
   invalid_saved_detectors: boolean;
   invalid_saved_output_detectors: boolean;
@@ -21,6 +22,8 @@ type GuardrailsUpdate = Omit<EnkryptGuardrailsConfig, 'output'> & {
 };
 
 const organizationId = 'aaaaaaaa-1111-4111-8111-111111111111';
+const engineering = { id: 'bbbbbbbb-2222-4222-8222-222222222222', name: 'Engineering' };
+const support = { id: 'cccccccc-3333-4333-8333-333333333333', name: 'Support' };
 const queryKey = ['organization-guardrails', organizationId];
 let mockConfig: GuardrailsResponse;
 const mockUpdate = jest.fn<(input: GuardrailsUpdate) => Promise<GuardrailsResponse>>();
@@ -50,6 +53,59 @@ jest.mock('@/lib/trpc/utils', () => ({
 jest.mock('@/contexts/RoleTestingContext', () => ({
   useRoleTesting: () => ({ assumedRole: null }),
 }));
+type SelectInjectedProps = { onValueChange?: (value: string) => void };
+
+function withSelectProps(children: React.ReactNode, props: SelectInjectedProps): React.ReactNode {
+  return React.Children.map(children, child =>
+    React.isValidElement<SelectInjectedProps>(child) ? React.cloneElement(child, props) : child
+  );
+}
+
+jest.mock('@/components/ui/select', () => ({
+  Select: ({
+    children,
+    value,
+    onValueChange,
+  }: {
+    children: React.ReactNode;
+    value: string;
+    onValueChange: (value: string) => void;
+  }) =>
+    createElement(
+      'div',
+      { 'data-select-value': value },
+      withSelectProps(children, { onValueChange })
+    ),
+  SelectTrigger: ({
+    children,
+    'aria-labelledby': labelledBy,
+  }: {
+    children: React.ReactNode;
+    'aria-labelledby'?: string;
+  }) =>
+    createElement(
+      'button',
+      { type: 'button', role: 'combobox', 'aria-labelledby': labelledBy },
+      children
+    ),
+  SelectValue: ({ children }: { children: React.ReactNode }) =>
+    createElement('span', null, children),
+  SelectContent: ({
+    children,
+    onValueChange,
+  }: { children: React.ReactNode } & SelectInjectedProps) =>
+    createElement('div', { role: 'listbox' }, withSelectProps(children, { onValueChange })),
+  SelectItem: ({
+    children,
+    value,
+    onValueChange,
+  }: { children: React.ReactNode; value: string } & SelectInjectedProps) =>
+    createElement(
+      'button',
+      { type: 'button', role: 'option', onClick: () => onValueChange?.(value) },
+      children
+    ),
+}));
 jest.mock('../OrganizationPageHeader', () => ({ OrganizationPageHeader: () => null }));
 jest.mock('./mcp-and-skills/McpSkillGuardrailsSection', () => ({
   McpSkillGuardrailsSection: () => createElement('div', null, 'MCP and skill guardrails'),
@@ -66,8 +122,10 @@ describe('OrganizationGuardrailsPage output availability', () => {
     jest.useFakeTimers();
     mockConfig = {
       enabled: true,
+      group_id: null,
       detectors: createKiloDefaultEnkryptInputDetectors(),
       output: { enabled: false, detectors: createEmptyEnkryptOutputDetectors() },
+      groups: [],
       output_available: false,
       invalid_saved_detectors: false,
       invalid_saved_output_detectors: false,
@@ -76,6 +134,7 @@ describe('OrganizationGuardrailsPage output availability', () => {
       mockConfig = {
         ...mockConfig,
         enabled: input.enabled,
+        group_id: input.group_id,
         detectors: input.detectors,
         invalid_saved_detectors: false,
         ...(input.output ? { output: input.output, invalid_saved_output_detectors: false } : {}),
@@ -232,8 +291,12 @@ describe('OrganizationGuardrailsPage output availability', () => {
     expect(container.textContent).not.toContain('Save detector settings');
     expect(container.querySelectorAll('[role="radiogroup"]')).toHaveLength(2);
     expect(switchControl('Input guardrails').getAttribute('aria-checked')).toBe('true');
-    expect(checkedChoice('Prompt injection')).toBe('Block');
+    expect(checkedChoice('Prompt injection')).toBe('Log only');
     expect(checkedChoice('Policy violation')).toBe('Off');
+    expect(container.textContent).not.toContain('NSFW');
+    expect(container.textContent).toContain(
+      'Blocking detectors reject requests if Enkrypt is unavailable.'
+    );
     expect(container.textContent).toContain('MCP and skill guardrails');
     expect(mockUpdate).not.toHaveBeenCalled();
   });
@@ -252,16 +315,16 @@ describe('OrganizationGuardrailsPage output availability', () => {
     expect(switchControl('Output guardrails').getAttribute('aria-checked')).toBe('false');
   });
 
-  it('saves Log only and Off choices for input detectors', async () => {
+  it('saves Block, Off, and Log only choices for input detectors', async () => {
     render();
 
-    choose('Prompt injection', 'Log only');
-    expect(checkedChoice('Prompt injection')).toBe('Log only');
+    choose('Prompt injection', 'Block');
+    expect(checkedChoice('Prompt injection')).toBe('Block');
     await advance();
     expect(mockUpdate).toHaveBeenCalledTimes(1);
     expect(mockUpdate.mock.calls[0][0].detectors.injection_attack).toEqual({
       enabled: true,
-      action: 'log',
+      action: 'block',
     });
     expect(container.textContent).toContain('All changes saved.');
 
@@ -270,13 +333,72 @@ describe('OrganizationGuardrailsPage output availability', () => {
     expect(mockUpdate).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain('Not saved yet. Turn on at least one input detector.');
 
-    choose('Prompt injection', 'Block');
+    choose('Prompt injection', 'Log only');
     await advance();
     expect(mockUpdate).toHaveBeenCalledTimes(2);
     expect(mockUpdate.mock.calls[1][0].detectors.injection_attack).toEqual({
       enabled: true,
-      action: 'block',
+      action: 'log',
     });
+  });
+
+  function groupSelect() {
+    return labelledBy<HTMLButtonElement>('[role="combobox"]', 'Apply to');
+  }
+
+  function chooseGroup(name: string) {
+    const option = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="option"]')
+    ).find(candidate => candidate.textContent === name);
+    if (!option) throw new Error(`Group option missing: ${name}`);
+    act(() => option.click());
+  }
+
+  it('hides the group choice while the organization has no groups', () => {
+    render();
+
+    expect(groupSelect()).toBeUndefined();
+    expect(container.textContent).not.toContain('Apply to');
+  });
+
+  it('applies input guardrails to all members or one group and saves the choice', async () => {
+    mockConfig.groups = [engineering, support];
+    render();
+
+    expect(groupSelect()?.textContent).toBe('All members');
+    expect(
+      Array.from(container.querySelectorAll('[role="option"]')).map(option => option.textContent)
+    ).toEqual(['All members', 'Engineering', 'Support']);
+
+    chooseGroup('Support');
+    expect(groupSelect()?.textContent).toBe('Support');
+    await advance();
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockUpdate).toHaveBeenLastCalledWith({
+      organizationId,
+      enabled: true,
+      group_id: support.id,
+      detectors: mockConfig.detectors,
+    });
+    expect(container.textContent).toContain('All changes saved.');
+
+    chooseGroup('All members');
+    await advance();
+    expect(mockUpdate).toHaveBeenCalledTimes(2);
+    expect(mockUpdate.mock.calls[1][0].group_id).toBeNull();
+    expect(groupSelect()?.textContent).toBe('All members');
+  });
+
+  it('keeps showing a saved group that is no longer listed so it can be cleared', async () => {
+    mockConfig.group_id = engineering.id;
+    render();
+
+    expect(groupSelect()?.textContent).toBe('Unknown group');
+    chooseGroup('All members');
+    await advance();
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockUpdate.mock.calls[0][0].group_id).toBeNull();
+    expect(groupSelect()).toBeUndefined();
   });
 
   it('shows and saves output controls and warnings when available, independently of input guardrails', async () => {
@@ -298,6 +420,7 @@ describe('OrganizationGuardrailsPage output availability', () => {
     expect(mockUpdate).toHaveBeenLastCalledWith({
       organizationId,
       enabled: false,
+      group_id: null,
       detectors: mockConfig.detectors,
       output: { ...mockConfig.output, enabled: false },
     });
@@ -333,6 +456,7 @@ describe('OrganizationGuardrailsPage output availability', () => {
       expect(mockUpdate).toHaveBeenLastCalledWith({
         organizationId,
         enabled: false,
+        group_id: null,
         detectors: mockConfig.detectors,
       });
       expect(mockUpdate.mock.calls[0][0]).not.toHaveProperty('output');
@@ -370,6 +494,7 @@ describe('OrganizationGuardrailsPage output availability', () => {
         expect(mockUpdate).toHaveBeenLastCalledWith({
           organizationId,
           enabled: false,
+          group_id: null,
           detectors: mockConfig.detectors,
         });
       }
@@ -403,6 +528,7 @@ describe('OrganizationGuardrailsPage output availability', () => {
     expect(mockUpdate).toHaveBeenLastCalledWith({
       organizationId,
       enabled: false,
+      group_id: null,
       detectors: mockConfig.detectors,
     });
     expect(mockConfig.output).toEqual(remoteOutput);
@@ -425,6 +551,7 @@ describe('OrganizationGuardrailsPage output availability', () => {
     expect(mockUpdate).toHaveBeenLastCalledWith({
       organizationId,
       enabled: true,
+      group_id: null,
       detectors: mockConfig.detectors,
     });
     expect(container.textContent).not.toContain("Saved input detector settings can't be read");

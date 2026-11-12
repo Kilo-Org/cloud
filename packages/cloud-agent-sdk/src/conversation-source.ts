@@ -9,6 +9,7 @@ import type { CloudAgentEvent } from './cloud-conversation-schemas';
 import {
   readKilo2ContentLayout,
   readKilo2Messages,
+  isCompactionSummaryPart,
   type Kilo2ContentLayout,
 } from './kilo2-source-messages';
 import type { SessionSnapshot } from './types';
@@ -27,7 +28,6 @@ function remember<V>(map: Map<string, V>, key: string, value: V) {
 
 export type ConversationSource = { version: 'v1' } | { version: 'v2' };
 
-/** Select the native reader at the SDK boundary. Renderers receive display events. */
 function positionFromPartId(messageId: string, partId: string): number | undefined {
   const prefix = `${messageId}_`;
   if (!partId.startsWith(prefix)) return undefined;
@@ -40,13 +40,14 @@ function positionFromPartId(messageId: string, partId: string): number | undefin
 function layoutFromProjected(
   message: SessionSnapshot['messages'][number]
 ): Kilo2ContentLayout | undefined {
-  const located = message.parts.map(part => positionFromPartId(message.info.id, part.id));
+  const parts = message.parts.filter(part => !isCompactionSummaryPart(part));
+  const located = parts.map(part => positionFromPartId(message.info.id, part.id));
   if (located.some(position => position === undefined)) return undefined;
   const summary = message.info.role === 'assistant' && message.info.summary === true;
   const ordinals = new Map<string, number>();
   const positions = new Map<string, number>();
   let next = 0;
-  for (const [index, part] of message.parts.entries()) {
+  for (const [index, part] of parts.entries()) {
     const position = located[index];
     if (position === undefined) return undefined;
     next = Math.max(next, position + 1);
@@ -186,6 +187,7 @@ export function createConversationSourceReader() {
         remember(layouts, message.info.id, layout);
       }
     },
+    /** Select the native reader at the SDK boundary. Renderers receive display events. */
     read(raw: CloudAgentEvent): { source: ConversationSource; events: NormalizedEvent[] } {
       const envelope = z.object({ type: z.string(), properties: z.unknown() }).safeParse(raw.data);
       if (

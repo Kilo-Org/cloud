@@ -52,10 +52,7 @@ import {
 import { createPreparationProgressRecorder } from '../../src/session/preparation-progress.js';
 import { sessionDoName } from '../../src/session-identity.js';
 import { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE } from '../../src/sandbox-control/session-credentials.js';
-import {
-  createFakeCredentialBroker,
-  installFakeCredentialEnv,
-} from './helpers/fake-credentials.js';
+import { createFakeCredentialBroker, installFakeSandboxEnv } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -681,26 +678,116 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     expect(await readAlarm(stub)).toBeNull();
   });
 
-  it('fails accepted and re-prepares queued messages on a lost route', async () => {
-    const { stub, peer } = await setup();
-    peer.prepareView = peer.view('ready');
-    await stub.send(promptPayload('m1'));
-    await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('running'));
+  it.each(['connection_lost', 'billing_blocked'] as const)(
+    'fails accepted and re-prepares queued messages on a %s lost route',
+    async reason => {
+      const { stub, peer } = await setup();
+      peer.prepareView = peer.view('ready');
+      await stub.send(promptPayload('m1'));
+      await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('running'));
 
-    peer.prepareView = peer.view('preparing');
-    await stub.onRoute({ state: 'preparing', attemptId: peer.attemptId });
-    await stub.send(promptPayload('m2'));
-    const preparesBefore = peer.prepareCalls.length;
+      peer.prepareView = peer.view('preparing');
+      await stub.onRoute({ state: 'preparing', attemptId: peer.attemptId });
+      await stub.send(promptPayload('m2'));
+      const preparesBefore = peer.prepareCalls.length;
 
-    const oldAttempt = peer.attemptId;
-    peer.status = async input => ({ sessionId: input.sessionId, view: { state: 'unknown' } });
-    peer.attemptId = crypto.randomUUID();
-    peer.prepareView = peer.view('preparing');
-    await stub.onRoute({ state: 'lost', attemptId: oldAttempt, reason: 'connection_lost' });
-    expect(await messageStatus(stub, 'm1')).toBe('failed');
-    expect(await messageStatus(stub, 'm2')).toBe('queued');
-    expect(peer.prepareCalls.length).toBeGreaterThan(preparesBefore);
-  });
+      const oldAttempt = peer.attemptId;
+      peer.status = async input => ({ sessionId: input.sessionId, view: { state: 'unknown' } });
+      peer.attemptId = crypto.randomUUID();
+      peer.prepareView = peer.view('preparing');
+      const billingFailure =
+        reason === 'billing_blocked'
+          ? {
+              code: 'INSUFFICIENT_CREDITS' as const,
+              payer: { type: 'user' as const, id: SESSION_OWNER_ID },
+              retryable: true,
+              remainingMicrodollars: 4_000_000,
+              minimumRequiredMicrodollars: 5_000_000,
+            }
+          : undefined;
+      await stub.onRoute({ state: 'lost', attemptId: oldAttempt, reason, billingFailure });
+      expect(await messageStatus(stub, 'm1')).toBe('failed');
+      expect(await messageStatus(stub, 'm2')).toBe('queued');
+      expect(peer.prepareCalls.length).toBeGreaterThan(preparesBefore);
+      const saved = await runInDurableObject(stub, async (_instance, state) => {
+        const db = drizzle(state.storage, { logger: false });
+        const [message] = await db
+          .select()
+          .from(controlPlaneMessages)
+          .where(eq(controlPlaneMessages.message_id, 'm1'));
+        return message;
+      });
+      expect(saved.reason).toBe(reason);
+      expect(
+        saved.billing_failure === null ? undefined : JSON.parse(saved.billing_failure)
+      ).toEqual(billingFailure);
+    }
+  );
+
+  it.each(['failed', 'lost'] as const)(
+    'persists and replays billing details from a %s route, then recovers',
+    async state => {
+      const { stub, peer } = await setup();
+      peer.prepareView = peer.view(state === 'lost' ? 'ready' : 'preparing');
+      await stub.send(promptPayload('billing-message'));
+      if (state === 'lost')
+        await waitFor(async () =>
+          expect(await messageStatus(stub, 'billing-message')).toBe('running')
+        );
+      const billingFailure = {
+        code: 'INSUFFICIENT_CREDITS' as const,
+        payer: { type: 'user' as const, id: SESSION_OWNER_ID },
+        retryable: true,
+        remainingMicrodollars: 4_000_000,
+        minimumRequiredMicrodollars: 5_000_000,
+      };
+      if (state === 'failed')
+        peer.prepareView = {
+          state,
+          attemptId: peer.attemptId,
+          reason: 'billing_blocked',
+          billingFailure,
+        };
+      await stub.onRoute({
+        state,
+        attemptId: peer.attemptId,
+        reason: 'billing_blocked',
+        billingFailure,
+      });
+      expect(await messageStatus(stub, 'billing-message')).toBe('failed');
+      expect(await readMessageReason(stub, 'billing-message')).toBe('billing_blocked');
+      await evictAllDurableObjects();
+      await installPeer(stub, peer);
+      const saved = await runInDurableObject(stub, async (_instance, durableState) => {
+        const db = drizzle(durableState.storage, { logger: false });
+        const [message] = await db
+          .select()
+          .from(controlPlaneMessages)
+          .where(eq(controlPlaneMessages.message_id, 'billing-message'));
+        const terminal = await db
+          .select()
+          .from(events)
+          .where(eq(events.stream_event_type, 'cloud.message.failed'));
+        return { message, terminal };
+      });
+      expect(JSON.parse(saved.message.billing_failure ?? 'null')).toEqual(billingFailure);
+      expect(saved.terminal.map(event => JSON.parse(event.payload))).toContainEqual(
+        expect.objectContaining({
+          messageId: 'billing-message',
+          reason: 'billing_blocked',
+          billingFailure,
+        })
+      );
+
+      peer.attemptId = crypto.randomUUID();
+      peer.prepareView = peer.view('ready');
+      await stub.send(promptPayload('recovered-message'));
+      await waitFor(async () =>
+        expect(await messageStatus(stub, 'recovered-message')).toBe('running')
+      );
+      expect(await messageStatus(stub, 'billing-message')).toBe('failed');
+    }
+  );
 
   it('fails a queued message on the backstop and clears the alarm', async () => {
     const { stub, peer } = await setup();
@@ -1035,30 +1122,50 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     stream.close();
   });
 
-  it('keeps the environment snapshot detail after the sandbox starts', async () => {
-    const { sessionId, stub, peer } = await setup();
-    peer.prepareView = peer.view('preparing');
-    await stub.send(promptPayload('m1'));
-    const detail = 'Starting from the environment snapshot (revision 2)';
-    await stub.onRoute({ state: 'preparing', step: 'sandbox_create', attemptId: peer.attemptId });
-    await stub.onRoute({
-      state: 'preparing',
+  it.each([
+    {
       step: 'environment_snapshot',
-      detail,
-      attemptId: peer.attemptId,
-    });
-    await stub.onRoute({ state: 'preparing', step: 'sandbox_start', attemptId: peer.attemptId });
+      key: 'environment_snapshot',
+      detail: 'Using environment snapshot',
+    },
+    { step: 'restore', key: 'workspace_restore', detail: 'Using workspace snapshot' },
+  ] as const)(
+    'keeps $key capture time in live progress and replay after sandbox startup',
+    async ({ step, key, detail }) => {
+      const { sessionId, stub, peer } = await setup();
+      peer.prepareView = peer.view('preparing');
+      await stub.send(promptPayload('m1'));
+      const snapshotCapturedAt = Date.parse('2026-10-24T21:32:19Z');
+      const live = await connectStream(sessionId);
+      await waitForStreamEvent(live, 'connected');
+      await drainStream(live);
+      await stub.onRoute({ state: 'preparing', step: 'sandbox_create', attemptId: peer.attemptId });
+      await stub.onRoute({
+        state: 'preparing',
+        step,
+        detail,
+        snapshotCapturedAt,
+        attemptId: peer.attemptId,
+      });
+      await stub.onRoute({ state: 'preparing', step: 'sandbox_start', attemptId: peer.attemptId });
+      expect(preparingRows(await drainStream(live))).toContainEqual(
+        expect.objectContaining({ action: 'step_progress', detail, snapshotCapturedAt })
+      );
+      live.close();
 
-    const stream = await connectStream(sessionId);
-    await waitForStreamEvent(stream, 'connected');
-    const replayed = preparingRows(await drainStream(stream));
-    expect(
-      replayed.find(
-        row => row.action === 'step_snapshot' && row.stepSnapshot?.key === 'environment_snapshot'
-      )?.stepSnapshot
-    ).toMatchObject({ status: 'completed', latestDetail: detail });
-    stream.close();
-  });
+      const stream = await connectStream(sessionId);
+      await waitForStreamEvent(stream, 'connected');
+      const replayed = preparingRows(await drainStream(stream));
+      expect(
+        replayed.find(row => row.action === 'step_snapshot' && row.stepSnapshot?.key === key)
+          ?.stepSnapshot
+      ).toMatchObject({ status: 'completed', latestDetail: detail, snapshotCapturedAt });
+      expect(
+        replayed.find(row => row.stepSnapshot?.key === 'sandbox_boot')?.stepSnapshot
+      ).not.toHaveProperty('snapshotCapturedAt');
+      stream.close();
+    }
+  );
 
   it('preserves ordered phase occurrences and original starts across retries in one attempt', async () => {
     const { sessionId, stub, peer } = await setup();
@@ -1903,6 +2010,25 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     stream.close();
   });
 
+  it('publishes a command catalog loaded after the client connects', async () => {
+    const { sessionId, stub } = await setup();
+    const stream = await connectStream(sessionId);
+    await waitForStreamEvent(stream, 'commands.available');
+    const commands = [{ name: 'profile-check', description: 'Check the profile' }];
+    await stub.onEvents({ events: [{ type: 'commands.available', properties: { commands } }] });
+    const updated = await waitForStreamEvent(stream, 'commands.available');
+    expect(updated.data).toMatchObject({
+      commands: expect.arrayContaining([expect.objectContaining(commands[0])]),
+    });
+    stream.close();
+    await evictAllDurableObjects();
+    const reconnected = await connectStream(sessionId);
+    expect((await waitForStreamEvent(reconnected, 'commands.available')).data).toMatchObject({
+      commands: expect.arrayContaining([expect.objectContaining(commands[0])]),
+    });
+    reconnected.close();
+  });
+
   it('returns session-not-found for an old-plane instance after the storage cutover', async () => {
     const sessionId = newSessionId();
     const sandboxId = unique('sbx__session_v2');
@@ -1947,7 +2073,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       const sandboxStub = sandboxes.getByName(sandboxId);
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
-        installFakeCredentialEnv(instance['env'], createFakeCredentialBroker());
+        installFakeSandboxEnv(instance, createFakeCredentialBroker());
         installFakeRuntimeProxyPeer(instance, async (ownerId, id) => {
           const kiloId = registeredKiloSessions.get(id);
           return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
@@ -2073,7 +2199,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     const sandboxStub = sandboxes.getByName(sandboxId);
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance['env'], createFakeCredentialBroker());
+      installFakeSandboxEnv(instance, createFakeCredentialBroker());
       installFakeRuntimeProxyPeer(instance, async (ownerId, id) => {
         const kiloId = registeredKiloSessions.get(id);
         return kiloId ? { userId: ownerId, kiloSessionId: kiloId } : null;
@@ -2151,7 +2277,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       const sandboxStub = sandboxes.getByName(sandboxId);
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
-        installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        installFakeSandboxEnv(instance, createFakeCredentialBroker());
         installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
           const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
           const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -2268,6 +2394,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
           Object.assign(reconstructed, {
             createProviderAdapter: () => provider.adapter,
             provider: provider.adapter,
+            organizationMembershipFor: async () => true,
             sessionPeerFor: (ownerId: string, id: string) => {
               const peer = originalPeerFor(ownerId, id);
               if (peer === null) throw new Error('Missing real Session peer');
@@ -2436,7 +2563,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       const sandboxStub = sandboxes.getByName(sandboxId);
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
-        installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        installFakeSandboxEnv(instance, createFakeCredentialBroker());
         installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
           const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
           const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -2652,7 +2779,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       const sandboxStub = sandboxes.getByName(sandboxId);
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
-        installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        installFakeSandboxEnv(instance, createFakeCredentialBroker());
         installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
           const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
           const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -2791,7 +2918,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     const sandboxStub = sandboxes.getByName(sandboxId);
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+      installFakeSandboxEnv(instance, createFakeCredentialBroker());
       installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
         const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
         const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -2862,7 +2989,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     const sandboxStub = sandboxes.getByName(sandboxId);
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+      installFakeSandboxEnv(instance, createFakeCredentialBroker());
       installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
         const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
         const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -2966,7 +3093,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     const sandboxStub = sandboxes.getByName(sandboxId);
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, broker);
+      installFakeSandboxEnv(instance, broker);
       installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
         const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
         const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -3037,7 +3164,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       const sandboxStub = sandboxes.getByName(sandboxId);
       await runInDurableObject(sandboxStub, async instance => {
         await instance.getAllocationState();
-        installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        installFakeSandboxEnv(instance, createFakeCredentialBroker());
         installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
           const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
           return stored?.auth.kiloSessionId
@@ -3128,7 +3255,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     const sandboxStub = sandboxes.getByName(sandboxId);
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, broker);
+      installFakeSandboxEnv(instance, broker);
       installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
         const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
         const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -3194,7 +3321,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     let policyOk = true;
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, broker);
+      installFakeSandboxEnv(instance, broker);
       installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
         const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
         const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -3269,7 +3396,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     let policyOk = true;
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, broker);
+      installFakeSandboxEnv(instance, broker);
       installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
         const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
         const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);
@@ -3322,7 +3449,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     const sandboxStub = sandboxes.getByName(sandboxId);
     await runInDurableObject(sandboxStub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, broker);
+      installFakeSandboxEnv(instance, broker);
       installFakeRuntimeProxyPeer(instance, async (ownerId, sessionId) => {
         const stored = await sessions.getByName(sessionDoName(ownerId, sessionId)).getMetadata();
         const kiloId = stored?.auth.kiloSessionId ?? registeredKiloSessions.get(sessionId);

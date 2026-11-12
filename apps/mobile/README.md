@@ -6,10 +6,11 @@ Humans: follow instructions below or talk to [@iscekic](https://github.com/iscek
 
 ## Feature availability
 
-- Chat and PR Review always appear in signed-in navigation.
+- The four signed-in tabs are Home, Agents, Chat, and Profile. Home and Profile include PR Review.
+- Quick Chat runs conversations on Kilo, custom backends, or supported on-device models.
+- Profile retains account, device sessions, notification preferences, and billing settings.
 - The `mobile-chat` and `mobile-pr-review` flags no longer control these features.
 - PostHog feature flag infrastructure and the version-aware registry remain available for future flags.
-- KiloClaw tab visibility still depends on instance ownership.
 
 ## Profile credits
 
@@ -33,6 +34,23 @@ current account. Route recording pauses while the root layout remounts, so its
 temporary Home route cannot replace the recovery destination. Credential
 preloads are used only for the first auth-provider mount; recovery reads the
 current stored credentials through the normal bounded retry path.
+
+## Voice-input terminal ownership
+
+Stop, cancel, and a queued next start wait for a terminal event with a 60-second
+silence bound. Completed gateway segments and final transcripts extend that
+window; interim text does not. A timed-out stop reports the retryable stopped
+message, while cancel stays silent.
+
+The OS adapter assigns each start a numeric `kiloSessionId` and consumes only
+the patched recognizer's `kiloEvent` channel. Native callbacks retain their
+originating run identity, and old teardown owns only that run's resources.
+Foreign-run events are dropped before controller delivery and iOS transcript
+deduplication. A genuine failed-start error and end remain valid without start.
+
+The versioned `expo-speech-recognition@57.1.1` patch, its workspace registration,
+and its lockfile hash form one native compatibility change. Rebuild both native
+clients; reloading JavaScript onto an older recognizer binary is not supported.
 
 ## New-session model choice
 
@@ -239,8 +257,6 @@ Native compatibility requirements:
 
 Native permission translations live in `plugins/permission-prompt-copy.json` for all 87 supported languages.
 The camera and photo library prompts explain AI agent attachments and include specific examples.
-Background location descriptions remain disabled because the app does not request background location.
-Apple requires a localized motion description for the location library's linked APIs, even though Kilo does not use or collect motion activity.
 Every build localizes the local-network prompt, because Chat can connect to a local model server.
 Changes require a new iOS build; an over-the-air update cannot change the native permission prompt.
 

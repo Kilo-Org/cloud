@@ -10,8 +10,6 @@ on:
       - 'apps/mobile/**'
       - 'packages/trpc/**'
       - 'packages/app-shared/**'
-      - 'packages/kilo-chat/**'
-      - 'packages/kilo-chat-hooks/**'
       - 'packages/event-service/**'
       - 'packages/notifications/**'
       - 'packages/cloud-agent-sdk/**'
@@ -97,7 +95,7 @@ jobs:
           # the version-bump branch re-triggers this workflow, and the tag marks the
           # pre-changelog commit, so without the exclusion every release starts the
           # next one. The same exclusion retires the bump-PR merge from the range.
-          CHANGES=$(git diff --name-only "$LAST_TAG"..HEAD -- apps/mobile/ packages/trpc/ packages/app-shared/ packages/kilo-chat/ packages/kilo-chat-hooks/ packages/event-service/ packages/notifications/ packages/cloud-agent-sdk/ ':(exclude)apps/mobile/CHANGELOG.md')
+          CHANGES=$(git diff --name-only "$LAST_TAG"..HEAD -- apps/mobile/ packages/trpc/ packages/app-shared/ packages/event-service/ packages/notifications/ packages/cloud-agent-sdk/ ':(exclude)apps/mobile/CHANGELOG.md')
 
           # The bump-version job edits the version line after every submission. Its
           # merged PR must not release the same code again, or every release starts
@@ -254,12 +252,12 @@ jobs:
           # so the shard job is the proof that this run executed the suite.
           if [ "$REUSE_RUNNING" = "false" ]; then
             if ! SHARD=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ID/jobs?per_page=100&filter=latest" \
-                --jq '[.jobs[] | select(.name == "mobile-test (1/8)") | .conclusion // ""] | .[0] // ""'); then
+                --jq '[.jobs[] | select(.name == "mobile-test (1/4)") | .conclusion // ""] | .[0] // ""'); then
               echo "::warning::could not read the jobs of kilo-app CI run $ID — the suite runs in this workflow"
               exit 0
             fi
             if [ "$SHARD" != "success" ]; then
-              echo "kilo-app CI run $ID did not execute the mobile suite for this commit (mobile-test 1/8: ${SHARD:-absent}) — the suite runs in this workflow instead."
+              echo "kilo-app CI run $ID did not execute the mobile suite for this commit (mobile-test 1/4: ${SHARD:-absent}) — the suite runs in this workflow instead."
               exit 0
             fi
           fi
@@ -274,10 +272,12 @@ jobs:
   # check-changes found a suite run for this exact commit, and it publishes
   # whether that run settled the validation: `passed`, or `fallback` for any
   # other end. Only a passed run is reused, so no store submission precedes a
-  # passing suite. A run a later push cancels through that workflow's
-  # cancel-in-progress group carries no verdict about this commit, so it falls
-  # back to the in-workflow suite instead of failing the release: a merge burst
-  # must not fail a release whose suite never ran to completion.
+  # passing suite. A cancelled run carries no verdict about this commit, so it
+  # falls back to the in-workflow suite instead of failing the release: a merge
+  # burst must not fail a release whose suite never ran to completion. The mobile
+  # workflow cancels only a superseded pull request run, so the cancellations
+  # that remain are a run a maintainer stopped and a pending run that a third
+  # push dropped before it started.
   reuse:
     name: Reuse the same-commit suite run
     needs: [check-changes]
@@ -341,9 +341,9 @@ jobs:
           echo "The suite runs in this workflow instead."
 
   # The in-workflow suite runs when the lookup found no run to reuse, and when
-  # the run the gate waited for ended without a pass — a failure, or a run a
-  # later push cancelled. A skipped need would skip this job, and a bare `!`
-  # starts a YAML tag, so the status function is explicit.
+  # the run the gate waited for ended without a pass — a failure, or a
+  # cancellation, which carries no verdict. A skipped need would skip this job,
+  # and a bare `!` starts a YAML tag, so the status function is explicit.
   validate:
     needs: [check-changes, reuse]
     if: ${{ !cancelled() && needs.check-changes.result == 'success' && needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && (needs.check-changes.outputs.reuse == 'false' || needs.reuse.outputs.suite == 'fallback') && github.repository == 'Kilo-Org/cloud' }}
@@ -370,8 +370,15 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
+      # The preflight only reads the EAS CLI and the evaluated Expo config, and
+      # both come from the app's own closure: `eas-cli` is the app's development
+      # dependency, and `app.config.ts` with scripts/assert-expo-config.mjs
+      # resolves app-local modules. Only that closure and the root project are
+      # installed, so the smaller runner stops linking the workspaces the
+      # preflight never reads. Widen the filter when a step here imports a
+      # workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo
 
       - name: Check EXPO_TOKEN
         run: |
@@ -392,7 +399,7 @@ jobs:
             exit 1
           fi
           MISSING=""
-          for NAME in API_BASE_URL WEB_BASE_URL CLOUD_AGENT_WS_URL SESSION_INGEST_WS_URL APPSFLYER_DEV_KEY APPSFLYER_APP_ID KILO_CHAT_URL EVENT_SERVICE_URL NOTIFICATIONS_URL POSTHOG_API_KEY SENTRY_AUTH_TOKEN EXPO_PUBLIC_SENTRY_ENVIRONMENT GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER; do
+          for NAME in API_BASE_URL WEB_BASE_URL CLOUD_AGENT_WS_URL SESSION_INGEST_WS_URL APPSFLYER_DEV_KEY APPSFLYER_APP_ID EVENT_SERVICE_URL NOTIFICATIONS_URL POSTHOG_API_KEY SENTRY_AUTH_TOKEN EXPO_PUBLIC_SENTRY_ENVIRONMENT GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER; do
             if ! printf '%s\n' "$ENV_OUTPUT" | grep -qE "^Name[[:space:]]+${NAME}[[:space:]]*$"; then
               MISSING="$MISSING $NAME"
             fi

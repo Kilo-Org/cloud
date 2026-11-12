@@ -599,6 +599,58 @@ describe('ChatComposer draft restore', () => {
     });
   });
 
+  it('does not apply a stored draft whose message the server confirmed', async () => {
+    const render = await mount(
+      makeProps({
+        draftKey: 'agent-composer:sess-1',
+        initialDraft: 'Delivered late',
+        deliveredDraft: 'Delivered late',
+      })
+    );
+
+    // The transcript renders the delivered message; applying the stored draft
+    // would show it twice, so nothing is sent and the input stays empty.
+    requireInputRowOnSubmit(render)();
+    await settle();
+    expect(onSendMock).not.toHaveBeenCalled();
+  });
+
+  it('applies a stored draft with the delivered words once the record is consumed', async () => {
+    // The first load is the delivered message: it is consumed, not restored.
+    const delivered = await mount(
+      makeProps({
+        draftKey: 'agent-composer:sess-1',
+        initialDraft: 'Delivered late',
+        deliveredDraft: 'Delivered late',
+      })
+    );
+    const consumed = vi.fn<() => void>();
+    // The host clears the record once the load it was published for is spent.
+    await rerender(
+      makeProps({
+        draftKey: 'agent-composer:sess-1',
+        initialDraft: 'Delivered late',
+        deliveredDraft: null,
+        onDeliveredDraftConsumed: consumed,
+      })
+    );
+    requireInputRowOnSubmit(delivered)();
+    await settle();
+    expect(onSendMock).not.toHaveBeenCalled();
+
+    // A draft the reader stored afterwards, with the same words, is theirs.
+    const later = await mount(
+      makeProps({
+        draftKey: 'agent-composer:sess-2',
+        initialDraft: 'Delivered late',
+        deliveredDraft: null,
+      })
+    );
+    requireInputRowOnSubmit(later)();
+    await settle();
+    expect(onSendMock).toHaveBeenCalledWith('Delivered late', expect.anything());
+  });
+
   it('keeps text typed before the draft settles instead of restoring over it', async () => {
     const pending = await mount(
       makeProps({ draftKey: 'agent-composer:sess-1', initialDraft: undefined })

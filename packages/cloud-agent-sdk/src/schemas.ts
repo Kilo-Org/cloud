@@ -1,7 +1,12 @@
 import * as z from 'zod';
+import {
+  sessionIdSchema,
+  customerBillingFailureSchema,
+  type CustomerBillingFailure,
+} from '@kilocode/session-ingest-contracts';
+export { customerBillingFailureSchema, type CustomerBillingFailure };
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import { PREPARATION_OUTPUT_MAX_LENGTH, PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
-import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import { mutationCursorSchema } from './cloud-conversation-schemas';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
 import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
@@ -330,7 +335,11 @@ export const remoteModelCatalogV1Schema = remoteModelCatalogWireV1Schema.transfo
             ...(model.recommendedIndex !== undefined
               ? { recommendedIndex: model.recommendedIndex }
               : {}),
-            ...(model.isFree !== undefined ? { isFree: model.isFree } : {}),
+            ...(model.hasUserByokAvailable === true
+              ? { isFree: false }
+              : model.isFree !== undefined
+                ? { isFree: model.isFree }
+                : {}),
             ...(model.mayTrainOnYourPrompts !== undefined
               ? { mayTrainOnYourPrompts: model.mayTrainOnYourPrompts }
               : {}),
@@ -1002,6 +1011,7 @@ const preparationStepSchema = z.object({
   completedAt: z.number().optional(),
   revision: z.number(),
   latestDetail: z.string().max(PREPARATION_MAX_DETAIL_LENGTH).optional(),
+  snapshotCapturedAt: z.number().int().nonnegative().max(8_640_000_000_000_000).optional(),
   safeError: z.string().optional(),
   command: z.string().optional(),
   commandIndex: z.number().optional(),
@@ -1053,6 +1063,7 @@ export const preparingDataSchema = z
     commandIndex: z.number().optional(),
     commandCount: z.number().optional(),
     detail: z.string().max(PREPARATION_MAX_DETAIL_LENGTH).optional(),
+    snapshotCapturedAt: z.number().int().nonnegative().max(8_640_000_000_000_000).optional(),
     output: z.string().max(PREPARATION_OUTPUT_MAX_LENGTH).optional(),
     safeError: z.string().optional(),
     exitCode: z.number().optional(),
@@ -1189,6 +1200,7 @@ export const cloudMessageFailedDataSchema = z
     delivery: z.enum(['queued', 'sent']).optional(),
     attempts: z.number().optional(),
     status: z.string().optional(),
+    billingFailure: customerBillingFailureSchema.optional().catch(undefined),
   })
   .passthrough();
 export type CloudMessageFailedData = z.infer<typeof cloudMessageFailedDataSchema>;
@@ -1229,18 +1241,6 @@ export const errorShapeSchema = z
   })
   .passthrough();
 export type ErrorShape = z.infer<typeof errorShapeSchema>;
-
-// Keep aligned with the customer-safe projection in services/cloud-agent-next/src/trpc-error.ts.
-export const customerBillingFailureSchema = z
-  .object({
-    code: z.enum(['INSUFFICIENT_CREDITS', 'COMPUTE_STOPPING', 'BILLING_UNAVAILABLE']),
-    payer: z.object({ type: z.enum(['user', 'org']), id: z.string().min(1) }).strict(),
-    retryable: z.boolean(),
-    remainingMicrodollars: z.number().int().nonnegative().optional(),
-    minimumRequiredMicrodollars: z.number().int().nonnegative().optional(),
-  })
-  .strict();
-export type CustomerBillingFailure = z.infer<typeof customerBillingFailureSchema>;
 
 /** Only accepts the explicit tRPC cause projection; generic 402s stay legacy. */
 export function parseCustomerBillingFailure(error: unknown): CustomerBillingFailure | null {

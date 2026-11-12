@@ -1,6 +1,7 @@
 import 'server-only';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { appendAnthropicBetaHeader } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/beta-header';
+import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type {
   GatewayChatApiKind,
@@ -13,7 +14,9 @@ import {
 } from '@kilocode/web-shared/lib/auth/claude/config';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { ClaudeBillingOwner } from './store';
+import { resolveClaudeBillingConnector } from './connector';
 import { getAuthoritativeClaudeBillingState, type ClaudeBillingPayerState } from './payer-state';
 import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
 
@@ -22,6 +25,17 @@ export { CLAUDE_BILLING_PROVIDER_ID } from './provider-id';
 
 export const CLAUDE_BILLING_REQUIRED_MESSAGE =
   'Your Claude organization link cannot bill right now. An owner or admin can link it again, or check it at https://platform.claude.com/connected-platforms.';
+
+/**
+ * Shown when the account that linked an organization's shared-services
+ * connection is gone: the account row is missing, the account is soft-deleted or
+ * being deleted, or it holds no usable email. The copy names that condition
+ * instead of an organization membership, which routing never checks. The
+ * connection belongs to the organization, so an owner reconnects it instead of
+ * losing it.
+ */
+export const CLAUDE_BILLING_RECONNECT_MESSAGE =
+  'The account that linked Claude billing for this organization is no longer available, so shared services cannot bill through it.';
 
 const ANTHROPIC_VERSION = '2023-06-01';
 /** Marks a request as authenticated by an OAuth token rather than an API key. */
@@ -34,22 +48,67 @@ export type ClaudeBillingRoutingInput = {
   userId: string | null;
   requesterEmail: string | null;
   organizationId: string | undefined;
+  /**
+   * The platform caller for a service run, such as code review or the Discord
+   * bot; see `OpenAiChatGptRoutingInput`. Set with an organization, it makes the
+   * organization's shared-services connection the first candidate.
+   */
+  botId: string | undefined;
 };
 
 export type ClaudeBillingRoutingResult =
   | { kind: 'provider'; provider: Provider; userByok: null; skipBalanceCheck: true }
   /** The owner has a connection that cannot bill. Never serve it another way. */
-  | { kind: 'unavailable'; message: string; retryable?: boolean };
+  | { kind: 'unavailable'; message: string; retryable?: boolean }
+  /**
+   * The organization's shared-services connection was linked by a person who is
+   * gone, so it can no longer be gated. Never serve it another way, and never
+   * retry: only an organization owner reconnecting it changes the outcome.
+   */
+  | { kind: 'reconnect'; message: string };
 
 /**
- * The owner whose connection serves the request. An organization request uses
- * only the organization's connection, and a personal request only the person's.
+ * The connections a request may use, in order. A member's own request in an
+ * organization uses their connection for that organization, never their
+ * personal one, and a personal request uses only the personal connection. A
+ * service run carries a bot id: it uses the organization's shared-services
+ * connection first, because that connection exists so a service run does not
+ * spend a member's own Claude organization, and falls back to the caller's
+ * connection, which is what every existing caller has.
  */
-function ownerOf(input: ClaudeBillingRoutingInput): ClaudeBillingOwner | null {
-  if (input.organizationId) {
-    return { kind: 'organization', organizationId: input.organizationId };
+function ownerCandidates(input: ClaudeBillingRoutingInput): ClaudeBillingOwner[] {
+  if (!input.userId) return [];
+  const owners: ClaudeBillingOwner[] = [];
+  if (input.botId && input.organizationId) {
+    owners.push({ kind: 'shared_services', organizationId: input.organizationId });
   }
-  return input.userId ? { kind: 'personal', kiloUserId: input.userId } : null;
+  owners.push(
+    input.organizationId
+      ? { kind: 'member', kiloUserId: input.userId, organizationId: input.organizationId }
+      : { kind: 'personal', kiloUserId: input.userId }
+  );
+  return owners;
+}
+
+/**
+ * The flag check for a connection, or the reconnect requirement when a
+ * shared-services connection's connector is gone. A person's own connection is
+ * gated on the person making the request. A shared-services connection is gated
+ * on the person who linked it last, because a service run's caller is a bot that
+ * no release flag covers. The previous web app release does not report that
+ * person, so the requester stands in, as it did there.
+ */
+async function gateEmail(
+  input: ClaudeBillingRoutingInput,
+  owner: ClaudeBillingOwner,
+  connection: ClaudeBillingPayerState
+): Promise<{ kind: 'email'; email: string | null } | { kind: 'connector-gone' }> {
+  if (owner.kind !== 'shared_services' || !connection.created_by) {
+    return { kind: 'email', email: input.requesterEmail };
+  }
+  const connector = await resolveClaudeBillingConnector(connection.created_by, readDb);
+  if (connector.kind === 'gone') return { kind: 'connector-gone' };
+  return { kind: 'email', email: connector.kind === 'present' ? connector.email : null };
 }
 
 /** Billing connections serve the Messages API and Anthropic's OpenAI-compatible endpoint. */
@@ -89,6 +148,7 @@ export function buildClaudeBillingProvider(
 ): Provider {
   return {
     type: 'claude-billing',
+    inferenceProviderId: 'anthropic',
     claudeBillingOwner: owner,
     claudeBillingUserProfileId: userProfileId,
     apiUrl: `${CLAUDE_API_BASE_URL}/v1`,
@@ -104,6 +164,7 @@ export function buildClaudeBillingProvider(
       context.extraHeaders['anthropic-version'] ??= ANTHROPIC_VERSION;
       appendAnthropicBetaHeader(context.extraHeaders, OAUTH_API_BETA);
       appendAnthropicBetaHeader(context.extraHeaders, CLAUDE_BILLING_BETA);
+      dropThinkingBlocksOnPrefixMismatch(context);
       context.extraHeaders['anthropic-user-profile-id'] = userProfileId;
       markBilled(context.request.body, upstreamModel);
     },
@@ -111,65 +172,85 @@ export function buildClaudeBillingProvider(
 }
 
 /**
- * Resolves the owner's Claude billing connection as a provider, an unavailable
- * result, or null when the request is not this owner's to bill. The connection
- * is read before anything about Kilo's configuration: once an owner has a
- * connection, a missing or broken operator credential fails the request instead
- * of quietly serving it on Kilo's credits.
+ * Resolves a Claude billing connection as a provider, an unavailable result, or
+ * null when the request cannot be served by one. A connection is read before
+ * anything about Kilo's configuration: once an owner has a connection, a missing
+ * or broken operator credential fails the request instead of quietly serving it
+ * on Kilo's credits. A connection that cannot bill fails the request without
+ * trying the next one, and a connection that is absent or removed moves on to
+ * the next candidate.
  */
 export async function checkClaudeBilling(
   input: ClaudeBillingRoutingInput
 ): Promise<ClaudeBillingRoutingResult | null> {
-  const owner = ownerOf(input);
-  if (!owner) return null;
+  const owners = ownerCandidates(input);
+  // An organization request is always scoped by its signed-in person.
+  if (owners.length === 0) {
+    return input.organizationId
+      ? {
+          kind: 'unavailable',
+          message:
+            'Linked billing with Claude Platform is not enabled. Remove the link to use another payment method.',
+        }
+      : null;
+  }
 
   const upstreamModel = await resolveClaudeBillingModel(input.requestedModel);
   if (!upstreamModel) return null;
 
-  let connection: ClaudeBillingPayerState | null;
-  try {
-    connection = await getAuthoritativeClaudeBillingState(owner);
-  } catch {
+  for (const owner of owners) {
+    let connection: ClaudeBillingPayerState | null;
+    try {
+      connection = await getAuthoritativeClaudeBillingState(owner);
+    } catch {
+      return {
+        kind: 'unavailable',
+        message: 'We could not check your Claude link. Try again.',
+        retryable: true,
+      };
+    }
+    if (!connection || connection.status === ClaudeBillingConnectionStatus.Removed) continue;
+    if (connection.status === ClaudeBillingConnectionStatus.BillingUnavailable) {
+      return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
+    }
+    if (connection.status !== ClaudeBillingConnectionStatus.Connected) continue;
+    const gate = await gateEmail(input, owner, connection);
+    if (gate.kind === 'connector-gone') {
+      return { kind: 'reconnect', message: CLAUDE_BILLING_RECONNECT_MESSAGE };
+    }
+    if (!gate.email || !(await isClaudePlatformOAuthEnabled(gate.email))) {
+      return {
+        kind: 'unavailable',
+        message:
+          'Linked billing with Claude Platform is not enabled. Remove the link to use another payment method.',
+      };
+    }
+    if (!servesApiKind(input.request.kind)) {
+      return {
+        kind: 'unavailable',
+        message: 'Use the Messages or Chat Completions API with your Claude link.',
+      };
+    }
+    if (!isClaudeOperatorConfigured()) {
+      return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
+    }
+
+    const accessToken = await getClaudeOperatorToken();
     return {
-      kind: 'unavailable',
-      message: 'We could not check your Claude link. Try again.',
-      retryable: true,
+      kind: 'provider',
+      provider: {
+        ...buildClaudeBillingProvider(
+          accessToken,
+          upstreamModel,
+          owner,
+          connection.user_profile_id
+        ),
+        claudeBillingConnectedAt: connection.connected_at ?? undefined,
+      },
+      userByok: null,
+      skipBalanceCheck: true,
     };
-  }
-  if (!connection || connection.status === ClaudeBillingConnectionStatus.Removed) return null;
-  if (connection.status === ClaudeBillingConnectionStatus.BillingUnavailable) {
-    return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
-  }
-  if (connection.status !== ClaudeBillingConnectionStatus.Connected) return null;
-  if (
-    !input.userId ||
-    !input.requesterEmail ||
-    !(await isClaudePlatformOAuthEnabled(input.requesterEmail))
-  ) {
-    return {
-      kind: 'unavailable',
-      message:
-        'Linked billing with Claude Platform is not enabled. Remove the link to use another payment method.',
-    };
-  }
-  if (!servesApiKind(input.request.kind)) {
-    return {
-      kind: 'unavailable',
-      message: 'Use the Messages or Chat Completions API with your Claude link.',
-    };
-  }
-  if (!isClaudeOperatorConfigured()) {
-    return { kind: 'unavailable', message: CLAUDE_BILLING_REQUIRED_MESSAGE };
   }
 
-  const accessToken = await getClaudeOperatorToken();
-  return {
-    kind: 'provider',
-    provider: {
-      ...buildClaudeBillingProvider(accessToken, upstreamModel, owner, connection.user_profile_id),
-      claudeBillingConnectedAt: connection.connected_at ?? undefined,
-    },
-    userByok: null,
-    skipBalanceCheck: true,
-  };
+  return null;
 }

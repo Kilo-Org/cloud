@@ -30,6 +30,32 @@ jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   deleteStripeCustomer: jest.fn().mockResolvedValue(undefined),
 }));
 
+// WorkOS is not reachable in tests either (`.env.test` carries an invalid
+// key), and the domain gate now asks it which domains the organization
+// verified through DNS. Default to none, so the existing cases still exercise
+// the refusal path, and let a case opt into a verified set.
+// Both error classes are exported, not just the lookup one: `directory-sync`
+// branches on `instanceof VerifiedDomainOwnerMissingError` first, and an
+// omitted export is `undefined` at that site, which throws
+// `TypeError: Right-hand side of 'instanceof' is not callable` for *every*
+// rejected lookup. A test asserting only `instanceof Error` would stay green
+// on that TypeError while exercising none of the classification.
+jest.mock('@/lib/scim/directory-verified-domains', () => {
+  class VerifiedDomainLookupError extends Error {}
+  class VerifiedDomainOwnerMissingError extends Error {}
+  return {
+    VerifiedDomainLookupError,
+    VerifiedDomainOwnerMissingError,
+    listDnsVerifiedDomains: jest.fn().mockResolvedValue([]),
+  };
+});
+
+const verifiedDomains = jest.requireMock<{
+  listDnsVerifiedDomains: jest.Mock;
+  VerifiedDomainLookupError: new (message: string) => Error;
+  VerifiedDomainOwnerMissingError: new (message: string) => Error;
+}>('@/lib/scim/directory-verified-domains');
+
 const organizationBilling = jest.requireMock<{
   getOrCreateStripeCustomerIdForOrganization: jest.Mock;
 }>('@/lib/organizations/organization-billing');
@@ -40,6 +66,7 @@ import {
   deleteDirectorySubOrganization,
   DirectorySyncConflictError,
   removeDirectoryMembership,
+  revokeAllDirectoryMemberships,
   upsertDirectoryOrganization,
   upsertDirectorySubOrganization,
   upsertDirectoryUser,
@@ -70,6 +97,10 @@ beforeEach(() => {
   workOSOrganizationId = `org_${suffix}`;
   externalId = `directory_user_${suffix}`;
   email = `scim-${suffix}@example.test`;
+  // Default to no verified domains, so a `mockResolvedValueOnce` in one test
+  // cannot leak into the next and silently admit a bind it asserts is refused.
+  verifiedDomains.listDnsVerifiedDomains.mockReset();
+  verifiedDomains.listDnsVerifiedDomains.mockResolvedValue([]);
 });
 
 afterEach(async () => {
@@ -469,6 +500,158 @@ describe('upsertDirectoryUser', () => {
     expect(row.stripe_customer_id).toBeTruthy();
   });
 
+  test('creates a user at a second domain the organization verified through DNS', async () => {
+    // The enterprise runs several mail domains through one directory, and only
+    // one of them can be the SSO authority (Policy Resolution rules 4 and 6).
+    // A DNS-verified domain is the organization proving it owns the others.
+    //
+    // `upsertDirectoryUser` is called directly rather than through
+    // `seedUser()`: that helper captures the fixture address's own domain as
+    // `sso_domain`, which satisfies the gate on its no-network fast path and
+    // leaves the DNS lookup unreached.
+    await seedOrganizationWithDomain(`primary-${suffix}.test`);
+    verifiedDomains.listDnsVerifiedDomains.mockResolvedValueOnce(['example.test']);
+
+    const created = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email,
+      firstName: 'Bob',
+      lastName: 'Bobert',
+    });
+    createdUserIds.push(created.id);
+
+    const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, created.id));
+    expect(row.external_id).toBe(externalId);
+    expect(row.google_user_email).toBe(email);
+    // The lookup is what authorized this bind, so it must have happened.
+    expect(verifiedDomains.listDnsVerifiedDomains).toHaveBeenCalledWith(workOSOrganizationId);
+  });
+
+  test('creates a user at a DNS-verified domain when the organization has no SSO domain', async () => {
+    // No `sso_domain`, so the Effective SSO policy is `not_required`. DNS
+    // verification is itself the proof of ownership and does not depend on
+    // which domain is the SSO authority, so the bind is allowed — rule 13.
+    await seedOrganization();
+    verifiedDomains.listDnsVerifiedDomains.mockResolvedValueOnce(['example.test']);
+
+    const created = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email,
+      firstName: 'Bob',
+      lastName: 'Bobert',
+    });
+    createdUserIds.push(created.id);
+
+    const [row] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, created.id));
+    expect(row.external_id).toBe(externalId);
+    expect(verifiedDomains.listDnsVerifiedDomains).toHaveBeenCalledWith(workOSOrganizationId);
+  });
+
+  test('parks rather than retries when the organization carries no WorkOS id', async () => {
+    // The organization is already bound to the directory, and the activation
+    // upsert returns an already-bound owner without repairing a missing
+    // `external_org_id`, so no later event supplies one. Reporting this as
+    // `directory_not_found` would make the Worker hold the one shared cursor
+    // for its full conflict budget before parking.
+    const organizationId = await seedOrganization();
+    await db
+      .update(organizations)
+      .set({ external_org_id: null })
+      .where(eq(organizations.id, organizationId));
+
+    const failure = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email,
+      firstName: 'Bob',
+      lastName: 'Bobert',
+    }).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(DirectorySyncConflictError);
+    // Terminal, so the event parks at once and an operator sees the reason.
+    expect((failure as DirectorySyncConflictError).code).toBe('domain_not_captured');
+    expect(failure instanceof Error ? failure.message : '').toContain('no WorkOS organization id');
+    // And WorkOS was never asked, since there is nothing to ask about.
+    expect(verifiedDomains.listDnsVerifiedDomains).not.toHaveBeenCalled();
+  });
+
+  test('refuses a domain WorkOS verified by hand rather than through DNS', async () => {
+    await seedOrganizationWithDomain(`primary-${suffix}.test`);
+    // `listDnsVerifiedDomains` filters on `verificationStrategy === 'dns'`, so
+    // a `manual` domain never reaches the gate: WorkOS reaches `verified` by a
+    // dashboard tick as well, which is an assertion rather than evidence of
+    // control, and this authorizes taking over an existing account.
+    verifiedDomains.listDnsVerifiedDomains.mockResolvedValueOnce([]);
+
+    const failure = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email,
+      firstName: 'Bob',
+      lastName: 'Bobert',
+    }).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(DirectorySyncConflictError);
+    expect((failure as DirectorySyncConflictError).code).toBe('domain_not_captured');
+    expect(failure instanceof Error ? failure.message : '').toContain('no DNS-verified domain');
+    // Nothing was provisioned.
+    const rows = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.external_id, externalId));
+    expect(rows).toEqual([]);
+  });
+
+  test('holds rather than refuses when WorkOS cannot be reached', async () => {
+    await seedOrganizationWithDomain(`primary-${suffix}.test`);
+    verifiedDomains.listDnsVerifiedDomains.mockRejectedValueOnce(
+      new verifiedDomains.VerifiedDomainLookupError('WorkOS unavailable')
+    );
+
+    const failure = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email,
+      firstName: 'Bob',
+      lastName: 'Bobert',
+    }).catch((error: unknown) => error);
+
+    // Deliberately *not* a conflict: a conflict is terminal for this code and
+    // would park the event, discarding a bind that may well be valid. An
+    // unreachable WorkOS has to answer 500 so the Worker holds its cursor.
+    expect(failure).not.toBeInstanceOf(DirectorySyncConflictError);
+    // The exact class, not merely `Error`: a bare `instanceof Error` also
+    // accepts the TypeError thrown when the module mock omits an error class
+    // the gate branches on, which would leave this assertion green while
+    // exercising none of the classification it describes.
+    expect(failure).toBeInstanceOf(verifiedDomains.VerifiedDomainLookupError);
+    expect(failure instanceof Error ? failure.message : '').toContain('WorkOS unavailable');
+  });
+
+  test('parks when the WorkOS organization no longer exists', async () => {
+    await seedOrganizationWithDomain(`primary-${suffix}.test`);
+    verifiedDomains.listDnsVerifiedDomains.mockRejectedValueOnce(
+      new verifiedDomains.VerifiedDomainOwnerMissingError('org gone')
+    );
+
+    const failure = await upsertDirectoryUser(externalId, {
+      directoryId,
+      email,
+      firstName: 'Bob',
+      lastName: 'Bobert',
+    }).catch((error: unknown) => error);
+
+    // The other half of hold-versus-park: a 404 is a completed answer, so it
+    // refuses terminally and the event parks rather than holding the one
+    // shared cursor for every other directory.
+    expect(failure).toBeInstanceOf(DirectorySyncConflictError);
+    expect((failure as DirectorySyncConflictError).code).toBe('domain_not_captured');
+    expect(failure instanceof Error ? failure.message : '').toContain('no longer exists');
+
+    const rows = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.external_id, externalId));
+    expect(rows).toEqual([]);
+  });
+
   test('refuses to create a user at a domain the organization never captured', async () => {
     await seedOrganizationWithDomain(`captured-${suffix}.test`);
 
@@ -522,7 +705,8 @@ describe('upsertDirectoryUser', () => {
       lastName: 'Comer',
     }).catch((error: unknown) => error);
     expect(retryError).toBeInstanceOf(DirectorySyncConflictError);
-    expect(retryError instanceof Error ? retryError.message : '').toContain('captured domain');
+    // Names the domain and why it was refused, never the address.
+    expect(retryError instanceof Error ? retryError.message : '').toContain('DNS-verified');
   });
 
   test('is idempotent: a replayed event returns the same user', async () => {
@@ -1215,6 +1399,248 @@ describe('directory membership', () => {
       .from(kilocode_users)
       .where(eq(kilocode_users.external_id, absentExternalId));
     expect(users).toEqual([]);
+  });
+});
+
+describe('revokeAllDirectoryMemberships', () => {
+  test('a user in two sibling groups loses both and the parent', async () => {
+    const parentId = await seedOrganization();
+    const childId = await seedSubOrganization();
+    const userId = await seedUser();
+
+    const siblingGroupId = `directory_group_sibling_${suffix}`;
+    const sibling = await upsertDirectorySubOrganization(siblingGroupId, {
+      directoryId,
+      directoryIdpId: `idp_group_sibling_${suffix}`,
+      name: `on-call-${suffix}`,
+    });
+    trackOrganization(sibling.id);
+
+    await addDirectoryMembership({ directoryGroupId, externalId });
+    await addDirectoryMembership({ directoryGroupId: siblingGroupId, externalId });
+
+    const result = await revokeAllDirectoryMemberships(externalId, { directoryId });
+
+    expect(result.kiloUserId).toBe(userId);
+    expect(result.revokedOrganizationIds.toSorted()).toEqual(
+      [parentId, childId, sibling.id].toSorted()
+    );
+
+    const remaining = await db
+      .select({ organizationId: organization_memberships.organization_id })
+      .from(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, userId));
+    expect(remaining).toEqual([]);
+
+    // Every removal goes through the ordinary removal primitive, so each one
+    // leaves the tombstone that stops an SSO sign-in restoring it.
+    const tombstones = await db
+      .select({ organizationId: organization_membership_removals.organization_id })
+      .from(organization_membership_removals)
+      .where(eq(organization_membership_removals.kilo_user_id, userId));
+    expect(tombstones.map(row => row.organizationId).toSorted()).toEqual(
+      [parentId, childId, sibling.id].toSorted()
+    );
+
+    // Memberships only: the account is never deleted or anonymized.
+    const [user] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, userId));
+    expect(user.external_id).toBe(externalId);
+    expect(user.google_user_email).toBe(email);
+  });
+
+  test('a user holding only the parent membership of a directory organization loses it', async () => {
+    const parentId = await seedOrganization();
+    await seedSubOrganization();
+    const userId = await seedUser();
+    await addDirectoryMembership({ directoryGroupId, externalId });
+
+    // The group went first — a disbanded group, or a `dsync.group.deleted` that
+    // arrived before the user's deletion. The user now holds no live group
+    // membership at all, only the enterprise one, so the parents of the groups
+    // being left are an empty set and the directory organization itself is the
+    // only candidate. Missing it would leave a deleted directory user inside
+    // the enterprise organization.
+    await deleteDirectorySubOrganization(directoryGroupId);
+
+    const result = await revokeAllDirectoryMemberships(externalId, { directoryId });
+
+    expect(result).toEqual({ kiloUserId: userId, revokedOrganizationIds: [parentId] });
+
+    // The soft-deleted group keeps its membership row, which is not this
+    // function's to clean up; what matters is that no live organization does.
+    const remaining = await db
+      .select({ organizationId: organization_memberships.organization_id })
+      .from(organization_memberships)
+      .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
+      .where(
+        and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at))
+      );
+    expect(remaining).toEqual([]);
+  });
+
+  test('an unknown directory user converges with an empty list', async () => {
+    await seedOrganization();
+    await seedSubOrganization();
+    const absentExternalId = `directory_user_absent_${suffix}`;
+
+    // Nothing to revoke is the state the event asserts, so this must not
+    // conflict and must not provision the departing user.
+    const result = await revokeAllDirectoryMemberships(absentExternalId, { directoryId });
+
+    expect(result).toEqual({ kiloUserId: null, revokedOrganizationIds: [] });
+
+    const users = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.external_id, absentExternalId));
+    expect(users).toEqual([]);
+  });
+
+  test('a replay reports an empty list', async () => {
+    await seedOrganization();
+    await seedSubOrganization();
+    const userId = await seedUser();
+    await addDirectoryMembership({ directoryGroupId, externalId });
+
+    const first = await revokeAllDirectoryMemberships(externalId, { directoryId });
+    const replay = await revokeAllDirectoryMemberships(externalId, { directoryId });
+
+    expect(first.revokedOrganizationIds.length).toBe(2);
+    expect(replay).toEqual({ kiloUserId: userId, revokedOrganizationIds: [] });
+  });
+
+  test('a membership in a sub-organization with no directory group binding is left alone', async () => {
+    const parentId = await seedOrganization();
+    const childId = await seedSubOrganization();
+    const userId = await seedUser();
+    await addDirectoryMembership({ directoryGroupId, externalId });
+
+    // The customer created this one, so it is not the directory's to revoke.
+    const manual = await createChildOrganization(`manual-${suffix}`, parentId);
+    trackOrganization(manual.id);
+    await addUserToOrganization(manual.id, userId, 'member');
+
+    const result = await revokeAllDirectoryMemberships(externalId, { directoryId });
+
+    expect(result.revokedOrganizationIds.toSorted()).toEqual([parentId, childId].toSorted());
+
+    const remaining = await db
+      .select({ organizationId: organization_memberships.organization_id })
+      .from(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, userId));
+    expect(remaining.map(row => row.organizationId)).toEqual([manual.id]);
+  });
+
+  test('a membership under another directory survives, tombstone-free', async () => {
+    const parentId = await seedOrganization();
+    const childId = await seedSubOrganization();
+    const userId = await seedUser();
+    await addDirectoryMembership({ directoryGroupId, externalId });
+
+    // A second enterprise, with its own directory and its own group. Nothing
+    // stops the account from holding a membership here: the administrator-add,
+    // seat-assignment, and invitation-acceptance paths all write a membership
+    // without consulting `directory_id`, so `addUserToOrganization` is how such
+    // a row really appears.
+    const otherDirectoryId = `directory_other_${suffix}`;
+    const otherParent = await upsertDirectoryOrganization(otherDirectoryId, {
+      workOSOrganizationId: `org_other_${suffix}`,
+      name: `Other Org ${suffix}`,
+    });
+    trackOrganization(otherParent.id);
+    const otherGroup = await upsertDirectorySubOrganization(`directory_group_other_${suffix}`, {
+      directoryId: otherDirectoryId,
+      directoryIdpId: `idp_group_other_${suffix}`,
+      name: `other-users-${suffix}`,
+    });
+    trackOrganization(otherGroup.id);
+    await addUserToOrganization(otherParent.id, userId, 'member');
+    await addUserToOrganization(otherGroup.id, userId, 'member');
+
+    const result = await revokeAllDirectoryMemberships(externalId, { directoryId });
+
+    // Only the emitting directory's organizations.
+    expect(result.revokedOrganizationIds.toSorted()).toEqual([parentId, childId].toSorted());
+
+    const remaining = await db
+      .select({ organizationId: organization_memberships.organization_id })
+      .from(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, userId));
+    expect(remaining.map(row => row.organizationId).toSorted()).toEqual(
+      [otherParent.id, otherGroup.id].toSorted()
+    );
+
+    // The irrecoverable half: `removeUserFromOrganization` writes a removal
+    // tombstone, and under Membership Admission rule 4 a tombstone blocks
+    // ordinary SSO JIT provisioning from restoring the membership. A stray
+    // tombstone here would fence the user out of the other tenant, not merely
+    // delete a row an administrator could re-add.
+    const tombstones = await db
+      .select({ organizationId: organization_membership_removals.organization_id })
+      .from(organization_membership_removals)
+      .where(
+        and(
+          eq(organization_membership_removals.kilo_user_id, userId),
+          inArray(organization_membership_removals.organization_id, [otherParent.id, otherGroup.id])
+        )
+      );
+    expect(tombstones).toEqual([]);
+  });
+
+  test('a user in many groups is revoked in one transaction', async () => {
+    const parentId = await seedOrganization();
+    const firstChildId = await seedSubOrganization();
+    const userId = await seedUser();
+    await addDirectoryMembership({ directoryGroupId, externalId });
+
+    // Enough groups that a transaction and a session-invalidation round trip
+    // apiece would not fit the Worker's 15s request budget. One call must
+    // finish the revocation: a partial one that reported success would leave
+    // the departed user holding seats the next event never revisits.
+    const groupIds = [firstChildId];
+    for (let index = 0; index < 11; index += 1) {
+      const groupKey = `directory_group_${index}_${suffix}`;
+      const group = await upsertDirectorySubOrganization(groupKey, {
+        directoryId,
+        directoryIdpId: `idp_group_${index}_${suffix}`,
+        name: `team-${index}-${suffix}`,
+      });
+      trackOrganization(group.id);
+      groupIds.push(group.id);
+      await addDirectoryMembership({ directoryGroupId: groupKey, externalId });
+    }
+
+    // The row counts alone do not distinguish this from the per-group
+    // implementation that preceded it — the same memberships end up deleted
+    // either way. What changed is *how*: one transaction for every deletion,
+    // with the outbound session-invalidation calls outside it. That is what
+    // keeps a user in many groups inside the Worker's 15s budget, so it is
+    // what this asserts.
+    //
+    // `invalidateMemberSessionAccess` is not spied on: it is an ES module
+    // export, so `jest.spyOn` cannot redefine it. The transaction count is
+    // the observable that separates the two implementations — the previous
+    // one opened one per group, and each of those also awaited its own
+    // invalidation inside `removeUserFromOrganization`.
+    const transactionSpy = jest.spyOn(db, 'transaction');
+
+    const result = await revokeAllDirectoryMemberships(externalId, { directoryId });
+
+    expect(result.revokedOrganizationIds.toSorted()).toEqual([parentId, ...groupIds].toSorted());
+
+    const remaining = await db
+      .select({ organizationId: organization_memberships.organization_id })
+      .from(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, userId));
+    expect(remaining).toEqual([]);
+
+    // One transaction for all 13 revocations, not one apiece. The per-group
+    // implementation opened 13, each awaiting its own session-invalidation
+    // round trip inside `removeUserFromOrganization`, which is what could
+    // exceed the Worker's request budget.
+    expect(transactionSpy).toHaveBeenCalledTimes(1);
+
+    transactionSpy.mockRestore();
   });
 });
 

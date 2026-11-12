@@ -48,14 +48,6 @@ git diff --check
   `jotai/vanilla/utils` and calls `setSelf`; both are gone in 3.x. Revisit as
   soon as `jotai-minidb` ships a release that supports `jotai` 3; 3.0.1 already
   clears `minimumReleaseAge`.
-- `@kilocode/kilo-chat-hooks` is copied, not symlinked. After editing it:
-
-  ```bash
-  pnpm install --filter kilo-app...
-  rm -rf "$TMPDIR/metro-cache" "$TMPDIR"/metro-file-map-*
-  ```
-
-  Then restart Metro and force-quit the app.
 
 ## Library First
 
@@ -89,7 +81,7 @@ One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces th
 | Video | `expo-video` | `react-native-video`, `expo-av` |
 | Blur | `expo-blur` | `expo-glass-effect`, `@callstack/liquid-glass` (no Liquid Glass) |
 | Toast | `sonner-native` | `react-native-toast-message`, `burnt` |
-| Images | `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
+| Images | `Image` from `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
 | Icons | `@/components/ui/icons` | `lucide-react-native` |
 | Markdown | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown` | `react-native-marked`, `react-native-markdown-display` |
 | HTML in markdown | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html` |
@@ -112,8 +104,18 @@ Use a concrete height and `flex: 0` for an inline `FlashList`; `maxHeight` alone
 Omit empty-state descriptions that repeat the title or tell the user to use a disabled action.
 
 Keyboard avoidance is `react-native-keyboard-controller`, wrapped in one `KeyboardProvider` at the app root.
-`KeyboardAvoidingView` clears the IME on the session, history, quick-chat, session-detail, new-session,
-conversation, manual-review and PR-discussion surfaces; `useKeyboardState` is the app's one keyboard-height read.
+`KeyboardAvoidingView` clears the IME on the session, quick-chat, session-detail, new-session,
+conversation, manual-review and PR-discussion surfaces; the Agents list and the stored history render
+`@/components/agents/owned-keyboard-lift` instead, which pads by the keyboard their own search field raised and
+writes that pad on every render (the library container drops its animated style when `enabled` turns false, and
+the property it last applied stays on the native view). The pad never takes more room than the body can spare:
+it is clamped so a minimum viewport survives (`MIN_BODY_VIEWPORT` in `@/lib/body-viewport`, the same floor
+`TabScreenScrollView` applies to its frame), because a keyboard height belongs to the window it was measured in
+and a rotation replaces that window with a much shorter one — an unclamped pad then fills the body and the list
+renders nothing, with no rows, skeleton, empty state or error. The clamp measures the body frame and keys that
+measurement to `useWindowDimensions().height`: the layout pass that reports a new frame runs after the first
+render a rotation produces, so a frame measured in the previous window is released for that render instead of
+being trusted. `useKeyboardState` is the app's one keyboard-height read.
 The conversation list follows the newest message when its viewport shrinks; it must not add a second keyboard inset.
 A surface whose content
 pads the platform's bottom inset itself passes `keyboardVerticalOffset={keyboardInsetOffset(bottom)}`

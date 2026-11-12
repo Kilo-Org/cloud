@@ -40,6 +40,8 @@ async function usageRecordForNewOrganization() {
     apiKind: 'messages' as const,
     decision: 'blocked' as const,
     creditsCost: 7,
+    scannedCharacters: 2_400,
+    totalCharacters: 10_000,
     addedLatencyMs: 212,
   };
 }
@@ -118,6 +120,28 @@ describe('recordEnkryptUsage region routing', () => {
     expect(await ledgerRows(usageRecord.organizationId)).toEqual([]);
   });
 
+  it.each(['recorded', 'duplicate'])(
+    'treats a %s response echoing the sent usage id as handled without writing locally',
+    async status => {
+      mockedIsUSRegion.mockReturnValue(true);
+      mockFetch.mockImplementation(async (_url, init) =>
+        Response.json({
+          status,
+          usageId: EnkryptUsageWriteSchema.parse(JSON.parse(String(init?.body))).id,
+        })
+      );
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const usageRecord = await usageRecordForNewOrganization();
+
+      await recordEnkryptUsage(usageRecord);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(consoleError).not.toHaveBeenCalled();
+      expect(await ledgerRows(usageRecord.organizationId)).toEqual([]);
+      expect(await microdollarsUsed(usageRecord.organizationId)).toBe(0);
+    }
+  );
+
   it.each([
     [
       'a transport failure',
@@ -143,6 +167,17 @@ describe('recordEnkryptUsage region routing', () => {
       'a malformed response',
       () => mockFetch.mockResolvedValue(Response.json({ status: 'unknown' })),
       'malformed_response',
+    ],
+    [
+      'a response with an unknown field',
+      () => mockFetch.mockResolvedValue(Response.json({ status: 'recorded', result: null })),
+      'malformed_response',
+    ],
+    [
+      'a response echoing a different usage id',
+      () =>
+        mockFetch.mockResolvedValue(Response.json({ status: 'recorded', usageId: randomUUID() })),
+      'usage_id_mismatch',
     ],
   ])('logs %s without the secret and writes locally once', async (_name, arrange, reason) => {
     mockedIsUSRegion.mockReturnValue(true);
@@ -170,4 +205,77 @@ describe('recordEnkryptUsage region routing', () => {
       7 * MICRODOLLARS_PER_ENKRYPT_CREDIT
     );
   });
+
+  it.each([
+    [
+      'a failed body cancel on an error response',
+      () =>
+        new Response(
+          new ReadableStream({
+            cancel() {
+              throw new TypeError('cancel failed with a detail that must not be logged');
+            },
+          }),
+          { status: 503 }
+        ),
+      '[enkrypt-guardrail] failed to cancel the primary region error response body',
+      'TypeError',
+      'http_503',
+    ],
+    [
+      'an unparseable success response',
+      () => new Response('not json, with a detail that must not be logged', { status: 200 }),
+      '[enkrypt-guardrail] failed to parse the primary region response body',
+      'SyntaxError',
+      'malformed_response',
+    ],
+    [
+      'a success response body that times out while being read',
+      () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.error(
+                new DOMException('timed out with a detail that must not be logged', 'TimeoutError')
+              );
+            },
+          }),
+          { status: 200 }
+        ),
+      '[enkrypt-guardrail] failed to parse the primary region response body',
+      'TimeoutError',
+      'malformed_response',
+    ],
+  ])(
+    'logs %s and still writes locally once',
+    async (_name, response, warning, errorName, reason) => {
+      mockedIsUSRegion.mockReturnValue(true);
+      mockFetch.mockResolvedValue(response());
+      const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const usageRecord = await usageRecordForNewOrganization();
+
+      await expect(recordEnkryptUsage(usageRecord)).resolves.toBeUndefined();
+
+      const handedOff = EnkryptUsageWriteSchema.parse(
+        JSON.parse(String(mockFetch.mock.calls[0][1]?.body))
+      );
+      expect(consoleWarn).toHaveBeenCalledTimes(1);
+      expect(consoleWarn).toHaveBeenCalledWith(warning, {
+        usage_id: handedOff.id,
+        error_name: errorName,
+      });
+      expect(JSON.stringify(consoleWarn.mock.calls)).not.toContain('must not be logged');
+      expect(consoleError).toHaveBeenCalledWith(
+        '[enkrypt-guardrail] failed to record usage in the primary region; writing locally',
+        { usage_id: handedOff.id, reason }
+      );
+      const rows = await ledgerRows(usageRecord.organizationId);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].id).toBe(handedOff.id);
+      expect(await microdollarsUsed(usageRecord.organizationId)).toBe(
+        7 * MICRODOLLARS_PER_ENKRYPT_CREDIT
+      );
+    }
+  );
 });

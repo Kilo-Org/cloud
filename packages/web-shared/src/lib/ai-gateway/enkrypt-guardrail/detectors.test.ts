@@ -256,35 +256,27 @@ describe('policy rule cap', () => {
 });
 
 describe('enforcedEnkryptInputDetectors', () => {
-  it('keeps the configurable detectors and applies Kilo Default to every other one', () => {
+  it('keeps the configurable detectors and turns every other one off', () => {
     const detectors = allEnabled();
     const enforced = enforcedEnkryptInputDetectors(detectors);
 
-    expect(enabledEnkryptDetectorIds(enforced)).toEqual([
-      'injection_attack',
-      'pii',
-      'policy_violation',
-      'nsfw',
-    ]);
+    expect(enabledEnkryptDetectorIds(enforced)).toEqual(['injection_attack', 'policy_violation']);
     expect(enforced.policy_violation).toBe(detectors.policy_violation);
     const configurable: readonly EnkryptDetectorId[] = ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS;
     for (const id of ENKRYPT_DETECTOR_IDS.filter(id => !configurable.includes(id))) {
       expect(enforced[id]).toEqual(createKiloDefaultEnkryptInputDetectors()[id]);
+      expect(enforced[id].enabled).toBe(false);
     }
   });
 
-  it('blocks NSFW content and logs secrets even when the saved detectors turned them off', () => {
-    const detectors = createKiloDefaultEnkryptInputDetectors();
+  it('scans nothing when the saved configurable detectors are off', () => {
+    const detectors = allEnabled();
     detectors.injection_attack.enabled = false;
-    detectors.pii = { enabled: false, action: 'block', entities: ['url'] };
-    detectors.nsfw.enabled = false;
+    detectors.policy_violation.enabled = false;
     const enforced = enforcedEnkryptInputDetectors(detectors);
 
-    expect(buildEnkryptDetectRequestDetectors(enforced)).toEqual({
-      pii: { enabled: true, entities: ['secrets'] },
-      nsfw: { enabled: true },
-    });
-    expect(blockingEnkryptDetectorIds(enforced)).toEqual(['nsfw']);
+    expect(buildEnkryptDetectRequestDetectors(enforced)).toEqual({});
+    expect(enabledEnkryptDetectorIds(enforced)).toEqual([]);
   });
 });
 
@@ -300,35 +292,26 @@ describe('detector metadata', () => {
 });
 
 describe('blockingEnkryptDetectorIds', () => {
-  it('blocks on enabled block-type detectors and on revise-type detectors set to block', () => {
-    expect(blockingEnkryptDetectorIds(createKiloDefaultEnkryptInputDetectors())).toEqual([
-      'injection_attack',
-      'nsfw',
-    ]);
+  it('blocks only on enabled configurable detectors set to block', () => {
     expect(blockingEnkryptDetectorIds(allEnabled())).toEqual([
       'injection_attack',
-      'pii',
-      'keyword_detector',
-      'topic_detector',
       'policy_violation',
-      'toxicity',
-      'nsfw',
-      'sponge_attack',
     ]);
+  });
+
+  it('logs prompt injection without blocking for Kilo Default', () => {
+    const detectors = createKiloDefaultEnkryptInputDetectors();
+
+    expect(enabledEnkryptDetectorIds(detectors)).toEqual(['injection_attack']);
+    expect(blockingEnkryptDetectorIds(detectors)).toEqual([]);
   });
 
   it('only logs configurable detectors set to log only', () => {
     const detectors = createKiloDefaultEnkryptInputDetectors();
-    detectors.injection_attack.action = 'log';
     detectors.policy_violation = { ...allEnabled().policy_violation, action: 'log' };
 
-    expect(enabledEnkryptDetectorIds(detectors)).toEqual([
-      'injection_attack',
-      'pii',
-      'policy_violation',
-      'nsfw',
-    ]);
-    expect(blockingEnkryptDetectorIds(detectors)).toEqual(['nsfw']);
+    expect(enabledEnkryptDetectorIds(detectors)).toEqual(['injection_attack', 'policy_violation']);
+    expect(blockingEnkryptDetectorIds(detectors)).toEqual([]);
   });
 });
 
@@ -370,11 +353,9 @@ describe('storableEnkryptInputDetectors', () => {
 });
 
 describe('buildEnkryptDetectRequestDetectors', () => {
-  it('sends prompt injection, secrets, and NSFW for Kilo Default', () => {
+  it('sends only prompt injection for Kilo Default', () => {
     expect(buildEnkryptDetectRequestDetectors(createKiloDefaultEnkryptInputDetectors())).toEqual({
       injection_attack: { enabled: true, need_explanation: false },
-      pii: { enabled: true, entities: ['secrets'] },
-      nsfw: { enabled: true },
     });
   });
 

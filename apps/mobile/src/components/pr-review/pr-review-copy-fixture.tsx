@@ -14,6 +14,7 @@ import { PrReviewCommentComposer } from '@/components/pr-review/pr-review-commen
 import {
   createFixtureClient,
   fileCount,
+  filesForSurface,
   headSha,
   triple,
 } from '@/components/pr-review/pr-review-copy-fixture-client';
@@ -40,7 +41,7 @@ import { type ProviderPrScope, ProviderPrScopeProvider } from '@/lib/pr-review/p
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { TRPCProvider } from '@/lib/trpc';
 
-// In a development build, open dev/pr-review-copy-fixture/{checks,navigator,files,merge,tabs}
+// In a development build, open dev/pr-review-copy-fixture/{checks,navigator,files,files-context,merge,tabs}
 // through the app's native link scheme; the overview surfaces are
 // dev/pr-review-copy-fixture/{overview,overview-blocked,overview-merged,merge-request,
 // merge-request-missing,merge-request-error}.
@@ -152,7 +153,7 @@ export function PrReviewCopyFixture() {
             conflicts: false,
             blockedReasons: [],
           }}
-          sheetTitle={providerPrMergeTitles(t, scope.ref.platform).action}
+          sheetTitle={providerPrMergeTitles(t, scope.ref.platform).title}
           eyebrow="sample/review-copy!1"
           onRefetch={async () => {
             await queryClient.invalidateQueries();
@@ -167,14 +168,18 @@ export function PrReviewCopyFixture() {
     content = (
       <PrDiffFileNavigator {...triple} headSha={headSha} changedFiles={fileCount} header={header} />
     );
-  } else if (surface === 'files') {
+  } else if (surface === 'files' || surface === 'files-context') {
     content = (
       <PendingReviewProvider
         userId="review-copy-fixture"
         draftEntityKey={pendingReviewDraftKey(triple.owner, triple.repo, triple.number)}
       >
         {header}
-        <PrReviewFileList {...triple} headSha={headSha} changedFiles={fileCount} />
+        <PrReviewFileList
+          {...triple}
+          headSha={headSha}
+          changedFiles={filesForSurface(surface).length}
+        />
       </PendingReviewProvider>
     );
   } else if (isOverviewSurface(surface)) {

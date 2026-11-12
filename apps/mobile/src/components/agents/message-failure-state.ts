@@ -7,7 +7,26 @@ import { i18n } from '@/i18n';
  * Fixed, safe copy for a failed user-message delivery, keyed by the delivery
  * `reason`. Never surfaces raw provider or transport text.
  */
-type DeliveryReason = Extract<MessageDeliveryState, { status: 'failed' }>['reason'];
+type SdkDeliveryReason = Extract<MessageDeliveryState, { status: 'failed' }>['reason'];
+
+/**
+ * The reason the chat reports for a turn it could not send because the account's
+ * balance could not pay for it. The SDK never records it: no transport carried
+ * the message, so there is nothing for it to report. The chat hands it to the
+ * bubble in the same failed-delivery statement, so the footer, its actions and
+ * its accessibility label stay one mechanism.
+ */
+export const CREDITS_DELIVERY_REASON = 'credits';
+
+/**
+ * What a bubble is told about a turn that failed: the SDK's delivery record, or
+ * the chat's own credits statement above.
+ */
+export type MessageDeliveryStatement =
+  | MessageDeliveryState
+  | { status: 'failed'; error: string; reason: typeof CREDITS_DELIVERY_REASON };
+
+type DeliveryReason = SdkDeliveryReason | typeof CREDITS_DELIVERY_REASON;
 
 /**
  * The row a delivery failure draws, keyed by its `reason`. A message the person
@@ -42,6 +61,16 @@ const DELIVERY_FAILURE_ROW = {
     error: true,
     titleKey: 'agentChat.messageFailure.assistantTitle',
     detailKey: 'agentChat.messageFailure.deliveryExecution',
+  },
+  /* The account's balance refused the send: the message itself did not go, so the
+     statement sits under the person's own bubble, like the other delivery rows.
+     The title alone states the cause, because the action under it carries the
+     recovery, and a second line would repeat it. */
+  credits: {
+    side: 'user',
+    error: true,
+    titleKey: 'modelChat.creditsRequired',
+    detailKey: null,
   },
 } as const satisfies Record<
   DeliveryReason,
@@ -301,8 +330,36 @@ export function messageFailureLabel(
   return template === '' ? i18n.t(key, { title }) : composeFailureLabel(title, template);
 }
 
+/**
+ * The detail keys of the statement that says only that the response failed: an
+ * unclassified assistant error carries none, and a question whose run failed
+ * carries `deliveryExecution`. Every classified cause — a provider refusal, a
+ * spent balance, an aborted or overflowing turn — names something the reader
+ * cannot get anywhere else, so it is not generic.
+ */
+const GENERIC_RESPONSE_FAILURE_DETAIL_KEYS: ReadonlySet<string | null> = new Set([
+  null,
+  'agentChat.messageFailure.deliveryExecution',
+]);
+
+/**
+ * Whether this failure states only that the response failed. A question whose
+ * preparation failed states that failure in its preparation group, which sits
+ * with the turn, so this statement above it would repeat one failure in the
+ * same turn. The row keeps its actions; a classified statement is never
+ * hidden.
+ */
+export function isGenericResponseFailure(
+  failure: Pick<MessageFailure, 'titleKey' | 'detailKey'>
+): boolean {
+  return (
+    failure.titleKey === 'agentChat.messageFailure.assistantTitle' &&
+    GENERIC_RESPONSE_FAILURE_DETAIL_KEYS.has(failure.detailKey)
+  );
+}
+
 export function selectMessageFailure(input: {
-  deliveryState?: MessageDeliveryState;
+  deliveryState?: MessageDeliveryStatement;
   info: MessageInfo;
   /**
    * Whether this row's session can accept a re-send right now. A read-only
@@ -316,8 +373,16 @@ export function selectMessageFailure(input: {
   const retryAvailable = input.retryAvailable ?? true;
 
   if (info.role === 'user' && deliveryState?.status === 'failed') {
-    if (deliveryState.reason === AGENT_EXECUTION_DELIVERY_REASON) {
-      const copy = DELIVERY_FAILURE_ROW.execution;
+    // A failed response and a send the balance refused state their own cause
+    // rather than the transport's; both keep Copy to composer. The credits row
+    // drops the Retry its cause would make pointless and carries the one action
+    // that settles it.
+    if (
+      deliveryState.reason === AGENT_EXECUTION_DELIVERY_REASON ||
+      deliveryState.reason === CREDITS_DELIVERY_REASON
+    ) {
+      const credits = deliveryState.reason === CREDITS_DELIVERY_REASON;
+      const copy = credits ? DELIVERY_FAILURE_ROW.credits : DELIVERY_FAILURE_ROW.execution;
       return {
         kind: 'delivery',
         side: copy.side,
@@ -325,10 +390,10 @@ export function selectMessageFailure(input: {
         titleKey: copy.titleKey,
         title: i18n.t(copy.titleKey),
         detailKey: copy.detailKey,
-        detail: i18n.t(copy.detailKey),
+        detail: copy.detailKey === null ? null : i18n.t(copy.detailKey),
         copyDetail: deliveryState.error,
-        canRetry: retryAvailable,
-        canAddCredits: false,
+        canRetry: credits ? false : retryAvailable,
+        canAddCredits: credits,
         canCopy: true,
       };
     }

@@ -767,15 +767,40 @@ describe('fake-llm-server HTTP', () => {
     expect(body.error.message).toContain('unknown fake scenario: nosuch');
   });
 
-  it('missing directive echoes the last user message', async () => {
+  it.each([
+    {
+      kind: 'initial',
+      prompt:
+        'You MUST summarize the conversation above into a structured summary that will be given to another agent to resume the work.\nSummarize only what the user and the assistant said and did.',
+    },
+    {
+      kind: 'checkpoint',
+      prompt:
+        'Update the existing checkpoint in the conversation above into one consolidated summary.\nNewer history always takes precedence over the existing checkpoint.',
+    },
+  ])('streams a deterministic summary for the $kind compaction prompt', async ({ prompt }) => {
     const h = await start();
-    const res = await postChat(h.url, 'just some prompt with no directive');
+    const res = await postChat(h.url, prompt);
     expect(res.status).toBe(200);
-    const chunks = await readAllSse(res.body!);
-    const parsed = chunks.slice(0, -1).map(c => JSON.parse(c.data));
-    expect(parsed[0].choices[0].delta.content).toBe('just some prompt with no directive');
-    expect(parsed[parsed.length - 1].choices[0].finish_reason).toBe('stop');
+    const chunks = await parseSse(res);
+    const content = assistantContent(chunks);
+    expect(content).toContain('## Objective');
+    expect(content).toContain('This is a deterministic local test summary.');
+    expect(content).not.toContain(prompt);
+    expect(chunks.at(-1)?.choices).toEqual([{ index: 0, delta: {}, finish_reason: 'stop' }]);
   });
+
+  it.each(['just some prompt with no directive', 'Please summarize this conversation'])(
+    'missing directive echoes the last user message: %s',
+    async prompt => {
+      const h = await start();
+      const res = await postChat(h.url, prompt);
+      expect(res.status).toBe(200);
+      const chunks = await parseSse(res);
+      expect(assistantContent(chunks)).toBe(prompt);
+      expect(chunks.at(-1)?.choices).toEqual([{ index: 0, delta: {}, finish_reason: 'stop' }]);
+    }
+  );
 
   it('missing directive strips kilo environment_details from the echo', async () => {
     const h = await start();

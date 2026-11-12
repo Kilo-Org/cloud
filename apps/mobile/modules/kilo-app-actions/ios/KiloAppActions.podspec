@@ -12,5 +12,6 @@ Pod::Spec.new do |s|
   s.static_framework = true
   s.dependency 'ExpoModulesCore'
   s.source_files = '**/*.swift'
+  s.exclude_files = '**/AppIntents/**/*'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
 end

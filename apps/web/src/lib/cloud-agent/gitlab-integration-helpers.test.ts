@@ -63,6 +63,28 @@ describe('gitlab-integration-helpers', () => {
     jest.resetModules();
   });
 
+  /**
+   * A stored connection that may answer: active, unsuspended, and with no
+   * credential marker. Each test overrides the columns that make it unhealthy
+   * or the snapshot it answers from.
+   */
+  const buildGitLabIntegration = (
+    overrides: Partial<PlatformIntegration> = {}
+  ): PlatformIntegration =>
+    ({
+      id: 'integration-1',
+      platform: 'gitlab',
+      integration_status: INTEGRATION_STATUS.ACTIVE,
+      suspended_at: null,
+      auth_invalid_at: null,
+      auth_invalid_reason: null,
+      github_disconnected_at: null,
+      metadata: {},
+      repositories: [{ id: 1, name: 'project', full_name: 'group/project', private: false }],
+      repositories_synced_at: '2024-01-01T00:00:00Z',
+      ...overrides,
+    }) as PlatformIntegration;
+
   describe('buildGitLabCloneUrl', () => {
     it('should build URL for simple project path', () => {
       const result = buildGitLabCloneUrl('group/project');
@@ -300,14 +322,8 @@ describe('gitlab-integration-helpers', () => {
   });
 
   describe('getGitLabProjectAccessForRequester', () => {
-    const buildIntegration = (): PlatformIntegration =>
-      ({
-        id: 'integration-1',
-        metadata: {},
-      }) as PlatformIntegration;
-
     it('allows a project the requester credential holds Developer access to', async () => {
-      mockGetGitLabIntegration.mockResolvedValue(buildIntegration());
+      mockGetGitLabIntegration.mockResolvedValue(buildGitLabIntegration());
       mockGetValidGitLabToken.mockResolvedValue('requester-token');
       mockGetGitLabProject.mockResolvedValue({
         id: 7,
@@ -326,7 +342,7 @@ describe('gitlab-integration-helpers', () => {
     });
 
     it('allows a project the requester reaches through a group at Maintainer level', async () => {
-      mockGetGitLabIntegration.mockResolvedValue(buildIntegration());
+      mockGetGitLabIntegration.mockResolvedValue(buildGitLabIntegration());
       mockGetValidGitLabToken.mockResolvedValue('requester-token');
       mockGetGitLabProject.mockResolvedValue({
         id: 7,
@@ -340,7 +356,7 @@ describe('gitlab-integration-helpers', () => {
     });
 
     it('refuses a requester whose reported level cannot push', async () => {
-      mockGetGitLabIntegration.mockResolvedValue(buildIntegration());
+      mockGetGitLabIntegration.mockResolvedValue(buildGitLabIntegration());
       mockGetValidGitLabToken.mockResolvedValue('requester-token');
       mockGetGitLabProject.mockResolvedValue({
         id: 7,
@@ -355,7 +371,7 @@ describe('gitlab-integration-helpers', () => {
     });
 
     it('refuses a project the instance reports no access level for', async () => {
-      mockGetGitLabIntegration.mockResolvedValue(buildIntegration());
+      mockGetGitLabIntegration.mockResolvedValue(buildGitLabIntegration());
       mockGetValidGitLabToken.mockResolvedValue('requester-token');
       mockGetGitLabProject.mockResolvedValue({ id: 7 });
 
@@ -366,7 +382,7 @@ describe('gitlab-integration-helpers', () => {
     });
 
     it('refuses a project whose reported permissions cannot be read', async () => {
-      mockGetGitLabIntegration.mockResolvedValue(buildIntegration());
+      mockGetGitLabIntegration.mockResolvedValue(buildGitLabIntegration());
       mockGetValidGitLabToken.mockResolvedValue('requester-token');
       mockGetGitLabProject.mockResolvedValue({
         id: 7,
@@ -381,7 +397,7 @@ describe('gitlab-integration-helpers', () => {
 
     it('refuses a 404 from the requester instance without retrying', async () => {
       const { GitLabProjectFetchError, helpers } = await loadRequesterAccess();
-      mockGetGitLabIntegration.mockResolvedValue(buildIntegration());
+      mockGetGitLabIntegration.mockResolvedValue(buildGitLabIntegration());
       mockGetValidGitLabToken.mockResolvedValue('requester-token');
       mockGetGitLabProject.mockRejectedValue(new GitLabProjectFetchError(404));
 
@@ -395,6 +411,19 @@ describe('gitlab-integration-helpers', () => {
 
     it('refuses a requester with no GitLab connection of their own', async () => {
       mockGetGitLabIntegration.mockResolvedValue(null);
+
+      const { getGitLabProjectAccessForRequester } = await import('./gitlab-integration-helpers');
+      await expect(getGitLabProjectAccessForRequester('user-1', 'group/repo')).resolves.toEqual({
+        outcome: 'refused',
+      });
+      expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
+      expect(mockGetGitLabProject).not.toHaveBeenCalled();
+    });
+
+    it('refuses a connection that requires reauthorization', async () => {
+      mockGetGitLabIntegration.mockResolvedValue(
+        buildGitLabIntegration({ auth_invalid_at: '2026-11-01T00:00:00.000Z' })
+      );
 
       const { getGitLabProjectAccessForRequester } = await import('./gitlab-integration-helpers');
       await expect(getGitLabProjectAccessForRequester('user-1', 'group/repo')).resolves.toEqual({
@@ -422,7 +451,7 @@ describe('gitlab-integration-helpers', () => {
 
     it('propagates a transient lookup failure for the retry response', async () => {
       const { GitLabProjectFetchError, helpers } = await loadRequesterAccess();
-      mockGetGitLabIntegration.mockResolvedValue(buildIntegration());
+      mockGetGitLabIntegration.mockResolvedValue(buildGitLabIntegration());
       mockGetValidGitLabToken.mockResolvedValue('requester-token');
       mockGetGitLabProject.mockRejectedValue(new GitLabProjectFetchError(503));
 
@@ -434,7 +463,7 @@ describe('gitlab-integration-helpers', () => {
     it('keeps the provider failure as the cause of the lookup error', async () => {
       const { GitLabProjectFetchError, helpers } = await loadRequesterAccess();
       const failure = new GitLabProjectFetchError(503);
-      mockGetGitLabIntegration.mockResolvedValue(buildIntegration());
+      mockGetGitLabIntegration.mockResolvedValue(buildGitLabIntegration());
       mockGetValidGitLabToken.mockResolvedValue('requester-token');
       mockGetGitLabProject.mockRejectedValue(failure);
 
@@ -447,7 +476,7 @@ describe('gitlab-integration-helpers', () => {
     });
 
     it('does not treat a failure without a provider status as a refusal', async () => {
-      mockGetGitLabIntegration.mockResolvedValue(buildIntegration());
+      mockGetGitLabIntegration.mockResolvedValue(buildGitLabIntegration());
       mockGetValidGitLabToken.mockResolvedValue('requester-token');
       mockGetGitLabProject.mockRejectedValue(new Error('GitLab project fetch failed: 404'));
 
@@ -460,15 +489,14 @@ describe('gitlab-integration-helpers', () => {
 
   describe('validateGitLabRepoAccessForUser', () => {
     it('should return true when project is in repository list', async () => {
-      mockGetIntegrationForOwner.mockResolvedValue({
-        id: 'integration-1',
-        metadata: {},
-        repositories: [
-          { id: 1, name: 'project', full_name: 'group/project', private: false },
-          { id: 2, name: 'other', full_name: 'group/other', private: true },
-        ],
-        repositories_synced_at: '2024-01-01T00:00:00Z',
-      } as PlatformIntegration);
+      mockGetIntegrationForOwner.mockResolvedValue(
+        buildGitLabIntegration({
+          repositories: [
+            { id: 1, name: 'project', full_name: 'group/project', private: false },
+            { id: 2, name: 'other', full_name: 'group/other', private: true },
+          ],
+        })
+      );
 
       const { validateGitLabRepoAccessForUser } = await import('./gitlab-integration-helpers');
       const result = await validateGitLabRepoAccessForUser('user-123', 'group/project');
@@ -477,12 +505,7 @@ describe('gitlab-integration-helpers', () => {
     });
 
     it('should return false when project is not in repository list', async () => {
-      mockGetIntegrationForOwner.mockResolvedValue({
-        id: 'integration-1',
-        metadata: {},
-        repositories: [{ id: 1, name: 'project', full_name: 'group/project', private: false }],
-        repositories_synced_at: '2024-01-01T00:00:00Z',
-      } as PlatformIntegration);
+      mockGetIntegrationForOwner.mockResolvedValue(buildGitLabIntegration());
 
       const { validateGitLabRepoAccessForUser } = await import('./gitlab-integration-helpers');
       const result = await validateGitLabRepoAccessForUser('user-123', 'group/nonexistent');
@@ -491,12 +514,11 @@ describe('gitlab-integration-helpers', () => {
     });
 
     it('should perform case-insensitive matching', async () => {
-      mockGetIntegrationForOwner.mockResolvedValue({
-        id: 'integration-1',
-        metadata: {},
-        repositories: [{ id: 1, name: 'Project', full_name: 'Group/Project', private: false }],
-        repositories_synced_at: '2024-01-01T00:00:00Z',
-      } as PlatformIntegration);
+      mockGetIntegrationForOwner.mockResolvedValue(
+        buildGitLabIntegration({
+          repositories: [{ id: 1, name: 'Project', full_name: 'Group/Project', private: false }],
+        })
+      );
 
       const { validateGitLabRepoAccessForUser } = await import('./gitlab-integration-helpers');
       const result = await validateGitLabRepoAccessForUser('user-123', 'group/project');
@@ -514,15 +536,25 @@ describe('gitlab-integration-helpers', () => {
     });
 
     it('should return false when project not found in non-empty repository list', async () => {
-      mockGetIntegrationForOwner.mockResolvedValue({
-        id: 'integration-1',
-        metadata: {},
-        repositories: [{ id: 1, name: 'other', full_name: 'other/repo', private: false }],
-        repositories_synced_at: '2024-01-01T00:00:00Z',
-      } as PlatformIntegration);
+      mockGetIntegrationForOwner.mockResolvedValue(
+        buildGitLabIntegration({
+          repositories: [{ id: 1, name: 'other', full_name: 'other/repo', private: false }],
+        })
+      );
 
       const { validateGitLabRepoAccessForUser } = await import('./gitlab-integration-helpers');
       // Search for a project that doesn't exist in the list
+      const result = await validateGitLabRepoAccessForUser('user-123', 'group/project');
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when the connection requires reauthorization', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(
+        buildGitLabIntegration({ auth_invalid_at: '2026-11-01T00:00:00.000Z' })
+      );
+
+      const { validateGitLabRepoAccessForUser } = await import('./gitlab-integration-helpers');
       const result = await validateGitLabRepoAccessForUser('user-123', 'group/project');
 
       expect(result).toBe(false);
@@ -531,15 +563,14 @@ describe('gitlab-integration-helpers', () => {
 
   describe('validateGitLabRepoAccessForOrganization', () => {
     it('should return true when project is in repository list', async () => {
-      mockGetIntegrationForOrganization.mockResolvedValue({
-        id: 'integration-1',
-        metadata: {},
-        repositories: [
-          { id: 1, name: 'project', full_name: 'org/project', private: false },
-          { id: 2, name: 'other', full_name: 'org/other', private: true },
-        ],
-        repositories_synced_at: '2024-01-01T00:00:00Z',
-      } as PlatformIntegration);
+      mockGetIntegrationForOrganization.mockResolvedValue(
+        buildGitLabIntegration({
+          repositories: [
+            { id: 1, name: 'project', full_name: 'org/project', private: false },
+            { id: 2, name: 'other', full_name: 'org/other', private: true },
+          ],
+        })
+      );
 
       const { validateGitLabRepoAccessForOrganization } =
         await import('./gitlab-integration-helpers');
@@ -553,12 +584,11 @@ describe('gitlab-integration-helpers', () => {
     });
 
     it('should return false when project is not in repository list', async () => {
-      mockGetIntegrationForOrganization.mockResolvedValue({
-        id: 'integration-1',
-        metadata: {},
-        repositories: [{ id: 1, name: 'project', full_name: 'org/project', private: false }],
-        repositories_synced_at: '2024-01-01T00:00:00Z',
-      } as PlatformIntegration);
+      mockGetIntegrationForOrganization.mockResolvedValue(
+        buildGitLabIntegration({
+          repositories: [{ id: 1, name: 'project', full_name: 'org/project', private: false }],
+        })
+      );
 
       const { validateGitLabRepoAccessForOrganization } =
         await import('./gitlab-integration-helpers');
@@ -572,12 +602,11 @@ describe('gitlab-integration-helpers', () => {
     });
 
     it('should perform case-insensitive matching', async () => {
-      mockGetIntegrationForOrganization.mockResolvedValue({
-        id: 'integration-1',
-        metadata: {},
-        repositories: [{ id: 1, name: 'Project', full_name: 'ORG/PROJECT', private: false }],
-        repositories_synced_at: '2024-01-01T00:00:00Z',
-      } as PlatformIntegration);
+      mockGetIntegrationForOrganization.mockResolvedValue(
+        buildGitLabIntegration({
+          repositories: [{ id: 1, name: 'Project', full_name: 'ORG/PROJECT', private: false }],
+        })
+      );
 
       const { validateGitLabRepoAccessForOrganization } =
         await import('./gitlab-integration-helpers');
@@ -605,12 +634,11 @@ describe('gitlab-integration-helpers', () => {
     });
 
     it('should return false when project not found in non-empty repository list', async () => {
-      mockGetIntegrationForOrganization.mockResolvedValue({
-        id: 'integration-1',
-        metadata: {},
-        repositories: [{ id: 1, name: 'other', full_name: 'other/repo', private: false }],
-        repositories_synced_at: '2024-01-01T00:00:00Z',
-      } as PlatformIntegration);
+      mockGetIntegrationForOrganization.mockResolvedValue(
+        buildGitLabIntegration({
+          repositories: [{ id: 1, name: 'other', full_name: 'other/repo', private: false }],
+        })
+      );
 
       const { validateGitLabRepoAccessForOrganization } =
         await import('./gitlab-integration-helpers');
@@ -624,14 +652,13 @@ describe('gitlab-integration-helpers', () => {
     });
 
     it('should handle nested project paths', async () => {
-      mockGetIntegrationForOrganization.mockResolvedValue({
-        id: 'integration-1',
-        metadata: {},
-        repositories: [
-          { id: 1, name: 'project', full_name: 'org/subgroup/project', private: false },
-        ],
-        repositories_synced_at: '2024-01-01T00:00:00Z',
-      } as PlatformIntegration);
+      mockGetIntegrationForOrganization.mockResolvedValue(
+        buildGitLabIntegration({
+          repositories: [
+            { id: 1, name: 'project', full_name: 'org/subgroup/project', private: false },
+          ],
+        })
+      );
 
       const { validateGitLabRepoAccessForOrganization } =
         await import('./gitlab-integration-helpers');
@@ -642,6 +669,25 @@ describe('gitlab-integration-helpers', () => {
       );
 
       expect(result).toBe(true);
+    });
+
+    it('should return false when the connection requires reauthorization', async () => {
+      mockGetIntegrationForOrganization.mockResolvedValue(
+        buildGitLabIntegration({
+          auth_invalid_at: '2026-11-01T00:00:00.000Z',
+          repositories: [{ id: 1, name: 'project', full_name: 'org/project', private: false }],
+        })
+      );
+
+      const { validateGitLabRepoAccessForOrganization } =
+        await import('./gitlab-integration-helpers');
+      const result = await validateGitLabRepoAccessForOrganization(
+        'org-123',
+        'actor-123',
+        'org/project'
+      );
+
+      expect(result).toBe(false);
     });
   });
 
@@ -739,6 +785,24 @@ describe('gitlab-integration-helpers', () => {
       const result = await fetchGitLabRepositoriesForUser('user-123', true);
 
       expect(result.integrationInstalled).toBe(false);
+      expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
+      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+    });
+
+    it('should answer the unavailable result when the connection requires reauthorization', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(
+        buildIntegration({ auth_invalid_at: '2026-11-01T00:00:00.000Z' })
+      );
+
+      const { fetchGitLabRepositoriesForUser } = await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForUser('user-123');
+
+      expect(result).toEqual({
+        integrationInstalled: false,
+        repositories: [],
+        syncedAt: null,
+        errorMessage: 'GitLab integration requires reauthorization',
+      });
       expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
       expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
     });
@@ -846,6 +910,39 @@ describe('gitlab-integration-helpers', () => {
       expect(result.integrationInstalled).toBe(false);
       expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
       expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+    });
+
+    it('should answer the unavailable result when the connection requires reauthorization', async () => {
+      mockGetIntegrationForOrganization.mockResolvedValue(
+        buildIntegration({ auth_invalid_at: '2026-11-01T00:00:00.000Z' })
+      );
+
+      const { fetchGitLabRepositoriesForOrganization } =
+        await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForOrganization('org-123', 'actor-123');
+
+      expect(result).toEqual({
+        integrationInstalled: false,
+        repositories: [],
+        syncedAt: null,
+        errorMessage: 'GitLab integration requires reauthorization',
+      });
+      expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
+      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+    });
+
+    it('should report a connection that was never marked active as not configured', async () => {
+      mockGetIntegrationForOrganization.mockResolvedValue(
+        buildIntegration({ integration_status: null })
+      );
+
+      const { fetchGitLabRepositoriesForOrganization } =
+        await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForOrganization('org-123', 'actor-123');
+
+      expect(result.integrationInstalled).toBe(false);
+      expect(result.repositories).toEqual([]);
+      expect(result.errorMessage).toBe('GitLab integration is not properly configured');
     });
   });
 });

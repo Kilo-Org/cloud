@@ -8,6 +8,7 @@ import {
   agent_environment_profile_agents,
   agent_environment_profile_kilo_commands,
   agent_environment_profile_instructions,
+  cli_sessions_v2,
   type AgentEnvironmentProfile,
 } from '@kilocode/db/schema';
 import { eq, and, sql, count, inArray } from 'drizzle-orm';
@@ -297,7 +298,7 @@ export async function getProfile(
 ): Promise<ProfileResponse> {
   const profile = await verifyProfileOwnership(db, profileId, owner);
 
-  const [vars, commands, mcpServers, skills, agents, kiloCommands, instructions] =
+  const [vars, commands, mcpServers, skills, agents, kiloCommands, instructions, [usage]] =
     await Promise.all([
       db
         .select({
@@ -329,6 +330,14 @@ export async function getProfile(
       listAgentsForProfile(db, profileId),
       listKiloCommandsForProfile(db, profileId),
       listInstructionsForProfile(db, profileId),
+      db
+        .select({
+          lastUsedAt: sql<
+            string | null
+          >`max(coalesce(${cli_sessions_v2.last_activity_at}, ${cli_sessions_v2.created_at}))`,
+        })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.profile_id, profileId)),
     ]);
 
   return {
@@ -338,6 +347,7 @@ export async function getProfile(
     isDefault: profile.is_default,
     createdAt: profile.created_at,
     updatedAt: profile.updated_at,
+    lastUsedAt: usage?.lastUsedAt ? new Date(usage.lastUsedAt).toISOString() : null,
     vars,
     commands,
     mcpServers,

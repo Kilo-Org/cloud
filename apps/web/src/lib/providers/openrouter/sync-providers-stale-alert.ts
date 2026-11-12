@@ -16,7 +16,7 @@ const SYNC_PROVIDERS_STALE_ALERT_TTL_MS = SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS
 
 const STALE_WINDOW_LABEL = 'hour';
 export const URGENCY_COPY = 'Important, not urgent. Some delay is acceptable.';
-const TEST_COPY = 'This verifies alert delivery only; it does not indicate an active issue.';
+export const TEST_COPY = 'This verifies alert delivery only; it does not indicate an active issue.';
 
 type SyncStateColumn = keyof Pick<
   typeof ai_gateway_sync_providers_state.$inferSelect,

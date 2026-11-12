@@ -114,57 +114,85 @@ const MIDDLEWARE_CHECKED_PATHS = [
 ];
 
 const APP_ROOT = path.resolve(__dirname, '../app');
-const USER_ROUTE_ROOT = path.join(APP_ROOT, 'admin/api/users');
+const ADMIN_API_ROOT = path.join(APP_ROOT, 'admin/api');
 
-// The listed user routes each verify admin access with `getUserFromAuth`, so the
-// middleware must keep them in the list as route files come and go. The
-// enrichment route is left out of this scan, because it verifies through the
-// admin tRPC procedure its handler calls; `unguardedListedRoutePaths` below
-// covers that shape.
-function adminGuardedUserRoutePaths(): string[] {
+function adminApiRouteFiles(): string[] {
   return fs
-    .readdirSync(USER_ROUTE_ROOT, { recursive: true, withFileTypes: true })
+    .readdirSync(ADMIN_API_ROOT, { recursive: true, withFileTypes: true })
     .filter(entry => entry.isFile() && entry.name === 'route.ts')
     .map(entry => path.join(entry.parentPath, entry.name))
-    .filter(file =>
-      /getUserFromAuth\(\s*\{\s*adminOnly:\s*true/.test(fs.readFileSync(file, 'utf8'))
-    )
-    .map(file => `/${path.relative(APP_ROOT, path.dirname(file)).split(path.sep).join('/')}`)
     .sort();
 }
 
-function listedUserRoutePaths(): string[] {
-  return ADMIN_API_ROUTES_WITH_OWN_ADMIN_CHECK.filter(
-    route => route === '/admin/api/users' || route.startsWith('/admin/api/users/')
-  ).sort();
+function routePathOf(routeFile: string): string {
+  return `/${path.relative(APP_ROOT, path.dirname(routeFile)).split(path.sep).join('/')}`;
+}
+
+function routeFileOf(route: string): string {
+  return path.join(APP_ROOT, `${route.replace(/^\//, '')}/route.ts`);
+}
+
+const HANDLER_DECLARATION =
+  /^export\s+(?:async\s+)?(?:function\s+|const\s+)(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/;
+
+type Handler = { method: string; body: string };
+
+/**
+ * Splits a route file into top-level blocks. A block starts at a top-level
+ * statement keyword in column 0, so a continuation line of a multi-line
+ * signature stays inside its block. Only a block that declares an HTTP method is
+ * a handler, so a top-level helper or constant is never credited to the handler
+ * above it.
+ */
+const TOP_LEVEL_STATEMENT =
+  /^(?:export|import|const|let|var|function|async|class|type|interface|declare|enum|namespace)\b/;
+
+function topLevelBlocks(source: string): string[][] {
+  const blocks: string[][] = [];
+  let block: string[] = [];
+  for (const line of source.split('\n')) {
+    if (TOP_LEVEL_STATEMENT.test(line) && block.length > 0) {
+      blocks.push(block);
+      block = [];
+    }
+    block.push(line);
+  }
+  if (block.length > 0) blocks.push(block);
+  return blocks;
+}
+
+function exportedHandlers(source: string): Handler[] {
+  return topLevelBlocks(source).flatMap(lines => {
+    const declaration = HANDLER_DECLARATION.exec(lines[0]);
+    return declaration ? [{ method: declaration[1], body: lines.join('\n') }] : [];
+  });
 }
 
 type MountedProcedure = { _def?: { middlewares?: readonly unknown[] } };
 
 const MOUNTED_PROCEDURES = rootRouter._def.procedures as Record<string, MountedProcedure>;
 
-/** The mounted procedures a handler calls through the tRPC caller it receives. */
-function delegatedProcedurePaths(route: string): string[] {
-  const source = fs.readFileSync(path.join(APP_ROOT, route, 'route.ts'), 'utf8');
-  const calls = source.matchAll(/\bcaller\.([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+)\s*\(/g);
-  return [...calls].map(call => call[1]);
-}
-
 /**
- * A listed handler proves admin access either by calling
+ * A handler proves admin access either by calling
  * `getUserFromAuth({ adminOnly: true })` itself or by reaching a mounted tRPC
  * procedure that carries a privileged guard. Every privileged guard tier chains
  * on `adminProcedure`, so any tier proves the admin check.
  */
-function unguardedListedRoutePaths(): string[] {
-  return ADMIN_API_ROUTES_WITH_OWN_ADMIN_CHECK.filter(route => {
-    const source = fs.readFileSync(path.join(APP_ROOT, route, 'route.ts'), 'utf8');
-    if (/getUserFromAuth\(\s*\{\s*adminOnly:\s*true/.test(source)) return false;
-    return !delegatedProcedurePaths(route).some(
-      procedure =>
-        privilegedGuardTiers(MOUNTED_PROCEDURES[procedure]?._def?.middlewares ?? []).length > 0
-    );
-  });
+function hasAdminCheck(handler: Handler): boolean {
+  if (/getUserFromAuth\(\s*\{\s*adminOnly:\s*true/.test(handler.body)) return true;
+  const calls = handler.body.matchAll(/\bcaller\.([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+)\s*\(/g);
+  return [...calls].some(
+    call => privilegedGuardTiers(MOUNTED_PROCEDURES[call[1]]?._def?.middlewares ?? []).length > 0
+  );
+}
+
+function unguardedHandlerNames(routeFile: string): string[] {
+  const route = routePathOf(routeFile);
+  const handlers = exportedHandlers(fs.readFileSync(routeFile, 'utf8'));
+  if (handlers.length === 0) return [`${route} exports no HTTP handler`];
+  return handlers
+    .filter(handler => !hasAdminCheck(handler))
+    .map(handler => `${handler.method} ${route}`);
 }
 
 describe('withAuthenticatedAdminApiRoutes', () => {
@@ -205,16 +233,15 @@ describe('withAuthenticatedAdminApiRoutes', () => {
     expect(nextMiddleware).toHaveBeenCalledTimes(1);
   });
 
-  it('lists every user route that verifies admin access itself', () => {
-    expect(adminGuardedUserRoutePaths()).toEqual(listedUserRoutePaths());
-  });
-
-  // A listed handler is exempt from the middleware admin check only because it
-  // verifies admin access itself. Directly guarded handlers are covered by the
-  // scan above; this test covers a handler that delegates its check to the
-  // tRPC procedure it calls, so downgrading that procedure fails here.
-  it('reaches a guarded admin procedure in every listed handler without its own guard', () => {
-    expect(unguardedListedRoutePaths()).toEqual([]);
+  // Every admin API handler confirms admin access itself, so the middleware's
+  // token claim is only a first layer. A handler that drops its check fails
+  // here, whether it sits on the exempt list or behind the middleware check.
+  // A listed path with no route file is a stale exemption and fails here too.
+  it('checks admin access in every handler of every admin API route', () => {
+    expect(adminApiRouteFiles().flatMap(unguardedHandlerNames)).toEqual([]);
+    expect(
+      ADMIN_API_ROUTES_WITH_OWN_ADMIN_CHECK.filter(route => !fs.existsSync(routeFileOf(route)))
+    ).toEqual([]);
   });
 
   it('treats only a one-segment dynamic name as a wildcard', () => {

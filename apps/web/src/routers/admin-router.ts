@@ -14,6 +14,7 @@ import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { isEligibleForPlatformAdmin, platformAdminDomains } from '@/lib/admin/platform-admin';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { insertKiloClawSubscriptionChangeLog, type KiloClawSubscription } from '@kilocode/db';
 import {
   user_admin_notes,
@@ -32,6 +33,7 @@ import {
   organizations,
   modelsByProvider,
   ai_gateway_sync_providers_state,
+  ai_gateway_metadata_cache,
   api_request_log,
 } from '@kilocode/db/schema';
 import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete';
@@ -39,6 +41,7 @@ import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
 import { postTestStaleSyncAlert } from '@/lib/providers/openrouter/sync-providers-stale-alert';
+import { postTestMetadataCacheStaleAlert } from '@/lib/providers/metadata-cache/metadata-cache-stale-alert';
 import { syncAndStoreProviders } from '@/lib/providers/openrouter/sync-providers';
 import { syncAndStoreDirectByokProviders } from '@/lib/providers/direct-byok/sync-direct-byok';
 import { refreshMetadataCache } from '@/lib/providers/metadata-cache/refresh-metadata-cache';
@@ -46,6 +49,8 @@ import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances
 import { adminKiloclawVersionsRouter } from '@/routers/admin-kiloclaw-versions-router';
 import { adminKiloclawRegionsRouter } from '@/routers/admin-kiloclaw-regions-router';
 import { adminKiloclawProvidersRouter } from '@/routers/admin-kiloclaw-providers-router';
+import { adminKiloclawStripeRenewalsRouter } from '@/routers/admin-kiloclaw-stripe-renewals-router';
+import { adminKiloclawCreditRenewalsRouter } from '@/routers/admin-kiloclaw-credit-renewals-router';
 import { adminFeatureInterestRouter } from '@/routers/admin-feature-interest-router';
 import { adminCodeReviewsRouter } from '@/routers/admin-code-reviews-router';
 import { adminCloudAgentNextRouter } from '@/routers/admin-cloud-agent-next-router';
@@ -106,6 +111,7 @@ import {
   inArray,
   count,
   min,
+  max,
 } from 'drizzle-orm';
 import type { InferColumnsDataTypes } from 'drizzle-orm';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
@@ -442,7 +448,7 @@ async function assertNotLastUnblockedSuperadmin(
   tx: DrizzleTransaction,
   target: typeof kilocode_users.$inferSelect
 ) {
-  if (!target.is_admin || !target.is_super_admin || target.blocked_reason !== null) return;
+  if (!target.is_admin || !target.is_super_admin || isBlockedAccount(target)) return;
 
   const [result] = await tx
     .select({ value: sql<number>`count(*)::int` })
@@ -451,6 +457,7 @@ async function assertNotLastUnblockedSuperadmin(
       and(
         eq(kilocode_users.is_admin, true),
         eq(kilocode_users.is_super_admin, true),
+        isNull(kilocode_users.blocked_at),
         isNull(kilocode_users.blocked_reason)
       )
     );
@@ -572,7 +579,7 @@ export const adminRouter = createTRPCRouter({
       where: eq(kilocode_users.id, ctx.user.id),
     });
 
-    if (!currentUser || currentUser.blocked_reason !== null || !currentUser.is_admin) {
+    if (!currentUser || isBlockedAccount(currentUser) || !currentUser.is_admin) {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
     }
 
@@ -2033,7 +2040,7 @@ export const adminRouter = createTRPCRouter({
             const actor = lockedRows.find(row => row.id === actorId);
             const target = lockedRows.find(row => row.id === targetId);
 
-            if (!actor || actor.blocked_reason !== null || !userIsSuperadmin(actor)) {
+            if (!actor || isBlockedAccount(actor) || !userIsSuperadmin(actor)) {
               throw new TRPCError({ code: 'FORBIDDEN', message: 'Superadmin access required' });
             }
 
@@ -2178,7 +2185,7 @@ export const adminRouter = createTRPCRouter({
           const actor = lockedRows.find(row => row.id === actorId);
           const target = lockedRows.find(row => row.id === targetId);
 
-          if (!actor || actor.blocked_reason !== null || !userIsSuperadmin(actor)) {
+          if (!actor || isBlockedAccount(actor) || !userIsSuperadmin(actor)) {
             throw new TRPCError({ code: 'FORBIDDEN', message: 'Superadmin access required' });
           }
           if (!target) {
@@ -2537,15 +2544,18 @@ export const adminRouter = createTRPCRouter({
       return refreshMetadataCache();
     }),
     postTestStaleAlert: adminProcedure
-      .input(z.object({ job: z.enum(['providers', 'direct_byok']) }))
+      .input(z.object({ job: z.enum(['metadata_cache', 'providers', 'direct_byok']) }))
       .mutation(async ({ input }) => {
-        const delivery = await postTestStaleSyncAlert(input.job);
+        const delivery =
+          input.job === 'metadata_cache'
+            ? await postTestMetadataCacheStaleAlert()
+            : await postTestStaleSyncAlert(input.job);
         return { delivery };
       }),
     getLastSync: adminProcedure.query(async () => {
-      const [[latest], [syncState]] = await Promise.all([
+      const [[latest], [syncState], [metadataCache]] = await Promise.all([
         db
-          .select({ id: modelsByProvider.id, data: modelsByProvider.data })
+          .select({ data: modelsByProvider.data })
           .from(modelsByProvider)
           .orderBy(desc(modelsByProvider.id))
           .limit(1),
@@ -2558,19 +2568,22 @@ export const adminRouter = createTRPCRouter({
           .from(ai_gateway_sync_providers_state)
           .where(eq(ai_gateway_sync_providers_state.id, 1))
           .limit(1),
+        db
+          .select({
+            newestUpdatedAt: max(ai_gateway_metadata_cache.updated_at),
+            oldestUpdatedAt: min(ai_gateway_metadata_cache.updated_at),
+          })
+          .from(ai_gateway_metadata_cache),
       ]);
-      const lastCompletedAt = syncState?.lastCompletedAt ?? null;
-      const directByokLastCompletedAt = syncState?.directByokLastCompletedAt ?? null;
-      if (!latest && !lastCompletedAt && !directByokLastCompletedAt) return null;
+      const toIso = (value: string | null | undefined) =>
+        value ? new Date(value).toISOString() : null;
       return {
-        id: latest?.id ?? null,
-        generated_at: latest?.data.generated_at ?? null,
-        completed_at: lastCompletedAt ? new Date(lastCompletedAt).toISOString() : null,
-        direct_byok_completed_at: directByokLastCompletedAt
-          ? new Date(directByokLastCompletedAt).toISOString()
-          : null,
-        total_providers: latest?.data.total_providers ?? 0,
-        total_models: latest?.data.total_models ?? 0,
+        completed_at: toIso(syncState?.lastCompletedAt),
+        direct_byok_completed_at: toIso(syncState?.directByokLastCompletedAt),
+        metadata_cache_newest_updated_at: toIso(metadataCache?.newestUpdatedAt),
+        metadata_cache_oldest_updated_at: toIso(metadataCache?.oldestUpdatedAt),
+        total_providers: latest?.data.total_providers ?? null,
+        total_models: latest?.data.total_models ?? null,
       };
     }),
   }),
@@ -2856,6 +2869,8 @@ export const adminRouter = createTRPCRouter({
   kiloclawVersions: adminKiloclawVersionsRouter,
   kiloclawRegions: adminKiloclawRegionsRouter,
   kiloclawProviders: adminKiloclawProvidersRouter,
+  kiloclawStripeRenewals: adminKiloclawStripeRenewalsRouter,
+  kiloclawCreditRenewals: adminKiloclawCreditRenewalsRouter,
   aiAttribution: adminAIAttributionRouter,
   ossSponsorship: ossSponsorshipRouter,
   contributorChampions: contributorChampionsRouter,

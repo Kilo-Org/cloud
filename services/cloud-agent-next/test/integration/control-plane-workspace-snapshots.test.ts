@@ -1,5 +1,11 @@
 import type { SessionEnvironmentReference } from '../../src/environment-build/reference.js';
-import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
+import {
+  abortAllDurableObjects,
+  env,
+  evictAllDurableObjects,
+  reset,
+  runInDurableObject,
+} from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '../../src/logger.js';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
@@ -22,7 +28,7 @@ import {
 import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -30,6 +36,11 @@ import { readRoute, writeRoute } from '../../src/control-plane/sandbox/routes.js
 import { workspaceDiskSnapshots } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import { DEADLINE_MS } from '../../src/sandbox-control/deadlines.js';
 import { waitFor } from './wait-for.js';
+import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
+import {
+  SandboxStatusSnapshotSchema,
+  type SandboxStatusSnapshot,
+} from '../../src/shared/sandbox-status.js';
 
 const sandboxes = (env as unknown as { SANDBOX_CONTROL: DurableObjectNamespace<SandboxControlV2> })
   .SANDBOX_CONTROL;
@@ -99,7 +110,7 @@ async function setup(
     async logs() {
       return '';
     },
-    environmentSnapshots: true,
+    environmentSnapshots: 'launch',
     workspaceSnapshots: {
       currentImage: async () => {
         controls.imageLookups += 1;
@@ -113,12 +124,8 @@ async function setup(
   };
   await runInDurableObject(sandbox, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance['env'], createFakeCredentialBroker(), {
-      WORKSPACE_SNAPSHOT_USER_IDS: options.enabled === false ? '' : USER,
-      WORKSPACE_SNAPSHOT_ORG_IDS: '',
-      RUNTIME_STARTUP_MODE: 'preinstalled',
-      NATIVE_RUNTIME_IMAGE: 'all-in-one',
-      RUNTIME_RELEASE_DESCRIPTOR: '',
+    installFakeSandboxEnv(instance, createFakeCredentialBroker(), {
+      WORKSPACE_SNAPSHOT_IDS: options.enabled === false ? '' : USER,
       SANDBOX_CONTAINERS: { idFromName: (name: string) => ({ toString: () => `oc_${name}` }) },
     });
     installFakeRuntimeProxyPeer(instance, async (owner, id) => ({
@@ -216,6 +223,18 @@ async function setup(
       instance => readWorkspaceSnapshot(instance['db'], workspaceId) ?? undefined
     );
   }
+  async function expectRestoreFailure(retry = false) {
+    const descriptor = await snapshot();
+    if (descriptor === undefined) throw new Error('Missing checkpoint');
+    const retryDetail = retry ? ' Send a message to retry.' : '';
+    const detail = `Could not restore the workspace snapshot.${retryDetail} Start fresh discards changes since ${new Date(descriptor.capturedAt).toISOString()}.`;
+    await waitFor(async () => {
+      const attempts = await session.getPreparationAttempts();
+      expect(attempts.flatMap(attempt => attempt.steps.map(step => step.latestDetail))).toContain(
+        detail
+      );
+    });
+  }
   const alarm = async (settle = true) => {
     await runInDurableObject(sandbox, instance => instance.alarm());
     if (settle)
@@ -279,6 +298,42 @@ async function setup(
     });
     return { ...sibling, frame };
   }
+  async function statusStream(target = session, id = sessionId) {
+    await runInDurableObject(target, instance => {
+      instance['metadata'] = parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: id, userId: USER, orgId: registration.credentials.orgId },
+        auth: { kiloSessionId: KILO, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
+        agent: { mode: 'code', model: 'test/model' },
+        workspace: { sandboxId, sandboxKind: 'isolated-standard' },
+        lifecycle: { version: 1, timestamp: 1 },
+      });
+    });
+    const response = await target.fetch(
+      new Request('https://session.internal/stream?sandboxStatus=true', {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+    expect(response.status).toBe(101);
+    const socket = response.webSocket;
+    if (socket === null) throw new Error('Missing status socket');
+    const snapshots: SandboxStatusSnapshot[] = [];
+    socket.addEventListener('message', event => {
+      const envelope = JSON.parse(String(event.data));
+      expect(envelope.streamEventType).toBe('cloud.sandbox.status');
+      snapshots.push(SandboxStatusSnapshotSchema.parse(envelope.data));
+    });
+    socket.accept();
+    await waitFor(() => expect(snapshots.length).toBeGreaterThan(0));
+    return {
+      snapshots,
+      close: () =>
+        new Promise<void>(resolve => {
+          socket.addEventListener('close', () => resolve(), { once: true });
+          socket.close();
+        }),
+    };
+  }
   return {
     sandbox,
     workspaceId,
@@ -294,12 +349,14 @@ async function setup(
     start,
     idle,
     snapshot,
+    expectRestoreFailure,
     cold,
     checkpoint,
     registerSibling,
     attachSibling,
     messageState,
     alarm,
+    statusStream,
   };
 }
 
@@ -310,6 +367,73 @@ afterEach(async () => {
 });
 
 describe('idle workspace disk checkpoint', () => {
+  it('publishes accepted capture time and retains it during workspace activity without chat events', async () => {
+    const test = await setup();
+    const wrapper = await test.start();
+    const sibling = await test.attachSibling(wrapper);
+    const first = await test.statusStream();
+    const second = await test.statusStream(sibling.session, sibling.id);
+    const unrelated = await test.registerSibling();
+    await unrelated.session.registerSession({
+      ...unrelated.registration,
+      credentials: { ...unrelated.registration.credentials, orgId: 'other-org' },
+    });
+    const isolated = await test.statusStream(unrelated.session, unrelated.id);
+    expect(first.snapshots.at(-1)?.workspaceSnapshot).toBeUndefined();
+    const capturedAt = Date.parse('2026-10-24T21:32:19Z');
+    test.controls.capture = async () => ({ ...stored(), capturedAt });
+    const before = await test.session.getSession();
+    const firstBeforeIdle = first.snapshots.length;
+    const secondBeforeIdle = second.snapshots.length;
+    const isolatedBeforeIdle = isolated.snapshots.length;
+    await test.idle(wrapper);
+    await waitFor(() => {
+      expect(first.snapshots.length).toBe(firstBeforeIdle + 1);
+      expect(second.snapshots.length).toBe(secondBeforeIdle + 1);
+      expect(isolated.snapshots.length).toBe(isolatedBeforeIdle + 1);
+    });
+    const isolatedBeforeAlarm = isolated.snapshots.length;
+    await test.alarm();
+    await waitFor(() => {
+      expect(first.snapshots.at(-1)?.workspaceSnapshot).toEqual({ capturedAt });
+      expect(second.snapshots.at(-1)?.workspaceSnapshot).toEqual({ capturedAt });
+      expect(isolated.snapshots.length).toBe(isolatedBeforeAlarm + 1);
+    });
+    expect(isolated.snapshots.slice(isolatedBeforeAlarm)).toHaveLength(1);
+    expect(
+      isolated.snapshots
+        .slice(isolatedBeforeAlarm)
+        .every(snapshot => snapshot.workspaceSnapshot === undefined)
+    ).toBe(true);
+    expect((await test.session.getSandboxStatus()).workspaceSnapshot).toEqual({ capturedAt });
+    const after = await test.session.getSession();
+    expect(after.type === 'found' && after.latestEventId).toBe(
+      before.type === 'found' && before.latestEventId
+    );
+    const lateSibling = await test.registerSibling();
+    const initial = await test.statusStream(lateSibling.session, lateSibling.id);
+    expect(initial.snapshots[0].workspaceSnapshot).toEqual({ capturedAt });
+    expect(await test.snapshot()).toMatchObject({ capturedAt });
+    expect(test.captures).toHaveLength(1);
+    const activityBeforeMutation = (await test.sandbox.getAllocationState()).lastActivityAt;
+    wrapper.send({ type: 'heartbeat', active: false, workspaceBusy: true, degraded: false });
+    await waitFor(async () => {
+      const disk = await runInDurableObject(test.sandbox, instance =>
+        readWorkspaceSnapshotAllocation(instance['db'])
+      );
+      expect(disk?.idleConnectionId).toBeUndefined();
+    });
+    expect(first.snapshots.at(-1)?.workspaceSnapshot).toEqual({ capturedAt });
+    expect(second.snapshots.at(-1)?.workspaceSnapshot).toEqual({ capturedAt });
+    expect(initial.snapshots.at(-1)?.workspaceSnapshot).toEqual({ capturedAt });
+    expect(await test.snapshot()).toMatchObject({ capturedAt });
+    expect((await test.sandbox.getAllocationState()).lastActivityAt).toBe(activityBeforeMutation);
+    expect(test.captures).toHaveLength(1);
+    await Promise.all([first, second, isolated, initial].map(stream => stream.close()));
+    test.wrappers.forEach(wrapper => wrapper.close());
+    await abortAllDurableObjects();
+  });
+
   it.each([
     {
       options: { enabled: false },
@@ -607,6 +731,10 @@ describe('idle workspace disk checkpoint', () => {
 
   it('lets a new sibling restore the workspace and attaches later siblings with provenance', async () => {
     const test = await setup();
+    test.controls.capture = async () => ({
+      ...stored(),
+      capturedAt: Date.parse('2026-10-24T21:32:19Z'),
+    });
     await test.checkpoint();
     const sourceAllocationId = (await test.sandbox.getAllocationState()).allocationId;
     await test.cold();
@@ -614,6 +742,15 @@ describe('idle workspace disk checkpoint', () => {
     await sibling.session.send(prompt('new-chat'));
     const { wrapper, frame } = await test.connect(1);
     expect(test.launchOptions[1]?.snapshot?.snapshotId).toBe('session-snapshot');
+    await waitFor(async () => {
+      const attempts = await sibling.session.getPreparationAttempts();
+      expect(attempts.flatMap(attempt => attempt.steps)).toContainEqual(
+        expect.objectContaining({
+          latestDetail: 'Using workspace snapshot',
+          snapshotCapturedAt: Date.parse('2026-10-24T21:32:19Z'),
+        })
+      );
+    });
     expect(frame && 'spec' in frame && frame.spec.workspaceSnapshot).toMatchObject({
       workspaceId: test.workspaceId,
       sourceAllocationId,
@@ -760,6 +897,7 @@ describe('idle workspace disk checkpoint', () => {
       expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
     });
     expect(test.launchEnvs).toHaveLength(1);
+    await test.expectRestoreFailure(true);
     expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
     expect(fields.mock.calls.map(call => call[0])).toContainEqual(
       expect.objectContaining({
@@ -774,9 +912,8 @@ describe('idle workspace disk checkpoint', () => {
     test.wrappers.forEach(wrapper => wrapper.close());
   });
 
-  it('fails a tail start when the private snapshot uses a different image, without an environment fallback', async () => {
+  it('restores a tail captured from an earlier base image with the current image identity', async () => {
     const test = await setup();
-    const fields = vi.spyOn(logger, 'withFields');
     await test.checkpoint();
     await test.cold();
     await runInDurableObject(test.sandbox, instance => {
@@ -787,21 +924,13 @@ describe('idle workspace disk checkpoint', () => {
         .run();
     });
     await test.session.send(prompt('m2'));
-    await waitFor(async () => {
-      const route = await runInDurableObject(test.sandbox, instance =>
-        readRoute(instance['db'], test.sessionId)
-      );
-      expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    const { wrapper } = await test.connect(1);
+    expect(test.launchOptions[1]?.snapshot).toEqual({
+      snapshotId: 'session-snapshot',
+      baseImage: 'image:1',
     });
-    expect(test.launchEnvs).toHaveLength(1);
-    expect(test.launchOptions[1]).toBeUndefined();
-    expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
-    expect(fields.mock.calls.map(call => call[0])).toContainEqual(
-      expect.objectContaining({
-        diagnosticEvent: 'workspace_snapshot_launch',
-        reason: 'image_mismatch',
-      })
-    );
+    wrapper.send({ type: 'session.ready', sessionId: test.sessionId });
+    await test.messageState('m2', 'accepted');
     test.wrappers.forEach(wrapper => wrapper.close());
   });
 
@@ -809,7 +938,7 @@ describe('idle workspace disk checkpoint', () => {
     const test = await setup();
     const wrapper = await test.checkpoint();
     await runInDurableObject(test.sandbox, instance => {
-      instance['env'].WORKSPACE_SNAPSHOT_USER_IDS = '';
+      instance['env'].WORKSPACE_SNAPSHOT_IDS = '';
     });
     await test.idle(wrapper);
     await test.alarm();
@@ -827,7 +956,7 @@ describe('idle workspace disk checkpoint', () => {
     const sourceAllocationId = (await test.sandbox.getAllocationState()).allocationId;
     await test.cold();
     await runInDurableObject(test.sandbox, instance => {
-      instance['env'].WORKSPACE_SNAPSHOT_USER_IDS = '';
+      instance['env'].WORKSPACE_SNAPSHOT_IDS = '';
     });
     await test.session.send(prompt('m2'));
     const { wrapper } = await test.connect(1);
@@ -845,7 +974,7 @@ describe('idle workspace disk checkpoint', () => {
     await test.messageState('m2', 'completed');
     await test.cold();
     await runInDurableObject(test.sandbox, instance => {
-      instance['env'].WORKSPACE_SNAPSHOT_USER_IDS = USER;
+      instance['env'].WORKSPACE_SNAPSHOT_IDS = USER;
     });
     await test.session.send(prompt('m3'));
     const resumed = await test.connect(2);
@@ -1172,6 +1301,7 @@ describe('idle workspace disk checkpoint', () => {
       expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
     });
     expect(test.launchEnvs).toHaveLength(1);
+    await test.expectRestoreFailure();
     expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
     expect(fields.mock.calls.map(call => call[0])).toContainEqual(
       expect.objectContaining({
@@ -1285,6 +1415,7 @@ describe('idle workspace disk checkpoint', () => {
       expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
     });
     expect(test.launchEnvs).toHaveLength(3);
+    await test.expectRestoreFailure(true);
     for (const options of test.launchOptions.slice(1)) {
       expect(options?.snapshot?.snapshotId).toBe('session-snapshot');
     }
@@ -1348,6 +1479,7 @@ describe('idle workspace disk checkpoint', () => {
       expect(route).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
     });
     expect(test.launchEnvs).toHaveLength(2);
+    await test.expectRestoreFailure();
     expect(test.launchOptions[1]?.snapshot?.snapshotId).toBe('session-snapshot');
     expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
     test.wrappers.forEach(wrapper => wrapper.close());
@@ -1401,6 +1533,7 @@ describe('idle workspace disk checkpoint', () => {
       })
     );
     // No image relaunch and no descriptor deletion.
+    await test.expectRestoreFailure();
     expect(test.launchEnvs).toHaveLength(2);
     expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
     expect(await test.sandbox.getWorkspaceSnapshotRecovery({ sessionId: test.sessionId })).toEqual({

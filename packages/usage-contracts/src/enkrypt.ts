@@ -50,15 +50,43 @@ export const EnkryptUsageWriteSchema = z.strictObject({
    * call without a detection stays compatible with a web app deployed before the field.
    */
   detectorsFired: z.array(z.enum(ENKRYPT_DETECTOR_IDS)).nonempty().optional(),
+  /**
+   * UTF-16 code units this call sent to Enkrypt: the part no cached verdict covers, plus an overlap
+   * of already-scanned text. Optional so writes from a gateway deployed before it stay valid.
+   */
+  scannedCharacters: z.int32().nonnegative().optional(),
+  /**
+   * UTF-16 code units of the full text the scan covers: one tool definition, the system prompt, or
+   * the conversation of the request, or the response, including what the verdict cache covered.
+   * Optional like `scannedCharacters`.
+   */
+  totalCharacters: z.int32().nonnegative().optional(),
 });
 
 export type EnkryptUsageWrite = z.infer<typeof EnkryptUsageWriteSchema>;
 
 export type EnkryptUsageWriteInput = z.input<typeof EnkryptUsageWriteSchema>;
 
-/** `duplicate` means an earlier delivery of the same usage id already committed it and its debit. */
+/**
+ * `duplicate` means an earlier delivery of the same usage id already committed it and its debit.
+ * `usageId` echoes the written id. It is optional so a sender accepts replies from a writer
+ * deployed before the echo; a sender that receives it must check that it matches.
+ */
 export const EnkryptUsageWriteResponseSchema = z.strictObject({
   status: z.enum(['recorded', 'duplicate']),
+  usageId: z.uuid().optional(),
 });
 
 export type EnkryptUsageWriteResponse = z.infer<typeof EnkryptUsageWriteResponseSchema>;
+
+/**
+ * Body of an Enkrypt usage message on the shared usage queue. The kind tag is what separates it
+ * from an LLM usage message, which is always sent untagged.
+ */
+export const EnkryptUsageQueueMessageSchema = z.strictObject({
+  kind: z.literal('enkrypt_usage'),
+  v: z.literal(1),
+  record: EnkryptUsageWriteSchema,
+});
+
+export type EnkryptUsageQueueMessage = z.infer<typeof EnkryptUsageQueueMessageSchema>;

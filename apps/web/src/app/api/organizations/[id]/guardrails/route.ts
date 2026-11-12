@@ -8,8 +8,8 @@ import {
 
 /**
  * The organization's guardrails for its clients to apply: the MCP allow list and enforcement
- * mode, skill guardrails, and whether input and response scanning are on. Readable by any
- * member, because every member's client needs it. Organizations without AI Guardrails get
+ * mode, skill guardrails, and whether input and response scanning are on for the caller. Readable
+ * by any member, because every member's client needs it. Organizations without AI Guardrails get
  * everything off.
  */
 export async function GET(
@@ -27,5 +27,5 @@ export async function GET(
     return nextResponse;
   }
 
-  return NextResponse.json(await getOrganizationGuardrailsPolicy(data.organization));
+  return NextResponse.json(await getOrganizationGuardrailsPolicy(data.organization, data.user.id));
 }

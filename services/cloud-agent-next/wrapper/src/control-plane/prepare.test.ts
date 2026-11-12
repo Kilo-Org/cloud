@@ -22,7 +22,12 @@ import type { ExecResult, ProcessOptions, ProcessOutputStream, ProcessSpawn } fr
 import type { Harness as HarnessClient } from './harness.js';
 import { createKiloHarness } from './kilo-harness.js';
 import * as processUtils from '../utils.js';
-import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
+import {
+  createPreparationManager,
+  stackedBaseMismatchError,
+  type PrepareRuntimePort,
+  type PrepareDeps,
+} from './prepare.js';
 import type { WorkspaceStamp } from './workspace-stamp.js';
 import { directoryHome } from './workspace-home.js';
 
@@ -36,6 +41,85 @@ import {
 } from './kilo-runtime.js';
 import type { restoreWorktreeRecovery } from './worktree-recovery.js';
 import { restoreSession } from '../restore-session.js';
+
+describe('workspace startup history', () => {
+  it('restores the requested chat and recent siblings in parallel before reporting ready', async () => {
+    const base = routeSpec();
+    const recent = [
+      { sessionId: base.sessionId, kiloSessionId: base.kiloSessionId },
+      ...Array.from({ length: 4 }, (_, index) => ({
+        sessionId: `workspace_sibling_${index}`,
+        kiloSessionId: `ses_${String(index + 2).repeat(26)}`,
+      })),
+    ];
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const h = createHarness(FAST_TIMERS, {
+      supportsHistoryPreload: true,
+      readRecentHistory: async () => recent,
+      readHistoryPage: async () => ({}),
+    });
+    h.setSessionExists(false);
+    h.setRestore(async () => {
+      if (h.restoreOptions().length === 5) started.resolve();
+      await release.promise;
+      return { ok: true, diffs: { applied: 0, skipped: 0, total: 0 } };
+    });
+    const preparing = h.manager.prepare({
+      ...base,
+      kilo: { ...base.kilo!, scopeId: 'worktree_6a7199ec-d6d7-4788-b5a5-d74960f401e3' },
+    });
+    await started.promise;
+    expect(h.frames.some(frame => frame.type === 'session.ready')).toBe(false);
+    expect(h.restoreOptions().map(options => options?.restoreFiles)).toEqual([
+      true,
+      false,
+      false,
+      false,
+      false,
+    ]);
+    release.resolve();
+    await preparing;
+    expect(h.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+  });
+
+  it('reports the requested chat ready even when recent-chat discovery fails', async () => {
+    const base = routeSpec();
+    const h = createHarness(FAST_TIMERS, {
+      supportsHistoryPreload: true,
+      readRecentHistory: async () => {
+        throw new Error('unavailable');
+      },
+      readHistoryPage: async () => ({}),
+    });
+    await h.manager.prepare({
+      ...base,
+      kilo: { ...base.kilo!, scopeId: 'worktree_6a7199ec-d6d7-4788-b5a5-d74960f401e3' },
+    });
+    expect(h.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    expect(h.frames.some(frame => frame.type === 'session.failed')).toBe(false);
+  });
+
+  it('does not preload legacy chats before their on-demand file restore', async () => {
+    let discoveries = 0;
+    const h = createHarness(FAST_TIMERS, {
+      readRecentHistory: async () => {
+        discoveries++;
+        return [];
+      },
+      readHistoryPage: async () => ({}),
+    });
+    h.setSessionExists(false);
+    const base = routeSpec();
+    await h.manager.prepare({
+      ...base,
+      kilo: { ...base.kilo!, scopeId: 'worktree_6a7199ec-d6d7-4788-b5a5-d74960f401e3' },
+    });
+    expect(discoveries).toBe(0);
+    expect(h.restoreOptions().map(options => options?.restoreFiles)).toEqual([true]);
+    expect(h.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+  });
+});
 
 describe('replacement workspace local recovery', () => {
   const recovery = {
@@ -730,6 +814,9 @@ function createHarness(
     runtimes?: PrepareRuntimePort;
     runSkillInstall?: typeof processUtils.runProcess;
     spawnSetup?: ProcessSpawn;
+    readRecentHistory?: PrepareDeps['readRecentHistory'];
+    readHistoryPage?: PrepareDeps['readHistoryPage'];
+    supportsHistoryPreload?: boolean;
   } = {}
 ): Harness {
   const frames: ControlPlaneWrapperFrame[] = [];
@@ -858,6 +945,7 @@ function createHarness(
         },
         log: message => logs.push(message),
       });
+      currentClient.supportsHistoryPreload = options.supportsHistoryPreload;
       return currentClient;
     },
     installCredentials: async (key, env, cloudAgentMcp) => {
@@ -888,6 +976,8 @@ function createHarness(
     inheritedEnv: {},
     homeRoots: homeRootsFor(options.homeRoot ?? '/tmp/prepare-test-homes'),
     allocationId: 'alloc-current',
+    readRecentHistory: options.readRecentHistory,
+    readHistoryPage: options.readHistoryPage,
     ...(options.releaseCleanupDeadlineMs === undefined
       ? {}
       : { releaseCleanupDeadlineMs: options.releaseCleanupDeadlineMs }),
@@ -1759,6 +1849,113 @@ describe('createPreparationManager', () => {
     ]);
   });
 
+  it('creates a stacked branch from the exact base SHA with --no-track', async () => {
+    const harness = createHarness();
+    const baseSha = 'a'.repeat(40);
+    harness.setGit(args => {
+      if (args[0] === 'show-ref') {
+        return args[3]?.startsWith('refs/remotes/origin/feat/parent') ? result(0) : result(1);
+      }
+      return result(0);
+    });
+    const spec = routeSpec({
+      git: { url: 'https://github.com/acme/repo.git' },
+      branch: 'kilo/stacked',
+      branchMode: 'working',
+      baseBranch: 'feat/parent',
+      baseSha,
+    });
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.gitCalls).toContainEqual(['fetch', '--no-tags', 'origin', 'feat/parent']);
+    expect(harness.gitCalls).toContainEqual([
+      'merge-base',
+      '--is-ancestor',
+      baseSha,
+      'refs/remotes/origin/feat/parent',
+    ]);
+    expect(harness.gitCalls).toContainEqual([
+      'checkout',
+      '--progress',
+      '-b',
+      'kilo/stacked',
+      '--no-track',
+      baseSha,
+    ]);
+    // Never track the parent: otherwise auto-commit pushes to the base branch.
+    expect(harness.gitCalls).not.toContainEqual([
+      'checkout',
+      '--progress',
+      '-b',
+      'kilo/stacked',
+      '--track',
+      'origin/feat/parent',
+    ]);
+    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
+  });
+
+  it('fails non-retryably when the stacked base branch has not been pushed', async () => {
+    const harness = createHarness();
+    harness.setGit(args => {
+      if (args[0] === 'show-ref') return result(1);
+      if (args[0] === 'fetch') return result(128, "fatal: couldn't find remote ref feat/parent");
+      return result(0);
+    });
+    const spec = routeSpec({
+      git: { url: 'https://github.com/acme/repo.git' },
+      branch: 'kilo/stacked',
+      branchMode: 'working',
+      baseBranch: 'feat/parent',
+      baseSha: 'a'.repeat(40),
+    });
+
+    await harness.manager.prepare(spec);
+
+    expect(lastFrame(harness.frames)).toMatchObject({
+      type: 'session.failed',
+      step: 'checkout',
+      subtype: 'base_branch_missing',
+    });
+  });
+
+  it('fails retryably when the recorded base SHA left the base branch', async () => {
+    const harness = createHarness();
+    harness.setGit(args => {
+      if (args[0] === 'show-ref') {
+        return args[3]?.startsWith('refs/remotes/origin/feat/parent') ? result(0) : result(1);
+      }
+      if (args[0] === 'merge-base') return result(1);
+      return result(0);
+    });
+    const spec = routeSpec({
+      git: { url: 'https://github.com/acme/repo.git' },
+      branch: 'kilo/stacked',
+      branchMode: 'working',
+      baseBranch: 'feat/parent',
+      baseSha: 'a'.repeat(40),
+    });
+
+    await harness.manager.prepare(spec);
+
+    expect(lastFrame(harness.frames)).toMatchObject({
+      type: 'session.failed',
+      step: 'checkout',
+      subtype: 'base_branch_changed',
+    });
+  });
+
+  it('classifies a rebuilt stacked workspace with a rewritten base as terminal stale', () => {
+    expect(stackedBaseMismatchError('feat/parent', true)).toMatchObject({
+      subtype: 'base_branch_stale',
+      retryable: false,
+    });
+    expect(stackedBaseMismatchError('feat/parent', false)).toMatchObject({
+      subtype: 'base_branch_changed',
+      retryable: true,
+    });
+  });
+
   it('fetches a synthetic review ref through the review-ref path', async () => {
     const harness = createHarness();
     const spec = routeSpec({
@@ -2383,6 +2580,53 @@ describe('createPreparationManager', () => {
     expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe('kilo-token-2');
     expect(harness.gitCalls).toEqual([]);
   });
+
+  it.each(['org-session', undefined])(
+    'carries the route organization %s into the contained runtime config and environment',
+    async organizationId => {
+      const harness = createHarness();
+      const spec = routeSpec();
+      if (!spec.kilo) throw new Error('Missing test Kilo config');
+      if (organizationId) spec.kilo.organizationId = organizationId;
+      const credentials: ControlPlaneSessionCredentialsPayload = {
+        sessionId: spec.sessionId,
+        kilo: { token: 'kilo-alias' },
+        proxy: {
+          handle: 'proxy-handle',
+          targets: {
+            backendBaseUrl: 'https://facade.test',
+            providerBaseUrl: 'https://facade.test/api/openrouter',
+            sessionIngestBaseUrl: 'https://facade.test',
+          },
+        },
+      };
+      await harness.manager.prepare(spec, credentials);
+
+      const env = harness.ensureInputs[0]?.env;
+      if (organizationId) expect(env?.KILOCODE_ORGANIZATION_ID).toBe(organizationId);
+      else expect(env?.KILOCODE_ORGANIZATION_ID).toBeUndefined();
+      for (const key of ['KILO_CONFIG_CONTENT', 'OPENCODE_CONFIG_CONTENT']) {
+        const config = JSON.parse(env?.[key] ?? '{}');
+        expect(config.provider.kilo.options.kilocodeOrganizationId).toBe(organizationId);
+        expect(config.provider.kilo.options.baseURL).toBe(
+          credentials.proxy?.targets.providerBaseUrl
+        );
+      }
+      expect(env?.KILOCODE_TOKEN).toBe('proxy-handle');
+
+      await harness.manager.installCredentials({
+        ...credentials,
+        proxy: { ...credentials.proxy!, handle: 'renewed-proxy-handle' },
+      });
+      if (organizationId)
+        expect(harness.installCalls[0]?.env.KILOCODE_ORGANIZATION_ID).toBe(organizationId);
+      else expect(harness.installCalls[0]?.env.KILOCODE_ORGANIZATION_ID).toBeUndefined();
+      expect(
+        JSON.parse(harness.installCalls[0]?.env.KILO_CONFIG_CONTENT ?? '{}').provider.kilo.options
+          .kilocodeOrganizationId
+      ).toBe(organizationId);
+    }
+  );
 
   it('prefers the runtime-proxy handle and facade targets over the spec alias', async () => {
     const harness = createHarness();
@@ -3709,9 +3953,12 @@ describe('control-plane runtime profiles', () => {
     }
   });
 
-  it('materializes skills, agents and commands before Kilo starts and retains them through credential refresh', async () => {
+  it('materializes the profile before Kilo starts and shares it through credential refresh', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-profile-'));
     const profile = {
+      runtimeInstructions: [
+        { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+      ],
       runtimeSkills: [
         {
           name: 'review',
@@ -3746,6 +3993,9 @@ describe('control-plane runtime profiles', () => {
       beforeEnsure: async () => {
         const env = harness.ensureInputs.at(-1)!.env;
         if (!env.KILO_CONFIG) return;
+        expect(
+          await fs.readFile(path.join(env.HOME, '.kilocode/rules/profile-proof.md'), 'utf8')
+        ).toBe(profile.runtimeInstructions[0].content);
         expect(
           await fs.readFile(path.join(env.HOME, '.kilocode/skills/review/SKILL.md'), 'utf8')
         ).toBe(profile.runtimeSkills[0].rawMarkdown);
@@ -3799,6 +4049,9 @@ describe('control-plane runtime profiles', () => {
       expect(harness.ensureInputs[1].key).toBe(spec.directory);
       expect(siblingEnv.HOME).toBe(env.HOME);
       expect(siblingEnv.KILO_CONFIG).toBe(env.KILO_CONFIG);
+      expect(
+        await fs.readFile(path.join(siblingEnv.HOME, '.kilocode/rules/profile-proof.md'), 'utf8')
+      ).toBe(profile.runtimeInstructions[0].content);
 
       await harness.manager.prepare(
         routeSpec({

@@ -10,15 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@radix-ui/react-avatar';
-import {
-  BookOpen,
-  ChevronsUpDown,
-  Download,
-  FileDown,
-  LogOut,
-  Trash2,
-  UserCog,
-} from 'lucide-react';
+import { ChevronsUpDown, FileDown, LogOut, Trash2, UserCog } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -131,14 +123,6 @@ export function SidebarUserFooterView({
                   Request data deletion
                 </>
               )}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push('/install')}>
-              <Download className="h-4 w-4" />
-              Install
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push('/learn')}>
-              <BookOpen className="h-4 w-4" />
-              Learn
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>

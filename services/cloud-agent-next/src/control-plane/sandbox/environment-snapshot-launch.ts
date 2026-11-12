@@ -1,8 +1,10 @@
-import { environmentSnapshotName } from '../../shared/environment-snapshot-name.js';
 import { withTimeout } from '@kilocode/worker-utils';
 import type { EnvironmentBuild } from '../../environment-build/environment-build-do.js';
-import type { SnapshotAdmission, SnapshotResolution } from '../../environment-build/coordinator.js';
-import { SNAPSHOT_LOOKUP_BUDGET_MS } from '../../environment-build/policy.js';
+import type { SnapshotResolution } from '../../environment-build/coordinator.js';
+import {
+  SNAPSHOT_LOOKUP_BUDGET_MS,
+  type PublishedSnapshot,
+} from '../../environment-build/policy.js';
 import {
   sameEnvironmentScope,
   type SessionEnvironmentReference,
@@ -76,6 +78,8 @@ export function environmentLaunchCandidate(
   return { candidate: { reference, actorUserId, buildCommands } };
 }
 
+export type SnapshotProvider = PublishedSnapshot['provider'];
+
 export type EnvironmentLookup =
   | { kind: 'resolved'; resolution: SnapshotResolution }
   | { kind: 'timeout' }
@@ -89,6 +93,8 @@ export type EnvironmentLookup =
 export async function lookupEnvironmentSnapshot(input: {
   namespace: DurableObjectNamespace<EnvironmentBuild> | undefined;
   candidate: EnvironmentLaunchCandidate;
+  /** The session's pinned provider; the coordinator compares snapshots against it. */
+  provider: SnapshotProvider;
   launchDeadlineAt: number;
   now?: () => number;
 }): Promise<EnvironmentLookup> {
@@ -105,6 +111,7 @@ export async function lookupEnvironmentSnapshot(input: {
         stub.resolveSnapshot({
           reference: input.candidate.reference,
           actorUserId: input.candidate.actorUserId,
+          provider: input.provider,
         }),
         remaining,
         'Environment snapshot lookup timed out',
@@ -121,8 +128,8 @@ export async function lookupEnvironmentSnapshot(input: {
 }
 
 /**
- * The snapshot a session starts from. During the image rollout window the
- * coordinator may publish an older snapshot as compatible; the container
+ * The snapshot a session starts from. The coordinator may publish a snapshot
+ * from an earlier base image as compatible; the container
  * restore does not use that image, and startup installs the current runtime
  * over the restored disk, so the provider receives the current image identity.
  */
@@ -132,7 +139,11 @@ export function snapshotStart(resolution: SnapshotResolution): ProviderSnapshotS
     resolution.snapshot.stale === 'image'
       ? (resolution.currentBaseImage ?? resolution.snapshot.baseImage)
       : resolution.snapshot.baseImage;
-  return { snapshotId: resolution.snapshot.snapshotId, baseImage };
+  return {
+    snapshotId: resolution.snapshot.snapshotId,
+    baseImage,
+    ...(resolution.snapshot.provider === 'vercel' ? { provider: 'vercel' as const } : {}),
+  };
 }
 
 export type EnvironmentSnapshotBlockReason =
@@ -162,37 +173,19 @@ export type EnvironmentSnapshotBlock = {
 };
 
 export type EnvironmentSnapshotDecision =
-  | { kind: 'start'; snapshot: ProviderSnapshotStart | undefined; detail: string }
+  | { kind: 'start'; snapshot: ProviderSnapshotStart | undefined }
   | { kind: 'blocked'; block: EnvironmentSnapshotBlock };
 
-function admissionText(admission: SnapshotAdmission): string | null {
-  switch (admission.status) {
-    case 'admitted':
-      return 'a replacement build was started';
-    case 'active':
-      return 'a replacement build is running';
-    case 'not_needed':
-      return null;
-    case 'skipped':
-      switch (admission.reason) {
-        case 'backoff':
-          return 'the replacement build is waiting after earlier failures';
-        case 'container_limit_reached':
-          return 'no replacement build started: the container limit is reached';
-        case 'build_in_progress':
-        case 'cleanup_pending':
-          return 'another environment build is still running';
-        case 'revision_superseded':
-          return 'the environment changed after this session started';
-        default:
-          return 'no replacement build started';
-      }
-  }
-}
-
-function blockedDetail(sentence: string, buildId: string | null): string {
-  return buildId === null ? sentence : `${sentence} Build ${buildId}.`;
-}
+// Keep user-facing recovery instructions consistent while retaining precise
+// failure reasons in the control plane and diagnostics.
+export const ENVIRONMENT_SNAPSHOT_MESSAGES = {
+  rebuild: 'Environment snapshot is unavailable. Rebuild the environment.',
+  retry: 'Environment snapshot is temporarily unavailable. Try again.',
+  unsupported: 'Environment snapshots are not supported for this session.',
+  newSession: 'This session cannot use the environment snapshot. Start a new session.',
+  providerMismatch:
+    "This session runs on different compute than the environment's snapshot. Use the environment's compute.",
+} as const;
 
 function buildIdOf(resolution: SnapshotResolution): string | null {
   if (resolution.admission.status === 'admitted' || resolution.admission.status === 'active') {
@@ -222,14 +215,21 @@ function blockedEnvironment(
     case 'unsupported':
       return {
         reason: 'environment_not_supported',
-        detail: 'Environment snapshots are unavailable for this environment.',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.unsupported,
+        environmentId,
+        buildId,
+      };
+    case 'provider_mismatch':
+      return {
+        reason: 'environment_not_supported',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.providerMismatch,
         environmentId,
         buildId,
       };
     case 'deleted':
       return {
         reason: 'environment_snapshot_unavailable',
-        detail: 'The environment was deleted.',
+        detail: 'This environment was deleted. Choose another environment.',
         environmentId,
         buildId,
       };
@@ -237,24 +237,21 @@ function blockedEnvironment(
     case 'newer_than_session':
       return {
         reason: 'environment_snapshot_unavailable',
-        detail: 'The published environment snapshot cannot be used for this session.',
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.newSession,
         environmentId,
         buildId,
       };
     case 'expired':
       return {
         reason: 'environment_snapshot_expired',
-        detail: blockedDetail('The environment snapshot expired.', buildId),
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.rebuild,
         environmentId,
         buildId,
       };
     case 'incompatible':
       return {
         reason: 'environment_snapshot_incompatible',
-        detail: blockedDetail(
-          'The environment snapshot was built for an earlier image and is outside the rollout window.',
-          buildId
-        ),
+        detail: ENVIRONMENT_SNAPSHOT_MESSAGES.rebuild,
         environmentId,
         buildId,
       };
@@ -266,7 +263,7 @@ function blockedEnvironment(
     case 'active':
       return {
         reason: 'environment_building',
-        detail: blockedDetail('The environment is building.', buildId),
+        detail: 'Environment is building. Retry when it finishes.',
         environmentId,
         buildId,
       };
@@ -276,7 +273,7 @@ function blockedEnvironment(
           if (buildIsActive(resolution)) {
             return {
               reason: 'environment_building',
-              detail: blockedDetail('The environment is building.', buildId),
+              detail: 'Environment is building. Retry when it finishes.',
               environmentId,
               buildId,
             };
@@ -284,26 +281,20 @@ function blockedEnvironment(
           return resolution.build?.state === 'failed' || resolution.build?.outcome === 'failed'
             ? {
                 reason: 'environment_build_failed',
-                detail: blockedDetail('The environment build failed.', buildId),
+                detail: 'Environment build failed. Check the build logs and rebuild.',
                 environmentId,
                 buildId,
               }
             : {
                 reason: 'environment_build_backoff',
-                detail: blockedDetail(
-                  'The environment build is waiting after earlier failures.',
-                  buildId
-                ),
+                detail: 'Environment build paused after failures. Try again later.',
                 environmentId,
                 buildId,
               };
         case 'container_limit_reached':
           return {
             reason: 'environment_build_unavailable',
-            detail: blockedDetail(
-              'The environment build cannot start because the container limit is reached.',
-              buildId
-            ),
+            detail: 'Container limit reached. Retry when a container is available.',
             environmentId,
             buildId,
           };
@@ -311,38 +302,35 @@ function blockedEnvironment(
         case 'cleanup_pending':
           return {
             reason: 'environment_building',
-            detail: blockedDetail('The environment is building.', buildId),
+            detail: 'Environment is building. Retry when it finishes.',
             environmentId,
             buildId,
           };
         case 'unsupported':
           return {
             reason: 'environment_not_supported',
-            detail: 'Environment snapshots are unavailable for this environment.',
+            detail: ENVIRONMENT_SNAPSHOT_MESSAGES.unsupported,
             environmentId,
             buildId,
           };
         case 'revision_superseded':
           return {
             reason: 'environment_snapshot_unavailable',
-            detail: blockedDetail(
-              'The environment changed after this session started and has no usable snapshot.',
-              buildId
-            ),
+            detail: ENVIRONMENT_SNAPSHOT_MESSAGES.newSession,
             environmentId,
             buildId,
           };
         case 'environment_deleted':
           return {
             reason: 'environment_snapshot_unavailable',
-            detail: 'The environment was deleted.',
+            detail: 'This environment was deleted. Choose another environment.',
             environmentId,
             buildId,
           };
         case 'unavailable':
           return {
             reason: 'environment_build_unavailable',
-            detail: blockedDetail('The environment build is unavailable.', buildId),
+            detail: ENVIRONMENT_SNAPSHOT_MESSAGES.retry,
             environmentId,
             buildId,
           };
@@ -351,7 +339,7 @@ function blockedEnvironment(
     case 'not_needed':
       return {
         reason: 'environment_not_built',
-        detail: blockedDetail('The environment is not built.', buildId),
+        detail: 'Environment has no snapshot. Build the environment first.',
         environmentId,
         buildId,
       };
@@ -365,10 +353,7 @@ function blockedLookup(
   return {
     reason:
       lookup.kind === 'timeout' ? 'environment_lookup_timeout' : 'environment_lookup_unavailable',
-    detail:
-      lookup.kind === 'timeout'
-        ? 'The environment snapshot lookup timed out. The environment must be built before this session can start.'
-        : 'The environment snapshot lookup is unavailable. The environment must be built before this session can start.',
+    detail: ENVIRONMENT_SNAPSHOT_MESSAGES.retry,
     environmentId: candidate.reference.environmentId,
     buildId: null,
   };
@@ -381,10 +366,7 @@ export function environmentSnapshotStartBlock(
 ): EnvironmentSnapshotBlock {
   return {
     reason: 'environment_snapshot_start_failed',
-    detail: blockedDetail(
-      'The environment snapshot could not start. Rebuild the environment.',
-      buildId
-    ),
+    detail: ENVIRONMENT_SNAPSHOT_MESSAGES.rebuild,
     environmentId: candidate.reference.environmentId,
     buildId,
   };
@@ -405,7 +387,6 @@ export function environmentSnapshotDecision(
       ? {
           kind: 'start',
           snapshot: undefined,
-          detail: environmentStartDetail(candidate.reference, lookup),
         }
       : { kind: 'blocked', block: blockedLookup(candidate, lookup) };
   }
@@ -414,36 +395,7 @@ export function environmentSnapshotDecision(
     return {
       kind: 'start',
       snapshot,
-      detail: environmentStartDetail(candidate.reference, lookup),
     };
   }
   return { kind: 'blocked', block: blockedEnvironment(candidate, lookup.resolution) };
-}
-
-/**
- * The preparation detail shown while the sandbox starts. It names the actual
- * snapshot by capture time and the real replacement build status. Changed
- * settings remain visible without exposing internal configuration revisions.
- */
-export function environmentStartDetail(
-  reference: SessionEnvironmentReference,
-  lookup: EnvironmentLookup
-): string {
-  if (lookup.kind !== 'resolved') {
-    return 'Starting without an environment snapshot (lookup unavailable)';
-  }
-  const { snapshot, admission } = lookup.resolution;
-  const build = admissionText(admission);
-  if (snapshot === null) {
-    return `Starting without an environment snapshot${build === null ? '' : `; ${build}`}`;
-  }
-  const settings =
-    snapshot.revision === reference.configurationRevision
-      ? ''
-      : '; environment settings have changed; cached files may retain earlier values';
-  const image =
-    snapshot.stale === 'image'
-      ? '; built for an earlier image; using it during the rollout window'
-      : '';
-  return `Using snapshot · ${environmentSnapshotName(snapshot.capturedAt)}${image}${settings}${build === null ? '' : `; ${build}`}`;
 }

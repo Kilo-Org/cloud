@@ -137,11 +137,17 @@ describe('Kilo harness', () => {
         model: { providerID: 'kilo', modelID: 'test/model' },
       },
     ]);
-    expect(await f.harness.compact({ sessionId, directory, model: 'test/model', auto: true })).toBe(
-      true
-    );
+    expect(
+      await f.harness.compact({
+        sessionId,
+        directory,
+        messageId: 'm1',
+        model: 'test/model',
+        auto: true,
+      })
+    ).toBe('executed');
     expect(f.summaries).toEqual([
-      { sessionId, directory, model: { modelID: 'test/model' }, auto: true },
+      { sessionId, directory, messageId: 'm1', model: { modelID: 'test/model' }, auto: true },
     ]);
   });
 

@@ -67,6 +67,13 @@ class ArtifactsDocumentsProvider : DocumentsProvider() {
     // instead of an error.
     val session = sessions.firstOrNull { it.id == parentDocumentId } ?: return cursor
     for (file in session.files) {
+      // Only an entry with bytes is a document. The index is written last, so an
+      // entry can outlive its file; the browser would list that row, the open
+      // would fail, and the picker reports the failure as the same cancel a Back
+      // produces — a tap that does nothing and says nothing.
+      if (!mirrorFile(session.id, file).isFile) {
+        continue
+      }
       fileRow(session.id, file).addTo(cursor)
     }
     return cursor
@@ -83,7 +90,7 @@ class ArtifactsDocumentsProvider : DocumentsProvider() {
       sessionRow(session).addTo(cursor)
       return cursor
     }
-    val file = findFile(documentId, sessions)
+    val file = servedDocument(documentId, sessions)
       ?: throw FileNotFoundException("No artifact document $documentId")
     fileRow(file.session.id, file.entry).addTo(cursor)
     return cursor
@@ -97,7 +104,7 @@ class ArtifactsDocumentsProvider : DocumentsProvider() {
     if (sessions.any { it.id == documentId }) {
       return Document.MIME_TYPE_DIR
     }
-    return findFile(documentId, sessions)?.entry?.mime
+    return servedDocument(documentId, sessions)?.entry?.mime
       ?: throw FileNotFoundException("No artifact document $documentId")
   }
 
@@ -109,12 +116,12 @@ class ArtifactsDocumentsProvider : DocumentsProvider() {
     if (mode != READ_MODE) {
       throw FileNotFoundException("Read-only artifact provider cannot open $documentId for $mode")
     }
-    val file = resolveFile(documentId)
-      ?: throw FileNotFoundException("No artifact document $documentId")
-    if (!file.isFile) {
-      throw FileNotFoundException("No artifact file on disk for $documentId")
-    }
-    return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+    val file = servedDocument(documentId, readSessions())
+      ?: throw FileNotFoundException("No artifact file on disk for $documentId")
+    return ParcelFileDescriptor.open(
+      mirrorFile(file.session.id, file.entry),
+      ParcelFileDescriptor.MODE_READ_ONLY,
+    )
   }
 
   override fun createDocument(parentDocumentId: String, mimeType: String, displayName: String): String {
@@ -142,10 +149,18 @@ class ArtifactsDocumentsProvider : DocumentsProvider() {
    * id>/<file id>`. The display name never reaches the filesystem, so a name that
    * carries a path cannot escape the session folder.
    */
-  private fun resolveFile(documentId: String): File? {
-    val file = findFile(documentId, readSessions()) ?: return null
-    val sessionDirectory = File(File(artifactsDirectory, SESSIONS_DIRECTORY_NAME), file.session.id)
-    return File(sessionDirectory, file.entry.id)
+  private fun mirrorFile(sessionId: String, entry: ManifestFile): File =
+    File(File(File(artifactsDirectory, SESSIONS_DIRECTORY_NAME), sessionId), entry.id)
+
+  /**
+   * The manifest entry for `documentId`, kept only while its bytes are a regular
+   * file under the mirror. The index is written last and pruned by the next
+   * sync, so an entry can outlive its bytes; such an entry is not a document,
+   * because every read of it would fail after the file browser showed the row.
+   */
+  private fun servedDocument(documentId: String, sessions: List<ManifestSession>): ArtifactFile? {
+    val file = findFile(documentId, sessions) ?: return null
+    return file.takeIf { mirrorFile(it.session.id, it.entry).isFile }
   }
 
   private fun findFile(documentId: String, sessions: List<ManifestSession>): ArtifactFile? {

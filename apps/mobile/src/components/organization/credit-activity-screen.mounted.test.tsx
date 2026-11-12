@@ -137,7 +137,7 @@ vi.mock('@kilocode/app-shared/utils', () => ({
 
 vi.mock('@/lib/format', () => ({
   formatDate: String,
-  formatMoney: (amount: number) => `$${amount}`,
+  formatPrefixedMoney: (amount: number) => `$${amount}`,
 }));
 
 vi.mock('@/lib/utils', () => ({

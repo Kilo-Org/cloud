@@ -228,7 +228,7 @@ function validate(workflow) {
   );
   assert.match(
     suite.run,
-    /select\(\.name == "mobile-test \(1\/8\)"\)/,
+    /select\(\.name == "mobile-test \(1\/4\)"\)/,
     'the proof must read a shard job that runs only when the suite runs'
   );
   assert.match(
@@ -255,7 +255,7 @@ function validate(workflow) {
   // The gate publishes whether the run settled the validation, and the
   // in-workflow suite covers every case it did not: a manual run of another
   // ref, a lookup that cannot prove a run, and a run that ended without a
-  // pass, which includes one a later push cancelled.
+  // pass, which includes a cancelled one.
   const reuseJob = workflow.jobs.reuse;
   assert.ok(reuseJob, 'the reuse gate job is missing');
   assert.ok(
@@ -331,6 +331,25 @@ function validate(workflow) {
     workflow.jobs.validate.if,
     /needs\.check-changes\.outputs\.reuse == 'false' \|\| needs\.reuse\.outputs\.suite == 'fallback'/,
     'the in-workflow suite must run when no run is reused or the reused run ended without a pass'
+  );
+
+  // The release reuses the push run of this commit, so the mobile workflow must
+  // let a main push it started reach a conclusion: only a superseded pull
+  // request run is cancelled, the rule ci.yml and extension-ci.yml already
+  // apply. A cancelled push run carries no verdict about its commit, so the
+  // release would run the whole suite a second time inside its own workflow.
+  const mobileWorkflow = load(
+    readFileSync(new URL(`../${ciWorkflowPath}`, import.meta.url), 'utf8')
+  );
+  assert.equal(
+    mobileWorkflow.concurrency?.group,
+    '${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}',
+    'the mobile workflow must keep one concurrency group per pull request and ref'
+  );
+  assert.equal(
+    mobileWorkflow.concurrency?.['cancel-in-progress'],
+    "${{ github.event_name == 'pull_request' }}",
+    'the mobile workflow must cancel only a superseded pull request run'
   );
 
   // The cost gate is the last thing before any build: every job that builds or
@@ -549,6 +568,30 @@ function validate(workflow) {
 
 test('the release workflow gates the build on the upload cap and lands the changelog section', () => {
   validate(readWorkflow());
+});
+
+// The preflight reads the EAS CLI and the evaluated Expo config only. `eas-cli`
+// is the app's development dependency, and `app.config.ts` with
+// scripts/assert-expo-config.mjs resolves app-local modules, so the app closure
+// carries every input of the job. The job runs on the default runner, and a
+// measured run of it puts the install saving above a tenth of its wall time.
+const preflightInstall =
+  "pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo";
+
+test('the release preflight installs the app closure', () => {
+  const job = readWorkflow().jobs.preflight;
+  const installs = job.steps.filter(item => /^pnpm\b.*\binstall\b/.test(item.run ?? ''));
+  assert.deepEqual(
+    installs.map(item => item.run),
+    [preflightInstall],
+    'one install links the app closure and the root project'
+  );
+  const assertion = job.steps.find(item => item.name === 'Assert production config contract');
+  assert.match(
+    assertion.run,
+    /pnpm assert:config/,
+    'the config assertion the closure must carry still runs'
+  );
 });
 
 test('release retries preserve shipped sections on a bump branch without a PR', () => {
@@ -991,8 +1034,9 @@ sed -n "$((INDEX + 1))p" "$GH_STUB_RUN"
     assert.equal(settled.calls.length, 1, 'a settled pass needs one read');
 
     // A cancelled run carries no verdict about this commit: the suite runs in
-    // this workflow and the release does not fail at the gate. A merge burst
-    // produces exactly this, because the app workflow cancels its own main run.
+    // this workflow and the release does not fail at the gate. A burst of main
+    // pushes produces exactly this, because GitHub drops a run that is still
+    // pending when a third run enters its group.
     const cancelled = gate({ runs: [{ status: 'completed', conclusion: 'cancelled' }] });
     assert.equal(cancelled.status, 0, 'a cancelled reuse must not fail the release');
     assert.deepEqual(cancelled.outputs, { suite: 'fallback' });
@@ -1129,7 +1173,7 @@ const mutations = {
   'the suite proof reads a job that runs for every commit': workflow => {
     const suite = step(workflow, 'check-changes', 'suite');
     suite.run = suite.run.replace(
-      'select(.name == "mobile-test (1/8)")',
+      'select(.name == "mobile-test (1/4)")',
       'select(.name == "mobile-changes")'
     );
   },

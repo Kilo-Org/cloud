@@ -388,9 +388,7 @@ describe('resolveSavedSandboxAllocation', () => {
       });
 
       expect(allocation).toBe('vercel-small');
-      expect(() =>
-        assertEnvironmentSupportsSandbox({ environment: v2, allocation, contained: true })
-      ).toThrowError(
+      expect(() => assertEnvironmentSupportsSandbox({ environment: v2, allocation })).toThrowError(
         expect.objectContaining({
           code: 'BAD_REQUEST',
           message: expect.stringContaining('Vercel sandbox'),
@@ -496,7 +494,6 @@ describe('withSavedSandboxAllocation', () => {
       assertEnvironmentSupportsSandbox({
         environment: v2,
         allocation: requestedSandboxAllocation(resolved),
-        contained: true,
       })
     ).toThrowError(expect.objectContaining({ code: 'BAD_REQUEST' }));
   });
@@ -535,14 +532,9 @@ describe('assertEnvironmentSupportsSandbox', () => {
     ['isolated Cloudflare containers', 'cloudflare-containers-standard-3'],
     ['larger isolated Cloudflare containers', 'cloudflare-containers-standard-4'],
     ['a Cloudflare sandbox', 'cloudflare-single'],
-  ] as const)(
-    'lets a V2 environment start on %s with contained credentials',
-    (_name, allocation) => {
-      expect(() =>
-        assertEnvironmentSupportsSandbox({ environment: v2, allocation, contained: true })
-      ).not.toThrow();
-    }
-  );
+  ] as const)('lets a V2 environment start on %s', (_name, allocation) => {
+    expect(() => assertEnvironmentSupportsSandbox({ environment: v2, allocation })).not.toThrow();
+  });
 
   it.each([
     ['the shared sandbox', 'cloudflare-shared', 'shared sandbox'],
@@ -551,24 +543,11 @@ describe('assertEnvironmentSupportsSandbox', () => {
   ] as const)(
     'fails a V2 environment on %s with a specific reason',
     (_name, allocation, reason) => {
-      expect(() =>
-        assertEnvironmentSupportsSandbox({ environment: v2, allocation, contained: true })
-      ).toThrowError(
+      expect(() => assertEnvironmentSupportsSandbox({ environment: v2, allocation })).toThrowError(
         expect.objectContaining({ code: 'BAD_REQUEST', message: expect.stringContaining(reason) })
       );
     }
   );
-
-  it('fails a V2 environment whose credentials would be direct', () => {
-    expect(() =>
-      assertEnvironmentSupportsSandbox({ environment: v2, allocation: undefined, contained: false })
-    ).toThrowError(
-      expect.objectContaining({
-        code: 'BAD_REQUEST',
-        message: expect.stringContaining('contained credentials'),
-      })
-    );
-  });
 
   it.each([
     undefined,
@@ -577,11 +556,7 @@ describe('assertEnvironmentSupportsSandbox', () => {
     'cloudflare-containers-standard-3',
   ] as const)('never restricts a V1 environment or no environment (allocation %s)', allocation => {
     for (const environment of [v1, undefined]) {
-      for (const contained of [true, false]) {
-        expect(() =>
-          assertEnvironmentSupportsSandbox({ environment, allocation, contained })
-        ).not.toThrow();
-      }
+      expect(() => assertEnvironmentSupportsSandbox({ environment, allocation })).not.toThrow();
     }
   });
 });

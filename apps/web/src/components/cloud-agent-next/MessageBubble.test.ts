@@ -17,7 +17,10 @@ jest.mock('../../../node_modules/@pierre/diffs/dist/utils/iterateOverDiff.js', (
 
 import { MessageBubble } from './assistant-ui/test-renderers';
 import { CloudChatRuntimeProvider } from './assistant-ui/CloudChatRuntimeProvider';
-import { CloudThread } from './assistant-ui/CloudThread';
+import { CloudReadOnlyThread, CloudThread } from './assistant-ui/CloudThread';
+import { CloudSharedTranscript } from './assistant-ui/CloudSharedTranscript';
+import { useCloudPresentationActions } from './assistant-ui/cloud-presentation-context';
+import { readKilo2Messages } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
 
 Object.assign(globalThis, { React });
 
@@ -78,6 +81,176 @@ function userMessage(text: string): StoredMessage {
 }
 
 describe('MessageBubble', () => {
+  it.each([
+    ['pending', 'Compacting context…', undefined, true],
+    ['running', 'Compacting context…', undefined, true],
+    ['pending', 'Context compaction interrupted', undefined, false],
+    ['running', 'Context compaction interrupted', undefined, false],
+    ['completed', 'Context compacted', undefined, false],
+    ['failed', 'Context compaction failed', { type: 'model', message: 'Model unavailable' }, false],
+    ['failed', 'Context compaction failed', undefined, false],
+    [
+      'failed',
+      'Context compaction interrupted',
+      { type: 'aborted', message: 'Raw abort text' },
+      false,
+    ],
+  ])(
+    'renders a %s V2 compaction as %s with error %j (live: %s)',
+    (status, label, error, isStreaming) => {
+      const messages = readKilo2Messages(
+        {
+          id: 'ses-1',
+          location: { directory: '/workspace' },
+          time: { created: 1, updated: 5 },
+        },
+        [
+          { id: 'msg_user', type: 'user', text: 'Hello', time: { created: 1 } },
+          {
+            id: 'msg_before',
+            type: 'assistant',
+            content: [{ type: 'text', text: 'Before compaction' }],
+            time: { created: 2, completed: 3 },
+          },
+          {
+            id: 'msg_compaction',
+            type: 'compaction',
+            status,
+            reason: 'manual',
+            summary: 'Internal context summary',
+            content: [
+              { type: 'reasoning', text: '' },
+              { type: 'text', text: 'Compaction detail' },
+            ],
+            time: { created: 4 },
+            ...(error ? { error } : {}),
+          },
+          ...(status === 'completed'
+            ? [
+                {
+                  id: 'msg_after',
+                  type: 'assistant',
+                  content: [{ type: 'text', text: 'After compaction' }],
+                  time: { created: 5, completed: 6 },
+                },
+              ]
+            : []),
+        ]
+      );
+      const render = () =>
+        renderToStaticMarkup(
+          React.createElement(CloudChatRuntimeProvider, {
+            projection: { messages, isStreaming },
+            state: {
+              isLoading: false,
+              isRunning: isStreaming,
+              isReadOnly: false,
+              isSendDisabled: false,
+              canInterrupt: false,
+            },
+            onNew: async () => {},
+            children: React.createElement(CloudThread),
+          })
+        );
+      const html = render();
+      expect(html).toContain(label);
+      expect(html).toContain('Before compaction');
+      expect(html).toContain('Compaction detail');
+      if (status === 'completed') {
+        expect(html).not.toContain('Internal context summary');
+        expect(html).toContain('Context summary');
+        expect(html).toContain('Compaction replaces older model context with a summary.');
+        expect(html).toContain('aria-expanded="false"');
+      } else {
+        expect(html).not.toContain('Internal context summary');
+        expect(html).not.toContain('No summary is available');
+      }
+      expect(html.split(label)).toHaveLength(2);
+      expect(html).not.toContain('Raw abort text');
+      expect(html.match(/data-message-id="msg_compaction"/g)).toHaveLength(1);
+      if (status === 'completed') {
+        expect(html).toContain('After compaction');
+        expect(html.indexOf('Before compaction')).toBeLessThan(html.indexOf(label));
+        expect(html.indexOf(label)).toBeLessThan(html.indexOf('After compaction'));
+      }
+      if (status === 'failed') {
+        if (error?.type === 'model') expect(html).toContain('Model unavailable');
+        if (error?.type === 'aborted') expect(html).not.toContain('Context compaction failed');
+        expect(html).not.toContain('Context compacted');
+      }
+      expect(render()).toBe(html);
+      const sharedHtml = renderToStaticMarkup(
+        React.createElement(CloudSharedTranscript, { messages })
+      );
+      const historicalLabel = isStreaming ? 'Context compaction interrupted' : label;
+      expect(sharedHtml).toContain(historicalLabel);
+      expect(sharedHtml.split(historicalLabel)).toHaveLength(2);
+      expect(sharedHtml).toContain('Compaction detail');
+      expect(sharedHtml).not.toContain('Compacting context…');
+      expect(sharedHtml).not.toContain('Raw abort text');
+      expect(sharedHtml).not.toContain('Internal context summary');
+      expect(sharedHtml.match(/data-message-id="msg_compaction"/g)).toHaveLength(1);
+      const childHtml = renderToStaticMarkup(
+        React.createElement(CloudReadOnlyThread, { messages, child: true, isStreaming })
+      );
+      expect(childHtml).toContain(label);
+      expect(childHtml.split(label)).toHaveLength(2);
+      expect(childHtml).toContain('Compaction detail');
+      expect(childHtml).not.toContain('Unknown part type');
+      expect(childHtml).not.toContain('Internal context summary');
+      expect(childHtml).not.toContain('Raw abort text');
+      if (error?.type === 'model') expect(childHtml).toContain('Model unavailable');
+      function NestedTranscript() {
+        return useCloudPresentationActions().renderChildTranscript(
+          messages.filter(message => message.info.id === 'msg_compaction'),
+          1
+        );
+      }
+      const nestedHtml = renderToStaticMarkup(
+        React.createElement(CloudReadOnlyThread, {
+          messages: messages.slice(0, 1),
+          isStreaming,
+          messageComponent: NestedTranscript,
+        })
+      );
+      expect(nestedHtml).toContain(label);
+      expect(nestedHtml).not.toContain('Unknown part type');
+    }
+  );
+
+  it('explains a completed V2 compaction that has no saved summary', () => {
+    const messages = readKilo2Messages(
+      { id: 'ses-1', location: { directory: '/workspace' }, time: { created: 1, updated: 2 } },
+      [{ id: 'msg_compaction', type: 'compaction', status: 'completed', time: { created: 2 } }]
+    );
+    const html = renderToStaticMarkup(React.createElement(CloudSharedTranscript, { messages }));
+    expect(html).toContain('No summary is available for this compaction.');
+    expect(html).not.toContain('aria-label="Context summary"');
+  });
+
+  it('keeps a summary-only V2 compaction collapsed by default without requiring streamed content', () => {
+    const messages = readKilo2Messages(
+      { id: 'ses-1', location: { directory: '/workspace' }, time: { created: 1, updated: 2 } },
+      [
+        {
+          id: 'msg_compaction',
+          type: 'compaction',
+          status: 'completed',
+          reason: 'auto',
+          summary: 'Keep the task and the next step.',
+          time: { created: 2 },
+        },
+      ]
+    );
+    const html = renderToStaticMarkup(React.createElement(CloudSharedTranscript, { messages }));
+    expect(html).toContain('Context compacted');
+    expect(html).toContain('(auto)');
+    expect(html).not.toContain('Keep the task and the next step.');
+    expect(html).toContain('aria-label="Context summary"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain('No summary is available');
+  });
+
   it('keeps one resume anchor for a compaction-only group', () => {
     const message = userMessage('');
     message.parts = [

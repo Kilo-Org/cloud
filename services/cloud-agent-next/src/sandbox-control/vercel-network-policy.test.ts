@@ -74,6 +74,34 @@ function request(url: string, method: string, authorization: string): Request {
   });
 }
 
+describe('provider organization catalog', () => {
+  const input: VercelCredentialPolicyInput = {
+    rootSessionIds: [root],
+    organizationId: 'org-1',
+    runtimeProxy: {
+      targets,
+      members: [{ sessionId, kiloSessionId: root, handle: 'member-handle' }],
+    },
+  };
+
+  it('allows only the session organization catalog', () => {
+    const policy = buildVercelCredentialNetworkPolicy(input);
+    const exactPaths = policy.injectionRules.flatMap(rule =>
+      rule.match.path && 'exact' in rule.match.path ? [rule.match.path.exact] : []
+    );
+    expect(exactPaths).toContain('/api/openrouter/organizations/org-1/models');
+    expect(exactPaths).toContain('/api/gateway/organizations/org-1/models');
+    expect(exactPaths).not.toContain('/api/openrouter/organizations/org-2/models');
+    const rule = policy.injectionRules.find(
+      candidate =>
+        candidate.match.path &&
+        'exact' in candidate.match.path &&
+        candidate.match.path.exact === '/api/openrouter/organizations/org-1/models'
+    );
+    expect(rule?.match.method).toEqual(['GET']);
+  });
+});
+
 describe('Vercel ordered transform conversion', () => {
   const inputs: Array<[string, VercelCredentialPolicyInput]> = [
     [

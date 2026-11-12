@@ -7,7 +7,7 @@ import {
   getRawOpenRouterModels,
   resetOpenRouterModelsCaches,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
-import type { StoredModel } from '@kilocode/db/schema-types';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import {
   createMockResponse,
   mockOpenRouterModels,
@@ -477,7 +477,7 @@ describe('reasoning variants', () => {
 
 describe('reasoning options', () => {
   const reasoningSupported = ['max_tokens', 'tools', 'reasoning', 'include_reasoning'];
-  const openRouterReasoning: Record<string, StoredModel['reasoning']> = {
+  const openRouterReasoning: Record<string, GatewayModelWithEndpoints['reasoning']> = {
     'anthropic/claude-sonnet-4.6': {
       mandatory: false,
       supported_efforts: ['max', 'high', 'medium', 'low'],

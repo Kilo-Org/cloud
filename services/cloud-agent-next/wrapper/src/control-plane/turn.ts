@@ -23,6 +23,7 @@ import { autoCommitFailure, autoCommitRoots } from './auto-commit-roots.js';
 import { isEnvironmentRoot, routeRoots, type RouteRoot } from './workspace-roots.js';
 import { DEFAULT_CONDENSE_TIMEOUT_MS, type CondenseResult } from '../condense-on-complete.js';
 import { childFromSessionCreated, eventKiloSessionId } from '../control/feed.js';
+import { isDirectoryRewriteActive } from '../control/worktree-operations.js';
 import type { KiloFeedEvent } from './kilo-event-feed.js';
 import {
   activitySessionId,
@@ -288,6 +289,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
       }));
 
   const routes = new Map<string, TurnRoute>();
+  const routeSpecs = new Map<string, ControlPlaneRouteSpec>();
+  const commandPublications = new Map<string, { dirty: boolean; done: Promise<void> }>();
   const turns = new Map<string, Turn>();
   const interruptedFinalizations = new Map<
     string,
@@ -656,14 +659,22 @@ export function createTurnManager(deps: TurnManagerDeps) {
         pending.nativeClose = nativeClose;
         markDispatched(turn, pending);
         try {
-          const summarized = await client.compact({
+          const compacted = await client.compact({
             sessionId: route.kiloSessionId,
             directory: route.directory,
+            messageId: pending.payload.messageId,
             signal: pending.abort.signal,
             model,
           });
-          if (!summarized) throw new Error('Session summarization failed');
           if (!isCurrent()) return;
+          dispatchSignal.throwIfAborted();
+          if (compacted === 'replayed') {
+            // The retired runtime feed is fenced; replay produces no new execution close.
+            pending.acknowledged = true;
+            pending.nativeObserved = true;
+            void finalize(turn);
+            return;
+          }
           // The response can overtake the feed. Keep follow-ups undispatched until
           // the compact's close is processed, so it cannot complete newer work. Once
           // no native execution is live, the delivery deadline `tick` owns bounds the
@@ -726,12 +737,18 @@ export function createTurnManager(deps: TurnManagerDeps) {
       turn.inbox.push(pending);
       return;
     }
+    // A branch rewrite owns the checkout: park the prompt until it finishes.
+    if (isDirectoryRewriteActive(route.directory)) {
+      turn.inbox.push(pending);
+      return;
+    }
     chainSubmit(turn, pending);
   }
 
   function drainInbox(turn: Turn): void {
     if (turn.inbox.length === 0) return;
     if (interruptedFinalizations.has(turn.route.sessionId)) return;
+    if (isDirectoryRewriteActive(turn.route.directory)) return;
     const state = queueState(turn.route);
     if (state === 'queue') return;
     if (state === 'unavailable') {
@@ -1306,10 +1323,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
     }
   }
 
-  async function publishCommandsFor(sessionId: string): Promise<void> {
-    const route = routes.get(sessionId);
-    if (route === undefined) return;
-    const runtime = deps.runtimes.get(route.runtimeKey);
+  async function publishRuntimeCommands(runtimeKeyValue: string): Promise<void> {
+    const runtime = deps.runtimes.get(runtimeKeyValue);
     if (runtime === undefined || runtime.isRestarting() || runtime.isUnavailable()) return;
     let client: Harness;
     try {
@@ -1320,24 +1335,42 @@ export function createTurnManager(deps: TurnManagerDeps) {
     try {
       const catalog = await client.listCommands();
       const catalogStatus = slashCommandCatalogStatus(catalog);
-      emitEvents(sessionId, [
-        {
-          type: 'commands.available',
-          properties: {
-            commands: catalog.commands,
-            ...(catalogStatus ? { catalogStatus } : {}),
+      for (const route of routes.values()) {
+        if (route.runtimeKey !== runtimeKeyValue) continue;
+        emitEvents(route.sessionId, [
+          {
+            type: 'commands.available',
+            properties: {
+              commands: catalog.commands,
+              ...(catalogStatus ? { catalogStatus } : {}),
+            },
           },
-        },
-      ]);
+        ]);
+      }
     } catch (error) {
       log(`turn: listCommands failed - ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  async function publishCommandsForRuntimeKey(runtimeKeyValue: string): Promise<void> {
-    for (const route of routes.values()) {
-      if (route.runtimeKey === runtimeKeyValue) await publishCommandsFor(route.sessionId);
+  function publishCommandsForRuntimeKey(runtimeKeyValue: string): Promise<void> {
+    const active = commandPublications.get(runtimeKeyValue);
+    if (active) {
+      active.dirty = true;
+      return active.done;
     }
+    const publication = { dirty: false, done: Promise.resolve() };
+    commandPublications.set(runtimeKeyValue, publication);
+    publication.done = (async () => {
+      try {
+        do {
+          publication.dirty = false;
+          await publishRuntimeCommands(runtimeKeyValue);
+        } while (publication.dirty);
+      } finally {
+        commandPublications.delete(runtimeKeyValue);
+      }
+    })();
+    return publication.done;
   }
 
   function turnsForRuntimeKey(runtimeKeyValue: string): Turn[] {
@@ -1373,6 +1406,32 @@ export function createTurnManager(deps: TurnManagerDeps) {
       await Promise.all(pending.map(entry => entry.done));
     },
 
+    /**
+     * True while any live turn (including a sibling) uses this directory, or an
+     * interrupted turn's auto-commit still runs there after the turn was reset.
+     */
+    hasActiveTurnInDirectory(directory: string): boolean {
+      for (const turn of turns.values()) {
+        if (turn.route.directory === directory) return true;
+      }
+      for (const entry of interruptedFinalizations.values()) {
+        if (entry.route.directory === directory) return true;
+      }
+      return false;
+    },
+
+    /** The registered route spec, used for managed git args and the expected branch. */
+    routeSpec(sessionId: string): ControlPlaneRouteSpec | undefined {
+      return routeSpecs.get(sessionId);
+    },
+
+    /** Admission resumes after a branch rewrite releases the directory. */
+    resumeDirectory(directory: string): void {
+      for (const turn of turns.values()) {
+        if (turn.route.directory === directory) drainInbox(turn);
+      }
+    },
+
     credentialsInstalled(runtimeKeyValue: string): void {
       maybeApplyPendingCredentials(runtimeKeyValue);
     },
@@ -1395,6 +1454,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         automaticQuestions: existing?.automaticQuestions ?? new Set(),
       };
       routes.set(spec.sessionId, route);
+      routeSpecs.set(spec.sessionId, spec);
       turnByKiloSession.set(spec.kiloSessionId, spec.sessionId);
     },
 
@@ -1408,6 +1468,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         }
       }
       routes.delete(sessionId);
+      routeSpecs.delete(sessionId);
       turns.get(sessionId)?.publication?.dispose();
       turns.delete(sessionId);
       stopTickIfIdle();
@@ -1432,6 +1493,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
     },
 
     observeKiloEvent(event: KiloFeedEvent): void {
+      if (event.type === 'command.updated' && event.runtimeKey) {
+        void publishCommandsForRuntimeKey(event.runtimeKey);
+        return;
+      }
       observeFeed(
         event,
         eventKiloSessionId(event.properties),
@@ -1543,7 +1608,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
     },
 
     publishCommands(sessionId: string): Promise<void> {
-      return publishCommandsFor(sessionId);
+      const route = routes.get(sessionId);
+      return route ? publishCommandsForRuntimeKey(route.runtimeKey) : Promise.resolve();
     },
 
     refreshActivity,

@@ -1,4 +1,4 @@
-import type { Part, SessionSnapshot } from './types';
+import type { Part, SessionSnapshot, TextPart } from './types';
 import { projectKilo2ShellNotification } from './kilo2-shell-notification';
 import {
   kilo2FileContentSchema,
@@ -7,6 +7,12 @@ import {
   type Kilo2Session,
 } from '@kilocode/session-ingest-contracts';
 type ProjectedKilo2Message = SessionSnapshot['messages'][number];
+
+export function isCompactionSummaryPart(
+  part: Part
+): part is TextPart & { metadata: { compactionSummary: true } } {
+  return part.type === 'text' && part.metadata?.['compactionSummary'] === true;
+}
 
 export type Kilo2ContentLayout = { positions: Map<string, number>; next: number };
 
@@ -166,14 +172,21 @@ export function readKilo2Messages(
       });
       continue;
     }
-    const compaction = message.type === 'compaction' && message.status === 'completed';
+    const compaction = message.type === 'compaction';
     if (message.type !== 'assistant' && !compaction) continue;
+    const compactionEnded =
+      compaction && (message.status === 'completed' || message.status === 'failed');
+    const error =
+      message.error ??
+      (compaction && message.status === 'failed'
+        ? { type: 'unknown', message: 'Context compaction failed' }
+        : undefined);
     const info: SessionSnapshot['messages'][number]['info'] = {
       ...base,
       role: 'assistant',
       time: {
         created: message.time.created,
-        ...(compaction || message.time.completed !== undefined
+        ...(compactionEnded || message.time.completed !== undefined
           ? { completed: message.time.completed ?? message.time.created }
           : {}),
       },
@@ -189,24 +202,36 @@ export function readKilo2Messages(
       ...(message.finish ? { finish: message.finish } : {}),
       ...(compaction ? { summary: true } : {}),
       // A stopped turn is an interruption, not a failure, as v1 reports it.
-      ...(message.error
+      ...(error
         ? {
             error: {
-              name: message.error.type === 'aborted' ? 'MessageAbortedError' : 'UnknownError',
-              data: { message: message.error.message },
+              name: error.type === 'aborted' ? 'MessageAbortedError' : 'UnknownError',
+              data: { message: error.message },
             } as const,
           }
         : {}),
     };
     const parts: Part[] = [];
-    if (compaction)
+    if (compaction) {
       parts.push({
         id: kilo2PartId(message.id, 0),
         messageID: message.id,
         sessionID: session.id,
-        type: 'text',
-        text: message.summary ?? '',
+        type: 'compaction',
+        auto: message['reason'] === 'auto',
       });
+      // The summary is outside native content; do not shift streamed content IDs.
+      // Use the same completion signal as the transcript's completed state.
+      if (info.time.completed !== undefined && !error && message.summary?.trim())
+        parts.push({
+          id: `${kilo2PartId(message.id, 0)}_summary`,
+          messageID: message.id,
+          sessionID: session.id,
+          type: 'text',
+          text: message.summary,
+          metadata: { compactionSummary: true },
+        });
+    }
     const offset = compaction ? 1 : 0;
     for (const [index, item] of (message.content ?? []).entries()) {
       const identity = {

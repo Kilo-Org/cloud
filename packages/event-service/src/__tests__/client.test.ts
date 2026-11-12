@@ -346,6 +346,34 @@ describe('EventServiceClient', () => {
     }
   });
 
+  it.each([401, 403] as const)(
+    'stops after the first refused connection ticket (%i) when no unauthorized handler is configured',
+    async refusalStatus => {
+      vi.useFakeTimers();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      try {
+        const fetchMock = vi.fn(async () => new Response(null, { status: refusalStatus }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        const client = makeClient();
+        await client.connect();
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(allMockWs).toHaveLength(0);
+        expect(client.isConnected()).toBe(false);
+
+        await vi.advanceTimersByTimeAsync(120_000);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(allMockWs).toHaveLength(0);
+        expect(client.isConnected()).toBe(false);
+        expect(warn).toHaveBeenCalledTimes(1);
+      } finally {
+        warn.mockRestore();
+        vi.useRealTimers();
+      }
+    }
+  );
+
   it('keeps reconnecting after repeated pre-open failures', async () => {
     vi.useFakeTimers();
     const reconnectDelay = vi.spyOn(Math, 'random').mockReturnValue(1);

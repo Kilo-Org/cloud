@@ -42,11 +42,24 @@ function readSource() {
   return source;
 }
 
+// A Pages archive is a few MiB. These bound a stalled or oversized download
+// before the digest check can reject it.
+const DOWNLOAD_TIMEOUT_MS = 120_000;
+const MAX_ARCHIVE_BYTES = 64 * 1024 * 1024;
+
 async function download(source) {
   const url = `https://github.com/${source.repository}/releases/download/${source.tag}/${archiveName(source.tag)}`;
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
   if (!response.ok) throw new Error(`Downloading ${url} failed: ${response.status}`);
-  return Buffer.from(await response.arrayBuffer());
+  const chunks = [];
+  let bytes = 0;
+  for await (const chunk of response.body) {
+    bytes += chunk.length;
+    if (bytes > MAX_ARCHIVE_BYTES)
+      throw new Error(`${url} is larger than ${MAX_ARCHIVE_BYTES} bytes`);
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }
 
 async function build(localArchive) {

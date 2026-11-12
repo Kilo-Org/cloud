@@ -61,7 +61,12 @@ export function readArchive(gzipped) {
     const name = field(header, 0, 100);
     const prefix = field(header, 345, 155);
     const member = prefix ? `${prefix}/${name}` : name;
-    const size = Number.parseInt(field(header, 124, 12).trim() || '0', 8);
+    // ustar stores the size as octal digits. Anything else, such as a sign,
+    // would let `offset` stand still or move back.
+    const sizeField = field(header, 124, 12).trim();
+    if (!/^[0-7]*$/.test(sizeField))
+      return { files, problems: [`${field(header, 0, 100)} has an invalid size`] };
+    const size = Number.parseInt(sizeField || '0', 8);
     const type = String.fromCharCode(header[156]);
     const start = offset + 512;
     if (!Number.isSafeInteger(size) || start + size > tar.length)

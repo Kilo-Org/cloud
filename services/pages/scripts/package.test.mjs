@@ -77,17 +77,17 @@ test('a release tag names its archive', () => {
   assert.throws(() => archiveName('v2.10.0-nightly.202611112112'), /not a Pages release tag/);
 });
 
-/** A gzipped ustar archive of `members`: [path, contents, typeflag?]. */
+/** A gzipped ustar archive of `members`: [path, contents, typeflag?, size field?]. */
 function archiveOf(members) {
   const blocks = [];
-  for (const [name, contents, type = '0'] of members) {
+  for (const [name, contents, type = '0', sizeField] of members) {
     const bytes = Buffer.from(contents);
     const header = Buffer.alloc(512);
     header.write(name, 0);
     header.write('0000644\0', 100);
     header.write('0000000\0', 108);
     header.write('0000000\0', 116);
-    header.write(bytes.length.toString(8).padStart(11, '0') + '\0', 124);
+    header.write((sizeField ?? bytes.length.toString(8).padStart(11, '0')) + '\0', 124);
     header.write('00000000000\0', 136);
     header.fill(' ', 148, 156);
     header.write(type, 156);
@@ -141,6 +141,11 @@ for (const [name, member] of Object.entries(refusedMembers)) {
 test('refuses a member that appears twice', () => {
   const { problems } = readArchive(archiveOf([...goodMembers, ['worker/index.js', 'again']]));
   assert.deepEqual(problems, ['worker/index.js appears twice']);
+});
+
+test('refuses a negative member size instead of reading the header again', () => {
+  const { problems } = readArchive(archiveOf([['worker/index.js', '', '0', '-0000001000']]));
+  assert.deepEqual(problems, ['worker/index.js has an invalid size']);
 });
 
 test('refuses a corrupt header', () => {

@@ -176,7 +176,7 @@ jest.mock('./session', () => ({
   REMOTE_SESSION_CREATION_NOT_SUPPORTED:
     'Remote session creation is not supported for the current session',
   REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED:
-    'Remote session creation is waiting for the current session to load',
+    'This session is still loading. Try again in a moment.',
   createCloudAgentSession: jest.fn(
     (sessionConfig: {
       kiloSessionId: string;

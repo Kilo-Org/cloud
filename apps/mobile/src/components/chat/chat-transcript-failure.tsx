@@ -39,12 +39,14 @@ export function ChatTranscriptFailure({
   const unavailable = failureKey === CHAT_UNAVAILABLE_KEY;
 
   return (
-    // Centered in the transcript area this state occupies (`band="viewport"`),
-    // like the empty state beside it. The shared measured centring against the
-    // whole window lands half the difference between the two away from where
-    // the state first drew, so it jumped when the measurement arrived; centered
-    // in its own band, the first frame and the measurement agree.
+    // Centered in the transcript area this state occupies (`band="viewport"`
+    // through QueryError's EmptyState → CenteredState), like the empty state
+    // beside it. The shared measured centring against the whole window lands
+    // half the difference between the two away from where the state first
+    // drew, so it jumped when the measurement arrived; centered in its own
+    // band, the first frame and the measurement agree.
     <QueryError
+      band="viewport"
       // The chat is gone in the first case and failed in the second, so the
       // title says which of the two the person is looking at.
       variant={unavailable ? 'not-found' : 'neutral'}

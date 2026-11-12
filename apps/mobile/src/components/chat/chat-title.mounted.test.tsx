@@ -93,7 +93,7 @@ describe('the chat title', () => {
   });
 
   it('gives the notice up rather than squeezing the name on a narrow header', async () => {
-    // 33.52 + 8 gap + 41.52 = 83.04 does not fit the compact cell's 76.19dp:
+    // 33.52 + 7 gap + 41.52 = 82.04 does not fit the compact cell's 76.19dp:
     // the name keeps its width and stays whole.
     view = await mount();
     measure(view.renderer.root, {

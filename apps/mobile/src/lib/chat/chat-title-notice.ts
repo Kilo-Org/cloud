@@ -1,8 +1,10 @@
 /**
- * The gap between the model chat's title and the notice beside it, in dp
- * (`gap-2` at NativeWind's 14dp rem).
+ * The gap between the model chat's name and the notice beside it, in dp
+ * (`gap-2`, half NativeWind's 14dp rem). Measured on the header: the name ends
+ * at 84.95dp and the notice starts at 91.81dp, so the row keeps 6.86dp and
+ * rounds to 7.
  */
-export const CHAT_TITLE_NOTICE_GAP_DP = 8;
+export const CHAT_TITLE_NOTICE_GAP_DP = 7;
 
 /**
  * Slack kept between the notice's end edge and the header slot's end edge, in

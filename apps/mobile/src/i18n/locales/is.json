@@ -2928,7 +2928,10 @@
       "alreadyInvited": "Tölvupóstfangið er þegar boðið eða meðlimurinn er þegar í félaginu.",
       "sendError": "Ekki tókst að senda boðið.",
       "pendingInvitation": "Þetta tölvupóstfang er þegar með boð í bið.",
-      "alreadyMember": "Þessi einstaklingur er þegar meðlimur í þessu fyrirtæki."
+      "alreadyMember": "Þessi einstaklingur er þegar meðlimur í þessu fyrirtæki.",
+      "seatsFull": "Öll sæti eru í notkun ({{used}}/{{total}}). Biddu eiganda fyrirtækisins að bæta við sætum áður en þú býður fleiri meðlimum.",
+      "seatsFullCanInviteBilling": "Öll sæti eru í notkun ({{used}}/{{total}}). Þú getur samt boðið greiðslustjórum, sem nota ekki sæti.",
+      "noSeatsAvailable": "Öll sæti eru í notkun. Biddu eiganda fyrirtækisins að bæta við sætum áður en þú býður fleiri meðlimum."
     },
     "invoices": {
       "downloadA11y": "Sækja reikning {{number}}",

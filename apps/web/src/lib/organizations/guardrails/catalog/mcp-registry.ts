@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { mcpIdentityKey, normalizePackageIdentifier, normalizeRemoteMcpUrl } from '../mcp-identity';
-import { packageVersionHint } from '../package-version-hint';
+import { packageVersionSpecHint } from '../package-version-hint';
 import type { McpCatalogItem, McpCatalogPage, McpCatalogVariant } from './types';
 import { MCP_CATALOG_PAGE_SIZE } from './types';
 
@@ -68,7 +68,7 @@ function adaptPackage(pkg: RegistryPackage): McpCatalogVariant {
     label,
     identityKey: mcpIdentityKey(target),
     target,
-    versionHint: packageVersionHint(pkg.registryType, pkg.version),
+    versionSpecHint: packageVersionSpecHint(pkg.registryType, pkg.version),
   };
 }
 
@@ -85,7 +85,7 @@ function adaptRemote(remote: RegistryRemote): McpCatalogVariant {
     label,
     identityKey: mcpIdentityKey(target),
     target,
-    versionHint: null,
+    versionSpecHint: null,
   };
 }
 

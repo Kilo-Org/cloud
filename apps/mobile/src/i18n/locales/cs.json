@@ -3034,7 +3034,10 @@
       "alreadyInvited": "Tento uživatel už byl pozván nebo už je členem.",
       "sendError": "Pozvánku se nepodařilo odeslat.",
       "pendingInvitation": "Pro tento e-mail již existuje čekající pozvánka.",
-      "alreadyMember": "Tato osoba je již členem této organizace."
+      "alreadyMember": "Tato osoba je již členem této organizace.",
+      "seatsFull": "Všechna místa jsou obsazena ({{used}}/{{total}}). Než pozvete další členy, požádejte vlastníka organizace o přidání míst.",
+      "seatsFullCanInviteBilling": "Všechna místa jsou obsazena ({{used}}/{{total}}). Stále však můžete pozvat správce fakturace, kteří žádné místo nezabírají.",
+      "noSeatsAvailable": "Všechna místa jsou obsazena. Než pozvete další členy, požádejte vlastníka organizace o přidání míst."
     },
     "invoices": {
       "downloadA11y": "Stáhnout fakturu {{number}}",

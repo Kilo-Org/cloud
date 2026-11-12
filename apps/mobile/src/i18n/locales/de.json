@@ -2933,7 +2933,10 @@
       "alreadyInvited": "Diese Person ist bereits eingeladen oder bereits Mitglied.",
       "sendError": "Die Einladung konnte nicht gesendet werden.",
       "pendingInvitation": "Für diese E-Mail-Adresse liegt bereits eine ausstehende Einladung vor.",
-      "alreadyMember": "Diese Person ist bereits Mitglied dieser Organisation."
+      "alreadyMember": "Diese Person ist bereits Mitglied dieser Organisation.",
+      "seatsFull": "Alle Plätze sind belegt ({{used}}/{{total}}). Bitte einen Organisationsinhaber, Plätze hinzuzufügen, bevor du weitere Mitglieder einlädst.",
+      "seatsFullCanInviteBilling": "Alle Plätze sind belegt ({{used}}/{{total}}). Du kannst weiterhin Abrechnungsmanager einladen, die keinen Platz belegen.",
+      "noSeatsAvailable": "Alle Plätze sind belegt. Bitte einen Organisationsinhaber, Plätze hinzuzufügen, bevor du weitere Mitglieder einlädst."
     },
     "invoices": {
       "downloadA11y": "Rechnung {{number}} herunterladen",

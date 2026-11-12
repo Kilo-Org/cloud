@@ -2928,7 +2928,10 @@
       "alreadyInvited": "E-mel itu sudah dijemput atau sudah menjadi ahli.",
       "sendError": "Tidak dapat menghantar jemputan.",
       "pendingInvitation": "E-mel ini sudah mempunyai jemputan yang belum selesai.",
-      "alreadyMember": "Orang ini sudah menjadi ahli organisasi ini."
+      "alreadyMember": "Orang ini sudah menjadi ahli organisasi ini.",
+      "seatsFull": "Semua tempat duduk sedang digunakan ({{used}}/{{total}}). Minta pemilik organisasi menambah tempat duduk sebelum menjemput lebih ramai ahli.",
+      "seatsFullCanInviteBilling": "Semua tempat duduk sedang digunakan ({{used}}/{{total}}). Anda masih boleh menjemput pengurus pengebilan, yang tidak menggunakan tempat duduk.",
+      "noSeatsAvailable": "Semua tempat duduk sedang digunakan. Minta pemilik organisasi menambah tempat duduk sebelum menjemput lebih ramai ahli."
     },
     "invoices": {
       "downloadA11y": "Muat turun invois {{number}}",

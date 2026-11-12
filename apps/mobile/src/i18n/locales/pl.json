@@ -3039,7 +3039,10 @@
       "alreadyInvited": "Ten adres e-mail ma już oczekujące zaproszenie lub należy już do członka tej organizacji.",
       "sendError": "Nie udało się wysłać zaproszenia.",
       "pendingInvitation": "Ten adres e-mail ma już oczekujące zaproszenie.",
-      "alreadyMember": "Ta osoba jest już członkiem tej organizacji."
+      "alreadyMember": "Ta osoba jest już członkiem tej organizacji.",
+      "seatsFull": "Wszystkie miejsca są zajęte ({{used}}/{{total}}). Poproś właściciela organizacji o dodanie miejsc, zanim zaprosisz kolejnych członków.",
+      "seatsFullCanInviteBilling": "Wszystkie miejsca są zajęte ({{used}}/{{total}}). Nadal możesz zapraszać menedżerów rozliczeń, którzy nie zajmują miejsca.",
+      "noSeatsAvailable": "Wszystkie miejsca są zajęte. Poproś właściciela organizacji o dodanie miejsc, zanim zaprosisz kolejnych członków."
     },
     "invoices": {
       "downloadA11y": "Pobierz fakturę {{number}}",

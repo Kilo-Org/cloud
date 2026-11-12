@@ -2928,7 +2928,10 @@
       "alreadyInvited": "Ky person është ftuar tashmë ose është tashmë anëtar.",
       "sendError": "Ftesa nuk u dërgua.",
       "pendingInvitation": "Ky email ka tashmë një ftesë në pritje.",
-      "alreadyMember": "Ky person është tashmë anëtar i kësaj organizate."
+      "alreadyMember": "Ky person është tashmë anëtar i kësaj organizate.",
+      "seatsFull": "Të gjitha vendet janë në përdorim ({{used}}/{{total}}). Kërkoji një pronari të organizatës të shtojë vende para se të ftosh më shumë anëtarë.",
+      "seatsFullCanInviteBilling": "Të gjitha vendet janë në përdorim ({{used}}/{{total}}). Mund të ftosh ende menaxherë të faturimit, të cilët nuk zënë vend.",
+      "noSeatsAvailable": "Të gjitha vendet janë në përdorim. Kërkoji një pronari të organizatës të shtojë vende para se të ftosh më shumë anëtarë."
     },
     "invoices": {
       "downloadA11y": "Shkarko faturën {{number}}",

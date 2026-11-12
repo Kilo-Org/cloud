@@ -2986,7 +2986,10 @@
       "alreadyInvited": "Ya está invitado o ya es miembro.",
       "sendError": "No se pudo enviar la invitación.",
       "pendingInvitation": "Este correo electrónico ya tiene una invitación pendiente.",
-      "alreadyMember": "Esta persona ya es miembro de esta organización."
+      "alreadyMember": "Esta persona ya es miembro de esta organización.",
+      "seatsFull": "Todas las plazas están en uso ({{used}}/{{total}}). Pide a un propietario de la organización que añada plazas antes de invitar a más miembros.",
+      "seatsFullCanInviteBilling": "Todas las plazas están en uso ({{used}}/{{total}}). Aún puedes invitar a gestores de facturación, que no ocupan ninguna plaza.",
+      "noSeatsAvailable": "Todas las plazas están en uso. Pide a un propietario de la organización que añada plazas antes de invitar a más miembros."
     },
     "invoices": {
       "downloadA11y": "Descargar factura {{number}}",

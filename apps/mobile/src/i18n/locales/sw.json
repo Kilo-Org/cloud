@@ -2928,7 +2928,10 @@
       "alreadyInvited": "Wamekwishaalikwa au ni wanachama tayari.",
       "sendError": "Imeshindikana kutuma mwaliko.",
       "pendingInvitation": "Barua pepe hii tayari ina mwaliko unaosubiri.",
-      "alreadyMember": "Mtu huyu tayari ni mwanachama wa shirika hili."
+      "alreadyMember": "Mtu huyu tayari ni mwanachama wa shirika hili.",
+      "seatsFull": "Nafasi zote zinatumika ({{used}}/{{total}}). Muombe mmiliki wa shirika aongeze nafasi kabla ya kualika wanachama zaidi.",
+      "seatsFullCanInviteBilling": "Nafasi zote zinatumika ({{used}}/{{total}}). Bado unaweza kualika wasimamizi wa malipo, ambao hawatumii nafasi.",
+      "noSeatsAvailable": "Nafasi zote zinatumika. Muombe mmiliki wa shirika aongeze nafasi kabla ya kualika wanachama zaidi."
     },
     "invoices": {
       "downloadA11y": "Pakua ankara {{number}}",

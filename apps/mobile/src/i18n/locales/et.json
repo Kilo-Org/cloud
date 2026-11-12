@@ -2928,7 +2928,10 @@
       "alreadyInvited": "Ta on juba kutsutud või juba liige.",
       "sendError": "Kutset ei õnnestunud saata.",
       "pendingInvitation": "Sellele e-posti aadressile on juba saadetud kutse, mis on ootel.",
-      "alreadyMember": "See isik on juba selle organisatsiooni liige."
+      "alreadyMember": "See isik on juba selle organisatsiooni liige.",
+      "seatsFull": "Kõik kohad on kasutusel ({{used}}/{{total}}). Palu organisatsiooni omanikul enne uute liikmete kutsumist kohti juurde lisada.",
+      "seatsFullCanInviteBilling": "Kõik kohad on kasutusel ({{used}}/{{total}}). Saad endiselt kutsuda arveldushaldureid, kes kohta ei kasuta.",
+      "noSeatsAvailable": "Kõik kohad on kasutusel. Palu organisatsiooni omanikul enne uute liikmete kutsumist kohti juurde lisada."
     },
     "invoices": {
       "downloadA11y": "Laadi alla arve {{number}}",

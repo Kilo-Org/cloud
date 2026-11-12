@@ -2933,7 +2933,10 @@
       "alreadyInvited": "이미 초대되었거나 이미 멤버입니다.",
       "sendError": "초대를 보내지 못했습니다.",
       "pendingInvitation": "이 이메일에는 이미 보류 중인 초대가 있습니다.",
-      "alreadyMember": "이 사용자는 이미 이 조직의 멤버입니다."
+      "alreadyMember": "이 사용자는 이미 이 조직의 멤버입니다.",
+      "seatsFull": "모든 시트가 사용 중입니다({{used}}/{{total}}). 멤버를 더 초대하려면 먼저 조직 소유자에게 시트 추가를 요청하세요.",
+      "seatsFullCanInviteBilling": "모든 시트가 사용 중입니다({{used}}/{{total}}). 결제 관리자는 시트를 차지하지 않으므로 계속 초대할 수 있습니다.",
+      "noSeatsAvailable": "모든 시트가 사용 중입니다. 멤버를 더 초대하려면 먼저 조직 소유자에게 시트 추가를 요청하세요."
     },
     "invoices": {
       "downloadA11y": "청구서 {{number}} 다운로드",

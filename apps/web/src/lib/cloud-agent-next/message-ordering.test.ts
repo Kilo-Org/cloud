@@ -56,4 +56,37 @@ describe('sortSessionMessagesForDisplay', () => {
   it('handles an empty message list', () => {
     expect(sortSessionMessagesForDisplay([])).toEqual([]);
   });
+
+  it('orders timed rows turn by turn, matching the cloud-agent-next transcript', () => {
+    const row = (id: string, created: number, parentID?: string) => ({
+      info: {
+        id,
+        sessionID: 'ses_1',
+        role: parentID === undefined ? 'user' : 'assistant',
+        time: { created },
+        ...(parentID === undefined ? {} : { parentID }),
+      },
+      parts: [],
+    });
+    // Ids disagree with time, and a later prompt falls between the steps of
+    // the turn that was running when it was sent.
+    const sorted = sortSessionMessagesForDisplay([
+      row('msg_d', 2000, 'msg_c'),
+      row('msg_c', 900),
+      row('msg_a', 1500),
+      row('msg_b', 1000, 'msg_c'),
+    ]);
+
+    expect(sorted.map(m => m.info.id)).toEqual(['msg_c', 'msg_b', 'msg_d', 'msg_a']);
+  });
+
+  it('keeps every row when ids repeat', () => {
+    const input = [message('msg_2'), message('msg_1'), message('msg_2')];
+
+    expect(sortSessionMessagesForDisplay(input).map(m => m.info.id)).toEqual([
+      'msg_1',
+      'msg_2',
+      'msg_2',
+    ]);
+  });
 });

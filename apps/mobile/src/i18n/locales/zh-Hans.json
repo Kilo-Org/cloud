@@ -2933,7 +2933,10 @@
       "alreadyInvited": "该邮箱已被邀请或已是成员。",
       "sendError": "无法发送邀请。",
       "pendingInvitation": "该邮箱已有待处理的邀请。",
-      "alreadyMember": "此人已是该组织的成员。"
+      "alreadyMember": "此人已是该组织的成员。",
+      "seatsFull": "所有席位均已占用（{{used}}/{{total}}）。请先联系组织所有者增加席位，再邀请更多成员。",
+      "seatsFullCanInviteBilling": "所有席位均已占用（{{used}}/{{total}}）。你仍可邀请账单管理员，他们不占用席位。",
+      "noSeatsAvailable": "所有席位均已占用。请先联系组织所有者增加席位，再邀请更多成员。"
     },
     "invoices": {
       "downloadA11y": "下载发票 {{number}}",

@@ -2928,7 +2928,10 @@
       "alreadyInvited": "Yo deja gen yon envitasyon oswa yo deja se yon manm.",
       "sendError": "Pa t ka voye envitasyon an.",
       "pendingInvitation": "Imel sa a deja gen yon envitasyon ki an atant.",
-      "alreadyMember": "Moun sa a deja yon manm nan òganizasyon sa a."
+      "alreadyMember": "Moun sa a deja yon manm nan òganizasyon sa a.",
+      "seatsFull": "Tout plas yo okipe ({{used}}/{{total}}). Mande yon pwopriyetè òganizasyon pou li ajoute plas anvan ou envite plis manm.",
+      "seatsFullCanInviteBilling": "Tout plas yo okipe ({{used}}/{{total}}). Ou ka toujou envite jesyonè faktirasyon, paske yo pa pran okenn plas.",
+      "noSeatsAvailable": "Tout plas yo okipe. Mande yon pwopriyetè òganizasyon pou li ajoute plas anvan ou envite plis manm."
     },
     "invoices": {
       "downloadA11y": "Telechaje fakti {{number}}",

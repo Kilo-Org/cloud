@@ -2928,7 +2928,10 @@
       "alreadyInvited": "Personen er allerede inviteret eller allerede medlem.",
       "sendError": "Invitationen kunne ikke sendes.",
       "pendingInvitation": "Denne e-mailadresse har allerede en afventende invitation.",
-      "alreadyMember": "Denne person er allerede medlem af denne organisation."
+      "alreadyMember": "Denne person er allerede medlem af denne organisation.",
+      "seatsFull": "Alle pladser er i brug ({{used}}/{{total}}). Bed en organisationsejer om at tilføje pladser, før du inviterer flere medlemmer.",
+      "seatsFullCanInviteBilling": "Alle pladser er i brug ({{used}}/{{total}}). Du kan stadig invitere faktureringsansvarlige, da de ikke optager en plads.",
+      "noSeatsAvailable": "Alle pladser er i brug. Bed en organisationsejer om at tilføje pladser, før du inviterer flere medlemmer."
     },
     "invoices": {
       "downloadA11y": "Download faktura {{number}}",

@@ -2928,7 +2928,10 @@
       "alreadyInvited": "An riga an aika musu gayyata ko kuma sun riga zama memba.",
       "sendError": "Ba a iya aika gayyata ba.",
       "pendingInvitation": "Wannan adireshin imel ɗin ya riga yana da gayyata da ke jiran amsa.",
-      "alreadyMember": "Wannan mutumin ya riga ya zama memba na wannan ƙungiyar."
+      "alreadyMember": "Wannan mutumin ya riga ya zama memba na wannan ƙungiyar.",
+      "seatsFull": "Ana amfani da dukkan gurabe ({{used}}/{{total}}). Ka nemi mai ƙungiya ya ƙara gurabe kafin ka gayyaci ƙarin membobi.",
+      "seatsFullCanInviteBilling": "Ana amfani da dukkan gurabe ({{used}}/{{total}}). Har yanzu kana iya gayyatar masu kula da biyan kuɗi, waɗanda ba sa ɗaukar gurbi.",
+      "noSeatsAvailable": "Ana amfani da dukkan gurabe. Ka nemi mai ƙungiya ya ƙara gurabe kafin ka gayyaci ƙarin membobi."
     },
     "invoices": {
       "downloadA11y": "Sauke takardar biyan kuɗi {{number}}",

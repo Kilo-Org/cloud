@@ -2981,7 +2981,10 @@
       "alreadyInvited": "Această persoană este deja invitată sau este deja membru.",
       "sendError": "Invitația nu a putut fi trimisă.",
       "pendingInvitation": "Acest e-mail are deja o invitație în așteptare.",
-      "alreadyMember": "Această persoană este deja membru al acestei organizații."
+      "alreadyMember": "Această persoană este deja membru al acestei organizații.",
+      "seatsFull": "Toate locurile sunt ocupate ({{used}}/{{total}}). Cere unui proprietar al organizației să adauge locuri înainte de a invita mai mulți membri.",
+      "seatsFullCanInviteBilling": "Toate locurile sunt ocupate ({{used}}/{{total}}). Poți invita în continuare administratori de facturare, care nu ocupă un loc.",
+      "noSeatsAvailable": "Toate locurile sunt ocupate. Cere unui proprietar al organizației să adauge locuri înainte de a invita mai mulți membri."
     },
     "invoices": {
       "downloadA11y": "Descarcă factura {{number}}",

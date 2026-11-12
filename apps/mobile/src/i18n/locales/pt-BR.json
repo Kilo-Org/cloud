@@ -2992,7 +2992,10 @@
       "alreadyInvited": "A pessoa já foi convidada ou já é membro.",
       "sendError": "Não foi possível enviar o convite.",
       "pendingInvitation": "Este e-mail já tem um convite pendente.",
-      "alreadyMember": "Esta pessoa já é membro desta organização."
+      "alreadyMember": "Esta pessoa já é membro desta organização.",
+      "seatsFull": "Todos os assentos estão em uso ({{used}}/{{total}}). Peça a um proprietário da organização que adicione assentos antes de convidar mais membros.",
+      "seatsFullCanInviteBilling": "Todos os assentos estão em uso ({{used}}/{{total}}). Você ainda pode convidar gerentes de faturamento, que não ocupam um assento.",
+      "noSeatsAvailable": "Todos os assentos estão em uso. Peça a um proprietário da organização que adicione assentos antes de convidar mais membros."
     },
     "invoices": {
       "downloadA11y": "Baixar fatura {{number}}",

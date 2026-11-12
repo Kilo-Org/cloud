@@ -2986,7 +2986,10 @@
       "alreadyInvited": "Questo indirizzo ha già un invito in sospeso o appartiene già a un membro.",
       "sendError": "Impossibile inviare l'invito.",
       "pendingInvitation": "Questo indirizzo email ha già un invito in sospeso.",
-      "alreadyMember": "Questa persona è già un membro di questa organizzazione."
+      "alreadyMember": "Questa persona è già un membro di questa organizzazione.",
+      "seatsFull": "Tutti i posti sono in uso ({{used}}/{{total}}). Chiedi a un proprietario dell'organizzazione di aggiungere posti prima di invitare altri membri.",
+      "seatsFullCanInviteBilling": "Tutti i posti sono in uso ({{used}}/{{total}}). Puoi comunque invitare responsabili della fatturazione, che non occupano un posto.",
+      "noSeatsAvailable": "Tutti i posti sono in uso. Chiedi a un proprietario dell'organizzazione di aggiungere posti prima di invitare altri membri."
     },
     "invoices": {
       "downloadA11y": "Scarica la fattura {{number}}",

@@ -2933,7 +2933,10 @@
       "alreadyInvited": "Dit e-mailadres is al uitgenodigd of is al lid.",
       "sendError": "De uitnodiging kon niet worden verzonden.",
       "pendingInvitation": "Dit e-mailadres heeft al een openstaande uitnodiging.",
-      "alreadyMember": "Deze persoon is al lid van deze organisatie."
+      "alreadyMember": "Deze persoon is al lid van deze organisatie.",
+      "seatsFull": "Alle plaatsen zijn in gebruik ({{used}}/{{total}}). Vraag een organisatie-eigenaar om plaatsen toe te voegen voordat je meer leden uitnodigt.",
+      "seatsFullCanInviteBilling": "Alle plaatsen zijn in gebruik ({{used}}/{{total}}). Je kunt nog steeds factuurbeheerders uitnodigen, want zij nemen geen plaats in.",
+      "noSeatsAvailable": "Alle plaatsen zijn in gebruik. Vraag een organisatie-eigenaar om plaatsen toe te voegen voordat je meer leden uitnodigt."
     },
     "invoices": {
       "downloadA11y": "Factuur {{number}} downloaden",

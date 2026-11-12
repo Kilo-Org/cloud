@@ -2928,7 +2928,10 @@
       "alreadyInvited": "Duraan ni affeeramaniiru ykn miseensa dha.",
       "sendError": "Affeerraa erguun hin danda'amne.",
       "pendingInvitation": "Teessoon imeelii kun duraanuu affeerraa eeggachaa jiru qaba.",
-      "alreadyMember": "Namni kun duraanuu miseensa dhaabbata kanaati."
+      "alreadyMember": "Namni kun duraanuu miseensa dhaabbata kanaati.",
+      "seatsFull": "Teessoowwan hundi fayyadamarra jiru ({{used}}/{{total}}). Miseensoota dabalataa afeeruu kee dura, abbaa dhaabbataa teessoowwan akka dabalu gaafadhu.",
+      "seatsFullCanInviteBilling": "Teessoowwan hundi fayyadamarra jiru ({{used}}/{{total}}). Bulchitoota kaffaltii, kanneen teessoo hin fudhanne, ammallee afeeruu dandeessa.",
+      "noSeatsAvailable": "Teessoowwan hundi fayyadamarra jiru. Miseensoota dabalataa afeeruu kee dura, abbaa dhaabbataa teessoowwan akka dabalu gaafadhu."
     },
     "invoices": {
       "downloadA11y": "Gaaffii kaffaltii {{number}} buufadhu",

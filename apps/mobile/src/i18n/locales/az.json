@@ -2928,7 +2928,10 @@
       "alreadyInvited": "Bu e-poçt ünvanı artıq dəvət olunub və ya artıq üzvdür.",
       "sendError": "Dəvət göndərilmədi.",
       "pendingInvitation": "Bu e-poçt ünvanının artıq gözləyən dəvəti var.",
-      "alreadyMember": "Bu şəxs artıq bu təşkilatın üzvüdür."
+      "alreadyMember": "Bu şəxs artıq bu təşkilatın üzvüdür.",
+      "seatsFull": "Bütün yerlər istifadədədir ({{used}}/{{total}}). Daha çox üzv dəvət etməzdən əvvəl təşkilat sahibindən yer əlavə etməsini xahiş et.",
+      "seatsFullCanInviteBilling": "Bütün yerlər istifadədədir ({{used}}/{{total}}). Yer tutmayan ödəniş menecerlərini yenə də dəvət edə bilərsən.",
+      "noSeatsAvailable": "Bütün yerlər istifadədədir. Daha çox üzv dəvət etməzdən əvvəl təşkilat sahibindən yer əlavə etməsini xahiş et."
     },
     "invoices": {
       "downloadA11y": "{{number}} nömrəli hesab-fakturanı endir",

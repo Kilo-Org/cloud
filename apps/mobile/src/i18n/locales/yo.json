@@ -2928,7 +2928,10 @@
       "alreadyInvited": "A ti pe wọ́n tẹ́lẹ̀ tàbí wọ́n ti jẹ́ ọmọ ẹgbẹ́ tẹ́lẹ̀.",
       "sendError": "A kò lè fi ìkésíni ránṣẹ́.",
       "pendingInvitation": "Àdírẹ́sì ímeèlì yìí ti ní ìkésíni tí ń dúró.",
-      "alreadyMember": "Ẹnìkan yìí ti jẹ́ ọmọ ẹgbẹ́ àjọ yìí tẹ́lẹ̀."
+      "alreadyMember": "Ẹnìkan yìí ti jẹ́ ọmọ ẹgbẹ́ àjọ yìí tẹ́lẹ̀.",
+      "seatsFull": "Gbogbo ìjókòó ni wọ́n ti ń lò ({{used}}/{{total}}). Béèrè lọ́wọ́ olùní àjọ kan láti ṣàfikún ìjókòó kí o tó pe àwọn ọmọ ẹgbẹ́ míì.",
+      "seatsFullCanInviteBilling": "Gbogbo ìjókòó ni wọ́n ti ń lò ({{used}}/{{total}}). O ṣì lè pe àwọn alábòójútó ìsanwó, tí wọn kì í gba ìjókòó.",
+      "noSeatsAvailable": "Gbogbo ìjókòó ni wọ́n ti ń lò. Béèrè lọ́wọ́ olùní àjọ kan láti ṣàfikún ìjókòó kí o tó pe àwọn ọmọ ẹgbẹ́ míì."
     },
     "invoices": {
       "downloadA11y": "Ṣe ìgbàsílẹ̀ ìwé ìbéèrè owó {{number}}",

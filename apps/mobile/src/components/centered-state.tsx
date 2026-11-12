@@ -13,7 +13,9 @@ import { ShortCenteredBandProvider } from '@/components/centered-state-band';
 import { useStateSurface } from '@/components/centered-state-surface';
 import { RefreshProgress } from '@/components/ui/refresh-progress';
 import {
+  getCenteredStateBandStyle,
   getCenteredStateLayout,
+  getPendingCenteredStateStyle,
   isShortViewport,
   type StateFrame,
 } from '@/lib/centered-state-layout';
@@ -33,15 +35,6 @@ type CenteredStateProps = {
   contentContainerClassName?: string;
   testID?: string;
   refreshControl?: ScrollViewProps['refreshControl'];
-  /**
-   * The frame the state centers in. `surface` (the default) centers on the
-   * surface's own frame, which keeps a state steady when the scroller around it
-   * grows or shrinks. `viewport` centers in the band this scroller fills — for a
-   * state whose scroller sits between chrome the surface does not describe (a
-   * chat body between a header and a composer), where centering on the surface
-   * moves the state whenever the surface's own measurement arrives.
-   */
-  band?: 'surface' | 'viewport';
 };
 
 type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
@@ -51,10 +44,23 @@ type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
  * reserves.
  *
  * The state paints from its first frame: a hidden data state is a blank body,
- * which reads as a broken screen. The first frame sits at the pending placement
- * — centered in the band the surface reports, or in the window minus the
- * reservation the caller already knows — and the measured placement replaces it
- * once the surface and the content have reported their sizes.
+ * which reads as a broken screen. That first frame and the measured one use one
+ * placement — centered in the band the scroller shows, above the surface's
+ * bottom reserve — so a state never moves after it is first painted. The layout
+ * engine produces the pending placement from the caller's reserve alone, and
+ * `getCenteredStateLayout` produces the same numbers once the surface, the
+ * scroller and the content have reported their sizes.
+ *
+ * The pending placement is the band placement for a band that starts at the
+ * scroller's top and ends at the scroller's bottom, which is every band a screen
+ * paints. A reserved top inset moves the band's top below the scroller's top and
+ * a native-filled viewport moves its bottom below the scroller's bottom; the
+ * estimate has no scroller frame to follow either of them, so those bands keep
+ * the content back until the scroller reports its own frame. The measurement
+ * answers inside the commit that mounts the scroller, so the state paints placed
+ * rather than at a position the measurement then corrects. It also paints at the
+ * estimate whenever a measurement cannot place it at all, because a state that
+ * never appears is worse than one placed by the estimate.
  */
 export function CenteredState({
   children,
@@ -62,28 +68,22 @@ export function CenteredState({
   contentContainerClassName,
   testID = 'centered-state',
   refreshControl,
-  band = 'surface',
 }: CenteredStateProps) {
   const surface = useStateSurface();
   const windowSize = useWindowDimensions();
   const shortBand = isShortViewport(windowSize.width, windowSize.height);
-  // A screen whose surface is not published yet still covers the window it
-  // fills: its band is the window minus the reservation the caller already
-  // knows. Placing against that band is exact for a full-screen state, so a
-  // first mount paints where it will be measured instead of at the pending
-  // centering and then lifting when the surface arrives.
-  const liveFrame = surface?.frame ?? null;
-  // Measured bands carry sub-pixel noise: a re-measure of the same layout can
-  // report a different fraction of a point, and a placement derived from it
-  // moves the state by a pixel for no visual reason. Round the band to whole
-  // pixels so repeated measurements of one layout place the state identically.
-  const frame = useMemo(() => {
-    const live = liveFrame ?? { top: 0, bottom: windowSize.height };
-    return {
-      top: PixelRatio.roundToNearestPixel(live.top),
-      bottom: PixelRatio.roundToNearestPixel(live.bottom),
-    };
-  }, [liveFrame, windowSize.height]);
+  // The clip the band lives in: the window, in the same window coordinates the
+  // scroller reports through `measureInWindow`. Measured bands carry sub-pixel
+  // noise — a re-measure of the same layout can report a different fraction of
+  // a point — so round it to whole pixels and place every measurement of one
+  // layout identically.
+  const frame = useMemo(
+    () => ({
+      top: PixelRatio.roundToNearestPixel(0),
+      bottom: PixelRatio.roundToNearestPixel(windowSize.height),
+    }),
+    [windowSize.height]
+  );
   const topInset = surface?.frame ? surface.topInset : 0;
   const bottomInset = surface?.frame ? surface.bottomInset : (surface?.bottomReservation ?? 0);
   const boundsBottom = surface?.frame ? surface.bounds?.bottom : frame.bottom;
@@ -92,6 +92,10 @@ export function CenteredState({
   const requestRef = useRef(0);
   const [viewport, setViewport] = useState<MeasuredViewport | null>(null);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
+  // Whether the last measurement could place the state at all: no scroller node
+  // yet, or bounds that name no area. A band that cannot be estimated needs this
+  // to tell a measurement in flight from one that will never arrive.
+  const [unplaceable, setUnplaceable] = useState(false);
 
   const register = surface?.register;
   useLayoutEffect(() => register?.(), [register]);
@@ -107,6 +111,7 @@ export function CenteredState({
       // stays: dropping it here is what made a returning state re-center and
       // then jump back to its measured position. The measurement publishes a
       // fresh object each run, so compare the band, not the identity.
+      setUnplaceable(true);
       setViewport(previous =>
         previous !== null &&
         previous.surface.top === frame.top &&
@@ -129,9 +134,11 @@ export function CenteredState({
         !Number.isFinite(measuredBottom) ||
         measuredBottom <= measuredTop
       ) {
+        setUnplaceable(true);
         setViewport(null);
         return;
       }
+      setUnplaceable(false);
       setViewport(previous =>
         previous !== null &&
         previous.surface.top === frame.top &&
@@ -146,6 +153,10 @@ export function CenteredState({
       );
     });
   }, [frame]);
+
+  const measureContent = useCallback((event: LayoutChangeEvent) => {
+    setContentHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
+  }, []);
 
   const capture = useCallback(
     (node: ScrollViewInstance | null) => {
@@ -162,60 +173,75 @@ export function CenteredState({
     };
   }, [measure]);
 
-  const measureContent = useCallback((event: LayoutChangeEvent) => {
-    setContentHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
-  }, []);
-  const layout = useMemo(() => {
-    // The stored viewport carries the band it was measured against, and the
-    // surface publishes a fresh frame object on every measurement, so compare
-    // the band itself: a state whose surface has not moved keeps its placement
-    // instead of dropping back to the pending one and jumping when it returns.
-    const measured = viewport;
+  // The stored viewport carries the band it was measured against, and the window
+  // frame is a fresh object on every dimension change, so compare the band
+  // itself: a state whose window has not moved keeps its placement instead of
+  // dropping back to the pending one and jumping when it returns.
+  const measuredViewport = useMemo(() => {
     if (
-      !measured ||
-      measured.surface.top !== frame.top ||
-      measured.surface.bottom !== frame.bottom ||
-      contentHeight === null
+      !viewport ||
+      viewport.surface.top !== frame.top ||
+      viewport.surface.bottom !== frame.bottom
     ) {
+      return null;
+    }
+    return viewport.frame;
+  }, [frame, viewport]);
+
+  // The placement: centered in the band the scroller shows. Until the content
+  // reports its height the band style places it by centering alone, which is the
+  // same position, so the first frame and every later frame agree.
+  const layout = useMemo(() => {
+    if (!measuredViewport) {
       return undefined;
     }
-    const measuredFrame = measured.frame;
-    return getCenteredStateLayout({
-      surface: frame,
-      viewport: measuredFrame,
-      contentHeight,
+    const band = {
+      window: frame,
+      viewport: measuredViewport,
       topInset,
       bottomInset,
       nativeViewportFillsSurface,
       nativeViewportBottom: boundsBottom,
-      band,
+    };
+    if (contentHeight === null) {
+      return getCenteredStateBandStyle(band);
+    }
+    return getCenteredStateLayout({
+      ...band,
+      contentHeight,
       roundToPixel: value => PixelRatio.roundToNearestPixel(value),
     });
   }, [
-    band,
     boundsBottom,
     bottomInset,
     contentHeight,
     frame,
+    measuredViewport,
     nativeViewportFillsSurface,
     topInset,
-    viewport,
   ]);
-  // While the measured layout is pending, the fallback must still keep the band
-  // the surface reserved (the fixed tab bar) free: without it the body centers
-  // in the full viewport, which runs under the bar, and the bar clips the
-  // body's lower lines and its action. This padding is the only reservation —
-  // a caller that also shrinks the scroller frame by the same band clears it
-  // twice and pushes the body above the centre of the visible area.
-  const bottomReservation = surface?.bottomReservation ?? 0;
-  const contentStyle = useMemo(() => {
-    const style = layout ?? {
-      justifyContent: 'center' as const,
-      paddingTop: 16,
-      paddingBottom: 16 + bottomReservation,
-    };
-    return { flexGrow: 1, ...style };
-  }, [bottomReservation, layout]);
+  // The pending placement centers in the scroller and carries the caller's
+  // bottom reserve, so the band the surface reserved (the fixed tab bar) stays
+  // free and the position it paints is the position the measurement confirms.
+  // This padding is the only reservation — a caller that also shrinks the
+  // scroller frame by the same band clears it twice and pushes the body above
+  // the centre of the visible area. It is the band placement for a band that
+  // starts at the scroller's top; a reserved top inset and a native-filled
+  // viewport move that band off the scroller's own edges, so those bands wait
+  // for the scroller's frame instead of painting a position the measurement
+  // would correct. The estimate still lands whenever a measurement cannot place
+  // the state, so a state never stays hidden.
+  const estimateFits = topInset === 0 && !nativeViewportFillsSurface;
+  const placement = useMemo(() => {
+    if (layout) {
+      return layout;
+    }
+    return estimateFits || unplaceable ? getPendingCenteredStateStyle(bottomInset) : null;
+  }, [bottomInset, estimateFits, layout, unplaceable]);
+  const contentStyle = useMemo(
+    () => (placement ? { flexGrow: 1, ...placement } : undefined),
+    [placement]
+  );
 
   if (!surface) {
     throw new Error('CenteredState requires a StateSurface');
@@ -234,14 +260,16 @@ export function CenteredState({
         refreshControl={refreshControl}
         keyboardShouldPersistTaps="handled"
       >
-        <View
-          className={cn('w-full', contentContainerClassName)}
-          testID={testID ? `${testID}-content` : undefined}
-          onLayout={measureContent}
-        >
-          {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}
-          {children}
-        </View>
+        {contentStyle === undefined ? null : (
+          <View
+            className={cn('w-full', contentContainerClassName)}
+            testID={testID ? `${testID}-content` : undefined}
+            onLayout={measureContent}
+          >
+            {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}
+            {children}
+          </View>
+        )}
       </ScrollView>
     </ShortCenteredBandProvider>
   );

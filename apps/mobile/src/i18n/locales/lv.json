@@ -2981,7 +2981,10 @@
       "alreadyInvited": "Šī e-pasta adrese jau ir uzaicināta vai jau pieder dalībniekam.",
       "sendError": "Neizdevās nosūtīt uzaicinājumu.",
       "pendingInvitation": "Šai e-pasta adresei jau ir gaidošs uzaicinājums.",
-      "alreadyMember": "Šis cilvēks jau ir šīs organizācijas dalībnieks."
+      "alreadyMember": "Šis cilvēks jau ir šīs organizācijas dalībnieks.",
+      "seatsFull": "Visas vietas ir aizņemtas ({{used}}/{{total}}). Palūdz organizācijas īpašniekam pievienot vietas, pirms uzaicini vairāk dalībnieku.",
+      "seatsFullCanInviteBilling": "Visas vietas ir aizņemtas ({{used}}/{{total}}). Tu joprojām vari uzaicināt norēķinu pārvaldniekus, kuri neaizņem vietu.",
+      "noSeatsAvailable": "Visas vietas ir aizņemtas. Palūdz organizācijas īpašniekam pievienot vietas, pirms uzaicini vairāk dalībnieku."
     },
     "invoices": {
       "downloadA11y": "Lejupielādēt rēķinu {{number}}",

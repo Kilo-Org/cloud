@@ -3087,7 +3087,10 @@
       "alreadyInvited": "Tá cuireadh acu cheana féin nó is ball den eagraíocht iad cheana féin.",
       "sendError": "Níorbh fhéidir an cuireadh a sheoladh.",
       "pendingInvitation": "Tá cuireadh ar feitheamh ag an seoladh ríomhphoist seo cheana féin.",
-      "alreadyMember": "Tá an duine seo ina bhall den eagraíocht seo cheana féin."
+      "alreadyMember": "Tá an duine seo ina bhall den eagraíocht seo cheana féin.",
+      "seatsFull": "Tá gach suíochán in úsáid ({{used}}/{{total}}). Iarr ar úinéir eagraíochta suíocháin a chur leis sula dtabharfaidh tú cuireadh do thuilleadh ball.",
+      "seatsFullCanInviteBilling": "Tá gach suíochán in úsáid ({{used}}/{{total}}). Is féidir leat cuireadh a thabhairt fós do bhainisteoirí billeála, nach n-úsáideann suíochán.",
+      "noSeatsAvailable": "Tá gach suíochán in úsáid. Iarr ar úinéir eagraíochta suíocháin a chur leis sula dtabharfaidh tú cuireadh do thuilleadh ball."
     },
     "invoices": {
       "downloadA11y": "Íoslódáil sonrasc {{number}}",

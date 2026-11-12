@@ -2933,7 +2933,10 @@
       "alreadyInvited": "Alamat email tersebut sudah diundang atau sudah menjadi anggota.",
       "sendError": "Tidak dapat mengirim undangan.",
       "pendingInvitation": "Email ini sudah memiliki undangan yang tertunda.",
-      "alreadyMember": "Orang ini sudah menjadi anggota organisasi ini."
+      "alreadyMember": "Orang ini sudah menjadi anggota organisasi ini.",
+      "seatsFull": "Semua kursi sudah terpakai ({{used}}/{{total}}). Minta pemilik organisasi untuk menambah kursi sebelum mengundang lebih banyak anggota.",
+      "seatsFullCanInviteBilling": "Semua kursi sudah terpakai ({{used}}/{{total}}). Kamu masih dapat mengundang pengelola penagihan, yang tidak menggunakan kursi.",
+      "noSeatsAvailable": "Semua kursi sudah terpakai. Minta pemilik organisasi untuk menambah kursi sebelum mengundang lebih banyak anggota."
     },
     "invoices": {
       "downloadA11y": "Unduh faktur {{number}}",

@@ -3,8 +3,8 @@ import path from 'node:path';
 import {
   expandSamples,
   InfraError,
+  IN_APP_SAMPLE_INTERVAL_MS,
   openTarget,
-  SAMPLE_INTERVAL_MS,
   sampleUntilSettled,
   writeJson,
   type Clock,
@@ -284,7 +284,7 @@ export async function runMotion(
   let sampling: { readonly samples: ProbeSample[]; readonly truncated: boolean } | undefined;
   try {
     await ctx.clock.sleep(TAP_DELAY_MS - PRE_TAP_SAMPLE_MS);
-    await ctx.probe.startSampling(SAMPLE_INTERVAL_MS, recordingMs);
+    await ctx.probe.startSampling(IN_APP_SAMPLE_INTERVAL_MS, recordingMs);
     await ctx.clock.sleep(PRE_TAP_SAMPLE_MS);
     if (options.tap !== undefined) await tapElement(ctx, options.tap);
     await ctx.clock.sleep(recordingMs - TAP_DELAY_MS);
@@ -302,7 +302,7 @@ export async function runMotion(
     );
   }
   const timeline = expandSamples(samples);
-  const findings = checkShift(timeline.map(normalize), SAMPLE_INTERVAL_MS).map(finding => ({
+  const findings = checkShift(timeline.map(normalize), IN_APP_SAMPLE_INTERVAL_MS).map(finding => ({
     ...finding,
     cell: 'motion',
     target: options.target,

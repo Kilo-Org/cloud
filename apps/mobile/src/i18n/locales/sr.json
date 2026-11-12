@@ -2954,7 +2954,10 @@
       "alreadyInvited": "Korisnik je već pozvan ili je već član.",
       "sendError": "Pozivnicu nije moguće poslati.",
       "pendingInvitation": "Ova adresa e-pošte već ima pozivnicu na čekanju.",
-      "alreadyMember": "Ova osoba je već član ove organizacije."
+      "alreadyMember": "Ova osoba je već član ove organizacije.",
+      "seatsFull": "Sva mesta su zauzeta ({{used}}/{{total}}). Zamoli vlasnika organizacije da doda mesta pre nego što pozoveš još članova.",
+      "seatsFullCanInviteBilling": "Sva mesta su zauzeta ({{used}}/{{total}}). I dalje možeš da pozoveš menadžere za naplatu, koji ne zauzimaju mesto.",
+      "noSeatsAvailable": "Sva mesta su zauzeta. Zamoli vlasnika organizacije da doda mesta pre nego što pozoveš još članova."
     },
     "invoices": {
       "downloadA11y": "Preuzmi fakturu {{number}}",

@@ -2901,7 +2901,10 @@
       "alreadyInvited": "Bu elektron pochta manzili allaqachon taklif qilingan yoki allaqachon a'zo.",
       "sendError": "Taklifnomani yuborib bo'lmadi.",
       "pendingInvitation": "Bu elektron pochta uchun allaqachon kutilayotgan taklifnoma mavjud.",
-      "alreadyMember": "Bu shaxs allaqachon ushbu tashkilotning a'zosi."
+      "alreadyMember": "Bu shaxs allaqachon ushbu tashkilotning a'zosi.",
+      "seatsFull": "Barcha o'rinlar band ({{used}}/{{total}}). Ko'proq a'zo taklif qilishdan oldin tashkilot egasidan o'rinlar qo'shishni so'rang.",
+      "seatsFullCanInviteBilling": "Barcha o'rinlar band ({{used}}/{{total}}). Siz hali ham o'rin egallamaydigan hisob-kitob menejerlarini taklif qilishingiz mumkin.",
+      "noSeatsAvailable": "Barcha o'rinlar band. Ko'proq a'zo taklif qilishdan oldin tashkilot egasidan o'rinlar qo'shishni so'rang."
     },
     "invoices": {
       "downloadA11y": "{{number}} raqamli hisob-fakturani yuklab olish",

@@ -3060,7 +3060,10 @@
       "alreadyInvited": "Din il-persuna diġà hija mistiedna jew diġà membru.",
       "sendError": "L-istedina ma setgħetx tintbagħat.",
       "pendingInvitation": "Dan l-indirizz tal-posta elettronika diġà għandu stedina pendenti.",
-      "alreadyMember": "Din il-persuna diġà hija membru ta' din l-organizzazzjoni."
+      "alreadyMember": "Din il-persuna diġà hija membru ta' din l-organizzazzjoni.",
+      "seatsFull": "Il-postijiet kollha qed jintużaw ({{used}}/{{total}}). Staqsi lil sid tal-organizzazzjoni biex iżid postijiet qabel ma tistieden aktar membri.",
+      "seatsFullCanInviteBilling": "Il-postijiet kollha qed jintużaw ({{used}}/{{total}}). Xorta tista' tistieden maniġers tal-fatturazzjoni, li ma jokkupawx post.",
+      "noSeatsAvailable": "Il-postijiet kollha qed jintużaw. Staqsi lil sid tal-organizzazzjoni biex iżid postijiet qabel ma tistieden aktar membri."
     },
     "invoices": {
       "downloadA11y": "Niżżel l-fattura {{number}}",

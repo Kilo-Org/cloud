@@ -2901,7 +2901,10 @@
       "alreadyInvited": "Isimemo sabo sesivele sikhona noma bese belilungu leqembu.",
       "sendError": "Asikwazanga ukuthumela isimemo.",
       "pendingInvitation": "Le imeyili isivele inesimemo esilindile.",
-      "alreadyMember": "Lo muntu usevele eyilungu lale nhlangano."
+      "alreadyMember": "Lo muntu usevele eyilungu lale nhlangano.",
+      "seatsFull": "Zonke izihlalo ziyasetshenziswa ({{used}}/{{total}}). Cela umnikazi wenhlangano ukuthi engeze izihlalo ngaphambi kokumema amanye amalungu.",
+      "seatsFullCanInviteBilling": "Zonke izihlalo ziyasetshenziswa ({{used}}/{{total}}). Usengakwazi ukumema abaphathi bezokukhokha, abangasebenzisi isihlalo.",
+      "noSeatsAvailable": "Zonke izihlalo ziyasetshenziswa. Cela umnikazi wenhlangano ukuthi engeze izihlalo ngaphambi kokumema amanye amalungu."
     },
     "invoices": {
       "downloadA11y": "Landa i-invoyisi {{number}}",

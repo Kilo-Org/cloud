@@ -3113,7 +3113,10 @@
       "alreadyInvited": "Mae'r cyfeiriad e-bost hwn eisoes wedi cael gwahoddiad neu'n eisoes yn perthyn i aelod.",
       "sendError": "Ni lwyddwyd i anfon y gwahoddiad.",
       "pendingInvitation": "Mae gwahoddiad ar y gweill eisoes ar gyfer yr e-bost hwn.",
-      "alreadyMember": "Mae'r person hwn eisoes yn aelod o'r sefydliad hwn."
+      "alreadyMember": "Mae'r person hwn eisoes yn aelod o'r sefydliad hwn.",
+      "seatsFull": "Mae'r holl seddi'n cael eu defnyddio ({{used}}/{{total}}). Gofynnwch i berchennog sefydliad ychwanegu seddi cyn gwahodd rhagor o aelodau.",
+      "seatsFullCanInviteBilling": "Mae'r holl seddi'n cael eu defnyddio ({{used}}/{{total}}). Gallwch barhau i wahodd rheolwyr bilio, nad ydynt yn defnyddio sedd.",
+      "noSeatsAvailable": "Mae'r holl seddi'n cael eu defnyddio. Gofynnwch i berchennog sefydliad ychwanegu seddi cyn gwahodd rhagor o aelodau."
     },
     "invoices": {
       "downloadA11y": "Lawrlwytho anfoneb {{number}}",

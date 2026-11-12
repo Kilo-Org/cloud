@@ -7,6 +7,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
+import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
 import {
@@ -231,6 +232,8 @@ describe('waiting ask store', () => {
     // one fake store.
     _setPersistSecureStoreForTests(secureStoreMock);
     store.clear();
+    // The class upgrade has run, so an absent record is absent.
+    store.set(WIDGET_STORE_CLASS_MARKER.key, WIDGET_STORE_CLASS_MARKER.value);
     vi.clearAllMocks();
   });
 

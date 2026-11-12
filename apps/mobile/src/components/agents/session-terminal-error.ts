@@ -414,20 +414,43 @@ export function resolveSessionTerminalError(input: {
     return null;
   }
   if (input.error !== null) {
-    // The atom carries the transport's own English text. Show the reader a
-    // translated line and keep the original for the clipboard.
+    // The atom carries the transport's own English text: an SDK fixed string,
+    // or a server failure the transport forwards. Show the reader translated
+    // copy and keep the original for the clipboard.
     //
-    // A typed transcript failure that a retry cannot recover (the stored page
-    // is oversize or unreadable) is the same permanent state as a denial: the
-    // same read answers the same way every time, so a Retry would only repeat
-    // it. Every other error keeps its Retry, which is what recovers a lost
-    // connection or a transient server failure.
-    const terminalTranscript = TERMINAL_SESSION_HISTORY_FAILURE_MESSAGES.includes(input.error);
+    // The class decides the Retry. A typed transcript failure that a retry
+    // cannot recover (the stored page is oversize or unreadable) answers the
+    // same way every time; a denial, an empty wallet, a model the agent cannot
+    // use and a session the server no longer has each need the reader to
+    // change something first. Those keep their own copy and offer no Retry,
+    // which could only repeat them. An unclassifiable failure keeps its Retry:
+    // only the transport can recover one the app cannot name.
+    if (TERMINAL_SESSION_HISTORY_FAILURE_MESSAGES.includes(input.error)) {
+      return {
+        variant: 'server',
+        title: i18n.t('agentChat.session.couldNotLoadThisSession'),
+        message: i18n.t('agentChat.session.failedToLoadDetails'),
+        retryable: false,
+        retryWith: 'session',
+        detail: input.error,
+      };
+    }
+    const failureClass = classifyTerminalError(input.error);
+    if (!retryableClass(failureClass) && failureClass !== 'unknown') {
+      return {
+        variant: variantForClass(failureClass),
+        title: titleForClass(failureClass),
+        message: messageForClass(failureClass),
+        retryable: false,
+        retryWith: 'session',
+        detail: input.error,
+      };
+    }
     return {
       variant: 'server',
       title: i18n.t('agentChat.session.couldNotLoadThisSession'),
       message: i18n.t('agentChat.session.failedToLoadDetails'),
-      retryable: !terminalTranscript,
+      retryable: true,
       retryWith: 'session',
       detail: input.error,
     };

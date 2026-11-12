@@ -3007,7 +3007,10 @@
       "alreadyInvited": "Táto osoba už bola pozvaná alebo už je členom.",
       "sendError": "Pozvánku sa nepodarilo odoslať.",
       "pendingInvitation": "Táto e-mailová adresa už má čakajúcu pozvánku.",
-      "alreadyMember": "Táto osoba je už členom tejto organizácie."
+      "alreadyMember": "Táto osoba je už členom tejto organizácie.",
+      "seatsFull": "Všetky miesta sú obsadené ({{used}}/{{total}}). Pred pozvaním ďalších členov požiadaj vlastníka organizácie o pridanie miest.",
+      "seatsFullCanInviteBilling": "Všetky miesta sú obsadené ({{used}}/{{total}}). Stále môžeš pozvať správcov fakturácie, ktorí nezaberajú žiadne miesto.",
+      "noSeatsAvailable": "Všetky miesta sú obsadené. Pred pozvaním ďalších členov požiadaj vlastníka organizácie o pridanie miest."
     },
     "invoices": {
       "downloadA11y": "Stiahnuť faktúru {{number}}",

@@ -2901,7 +2901,10 @@
       "alreadyInvited": "Tämä sähköpostiosoite on jo kutsuttu tai kuuluu jo jäsenelle.",
       "sendError": "Kutsun lähettäminen epäonnistui.",
       "pendingInvitation": "Tällä sähköpostiosoitteella on jo odottava kutsu.",
-      "alreadyMember": "Tämä henkilö on jo tämän organisaation jäsen."
+      "alreadyMember": "Tämä henkilö on jo tämän organisaation jäsen.",
+      "seatsFull": "Kaikki paikat ovat käytössä ({{used}}/{{total}}). Pyydä organisaation omistajaa lisäämään paikkoja ennen kuin kutsut lisää jäseniä.",
+      "seatsFullCanInviteBilling": "Kaikki paikat ovat käytössä ({{used}}/{{total}}). Voit edelleen kutsua laskutuksen hallinnoijia, sillä he eivät vie paikkaa.",
+      "noSeatsAvailable": "Kaikki paikat ovat käytössä. Pyydä organisaation omistajaa lisäämään paikkoja ennen kuin kutsut lisää jäseniä."
     },
     "invoices": {
       "downloadA11y": "Lataa lasku {{number}}",

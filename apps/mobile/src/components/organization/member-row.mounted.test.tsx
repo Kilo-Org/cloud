@@ -60,7 +60,14 @@ const mounted: Mounted[] = [];
 async function renderRow(overrides: Partial<Parameters<typeof MemberRow>[0]> = {}) {
   mocks.menuProps.length = 0;
   const view = await renderWithProviders(
-    <MemberRow member={member} canManage enableUsageLimits organizationId="org-1" {...overrides} />
+    <MemberRow
+      member={member}
+      canManage
+      callerRole="owner"
+      enableUsageLimits
+      organizationId="org-1"
+      {...overrides}
+    />
   );
   mounted.push(view);
   return view.renderer;
@@ -259,6 +266,25 @@ describe('MemberRow menu', () => {
       { memberId: 'membership-1', role: 'admin' },
       expect.objectContaining({ onSuccess: expect.any(Function) })
     );
+  });
+
+  it('offers an admin every role but owner, which the server reserves for owners', async () => {
+    const renderer = await renderRow({ callerRole: 'admin' });
+    await act(() => {
+      (renderer.root.findByType('Pressable').props.onPress as () => void)();
+    });
+    await act(() => {
+      actionsMenu().onSelect(0);
+    });
+    await act(() => {
+      actionsMenu().onDismiss();
+    });
+
+    expect(roleMenu().options.map(option => option.label)).toEqual([
+      i18n.t('organization.members.roles.admin'),
+      i18n.t('organization.members.roles.member'),
+      i18n.t('organization.members.roles.billingManager'),
+    ]);
   });
 
   it('closes the menu without navigating when it is dismissed', async () => {

@@ -2954,7 +2954,10 @@
       "alreadyInvited": "Ja té una invitació pendent o ja és membre.",
       "sendError": "No s'ha pogut enviar la invitació.",
       "pendingInvitation": "Aquest correu electrònic ja té una invitació pendent.",
-      "alreadyMember": "Aquesta persona ja és membre d'aquesta organització."
+      "alreadyMember": "Aquesta persona ja és membre d'aquesta organització.",
+      "seatsFull": "Totes les places estan en ús ({{used}}/{{total}}). Demana a un propietari de l'organització que afegeixi places abans de convidar més membres.",
+      "seatsFullCanInviteBilling": "Totes les places estan en ús ({{used}}/{{total}}). Encara pots convidar gestors de facturació, que no ocupen cap plaça.",
+      "noSeatsAvailable": "Totes les places estan en ús. Demana a un propietari de l'organització que afegeixi places abans de convidar més membres."
     },
     "invoices": {
       "downloadA11y": "Baixa la factura {{number}}",

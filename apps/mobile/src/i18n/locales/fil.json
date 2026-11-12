@@ -2901,7 +2901,10 @@
       "alreadyInvited": "Imbitado na sila o miyembro na.",
       "sendError": "Hindi naipadala ang imbitasyon.",
       "pendingInvitation": "May nakabinbing imbitasyon na ang email na ito.",
-      "alreadyMember": "Miembro na ng organisasyong ito ang taong ito."
+      "alreadyMember": "Miembro na ng organisasyong ito ang taong ito.",
+      "seatsFull": "Ginagamit na ang lahat ng seat ({{used}}/{{total}}). Hilingin sa isang may-ari ng organisasyon na magdagdag ng mga seat bago mag-imbita ng mas maraming miyembro.",
+      "seatsFullCanInviteBilling": "Ginagamit na ang lahat ng seat ({{used}}/{{total}}). Maaari ka pa ring mag-imbita ng mga billing manager, na hindi gumagamit ng seat.",
+      "noSeatsAvailable": "Ginagamit na ang lahat ng seat. Hilingin sa isang may-ari ng organisasyon na magdagdag ng mga seat bago mag-imbita ng mas maraming miyembro."
     },
     "invoices": {
       "downloadA11y": "I-download ang talaan ng singil {{number}}",

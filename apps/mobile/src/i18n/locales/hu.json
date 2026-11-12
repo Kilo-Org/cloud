@@ -2901,7 +2901,10 @@
       "alreadyInvited": "Már meg van hívva, vagy már tag.",
       "sendError": "Nem sikerült elküldeni a meghívót.",
       "pendingInvitation": "Erre az e-mail-címre már van egy függőben lévő meghívó.",
-      "alreadyMember": "Ez a személy már tagja ennek a szervezetnek."
+      "alreadyMember": "Ez a személy már tagja ennek a szervezetnek.",
+      "seatsFull": "Az összes hely foglalt ({{used}}/{{total}}). Kérj meg egy szervezettulajdonost, hogy adjon hozzá helyeket, mielőtt további tagokat hívnál meg.",
+      "seatsFullCanInviteBilling": "Az összes hely foglalt ({{used}}/{{total}}). Számlázási kezelőket továbbra is meghívhatsz, mivel ők nem foglalnak helyet.",
+      "noSeatsAvailable": "Az összes hely foglalt. Kérj meg egy szervezettulajdonost, hogy adjon hozzá helyeket, mielőtt további tagokat hívnál meg."
     },
     "invoices": {
       "downloadA11y": "A(z) {{number}} számú számla letöltése",

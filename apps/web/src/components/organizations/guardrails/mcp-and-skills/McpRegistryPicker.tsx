@@ -9,6 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  MAX_SEMVER_LENGTH,
+  VERSION_SPEC_EXAMPLE,
+} from '@/lib/organizations/guardrails/version-spec-constants';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { McpBrowseItem, McpBrowseVariant } from './guardrail-types';
 import { useDebouncedValue } from './use-debounced-value';
@@ -22,7 +26,7 @@ export type McpSelection = {
   identityKey: string;
   name: string;
   isPackage: boolean;
-  minVersion: string;
+  versionSpec: string;
 };
 
 export type McpSelectionState = Record<string, McpSelection>;
@@ -45,7 +49,7 @@ export function McpRegistryPicker({
   source,
   selection,
   onToggle,
-  onMinVersionChange,
+  onVersionSpecChange,
 }: {
   organizationId: string;
   source: McpRegistrySource;
@@ -55,7 +59,7 @@ export function McpRegistryPicker({
     variant: Extract<McpBrowseVariant, { eligible: true }>,
     checked: boolean
   ) => void;
-  onMinVersionChange: (key: string, minVersion: string) => void;
+  onVersionSpecChange: (key: string, versionSpec: string) => void;
 }) {
   const trpc = useTRPC();
   const [search, setSearch] = useState('');
@@ -124,7 +128,7 @@ export function McpRegistryPicker({
                 item={item}
                 selection={selection}
                 onToggle={onToggle}
-                onMinVersionChange={onMinVersionChange}
+                onVersionSpecChange={onVersionSpecChange}
               />
             ))}
             {browseQuery.hasNextPage && (
@@ -150,7 +154,7 @@ function RegistryItem({
   item,
   selection,
   onToggle,
-  onMinVersionChange,
+  onVersionSpecChange,
 }: {
   item: McpBrowseItem;
   selection: McpSelectionState;
@@ -159,7 +163,7 @@ function RegistryItem({
     variant: Extract<McpBrowseVariant, { eligible: true }>,
     checked: boolean
   ) => void;
-  onMinVersionChange: (key: string, minVersion: string) => void;
+  onVersionSpecChange: (key: string, versionSpec: string) => void;
 }) {
   return (
     <div className="grid gap-2 rounded-md border p-3">
@@ -218,17 +222,18 @@ function RegistryItem({
               {selected?.isPackage && (
                 <div className="flex items-center gap-2 pl-7">
                   <label
-                    htmlFor={`min-version-${key}`}
+                    htmlFor={`version-spec-${key}`}
                     className="text-muted-foreground text-xs whitespace-nowrap"
                   >
-                    Minimum version
+                    Allowed versions
                   </label>
                   <Input
-                    id={`min-version-${key}`}
-                    value={selected.minVersion}
-                    placeholder="Any version"
-                    className="h-8 w-36"
-                    onChange={event => onMinVersionChange(key, event.target.value)}
+                    id={`version-spec-${key}`}
+                    value={selected.versionSpec}
+                    placeholder={VERSION_SPEC_EXAMPLE}
+                    maxLength={MAX_SEMVER_LENGTH}
+                    className="h-8 w-64"
+                    onChange={event => onVersionSpecChange(key, event.target.value)}
                   />
                 </div>
               )}

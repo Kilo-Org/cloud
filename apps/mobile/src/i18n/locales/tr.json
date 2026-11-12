@@ -2906,7 +2906,10 @@
       "alreadyInvited": "Bu kişi zaten davet edilmiş veya zaten üye.",
       "sendError": "Davet gönderilemedi.",
       "pendingInvitation": "Bu e-posta adresinin zaten bekleyen bir daveti var.",
-      "alreadyMember": "Bu kişi zaten bu kuruluşun bir üyesi."
+      "alreadyMember": "Bu kişi zaten bu kuruluşun bir üyesi.",
+      "seatsFull": "Tüm koltuklar kullanımda ({{used}}/{{total}}). Daha fazla üye davet etmeden önce bir kuruluş sahibinden koltuk eklemesini iste.",
+      "seatsFullCanInviteBilling": "Tüm koltuklar kullanımda ({{used}}/{{total}}). Koltuk kullanmayan faturalandırma yöneticilerini yine de davet edebilirsin.",
+      "noSeatsAvailable": "Tüm koltuklar kullanımda. Daha fazla üye davet etmeden önce bir kuruluş sahibinden koltuk eklemesini iste."
     },
     "invoices": {
       "downloadA11y": "{{number}} numaralı faturayı indir",

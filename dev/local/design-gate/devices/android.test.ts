@@ -65,6 +65,7 @@ test('android cells apply wm size, rotation, night mode and restore only what ch
     exec,
     spawn: () => ({ signal: () => undefined, exited: Promise.resolve(0) }),
     serial: 'emulator-5554',
+    metroPort: 8081,
   });
   assert.deepEqual(device.names, ['sdk_gphone64_arm64']);
   const setup = commands.length;
@@ -99,6 +100,7 @@ test('android tap, landscape and null-setting restore commands', () => {
     exec,
     spawn: () => ({ signal: () => undefined, exited: Promise.resolve(0) }),
     serial: 's',
+    metroPort: 8081,
   });
   const setup = commands.length;
   device.tap?.(10.4, 20.6);
@@ -125,6 +127,7 @@ test('recording stop signals only its remote PID, is idempotent, and cleans up a
   };
   const device = createAndroidDevice({
     serial: 'owned-device',
+    metroPort: 8081,
     exec: (binary, args) => {
       calls.push([binary, ...args]);
       if (args[2] === 'pull') throw new Error('pull failed');
@@ -158,4 +161,28 @@ test('recording stop signals only its remote PID, is idempotent, and cleans up a
   const cleanup = calls.at(-1);
   assert.deepEqual(cleanup?.slice(0, 6), ['adb', '-s', 'owned-device', 'shell', 'rm', '-f']);
   assert.ok(cleanup?.includes(video));
+});
+
+test('relaunch restores the reverse tunnel and the dev-client link of its own Metro', () => {
+  const { exec, commands } = fakeAdb({
+    'shell wm density': 'Physical density: 420\n',
+    'shell wm size': 'Physical size: 1080x2400\n',
+    'shell cmd uimode night': 'Night mode: no\n',
+  });
+  const device = createAndroidDevice({
+    exec,
+    spawn: () => ({ signal: () => undefined, exited: Promise.resolve(0) }),
+    serial: 'emulator-5554',
+    metroPort: 8091,
+  });
+  const setup = commands.length;
+  device.relaunch?.();
+  // The emulator loses its forward to Metro with the old process, so the tunnel
+  // and the deep link that carries it must name the Metro the gate was opened
+  // against, not a guessed default.
+  assert.deepEqual(commands.slice(setup), [
+    'adb -s emulator-5554 reverse tcp:8091 tcp:8091',
+    'adb -s emulator-5554 shell am force-stop com.kilocode.kiloapp',
+    'adb -s emulator-5554 shell am start -a android.intent.action.VIEW -d kiloapp://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8091 com.kilocode.kiloapp',
+  ]);
 });

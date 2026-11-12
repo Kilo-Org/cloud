@@ -54,6 +54,16 @@ selection_packages() {
   '
 }
 
+# Whether the selection reaches a workspace directory. `dirs` is the list
+# scripts/changed-workspaces.sh reads, so a directory in it is a directory that
+# extension-ci.yml selects.
+selection_reaches() {
+  node -e '
+    const selection = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+    process.stdout.write((selection.dirs ?? []).includes(process.argv[1]) ? "true" : "false");
+  ' "$1"
+}
+
 # Whether a selected workspace declares a dependency on one whose built
 # declarations it compiles against. Such a workspace typechecks against that
 # package's dist, so the build must run even when the package's own sources did
@@ -90,6 +100,20 @@ if [ -n "$group" ]; then
   affects() {
     [ "$full" = true ] || grep -Fxq -- "$1" <<< "$selected_packages"
   }
+  # Whether extension-ci.yml typechecks the extension for this run. That
+  # workflow runs on a pull request and a main push and has no merge-queue
+  # trigger; its `verify` job starts whenever its own selection reaches
+  # apps/extension, which is the `dirs` list this document carries. One of the
+  # two workflows owns the compile, never both. Any other event, and any
+  # unreadable answer, keeps the leg here.
+  extension_ci_typechecks() {
+    case "${GITHUB_EVENT_NAME:-}" in
+      pull_request | push)
+        [ "$(selection_reaches apps/extension <<< "$selection")" = true ]
+        ;;
+      *) return 1 ;;
+    esac
+  }
   case "$group" in
     web)
       if affects web; then
@@ -103,20 +127,21 @@ if [ -n "$group" ]; then
       fi
       ;;
     trpc)
-      # The rows run on every full typecheck, which `selectAffected` reports
+      # The row runs on every full typecheck, which `selectAffected` reports
       # whenever a change has no base, hits a GLOBAL path or this script,
       # moves root or unscoped dependencies, or holds a file it cannot
-      # attribute to any workspace. The merge queue is one of those runs and
-      # has no extension trigger, so the rows keep the extension's gate there.
-      # The extension's own workflow typechecks it for the same selection on
-      # every other pull request, and kilo-app typechecks in kilo-app CI.
-      # CI restores or builds the declarations first and sets
-      # KILO_TYPECHECK_TRPC_BUILT=1.
+      # attribute to any workspace; `affects` then answers for every package.
+      # The extension leg repeats the typecheck extension-ci.yml's `verify` job
+      # runs. That workflow has no merge-queue trigger, so the merge queue needs
+      # the leg here. A pull request or a main push whose selection reaches
+      # apps/extension leaves the compile to `verify`; a full check of this
+      # script alone selects no workspace there, so the leg stays. CI restores
+      # or builds the declarations first and sets KILO_TYPECHECK_TRPC_BUILT=1.
       if [ "${KILO_TYPECHECK_TRPC_BUILT:-}" != 1 ]; then
         pnpm --filter @kilocode/trpc run build
         export KILO_TYPECHECK_TRPC_BUILT=1
       fi
-      if affects kilo-extension; then
+      if affects kilo-extension && ! extension_ci_typechecks; then
         pnpm --filter kilo-extension run typecheck
       fi
       ;;

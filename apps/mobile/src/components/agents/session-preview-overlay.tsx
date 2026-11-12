@@ -22,6 +22,7 @@ import { RenameModal } from '@/components/rename-modal';
 import { Text } from '@/components/ui/text';
 import { requestA11yFocus } from '@/lib/a11y/announce';
 import { SESSION_TRANSCRIPT_STALE_TIME_MS } from '@/lib/agent-session-cache';
+import { useModalSurfaceHold } from '@/lib/modal-surface-veil';
 import { useTRPC } from '@/lib/trpc';
 
 import { SessionPreviewActionPanel } from './session-preview-action-panel';
@@ -82,6 +83,11 @@ function SessionPreviewContent({
   visible,
 }: Readonly<{ target: SessionPreviewTarget; visible: boolean }>) {
   const { t } = useTranslation();
+  // The preview is a portal overlay inside the app window, so the list and the
+  // tab bar it dims must leave the accessibility tree while it is up; the root
+  // applies the veil (the `accessibilityViewIsModal` on the column below is
+  // ignored by Android).
+  useModalSurfaceHold();
   const trpc = useTRPC();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();

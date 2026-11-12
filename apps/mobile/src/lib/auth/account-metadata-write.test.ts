@@ -1,11 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = new Map<string, string>();
-// The class the widget store writes; the seam below supplies it because the
-// native module cannot load in the pure suite.
+// The class the widget store writes. The mocked module supplies it, the way the
+// native one does at load.
 const AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY = 1;
 
 vi.mock('expo-secure-store', () => ({
+  // Inlined: a `vi.mock` factory is hoisted above the module's own constants.
+  AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 1,
   getItemAsync: vi.fn(async (key: string) => {
     await Promise.resolve();
     return store.get(key) ?? null;
@@ -22,7 +24,6 @@ vi.mock('expo-secure-store', () => ({
 
 /* eslint-disable import/first */
 import * as SecureStore from 'expo-secure-store';
-import { _setWidgetNativeStoreForTests } from '@/lib/auth/secure-store-gated';
 import {
   ACTIVE_USER_ID_KEY,
   ORGANIZATION_STORAGE_KEY,
@@ -40,15 +41,6 @@ describe('account-metadata-write', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     store.clear();
-    _setWidgetNativeStoreForTests({
-      AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
-      getItemAsync: SecureStore.getItemAsync,
-      setItemAsync: SecureStore.setItemAsync,
-    });
-  });
-
-  afterEach(() => {
-    _setWidgetNativeStoreForTests(null);
   });
 
   it('writes the value through the callback while the epoch is current', async () => {

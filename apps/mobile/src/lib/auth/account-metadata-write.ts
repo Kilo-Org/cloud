@@ -1,6 +1,10 @@
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
-import { LOCK_READABLE_METADATA_KEYS, widgetStoreOptions } from '@/lib/auth/secure-store-gated';
-import { deleteStoredValue, writeStoredValue } from '@/lib/auth/secure-store-value';
+import { LOCK_READABLE_METADATA_KEYS } from '@/lib/auth/secure-store-gated';
+import {
+  deleteStoredValue,
+  widgetStoreOptions,
+  writeStoredValue,
+} from '@/lib/auth/secure-store-value';
 import { chainSave } from '@/lib/hooks/save-chain';
 
 /**

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { WIDGET_STORE_PROBE } from '@/lib/auth/secure-store-gated';
 import { setProtectedDataAvailable } from '@/lib/protected-data';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
@@ -15,6 +16,20 @@ const mocks = vi.hoisted(() => ({ getItemAsync: vi.fn() }));
 // The store the hints are read through. Only the read is exercised here.
 const keychain = { getItemAsync: mocks.getItemAsync };
 
+/**
+ * Answer the given items, with the probe reading back the way a keychain that
+ * has been unlocked since boot does. A case that models a closed keychain
+ * overrides the mock with a plain `null` for every key instead.
+ */
+function answers(values: Readonly<Record<string, string | null>> = {}): void {
+  mocks.getItemAsync.mockImplementation((key: string) => {
+    if (key === WIDGET_STORE_PROBE.key) {
+      return WIDGET_STORE_PROBE.value;
+    }
+    return values[key] ?? null;
+  });
+}
+
 beforeEach(() => {
   mocks.getItemAsync.mockReset();
   _setScopeStoreForTests(keychain);
@@ -27,7 +42,7 @@ afterEach(() => {
 
 describe('glanceable scope reads', () => {
   it('reads the selected organization from its storage key', async () => {
-    mocks.getItemAsync.mockResolvedValue('org-9');
+    answers({ [ORGANIZATION_STORAGE_KEY]: 'org-9' });
 
     await expect(getSelectedOrganizationId()).resolves.toBe('org-9');
     // The shared helper omits the options slot when the caller passes none.
@@ -35,7 +50,7 @@ describe('glanceable scope reads', () => {
   });
 
   it('reads the active user from its storage key', async () => {
-    mocks.getItemAsync.mockResolvedValue('u1');
+    answers({ [ACTIVE_USER_ID_KEY]: 'u1' });
 
     await expect(getActiveUserId()).resolves.toBe('u1');
     expect(mocks.getItemAsync).toHaveBeenCalledWith(ACTIVE_USER_ID_KEY);
@@ -45,7 +60,7 @@ describe('glanceable scope reads', () => {
     ['organization', getSelectedOrganizationId, ORGANIZATION_STORAGE_KEY],
     ['user', getActiveUserId, ACTIVE_USER_ID_KEY],
   ] as const)('resolves the %s hint to null when the key is absent', async (_label, read, key) => {
-    mocks.getItemAsync.mockResolvedValue(null);
+    answers();
 
     await expect(read()).resolves.toBeNull();
     expect(mocks.getItemAsync).toHaveBeenCalledWith(key);
@@ -64,9 +79,7 @@ describe('glanceable scope reads', () => {
 describe('readSignedInScope', () => {
   it('reads both hints with the screen locked', async () => {
     setProtectedDataAvailable(false);
-    mocks.getItemAsync.mockImplementation((key: string) =>
-      key === ACTIVE_USER_ID_KEY ? 'u1' : 'org-9'
-    );
+    answers({ [ACTIVE_USER_ID_KEY]: 'u1', [ORGANIZATION_STORAGE_KEY]: 'org-9' });
 
     await expect(readSignedInScope(keychain)).resolves.toEqual({
       status: 'known',
@@ -77,9 +90,7 @@ describe('readSignedInScope', () => {
 
   it('keeps a personal scope once the user id answers', async () => {
     setProtectedDataAvailable(false);
-    mocks.getItemAsync.mockImplementation((key: string) =>
-      key === ACTIVE_USER_ID_KEY ? 'u1' : null
-    );
+    answers({ [ACTIVE_USER_ID_KEY]: 'u1' });
 
     await expect(readSignedInScope(keychain)).resolves.toEqual({
       status: 'known',
@@ -90,6 +101,7 @@ describe('readSignedInScope', () => {
 
   it('reads an unanswered user id before the first unlock as unavailable, never signed out', async () => {
     setProtectedDataAvailable(false);
+    // A closed keychain cannot answer the probe either, so the null proves nothing.
     mocks.getItemAsync.mockResolvedValue(null);
 
     await expect(readSignedInScope(keychain)).resolves.toEqual({ status: 'unavailable' });
@@ -98,8 +110,8 @@ describe('readSignedInScope', () => {
     await expect(getActiveUserId()).resolves.toBeNull();
   });
 
-  it('still reads a signed-out device as absent while unlocked', async () => {
-    mocks.getItemAsync.mockResolvedValue(null);
+  it('reads a signed-out device as absent when the keychain answers', async () => {
+    answers();
 
     await expect(readSignedInScope(keychain)).resolves.toEqual({ status: 'absent' });
   });

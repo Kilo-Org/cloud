@@ -1,4 +1,5 @@
 import {
+  ensureWidgetStoreProbe,
   type GatedSecureStore,
   LOCK_READABLE_METADATA_KEYS,
   readGatedValueForUpdate,
@@ -61,10 +62,17 @@ const ACCESSIBILITY_MARKER_VALUE = 'after-first-unlock';
  * attempt returns without the marker and the next unlocked run finishes it. The
  * marker is written after every item, never before: a half-finished upgrade is
  * never recorded as done, and a rewrite that already landed is simply repeated.
+ *
+ * The probe goes first. It is written with the same class, so planting it proves
+ * the keychain is open for every item below, and its presence is what lets a
+ * `null` record read as an absent one instead of an unreadable one.
  */
 export async function migrateWidgetStoreAccessibility(
   resolveStore: () => GatedSecureStore = widgetSecureStore
 ): Promise<void> {
+  if (!(await ensureWidgetStoreProbe(resolveStore))) {
+    return;
+  }
   const marker = await readGatedValueForUpdate(resolveStore, ACCESSIBILITY_MARKER_KEY);
   if (marker.status === 'unreadable' || marker.value === ACCESSIBILITY_MARKER_VALUE) {
     return;

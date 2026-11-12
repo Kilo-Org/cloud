@@ -10,6 +10,7 @@ import {
   type GatedSecureStore,
   readGatedValueForUpdate,
   upgradeGatedValue,
+  WIDGET_STORE_PROBE,
   withWidgetAccessibility,
   writeGatedValue,
 } from '@/lib/auth/secure-store-gated';
@@ -93,6 +94,11 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   return { promise, resolve };
 }
 
+/** The keys a run wrote, in order. */
+function writtenKeys(setItem: Mock<SetItem>): string[] {
+  return setItem.mock.calls.map(([key]) => key);
+}
+
 beforeEach(() => {
   store.clear();
   events = [];
@@ -168,13 +174,20 @@ describe('the widget store writes with AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY', () 
 });
 
 describe('migrateWidgetStoreAccessibility', () => {
-  it('rewrites an existing item with the class exactly once', async () => {
+  it('plants the probe first, then upgrades an existing item exactly once', async () => {
     store.set(GLANCEABLE_SNAPSHOT_KEY, '{"scopeKey":"s1"}');
     const { setItem, gated } = inspectableStore();
 
     await migrateWidgetStoreAccessibility(() => gated);
 
     expect(setItem.mock.calls).toEqual([
+      [
+        WIDGET_STORE_PROBE.key,
+        WIDGET_STORE_PROBE.value,
+        {
+          keychainAccessible: AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+        },
+      ],
       [
         GLANCEABLE_SNAPSHOT_KEY,
         '{"scopeKey":"s1"}',
@@ -190,7 +203,11 @@ describe('migrateWidgetStoreAccessibility', () => {
 
     // The marker records the upgrade, so the next start leaves the item alone.
     await migrateWidgetStoreAccessibility(() => gated);
-    expect(setItem).toHaveBeenCalledTimes(2);
+    expect(writtenKeys(setItem)).toEqual([
+      WIDGET_STORE_PROBE.key,
+      GLANCEABLE_SNAPSHOT_KEY,
+      'widget-store-accessibility',
+    ]);
   });
 
   it('skips a key the install never stored', async () => {
@@ -199,7 +216,8 @@ describe('migrateWidgetStoreAccessibility', () => {
 
     await migrateWidgetStoreAccessibility(() => gated);
 
-    expect(setItem.mock.calls.map(([key]) => key)).toEqual([
+    expect(writtenKeys(setItem)).toEqual([
+      WIDGET_STORE_PROBE.key,
       HOME_WIDGET_DATA_KEY,
       'widget-store-accessibility',
     ]);
@@ -212,7 +230,8 @@ describe('migrateWidgetStoreAccessibility', () => {
 
     await migrateWidgetStoreAccessibility(() => gated);
 
-    expect(setItem.mock.calls.map(([key]) => key)).toEqual([
+    expect(writtenKeys(setItem)).toEqual([
+      WIDGET_STORE_PROBE.key,
       ACTIVE_USER_ID_KEY,
       ORGANIZATION_STORAGE_KEY,
       'widget-store-accessibility',
@@ -228,6 +247,20 @@ describe('migrateWidgetStoreAccessibility', () => {
     expect(setItem).not.toHaveBeenCalled();
     expect(events).toHaveLength(0);
     expect(breadcrumbs).toHaveLength(1);
+  });
+
+  it('leaves the marker unwritten when the keychain refuses a write', async () => {
+    store.set(GLANCEABLE_SNAPSHOT_KEY, '{"scopeKey":"s1"}');
+    const { setItem, getItem, gated } = inspectableStore();
+    getItem.mockResolvedValue(null);
+    setItem.mockRejectedValue(new Error(REFUSED));
+
+    await migrateWidgetStoreAccessibility(() => gated);
+
+    // The probe write is the proof the keychain is open, so nothing follows it.
+    expect(writtenKeys(setItem)).toEqual([WIDGET_STORE_PROBE.key]);
+    expect(store.has('widget-store-accessibility')).toBe(false);
+    expect(store.get(GLANCEABLE_SNAPSHOT_KEY)).toBe('{"scopeKey":"s1"}');
   });
 });
 
@@ -248,28 +281,25 @@ describe('the lock gate on widget items', () => {
     ]);
   });
 
-  it('reads a null on a closed keychain as unreadable, never as an absent record', async () => {
-    setProtectedDataAvailable(false);
-    const { gated } = inspectableStore();
+  it('does not trust a null when the cached keychain state still says available', async () => {
+    // The phone locked while the app was suspended: the cached flag is stale, so
+    // the answer that matters is the probe's, and it cannot answer here.
+    const { getItem, gated } = inspectableStore();
+    getItem.mockResolvedValue(null);
 
-    // iOS can answer null for an item it will not hand over, and the Live
-    // Activity sweep ends every card on a null snapshot: this must not look
-    // like nothing is stored.
     await expect(readGatedValueForUpdate(() => gated, GLANCEABLE_SNAPSHOT_KEY)).resolves.toEqual({
       status: 'unreadable',
     });
   });
 
-  it('leaves the marker unwritten when a locked read answers null', async () => {
-    setProtectedDataAvailable(false);
-    const { setItem, gated } = inspectableStore();
-    store.set(GLANCEABLE_SNAPSHOT_KEY, '{"scopeKey":"s1"}');
+  it('reads an absence as absent once the probe answers', async () => {
+    const { gated } = inspectableStore();
+    store.set(WIDGET_STORE_PROBE.key, WIDGET_STORE_PROBE.value);
 
-    await migrateWidgetStoreAccessibility(() => gated);
-
-    expect(setItem).not.toHaveBeenCalled();
-    expect(store.has('widget-store-accessibility')).toBe(false);
-    expect(store.get(GLANCEABLE_SNAPSHOT_KEY)).toBe('{"scopeKey":"s1"}');
+    await expect(readGatedValueForUpdate(() => gated, GLANCEABLE_SNAPSHOT_KEY)).resolves.toEqual({
+      status: 'value',
+      value: null,
+    });
   });
 
   it('reports a real failure on a locked device instead of hiding it', async () => {

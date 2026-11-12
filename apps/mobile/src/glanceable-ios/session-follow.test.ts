@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GLANCEABLE_STALE_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { sessionLiveActivityRelevance } from '@kilocode/notifications/schemas';
 
+import { WIDGET_STORE_PROBE } from '@/lib/auth/secure-store-gated';
 import {
   _resetLiveActivitySwitchForTests,
   setLiveActivityEnabledValue,
@@ -179,6 +180,9 @@ beforeEach(() => {
   _resetSessionCardScopeStoreForTests();
   _setSessionCardScopeStoreForTests(scopeStore);
   storedScopes.clear();
+  // A keychain that has been unlocked since boot answers the probe, which is
+  // what lets an absent record read as absent instead of unreadable.
+  storedScopes.set(WIDGET_STORE_PROBE.key, WIDGET_STORE_PROBE.value);
   scopeReadsFail = false;
 });
 
@@ -321,6 +325,9 @@ describe('the follow scope record', () => {
     });
 
     it('does not write a follow over a record it cannot read while locked', async () => {
+      // A keychain the device has not unlocked since boot cannot answer the
+      // probe either, so nothing it returns proves the record is empty.
+      storedScopes.delete(WIDGET_STORE_PROBE.key);
       const write = vi.fn(scopeStore.setItemAsync);
       _setSessionCardScopeStoreForTests({
         getItemAsync: scopeStore.getItemAsync,
@@ -331,8 +338,7 @@ describe('the follow scope record', () => {
       rememberSessionCardScope('session-1', CTX);
       await _settleSessionCardScopeWritesForTests();
 
-      // A null from a closed keychain is not proof the record is empty: the map
-      // this follow built would drop every other card's scope.
+      // The map this follow built would drop every other card's scope.
       expect(write).not.toHaveBeenCalled();
     });
   });

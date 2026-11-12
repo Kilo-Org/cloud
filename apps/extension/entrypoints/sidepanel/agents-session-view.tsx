@@ -5,7 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAtomValue } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
-import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
+import type { KiloSessionId, SdkStatusMessageCode } from '@kilocode/cloud-agent-sdk';
 import { AlertTriangle, ArrowLeft, GitPullRequest } from 'lucide-react';
 import { MESSAGE_SENT_EVENT, captureEvent } from '@/src/shared/analytics';
 import type { StoredAuth } from '@/src/shared/auth';
@@ -34,6 +34,19 @@ const CREDITS_KEYWORDS =
 /* Same grace the session list's Offline pill uses: a reconnect blip must not
    flash a connection error over a perfectly healthy transcript. */
 const LIVE_CONNECTION_GRACE_MS = 5000;
+
+/*
+ * Failures no re-dial can fix: the session is gone, or this sign-in may not
+ * read it. Retry would repeat the same answer, so the view offers the way back
+ * instead.
+ */
+const TERMINAL_STATUS_ERROR_CODES = {
+  'child-session-not-found': true,
+  'not-authorized': true,
+} satisfies Partial<Record<SdkStatusMessageCode, true>>;
+
+const isTerminalStatusCode = (code: SdkStatusMessageCode): boolean =>
+  code in TERMINAL_STATUS_ERROR_CODES;
 
 /*
  * Same query key and fetcher as the new-session form's own stored-auth query,
@@ -141,10 +154,15 @@ export const AgentsSessionView = ({
   const errorMessage =
     error ?? (statusIndicator?.type === 'error' ? statusIndicator.message : null);
 
-  // A fresh failure, or another session, is new information: the old verdict no longer applies.
+  /* A retry clears every failure atom before it re-dials, so the message going
+     null mid-retry says nothing. Only a cleared failure while no retry is in
+     flight (the session opened, or the reader dismissed it) drops the verdict. */
   useEffect(() => {
+    if (retryingSwitch || errorMessage !== null) {
+      return;
+    }
     setRetryFailed(false);
-  }, [errorMessage, kiloSessionId]);
+  }, [errorMessage, retryingSwitch]);
 
   // Single session lifecycle: clear error + switch on setup, destroy on cleanup.
   // On id change cleanup runs first (destroy old), then setup reconnects fresh.
@@ -265,18 +283,27 @@ export const AgentsSessionView = ({
     }
   }, [failedPrompt, manager, sessionConfig]);
 
+  const readOpenFailure = useCallback((): string | null => {
+    const atomError = store.get(manager.atoms.error);
+    if (atomError !== null) {
+      return atomError;
+    }
+    const indicator = store.get(manager.atoms.statusIndicator);
+    return indicator?.type === 'error' ? indicator.message : null;
+  }, [manager, store]);
+
   const handleRetrySwitchSession = useCallback(() => {
     setRetryingSwitch(true);
     void (async () => {
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- branded ID from untyped hook input
         await manager.switchSession(kiloSessionId as KiloSessionId);
-        setRetryFailed(store.get(manager.atoms.error) !== null);
+        setRetryFailed(readOpenFailure() !== null);
       } finally {
         setRetryingSwitch(false);
       }
     })();
-  }, [kiloSessionId, manager, store]);
+  }, [kiloSessionId, manager, readOpenFailure]);
 
   const handleDismissError = useCallback(() => {
     manager.clearError();
@@ -422,6 +449,10 @@ export const AgentsSessionView = ({
 
   const rawTitle = fetchedSessionData?.title ?? '';
   const title = rawTitle === '' ? 'Session' : rawTitle;
+  const isTerminalStatusError =
+    statusIndicator?.type === 'error' &&
+    statusIndicator.code !== undefined &&
+    isTerminalStatusCode(statusIndicator.code);
   const composerDisabledReason = ((): string | undefined => {
     if (isReadOnly) {
       return 'This session is read-only: no live agent is attached to it. Open its CLI to continue it, or start a new session.';
@@ -507,29 +538,6 @@ export const AgentsSessionView = ({
           <div className="flex items-start justify-between gap-2">
             <span className="min-w-0 break-words">{statusIndicator.message}</span>
             {(() => {
-              if (statusIndicator.type === 'error' && !isCreditsStatus) {
-                return (
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      className="type-label underline outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
-                      onClick={handleDismissError}
-                      type="button"
-                    >
-                      Dismiss
-                    </button>
-                    {!retryFailed && (failedPrompt === null || retrySucceeded) ? (
-                      <button
-                        className="rounded-md border border-border bg-surface-overlay px-3 py-1 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:opacity-50"
-                        disabled={retryingSwitch}
-                        onClick={handleRetrySwitchSession}
-                        type="button"
-                      >
-                        {retryingSwitch ? 'Retrying…' : 'Retry'}
-                      </button>
-                    ) : null}
-                  </div>
-                );
-              }
               if (isCreditsStatus) {
                 return (
                   <a
@@ -546,13 +554,49 @@ export const AgentsSessionView = ({
                   </a>
                 );
               }
-              return null;
+              if (statusIndicator.type !== 'error') {
+                return null;
+              }
+              const canRetry =
+                !isTerminalStatusError && !retryFailed && (failedPrompt === null || retrySucceeded);
+              return (
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    className="type-label underline outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
+                    onClick={handleDismissError}
+                    type="button"
+                  >
+                    Dismiss
+                  </button>
+                  {isTerminalStatusError ? (
+                    <button
+                      className="rounded-md border border-border bg-surface-overlay px-3 py-1 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring"
+                      onClick={() => {
+                        onBack();
+                      }}
+                      type="button"
+                    >
+                      Back to sessions
+                    </button>
+                  ) : null}
+                  {canRetry ? (
+                    <button
+                      className="rounded-md border border-border bg-surface-overlay px-3 py-1 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:opacity-50"
+                      disabled={retryingSwitch}
+                      onClick={handleRetrySwitchSession}
+                      type="button"
+                    >
+                      {retryingSwitch ? 'Retrying…' : 'Retry'}
+                    </button>
+                  ) : null}
+                </div>
+              );
             })()}
           </div>
           {statusIndicator.detail === undefined ? null : (
             <p className="mt-1 break-words text-foreground-muted">{statusIndicator.detail}</p>
           )}
-          {statusIndicator.type === 'error' && retryFailed ? (
+          {statusIndicator.type === 'error' && retryFailed && !isTerminalStatusError ? (
             <p className="mt-1 break-words">
               Retrying did not help. Go back to the session list and start a new session.
             </p>
@@ -596,7 +640,11 @@ export const AgentsSessionView = ({
                   </a>
                 );
               }
-              if (!retryFailed && (failedPrompt === null || retrySucceeded)) {
+              if (
+                !retryFailed &&
+                !isTerminalStatusError &&
+                (failedPrompt === null || retrySucceeded)
+              ) {
                 return (
                   <button
                     className="shrink-0 rounded-md border border-border bg-surface-overlay px-3 py-1 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:opacity-50"
@@ -611,7 +659,7 @@ export const AgentsSessionView = ({
               return null;
             })()}
           </div>
-          {retryFailed && statusIndicator?.type !== 'error' ? (
+          {retryFailed && !isTerminalStatusError && statusIndicator?.type !== 'error' ? (
             <p className="mt-1 break-words">
               Retrying did not help. Go back to the session list and start a new session.
             </p>

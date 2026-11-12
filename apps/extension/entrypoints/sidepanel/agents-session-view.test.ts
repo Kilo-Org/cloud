@@ -565,7 +565,14 @@ const mockTrpcClient = {
   modelPreferences: { setLastSelected: { mutate: mockSetLastSelected } },
 };
 
-const mockStore = { get: vi.fn(() => null) };
+/* Reads the same fixture map the jotai mock reads, so a retry sees the failure
+   that is still present after it re-dials. */
+const mockStore = {
+  get: (atom: object): unknown => {
+    const label = atomMap.get(atom);
+    return label === undefined ? null : (storedAtomValues[label] ?? null);
+  },
+};
 const mockUserWebConnection = {
   isConnected: vi.fn(() => true),
   onConnectionChange: vi.fn(() => () => {}),
@@ -686,11 +693,9 @@ describe('agents session view integration', () => {
     /* eslint-enable unicorn/no-useless-undefined */
   });
 
-  async function renderView() {
+  async function renderView(onBack: () => void = () => {}) {
     const { AgentsSessionView } = await import('./agents-session-view');
-    return render(
-      withQueryClient(h(AgentsSessionView, { kiloSessionId: 'ses-test-1', onBack: () => {} }))
-    );
+    return render(withQueryClient(h(AgentsSessionView, { kiloSessionId: 'ses-test-1', onBack })));
   }
 
   it('shows Retry button when status indicator type is error', async () => {
@@ -985,6 +990,56 @@ describe('agents session view integration', () => {
 
     expect(container.textContent).toContain('Dismiss');
     expect(container.textContent).toContain('Retry');
+  });
+
+  it('reports that a retry re-dialed into the same failure', async () => {
+    /* The open-failure path raises the status indicator without an error atom;
+       this is the sequence the browser showed (open fails → Retry → same bar). */
+    storedAtomValues['statusIndicator'] = {
+      type: 'error',
+      message: 'Service is unavailable right now. Please try again.',
+      code: 'service-unavailable',
+      timestamp: Date.now(),
+    };
+    storedAtomValues['failedPrompt'] = null;
+    storedAtomValues['isStreaming'] = false;
+
+    const { container } = await renderView();
+    const retryBtn = [...container.querySelectorAll('button')].find(b => b.textContent === 'Retry');
+    expect(retryBtn).not.toBeNull();
+
+    fireEvent.click(retryBtn!);
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Retrying did not help');
+    });
+    const labels = [...container.querySelectorAll('button')].map(button => button.textContent);
+    expect(labels).not.toContain('Retry');
+    expect(labels).toContain('Dismiss');
+  });
+
+  it('offers the way back instead of Retry when the session is gone', async () => {
+    storedAtomValues['statusIndicator'] = {
+      type: 'error',
+      message: 'This session is no longer available.',
+      code: 'child-session-not-found',
+      timestamp: Date.now(),
+    };
+    storedAtomValues['failedPrompt'] = null;
+    storedAtomValues['isStreaming'] = false;
+
+    const onBack = vi.fn();
+    const { container } = await renderView(onBack);
+
+    const labels = [...container.querySelectorAll('button')].map(button => button.textContent);
+    expect(labels).toContain('Back to sessions');
+    expect(labels).not.toContain('Retry');
+
+    const backBtn = [...container.querySelectorAll('button')].find(
+      button => button.textContent === 'Back to sessions'
+    );
+    fireEvent.click(backBtn!);
+    expect(onBack).toHaveBeenCalledWith();
   });
 
   it('includes sessionConfig.variant in send payload when present', async () => {

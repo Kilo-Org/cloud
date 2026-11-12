@@ -675,6 +675,21 @@ vi.mock('@/lib/trpc', () => ({
         }),
       },
     },
+    // The context sheet mounts its share section here, so the section's read must
+    // resolve: these tests assert the header and the sheet's other rows, so the
+    // read reports no live link and nothing presses the share mutations.
+    cliSessionsV2: {
+      get: {
+        queryOptions: () => ({
+          queryKey: ['cliSessionsV2', 'get'],
+          queryFn: () => Promise.resolve({ public_id: null }),
+          initialData: { public_id: null },
+        }),
+        queryKey: () => ['cliSessionsV2', 'get'],
+      },
+      share: { mutationOptions: () => ({}) },
+      unshare: { mutationOptions: () => ({}) },
+    },
     // The session header's active-profile chip reads the context profiles; the
     // hoisted rows let a test resolve a default, and the empty default keeps
     // the chip absent so the existing header assertions hold.

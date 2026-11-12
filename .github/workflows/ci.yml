@@ -1135,8 +1135,19 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # The build runs one Next production build, and that build's type check
+      # reads the app's tsconfig include: the app sources and tests, the
+      # web-shared sources the config maps in, the ai-gateway sources a web test
+      # imports, and the sources of one billing service that two web tests import
+      # inside apps/web. That service imports @kilocode/organization-entitlement,
+      # so its dependents are selected rather than every other workspace: a
+      # project outside the install scope has no node_modules, and the type check
+      # then fails on an unresolvable import. Only those closures and the root
+      # project are installed, so the job stops linking the workspaces its build
+      # never reads. Widen the filter when a step here imports a workspace
+      # outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'web...' --filter 'ai-gateway...' --filter '...@kilocode/organization-entitlement' --filter kilocode-monorepo
 
       - name: Cache Next.js build
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4

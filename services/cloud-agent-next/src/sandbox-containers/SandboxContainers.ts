@@ -1,6 +1,7 @@
 import {
   classifySnapshotStartFailure,
   type SnapshotStartFailureReason,
+  type SnapshotLaunchDiagnosticContext,
 } from './snapshot-start-failures.js';
 import { billingFailureFromAdmission } from '../billing-failure.js';
 import { getBillingContext } from '@kilocode/container-usage';
@@ -94,6 +95,7 @@ export type ContainersLaunchInput = {
   snapshot?: NativeStartSnapshot;
   deadlineAt?: number;
   nativeImage?: NativeRuntimeImage;
+  snapshotDiagnostic?: SnapshotLaunchDiagnosticContext;
 };
 
 /**
@@ -528,7 +530,9 @@ export class SandboxContainers extends DurableObject<Env> {
     record: ContainersRecord,
     ref: string,
     start: ResolvedStart,
-    policy: Pick<ContainersLaunchInput, 'egressAllowlist' | 'egressAudit'> | undefined,
+    policy:
+      | Pick<ContainersLaunchInput, 'egressAllowlist' | 'egressAudit' | 'snapshotDiagnostic'>
+      | undefined,
     deadlineAt: number | undefined
   ): Promise<ContainersLaunchResult> {
     const container = this.requiredContainer();
@@ -556,12 +560,16 @@ export class SandboxContainers extends DurableObject<Env> {
     if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
       throw new WrapperExecTimeoutError();
     }
-    const failure = await this.runStart(start, async () => {
-      const issuedAt = Date.now();
-      await this.startContainerAndActivateBilling(container, record, start.options);
-      await this.awaitMainProcess(container, start, issuedAt, deadlineAt);
-      await this.activateBillingIfRunning(container, record);
-    });
+    const failure = await this.runStart(
+      start,
+      async () => {
+        const issuedAt = Date.now();
+        await this.startContainerAndActivateBilling(container, record, start.options);
+        await this.awaitMainProcess(container, start, issuedAt, deadlineAt);
+        await this.activateBillingIfRunning(container, record);
+      },
+      policy?.snapshotDiagnostic
+    );
     if (failure !== null) return { started: false, startSource: start.source, ...failure };
     await this.writeRunning(ref, 'clear');
     return { started: true, startSource: start.source };
@@ -631,8 +639,10 @@ export class SandboxContainers extends DurableObject<Env> {
    */
   private async runStart(
     start: ResolvedStart,
-    attempt: () => Promise<void>
+    attempt: () => Promise<void>,
+    diagnostic?: SnapshotLaunchDiagnosticContext
   ): Promise<StartFailure | null> {
+    const startedAt = diagnostic?.startedAt ?? Date.now();
     try {
       await attempt();
       return null;
@@ -641,9 +651,14 @@ export class SandboxContainers extends DurableObject<Env> {
         const snapshotFailureReason = classifySnapshotStartFailure(error);
         logControlDiagnostic('snapshot_start_failed', {
           sandboxId: this.sandboxNameForLog(),
+          allocationId: diagnostic?.allocationId,
+          source: diagnostic?.source ?? 'image',
+          failureStage: 'provider_snapshot',
           reason: snapshotFailureReason,
           errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
           cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
+          attempt: diagnostic?.attempt ?? 1,
+          elapsedMs: Math.max(0, Date.now() - startedAt),
         });
         return { snapshotFailed: true, snapshotFailureReason };
       }

@@ -233,13 +233,15 @@ export function mintStreamTicket(
   user: { id: string },
   cloudAgentSessionId: string,
   nextAuthSecret: string,
-  expiresInSeconds = 120
+  expiresInSeconds = 120,
+  organizationId?: string
 ): string {
   return jwt.sign(
     {
       type: 'stream_ticket',
       userId: user.id,
       cloudAgentSessionId,
+      ...(organizationId ? { organizationId } : {}),
       nonce: randomUUID(),
     },
     nextAuthSecret,

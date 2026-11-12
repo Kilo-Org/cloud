@@ -8,28 +8,53 @@ afterEach(async () => {
   await i18n.changeLanguage('en');
 });
 
+/** Every permission id a CLI can put in a request, with its English subject. */
+const KNOWN_SUBJECTS = [
+  ['read', 'read'],
+  ['edit', 'edit'],
+  ['write', 'write'],
+  ['bash', 'bash'],
+  ['glob', 'glob'],
+  ['grep', 'grep'],
+  ['list', 'list'],
+  ['patch', 'patch'],
+  ['apply_patch', 'patch'],
+  ['task', 'task'],
+  ['webfetch', 'fetching a web page'],
+  ['websearch', 'searching online'],
+  ['codesearch', 'searching code'],
+  ['todoread', 'todo list'],
+  ['todowrite', 'todo list'],
+  ['skill', 'skill loading'],
+  ['lsp', 'language server access'],
+  ['browser_open', 'browser access'],
+  ['notebook_read', 'notebook access'],
+  ['notebook_edit', 'notebook access'],
+  ['notebook_execute', 'notebook access'],
+  ['board_read', 'board access'],
+  ['board_post', 'board access'],
+  ['question', 'asking you questions'],
+  ['suggest', 'suggestions'],
+  ['recall', 'memory recall'],
+  ['repo_clone', 'repository cloning'],
+  ['repo_overview', 'repository overview'],
+  ['semantic_search', 'semantic search'],
+  ['external_directory', 'access to an external directory'],
+  ['doom_loop', 'repeated tool calls'],
+  ['agent_manager', 'agent management'],
+  ['sandbox_escalation', 'host access'],
+] as const;
+
 describe('permissionToolLabel', () => {
-  it('maps every known tool id to its catalog name', async () => {
+  it.each(KNOWN_SUBJECTS)('names the %s permission for the allow sentence', async (id, label) => {
     await i18n.changeLanguage('en');
-    expect(permissionToolLabel('read')).toBe('read');
-    expect(permissionToolLabel('edit')).toBe('edit');
-    expect(permissionToolLabel('write')).toBe('write');
-    expect(permissionToolLabel('bash')).toBe('bash');
-    expect(permissionToolLabel('glob')).toBe('glob');
-    expect(permissionToolLabel('grep')).toBe('grep');
-    expect(permissionToolLabel('list')).toBe('list');
-    expect(permissionToolLabel('patch')).toBe('patch');
-    expect(permissionToolLabel('apply_patch')).toBe('patch');
-    expect(permissionToolLabel('task')).toBe('task');
+    expect(permissionToolLabel(id)).toBe(label);
   });
 
   it('returns an unknown id unchanged instead of capitalizing it', () => {
-    expect(permissionToolLabel('webfetch')).toBe('webfetch');
-    expect(permissionToolLabel('websearch')).toBe('websearch');
-    expect(permissionToolLabel('codesearch')).toBe('codesearch');
-    expect(permissionToolLabel('todoread')).toBe('todoread');
-    expect(permissionToolLabel('todowrite')).toBe('todowrite');
     expect(permissionToolLabel('some_future_tool')).toBe('some_future_tool');
+    // A config-only id the CLI never asks about stays a raw fallback.
+    expect(permissionToolLabel('markdown_source')).toBe('markdown_source');
   });
 
   it('returns an id that names an inherited member unchanged', () => {
@@ -54,5 +79,7 @@ describe('permissionToolLabel', () => {
     expect(permissionToolLabel('bash')).toBe('bash');
     expect(permissionToolLabel('read')).toBe('čitanje');
     expect(permissionToolLabel('read')).not.toBe('Read');
+    // The reported subject is translated, never the machine id.
+    expect(permissionToolLabel('external_directory')).not.toBe('external_directory');
   });
 });

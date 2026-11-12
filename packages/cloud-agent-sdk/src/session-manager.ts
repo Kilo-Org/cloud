@@ -1,3 +1,4 @@
+import type { ToolDisplayMode } from './tool-detail-marker';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
 import {
   errorShapeSchema,
@@ -82,6 +83,7 @@ import { generateMessageId } from './message-id';
 import { findLatestContextUsage } from './context-usage';
 import type { ContextUsage } from './context-usage';
 import { CLI_MODEL_ID, cliModelLabel } from './cli-model';
+import { readCloudSnapshotPage, type SnapshotRead } from './cloud-agent-transport';
 
 type StoredMessage = { info: MessageInfo; parts: Part[] };
 type SessionManagerPromptPayload = Omit<SendPromptPayload, 'model'> & { model?: string };
@@ -415,6 +417,8 @@ type SessionManagerConfig = {
   api: CloudAgentApi;
   lifecycleHooks?: ConnectionLifecycleHooks;
   websocketHeaders?: WebSocketHeaders;
+  /** Requests bounded completed-tool previews in historical stream replay. */
+  toolDisplay?: ToolDisplayMode;
   prepare: (
     input: PrepareInput
   ) => Promise<{ cloudAgentSessionId: CloudAgentSessionId; kiloSessionId: KiloSessionId }>;
@@ -515,7 +519,7 @@ type SessionManagerAtoms = {
    * reader.
    */
   isRefreshingCachedTranscript: W<boolean>;
-  /** The session whose cached transcript is on screen while its live one loads. */
+  /** Route identity owning an authorized cached/early page before metadata lands. */
   cachedTranscriptSessionId: Atom<string | null>;
   /**
    * True from a session switch (and each reconnect) until the live transport
@@ -1037,6 +1041,9 @@ function isCloudReady(
  * deferred cache read share.
  */
 type SessionOpen = {
+  initialPageRead?: Promise<SnapshotRead>;
+  initialPageApplied?: SessionSnapshotPage;
+  denied: boolean;
   initialResolvedSession: ResolvedSession | null;
   kiloSessionId: KiloSessionId;
   expectedGeneration: number;
@@ -1107,9 +1114,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * — and on an error, a transcript clear, or a session reset.
    */
   const isRefreshingCachedTranscriptAtom = atom(false);
-  const cachedTranscriptSessionIdAtom = atom(get =>
-    get(isRefreshingCachedTranscriptAtom) ? get(rootSessionIdAtom) : null
-  );
+  const cachedTranscriptSessionIdAtom = atom<string | null>(null);
   const isReplayingLiveHistoryAtom = atom(true);
   const isReadOnlyAtom = atom(false);
   // False while no session is active; once a session resolves the gate is
@@ -1650,6 +1655,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);
     store.set(isRefreshingCachedTranscriptAtom, false);
+    if (!preserveTranscript) store.set(cachedTranscriptSessionIdAtom, null);
     store.set(isReadOnlyAtom, false);
     store.set(supportsAttachmentsAtom, false);
     store.set(activeSessionTypeAtom, null);
@@ -3023,6 +3029,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const jotaiStorage = store.get(sessionStorageAtom) ?? createJotaiStorage(store);
     store.set(sessionStorageAtom, jotaiStorage);
     return {
+      denied: false,
       initialResolvedSession: null,
       kiloSessionId,
       expectedGeneration,
@@ -3045,6 +3052,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         return;
       }
       if (!applyPage({ ...cachedPage, kind: 'success' }, open.initialPageGeneration, true)) return;
+      store.set(cachedTranscriptSessionIdAtom, open.kiloSessionId);
       transcriptRows.restore(cachedPage);
       // Settings are cached only for Cloud Agent sessions, so the composer can show
       // that session's controls until the live metadata confirms them.
@@ -3097,6 +3105,28 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           initialResolvedSession.cloudAgentSessionId.startsWith('workspace_')
         ) {
           activeCloudSessionId = initialResolvedSession.cloudAgentSessionId;
+          if (config.fetchCloudSnapshotPage) {
+            open.initialPageRead = readCloudSnapshotPage(
+              config.fetchCloudSnapshotPage,
+              activeCloudSessionId
+            );
+            void open.initialPageRead.then(read => {
+              if (open.expectedGeneration !== switchGeneration || open.denied) return;
+              if (read.kind === 'rejected' && denySessionOpen(open, read.error)) return;
+              if (read.kind !== 'page' || !open.acceptCachedPage) return;
+              if (open.initialPageGeneration !== loadOlderGeneration) return;
+              store.set(rootSessionIdAtom, read.page.info.id);
+              if (!applyPage({ ...read.page, kind: 'success' }, open.initialPageGeneration, true))
+                return;
+              open.initialPageApplied = read.page;
+              store.set(cachedTranscriptSessionIdAtom, open.kiloSessionId);
+              // A late disk page must not overwrite this fresh, authorized read.
+              open.acceptCachedPage = false;
+              transcriptRows.restore(read.page);
+              store.set(isLoadingAtom, false);
+              store.set(isRefreshingCachedTranscriptAtom, false);
+            });
+          }
         }
       }
 
@@ -3139,36 +3169,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
     } catch (err) {
       if (open.expectedGeneration !== switchGeneration) return null;
-      const parsed = errorShapeSchema.safeParse(err);
-      const code = parsed.success ? (parsed.data.data?.code ?? parsed.data.shape?.code) : undefined;
-      const accessDenied = code === 'NOT_FOUND' || code === 'UNAUTHORIZED' || code === 'FORBIDDEN';
-      if (accessDenied) {
-        // An authoritative denial is terminal and must retire any cached
-        // rows the moment it lands — never deferred behind the cache read.
-        open.acceptCachedPage = false;
-        // Ask for the caller-persisted page of this id to be deleted.
-        rememberDeniedSession(open.kiloSessionId);
-        invalidateCachedPageForSession(open.kiloSessionId);
-        clearAllAtoms();
-        store.set(isLoadingAtom, false);
-        if (code === 'NOT_FOUND') {
-          setIndicator({
-            type: 'error',
-            message: CHILD_SESSION_NOT_FOUND_MESSAGE,
-            timestamp: Date.now(),
-            code: 'child-session-not-found',
-          });
-        } else {
-          const detail = formatErrorDetail(err);
-          setIndicator({
-            type: 'error',
-            message: detail.message,
-            timestamp: Date.now(),
-            code: detail.code,
-          });
-        }
-        return null;
-      }
+      if (open.denied || denySessionOpen(open, err)) return null;
       if (config.readCachedSnapshotPage) {
         const retry = () => {
           if (open.expectedGeneration !== switchGeneration) return;
@@ -3206,10 +3207,33 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       return null;
     }
-    if (open.expectedGeneration !== switchGeneration) return null;
+    if (open.expectedGeneration !== switchGeneration || open.denied) return null;
     // The server confirmed this id, so its page may be used again.
     deniedSessionIds.delete(open.kiloSessionId);
     return data;
+  }
+
+  function denySessionOpen(open: SessionOpen, error: unknown): boolean {
+    const parsed = errorShapeSchema.safeParse(error);
+    const code = parsed.success ? (parsed.data.data?.code ?? parsed.data.shape?.code) : undefined;
+    if (code !== 'NOT_FOUND' && code !== 'UNAUTHORIZED' && code !== 'FORBIDDEN') return false;
+    open.denied = true;
+    open.acceptCachedPage = false;
+    open.surfaceDeferredOpenFailure = null;
+    stateUnsub?.();
+    stateUnsub = null;
+    currentSession?.destroy();
+    currentSession = null;
+    rememberDeniedSession(open.kiloSessionId);
+    invalidateCachedPageForSession(open.kiloSessionId);
+    clearAllAtoms();
+    store.set(isLoadingAtom, false);
+    const detail =
+      code === 'NOT_FOUND'
+        ? { message: CHILD_SESSION_NOT_FOUND_MESSAGE, code: 'child-session-not-found' as const }
+        : formatErrorDetail(error);
+    setIndicator({ type: 'error', ...detail, timestamp: Date.now() });
+    return true;
   }
 
   /**
@@ -3622,6 +3646,19 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // and omitted-item count.
     const recordInitialPage = (page: SessionSnapshotPage): void => {
       if (initialPageGeneration !== loadOlderGeneration) return;
+      // The early page already seeded pagination. Replaying it must not rewind
+      // a cursor the reader advanced while metadata was still in flight.
+      if (open.initialPageApplied === page) {
+        const data = store.get(fetchedSessionDataAtom);
+        if (data && page.totalCostMicrodollars !== undefined) {
+          store.set(fetchedSessionDataAtom, {
+            ...data,
+            totalCostMicrodollars: page.totalCostMicrodollars,
+          });
+        }
+        store.set(cachedTranscriptSessionIdAtom, null);
+        return;
+      }
       if (activeCloudSessionId) store.set(rootSessionIdAtom, page.info.id);
       if (applyPage({ ...page, kind: 'success' }, initialPageGeneration, true)) {
         // The stream replays these rows later; show them with the page's messages.
@@ -3629,6 +3666,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // A bounded page can lag the stream; omissions are not deletion evidence.
         // Only an applied page can finish the current open's refresh.
         store.set(isRefreshingCachedTranscriptAtom, false);
+        store.set(cachedTranscriptSessionIdAtom, null);
       }
     };
 
@@ -3651,6 +3689,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         getTicket: config.getTicket,
         api: config.api,
         fetchSnapshot: config.fetchSnapshot,
+        initialSnapshotRead: open.initialPageRead,
         ...(config.fetchCloudSnapshotPage
           ? { fetchCloudSnapshotPage: config.fetchCloudSnapshotPage }
           : {}),
@@ -3659,6 +3698,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         userWebConnection: config.userWebConnection,
         lifecycleHooks: config.lifecycleHooks,
         websocketHeaders: config.websocketHeaders,
+        toolDisplay: config.toolDisplay,
       },
       ...(config.websocketBaseUrl ? { websocketBaseUrl: config.websocketBaseUrl } : {}),
       storage,

@@ -175,6 +175,7 @@ vi.mock('@/components/agents/session-message-list', () => ({
   SessionMessageList: 'SessionMessageList',
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -354,6 +355,13 @@ describe('the chat transcript while it opens', () => {
     expect(messagesOf(tree)).toEqual([]);
     /* Nothing failed, so the chat takes a first message. */
     expect(count(tree, 'ChatComposer')).toBe(1);
+    /* The state centers in the transcript area its own scroller shows, so the
+       pending paint and the measured placement agree from the first frame and
+       the state does not move when a measurement lands. The state centers
+       through its own scroller, so no second one wraps it. */
+    const [empty] = emptyStatesOf(tree);
+    expect(empty?.description).toBeDefined();
+    expect(count(tree, 'CenteredState')).toBe(0);
   });
 
   it.each([

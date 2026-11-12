@@ -4,6 +4,68 @@ import { classifyAssistantFailure } from '../../../src/shared/assistant-failure.
 import type { KiloFeedEvent } from './kilo-event-feed.js';
 import type { HarnessActivityEvent } from './harness-activity.js';
 
+it('translates native drain proof without session reads or conversation history', async () => {
+  const events: KiloFeedEvent[] = [];
+  let reads = 0;
+  const marker = { sessionID: 'ses_root', token: 'proof-token' };
+  const native = Bun.serve({
+    port: 0,
+    fetch(request) {
+      if (new URL(request.url).pathname !== '/api/event') {
+        reads++;
+        return new Response(null, { status: 503 });
+      }
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            for (const [type, data] of [
+              ['server.connected', {}],
+              ['rpc.kilocode.session-drain.drained', marker],
+            ] as const)
+              controller.enqueue(
+                new TextEncoder().encode(
+                  `data: ${JSON.stringify({ id: `evt_${type}`, type, data, created: 1, location: { directory: '/workspace' } })}\n\n`
+                )
+              );
+          },
+        }),
+        { headers: { 'content-type': 'text/event-stream' } }
+      );
+    },
+  });
+  const received = Promise.withResolvers<void>();
+  const feed = createKilo2EventFeed({
+    source: {
+      server: { url: native.url.origin },
+      directory: '/workspace',
+      nativeRuntimeId: 'rt_v2',
+    },
+    signal: AbortSignal.timeout(5000),
+    onEvent(event) {
+      events.push(event);
+      if (event.type === 'session.drained') received.resolve();
+    },
+    onFailure() {},
+  });
+  try {
+    await feed.open();
+    await received.promise;
+    expect(events).toEqual([
+      { type: 'server.connected', properties: {}, directory: undefined, nativeRuntimeId: 'rt_v2' },
+      {
+        type: 'session.drained',
+        properties: marker,
+        directory: '/workspace',
+        nativeRuntimeId: 'rt_v2',
+      },
+    ]);
+    expect(reads).toBe(0);
+  } finally {
+    feed.close();
+    await native.stop(true);
+  }
+});
+
 it('does not acknowledge a later prompt from an earlier interrupted execution snapshot', async () => {
   const directory = '/workspace';
   const sessionID = 'ses_local';

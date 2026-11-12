@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
-import { enkrypt_usage, organizations } from '@kilocode/db/schema';
+import { enkrypt_usage } from '@kilocode/db/schema';
 import {
   ENKRYPT_USAGE_WRITE_PATH,
   EnkryptUsageQueueMessageSchema,
@@ -31,8 +30,10 @@ import {
   MICRODOLLARS_PER_ENKRYPT_CREDIT,
   recordEnkryptUsage,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
-import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  enkryptUsageRecordForNewOrganization,
+  organizationMicrodollarsUsed,
+} from '@kilocode/web-shared/tests/helpers/enkrypt-usage.helper';
 import { POST as writeEnkryptUsageRoute } from '@/app/api/internal/enkrypt-usage/record/route';
 
 const INGEST_URL = 'https://ingest.synthetic.invalid/enkrypt-usage';
@@ -88,34 +89,6 @@ async function routeFetch(input: string | URL | Request, init?: RequestInit): Pr
   throw new TypeError('unexpected fetch target');
 }
 
-async function usageRecordForNewOrganization() {
-  const user = await insertTestUser();
-  const organization = await createTestOrganization(
-    `enkrypt-queue-composed-${randomUUID()}`,
-    user.id,
-    10_000_000
-  );
-  return {
-    organizationId: organization.id,
-    kiloUserId: user.id,
-    sessionId: 'ses_guardrail',
-    apiKind: 'messages' as const,
-    decision: 'blocked' as const,
-    creditsCost: 7,
-    scannedCharacters: 2_400,
-    totalCharacters: 10_000,
-    addedLatencyMs: 212,
-  };
-}
-
-async function microdollarsUsed(organizationId: string) {
-  const [row] = await db
-    .select({ microdollarsUsed: organizations.microdollars_used })
-    .from(organizations)
-    .where(eq(organizations.id, organizationId));
-  return row?.microdollarsUsed;
-}
-
 beforeEach(() => {
   queued.length = 0;
   requestedUrls.length = 0;
@@ -137,7 +110,7 @@ describe('Enkrypt usage from the gateway through the usage queue', () => {
     'records the same write from %s through the ingress, queue and consumer',
     async (_region, us) => {
       mockedIsUSRegion.mockReturnValue(us);
-      const usageRecord = await usageRecordForNewOrganization();
+      const usageRecord = await enkryptUsageRecordForNewOrganization();
 
       await recordEnkryptUsage(usageRecord);
 
@@ -151,7 +124,7 @@ describe('Enkrypt usage from the gateway through the usage queue', () => {
           occurredAt: message.record.occurredAt,
         })
       );
-      expect(await microdollarsUsed(usageRecord.organizationId)).toBe(0);
+      expect(await organizationMicrodollarsUsed(usageRecord.organizationId)).toBe(0);
 
       const delivery: QueueMessage = {
         id: 'synthetic-queue-message',
@@ -184,7 +157,7 @@ describe('Enkrypt usage from the gateway through the usage queue', () => {
       expect(rows).toHaveLength(1);
       expect(rows[0].id).toBe(message.record.id);
       expect(new Date(rows[0].createdAt).toISOString()).toBe(message.record.occurredAt);
-      expect(await microdollarsUsed(usageRecord.organizationId)).toBe(
+      expect(await organizationMicrodollarsUsed(usageRecord.organizationId)).toBe(
         7 * MICRODOLLARS_PER_ENKRYPT_CREDIT
       );
     }

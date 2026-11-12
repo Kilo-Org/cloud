@@ -5,6 +5,8 @@ import {
   EXA_USAGE_FEATURE_ID_MAX_LENGTH,
   EXA_USAGE_TYPE_MAX_LENGTH,
   EXA_USAGE_WRITE_PATH,
+  EnkryptUsageQueueMessageSchema,
+  ExaUsageQueueMessageSchema,
   ExaUsageRecordSchema,
   ExaUsageWriteResponseSchema,
   isExaAllowedPath,
@@ -229,5 +231,44 @@ describe('ExaUsageWriteResponseSchema', () => {
     ],
   ])('rejects %s', (_label, body) => {
     expect(ExaUsageWriteResponseSchema.safeParse(body).success).toBe(false);
+  });
+});
+
+describe('ExaUsageQueueMessageSchema', () => {
+  test('accepts the version 1 envelope around a valid record', () => {
+    const message = { kind: 'exa_usage', v: 1, record: validRecord() };
+    expect(ExaUsageQueueMessageSchema.parse(message)).toStrictEqual(message);
+  });
+
+  test('accepts a personal record in the envelope', () => {
+    const message = { kind: 'exa_usage', v: 1, record: recordWith({ organizationId: null }) };
+    expect(ExaUsageQueueMessageSchema.parse(message)).toStrictEqual(message);
+  });
+
+  test.each([
+    ['another kind', { kind: 'enkrypt_usage', v: 1, record: validRecord() }],
+    ['another version', { kind: 'exa_usage', v: 2, record: validRecord() }],
+    ['a string version', { kind: 'exa_usage', v: '1', record: validRecord() }],
+    ['a missing version', { kind: 'exa_usage', record: validRecord() }],
+    ['an extra key', { kind: 'exa_usage', v: 1, record: validRecord(), extra: true }],
+    ['an invalid record', { kind: 'exa_usage', v: 1, record: recordWith({ id: 'x' }) }],
+    ['an unknown record key', { kind: 'exa_usage', v: 1, record: recordWith({ prompt: 'x' }) }],
+    [
+      'a non-RFC UUID organization',
+      {
+        kind: 'exa_usage',
+        v: 1,
+        record: recordWith({ organizationId: '4f4f4f4f-4f4f-4f4f-4f4f-4f4f4f4f4f4f' }),
+      },
+    ],
+    ['a missing record', { kind: 'exa_usage', v: 1 }],
+    ['a bare record', validRecord()],
+  ])('rejects %s', (_label, message) => {
+    expect(ExaUsageQueueMessageSchema.safeParse(message).success).toBe(false);
+  });
+
+  test('is not accepted as an Enkrypt message', () => {
+    const message = { kind: 'exa_usage', v: 1, record: validRecord() };
+    expect(EnkryptUsageQueueMessageSchema.safeParse(message).success).toBe(false);
   });
 });

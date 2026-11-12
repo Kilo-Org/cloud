@@ -326,6 +326,33 @@ describe('ChatSidebar row rendering', () => {
     expect(dom.container.textContent).toContain('No sessions yet');
   });
 
+  it('rerenders only the two affected workspace rows when selection changes', () => {
+    const sessions = makeSessions(SESSION_COUNT).map((session, index) => ({
+      ...session,
+      worktreeId: `worktree_${index}`,
+    }));
+    const onOpenSession = jest.fn();
+    renderSidebar({ sessions, currentSessionId: sessions[0].sessionId, onOpenSession });
+    tooltipMock.mockClear();
+    renderSidebar({ sessions, currentSessionId: sessions[1].sessionId, onOpenSession });
+    expect(tooltipMock.mock.calls.filter(([props]) => props.delayDuration === 400)).toHaveLength(2);
+  });
+
+  it('uses updated workspace actions even when the row does not rerender', () => {
+    const session = makeSession(0, { worktreeId: 'worktree_actions' });
+    const sessions = [session];
+    const previous = jest.fn();
+    const next = jest.fn();
+    renderSidebar({ sessions, onOpenSession: previous });
+    tooltipMock.mockClear();
+    renderSidebar({ sessions, onOpenSession: next });
+    expect(tooltipMock.mock.calls.filter(([props]) => props.delayDuration === 400)).toHaveLength(0);
+    const button = dom.container.querySelector<HTMLButtonElement>('[data-worktree-id] button');
+    act(() => button?.click());
+    expect(previous).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(session.sessionId);
+  });
+
   it('keeps one skeleton until sessions, names and folders are ready together', () => {
     const session = makeSession(0, { worktreeId: 'worktree_ready' });
     renderSidebar({ sessions: [session], isLoading: true });
@@ -335,6 +362,31 @@ describe('ChatSidebar row rendering', () => {
     renderSidebar({ sessions: [session] });
     expect(dom.container.querySelector('[aria-label="Loading sessions"]')).toBeNull();
     expect(dom.container.querySelector('[data-worktree-id="worktree_ready"]')).not.toBeNull();
+  });
+
+  it('passes the displayed worktree name to the current delete action without rerendering', () => {
+    const sessions = [makeSession(0, { worktreeId: 'worktree_delete' })];
+    const worktreeDetails = {
+      worktree_delete: {
+        name: 'Named workspace',
+        defaultTitle: null,
+        prSession: null,
+        sessions: [],
+      },
+    };
+    const previous = jest.fn();
+    const next = jest.fn();
+    renderSidebar({ sessions, worktreeDetails, onDeleteWorktree: previous });
+    tooltipMock.mockClear();
+    renderSidebar({ sessions, worktreeDetails, onDeleteWorktree: next });
+    expect(tooltipMock.mock.calls.filter(([props]) => props.delayDuration === 400)).toHaveLength(0);
+    const deleteItem = Array.from(
+      dom.container.querySelectorAll<HTMLElement>('[role="menuitem"]')
+    ).find(item => item.textContent === 'Delete worktree');
+    expect(deleteItem).toBeDefined();
+    act(() => deleteItem?.click());
+    expect(previous).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith('worktree_delete', 'Named workspace');
   });
 
   it('shows the full workspace title above the row, away from the sibling PR badge', () => {
@@ -707,7 +759,6 @@ describe('ChatSidebar row rendering', () => {
       toggleFolder: jest.fn(),
       saveFolder: jest.fn(async () => true),
       setFolderColor: jest.fn(async () => true),
-      setFolderSortMode: jest.fn(async () => true),
       deleteFolder: jest.fn(async () => true),
       moveWorktree: jest.fn(
         async (_worktreeId: string, _folderId: string | null, _position?: string | null) => false
@@ -1395,7 +1446,6 @@ describe('ChatSidebar phase 4 drag ordering', () => {
       toggleFolder: jest.fn(),
       saveFolder: jest.fn(async () => true),
       setFolderColor: jest.fn(async () => true),
-      setFolderSortMode: jest.fn(async () => true),
       deleteFolder: jest.fn(async () => true),
       moveWorktree: jest.fn(
         async (_worktreeId: string, _folderId: string | null, _position?: string | null) => false
@@ -1745,6 +1795,70 @@ describe('ChatSidebar phase 4 drag ordering', () => {
     );
   }
 
+  it.each(['manual', 'created', 'activity'] as const)(
+    'uses shared %s order for smart folders, not their saved sort mode',
+    workspaceOrder => {
+      const folders = workspaceFolders();
+      const groups = [
+        phase4Group(0, 'a2', {
+          createdAt: '2026-01-01T00:00:00.000Z',
+          lastActivityAt: '2026-03-01T00:00:00.000Z',
+          updatedAt: '2026-03-01T00:00:00.000Z',
+          sessionStatus: 'question',
+        }),
+        phase4Group(1, 'a1', {
+          createdAt: '2026-02-01T00:00:00.000Z',
+          lastActivityAt: '2026-02-01T00:00:00.000Z',
+          updatedAt: '2026-02-01T00:00:00.000Z',
+          sessionStatus: 'question',
+        }),
+      ];
+      folders.folders = [
+        {
+          ...manualFolder([]),
+          name: 'Needs you',
+          kind: 'smart',
+          smartPreset: 'needs_you',
+          sortMode: 'created',
+        },
+      ];
+      renderSidebar({ workspaceGroups: groups, workspaceFolders: folders, workspaceOrder });
+      expect(workspaceIds()).toEqual(
+        workspaceOrder === 'activity'
+          ? ['worktree_drag_0', 'worktree_drag_1']
+          : ['worktree_drag_1', 'worktree_drag_0']
+      );
+    }
+  );
+
+  it.each([false, true])(
+    'explains an empty smart folder when workspace truncation is %s',
+    workspaceRowsTruncated => {
+      const folders = workspaceFolders();
+      folders.folders = [
+        {
+          ...manualFolder([]),
+          name: 'Done',
+          kind: 'smart',
+          smartPreset: 'done',
+        },
+      ];
+      renderSidebar({ workspaceGroups: [], workspaceFolders: folders, workspaceRowsTruncated });
+      const section = dom.container.querySelector('[aria-label="Folder Done"]');
+      expect(section?.textContent).toContain(
+        workspaceRowsTruncated
+          ? 'Workspace list limited to 200. Use search to find matching workspaces.'
+          : 'No matching workspaces. Workspaces appear here automatically.'
+      );
+      if (workspaceRowsTruncated) {
+        expect(section?.textContent).not.toContain('No matching workspaces');
+        expect(section?.textContent).not.toContain('Workspaces appear here automatically.');
+      }
+      expect(section?.textContent).not.toContain('Drop workspaces here');
+      expect(section?.textContent).not.toContain('Sort workspaces');
+    }
+  );
+
   it('renders saved manual folder positions after a drag, refetch and remount', () => {
     const folders = workspaceFolders();
     const initial = [phase4Group(0, null), phase4Group(1, null), phase4Group(2, null)];
@@ -1980,7 +2094,6 @@ describe('ChatSidebar phase 4 drag ordering end placement', () => {
       toggleFolder: jest.fn(),
       saveFolder: jest.fn(async () => true),
       setFolderColor: jest.fn(async () => true),
-      setFolderSortMode: jest.fn(async () => true),
       deleteFolder: jest.fn(async () => true),
       moveWorktree: jest.fn(
         async (_worktreeId: string, _folderId: string | null, _position?: string | null) => false

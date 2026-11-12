@@ -171,6 +171,9 @@ export function createCloudflareContainersProviderAdapter(deps: {
         ...(deps.egressAudit === true ? { egressAudit: true } : {}),
         ...(options?.deadlineAt === undefined ? {} : { deadlineAt: options.deadlineAt }),
         ...(options?.nativeImage === undefined ? {} : { nativeImage: options.nativeImage }),
+        ...(options?.snapshotDiagnostic === undefined
+          ? {}
+          : { snapshotDiagnostic: options.snapshotDiagnostic }),
         env: {
           ...env,
           CONTROL_WORKLOAD_LIMIT_MB: workloadLimitMb,

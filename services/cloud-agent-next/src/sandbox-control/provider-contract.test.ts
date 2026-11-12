@@ -504,8 +504,19 @@ describe('provider-specific contract differences', () => {
 
     expect(harness.adapter.environmentSnapshots).toBe('launch');
     const snapshot = { snapshotId: 'snap-env', baseImage: 'registry.example/app:1' };
-    await harness.adapter.launch(ref, { command: supervisorStartup(), env: {} }, { snapshot });
+    const snapshotDiagnostic = {
+      allocationId: 'allocation-test',
+      source: 'environment' as const,
+      attempt: 2,
+      startedAt: 10_000,
+    };
+    await harness.adapter.launch(
+      ref,
+      { command: supervisorStartup(), env: {} },
+      { snapshot, snapshotDiagnostic }
+    );
     expect(harness.launchInputs!().at(-1)?.snapshot).toEqual(snapshot);
+    expect(harness.launchInputs!().at(-1)?.snapshotDiagnostic).toEqual(snapshotDiagnostic);
     await harness.adapter.launch(ref, { command: supervisorStartup(), env: {} });
     expect(harness.launchInputs!().at(-1)).not.toHaveProperty('snapshot');
 

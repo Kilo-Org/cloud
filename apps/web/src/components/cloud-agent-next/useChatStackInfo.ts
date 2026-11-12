@@ -12,6 +12,7 @@ import { stackedWorkspaceTargetAtom } from './store/stacked-workspace-atoms';
 import { sidebarWorkspaceListInput, worktreeDetailsBatches } from './hooks/sidebar-queries';
 import { repositoryKey, shortBranchRef } from './worktree-meta';
 import { stackedWorkspacePushReason } from './stacked-workspace-preparation';
+import { useSavedWorktreeChanges } from './useSavedWorktreeChanges';
 import type { WorktreeBranchOperationTarget } from './useWorktreeBranchOperations';
 import {
   MAX_STACK_ANCESTRY,
@@ -403,24 +404,13 @@ export function useChatStackInfo({
   };
 
   const parentCloudSessionId = parentWorkspace ? cloudSessionIdFor(parentWorkspace) : null;
-  const currentSnapshotQuery = useQuery({
-    queryKey: [
-      'chat-stack-current-changes',
-      userId,
-      organizationId ?? null,
-      cloudAgentSessionId,
-      refreshToken,
-    ] as const,
-    queryFn: () =>
-      organizationId
-        ? trpcClient.organizations.cloudAgentNext.getWorktreeChanges.query({
-            organizationId,
-            cloudAgentSessionId,
-          })
-        : trpcClient.cloudAgentNext.getWorktreeChanges.query({ cloudAgentSessionId }),
-    enabled: Boolean(enabled && cloudAgentSessionId),
-    staleTime: 5_000,
-    retry: false,
+  const { saved: currentSnapshotQuery } = useSavedWorktreeChanges({
+    userId,
+    organizationId,
+    cloudAgentSessionId,
+    worktreeId: currentWorktreeId ?? undefined,
+    refreshToken,
+    enabled: Boolean(enabled && cloudAgentSessionId && parentWorkspace),
   });
   const parentSnapshotQuery = useQuery({
     queryKey: [

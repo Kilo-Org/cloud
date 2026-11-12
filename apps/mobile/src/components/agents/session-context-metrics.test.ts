@@ -256,6 +256,29 @@ describe('SessionContextMetrics', () => {
     expect(findAll(pill, el => el.type === 'Text')).toHaveLength(0);
   });
 
+  // A session that reported tokens but no context window has no percentage.
+  // The pill paints the cost alone: a marker in the percentage slot sat right
+  // before the price and read as a negative amount.
+  it('paints no marker before the cost when the context window is unknown', () => {
+    const root = render({
+      hasMessages: true,
+      info: info({ contextWindow: undefined, percentage: undefined }),
+      totalCostMicrodollars: 20_000,
+    });
+    const pill = pillOf(root);
+    const texts = findAll(pill, el => el.type === 'Text');
+    expect(texts).toHaveLength(1);
+    const cost = texts[0];
+    if (cost == null) {
+      throw new Error('expected the cost text');
+    }
+    expect(String(propsOf(cost).children)).toContain('$0.02');
+    expect(findAll(pill, el => el.type === 'ContextUsageRing')).toHaveLength(1);
+    expect(
+      findAll(pill, el => el.type === 'ContextUsageRing' && propsOf(el).arcFraction === undefined)
+    ).toHaveLength(1);
+  });
+
   // The pill hugs what it holds: the header's trailing cluster ends with the
   // Follow control, so a reading that arrives widens the pill instead of moving
   // that control. The reading itself is two texts with one small gap.

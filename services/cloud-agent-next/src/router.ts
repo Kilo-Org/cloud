@@ -38,10 +38,14 @@ import {
   getEnvironmentBuildStatus,
   notifyEnvironmentDeleted,
 } from './router/handlers/environment-build.js';
-import { getSessionMessagesPage } from './router/handlers/session-history.js';
+import {
+  getSessionMessagesPage,
+  getSessionToolPartDetail,
+} from './router/handlers/session-history.js';
 
 export const appRouter = router({
   getSessionMessagesPage,
+  getSessionToolPartDetail,
   deleteWorktree,
   getSandboxSelectionOptions,
   getPreviewOptions,

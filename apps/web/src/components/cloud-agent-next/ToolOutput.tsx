@@ -8,6 +8,7 @@ import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { toSafeHttpUrl } from '@/lib/safe-http-url';
 import { cn } from '@/lib/utils';
 import { createMarkdownParseCachePlugin, useMarkdownParseCache } from './markdown-parse-cache';
+import { useToolDetail } from './ToolPartDetail';
 
 type ToolCodeBlockProps = {
   content: string;
@@ -32,10 +33,13 @@ export function ToolCodeBlock({
   scrollRef,
   onScroll,
 }: ToolCodeBlockProps) {
+  const detail = useToolDetail();
+  // Until the complete call loads, copying takes only the visible preview.
+  const copiesPreview = detail !== null && detail.state.status !== 'complete';
   const copyButton = (
     <CopyMessageButton
       getText={() => content}
-      label={`Copy ${label.toLowerCase()}`}
+      label={`Copy ${label.toLowerCase()}${copiesPreview ? ' preview' : ''}`}
       className={compact ? 'mt-1 shrink-0' : undefined}
     />
   );

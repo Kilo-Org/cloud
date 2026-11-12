@@ -91,6 +91,7 @@ describe('sidebar server prefetch', () => {
     mockWorkspaces.mockReset();
     mockPreferences.mockReset();
     mockDetails.mockReset();
+    jest.clearAllMocks();
     mockList.mockResolvedValue({ cliSessions: [session(0), session(1), session(2)] });
     mockWorkspaces.mockResolvedValue({
       workspaces: [],
@@ -130,5 +131,68 @@ describe('sidebar server prefetch', () => {
     expect(mockDetails).not.toHaveBeenCalled();
     await jest.advanceTimersByTimeAsync(200);
     expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('keeps sibling prefetch results when the workspace list fails first', async () => {
+    mockWorkspaces.mockRejectedValue(new Error('Workspace list unavailable'));
+    mockList.mockImplementation(async () => {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return { cliSessions: [session(0)] };
+    });
+    mockPreferences.mockImplementation(async () => {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return { workspaceOrder: 'manual' };
+    });
+
+    const page = PrefetchedCloudSidebar(scope);
+    await jest.advanceTimersByTimeAsync(300);
+    const result = await page;
+    const { QueryClient, hydrate } = await import('@tanstack/react-query');
+    const client = new QueryClient();
+    hydrate(client, result.props.state);
+
+    expect(client.getQueryData(['list'])).toEqual({ cliSessions: [session(0)] });
+    expect(client.getQueryData(['preferences'])).toEqual({ workspaceOrder: 'manual' });
+    expect(client.getQueryData(['folders', { userId: scope.userId }])).toEqual({ folders: [] });
+    expect(mockDetails).toHaveBeenCalledWith({
+      worktreeIds: [worktreeIds[0]],
+      organizationId: null,
+    });
+    const { captureException } = await import('@sentry/nextjs');
+    expect(captureException).not.toHaveBeenCalled();
+    client.clear();
+  });
+
+  it('hydrates the same details key as the client, including workspace-only ids', async () => {
+    mockList.mockResolvedValue({ cliSessions: [session(2)] });
+    mockWorkspaces.mockResolvedValue({
+      workspaces: [
+        { worktreeId: worktreeIds[1] },
+        { worktreeId: worktreeIds[0] },
+        { worktreeId: worktreeIds[2] },
+      ],
+      nextCursor: null,
+      truncated: false,
+    });
+    const page = PrefetchedCloudSidebar(scope);
+    await jest.advanceTimersByTimeAsync(100);
+    const result = await page;
+    const { sidebarWorktreeDetailsBatches } = await import('../hooks/sidebar-queries');
+    const [clientBatch] = sidebarWorktreeDetailsBatches(
+      [worktreeIds[2]],
+      [{ worktreeId: worktreeIds[0] }, { worktreeId: worktreeIds[1] }]
+    );
+    const { QueryClient, hydrate } = await import('@tanstack/react-query');
+    const client = new QueryClient();
+    hydrate(client, result.props.state);
+    const fetchDetails = jest.fn(async () => ({ worktrees: {} }));
+    await client.fetchQuery({
+      queryKey: ['details', { worktreeIds: clientBatch, organizationId: null }],
+      queryFn: fetchDetails,
+      staleTime: 5000,
+    });
+    expect(mockDetails).toHaveBeenCalledTimes(1);
+    expect(fetchDetails).not.toHaveBeenCalled();
+    client.clear();
   });
 });

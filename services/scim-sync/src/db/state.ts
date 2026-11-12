@@ -1,10 +1,16 @@
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 
-import type { AttemptOutcome } from '../dispatch/app-client';
+import type { AttemptClass, AttemptOutcome } from '../dispatch/app-client';
 import type { CursorSource, EventFailureState } from '../types';
 import { CURSOR_KEY, SEED_CURSOR_KEY } from '../util/constants';
-import { eventFailures, parkedEvents, syncState } from './sqlite-schema';
+import {
+  directoryConflicts,
+  eventFailures,
+  parkedActivations,
+  parkedEvents,
+  syncState,
+} from './sqlite-schema';
 
 export type Db = DrizzleSqliteDODatabase<Record<string, never>>;
 
@@ -50,7 +56,9 @@ export function peekCursor(db: Db, configured: string | null): ResolvedCursor {
  * past it — and a rewind *onto* it would carry the old `attempts` and
  * `first_failed_at` into `recordFailure`, so a conflict could be parked on its
  * first attempt instead of getting the retry budget the reset was meant to
- * grant. An operator reset is a deliberate "start from here".
+ * grant. An operator reset is a deliberate "start from here", and the directory
+ * records go with it: a replayed conflict is measured from the new position
+ * rather than against a window that was already spent.
  */
 export function resolveCursor(db: Db, configured: string | null): ResolvedCursor {
   const overrides = configured !== read(db, SEED_CURSOR_KEY);
@@ -58,6 +66,7 @@ export function resolveCursor(db: Db, configured: string | null): ResolvedCursor
   if (overrides) {
     writeCursor(db, configured);
     clearHeldFailure(db);
+    clearAllDirectoryLimits(db);
   }
   return resolved;
 }
@@ -176,14 +185,33 @@ function clearHeldFailure(db: Db): void {
 }
 
 /**
+ * Drops every directory's records. Only the cursor override needs this, for the
+ * same reason as `clearHeldFailure`: a reset is a deliberate "start from here",
+ * so a replayed conflict is measured from the new position rather than against a
+ * window that was spent before it.
+ */
+function clearAllDirectoryLimits(db: Db): void {
+  // `isNotNull` on the primary key is the whole table: a where-less delete is
+  // what the lint rule forbids, and there is no narrower condition here.
+  db.delete(directoryConflicts).where(isNotNull(directoryConflicts.directory_id)).run();
+  db.delete(parkedActivations).where(isNotNull(parkedActivations.directory_id)).run();
+}
+
+/**
  * Steps over an event the loop gave up on. The park row and the cleared
  * failure row are written here; the caller commits the cursor past the event,
  * which is what lets the stream continue.
+ *
+ * `record` carries the class and the reason the decision settled on, which is
+ * not always the attempt's own: a conflict can be parked as terminal when no
+ * later event can clear it, and its reason then names the directory rule rather
+ * than only the app's answer.
  */
 export function parkEvent(
   db: Db,
   event: { id: string; event: string },
   outcome: AttemptOutcome,
+  record: { class: AttemptClass; reason: string | null },
   attempts: number,
   now: number
 ): void {
@@ -191,9 +219,9 @@ export function parkEvent(
     .values({
       event_id: event.id,
       event_type: event.event,
-      class: outcome.class,
+      class: record.class,
       status: outcome.status,
-      error: outcome.reason ?? '',
+      error: record.reason ?? '',
       attempts,
       parked_at: now,
     })
@@ -209,6 +237,96 @@ export function parkedCount(db: Db): number {
       .from(parkedEvents)
       .get()?.count ?? 0
   );
+}
+
+/** The conflict window a directory has open, keyed on the event that opened it. */
+export type ConflictWindow = {
+  directoryId: string;
+  /** The event whose conflict opened the window, and the only one that closes it. */
+  eventId: string;
+  /** When that event first conflicted, which is what the budget is measured from. */
+  firstConflictAt: number;
+};
+
+/**
+ * Opens a directory's conflict window, or reports the one it already has.
+ *
+ * One window per directory, and the row names the event that opened it, so the
+ * window closes when that event applies and stays open while it does not.
+ */
+export function openConflictWindow(
+  db: Db,
+  directoryId: string,
+  eventId: string,
+  now: number
+): ConflictWindow {
+  const existing = db
+    .select()
+    .from(directoryConflicts)
+    .where(eq(directoryConflicts.directory_id, directoryId))
+    .get();
+
+  if (existing !== undefined) {
+    return {
+      directoryId: existing.directory_id,
+      eventId: existing.event_id,
+      firstConflictAt: existing.first_conflict_at,
+    };
+  }
+
+  db.insert(directoryConflicts)
+    .values({ directory_id: directoryId, event_id: eventId, first_conflict_at: now })
+    .run();
+  return { directoryId, eventId, firstConflictAt: now };
+}
+
+/**
+ * Closes the window when the event that opened it applies.
+ *
+ * A `where`-less delete would clear every directory's window; the pair of keys
+ * keeps it to the one event.
+ */
+export function closeConflictWindow(db: Db, directoryId: string, eventId: string): void {
+  db.delete(directoryConflicts)
+    .where(
+      and(
+        eq(directoryConflicts.directory_id, directoryId),
+        eq(directoryConflicts.event_id, eventId)
+      )
+    )
+    .run();
+}
+
+/**
+ * Drops both records for one directory: an activation that applied binds its
+ * organization, so neither the conflict window nor the parked-activation marker
+ * describes it any more.
+ */
+export function clearDirectoryLimits(db: Db, directoryId: string): void {
+  db.delete(directoryConflicts).where(eq(directoryConflicts.directory_id, directoryId)).run();
+  db.delete(parkedActivations).where(eq(parkedActivations.directory_id, directoryId)).run();
+}
+
+/**
+ * Records that this directory's activation was parked, so no organization is
+ * bound for it and no later event binds one. Keeps the first park: the marker
+ * means the same thing however many activations park afterwards.
+ */
+export function markActivationParked(db: Db, directoryId: string, now: number): void {
+  db.insert(parkedActivations)
+    .values({ directory_id: directoryId, parked_at: now })
+    .onConflictDoNothing()
+    .run();
+}
+
+/** When this directory's activation was parked, or null when none was. */
+export function activationParkedAt(db: Db, directoryId: string): number | null {
+  const row = db
+    .select({ parkedAt: parkedActivations.parked_at })
+    .from(parkedActivations)
+    .where(eq(parkedActivations.directory_id, directoryId))
+    .get();
+  return row?.parkedAt ?? null;
 }
 
 function read(db: Db, key: string): string | null {

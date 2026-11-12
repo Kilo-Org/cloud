@@ -23,7 +23,7 @@ const catalogStatusSchema = z.object({
   overLimit: z.boolean(),
 });
 
-const commandsPayloadSchema = z.object({
+export const commandsPayloadSchema = z.object({
   commands: z.array(z.unknown()),
   // The notice is a nicety and the catalog is essential, so a malformed status
   // is dropped instead of rejecting the event and losing the catalog.

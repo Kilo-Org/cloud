@@ -377,10 +377,10 @@ describe('emitApiMetricsForResponse', () => {
     const deferred = afterForLoadedModule.mock.calls.map(([task]) =>
       Promise.resolve(typeof task === 'function' ? (task as () => unknown)() : task)
     );
-    expect(deferred).toHaveLength(0);
     await Promise.all(deferred);
     await new Promise(resolve => setImmediate(resolve));
 
+    expect(deferred).toHaveLength(0);
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 });

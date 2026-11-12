@@ -874,6 +874,14 @@ describe('ChatComposer reduced motion', () => {
 });
 
 describe('ChatComposer toolbar row', () => {
+  function maxHeightOf(style: unknown): number | null {
+    if (typeof style !== 'object' || style === null || !('maxHeight' in style)) {
+      return null;
+    }
+    const value: unknown = style.maxHeight;
+    return typeof value === 'number' ? value : null;
+  }
+
   function rowOf(render: React.ReactElement) {
     return findNode(
       render,
@@ -887,15 +895,15 @@ describe('ChatComposer toolbar row', () => {
       throw new Error('toolbar row not found');
     }
     const { style, onLayout } = row.props;
-    if (typeof style !== 'object' || style === null || typeof style.maxHeight !== 'number') {
+    const maxHeight = maxHeightOf(style);
+    if (maxHeight === null) {
       throw new Error('toolbar row has no clamped style');
     }
+    const layout = onLayout as (event: { nativeEvent: { layout: { height: number } } }) => void;
     return {
-      maxHeight: style.maxHeight as number,
+      maxHeight,
       layout: (height: number) => {
-        (onLayout as (event: { nativeEvent: { layout: { height: number } } }) => void)({
-          nativeEvent: { layout: { height } },
-        });
+        layout({ nativeEvent: { layout: { height } } });
       },
     };
   }

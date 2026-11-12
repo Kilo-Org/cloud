@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tämän hakutuloksen avaaminen epäonnistui"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Laskentakulut",
+      "noUsage": "Ei käyttöä vielä",
+      "sharedWorkspace": "Jaettu kaikkien tämän työtilan keskustelujen kesken",
+      "currentRates": "Nykyiset hinnat",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Keskikokoinen hiekkalaatikko",
+      "largeSandbox": "Suuri hiekkalaatikko",
+      "earlierActivity": "Aiempi toiminta",
+      "now": "nyt",
+      "loadFailed": "Laskentakuluja ei voitu ladata."
+    },
+    "preview": {
+      "title": "Avaa esikatselu",
+      "listeningServices": "Kuuntelevat palvelut",
+      "empty": "Kuuntelevia palveluita ei löytynyt. Pyydä agenttia käynnistämään verkkopalvelin ja päivitä sitten.",
+      "notRunning": "Tämä hiekkalaatikko on pysäytetty. Lähetä agentille viesti käynnistääksesi sen uudelleen.",
+      "notReady": "Hiekkalaatikko ei ole vielä valmis. Päivitä, kun se on yhdistetty.",
+      "unsupported": "Palveluiden haku ei ole käytettävissä tässä hiekkalaatikossa.",
+      "failed": "Palveluita ei voitu hakea.",
+      "openService": "Avaa {{name}} portissa {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Käynnistimet ja webhookit",
+      "subtitle": "Hallitse webhook- ja ajastettuja käynnistimiä verkossa."
+    }
   }
 }

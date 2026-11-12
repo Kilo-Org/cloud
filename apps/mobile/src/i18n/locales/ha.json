@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ba a iya buɗe wannan sakamakon binciken ba"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Babu amfani tukuna",
+      "sharedWorkspace": "Duk hirarrakin wannan wurin aiki suna raba shi",
+      "currentRates": "Farashin yanzu",
+      "perHour": "{{rate}}/awa",
+      "mediumSandbox": "Matsakaicin sandbox",
+      "largeSandbox": "Babban sandbox",
+      "earlierActivity": "Ayyukan baya",
+      "now": "yanzu",
+      "loadFailed": "Ba a iya loda kuɗin Compute ba."
+    },
+    "preview": {
+      "title": "Buɗe preview",
+      "listeningServices": "Sabis masu sauraro",
+      "empty": "Ba a sami sabis masu sauraro ba. Nemi wakilin ya fara sabar yanar gizo, sannan a sabunta.",
+      "notRunning": "An dakatar da wannan sandbox. Aika wa wakilin saƙo don sake kunna shi.",
+      "notReady": "Sandbox bai shirya ba tukuna. Sabunta da zarar an haɗa shi.",
+      "unsupported": "Ba a samun gano sabis a wannan sandbox.",
+      "failed": "Ba a iya gano sabis ba.",
+      "openService": "Buɗe {{name}} a tashar {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Triggers da webhooks",
+      "subtitle": "Sarrafa webhook da triggers na jadawali a yanar gizo."
+    }
   }
 }

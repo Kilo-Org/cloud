@@ -3933,5 +3933,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nu s-a putut deschide acest rezultat de căutare"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Nicio utilizare încă",
+      "sharedWorkspace": "Partajat de toate conversațiile din acest spațiu de lucru",
+      "currentRates": "Tarife curente",
+      "perHour": "{{rate}}/oră",
+      "mediumSandbox": "Sandbox mediu",
+      "largeSandbox": "Sandbox mare",
+      "earlierActivity": "Activitate anterioară",
+      "now": "acum",
+      "loadFailed": "Costurile Compute nu au putut fi încărcate."
+    },
+    "preview": {
+      "title": "Deschide previzualizarea",
+      "listeningServices": "Servicii în ascultare",
+      "empty": "Nu s-au găsit servicii în ascultare. Cere-i agentului să pornească un server web, apoi reîmprospătează.",
+      "notRunning": "Acest sandbox este oprit. Trimite-i un mesaj agentului pentru a-l porni din nou.",
+      "notReady": "Sandboxul nu este încă pregătit. Reîmprospătează după ce se conectează.",
+      "unsupported": "Descoperirea serviciilor nu este disponibilă pentru acest sandbox.",
+      "failed": "Serviciile nu au putut fi descoperite.",
+      "openService": "Deschide {{name}} pe portul {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Declanșatoare și webhookuri",
+      "subtitle": "Gestionează declanșatoarele webhook și programate pe web."
+    }
   }
 }

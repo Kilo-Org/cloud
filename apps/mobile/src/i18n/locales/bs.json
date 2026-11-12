@@ -3933,5 +3933,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nije moguće otvoriti ovaj rezultat pretrage"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Još nema potrošnje",
+      "sharedWorkspace": "Zajedničko za sve razgovore u ovom radnom prostoru",
+      "currentRates": "Trenutne cijene",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Srednji sandbox",
+      "largeSandbox": "Veliki sandbox",
+      "earlierActivity": "Ranija aktivnost",
+      "now": "sada",
+      "loadFailed": "Troškovi za Compute se nisu mogli učitati."
+    },
+    "preview": {
+      "title": "Otvori pregled",
+      "listeningServices": "Servisi koji slušaju",
+      "empty": "Nije pronađen nijedan servis koji sluša. Zamoli agenta da pokrene web server, pa osvježi.",
+      "notRunning": "Ovaj sandbox je zaustavljen. Pošalji agentu poruku da ga ponovo pokrene.",
+      "notReady": "Sandbox još nije spreman. Osvježi kada se poveže.",
+      "unsupported": "Otkrivanje servisa nije dostupno za ovaj sandbox.",
+      "failed": "Nije moguće otkriti servise.",
+      "openService": "Otvori {{name}} na portu {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Okidači i webhookovi",
+      "subtitle": "Upravljaj webhook i zakazanim okidačima na webu."
+    }
   }
 }

@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ekki tókst að opna þessa leitarniðurstöðu"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Reikniafl",
+      "noUsage": "Engin notkun enn",
+      "sharedWorkspace": "Sameiginlegt öllum spjöllum í þessu vinnusvæði",
+      "currentRates": "Núverandi verð",
+      "perHour": "{{rate}}/klst",
+      "mediumSandbox": "Meðalstór sandkassi",
+      "largeSandbox": "Stór sandkassi",
+      "earlierActivity": "Fyrri virkni",
+      "now": "núna",
+      "loadFailed": "Ekki tókst að hlaða gjöldum fyrir reikniafl."
+    },
+    "preview": {
+      "title": "Opna forskoðun",
+      "listeningServices": "Þjónustur sem hlusta",
+      "empty": "Engar þjónustur sem hlusta fundust. Biddu fulltrúann að ræsa vefþjón og endurnýjaðu svo.",
+      "notRunning": "Þessi sandkassi er stöðvaður. Sendu fulltrúanum skilaboð til að ræsa hann aftur.",
+      "notReady": "Sandkassinn er ekki tilbúinn enn. Endurnýjaðu þegar hann er tengdur.",
+      "unsupported": "Þjónustuleit er ekki tiltæk fyrir þennan sandkassa.",
+      "failed": "Ekki tókst að finna þjónustur.",
+      "openService": "Opna {{name}} á gátt {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Kveikjur og vefkrókar",
+      "subtitle": "Stjórnaðu vefkrókakveikjum og tímasettum kveikjum á vefnum."
+    }
   }
 }

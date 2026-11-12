@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu'aa barbaachuu kana banuun hin danda'amne"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Ammaaf itti fayyadamni hin jiru",
+      "sharedWorkspace": "Chaatota iddoo hojii kana keessa jiran hundaaf waloo",
+      "currentRates": "Gatiiwwan ammaa",
+      "perHour": "{{rate}}/sa'a",
+      "mediumSandbox": "Saandiboksii giddugaleessaa",
+      "largeSandbox": "Saandiboksii guddaa",
+      "earlierActivity": "Sochii duraanii",
+      "now": "amma",
+      "loadFailed": "Kaffaltiiwwan Compute fe'amuu hin dandeenye."
+    },
+    "preview": {
+      "title": "Agarsiisa dursaa bani",
+      "listeningServices": "Tajaajiloota dhaggeeffachaa jiran",
+      "empty": "Tajaajilli dhaggeeffachaa jiru hin argamne. Akka sarvarii weebii jalqabu ergamaa gaafadhu, achiis haaromsi.",
+      "notRunning": "Saandiboksiin kun dhaabateera. Akka irra deebi'ee jalqabuuf ergamaaf ergaa ergi.",
+      "notReady": "Saandiboksiin ammallee qophaa'aa miti. Erga walqunnamee booda haaromsi.",
+      "unsupported": "Barbaadinsi tajaajilaa saandiboksii kanaaf hin jiru.",
+      "failed": "Tajaajiloota argachuun hin danda'amne.",
+      "openService": "{{name}} poortii {{port}} irratti bani",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Kakaasotaa fi webhookota",
+      "subtitle": "Kakaasota webhookii fi kan sagantaan qabame weebii irratti bulchi."
+    }
   }
 }

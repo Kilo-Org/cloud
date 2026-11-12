@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Dieses Suchergebnis konnte nicht geöffnet werden"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Noch keine Nutzung",
+      "sharedWorkspace": "Gemeinsam für alle Chats in diesem Workspace",
+      "currentRates": "Aktuelle Preise",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Mittlere Sandbox",
+      "largeSandbox": "Große Sandbox",
+      "earlierActivity": "Frühere Aktivität",
+      "now": "jetzt",
+      "loadFailed": "Compute-Kosten konnten nicht geladen werden."
+    },
+    "preview": {
+      "title": "Vorschau öffnen",
+      "listeningServices": "Lauschende Dienste",
+      "empty": "Keine lauschenden Dienste gefunden. Den Agenten bitten, einen Webserver zu starten, und dann aktualisieren.",
+      "notRunning": "Diese Sandbox ist gestoppt. Mit einer Nachricht an den Agenten wird sie wieder gestartet.",
+      "notReady": "Die Sandbox ist noch nicht bereit. Nach dem Verbinden aktualisieren.",
+      "unsupported": "Die Diensterkennung ist für diese Sandbox nicht verfügbar.",
+      "failed": "Dienste konnten nicht ermittelt werden.",
+      "openService": "{{name}} auf Port {{port}} öffnen",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Trigger & Webhooks",
+      "subtitle": "Webhook- und zeitgesteuerte Trigger im Web verwalten."
+    }
   }
 }

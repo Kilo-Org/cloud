@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Энэ хайлтын үр дүнг нээж чадсангүй"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Ашиглалт хараахан алга",
+      "sharedWorkspace": "Энэ ажлын орчны бүх чатад хуваалцсан",
+      "currentRates": "Одоогийн тарифууд",
+      "perHour": "{{rate}}/ц",
+      "mediumSandbox": "Дунд sandbox",
+      "largeSandbox": "Том sandbox",
+      "earlierActivity": "Өмнөх үйл ажиллагаа",
+      "now": "одоо",
+      "loadFailed": "Compute-ийн төлбөрийг ачаалж чадсангүй."
+    },
+    "preview": {
+      "title": "Урьдчилан харахыг нээх",
+      "listeningServices": "Сонсож буй үйлчилгээнүүд",
+      "empty": "Сонсож буй үйлчилгээ олдсонгүй. Агентаас вэб сервер эхлүүлэхийг хүсээд, дараа нь сэргээнэ үү.",
+      "notRunning": "Энэ sandbox зогссон байна. Дахин эхлүүлэхийн тулд агент руу мессеж илгээнэ үү.",
+      "notReady": "Sandbox хараахан бэлэн болоогүй байна. Холбогдсоны дараа сэргээнэ үү.",
+      "unsupported": "Энэ sandbox-д үйлчилгээ илрүүлэх боломжгүй.",
+      "failed": "Үйлчилгээнүүдийг илрүүлж чадсангүй.",
+      "openService": "{{port}} порт дээрх {{name}} нээх",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Триггер ба webhook",
+      "subtitle": "Webhook болон хуваарьт триггерүүдийг вэб дээр удирдана уу."
+    }
   }
 }

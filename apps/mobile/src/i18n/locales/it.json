@@ -3933,5 +3933,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Impossibile aprire questo risultato di ricerca"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Ancora nessun utilizzo",
+      "sharedWorkspace": "Condiviso da tutte le chat di questo workspace",
+      "currentRates": "Tariffe attuali",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Sandbox media",
+      "largeSandbox": "Sandbox grande",
+      "earlierActivity": "Attività precedente",
+      "now": "ora",
+      "loadFailed": "Impossibile caricare i costi di Compute."
+    },
+    "preview": {
+      "title": "Apri anteprima",
+      "listeningServices": "Servizi in ascolto",
+      "empty": "Nessun servizio in ascolto trovato. Chiedi all'agente di avviare un server web, poi aggiorna.",
+      "notRunning": "Questa sandbox è ferma. Invia un messaggio all'agente per riavviarla.",
+      "notReady": "La sandbox non è ancora pronta. Aggiorna quando sarà connessa.",
+      "unsupported": "Il rilevamento dei servizi non è disponibile per questa sandbox.",
+      "failed": "Impossibile rilevare i servizi.",
+      "openService": "Apri {{name}} sulla porta {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Trigger e webhook",
+      "subtitle": "Gestisci i trigger webhook e programmati sul web."
+    }
   }
 }

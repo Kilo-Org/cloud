@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "この検索結果を開けませんでした"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "コンピュート",
+      "noUsage": "まだ使用量はありません",
+      "sharedWorkspace": "このワークスペースのすべてのチャットで共有",
+      "currentRates": "現在の料金",
+      "perHour": "{{rate}}/時間",
+      "mediumSandbox": "中サイズのサンドボックス",
+      "largeSandbox": "大サイズのサンドボックス",
+      "earlierActivity": "以前のアクティビティ",
+      "now": "現在",
+      "loadFailed": "コンピュート料金を読み込めませんでした。"
+    },
+    "preview": {
+      "title": "プレビューを開く",
+      "listeningServices": "待ち受け中のサービス",
+      "empty": "待ち受け中のサービスが見つかりません。エージェントにWebサーバーの起動を依頼してから、更新してください。",
+      "notRunning": "このサンドボックスは停止しています。再度起動するには、エージェントにメッセージを送信してください。",
+      "notReady": "サンドボックスの準備がまだできていません。接続されたら更新してください。",
+      "unsupported": "このサンドボックスではサービス検出を利用できません。",
+      "failed": "サービスを検出できませんでした。",
+      "openService": "ポート{{port}}の{{name}}を開く",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "トリガーとWebhook",
+      "subtitle": "WebhookトリガーとスケジュールトリガーをWebで管理します。"
+    }
   }
 }

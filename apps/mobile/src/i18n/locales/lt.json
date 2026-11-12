@@ -3998,5 +3998,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nepavyko atidaryti šio paieškos rezultato"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Skaičiavimo ištekliai",
+      "noUsage": "Dar nenaudota",
+      "sharedWorkspace": "Bendra visiems šios darbo erdvės pokalbiams",
+      "currentRates": "Dabartiniai įkainiai",
+      "perHour": "{{rate}}/val.",
+      "mediumSandbox": "Vidutinė smėliadėžė",
+      "largeSandbox": "Didelė smėliadėžė",
+      "earlierActivity": "Ankstesnė veikla",
+      "now": "dabar",
+      "loadFailed": "Nepavyko įkelti skaičiavimo išteklių mokesčių."
+    },
+    "preview": {
+      "title": "Atidaryti peržiūrą",
+      "listeningServices": "Klausančios paslaugos",
+      "empty": "Klausančių paslaugų nerasta. Paprašykite agento paleisti žiniatinklio serverį, tada atnaujinkite.",
+      "notRunning": "Ši smėliadėžė sustabdyta. Nusiųskite agentui žinutę, kad ji vėl būtų paleista.",
+      "notReady": "Smėliadėžė dar neparengta. Atnaujinkite, kai ji prisijungs.",
+      "unsupported": "Šiai smėliadėžei paslaugų aptikimas nepasiekiamas.",
+      "failed": "Nepavyko aptikti paslaugų.",
+      "openService": "Atidaryti {{name}} prievade {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Paleidikliai ir žiniatinklio kabliukai",
+      "subtitle": "Tvarkykite žiniatinklio kabliukų ir suplanuotus paleidiklius svetainėje."
+    }
   }
 }

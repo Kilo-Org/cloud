@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu arama sonucu açılamadı"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "İşlem gücü",
+      "noUsage": "Henüz kullanım yok",
+      "sharedWorkspace": "Bu çalışma alanındaki tüm sohbetlerle paylaşılır",
+      "currentRates": "Güncel ücretler",
+      "perHour": "{{rate}}/sa",
+      "mediumSandbox": "Orta kum havuzu",
+      "largeSandbox": "Büyük kum havuzu",
+      "earlierActivity": "Önceki etkinlik",
+      "now": "şimdi",
+      "loadFailed": "İşlem gücü ücretleri yüklenemedi."
+    },
+    "preview": {
+      "title": "Önizlemeyi aç",
+      "listeningServices": "Dinleyen hizmetler",
+      "empty": "Dinleyen hizmet bulunamadı. Ajandan bir web sunucusu başlatmasını iste, ardından yenile.",
+      "notRunning": "Bu kum havuzu durduruldu. Yeniden başlatmak için ajana bir mesaj gönder.",
+      "notReady": "Kum havuzu henüz hazır değil. Bağlandıktan sonra yenile.",
+      "unsupported": "Bu kum havuzu için hizmet keşfi kullanılamıyor.",
+      "failed": "Hizmetler keşfedilemedi.",
+      "openService": "{{port}} numaralı bağlantı noktasında {{name}} hizmetini aç",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Tetikleyiciler ve webhook'lar",
+      "subtitle": "Webhook ve zamanlanmış tetikleyicileri web'de yönet."
+    }
   }
 }

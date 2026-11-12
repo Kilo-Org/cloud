@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Enweghị ike imepe nsonaazụ ọchụchọ a"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Ọ dịbeghị ojiji",
+      "sharedWorkspace": "Nkata niile dị n'ebe ọrụ a na-ekekọrịta ya",
+      "currentRates": "Ọnụ ahịa ugbu a",
+      "perHour": "{{rate}}/awa",
+      "mediumSandbox": "Sandbox etiti",
+      "largeSandbox": "Sandbox buru ibu",
+      "earlierActivity": "Ihe omume gara aga",
+      "now": "ugbu a",
+      "loadFailed": "Enweghị ike ibudata ụgwọ Compute."
+    },
+    "preview": {
+      "title": "Mepee nlele mbụ",
+      "listeningServices": "Ọrụ ndị na-ege ntị",
+      "empty": "Ahụghị ọrụ ọ bụla na-ege ntị. Gwa onye nnọchi anya ka ọ malite web server, wee bugharịa.",
+      "notRunning": "Sandbox a akwụsịla. Zitere onye nnọchi anya ozi ka ọ malite ya ọzọ.",
+      "notReady": "Sandbox adịbeghị njikere. Bugharịa ozugbo ejikọrọ ya.",
+      "unsupported": "Nchọpụta ọrụ adịghị maka sandbox a.",
+      "failed": "Enweghị ike ịchọpụta ọrụ.",
+      "openService": "Mepee {{name}} na port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Ihe mkpalite na webhooks",
+      "subtitle": "Jikwaa webhook na ihe mkpalite ahaziri oge na weebụ."
+    }
   }
 }

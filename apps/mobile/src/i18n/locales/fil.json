@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Hindi mabuksan ang resulta ng paghahanap na ito"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Wala pang paggamit",
+      "sharedWorkspace": "Pinaghahatian ng lahat ng chat sa workspace na ito",
+      "currentRates": "Kasalukuyang mga rate",
+      "perHour": "{{rate}}/oras",
+      "mediumSandbox": "Katamtamang sandbox",
+      "largeSandbox": "Malaking sandbox",
+      "earlierActivity": "Naunang aktibidad",
+      "now": "ngayon",
+      "loadFailed": "Hindi ma-load ang mga singil sa Compute."
+    },
+    "preview": {
+      "title": "Buksan ang preview",
+      "listeningServices": "Mga nakikinig na serbisyo",
+      "empty": "Walang nakitang nakikinig na serbisyo. Hilingin sa agent na magsimula ng web server, pagkatapos ay mag-refresh.",
+      "notRunning": "Nakahinto ang sandbox na ito. Padalhan ng mensahe ang agent para simulan itong muli.",
+      "notReady": "Hindi pa handa ang sandbox. Mag-refresh kapag nakakonekta na ito.",
+      "unsupported": "Hindi magagamit ang pagtuklas ng serbisyo para sa sandbox na ito.",
+      "failed": "Hindi matuklasan ang mga serbisyo.",
+      "openService": "Buksan ang {{name}} sa port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Mga trigger at webhook",
+      "subtitle": "Pamahalaan ang mga webhook at naka-iskedyul na trigger sa web."
+    }
   }
 }

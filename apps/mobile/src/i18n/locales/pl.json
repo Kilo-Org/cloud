@@ -3998,5 +3998,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nie udało się otworzyć tego wyniku wyszukiwania"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Moc obliczeniowa",
+      "noUsage": "Brak zużycia",
+      "sharedWorkspace": "Wspólne dla wszystkich czatów w tym obszarze roboczym",
+      "currentRates": "Aktualne stawki",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Średnia piaskownica",
+      "largeSandbox": "Duża piaskownica",
+      "earlierActivity": "Wcześniejsza aktywność",
+      "now": "teraz",
+      "loadFailed": "Nie udało się wczytać opłat za moc obliczeniową."
+    },
+    "preview": {
+      "title": "Otwórz podgląd",
+      "listeningServices": "Nasłuchujące usługi",
+      "empty": "Nie znaleziono nasłuchujących usług. Poproś agenta o uruchomienie serwera WWW, a następnie odśwież.",
+      "notRunning": "Ta piaskownica jest zatrzymana. Wyślij agentowi wiadomość, aby uruchomić ją ponownie.",
+      "notReady": "Piaskownica nie jest jeszcze gotowa. Odśwież, gdy zostanie połączona.",
+      "unsupported": "Wykrywanie usług nie jest dostępne dla tej piaskownicy.",
+      "failed": "Nie udało się wykryć usług.",
+      "openService": "Otwórz {{name}} na porcie {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Wyzwalacze i webhooki",
+      "subtitle": "Zarządzaj wyzwalaczami webhooków i zaplanowanymi wyzwalaczami w przeglądarce."
+    }
   }
 }

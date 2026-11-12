@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Asikwazanga ukuvula leli phumela lokusesha"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "I-Compute",
+      "noUsage": "Akukasetshenziswa lutho",
+      "sharedWorkspace": "Kwabiwe yizingxoxo zonke kule ndawo yokusebenzela",
+      "currentRates": "Amanani amanje",
+      "perHour": "{{rate}}/ihora",
+      "mediumSandbox": "Isandbox emaphakathi",
+      "largeSandbox": "Isandbox enkulu",
+      "earlierActivity": "Umsebenzi wangaphambilini",
+      "now": "manje",
+      "loadFailed": "Izindleko ze-Compute azikwazanga ukulayishwa."
+    },
+    "preview": {
+      "title": "Vula ukubuka kuqala",
+      "listeningServices": "Amasevisi alalele",
+      "empty": "Awekho amasevisi alalele atholakele. Cela umenzeli aqalise iseva yewebhu, bese uvuselela.",
+      "notRunning": "Le sandbox imisiwe. Thumelela umenzeli umlayezo ukuze iqale futhi.",
+      "notReady": "Isandbox ayikakalungi. Vuselela uma isixhunyiwe.",
+      "unsupported": "Ukuthola amasevisi akutholakali kule sandbox.",
+      "failed": "Akukwazekanga ukuthola amasevisi.",
+      "openService": "Vula {{name}} kuphothi {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Ama-trigger nama-webhook",
+      "subtitle": "Phatha ama-trigger e-webhook nahleliwe kuwebhu."
+    }
   }
 }

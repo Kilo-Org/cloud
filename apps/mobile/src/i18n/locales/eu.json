@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ezin izan da bilaketa-emaitza hau ireki"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Oraindik ez dago erabilerarik",
+      "sharedWorkspace": "Lan-eremu honetako txat guztiek partekatua",
+      "currentRates": "Uneko tarifak",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Sandbox ertaina",
+      "largeSandbox": "Sandbox handia",
+      "earlierActivity": "Lehenagoko jarduera",
+      "now": "orain",
+      "loadFailed": "Ezin izan dira Compute-kobrantzak kargatu."
+    },
+    "preview": {
+      "title": "Ireki aurrebista",
+      "listeningServices": "Entzuten ari diren zerbitzuak",
+      "empty": "Ez da entzuten ari den zerbitzurik aurkitu. Eskatu agenteari web-zerbitzari bat abiarazteko, eta freskatu gero.",
+      "notRunning": "Sandbox hau geldituta dago. Bidali mezu bat agenteari berriro abiarazteko.",
+      "notReady": "Sandbox-a ez dago prest oraindik. Freskatu konektatuta dagoenean.",
+      "unsupported": "Zerbitzuak aurkitzeko aukera ez dago eskuragarri sandbox honetan.",
+      "failed": "Ezin izan dira zerbitzuak aurkitu.",
+      "openService": "Ireki {{name}} {{port}} atakan",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Abiarazleak eta webhookak",
+      "subtitle": "Kudeatu webhook-abiarazleak eta programatutako abiarazleak webean."
+    }
   }
 }

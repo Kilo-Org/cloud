@@ -30,6 +30,12 @@ vi.mock('@/lib/trpc', () => ({
     activeSessions: { listInstances: { queryOptions: () => ({}) } },
   }),
 }));
+// The sheet's compute block reads its own query; the harness pins it to "nothing
+// recorded" so the cost assertions below stay about the model cost alone.
+vi.mock('@/lib/hooks/use-session-compute', () => ({
+  useSessionComputeCharges: () => ({ data: undefined, isError: false, refetch: vi.fn() }),
+  useComputeRates: () => ({ data: undefined }),
+}));
 vi.mock('./session-row-actions', () => ({
   copySessionId: async (id: string) => {
     await Promise.resolve();
@@ -301,6 +307,8 @@ function sheetElement(
     modelDisplay: 'Claude',
     providerDisplay: 'Kilo',
     totalCostMicrodollars: null,
+    cloudAgentSessionId: null,
+    organizationId: undefined,
     breakdownCostUsd: 0,
     messages: [],
     modelOptions: [],

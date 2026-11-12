@@ -357,6 +357,12 @@ vi.mock('@/lib/hooks/use-remote-model-catalog-retry', () => ({
 vi.mock('@/lib/hooks/use-session-raise-reader', () => ({
   useSessionRaiseReader: () => () => null,
 }));
+// The header pill adds the session's compute charges to its total; this screen
+// test supplies the model cost only, so the read is pinned to "nothing recorded".
+vi.mock('@/lib/hooks/use-session-compute', () => ({
+  useSessionComputeCharges: () => ({ data: undefined, isError: false, refetch: vi.fn() }),
+  useComputeRates: () => ({ data: undefined }),
+}));
 vi.mock('@/lib/use-github-repos-refresh', () => ({
   useGitHubReposRefresh: () => ({ openGitHubIntegration: vi.fn() }),
 }));

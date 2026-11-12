@@ -3933,5 +3933,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "No s'ha pogut obrir aquest resultat de la cerca"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Computació",
+      "noUsage": "Encara no hi ha ús",
+      "sharedWorkspace": "Compartit per tots els xats d'aquest espai de treball",
+      "currentRates": "Tarifes actuals",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Entorn aïllat mitjà",
+      "largeSandbox": "Entorn aïllat gran",
+      "earlierActivity": "Activitat anterior",
+      "now": "ara",
+      "loadFailed": "No s'han pogut carregar els càrrecs de computació."
+    },
+    "preview": {
+      "title": "Obre la previsualització",
+      "listeningServices": "Serveis en escolta",
+      "empty": "No s'ha trobat cap servei en escolta. Demana a l'agent que iniciï un servidor web i després actualitza.",
+      "notRunning": "Aquest entorn aïllat està aturat. Envia un missatge a l'agent per tornar-lo a iniciar.",
+      "notReady": "L'entorn aïllat encara no està a punt. Actualitza quan estigui connectat.",
+      "unsupported": "La detecció de serveis no està disponible per a aquest entorn aïllat.",
+      "failed": "No s'han pogut detectar els serveis.",
+      "openService": "Obre {{name}} al port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Activadors i webhooks",
+      "subtitle": "Gestiona els activadors de webhook i programats al web."
+    }
   }
 }

@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ບໍ່ສາມາດເປີດຜົນການຄົ້ນຫານີ້ໄດ້"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "ຍັງບໍ່ມີການໃຊ້ງານ",
+      "sharedWorkspace": "ໃຊ້ຮ່ວມກັນໂດຍທຸກການສົນທະນາໃນພື້ນທີ່ເຮັດວຽກນີ້",
+      "currentRates": "ອັດຕາປັດຈຸບັນ",
+      "perHour": "{{rate}}/ຊົ່ວໂມງ",
+      "mediumSandbox": "Sandbox ຂະໜາດກາງ",
+      "largeSandbox": "Sandbox ຂະໜາດໃຫຍ່",
+      "earlierActivity": "ກິດຈະກຳກ່ອນໜ້າ",
+      "now": "ດຽວນີ້",
+      "loadFailed": "ບໍ່ສາມາດໂຫຼດຄ່າ Compute ໄດ້."
+    },
+    "preview": {
+      "title": "ເປີດຕົວຢ່າງ",
+      "listeningServices": "ບໍລິການທີ່ກຳລັງຮັບຟັງ",
+      "empty": "ບໍ່ພົບບໍລິການທີ່ກຳລັງຮັບຟັງ. ຂໍໃຫ້ຕົວແທນເລີ່ມເວັບເຊີບເວີ ແລ້ວໂຫຼດໃໝ່.",
+      "notRunning": "Sandbox ນີ້ຖືກຢຸດແລ້ວ. ສົ່ງຂໍ້ຄວາມຫາຕົວແທນເພື່ອເລີ່ມມັນອີກຄັ້ງ.",
+      "notReady": "Sandbox ຍັງບໍ່ພ້ອມເທື່ອ. ໂຫຼດໃໝ່ເມື່ອເຊື່ອມຕໍ່ແລ້ວ.",
+      "unsupported": "ການຄົ້ນຫາບໍລິການບໍ່ມີໃຫ້ໃຊ້ສຳລັບ sandbox ນີ້.",
+      "failed": "ບໍ່ສາມາດຄົ້ນຫາບໍລິການໄດ້.",
+      "openService": "ເປີດ {{name}} ທີ່ພອດ {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "ທຣິກເກີ ແລະ webhook",
+      "subtitle": "ຈັດການທຣິກເກີ webhook ແລະ ທຣິກເກີຕາມກຳນົດເວລາໃນເວັບ."
+    }
   }
 }

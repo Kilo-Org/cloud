@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "មិនអាចបើកលទ្ធផលស្វែងរកនេះបានទេ"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "មិនទាន់មានការប្រើប្រាស់នៅឡើយ",
+      "sharedWorkspace": "ចែករំលែកដោយការជជែកទាំងអស់នៅក្នុងកន្លែងធ្វើការនេះ",
+      "currentRates": "អត្រាបច្ចុប្បន្ន",
+      "perHour": "{{rate}}/ម៉ោង",
+      "mediumSandbox": "Sandbox មធ្យម",
+      "largeSandbox": "Sandbox ធំ",
+      "earlierActivity": "សកម្មភាពមុនៗ",
+      "now": "ឥឡូវនេះ",
+      "loadFailed": "មិនអាចផ្ទុកថ្លៃ Compute បានទេ។"
+    },
+    "preview": {
+      "title": "បើកការមើលជាមុន",
+      "listeningServices": "សេវាកម្មដែលកំពុងស្តាប់",
+      "empty": "រកមិនឃើញសេវាកម្មដែលកំពុងស្តាប់ទេ។ សូមស្នើឱ្យភ្នាក់ងារចាប់ផ្តើមម៉ាស៊ីនមេវេប រួចផ្ទុកឡើងវិញ។",
+      "notRunning": "Sandbox នេះត្រូវបានបញ្ឈប់។ សូមផ្ញើសារទៅភ្នាក់ងារ ដើម្បីចាប់ផ្តើមវាម្តងទៀត។",
+      "notReady": "Sandbox មិនទាន់រួចរាល់នៅឡើយទេ។ សូមផ្ទុកឡើងវិញនៅពេលវាបានភ្ជាប់។",
+      "unsupported": "ការស្វែងរកសេវាកម្មមិនមានសម្រាប់ Sandbox នេះទេ។",
+      "failed": "មិនអាចស្វែងរកសេវាកម្មបានទេ។",
+      "openService": "បើក {{name}} នៅលើច្រក {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Trigger និង Webhook",
+      "subtitle": "គ្រប់គ្រង Trigger តាម Webhook និងតាមកាលវិភាគនៅលើវេប។"
+    }
   }
 }

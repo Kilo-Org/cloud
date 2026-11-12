@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tidak dapat membuka hasil pencarian ini"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Belum ada penggunaan",
+      "sharedWorkspace": "Digunakan bersama oleh semua chat di workspace ini",
+      "currentRates": "Tarif saat ini",
+      "perHour": "{{rate}}/jam",
+      "mediumSandbox": "Sandbox sedang",
+      "largeSandbox": "Sandbox besar",
+      "earlierActivity": "Aktivitas sebelumnya",
+      "now": "sekarang",
+      "loadFailed": "Biaya compute gagal dimuat."
+    },
+    "preview": {
+      "title": "Buka pratinjau",
+      "listeningServices": "Layanan yang mendengarkan",
+      "empty": "Tidak ditemukan layanan yang mendengarkan. Minta agen menjalankan server web, lalu muat ulang.",
+      "notRunning": "Sandbox ini dihentikan. Kirim pesan ke agen untuk menyalakannya lagi.",
+      "notReady": "Sandbox belum siap. Muat ulang setelah terhubung.",
+      "unsupported": "Penemuan layanan tidak tersedia untuk sandbox ini.",
+      "failed": "Tidak dapat menemukan layanan.",
+      "openService": "Buka {{name}} di port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Pemicu & webhook",
+      "subtitle": "Kelola pemicu webhook dan terjadwal di web."
+    }
   }
 }

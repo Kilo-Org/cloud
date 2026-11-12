@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Kunne ikke åpne dette søkeresultatet"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Ingen bruk ennå",
+      "sharedWorkspace": "Delt av alle chatter i dette arbeidsområdet",
+      "currentRates": "Gjeldende priser",
+      "perHour": "{{rate}}/t",
+      "mediumSandbox": "Middels sandkasse",
+      "largeSandbox": "Stor sandkasse",
+      "earlierActivity": "Tidligere aktivitet",
+      "now": "nå",
+      "loadFailed": "Kunne ikke laste inn Compute-kostnader."
+    },
+    "preview": {
+      "title": "Åpne forhåndsvisning",
+      "listeningServices": "Lyttende tjenester",
+      "empty": "Fant ingen lyttende tjenester. Be agenten starte en webserver, og oppdater deretter.",
+      "notRunning": "Denne sandkassen er stoppet. Send agenten en melding for å starte den igjen.",
+      "notReady": "Sandkassen er ikke klar ennå. Oppdater når den er tilkoblet.",
+      "unsupported": "Tjenesteoppdagelse er ikke tilgjengelig for denne sandkassen.",
+      "failed": "Kunne ikke finne tjenester.",
+      "openService": "Åpne {{name}} på port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Utløsere og webhooks",
+      "subtitle": "Administrer webhook-utløsere og planlagte utløsere på nettet."
+    }
   }
 }

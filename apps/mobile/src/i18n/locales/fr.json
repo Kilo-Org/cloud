@@ -3933,5 +3933,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Impossible d'ouvrir ce résultat de recherche"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Aucune utilisation pour l'instant",
+      "sharedWorkspace": "Partagé par toutes les discussions de cet espace de travail",
+      "currentRates": "Tarifs actuels",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Bac à sable moyen",
+      "largeSandbox": "Grand bac à sable",
+      "earlierActivity": "Activité antérieure",
+      "now": "maintenant",
+      "loadFailed": "Impossible de charger les frais de Compute."
+    },
+    "preview": {
+      "title": "Ouvrir l'aperçu",
+      "listeningServices": "Services en écoute",
+      "empty": "Aucun service en écoute trouvé. Demander à l'agent de démarrer un serveur web, puis actualiser.",
+      "notRunning": "Ce bac à sable est arrêté. Il redémarrera dès que l'agent recevra un message.",
+      "notReady": "Le bac à sable n'est pas encore prêt. Actualiser une fois la connexion établie.",
+      "unsupported": "La découverte de services n'est pas disponible pour ce bac à sable.",
+      "failed": "Impossible de découvrir les services.",
+      "openService": "Ouvrir {{name}} sur le port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Déclencheurs et webhooks",
+      "subtitle": "Gérer les déclencheurs webhook et planifiés sur le web."
+    }
   }
 }

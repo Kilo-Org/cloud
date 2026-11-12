@@ -3868,5 +3868,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Kunde inte öppna det här sökresultatet"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Ingen användning än",
+      "sharedWorkspace": "Delas av alla chattar i den här arbetsytan",
+      "currentRates": "Aktuella priser",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Mellanstor sandlåda",
+      "largeSandbox": "Stor sandlåda",
+      "earlierActivity": "Tidigare aktivitet",
+      "now": "nu",
+      "loadFailed": "Compute-avgifterna kunde inte läsas in."
+    },
+    "preview": {
+      "title": "Öppna förhandsvisning",
+      "listeningServices": "Lyssnande tjänster",
+      "empty": "Inga lyssnande tjänster hittades. Be agenten starta en webbserver och uppdatera sedan.",
+      "notRunning": "Den här sandlådan är stoppad. Skicka ett meddelande till agenten för att starta den igen.",
+      "notReady": "Sandlådan är inte redo än. Uppdatera när den är ansluten.",
+      "unsupported": "Tjänsteidentifiering är inte tillgänglig för den här sandlådan.",
+      "failed": "Det gick inte att hitta tjänster.",
+      "openService": "Öppna {{name}} på port {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Utlösare och webhooks",
+      "subtitle": "Hantera webhook-utlösare och schemalagda utlösare på webben."
+    }
   }
 }

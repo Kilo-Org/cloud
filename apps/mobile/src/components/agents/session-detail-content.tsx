@@ -226,6 +226,11 @@ import {
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
 import { useRemoteModelCatalogRetry } from '@/lib/hooks/use-remote-model-catalog-retry';
+import {
+  computeChargesMicrodollars,
+  sessionTotalMicrodollars,
+} from '@/lib/session-compute-total';
+import { useSessionComputeCharges } from '@/lib/hooks/use-session-compute';
 import { useSessionRaiseReader } from '@/lib/hooks/use-session-raise-reader';
 import {
   buildContinueHref,
@@ -598,6 +603,16 @@ export function SessionDetailContent({
   // own row is available the scope is unresolved: the org-scoped reads wait for
   // it, and the create, restart, Continue and fork actions stay unavailable.
   const organizationId = sessionDataLoaded ? (fetchedData.organizationId ?? undefined) : undefined;
+
+  // Compute cost is part of the session's total wherever the screen paints one:
+  // the header pill and the context sheet. One read serves both, and a session
+  // with no compute scope answers nothing, so the model cost stands alone.
+  const cloudAgentSessionId = sessionDataLoaded ? (fetchedData.cloudAgentSessionId ?? null) : null;
+  const computeCharges = useSessionComputeCharges({ cloudAgentSessionId, organizationId });
+  const sessionCostMicrodollars = sessionTotalMicrodollars(
+    totalMicrodollars,
+    computeChargesMicrodollars(computeCharges.data)
+  );
 
   // The session's active-profile chip: the profile this session runs on. It
   // resolves from the session's own recorded `profileId`, so an explicit
@@ -2123,7 +2138,7 @@ export function SessionDetailContent({
     <View className="min-w-0 shrink flex-row items-center gap-2">
       <SessionContextMetrics
         info={contextInfo}
-        totalCostMicrodollars={totalMicrodollars}
+        totalCostMicrodollars={sessionCostMicrodollars}
         // The pill's values read as a settled session. While the body is still
         // a skeleton no reading has arrived, so the pill paints its ring alone.
         hasMessages={messages.length > 0 && !isSessionChromePending}
@@ -2696,6 +2711,8 @@ export function SessionDetailContent({
               modelDisplay={contextModelAndProvider.model}
               providerDisplay={contextModelAndProvider.provider}
               totalCostMicrodollars={totalMicrodollars}
+              cloudAgentSessionId={cloudAgentSessionId}
+              organizationId={organizationId}
               breakdownCostUsd={breakdownCostUsd}
               messages={messages}
               modelOptions={modelOptions}

@@ -3939,5 +3939,34 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Não foi possível abrir este resultado da pesquisa"
+  },
+  "cloudAgent": {
+    "compute": {
+      "title": "Compute",
+      "noUsage": "Nenhum uso ainda",
+      "sharedWorkspace": "Compartilhado por todos os chats deste espaço de trabalho",
+      "currentRates": "Tarifas atuais",
+      "perHour": "{{rate}}/h",
+      "mediumSandbox": "Sandbox médio",
+      "largeSandbox": "Sandbox grande",
+      "earlierActivity": "Atividade anterior",
+      "now": "agora",
+      "loadFailed": "Não foi possível carregar as cobranças de Compute."
+    },
+    "preview": {
+      "title": "Abrir pré-visualização",
+      "listeningServices": "Serviços em escuta",
+      "empty": "Nenhum serviço em escuta encontrado. Peça ao agente para iniciar um servidor web e depois atualize.",
+      "notRunning": "Este sandbox está parado. Envie uma mensagem ao agente para iniciá-lo novamente.",
+      "notReady": "O sandbox ainda não está pronto. Atualize assim que ele estiver conectado.",
+      "unsupported": "A descoberta de serviços não está disponível para este sandbox.",
+      "failed": "Não foi possível descobrir os serviços.",
+      "openService": "Abrir {{name}} na porta {{port}}",
+      "portLabel": "localhost:{{port}}"
+    },
+    "triggers": {
+      "title": "Gatilhos e webhooks",
+      "subtitle": "Gerencie gatilhos de webhook e agendados na web."
+    }
   }
 }

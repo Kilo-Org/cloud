@@ -169,19 +169,13 @@ export function blockingEnkryptOutputDetectorIds(
 export function enkryptOutputDetectorsAsInputDetectors(
   detectors: EnkryptOutputDetectors
 ): EnkryptInputDetectors {
-  const { topic_detector, policy_violation } = detectors;
+  const { topic_detector } = detectors;
   return {
     injection_attack: { enabled: false, action: 'block' },
     pii: detectors.pii,
     keyword_detector: detectors.keyword_detector,
     topic_detector: { enabled: topic_detector.enabled, topic: topic_detector.topic },
-    policy_violation: {
-      enabled: policy_violation.enabled,
-      action: policy_violation.action,
-      format: policy_violation.format,
-      policy_text: policy_violation.policy_text,
-      rules: policy_violation.rules,
-    },
+    policy_violation: detectors.policy_violation,
     toxicity: { enabled: detectors.toxicity.enabled },
     nsfw: { enabled: detectors.nsfw.enabled },
     bias: detectors.bias,

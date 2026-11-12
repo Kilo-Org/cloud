@@ -20,7 +20,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { CreditsCard } from './profile-credits-card';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import {
+  ICON_TARGET_BOX_CLASS,
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
+  MIN_TAP_TARGET_DP,
+  tapTargetReachDp,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { OrganizationProvider } from '@/lib/organization-context';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
@@ -1330,25 +1337,28 @@ describe('CreditsCard credits header', () => {
     unmount();
   });
 
-  it('keeps the header on the eyebrow line with the picker target inside the row', async () => {
+  it('keeps the header one text line tall and reaches the picker target with hitSlop', async () => {
     const { renderer, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
 
-    // The row and the picker both carry a literal 44dp box, so the picker's
-    // whole touch target stays inside the row's bounds: RN drops touches
-    // outside every ancestor, and a shorter row would clip it. Both children
-    // align to the row's bottom, which puts the eyebrow on the picker's line and
-    // closes the gap to the credits card to the section headers' own gap. The
-    // literal is used because the app's `min-h-11` compiles to about 38.5pt.
-    expect(headerClasses(renderer)).toContain('min-h-[44px]');
-    expect(headerClasses(renderer)).toContain('items-end');
+    // The header is the eyebrow's line, so "Credits" starts at the screen's top
+    // padding like the other Profile section headings; a taller row pushes it
+    // down and opens a hole under the screen title.
+    expect(headerClasses(renderer)).not.toContain('min-h-[44px]');
+    expect(headerClasses(renderer)).toContain('items-center');
     const picker = renderer.root.find(
       node => Object.is(node.type, Pressable) && node.props.accessibilityHint === 'Select account'
     );
-    expect(String(picker.props.className)).toContain('min-h-[44px]');
+    // The picker floats the shared 28dp line-action box over the line and
+    // reaches the 44pt target with its slop instead of growing the row.
+    for (const token of LINE_ACTION_BOX_CLASS.split(' ')) {
+      expect(String(picker.props.className)).toContain(token);
+    }
+    expect(picker.props.hitSlop).toBe(LINE_ACTION_HIT_SLOP);
+    expect(tapTargetReachDp(MIN_TAP_TARGET_DP, LINE_ACTION_HIT_SLOP.top)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
     // A short account or org name must not shrink the target below 44pt.
     expect(String(picker.props.className)).toContain('min-w-[44px]');
-    expect(String(picker.props.className)).toContain('items-end');
-    expect(picker.props.hitSlop).toBeUndefined();
     unmount();
   });
 });

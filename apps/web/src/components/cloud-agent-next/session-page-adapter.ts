@@ -10,6 +10,10 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import { cloudSessionMessagesPageWireSchema } from '@kilocode/cloud-agent-sdk/schemas';
 
+type SessionReadOptions = { context: { skipBatch: boolean } };
+const SESSION_READ_OPTIONS: SessionReadOptions = { context: { skipBatch: true } };
+const INITIAL_WEB_HISTORY_PAGE_SIZE = 20;
+
 type SessionMessagesPageResult = {
   kiloSessionId: string;
   history: KiloSdkMessageHistory | null;
@@ -20,7 +24,10 @@ type SessionMessagesPageResult = {
 export type SessionPageTrpcClient = {
   cliSessionsV2: {
     getSessionMessagesPage: {
-      query: (input: { session_id: string; cursor?: string }) => Promise<SessionMessagesPageResult>;
+      query: (
+        input: { session_id: string; cursor?: string; limit?: number },
+        options?: SessionReadOptions
+      ) => Promise<SessionMessagesPageResult>;
     };
   };
 };
@@ -30,16 +37,22 @@ type CloudSessionPageInput = {
   kiloSessionId?: string;
   cursor?: string;
   limit?: number;
+  toolDisplay?: 'preview';
 };
 
 export type CloudSessionPageTrpcClient = {
   cloudAgentNext: {
-    getSessionMessagesPage: { query: (input: CloudSessionPageInput) => Promise<unknown> };
+    getSessionMessagesPage: {
+      query: (input: CloudSessionPageInput, options?: SessionReadOptions) => Promise<unknown>;
+    };
   };
   organizations: {
     cloudAgentNext: {
       getSessionMessagesPage: {
-        query: (input: CloudSessionPageInput & { organizationId: string }) => Promise<unknown>;
+        query: (
+          input: CloudSessionPageInput & { organizationId: string },
+          options?: SessionReadOptions
+        ) => Promise<unknown>;
       };
     };
   };
@@ -50,14 +63,21 @@ export async function fetchWebCloudSessionSnapshotPage(
   sessionId: CloudAgentSessionId,
   options: { organizationId?: string; kiloSessionId?: string; cursor?: string; limit?: number }
 ): Promise<CloudSessionMessagesWirePage> {
-  const { organizationId, ...pageOptions } = options;
-  const input = { sessionId, ...pageOptions };
+  const { organizationId, limit, ...pageOptions } = options;
+  const pageLimit = limit ?? (pageOptions.cursor ? undefined : INITIAL_WEB_HISTORY_PAGE_SIZE);
+  // Completed tool bodies arrive as bounded previews; expanded cards read the complete call.
+  const input = {
+    sessionId,
+    ...pageOptions,
+    toolDisplay: 'preview' as const,
+    ...(pageLimit === undefined ? {} : { limit: pageLimit }),
+  };
   const result = organizationId
-    ? await trpcClient.organizations.cloudAgentNext.getSessionMessagesPage.query({
-        ...input,
-        organizationId,
-      })
-    : await trpcClient.cloudAgentNext.getSessionMessagesPage.query(input);
+    ? await trpcClient.organizations.cloudAgentNext.getSessionMessagesPage.query(
+        { ...input, organizationId },
+        SESSION_READ_OPTIONS
+      )
+    : await trpcClient.cloudAgentNext.getSessionMessagesPage.query(input, SESSION_READ_OPTIONS);
   return cloudSessionMessagesPageWireSchema.parse(result);
 }
 
@@ -70,10 +90,13 @@ export async function fetchWebSessionSnapshotPage(
   kiloSessionId: KiloSessionId,
   options: { cursor?: string }
 ): Promise<SessionSnapshotPageOutcome> {
-  const result = await trpcClient.cliSessionsV2.getSessionMessagesPage.query({
-    session_id: kiloSessionId,
-    ...(options.cursor ? { cursor: options.cursor } : {}),
-  });
+  const result = await trpcClient.cliSessionsV2.getSessionMessagesPage.query(
+    {
+      session_id: kiloSessionId,
+      ...(options.cursor ? { cursor: options.cursor } : { limit: INITIAL_WEB_HISTORY_PAGE_SIZE }),
+    },
+    SESSION_READ_OPTIONS
+  );
 
   const history = result.history;
   const pageState = {

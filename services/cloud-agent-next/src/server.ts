@@ -14,7 +14,8 @@ import {
 } from './auth.js';
 import { validateKiloToken } from './validate-kilo-token.js';
 import { consumeStreamTicketNonce } from './persistence/StreamTicketNonceDO.js';
-import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
+import { createNotFoundHandler } from '@kilocode/worker-utils';
+import { createWorkerErrorHandler } from './error-handler.js';
 import { createCallbackQueueConsumer } from './callbacks/index.js';
 import type { CallbackJob } from './callbacks/index.js';
 import {
@@ -229,11 +230,7 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
     logger.withFields({ cloudAgentSessionId, userId }).warn('/terminal: Missing ticket nonce');
     return new Response('Missing ticket nonce', { status: 401 });
   }
-  const consumed = await consumeStreamTicketNonce(
-    env,
-    nonce,
-    (ticketResult.payload as unknown as { exp: number }).exp * 1000
-  );
+  const consumed = await consumeStreamTicketNonce(env, nonce, ticketResult.payload.exp * 1000);
   if (!consumed) {
     logger.withFields({ cloudAgentSessionId, userId }).warn('/terminal: Ticket nonce already used');
     return new Response('Ticket nonce already used', { status: 401 });
@@ -342,7 +339,7 @@ app.get('/internal/byoc/vercel-runtime-identity', async (c: Context<HonoContext>
   if (unauthorized) return unauthorized;
 
   try {
-    return c.json(await getVercelRuntimeIdentity(c.env), 200, { 'Cache-Control': 'no-store' });
+    return c.json(await getVercelRuntimeIdentity(), 200, { 'Cache-Control': 'no-store' });
   } catch {
     return c.text('Vercel runtime identity could not be resolved', 502);
   }
@@ -806,11 +803,7 @@ app.get('/stream', async (c: Context<HonoContext>) => {
     logger.withFields({ cloudAgentSessionId, userId }).warn('/stream: Missing ticket nonce');
     return c.text('Missing ticket nonce', 401);
   }
-  const consumed = await consumeStreamTicketNonce(
-    c.env,
-    nonce,
-    (ticketResult.payload as unknown as { exp: number }).exp * 1000
-  );
+  const consumed = await consumeStreamTicketNonce(c.env, nonce, ticketResult.payload.exp * 1000);
   if (!consumed) {
     logger.withFields({ cloudAgentSessionId, userId }).warn('/stream: Ticket nonce already used');
     return c.text('Ticket nonce already used', 401);
@@ -949,7 +942,7 @@ app.use(
 );
 
 app.notFound(createNotFoundHandler());
-app.onError(createErrorHandler(logger, { includeMessage: false }));
+app.onError(createWorkerErrorHandler(logger));
 
 export const REPORT_RETENTION_CRON = '17 2 * * *';
 export const OUTCOME_AGGREGATE_CRON = '*/5 * * * *';

@@ -658,7 +658,41 @@ describe('recoverMissedReviews', () => {
 
     const summary = await recoverMissedReviews({ now: FROZEN_NOW });
 
-    expect(summary).toMatchObject({ skippedExisting: 1, reviewsRetried: 0, reviewsStarted: 0 });
+    expect(summary).toMatchObject({
+      retriesExhausted: 1,
+      reviewsRetried: 0,
+      reviewsStarted: 0,
+    });
+    expect(mockRetryFailedCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('reports a review whose unattended restarts are spent once the run spent its starts', async () => {
+    const pulls: OpenPullRequest[] = [];
+    for (let index = 0; index < RECOVER_MISSED_REVIEWS_START_LIMIT + 3; index += 1) {
+      pulls.push(makePull({ number: 10 + index, headSha: `sha-${index}` }));
+    }
+    mockFetchOpenPullRequests.mockResolvedValue(pulls);
+    // The exhausted review sits past the run's start budget, so it is reached
+    // only after the budget is spent.
+    mockFindExistingReview.mockImplementation(async (_scope: unknown, headSha: unknown) =>
+      headSha === `sha-${RECOVER_MISSED_REVIEWS_START_LIMIT}`
+        ? { id: 'review-1', status: 'failed', terminal_reason: 'assistant_unauthorized' }
+        : null
+    );
+    mockListAttempts.mockResolvedValue([
+      { id: 'attempt-1' },
+      { id: 'attempt-2' },
+      { id: 'attempt-3' },
+    ]);
+
+    const summary = await recoverMissedReviews({ now: FROZEN_NOW });
+
+    expect(summary).toMatchObject({
+      reviewsStarted: RECOVER_MISSED_REVIEWS_START_LIMIT,
+      retriesExhausted: 1,
+      skippedStartLimit: 2,
+      reviewsRetried: 0,
+    });
     expect(mockRetryFailedCodeReview).not.toHaveBeenCalled();
   });
 

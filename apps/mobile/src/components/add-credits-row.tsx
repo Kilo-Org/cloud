@@ -8,9 +8,17 @@ import { openExternalUrl } from '@/lib/external-link';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { cn } from '@/lib/utils';
 
+/**
+ * How prominent the control reads where it sits. `quiet` is the balance line's
+ * outline control. `primary` fills with the accent surface, which is how a
+ * transcript marks the one action that settles a refused send.
+ */
+export type AddCreditsEmphasis = 'quiet' | 'primary';
+
 type AddCreditsButtonProps = Readonly<{
   /** In-app destination (the credit purchase screen); platform-agnostic. */
   onPress: () => void;
+  emphasis?: AddCreditsEmphasis;
   className?: string;
 }>;
 
@@ -29,16 +37,32 @@ type AddCreditsButtonProps = Readonly<{
  * external billing-page variant lives in `AddCreditsRow`, which owns the App
  * Store gate.
  */
-export function AddCreditsButton({ onPress, className }: AddCreditsButtonProps) {
+export function AddCreditsButton({
+  onPress,
+  emphasis = 'quiet',
+  className,
+}: AddCreditsButtonProps) {
   const { t } = useTranslation();
+  const primary = emphasis === 'primary';
   return (
     <Button
       size="sm"
-      variant="outline"
-      className={cn('dark:bg-secondary-fill', className, STATE_ACTION_CLASS)}
+      variant={primary ? 'default' : 'outline'}
+      className={cn(
+        // The theme's `--primary` is olive in light, which reads as one more
+        // secondary action in a transcript, so the primary emphasis fills with
+        // the surface the person's own bubble uses instead.
+        primary ? 'bg-accent-soft' : 'dark:bg-secondary-fill',
+        className,
+        STATE_ACTION_CLASS
+      )}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={t('addCredits.cta')}
     >
-      <Text className="text-xs font-semibold">{t('addCredits.cta')}</Text>
+      <Text className={primary ? 'text-accent-soft-foreground' : 'text-xs font-semibold'}>
+        {t('addCredits.cta')}
+      </Text>
     </Button>
   );
 }
@@ -49,6 +73,8 @@ type AddCreditsRowProps = Readonly<{
   /** In-app destination (the credit purchase screen); platform-agnostic. */
   onPress?: () => void;
   className?: string;
+  /** How prominent the control reads where it sits; see `AddCreditsButton`. */
+  emphasis?: AddCreditsEmphasis;
   /**
    * Hand the button to the caller's own row — the balance line it tops up —
    * with no wrapper and no full-width branch. The row and its padding belong to
@@ -73,7 +99,7 @@ type AddCreditsRowProps = Readonly<{
  * button is returned alone, at its natural size, so it can sit on the balance
  * line instead of filling a block of its own.
  */
-export function AddCreditsRow({ url, onPress, className, inline }: AddCreditsRowProps) {
+export function AddCreditsRow({ url, onPress, className, emphasis, inline }: AddCreditsRowProps) {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const narrow = isNarrowLayout(width);
@@ -94,6 +120,7 @@ export function AddCreditsRow({ url, onPress, className, inline }: AddCreditsRow
           }
         })
       }
+      emphasis={emphasis}
       className={inline || !narrow ? undefined : 'w-full'}
     />
   );

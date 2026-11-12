@@ -14,6 +14,7 @@ import {
   openRouterModelsMetadataSource,
   openRouterTranscriptionModelsMetadataSource,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { openRouterEmbeddingModelsMetadataSource } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
 import { openAiServedModelsMetadataSource } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models';
 import { OPENAI_CHATGPT_API_KEY_ENV } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/upstream';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
@@ -55,6 +56,7 @@ function catalogSources(): MetadataSource<unknown>[] {
   const sources: MetadataSource<unknown>[] = [
     openRouterModelsMetadataSource,
     openRouterTranscriptionModelsMetadataSource,
+    openRouterEmbeddingModelsMetadataSource,
     openRouterGatewayModelsSource,
     vercelGatewayModelsSource,
     openRouterProvidersSource,

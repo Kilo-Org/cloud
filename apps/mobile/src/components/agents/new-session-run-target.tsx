@@ -8,6 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { InstanceSelector } from '@/components/agents/instance-selector';
+import { formatInstanceTarget } from '@/lib/instance-target-label';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from '@/components/ui/icons';
@@ -70,8 +71,7 @@ export function NewSessionRunTarget({
     onRefreshInstances();
   }
 
-  const targetLabel =
-    runOnInstance !== null ? `${runOnInstance.name} · ${runOnInstance.projectName}` : null;
+  const targetLabel = runOnInstance !== null ? formatInstanceTarget(runOnInstance) : null;
   if (showRunOnSelector) {
     return (
       <View className="mt-5">

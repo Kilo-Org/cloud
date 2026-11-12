@@ -8,6 +8,8 @@ type CenteredStateLayoutInput = {
   bottomInset?: number;
   nativeViewportFillsSurface?: boolean;
   nativeViewportBottom?: number;
+  /** The frame the state centers in: its surface, or the viewport it fills. */
+  band?: 'surface' | 'viewport';
   roundToPixel?: (value: number) => number;
 };
 
@@ -127,6 +129,7 @@ export function getCenteredStateLayout({
   bottomInset = 0,
   nativeViewportFillsSurface = false,
   nativeViewportBottom = surface.bottom,
+  band = 'surface',
   roundToPixel = (value: number) => value,
 }: CenteredStateLayoutInput) {
   const viewportBottom = nativeViewportFillsSurface ? nativeViewportBottom : viewport.bottom;
@@ -136,7 +139,12 @@ export function getCenteredStateLayout({
     topInset,
     bottomInset,
   });
-  const idealTop = (surface.top + surface.bottom - contentHeight) / 2;
+  // A caller whose scroller is a band the surface does not describe (a chat
+  // body between a header and a composer) centers in the viewport it fills:
+  // its pending paint and its measured placement then agree from the first
+  // frame, and no surface publication can move the state after it settled.
+  const frame = band === 'viewport' ? { top: viewport.top, bottom: viewport.bottom } : surface;
+  const idealTop = (frame.top + frame.bottom - contentHeight) / 2;
   const fits = contentHeight <= roundToPixel(bottom - top);
   const clearance = Math.min(PREFERRED_CLEARANCE, Math.max(0, (bottom - top - contentHeight) / 2));
   const contentTop = fits

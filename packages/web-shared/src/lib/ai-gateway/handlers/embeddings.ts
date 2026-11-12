@@ -189,6 +189,14 @@ export async function handleEmbeddingsRequest(
   // Build usage context
   const promptInfo = extractEmbeddingPromptInfo(requestBodyParsed);
 
+  const bouncerUsageFields = {
+    occurredAt: new Date(requestStartedAtMs),
+    clientAttributed: usageBase.clientAttributed,
+    requestedLogprobs: false,
+    samples: null,
+    // Embedding input is not read by any bouncer rule, so no hash is computed.
+    promptSimHash: null,
+  };
   const usageContext: MicrodollarUsageContext = {
     ...usageBase.context,
     api_kind: 'embeddings',
@@ -200,14 +208,6 @@ export async function handleEmbeddingsRequest(
     user_byok: !!userByok,
     has_tools: false,
     feature,
-    bouncer: bouncer.usage({
-      occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: usageBase.clientAttributed,
-      requestedLogprobs: false,
-      samples: null,
-      // Embedding input is not read by any bouncer rule, so no hash is computed.
-      promptSimHash: null,
-    }),
   };
 
   setTag('ui.ai_model', requestBodyParsed.model);
@@ -242,6 +242,12 @@ export async function handleEmbeddingsRequest(
     if (preferences.kind === 'rejected') return preferences.response;
     if (preferences.provider) requestBodyParsed.provider = preferences.provider;
   }
+
+  // The usage row reports the payer the balance check resolved: the root organization for an
+  // organization member.
+  usageContext.bouncer = await (bouncer.kind === 'signed-in'
+    ? bouncer.usage(bouncerUsageFields, accountPayer)
+    : bouncer.usage(bouncerUsageFields));
 
   sentryRootSpan()?.setAttribute(
     'embedding.time_to_request_start_ms',

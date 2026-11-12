@@ -34,13 +34,24 @@ function omitted(header: string): Piece {
 export type RequestSegment = { header: string; body: string | null };
 
 /**
- * A request in three parts, each scanned and cached on its own. `tools` holds tool definitions and
- * output formats, which rarely change within a session. `system` is the system prompt, which
- * clients rebuild more often, for example with the date or workspace state. Both are cached as a
- * whole. `conversation` is the message history, which grows request by request.
+ * One tool definition, or the request's response or output format, which constrains the model's
+ * output like a tool's schema does. Each is scanned and cached on its own.
+ */
+export type RequestToolDefinition = {
+  kind: 'tool' | 'response_format';
+  /** The tool's name; null for a response format or a tool without one. */
+  name: string | null;
+  segments: RequestSegment[];
+};
+
+/**
+ * A request in three parts, each scanned on its own, with the verdict of every segment cached on
+ * its own. `tools` holds tool definitions and response formats, which rarely change within a
+ * session; each is scanned by its own calls, so a detection is reported for its tool. `system` is
+ * the system prompt. `conversation` is the message history, which grows request by request.
  */
 export type RequestScanParts = {
-  tools: RequestSegment[];
+  tools: RequestToolDefinition[];
   system: RequestSegment[];
   conversation: RequestSegment[];
 };
@@ -90,6 +101,17 @@ function toolCall(role: string, name: Text, input: Text): Piece {
 
 function toolDefinition(name: Text, texts: Text[]): Piece {
   return piece(name ? `tool definition: ${name}` : 'tool definition', texts);
+}
+
+/** The pieces of one `RequestToolDefinition`. */
+type ToolPieces = { kind: RequestToolDefinition['kind']; name: string | null; pieces: Piece[] };
+
+function toolPieces(name: Text, pieces: Piece[]): ToolPieces {
+  return { kind: 'tool', name: name || null, pieces };
+}
+
+function responseFormatPieces(texts: Text[]): ToolPieces {
+  return { kind: 'response_format', name: null, pieces: [piece('response format', texts)] };
 }
 
 function namedFile(header: string, filename: Text): Piece {
@@ -161,60 +183,59 @@ function chatToolCallPiece(call: OpenAI.Chat.ChatCompletionMessageToolCall): Pie
 
 type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam & MessageWithReasoning;
 
-function chatMessagePieces(message: ChatMessage): Piece[] {
+function chatMessageItems(message: ChatMessage): Item[] {
   switch (message.role) {
     case 'tool':
-      return chatContentPieces('tool result', message.content);
+      return [chatContentPieces('tool result', message.content)];
     case 'function':
-      return [piece(`function result: ${message.name}`, [message.content])];
+      return [[piece(`function result: ${message.name}`, [message.content])]];
     case 'system':
     case 'developer':
     case 'user':
-      return chatContentPieces(message.role, message.content);
+      return [chatContentPieces(message.role, message.content)];
     case 'assistant':
       return [
-        chatReasoning(message),
-        ...chatContentPieces('assistant', message.content),
-        piece('assistant refusal', [message.refusal]),
+        [chatReasoning(message)],
+        chatContentPieces('assistant', message.content),
+        [piece('assistant refusal', [message.refusal])],
         ...(message.function_call
-          ? [toolCall('assistant', message.function_call.name, message.function_call.arguments)]
+          ? [[toolCall('assistant', message.function_call.name, message.function_call.arguments)]]
           : []),
-        ...(message.tool_calls ?? []).flatMap(chatToolCallPiece),
+        ...(message.tool_calls ?? []).map(chatToolCallPiece),
       ];
     default:
-      return unrecognized(null, message);
+      return [unrecognized(null, message)];
   }
 }
 
-function chatToolDefinitionPieces(tool: OpenAI.Chat.ChatCompletionTool): Piece[] {
+function chatFunctionDefinitionPieces(fn: OpenAI.FunctionDefinition): ToolPieces {
+  return toolPieces(fn.name, [toolDefinition(fn.name, [fn.description, jsonText(fn.parameters)])]);
+}
+
+function chatToolDefinitionPieces(tool: OpenAI.Chat.ChatCompletionTool): ToolPieces {
   switch (tool.type) {
     case 'function':
-      return [
-        toolDefinition(tool.function.name, [
-          tool.function.description,
-          jsonText(tool.function.parameters),
-        ]),
-      ];
+      return chatFunctionDefinitionPieces(tool.function);
     case 'custom': {
       const { format } = tool.custom;
-      return [
+      return toolPieces(tool.custom.name, [
         toolDefinition(tool.custom.name, [
           tool.custom.description,
           format?.type === 'grammar' ? format.grammar.definition : undefined,
         ]),
-      ];
+      ]);
     }
     default:
-      return unrecognized('tool definition', tool);
+      return toolPieces(null, unrecognized('tool definition', tool));
   }
 }
 
 function chatResponseFormatPieces(
   format: OpenRouterChatCompletionRequest['response_format']
-): Piece[] {
+): ToolPieces[] {
   if (format?.type !== 'json_schema') return [];
   const { name, description, schema } = format.json_schema;
-  return [piece('response format', [name, description, jsonText(schema)])];
+  return [responseFormatPieces([name, description, jsonText(schema)])];
 }
 
 function isInstructionRole(role: unknown): boolean {
@@ -234,13 +255,11 @@ function chatCompletionsParts(body: OpenRouterChatCompletionRequest): ScanPieces
   return {
     tools: [
       ...(body.tools ?? []).map(chatToolDefinitionPieces),
-      ...(body.functions ?? []).map(fn => [
-        toolDefinition(fn.name, [fn.description, jsonText(fn.parameters)]),
-      ]),
-      chatResponseFormatPieces(body.response_format),
+      ...(body.functions ?? []).map(chatFunctionDefinitionPieces),
+      ...chatResponseFormatPieces(body.response_format),
     ],
-    system: body.messages.slice(0, instructions).map(chatMessagePieces),
-    conversation: body.messages.slice(instructions).map(chatMessagePieces),
+    system: body.messages.slice(0, instructions).flatMap(chatMessageItems),
+    conversation: body.messages.slice(instructions).flatMap(chatMessageItems),
   };
 }
 
@@ -405,17 +424,29 @@ function anthropicBlockPieces(role: string, block: AnthropicBlock): Piece[] {
   }
 }
 
-function anthropicMessagePieces(message: Anthropic.Beta.BetaMessageParam): Piece[] {
-  return typeof message.content === 'string'
-    ? [piece(message.role, [message.content])]
-    : message.content.flatMap(block => anthropicBlockPieces(message.role, block));
+/** Each block is an item of its own, except that consecutive text blocks are one item. */
+function anthropicMessageItems(message: Anthropic.Beta.BetaMessageParam): Item[] {
+  if (typeof message.content === 'string') return [[piece(message.role, [message.content])]];
+  const items: Item[] = [];
+  let previous: AnthropicBlock | undefined;
+  for (const block of message.content) {
+    const pieces = anthropicBlockPieces(message.role, block);
+    const item = items.at(-1);
+    if (item && block.type === 'text' && previous?.type === 'text') item.push(...pieces);
+    else items.push(pieces);
+    previous = block;
+  }
+  return items;
 }
 
-function anthropicToolDefinitionPiece(tool: Anthropic.Beta.BetaToolUnion): Piece {
-  return toolDefinition('name' in tool ? tool.name : undefined, [
-    'description' in tool ? tool.description : undefined,
-    'input_schema' in tool ? jsonText(tool.input_schema) : undefined,
-    'input_examples' in tool ? jsonText(tool.input_examples) : undefined,
+function anthropicToolDefinitionPieces(tool: Anthropic.Beta.BetaToolUnion): ToolPieces {
+  const name = 'name' in tool ? tool.name : undefined;
+  return toolPieces(name, [
+    toolDefinition(name, [
+      'description' in tool ? tool.description : undefined,
+      'input_schema' in tool ? jsonText(tool.input_schema) : undefined,
+      'input_examples' in tool ? jsonText(tool.input_examples) : undefined,
+    ]),
   ]);
 }
 
@@ -437,15 +468,13 @@ function messagesParts(request: GatewayMessagesRequest): ScanPieces {
       ],
     ],
     tools: [
-      ...(body.tools ?? []).map(tool => [anthropicToolDefinitionPiece(tool)]),
-      [
-        piece('response format', [
-          jsonText(body.output_format?.schema),
-          jsonText(body.output_config?.format?.schema),
-        ]),
-      ],
+      ...(body.tools ?? []).map(anthropicToolDefinitionPieces),
+      responseFormatPieces([
+        jsonText(body.output_format?.schema),
+        jsonText(body.output_config?.format?.schema),
+      ]),
     ],
-    conversation: body.messages.map(anthropicMessagePieces),
+    conversation: body.messages.flatMap(anthropicMessageItems),
   };
 }
 
@@ -464,27 +493,44 @@ function responsesFormatTexts(
   }
 }
 
+/** The name of a tool, which also heads its definition; null for a tool without one. */
+function responsesToolName(tool: ResponsesTool): string | null {
+  switch (tool.type) {
+    case 'function':
+    case 'custom':
+    case 'namespace':
+      return tool.name;
+    case 'tool_search':
+      return 'tool_search';
+    case 'mcp':
+      return `MCP server ${tool.server_label}`;
+    default:
+      return null;
+  }
+}
+
 function responsesToolDefinitionPieces(tool: ResponsesTool): Piece[] {
+  const name = responsesToolName(tool);
   switch (tool.type) {
     case 'function':
       return [
-        toolDefinition(tool.name, [
+        toolDefinition(name, [
           tool.description,
           jsonText(tool.parameters),
           jsonText(tool.output_schema),
         ]),
       ];
     case 'custom':
-      return [toolDefinition(tool.name, [tool.description, ...responsesFormatTexts(tool.format)])];
+      return [toolDefinition(name, [tool.description, ...responsesFormatTexts(tool.format)])];
     case 'namespace':
       return [
-        toolDefinition(tool.name, [tool.description]),
+        toolDefinition(name, [tool.description]),
         ...tool.tools.flatMap(responsesToolDefinitionPieces),
       ];
     case 'tool_search':
-      return [toolDefinition('tool_search', [tool.description, jsonText(tool.parameters)])];
+      return [toolDefinition(name, [tool.description, jsonText(tool.parameters)])];
     case 'mcp':
-      return [toolDefinition(`MCP server ${tool.server_label}`, [tool.server_description])];
+      return [toolDefinition(name, [tool.server_description])];
     case 'file_search':
     case 'computer':
     case 'computer_use_preview':
@@ -502,6 +548,20 @@ function responsesToolDefinitionPieces(tool: ResponsesTool): Piece[] {
     default:
       return unrecognized('tool definition', tool);
   }
+}
+
+/**
+ * Each tool of a namespace is a tool definition of its own, so a namespace holding many tools, such
+ * as an MCP server's, is not scanned and cached as one large item.
+ */
+function responsesToolDefinitionItems(tool: ResponsesTool): ToolPieces[] {
+  if (tool.type !== 'namespace') {
+    return [toolPieces(responsesToolName(tool), responsesToolDefinitionPieces(tool))];
+  }
+  return [
+    toolPieces(tool.name, [toolDefinition(tool.name, [tool.description])]),
+    ...tool.tools.flatMap(responsesToolDefinitionItems),
+  ];
 }
 
 type ResponsesMessagePart =
@@ -670,8 +730,8 @@ function responsesParts(body: GatewayResponsesRequest): ScanPieces {
   const instructions = leadingInstructionCount(items, isInstructionItem);
   return {
     tools: [
-      ...(body.tools ?? []).map(responsesToolDefinitionPieces),
-      [piece('response format', responsesFormatTexts(body.text?.format))],
+      ...(body.tools ?? []).flatMap(responsesToolDefinitionItems),
+      responseFormatPieces(responsesFormatTexts(body.text?.format)),
     ],
     system: [
       [piece('instructions', [body.instructions])],
@@ -684,8 +744,14 @@ function responsesParts(body: GatewayResponsesRequest): ScanPieces {
   };
 }
 
-/** Pieces grouped by the tool definition, message, or input item they came from. */
-type ScanPieces = Record<keyof RequestScanParts, Piece[][]>;
+/**
+ * The pieces of one model-visible item: a message's text, one tool call, one tool result, or one
+ * Responses input item. Each item becomes at least one segment of its own.
+ */
+type Item = Piece[];
+
+/** Pieces grouped by the tool definition or item they came from. */
+type ScanPieces = { tools: ToolPieces[]; system: Item[]; conversation: Item[] };
 
 function scanPieces(request: GatewayRequest): ScanPieces {
   switch (request.kind) {
@@ -713,10 +779,11 @@ export function renderSegment({ header, body }: RequestSegment): string {
 }
 
 /**
- * Pieces of one message are segments of their own; consecutive pieces with the same header, such as
- * two text parts, are merged.
+ * Pieces of one item are segments of their own; consecutive pieces with the same header, such as
+ * two text parts of one message, are merged. Items are never merged, so each tool call and tool
+ * result, including parallel ones, is a segment of its own, with its verdict cached on its own.
  */
-function messageSegments(pieces: Piece[]): RequestSegment[] {
+function itemSegments(pieces: Item): RequestSegment[] {
   const groups: { header: string; texts: string[] | null }[] = [];
   for (const { header, texts } of pieces) {
     const trimmed =
@@ -745,8 +812,11 @@ function messageSegments(pieces: Piece[]): RequestSegment[] {
 export function extractRequestParts(request: GatewayRequest): RequestScanParts {
   const { tools, system, conversation } = scanPieces(request);
   return {
-    tools: tools.flatMap(messageSegments),
-    system: system.flatMap(messageSegments),
-    conversation: conversation.flatMap(messageSegments),
+    tools: tools.flatMap(({ kind, name, pieces }) => {
+      const segments = itemSegments(pieces);
+      return segments.length > 0 ? [{ kind, name, segments }] : [];
+    }),
+    system: system.flatMap(itemSegments),
+    conversation: conversation.flatMap(itemSegments),
   };
 }

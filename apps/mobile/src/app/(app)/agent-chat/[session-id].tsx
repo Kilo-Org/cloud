@@ -1,5 +1,5 @@
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams } from 'expo-router';
 import { hashKey, useQuery } from '@tanstack/react-query';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -23,16 +23,13 @@ import { AgentSessionProvider } from '@/components/agents/session-provider';
 import { useSessionSlowLoadPhase } from '@/components/agents/session-slow-load';
 import { useIdentityConfirmation } from '@/components/agents/user-web-connection-provider';
 import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal-error';
-import { performCopy } from '@/components/agents/use-message-copy';
+import { SessionPermanentError } from '@/components/agents/session-permanent-error';
 import { InvalidRouteState } from '@/components/invalid-route-state';
-import { CenteredState } from '@/components/centered-state';
-import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
 import { parseParam } from '@/lib/route-params';
-import { AGENTS_SESSIONS_HREF, AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
+import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { isAddressableStoredSessionId } from '@/lib/session-id-shape';
+import { useRestoredRouteOpen } from '@/lib/hooks/use-restored-route-open';
 import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { parseResumeAnchor } from '@/lib/session-resume';
 import { useRestoredAccountId } from '@/lib/hooks/use-restored-account-id';
@@ -96,8 +93,13 @@ export default function SessionDetailScreen() {
   const autoSendParam = Array.isArray(autoSendRaw) ? autoSendRaw[0] : autoSendRaw;
   const spawnedMode = Array.isArray(modeParam) ? modeParam[0] : modeParam;
   const resumeAt = parseResumeAnchor(resumeAtRaw);
+  // Whether the relaunch repair opened this destination. It is keyed on the
+  // destination this screen renders, never on the focused route's pathname: a
+  // sheet or a share gate in front of this screen must not answer for it.
+  const restoredOpen = useRestoredRouteOpen(
+    sessionId === null ? '' : `/(app)/agent-chat/${sessionId}`
+  );
   const trpc = useTRPC();
-  const router = useRouter();
   const { t } = useTranslation();
   // The open's clock starts at route mount — before the metadata query and
   // the transcript screen — so the slow-load threshold measures from when
@@ -380,41 +382,15 @@ export default function SessionDetailScreen() {
           backFallback={AGENTS_SESSIONS_HREF}
           className="pb-1"
         />
-        <CenteredState>
-          <View className="items-center gap-3 px-6">
-            <QueryError
-              variant={variant}
-              placement="top"
-              className="px-0 pt-0"
-              title={title}
-              message={message}
-              onRetry={notFound || unauthorized ? undefined : retry}
-              isRetrying={identityFailed ? confirmation.isPending : sessionQuery.isFetching}
-            />
-            <View className="flex-row gap-3">
-              <Button
-                variant="ghost"
-                accessibilityLabel={t('agentChat.session.copyErrorDetails')}
-                onPress={() => {
-                  void performCopy(copyText);
-                }}
-              >
-                <Text>{t('common.copy')}</Text>
-              </Button>
-              <Button
-                variant="ghost"
-                onPress={() => {
-                  // POP_TO reuses the `(tabs)` route under this screen and
-                  // truncates every `agent-chat` route above it, so a composer
-                  // still on the stack under a missing session is gone with it.
-                  router.dismissTo(AGENTS_SESSIONS_INDEX_HREF);
-                }}
-              >
-                <Text>{t('agentChat.session.backToSessions')}</Text>
-              </Button>
-            </View>
-          </View>
-        </CenteredState>
+        <SessionPermanentError
+          variant={variant}
+          title={title}
+          message={message}
+          retry={notFound || unauthorized ? undefined : retry}
+          isRetrying={identityFailed ? confirmation.isPending : sessionQuery.isFetching}
+          copyText={copyText}
+          restoredRouteOpen={restoredOpen && (notFound || unauthorized)}
+        />
       </View>
     );
   }

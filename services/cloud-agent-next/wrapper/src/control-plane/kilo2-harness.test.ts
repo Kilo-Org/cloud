@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { createKilo2Harness } from './kilo2-harness.js';
 import { createKilo2Lifecycle } from './kilo2-lifecycle.js';
+import { DrainSessionError } from '../kilo-api.js';
 
 type RecordedRequest = {
   method: string;
@@ -558,5 +559,73 @@ describe('Kilo v2 harness release', () => {
     expect(
       stub.requests.some(request => request.pathname === '/api/session/ses_root/interrupt')
     ).toBe(true);
+  });
+});
+
+describe('Kilo v2 full-tree drain', () => {
+  it('calls the native plugin RPC with location, token, and server authorization', async () => {
+    const stub = startStub(() => Response.json({ output: true }));
+    const harness = createHarness(stub.url);
+    expect(await harness.drainSession?.({ sessionId: 'ses_root', directory, token: 'proof' })).toBe(
+      true
+    );
+    expect(stub.requests).toEqual([
+      {
+        method: 'POST',
+        pathname: '/api/rpc/kilocode.session-drain/drain',
+        directory,
+        authorization: 'Basic harness-test',
+        body: { input: { sessionID: 'ses_root', token: 'proof' } },
+      },
+    ]);
+  });
+
+  it.each([408, 429, 500, 503])('classifies HTTP %i as retryable', async status => {
+    const stub = startStub(() => new Response(null, { status }));
+    const error = await createHarness(stub.url)
+      .drainSession?.({ sessionId: 'ses_root', directory })
+      .catch(cause => cause);
+    expect(error).toMatchObject({ kind: 'transient' });
+  });
+
+  it.each([400, 401, 403, 404])('does not retry a definitive HTTP %i refusal', async status => {
+    const stub = startStub(() => new Response(null, { status }));
+    const error = await createHarness(stub.url)
+      .drainSession?.({ sessionId: 'ses_root', directory })
+      .catch(cause => cause);
+    expect(error).toMatchObject({ kind: 'definitive' });
+  });
+
+  it.each([{ output: false }, {}, { output: 'true' }, true])(
+    'rejects an invalid drain result %j',
+    async body => {
+      const stub = startStub(() => Response.json(body));
+      const error = await createHarness(stub.url)
+        .drainSession?.({ sessionId: 'ses_root', directory })
+        .catch(cause => cause);
+      expect(error).toBeInstanceOf(DrainSessionError);
+      expect(error).toMatchObject({ kind: 'anomalous' });
+    }
+  );
+
+  it('cancels the transport without sending a native session interruption', async () => {
+    const entered = Promise.withResolvers<void>();
+    const server = Bun.serve({
+      port: 0,
+      fetch() {
+        entered.resolve();
+        return new Promise<Response>(() => {});
+      },
+    });
+    startedServers.push(server);
+    const controller = new AbortController();
+    const drained = createHarness(server.url.toString()).drainSession?.({
+      sessionId: 'ses_root',
+      directory,
+      signal: controller.signal,
+    });
+    await entered.promise;
+    controller.abort();
+    expect(await drained?.catch(cause => cause)).toBeInstanceOf(Error);
   });
 });

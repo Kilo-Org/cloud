@@ -370,8 +370,15 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
 
+      # The preflight only reads the EAS CLI and the evaluated Expo config, and
+      # both come from the app's own closure: `eas-cli` is the app's development
+      # dependency, and `app.config.ts` with scripts/assert-expo-config.mjs
+      # resolves app-local modules. Only that closure and the root project are
+      # installed, so the smaller runner stops linking the workspaces the
+      # preflight never reads. Widen the filter when a step here imports a
+      # workspace outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo
 
       - name: Check EXPO_TOKEN
         run: |

@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
@@ -82,7 +83,6 @@ import { PermissionCard, PermissionContextProvider } from './PermissionCard';
 import { PermissionUnreadableNotice } from './PermissionUnreadableNotice';
 import { SuggestionContextProvider } from './SuggestionCard';
 import { SessionContinuationPanel } from './SessionContinuationPanel';
-import { CloudAgentTerminalPane } from './CloudAgentTerminalDock';
 import { CloudAgentBillingError } from './CloudAgentBillingError';
 import { OlderMessagesHeader } from './OlderMessagesHeader';
 import { resolveTranscriptPhase, transcriptReadyForEffects } from './transcript-switch';
@@ -92,7 +92,6 @@ import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/or
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
 import { PreviewPortDialog } from './PreviewPortDialog';
 import { WorktreeChangesView } from './WorktreeChanges';
-import { WorktreeFilePane } from './WorktreeFilePane';
 import { commitsByMessageAnchor, isCommitSummaryRepresented } from './message-presentation';
 import { WorktreeReviewDialog } from './WorktreeReviewDialog';
 import { useWorktreeReview } from './useWorktreeReview';
@@ -120,6 +119,7 @@ import {
 import { getWorkspaceTabsStorageKey } from './workspace-tabs-storage';
 import { usePersistedWorkspaceTabs } from './hooks/usePersistedWorkspaceTabs';
 import { PreviewLinksContext } from './use-preview';
+import { ToolDetailScopeProvider } from './ToolPartDetail';
 import { usePreviewController } from './use-preview-controller';
 import {
   createRemoteModelOverride,
@@ -142,6 +142,27 @@ import type { AgentMode, StoredMessage } from './types';
 import type { PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 import type { WorkspaceTabId } from './workspace-tabs';
 import type { TerminalStatus } from './useCloudAgentTerminal';
+
+const CloudAgentTerminalPane = dynamic(
+  () => import('./CloudAgentTerminalDock').then(module => module.CloudAgentTerminalPane),
+  {
+    loading: () => (
+      <div role="status" className="text-muted-foreground p-4 text-sm">
+        Loading terminal…
+      </div>
+    ),
+  }
+);
+const WorktreeFilePane = dynamic(
+  () => import('./WorktreeFilePane').then(module => module.WorktreeFilePane),
+  {
+    loading: () => (
+      <div role="status" className="text-muted-foreground p-4 text-sm">
+        Loading file…
+      </div>
+    ),
+  }
+);
 
 const emptyQuestionRequestIds = new Map<string, string>();
 
@@ -291,6 +312,7 @@ export default function CloudChatPage({
   const unreadablePermissions = useAtomValue(manager.atoms.unreadablePermissions);
   const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
   const failedPrompt = useAtomValue(manager.atoms.failedPrompt);
+  const deliveredFailedPrompt = useAtomValue(manager.atoms.deliveredFailedPrompt);
   const staticMessages = useAtomValue(manager.atoms.staticMessages);
   const dynamicMessages = useAtomValue(manager.atoms.dynamicMessages);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
@@ -586,6 +608,8 @@ export default function CloudChatPage({
     if (target?.isConnected) target.focus({ preventScroll: true });
   }, [changesViewOpen]);
 
+  const [modelCatalogRequested, setModelCatalogRequested] = useState(false);
+  const requestModelCatalog = useCallback(() => setModelCatalogRequested(true), []);
   const sessionModels = useSessionModels({
     activeSessionType,
     remoteModelState,
@@ -603,6 +627,7 @@ export default function CloudChatPage({
     sessionIdFromParams,
     knownModels,
     currentUserId,
+    loadGatewayCatalog: modelCatalogRequested,
   });
   const { modelOptions, isLoadingModels } = sessionModels;
 
@@ -1532,6 +1557,18 @@ export default function CloudChatPage({
     />
   );
 
+  const toolDetailScope = useMemo(
+    () =>
+      sessionId
+        ? {
+            userId: currentUserId,
+            organizationId: organizationId ?? null,
+            cloudAgentSessionId: sessionId,
+          }
+        : null,
+    [currentUserId, organizationId, sessionId]
+  );
+
   return (
     <QuestionContextProvider
       questionRequestIds={emptyQuestionRequestIds}
@@ -1549,535 +1586,550 @@ export default function CloudChatPage({
           acceptSuggestion={handleAcceptSuggestion}
           dismissSuggestion={handleDismissSuggestion}
         >
-          <div className="flex h-full min-w-0 w-full flex-col overflow-hidden">
-            <SetPageTitle
-              subtitle={
-                parentSession && parentSessionHref ? (
-                  <ParentSessionLink href={parentSessionHref} title={parentSession.title} />
-                ) : null
-              }
-              title={
-                !sessionIdFromParams && selectedWorktreeId
-                  ? 'Worktree'
-                  : sessionIdFromParams
-                    ? (displayedChatTitle ?? '')
-                    : 'Cloud Agent'
-              }
-            >
-              {sessionIdFromParams && isCurrentSession && fetchedSessionData && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground h-11 gap-1 px-2 text-sm font-normal"
-                  aria-haspopup="dialog"
-                  aria-expanded={sessionInfoOpen}
-                  aria-label={`Session cost ${formatSessionTotalCost(totalCostUsd)}. View cost and token usage`}
-                  onClick={event => {
-                    sessionInfoTriggerRef.current = event.currentTarget;
-                    setSessionInfoOpen(true);
+          <ToolDetailScopeProvider scope={toolDetailScope}>
+            <div className="flex h-full min-w-0 w-full flex-col overflow-hidden">
+              <SetPageTitle
+                subtitle={
+                  parentSession && parentSessionHref ? (
+                    <ParentSessionLink href={parentSessionHref} title={parentSession.title} />
+                  ) : null
+                }
+                title={
+                  !sessionIdFromParams && selectedWorktreeId
+                    ? 'Worktree'
+                    : sessionIdFromParams
+                      ? (displayedChatTitle ?? '')
+                      : 'Cloud Agent'
+                }
+              >
+                {sessionIdFromParams && isCurrentSession && fetchedSessionData && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground h-11 gap-1 px-2 text-sm font-normal"
+                    aria-haspopup="dialog"
+                    aria-expanded={sessionInfoOpen}
+                    aria-label={`Session cost ${formatSessionTotalCost(totalCostUsd)}. View cost and token usage`}
+                    onClick={event => {
+                      sessionInfoTriggerRef.current = event.currentTarget;
+                      setSessionInfoOpen(true);
+                    }}
+                  >
+                    Cost{' '}
+                    <span className="font-mono tabular-nums">
+                      {formatSessionTotalCost(totalCostUsd)}
+                    </span>
+                  </Button>
+                )}
+              </SetPageTitle>
+              {showChatInterface ? (
+                <CloudChatRuntimeProvider
+                  active={chatTabActive}
+                  projection={{
+                    messages: shownMessages,
+                    isStreaming,
+                    pendingMessages: shownTranscript.pendingMessages,
+                    sendingMessageIds: shownTranscript.sendingMessageIds,
+                    preparationByMessageId,
+                    commitsAfterMessage,
+                  }}
+                  state={{
+                    isLoading,
+                    isRunning: isStreaming,
+                    isReadOnly,
+                    isSendDisabled: !canSend,
+                    canInterrupt,
+                  }}
+                  onCancel={async () => {
+                    await manager.interrupt();
+                  }}
+                  onNew={async message => {
+                    const text = message.content
+                      .flatMap(part => (part.type === 'text' ? [part.text] : []))
+                      .join('');
+                    if (!(await handleSendMessage(text)))
+                      throw new MessageNotSentError('Message was not accepted');
                   }}
                 >
-                  Cost{' '}
-                  <span className="font-mono tabular-nums">
-                    {formatSessionTotalCost(totalCostUsd)}
-                  </span>
-                </Button>
-              )}
-            </SetPageTitle>
-            {showChatInterface ? (
-              <CloudChatRuntimeProvider
-                active={chatTabActive}
-                projection={{
-                  messages: shownMessages,
-                  isStreaming,
-                  pendingMessages: shownTranscript.pendingMessages,
-                  sendingMessageIds: shownTranscript.sendingMessageIds,
-                  preparationByMessageId,
-                  commitsAfterMessage,
-                }}
-                state={{
-                  isLoading,
-                  isRunning: isStreaming,
-                  isReadOnly,
-                  isSendDisabled: !canSend,
-                  canInterrupt,
-                }}
-                onCancel={async () => {
-                  await manager.interrupt();
-                }}
-                onNew={async message => {
-                  const text = message.content
-                    .flatMap(part => (part.type === 'text' ? [part.text] : []))
-                    .join('');
-                  if (!(await handleSendMessage(text)))
-                    throw new MessageNotSentError('Message was not accepted');
-                }}
-              >
-                <Tabs
-                  value={activeWorkspaceTabId === CHAT_TAB_ID ? chatTabValue : activeWorkspaceTabId}
-                  onValueChange={handleWorkspaceValueChange}
-                  className="flex min-h-0 flex-1 flex-col"
-                >
-                  <div className="flex shrink-0 flex-wrap items-center gap-x-2 border-b px-3 py-2 sm:flex-nowrap">
-                    <MobileSidebarToggle variant="inline" label="Worktrees" />
-                    <div
-                      className={cn(
-                        'order-last min-w-0 basis-full sm:order-none sm:flex-1 sm:basis-auto',
-                        // Hold the tab strip's height while the session resolves its worktree.
-                        (sessionIdFromParams || selectedWorktreeId) &&
-                          'min-h-10 [@media(any-pointer:coarse)]:min-h-14'
+                  <Tabs
+                    value={
+                      activeWorkspaceTabId === CHAT_TAB_ID ? chatTabValue : activeWorkspaceTabId
+                    }
+                    onValueChange={handleWorkspaceValueChange}
+                    className="flex min-h-0 flex-1 flex-col"
+                  >
+                    <div className="flex shrink-0 flex-wrap items-center gap-x-2 border-b px-3 py-2 sm:flex-nowrap">
+                      <MobileSidebarToggle variant="inline" label="Worktrees" />
+                      <div
+                        className={cn(
+                          'order-last min-w-0 basis-full sm:order-none sm:flex-1 sm:basis-auto',
+                          // Hold the tab strip's height while the session resolves its worktree.
+                          (sessionIdFromParams || selectedWorktreeId) &&
+                            'min-h-10 [@media(any-pointer:coarse)]:min-h-14'
+                        )}
+                      >
+                        {(canOpenTerminal || selectedWorktreeId) && (
+                          <CloudAgentWorkspaceTabs
+                            activeTabId={activeWorkspaceTabId}
+                            activeTabRef={activeWorkspaceTabRef}
+                            files={filesVisible ? workspaceTabs.files : []}
+                            onCloseFile={handleCloseFileTab}
+                            chatSessions={worktreeChats}
+                            currentChatProgress={currentChatProgress}
+                            currentChatLoadingLabel={currentChatLoadingLabel}
+                            openChatSessionIds={openWorktreeChats.map(chat => chat.sessionId)}
+                            closedChatSessionIds={closedWorktreeChats.map(chat => chat.sessionId)}
+                            currentSessionId={sessionIdFromParams}
+                            worktreeId={selectedWorktreeId}
+                            onSelectChat={openSession}
+                            onCloseChat={handleCloseChat}
+                            onCreateChat={selectedWorktreeId ? handleCreateWorktreeChat : undefined}
+                            canCreateChat={canCreateWorktreeChat}
+                            onRenameChat={renameSession}
+                            deletingSessionIds={deletingSessionIds}
+                            terminals={workspaceTabs.terminals}
+                            terminalStatuses={terminalStatuses}
+                            canCreateTerminal={canOpenTerminal}
+                            canOpenPreview={preview.links !== null}
+                            onSelectTab={handleSelectWorkspaceTab}
+                            onCreateTerminal={handleCreateTerminalTab}
+                            onOpenPreview={preview.openDialog}
+                            onCloseTerminal={handleCloseTerminalTab}
+                            onActivateTab={closeChangesView}
+                            selectionSuppressed={changesViewOpen}
+                          />
+                        )}
+                      </div>
+                      <WorktreeReviewDialog
+                        review={review}
+                        onOpenComment={handleOpenReviewComment}
+                      />
+                      {preview.dialog !== null && <PreviewPortDialog {...preview.dialog} />}
+                      {(sessionIdFromParams || workspaceControlSession) && (
+                        <div
+                          className={cn(
+                            // Reserve the late-loading Changes and sandbox controls, which are
+                            // touch-sized below `sm`, so they do not resize the header row.
+                            'ml-auto flex min-h-11 shrink-0 items-center justify-end sm:min-h-8',
+                            (sessionIdFromParams || selectedWorktreeId) &&
+                              'min-w-[188px] sm:min-w-0'
+                          )}
+                        >
+                          {sessionActions}
+                        </div>
                       )}
+                    </div>
+
+                    <div
+                      ref={setChildSessionDrawerContainer}
+                      className="relative flex min-h-0 flex-1 flex-col"
                     >
-                      {(canOpenTerminal || selectedWorktreeId) && (
-                        <CloudAgentWorkspaceTabs
-                          activeTabId={activeWorkspaceTabId}
-                          activeTabRef={activeWorkspaceTabRef}
-                          files={filesVisible ? workspaceTabs.files : []}
-                          onCloseFile={handleCloseFileTab}
-                          chatSessions={worktreeChats}
-                          currentChatProgress={currentChatProgress}
-                          currentChatLoadingLabel={currentChatLoadingLabel}
-                          openChatSessionIds={openWorktreeChats.map(chat => chat.sessionId)}
-                          closedChatSessionIds={closedWorktreeChats.map(chat => chat.sessionId)}
-                          currentSessionId={sessionIdFromParams}
-                          worktreeId={selectedWorktreeId}
-                          onSelectChat={openSession}
-                          onCloseChat={handleCloseChat}
-                          onCreateChat={selectedWorktreeId ? handleCreateWorktreeChat : undefined}
-                          canCreateChat={canCreateWorktreeChat}
-                          onRenameChat={renameSession}
-                          deletingSessionIds={deletingSessionIds}
-                          terminals={workspaceTabs.terminals}
-                          terminalStatuses={terminalStatuses}
-                          canCreateTerminal={canOpenTerminal}
-                          canOpenPreview={preview.links !== null}
-                          onSelectTab={handleSelectWorkspaceTab}
-                          onCreateTerminal={handleCreateTerminalTab}
-                          onOpenPreview={preview.openDialog}
-                          onCloseTerminal={handleCloseTerminalTab}
-                          onActivateTab={closeChangesView}
-                          selectionSuppressed={changesViewOpen}
+                      <div
+                        inert={childSessionStack.length > 0 || preparationDrawerAttemptId !== null}
+                        className={changesViewOpen ? 'hidden' : 'flex min-h-0 flex-1 flex-col'}
+                      >
+                        <TabsContent
+                          value={chatTabValue}
+                          forceMount
+                          hidden={activeWorkspaceTabId !== CHAT_TAB_ID}
+                          className={
+                            activeWorkspaceTabId === CHAT_TAB_ID
+                              ? 'm-0 flex min-h-0 flex-1 flex-col'
+                              : 'hidden'
+                          }
+                        >
+                          <div className="relative min-h-0 flex-1">
+                            {!sessionIdFromParams &&
+                              selectedWorktreeId &&
+                              workspaceTabs.activeTabId === CHAT_TAB_ID && (
+                                <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+                                  <MessageSquare
+                                    className="text-muted-foreground h-6 w-6"
+                                    aria-hidden="true"
+                                  />
+                                  <div className="space-y-1">
+                                    <p className="text-sm font-medium">
+                                      {openWorktreeChats.length > 0
+                                        ? 'Select a chat'
+                                        : 'No open chats'}
+                                    </p>
+                                    <p className="text-muted-foreground text-sm">
+                                      Reopen a saved session from Sessions in the tab options menu
+                                      {canCreateWorktreeChat ? ' or start a new chat.' : '.'}
+                                    </p>
+                                  </div>
+                                  {canCreateWorktreeChat && (
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={handleCreateWorktreeChat}
+                                    >
+                                      New chat
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+                            <>
+                              <div
+                                ref={scrollContainerRef}
+                                hidden={!chatTabActive}
+                                className="absolute inset-0 overflow-x-hidden overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] py-2"
+                                onScroll={handleScroll}
+                              >
+                                <div ref={messagesContentRef}>
+                                  <div className="sr-only" aria-live="polite">
+                                    {olderArrivalAnnouncement}
+                                  </div>
+                                  {transcriptPhase !== 'opening' && (
+                                    <OlderMessagesHeader
+                                      hasOlderMessages={hasOlderMessages}
+                                      isLoadingOlderMessages={isLoadingOlderMessages}
+                                      olderMessagesError={olderMessagesError}
+                                      olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
+                                      onRetry={requestOlderMessages}
+                                    />
+                                  )}
+                                  {transcriptPhase === 'opening' ? (
+                                    <div
+                                      role="status"
+                                      aria-busy="true"
+                                      className="flex flex-col gap-3 py-2"
+                                    >
+                                      <span className="sr-only">Loading session…</span>
+                                      <Skeleton className="h-3 w-2/3 motion-reduce:animate-none" />
+                                      <Skeleton className="h-3 w-1/2 motion-reduce:animate-none" />
+                                    </div>
+                                  ) : transcriptPhase === 'failed' ? null : (
+                                    <PreviewLinksContext.Provider value={preview.links}>
+                                      <CloudThread
+                                        active={chatTabActive}
+                                        collapseTools={collapseTools}
+                                        getChildMessages={getChildMessages}
+                                        onOpenChildSession={handleOpenTopLevelChildSession}
+                                        onOpenPreparationDetails={handleOpenPreparationDetails}
+                                      />
+
+                                      {localFailure ? (
+                                        <LocalChatFailure
+                                          session={localFailure}
+                                          onRetry={() => retryLocalChat(localFailure.kiloSessionId)}
+                                          onDiscard={() =>
+                                            discardLocalChat(localFailure.kiloSessionId)
+                                          }
+                                        />
+                                      ) : (
+                                        <TranscriptStatusSlot
+                                          yieldToPreparationRow={preparationRowShowsProgress}
+                                          workingMessages={
+                                            chatTabActive &&
+                                            isStreaming &&
+                                            visibleStatusIndicator?.type !== 'warning'
+                                              ? dynamicMessages
+                                              : null
+                                          }
+                                          indicator={
+                                            shownBillingFailure ||
+                                            slotStatusIndicator?.type === 'error'
+                                              ? null
+                                              : slotStatusIndicator
+                                          }
+                                        />
+                                      )}
+                                    </PreviewLinksContext.Provider>
+                                  )}
+
+                                  <div ref={messagesEndRef} />
+                                </div>
+                              </div>
+
+                              {chatTabActive && showScrollButton && (
+                                <button
+                                  type="button"
+                                  onClick={scrollToBottom}
+                                  className="border-border bg-background absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border p-2 shadow-md"
+                                >
+                                  <ArrowDown className="h-4 w-4" />
+                                </button>
+                              )}
+                            </>
+                          </div>
+
+                          <div hidden={!chatTabActive} className={chatTabActive ? '' : 'hidden'}>
+                            {isReadOnly &&
+                              (!isLoading &&
+                              sessionIdFromParams &&
+                              fetchedSessionData &&
+                              transcriptPhase !== 'opening' ? (
+                                <SessionContinuationPanel sessionId={sessionIdFromParams} />
+                              ) : null)}
+                            <div hidden={isReadOnly}>
+                              {unreadablePermissions.length > 0 &&
+                                transcriptPhase !== 'opening' && (
+                                  <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
+                                    <PermissionUnreadableNotice />
+                                  </div>
+                                )}
+                              {activeQuestion && transcriptPhase !== 'opening' && (
+                                <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
+                                  <QuestionToolCard
+                                    key={activeQuestion.requestId}
+                                    questions={activeQuestion.questions}
+                                    requestId={activeQuestion.requestId}
+                                    status="running"
+                                  />
+                                </div>
+                              )}
+                              {activePermission && transcriptPhase !== 'opening' && (
+                                <div className="flex items-center border-t p-4">
+                                  <PermissionCard
+                                    key={activePermission.requestId}
+                                    requestId={activePermission.requestId}
+                                    permission={activePermission.permission}
+                                    patterns={activePermission.patterns}
+                                    metadata={activePermission.metadata}
+                                    always={activePermission.always}
+                                  />
+                                </div>
+                              )}
+                              <div className={activeQuestion || activePermission ? 'hidden' : ''}>
+                                {transcriptPhase !== 'opening' && shownBillingFailure && (
+                                  <div className="px-[max(1rem,calc(50%_-_27rem))] pb-2">
+                                    <CloudAgentBillingError
+                                      failure={shownBillingFailure}
+                                      presentation={billingPayerPresentation(shownBillingFailure, {
+                                        currentUserId,
+                                        organization:
+                                          organizationId && organizationName && organizationRole
+                                            ? {
+                                                id: organizationId,
+                                                name: organizationName,
+                                                role: organizationRole,
+                                              }
+                                            : undefined,
+                                      })}
+                                    />
+                                  </div>
+                                )}
+                                <div className="px-[max(1rem,calc(50%_-_27rem))]">
+                                  <CurrentTaskList todos={currentTodos} />
+                                </div>
+                                {sessionErrorMessage !== null && (
+                                  <div className="-mb-2 px-[max(1rem,calc(50%_-_27rem))]">
+                                    <SessionErrorNotice
+                                      message={sessionErrorMessage}
+                                      hint={
+                                        workspaceSnapshotRecoveryState !== null
+                                          ? 'Start fresh to discard the snapshot, or send your message again to retry.'
+                                          : environmentBuildRecoveryId !== null
+                                            ? 'Send your message again once the environment snapshot is ready.'
+                                            : undefined
+                                      }
+                                      actions={
+                                        environmentBuildRecoveryId !== null ||
+                                        workspaceSnapshotRecoveryState !== null ||
+                                        failedPreparationAttemptId !== null ? (
+                                          <>
+                                            {environmentBuildRecoveryId !== null && (
+                                              <EnvironmentBuildRecovery
+                                                environmentId={environmentBuildRecoveryId}
+                                                organizationId={organizationId}
+                                              />
+                                            )}
+                                            {workspaceSnapshotRecoveryState !== null && (
+                                              <WorkspaceSnapshotRecovery
+                                                capturedAt={
+                                                  workspaceSnapshotRecoveryState.capturedAt
+                                                }
+                                                isRemoving={removeWorkspaceSnapshot.isPending}
+                                                onRemove={async () => {
+                                                  await removeWorkspaceSnapshot.mutateAsync();
+                                                  toast.success(
+                                                    'Workspace snapshot removed. Your next start will use the environment snapshot or base image.'
+                                                  );
+                                                }}
+                                              />
+                                            )}
+                                            {failedPreparationAttemptId !== null && (
+                                              <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() =>
+                                                  handleOpenPreparationDetails(
+                                                    failedPreparationAttemptId
+                                                  )
+                                                }
+                                              >
+                                                View details
+                                              </Button>
+                                            )}
+                                          </>
+                                        ) : undefined
+                                      }
+                                    />
+                                  </div>
+                                )}
+                                <CloudComposer
+                                  inputRef={composerInputRef}
+                                  onSend={handleSendMessage}
+                                  onSendCommand={handleSendSlashCommand}
+                                  onNewChat={
+                                    canCreateWorktreeChat ? handleReplaceWorktreeChat : undefined
+                                  }
+                                  onStop={handleStopExecution}
+                                  canInterrupt={canInterrupt}
+                                  conversationKey={sessionIdFromParams ?? 'new'}
+                                  disabled={
+                                    !canSend ||
+                                    isLoading ||
+                                    transcriptPhase === 'opening' ||
+                                    activeSessionType === null
+                                  }
+                                  sendUnavailableReason={
+                                    transcriptPhase === 'local'
+                                      ? localFailure
+                                        ? undefined
+                                        : 'Creating session…'
+                                      : chatOpening
+                                        ? 'Loading session…'
+                                        : undefined
+                                  }
+                                  textareaDisabled={composerTextareaDisabled}
+                                  isStreaming={
+                                    (isStreaming || activity.type === 'retrying') &&
+                                    !activeSuggestion
+                                  }
+                                  placeholder="Ask anything…"
+                                  slashCommands={availableCommands}
+                                  mode={modeControlValue(composerSettings?.mode ?? null)}
+                                  model={displayModel}
+                                  modelOptions={modelOptions}
+                                  isLoadingModels={isLoadingModels}
+                                  onModelPickerIntent={requestModelCatalog}
+                                  onModeChange={handleModeChange}
+                                  onModelChange={handleModelChange}
+                                  variant={displayVariant}
+                                  onVariantChange={handleVariantChange}
+                                  availableVariants={displayAvailableVariants}
+                                  showToolbar={Boolean(sessionIdFromParams)}
+                                  initialValue={failedPrompt ?? undefined}
+                                  withdrawnFailedPrompt={deliveredFailedPrompt}
+                                  customModeOptions={customModeOptions}
+                                  modelPickerDisabled={
+                                    modelPickerLocked || sessionModels.modelPickerDisabled
+                                  }
+                                  modelPickerTooltip={lockTooltip}
+                                  variantPickerDisabled={
+                                    modelPickerLocked || sessionModels.modelPickerDisabled
+                                  }
+                                  variantPickerTooltip={lockTooltip}
+                                  attachmentsEnabled={
+                                    !isReadOnly &&
+                                    (supportsAttachments || transcriptPhase === 'local')
+                                  }
+                                  attachmentUploadOptions={{
+                                    messageUuid: attachmentMessageUuid,
+                                    organizationId,
+                                    getUploadUrl: {
+                                      personal: personalUploadUrl,
+                                      organization: orgUploadUrl,
+                                    },
+                                  }}
+                                />
+                                <ComposerContextLine
+                                  userId={currentUserId}
+                                  reserve={Boolean(sessionIdFromParams)}
+                                  cloudAgentSessionId={workspaceCloudSessionId ?? undefined}
+                                  organizationId={organizationId}
+                                  worktreeId={selectedWorktreeId ?? undefined}
+                                  repository={composerRepository}
+                                  branch={composerBranch}
+                                  environmentName={environment?.name}
+                                  contextTokens={contextUsage?.contextTokens}
+                                  contextWindow={contextWindow}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </TabsContent>
+                        <div
+                          className={
+                            terminalTabActive
+                              ? 'h-full min-h-0 px-[max(1rem,calc(50%_-_27rem))] py-2'
+                              : 'hidden'
+                          }
+                        >
+                          {terminalPaneMap}
+                        </div>
+                        {filesVisible &&
+                          changesCloudSessionId &&
+                          workspaceTabs.files.map(tab => {
+                            const tabId = fileTabId(tab.path, tab.scope);
+                            const active = activeWorkspaceTabId === tabId;
+                            return (
+                              <TabsContent key={tabId} value={tabId} className="m-0 min-h-0 flex-1">
+                                {active && !changesViewOpen && (
+                                  <WorktreeFilePane
+                                    userId={currentUserId}
+                                    cloudAgentSessionId={changesCloudSessionId}
+                                    organizationId={organizationId}
+                                    worktreeId={selectedWorktreeId ?? undefined}
+                                    path={tab.path}
+                                    scope={tab.scope}
+                                    mode={tab.mode}
+                                    review={review.scope ? review.bindings : undefined}
+                                    reviewScope={review.scope ?? undefined}
+                                    onModeChange={mode =>
+                                      setWorkspaceTabs(state =>
+                                        setFileTabMode(state, tab.path, mode, tab.scope)
+                                      )
+                                    }
+                                  />
+                                )}
+                              </TabsContent>
+                            );
+                          })}
+                      </div>
+                      {canOpenChanges && changesCloudSessionId && (
+                        <WorktreeChangesView
+                          key={fileScope}
+                          userId={currentUserId}
+                          cloudAgentSessionId={changesCloudSessionId}
+                          organizationId={organizationId}
+                          worktreeId={selectedWorktreeId ?? undefined}
+                          open={changesViewOpen}
+                          commentCounts={reviewCommentCounts}
+                          review={review.scope ? review.bindings : undefined}
+                          reviewScope={review.scope ?? undefined}
                         />
                       )}
                     </div>
-                    <WorktreeReviewDialog review={review} onOpenComment={handleOpenReviewComment} />
-                    {preview.dialog !== null && <PreviewPortDialog {...preview.dialog} />}
-                    {(sessionIdFromParams || workspaceControlSession) && (
-                      <div
-                        className={cn(
-                          // Reserve the late-loading Changes and sandbox controls, which are
-                          // touch-sized below `sm`, so they do not resize the header row.
-                          'ml-auto flex min-h-11 shrink-0 items-center justify-end sm:min-h-8',
-                          (sessionIdFromParams || selectedWorktreeId) && 'min-w-[188px] sm:min-w-0'
-                        )}
-                      >
-                        {sessionActions}
-                      </div>
-                    )}
-                  </div>
-
-                  <div
-                    ref={setChildSessionDrawerContainer}
-                    className="relative flex min-h-0 flex-1 flex-col"
-                  >
-                    <div
-                      inert={childSessionStack.length > 0 || preparationDrawerAttemptId !== null}
-                      className={changesViewOpen ? 'hidden' : 'flex min-h-0 flex-1 flex-col'}
-                    >
-                      <TabsContent
-                        value={chatTabValue}
-                        forceMount
-                        hidden={activeWorkspaceTabId !== CHAT_TAB_ID}
-                        className={
-                          activeWorkspaceTabId === CHAT_TAB_ID
-                            ? 'm-0 flex min-h-0 flex-1 flex-col'
-                            : 'hidden'
-                        }
-                      >
-                        <div className="relative min-h-0 flex-1">
-                          {!sessionIdFromParams &&
-                            selectedWorktreeId &&
-                            workspaceTabs.activeTabId === CHAT_TAB_ID && (
-                              <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-                                <MessageSquare
-                                  className="text-muted-foreground h-6 w-6"
-                                  aria-hidden="true"
-                                />
-                                <div className="space-y-1">
-                                  <p className="text-sm font-medium">
-                                    {openWorktreeChats.length > 0
-                                      ? 'Select a chat'
-                                      : 'No open chats'}
-                                  </p>
-                                  <p className="text-muted-foreground text-sm">
-                                    Reopen a saved session from Sessions in the tab options menu
-                                    {canCreateWorktreeChat ? ' or start a new chat.' : '.'}
-                                  </p>
-                                </div>
-                                {canCreateWorktreeChat && (
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={handleCreateWorktreeChat}
-                                  >
-                                    New chat
-                                  </Button>
-                                )}
-                              </div>
-                            )}
-                          <>
-                            <div
-                              ref={scrollContainerRef}
-                              hidden={!chatTabActive}
-                              className="absolute inset-0 overflow-x-hidden overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] py-2"
-                              onScroll={handleScroll}
-                            >
-                              <div ref={messagesContentRef}>
-                                <div className="sr-only" aria-live="polite">
-                                  {olderArrivalAnnouncement}
-                                </div>
-                                {transcriptPhase !== 'opening' && (
-                                  <OlderMessagesHeader
-                                    isLoadingOlderMessages={isLoadingOlderMessages}
-                                    olderMessagesError={olderMessagesError}
-                                    olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
-                                    onRetry={requestOlderMessages}
-                                  />
-                                )}
-                                {transcriptPhase === 'opening' ? (
-                                  <div
-                                    role="status"
-                                    aria-busy="true"
-                                    className="flex flex-col gap-3 py-2"
-                                  >
-                                    <span className="sr-only">Loading session…</span>
-                                    <Skeleton className="h-3 w-2/3 motion-reduce:animate-none" />
-                                    <Skeleton className="h-3 w-1/2 motion-reduce:animate-none" />
-                                  </div>
-                                ) : transcriptPhase === 'failed' ? null : (
-                                  <PreviewLinksContext.Provider value={preview.links}>
-                                    <CloudThread
-                                      active={chatTabActive}
-                                      collapseTools={collapseTools}
-                                      getChildMessages={getChildMessages}
-                                      onOpenChildSession={handleOpenTopLevelChildSession}
-                                      onOpenPreparationDetails={handleOpenPreparationDetails}
-                                    />
-
-                                    {localFailure ? (
-                                      <LocalChatFailure
-                                        session={localFailure}
-                                        onRetry={() => retryLocalChat(localFailure.kiloSessionId)}
-                                        onDiscard={() =>
-                                          discardLocalChat(localFailure.kiloSessionId)
-                                        }
-                                      />
-                                    ) : (
-                                      <TranscriptStatusSlot
-                                        yieldToPreparationRow={preparationRowShowsProgress}
-                                        workingMessages={
-                                          chatTabActive &&
-                                          isStreaming &&
-                                          visibleStatusIndicator?.type !== 'warning'
-                                            ? dynamicMessages
-                                            : null
-                                        }
-                                        indicator={
-                                          shownBillingFailure ||
-                                          slotStatusIndicator?.type === 'error'
-                                            ? null
-                                            : slotStatusIndicator
-                                        }
-                                      />
-                                    )}
-                                  </PreviewLinksContext.Provider>
-                                )}
-
-                                <div ref={messagesEndRef} />
-                              </div>
-                            </div>
-
-                            {chatTabActive && showScrollButton && (
-                              <button
-                                type="button"
-                                onClick={scrollToBottom}
-                                className="border-border bg-background absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border p-2 shadow-md"
-                              >
-                                <ArrowDown className="h-4 w-4" />
-                              </button>
-                            )}
-                          </>
-                        </div>
-
-                        <div hidden={!chatTabActive} className={chatTabActive ? '' : 'hidden'}>
-                          {isReadOnly &&
-                            (!isLoading &&
-                            sessionIdFromParams &&
-                            fetchedSessionData &&
-                            transcriptPhase !== 'opening' ? (
-                              <SessionContinuationPanel sessionId={sessionIdFromParams} />
-                            ) : null)}
-                          <div hidden={isReadOnly}>
-                            {unreadablePermissions.length > 0 && transcriptPhase !== 'opening' && (
-                              <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
-                                <PermissionUnreadableNotice />
-                              </div>
-                            )}
-                            {activeQuestion && transcriptPhase !== 'opening' && (
-                              <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
-                                <QuestionToolCard
-                                  key={activeQuestion.requestId}
-                                  questions={activeQuestion.questions}
-                                  requestId={activeQuestion.requestId}
-                                  status="running"
-                                />
-                              </div>
-                            )}
-                            {activePermission && transcriptPhase !== 'opening' && (
-                              <div className="flex items-center border-t p-4">
-                                <PermissionCard
-                                  key={activePermission.requestId}
-                                  requestId={activePermission.requestId}
-                                  permission={activePermission.permission}
-                                  patterns={activePermission.patterns}
-                                  metadata={activePermission.metadata}
-                                  always={activePermission.always}
-                                />
-                              </div>
-                            )}
-                            <div className={activeQuestion || activePermission ? 'hidden' : ''}>
-                              {transcriptPhase !== 'opening' && shownBillingFailure && (
-                                <div className="px-[max(1rem,calc(50%_-_27rem))] pb-2">
-                                  <CloudAgentBillingError
-                                    failure={shownBillingFailure}
-                                    presentation={billingPayerPresentation(shownBillingFailure, {
-                                      currentUserId,
-                                      organization:
-                                        organizationId && organizationName && organizationRole
-                                          ? {
-                                              id: organizationId,
-                                              name: organizationName,
-                                              role: organizationRole,
-                                            }
-                                          : undefined,
-                                    })}
-                                  />
-                                </div>
-                              )}
-                              <div className="px-[max(1rem,calc(50%_-_27rem))]">
-                                <CurrentTaskList todos={currentTodos} />
-                              </div>
-                              {sessionErrorMessage !== null && (
-                                <div className="-mb-2 px-[max(1rem,calc(50%_-_27rem))]">
-                                  <SessionErrorNotice
-                                    message={sessionErrorMessage}
-                                    hint={
-                                      workspaceSnapshotRecoveryState !== null
-                                        ? 'Start fresh to discard the snapshot, or send your message again to retry.'
-                                        : environmentBuildRecoveryId !== null
-                                          ? 'Send your message again once the environment snapshot is ready.'
-                                          : undefined
-                                    }
-                                    actions={
-                                      environmentBuildRecoveryId !== null ||
-                                      workspaceSnapshotRecoveryState !== null ||
-                                      failedPreparationAttemptId !== null ? (
-                                        <>
-                                          {environmentBuildRecoveryId !== null && (
-                                            <EnvironmentBuildRecovery
-                                              environmentId={environmentBuildRecoveryId}
-                                              organizationId={organizationId}
-                                            />
-                                          )}
-                                          {workspaceSnapshotRecoveryState !== null && (
-                                            <WorkspaceSnapshotRecovery
-                                              capturedAt={workspaceSnapshotRecoveryState.capturedAt}
-                                              isRemoving={removeWorkspaceSnapshot.isPending}
-                                              onRemove={async () => {
-                                                await removeWorkspaceSnapshot.mutateAsync();
-                                                toast.success(
-                                                  'Workspace snapshot removed. Your next start will use the environment snapshot or base image.'
-                                                );
-                                              }}
-                                            />
-                                          )}
-                                          {failedPreparationAttemptId !== null && (
-                                            <Button
-                                              type="button"
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() =>
-                                                handleOpenPreparationDetails(
-                                                  failedPreparationAttemptId
-                                                )
-                                              }
-                                            >
-                                              View details
-                                            </Button>
-                                          )}
-                                        </>
-                                      ) : undefined
-                                    }
-                                  />
-                                </div>
-                              )}
-                              <CloudComposer
-                                inputRef={composerInputRef}
-                                onSend={handleSendMessage}
-                                onSendCommand={handleSendSlashCommand}
-                                onNewChat={
-                                  canCreateWorktreeChat ? handleReplaceWorktreeChat : undefined
-                                }
-                                onStop={handleStopExecution}
-                                canInterrupt={canInterrupt}
-                                conversationKey={sessionIdFromParams ?? 'new'}
-                                disabled={
-                                  !canSend ||
-                                  isLoading ||
-                                  transcriptPhase === 'opening' ||
-                                  activeSessionType === null
-                                }
-                                sendUnavailableReason={
-                                  transcriptPhase === 'local'
-                                    ? localFailure
-                                      ? undefined
-                                      : 'Creating session…'
-                                    : chatOpening
-                                      ? 'Loading session…'
-                                      : undefined
-                                }
-                                textareaDisabled={composerTextareaDisabled}
-                                isStreaming={
-                                  (isStreaming || activity.type === 'retrying') && !activeSuggestion
-                                }
-                                placeholder="Ask anything…"
-                                slashCommands={availableCommands}
-                                mode={modeControlValue(composerSettings?.mode ?? null)}
-                                model={displayModel}
-                                modelOptions={modelOptions}
-                                isLoadingModels={isLoadingModels}
-                                onModeChange={handleModeChange}
-                                onModelChange={handleModelChange}
-                                variant={displayVariant}
-                                onVariantChange={handleVariantChange}
-                                availableVariants={displayAvailableVariants}
-                                showToolbar={Boolean(sessionIdFromParams)}
-                                initialValue={failedPrompt ?? undefined}
-                                customModeOptions={customModeOptions}
-                                modelPickerDisabled={
-                                  modelPickerLocked || sessionModels.modelPickerDisabled
-                                }
-                                modelPickerTooltip={lockTooltip}
-                                variantPickerDisabled={
-                                  modelPickerLocked || sessionModels.modelPickerDisabled
-                                }
-                                variantPickerTooltip={lockTooltip}
-                                attachmentsEnabled={
-                                  !isReadOnly &&
-                                  (supportsAttachments || transcriptPhase === 'local')
-                                }
-                                attachmentUploadOptions={{
-                                  messageUuid: attachmentMessageUuid,
-                                  organizationId,
-                                  getUploadUrl: {
-                                    personal: personalUploadUrl,
-                                    organization: orgUploadUrl,
-                                  },
-                                }}
-                              />
-                              <ComposerContextLine
-                                userId={currentUserId}
-                                reserve={Boolean(sessionIdFromParams)}
-                                cloudAgentSessionId={workspaceCloudSessionId ?? undefined}
-                                organizationId={organizationId}
-                                worktreeId={selectedWorktreeId ?? undefined}
-                                repository={composerRepository}
-                                branch={composerBranch}
-                                environmentName={environment?.name}
-                                contextTokens={contextUsage?.contextTokens}
-                                contextWindow={contextWindow}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </TabsContent>
-                      <div
-                        className={
-                          terminalTabActive
-                            ? 'h-full min-h-0 px-[max(1rem,calc(50%_-_27rem))] py-2'
-                            : 'hidden'
-                        }
-                      >
-                        {terminalPaneMap}
-                      </div>
-                      {filesVisible &&
-                        changesCloudSessionId &&
-                        workspaceTabs.files.map(tab => {
-                          const tabId = fileTabId(tab.path, tab.scope);
-                          const active = activeWorkspaceTabId === tabId;
-                          return (
-                            <TabsContent key={tabId} value={tabId} className="m-0 min-h-0 flex-1">
-                              {active && !changesViewOpen && (
-                                <WorktreeFilePane
-                                  userId={currentUserId}
-                                  cloudAgentSessionId={changesCloudSessionId}
-                                  organizationId={organizationId}
-                                  worktreeId={selectedWorktreeId ?? undefined}
-                                  path={tab.path}
-                                  scope={tab.scope}
-                                  mode={tab.mode}
-                                  review={review.scope ? review.bindings : undefined}
-                                  reviewScope={review.scope ?? undefined}
-                                  onModeChange={mode =>
-                                    setWorkspaceTabs(state =>
-                                      setFileTabMode(state, tab.path, mode, tab.scope)
-                                    )
-                                  }
-                                />
-                              )}
-                            </TabsContent>
-                          );
-                        })}
-                    </div>
-                    {canOpenChanges && changesCloudSessionId && (
-                      <WorktreeChangesView
-                        key={fileScope}
-                        userId={currentUserId}
-                        cloudAgentSessionId={changesCloudSessionId}
-                        organizationId={organizationId}
-                        worktreeId={selectedWorktreeId ?? undefined}
-                        open={changesViewOpen}
-                        commentCounts={reviewCommentCounts}
-                        review={review.scope ? review.bindings : undefined}
-                        reviewScope={review.scope ?? undefined}
-                      />
-                    )}
-                  </div>
-                </Tabs>
-              </CloudChatRuntimeProvider>
-            ) : (
-              <div className="text-muted-foreground relative flex h-full flex-col items-center justify-center gap-2">
-                <MobileSidebarToggle />
-                <p className="text-sm">No active session</p>
-                <p className="text-xs">Select a session from the sidebar or create a new one</p>
-              </div>
-            )}
-            <ChildSessionDrawer
-              stack={childSessionStack}
-              onBack={handleChildSessionDrawerBack}
-              onOpenChange={handleChildSessionDrawerOpenChange}
-              onOpenChildSession={handleOpenNestedChildSession}
-              onCloseAutoFocus={handleChildSessionDrawerCloseAutoFocus}
-              portalContainer={childSessionDrawerContainer}
-            />
-            <PreparationDrawer
-              attemptId={preparationDrawerAttemptId}
-              onOpenChange={handlePreparationDrawerOpenChange}
-              onCloseAutoFocus={handlePreparationDrawerCloseAutoFocus}
-              portalContainer={childSessionDrawerContainer}
-            />
-          </div>
+                  </Tabs>
+                </CloudChatRuntimeProvider>
+              ) : (
+                <div className="text-muted-foreground relative flex h-full flex-col items-center justify-center gap-2">
+                  <MobileSidebarToggle />
+                  <p className="text-sm">No active session</p>
+                  <p className="text-xs">Select a session from the sidebar or create a new one</p>
+                </div>
+              )}
+              <ChildSessionDrawer
+                stack={childSessionStack}
+                onBack={handleChildSessionDrawerBack}
+                onOpenChange={handleChildSessionDrawerOpenChange}
+                onOpenChildSession={handleOpenNestedChildSession}
+                onCloseAutoFocus={handleChildSessionDrawerCloseAutoFocus}
+                portalContainer={childSessionDrawerContainer}
+              />
+              <PreparationDrawer
+                attemptId={preparationDrawerAttemptId}
+                onOpenChange={handlePreparationDrawerOpenChange}
+                onCloseAutoFocus={handlePreparationDrawerCloseAutoFocus}
+                portalContainer={childSessionDrawerContainer}
+              />
+            </div>
+          </ToolDetailScopeProvider>
         </SuggestionContextProvider>
       </PermissionContextProvider>
     </QuestionContextProvider>

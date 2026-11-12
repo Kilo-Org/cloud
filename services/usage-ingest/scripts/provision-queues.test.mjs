@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import test, { describe } from 'node:test';
+import { experimental_readRawConfig } from 'wrangler';
 import { prepareQueues } from './provision-queues.mjs';
 
 const execute = promisify(execFile);
@@ -24,7 +25,29 @@ const defaultSettings = {
   delivery_paused: false,
   message_retention_period: 345_600,
 };
-async function createFixture(t, existing = [], environment) {
+const configPath = new URL('../wrangler.jsonc', import.meta.url).pathname;
+
+// The pre-hedge shape (one EU source, its DLQ, one consumer) that historical revisions deploy.
+function withoutHedge(queues) {
+  return {
+    ...queues,
+    producers: queues.producers.filter(p => p.binding !== 'USAGE_INGEST_HEDGE_QUEUE'),
+    consumers: queues.consumers.filter(c => c.queue.endsWith('-eu')),
+  };
+}
+
+function writeConfig(path, environment, { hedged, mutate }) {
+  const config = structuredClone(experimental_readRawConfig({ config: configPath }).rawConfig);
+  for (const selected of [config, config.env.staging]) {
+    if (!hedged) selected.queues = withoutHedge(selected.queues);
+  }
+  mutate?.(environment === 'staging' ? config.env.staging : config);
+  const text = JSON.stringify(config, null, 2);
+  writeFileSync(path, text);
+  return text;
+}
+
+async function createFixture(t, existing = [], environment, { hedged = false } = {}) {
   const suffix = environment === 'staging' ? '-staging' : '';
   const globalSource = `usage-ingest-processing${suffix}`;
   const globalDlq = `usage-ingest-processing-dlq${suffix}`;
@@ -42,8 +65,8 @@ async function createFixture(t, existing = [], environment) {
     join(directory, 'scripts/provision-queues.mjs'),
     readFileSync(new URL('./provision-queues.mjs', import.meta.url))
   );
-  const config = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  writeFileSync(join(directory, 'wrangler.jsonc'), config);
+  const configFile = join(directory, 'wrangler.jsonc');
+  const config = writeConfig(configFile, environment, { hedged });
   const queues = new Map();
   const calls = [];
   let nextId = 0;
@@ -69,6 +92,8 @@ async function createFixture(t, existing = [], environment) {
     calls,
     fault: undefined,
     selectedDlq: dlq,
+    hedged,
+    mutate: mutate => writeConfig(configFile, environment, { hedged, mutate }),
     global: () => {
       f.selectedDlq = globalDlq;
       writeFileSync(
@@ -113,7 +138,10 @@ async function createFixture(t, existing = [], environment) {
       }
     } else if (req.method === 'PATCH') {
       const queue = [...queues.values()].find(q => q.queue_id === url.pathname.split('/').at(-1));
-      assert.equal(queue?.queue_name, f.selectedDlq);
+      assert.ok(
+        queue?.queue_name === f.selectedDlq || (f.hedged && queue?.queue_name === globalDlq),
+        'only a selected DLQ is updated'
+      );
       assert.deepEqual(Object.keys(body), ['settings']);
       assert.ok(
         body.settings.message_retention_period >= queue.settings.message_retention_period,
@@ -132,20 +160,34 @@ async function createFixture(t, existing = [], environment) {
       }
       result = queue;
     } else if (req.method === 'POST') {
+      const global = [globalDlq, globalSource].includes(body.queue_name);
+      const jurisdiction = global ? {} : { jurisdiction: 'eu' };
       assert.deepEqual(
         body,
-        body.queue_name === dlq
+        [dlq, globalDlq].includes(body.queue_name)
           ? {
-              queue_name: dlq,
-              jurisdiction: 'eu',
+              queue_name: body.queue_name,
+              ...jurisdiction,
               settings: { message_retention_period: maxRetention },
             }
-          : { queue_name: body.queue_name, jurisdiction: 'eu' }
+          : { queue_name: body.queue_name, ...jurisdiction }
       );
-      assert.ok([dlq, source].includes(body.queue_name) && !queues.has(body.queue_name));
+      assert.ok(
+        (f.hedged ? [dlq, source, globalDlq, globalSource] : [dlq, source]).includes(
+          body.queue_name
+        ) && !queues.has(body.queue_name)
+      );
+      if (f.fault === 'unreadable creation' && body.queue_name === globalSource) {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ success: true, result: {} }));
+        return;
+      }
       result = add(body.queue_name, f.fault === 'create ignores retention' ? {} : body.settings);
       if (f.fault === 'ignored jurisdiction') delete result.jurisdiction;
-      if (f.fault === 'created foreign consumer' && body.queue_name === source)
+      if (
+        f.fault === 'created foreign consumer' &&
+        [source, globalSource].includes(body.queue_name)
+      )
         result.consumers = [{ ...owned, script: 'foreign-worker' }];
       if (f.fault === 'lost acceptance' && body.queue_name === source) {
         req.socket.destroy();
@@ -618,5 +660,241 @@ for (const environment of ['staging', 'production'])
       assert.deepEqual(f.queues.get(otherSource), untouched);
       assert.deepEqual(f.queues.get(globalSource).consumers, []);
       assert.ok(f.queues.has(source) && f.queues.has(dlq));
+    });
+
+    describe('stall hedge configuration', () => {
+      const hedged = (t, existing) => createFixture(t, existing, environment, { hedged: true });
+      const writes = f => f.calls.filter(c => c.method !== 'GET');
+
+      test('the committed config declares the hedge pair; the legacy fixture does not', async t => {
+        const current = await hedged(t, []);
+        const legacy = await fixture(t, []);
+        assert.equal(current.hedged, true);
+        assert.equal(legacy.hedged, false);
+        await current.cli();
+        await legacy.cli();
+        assert.ok(current.queues.has(globalSource) && current.queues.has(globalDlq));
+        assert.ok(!legacy.queues.has(globalSource) && !legacy.queues.has(globalDlq));
+      });
+
+      for (const existing of [
+        [],
+        [dlq, source],
+        [globalDlq],
+        [dlq, source, globalDlq, globalSource],
+      ])
+        test(`creates only missing queues, global ones without EU jurisdiction (${existing.join(', ') || 'none'} existing)`, async t => {
+          const f = await hedged(t, existing);
+          await f.cli();
+          const created = f.calls.filter(c => c.method === 'POST').map(c => c.name);
+          assert.deepEqual(
+            created,
+            [dlq, source, globalDlq, globalSource].filter(name => !existing.includes(name))
+          );
+          assert.equal(f.queues.get(source).jurisdiction, 'eu');
+          assert.equal(f.queues.get(dlq).jurisdiction, 'eu');
+          assert.equal(f.queues.get(globalSource).jurisdiction, undefined);
+          assert.equal(f.queues.get(globalDlq).jurisdiction, undefined);
+          assert.equal(f.queues.get(globalDlq).settings.message_retention_period, maxRetention);
+          assert.equal(f.queues.get(dlq).settings.message_retention_period, maxRetention);
+          assert.deepEqual(f.queues.get(globalSource).settings, defaultSettings);
+          assert.ok(f.calls.every(c => c.method !== 'DELETE'));
+          const before = f.calls.length;
+          await f.cli();
+          assert.ok(f.calls.slice(before).every(c => c.method === 'GET'));
+        });
+
+      test('keeps the owned global consumer attached and never detaches anything', async t => {
+        const f = await hedged(t, [source, dlq, globalSource, globalDlq]);
+        f.queues.get(source).consumers = [{ ...owned }];
+        f.queues.get(globalSource).consumers = [{ ...owned }];
+        f.queues.get(globalDlq).settings.message_retention_period = maxRetention;
+        f.queues.get(dlq).settings.message_retention_period = maxRetention;
+        const before = structuredClone([...f.queues.values()]);
+        await f.cli();
+        await f.cli();
+        assert.deepEqual(writes(f), []);
+        assert.deepEqual([...f.queues.values()], before);
+      });
+
+      test('a legacy-shaped deployment after hedge activation detaches the hedge consumer regardless of backlog', async t => {
+        const f = await fixture(t, [source, dlq, globalSource, globalDlq]);
+        const hedgeQueue = f.queues.get(globalSource);
+        hedgeQueue.consumers = [{ ...owned }];
+        hedgeQueue.backlog = 3;
+        await f.cli();
+        assert.deepEqual(hedgeQueue.consumers, []);
+        assert.equal(hedgeQueue.backlog, 3);
+        assert.equal(f.queues.size, 4);
+        assert.deepEqual(
+          f.calls.filter(c => c.method === 'DELETE').map(c => c.path),
+          [
+            `/client/v4/accounts/e115e769bcdd4c3d66af59d3332cb394/queues/${hedgeQueue.queue_id}/consumers/${owned.consumer_id}`,
+          ]
+        );
+      });
+
+      test('a service-bound global consumer in the default environment is accepted', async t => {
+        const f = await hedged(t, [source, dlq, globalSource, globalDlq]);
+        const consumer = {
+          type: 'worker',
+          service: worker,
+          environment: 'production',
+          consumer_id: owned.consumer_id,
+        };
+        f.queues.get(globalSource).consumers = [consumer];
+        await f.cli();
+        assert.deepEqual(f.queues.get(globalSource).consumers, [consumer]);
+        assert.ok(f.calls.every(c => c.method !== 'DELETE'));
+      });
+
+      test('raises existing global DLQ retention with readback, keeping other settings', async t => {
+        const f = await hedged(t, [source, dlq, globalSource, globalDlq]);
+        f.queues.get(dlq).settings.message_retention_period = maxRetention;
+        f.queues.get(globalDlq).settings = { ...defaultSettings, delivery_delay: 5 };
+        await f.cli();
+        assert.deepEqual(
+          patches(f).map(c => [c.path.split('/').at(-1), c.body]),
+          [
+            [
+              f.queues.get(globalDlq).queue_id,
+              {
+                settings: {
+                  ...defaultSettings,
+                  delivery_delay: 5,
+                  message_retention_period: maxRetention,
+                },
+              },
+            ],
+          ]
+        );
+        assert.equal(f.queues.get(globalDlq).settings.message_retention_period, maxRetention);
+      });
+
+      test('unconfirmed or unreadable global DLQ retention stops deployment', async t => {
+        for (const fault of ['patch ignored', 'patch clobbers settings']) {
+          const f = await hedged(t, [source, dlq, globalSource, globalDlq]);
+          f.queues.get(dlq).settings.message_retention_period = maxRetention;
+          f.fault = fault;
+          await assert.rejects(f.cli(), error =>
+            new RegExp(`${globalDlq} retention update was not confirmed`).test(error.stderr)
+          );
+        }
+        const f = await hedged(t, [source, dlq, globalSource, globalDlq]);
+        f.queues.get(globalDlq).settings = {};
+        await assert.rejects(f.cli(), error =>
+          new RegExp(`Cannot read ${globalDlq} message retention`).test(error.stderr)
+        );
+      });
+
+      test('foreign or unverifiable hedge consumer stops before any write', async t => {
+        for (const consumers of [
+          undefined,
+          [null],
+          [{ ...owned, script: 'foreign-worker' }],
+          [{ ...owned, type: 'http_pull' }],
+          [owned, owned],
+          [{ ...owned, consumer_id: 'invalid' }],
+          [
+            {
+              type: 'worker',
+              service: worker,
+              environment: 'preview',
+              consumer_id: owned.consumer_id,
+            },
+          ],
+        ]) {
+          const f = await hedged(t, [globalSource]);
+          f.queues.get(globalSource).consumers = consumers;
+          await assert.rejects(f.cli(), error => /ownership|environment/.test(error.stderr));
+          assert.ok(f.calls.every(c => c.method === 'GET'));
+          assert.deepEqual(f.queues.get(globalSource).consumers, consumers);
+          assert.equal(f.queues.size, 1);
+        }
+      });
+
+      test('a created hedge queue with a foreign consumer stops deployment', async t => {
+        const f = await hedged(t, [source, dlq, globalDlq]);
+        f.fault = 'created foreign consumer';
+        await assert.rejects(f.cli(), error => /ownership mismatch/.test(error.stderr));
+        assert.ok(f.calls.every(c => c.method !== 'DELETE'));
+      });
+
+      test('a created hedge queue that cannot be read back stops deployment', async t => {
+        const f = await hedged(t, [source, dlq, globalDlq]);
+        f.fault = 'unreadable creation';
+        await assert.rejects(f.cli(), error =>
+          new RegExp(`Created queue ${globalSource} was not read back`).test(error.stderr)
+        );
+      });
+
+      test('a foreign main consumer still stops before any hedge write', async t => {
+        const f = await hedged(t, [source]);
+        f.queues.get(source).consumers = [{ ...owned, script: 'foreign-worker' }];
+        await assert.rejects(f.cli(), error => /ownership/.test(error.stderr));
+        assert.ok(f.calls.every(c => c.method === 'GET'));
+      });
+
+      const hedgeProducer = selected =>
+        selected.queues.producers.find(p => p.binding === 'USAGE_INGEST_HEDGE_QUEUE');
+      const otherGlobal =
+        environment === 'production'
+          ? 'usage-ingest-processing-staging'
+          : 'usage-ingest-processing';
+      for (const [name, mutate] of [
+        ['hedge producer without its consumer', s => s.queues.consumers.pop()],
+        [
+          'hedge consumer without its producer',
+          s => {
+            s.queues.producers = s.queues.producers.filter(p => p !== hedgeProducer(s));
+          },
+        ],
+        [
+          'hedge producer on another queue',
+          s => {
+            hedgeProducer(s).queue = `${globalSource}-other`;
+          },
+        ],
+        [
+          "hedge producer on the other environment's queue",
+          s => {
+            hedgeProducer(s).queue = otherGlobal;
+            s.queues.consumers[1].queue = otherGlobal;
+          },
+        ],
+        [
+          'hedge consumer on another queue',
+          s => {
+            s.queues.consumers[1].queue = `${globalSource}-other`;
+          },
+        ],
+        [
+          'hedge consumer dead-lettering into the EU DLQ',
+          s => {
+            s.queues.consumers[1].dead_letter_queue = dlq;
+          },
+        ],
+        [
+          'two hedge producers',
+          s => {
+            s.queues.producers.push({ ...hedgeProducer(s) });
+          },
+        ],
+        [
+          'hedge with a global main source',
+          s => {
+            s.queues.producers[0].queue = globalSource;
+            s.queues.producers[1].queue = globalDlq;
+            s.queues.consumers[0].queue = globalSource;
+            s.queues.consumers[0].dead_letter_queue = globalDlq;
+          },
+        ],
+      ])
+        test(`malformed hedge config is rejected before API access: ${name}`, async t => {
+          const f = await hedged(t, [source, dlq, globalSource, globalDlq]);
+          f.mutate(mutate);
+          await assert.rejects(f.cli(), error => /Expected matching/.test(error.stderr));
+          assert.deepEqual(f.calls, []);
+        });
     });
   });

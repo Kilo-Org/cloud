@@ -6,6 +6,7 @@ import { TRPCError } from '@trpc/server';
 import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import { logTRPCError } from '@kilocode/web-shared/lib/trpc/error-utils';
+import type { ModelStatsLoadClient } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 
 type ErrorResponse = { error: string; message?: string };
 
@@ -13,7 +14,10 @@ type ErrorResponse = { error: string; message?: string };
  * Creates `handleTRPCRequest` for the router behind `createCaller`, so an app
  * only pulls in the routers its API routes call.
  */
-export function createTRPCRouteHandler<TCaller>(createCaller: (ctx: TRPCContext) => TCaller) {
+export function createTRPCRouteHandler<TCaller>(
+  createCaller: (ctx: TRPCContext) => TCaller,
+  options?: { fromDb?: ModelStatsLoadClient }
+) {
   /**
    * Wraps a tRPC procedure call with standard error handling for Next.js API routes
    * @param request - The Next.js request object
@@ -25,7 +29,7 @@ export function createTRPCRouteHandler<TCaller>(createCaller: (ctx: TRPCContext)
     handler: (caller: TCaller) => Promise<TResult>
   ): Promise<NextResponse<ErrorResponse | TResult>> {
     try {
-      const ctx = await createTRPCContext({ req: request });
+      const ctx = await createTRPCContext({ req: request, fromDb: options?.fromDb });
       const caller = createCaller(ctx);
 
       const result = await handler(caller);

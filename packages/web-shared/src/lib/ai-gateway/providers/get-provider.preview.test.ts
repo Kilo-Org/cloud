@@ -7,6 +7,7 @@ import {
   type GetProviderResult,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { getProviderInput } from '@kilocode/web-shared/tests/helpers/get-provider-input.helper';
+import { firstRoute } from '@kilocode/web-shared/tests/helpers/get-provider-result.helper';
 import type { ProviderRoutingDecision } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
 import {
   findDirectByokCatalogModels,
@@ -112,7 +113,6 @@ function catalogModel(
         supportedChatApis,
         responseTransforms: null,
       }),
-      transformRequest() {},
       models: async () => [],
     },
     model: { id: 'kimi-k2.6', name: 'Kimi K2.6', context_length: 1, max_completion_tokens: 1 },
@@ -178,9 +178,11 @@ type RouteSignature =
   | { route: 'gateway-byok'; providerId: string }
   | { route: 'kilo'; gateway: 'vercel' | 'openrouter' };
 
-function routeOf(result: GetProviderResult, apiKind: GatewayChatApiKind): RouteSignature {
-  if (result.kind !== 'provider') throw new Error(`unexpected ${result.kind} result`);
-  const { provider, userByok } = result;
+async function routeOf(
+  result: GetProviderResult,
+  apiKind: GatewayChatApiKind
+): Promise<RouteSignature> {
+  const { provider, userByok } = await firstRoute(result);
   if (provider.type === 'direct-byok') {
     const providerId = userByok?.[0]?.providerId ?? '';
     return provider.supportedChatApis.includes(apiKind)
@@ -368,7 +370,7 @@ describe('previewByokRouting', () => {
           })
         );
         expect(decisions.map(decision => decision.result)).toEqual([
-          expect.objectContaining({ route: routeOf(routed, apiKind).route }),
+          expect.objectContaining({ route: (await routeOf(routed, apiKind)).route }),
         ]);
 
         jest.mocked(decryptApiKey).mockClear();
@@ -387,7 +389,7 @@ describe('previewByokRouting', () => {
         if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
         expect({ scenario, route: previewRouteOf(preview.steps) }).toEqual({
           scenario,
-          route: routeOf(routed, apiKind),
+          route: await routeOf(routed, apiKind),
         });
         expect({ scenario, decision: routedSteps(decisions[0]) }).toEqual({
           scenario,
@@ -441,7 +443,7 @@ describe('previewByokRouting', () => {
       });
 
       if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
-      expect(routeOf(routed, 'chat_completions')).toEqual({
+      expect(await routeOf(routed, 'chat_completions')).toEqual({
         route: 'direct-byok',
         providerId: expected,
       });
@@ -518,7 +520,7 @@ describe('previewByokRouting', () => {
 
           if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
           const scenario = { apiKind, gatewayProviders };
-          expect({ scenario, route: routeOf(routed, apiKind) }).toEqual({
+          expect({ scenario, route: await routeOf(routed, apiKind) }).toEqual({
             scenario,
             route: expected,
           });
@@ -598,7 +600,7 @@ describe('previewByokRouting', () => {
       );
 
       if (expected === 'serves') {
-        expect(routeOf(await routed, 'chat_completions')).toEqual({
+        expect(await routeOf(await routed, 'chat_completions')).toEqual({
           route: 'direct-byok',
           providerId: 'zai-coding',
         });
@@ -642,7 +644,7 @@ describe('previewByokRouting', () => {
       })
     );
 
-    expect(routeOf(routed, 'chat_completions')).toEqual({
+    expect(await routeOf(routed, 'chat_completions')).toEqual({
       route: 'gateway-byok',
       providerId: 'openrouter',
     });
@@ -694,7 +696,7 @@ describe('previewByokRouting', () => {
 
     if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
     const expected = { route: 'gateway-byok', providerId: 'openrouter' };
-    expect(routeOf(routed, 'chat_completions')).toEqual(expected);
+    expect(await routeOf(routed, 'chat_completions')).toEqual(expected);
     expect(previewRouteOf(preview.steps)).toEqual(expected);
   });
 

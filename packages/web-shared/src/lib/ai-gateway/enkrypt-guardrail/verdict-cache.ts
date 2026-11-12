@@ -212,6 +212,17 @@ function cachedBlock(
   );
 }
 
+/** The segments whose units all have a cached verdict, and their length joined as in the part. */
+function cachedCoverage(
+  rendered: string[],
+  units: KeyedUnit[],
+  verdicts: (CachedVerdict | null)[]
+): Pick<EnkryptScanCoverage, 'cachedCharacters' | 'cachedSegments'> {
+  const uncached = new Set(units.filter((_, index) => !verdicts[index]).map(unit => unit.segment));
+  const cached = rendered.filter((_, index) => !uncached.has(index));
+  return { cachedCharacters: joinSegments(cached).length, cachedSegments: cached.length };
+}
+
 /**
  * The units without a cached verdict, each once, packed into Enkrypt calls. A unit that appears
  * more than once, such as a repeated message, is scanned once.
@@ -386,15 +397,12 @@ async function planSegmentsPart(
   const units = keyedUnits(request, part, segments, store);
   const looked = await lookup(request.organizationId, units, config, store);
   const verdicts = verdictsOf(looked, units.length);
-  const uncachedSegments = new Set(units.filter((_, i) => !verdicts[i]).map(unit => unit.segment));
-  const cachedSegments = rendered.filter((_, index) => !uncachedSegments.has(index));
   const coverage: EnkryptScanCoverage = {
     part,
     cache: cacheStatus(looked),
     totalCharacters: joinSegments(rendered).length,
     totalSegments: segments.length,
-    cachedCharacters: joinSegments(cachedSegments).length,
-    cachedSegments: cachedSegments.length,
+    ...cachedCoverage(rendered, units, verdicts),
     omittedAttachments: segments.filter(segment => segment.body === null).length,
   };
   const block = cachedBlock(verdicts);
@@ -523,7 +531,9 @@ function toolsReport(
     tools_scanned: outcomes.length - cached.length,
     tools_flagged: flagged.length,
     total_characters: sum(outcomes.map(each => each.characters)),
-    cached_characters: sum(cached.map(each => each.characters)),
+    cached_characters:
+      sum(cached.map(each => each.characters)) +
+      sum(reports.map(report => report.cached_characters)),
     scanned_characters: sum(reports.map(report => report.scanned_characters)),
     decision,
     error: [...reports].sort(bySeverity).find(report => report.error !== null)?.error ?? null,
@@ -579,8 +589,7 @@ async function planTools(
       cache,
       totalCharacters: texts[index]?.length ?? 0,
       totalSegments: required(tools[index]).segments.length,
-      cachedCharacters: 0,
-      cachedSegments: 0,
+      ...cachedCoverage(required(tools[index]).segments.map(renderSegment), units, verdicts),
       omittedAttachments: 0,
     };
     return { calls, scans: callScans(request, coverage, calls) };

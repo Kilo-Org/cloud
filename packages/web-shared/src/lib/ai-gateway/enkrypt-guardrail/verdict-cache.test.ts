@@ -1808,7 +1808,7 @@ describe('scanRequestWithVerdictCache', () => {
         tools_cached: 0,
         tools_scanned: 1,
         total_characters: toolText(definition).length,
-        cached_characters: 0,
+        cached_characters: renderSegment(definition.segments[0]).length,
         scanned_characters: renderSegment(definition.segments[1]).length,
       });
       expect(results[0]?.cacheEntries).toEqual(allowed([keys[1]]));

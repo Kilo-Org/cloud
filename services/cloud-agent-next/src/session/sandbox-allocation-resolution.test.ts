@@ -38,6 +38,7 @@ const owner = { userId: 'oauth/user', orgId: 'org-id' };
 
 // Selection is enabled and Vercel BYOC credentials are configured.
 const selectionEnv = Object.assign({} as Env, {
+  CONTAINER_USAGE_METER: { getBillingMode: vi.fn().mockResolvedValue('shadow') },
   SANDBOX_SELECTION_IDS: 'org-id',
   VERCEL_TOKEN: 'test-token',
   VERCEL_TEAM_ID: 'team-id',
@@ -50,7 +51,9 @@ const selectionEnv = Object.assign({} as Env, {
 });
 const env = selectionEnv as Env;
 const withoutVercelEnv = { SANDBOX_SELECTION_IDS: 'org-id' } as Env;
-const disabledEnv = {} as Env;
+const disabledEnv = {
+  CONTAINER_USAGE_METER: { getBillingMode: vi.fn().mockResolvedValue('shadow') },
+} as unknown as Env;
 
 const v1 = {
   environmentId: '123e4567-e89b-12d3-a456-426614174099',
@@ -173,6 +176,25 @@ describe('resolveSavedSandboxAllocation', () => {
     });
 
     await expect(resolve()).resolves.toBe('cloudflare-containers-standard-4');
+  });
+
+  it('applies a saved size from billing enrollment without the selection allowlist', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-containers-standard-4',
+    });
+    const getBillingMode = vi.fn().mockResolvedValue('paid');
+
+    await expect(
+      resolve({
+        env: {
+          CONTAINER_USAGE_METER: { getBillingMode },
+        } as unknown as Env,
+      })
+    ).resolves.toBe('cloudflare-containers-standard-4');
+    expect(getBillingMode).toHaveBeenCalledWith({
+      service: 'cloud-agent-next-sandbox-containers-standard3',
+      subject: { type: 'org', id: owner.orgId },
+    });
   });
 
   it.each(['github', 'gitlab', 'bitbucket'] as const)(
@@ -313,9 +335,38 @@ describe('resolveSavedSandboxAllocation', () => {
     await expect(resolve()).resolves.toBeUndefined();
   });
 
-  it('does not read settings when the owner cannot select a sandbox', async () => {
+  it.each([{}, { contextAllocation: 'retired-allocation' }])(
+    'does not check billing when no selectable saved setting exists: %j',
+    async candidates => {
+      getSandboxAllocationCandidatesMock.mockResolvedValue(candidates);
+      const getBillingMode = vi.fn().mockRejectedValue(new Error('unavailable'));
+
+      await expect(
+        resolve({ env: { CONTAINER_USAGE_METER: { getBillingMode } } as unknown as Env })
+      ).resolves.toBeUndefined();
+      expect(getBillingMode).not.toHaveBeenCalled();
+    }
+  );
+
+  it('skips a saved size when the owner cannot select a sandbox', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-containers-standard-4',
+    });
+
     await expect(resolve({ env: disabledEnv })).resolves.toBeUndefined();
-    expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
+    expect(disabledEnv.CONTAINER_USAGE_METER.getBillingMode).toHaveBeenCalledOnce();
+  });
+
+  it('reports a billing failure instead of dropping a selectable saved size', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-containers-standard-4',
+    });
+    const getBillingMode = vi.fn().mockRejectedValue(new Error('unavailable'));
+
+    await expect(
+      resolve({ env: { CONTAINER_USAGE_METER: { getBillingMode } } as unknown as Env })
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+    expect(getBillingMode).toHaveBeenCalledTimes(2);
   });
 
   it('reads only the context setting for a Bitbucket repository', async () => {

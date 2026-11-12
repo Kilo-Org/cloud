@@ -4,6 +4,8 @@ import {
   fetchByocVercelEnrollmentForUser,
 } from './byoc/vercel-credential-resolver.js';
 import { TRPCError } from '@trpc/server';
+import { billingModeSchema, type BillingMode } from '@kilocode/container-usage';
+import { withTimeout } from '@kilocode/worker-utils';
 import {
   CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
   SELECTABLE_SANDBOX_ALLOCATIONS,
@@ -86,7 +88,7 @@ export function sandboxAllocationUnavailableReason(
   }
 }
 
-export function getSandboxSelectionCapabilities(
+export async function getSandboxSelectionCapabilities(
   env: Env,
   owner: SelectionOwner,
   options?: {
@@ -94,11 +96,13 @@ export function getSandboxSelectionCapabilities(
     capability?: SandboxAllocationCapability;
     vercelUnavailableReason?: string;
   }
-): SandboxSelectionCapabilities {
+): Promise<SandboxSelectionCapabilities> {
   const selectionAllowed =
     isOrgInList(env.SANDBOX_SELECTION_IDS, owner.userId) ||
-    isOrgInList(env.SANDBOX_SELECTION_IDS, owner.orgId);
-  if (!selectionAllowed && enrolledByocVercelOwner(env, owner) === undefined) {
+    isOrgInList(env.SANDBOX_SELECTION_IDS, owner.orgId) ||
+    enrolledByocVercelOwner(env, owner) !== undefined ||
+    (await billingModeForOwner(env, owner)) === 'paid';
+  if (!selectionAllowed) {
     // Owners without selection still run somewhere; report where so the UI can
     // show it without offering a choice.
     return {
@@ -131,6 +135,33 @@ export function getSandboxSelectionCapabilities(
   };
 }
 
+async function billingModeForOwner(env: Env, owner: SelectionOwner): Promise<BillingMode> {
+  let cause: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return billingModeSchema.parse(
+        await withTimeout(
+          env.CONTAINER_USAGE_METER.getBillingMode({
+            service: 'cloud-agent-next-sandbox-containers-standard3',
+            subject: owner.orgId
+              ? { type: 'org', id: owner.orgId }
+              : { type: 'user', id: owner.userId },
+          }),
+          1_000,
+          'Compute billing policy lookup timed out'
+        )
+      );
+    } catch (error) {
+      cause = error;
+    }
+  }
+  throw new TRPCError({
+    code: 'SERVICE_UNAVAILABLE',
+    message: 'Could not check compute billing eligibility. Try again shortly.',
+    cause,
+  });
+}
+
 export type VercelSelectionReadiness = {
   vercelUnavailableReason?: string;
 };
@@ -154,19 +185,19 @@ export async function resolveVercelSelectionReadiness(
   }
 }
 
-export function assertSandboxAllocationAvailable(
+export async function assertSandboxAllocationAvailable(
   env: Env,
   owner: SelectionOwner,
   allocation: SandboxAllocation,
   repositoryType?: SessionRepositoryType,
   capability?: SandboxAllocationCapability
-): void {
+): Promise<void> {
   // Retired explicit choices are rejected with a specific reason; a saved value
   // is skipped before this check and falls through to the default.
   if (isRetiredSandboxAllocation(allocation)) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: RETIRED_SANDBOX_ALLOCATION_MESSAGE });
   }
-  const capabilities = getSandboxSelectionCapabilities(env, owner, {
+  const capabilities = await getSandboxSelectionCapabilities(env, owner, {
     ...(repositoryType ? { repositoryType } : {}),
     ...(capability ? { capability } : {}),
   });

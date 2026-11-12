@@ -334,6 +334,7 @@ function createdMetadata(doStub: ReturnType<typeof makeDoStub>): SessionMetadata
 
 function makeEnv(doStub: ReturnType<typeof makeDoStub>): Env {
   return {
+    CONTAINER_USAGE_METER: { getBillingMode: vi.fn().mockResolvedValue('shadow') },
     SANDBOX_SESSION: {
       idFromName: vi.fn((name: string) => ({ toString: () => name })),
       get: vi.fn(() => doStub),
@@ -2607,6 +2608,35 @@ describe('explicit sandbox session creation', () => {
     expect(recordOperationProgressMock.mock.calls[0]?.[2]).not.toHaveProperty(
       SESSION_CREATE_SAVED_ALLOCATION_KEY
     );
+  });
+
+  it('settles a fresh create when saved-size billing lookup fails after admission', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-containers-standard-4',
+    });
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    ctx.env.SANDBOX_SELECTION_IDS = '';
+    ctx.env.CONTAINER_USAGE_METER.getBillingMode = vi
+      .fn()
+      .mockRejectedValue(new Error('unavailable'));
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Could not check compute billing eligibility. Try again shortly.',
+    });
+    expect(admitOperationMock).toHaveBeenCalledOnce();
+    expect(settleOperationMock).toHaveBeenCalledOnce();
+    expect(settleOptions(0)).toMatchObject({
+      rowId: ROW_ID,
+      status: 'failed',
+      outboxEvent: { properties: { outcome: 'failed', failure_stage: 'sandbox' } },
+    });
+    expectNoAllocation(doStub);
   });
 
   it('settles the delivered initial message so a replay reports the same delivery', async () => {

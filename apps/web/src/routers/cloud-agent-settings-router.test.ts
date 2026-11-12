@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeAll, afterEach, jest } from '@jest/globals';
+import { TRPCClientError } from '@trpc/client';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -117,6 +118,98 @@ describe('cloud-agent-settings router', () => {
   });
 
   describe('personal context', () => {
+    test('keeps saved settings readable when compute eligibility is unavailable', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const profileId = await insertProfile({ type: 'user', id: ownerUser.id }, 'Personal');
+      await caller.cloudAgentSettings.setContextAllocation({
+        allocation: 'cloudflare-containers-standard-4',
+      });
+      await caller.cloudAgentSettings.setRepositorySettings({
+        repoFullName: 'acme/web',
+        platform: 'github',
+        profileId,
+        allocation: 'cloudflare-containers-standard-3',
+      });
+      mockGetSandboxSelectionOptions.mockClear();
+      const failure = TRPCClientError.from({
+        error: {
+          message: 'Could not check compute billing eligibility. Try again shortly.',
+          code: -32003,
+          data: { code: 'SERVICE_UNAVAILABLE', httpStatus: 503 },
+        },
+      });
+      mockGetSandboxSelectionOptions.mockRejectedValueOnce(failure);
+
+      const result = await caller.cloudAgentSettings.get({});
+      expect(result.contextAllocation).toBe('cloudflare-containers-standard-4');
+      expect(result.contextUnavailableReason).toBeUndefined();
+      expect(result.capabilities).toBeNull();
+      expect(result.capabilitiesByPlatform).toEqual({ github: null, gitlab: null });
+      expect(result.repositories).toEqual([
+        {
+          repositoryFullName: 'acme/web',
+          repositoryPlatform: 'github',
+          profileId,
+          profileName: 'Personal',
+          allocation: 'cloudflare-containers-standard-3',
+        },
+      ]);
+      expect(mockGetSandboxSelectionOptions).toHaveBeenCalledTimes(1);
+
+      await caller.cloudAgentSettings.setRepositorySettings({
+        repoFullName: 'acme/web',
+        platform: 'github',
+        profileId: null,
+        allocation: 'cloudflare-containers-standard-3',
+      });
+      expect(mockGetSandboxSelectionOptions).toHaveBeenCalledTimes(1);
+
+      mockGetSandboxSelectionOptions.mockRejectedValueOnce(failure);
+      await expect(
+        caller.cloudAgentSettings.setContextAllocation({
+          allocation: 'cloudflare-containers-standard-3',
+        })
+      ).rejects.toThrow('Could not check compute billing eligibility');
+      expect((await caller.cloudAgentSettings.get({})).capabilities?.enabled).toBe(true);
+      expect((await caller.cloudAgentSettings.get({})).contextAllocation).toBe(
+        'cloudflare-containers-standard-4'
+      );
+    });
+
+    test('does not hide capability authorization errors', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      mockGetSandboxSelectionOptions.mockRejectedValueOnce(
+        TRPCClientError.from({
+          error: {
+            message: 'Not authorized',
+            code: -32001,
+            data: { code: 'UNAUTHORIZED', httpStatus: 401 },
+          },
+        })
+      );
+      await expect(caller.cloudAgentSettings.get({})).rejects.toThrow('Not authorized');
+    });
+
+    test('keeps settings readable when a repository capability lookup fails', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const capabilities = await mockGetSandboxSelectionOptions({});
+      mockGetSandboxSelectionOptions.mockResolvedValueOnce(capabilities).mockRejectedValueOnce(
+        TRPCClientError.from({
+          error: {
+            message: 'Compute eligibility unavailable',
+            code: -32003,
+            data: { code: 'SERVICE_UNAVAILABLE', httpStatus: 503 },
+          },
+        })
+      );
+
+      await expect(caller.cloudAgentSettings.get({})).resolves.toMatchObject({
+        canManage: true,
+        capabilities: null,
+        capabilitiesByPlatform: { github: null, gitlab: null },
+      });
+    });
+
     test('sets and reads the context default and repository overrides', async () => {
       const caller = await createCallerForUser(ownerUser.id);
       const profileId = await insertProfile({ type: 'user', id: ownerUser.id }, 'Personal');
@@ -522,14 +615,14 @@ describe('cloud-agent-settings router', () => {
     test('exposes GitLab-filtered capabilities without the GitHub-only Vercel allocation', async () => {
       const caller = await createCallerForUser(ownerUser.id);
       const result = await caller.cloudAgentSettings.get({});
-      const gitlabVercel = result.capabilitiesByPlatform.gitlab.options.find(
+      const gitlabVercel = result.capabilitiesByPlatform.gitlab?.options.find(
         option => getSandboxAllocation(option.allocation) === 'vercel-small'
       );
       expect(gitlabVercel?.repositoryUnavailableReason).toBe(
         'Vercel sandboxes support GitHub repositories only'
       );
       expect(gitlabVercel?.unavailableReason).toBeUndefined();
-      const githubVercel = result.capabilitiesByPlatform.github.options.find(
+      const githubVercel = result.capabilitiesByPlatform.github?.options.find(
         option => getSandboxAllocation(option.allocation) === 'vercel-small'
       );
       expect(githubVercel?.repositoryUnavailableReason).toBeUndefined();

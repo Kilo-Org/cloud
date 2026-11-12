@@ -112,10 +112,12 @@ export function createAndroidDevice(options: { exec: Exec; spawn: Spawn; serial:
     },
     // The dev client's inspector does not survive a runtime reload on every
     // emulator: after a language switch the app keeps painting while the page
-    // list stays empty until the process restarts. Relaunch through the dev
-    // client's own deep link (a launcher relaunch would open the launcher, not
-    // the app); the runner waits for readiness afterwards.
+    // list stays empty until the process restarts, and the device's reverse
+    // tunnel to Metro goes with it. Relaunch through the dev client's own deep
+    // link (a launcher relaunch opens the launcher, not the app) after
+    // re-establishing that tunnel; the runner waits for readiness afterwards.
     relaunch: (metroPort: number) => {
+      adb(['reverse', `tcp:${metroPort}`, `tcp:${metroPort}`]);
       shell('am', 'force-stop', APP_ID);
       adb([
         'shell',

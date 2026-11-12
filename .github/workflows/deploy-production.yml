@@ -163,11 +163,11 @@ jobs:
 
   # The Worker deploy consumes the detected matrix and the SHAs, so it opens as
   # soon as the gate and the matrix are done, beside the Vercel stage-and-promote
-  # chain; deploy-staging.yml runs it the same way. The rollout window is the
-  # mirror image of the old order: the previous web release runs against the new
-  # Workers until promotion finishes, so a Worker change keeps every route that
-  # release calls until promotion replaces it (ADR 0003, deploy-order contract).
-  # record-deployment below still requires every Vercel leg and this deploy.
+  # chain; deploy-staging.yml runs it the same way. The previous web release runs
+  # against the new Workers until promotion finishes, so a Worker change keeps
+  # every route that release calls until promotion replaces it (ADR 0003,
+  # deploy-order contract). record-deployment below still requires every Vercel
+  # leg and this deploy.
   deploy-workers:
     needs: [db-gate, check-changes, detect-workers]
     if: >-

@@ -89,16 +89,17 @@ id:
    decision and the gateway's balanced fallback. A configured pool with no
    ready/compatible selected pair likewise returns no decision.
 
-7. **Deploy-order contract.** Production deploys workers *before* promoting the
-   Vercel web deployment, in the same wave as the database gate, so the previous
-   web release runs against the new workers until the promotion lands. A worker
-   change therefore keeps every route that the previous web release calls until
-   promotion replaces that release: the mode-only `/admin/routing-mode` route
-   stays at every worker version, and the Auto routing card keeps saving through
-   it. Pools graduated to custom routers (ADR 0005), so the settings compat path
-   this invariant once described — the `/admin/routing-settings` 404 fallback and
-   the `pool_temporarily_unavailable` retry — no longer exists in the worker or
-   in the web client.
+7. **Deploy-order contract.** Production deploys workers as soon as the
+   database gate and the change detection finish, in parallel with the Vercel
+   staging and promotion jobs, so the previous web release runs against the new
+   workers until the promotion lands. A worker change therefore keeps every
+   route that the previous web release calls until promotion replaces that
+   release: the mode-only `/admin/routing-mode` route stays at every worker
+   version, and the Auto routing card keeps saving through it. Pools graduated
+   to custom routers (ADR 0005), so the settings compat path this invariant once
+   described — the `/admin/routing-settings` 404 fallback and the
+   `pool_temporarily_unavailable` retry — no longer exists in the worker or in
+   the web client.
 
 8. **Inheritance.** Mode and pool inherit independently (organization →
    personal → platform default). A configured pool does not force the owner into

@@ -368,7 +368,7 @@ test('the ingest workspace runs only the explicit native attachment regression',
   );
   assert.equal(
     step?.if,
-    "matrix.workspace.name == 'cloudflare-session-ingest' && needs.changes.outputs.test_scripts_db != 'true' && needs.changes.outputs.data_session_ingest != 'true'"
+    "matrix.workspace.name == 'cloudflare-session-ingest' && needs.changes.outputs.kilocode_backend != 'true'"
   );
   assert.equal(
     step?.run,

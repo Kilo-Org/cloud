@@ -24,7 +24,9 @@ show profile conflicts before saving; revised 2026-10-29 to allow several
 repositories in one environment; revised 2026-10-31 to define worktree-owned
 shared runtime and MCP configuration; revised 2026-11-04 to state that one
 sandbox serves one workspace; revised 2026-11-04 to add environment start
-commands and skip setup in a workspace started from an environment snapshot.
+commands and skip setup in a workspace started from an environment snapshot;
+revised 2026-11-12 to define organization-connection repository access without
+requiring a personal provider identity and retain GitHub-triggered actor write checks.
 
 ## Conventions
 
@@ -78,8 +80,8 @@ repository.
 
 ### Start
 
-1. The user MUST connect a git provider and select a repository before a session
-   can start.
+1. A session MUST have a connected git provider and a selected repository before
+   it can start.
 2. Paid use MUST require a balance of at least $1. Below that, the user MAY
    start only with a free or bring-your-own-key model.
 3. Submitting the first prompt MUST open the chat with that prompt already
@@ -164,6 +166,21 @@ repository.
     other than `code`. These preferences MUST belong to the user, MUST apply to
     every session that user starts including organization sessions, and MUST
     NOT be settable by a session request.
+
+### Repository Access
+
+1. A session started from an organization chat integration (Slack, Linear,
+   Discord) MUST get repository access from the organization's connected GitHub
+   App installation or GitLab connection.
+2. The session MUST NOT require the requesting member to link a personal GitHub
+   or GitLab identity.
+3. Rule 1 applies to every session mode, including a session that changes code.
+   The system MUST NOT check the requesting member's own permission on the
+   repository or project. A member who can use the integration gets the access
+   of the organization's connection, as in an organization web session.
+4. A GitHub-triggered action from an organization repository MUST require write
+   access for the triggering GitHub account. That account is not necessarily an
+   organization member.
 
 ### Stacked Worktrees
 
@@ -802,6 +819,14 @@ The following use SHOULD and are not enforced today:
      load the `AGENTS.md` or skills of each repository.
 
 ## Changelog
+
+### 2026-11-12 -- Organization repository access
+
+- Sessions from organization chat integrations get repository access from the
+  organization's GitHub or GitLab connection, in every mode. They no longer
+  require a personal provider identity or the member's own repository
+  permission. GitHub-triggered actions still check the triggering account's
+  write access.
 
 ### 2026-11-10 -- Worktree pull requests
 

@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { formatPercent } from '@/lib/format';
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
@@ -16,6 +17,7 @@ import {
   getHeaderPillContent,
   getIndeterminateArcFraction,
   getMetricsAccessibilityLabel,
+  getPillSlotSizers,
   getRemainingTokens,
   type HeaderPillContent,
 } from './context-usage-display';
@@ -48,7 +50,7 @@ function pill(args: {
 const trackOnly: HeaderPillContent = {
   primary: null,
   secondary: null,
-  costSlot: 'none',
+  costSlot: 'unreported',
   tone: 'neutral',
   arcFraction: 0,
   interactive: false,
@@ -191,7 +193,7 @@ describe('getHeaderPillContent', () => {
   it('omits secondary cost when cost is zero or null', () => {
     const base = {
       secondary: null,
-      costSlot: 'none',
+      costSlot: 'unreported',
       tone: 'primary' as const,
       arcFraction: 0.1,
       interactive: true,
@@ -255,7 +257,7 @@ describe('getHeaderPillContent', () => {
     ).toMatchObject({
       primary: null,
       secondary: null,
-      costSlot: 'none',
+      costSlot: 'unreported',
       tone: 'neutral',
       arcFraction: undefined,
       interactive: true,
@@ -285,6 +287,24 @@ describe('getHeaderPillContent', () => {
 
   it('never surfaces a bare cost before a transcript exists', () => {
     expect(pill({ totalCostMicrodollars: 700, hasMessages: false })).toEqual(unreported);
+  });
+});
+
+describe('getPillSlotSizers', () => {
+  // The slots are laid out at the widest reading they can paint, so a reading
+  // that arrives fills its slot instead of resizing the pill beside the title.
+  it('sizes both slots from the widest reading each one paints', () => {
+    const sizers = getPillSlotSizers();
+    expect(sizers.percentage).toBe(formatPercent(100, i18n.language));
+    // A settled cost badge, in the same format the painted cost uses.
+    expect(sizers.cost).toMatch(/^\$\d+\.\d{2}$/u);
+    expect(sizers.cost.length).toBeGreaterThanOrEqual('$0.15'.length);
+  });
+
+  it('never returns an empty sizer', () => {
+    const sizers = getPillSlotSizers();
+    expect(sizers.percentage.length).toBeGreaterThan(0);
+    expect(sizers.cost.length).toBeGreaterThan(0);
   });
 });
 

@@ -1,5 +1,6 @@
 import { Pressable, View } from 'react-native';
 
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { cn } from '@/lib/utils';
@@ -10,6 +11,7 @@ import {
   type ContextTone,
   getHeaderPillContent,
   getMetricsAccessibilityLabel,
+  getPillSlotSizers,
 } from './context-usage-display';
 
 type SessionContextMetricsProps = {
@@ -42,24 +44,43 @@ const RING_SIZE = 28;
 const RING_STROKE = 3;
 
 /**
- * The pill hugs what it holds: the ring, then the values the session has
- * reported. `gap-2` keeps the reading clear of the ring, and the value row's own
- * `gap-1` separates the percentage from the cost, so the three parts of a
- * settled reading each stand on their own.
+ * The pill holds the ring, then the two value slots its reading fills. `gap-2`
+ * keeps the reading clear of the ring, and the row's own `gap-1` separates the
+ * percentage from the cost, so the parts of a settled reading each stand on
+ * their own.
  *
- * The pill is the cluster's leading control, beside the trailing action, so a
- * reading that arrives widens it into the row and the heading beside it gives up
- * that width — the heading keeps its own line cap and tail ellipsis. `shrink
- * min-w-0` keeps the pill inside the header's capped trailing slot: RN's default
- * flexShrink is 0, so without them a long reading would paint past the row's
- * right edge. The percentage is a few glyphs at most, so it keeps its width; the
- * cost is the only unbounded part, so it is the one that truncates to one line.
+ * Each slot is laid out at the width of the widest reading it can paint and
+ * paints nothing itself, so a slot whose value has not arrived keeps that width
+ * invisibly. A settled empty chat therefore reads as a finished, empty control
+ * instead of carrying a placeholder glyph, and a reading that arrives fills the
+ * slot it already showed instead of resizing the pill beside the title and the
+ * trailing control.
+ *
+ * `shrink min-w-0` keeps the pill inside the header's capped trailing slot: RN's
+ * default flexShrink is 0, so without them the pill would paint past the row's
+ * right edge. Inside the capped pill the slots give up width before the pill
+ * does, and each reading keeps to one line.
  */
 const PILL_CLASS =
   'h-[44px] shrink min-w-0 flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
-const VALUE_ROW_CLASS = 'min-w-0 shrink flex-row items-baseline gap-1';
-const PRIMARY_VALUE_CLASS = 'shrink-0 text-xs tabular-nums';
-const COST_VALUE_CLASS = 'min-w-0 shrink text-xs tabular-nums';
+const VALUE_ROW_CLASS = 'min-w-0 shrink flex-row items-center gap-1';
+const VALUE_SLOT_CLASS = 'min-w-0 shrink justify-center';
+const PRIMARY_VALUE_CLASS = 'text-xs tabular-nums';
+const COST_VALUE_CLASS = 'text-xs tabular-nums';
+
+/**
+ * Full-bleed box over the value row that centres the loading bar in it. The row
+ * is sized by its own slots, so its width and height follow the font scale; the
+ * bar takes those instead of a fixed size of its own.
+ */
+const LOADING_BAR_OVERLAY = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  justifyContent: 'center',
+} as const;
 
 const TONE_TEXT_CLASS = {
   destructive: 'text-destructive',
@@ -67,6 +88,51 @@ const TONE_TEXT_CLASS = {
   primary: 'text-foreground',
   neutral: 'text-foreground',
 } satisfies Record<ContextTone, string>;
+
+/**
+ * One value slot of the pill.
+ *
+ * The sizer is a copy of the widest reading the slot can paint, in the slot's
+ * own text classes, and it paints nothing: it holds the width and the line box
+ * so the slot reads as part of the pill before its value exists. The reading
+ * paints over it, centred in the width it reserved. Both come from the same
+ * formatters, so the slot holds at every font scale and in every locale.
+ */
+function PillValueSlot({
+  sizer,
+  value,
+  textClassName,
+  accessibilityHidden = false,
+}: Readonly<{
+  sizer: string;
+  value: string | null;
+  textClassName: string;
+  accessibilityHidden?: boolean;
+}>) {
+  return (
+    <View className={VALUE_SLOT_CLASS}>
+      <Text
+        numberOfLines={1}
+        className={cn(textClassName, 'opacity-0')}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        {sizer}
+      </Text>
+      {value === null ? null : (
+        <Text
+          numberOfLines={1}
+          className={cn(textClassName, 'absolute inset-x-0 top-0 text-center')}
+          {...(accessibilityHidden
+            ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
+            : {})}
+        >
+          {value}
+        </Text>
+      )}
+    </View>
+  );
+}
 
 export function SessionContextMetrics({
   info,
@@ -99,16 +165,23 @@ export function SessionContextMetrics({
     usageUnavailable: content.usageUnavailable,
   });
 
-  // A value has no placeholder: the percentage paints once the session reports
-  // it, and the cost paints once it is known, so the pill never stands a dash in
+  // A value has no placeholder glyph: the percentage paints once the session
+  // reports it, and the cost paints once it is known. A slot whose value is not
+  // there keeps its width and paints nothing, so the pill never stands a dash in
   // for a number that has not arrived. A session that reported tokens but no
-  // context window has no honest percentage either, so its slot paints nothing;
+  // context window has no honest percentage either, so that slot paints nothing;
   // the ring's indeterminate arc, the accessibility label and the context sheet
   // carry the unknown.
   const costLabel =
     content.costSlot === 'label' && content.secondary !== null
       ? isolateLtrBidiText(content.secondary)
       : null;
+  // While the session still resolves, one bar covers the row the two slots lay
+  // out. A bar of its own fixed width matched that row only at the default font
+  // scale; the row itself is the correct extent at any scale, so the overlay
+  // takes its size instead of naming one.
+  const valueRowLoading = content.costSlot === 'loading';
+  const sizers = getPillSlotSizers();
 
   const body = (
     <>
@@ -118,28 +191,24 @@ export function SessionContextMetrics({
         arcFraction={content.arcFraction}
         tone={content.tone}
       />
-      {content.primary !== null || costLabel !== null ? (
-        <View className={VALUE_ROW_CLASS}>
-          {content.primary !== null ? (
-            <Text
-              numberOfLines={1}
-              className={cn(PRIMARY_VALUE_CLASS, 'font-semibold', TONE_TEXT_CLASS[content.tone])}
-            >
-              {content.primary}
-            </Text>
-          ) : null}
-          {costLabel !== null ? (
-            <Text
-              numberOfLines={1}
-              className={cn(COST_VALUE_CLASS, 'text-muted-foreground')}
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            >
-              {costLabel}
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
+      <View className={VALUE_ROW_CLASS}>
+        <PillValueSlot
+          sizer={sizers.percentage}
+          value={content.primary}
+          textClassName={cn(PRIMARY_VALUE_CLASS, 'font-semibold', TONE_TEXT_CLASS[content.tone])}
+        />
+        <PillValueSlot
+          sizer={sizers.cost}
+          value={costLabel}
+          textClassName={cn(COST_VALUE_CLASS, 'text-muted-foreground')}
+          accessibilityHidden
+        />
+        {valueRowLoading ? (
+          <View style={LOADING_BAR_OVERLAY}>
+            <Skeleton className="h-2 w-full rounded-[2px] bg-muted-soft" />
+          </View>
+        ) : null}
+      </View>
     </>
   );
 

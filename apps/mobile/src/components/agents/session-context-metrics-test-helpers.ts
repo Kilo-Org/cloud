@@ -26,11 +26,18 @@ export function findAll(
       return;
     }
     if (React.isValidElement(value)) {
-      if (predicate(value)) {
-        matches.push(value);
+      const element = value as React.ReactElement<{ children?: unknown }>;
+      if (predicate(element)) {
+        matches.push(element);
       }
-      const props = value.props as { children?: unknown };
-      walk(props.children);
+      // These suites call components as plain functions, so a child component
+      // element is still unrendered here. Invoke it the same way to reach what
+      // it paints; the components under test use no hooks.
+      if (typeof element.type === 'function') {
+        walk((element.type as (props: unknown) => unknown)(element.props));
+        return;
+      }
+      walk(element.props.children);
     }
   }
 

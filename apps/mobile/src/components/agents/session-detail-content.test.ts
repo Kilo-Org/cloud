@@ -1609,8 +1609,10 @@ describe('session detail header right cluster', () => {
       throw new Error('expected the cost text');
     }
     expect(cost.props.numberOfLines).toBe(1);
-    expect(cost.props.className).toContain('shrink');
-    expect(cost.props.className).toContain('min-w-0');
+    // The value paints over the slot that reserved its width, so a badge wider
+    // than the slot ellipsizes there instead of widening the pill.
+    expect(cost.props.className).toContain('absolute');
+    expect(cost.props.className).toContain('text-center');
   });
 });
 
@@ -4859,11 +4861,10 @@ describe('session detail read-only composer', () => {
           node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
       )
     ).toHaveLength(0);
-    // The pill paints its ring alone in every unresolved state, and the box
-    // around it holds the row its values will take, so nothing shrinks when the
-    // values arrive.
+    // The pill keeps its value row reserved in every state, so nothing shrinks
+    // when the values arrive; while the open resolves, one bar covers that row.
     const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
-    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
+    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(1);
 
     // The list then reports its rows painted, and the footer takes the
     // placeholder's place in the same slot.

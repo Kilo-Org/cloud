@@ -4,7 +4,7 @@ import { expect, it, vi } from 'vitest';
 import { usageRetryDelaySeconds } from './retry-policy';
 
 it.each([
-  [1, 1, 4, 60, 120],
+  [1, 1, 2, 60, 120],
   [6, 32, 64, 60, 120],
   [9, 256, 512, 256, 512],
   [10, 300, 600, 300, 600],
@@ -62,14 +62,12 @@ it.each([undefined, 'staging'])(
 
 it.each([
   [0, 1],
-  [0.25 - Number.EPSILON, 1],
-  [0.25, 2],
-  [0.5 - Number.EPSILON, 2],
-  [0.5, 3],
-  [0.75 - Number.EPSILON, 3],
-  [0.75, 4],
-  [1 - Number.EPSILON, 4],
-])('spreads first admission retry at random %s into bucket %s', (value, expected) => {
+  [0.25, 1],
+  [0.5 - Number.EPSILON, 1],
+  [0.5, 2],
+  [0.75, 2],
+  [1 - Number.EPSILON, 2],
+])('restores first admission retry at random %s into bucket %s', (value, expected) => {
   const random = vi.fn(() => value);
   expect(usageRetryDelaySeconds(1, true, random)).toBe(expected);
   expect(random).toHaveBeenCalledTimes(1);
@@ -97,9 +95,9 @@ it.each([undefined, null, '1', 0, -1, 1.5, NaN, Infinity, Number.MAX_VALUE])(
   attempts => {
     for (const [value, expected] of [
       [0, 1],
-      [0.25, 2],
-      [0.5, 3],
-      [0.75, 4],
+      [0.5 - Number.EPSILON, 1],
+      [0.5, 2],
+      [1 - Number.EPSILON, 2],
     ]) {
       const random = vi.fn(() => value);
       expect(usageRetryDelaySeconds(attempts, true, random)).toBe(expected);

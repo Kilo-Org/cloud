@@ -118,7 +118,7 @@ it('routes tagged Enkrypt messages through workerd and keeps untagged LLM dispos
     expect(admission.explicitAcks).toEqual([]);
     expect(admission.retryMessages.map(message => message.msgId)).toEqual(['queue-0']);
     expect(admission.retryMessages[0].delaySeconds).toBeGreaterThanOrEqual(1);
-    expect(admission.retryMessages[0].delaySeconds).toBeLessThanOrEqual(4);
+    expect(admission.retryMessages[0].delaySeconds).toBeLessThanOrEqual(2);
     expect(calls.at(-1)).toEqual(enkryptCall);
 
     for (const reply of ['wrong_echo', 'missing_echo'] as const) {

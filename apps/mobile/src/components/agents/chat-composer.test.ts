@@ -167,6 +167,11 @@ vi.mock('react-native-reanimated', () => ({
   },
   useAnimatedStyle: (style: () => unknown) => style(),
 }));
+vi.mock('@/components/keyboard-motion-provider', () => ({
+  KeyboardMotionProvider: 'KeyboardMotionProvider',
+  useKeyboardMotionProgress: () => keyboardProgress,
+  useKeyboardMotionHeight: () => ({ value: 0 }),
+}));
 vi.mock('@/components/keyboard-follow-pane', () => ({
   KeyboardFollowPane: 'KeyboardFollowPane',
   useInsideKeyboardFollowPane: () => insidePane.value,

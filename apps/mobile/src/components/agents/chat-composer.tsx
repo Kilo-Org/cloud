@@ -37,7 +37,7 @@ import {
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useKeyboardState, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -54,6 +54,7 @@ import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-s
 import { SharePrefillFailure } from '@/components/agents/share-prefill-failure';
 import { ChatToolbar, type ChatToolbarModeControl } from '@/components/agents/chat-toolbar';
 import { useInsideKeyboardFollowPane } from '@/components/keyboard-follow-pane';
+import { useKeyboardMotionProgress } from '@/components/keyboard-motion-provider';
 import { pickAgentAttachments, pickAgentImages } from '@/components/agents/attachment-picker';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -846,7 +847,7 @@ export function ChatComposer({
   // worklet reads only shared values and always writes `maxHeight`: Reanimated
   // keeps a style key a worklet stops returning, so a conditional key would
   // leave the row stuck at its collapsed height.
-  const { progress: keyboardProgress } = useReanimatedKeyboardAnimation();
+  const keyboardProgress = useKeyboardMotionProgress();
   const toolbarRowHeight = useSharedValue(0);
   const toolbarRowCollapsing = useSharedValue(false);
   useEffect(() => {

@@ -106,6 +106,12 @@ export type RecoverMissedReviewsSummary = {
   reviewsStarted: number;
   /** Failed reviews reset and handed back to dispatch by this run. */
   reviewsRetried: number;
+  /**
+   * Failed reviews this run left alone because their unattended attempts are
+   * spent. Each one needs a person to restart it, so the count is the sweep's
+   * escalation signal rather than another skip.
+   */
+  retriesExhausted: number;
   skippedExisting: number;
   skippedActiveReview: number;
   /** Failed reviews the reviewer configuration does not let a restart run. */
@@ -144,6 +150,7 @@ function summaryWith(counts: Partial<RecoverMissedReviewsSummary>): RecoverMisse
     pullRequestsConsidered: 0,
     reviewsStarted: 0,
     reviewsRetried: 0,
+    retriesExhausted: 0,
     skippedExisting: 0,
     skippedActiveReview: 0,
     skippedRetryRefused: 0,
@@ -626,7 +633,14 @@ async function recoverPullRequest(params: {
       // a head that already has its review costs one query.
       const attempts = await listCodeReviewAttempts(existingReview.id);
       if (!isAutomaticallyRetryableReview(existingReview, attempts.length)) {
-        summary.skippedExisting += 1;
+        // A cause this sweep can restart, with no attempts left: the next
+        // restart is a person's, so report it once per review per run.
+        summary.retriesExhausted += 1;
+        warnExceptInTest('[recoverMissedReviews] Review needs a manual restart', {
+          reviewId: existingReview.id,
+          terminalReason: existingReview.terminal_reason,
+          attempts: attempts.length,
+        });
         return;
       }
       const admission = await admitRestart({ owner, review: existingReview, pull });

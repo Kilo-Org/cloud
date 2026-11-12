@@ -658,7 +658,11 @@ describe('recoverMissedReviews', () => {
 
     const summary = await recoverMissedReviews({ now: FROZEN_NOW });
 
-    expect(summary).toMatchObject({ skippedExisting: 1, reviewsRetried: 0, reviewsStarted: 0 });
+    expect(summary).toMatchObject({
+      retriesExhausted: 1,
+      reviewsRetried: 0,
+      reviewsStarted: 0,
+    });
     expect(mockRetryFailedCodeReview).not.toHaveBeenCalled();
   });
 

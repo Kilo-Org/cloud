@@ -73,6 +73,10 @@ const AUTOMATIC_RETRY_TERMINAL_REASON_LIST = [
   'wrapper_failed',
   'delivery_failed',
   'session_import_failed',
+  // An upstream refusal is incident-scoped: the same request succeeds once the
+  // incident clears, and neither a person nor a customer key is implicated. The
+  // attempt cap is what keeps a standing refusal from billing a run every sweep.
+  'assistant_unauthorized',
 ] as const satisfies readonly CodeReviewTerminalReason[];
 
 /**

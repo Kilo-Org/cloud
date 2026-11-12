@@ -1971,7 +1971,12 @@ describe('per-tool entries', () => {
               description: 'Space tools',
               tools: [
                 { type: 'function', name: 'a', description: 'First' },
-                { type: 'function', name: 'b', parameters: { type: 'object' } },
+                {
+                  type: 'function',
+                  name: 'b',
+                  parameters: { type: 'object' },
+                  output_schema: { type: 'string' },
+                },
                 { type: 'web_search' },
               ],
             },
@@ -1997,7 +2002,9 @@ describe('per-tool entries', () => {
       {
         kind: 'tool',
         name: 'b',
-        segments: [{ header: 'tool definition: b', body: '{"type":"object"}' }],
+        segments: [
+          { header: 'tool definition: b', body: '{"type":"object"}\n\n{"type":"string"}' },
+        ],
       },
       {
         kind: 'tool',

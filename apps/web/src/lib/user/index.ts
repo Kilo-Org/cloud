@@ -170,7 +170,12 @@ import { getDeliveredEmailAddress, normalizeEmail } from '@kilocode/web-shared/l
 import { normalizeJa4, signupDecide } from '@kilocode/web-shared/lib/bouncer/client';
 import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
 import { bareIpLiteral } from '@kilocode/web-shared/lib/bouncer/inference';
-import { recordWatchwoodSignupShadow, type WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
+import {
+  checkWatchwoodSignup,
+  recordWatchwoodSignupShadow,
+  type WatchwoodSignupContext,
+} from '@/lib/auth/watchwood';
+import { getTrustedSignupClientIp } from '@/lib/auth/trusted-signup-ip';
 import { getDomain } from 'tldts';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
 import { deleteUserPasskeys } from '@/lib/user/session-revocation';
@@ -326,7 +331,7 @@ export type CreateOrUpdateUserTrackingContext = {
   anonymousId?: string | null;
   locale?: string | null;
   countryCode?: string | null;
-  watchwood?: WatchwoodSignupAssessment;
+  watchwood?: WatchwoodSignupContext;
 };
 
 export type DeferredSignInEvent = {
@@ -755,11 +760,6 @@ export async function createOrUpdateUser(
 
   const normalizedEmail = normalizeEmail(args.google_user_email);
   const operationId = signupOperationId(normalizedEmail);
-  recordWatchwoodSignupShadow({
-    operationId,
-    provider: args.provider,
-    assessment: trackingContext?.watchwood,
-  });
 
   // Never fall through to the insert: its dedup misses legacy rows with a NULL
   // normalized_email that findUserByNormalizedEmail matches case-insensitively.
@@ -785,11 +785,18 @@ export async function createOrUpdateUser(
     });
     return failureResult('ADMISSION_REQUIRED');
   }
+  const watchwoodCheck = checkWatchwoodSignup({
+    operationId,
+    context: trackingContext?.watchwood,
+    email: args.google_user_email,
+    ip: getTrustedSignupClientIp(requestHeaders ?? new Headers()),
+  });
   const bouncerIp = bareIpLiteral(signupIp ?? undefined);
-  if (!IS_DEVELOPMENT && !options.skipSignupAdmission) {
-    // Subdomains of one registrable domain share Bouncer's domain counter.
-    const emailHost = normalizedEmail.slice(normalizedEmail.lastIndexOf('@') + 1);
-    const verdict = bouncerIp
+  const signupAdmissionApplies = !IS_DEVELOPMENT && !options.skipSignupAdmission;
+  // Subdomains of one registrable domain share Bouncer's domain counter.
+  const emailHost = normalizedEmail.slice(normalizedEmail.lastIndexOf('@') + 1);
+  const verdict =
+    signupAdmissionApplies && bouncerIp
       ? await signupDecide({
           operationId,
           ip: bouncerIp,
@@ -798,6 +805,12 @@ export async function createOrUpdateUser(
           emailDomain: getDomain(emailHost, { allowPrivateDomains: true }) ?? emailHost,
         })
       : null;
+  recordWatchwoodSignupShadow({
+    operationId,
+    provider: args.provider,
+    assessment: await watchwoodCheck,
+  });
+  if (signupAdmissionApplies) {
     console.info('[auth] Bouncer signup admission', {
       operationId,
       enforced: verdict?.enforced ?? false,

@@ -208,12 +208,18 @@ import {
 import type * as StripeClient from '@kilocode/web-shared/lib/stripe-client';
 import type * as PostHogModule from '@kilocode/web-shared/lib/posthog';
 import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
-import type { WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
+import type { WatchwoodSignupAssessment, WatchwoodSignupContext } from '@/lib/auth/watchwood';
+import { checkWatchwoodSignup, recordWatchwoodSignupShadow } from '@/lib/auth/watchwood';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
   BOUNCER_URL: 'https://bouncer.example.com',
   INTERNAL_API_SECRET: 'test-internal-secret',
+}));
+
+jest.mock('@/lib/auth/watchwood', () => ({
+  checkWatchwoodSignup: jest.fn(async () => undefined),
+  recordWatchwoodSignupShadow: jest.fn(),
 }));
 
 jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
@@ -904,6 +910,8 @@ describe('User', () => {
     beforeEach(() => {
       mockRecordAffiliateAttributionAndQueueParentEvent.mockResolvedValue(null);
       mockSignupDecide.mockReset().mockResolvedValue({ enforced: false, flags: [] });
+      jest.mocked(checkWatchwoodSignup).mockReset().mockResolvedValue(undefined);
+      jest.mocked(recordWatchwoodSignupShadow).mockReset();
       jest.mocked(createStripeCustomer).mockClear();
       jest.mocked(deleteStripeCustomer).mockClear();
     });
@@ -912,18 +920,18 @@ describe('User', () => {
       jest.restoreAllMocks();
     });
 
-    it.each<WatchwoodSignupAssessment>([
-      {
-        status: 'assessed',
-        riskScore: 1,
-        safetyIdentifier: '4829b420-d43c-4f31-893d-f5042cf274cf',
-        latencyMs: 10,
-        assessedAt: 1,
-      },
-      { status: 'unavailable', latencyMs: 1000, assessedAt: 1 },
-      { status: 'missing', latencyMs: 0, assessedAt: 1 },
-    ])('creates an account with a $status shadow assessment', async watchwood => {
-      const email = `watchwood-${watchwood.status}@example.com`;
+    it.each<[string, WatchwoodSignupContext]>([
+      [
+        'valid-context',
+        {
+          safetyIdentifier: '4829b420-d43c-4f31-893d-f5042cf274cf',
+          turnstileGuid: '0f4d7b9a-2c1e-4a55-9d1b-6a1f6f0c3a10',
+        },
+      ],
+      ['missing', { status: 'missing' }],
+      ['unavailable', { status: 'unavailable' }],
+    ])('creates an account with a %s watchwood context', async (label, watchwood) => {
+      const email = `watchwood-${label}@example.com`;
       const result = await createOrUpdateUser(
         {
           google_user_email: email,
@@ -931,7 +939,7 @@ describe('User', () => {
           google_user_image_url: '',
           hosted_domain: null,
           provider: 'google',
-          provider_account_id: `watchwood-${watchwood.status}`,
+          provider_account_id: `watchwood-${label}`,
         },
         undefined,
         false,
@@ -943,10 +951,92 @@ describe('User', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
       expect(result.isNew).toBe(true);
+      expect(jest.mocked(checkWatchwoodSignup)).toHaveBeenCalledWith(
+        expect.objectContaining({ context: watchwood, email })
+      );
       expect(await findUserById(result.user.id)).toMatchObject({ google_user_email: email });
       expect(await getUserAuthProviders(result.user.id)).toMatchObject([
-        { provider: 'google', provider_account_id: `watchwood-${watchwood.status}` },
+        { provider: 'google', provider_account_id: `watchwood-${label}` },
       ]);
+    });
+
+    it('runs the watchwood check concurrently with the bouncer decision', async () => {
+      const watchwood = Promise.withResolvers<WatchwoodSignupAssessment | undefined>();
+      jest.mocked(checkWatchwoodSignup).mockReturnValueOnce(watchwood.promise);
+      mockSignupDecide.mockImplementationOnce(async () => {
+        expect(jest.mocked(recordWatchwoodSignupShadow)).not.toHaveBeenCalled();
+        watchwood.resolve(undefined);
+        return { enforced: false, flags: [] };
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'watchwood-concurrent@example.com',
+          google_user_name: 'Concurrent Signup',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'watchwood-concurrent',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '203.0.113.71' }),
+        null,
+        {
+          watchwood: {
+            safetyIdentifier: '4829b420-d43c-4f31-893d-f5042cf274cf',
+            turnstileGuid: '0f4d7b9a-2c1e-4a55-9d1b-6a1f6f0c3a10',
+          },
+        }
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockSignupDecide).toHaveBeenCalledTimes(1);
+    });
+
+    it('records the watchwood shadow assessment before a bouncer refusal', async () => {
+      const assessment: WatchwoodSignupAssessment = {
+        status: 'assessed',
+        riskScore: 0.9,
+        safetyIdentifier: '4829b420-d43c-4f31-893d-f5042cf274cf',
+        latencyMs: 12,
+        assessedAt: 1,
+      };
+      jest.mocked(checkWatchwoodSignup).mockResolvedValueOnce(assessment);
+      mockSignupDecide.mockResolvedValueOnce({
+        enforced: true,
+        code: 'signup_rate_limited',
+        flags: [],
+        methods: [],
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'watchwood-refused@example.com',
+          google_user_name: 'Refused Signup',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'watchwood-refused',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '203.0.113.72' }),
+        null,
+        {
+          watchwood: {
+            safetyIdentifier: '4829b420-d43c-4f31-893d-f5042cf274cf',
+            turnstileGuid: '0f4d7b9a-2c1e-4a55-9d1b-6a1f6f0c3a10',
+          },
+        }
+      );
+
+      expect(result).toEqual({ success: false, error: 'SIGNUP-RATE-LIMITED' });
+      expect(recordWatchwoodSignupShadow).toHaveBeenCalledWith({
+        operationId: expect.any(String),
+        provider: 'google',
+        assessment,
+      });
     });
 
     it('refuses a native signup without verified admission before creating a Stripe customer or user', async () => {

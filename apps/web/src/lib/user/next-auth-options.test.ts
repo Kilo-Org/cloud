@@ -6,7 +6,7 @@ import type * as userServerModule from '@kilocode/web-shared/lib/user/server';
 jest.mock('next/headers', () => ({ cookies: jest.fn(), headers: jest.fn() }));
 jest.mock('@/lib/auth/watchwood', () => ({
   ...jest.requireActual<typeof watchwoodModule>('@/lib/auth/watchwood'),
-  readWatchwoodSignupAssessment: jest.fn(),
+  readWatchwoodSignupContext: jest.fn(),
 }));
 jest.mock('@/lib/user/sso', () => ({ processSSOUserLogin: jest.fn() }));
 jest.mock('@/lib/user', () => ({
@@ -27,7 +27,7 @@ jest.mock('@/lib/account-linking-session', () => ({
 
 import { describe, test, expect } from '@jest/globals';
 import { cookies, headers } from 'next/headers';
-import { readWatchwoodSignupAssessment } from '@/lib/auth/watchwood';
+import { readWatchwoodSignupContext } from '@/lib/auth/watchwood';
 import { processSSOUserLogin } from '@/lib/user/sso';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
 import * as userServer from '@kilocode/web-shared/lib/user/server';
@@ -682,7 +682,10 @@ describe('preserveSignInRedirectContext', () => {
 describe('WorkOS sign-in callback', () => {
   const callbackPath = '/users/accept-invite/invite-token';
   const requestHeaders = new Headers({ 'accept-language': 'en-US', 'x-vercel-ip-country': 'US' });
-  const watchwood = { status: 'assessed', riskScore: 0.4, latencyMs: 12, assessedAt: 123 } as const;
+  const watchwood = {
+    safetyIdentifier: '4829b420-d43c-4f31-893d-f5042cf274cf',
+    turnstileGuid: '0f4d7b9a-2c1e-4a55-9d1b-6a1f6f0c3a10',
+  } as const;
   const signInArgs = {
     user: { id: 'workos-user', email: 'user@example.com', name: 'Test User', image: null },
     account: { provider: 'workos', providerAccountId: 'workos-user', type: 'oauth' as const },
@@ -700,7 +703,7 @@ describe('WorkOS sign-in callback', () => {
     } as Awaited<ReturnType<typeof cookies>>);
     jest.mocked(headers).mockResolvedValue(requestHeaders as Awaited<ReturnType<typeof headers>>);
     jest.mocked(getAccountLinkingSession).mockResolvedValue(null);
-    jest.mocked(readWatchwoodSignupAssessment).mockResolvedValue(watchwood);
+    jest.mocked(readWatchwoodSignupContext).mockResolvedValue(watchwood);
     jest.mocked(processSSOUserLogin).mockResolvedValue(true);
     jest.mocked(userLib.findAndSyncExistingUser).mockResolvedValue(null);
     jest.mocked(userServer.isBlockedTLD).mockResolvedValue(false);
@@ -761,7 +764,7 @@ describe('WorkOS sign-in callback', () => {
       { watchwood: undefined },
       undefined
     );
-    expect(readWatchwoodSignupAssessment).not.toHaveBeenCalled();
+    expect(readWatchwoodSignupContext).not.toHaveBeenCalled();
   });
 });
 
@@ -799,7 +802,7 @@ describe('Sign-in verification address', () => {
     } as unknown as Awaited<ReturnType<typeof cookies>>);
     jest.mocked(headers).mockResolvedValue(requestHeaders as Awaited<ReturnType<typeof headers>>);
     jest.mocked(getAccountLinkingSession).mockResolvedValue(null);
-    jest.mocked(readWatchwoodSignupAssessment).mockResolvedValue(undefined);
+    jest.mocked(readWatchwoodSignupContext).mockResolvedValue({ status: 'missing' });
     jest
       .mocked(userLib.findAndSyncExistingUser)
       .mockImplementation(

@@ -264,30 +264,38 @@ pnpm web:env set WATCHWOOD_SHADOW_ENABLED
 
 Set the enabled value to exact `true`, then redeploy.
 The browser receives only the organization and a server-generated signup identity.
-The server sends the token and trusted client IP to OpenAI, without email or phone signals.
+The signup endpoint validates the browser token, Turnstile context, and trusted client IP, then keeps the token server-side in Redis for up to ten minutes.
+The record is single use, so the next check consumes it.
+Sign-in reads the signed identity cookie with a fresh Turnstile claim and deletes the identity cookie.
+New-account creation sends the provider email address, the stored token, and the trusted client IP to OpenAI.
+The check runs concurrently with the Bouncer decision, so it adds at most one second to account creation.
 Production assessments require Vercel's trusted client-IP header.
 Production without Vercel skips assessment rather than trusting caller-supplied forwarding headers.
 Only local development and tests use the forwarded-header fallback.
 Turnstile verification signs a separate trusted-IP claim for Watchwood; existing authentication fields retain their behavior.
 Watchwood skips older proofs without that claim instead of changing authentication admission.
-Tokens remain transient; signed, HttpOnly cookies carry the signup identity and assessment through authentication redirects.
+The signed, HttpOnly session cookie carries only the signup identity through authentication redirects; the token and the assessment never live in a cookie.
 The SDK sets a first-party `watchwood_device_id` cookie and sends that device identifier with signup evidence; OpenAI treats the device identifier as a strong token-farming signal.
 
 The browser allows at most two seconds for shadow submission.
 After the mount request reports collection disabled, submission skips Watchwood without another request.
 An unresolved configuration request retains the bounded fail-open path.
-The server allows one second for body reads, Redis budgets, and the upstream check.
+The signup endpoint allows one second for body reads, Redis budgets, and the token store.
+The account-creation check allows one second for the Redis read and the upstream call.
 It retries an upstream server error once and does not retry client errors.
 Upstream redirects count as errors and are never followed.
 Missing tokens, blocked scripts, invalid responses, unavailable services, and high risk scores do not refuse signup.
-Redis budgets limit assessments per verified Turnstile context and client IP; exhausted budgets reduce coverage, not signup admission.
+Redis budgets limit stored tokens per verified Turnstile context and client IP; exhausted budgets reduce coverage, not signup admission.
 Each budget increment sets its expiry atomically.
 
-Logs named `[auth] Watchwood signup attempt` describe assessment coverage, failures, scores, risk reasons, upstream HTTP statuses, and latency.
+Logs named `[auth] Watchwood signup token` describe token storage coverage and its status.
+Logs named `[auth] Watchwood signup attempt` describe assessment coverage, failures, scores, risk reasons, upstream HTTP statuses, token age, and latency.
 Logs named `[auth] Watchwood signup shadow` correlate new-account attempts with existing signup outcomes through `operationId`.
-Both events carry `shadow: true`, `enforced: false`, and any risk reasons the upstream response supplied.
+Every event carries `shadow: true` and `enforced: false`.
+The attempt and shadow events also carry any risk reasons the upstream response supplied.
 The risk score ranges from zero to one; it is not a probability.
-Risk reasons and sub-reasons are optional upstream labels; unexpected shapes are omitted rather than failing the assessment.
+Risk reasons and sub-reasons are optional upstream labels; unexpected shapes are omitted rather than failing the assessment, and the attempt log marks them as unrecognized.
+The attempt log includes `tokenAgeMs`, the time from token storage to the check, so token expiry across the OAuth round trip is measurable.
 Do not interpret a missing assessment as a low score.
 Observe coverage, conversion, latency, and confirmed abuse before proposing enforcement.
 To disable collection, set `WATCHWOOD_SHADOW_ENABLED` to `false` and redeploy.

@@ -1,16 +1,20 @@
 import jwt from 'jsonwebtoken';
-import { NextRequest, type NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import {
   assessWatchwoodSignup,
+  checkWatchwoodSignup,
   prepareWatchwoodSignupSession,
-  readWatchwoodSignupAssessment,
-  type WatchwoodSignupAssessment,
+  readWatchwoodSignupContext,
   recordWatchwoodSignupShadow,
+  type WatchwoodSignupAssessment,
 } from './watchwood';
 
 const mockCookieValues = new Map<string, string>();
 const mockDelete = jest.fn((name: string) => mockCookieValues.delete(name));
 const mockEval = jest.fn();
+const mockSet = jest.fn();
+const mockGetdel = jest.fn();
+const mockTokens = new Map<string, string>();
 jest.mock('next/headers', () => ({
   cookies: jest.fn(async () => ({
     get: (name: string) => {
@@ -21,21 +25,24 @@ jest.mock('next/headers', () => ({
   })),
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  NEXTAUTH_SECRET: 'watchwood-unit-test-signing-key',
+  NEXTAUTH_SECRET: '[REDACTED by s1-secret-redact]',
   NEXTAUTH_URL: 'https://example.test',
 }));
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: {
     eval: (...args: unknown[]) => mockEval(...args),
+    set: (...args: unknown[]) => mockSet(...args),
+    getdel: (...args: unknown[]) => mockGetdel(...args),
   },
 }));
 
-const secret = 'watchwood-unit-test-signing-key';
+const secret = '[REDACTED by s1-secret-redact]';
 const sessionCookie = 'watchwood_signup_session';
-const assessmentCookie = 'watchwood_signup_assessment';
 const guid = '4829b420-d43c-4f31-893d-f5042cf274cf';
+const otherGuid = '0f4d7b9a-2c1e-4a55-9d1b-6a1f6f0c3a10';
 const ip = '192.0.2.10';
 const browserToken = 'synthetic-watchwood-token';
+const createAccountUrl = 'https://api.openai.com/v1/watchwood/check/create_account';
 const originalFetch = global.fetch;
 const originalEnv = process.env;
 let mockFetch: jest.Mock;
@@ -71,17 +78,29 @@ async function session() {
   return data.safety_identifier as string;
 }
 
-function assessment(result: NextResponse) {
-  const value = result.cookies.get(assessmentCookie)?.value;
-  expect(value).toBeDefined();
-  mockCookieValues.set(assessmentCookie, value ?? '');
-  const decoded = jwt.verify(value ?? '', secret, {
-    algorithms: ['HS256'],
-    audience: assessmentCookie,
+function storedRecord() {
+  const call = mockSet.mock.calls.at(-1);
+  expect(call).toBeDefined();
+  const [key, value, options] = call as [string, string, { ex: number }];
+  return { key, value: JSON.parse(value), options };
+}
+
+function logEntry(name: string): Record<string, unknown> | undefined {
+  const call = info.mock.calls.find(([event]) => event === name);
+  return call?.[1] as Record<string, unknown> | undefined;
+}
+
+async function tokenFor(identity: string, token = browserToken) {
+  await assessWatchwoodSignup(request({ token, safety_identifier: identity }));
+}
+
+function check(identity: string, options: { email?: string; ip?: string; guid?: string } = {}) {
+  return checkWatchwoodSignup({
+    operationId: 'operation',
+    context: { safetyIdentifier: identity, turnstileGuid: options.guid ?? guid },
+    email: options.email ?? 'user@example.com',
+    ip: options.ip ?? ip,
   });
-  expect(typeof decoded).toBe('object');
-  if (typeof decoded === 'string') throw new Error('Expected signed assessment');
-  return decoded.assessment;
 }
 
 beforeEach(() => {
@@ -94,9 +113,19 @@ beforeEach(() => {
   delete process.env.VERCEL;
   delete process.env.VERCEL_ENV;
   mockCookieValues.clear();
+  mockTokens.clear();
   jest.clearAllMocks();
   mockEval.mockResolvedValue(1);
-  mockFetch = jest.fn().mockResolvedValue(Response.json({ risk_score: 0.4 }));
+  mockSet.mockImplementation(async (key: string, value: string) => {
+    mockTokens.set(key, value);
+    return 'OK';
+  });
+  mockGetdel.mockImplementation(async (key: string) => {
+    const value = mockTokens.get(key) ?? null;
+    mockTokens.delete(key);
+    return value;
+  });
+  mockFetch = jest.fn();
   global.fetch = mockFetch;
   info = jest.spyOn(console, 'info').mockImplementation(() => undefined);
 });
@@ -115,11 +144,21 @@ describe('Watchwood signup session', () => {
     expect(await (await prepareWatchwoodSignupSession(request())).json()).toEqual({
       enabled: false,
     });
-    expect(await readWatchwoodSignupAssessment()).toBeUndefined();
+    expect(await readWatchwoodSignupContext()).toEqual({ status: 'missing' });
     expect(await (await assessWatchwoodSignup(request({ token: browserToken }))).json()).toEqual({
       success: true,
     });
+    expect(
+      await checkWatchwoodSignup({
+        operationId: 'operation',
+        context: { safetyIdentifier: guid, turnstileGuid: guid },
+        email: 'user@example.com',
+        ip,
+      })
+    ).toBeUndefined();
     expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockSet).not.toHaveBeenCalled();
+    expect(mockGetdel).not.toHaveBeenCalled();
     expect(info).not.toHaveBeenCalled();
   });
 
@@ -173,164 +212,136 @@ describe('Watchwood signup session', () => {
   });
 });
 
-describe('Watchwood signup assessment', () => {
-  it('stores a signed advisory result without persisting sensitive inputs', async () => {
+describe('Watchwood signup context', () => {
+  it('returns a verified context and consumes the session cookie', async () => {
+    const identity = await session();
+    expect(await readWatchwoodSignupContext()).toEqual({
+      safetyIdentifier: identity,
+      turnstileGuid: guid,
+    });
+    expect(mockDelete).toHaveBeenCalledWith(sessionCookie);
+  });
+
+  it('returns missing without a session cookie', async () => {
+    mockCookieValues.set('turnstile_jwt', signed({ guid, ip }));
+    expect(await readWatchwoodSignupContext()).toEqual({ status: 'missing' });
+  });
+
+  it.each(['forged session', 'missing turnstile', 'forged turnstile'])(
+    'returns invalid context for a %s',
+    async mode => {
+      const identity = await session();
+      if (mode === 'forged session')
+        mockCookieValues.set(
+          sessionCookie,
+          jwt.sign({ safetyIdentifier: identity }, 'different-key', { audience: sessionCookie })
+        );
+      if (mode === 'missing turnstile') mockCookieValues.delete('turnstile_jwt');
+      if (mode === 'forged turnstile')
+        mockCookieValues.set('turnstile_jwt', jwt.sign({ guid, ip }, 'different-key'));
+      expect(await readWatchwoodSignupContext()).toEqual({ status: 'invalid_context' });
+    }
+  );
+});
+
+describe('Watchwood signup token storage', () => {
+  it('stores a short-lived single-use token without logging it', async () => {
     const identity = await session();
     const result = await assessWatchwoodSignup(
       request({ token: browserToken, safety_identifier: identity })
     );
     expect(await result.json()).toEqual({ success: true });
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(assessment(result)).toMatchObject({
-      status: 'assessed',
-      riskScore: 0.4,
+    const { key, value, options } = storedRecord();
+    expect(key).toMatch(/^watchwood:signup:token:[a-f0-9]{64}$/);
+    expect(key).not.toContain(identity);
+    expect(value).toEqual({
+      token: browserToken,
+      ip,
+      turnstileGuid: guid,
+      receivedAt: expect.any(Number),
+      status: 'pending',
+    });
+    expect(options).toEqual({ ex: 600 });
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(logEntry('[auth] Watchwood signup token')).toEqual({
+      shadow: true,
+      enforced: false,
+      status: 'pending',
       safetyIdentifier: identity,
       latencyMs: expect.any(Number),
-      assessedAt: expect.any(Number),
     });
-    expect(result.cookies.get(assessmentCookie)).toMatchObject({
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      maxAge: 3600,
-    });
-    expect(await readWatchwoodSignupAssessment()).toMatchObject({
-      status: 'assessed',
-      riskScore: 0.4,
-    });
-    expect(mockDelete).toHaveBeenCalledWith(assessmentCookie);
-    expect(mockDelete).toHaveBeenCalledWith(sessionCookie);
-    const safeOutput = JSON.stringify({
-      logs: info.mock.calls,
-      cookie: jwt.decode(result.cookies.get(assessmentCookie)?.value ?? ''),
-    });
-    for (const sensitive of [browserToken, 'synthetic-api-key', ip])
-      expect(safeOutput).not.toContain(sensitive);
-    expect(info).toHaveBeenCalledWith(
-      '[auth] Watchwood signup attempt',
-      expect.objectContaining({ shadow: true, enforced: false, safetyIdentifier: identity })
-    );
+    expect(JSON.stringify(info.mock.calls)).not.toContain(browserToken);
   });
 
-  it('records upstream risk reasons in the assessment and both logs', async () => {
+  it('stores missing token coverage so account creation can report it', async () => {
     const identity = await session();
-    mockFetch.mockResolvedValueOnce(
-      Response.json({
-        risk_score: 0.72,
-        risk_reasons: [' token_farming ', 'disposable_email'],
-        risk_sub_reasons: ['shared_device'],
-      })
-    );
-    const result = await assessWatchwoodSignup(
-      request({ token: browserToken, safety_identifier: identity })
-    );
-    expect(assessment(result)).toMatchObject({
-      status: 'assessed',
-      riskScore: 0.72,
-      riskReasons: ['token_farming', 'disposable_email'],
-      riskSubReasons: ['shared_device'],
-    });
-    expect(info).toHaveBeenCalledWith(
-      '[auth] Watchwood signup attempt',
-      expect.objectContaining({
-        riskReasons: ['token_farming', 'disposable_email'],
-        riskSubReasons: ['shared_device'],
-      })
-    );
-    const stored = await readWatchwoodSignupAssessment();
-    expect(stored).toMatchObject({
-      status: 'assessed',
-      riskReasons: ['token_farming', 'disposable_email'],
-      riskSubReasons: ['shared_device'],
-    });
-    if (!stored) throw new Error('Expected stored assessment');
-    recordWatchwoodSignupShadow({ operationId: 'operation', provider: 'test', assessment: stored });
-    expect(info).toHaveBeenCalledWith(
-      '[auth] Watchwood signup shadow',
-      expect.objectContaining({
-        riskReasons: ['token_farming', 'disposable_email'],
-        riskSubReasons: ['shared_device'],
-      })
-    );
+    await assessWatchwoodSignup(request({ token: '  ', safety_identifier: identity }));
+    expect(storedRecord().value).toMatchObject({ token: '', status: 'token_missing' });
+    expect(mockEval).not.toHaveBeenCalled();
+    expect(logEntry('[auth] Watchwood signup token')).toMatchObject({ status: 'token_missing' });
   });
 
-  it.each([
-    ['a string', 'token_farming'],
-    ['non-string entries', [1, 2]],
-    ['more than ten entries', Array.from({ length: 11 }, () => 'reason')],
-    ['an overlong entry', ['a'.repeat(65)]],
-    ['a blank entry', ['  ']],
-    ['nested arrays', [['token_farming']]],
-  ])('omits malformed risk reasons: %s', async (_label, reasons) => {
+  it('stores a rate-limited record without calling upstream', async () => {
     const identity = await session();
-    mockFetch.mockResolvedValueOnce(
-      Response.json({ risk_score: 0.4, risk_reasons: reasons, risk_sub_reasons: reasons })
-    );
-    const result = await assessWatchwoodSignup(
-      request({ token: browserToken, safety_identifier: identity })
-    );
-    const recorded = assessment(result);
-    expect(recorded).toMatchObject({ status: 'assessed', riskScore: 0.4 });
-    expect(recorded).not.toHaveProperty('riskReasons');
-    expect(recorded).not.toHaveProperty('riskSubReasons');
-    expect(info).toHaveBeenCalledWith(
-      '[auth] Watchwood signup attempt',
-      expect.not.objectContaining({ riskReasons: expect.anything() })
-    );
-  });
-
-  it('round-trips a maximum-size assessment through the signed cookie', async () => {
-    const identity = await session();
-    const reasons = Array.from(
-      { length: 10 },
-      (_, index) => `${String(index).padStart(2, '0')}${'r'.repeat(62)}`
-    );
-    mockFetch.mockResolvedValueOnce(
-      Response.json({ risk_score: 0.5, risk_reasons: reasons, risk_sub_reasons: reasons })
-    );
-    const result = await assessWatchwoodSignup(
-      request({ token: browserToken, safety_identifier: identity })
-    );
-    const raw = result.cookies.get(assessmentCookie)?.value ?? '';
-    expect(raw.length).toBeLessThanOrEqual(4096);
-    mockCookieValues.set(assessmentCookie, raw);
-    expect(await readWatchwoodSignupAssessment()).toMatchObject({
-      status: 'assessed',
-      riskReasons: reasons,
-      riskSubReasons: reasons,
-    });
-  });
-
-  it('does not accept an unsigned browser identity or a different signed session', async () => {
-    await session();
-    const result = await assessWatchwoodSignup(
-      request({ token: browserToken, safety_identifier: 'dc22a990-f425-479f-b3ab-d48b16d7c02c' })
-    );
-    expect(assessment(result).status).toBe('invalid_context');
+    mockEval.mockResolvedValueOnce(1).mockResolvedValueOnce(11);
+    await assessWatchwoodSignup(request({ token: browserToken, safety_identifier: identity }));
+    expect(storedRecord().value).toMatchObject({ token: '', status: 'rate_limited' });
+    expect(logEntry('[auth] Watchwood signup token')).toMatchObject({ status: 'rate_limited' });
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it.each(['missing', 'forged', 'expired', 'ip_mismatch', 'missing_ip'])(
-    'requires a valid matching Turnstile context: %s',
-    async mode => {
-      const identity = await session();
-      if (mode === 'missing') mockCookieValues.delete('turnstile_jwt');
-      if (mode === 'missing_ip')
-        mockCookieValues.set('turnstile_jwt', signed({ guid, iat: Math.floor(Date.now() / 1000) }));
-      if (mode === 'forged')
-        mockCookieValues.set('turnstile_jwt', jwt.sign({ guid, ip }, 'wrong-key'));
-      if (mode === 'expired')
-        mockCookieValues.set('turnstile_jwt', jwt.sign({ guid, ip }, secret, { expiresIn: -1 }));
-      if (mode === 'ip_mismatch')
-        mockCookieValues.set('turnstile_jwt', signed({ guid, ip: '192.0.2.11' }));
-      const result = await assessWatchwoodSignup(
-        request({ token: browserToken, safety_identifier: identity })
-      );
-      expect(await result.json()).toEqual({ success: true });
-      expect(mockFetch).not.toHaveBeenCalled();
-      expect(result.cookies.get(assessmentCookie)).toBeUndefined();
-    }
-  );
+  it('does not store a submission without a matching signed identity', async () => {
+    await session();
+    await assessWatchwoodSignup(
+      request({ token: browserToken, safety_identifier: 'dc22a990-f425-479f-b3ab-d48b16d7c02c' })
+    );
+    expect(mockSet).not.toHaveBeenCalled();
+    expect(mockEval).not.toHaveBeenCalled();
+    expect(logEntry('[auth] Watchwood signup token')).toMatchObject({
+      status: 'invalid_context',
+    });
+  });
+
+  it('logs invalid context without storing anything when session cookies are missing', async () => {
+    await assessWatchwoodSignup(request({ token: browserToken }));
+    expect(mockSet).not.toHaveBeenCalled();
+    expect(logEntry('[auth] Watchwood signup token')).toEqual({
+      shadow: true,
+      enforced: false,
+      status: 'invalid_context',
+      safetyIdentifier: undefined,
+      latencyMs: expect.any(Number),
+    });
+  });
+
+  it('fails open when the token store is unavailable', async () => {
+    const identity = await session();
+    mockSet.mockRejectedValueOnce(new Error('private service detail'));
+    const result = await assessWatchwoodSignup(
+      request({ token: browserToken, safety_identifier: identity })
+    );
+    expect(await result.json()).toEqual({ success: true });
+    expect(logEntry('[auth] Watchwood signup token')).toMatchObject({ status: 'unavailable' });
+    expect(JSON.stringify(info.mock.calls)).not.toContain('private service detail');
+    expect(JSON.stringify(info.mock.calls)).not.toContain(browserToken);
+  });
+
+  it('bounds the token store within the shared deadline', async () => {
+    const identity = await session();
+    jest.useFakeTimers();
+    const stalled = Promise.withResolvers<'OK'>();
+    mockSet.mockReturnValueOnce(stalled.promise);
+    const pending = assessWatchwoodSignup(
+      request({ token: browserToken, safety_identifier: identity })
+    );
+    await jest.advanceTimersByTimeAsync(1000);
+    const result = await pending;
+    expect(await result.json()).toEqual({ success: true });
+    expect(logEntry('[auth] Watchwood signup token')).toMatchObject({ status: 'unavailable' });
+    stalled.resolve('OK');
+    await jest.advanceTimersByTimeAsync(0);
+    expect(info).toHaveBeenCalledTimes(1);
+  });
 
   it('uses the trusted Vercel address when Turnstile forwarding metadata differs', async () => {
     process.env.VERCEL = '1';
@@ -342,59 +353,48 @@ describe('Watchwood signup assessment', () => {
         { 'x-forwarded-for': '192.0.2.11', 'x-vercel-forwarded-for': ip }
       )
     );
-    expect(mockFetch.mock.calls[0][1].headers['X-OpenAI-Watchwood-Client-IP']).toBe(ip);
-    mockFetch.mockClear();
+    expect(storedRecord().value).toMatchObject({ ip, turnstileGuid: guid });
+    mockSet.mockClear();
     await assessWatchwoodSignup(request({ token: browserToken, safety_identifier: identity }));
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockSet).not.toHaveBeenCalled();
   });
 
   it('refuses a solved Turnstile context replayed from another trusted address', async () => {
     process.env.VERCEL = '1';
     const identity = await session();
     mockCookieValues.set('turnstile_jwt', signed({ guid, ip }));
-
-    const result = await assessWatchwoodSignup(
+    await assessWatchwoodSignup(
       request(
         { token: browserToken, safety_identifier: identity },
         { 'x-forwarded-for': ip, 'x-vercel-forwarded-for': '192.0.2.99' }
       )
     );
-
-    expect(await result.json()).toEqual({ success: true });
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockSet).not.toHaveBeenCalled();
     expect(mockEval).not.toHaveBeenCalled();
-    expect(result.cookies.get(assessmentCookie)).toBeUndefined();
   });
 
   it('skips checks without a trusted production address instead of accepting forwarded headers', async () => {
     process.env = { ...process.env, NODE_ENV: 'production' };
     const identity = await session();
-    const result = await assessWatchwoodSignup(
+    await assessWatchwoodSignup(
       request(
         { token: browserToken, safety_identifier: identity },
         { 'x-vercel-forwarded-for': ip, 'x-real-ip': ip }
       )
     );
-    expect(await result.json()).toEqual({ success: true });
-    expect(mockFetch).not.toHaveBeenCalled();
-    expect(mockEval).not.toHaveBeenCalled();
-  });
-
-  it('records missing coverage without calling upstream or charging the budget', async () => {
-    const identity = await session();
-    const result = await assessWatchwoodSignup(request({ token: '', safety_identifier: identity }));
-    expect(assessment(result).status).toBe('token_missing');
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockSet).not.toHaveBeenCalled();
     expect(mockEval).not.toHaveBeenCalled();
   });
 
   it.each([8193, 20000])('bounds token and request sizes at %i characters', async length => {
     const identity = await session();
-    const result = await assessWatchwoodSignup(
+    await assessWatchwoodSignup(
       request({ token: 'a'.repeat(length), safety_identifier: identity })
     );
-    expect(assessment(result).status).toBe('invalid_context');
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockSet).not.toHaveBeenCalled();
+    expect(logEntry('[auth] Watchwood signup token')).toMatchObject({
+      status: 'invalid_context',
+    });
   });
 
   it('rejects oversized declared bodies before reading them', async () => {
@@ -402,167 +402,7 @@ describe('Watchwood signup assessment', () => {
     await assessWatchwoodSignup(
       request({ token: browserToken, safety_identifier: identity }, { 'content-length': '20000' })
     );
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-
-  it('does not send repeated checks once either the Turnstile or address budget is exhausted', async () => {
-    const identity = await session();
-    mockEval.mockResolvedValueOnce(1).mockResolvedValueOnce(11);
-    const result = await assessWatchwoodSignup(
-      request({ token: browserToken, safety_identifier: identity })
-    );
-    expect(assessment(result).status).toBe('rate_limited');
-    expect(mockFetch).not.toHaveBeenCalled();
-    expect(mockEval.mock.calls[0][1][0]).not.toContain(guid);
-    expect(mockEval.mock.calls[1][1][0]).not.toContain(ip);
-    mockEval.mockResolvedValueOnce(4);
-    const second = await assessWatchwoodSignup(
-      request({ token: browserToken, safety_identifier: identity })
-    );
-    expect(assessment(second).status).toBe('rate_limited');
-  });
-
-  it('skips paid checks when Redis fails without failing authentication', async () => {
-    const identity = await session();
-    mockEval.mockRejectedValueOnce(new Error('private service detail'));
-    const result = await assessWatchwoodSignup(
-      request({ token: browserToken, safety_identifier: identity })
-    );
-    expect(await result.json()).toEqual({ success: true });
-    expect(assessment(result).status).toBe('unavailable');
-    expect(mockFetch).not.toHaveBeenCalled();
-    expect(JSON.stringify(info.mock.calls)).not.toContain('private service detail');
-  });
-
-  it('finishes within the total deadline when the atomic Redis budget never settles', async () => {
-    const identity = await session();
-    jest.useFakeTimers();
-    const stalled = Promise.withResolvers<number>();
-    mockEval.mockReturnValueOnce(stalled.promise);
-    const pending = assessWatchwoodSignup(
-      request({ token: browserToken, safety_identifier: identity })
-    );
-    await jest.advanceTimersByTimeAsync(1000);
-    const result = await pending;
-    expect(await result.json()).toEqual({ success: true });
-    expect(assessment(result)).toMatchObject({ status: 'unavailable', latencyMs: 1000 });
-    const originalCookie = result.cookies.get(assessmentCookie)?.value;
-    expect(mockFetch).not.toHaveBeenCalled();
-    expect(mockEval).toHaveBeenCalledTimes(1);
-    expect(info).toHaveBeenCalledTimes(1);
-    stalled.resolve(1);
-    await jest.advanceTimersByTimeAsync(1000);
-    expect(mockFetch).not.toHaveBeenCalled();
-    expect(mockEval).toHaveBeenCalledTimes(1);
-    expect(info).toHaveBeenCalledTimes(1);
-    expect(result.cookies.get(assessmentCookie)?.value).toBe(originalCookie);
-  });
-
-  it('retries a 5xx once and accepts the subsequent validated score', async () => {
-    const identity = await session();
-    mockFetch
-      .mockResolvedValueOnce(new Response('private upstream details', { status: 503 }))
-      .mockResolvedValueOnce(Response.json({ risk_score: 1 }));
-    const result = await assessWatchwoodSignup(
-      request({ token: browserToken, safety_identifier: identity })
-    );
-    expect(mockFetch).toHaveBeenCalledTimes(2);
-    expect(assessment(result)).toMatchObject({ status: 'assessed', riskScore: 1 });
-    expect(JSON.stringify(info.mock.calls)).not.toContain('private upstream details');
-  });
-
-  it.each([400, 401, 429, 302, 503])(
-    'never retries non-5xx or retries 5xx more than once: %i',
-    async status => {
-      const identity = await session();
-      mockFetch.mockImplementation(async () => new Response('sensitive response body', { status }));
-      const result = await assessWatchwoodSignup(
-        request({ token: browserToken, safety_identifier: identity })
-      );
-      expect(mockFetch).toHaveBeenCalledTimes(status === 503 ? 2 : 1);
-      expect(assessment(result).status).toBe('upstream_error');
-      expect(JSON.stringify(info.mock.calls)).not.toContain('sensitive response body');
-    }
-  );
-
-  it('records the upstream HTTP status for an upstream error', async () => {
-    const identity = await session();
-    mockFetch.mockResolvedValueOnce(new Response('sensitive response body', { status: 400 }));
-    const result = await assessWatchwoodSignup(
-      request({ token: browserToken, safety_identifier: identity })
-    );
-    expect(assessment(result)).toMatchObject({ status: 'upstream_error', upstreamStatus: 400 });
-    expect(info).toHaveBeenCalledWith(
-      '[auth] Watchwood signup attempt',
-      expect.objectContaining({ status: 'upstream_error', upstreamStatus: 400 })
-    );
-    recordWatchwoodSignupShadow({
-      operationId: 'operation',
-      provider: 'test',
-      assessment: assessment(result),
-    });
-    const shadowCall = info.mock.calls.find(([name]) => name === '[auth] Watchwood signup shadow');
-    expect(JSON.stringify(shadowCall)).not.toContain('upstreamStatus');
-    expect(JSON.stringify(info.mock.calls)).not.toContain('sensitive response body');
-  });
-
-  it.each([-0.1, 1.1, '0.2', null, undefined])('rejects an invalid risk score %s', async score => {
-    const identity = await session();
-    mockFetch.mockResolvedValueOnce(Response.json({ risk_score: score }));
-    const result = await assessWatchwoodSignup(
-      request({ token: browserToken, safety_identifier: identity })
-    );
-    expect(assessment(result).status).toBe('invalid_response');
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('bounds upstream response size', async () => {
-    const identity = await session();
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ risk_score: 0.2, padding: 'a'.repeat(20000) }))
-    );
-    const result = await assessWatchwoodSignup(
-      request({ token: browserToken, safety_identifier: identity })
-    );
-    expect(assessment(result).status).toBe('invalid_response');
-  });
-
-  it('aborts a stalled upstream within the shared deadline and never retries it', async () => {
-    const identity = await session();
-    jest.useFakeTimers();
-    mockFetch.mockImplementation((_url: string, options: RequestInit) => {
-      const { promise, reject } = Promise.withResolvers<Response>();
-      options.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
-      return promise;
-    });
-    const pending = assessWatchwoodSignup(
-      request({ token: browserToken, safety_identifier: identity })
-    );
-    await jest.advanceTimersByTimeAsync(1000);
-    const result = await pending;
-    expect(assessment(result)).toMatchObject({ status: 'unavailable', latencyMs: 1000 });
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not retry a transport failure or expose its details', async () => {
-    const identity = await session();
-    mockFetch.mockRejectedValueOnce(new Error('private transport details'));
-    const result = await assessWatchwoodSignup(
-      request({ token: browserToken, safety_identifier: identity })
-    );
-    expect(await result.json()).toEqual({ success: true });
-    expect(assessment(result).status).toBe('unavailable');
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(JSON.stringify(info.mock.calls)).not.toContain('private transport details');
-  });
-
-  it('rejects a non-finite JSON number', async () => {
-    const identity = await session();
-    mockFetch.mockResolvedValueOnce(new Response('{"risk_score":1e999}'));
-    const result = await assessWatchwoodSignup(
-      request({ token: browserToken, safety_identifier: identity })
-    );
-    expect(assessment(result).status).toBe('invalid_response');
+    expect(mockSet).not.toHaveBeenCalled();
   });
 
   it('aborts a stalled incoming body rather than waiting indefinitely', async () => {
@@ -576,63 +416,281 @@ describe('Watchwood signup assessment', () => {
     } as NonNullable<ConstructorParameters<typeof NextRequest>[1]>);
     const pending = assessWatchwoodSignup(stalled);
     await jest.advanceTimersByTimeAsync(1000);
-    expect(assessment(await pending).status).toBe('unavailable');
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(await (await pending).json()).toEqual({ success: true });
+    expect(logEntry('[auth] Watchwood signup token')).toMatchObject({ status: 'unavailable' });
+    expect(mockSet).not.toHaveBeenCalled();
   });
 });
 
-describe('Watchwood signup attribution', () => {
-  it('returns missing coverage rather than throwing when there is no assessment', async () => {
-    expect(await readWatchwoodSignupAssessment()).toMatchObject({ status: 'missing' });
+describe('Watchwood signup check', () => {
+  it('checks the account with the received email and records the adopted reasons', async () => {
+    const identity = await session();
+    await tokenFor(identity);
+    mockFetch.mockResolvedValueOnce(
+      Response.json({
+        risk_score: 0.72,
+        risk_reasons: [' token_farming ', 'disposable_email'],
+        risk_sub_reasons: ['shared_device'],
+      })
+    );
+
+    const assessment = await check(identity, { email: '  Signup@Example.com ' });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe(createAccountUrl);
+    expect(init).toMatchObject({ method: 'POST', redirect: 'manual', cache: 'no-store' });
+    expect(init.headers).toMatchObject({
+      Authorization: 'Bearer synthetic-api-key',
+      'Content-Type': 'application/json',
+      'X-OpenAI-Watchwood-Token': browserToken,
+      'X-OpenAI-Watchwood-Client-IP': ip,
+    });
+    expect(JSON.parse(init.body)).toEqual({
+      safety_identifier: identity,
+      extra_signals: { email: 'Signup@Example.com' },
+    });
+    expect(assessment).toMatchObject({
+      status: 'assessed',
+      riskScore: 0.72,
+      safetyIdentifier: identity,
+      riskReasons: ['token_farming', 'disposable_email'],
+      riskSubReasons: ['shared_device'],
+    });
+    expect(logEntry('[auth] Watchwood signup attempt')).toMatchObject({
+      operationId: 'operation',
+      status: 'assessed',
+      riskScore: 0.72,
+      tokenAgeMs: expect.any(Number),
+      riskReasons: ['token_farming', 'disposable_email'],
+      riskSubReasons: ['shared_device'],
+    });
+    expect(JSON.stringify(info.mock.calls)).not.toContain(browserToken);
   });
 
-  it.each(['signature', 'session', 'turnstile'])(
-    'does not attribute a stale or forged assessment: %s',
-    async mode => {
-      const identity = await session();
-      assessment(
-        await assessWatchwoodSignup(request({ token: browserToken, safety_identifier: identity }))
-      );
-      if (mode === 'signature')
-        mockCookieValues.set(assessmentCookie, `${mockCookieValues.get(assessmentCookie)}x`);
-      if (mode === 'session')
-        mockCookieValues.set(
-          sessionCookie,
-          signed({ safetyIdentifier: 'dc22a990-f425-479f-b3ab-d48b16d7c02c' }, sessionCookie)
-        );
-      if (mode === 'turnstile')
-        mockCookieValues.set(
-          'turnstile_jwt',
-          signed({ guid: 'dc22a990-f425-479f-b3ab-d48b16d7c02c', ip })
-        );
-      expect(await readWatchwoodSignupAssessment()).toMatchObject({ status: 'invalid_context' });
-    }
-  );
+  it('carries the reasons into the shadow log without the upstream status', async () => {
+    const identity = await session();
+    await tokenFor(identity);
+    mockFetch.mockResolvedValueOnce(Response.json({ risk_score: 0.3, risk_reasons: ['speed'] }));
+    const assessment = await check(identity);
+    if (!assessment) throw new Error('Expected an assessment');
+    recordWatchwoodSignupShadow({ operationId: 'operation', provider: 'google', assessment });
+    expect(info).toHaveBeenCalledWith(
+      '[auth] Watchwood signup shadow',
+      expect.objectContaining({ operationId: 'operation', riskReasons: ['speed'] })
+    );
+  });
 
-  it('logs only advisory fields and does nothing when disabled', () => {
+  it('flags reasons that are present but do not match the accepted shape', async () => {
+    const identity = await session();
+    await tokenFor(identity);
+    mockFetch.mockResolvedValueOnce(
+      Response.json({
+        risk_score: 0.4,
+        risk_reasons: ['a'.repeat(65)],
+        risk_sub_reasons: 'token_farming',
+      })
+    );
+    const assessment = await check(identity);
+    expect(assessment).toMatchObject({ status: 'assessed', riskScore: 0.4 });
+    expect(assessment).not.toHaveProperty('riskReasons');
+    expect(assessment).not.toHaveProperty('riskSubReasons');
+    expect(logEntry('[auth] Watchwood signup attempt')).toMatchObject({
+      riskReasonsUnrecognized: true,
+    });
+    expect(JSON.stringify(info.mock.calls)).not.toContain('a'.repeat(65));
+  });
+
+  it('does not flag absent reasons', async () => {
+    const identity = await session();
+    await tokenFor(identity);
+    mockFetch.mockResolvedValueOnce(Response.json({ risk_score: 0.4 }));
+    await check(identity);
+    expect(logEntry('[auth] Watchwood signup attempt')).not.toHaveProperty(
+      'riskReasonsUnrecognized'
+    );
+  });
+
+  it('uses the stored token once and reports the next check as missing', async () => {
+    const identity = await session();
+    await tokenFor(identity);
+    mockFetch.mockResolvedValueOnce(Response.json({ risk_score: 0.1 }));
+    await check(identity);
+    expect(mockGetdel).toHaveBeenCalledTimes(1);
+    await expect(check(identity)).resolves.toMatchObject({ status: 'missing' });
+    expect(mockGetdel).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports missing when no token record exists', async () => {
+    await expect(check(guid)).resolves.toMatchObject({ status: 'missing' });
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(logEntry('[auth] Watchwood signup attempt')).toMatchObject({
+      operationId: 'operation',
+      status: 'missing',
+    });
+  });
+
+  it('reports a stored missing-token record without calling upstream', async () => {
+    const identity = await session();
+    await assessWatchwoodSignup(request({ token: '', safety_identifier: identity }));
+    await expect(check(identity)).resolves.toMatchObject({ status: 'token_missing' });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('reports a stored rate-limited record without calling upstream', async () => {
+    const identity = await session();
+    mockEval.mockResolvedValueOnce(1).mockResolvedValueOnce(11);
+    await tokenFor(identity);
+    await expect(check(identity)).resolves.toMatchObject({ status: 'rate_limited' });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('refuses a check from a different trusted address', async () => {
+    const identity = await session();
+    await tokenFor(identity);
+    await expect(check(identity, { ip: '192.0.2.11' })).resolves.toMatchObject({
+      status: 'invalid_context',
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('refuses a check whose Turnstile context changed', async () => {
+    const identity = await session();
+    await tokenFor(identity);
+    await expect(check(identity, { guid: otherGuid })).resolves.toMatchObject({
+      status: 'invalid_context',
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('passes a context failure through without touching the token store', async () => {
+    await expect(
+      checkWatchwoodSignup({
+        operationId: 'operation',
+        context: { status: 'unavailable' },
+        email: 'user@example.com',
+        ip,
+      })
+    ).resolves.toMatchObject({ status: 'unavailable' });
+    expect(mockGetdel).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('retries a 5xx once and accepts the subsequent validated score', async () => {
+    const identity = await session();
+    await tokenFor(identity);
+    mockFetch
+      .mockResolvedValueOnce(new Response('private upstream details', { status: 503 }))
+      .mockResolvedValueOnce(Response.json({ risk_score: 1 }));
+    const assessment = await check(identity);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(assessment).toMatchObject({ status: 'assessed', riskScore: 1 });
+    expect(JSON.stringify(info.mock.calls)).not.toContain('private upstream details');
+  });
+
+  it('records the upstream HTTP status for a 4xx without retrying', async () => {
+    const identity = await session();
+    await tokenFor(identity);
+    mockFetch.mockResolvedValueOnce(new Response('sensitive response body', { status: 400 }));
+    const assessment = await check(identity);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(assessment).toMatchObject({ status: 'upstream_error', upstreamStatus: 400 });
+    expect(logEntry('[auth] Watchwood signup attempt')).toMatchObject({
+      status: 'upstream_error',
+      upstreamStatus: 400,
+    });
+    if (!assessment) throw new Error('Expected an assessment');
+    recordWatchwoodSignupShadow({ operationId: 'operation', provider: 'google', assessment });
+    expect(JSON.stringify(logEntry('[auth] Watchwood signup shadow'))).not.toContain(
+      'upstreamStatus'
+    );
+    expect(JSON.stringify(info.mock.calls)).not.toContain('sensitive response body');
+  });
+
+  it.each([-0.1, 1.1, '0.2', null, undefined])('rejects an invalid risk score %s', async score => {
+    const identity = await session();
+    await tokenFor(identity);
+    mockFetch.mockResolvedValueOnce(Response.json({ risk_score: score }));
+    await expect(check(identity)).resolves.toMatchObject({ status: 'invalid_response' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('bounds the upstream response size', async () => {
+    const identity = await session();
+    await tokenFor(identity);
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ risk_score: 0.2, padding: 'a'.repeat(20000) }))
+    );
+    await expect(check(identity)).resolves.toMatchObject({ status: 'invalid_response' });
+  });
+
+  it('never retries a transport failure or exposes its details', async () => {
+    const identity = await session();
+    await tokenFor(identity);
+    mockFetch.mockRejectedValueOnce(new Error('private transport details'));
+    await expect(check(identity)).resolves.toMatchObject({ status: 'unavailable' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(info.mock.calls)).not.toContain('private transport details');
+  });
+
+  it('ignores a stored record that cannot be parsed', async () => {
+    const identity = await session();
+    await tokenFor(identity);
+    mockGetdel.mockResolvedValueOnce('not-json');
+    await expect(check(identity)).resolves.toMatchObject({ status: 'missing' });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('aborts a stalled upstream within the shared deadline', async () => {
+    const identity = await session();
+    await tokenFor(identity);
+    jest.useFakeTimers();
+    mockFetch.mockImplementation((_url: string, options: RequestInit) => {
+      const { promise, reject } = Promise.withResolvers<Response>();
+      options.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+      return promise;
+    });
+    const pending = check(identity);
+    await jest.advanceTimersByTimeAsync(1000);
+    const assessment = await pending;
+    expect(assessment).toMatchObject({ status: 'unavailable', latencyMs: 1000 });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing and adds no calls when Watchwood is disabled', async () => {
+    delete process.env.WATCHWOOD_SHADOW_ENABLED;
+    expect(await check(guid)).toBeUndefined();
+    expect(mockGetdel).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(info).not.toHaveBeenCalled();
+  });
+});
+
+describe('Watchwood signup shadow logging', () => {
+  it('logs only advisory fields and does nothing without an assessment', () => {
     recordWatchwoodSignupShadow({
       operationId: 'operation',
       provider: 'test',
       assessment: undefined,
     });
     expect(info).not.toHaveBeenCalled();
-    recordWatchwoodSignupShadow({
-      operationId: 'operation',
-      provider: 'test',
-      assessment: {
-        status: 'assessed',
-        riskScore: 0.9,
-        latencyMs: 10,
-        assessedAt: 123,
-        token: browserToken,
-      } as WatchwoodSignupAssessment,
-    });
+    const assessment: WatchwoodSignupAssessment = {
+      status: 'assessed',
+      riskScore: 0.9,
+      riskReasons: ['token_farming'],
+      latencyMs: 10,
+      assessedAt: 123,
+      safetyIdentifier: guid,
+    };
+    recordWatchwoodSignupShadow({ operationId: 'operation', provider: 'test', assessment });
     expect(info).toHaveBeenCalledWith(
       '[auth] Watchwood signup shadow',
       expect.objectContaining({
         operationId: 'operation',
         provider: 'test',
         riskScore: 0.9,
+        riskReasons: ['token_farming'],
         shadow: true,
         enforced: false,
       })

@@ -9,8 +9,8 @@ import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { getTrustedSignupClientIp } from '@/lib/auth/trusted-signup-ip';
 
 const SESSION_COOKIE = 'watchwood_signup_session';
-const ASSESSMENT_COOKIE = 'watchwood_signup_assessment';
 const MAX_AGE_SECONDS = 60 * 60;
+const TOKEN_TTL_SECONDS = 10 * 60;
 const DEADLINE_MS = 1000;
 const MAX_BODY_BYTES = 16 * 1024;
 const CREATE_ACCOUNT_URL = 'https://api.openai.com/v1/watchwood/check/create_account';
@@ -24,6 +24,13 @@ return count
 const identitySchema = z.object({ safetyIdentifier: z.uuid() });
 const turnstileSchema = z.object({ guid: z.uuid(), ip: z.string() });
 const riskReasonsSchema = z.array(z.string().trim().min(1).max(64)).max(10);
+const tokenRecordSchema = z.object({
+  token: z.string().max(8192),
+  ip: z.string(),
+  turnstileGuid: z.uuid(),
+  receivedAt: z.number().int().nonnegative(),
+  status: z.enum(['pending', 'token_missing', 'rate_limited']),
+});
 const assessmentBase = z.object({
   safetyIdentifier: z.uuid().optional(),
   latencyMs: z.number().finite().nonnegative(),
@@ -51,16 +58,21 @@ const assessmentSchema = z.discriminatedUnion('status', [
 ]);
 const upstreamSchema = z.object({
   risk_score: z.number().finite().min(0).max(1),
-  risk_reasons: riskReasonsSchema.optional().catch(undefined),
-  risk_sub_reasons: riskReasonsSchema.optional().catch(undefined),
+  risk_reasons: z.unknown().optional(),
+  risk_sub_reasons: z.unknown().optional(),
 });
-const assessmentCookieSchema = z.object({ assessment: assessmentSchema, turnstileGuid: z.uuid() });
 const submissionSchema = z.object({
   token: z.string().max(8192).default(''),
   safety_identifier: z.uuid(),
 });
 
 export type WatchwoodSignupAssessment = z.infer<typeof assessmentSchema>;
+export type WatchwoodSignupContext =
+  | { safetyIdentifier: string; turnstileGuid: string }
+  | { status: 'missing' | 'invalid_context' | 'unavailable' };
+type WatchwoodTokenStatus = z.infer<typeof tokenRecordSchema>['status'];
+
+type WatchwoodTokenRecord = z.infer<typeof tokenRecordSchema>;
 
 function config() {
   const orgId = process.env.WATCHWOOD_ORG_ID?.trim();
@@ -102,43 +114,39 @@ function verify(value: string | undefined, audience?: string): unknown {
   }
 }
 
-function missingAssessment(
-  status: 'missing' | 'invalid_context' | 'unavailable'
-): WatchwoodSignupAssessment {
-  return { status, latencyMs: 0, assessedAt: Date.now() };
+function tokenKey(safetyIdentifier: string) {
+  const digest = createHmac('sha256', NEXTAUTH_SECRET).update(safetyIdentifier).digest('hex');
+  return `watchwood:signup:token:${digest}`;
 }
 
-export async function readWatchwoodSignupAssessment(): Promise<
-  WatchwoodSignupAssessment | undefined
-> {
-  if (!config()) return undefined;
+async function storeToken(
+  safetyIdentifier: string,
+  record: WatchwoodTokenRecord,
+  signal: AbortSignal
+): Promise<void> {
+  await withinDeadline(
+    () =>
+      redisClient.set(tokenKey(safetyIdentifier), JSON.stringify(record), {
+        ex: TOKEN_TTL_SECONDS,
+      }),
+    signal
+  );
+}
+
+async function takeToken(
+  safetyIdentifier: string,
+  signal: AbortSignal
+): Promise<WatchwoodTokenRecord | undefined> {
+  const value = await withinDeadline(
+    () => redisClient.getdel<string>(tokenKey(safetyIdentifier)),
+    signal
+  );
+  if (!value) return undefined;
   try {
-    const store = await cookies();
-    const raw = store.get(ASSESSMENT_COOKIE)?.value;
-    const assessment = assessmentCookieSchema.safeParse(verify(raw, ASSESSMENT_COOKIE));
-    const session = identitySchema.safeParse(
-      verify(store.get(SESSION_COOKIE)?.value, SESSION_COOKIE)
-    );
-    const turnstile = turnstileSchema.safeParse(verify(store.get('turnstile_jwt')?.value));
-    try {
-      store.delete(ASSESSMENT_COOKIE);
-      store.delete(SESSION_COOKIE);
-    } catch {
-      // Some authentication callbacks expose read-only cookies.
-    }
-    if (!raw) return missingAssessment('missing');
-    if (
-      !assessment.success ||
-      !session.success ||
-      !turnstile.success ||
-      assessment.data.turnstileGuid !== turnstile.data.guid ||
-      assessment.data.assessment.safetyIdentifier !== session.data.safetyIdentifier
-    ) {
-      return missingAssessment('invalid_context');
-    }
-    return assessment.data.assessment;
+    const parsed = tokenRecordSchema.safeParse(JSON.parse(value));
+    return parsed.success ? parsed.data : undefined;
   } catch {
-    return missingAssessment('unavailable');
+    return undefined;
   }
 }
 
@@ -158,6 +166,29 @@ function safeAssessment(assessment: WatchwoodSignupAssessment) {
   };
 }
 
+export async function readWatchwoodSignupContext(): Promise<WatchwoodSignupContext> {
+  if (!config()) return { status: 'missing' };
+  try {
+    const store = await cookies();
+    const raw = store.get(SESSION_COOKIE)?.value;
+    const session = identitySchema.safeParse(verify(raw, SESSION_COOKIE));
+    const turnstile = turnstileSchema.safeParse(verify(store.get('turnstile_jwt')?.value));
+    try {
+      store.delete(SESSION_COOKIE);
+    } catch {
+      // Some authentication callbacks expose read-only cookies.
+    }
+    if (!raw) return { status: 'missing' };
+    if (!session.success || !turnstile.success) return { status: 'invalid_context' };
+    return {
+      safetyIdentifier: session.data.safetyIdentifier,
+      turnstileGuid: turnstile.data.guid,
+    };
+  } catch {
+    return { status: 'unavailable' };
+  }
+}
+
 export function recordWatchwoodSignupShadow({
   operationId,
   provider,
@@ -175,6 +206,136 @@ export function recordWatchwoodSignupShadow({
     enforced: false,
     ...safeAssessment(assessment),
   });
+}
+
+export async function checkWatchwoodSignup({
+  operationId,
+  context,
+  email,
+  ip,
+}: {
+  operationId: string;
+  context: WatchwoodSignupContext | undefined;
+  email: string;
+  ip: string | undefined;
+}): Promise<WatchwoodSignupAssessment | undefined> {
+  const enabled = config();
+  if (!enabled) return undefined;
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DEADLINE_MS);
+  let status: WatchwoodSignupAssessment['status'] = 'invalid_context';
+  let safetyIdentifier: string | undefined;
+  let tokenAgeMs: number | undefined;
+  let riskScore: number | undefined;
+  let riskReasons: string[] | undefined;
+  let riskSubReasons: string[] | undefined;
+  let upstreamStatus: number | undefined;
+  let riskReasonsUnrecognized = false;
+  try {
+    if (!context) {
+      status = 'missing';
+    } else if ('status' in context) {
+      status = context.status;
+    } else {
+      safetyIdentifier = context.safetyIdentifier;
+      const record = await takeToken(context.safetyIdentifier, controller.signal);
+      if (!record) {
+        status = 'missing';
+      } else {
+        tokenAgeMs = Date.now() - record.receivedAt;
+        if (record.status !== 'pending') {
+          status = record.status;
+        } else if (!ip || record.ip !== ip || record.turnstileGuid !== context.turnstileGuid) {
+          status = 'invalid_context';
+        } else if (!record.token) {
+          status = 'token_missing';
+        } else {
+          for (let attempt = 0; attempt < 2; attempt++) {
+            controller.signal.throwIfAborted();
+            status = 'unavailable';
+            const upstream = await fetch(CREATE_ACCOUNT_URL, {
+              method: 'POST',
+              redirect: 'manual',
+              cache: 'no-store',
+              signal: controller.signal,
+              headers: {
+                Authorization: `Bearer ${enabled.apiKey}`,
+                'Content-Type': 'application/json',
+                'X-OpenAI-Watchwood-Token': record.token,
+                'X-OpenAI-Watchwood-Client-IP': ip,
+              },
+              body: JSON.stringify({
+                safety_identifier: safetyIdentifier,
+                extra_signals: { email: email.trim() },
+              }),
+            });
+            if (upstream.status >= 500 && upstream.status <= 599 && attempt === 0) {
+              void upstream.body?.cancel().catch(() => undefined);
+              continue;
+            }
+            if (!upstream.ok) {
+              void upstream.body?.cancel().catch(() => undefined);
+              status = 'upstream_error';
+              upstreamStatus = upstream.status;
+              break;
+            }
+            status = 'invalid_response';
+            let body: unknown;
+            try {
+              body = await readBoundedJson(upstream.body, controller.signal);
+            } catch (error) {
+              if (controller.signal.aborted) throw error;
+              break;
+            }
+            const parsed = upstreamSchema.safeParse(body);
+            if (parsed.success) {
+              status = 'assessed';
+              riskScore = parsed.data.risk_score;
+              const reasons = riskReasonsSchema.safeParse(parsed.data.risk_reasons);
+              const subReasons = riskReasonsSchema.safeParse(parsed.data.risk_sub_reasons);
+              riskReasonsUnrecognized =
+                ('risk_reasons' in parsed.data && !reasons.success) ||
+                ('risk_sub_reasons' in parsed.data && !subReasons.success);
+              if (reasons.success) riskReasons = reasons.data;
+              if (subReasons.success) riskSubReasons = subReasons.data;
+            }
+            break;
+          }
+        }
+      }
+    }
+  } catch {
+    status = 'unavailable';
+  }
+  clearTimeout(timeout);
+  const base = { safetyIdentifier, latencyMs: Date.now() - startedAt, assessedAt: Date.now() };
+  const assessment: WatchwoodSignupAssessment =
+    status === 'assessed' && riskScore !== undefined
+      ? {
+          ...base,
+          status: 'assessed',
+          riskScore,
+          ...(riskReasons ? { riskReasons } : {}),
+          ...(riskSubReasons ? { riskSubReasons } : {}),
+        }
+      : status === 'upstream_error'
+        ? {
+            ...base,
+            status: 'upstream_error',
+            ...(upstreamStatus !== undefined ? { upstreamStatus } : {}),
+          }
+        : { ...base, status: status === 'assessed' ? 'invalid_response' : status };
+  console.info('[auth] Watchwood signup attempt', {
+    operationId,
+    shadow: true,
+    enforced: false,
+    ...safeAssessment(assessment),
+    ...(upstreamStatus !== undefined ? { upstreamStatus } : {}),
+    ...(tokenAgeMs !== undefined ? { tokenAgeMs } : {}),
+    ...(riskReasonsUnrecognized ? { riskReasonsUnrecognized: true } : {}),
+  });
+  return assessment;
 }
 
 function response() {
@@ -272,11 +433,7 @@ export async function assessWatchwoodSignup(request: NextRequest): Promise<NextR
   const timeout = setTimeout(() => controller.abort(), DEADLINE_MS);
   let safetyIdentifier: string | undefined;
   let turnstileGuid: string | undefined;
-  let status: WatchwoodSignupAssessment['status'] = 'invalid_context';
-  let riskScore: number | undefined;
-  let riskReasons: string[] | undefined;
-  let riskSubReasons: string[] | undefined;
-  let upstreamStatus: number | undefined;
+  let status: WatchwoodTokenStatus | 'invalid_context' | 'unavailable' = 'invalid_context';
   try {
     const session = identitySchema.safeParse(
       verify(request.cookies.get(SESSION_COOKIE)?.value, SESSION_COOKIE)
@@ -298,90 +455,34 @@ export async function assessWatchwoodSignup(request: NextRequest): Promise<NextR
       await readBoundedJson(request.body, controller.signal)
     );
     if (!input.success || input.data.safety_identifier !== safetyIdentifier) return result;
-    if (!input.data.token.trim()) {
-      status = 'token_missing';
-      return result;
-    }
-    status = 'unavailable';
-    if (await rateLimited(turnstileGuid, ip, controller.signal)) {
-      status = 'rate_limited';
-      return result;
-    }
-    for (let attempt = 0; attempt < 2; attempt++) {
-      controller.signal.throwIfAborted();
-      const upstream = await fetch(CREATE_ACCOUNT_URL, {
-        method: 'POST',
-        redirect: 'manual',
-        cache: 'no-store',
-        signal: controller.signal,
-        headers: {
-          Authorization: `Bearer ${enabled.apiKey}`,
-          'Content-Type': 'application/json',
-          'X-OpenAI-Watchwood-Token': input.data.token,
-          'X-OpenAI-Watchwood-Client-IP': ip,
-        },
-        body: JSON.stringify({ safety_identifier: safetyIdentifier }),
-      });
-      if (upstream.status >= 500 && upstream.status <= 599 && attempt === 0) {
-        void upstream.body?.cancel().catch(() => undefined);
-      } else {
-        if (!upstream.ok) {
-          void upstream.body?.cancel().catch(() => undefined);
-          status = 'upstream_error';
-          upstreamStatus = upstream.status;
-          return result;
-        }
-        status = 'invalid_response';
-        const parsed = upstreamSchema.safeParse(
-          await readBoundedJson(upstream.body, controller.signal)
-        );
-        if (parsed.success) {
-          status = 'assessed';
-          riskScore = parsed.data.risk_score;
-          riskReasons = parsed.data.risk_reasons;
-          riskSubReasons = parsed.data.risk_sub_reasons;
-        }
-        return result;
+    const token = input.data.token.trim();
+    status = token ? 'pending' : 'token_missing';
+    try {
+      if (status === 'pending' && (await rateLimited(turnstileGuid, ip, controller.signal))) {
+        status = 'rate_limited';
       }
+      const record: WatchwoodTokenRecord = {
+        token: status === 'pending' ? token : '',
+        ip,
+        turnstileGuid,
+        receivedAt: Date.now(),
+        status,
+      };
+      await storeToken(safetyIdentifier, record, controller.signal);
+    } catch {
+      status = 'unavailable';
     }
   } catch {
     if (controller.signal.aborted) status = 'unavailable';
   } finally {
     clearTimeout(timeout);
-    const base = { safetyIdentifier, latencyMs: Date.now() - startedAt, assessedAt: Date.now() };
-    const assessment: WatchwoodSignupAssessment =
-      status === 'assessed' && riskScore !== undefined
-        ? {
-            ...base,
-            status: 'assessed',
-            riskScore,
-            ...(riskReasons ? { riskReasons } : {}),
-            ...(riskSubReasons ? { riskSubReasons } : {}),
-          }
-        : status === 'upstream_error'
-          ? {
-              ...base,
-              status: 'upstream_error',
-              ...(upstreamStatus !== undefined ? { upstreamStatus } : {}),
-            }
-          : { ...base, status: status === 'assessed' ? 'invalid_response' : status };
-    console.info('[auth] Watchwood signup attempt', {
+    console.info('[auth] Watchwood signup token', {
       shadow: true,
       enforced: false,
-      ...safeAssessment(assessment),
-      ...(upstreamStatus !== undefined ? { upstreamStatus } : {}),
+      status,
+      safetyIdentifier,
+      latencyMs: Date.now() - startedAt,
     });
-    if (safetyIdentifier && turnstileGuid) {
-      try {
-        result.cookies.set(
-          ASSESSMENT_COOKIE,
-          sign({ assessment, turnstileGuid }, ASSESSMENT_COOKIE),
-          cookieOptions()
-        );
-      } catch {
-        // Signing failure must not change authentication behavior.
-      }
-    }
   }
   return result;
 }

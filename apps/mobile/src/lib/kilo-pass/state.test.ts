@@ -9,34 +9,21 @@ import {
 
 function subscription(overrides: Partial<KiloPassSubscription> = {}): KiloPassSubscription {
   return {
-    subscriptionId: 'kilo-pass-1',
-    stripeSubscriptionId: 'sub_1',
-    paymentProvider: 'stripe',
-    providerSubscriptionId: null,
     tier: 'tier_49',
     cadence: 'monthly',
     status: 'active',
     cancelAtPeriodEnd: false,
-    currentStreakMonths: 3,
-    nextYearlyIssueAt: null,
-    startedAt: '2026-01-05T00:00:00.000Z',
     resumesAt: null,
-    nextBonusCreditsUsd: 9.8,
     nextBillingAt: '2026-12-05T12:00:00.000Z',
-    isFirstTimeSubscriberEver: false,
+    refillAt: '2026-12-05T12:00:00.000Z',
     currentPeriodBaseCreditsUsd: 49,
     currentPeriodUsageUsd: 12.5,
-    currentPeriodHostingCostUsd: 0,
-    currentPeriodBonusCreditsUsd: 9.8,
     currentPeriodBonus: {
       status: 'available',
       kind: null,
       actualAmountUsd: null,
       projectedAmountUsd: 9.8,
     },
-    isBonusUnlocked: false,
-    isBonusAvailableToUnlock: true,
-    refillAt: '2026-12-05T12:00:00.000Z',
     ...overrides,
   };
 }

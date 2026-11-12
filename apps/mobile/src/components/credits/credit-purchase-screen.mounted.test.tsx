@@ -792,10 +792,10 @@ describe('CreditPurchaseScreen', () => {
     // one of those arrivals changes where the copy sits.
     const DESCRIPTION_PREFIX = 'Credits are a one-time purchase';
     // The tallest state — the purchase error, the store's notice and four
-    // unpriced rows together — is 587.5 dp of fixed-height blocks. The
-    // reservation equals it, and the same value holds in every state, so the
-    // copy cannot move.
-    const TALLEST_STATE_MIN_HEIGHT = 587;
+    // unpriced rows together — is the sum of the capped blocks at the default
+    // scale. The reservation equals it, holds in every state, and grows only
+    // with the text, so the copy cannot move.
+    const TALLEST_STATE_MIN_HEIGHT = 691;
     // The purchase error's own sentence. Its two capped lines are the height
     // the reservation adds for it, so the case that shares it with the notice
     // must render it.
@@ -968,6 +968,42 @@ describe('CreditPurchaseScreen', () => {
     }
   });
 
+  it('caps every text block the pack reservation sizes', async () => {
+    // The reservation multiplies a fixed line count by the font scale, so each
+    // block it counts must stop at that count. An uncapped block would grow the
+    // area past the reservation at a raised scale and move the copy.
+    const lineCapOf = (node: TestRenderer.ReactTestInstance | undefined): number | undefined => {
+      if (node === undefined) {
+        return undefined;
+      }
+      const cap: unknown = node.props.numberOfLines;
+      return typeof cap === 'number' ? cap : undefined;
+    };
+    const textWith = (
+      renderer: TestRenderer.ReactTestRenderer,
+      needle: string
+    ): TestRenderer.ReactTestInstance | undefined =>
+      renderer.root
+        .findAll(node =>
+          node.children.some(part => typeof part === 'string' && part.includes(needle))
+        )
+        .find(node => typeof node.props.numberOfLines === 'number');
+
+    const priced = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(priced.renderer).length === 4);
+    expect(lineCapOf(textWith(priced.renderer, 'do not expire.'))).toBe(2);
+    priced.unmount();
+    vi.clearAllMocks();
+
+    owner.fetchStoreProducts.mockRejectedValue(new Error('Failed to query product for sku'));
+    const notice = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(notice.renderer).includes('App Store products unavailable'));
+    expect(lineCapOf(textWith(notice.renderer, 'App Store products unavailable'))).toBe(2);
+    expect(lineCapOf(textWith(notice.renderer, 'Could not connect to'))).toBe(3);
+    expect(lineCapOf(textWith(notice.renderer, 'do not expire.'))).toBe(2);
+    notice.unmount();
+  });
+
   it('scales the pack area reservation with the system font scale', async () => {
     // Line caps bound a line count, not a line height: at a raised scale every
     // reserved text line is taller, so a fixed dp floor would let the copy move
@@ -1002,7 +1038,7 @@ describe('CreditPurchaseScreen', () => {
     const reduced = await reservedHeight();
     dimensions.fontScale = 1;
 
-    expect(single).toBe(587.5);
+    expect(single).toBe(691.5);
     expect(doubled).toBeGreaterThan(single);
     expect(reduced).toBeGreaterThan(single * 0.85);
     expect(reduced).toBeLessThan(single);

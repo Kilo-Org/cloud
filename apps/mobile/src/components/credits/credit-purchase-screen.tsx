@@ -48,25 +48,29 @@ const PACK_SKELETON_ROWS = 4;
  * completed one — and the backend catalog still names the packs when the store
  * cannot price them.
  *
- * The reservation separates the two kinds of measurement a row is made of,
+ * The reservation separates the two kinds of measurement a block is made of,
  * because the system font scale moves only one of them:
  *
- * - text lines scale. A row's title and expiry line, the notice's title, body
- *   and retry label, and the purchase error are all text, and each is capped
- *   at a line count — so the scale multiplies their height;
- * - spacing does not scale. A row's 20 dp paddings and 8 dp gap, the notice's
- *   paddings, and every 10.5 dp step the column lays out between siblings keep
- *   their size at any scale.
+ * - text lines scale. Every text block is capped at a line count — the pack
+ *   title and its price at one line, the row's expiry line at two, the notice
+ *   title at two, its body at three, and the purchase error at two — so the
+ *   scale multiplies those lines and nothing else;
+ * - spacing does not scale. A row's 20 dp paddings and its 8 dp gap above the
+ *   expiry line, the notice's paddings, and every 10.5 dp step the column lays
+ *   out between siblings keep their size at any scale.
  *
- * Both are measured at the default scale. The text terms are the lines of each
- * block, and the column lays out one gap more than it has rows because the
- * notice and the error are siblings of the rows.
+ * Both are measured at the default scale. The column lays out one gap more
+ * than it has rows because the notice and the error are siblings of the rows.
+ * Reserving the capped line counts rather than the lines one locale happens to
+ * use leaves blank space after a shorter state's content, below the pack
+ * surface; it is the price of the copy never moving, and it keeps that price
+ * to the area that is already scrolled.
  */
-const PACK_ROW_TEXT_HEIGHT = 40;
-const PACK_ROW_SPACING = 40;
+const PACK_ROW_TEXT_HEIGHT = 50;
+const PACK_ROW_SPACING = 48;
 const PACK_CONTENT_GAP = 10.5;
-const STORE_NOTICE_TEXT_HEIGHT = 110;
-const STORE_NOTICE_SPACING = 70;
+const STORE_NOTICE_TEXT_HEIGHT = 140;
+const STORE_NOTICE_SPACING = 72;
 const PURCHASE_ERROR_TEXT_HEIGHT = 35;
 const packAreaMinHeight = (rows: number, fontScale: number): number =>
   rows * (PACK_ROW_TEXT_HEIGHT * fontScale + PACK_ROW_SPACING + PACK_CONTENT_GAP) +
@@ -310,7 +314,7 @@ export function CreditPurchaseScreen() {
 
             {storeUnavailable && (
               <View className="gap-3 rounded-xl border border-border bg-card p-5">
-                <Text className="font-semibold text-foreground">
+                <Text className="font-semibold text-foreground" numberOfLines={2}>
                   {t(storeUnavailableCopy.titleKey)}
                 </Text>
                 <Text className="text-sm text-muted-foreground" numberOfLines={3}>
@@ -408,7 +412,9 @@ export function CreditPurchaseScreen() {
                       </Text>
                     </View>
                     {expiryMessage && (
-                      <Text className="mt-2 text-xs text-muted-foreground">{expiryMessage}</Text>
+                      <Text className="mt-2 text-xs text-muted-foreground" numberOfLines={2}>
+                        {expiryMessage}
+                      </Text>
                     )}
                   </Pressable>
                 );

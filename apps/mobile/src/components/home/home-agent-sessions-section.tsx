@@ -74,7 +74,6 @@ export function AgentSessionsSection({
         actionLabel={showBriefing ? t('agentBriefing.history') : t('home.seeAll')}
         actionHidden={!showBriefing && content === 'empty'}
         reserveLabelAir
-        leading
         onActionPress={() => {
           if (showBriefing) {
             router.push('/(app)/agent-briefing' as Href);

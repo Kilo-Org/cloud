@@ -140,24 +140,6 @@ export const SECTION_ACTION_HIT_SLOP = {
 } as const;
 
 /**
- * The padding of a screen's first Home section header row. Its action floats
- * {@link SECTION_ACTION_FLOAT_CLASS} over the label line, so its box reaches
- * `(28 - 14) / 2 = 7 dp` past the line on each side and its hit slop
- * {@link SECTION_ACTION_HIT_SLOP_DP} more: `7 + 9 = 16 dp`. The row pads both
- * sides by that, `16 + 14 + 16 = 46 dp`, so the whole reach stays inside the
- * row: the scroll viewport above it and the cards below it take no touch for
- * the action. The label then starts 16 dp below the viewport instead of
- * 9 + 14 dp (design-gate `leading-gap`).
- */
-export const SECTION_HEADER_LEADING_ROW_PADDING_CLASS = 'py-[16px]';
-
-/**
- * Lets a {@link SECTION_ACTION_FRAME_DP} action box overhang a one-line row by
- * `(28 - 14) / 2 = 7 dp` per side, so the row stays one text line tall.
- */
-export const SECTION_ACTION_FLOAT_CLASS = '-my-[7px]';
-
-/**
  * The box every icon-only control renders. Its own node carries the target, as
  * a control-size audit measures, and 32pt clears the audit's
  * {@link MIN_TAP_TARGET_DP} floor while fitting the agents header row's

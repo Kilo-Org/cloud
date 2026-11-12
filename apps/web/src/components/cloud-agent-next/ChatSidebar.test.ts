@@ -101,7 +101,8 @@ jest.mock('@/components/ui/dropdown-menu', () => {
     DropdownMenuSeparator: () => null,
     DropdownMenuCheckboxItem: passthrough,
     DropdownMenuRadioGroup: passthrough,
-    DropdownMenuRadioItem: passthrough,
+    DropdownMenuRadioItem: ({ children }: { children?: ReactNode }) =>
+      react.createElement('div', { role: 'menuitemradio' }, children),
     DropdownMenuSub: passthrough,
     DropdownMenuSubTrigger: passthrough,
     DropdownMenuSubContent: passthrough,
@@ -793,6 +794,53 @@ describe('ChatSidebar row rendering', () => {
     return { sessions, workspaceFolders, dataTransfer, dragEvent };
   }
 
+  it.each(['needs_you', 'in_review', 'done'] as const)(
+    'excludes %s smart folders from move destinations without hiding their sidebar section',
+    smartPreset => {
+      const { sessions, workspaceFolders } = folderDragFixture();
+      const smartFolder = { ...workspaceFolders.folders[1], smartPreset };
+      const workspaceGroups = sessions.map(session => ({
+        type: 'worktree' as const,
+        worktreeId: session.worktreeId!,
+        sessions: [session],
+        latestSession: session,
+      }));
+      renderSidebar({
+        sessions,
+        workspaceGroups,
+        workspaceFolders: {
+          ...workspaceFolders,
+          folders: [workspaceFolders.folders[0], smartFolder],
+        },
+      });
+
+      const row = dom.container.querySelector(`[data-worktree-id="${sessions[0].worktreeId}"]`);
+      if (!row) throw new Error('Workspace row missing');
+      const destinations = () =>
+        Array.from(row.querySelectorAll('[role="menuitemradio"]'), item => item.textContent);
+
+      expect(destinations()).toEqual(['Ungrouped', 'Product']);
+      expect(dom.container.querySelector(`[data-folder-id="${smartFolder.id}"]`)).not.toBeNull();
+
+      renderSidebar({
+        sessions,
+        workspaceGroups,
+        workspaceFolders: { ...workspaceFolders, folders: [smartFolder] },
+      });
+      expect(destinations()).toEqual([]);
+      expect(row.textContent).not.toContain('Move to folder');
+      expect(dom.container.querySelector(`[data-folder-id="${smartFolder.id}"]`)).not.toBeNull();
+
+      renderSidebar({
+        sessions,
+        workspaceGroups,
+        workspaceFolders: { ...workspaceFolders, folders: [] },
+      });
+      expect(destinations()).toEqual([]);
+      expect(row.textContent).not.toContain('Move to folder');
+    }
+  );
+
   it('requires confirmation before deleting a folder and allows cancellation', async () => {
     const { sessions, workspaceFolders } = folderDragFixture();
     renderSidebar({ sessions, workspaceFolders });
@@ -1464,6 +1512,27 @@ describe('ChatSidebar phase 4 drag ordering', () => {
       refresh: jest.fn(async () => undefined),
     } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>;
   }
+
+  it('keeps Ungrouped available for a filed workspace while manual folders are unavailable', () => {
+    const group = phase4Group(0, null);
+    if (!group.details) throw new Error('Workspace details missing');
+    renderSidebar({
+      workspaceGroups: [
+        {
+          ...group,
+          details: { ...group.details, folderId: '11111111-1111-4111-8111-111111111111' },
+        },
+      ],
+      workspaceFolders: workspaceFolders(),
+    });
+
+    const row = dom.container.querySelector(`[data-worktree-id="${group.worktreeId}"]`);
+    if (!row) throw new Error('Workspace row missing');
+    expect(row.textContent).toContain('Move to folder');
+    expect(
+      Array.from(row.querySelectorAll('[role="menuitemradio"]'), item => item.textContent)
+    ).toEqual(['Ungrouped']);
+  });
 
   function dragRows(
     source: Element,

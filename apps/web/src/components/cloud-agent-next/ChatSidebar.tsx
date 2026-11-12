@@ -422,6 +422,7 @@ function WorktreeGroupMenuItems({
         : stackedSource.source?.basePushed === false
           ? `Push \`${sourceBranch}\` first; it will be pushed after the next successful turn, or enable auto-commit`
           : undefined;
+  const manualFolders = folderControls?.folders.filter(folder => folder.kind === 'manual') ?? [];
 
   return (
     <>
@@ -457,7 +458,7 @@ function WorktreeGroupMenuItems({
           Rename worktree
         </DropdownMenuItem>
       )}
-      {folderControls && (
+      {folderControls && (manualFolders.length > 0 || folderControls.folderId !== null) && (
         <DropdownMenuSub>
           <DropdownMenuSubTrigger disabled={folderControls.disabled} className="gap-2">
             <FolderInput className="text-muted-foreground size-4" />
@@ -469,7 +470,7 @@ function WorktreeGroupMenuItems({
               onValueChange={value => folderControls.onMove(value === 'ungrouped' ? null : value)}
             >
               <DropdownMenuRadioItem value="ungrouped">Ungrouped</DropdownMenuRadioItem>
-              {folderControls.folders.map(folder => (
+              {manualFolders.map(folder => (
                 <DropdownMenuRadioItem key={folder.id} value={folder.id}>
                   <span
                     aria-hidden="true"

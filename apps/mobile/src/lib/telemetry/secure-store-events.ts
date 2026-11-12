@@ -7,7 +7,7 @@
  * graph. The sink adapter itself stays in `error-sink.ts`.
  */
 
-import { isProtectedDataAvailable, ProtectedDataUnavailableError } from '@/lib/protected-data';
+import { ProtectedDataUnavailableError } from '@/lib/protected-data';
 import { addTelemetryBreadcrumb, captureTelemetry } from '@/lib/telemetry/error-sink';
 
 /**
@@ -48,14 +48,20 @@ const KEYCHAIN_INTERACTION_REFUSED_MESSAGE = 'User interaction is not allowed';
  *
  * A refusal from a locked device is not reported: iOS rejects every
  * `WHEN_UNLOCKED*` item with `errSecInteractionNotAllowed` until unlock, by
- * design. The cached protected-data state cannot recognise every one of them —
- * a background start after the screen locked can still read it as available,
- * and it can flip during the call — so the refusal itself is recognised too.
- * Such a refusal leaves a breadcrumb on the next event and files no event of
- * its own.
+ * design, and an `AFTER_FIRST_UNLOCK` item the same way until the device's first
+ * unlock since boot. The refusal itself is recognised by its fixed message — the
+ * cached protected-data state is not a substitute, because a background start
+ * can read it as available and it can flip during the call — and it leaves a
+ * breadcrumb on the next event instead of an event of its own.
+ *
+ * Every other failure is reported even while the keychain is closed: the widget
+ * and glanceable scope store runs in that state by design
+ * (`lib/auth/secure-store-gated`), so a real failure there must stay visible
+ * rather than being dropped as unattributable.
  */
 export function reportSecureStoreFailure(operation: SecureStoreOperation, error: unknown): void {
-  if (error instanceof ProtectedDataUnavailableError || !isProtectedDataAvailable()) {
+  // The app's own guard: the keychain was never called.
+  if (error instanceof ProtectedDataUnavailableError) {
     return;
   }
   if (error instanceof Error && error.message.includes(KEYCHAIN_INTERACTION_REFUSED_MESSAGE)) {

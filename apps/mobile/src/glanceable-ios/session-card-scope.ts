@@ -3,8 +3,10 @@ import { z } from 'zod';
 import {
   type GatedSecureStore,
   readGatedValueForUpdate,
+  widgetSecureStore,
   writeGatedValue,
 } from '@/lib/auth/secure-store-gated';
+import { SESSION_CARD_SCOPE_KEY } from '@/lib/glanceable/widget-store';
 
 /**
  * The account and organization each followed session card belongs to
@@ -19,12 +21,12 @@ import {
  *
  * A record written by an earlier build does not exist, so its card is out of
  * scope at the first restore after the update and is ended there. A store that
- * cannot be read — a locked keychain, or a value this build cannot parse —
- * reads as unavailable, and its cards are left exactly as they are: only a
- * record the app can read may end a card.
+ * cannot be read — a device that has not been unlocked since boot, or a value
+ * this build cannot parse — reads as unavailable, and its cards are left exactly
+ * as they are: only a record the app can read may end a card. The record lives
+ * in the widget store (`lib/glanceable/widget-store`), which is readable while
+ * the phone is locked so a push can re-register a card without waking the app.
  */
-
-const STORE_KEY = 'glanceable-session-card-scopes';
 
 const storedScopeSchema = z.object({
   userId: z.string().min(1),
@@ -59,11 +61,7 @@ export function isSessionCardScopeCurrent(
 let secureStoreForTests: GatedSecureStore | null = null;
 
 function getSecureStore(): GatedSecureStore {
-  if (secureStoreForTests !== null) {
-    return secureStoreForTests;
-  }
-  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
-  return require('expo-secure-store') as GatedSecureStore;
+  return secureStoreForTests ?? widgetSecureStore();
 }
 
 // Every write is a read-modify-write of one key, so they run one at a time: a
@@ -90,7 +88,7 @@ function enqueue(write: () => Promise<void>): void {
  * cannot be read now. A null answer leaves the cards as they are.
  */
 export async function readSessionCardScopes(): Promise<Map<string, SessionCardScope> | null> {
-  const stored = await readGatedValueForUpdate(getSecureStore, STORE_KEY);
+  const stored = await readGatedValueForUpdate(getSecureStore, SESSION_CARD_SCOPE_KEY);
   // A locked device reads as unconfirmed, not as empty: an empty map here would
   // make every followed card out of scope and end it.
   if (stored.status === 'unreadable') {
@@ -115,7 +113,11 @@ async function writeStored(scopes: Map<string, SessionCardScope>): Promise<void>
   for (const [sessionId, scope] of scopes) {
     cards[sessionId] = scope;
   }
-  await writeGatedValue(getSecureStore, STORE_KEY, JSON.stringify({ version: 1, cards }));
+  await writeGatedValue(
+    getSecureStore,
+    SESSION_CARD_SCOPE_KEY,
+    JSON.stringify({ version: 1, cards })
+  );
 }
 
 /** Record the scope one session was followed under. */

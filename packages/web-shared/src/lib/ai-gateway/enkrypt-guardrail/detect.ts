@@ -77,16 +77,20 @@ export type EnkryptScanCoverage = {
   chunk?: { index: number; count: number };
 };
 
-export type EnkryptGuardrailScan = {
+/** The request a scan belongs to, and the detectors it scans with. */
+export type EnkryptScanContext = {
   sessionId: string | null;
   microdollarUsageId?: string;
   organizationId: string;
   kiloUserId: string;
   apiKind: EnkryptGuardrailApiKind;
   clientRequestId: string | null;
+  config: EnkryptGuardrailConfig;
+};
+
+export type EnkryptGuardrailScan = EnkryptScanContext & {
   text: string;
   coverage: EnkryptScanCoverage;
-  config: EnkryptGuardrailConfig;
 };
 
 /**

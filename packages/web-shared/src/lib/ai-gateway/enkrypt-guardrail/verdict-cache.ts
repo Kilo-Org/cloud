@@ -8,6 +8,7 @@ import {
   type EnkryptGuardrailScan,
   type EnkryptGuardrailScanResult,
   type EnkryptGuardrailVerdict,
+  type EnkryptScanContext,
   type EnkryptScanCoverage,
   scanKind,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
@@ -64,7 +65,7 @@ export type EnkryptVerdictCacheStore = {
   ): Promise<unknown>;
 };
 
-export type EnkryptGuardrailRequest = Omit<EnkryptGuardrailScan, 'text' | 'coverage'> & {
+export type EnkryptGuardrailRequest = EnkryptScanContext & {
   parts: RequestScanParts;
 };
 
@@ -157,7 +158,7 @@ type KeyedUnit = ScanUnit & { key: string | null };
 type LookedUpUnit = KeyedUnit & { verdict: CachedVerdict | null };
 
 function keyedUnits(
-  request: Omit<EnkryptGuardrailRequest, 'parts'>,
+  request: EnkryptScanContext,
   part: RequestPart,
   segments: RequestSegment[],
   cache: VerdictCache | null
@@ -343,7 +344,7 @@ function combineChunks(results: EnkryptGuardrailScanResult[]): EnkryptGuardrailS
   };
 }
 
-function logFields(request: Omit<EnkryptGuardrailRequest, 'parts'>) {
+function logFields(request: EnkryptScanContext) {
   return {
     organization_id: request.organizationId,
     session_id: request.sessionId,
@@ -368,7 +369,7 @@ type PartPlan = {
  * still reports the part, without an Enkrypt call.
  */
 function callScans(
-  request: Omit<EnkryptGuardrailRequest, 'parts'>,
+  request: EnkryptScanContext,
   coverage: EnkryptScanCoverage,
   calls: KeyedUnit[][]
 ): EnkryptGuardrailScan[] {
@@ -390,7 +391,7 @@ function callScans(
 async function planSegmentsPart(
   part: 'system' | 'conversation',
   segments: RequestSegment[],
-  request: Omit<EnkryptGuardrailRequest, 'parts'>,
+  request: EnkryptScanContext,
   cache: VerdictCache | null
 ): Promise<PartPlan> {
   const rendered = segments.map(renderSegment);
@@ -572,7 +573,7 @@ type ToolPlan = { tool: RequestToolDefinition; characters: number } & (
  */
 async function planTools(
   tools: RequestToolDefinition[],
-  request: Omit<EnkryptGuardrailRequest, 'parts'>,
+  request: EnkryptScanContext,
   cache: VerdictCache | null
 ): Promise<PartPlan> {
   const { config } = request;

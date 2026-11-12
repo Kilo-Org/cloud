@@ -6,9 +6,9 @@ import {
   ENKRYPT_GUARDRAIL_TIMEOUT_MS,
   ENKRYPT_MAX_SCAN_CHARACTERS,
   scanRequest,
-  type EnkryptGuardrailScan,
   type EnkryptGuardrailScanResult,
   type EnkryptGuardrailVerdict,
+  type EnkryptScanContext,
   type EnkryptScanCoverage,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import {
@@ -39,7 +39,7 @@ import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 
 /** The request a response scan belongs to. The scanned text is the response. */
-export type EnkryptOutputScan = Omit<EnkryptGuardrailScan, 'text' | 'coverage'>;
+export type EnkryptOutputScan = EnkryptScanContext;
 
 /** The response scan of an organization member's request, or null without an output guardrail. */
 export function resolveEnkryptOutputScan(

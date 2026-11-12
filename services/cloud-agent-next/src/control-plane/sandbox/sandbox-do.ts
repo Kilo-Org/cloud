@@ -19,6 +19,10 @@ import {
   resetRuntimeContract,
   runtimeSpecForContract,
 } from './runtime-contract.js';
+import {
+  markRuntimeProxyOriginAllocation,
+  runtimeProxyOriginAdmitted,
+} from './runtime-proxy-origin-gate.js';
 import { DurableObject } from 'cloudflare:workers';
 import { admitVercelScmForward } from '../../scm-broker/vercel-admission.js';
 import { admitScmRequest } from '../../scm-broker/admission.js';
@@ -2139,6 +2143,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     kiloSessionId: string;
     directory: string;
     handle?: string;
+    originProof?: string;
   }): Promise<ControlRuntimeCredentialProxyFenceScope | null> {
     await this.initialized;
     if (
@@ -2153,6 +2158,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const state = await this.readAllocation();
       const fence = this.runtimeProxyFenceFor(state);
       if (fence === null) return null;
+      if (!(await this.runtimeProxyOriginAdmitted(fence.allocationId, input.originProof))) {
+        return null;
+      }
       const owner = await this.requireOwner();
       if (owner === null || owner !== input.ownerId) return null;
       const route = await readRoute(this.db, input.sessionId);
@@ -2280,7 +2288,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * none served (the facade returns a retryable 503); `denied` is a known denial
    * on every candidate (including a handle not in the accepted set).
    */
-  async resolveScopeHandle(input: { handle: string }): Promise<ScopeHandleResolution> {
+  async resolveScopeHandle(input: {
+    handle: string;
+    originProof?: string;
+  }): Promise<ScopeHandleResolution> {
     await this.initialized;
     if (
       typeof input?.handle !== 'string' ||
@@ -2295,6 +2306,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (owner === null || owner !== claims.userId) return { type: 'denied' };
     const fence = this.runtimeProxyFenceFor(await this.readAllocation());
     if (fence === null) return { type: 'denied' };
+    if (!(await this.runtimeProxyOriginAdmitted(fence.allocationId, input.originProof))) {
+      return { type: 'denied' };
+    }
     const match = await lookupAcceptedHandle(this.ctx.storage, input.handle, fence);
     if (match === undefined) return { type: 'denied' };
 
@@ -4948,6 +4962,27 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
   }
 
+  /** Whether a runtime proxy request carried this sandbox's platform egress proof. */
+  private async runtimeProxyOriginAdmitted(
+    allocationId: string,
+    presented: unknown
+  ): Promise<boolean> {
+    const proof = typeof presented === 'string' ? presented : undefined;
+    const admitted = await runtimeProxyOriginAdmitted({
+      storage: this.ctx.storage.kv,
+      env: this.env,
+      allocationId,
+      outboundId: this.outboundContainerIdFor(),
+      presented: proof,
+    });
+    if (!admitted) {
+      logger
+        .withFields({ sandboxId: this.sandboxId, allocationId, proofPresent: proof !== undefined })
+        .warn('Runtime proxy origin proof rejected');
+    }
+    return admitted;
+  }
+
   /** Fail one preparation attempt, fenced by attempt id (late mint failure). */
   private async failPrepareAttempt(
     sessionId: string,
@@ -6847,6 +6882,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (previous !== undefined && previous.allocationId !== state.allocationId) {
         resetRuntimeContract(this.ctx.storage.kv, state.allocationId);
         resetRuntimeIdentity(this.ctx.storage.kv);
+        markRuntimeProxyOriginAllocation(this.ctx.storage.kv, state.allocationId);
       }
     });
     if (

@@ -25,6 +25,8 @@ import {
   renewStoredRuntimeAuthorization,
 } from '../../src/session/runtime-authorization-persistence.js';
 import worker from '../../src/server.js';
+import { RUNTIME_PROXY_ORIGIN_HEADER } from '../../src/runtime-credential-proxy-origin.js';
+import { RUNTIME_PROXY_ORIGIN_ALLOCATION_KEY } from '../../src/control-plane/sandbox/runtime-proxy-origin-gate.js';
 import { logger } from '../../src/logger.js';
 import type { AgentSandboxProvider, Env } from '../../src/types.js';
 import type { ProviderAdapter, StopResult } from '../../src/sandbox-control/provider.js';
@@ -38,6 +40,7 @@ import {
   createFakeCredentialBroker,
   fakeOutboundContainerId,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
+  fakeRuntimeProxyOrigin,
   installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -303,6 +306,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const creatorId = newSessionId();
     const siblingId = newSessionId();
     const sandboxId = await generateSandboxId(creatorId);
+    const origin = await fakeRuntimeProxyOrigin(sandboxId, 'vercel');
     const worktreeId = `worktree_${crypto.randomUUID()}`;
     const provider = createProvider();
     const sandbox = await installSandbox(sandboxId, provider);
@@ -351,21 +355,21 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const sharedHandle = first.credentials.proxy.handle;
     // Two sibling modern sessions in one worktree share one adopted handle.
     expect(second.credentials.proxy.handle).toBe(sharedHandle);
-    expect(await creator.resolveRuntimeCredentialProxyGrant(sharedHandle)).not.toBeNull();
-    expect(await sibling.resolveRuntimeCredentialProxyGrant(sharedHandle)).not.toBeNull();
+    expect(await creator.resolveRuntimeCredentialProxyGrant(sharedHandle, origin)).not.toBeNull();
+    expect(await sibling.resolveRuntimeCredentialProxyGrant(sharedHandle, origin)).not.toBeNull();
     await creator.deleteSession();
     // The adopted handle survives the creator's deletion: the survivor serves it.
-    const afterRelease = await creator.resolveRuntimeCredentialProxyGrant(sharedHandle);
+    const afterRelease = await creator.resolveRuntimeCredentialProxyGrant(sharedHandle, origin);
     expect(afterRelease).not.toBeNull();
     expect(afterRelease?.runtimeAuthorization.resourceId).toBe(siblingId);
-    expect(await sibling.resolveRuntimeCredentialProxyGrant(sharedHandle)).not.toBeNull();
+    expect(await sibling.resolveRuntimeCredentialProxyGrant(sharedHandle, origin)).not.toBeNull();
     expect((await sandbox.getAllocationState()).kind).toBe('connected');
     expect(provider.launchEnvs).toHaveLength(1);
     wrapper.send({ type: 'session.failed', sessionId: siblingId, reason: 'agent_unavailable' });
     await waitFor(async () =>
       expect((await sandbox.status({ sessionId: siblingId })).view.state).toBe('failed')
     );
-    expect(await sibling.resolveRuntimeCredentialProxyGrant(sharedHandle)).toBeNull();
+    expect(await sibling.resolveRuntimeCredentialProxyGrant(sharedHandle, origin)).toBeNull();
     await waitFor(async () =>
       expect(await sibling.getSession()).toMatchObject({ messages: [{ state: 'failed' }] })
     );
@@ -386,6 +390,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       const sessionId = newSessionId();
       const kiloId = kiloSessionId();
       const sandboxId = await generateSandboxId(sessionId);
+      const origin = await fakeRuntimeProxyOrigin(sandboxId, providerName);
       const provider = createProvider();
       const broker = createFakeCredentialBroker();
       const sandboxStub = await installSandbox(sandboxId, provider, broker);
@@ -489,6 +494,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
         expect(claims.organizationId).toBe(ORG_ID);
         expect(claims.exp).toBeGreaterThan(Math.floor(Date.now() / 1000));
         expect(request.headers.get('x-kilocode-organizationid')).toBe(ORG_ID);
+        expect(request.headers.has(RUNTIME_PROXY_ORIGIN_HEADER)).toBe(false);
         destinations.push(url.pathname);
         return new Response('authorized');
       });
@@ -509,7 +515,10 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
           const response = await worker.fetch(
             new Request(`${WORKER_URL}${path}`, {
               method: methods[index],
-              headers: { authorization: `Bearer ${currentHandle}` },
+              headers: {
+                authorization: `Bearer ${currentHandle}`,
+                [RUNTIME_PROXY_ORIGIN_HEADER]: origin,
+              },
             }),
             requestEnv,
             createExecutionContext()
@@ -525,7 +534,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       await waitFor(async () =>
         expect((await sandboxStub.getAllocationState()).kind).toBe('stopped')
       );
-      expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).toBeNull();
+      expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle, origin)).toBeNull();
       await sessionStub.send(promptPayload(messageId()));
       await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
       const nextEnv = provider.launchEnvs[1];
@@ -541,14 +550,14 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       if (nextFrame?.type !== 'session.prepare') throw new Error('expected replacement prepare');
       const nextHandle = nextFrame.credentials?.proxy?.handle ?? '';
       expect(nextHandle === handle).toBe(false);
-      expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).toBeNull();
+      expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle, origin)).toBeNull();
       await forward(nextHandle);
       expect(destinations).toHaveLength(6);
       const siblingKiloSessionId = kiloSessionId();
       const siblingDenied = await worker.fetch(
         new Request(`${WORKER_URL}/api/session/${siblingKiloSessionId}/ingest`, {
           method: 'POST',
-          headers: { authorization: `Bearer ${nextHandle}` },
+          headers: { authorization: `Bearer ${nextHandle}`, [RUNTIME_PROXY_ORIGIN_HEADER]: origin },
         }),
         requestEnv,
         createExecutionContext()
@@ -570,7 +579,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       vi.mocked(Date.now).mockReturnValue(startedAt + 25 * 60 * 60_000);
       const expired = await worker.fetch(
         new Request(`${WORKER_URL}/api/profile`, {
-          headers: { authorization: `Bearer ${nextHandle}` },
+          headers: { authorization: `Bearer ${nextHandle}`, [RUNTIME_PROXY_ORIGIN_HEADER]: origin },
         }),
         requestEnv,
         createExecutionContext()
@@ -582,7 +591,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       vi.mocked(Date.now).mockReturnValue(startedAt + 122 * 60_000);
       const denied = await worker.fetch(
         new Request(`${WORKER_URL}/api/profile`, {
-          headers: { authorization: `Bearer ${nextHandle}` },
+          headers: { authorization: `Bearer ${nextHandle}`, [RUNTIME_PROXY_ORIGIN_HEADER]: origin },
         }),
         requestEnv,
         createExecutionContext()
@@ -596,7 +605,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       });
       const revoked = await worker.fetch(
         new Request(`${WORKER_URL}/api/profile`, {
-          headers: { authorization: `Bearer ${nextHandle}` },
+          headers: { authorization: `Bearer ${nextHandle}`, [RUNTIME_PROXY_ORIGIN_HEADER]: origin },
         }),
         requestEnv,
         createExecutionContext()
@@ -627,6 +636,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
   it('mints a handle on the connected prepare, projects it into the credentials, and resolves it', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId(sessionId);
+    const origin = await fakeRuntimeProxyOrigin(sandboxId, 'vercel');
     const provider = createProvider();
     await installSandbox(sandboxId, provider);
     const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -654,8 +664,52 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     expect((handle ?? '').length).toBeGreaterThan(0);
     expect(frame.credentials?.proxy?.targets.backendBaseUrl).toBe(FACADE_BASE);
     // The handle is a real grant bound to this route: the proxy resolves it.
-    expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle ?? '')).not.toBeNull();
+    expect(
+      await sessionStub.resolveRuntimeCredentialProxyGrant(handle ?? '', origin)
+    ).not.toBeNull();
   });
+
+  it.each(['cloudflare-containers', 'vercel'] as const)(
+    '%s serves a runtime proxy handle only through its own sandbox egress',
+    async providerName => {
+      const sessionId = newSessionId();
+      const sandboxId = await generateSandboxId(sessionId);
+      const origin = await fakeRuntimeProxyOrigin(sandboxId, providerName);
+      const otherSandboxId = await generateSandboxId(newSessionId());
+      const otherOrigin = await fakeRuntimeProxyOrigin(otherSandboxId, providerName);
+      const provider = createProvider();
+      const sandboxStub = await installSandbox(sandboxId, provider);
+      const { seal, token } = await sealedRuntimeAuthorization(sessionId);
+      const sessionStub = await createVercelSession({
+        sessionId,
+        kiloId: kiloSessionId(),
+        sandboxId,
+        kiloToken: token,
+        seal,
+        provider: providerName,
+        contained: true,
+      });
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+      const { credential, allocationId } = launchIdentity(provider);
+      const wrapper = await FakeWrapper.connect({ sandboxId, credential });
+      await wrapper.hello({ wrapperId: 'wr_1', allocationId });
+      const frame = await wrapper.next();
+      if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+      const handle = frame.credentials?.proxy?.handle ?? '';
+      expect(handle.length).toBeGreaterThan(0);
+
+      // A copied handle used from outside, or through another sandbox's egress, is denied.
+      expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).toBeNull();
+      expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle, otherOrigin)).toBeNull();
+      expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle, origin)).not.toBeNull();
+
+      // An allocation that started before origin proofs stays exempt until it stops.
+      await runInDurableObject(sandboxStub, instance => {
+        instance.ctx.storage.kv.delete(RUNTIME_PROXY_ORIGIN_ALLOCATION_KEY);
+      });
+      expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).not.toBeNull();
+    }
+  );
 
   it('delivers a private scoped MCP grant separately from model aliases and never in launch env or persisted route specs', async () => {
     const sessionId = newSessionId();
@@ -726,6 +780,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     async failure => {
       const sessionId = newSessionId();
       const sandboxId = await generateSandboxId(sessionId);
+      const origin = await fakeRuntimeProxyOrigin(sandboxId, 'vercel');
       const provider = createProvider();
       const sandbox = await installSandbox(sandboxId, provider);
       const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -774,7 +829,10 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       expect(frame.credentials.cloudAgentMcp).toBeUndefined();
       expect(frame.credentials.kilo.token).toEqual(expect.any(String));
       expect(
-        await session.resolveRuntimeCredentialProxyGrant(frame.credentials.proxy?.handle ?? '')
+        await session.resolveRuntimeCredentialProxyGrant(
+          frame.credentials.proxy?.handle ?? '',
+          origin
+        )
       ).not.toBeNull();
       expect(await sandbox.status({ sessionId })).toMatchObject({ view: { state: 'preparing' } });
       expect(issueMcpGrant).toHaveBeenCalledTimes(1);
@@ -804,6 +862,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     async disconnectAt => {
       const sessionId = newSessionId();
       const sandboxId = await generateSandboxId(sessionId);
+      const origin = await fakeRuntimeProxyOrigin(sandboxId, 'vercel');
       const provider = createProvider();
       const sandboxStub = await installSandbox(sandboxId, provider);
       const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -849,7 +908,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
         worker.fetch(
           new Request(`${WORKER_URL}/api/openrouter/chat/completions`, {
             method: 'POST',
-            headers: { authorization: `Bearer ${handle}` },
+            headers: { authorization: `Bearer ${handle}`, [RUNTIME_PROXY_ORIGIN_HEADER]: origin },
           }),
           { ...env, WORKER_URL, KILO_OPENROUTER_BASE: upstream } as Env,
           createExecutionContext()
@@ -884,7 +943,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       });
 
-      expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).not.toBeNull();
+      expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle, origin)).not.toBeNull();
       await runInDurableObject(sessionStub, async instance => {
         const grant = await instance.ctx.storage.get<{ grantId: string }>(RUNTIME_PROXY_GRANT_KEY);
         expect(grant?.grantId).toBe(runtimeProxyHandleGrantId(handle));
@@ -912,6 +971,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
   it('re-prepares and mints a new handle after a wrapper restart, invalidating the old one', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId(sessionId);
+    const origin = await fakeRuntimeProxyOrigin(sandboxId, 'vercel');
     const provider = createProvider();
     const sandboxStub = await installSandbox(sandboxId, provider);
     const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -934,7 +994,9 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     await waitFor(async () => {
       expect((await sandboxStub.status({ sessionId })).view.state).toBe('ready');
     });
-    expect(await sessionStub.resolveRuntimeCredentialProxyGrant(firstHandle)).not.toBeNull();
+    expect(
+      await sessionStub.resolveRuntimeCredentialProxyGrant(firstHandle, origin)
+    ).not.toBeNull();
 
     // A new wrapperId is a different wrapper instance: the ready route is lost
     // and re-prepared, and the Session DO replaces the persisted proxy grant.
@@ -951,13 +1013,16 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     if (second?.type !== 'session.prepare') throw new Error('expected session.prepare');
     const secondHandle = second.credentials?.proxy?.handle ?? '';
     expect(secondHandle).not.toBe(firstHandle);
-    expect(await sessionStub.resolveRuntimeCredentialProxyGrant(secondHandle)).not.toBeNull();
-    expect(await sessionStub.resolveRuntimeCredentialProxyGrant(firstHandle)).toBeNull();
+    expect(
+      await sessionStub.resolveRuntimeCredentialProxyGrant(secondHandle, origin)
+    ).not.toBeNull();
+    expect(await sessionStub.resolveRuntimeCredentialProxyGrant(firstHandle, origin)).toBeNull();
   });
 
   it('re-mints on a still-preparing route when a wrapper restart supersedes the handle', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId(sessionId);
+    const origin = await fakeRuntimeProxyOrigin(sandboxId, 'vercel');
     const provider = createProvider();
     const sandboxStub = await installSandbox(sandboxId, provider);
     const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -978,7 +1043,9 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const firstHandle = first.credentials?.proxy?.handle ?? '';
     // The route stays preparing (no `session.ready`), so the restart re-sends
     // `session.prepare` for the SAME attempt and grant.
-    expect(await sessionStub.resolveRuntimeCredentialProxyGrant(firstHandle)).not.toBeNull();
+    expect(
+      await sessionStub.resolveRuntimeCredentialProxyGrant(firstHandle, origin)
+    ).not.toBeNull();
 
     wrapper.close();
     await waitFor(async () => {
@@ -995,8 +1062,10 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     // The wrapper instance changed, so the old handle belongs to a superseded
     // fence and must be replaced by a fresh, resolvable one.
     expect(secondHandle).not.toBe(firstHandle);
-    expect(await sessionStub.resolveRuntimeCredentialProxyGrant(secondHandle)).not.toBeNull();
-    expect(await sessionStub.resolveRuntimeCredentialProxyGrant(firstHandle)).toBeNull();
+    expect(
+      await sessionStub.resolveRuntimeCredentialProxyGrant(secondHandle, origin)
+    ).not.toBeNull();
+    expect(await sessionStub.resolveRuntimeCredentialProxyGrant(firstHandle, origin)).toBeNull();
   });
 
   it('resends the identical handle on a plain reconnect without re-binding', async () => {
@@ -1052,6 +1121,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
   it('does not send a stale handle when the fence changes between bind and send', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId(sessionId);
+    const origin = await fakeRuntimeProxyOrigin(sandboxId, 'vercel');
     const provider = createProvider();
     const sandboxStub = await installSandbox(sandboxId, provider);
     const { seal, token } = await sealedRuntimeAuthorization(sessionId);
@@ -1106,7 +1176,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const handle = frame.credentials?.proxy?.handle ?? '';
     // Only the restarted task's frame reached the wrapper: welcome + prepare.
     expect(restarted.receivedFrames()).toBe(2);
-    expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).not.toBeNull();
+    expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle, origin)).not.toBeNull();
   });
 
   it('fails the route as workspace_setup_failed when the handle cannot be minted', async () => {

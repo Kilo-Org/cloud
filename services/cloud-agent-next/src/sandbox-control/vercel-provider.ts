@@ -12,6 +12,8 @@ import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-
 import { DEADLINE_MS } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
 import { buildControlNetworkPolicy, type SessionCredentialGrant } from './session-credentials.js';
+import type { SecretBinding } from '../auth.js';
+import { runtimeProxyOriginProof } from '../runtime-credential-proxy-origin.js';
 import type { ObserveResult } from './provider.js';
 import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
 import { ProviderCreationError } from './provider.js';
@@ -119,7 +121,7 @@ function isNotFound(error: unknown): boolean {
 
 export function createVercelProviderAdapter(deps: {
   sandboxName: string;
-  env?: { WORKER_URL?: string };
+  env?: { WORKER_URL?: string; NEXTAUTH_SECRET?: SecretBinding };
   config?: VercelSandboxRuntimeConfig;
   restClient?: VercelControlRestClient;
   now?: () => number;
@@ -158,6 +160,19 @@ export function createVercelProviderAdapter(deps: {
       fetch,
     });
   const now = deps.now ?? Date.now;
+  // Grants carry the logical sandbox id, which the Sandbox DO uses as this
+  // sandbox's egress id when it checks the runtime proxy origin proof.
+  const controlNetworkPolicy = async (grants: readonly SessionCredentialGrant[]) => {
+    const sandboxId = grants[0]?.sandboxId;
+    const originProof =
+      sandboxId === undefined ? null : await runtimeProxyOriginProof(deps.env ?? {}, sandboxId);
+    return buildControlNetworkPolicy(
+      grants,
+      await deps.readAcceptedRuntimeProxyHandles?.(),
+      deps.env,
+      originProof ?? undefined
+    );
+  };
   const decodeOwnedProviderRef = (ref: string | null): VercelProviderRef | null => {
     const parsed = decodeVercelProviderRef(ref);
     return parsed?.sandboxName === deps.sandboxName ? parsed : null;
@@ -196,11 +211,7 @@ export function createVercelProviderAdapter(deps: {
       // Read the authoritative grants and build the policy before the REST
       // create: the sandbox must never open with an empty or stale policy, so a
       // reader failure prevents the create entirely.
-      const networkPolicy = buildControlNetworkPolicy(
-        await deps.readContainedGrants(),
-        await deps.readAcceptedRuntimeProxyHandles?.(),
-        deps.env
-      );
+      const networkPolicy = await controlNetworkPolicy(await deps.readContainedGrants());
       const created = await restClient
         .createSandbox({
           name: intent.allocationName ?? deps.sandboxName,
@@ -355,11 +366,7 @@ export function createVercelProviderAdapter(deps: {
     async applyContainedCredentials(providerRef, grants) {
       const parsed = decodeOwnedProviderRef(providerRef);
       if (parsed === null) throw new Error('Invalid Vercel sandbox provider reference');
-      const networkPolicy = buildControlNetworkPolicy(
-        grants,
-        await deps.readAcceptedRuntimeProxyHandles?.(),
-        deps.env
-      );
+      const networkPolicy = await controlNetworkPolicy(grants);
       const session = await restClient.updateNetworkPolicy(
         parsed.sessionId,
         parsed.sandboxName,

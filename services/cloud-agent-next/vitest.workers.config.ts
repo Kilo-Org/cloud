@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { cloudflareTest } from '@cloudflare/vitest-plugin';
 import { defineConfig } from 'vitest/config';
 import { binaryAsArrayBuffer } from './test/plugins/binary-as-arraybuffer.js';
-import { FAKE_DOWNLOADED_RUNTIME_ENV } from './test/integration/helpers/fake-credentials.js';
+import { FAKE_DOWNLOADED_RUNTIME_ENV } from './test/integration/helpers/fake-runtime-env.js';
 
 // Integration tests - run in Cloudflare Workers runtime via Miniflare
 // Use cloudflare:test utilities: env, runInDurableObject, createMessageBatch, etc.

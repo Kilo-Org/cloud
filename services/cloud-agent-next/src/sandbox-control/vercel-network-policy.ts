@@ -4,10 +4,13 @@ import type {
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { EXA_PROXY_PATHS } from '../kilo/runtime-credential-proxy-routes.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
+import { RUNTIME_PROXY_ORIGIN_HEADER } from '../runtime-credential-proxy-origin.js';
 
 export type VercelCredentialPolicyInput = {
   rootSessionIds: string[];
   organizationId?: string;
+  /** This sandbox's egress proof, injected beside every runtime proxy credential. */
+  originProof?: string;
   runtimeProxy: {
     members?: Array<{ sessionId: string; kiloSessionId: string; handle: string }>;
     /**
@@ -28,6 +31,7 @@ type CredentialRuleInput = {
   expectedAuthorization: string;
   injectedAuthorization: string;
   organizationId?: string;
+  originProof?: string;
 };
 
 function invalidPolicy(): never {
@@ -43,6 +47,9 @@ function createCredentialRule(input: CredentialRuleInput): VercelSandboxInjectio
       ...(input.organizationId === undefined
         ? {}
         : { 'x-kilocode-organizationid': input.organizationId }),
+      ...(input.originProof === undefined
+        ? {}
+        : { [RUNTIME_PROXY_ORIGIN_HEADER]: input.originProof }),
     },
     match: {
       headers: [
@@ -64,7 +71,7 @@ function basePath(target: URL): string {
 function runtimeProxyInjectionRules(
   policy: VercelCredentialPolicyInput
 ): VercelSandboxInjectionRule[] {
-  const { runtimeProxy: input, organizationId } = policy;
+  const { runtimeProxy: input, organizationId, originProof } = policy;
   const targets = [
     new URL(input.targets.backendBaseUrl),
     new URL(input.targets.providerBaseUrl),
@@ -101,6 +108,7 @@ function runtimeProxyInjectionRules(
         methods,
         expectedAuthorization: authorization,
         injectedAuthorization: authorization,
+        originProof,
       })
     );
   const members = input.members ?? [];
@@ -177,6 +185,7 @@ function runtimeProxyInjectionRules(
         methods: ['POST'],
         expectedAuthorization: authorization,
         injectedAuthorization: authorization,
+        originProof,
       })
     );
     // Every member root is served by the shared handle, so each root's

@@ -8,7 +8,6 @@ const state = vi.hoisted(() => ({
   push: vi.fn((_href: unknown) => undefined),
   focusEffects: [] as (() => void)[],
   now: 1_700_000_000_000,
-  scheme: 'light' as 'light' | 'dark',
 }));
 
 vi.mock('expo-router', () => ({
@@ -17,7 +16,7 @@ vi.mock('expo-router', () => ({
     state.focusEffects.push(effect);
   },
 }));
-vi.mock('react-native', () => ({ View: 'View', useColorScheme: () => state.scheme }));
+vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -25,7 +24,6 @@ vi.mock('@/components/ui/icons', () => ({ Plus: 'Plus' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     primaryForeground: '#FFFFFF',
-    selectionForeground: '#F2F0EB',
   }),
 }));
 
@@ -94,7 +92,6 @@ beforeEach(() => {
   state.push.mockReset();
   state.focusEffects = [];
   state.now = 1_700_000_000_000;
-  state.scheme = 'light';
   vi.spyOn(Date, 'now').mockImplementation(() => state.now);
 });
 
@@ -153,22 +150,12 @@ describe('NewTaskButton', () => {
     expect(state.push).toHaveBeenCalledTimes(2);
   });
 
-  it('paints the light scheme with the primary pair', async () => {
+  it('paints the action with the primary fill and its ink', async () => {
     await mount();
 
-    expect(String(entry().props.className)).toContain('bg-primary');
+    expect(entry().props.variant).toBe('default');
+    expect(String(entry().props.className)).not.toContain('bg-');
     expect(String(nodesOfType('Text')[0]?.props.className)).toContain('text-primary-foreground');
     expect(nodesOfType('Plus')[0]?.props.color).toBe('#FFFFFF');
-  });
-
-  it('keeps the olive tone in the dark scheme instead of the brand accent', async () => {
-    state.scheme = 'dark';
-    await mount();
-
-    expect(String(entry().props.className)).toContain('dark:bg-selection');
-    expect(String(nodesOfType('Text')[0]?.props.className)).toContain(
-      'dark:text-selection-foreground'
-    );
-    expect(nodesOfType('Plus')[0]?.props.color).toBe('#F2F0EB');
   });
 });

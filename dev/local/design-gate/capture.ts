@@ -427,10 +427,6 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     screenTexts(dump) !== beforeTexts ||
     (dump.env.screen !== undefined && dump.env.screen !== beforeScreen) ||
     (beforeRoute === linkRoute && dump.env.route.split('?')[0] === linkRoute);
-  await ctx.probe.startSampling(
-    SAMPLE_INTERVAL_MS,
-    ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + 2 * LOADING_SETTLE_TIMEOUT_MS
-  );
   await ctx.probe.openLink(target.link);
   // A cold screen paints its own loading placeholder and holds it still, so a
   // settle loop would measure the placeholder. Wait for it to clear first, and
@@ -446,6 +442,17 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     }
   };
   await waitForPlaceholder();
+  // Sampling starts only once the placeholder is gone. The in-app sampler
+  // traverses and serializes the whole tree on the app's own JS thread every
+  // interval, so a sampler ticking through a cold open competes with the very
+  // work that open is doing: on a headless emulator a screen that settles in
+  // about ten seconds unsampled never mounted at all, and the run recorded
+  // placeholder frames for the whole budget. Those frames are not the screen
+  // either way — the settle below is what the rules read.
+  await ctx.probe.startSampling(
+    SAMPLE_INTERVAL_MS,
+    ctx.observeMs + IN_APP_SAMPLING_SLACK_MS + 2 * LOADING_SETTLE_TIMEOUT_MS
+  );
   let settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
   let unopened: string | undefined;
   if (!opened(settled.dump)) {

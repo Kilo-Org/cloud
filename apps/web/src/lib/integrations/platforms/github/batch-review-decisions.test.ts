@@ -286,28 +286,5 @@ describe('batch-review-decisions', () => {
       triggerBatchReviewDecisionFetchIfNeeded(false, testOwner);
       expect(mockGetIntegration).not.toHaveBeenCalled();
     });
-
-    // Flaky in CI due to setTimeout(0)-based wait for fire-and-forget async work.
-    // Recent failures:
-    //   https://github.com/Kilo-Org/cloud/actions/runs/25554038239
-    //   https://github.com/Kilo-Org/cloud/actions/runs/25549351687
-    //   https://github.com/Kilo-Org/cloud/actions/runs/25547782557
-    //   https://github.com/Kilo-Org/cloud/actions/runs/25547122885
-    // eslint-disable-next-line jest/no-disabled-tests
-    it.skip('calls executeBatch when hasPendingRows=true', async () => {
-      const branch = 'batch/trigger-true';
-      await seedSession(branch);
-      await seedPrRow(branch, 40, { pending: true });
-
-      mockGetIntegration.mockResolvedValue(fakeIntegration());
-      mockFetchBatch.mockResolvedValue(new Map([['pr0', 'review_required']]));
-
-      triggerBatchReviewDecisionFetchIfNeeded(true, testOwner);
-
-      // Give it a tick for any resolved promises
-      await new Promise(r => setTimeout(r, 0));
-
-      expect(mockGetIntegration).toHaveBeenCalled();
-    });
   });
 });

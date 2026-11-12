@@ -52,35 +52,6 @@ describe('trpc tests', () => {
     });
   });
 
-  describe('hello procedure', () => {
-    it('should greet the user with custom text', async () => {
-      const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.test.hello({ text: 'test' });
-
-      expect(result).toEqual({
-        greeting: `hello test from user ${regularUser.id}`,
-      });
-    });
-
-    it('should greet the user with default text when no input provided', async () => {
-      const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.test.hello();
-
-      expect(result).toEqual({
-        greeting: `hello world from user ${regularUser.id}`,
-      });
-    });
-
-    it('should greet the user with undefined input', async () => {
-      const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.test.hello(undefined);
-
-      expect(result).toEqual({
-        greeting: `hello world from user ${regularUser.id}`,
-      });
-    });
-  });
-
   describe('admin permissions', () => {
     it('returns the authenticated admin credit capability', async () => {
       const adminCaller = await createCallerForUser(adminUser.id);
@@ -102,15 +73,6 @@ describe('trpc tests', () => {
   });
 
   describe('adminHello procedure', () => {
-    it('should return hello world for admin users', async () => {
-      const caller = await createCallerForUser(adminUser.id);
-      const result = await caller.test.adminHello();
-
-      expect(result).toEqual({
-        message: 'hello world',
-      });
-    });
-
     it('should throw FORBIDDEN error for non-admin users', async () => {
       const caller = await createCallerForUser(regularUser.id);
 

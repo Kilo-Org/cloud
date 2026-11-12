@@ -3060,7 +3060,7 @@
       "plan": "Načrt organizacije",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · je potekel",
+      "planStatusLapsed": " · je potekel",
       "planEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta.",
       "manageBilling": "Upravljanje obračunavanja",
       "lowBalanceBelow": "Pod {{amount}}"

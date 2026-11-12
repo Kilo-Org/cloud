@@ -2954,7 +2954,7 @@
       "plan": "Байгууллагын төлөвлөгөө",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Дууссан",
+      "planStatusLapsed": " · Дууссан",
       "planEnded": "Байгууллагын туршилтын хугацаа дууссан бөгөөд идэвхтэй төлөвлөгөө байхгүй байна.",
       "manageBilling": "Төлбөрийн удирдлага",
       "lowBalanceBelow": "{{amount}}-оос доош"

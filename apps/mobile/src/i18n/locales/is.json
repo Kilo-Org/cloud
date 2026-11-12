@@ -2954,7 +2954,7 @@
       "plan": "Áætlun fyrirtækis",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Lokið",
+      "planStatusLapsed": " · Lokið",
       "planEnded": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun.",
       "manageBilling": "Stjórna innheimtu",
       "lowBalanceBelow": "Undir {{amount}}"

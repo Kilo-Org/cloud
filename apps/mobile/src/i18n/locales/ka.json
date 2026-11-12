@@ -2954,7 +2954,7 @@
       "plan": "ორგანიზაციის გეგმა",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · დასრულებული",
+      "planStatusLapsed": " · დასრულებული",
       "planEnded": "ორგანიზაციის საცდელი პერიოდი დასრულდა და მას აქტიური გეგმა არ აქვს.",
       "manageBilling": "ანგარიშსწორების მართვა",
       "lowBalanceBelow": "{{amount}}-ზე ნაკლები"

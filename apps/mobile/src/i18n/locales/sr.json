@@ -3007,7 +3007,7 @@
       "plan": "Plan organizacije",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Završen",
+      "planStatusLapsed": " · Završen",
       "planEnded": "Probni period organizacije je završen i ona nema aktivan plan.",
       "manageBilling": "Upravljaj naplatom",
       "lowBalanceBelow": "Ispod {{amount}}"

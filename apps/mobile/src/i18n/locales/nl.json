@@ -2852,7 +2852,7 @@
       "plan": "Organisatieplan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Afgelopen",
+      "planStatusLapsed": " · Afgelopen",
       "planEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement.",
       "manageBilling": "Facturering beheren",
       "renamePlaceholder": "Naam van de organisatie",

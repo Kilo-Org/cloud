@@ -2911,7 +2911,7 @@
       "plan": "Plano da organização",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Expirado",
+      "planStatusLapsed": " · Expirado",
       "planEnded": "O período de teste da organização terminou e ela não tem nenhum plano ativo.",
       "manageBilling": "Gerenciar cobrança",
       "renamePlaceholder": "Nome da organização",

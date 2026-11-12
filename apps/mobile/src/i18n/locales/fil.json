@@ -2954,7 +2954,7 @@
       "plan": "Plano ng organisasyon",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Natapos",
+      "planStatusLapsed": " · Natapos",
       "planEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano.",
       "manageBilling": "Pamahalaan ang pagsingil",
       "lowBalanceBelow": "Mas mababa sa {{amount}}"

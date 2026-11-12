@@ -2954,7 +2954,7 @@
       "plan": "Plan òganizasyon an",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Fini",
+      "planStatusLapsed": " · Fini",
       "planEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif.",
       "manageBilling": "Jere faktirasyon",
       "lowBalanceBelow": "Anba {{amount}}"

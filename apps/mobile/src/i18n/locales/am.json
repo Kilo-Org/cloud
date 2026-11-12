@@ -2954,7 +2954,7 @@
       "plan": "የድርጅት ዕቅድ",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · አልቋል",
+      "planStatusLapsed": " · አልቋል",
       "planEnded": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም።",
       "manageBilling": "ክፍያን አስተዳድር",
       "lowBalanceBelow": "ከ{{amount}} በታች"

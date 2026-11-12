@@ -3064,7 +3064,7 @@
       "plan": "خطة المؤسسة",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · منتهية",
+      "planStatusLapsed": " · منتهية",
       "planEnded": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة.",
       "manageBilling": "إدارة الفوترة",
       "renamePlaceholder": "اسم المؤسسة",

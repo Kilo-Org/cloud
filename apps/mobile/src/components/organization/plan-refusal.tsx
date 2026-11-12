@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { AlertCircle } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import { textActionTargetClass } from '@/lib/a11y/tap-target';
+import { UNDER_COPY_ACTION_BOX_CLASS, UNDER_COPY_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +30,12 @@ type OrganizationPlanRefusalProps = Readonly<{
  * The action wears that same ink with an underline: the brand primary is
  * off-palette on this surface, and it reads as the action by decoration
  * instead of by hue.
+ *
+ * The block pads the same on both vertical edges, so the action cannot add its
+ * own box slack below the last line: it renders the under-copy box, which
+ * cancels that slack in layout and keeps its target in `hitSlop`, and it sits
+ * one related-item gap under the copy. A block without an action keeps the same
+ * box.
  */
 export function OrganizationPlanRefusal({
   message,
@@ -52,7 +58,7 @@ export function OrganizationPlanRefusal({
           its longest line: a short sentence would otherwise leave the free
           space on one side only, and a right-to-left layout puts that space on
           the opposite edge from a left-to-right one. */}
-      <View className="min-w-0 flex-1 gap-1">
+      <View className="min-w-0 flex-1 gap-2">
         <AccessibleStatus message={message} tone="error" className="text-sm" />
         {action ? (
           <Pressable
@@ -61,9 +67,10 @@ export function OrganizationPlanRefusal({
             }}
             accessibilityRole="button"
             accessibilityLabel={action.label}
+            hitSlop={UNDER_COPY_ACTION_HIT_SLOP}
             className={cn(
               'justify-center self-start rounded-md active:opacity-70',
-              textActionTargetClass()
+              UNDER_COPY_ACTION_BOX_CLASS
             )}
           >
             <Text className="text-sm font-semibold text-destructive underline">{action.label}</Text>

@@ -2905,7 +2905,7 @@
       "plan": "Piano dell'organizzazione",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Terminato",
+      "planStatusLapsed": " · Terminato",
       "planEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo.",
       "manageBilling": "Gestisci la fatturazione",
       "renamePlaceholder": "Nome dell'organizzazione",

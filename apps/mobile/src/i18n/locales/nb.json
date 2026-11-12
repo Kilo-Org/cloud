@@ -2954,7 +2954,7 @@
       "plan": "Organisasjonsplan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Utløpt",
+      "planStatusLapsed": " · Utløpt",
       "planEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan.",
       "manageBilling": "Administrer fakturering",
       "lowBalanceBelow": "Under {{amount}}"

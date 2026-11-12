@@ -2954,7 +2954,7 @@
       "plan": "د سازمان پلان",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · پای ته رسېدلی",
+      "planStatusLapsed": " · پای ته رسېدلی",
       "planEnded": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري.",
       "manageBilling": "د بلونو مدیریت",
       "lowBalanceBelow": "له {{amount}} څخه کم"

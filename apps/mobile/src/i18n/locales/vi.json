@@ -2852,7 +2852,7 @@
       "plan": "Gói tổ chức",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Đã kết thúc",
+      "planStatusLapsed": " · Đã kết thúc",
       "planEnded": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động.",
       "manageBilling": "Quản lý thanh toán",
       "renamePlaceholder": "Tên tổ chức",

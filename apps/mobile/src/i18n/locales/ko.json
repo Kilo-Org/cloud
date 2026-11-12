@@ -2852,7 +2852,7 @@
       "plan": "조직 요금제",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · 종료됨",
+      "planStatusLapsed": " · 종료됨",
       "planEnded": "조직의 체험이 종료되었으며 활성 요금제가 없습니다.",
       "manageBilling": "결제 관리",
       "renamePlaceholder": "조직 이름",

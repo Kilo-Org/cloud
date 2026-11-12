@@ -3034,7 +3034,7 @@
       "plan": "Organization plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Lapsed",
+      "planStatusLapsed": " · Lapsed",
       "planEnded": "The organization's trial has ended and it has no active plan.",
       "manageBilling": "Manage billing",
       "lowBalanceBelow": "Below {{amount}}"

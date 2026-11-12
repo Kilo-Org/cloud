@@ -3007,7 +3007,7 @@
       "plan": "Planul organizației",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Încheiat",
+      "planStatusLapsed": " · Încheiat",
       "planEnded": "Perioada de probă a organizației s-a încheiat și nu are un plan activ.",
       "manageBilling": "Gestionează facturarea",
       "lowBalanceBelow": "Sub {{amount}}"

@@ -2954,7 +2954,7 @@
       "plan": "ସଂଗଠନର ଯୋଜନା",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · ଅବଧି ଶେଷ",
+      "planStatusLapsed": " · ଅବଧି ଶେଷ",
       "planEnded": "ସଂଗଠନର ଟ୍ରାଏଲ୍ ଅବଧି ଶେଷ ହୋଇଛି ଏବଂ ଏହାର କୌଣସି ସକ୍ରିୟ ପ୍ଲାନ୍ ନାହିଁ।",
       "manageBilling": "ବିଲିଂ ପରିଚାଳନା କରନ୍ତୁ",
       "lowBalanceBelow": "{{amount}} ରୁ କମ୍"

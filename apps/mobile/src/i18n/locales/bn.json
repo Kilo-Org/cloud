@@ -2954,7 +2954,7 @@
       "plan": "সংস্থার প্ল্যান",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · মেয়াদোত্তীর্ণ",
+      "planStatusLapsed": " · মেয়াদোত্তীর্ণ",
       "planEnded": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই।",
       "manageBilling": "বিলিং পরিচালনা করুন",
       "lowBalanceBelow": "{{amount}}-এর নিচে"

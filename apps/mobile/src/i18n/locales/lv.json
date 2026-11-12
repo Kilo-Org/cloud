@@ -3007,7 +3007,7 @@
       "plan": "Organizācijas plāns",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Beidzies",
+      "planStatusLapsed": " · Beidzies",
       "planEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna.",
       "manageBilling": "Norēķinu pārvaldība",
       "lowBalanceBelow": "Zem {{amount}}"

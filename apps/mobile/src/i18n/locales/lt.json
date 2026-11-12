@@ -3060,7 +3060,7 @@
       "plan": "Organizacijos planas",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Pasibaigęs",
+      "planStatusLapsed": " · Pasibaigęs",
       "planEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano.",
       "manageBilling": "Atsiskaitymų valdymas",
       "lowBalanceBelow": "Mažiau nei {{amount}}"

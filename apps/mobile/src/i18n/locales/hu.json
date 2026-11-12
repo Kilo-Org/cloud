@@ -2954,7 +2954,7 @@
       "plan": "Szervezeti csomag",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Lejárt",
+      "planStatusLapsed": " · Lejárt",
       "planEnded": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja.",
       "manageBilling": "Számlázás kezelése",
       "lowBalanceBelow": "{{amount}} alatt"

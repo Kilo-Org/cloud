@@ -62,9 +62,12 @@ describe('OrganizationPlanRefusal', () => {
     }
     expect(control.props.accessibilityRole).toBe('button');
     expect(control.props.accessibilityLabel).toBe('Manage billing');
-    // Android's platform minimum: the control's own node carries it, so the
-    // label cannot shrink below the target the design gate measures.
-    expect(control.props.className).toContain('min-h-[48px]');
+    // The action reads as one line of copy under the message: its visible box
+    // is the control-size audit's floor plus the label line, and `hitSlop`
+    // carries the design target, so the tile's own padding stays symmetric.
+    expect(control.props.className).toContain('min-h-[32px]');
+    expect(control.props.className).not.toContain('min-h-[48px]');
+    expect(control.props.hitSlop).toEqual({ top: 9, bottom: 9, left: 5, right: 5 });
     const label = root.findByType('Text');
     expect(label.props.children).toBe('Manage billing');
     // The brand primary is off-palette on the error-tinted surface (olive in

@@ -2954,7 +2954,7 @@
       "plan": "Erakundearen plana",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Amaitua",
+      "planStatusLapsed": " · Amaitua",
       "planEnded": "Erakundearen probaldia amaitu da eta ez du plan aktiborik.",
       "manageBilling": "Kudeatu fakturazioa",
       "lowBalanceBelow": "{{amount}} baino gutxiago"

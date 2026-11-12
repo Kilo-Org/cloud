@@ -2954,7 +2954,7 @@
       "plan": "Ұйым жоспары",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Аяқталды",
+      "planStatusLapsed": " · Аяқталды",
       "planEnded": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ.",
       "manageBilling": "Төлемдерді басқару",
       "lowBalanceBelow": "{{amount}} сомасынан төмен"

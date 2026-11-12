@@ -290,11 +290,16 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           {/* The plan is the tier the seats belong to, so it closes the card
               the seats are counted in and paints in every state. A lapsed plan
               states that in this row: the tier alone beside the block above
-              would read as an active plan. */}
+              would read as an active plan, and the tier keeps the row's own ink
+              so only the state carries the warning. */}
           <KvRow
             label={t('organization.hub.plan')}
-            value={planEnded ? t('organization.hub.planLapsed', { plan: planName }) : planName}
-            valueTone={planEnded ? 'danger' : 'default'}
+            value={planName}
+            valueStatus={
+              planEnded
+                ? { label: t('organization.hub.planStatusLapsed'), tone: 'danger' }
+                : undefined
+            }
             valueFace="text"
             last
           />

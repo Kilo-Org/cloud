@@ -2954,7 +2954,7 @@
       "plan": "संस्थाको प्लान",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · सकिएको",
+      "planStatusLapsed": " · सकिएको",
       "planEnded": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन।",
       "manageBilling": "बिलिङ व्यवस्थापन गर्नुहोस्",
       "lowBalanceBelow": "{{amount}} भन्दा कम"

@@ -2954,7 +2954,7 @@
       "plan": "План на организацията",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Приключил",
+      "planStatusLapsed": " · Приключил",
       "planEnded": "Пробният период на организацията е приключил и тя няма активен план.",
       "manageBilling": "Управление на плащанията",
       "lowBalanceBelow": "Под {{amount}}"

@@ -2852,7 +2852,7 @@
       "plan": "Organisationsplan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Beendet",
+      "planStatusLapsed": " · Beendet",
       "planEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan.",
       "manageBilling": "Abrechnung verwalten",
       "renamePlaceholder": "Name der Organisation",

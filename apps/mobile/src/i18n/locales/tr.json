@@ -2852,7 +2852,7 @@
       "plan": "Kuruluş planı",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Sona erdi",
+      "planStatusLapsed": " · Sona erdi",
       "planEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok.",
       "manageBilling": "Faturalandırmayı yönet",
       "renamePlaceholder": "Kuruluş adı",

@@ -350,8 +350,12 @@ describe('Organization hub plan', () => {
 
     const entitledRow = planRow(entitled.renderer);
     expect(entitledRow?.props.value).toBe(i18n.t('organization.hub.planTeams'));
-    expect(entitledRow?.props.valueTone).toBe('default');
-    // An entitled organization is not warned about a state it is not in.
+    // The row never overrides its value ink: the tier reads like every other
+    // value in the card.
+    expect(entitledRow?.props.valueTone).toBeUndefined();
+    // An entitled organization is not warned about a state it is not in, and it
+    // carries no status segment.
+    expect(entitledRow?.props.valueStatus).toBeUndefined();
     expect(refusals(entitled.renderer)).toHaveLength(0);
     entitled.unmount();
 
@@ -359,14 +363,17 @@ describe('Organization hub plan', () => {
     boundary.isTrialExpiredForEnforcement = true;
     const lapsed = await renderHub();
 
-    // A lapsed organization keeps its tier named and states the status in the
-    // same row: the bare tier beside a block that says there is no active plan
-    // reads as a plan that is still running.
+    // A lapsed organization keeps its tier named and states the status beside
+    // it: the bare tier beside a block that says there is no active plan reads
+    // as a plan that is still running. The tier keeps the row's ordinary ink and
+    // the status carries the warning, so the name does not glow with it.
     const lapsedRow = planRow(lapsed.renderer);
-    expect(lapsedRow?.props.value).toBe(
-      i18n.t('organization.hub.planLapsed', { plan: i18n.t('organization.hub.planEnterprise') })
-    );
-    expect(lapsedRow?.props.valueTone).toBe('danger');
+    expect(lapsedRow?.props.value).toBe(i18n.t('organization.hub.planEnterprise'));
+    expect(lapsedRow?.props.valueTone).toBeUndefined();
+    expect(lapsedRow?.props.valueStatus).toMatchObject({
+      label: i18n.t('organization.hub.planStatusLapsed'),
+      tone: 'danger',
+    });
     lapsed.unmount();
   });
 

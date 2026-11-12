@@ -2958,7 +2958,7 @@
       "plan": "План организации",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Закончился",
+      "planStatusLapsed": " · Закончился",
       "planEnded": "Пробный период организации закончился, и у неё нет активного плана.",
       "manageBilling": "Управление оплатой",
       "renamePlaceholder": "Название организации",

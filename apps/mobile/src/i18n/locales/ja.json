@@ -2852,7 +2852,7 @@
       "plan": "組織のプラン",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · 終了",
+      "planStatusLapsed": " · 終了",
       "planEnded": "組織のトライアルは終了し、有効なプランがありません。",
       "manageBilling": "請求を管理",
       "renamePlaceholder": "組織名",

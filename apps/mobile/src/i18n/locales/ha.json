@@ -2954,7 +2954,7 @@
       "plan": "Tsarin ƙungiya",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Ya ƙare",
+      "planStatusLapsed": " · Ya ƙare",
       "planEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki.",
       "manageBilling": "Sarrafa biyan kuɗi",
       "lowBalanceBelow": "Ƙasa da {{amount}}"

@@ -2954,7 +2954,7 @@
       "plan": "Karoora dhaabbataa",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
-      "planLapsed": "{{plan}} · Xumurameera",
+      "planStatusLapsed": " · Xumurameera",
       "planEnded": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu.",
       "manageBilling": "Kaffaltii bulchi",
       "lowBalanceBelow": "{{amount}} gadi"

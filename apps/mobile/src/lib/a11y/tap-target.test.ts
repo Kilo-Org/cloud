@@ -53,6 +53,8 @@ import {
   tapTargetReachDp,
   textActionTargetClass,
   TOUCH_TARGET_DP,
+  UNDER_COPY_ACTION_BOX_CLASS,
+  UNDER_COPY_ACTION_HIT_SLOP,
   VOICE_INPUT_LG_HIT_SLOP_DP,
 } from './tap-target';
 
@@ -140,6 +142,29 @@ describe('shared tap-target geometry', () => {
     expect(await compiledDp(android, 'minWidth')).toBeGreaterThanOrEqual(ICON_TARGET_DP);
 
     platform.OS = 'ios';
+  });
+
+  it('cancels the action box slack under the copy it sits below', async () => {
+    // The regression this guards: the box centres one label line, so a tile
+    // that pads its edges evenly showed a wider gap under its action than above
+    // its copy. The margin removes that slack from the layout, so the tile pads
+    // the same on both edges while the box stays above the audit floor and
+    // never reaches the message above it.
+    const height = await compiledDp(UNDER_COPY_ACTION_BOX_CLASS, 'minHeight');
+    expect(height).toBe(32);
+    expect(height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    // A short label in another language keeps the audit floor on both axes.
+    expect(await compiledDp(UNDER_COPY_ACTION_BOX_CLASS, 'minWidth')).toBe(48);
+    const margin = await compiledDp(UNDER_COPY_ACTION_BOX_CLASS, 'marginBlock');
+    expect(margin).toBe(-7);
+    // What is left is the label line itself, so the box adds no room of its own
+    // above the copy or below the label.
+    expect(Math.abs(height - 2 * Math.abs(margin) - INLINE_LINK_SENTENCE_LINE_DP)).toBeLessThan(1);
+    // The slop carries the reach the shortened box gives up on its own node.
+    expect(tapTargetReachDp(height - 0.2, UNDER_COPY_ACTION_HIT_SLOP.top)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
+    expect(UNDER_COPY_ACTION_HIT_SLOP.top).toBe(UNDER_COPY_ACTION_HIT_SLOP.bottom);
   });
 
   it('renders a state surface action on the Android 48dp minimum', async () => {

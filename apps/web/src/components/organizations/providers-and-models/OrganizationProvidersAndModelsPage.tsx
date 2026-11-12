@@ -206,6 +206,14 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     [actions, canEdit]
   );
 
+  const handleSetModelsAllowed = useCallback(
+    (modelIds: ReadonlyArray<string>, nextAllowed: boolean) => {
+      if (!canEdit) return;
+      actions.setModelsAllowed({ modelIds, nextAllowed });
+    },
+    [actions, canEdit]
+  );
+
   const handleCancelChanges = useCallback(() => {
     if (!canEdit) return;
     actions.resetToInitial();
@@ -510,9 +518,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               byokOnlyProviderSlugs={byokOnlyProviderSlugs}
               filteredModelRows={filteredModelRows}
               onToggleModelAllowed={handleToggleModelAllowed}
-              onSetModelsAllowed={(modelIds, nextAllowed) => {
-                if (canEdit) dispatch({ type: 'SET_MODELS_ALLOWED', modelIds, nextAllowed });
-              }}
+              onSetModelsAllowed={handleSetModelsAllowed}
               onOpenModelDetails={actions.setInfoModelId}
             />
           </TabsContent>
@@ -598,6 +604,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
           formatPriceCompact={formatPriceCompact}
           onToggleProviderEnabled={handleToggleProviderEnabled}
           onToggleModelAllowed={handleToggleModelAllowed}
+          onSetModelsAllowed={handleSetModelsAllowed}
           onClose={() => actions.setInfoProviderSlug(null)}
         />
 

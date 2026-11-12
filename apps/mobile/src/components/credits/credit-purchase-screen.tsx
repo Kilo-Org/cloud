@@ -39,7 +39,7 @@ import { CreditExpiryNote } from './credit-expiry-note';
 const PACK_SKELETON_ROWS = 4;
 
 /**
- * The height the pack area holds in every state, at the default font scale.
+ * The height the pack area holds in every state.
  *
  * The tallest state carries every surface the area can show at once: the
  * inline purchase error, the store's notice, and one unpriced row per catalog
@@ -48,42 +48,32 @@ const PACK_SKELETON_ROWS = 4;
  * completed one — and the backend catalog still names the packs when the store
  * cannot price them.
  *
- * Every block's height is fixed at the default scale:
+ * The reservation separates the two kinds of measurement a row is made of,
+ * because the system font scale moves only one of them:
  *
- * - a row is 80 dp: its 20 dp paddings, one title line, an 8 dp gap and its
- *   12 dp expiry line. Its title is capped at one line, so a longer pack name
- *   cannot make a row taller;
- * - the notice is 180 dp with a three-line body: its 20 dp paddings, the title
- *   line, three body lines, the retry control, and the gaps between them. Its
- *   body is capped at three lines for the same reason;
- * - the purchase error is two capped lines of `text-sm`;
- * - the gap between siblings is the scroller's 10.5 dp step, and the column
- *   lays out one gap more than it has rows because the notice and the error
- *   are siblings too.
+ * - text lines scale. A row's title and expiry line, the notice's title, body
+ *   and retry label, and the purchase error are all text, and each is capped
+ *   at a line count — so the scale multiplies their height;
+ * - spacing does not scale. A row's 20 dp paddings and 8 dp gap, the notice's
+ *   paddings, and every 10.5 dp step the column lays out between siblings keep
+ *   their size at any scale.
  *
- * The sum is 587.5 dp for the four packs the catalog sells.
- *
- * {@link packAreaMinHeight} multiplies the sum by the live font scale, because
- * `numberOfLines` caps a line count and not a line height: every text line
- * above grows with the scale. The gaps and paddings do not grow, so the
- * product over-reserves at a raised scale; over-reserving only adds blank
- * space, while under-reserving would move the copy. A state that shows fewer
- * surfaces keeps the difference as blank space after its own content, between
- * the pack surface and the copy, so no store answer, no purchase attempt and
- * no font scale moves the description or the legal links. The row count
- * follows the catalog, so a catalog that ever sells more packs widens the
- * reservation instead of pushing the copy down.
+ * Both are measured at the default scale. The text terms are the lines of each
+ * block, and the column lays out one gap more than it has rows because the
+ * notice and the error are siblings of the rows.
  */
-const PACK_ROW_HEIGHT = 80;
+const PACK_ROW_TEXT_HEIGHT = 40;
+const PACK_ROW_SPACING = 40;
 const PACK_CONTENT_GAP = 10.5;
-const STORE_NOTICE_HEIGHT = 180;
-const PURCHASE_ERROR_HEIGHT = 35;
+const STORE_NOTICE_TEXT_HEIGHT = 110;
+const STORE_NOTICE_SPACING = 70;
+const PURCHASE_ERROR_TEXT_HEIGHT = 35;
 const packAreaMinHeight = (rows: number, fontScale: number): number =>
-  (rows * (PACK_ROW_HEIGHT + PACK_CONTENT_GAP) +
-    PACK_CONTENT_GAP +
-    STORE_NOTICE_HEIGHT +
-    PURCHASE_ERROR_HEIGHT) *
-  fontScale;
+  rows * (PACK_ROW_TEXT_HEIGHT * fontScale + PACK_ROW_SPACING + PACK_CONTENT_GAP) +
+  PACK_CONTENT_GAP +
+  STORE_NOTICE_TEXT_HEIGHT * fontScale +
+  STORE_NOTICE_SPACING +
+  PURCHASE_ERROR_TEXT_HEIGHT * fontScale;
 
 /**
  * One-off credit packs bought with the store's own purchase sheet.

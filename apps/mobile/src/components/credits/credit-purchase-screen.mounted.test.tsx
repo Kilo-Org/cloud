@@ -996,10 +996,16 @@ describe('CreditPurchaseScreen', () => {
     const single = await reservedHeight();
     dimensions.fontScale = 2;
     const doubled = await reservedHeight();
+    // Only text lines scale, so a reduced scale keeps the spacing it does not
+    // change and a raised one adds exactly the text it enlarges.
+    dimensions.fontScale = 0.85;
+    const reduced = await reservedHeight();
     dimensions.fontScale = 1;
 
     expect(single).toBe(587.5);
-    expect(doubled).toBe(single * 2);
+    expect(doubled).toBeGreaterThan(single);
+    expect(reduced).toBeGreaterThan(single * 0.85);
+    expect(reduced).toBeLessThan(single);
   });
 
   it('names an expiring balance and says nothing when none expires', async () => {

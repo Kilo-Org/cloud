@@ -136,6 +136,27 @@ describe('useSessionListAutoScroll viewport re-pin', () => {
     expect(probe.list.scrollToEnd).toHaveBeenCalledTimes(1);
   });
 
+  it('corrects the tail again after the list remounts', () => {
+    const first = mountProbe();
+    act(() => {
+      first.api.handleListLayout(layoutAt(500));
+    });
+    for (const renderer of mounted.splice(0)) {
+      act(() => {
+        renderer.unmount();
+      });
+    }
+    runFrame();
+    expect(first.list.scrollToEnd).not.toHaveBeenCalled();
+
+    const second = mountProbe();
+    act(() => {
+      second.api.handleListLayout(layoutAt(500));
+    });
+    runFrame();
+    expect(second.list.scrollToEnd).toHaveBeenCalledTimes(1);
+  });
+
   it('does not correct when the user starts dragging before the frame', () => {
     const probe = mountProbe();
 

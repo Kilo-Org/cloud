@@ -24,12 +24,29 @@ const holder = vi.hoisted(() => ({
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({ data: { instances: holder.instances }, isPending: holder.isPending }),
+  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
-vi.mock('@/lib/trpc', () => ({
-  useTRPC: () => ({
-    activeSessions: { listInstances: { queryOptions: () => ({}) } },
-  }),
+vi.mock('@/lib/trpc', () => {
+  const options = { queryOptions: () => ({}), queryKey: () => [] };
+  const namespace = { getSandboxStatus: options, getWorkspaceSnapshotRecovery: options };
+  return {
+    trpcClient: { cloudAgentNext: {}, organizations: { cloudAgentNext: {} } },
+    useTRPC: () => ({
+      activeSessions: { listInstances: { queryOptions: () => ({}) } },
+      cloudAgentNext: namespace,
+      organizations: { cloudAgentNext: namespace },
+    }),
+  };
+});
+// The sandbox section's own button and dialog edges reach react-native through
+// modules the mounted transform cannot parse (activity-indicator -> motion ->
+// expo-battery), so both are mocked at their adapter.
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
 }));
+vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('./session-row-actions', () => ({
   copySessionId: async (id: string) => {
     await Promise.resolve();

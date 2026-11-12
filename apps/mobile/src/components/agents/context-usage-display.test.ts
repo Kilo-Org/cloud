@@ -58,9 +58,9 @@ const trackOnly: HeaderPillContent = {
 /** A transcript without usage: the same ring, no dash slot. */
 const trackOnlyWhileLoading: HeaderPillContent = { ...trackOnly, usageUnavailable: false };
 
-/** No usage reported yet: the usage dash paints, and no cost holds the pill open. */
+/** No usage reported yet: the pill paints nothing beside its ring. */
 const unreported: HeaderPillContent = {
-  primary: '—',
+  primary: null,
   secondary: null,
   costSlot: 'unreported',
   tone: 'neutral',
@@ -158,7 +158,7 @@ describe('formatRemainingTokens', () => {
 });
 
 describe('getHeaderPillContent', () => {
-  it('keeps both value slots open, non-interactive, with no info and no transcript', () => {
+  it('paints no reading before a transcript exists', () => {
     expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false })).toEqual(unreported);
     expect(pill({ totalCostMicrodollars: 0, hasMessages: false })).toEqual(unreported);
     expect(pill({ totalCostMicrodollars: null, hasMessages: false })).toEqual(unreported);

@@ -291,16 +291,11 @@ describe('SessionContextMetrics', () => {
     expect(findAll(reserve, el => propsOf(el).children === costSizer)).toHaveLength(1);
   });
 
-  // No usage yet: the pill paints its dashes, and while loading one bar covers
-  // the widest reading instead of a fixed width that fits only the default font
-  // scale.
-  it('paints the dashes while settled and one bar while loading', () => {
-    const classOf = classNameOf;
-    const textsWith = (root: React.ReactElement, text: string) =>
-      findAll(root, el => propsOf(el).children === text);
-    const bars = (root: React.ReactElement) => findAll(root, el => el.type === 'Skeleton');
+  // One silhouette from the first paint: until a value exists the pill paints
+  // its ring and nothing else, so a session that settles without usage never
+  // changes shape. The box around it already holds the row the values will take.
+  it('paints the ring alone until a value exists, while loading and after', () => {
     const onPress = vi.fn<() => void>();
-
     const bare = (loading = false) =>
       render({
         info: undefined,
@@ -309,27 +304,34 @@ describe('SessionContextMetrics', () => {
         loading,
         onPress,
       });
-    const settled = pillOf(bare());
-    expect(propsOf(settled).accessibilityLabel).toContain('usage unavailable');
-    // The usage dash is a real reading: the session reported tokens but no
-    // window to divide them by. The cost never arrived, so it paints nothing.
-    expect(textsWith(settled, '—')).toHaveLength(1);
-    for (const dash of textsWith(settled, '—')) {
-      expect(classOf(dash)).not.toContain('opacity-0');
-    }
-    expect(bars(settled)).toHaveLength(0);
 
-    const loading = pillOf(bare(true));
-    expect(propsOf(loading).accessibilityLabel ?? '').not.toContain('usage unavailable');
-    const hiddenRuns = findAll(
-      loading,
-      el => el.type === 'Text' && classOf(el).includes('opacity-0')
-    );
-    expect(hiddenRuns).toHaveLength(1);
-    expect(textsWith(loading, '—')).toHaveLength(0);
-    const [loadingBar] = bars(loading);
-    // A box over the run, not a fixed width that fits only the default font scale.
-    expect(classOf(loadingBar ?? loading)).toContain('w-full');
-    expect(classOf(loadingBar ?? loading)).toContain('bg-muted-soft');
+    for (const pill of [pillOf(bare(false)), pillOf(bare(true))]) {
+      expect(findAll(pill, el => el.type === 'ContextUsageRing')).toHaveLength(1);
+      expect(
+        findAll(pill, el => el.type === 'Text' && !classNameOf(el).includes('opacity-0'))
+      ).toHaveLength(0);
+    }
+    expect(propsOf(pillOf(bare(false))).accessibilityLabel).toContain('usage unavailable');
+    expect(propsOf(pillOf(bare(true))).accessibilityLabel ?? '').not.toContain('usage unavailable');
+  });
+
+  // The reserved width is what keeps the header row still, and it is the same in
+  // the loading state as in every settled state.
+  it('reserves the same width while loading as when settled', () => {
+    const onPress = vi.fn<() => void>();
+    const widthOfReserve = (loading: boolean): unknown => {
+      const [reserve] = findAll(
+        render({
+          info: undefined,
+          totalCostMicrodollars: null,
+          hasMessages: false,
+          loading,
+          onPress,
+        }),
+        el => classNameOf(el).includes('h-0')
+      );
+      return reserve === undefined ? undefined : propsOf(reserve).children;
+    };
+    expect(widthOfReserve(true)).toEqual(widthOfReserve(false));
   });
 });

@@ -145,14 +145,13 @@ export function getHeaderPillContent({
   }
 
   const costText = hasMessages ? formatSessionCostBadge(totalCostMicrodollars) : null;
-  // Nothing has reported usage yet. The pill paints the one dash that stands for
-  // an unknown denominator, and no cost: none has arrived, so the reading hugs
-  // the ring instead of holding a value box open. While the open resolves, the
-  // widest run lays out invisibly under one bar, so the pill is as wide as its
-  // settled form until the values arrive.
+  // Nothing has reported usage yet, so the pill paints nothing beside its ring:
+  // a value that has not arrived is not a value, and the reserved box around the
+  // pill already keeps the header row still until one does. The pill therefore
+  // has one silhouette from its first paint, whichever state it settles into.
   if (!hasMessages) {
     return {
-      primary: UNKNOWN_WINDOW_LABEL,
+      primary: null,
       secondary: null,
       costSlot: loading ? 'loading' : 'unreported',
       tone: 'neutral',

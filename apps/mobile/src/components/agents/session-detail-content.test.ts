@@ -4797,8 +4797,8 @@ describe('session detail read-only composer', () => {
   });
 
   // The transcript paints a skeleton until its rows stop measuring. The chrome
-  // around it reads the same fact: a live continue footer, or a pill settled on
-  // a bare ring, beside a loading body is the screen showing two states at once.
+  // around it reads the same fact: a live continue footer beside a loading body
+  // is the screen showing two states at once.
   it('keeps the footer and the pill in their loading shapes until the rows are painted', async () => {
     openSettledReport.value = false;
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
@@ -4811,10 +4811,11 @@ describe('session detail read-only composer', () => {
           node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
       )
     ).toHaveLength(0);
-    // The pill holds the row its values will take, instead of shrinking to a
-    // ring with no slot.
+    // The pill paints its ring alone in every unresolved state, and the box
+    // around it holds the row its values will take, so nothing shrinks when the
+    // values arrive.
     const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
-    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(1);
+    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
 
     // The list then reports its rows painted, and the footer takes the
     // placeholder's place in the same slot.

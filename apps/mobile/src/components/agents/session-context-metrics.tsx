@@ -1,6 +1,5 @@
 import { Pressable, View } from 'react-native';
 
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { isolateLtrBidiText } from '@/lib/bidi';
@@ -65,26 +64,17 @@ const RING_STROKE = 3;
  * rocker it is — a circle around the ring when the session reports nothing, a
  * compact reading when it does — while the Follow control beside the box never
  * moves.
+ *
+ * The pill paints the ring alone until a value exists, so it has one silhouette
+ * for as long as it has nothing to read. The reserve already holds the row's
+ * width, so a bar in the pill's own value area would add a second, wider
+ * silhouette that collapses the moment the session settles.
  */
 export const WIDEST_PERCENTAGE_VALUE = 100;
 export const WIDEST_COST_MICRODOLLARS = 1_234_560_000;
 const PILL_CLASS =
   'h-[44px] shrink min-w-0 flex-row items-center gap-1 rounded-full border border-border bg-secondary px-3';
 const VALUE_CLASS = 'min-w-0 shrink text-xs tabular-nums';
-
-/**
- * Full-bleed box over the value run that centres the loading bar in it. The run
- * is sized by its own text, so its width and height follow the font scale; the
- * bar takes those instead of a fixed size of its own.
- */
-const LOADING_BAR_OVERLAY = {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  justifyContent: 'center',
-} as const;
 
 const TONE_TEXT_CLASS = {
   destructive: 'text-destructive',
@@ -126,10 +116,6 @@ export function SessionContextMetrics({
 
   const percentageSizer = formatPercent(WIDEST_PERCENTAGE_VALUE, i18n.language);
   const costSizer = formatSessionCostBadge(WIDEST_COST_MICRODOLLARS) ?? percentageSizer;
-  // While the session still resolves, the widest run lays out invisibly under
-  // one bar, so the bar is as wide as the reading can become instead of a fixed
-  // width that fits only the default font scale.
-  const valueRowLoading = content.costSlot === 'loading';
   const costLabel =
     content.costSlot === 'label' && content.secondary !== null
       ? isolateLtrBidiText(content.secondary)
@@ -171,16 +157,7 @@ export function SessionContextMetrics({
         arcFraction={content.arcFraction}
         tone={content.tone}
       />
-      {valueRowLoading ? (
-        <View className="min-w-0 shrink">
-          {valueRun(percentageSizer, costSizer, true)}
-          <View style={LOADING_BAR_OVERLAY}>
-            <Skeleton className="h-2 w-full rounded-[2px] bg-muted-soft" />
-          </View>
-        </View>
-      ) : (
-        valueRun(content.primary, costLabel, false)
-      )}
+      {valueRun(content.primary, costLabel, false)}
     </>
   );
 

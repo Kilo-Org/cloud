@@ -754,12 +754,23 @@ export async function assertInviteeAddressIsAvailable(
   }
 }
 
+export type InviteUserOptions = {
+  /**
+   * The caller already ran {@link assertInviteeAddressIsAvailable} in this
+   * transaction. Only the invite procedure sets it: it must answer a duplicate
+   * address before its seat check, so it runs the lookup itself and asks the
+   * insert not to repeat it.
+   */
+  addressAlreadyChecked?: boolean;
+};
+
 export async function inviteUserToOrganization(
   organizationId: Organization['id'],
   invitingUserId: User['id'],
   email: string,
   role: OrganizationRole,
-  txn?: DrizzleTransaction
+  txn?: DrizzleTransaction,
+  options: InviteUserOptions = {}
 ): Promise<OrganizationInvitation> {
   const run = async (tx: DrizzleTransaction): Promise<OrganizationInvitation> => {
     const membershipRule = await decideChildOrganizationMembership(tx, organizationId, { email });
@@ -784,7 +795,9 @@ export async function inviteUserToOrganization(
       ssoSourceOrganizationId = policy.sourceOrganizationId;
     }
 
-    await assertInviteeAddressIsAvailable(tx, organizationId, email);
+    if (!options.addressAlreadyChecked) {
+      await assertInviteeAddressIsAvailable(tx, organizationId, email);
+    }
 
     const [invitation] = await tx
       .insert(organization_invitations)

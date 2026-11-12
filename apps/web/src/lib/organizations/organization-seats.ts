@@ -112,7 +112,7 @@ export async function getOrganizationSeatUsage(
         seatCount: organizations.seat_count,
       })
       .from(organizations)
-      .where(eq(organizations.id, organizationId))
+      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
       .limit(1),
   ]);
   const used = (activeMembers[0]?.value ?? 0) + (pendingInvitations[0]?.value ?? 0);
@@ -130,6 +130,12 @@ export async function getOrganizationSeatUsage(
  * the first to commit and then counts the invitation it wrote. The lock is
  * advisory rather than a row lock on `organizations`, so it orders only the
  * seat check and leaves unrelated writes to that row alone.
+ *
+ * This gates invitations only. Adding a membership directly — SCIM directory
+ * sync (`directory-sync.ts`), SSO sign-in (`user/sso.ts`), the admin add-member
+ * route, a sales-demo seed, or the subscription's owner grant — has never
+ * enforced a seat limit and still does not, so those paths can take the last
+ * seat without this lock. Widening that is a separate behaviour change.
  */
 export async function assertInviteSeatCapacity(
   tx: DrizzleTransaction,

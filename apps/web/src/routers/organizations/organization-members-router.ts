@@ -621,7 +621,10 @@ export const organizationsMembersRouter = createTRPCRouter({
             user.id,
             email,
             role,
-            tx
+            tx,
+            // The duplicate lookup above runs before the seat check, so the
+            // insert must not repeat it.
+            { addressAlreadyChecked: true }
           );
           const acceptInviteUrl = getAcceptInviteUrl(invitation.token);
 

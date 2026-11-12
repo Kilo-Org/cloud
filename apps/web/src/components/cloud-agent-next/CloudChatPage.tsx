@@ -743,14 +743,17 @@ export default function CloudChatPage({
       // produces no output, so the resume keeps the position instead of being
       // abandoned at the bottom.
       const resumeStateAtSend = captureSendPosition();
-      const selection = resolveSendSelection(sessionConfig);
+      const selection = resolveSendSelection(sessionConfig, {
+        model: sessionModels.selectedValue,
+        variant: sessionModels.selectedVariant,
+      });
       const acceptedPromise = manager.send({
         payload: {
           type: 'prompt',
           prompt,
           mode: selection.mode,
-          model: sessionModels.selectedValue ?? selection.model,
-          variant: sessionModels.selectedVariant,
+          model: selection.model,
+          variant: selection.variant,
         },
         attachments: supportsAttachments ? attachments : undefined,
       });
@@ -790,7 +793,10 @@ export default function CloudChatPage({
       // or the effect re-pauses follow and cancels the scroll for this
       // command's output. A refused command leaves the resume in place.
       const resumeStateAtSend = captureSendPosition();
-      const selection = resolveSendSelection(sessionConfig);
+      const selection = resolveSendSelection(sessionConfig, {
+        model: sessionModels.selectedValue,
+        variant: sessionModels.selectedVariant,
+      });
       const acceptedPromise = manager.send({
         payload: {
           type: 'command',
@@ -818,6 +824,8 @@ export default function CloudChatPage({
       manager,
       scheduleScrollToBottom,
       sessionConfig,
+      sessionModels.selectedValue,
+      sessionModels.selectedVariant,
       supportsAttachments,
       captureSendPosition,
       followAcceptedSend,

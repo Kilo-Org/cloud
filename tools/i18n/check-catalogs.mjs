@@ -484,6 +484,17 @@ const SENTENCE_SEPARATED_FAMILY = 'prReview.submit.partialPostedFresh';
 /** The catalogs whose sentence terminator is the whole separator. */
 const UNSPACED_SENTENCE_TAGS = new Set(['ja', 'zh-Hans', 'zh-Hant']);
 
+/**
+ * The catalogs that write their conjunction as a prefix letter of the next
+ * word rather than as a word of its own. Arabic joins the waw to the noun it
+ * governs, so `login.termsConnector` carries the space before the conjunction
+ * and none after it. Every catalog that separates words with spaces and is
+ * absent from this set separates the conjunction on both sides; a catalog that
+ * abuts its words pads neither. A catalog whose orthography changes has to move
+ * into or out of this set together with its values.
+ */
+const PREFIX_CONJUNCTION_TAGS = new Set(['ar']);
+
 /** Whether the key's own edge whitespace is a separator this catalog chooses. */
 function carriesOwnEdges(key) {
   return LOCALE_SEPARATED_KEYS.has(key) || pluralBaseKey(key) === SENTENCE_SEPARATED_FAMILY;
@@ -1147,17 +1158,34 @@ for (const catalog of CATALOGS) {
 
     // The separator keys are this catalog's only statement about how it joins
     // one word to the next, and they are allowed to differ from English on
-    // purpose — so they have to agree with each other. A padded prefix with a
-    // bare connector joins "our" to "Terms" but runs the conjunction into the
-    // next noun; the reverse drops the space before the link.
+    // purpose — so they have to agree with each other about the junction before
+    // the Terms link: a padded prefix with a bare connector joins "our" to
+    // "Terms" but runs the conjunction into the next noun; the reverse drops the
+    // space before the link. The junction after the conjunction follows the
+    // catalog's orthography. A catalog that abuts its words pads neither side
+    // ("和"). One that separates words with spaces pads the conjunction's start,
+    // and its end depends on how the language writes the conjunction: as a word
+    // of its own (" and ") or, in the tags in `PREFIX_CONJUNCTION_TAGS`, as a
+    // prefix letter that joins the noun it governs (" و").
     const prefixValue = translated.get('login.termsPrefix');
     const connectorValue = translated.get('login.termsConnector');
     if (prefixValue !== undefined && connectorValue !== undefined) {
       const paddedPrefix = /\s$/.test(prefixValue);
-      const paddedConnector = /^\s/.test(connectorValue) && /\s$/.test(connectorValue);
-      if (paddedPrefix !== paddedConnector) {
+      const connectorLeads = /^\s/.test(connectorValue);
+      if (paddedPrefix !== connectorLeads) {
         fail(
-          `${label}: "login.termsPrefix" and "login.termsConnector" disagree about their separator; pad both or neither`
+          `${label}: "login.termsPrefix" and "login.termsConnector" disagree about the space before the Terms link; pad the prefix and the conjunction's start together`
+        );
+      }
+      const wantsPaddedEnd = paddedPrefix && !PREFIX_CONJUNCTION_TAGS.has(tag);
+      if (/\s$/.test(connectorValue) !== wantsPaddedEnd) {
+        const reason = !paddedPrefix
+          ? 'this catalog abuts its words'
+          : PREFIX_CONJUNCTION_TAGS.has(tag)
+            ? 'this catalog writes the conjunction as a prefix of the next word'
+            : 'this catalog writes the conjunction as a separate word';
+        fail(
+          `${label}: "login.termsConnector" must ${wantsPaddedEnd ? 'end with a space' : 'end without a space'}, because ${reason}`
         );
       }
     }

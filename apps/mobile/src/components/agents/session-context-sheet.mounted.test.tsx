@@ -29,10 +29,17 @@ const holder = vi.hoisted(() => ({
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({ data: { instances: holder.instances }, isPending: holder.isPending }),
+  useQueryClient: () => ({ invalidateQueries: () => Promise.resolve() }),
+  useMutation: () => ({ mutate: () => undefined, isPending: false }),
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     activeSessions: { listInstances: { queryOptions: () => ({}) } },
+    cliSessionsV2: {
+      get: { queryOptions: () => ({}), queryKey: () => ['get'] },
+      share: { mutationOptions: () => ({}) },
+      unshare: { mutationOptions: () => ({}) },
+    },
   }),
 }));
 // The sheet's compute block and its total read one query; the harness pins it
@@ -86,6 +93,10 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+}));
 vi.mock('@/components/ui/text', async () => {
   const React = await import('react');
   return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };

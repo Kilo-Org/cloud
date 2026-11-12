@@ -48,6 +48,7 @@ function makeFolders(): WorkspaceFolder[] {
       smartPreset: null,
       sortMode: 'manual',
       worktreeIds: [worktreeA, hiddenWorktree],
+      manualWorktreeOrder: [],
     },
     {
       id: folderB,
@@ -57,6 +58,7 @@ function makeFolders(): WorkspaceFolder[] {
       smartPreset: null,
       sortMode: 'manual',
       worktreeIds: [],
+      manualWorktreeOrder: [],
     },
     {
       id: folderC,
@@ -66,6 +68,7 @@ function makeFolders(): WorkspaceFolder[] {
       smartPreset: null,
       sortMode: 'manual',
       worktreeIds: [],
+      manualWorktreeOrder: [],
     },
   ];
 }

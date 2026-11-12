@@ -204,7 +204,7 @@ patchedDependencies:
   expo-localization@58.0.4: 790ed1623bb21bc6af1bfe44cacd8f383a128e62d0572669c5568fb8f3676b73
   expo-modules-autolinking@58.0.13: 89b56c788c823c6759fade3e7de679ca1d92e5120ccfe007a47ea2ce2d4caea6
   expo-modules-core@58.0.18: b9171316da59a4fe5d584c9ebb6d04297dc3de0de48c3fcef611d4dc621b37c9
-  expo-notifications@58.1.4: 4bdcdf64d693d0d0ea97c121e481fececc083e86c227b019cbbf8fa1c7f8d1f5
+  expo-notifications@58.1.4: 687bb2bde9480b90d31b004373e3edb3fb699a99eac3b65d2e85aa5e76572e9e
   expo-router@58.0.19: b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd
   expo-server-sdk@6.1.0: 7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b
   expo-speech-recognition@57.1.1: a2fc2568603b981e0b9bf1133deef50012a0b2d18b52f445a9868b1770005b99
@@ -697,7 +697,7 @@ importers:
         version: 58.0.4(patch_hash=790ed1623bb21bc6af1bfe44cacd8f383a128e62d0572669c5568fb8f3676b73)(expo@58.0.10)(react@19.3.0)
       expo-notifications:
         specifier: ~58.1.4
-        version: 58.1.4(patch_hash=4bdcdf64d693d0d0ea97c121e481fececc083e86c227b019cbbf8fa1c7f8d1f5)(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)
+        version: 58.1.4(patch_hash=687bb2bde9480b90d31b004373e3edb3fb699a99eac3b65d2e85aa5e76572e9e)(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)
       expo-router:
         specifier: ~58.0.19
         version: 58.0.19(patch_hash=b02d51c91eb65aad388c7558622a89e10160d0ff948f765790a665a68d93d5dd)(aa9e0f2e012d774790f9138f88c7e186)
@@ -37308,7 +37308,7 @@ snapshots:
       '@expo/modules-macros-win32-arm64': 0.20.0
       '@expo/modules-macros-win32-x64': 0.20.0
 
-  expo-notifications@58.1.4(patch_hash=4bdcdf64d693d0d0ea97c121e481fececc083e86c227b019cbbf8fa1c7f8d1f5)(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2):
+  expo-notifications@58.1.4(patch_hash=687bb2bde9480b90d31b004373e3edb3fb699a99eac3b65d2e85aa5e76572e9e)(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2):
     dependencies:
       '@expo/image-utils': 0.12.5(typescript@7.0.2)
       abort-controller: 3.0.0

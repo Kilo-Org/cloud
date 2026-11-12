@@ -6,6 +6,7 @@ import {
   groupWorkspaceGroupsByDestination,
   isValidPositionKey,
   sortWorkspaceGroups,
+  sortSmartFolderGroups,
   type SidebarWorkspaceGroup,
   type SidebarWorkspaceRow,
 } from './sidebar-ordering';
@@ -48,6 +49,7 @@ function folder(id: string, overrides: Partial<WorkspaceFolder> = {}): Workspace
     kind: 'manual',
     smartPreset: null,
     sortMode: 'manual',
+    manualWorktreeOrder: [],
     worktreeIds: [],
     ...overrides,
   };
@@ -95,6 +97,55 @@ describe('workspace ordering', () => {
     expect(isValidPositionKey('a0')).toBe(false);
     expect(isValidPositionKey(null)).toBe(false);
   });
+});
+
+describe('smart folder ordering', () => {
+  it('uses its own saved order, not positions from regular folders or Ungrouped', () => {
+    const groups = [
+      group('first', { sidebarPosition: 'a2' }),
+      group('second', { sidebarPosition: 'a1' }),
+    ];
+    expect(sortSmartFolderGroups(groups, 'manual', ['first', 'second'])).toEqual(groups);
+    expect(groups.map(item => item.root.sidebarPosition)).toEqual(['a2', 'a1']);
+  });
+
+  it('puts new members above the saved order, even if they already have sidebar positions', () => {
+    const groups = [
+      group('saved-first'),
+      group('new-old-workspace', {
+        sidebarPosition: 'z',
+        createdAt: '2025-01-01T00:00:00.000Z',
+        statusUpdatedAt: '2026-03-01T00:00:00.000Z',
+      }),
+      group('saved-second'),
+      group('other-new', { statusUpdatedAt: '2026-02-01T00:00:00.000Z' }),
+    ];
+    expect(
+      sortSmartFolderGroups(groups, 'manual', ['saved-first', 'saved-second']).map(
+        item => item.root.worktreeId
+      )
+    ).toEqual(['new-old-workspace', 'other-new', 'saved-first', 'saved-second']);
+  });
+
+  it('uses stack activity for new arrivals and ignores saved members that no longer match', () => {
+    const root = group('stack', {}, [
+      row('layer', { statusUpdatedAt: '2026-02-01T00:00:00.000Z' }),
+    ]);
+    expect(sortSmartFolderGroups([group('other'), root], 'manual', ['absent'])).toEqual([
+      root,
+      group('other'),
+    ]);
+  });
+
+  it.each(['created', 'activity'] as const)(
+    'keeps %s sorting independent of manual order',
+    order => {
+      const groups = [group('old', { createdAt: '2025-01-01T00:00:00.000Z' }), group('new')];
+      expect(sortSmartFolderGroups(groups, order, ['old', 'new'])).toEqual(
+        sortWorkspaceGroups(groups, order)
+      );
+    }
+  );
 });
 
 describe('groupWorkspaceGroupsByDestination', () => {

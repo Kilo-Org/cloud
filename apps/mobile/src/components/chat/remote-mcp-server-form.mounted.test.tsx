@@ -17,6 +17,7 @@ import { act, TestRenderer } from '@/test/renderer';
 type FieldProps = {
   readonly label: string;
   readonly defaultValue?: string;
+  readonly error?: string;
   readonly onChangeText?: (value: string) => void;
   readonly validate?: (value: string) => string | null;
 };
@@ -225,6 +226,80 @@ describe('the remote MCP server form', () => {
 
     await type(1, '');
     expect(dirty.at(-1)).toBe(false);
+  });
+
+  it('asks for the token again when the URL names another endpoint', async () => {
+    await mount({
+      server: {
+        id: 'remote',
+        name: 'Remote',
+        url: 'https://remote.example/mcp',
+        auth: { type: 'bearer', token: 'secret' },
+        enabled: true,
+      },
+      onSave,
+    });
+
+    expect(fields()[2]?.defaultValue).toBe('secret');
+    expect(saveButton().disabled).toBe(false);
+
+    await type(1, 'https://elsewhere.example/mcp');
+
+    // The saved value belonged to the endpoint the form opened on, so the field
+    // is empty for the endpoint it now names and Save waits for a value.
+    expect(fields()[2]?.defaultValue).toBe('');
+    expect(saveButton().disabled).toBe(true);
+    expect(fields()[2]?.error).toBe('common.required');
+
+    await type(2, 'entered');
+    expect(saveButton().disabled).toBe(false);
+    expect(fields()[2]?.error).toBeUndefined();
+
+    await pressSave();
+
+    expect(saved[0]?.id).toBe('remote');
+    expect(saved[0]?.url).toBe('https://elsewhere.example/mcp');
+    expect(saved[0]?.auth).toEqual({ type: 'bearer', token: 'entered' });
+  });
+
+  it('restores the saved token when the URL returns to the saved endpoint', async () => {
+    await mount({
+      server: {
+        id: 'remote',
+        name: 'Remote',
+        url: 'https://remote.example/mcp',
+        auth: { type: 'bearer', token: 'secret' },
+        enabled: true,
+      },
+      onSave,
+    });
+
+    await type(1, 'https://elsewhere.example/mcp');
+    expect(fields()[2]?.defaultValue).toBe('');
+
+    await type(1, 'https://remote.example/mcp/');
+    expect(fields()[2]?.defaultValue).toBe('secret');
+    expect(fields()[2]?.error).toBeUndefined();
+    expect(saveButton().disabled).toBe(false);
+
+    await pressSave();
+
+    expect(saved[0]?.url).toBe('https://remote.example/mcp/');
+    expect(saved[0]?.auth).toEqual({ type: 'bearer', token: 'secret' });
+  });
+
+  it('keeps a token typed while adding a server', async () => {
+    await mount({ onSave });
+
+    await type(0, 'Remote');
+    await choose('bearer');
+    await type(2, 'secret');
+    await type(1, 'https://remote.example/mcp');
+
+    await pressSave();
+
+    expect(saved[0]?.url).toBe('https://remote.example/mcp');
+    expect(saved[0]?.auth).toEqual({ type: 'bearer', token: 'secret' });
   });
 
   it('counts a bearer token edit and clears it when the token is restored', async () => {

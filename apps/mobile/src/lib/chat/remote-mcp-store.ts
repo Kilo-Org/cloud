@@ -5,7 +5,7 @@ import { createSecureStorePreference } from '@/lib/hooks/secure-store-preference
 import { REMOTE_MCP_SERVERS_KEY } from '@/lib/storage-keys';
 
 import { clearRemoteMcpOAuth, forgetRemoteMcpOAuth } from './remote-mcp-oauth-store';
-import { normalizeRemoteMcpUrl } from './remote-mcp-url';
+import { normalizeRemoteMcpUrl, sameRemoteMcpEndpoint } from './remote-mcp-url';
 
 /**
  * The remote MCP servers the user added, and the one place they are written.
@@ -210,10 +210,39 @@ export function addRemoteMcpServer(draft: RemoteMcpServerDraft): StoredRemoteMcp
 }
 
 /**
+ * The auth an edit leaves behind.
+ *
+ * A value saved for one endpoint is not a value for another. When the endpoint
+ * changes, the bearing value the edit carries forward — no auth field at all, or
+ * the saved auth echoed back — is dropped and the server stays `bearer` with no
+ * value, so the new endpoint's value must be entered for it. This is the rule
+ * the OAuth state already follows. A patch that names a different value, or
+ * another method, is the patch's to set.
+ */
+function authAfterEdit(
+  existing: StoredRemoteMcpServer,
+  url: string,
+  patch: RemoteMcpAuth | undefined
+): RemoteMcpAuth {
+  if (sameRemoteMcpEndpoint(existing.url, url)) {
+    return patch ?? existing.auth;
+  }
+  const savedToken = existing.auth.type === 'bearer' ? existing.auth.token : undefined;
+  if (patch === undefined) {
+    return existing.auth.type === 'bearer' ? { type: 'bearer' } : existing.auth;
+  }
+  if (patch.type === 'bearer' && savedToken !== undefined && patch.token === savedToken) {
+    return { type: 'bearer' };
+  }
+  return patch;
+}
+
+/**
  * Replaces one server in place, keeping its id and its position in the list.
  * A rename does not change the id, so the tool names the model already read
- * stay the same. A URL another server already uses is refused. A new URL, or
- * a server that no longer signs in with OAuth, drops its OAuth tokens.
+ * stay the same. A URL another server already uses is refused. A new endpoint,
+ * or a server that no longer signs in with OAuth, drops its OAuth tokens, and
+ * a new endpoint also drops the saved bearer value.
  */
 export function updateRemoteMcpServer(
   id: string,
@@ -232,11 +261,11 @@ export function updateRemoteMcpServer(
     id,
     name: patch.name ?? existing.name,
     url,
-    auth: patch.auth ?? existing.auth,
+    auth: authAfterEdit(existing, url, patch.auth),
     enabled: patch.enabled ?? existing.enabled,
   };
   store.set(current.map(server => (server.id === id ? updated : server)));
-  if (updated.url !== existing.url || updated.auth.type !== 'oauth') {
+  if (!sameRemoteMcpEndpoint(existing.url, url) || updated.auth.type !== 'oauth') {
     void forgetRemoteMcpOAuth(id);
   }
   return updated;

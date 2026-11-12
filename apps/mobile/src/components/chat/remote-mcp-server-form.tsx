@@ -11,6 +11,7 @@ import {
   type RemoteMcpServerDraft,
   type StoredRemoteMcpServer,
 } from '@/lib/chat/remote-mcp-store';
+import { sameRemoteMcpEndpoint } from '@/lib/chat/remote-mcp-url';
 
 import { mcpServerFormError, type McpServerFormErrors } from './mcp-settings-state';
 
@@ -89,6 +90,21 @@ export function RemoteMcpServerForm({
   const name = useRef(initialName);
   const url = useRef(initialUrl);
   const token = useRef(initialToken);
+  /**
+   * The token field's mount key. A value saved for one endpoint is not a value
+   * for another, so the field is mounted again whenever the URL names a
+   * different endpoint: empty for the new one, and the saved value again when
+   * the URL returns to the saved endpoint. The field is uncontrolled, so the
+   * key is what makes the new default take effect.
+   */
+  const [tokenFieldKey, setTokenFieldKey] = useState(0);
+  const tokenDefault = useRef(initialToken);
+  /**
+   * Whether the token field was cleared because the URL left the saved
+   * endpoint. The field then shows why it is empty, rather than leaving a greyed
+   * Save with no reason; typing a value answers it.
+   */
+  const [tokenRetargeted, setTokenRetargeted] = useState(false);
   const [method, setMethod] = useState<AuthMethod>(initialMethod);
   const fieldsWith = useCallback(
     (changed: Partial<DraftFields>): DraftFields => ({
@@ -120,6 +136,30 @@ export function RemoteMcpServerForm({
       );
     },
     [fieldsWith, server, onDirtyChange, initialName, initialUrl, initialMethod, initialToken]
+  );
+
+  /**
+   * Points the token field at the endpoint the URL text now names. While the URL
+   * still names the saved endpoint the saved value stands; any other endpoint
+   * starts with an empty field, and the required-token rule holds Save until a
+   * value is entered for it. Returning the URL to the saved endpoint restores
+   * the saved value, so an abandoned retarget leaves nothing to retype.
+   */
+  const retargetToken = useCallback(
+    (nextUrl: string) => {
+      if (server === undefined) {
+        return;
+      }
+      const next = sameRemoteMcpEndpoint(initialUrl, nextUrl) ? initialToken : '';
+      if (next === token.current) {
+        return;
+      }
+      token.current = next;
+      tokenDefault.current = next;
+      setTokenRetargeted(next === '' && initialToken !== '');
+      setTokenFieldKey(key => key + 1);
+    },
+    [server, initialUrl, initialToken]
   );
 
   const validateName = useCallback(
@@ -178,6 +218,7 @@ export function RemoteMcpServerForm({
         returnKeyType="next"
         onChangeText={value => {
           url.current = value;
+          retargetToken(value);
           refresh();
         }}
         validate={validateUrl}
@@ -202,13 +243,18 @@ export function RemoteMcpServerForm({
       </View>
       {method === 'bearer' ? (
         <FormField
+          key={tokenFieldKey}
           label={t('modelChat.mcpOAuth.fieldToken')}
-          defaultValue={initialToken}
+          defaultValue={tokenDefault.current}
+          error={tokenRetargeted && errors?.token !== undefined ? t(errors.token) : undefined}
           autoCapitalize="none"
           autoCorrect={false}
           secureTextEntry
           onChangeText={value => {
             token.current = value;
+            if (value.trim() !== '') {
+              setTokenRetargeted(false);
+            }
             refresh();
           }}
           validate={validateToken}

@@ -46,3 +46,19 @@ export function normalizeRemoteMcpUrl(raw: string): string {
 
   return `${endpoint.replaceAll(/\/+$/g, '')}${query}`;
 }
+
+/**
+ * Whether two spellings name one remote MCP endpoint.
+ *
+ * A credential belongs to an endpoint, so every place that decides "the same
+ * server" — an edit, the OAuth state, the saved bearer value, the edit form —
+ * compares the normalized form. A value that cannot be normalized is compared
+ * as written, so it matches only itself.
+ */
+export function sameRemoteMcpEndpoint(saved: string, url: string): boolean {
+  try {
+    return normalizeRemoteMcpUrl(saved) === normalizeRemoteMcpUrl(url);
+  } catch {
+    return saved === url;
+  }
+}

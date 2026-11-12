@@ -9,11 +9,15 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { InviteMemberSheet } from './invite-member-sheet';
 import { LowBalanceAlertSheet } from './low-balance-alert-sheet';
 import { MemberLimitSheet } from './member-limit-sheet';
+import {
+  type OrganizationBoundaryFixture,
+  resetOrganizationBoundary,
+} from './member-limit-sheet.mounted.test-helpers';
 
-const boundary = vi.hoisted(() => ({
-  organizationId: 'org-1' as string | null,
+const boundary = vi.hoisted((): OrganizationBoundaryFixture => ({
+  organizationId: null,
   role: 'owner',
-  org: null as { organizationId: string } | null,
+  org: null,
   isResolving: false,
 }));
 const query = vi.hoisted(() => ({
@@ -115,10 +119,7 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 }));
 
 beforeEach(() => {
-  boundary.organizationId = 'org-1';
-  boundary.org = { organizationId: 'org-1' };
-  boundary.role = 'owner';
-  boundary.isResolving = false;
+  resetOrganizationBoundary(boundary);
   query.data = undefined;
   query.isLoading = false;
   query.isPending = false;

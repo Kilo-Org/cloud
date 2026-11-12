@@ -49,6 +49,7 @@ describe('browserLandingPath', () => {
       '/organizations/*/security-agent/findings': '/organizations/o1/security-agent/findings',
       '/organizations/*/code-reviews': '/organizations/o1/code-reviews',
       '/organizations/*/code-reviews/*': '/organizations/o1/code-reviews/r2',
+      '/s/*': '/s/abc',
     };
 
     for (const [pattern, concrete] of Object.entries(wildcardInstantiations)) {

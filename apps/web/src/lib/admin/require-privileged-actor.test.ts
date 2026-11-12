@@ -8,7 +8,11 @@ import { eq } from 'drizzle-orm';
 import { kilocode_users, passkey_credentials, session_step_up_proofs } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
-import { hashWebSessionId, revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
+import {
+  hashWebSessionId,
+  revokeStepUpProofs,
+  stepUpBindingHash,
+} from '@kilocode/web-shared/lib/admin/step-up-store';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createBearerCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import { assertPrivilegedPermission, requirePrivilegedActor } from './require-privileged-actor';
@@ -40,9 +44,16 @@ async function insertProof(
     verifiedAt?: Date;
     expiresAt?: Date;
     revokedAt?: Date | null;
+    operation?: {
+      actionClass: 'sensitive_write' | 'support_write';
+      id: string;
+      targetKind: 'user' | 'organization';
+      targetId: string | null;
+    };
   } = {}
 ) {
   const verifiedAt = params.verifiedAt ?? new Date();
+  const operation = params.operation;
   const [proof] = await db
     .insert(session_step_up_proofs)
     .values({
@@ -50,7 +61,16 @@ async function insertProof(
       session_id_hash: hashWebSessionId(params.sessionId ?? webSessionId),
       method: 'webauthn_uv',
       passkey_credential_id: credentialUuid,
-      purpose: 'session',
+      purpose: operation ? 'operation' : 'session',
+      action_class: operation?.actionClass ?? null,
+      target_identifier: operation?.id ?? null,
+      action_binding_hash: operation
+        ? stepUpBindingHash(operation.actionClass, {
+            id: operation.id,
+            targetKind: operation.targetKind,
+            targetId: operation.targetId,
+          })
+        : null,
       verified_at: verifiedAt.toISOString(),
       expires_at: (params.expiresAt ?? new Date(verifiedAt.getTime() + 15 * 60_000)).toISOString(),
       revoked_at: params.revokedAt ? params.revokedAt.toISOString() : null,
@@ -269,9 +289,16 @@ describe('requirePrivilegedActor', () => {
       expect(cause?.code).toBe('STEP_UP_UNAVAILABLE');
     });
 
-    it('uses the same uniform freshness for a sensitive write', async () => {
+    it('accepts one operation proof for a sensitive write and spends it', async () => {
       const { user, credential } = await setup();
-      await insertProof(user.id, credential.id);
+      await insertProof(user.id, credential.id, {
+        operation: {
+          actionClass: 'sensitive_write',
+          id: 'trpc.admin.users',
+          targetKind: 'user',
+          targetId: 'target-user',
+        },
+      });
 
       const actor = await requirePrivilegedActor(
         {
@@ -284,6 +311,44 @@ describe('requirePrivilegedActor', () => {
       );
 
       expect(actor.assurance.stepUp.status).toBe('fresh');
+
+      const cause = await refusal(
+        requirePrivilegedActor(
+          {
+            permission: 'admin',
+            actionClass: 'sensitive_write',
+            inventoryId: 'trpc.admin.users',
+            target: { kind: 'user', id: 'target-user' },
+          },
+          contextFor(user)
+        )
+      );
+      expect(cause?.code).toBe('MFA_REQUIRED');
+      expect(cause?.operation).toEqual({
+        id: 'trpc.admin.users',
+        targetKind: 'user',
+        targetId: 'target-user',
+      });
+    });
+
+    it('refuses a session proof for a sensitive write', async () => {
+      const { user, credential } = await setup();
+      await insertProof(user.id, credential.id);
+
+      const cause = await refusal(
+        requirePrivilegedActor(
+          {
+            permission: 'admin',
+            actionClass: 'sensitive_write',
+            inventoryId: 'trpc.admin.users',
+            target: { kind: 'user', id: 'target-user' },
+          },
+          contextFor(user)
+        )
+      );
+
+      expect(cause?.code).toBe('MFA_REQUIRED');
+      expect(cause?.operation?.id).toBe('trpc.admin.users');
     });
 
     it('reuses the state measured by the admin middleware', async () => {

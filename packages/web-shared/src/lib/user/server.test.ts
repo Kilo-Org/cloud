@@ -1628,7 +1628,16 @@ describe('binary step-up enforcement (REST)', () => {
     const result = await getUserFromAuth({ adminOnly: true });
 
     expect((result.authFailedResponse as Response).status).toBe(403);
-    expect(await errorCode(result)).toEqual({ success: false, error: code });
+    expect(await errorCode(result)).toEqual({
+      success: false,
+      error: code,
+      stepUp: expect.objectContaining({
+        code,
+        actionClass: 'platform_write',
+        purpose: 'session',
+        maxAgeSeconds: 1800,
+      }),
+    });
   });
 
   it('denies a bearer credential with BEARER_NOT_ALLOWED when on', async () => {
@@ -1650,7 +1659,11 @@ describe('binary step-up enforcement (REST)', () => {
 
     expect(evaluateStepUp).not.toHaveBeenCalled();
     expect((result.authFailedResponse as Response).status).toBe(403);
-    expect(await errorCode(result)).toEqual({ success: false, error: 'BEARER_NOT_ALLOWED' });
+    expect(await errorCode(result)).toEqual({
+      success: false,
+      error: 'BEARER_NOT_ALLOWED',
+      stepUp: expect.objectContaining({ code: 'BEARER_NOT_ALLOWED' }),
+    });
   });
 
   it('fails closed with STEP_UP_UNAVAILABLE when evaluation errors', async () => {
@@ -1661,7 +1674,11 @@ describe('binary step-up enforcement (REST)', () => {
     const result = await getUserFromAuth({ adminOnly: true });
 
     expect((result.authFailedResponse as Response).status).toBe(403);
-    expect(await errorCode(result)).toEqual({ success: false, error: 'STEP_UP_UNAVAILABLE' });
+    expect(await errorCode(result)).toEqual({
+      success: false,
+      error: 'STEP_UP_UNAVAILABLE',
+      stepUp: expect.objectContaining({ code: 'STEP_UP_UNAVAILABLE' }),
+    });
   });
 
   it('skips enforcement only for the layout escape hatch', async () => {

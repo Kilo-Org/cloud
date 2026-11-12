@@ -389,13 +389,14 @@ const adminStepUpEnforcementMiddleware = t.middleware(async ({ ctx, path, type, 
       tokenSource: ctx.tokenSource ?? null,
       internalApiUse: ctx.internalApiUse,
     });
-  const { actionClass } = actionClassForAdminProcedure(path, type);
+  const { actionClass, inventoryId } = actionClassForAdminProcedure(path, type);
 
   const adminStepUpState = await runStepUpGuard({
     userId: ctx.user.id,
     credential,
     webSessionId: ctx.webSessionId,
     actionClass,
+    inventoryId,
     enabled,
     route: path,
     method: type,

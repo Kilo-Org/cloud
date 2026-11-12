@@ -60,6 +60,13 @@ export const TrpcErrorDataSchema = z
         actionClass: z.string(),
         purpose: z.string(),
         maxAgeSeconds: z.number(),
+        operation: z
+          .object({
+            id: z.string(),
+            targetKind: z.string(),
+            targetId: z.string().nullable(),
+          })
+          .optional(),
       })
       .optional(),
   })
@@ -129,15 +136,7 @@ export const trpcErrorFormatter = (({ shape, error }) => {
           : null,
       upstreamCode: error.cause instanceof UpstreamApiError ? error.cause.upstreamCode : undefined,
       authRequired: error.cause instanceof AuthContextError ? true : undefined,
-      stepUp:
-        error.cause instanceof StepUpRequiredError
-          ? {
-              code: error.cause.code,
-              actionClass: error.cause.actionClass,
-              purpose: error.cause.purpose,
-              maxAgeSeconds: error.cause.maxAgeSeconds,
-            }
-          : undefined,
+      stepUp: error.cause instanceof StepUpRequiredError ? error.cause.toPayload() : undefined,
       ...(billingFailure ? { billingFailure } : {}),
       ...(supportAccessReason ? { supportAccessReason } : {}),
     },

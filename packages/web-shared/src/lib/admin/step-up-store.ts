@@ -11,6 +11,7 @@ import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type {
   AdminStepUpState,
   PrivilegedActionClass,
+  StepUpOperation,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import {
   STEP_UP_RETENTION_AFTER_EXPIRY_MS,
@@ -30,6 +31,8 @@ export type StepUpEvaluationParams = {
   userId: string;
   webSessionId?: string | null;
   actionClass: PrivilegedActionClass;
+  /** Required when the class has the per-operation policy. */
+  operation?: StepUpOperation;
   now?: Date;
 };
 
@@ -43,6 +46,22 @@ export function hashWebSessionId(webSessionId: string): string {
   return createHash('sha256').update(webSessionId).digest('hex');
 }
 
+/**
+ * The composite lookup key of a per-operation proof. The action class, the
+ * operation identity and the target are hashed together, so a proof minted for
+ * one operation matches no other operation even when both share a class.
+ */
+export function stepUpBindingHash(
+  actionClass: PrivilegedActionClass,
+  operation: StepUpOperation
+): string {
+  return createHash('sha256')
+    .update(
+      [actionClass, operation.id, operation.targetKind, operation.targetId ?? ''].join('\u0000')
+    )
+    .digest('hex');
+}
+
 async function countPasskeys(userId: string, fromDb: typeof db): Promise<number> {
   const [row] = await fromDb
     .select({ count: sql<number>`count(*)::int` })
@@ -51,7 +70,14 @@ async function countPasskeys(userId: string, fromDb: typeof db): Promise<number>
   return row?.count ?? 0;
 }
 
-/** Read the live proof state for one browser session and action class. */
+/**
+ * Read the live proof state for one browser session and action class.
+ *
+ * A session class reads the reusable session proof. An operation class reads
+ * the proof bound to exactly this operation and target, and claims it in the
+ * same statement that reads it: `consumed_at` is set only when it is still
+ * null, so one proof authorizes one request and a concurrent caller loses.
+ */
 export async function evaluateStepUp(
   params: StepUpEvaluationParams,
   fromDb: typeof db = db
@@ -66,25 +92,61 @@ export async function evaluateStepUp(
   const policy = stepUpPolicyFor(params.actionClass);
   const passkeyCount = await countPasskeys(params.userId, fromDb);
 
+  const bindingHash =
+    policy.purpose === 'operation'
+      ? stepUpBindingHash(params.actionClass, requireOperation(params))
+      : null;
+
   const proofFilters = [
     eq(session_step_up_proofs.kilo_user_id, params.userId),
     eq(session_step_up_proofs.session_id_hash, sessionIdHash),
     eq(session_step_up_proofs.purpose, policy.purpose),
     isNull(session_step_up_proofs.revoked_at),
-    isNull(session_step_up_proofs.consumed_at),
     gt(session_step_up_proofs.expires_at, nowIso),
     gte(
       session_step_up_proofs.verified_at,
       new Date(now.getTime() - policy.maxAgeMs).toISOString()
     ),
+    ...(bindingHash ? [eq(session_step_up_proofs.action_binding_hash, bindingHash)] : []),
   ];
 
-  const [liveProof] = await fromDb
-    .select()
-    .from(session_step_up_proofs)
-    .where(and(...proofFilters))
-    .orderBy(desc(session_step_up_proofs.verified_at))
-    .limit(1);
+  // One operation proof authorizes one request: claim the newest live proof for
+  // this binding by setting `consumed_at` in the same statement, and let
+  // PostgreSQL pick the single row. A concurrent caller either wins another
+  // live proof of the same binding or finds none.
+  const claimOneOfBinding = sql`${session_step_up_proofs.id} IN (
+    SELECT "id" FROM "session_step_up_proofs"
+    WHERE "kilo_user_id" = ${params.userId}
+      AND "session_id_hash" = ${sessionIdHash}
+      AND "purpose" = ${policy.purpose}
+      AND "action_binding_hash" = ${bindingHash}
+      AND "revoked_at" IS NULL
+      AND "consumed_at" IS NULL
+      AND "expires_at" > ${nowIso}
+      AND "verified_at" >= ${new Date(now.getTime() - policy.maxAgeMs).toISOString()}
+    ORDER BY "verified_at" DESC
+    LIMIT 1
+  )`;
+
+  const liveProof =
+    bindingHash === null
+      ? (
+          await fromDb
+            .select()
+            .from(session_step_up_proofs)
+            .where(and(...proofFilters, isNull(session_step_up_proofs.consumed_at)))
+            .orderBy(desc(session_step_up_proofs.verified_at))
+            .limit(1)
+        )[0]
+      : (
+          await fromDb
+            .update(session_step_up_proofs)
+            .set({ consumed_at: nowIso })
+            .where(
+              and(...proofFilters, isNull(session_step_up_proofs.consumed_at), claimOneOfBinding)
+            )
+            .returning()
+        )[0];
 
   if (liveProof) {
     return {
@@ -103,19 +165,23 @@ export async function evaluateStepUp(
     .select({
       verified_at: session_step_up_proofs.verified_at,
       revoked_at: session_step_up_proofs.revoked_at,
+      consumed_at: session_step_up_proofs.consumed_at,
     })
     .from(session_step_up_proofs)
     .where(
       and(
         eq(session_step_up_proofs.kilo_user_id, params.userId),
         eq(session_step_up_proofs.session_id_hash, sessionIdHash),
-        eq(session_step_up_proofs.purpose, policy.purpose)
+        eq(session_step_up_proofs.purpose, policy.purpose),
+        ...(bindingHash ? [eq(session_step_up_proofs.action_binding_hash, bindingHash)] : [])
       )
     )
     .orderBy(desc(session_step_up_proofs.verified_at))
     .limit(1);
 
-  if (latestProof) {
+  // A proof already spent on its operation cannot explain a refusal as
+  // staleness, so it reports the same state as a missing one.
+  if (latestProof && !latestProof.consumed_at) {
     return {
       state: latestProof.revoked_at
         ? {
@@ -136,6 +202,13 @@ export async function evaluateStepUp(
     proof: null,
     passkeyCount,
   };
+}
+
+function requireOperation(params: StepUpEvaluationParams): StepUpOperation {
+  if (!params.operation) {
+    throw new Error('step-up operation binding required');
+  }
+  return params.operation;
 }
 
 /**

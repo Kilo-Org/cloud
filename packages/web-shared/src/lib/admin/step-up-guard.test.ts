@@ -123,4 +123,77 @@ describe('runStepUpGuard', () => {
       expect.any(Error)
     );
   });
+
+  it('binds an operation class to the inventory operation and tells the client', async () => {
+    mockEvaluateStepUp.mockResolvedValue({
+      state: { status: 'required' },
+      proof: null,
+      passkeyCount: 1,
+    });
+
+    const cause = await refusal(
+      runStepUpGuard(
+        params({
+          actionClass: 'sensitive_write',
+          route: 'admin.users.delete',
+          method: 'mutation',
+        })
+      )
+    );
+
+    expect(cause?.purpose).toBe('operation');
+    expect(cause?.operation).toEqual({
+      id: 'trpc.admin.users',
+      targetKind: 'user',
+      targetId: null,
+    });
+    expect(mockEvaluateStepUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionClass: 'sensitive_write',
+        operation: { id: 'trpc.admin.users', targetKind: 'user', targetId: null },
+      })
+    );
+  });
+
+  it('keeps a concrete target the caller knows in the binding', async () => {
+    mockEvaluateStepUp.mockResolvedValue({
+      state: freshState(),
+      proof: null,
+      passkeyCount: 1,
+    });
+
+    await runStepUpGuard(
+      params({
+        actionClass: 'support_write',
+        inventoryId: 'trpc.admin.supportAccess',
+        target: { kind: 'organization', id: 'organization-1' },
+      })
+    );
+
+    expect(mockEvaluateStepUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: {
+          id: 'trpc.admin.supportAccess',
+          targetKind: 'organization',
+          targetId: 'organization-1',
+        },
+      })
+    );
+  });
+
+  it('carries no operation for a session class', async () => {
+    mockEvaluateStepUp.mockResolvedValue({
+      state: { status: 'required' },
+      proof: null,
+      passkeyCount: 1,
+    });
+
+    const cause = await refusal(runStepUpGuard(params({ actionClass: 'support_read' })));
+
+    expect(cause?.purpose).toBe('session');
+    expect(cause?.operation).toBeNull();
+    expect(mockEvaluateStepUp).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: undefined })
+    );
+  });
 });

@@ -31,6 +31,7 @@ import {
 } from '@kilocode/worker-utils/account-access';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
+import type { StepUpRequirementPayload } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { isAdminStepUpEnabled, NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import jwt from 'jsonwebtoken';
 import {
@@ -175,10 +176,18 @@ export type RequiredPermissions = {
   skipStepUpGuard?: boolean;
 };
 
+/**
+ * REST body of an auth refusal. A step-up refusal adds the requirement the
+ * browser needs to mint the right proof; every other refusal keeps `{ error }`.
+ */
+export type AuthRefusalBody = FailureResult<string> & {
+  stepUp?: StepUpRequirementPayload;
+};
+
 type GetAuthResponse =
   | {
       user: null;
-      authFailedResponse: NextResponse<FailureResult<string>>;
+      authFailedResponse: NextResponse<AuthRefusalBody>;
       /**
        * True when the request presented a credential that failed verification,
        * rather than presenting none. Such a request must not be downgraded to
@@ -280,6 +289,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
           credential,
           webSessionId: result.webSessionId,
           actionClass,
+          inventoryId,
           enabled: true,
           route,
           method,
@@ -309,7 +319,9 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
         };
         if (error instanceof TRPCError && error.cause instanceof StepUpRequiredError) {
           emitOutcome('denied');
-          return authError(403, error.cause.code, result.user.id);
+          return authError(403, error.cause.code, result.user.id, {
+            stepUp: error.cause.toPayload(),
+          });
         }
         // Fail closed. The guard normally converts evaluation failures itself;
         // this covers anything unexpected around it.
@@ -649,12 +661,16 @@ function authError(
     internalApiUse?: boolean;
     tokenSource?: string;
     cloudAgentAuthority?: CloudAgentAuthority;
+    stepUp?: StepUpRequirementPayload;
   }
 ) {
   console.warn(`AUTH-FAIL ${status} (${kiloUserId}): ${error}`);
   return {
     user: null,
-    authFailedResponse: NextResponse.json(failureResult(error), { status }),
+    authFailedResponse: NextResponse.json<AuthRefusalBody>(
+      { ...failureResult(error), ...(options?.stepUp ? { stepUp: options.stepUp } : {}) },
+      { status }
+    ),
     credentialsRejected: options?.credentialsRejected ?? false,
     authorizationRefused: options?.authorizationRefused ?? false,
     internalApiUse: options?.internalApiUse,

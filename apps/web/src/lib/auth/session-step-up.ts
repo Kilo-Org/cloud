@@ -14,12 +14,16 @@ import {
   passkey_credentials,
   session_step_up_challenges,
   session_step_up_proofs,
+  type SessionStepUpActionClass,
   type SessionStepUpProof,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import type { PrivilegedActionClass } from '@kilocode/web-shared/lib/admin/privileged-access';
+import type {
+  PrivilegedActionClass,
+  StepUpOperation,
+} from '@kilocode/web-shared/lib/admin/privileged-access';
 import type { User } from '@kilocode/db/schema';
-import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
+import { hashWebSessionId, stepUpBindingHash } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import {
   STEP_UP_CHALLENGE_TTL_MS,
@@ -60,20 +64,42 @@ export type StepUpOptionsResult = {
 type ChallengePurpose = StepUpProofPurpose;
 
 /**
+ * The binding an operation proof carries. A session class has none; an
+ * operation class must have exactly one, and the challenge stores its hash so
+ * the verification cannot be replayed for another operation.
+ */
+function resolveBinding(
+  actionClass: PrivilegedActionClass,
+  operation: StepUpOperation | undefined
+): { bindingHash: string | null; actionClass: SessionStepUpActionClass | null } {
+  const policy = stepUpPolicyFor(actionClass);
+  if (policy.purpose === 'session') {
+    if (operation) throw new Error('a session step-up does not take an operation binding');
+    return { bindingHash: null, actionClass: null };
+  }
+  if (!operation) throw new Error('an operation step-up requires an operation binding');
+  return { bindingHash: stepUpBindingHash(actionClass, operation), actionClass };
+}
+
+/**
  * Mint UV-required authentication options for the actor's own passkeys and
  * store the challenge bound to this browser session. The challenge is the only
- * authority to mint a proof; the client never supplies it.
+ * authority to mint a proof; the client never supplies it. For an operation
+ * class the challenge also carries the action class and the binding hash of the
+ * operation it authorizes.
  */
 export async function createStepUpOptions(params: {
   userId: string;
   webSessionId: string | null | undefined;
   actionClass: PrivilegedActionClass;
+  operation?: StepUpOperation;
 }): Promise<StepUpOptionsResult> {
   if (!params.webSessionId) {
     throw new StepUpVerificationError('SESSION_UNBOUND');
   }
 
   const policy = stepUpPolicyFor(params.actionClass);
+  const binding = resolveBinding(params.actionClass, params.operation);
   const { rpId } = getWebRelyingParty();
 
   const credentials = await db
@@ -104,7 +130,8 @@ export async function createStepUpOptions(params: {
     kilo_user_id: params.userId,
     session_id_hash: hashWebSessionId(params.webSessionId),
     purpose: policy.purpose,
-    action_binding_hash: null,
+    action_class: binding.actionClass,
+    action_binding_hash: binding.bindingHash,
     expires_at: new Date(Date.now() + STEP_UP_CHALLENGE_TTL_MS).toISOString(),
   });
 
@@ -114,15 +141,25 @@ export async function createStepUpOptions(params: {
 /**
  * Consume the challenge atomically. Exactly one caller can win the
  * `UPDATE ... WHERE consumed_at IS NULL AND expires_at > NOW()`; a challenge
- * minted for another session or user matches no row and is reported as
- * expired so it cannot be used as an oracle.
+ * minted for another session, user or operation binding matches no row and is
+ * reported as expired so it cannot be used as an oracle.
  */
 async function consumeChallenge(params: {
   challengeId: string;
   userId: string;
   sessionIdHash: string;
   purpose: ChallengePurpose;
+  actionClass: SessionStepUpActionClass | null;
+  bindingHash: string | null;
 }): Promise<{ challenge: string }> {
+  const bindingFilters = [
+    params.actionClass
+      ? eq(session_step_up_challenges.action_class, params.actionClass)
+      : isNull(session_step_up_challenges.action_class),
+    params.bindingHash
+      ? eq(session_step_up_challenges.action_binding_hash, params.bindingHash)
+      : isNull(session_step_up_challenges.action_binding_hash),
+  ];
   const [consumed] = await db
     .update(session_step_up_challenges)
     .set({ consumed_at: sql`NOW()` })
@@ -132,6 +169,7 @@ async function consumeChallenge(params: {
         eq(session_step_up_challenges.kilo_user_id, params.userId),
         eq(session_step_up_challenges.session_id_hash, params.sessionIdHash),
         eq(session_step_up_challenges.purpose, params.purpose),
+        ...bindingFilters,
         isNull(session_step_up_challenges.consumed_at),
         sql`${session_step_up_challenges.expires_at} > NOW()`
       )
@@ -152,7 +190,8 @@ async function consumeChallenge(params: {
         eq(session_step_up_challenges.id, params.challengeId),
         eq(session_step_up_challenges.kilo_user_id, params.userId),
         eq(session_step_up_challenges.session_id_hash, params.sessionIdHash),
-        eq(session_step_up_challenges.purpose, params.purpose)
+        eq(session_step_up_challenges.purpose, params.purpose),
+        ...bindingFilters
       )
     )
     .limit(1);
@@ -206,6 +245,7 @@ export async function verifyStepUp(params: {
   challengeId: string;
   response: AuthenticationResponseJSON;
   actionClass: PrivilegedActionClass;
+  operation?: StepUpOperation;
 }): Promise<SessionStepUpProof> {
   if (!params.webSessionId) {
     throw new StepUpVerificationError('SESSION_UNBOUND');
@@ -217,6 +257,7 @@ export async function verifyStepUp(params: {
   }
 
   const policy = stepUpPolicyFor(params.actionClass);
+  const binding = resolveBinding(params.actionClass, params.operation);
   const sessionIdHash = hashWebSessionId(params.webSessionId);
   const { rpId, expectedOrigin } = getWebRelyingParty();
 
@@ -225,6 +266,8 @@ export async function verifyStepUp(params: {
     userId: params.userId,
     sessionIdHash,
     purpose: policy.purpose,
+    actionClass: binding.actionClass,
+    bindingHash: binding.bindingHash,
   });
 
   const presentedChallenge = readPresentedChallenge(params.response);
@@ -311,7 +354,9 @@ export async function verifyStepUp(params: {
         method: 'webauthn_uv',
         passkey_credential_id: credential.id,
         purpose: policy.purpose,
-        action_binding_hash: null,
+        action_class: binding.actionClass,
+        target_identifier: params.operation?.id ?? null,
+        action_binding_hash: binding.bindingHash,
         verified_at: verifiedAt.toISOString(),
         expires_at: expiresAt.toISOString(),
       })
@@ -330,6 +375,8 @@ export async function verifyStepUp(params: {
       kiloUserId: params.userId,
       method: 'webauthn_uv',
       purpose: policy.purpose,
+      actionClass: binding.actionClass,
+      operationId: params.operation?.id ?? null,
       expiresAt: expiresAt.toISOString(),
     })
   );
@@ -354,7 +401,11 @@ export async function verifyStepUp(params: {
         action: 'admin.step_up.verified',
         target: { type: 'user', id: params.userId },
         message: 'Verified MFA for a privileged session',
-        metadata: { purpose: policy.purpose },
+        metadata: {
+          purpose: policy.purpose,
+          ...(binding.actionClass ? { actionClass: binding.actionClass } : {}),
+          ...(params.operation ? { operationId: params.operation.id } : {}),
+        },
       }
     );
   } catch (error) {

@@ -79,6 +79,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
           route: ctx.trpcPath ?? null,
           method: ctx.trpcType ?? null,
           surface: 'trpc',
+          stepUp: ctx.adminStepUpState,
         });
       }
       const grant = await requestSupportGrant({
@@ -124,6 +125,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
           route: ctx.trpcPath ?? null,
           method: ctx.trpcType ?? null,
           surface: 'trpc',
+          stepUp: ctx.adminStepUpState,
         });
       }
       const grant = await approveSupportGrant({
@@ -214,6 +216,7 @@ export const adminSupportAccessRouter = createTRPCRouter({
         route: ctx.trpcPath ?? null,
         method: ctx.trpcType ?? null,
         surface: 'trpc',
+        stepUp: ctx.adminStepUpState,
       });
       const grant = await emergencyIssueSupportGrant({
         superadminKiloUserId: ctx.user.id,

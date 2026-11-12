@@ -10,7 +10,7 @@ import {
   support_access_grant_events,
   support_access_grants,
 } from '@kilocode/db/schema';
-import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
+import { hashWebSessionId, stepUpBindingHash } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -153,6 +153,9 @@ describe('admin.supportAccess request', () => {
     expect(grant.issuedAt).toBeNull();
     expect(grant.approvedByKiloUserId).toBeNull();
 
+    // The write request spent its operation proof, so the next write on this
+    // session needs a new one.
+    await grantOperationStepUp(requester.id);
     await expect(caller.admin.supportAccess.approve({ grantId: grant.id })).rejects.toMatchObject({
       code: 'BAD_REQUEST',
     });
@@ -233,6 +236,9 @@ describe('admin.supportAccess request', () => {
     const requester = await insertRequester();
     const { organization } = await orgWithOwner();
     const caller = await stepUpCaller(requester.id);
+    // Both concurrent requests must clear the guard, so the conflict is the
+    // business rule and not a spent proof.
+    await grantOperationStepUp(requester.id);
 
     const results = await Promise.allSettled([
       caller.admin.supportAccess.request({
@@ -311,6 +317,7 @@ describe('admin.supportAccess emergency issue and review', () => {
     const lifetime = new Date(grant.expiresAt!).getTime() - new Date(grant.issuedAt!).getTime();
     expect(lifetime).toBeLessThanOrEqual(15 * 60 * 1000);
 
+    await grantOperationStepUp(superadmin.id);
     await expect(caller.admin.supportAccess.review({ grantId: grant.id })).rejects.toMatchObject({
       code: 'BAD_REQUEST',
     });
@@ -409,7 +416,13 @@ afterAll(() => {
 
 const supportStepUpSessionId = 'support-access-step-up-test';
 
-async function grantFreshStepUp(userId: string) {
+const SUPPORT_WRITE_OPERATION = {
+  id: 'trpc.admin.supportAccess',
+  targetKind: 'organization' as const,
+  targetId: null,
+};
+
+async function insertStepUpCredential(userId: string) {
   const [credential] = await db
     .insert(passkey_credentials)
     .values({
@@ -418,15 +431,58 @@ async function grantFreshStepUp(userId: string) {
       public_key: 'unused-public-key',
     })
     .returning();
+  return credential!;
+}
+
+/**
+ * One reusable session proof for the read-grade classes and one single-use
+ * operation proof for the support write class. Every support write mutation
+ * spends the operation proof, so a test that performs a second one grants again.
+ */
+async function grantFreshStepUp(userId: string) {
+  const credential = await insertStepUpCredential(userId);
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 15 * 60_000).toISOString();
+  await db.insert(session_step_up_proofs).values([
+    {
+      kilo_user_id: userId,
+      session_id_hash: hashWebSessionId(supportStepUpSessionId),
+      method: 'webauthn_uv',
+      passkey_credential_id: credential.id,
+      purpose: 'session',
+      verified_at: now.toISOString(),
+      expires_at: expiresAt,
+    },
+    {
+      kilo_user_id: userId,
+      session_id_hash: hashWebSessionId(supportStepUpSessionId),
+      method: 'webauthn_uv',
+      passkey_credential_id: credential.id,
+      purpose: 'operation',
+      action_class: 'support_write',
+      target_identifier: 'trpc.admin.supportAccess',
+      action_binding_hash: stepUpBindingHash('support_write', SUPPORT_WRITE_OPERATION),
+      verified_at: now.toISOString(),
+      expires_at: expiresAt,
+    },
+  ]);
+}
+
+/** Grant one more single-use operation proof for a support write mutation. */
+async function grantOperationStepUp(userId: string) {
+  const credential = await insertStepUpCredential(userId);
   const now = new Date();
   await db.insert(session_step_up_proofs).values({
     kilo_user_id: userId,
     session_id_hash: hashWebSessionId(supportStepUpSessionId),
     method: 'webauthn_uv',
-    passkey_credential_id: credential!.id,
-    purpose: 'session',
+    passkey_credential_id: credential.id,
+    purpose: 'operation',
+    action_class: 'support_write',
+    target_identifier: SUPPORT_WRITE_OPERATION.id,
+    action_binding_hash: stepUpBindingHash('support_write', SUPPORT_WRITE_OPERATION),
     verified_at: now.toISOString(),
-    expires_at: new Date(now.getTime() + 15 * 60_000).toISOString(),
+    expires_at: new Date(now.getTime() + 5 * 60_000).toISOString(),
   });
 }
 

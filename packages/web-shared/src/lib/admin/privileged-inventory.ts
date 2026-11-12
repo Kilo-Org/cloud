@@ -1,6 +1,8 @@
 import type {
   PrivilegedActionClass,
+  PrivilegedTarget,
   PrivilegedTargetKind,
+  StepUpOperation,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 
 export type PrivilegedSurface = 'rest' | 'trpc' | 'server-component' | 'worker';
@@ -931,17 +933,29 @@ export function actionClassForEntry(
 export function actionClassForAdminProcedure(
   path: string,
   type: string
-): { actionClass: PrivilegedActionClass; inventoryId: string | null } {
+): {
+  actionClass: PrivilegedActionClass;
+  inventoryId: string | null;
+  targetKind: PrivilegedTargetKind;
+} {
   const access: PrivilegedAccessKind = type === 'mutation' ? 'write' : 'read';
   const entry = findPrivilegedInventoryEntry({ surface: 'trpc', route: path, access });
-  return { actionClass: actionClassForEntry(entry, access), inventoryId: entry?.id ?? null };
+  return {
+    actionClass: actionClassForEntry(entry, access),
+    inventoryId: entry?.id ?? null,
+    targetKind: entry?.target ?? 'none',
+  };
 }
 
 export function actionClassForRoute(params: {
   surface: Exclude<PrivilegedSurface, 'trpc' | 'worker'>;
   route: string;
   method: string | null;
-}): { actionClass: PrivilegedActionClass; inventoryId: string | null } {
+}): {
+  actionClass: PrivilegedActionClass;
+  inventoryId: string | null;
+  targetKind: PrivilegedTargetKind;
+} {
   const access: PrivilegedAccessKind =
     params.method === 'GET' || params.method === 'HEAD' ? 'read' : 'write';
   const entry = findPrivilegedInventoryEntry({
@@ -949,5 +963,37 @@ export function actionClassForRoute(params: {
     route: params.route,
     access,
   });
-  return { actionClass: actionClassForEntry(entry, access), inventoryId: entry?.id ?? null };
+  return {
+    actionClass: actionClassForEntry(entry, access),
+    inventoryId: entry?.id ?? null,
+    targetKind: entry?.target ?? 'none',
+  };
+}
+
+/**
+ * The stable operation a per-operation step-up proof is bound to. `id` prefers
+ * the checked-in inventory id, so every request to the same guarded
+ * procedure or route resolves to the same operation; the fallback keeps the
+ * identity deterministic for a request the inventory does not cover. A caller
+ * that knows a concrete target id passes it in `target`; otherwise the
+ * inventory entry's target kind is used with no id.
+ */
+export function stepUpOperationFor(params: {
+  surface: PrivilegedSurface;
+  route: string | null;
+  method: string | null;
+  inventoryId?: string | null;
+  target?: PrivilegedTarget;
+}): StepUpOperation {
+  const entry = findPrivilegedInventoryEntry({
+    surface: params.surface,
+    route: params.route ?? '',
+    access: params.method === 'GET' || params.method === 'HEAD' ? 'read' : 'write',
+  });
+  const id =
+    params.inventoryId ??
+    entry?.id ??
+    `${params.surface}:${params.route ?? ''}:${params.method ?? ''}`;
+  const targetKind = params.target?.kind ?? entry?.target ?? 'none';
+  return { id, targetKind, targetId: params.target?.id ?? null };
 }

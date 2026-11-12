@@ -12,6 +12,7 @@ import {
 } from '@/lib/auth/session-step-up';
 import { getUserFromSessionForStepUp } from '@kilocode/web-shared/lib/user/server';
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
+import { stepUpIsOperationClass } from '@kilocode/web-shared/lib/admin/step-up-policy';
 
 /**
  * Firewall rate-limit rule ids, created in the Vercel project. Until a rule
@@ -21,13 +22,63 @@ import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-obse
 const STEP_UP_OPTIONS_RATE_LIMIT_ID = 'admin-step-up-options';
 const STEP_UP_VERIFY_RATE_LIMIT_ID = 'admin-step-up-verify';
 
+const actionClassSchema = z.enum([
+  'platform_read',
+  'platform_write',
+  'sensitive_write',
+  'support_read',
+  'support_write',
+  'worker_admin',
+]);
+
+const operationSchema = z.object({
+  /** Stable operation identity from the privileged inventory. */
+  id: z.string().min(1).max(200),
+  targetKind: z.enum(['organization', 'user', 'service', 'none']),
+  targetId: z.string().min(1).max(400).nullable(),
+});
+
+/**
+ * A session class verifies the browser session; an operation class verifies
+ * exactly one operation, so it must name the class and the binding and a
+ * session class must not carry one.
+ */
+const bindingShape = {
+  actionClass: actionClassSchema,
+  operation: operationSchema.optional(),
+};
+
+function requireMatchingBinding(
+  value: { actionClass: z.infer<typeof actionClassSchema>; operation?: unknown },
+  ctx: z.RefinementCtx
+): void {
+  const isOperation = stepUpIsOperationClass(value.actionClass);
+  if (isOperation && !value.operation) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['operation'],
+      message: 'An operation proof requires the operation it authorizes',
+    });
+  }
+  if (!isOperation && value.operation) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['operation'],
+      message: 'A session proof cannot be bound to an operation',
+    });
+  }
+}
+
 const requestSchema = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('options') }),
-  z.object({
-    action: z.literal('verify'),
-    challengeId: z.uuid(),
-    response: authenticationResponseSchema,
-  }),
+  z.object({ action: z.literal('options'), ...bindingShape }).superRefine(requireMatchingBinding),
+  z
+    .object({
+      action: z.literal('verify'),
+      challengeId: z.uuid(),
+      response: authenticationResponseSchema,
+      ...bindingShape,
+    })
+    .superRefine(requireMatchingBinding),
 ]);
 
 function rateLimitKey(action: 'options' | 'verify', userId: string): string {
@@ -98,7 +149,8 @@ export async function POST(request: NextRequest) {
       const { challengeId, options } = await createStepUpOptions({
         userId: user.id,
         webSessionId,
-        actionClass: 'platform_read',
+        actionClass: parsed.data.actionClass,
+        operation: parsed.data.operation,
       });
       return NextResponse.json({ challengeId, options });
     }
@@ -109,7 +161,8 @@ export async function POST(request: NextRequest) {
       webSessionPepper,
       challengeId: parsed.data.challengeId,
       response: parsed.data.response,
-      actionClass: 'platform_read',
+      actionClass: parsed.data.actionClass,
+      operation: parsed.data.operation,
     });
     return NextResponse.json({ verified: true, expiresAt: proof.expires_at });
   } catch (error) {

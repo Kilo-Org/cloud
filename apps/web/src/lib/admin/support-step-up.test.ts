@@ -21,7 +21,10 @@ const mockedEvaluate = (
 ).evaluateStepUp;
 const originalAdminStepUp = process.env.ADMIN_STEP_UP_ENABLED;
 
-function requireFresh(credential?: 'session' | 'human_bearer') {
+function requireFresh(
+  credential?: 'session' | 'human_bearer',
+  overrides: Partial<Parameters<typeof supportStepUpPort.requireFresh>[0]> = {}
+) {
   return supportStepUpPort.requireFresh({
     userId: 'user-1',
     action: 'support_write_request',
@@ -30,6 +33,7 @@ function requireFresh(credential?: 'session' | 'human_bearer') {
     route: 'admin.supportAccess.request',
     method: 'mutation',
     surface: 'trpc',
+    ...overrides,
   });
 }
 
@@ -79,5 +83,28 @@ describe('support step-up adapter', () => {
     delete process.env.ADMIN_STEP_UP_ENABLED;
     expect(await stepUpCode(requireFresh('session'))).toBe('MFA_REQUIRED');
     expect(mockedEvaluate).not.toHaveBeenCalled();
+  });
+
+  test('reuses the fresh verdict the request already measured', async () => {
+    const result = await requireFresh('session', {
+      stepUp: {
+        status: 'fresh',
+        method: 'webauthn_uv',
+        verifiedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+      },
+    });
+
+    expect(result).toBeUndefined();
+    expect(mockedEvaluate).not.toHaveBeenCalled();
+  });
+
+  test('does not reuse a stale verdict', async () => {
+    mockedEvaluate.mockResolvedValue({ state: { status: 'required' } } as never);
+
+    expect(await stepUpCode(requireFresh('session', { stepUp: { status: 'required' } }))).toBe(
+      'MFA_REQUIRED'
+    );
+    expect(mockedEvaluate).toHaveBeenCalled();
   });
 });

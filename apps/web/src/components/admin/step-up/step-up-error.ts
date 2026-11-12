@@ -1,10 +1,19 @@
+import * as z from 'zod';
 import type { StepUpErrorCode } from '@kilocode/web-shared/lib/admin/privileged-access';
+
+export type StepUpOperationRequirement = {
+  id: string;
+  targetKind: 'organization' | 'user' | 'service' | 'none';
+  targetId: string | null;
+};
 
 export type StepUpRequirement = {
   code: StepUpErrorCode;
   actionClass?: string;
   purpose?: 'session' | 'operation';
   maxAgeSeconds?: number;
+  /** The operation an `operation` proof must be minted for. */
+  operation?: StepUpOperationRequirement;
 };
 
 export class StepUpCancelledError extends Error {
@@ -14,7 +23,7 @@ export class StepUpCancelledError extends Error {
   }
 }
 
-const STEP_UP_CODES = new Set<string>([
+const STEP_UP_CODES = [
   'MFA_REQUIRED',
   'MFA_EXPIRED',
   'NOT_ENROLLED',
@@ -22,7 +31,31 @@ const STEP_UP_CODES = new Set<string>([
   'BEARER_NOT_ALLOWED',
   'REAUTH_REQUIRED',
   'STEP_UP_UNAVAILABLE',
-]);
+] as const satisfies readonly StepUpErrorCode[];
+
+const stepUpOperationSchema = z.object({
+  id: z.string().min(1),
+  targetKind: z.enum(['organization', 'user', 'service', 'none']),
+  targetId: z.string().nullable(),
+});
+
+const stepUpPayloadSchema = z.object({
+  code: z.enum(STEP_UP_CODES),
+  actionClass: z.string().optional(),
+  purpose: z.enum(['session', 'operation']).optional(),
+  maxAgeSeconds: z.number().optional(),
+  operation: stepUpOperationSchema.optional(),
+});
+
+/**
+ * Read one step-up payload: the tRPC `data.stepUp` object and the REST
+ * `stepUp` field carry the same shape. An unknown shape is ignored, never trusted.
+ */
+function parseStepUpPayload(value: unknown): StepUpRequirement | null {
+  const parsed = stepUpPayloadSchema.safeParse(value);
+  if (!parsed.success) return null;
+  return parsed.data;
+}
 
 /**
  * Read the formatter's `data.stepUp` contract without importing a client
@@ -34,19 +67,7 @@ export function stepUpRequirementFromError(error: unknown): StepUpRequirement | 
   if (typeof data !== 'object' || data === null) return null;
   const stepUp = (data as { stepUp?: unknown }).stepUp;
   if (typeof stepUp !== 'object' || stepUp === null) return null;
-  const candidate = stepUp as Record<string, unknown>;
-  if (typeof candidate.code !== 'string' || !STEP_UP_CODES.has(candidate.code)) return null;
-
-  return {
-    code: candidate.code as StepUpErrorCode,
-    actionClass: typeof candidate.actionClass === 'string' ? candidate.actionClass : undefined,
-    purpose:
-      candidate.purpose === 'session' || candidate.purpose === 'operation'
-        ? candidate.purpose
-        : undefined,
-    maxAgeSeconds:
-      typeof candidate.maxAgeSeconds === 'number' ? candidate.maxAgeSeconds : undefined,
-  };
+  return parseStepUpPayload(stepUp);
 }
 
 export function stepUpDialogTitle(requirement: StepUpRequirement): string {
@@ -96,9 +117,10 @@ export function formatStepUpRemaining(expiresAt: string, now: number = Date.now(
   return `${minutes} min left`;
 }
 
-const STEP_UP_HTTP_CODES: ReadonlySet<string> = STEP_UP_CODES;
-
-/** Read the REST 403 `{ error: code }` contract used by adminOnly routes. */
+/**
+ * Read the REST 403 refusal body used by adminOnly routes. A step-up refusal
+ * carries `stepUp` next to the error code; without it only the code is known.
+ */
 export async function stepUpRequirementFromResponse(
   response: Response
 ): Promise<StepUpRequirement | null> {
@@ -110,7 +132,9 @@ export async function stepUpRequirementFromResponse(
     return null;
   }
   if (typeof body !== 'object' || body === null) return null;
+  const stepUp = parseStepUpPayload((body as { stepUp?: unknown }).stepUp);
+  if (stepUp) return stepUp;
   const code = (body as { error?: unknown }).error;
-  if (typeof code !== 'string' || !STEP_UP_HTTP_CODES.has(code)) return null;
-  return { code: code as StepUpErrorCode };
+  const parsedCode = stepUpPayloadSchema.shape.code.safeParse(code);
+  return parsedCode.success ? { code: parsedCode.data } : null;
 }

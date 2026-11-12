@@ -7,6 +7,8 @@
  * `support-access-resolver.ts` and grant lifecycle in `apps/web`.
  */
 
+import type { AdminStepUpState } from '@kilocode/web-shared/lib/admin/privileged-access';
+
 export type SupportActionClass = 'support_read' | 'support_write';
 export type SupportSurface = 'trpc' | 'rest' | 'server-component';
 
@@ -372,5 +374,11 @@ export type SupportStepUpPort = {
     route?: string | null;
     method?: string | null;
     surface?: SupportSurface;
+    /**
+     * The step-up state this request already measured. When the admin guard
+     * ran for the same request, its fresh verdict is the answer, and the port
+     * must not evaluate a second proof.
+     */
+    stepUp?: AdminStepUpState;
   }): Promise<void>;
 };

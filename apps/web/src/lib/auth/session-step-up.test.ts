@@ -10,7 +10,11 @@ import {
   session_step_up_proofs,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { evaluateStepUp, hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
+import {
+  evaluateStepUp,
+  hashWebSessionId,
+  stepUpBindingHash,
+} from '@kilocode/web-shared/lib/admin/step-up-store';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   buildAuthenticationResponse,
@@ -20,6 +24,11 @@ import { createStepUpOptions, StepUpVerificationError, verifyStepUp } from './se
 
 const webSessionId = 'browser-session-one';
 const otherSessionId = 'browser-session-two';
+const sensitiveOperation = {
+  id: 'trpc.admin.users',
+  targetKind: 'user' as const,
+  targetId: 'target-user',
+};
 
 async function expectRefusal(promise: Promise<unknown>, code: string): Promise<void> {
   const error: unknown = await promise.then(
@@ -500,7 +509,7 @@ describe('session step-up ceremony', () => {
     );
   });
 
-  it('uses the same session proof for a sensitive write', async () => {
+  it('mints a single-use operation proof for the named operation', async () => {
     const user = await createAdmin();
     const authenticator = createTestAuthenticator();
     await insertCredential(user.id, authenticator);
@@ -508,6 +517,7 @@ describe('session step-up ceremony', () => {
       userId: user.id,
       webSessionId,
       actionClass: 'sensitive_write',
+      operation: sensitiveOperation,
     });
 
     const proof = await verifyStepUp(
@@ -518,19 +528,205 @@ describe('session step-up ceremony', () => {
           challenge: options.challenge,
           counter: 1,
         }),
-        { actionClass: 'sensitive_write' }
+        { actionClass: 'sensitive_write', operation: sensitiveOperation }
       )
     );
-    expect(proof.purpose).toBe('session');
-    expect(proof.action_binding_hash).toBeNull();
-    expect((new Date(proof.expires_at).getTime() - Date.now()) / 60_000).toBeGreaterThan(14.9);
+    expect(proof.purpose).toBe('operation');
+    expect(proof.action_class).toBe('sensitive_write');
+    expect(proof.target_identifier).toBe(sensitiveOperation.id);
+    expect(proof.action_binding_hash).toBe(
+      stepUpBindingHash('sensitive_write', sensitiveOperation)
+    );
+    expect(proof.consumed_at).toBeNull();
+    // The proof lives for the challenge window, not the session window.
+    expect((new Date(proof.expires_at).getTime() - Date.now()) / 60_000).toBeLessThan(5.1);
 
-    const fresh = await evaluateStepUp({
+    const first = await evaluateStepUp({
       userId: user.id,
       webSessionId,
       actionClass: 'sensitive_write',
+      operation: sensitiveOperation,
     });
-    expect(fresh.state.status).toBe('fresh');
+    expect(first.state.status).toBe('fresh');
+    expect(first.proof?.id).toBe(proof.id);
+    expect(first.proof?.consumed_at).not.toBeNull();
+
+    // The same proof cannot authorize a second request.
+    const second = await evaluateStepUp({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'sensitive_write',
+      operation: sensitiveOperation,
+    });
+    expect(second.state.status).toBe('required');
+  });
+
+  it('refuses an operation proof minted for another target or class', async () => {
+    const user = await createAdmin();
+    const authenticator = createTestAuthenticator();
+    await insertCredential(user.id, authenticator);
+    const { challengeId, options } = await createStepUpOptions({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'sensitive_write',
+      operation: sensitiveOperation,
+    });
+    await verifyStepUp(
+      verifyParams(
+        user,
+        challengeId,
+        buildAuthenticationResponse(authenticator, {
+          challenge: options.challenge,
+          counter: 1,
+        }),
+        { actionClass: 'sensitive_write', operation: sensitiveOperation }
+      )
+    );
+
+    const otherTarget = await evaluateStepUp({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'sensitive_write',
+      operation: { ...sensitiveOperation, targetId: 'other-user' },
+    });
+    expect(otherTarget.state.status).toBe('required');
+
+    const otherClass = await evaluateStepUp({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'support_write',
+      operation: sensitiveOperation,
+    });
+    expect(otherClass.state.status).toBe('required');
+
+    // Neither probe spent the proof minted for the original operation.
+    const original = await evaluateStepUp({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'sensitive_write',
+      operation: sensitiveOperation,
+    });
+    expect(original.state.status).toBe('fresh');
+  });
+
+  it('refuses to complete a challenge with a different operation binding', async () => {
+    const user = await createAdmin();
+    const authenticator = createTestAuthenticator();
+    await insertCredential(user.id, authenticator);
+    const { challengeId, options } = await createStepUpOptions({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'sensitive_write',
+      operation: sensitiveOperation,
+    });
+
+    await expectRefusal(
+      verifyStepUp(
+        verifyParams(
+          user,
+          challengeId,
+          buildAuthenticationResponse(authenticator, {
+            challenge: options.challenge,
+            counter: 1,
+          }),
+          {
+            actionClass: 'sensitive_write',
+            operation: { ...sensitiveOperation, targetId: 'other-user' },
+          }
+        )
+      ),
+      'CHALLENGE_EXPIRED'
+    );
+  });
+
+  it('does not let a session proof satisfy an operation class', async () => {
+    const user = await createAdmin();
+    const authenticator = createTestAuthenticator();
+    await insertCredential(user.id, authenticator);
+    const { challengeId, options } = await createStepUpOptions({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'platform_read',
+    });
+    await verifyStepUp(
+      verifyParams(
+        user,
+        challengeId,
+        buildAuthenticationResponse(authenticator, {
+          challenge: options.challenge,
+          counter: 1,
+        })
+      )
+    );
+
+    const sessionState = await evaluateStepUp({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'platform_read',
+    });
+    expect(sessionState.state.status).toBe('fresh');
+
+    const operationState = await evaluateStepUp({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'sensitive_write',
+      operation: sensitiveOperation,
+    });
+    expect(operationState.state.status).toBe('required');
+  });
+
+  it('keeps the reusable session proof for the read-grade classes', async () => {
+    const user = await createAdmin();
+    const authenticator = createTestAuthenticator();
+    await insertCredential(user.id, authenticator);
+    const { challengeId, options } = await createStepUpOptions({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'support_read',
+    });
+    const proof = await verifyStepUp(
+      verifyParams(
+        user,
+        challengeId,
+        buildAuthenticationResponse(authenticator, {
+          challenge: options.challenge,
+          counter: 1,
+        }),
+        { actionClass: 'support_read' }
+      )
+    );
+    expect(proof.purpose).toBe('session');
+    expect(proof.action_class).toBeNull();
+    expect(proof.target_identifier).toBeNull();
+    expect((new Date(proof.expires_at).getTime() - Date.now()) / 60_000).toBeGreaterThan(29.9);
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const reused = await evaluateStepUp({
+        userId: user.id,
+        webSessionId,
+        actionClass: 'platform_write',
+      });
+      expect(reused.state.status).toBe('fresh');
+      expect(reused.proof?.consumed_at).toBeNull();
+    }
+  });
+
+  it('refuses an operation binding on a session class and requires one for an operation class', async () => {
+    const user = await createAdmin();
+    const authenticator = createTestAuthenticator();
+    await insertCredential(user.id, authenticator);
+
+    await expect(
+      createStepUpOptions({
+        userId: user.id,
+        webSessionId,
+        actionClass: 'platform_read',
+        operation: sensitiveOperation,
+      })
+    ).rejects.toThrow('session step-up');
+    await expect(
+      createStepUpOptions({ userId: user.id, webSessionId, actionClass: 'sensitive_write' })
+    ).rejects.toThrow('operation binding');
   });
 
   it('supersedes the previous session proof', async () => {

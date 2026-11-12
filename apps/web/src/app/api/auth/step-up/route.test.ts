@@ -80,7 +80,9 @@ describe('POST /api/auth/step-up', () => {
       { cookie: 'next-auth.session-token=x', authorization: 'Bearer x' },
     ],
   ])('refuses %s before reading the session', async (_label, headers) => {
-    const response = await POST(createRequest({ action: 'options' }, { ...headers, origin }));
+    const response = await POST(
+      createRequest({ action: 'options', actionClass: 'platform_read' }, { ...headers, origin })
+    );
 
     expect(response.status).toBe(401);
     expect(mockGetSession).not.toHaveBeenCalled();
@@ -92,7 +94,10 @@ describe('POST /api/auth/step-up', () => {
     ['a foreign Origin', { origin: 'https://evil.example' }],
   ])('refuses %s', async (_label, headers) => {
     const response = await POST(
-      createRequest({ action: 'options' }, { ...headers, 'Content-Type': 'application/json' })
+      createRequest(
+        { action: 'options', actionClass: 'platform_read' },
+        { ...headers, 'Content-Type': 'application/json' }
+      )
     );
 
     expect(response.status).toBe(403);
@@ -105,7 +110,7 @@ describe('POST /api/auth/step-up', () => {
       authFailedResponse: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
     } as never);
 
-    const response = await POST(createRequest({ action: 'options' }));
+    const response = await POST(createRequest({ action: 'options', actionClass: 'platform_read' }));
 
     expect(response.status).toBe(403);
   });
@@ -113,7 +118,7 @@ describe('POST /api/auth/step-up', () => {
   it('tells a legacy session to sign in again', async () => {
     mockGetSession.mockResolvedValue(session({ webSessionId: undefined }));
 
-    const response = await POST(createRequest({ action: 'options' }));
+    const response = await POST(createRequest({ action: 'options', actionClass: 'platform_read' }));
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: 'SESSION_UNBOUND' });
@@ -125,7 +130,7 @@ describe('POST /api/auth/step-up', () => {
       options: { challenge: 'stored-challenge', rpId: 'localhost' },
     } as never);
 
-    const response = await POST(createRequest({ action: 'options' }));
+    const response = await POST(createRequest({ action: 'options', actionClass: 'platform_read' }));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
@@ -143,11 +148,72 @@ describe('POST /api/auth/step-up', () => {
     });
   });
 
+  it('mints an operation proof for the operation the client names', async () => {
+    mockCreateStepUpOptions.mockResolvedValue({
+      challengeId,
+      options: { challenge: 'stored-challenge', rpId: 'localhost' },
+    } as never);
+    const operation = {
+      id: 'trpc.admin.users',
+      targetKind: 'user',
+      targetId: 'target-user',
+    };
+
+    const response = await POST(
+      createRequest({ action: 'options', actionClass: 'sensitive_write', operation })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCreateStepUpOptions).toHaveBeenCalledWith({
+      userId: 'user-1',
+      webSessionId: 'browser-session',
+      actionClass: 'sensitive_write',
+      operation,
+    });
+  });
+
+  it.each([
+    ['an operation class without an operation', { actionClass: 'sensitive_write' }],
+    [
+      'a session class bound to an operation',
+      {
+        actionClass: 'platform_read',
+        operation: { id: 'trpc.admin.users', targetKind: 'user', targetId: null },
+      },
+    ],
+    ['an unknown action class', { actionClass: 'root' }],
+    [
+      'an overlong target identifier',
+      {
+        actionClass: 'sensitive_write',
+        operation: { id: 'op', targetKind: 'user', targetId: 'x'.repeat(500) },
+      },
+    ],
+    [
+      'an unknown target kind',
+      {
+        actionClass: 'sensitive_write',
+        operation: { id: 'op', targetKind: 'planet', targetId: null },
+      },
+    ],
+  ])('refuses %s as an invalid request', async (_label, binding) => {
+    const response = await POST(createRequest({ action: 'options', ...binding }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'INVALID_REQUEST' });
+    expect(mockCreateStepUpOptions).not.toHaveBeenCalled();
+  });
+
   it('verifies an assertion and applies the verify rate limit', async () => {
     mockVerifyStepUp.mockResolvedValue({ expires_at: '2030-01-01T00:00:00.000Z' } as never);
 
     const response = await POST(
-      createRequest({ action: 'verify', challengeId, response: assertion })
+      createRequest({
+        action: 'verify',
+        challengeId,
+        response: assertion,
+        actionClass: 'platform_read',
+      })
     );
 
     expect(response.status).toBe(200);
@@ -172,7 +238,12 @@ describe('POST /api/auth/step-up', () => {
     mockVerifyStepUp.mockRejectedValue(new StepUpVerificationError('CHALLENGE_ALREADY_USED'));
 
     const response = await POST(
-      createRequest({ action: 'verify', challengeId, response: assertion })
+      createRequest({
+        action: 'verify',
+        challengeId,
+        response: assertion,
+        actionClass: 'platform_read',
+      })
     );
 
     expect(response.status).toBe(401);
@@ -182,7 +253,7 @@ describe('POST /api/auth/step-up', () => {
   it('refuses when the firewall limiter is unavailable', async () => {
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'blocked' });
 
-    const response = await POST(createRequest({ action: 'options' }));
+    const response = await POST(createRequest({ action: 'options', actionClass: 'platform_read' }));
 
     expect(response.status).toBe(503);
     expect(mockCreateStepUpOptions).not.toHaveBeenCalled();
@@ -191,7 +262,7 @@ describe('POST /api/auth/step-up', () => {
   it('rate limits the options action', async () => {
     mockCheckRateLimit.mockResolvedValue({ rateLimited: true });
 
-    const response = await POST(createRequest({ action: 'options' }));
+    const response = await POST(createRequest({ action: 'options', actionClass: 'platform_read' }));
 
     expect(response.status).toBe(429);
     expect(mockCreateStepUpOptions).not.toHaveBeenCalled();

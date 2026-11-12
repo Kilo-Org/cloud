@@ -163,8 +163,32 @@ export type StepUpErrorCode =
   | 'STEP_UP_UNAVAILABLE';
 
 /**
+ * The operation a per-operation step-up proof authorizes. `id` is the stable
+ * identity from the checked-in privileged inventory, so the operation a client
+ * asks to verify is the same one the guard recomputes from the live request.
+ */
+export type StepUpOperation = {
+  id: string;
+  targetKind: PrivilegedTargetKind;
+  targetId: string | null;
+};
+
+/**
+ * Client-visible step-up contract. A client must repeat `operation` when it
+ * asks for an `operation` proof; the server refuses a proof whose binding does
+ * not match the request it authorizes.
+ */
+export type StepUpRequirementPayload = {
+  code: StepUpErrorCode;
+  actionClass: PrivilegedActionClass;
+  purpose: 'session' | 'operation';
+  maxAgeSeconds: number;
+  operation?: StepUpOperation;
+};
+
+/**
  * Cause attached to a FORBIDDEN tRPC error when enforcement refuses a request
- * for missing or stale step-up. The error formatter exposes only these fields
+ * for missing or stale step-up. The error formatter exposes only the payload
  * as `data.stepUp`, never the underlying session or proof.
  */
 export class StepUpRequiredError extends Error {
@@ -172,12 +196,14 @@ export class StepUpRequiredError extends Error {
   readonly actionClass: PrivilegedActionClass;
   readonly purpose: 'session' | 'operation';
   readonly maxAgeSeconds: number;
+  readonly operation: StepUpOperation | null;
 
   constructor(params: {
     code: StepUpErrorCode;
     actionClass: PrivilegedActionClass;
     purpose: 'session' | 'operation';
     maxAgeSeconds: number;
+    operation?: StepUpOperation | null;
   }) {
     super(params.code);
     this.name = 'StepUpRequiredError';
@@ -185,5 +211,17 @@ export class StepUpRequiredError extends Error {
     this.actionClass = params.actionClass;
     this.purpose = params.purpose;
     this.maxAgeSeconds = params.maxAgeSeconds;
+    this.operation = params.operation ?? null;
+  }
+
+  /** The JSON contract the tRPC formatter and the REST 403 body both carry. */
+  toPayload(): StepUpRequirementPayload {
+    return {
+      code: this.code,
+      actionClass: this.actionClass,
+      purpose: this.purpose,
+      maxAgeSeconds: this.maxAgeSeconds,
+      ...(this.operation ? { operation: this.operation } : {}),
+    };
   }
 }

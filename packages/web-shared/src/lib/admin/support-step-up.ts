@@ -8,10 +8,14 @@ import { stepUpPolicyFor } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import type { SupportStepUpPort } from '@kilocode/web-shared/lib/admin/support-access';
 
 /**
- * Support write authority requires a fresh session-bound passkey proof. Unlike
- * the general admin guard, this is not gated on `ADMIN_STEP_UP_ENABLED`: when
- * that switch is off, support writes are refused rather than silently allowed
- * without a proof.
+ * Support write authority requires a fresh passkey proof. Unlike the general
+ * admin guard, this is not gated on `ADMIN_STEP_UP_ENABLED`: when that switch
+ * is off, support writes are refused rather than silently allowed without a
+ * proof.
+ *
+ * When the request already measured its step-up state (the admin guard runs
+ * before the support write), that fresh verdict decides, so one request never
+ * asks for two proofs and never spends a per-operation proof twice.
  */
 export const supportStepUpPort: SupportStepUpPort = {
   async requireFresh(params) {
@@ -28,6 +32,8 @@ export const supportStepUpPort: SupportStepUpPort = {
         }),
       });
     }
+
+    if (params.stepUp?.status === 'fresh') return;
 
     // A missing credential is treated as non-session, so bearer or unknown
     // callers are refused rather than silently assumed to have a passkey.

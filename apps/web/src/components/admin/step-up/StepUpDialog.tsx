@@ -19,11 +19,11 @@ import {
 import { runStepUpCeremony, type StepUpOptions } from './step-up-ceremony';
 import { StepUpSignInAgainButton } from './StepUpSignInAgainButton';
 
-async function requestOptions(): Promise<StepUpOptions> {
+async function requestOptions(requirement: StepUpRequirement): Promise<StepUpOptions> {
   const response = await fetch('/api/auth/step-up', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'options' }),
+    body: JSON.stringify(stepUpRequestBody(requirement, { action: 'options' })),
   });
   const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) {
@@ -39,13 +39,35 @@ async function requestOptions(): Promise<StepUpOptions> {
   };
 }
 
-async function submitAssertion(challengeId: string, response: unknown): Promise<boolean> {
+async function submitAssertion(
+  requirement: StepUpRequirement,
+  challengeId: string,
+  response: unknown
+): Promise<boolean> {
   const verify = await fetch('/api/auth/step-up', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'verify', challengeId, response }),
+    body: JSON.stringify(
+      stepUpRequestBody(requirement, { action: 'verify', challengeId, response })
+    ),
   });
   return verify.ok;
+}
+
+/**
+ * The proof the browser asks for is the one the refusing operation named. A
+ * requirement with no action class comes from an interstitial that only needs
+ * the reusable browser-session proof.
+ */
+function stepUpRequestBody(
+  requirement: StepUpRequirement,
+  request: Record<string, unknown>
+): Record<string, unknown> {
+  return {
+    ...request,
+    actionClass: requirement.actionClass ?? 'platform_read',
+    ...(requirement.operation ? { operation: requirement.operation } : {}),
+  };
 }
 
 function errorMessage(code?: string): string {
@@ -115,9 +137,9 @@ export function StepUpCeremonyContent({
 
     try {
       const result = await runStepUpCeremony({
-        requestOptions,
+        requestOptions: () => requestOptions(current),
         startAuthentication: options => startAuthentication({ optionsJSON: options }),
-        submitAssertion,
+        submitAssertion: (challengeId, response) => submitAssertion(current, challengeId, response),
         enroll: registerNewPasskey,
       });
       if (result.ok) {

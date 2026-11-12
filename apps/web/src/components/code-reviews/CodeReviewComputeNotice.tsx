@@ -33,15 +33,15 @@ export function CodeReviewComputeNotice({ organizationId }: { organizationId?: s
       <Server aria-hidden="true" />
       <AlertTitle className="line-clamp-none">Code reviews use paid Cloud Agents</AlertTitle>
       <AlertDescription>
-        <p>Each code review runs in a Cloud Agent container, a paid resource.</p>
+        <p>Each code review uses Cloud Agent compute, a paid resource.</p>
         <p>
-          Container usage:{' '}
+          Compute usage:{' '}
           <span className="font-medium">
             {rate.data.hourlyUsd === null
               ? 'Price unavailable'
               : formatHourlyRate(rate.data.hourlyUsd)}
           </span>
-          . Container costs are charged to your Kilo credits, separately from model usage.
+          . Compute costs are charged to your Kilo credits, separately from model usage.
         </p>
       </AlertDescription>
     </Alert>

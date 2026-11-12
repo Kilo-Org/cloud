@@ -293,7 +293,7 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
             )}
             {data.containerCostMusd !== null && (
               <div>
-                <dt className="text-muted-foreground">Container cost</dt>
+                <dt className="text-muted-foreground">Compute cost</dt>
                 <dd>{formatSessionCost(data.containerCostMusd / 1_000_000)}</dd>
               </div>
             )}

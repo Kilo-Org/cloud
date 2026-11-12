@@ -1,19 +1,24 @@
 import type { AgentMemory } from '@/src/shared/agent-memories';
+import { memoryMatchesSearchTokens, parseMemorySearchTokens } from '@/src/shared/agent-memories';
+import { formatLocalListDate } from './format-local-date';
 import { buildMemoryPreviewLabel } from './pending-memory-save-card-state';
 
 export type MemoriesSettingsView =
   | { kind: 'loading' }
   | { kind: 'loadError' }
   | { kind: 'empty' }
+  | { kind: 'noMatches' }
   | { kind: 'list'; items: readonly MemorySettingsListItem[] };
 
-export interface MemorySettingsListItem {
+export type MemorySettingsListItem = {
   id: string;
   preview: string;
   domain: string | undefined;
   dateLabel: string;
   deleteAriaLabel: string;
-}
+};
+
+export const MEMORY_FILTER_MIN_COUNT = 3;
 
 const sortByCreatedAtDesc = (memories: readonly AgentMemory[]): AgentMemory[] =>
   [...memories].toSorted((left, right) => right.createdAt - left.createdAt);
@@ -35,13 +40,10 @@ export const formatMemorySourceDomain = (pageUrl: string): string | undefined =>
   }
 };
 
-export const formatMemoryListDate = (createdAt: number): string =>
-  new Date(createdAt).toISOString().slice(0, 10);
-
 export const toMemorySettingsListItem = (memory: AgentMemory): MemorySettingsListItem => {
   const preview = buildMemoryPreviewLabel(memory);
   return {
-    dateLabel: formatMemoryListDate(memory.createdAt),
+    dateLabel: formatLocalListDate(memory.createdAt),
     deleteAriaLabel: `Delete memory "${preview}"`,
     domain: formatMemorySourceDomain(memory.pageUrl),
     id: memory.id,
@@ -53,10 +55,12 @@ export const deriveMemoriesSettingsView = ({
   isLoaded,
   loadError,
   memories,
+  query,
 }: {
   isLoaded: boolean;
   loadError: boolean;
   memories: readonly AgentMemory[];
+  query: string;
 }): MemoriesSettingsView => {
   if (!isLoaded) {
     return { kind: 'loading' };
@@ -70,8 +74,18 @@ export const deriveMemoriesSettingsView = ({
     return { kind: 'empty' };
   }
 
+  const tokens = parseMemorySearchTokens(query);
+  const matches =
+    tokens.length === 0
+      ? memories
+      : memories.filter(memory => memoryMatchesSearchTokens(tokens, memory));
+
+  if (matches.length === 0) {
+    return { kind: 'noMatches' };
+  }
+
   return {
-    items: sortByCreatedAtDesc(memories).map(entry => toMemorySettingsListItem(entry)),
+    items: sortByCreatedAtDesc(matches).map(entry => toMemorySettingsListItem(entry)),
     kind: 'list',
   };
 };

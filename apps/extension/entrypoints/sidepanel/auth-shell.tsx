@@ -28,6 +28,7 @@ import { MemorySettings } from './memory-settings';
 import { OrganizationCreditAccountSelect } from './organization-credit-account';
 import { RemoteMcpSettings } from './remote-mcp-settings';
 import { settingsDialogOpenAtom } from './settings-dialog-state';
+import { useModalDialog } from './use-dismiss';
 import { WebMcpSettings } from './web-mcp-settings';
 import { WorkflowSettings } from './workflow-settings';
 
@@ -105,7 +106,8 @@ const AnalyticsSettingsRow = ({ userEmail }: { userEmail: string | undefined }):
 
   return (
     <div className="min-w-0 rounded-xl border border-border bg-surface-raised p-3">
-      <div className="flex items-start justify-between gap-3">
+      <h2 className="type-label text-foreground-muted">Usage analytics</h2>
+      <div className="mt-2 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="type-body font-medium text-foreground">Share usage analytics</p>
           <p className="type-label mt-0.5 leading-4 text-foreground-muted">
@@ -161,6 +163,10 @@ const HeaderActions = ({
   selectedOrganizationId: string;
 }): JSX.Element => {
   const [isSettingsOpen, setIsSettingsOpen] = useAtom(settingsDialogOpenAtom);
+  const closeSettings = (): void => {
+    setIsSettingsOpen(false);
+  };
+  const settingsDialogRef = useModalDialog({ open: isSettingsOpen, onClose: closeSettings });
 
   return (
     <div className="relative flex shrink-0 items-center justify-end gap-2">
@@ -179,16 +185,16 @@ const HeaderActions = ({
           aria-label="Settings panel"
           aria-modal="true"
           className="fixed inset-0 z-30 flex flex-col bg-surface-background"
+          ref={settingsDialogRef}
           role="dialog"
+          tabIndex={-1}
         >
           <div className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface-raised px-4">
             <p className="text-sm font-semibold text-foreground">Settings</p>
             <button
               aria-label="Close settings"
               className={iconButtonClassName}
-              onClick={() => {
-                setIsSettingsOpen(false);
-              }}
+              onClick={closeSettings}
               type="button"
             >
               <X aria-hidden="true" className="size-4" />

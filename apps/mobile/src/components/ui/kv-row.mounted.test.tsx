@@ -33,13 +33,24 @@ vi.mock('@/components/ui/text', () => ({
     variant,
     className,
     children,
+    style,
     ...rest
-  }: { variant?: string; className?: string; children?: unknown } & Record<string, unknown>) => {
+  }: { variant?: string; className?: string; children?: unknown; style?: unknown } & Record<
+    string,
+    unknown
+  >) => {
     const variantClasses =
       variant === 'mono' ? 'font-mono-medium text-sm' : 'text-foreground text-base font-medium';
+    // The real primitive prepends the interface direction and keeps the
+    // caller's style last, so a row's own pinned run must win over it.
+    const rtlStyle = i18nManager.isRTL ? { writingDirection: 'rtl' } : undefined;
     return primitiveText.make(
       'Text',
-      { ...rest, className: [variantClasses, className].filter(Boolean).join(' ') },
+      {
+        ...rest,
+        className: [variantClasses, className].filter(Boolean).join(' '),
+        style: [rtlStyle, style].filter(Boolean),
+      },
       children
     );
   },
@@ -50,6 +61,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/rtl-text', () => ({
   LTR_TEXT_DIRECTION: { direction: 'ltr', writingDirection: 'ltr' },
+  RTL_WRITING_DIRECTION: { writingDirection: 'rtl' },
 }));
 
 // The merged suite keeps the row's real class merge (`cn`) for the face and
@@ -160,7 +172,7 @@ describe('KvRow mounted layout', () => {
     try {
       const text = valueText(renderRow({ value: 'لا يوجد تصحيح متاح' }), 'لا يوجد تصحيح متاح');
 
-      expect(valueStyle(text).writingDirection).toBeUndefined();
+      expect(valueStyle(text).writingDirection).toBe('rtl');
     } finally {
       i18nManager.isRTL = false;
     }

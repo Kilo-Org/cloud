@@ -68,7 +68,12 @@ export function HomeScreen() {
         // opens. The heading is the mark alone, so the row never reflows the
         // picker under it (`allowInlineActionsStacking` reserves room for a
         // heading's text that this header does not have).
-        inlineActions={<ContextControl />}
+        // The account-list failure stays out of the header: the live-session
+        // card below states it and retries the same query, and the message and
+        // Retry rows this control would add made the fixed header taller, so
+        // every section moved down while the list failed and back up when it
+        // recovered (finding home-header-failure-shift).
+        inlineActions={<ContextControl inlineFailure={false} />}
         allowInlineActionsStacking={false}
         // The logo is the header's only visible child, so this is the brand
         // mark's leading edge: it must be the page gutter the sections, cards

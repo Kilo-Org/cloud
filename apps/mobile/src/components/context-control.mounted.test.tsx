@@ -141,11 +141,13 @@ function Surface({
   value,
   onSelectionChange,
   variant,
+  inlineFailure,
 }: {
   scope?: ContextDisplayScope;
   value?: string | null;
   onSelectionChange?: (organizationId: string | null) => void;
   variant?: 'inline' | 'field';
+  inlineFailure?: boolean;
 }) {
   const { organizationId: id } = useOrganization();
   const [, setVersion] = useState(0);
@@ -157,7 +159,7 @@ function Surface({
   return createElement(
     'GlobalScope',
     { id },
-    createElement(ContextControl, { scope, value, onSelectionChange, variant })
+    createElement(ContextControl, { scope, value, onSelectionChange, variant, inlineFailure })
   );
 }
 
@@ -167,6 +169,7 @@ async function mount(
     value?: string | null;
     onSelectionChange?: (organizationId: string | null) => void;
     variant?: 'inline' | 'field';
+    inlineFailure?: boolean;
   } = {}
 ) {
   const result = await renderWithProviders(createElement(Surface, props), {
@@ -548,6 +551,35 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     });
     await waitFor(() => !texts(ui).includes('Retry'));
     expect(texts(ui)).toContain(name);
+  });
+
+  it('leaves the account-list failure to the surface that draws it, never adding a row', async () => {
+    storage.read.mockResolvedValue('org-a');
+    list.mockRejectedValue(new Error('offline'));
+    const ui = await mount({ inlineFailure: false });
+    // Home draws this failure and its Retry in its live-session card, and both
+    // Retry actions refetch the same query. Two rows stacked under a fixed
+    // header's single row made that header taller by exactly their height, so
+    // the body moved down while the list failed and back up on recovery.
+    await waitFor(() => ui.renderer.root.findAll(node => node.type === Text).length === 1);
+    expect(texts(ui)).not.toContain("Couldn't load your organizations");
+    expect(texts(ui)).not.toContain('Retry');
+    // The control gives up the failure block only: it still names an account and
+    // stays the same single-row button.
+    expect(picker(ui).props.accessibilityRole).toBe('button');
+    expect(picker(ui).props.accessibilityLabel).toEqual(expect.any(String));
+  });
+
+  it('keeps the stored choice failure in the control even when the list failure moves out', async () => {
+    // Nothing else on the screen reaches the provider's own read/write failure,
+    // so that message and its Retry stay wherever the control is mounted.
+    storage.read.mockRejectedValueOnce(new Error('read failed')).mockResolvedValue('org-a');
+    const ui = await mount({ inlineFailure: false });
+    expect(texts(ui)).toContain('Something went wrong');
+    await press(retry(ui));
+    await waitFor(() => texts(ui).includes(name));
+    expect(texts(ui)).not.toContain('Something went wrong');
+    expect(texts(ui)).not.toContain('Retry');
   });
 
   it('offers restoration Retry without publishing Personal', async () => {

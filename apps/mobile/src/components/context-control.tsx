@@ -129,6 +129,14 @@ const FIELD_TRIGGER_CLASS =
  *
  * `variant` picks the shape: `inline` is the compact label-and-chevron a header
  * or a detail row shows, and `field` is the stacked form's full-width trigger.
+ *
+ * `inlineFailure` is false on a surface that draws the account-list failure and
+ * its own Retry itself, as Home does in its live-session card. Both Retry actions
+ * refetch the same query, and the control sits in a fixed header: the message
+ * line and the retry row it stacks under its label made that header grow by their
+ * combined height, so the whole body moved down while the account list failed and
+ * back up when it recovered (the pending-to-error jump). A surface that keeps the
+ * failure here leaves the default; its body has no other Retry for that query.
  */
 export function ContextControl({
   scope,
@@ -136,12 +144,14 @@ export function ContextControl({
   onSelectionChange,
   value,
   variant = 'inline',
+  inlineFailure = true,
 }: Readonly<{
   scope?: ContextDisplayScope;
   showOrganizationName?: boolean;
   onSelectionChange?: (organizationId: string | null) => void;
   value?: string | null;
   variant?: 'inline' | 'field';
+  inlineFailure?: boolean;
 }>) {
   const context = useOrganization();
   const { token } = useAuth();
@@ -179,17 +189,20 @@ export function ContextControl({
   let errorMessage: string | null = null;
   let retry: (() => void) | undefined = undefined;
   if (providerError) {
+    // The stored choice's own read or write failed, and nothing else on the
+    // screen reaches that failure: this control keeps both the message and the
+    // Retry, whatever `inlineFailure` says.
     errorMessage =
       providerError === 'restore'
         ? t('common.somethingWentWrong')
         : t('common.couldNotSaveSetting');
     retry = context.retry;
-  } else if (nameError) {
+  } else if (inlineFailure && nameError) {
     errorMessage = t('organization.boundary.loadErrorTitle');
     retry = () => {
       void organizations.refetch();
     };
-  } else if (unavailable) {
+  } else if (inlineFailure && unavailable) {
     errorMessage = t('organization.boundary.organizationUnavailable');
   }
   const retryBusy =

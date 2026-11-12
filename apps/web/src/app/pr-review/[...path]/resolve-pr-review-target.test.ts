@@ -28,6 +28,13 @@ describe('resolvePrReviewTarget', () => {
         url: 'https://github.com/octocat/hello.world/pull/7',
       });
     });
+
+    it("maps GitHub's `.github` repository, which starts with a dot", () => {
+      expect(resolve(['octocat', '.github', '7'])).toEqual({
+        kind: 'redirect',
+        url: 'https://github.com/octocat/.github/pull/7',
+      });
+    });
   });
 
   describe('GitLab', () => {
@@ -42,6 +49,13 @@ describe('resolvePrReviewTarget', () => {
       expect(resolve(['gitlab', 'group', 'repo', '9'], 'https://gitlab.com')).toEqual({
         kind: 'redirect',
         url: 'https://gitlab.com/group/repo/-/merge_requests/9',
+      });
+    });
+
+    it('accepts a project segment that starts with an underscore', () => {
+      expect(resolve(['gitlab', 'group', '_hidden', '9'])).toEqual({
+        kind: 'redirect',
+        url: 'https://gitlab.com/group/_hidden/-/merge_requests/9',
       });
     });
 
@@ -80,6 +94,13 @@ describe('resolvePrReviewTarget', () => {
   });
 
   describe('Bitbucket', () => {
+    it('accepts a repository slug that starts with an underscore', () => {
+      expect(resolve(['bitbucket', 'acme', '_api', '42'])).toEqual({
+        kind: 'redirect',
+        url: 'https://bitbucket.org/acme/_api/pull-requests/42',
+      });
+    });
+
     it('maps a pull request id', () => {
       expect(resolve(['bitbucket', 'acme', 'api', '42'])).toEqual({
         kind: 'redirect',
@@ -114,6 +135,11 @@ describe('resolvePrReviewTarget', () => {
       ['a GitLab platform with no identity', ['gitlab']],
     ])('returns null for %s', (_label, path) => {
       expect(resolve(path)).toBeNull();
+    });
+
+    it('rejects a bare dash segment', () => {
+      expect(resolve(['octocat', '-', '42'])).toBeNull();
+      expect(resolve(['gitlab', 'group', '-', '9'])).toBeNull();
     });
 
     it('rejects an empty segment', () => {

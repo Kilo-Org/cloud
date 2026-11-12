@@ -8,10 +8,13 @@ function createRequest(pathname: string, search = ''): NextRequest {
 }
 
 async function callGet(pathname: string, search = ''): Promise<Response> {
+  // Next decodes catch-all params before the handler runs, so `%2F` arrives as
+  // `/` and the resolver must see that decoded value.
   const path = pathname
     .replace(/^\/pr-review\/?/, '')
     .split('/')
-    .filter(Boolean);
+    .filter(Boolean)
+    .map(segment => decodeURIComponent(segment));
   return GET(createRequest(pathname, search), { params: Promise.resolve({ path }) });
 }
 

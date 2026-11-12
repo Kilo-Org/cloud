@@ -38,14 +38,21 @@ const BITBUCKET_PLATFORM = 'bitbucket';
 const MAX_PATH_SEGMENTS = 64;
 
 /**
- * A provider path segment. The first character must be alphanumeric, which is
- * what keeps `@evil.com`, `..`, `.` and a bare `-` out of the built URL.
+ * A provider path segment, matching the mobile route parser (`decodeSegment`
+ * plus `isGitLabPathSegment` in `apps/mobile/src/lib/pr-review/provider-pr-ref.ts`):
+ * letters, digits, `_`, `.` and `-`, but never the bare `.`, `..` or `-` shape
+ * a provider does not name a repository with. A leading `_` (a GitLab segment)
+ * and a leading `.` (GitHub's `.github` repository) are legitimate, so the
+ * pattern cannot require an alphanumeric first character. `/`, `\`, control
+ * characters and `@` are not in the set, so no segment can change the host of
+ * the URL this builds.
  */
 const segmentSchema = z
   .string()
   .min(1)
   .max(200)
-  .regex(/^[A-Za-z0-9][A-Za-z0-9_.-]*$/);
+  .regex(/^[A-Za-z0-9_.-]+$/)
+  .refine(value => value !== '.' && value !== '..' && value !== '-');
 
 /**
  * GitHub's own owner shape: alphanumeric with single hyphens, 39 characters

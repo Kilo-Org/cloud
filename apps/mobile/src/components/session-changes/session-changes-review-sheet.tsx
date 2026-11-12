@@ -35,13 +35,14 @@ function CommentRow({
       <Text className="font-mono-medium text-xs text-muted-foreground" numberOfLines={2}>
         {isolateLtrBidiText(quote)}
       </Text>
-      <View className="flex-row items-start gap-2">
+      <View className="flex-row items-center gap-2">
         <Text className="flex-1 text-sm text-foreground">{text}</Text>
         <Pressable
           onPress={onRemove}
           accessibilityRole="button"
           accessibilityLabel={t('agentChat.sessionChanges.removeComment')}
           className="min-h-[32px] min-w-[32px] items-center justify-center active:opacity-70"
+          hitSlop={6}
           testID="session-changes-review-remove-comment"
         >
           <Text className="text-xs text-destructive">{t('common.remove')}</Text>
@@ -85,7 +86,8 @@ export function SessionChangesReviewSheet({
             onPress={onClose}
             accessibilityRole="button"
             accessibilityLabel={t('common.close')}
-            className="min-h-[44px] justify-center active:opacity-70"
+            className="min-h-[44px] min-w-[44px] items-center justify-center active:opacity-70"
+            hitSlop={6}
           >
             <Text variant="muted" className="text-sm">
               {t('common.close')}

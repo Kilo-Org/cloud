@@ -108,6 +108,14 @@ function UnavailableState({
   );
 }
 
+/**
+ * A review-comment tap target needs a real vertical target: these rows are
+ * pressable, unlike the read-only PR diff they mimic, and contiguous diff rows
+ * get no vertical hit slop (a vertical slop would mis-route taps to the lower
+ * sibling). The bounded row height therefore carries the whole target.
+ */
+const TAPPABLE_ROW_MIN_HEIGHT = 30;
+
 export function SessionChangesFileView({
   path,
   patchState,
@@ -133,6 +141,13 @@ export function SessionChangesFileView({
 }>) {
   const { t } = useTranslation();
   const diffFontMetrics = useBoundedDiffFontMetrics();
+  const tappableFontMetrics = useMemo(
+    () => ({
+      ...diffFontMetrics,
+      rowMinHeight: Math.max(diffFontMetrics.rowMinHeight, TAPPABLE_ROW_MIN_HEIGHT),
+    }),
+    [diffFontMetrics]
+  );
   const bottomPadding = useDetailScreenBottomPadding();
   const language = useMemo(() => languageForPath(path), [path]);
   const parsed = useMemo(
@@ -204,7 +219,7 @@ export function SessionChangesFileView({
   }
 
   return (
-    <DiffFontMetricsContext.Provider value={diffFontMetrics}>
+    <DiffFontMetricsContext.Provider value={tappableFontMetrics}>
       <View className="flex-1" testID="session-changes-file-view">
         {commentsDisabledReason === undefined ? null : (
           <View className="border-b border-hair-soft bg-secondary px-4 py-2">

@@ -101,7 +101,8 @@ jest.mock('@/components/ui/dropdown-menu', () => {
     DropdownMenuSeparator: () => null,
     DropdownMenuCheckboxItem: passthrough,
     DropdownMenuRadioGroup: passthrough,
-    DropdownMenuRadioItem: passthrough,
+    DropdownMenuRadioItem: ({ children }: { children?: ReactNode }) =>
+      react.createElement('div', { role: 'menuitemradio' }, children),
     DropdownMenuSub: passthrough,
     DropdownMenuSubTrigger: passthrough,
     DropdownMenuSubContent: passthrough,
@@ -789,6 +790,43 @@ describe('ChatSidebar row rendering', () => {
     };
     return { sessions, workspaceFolders, dataTransfer, dragEvent };
   }
+
+  it.each(['needs_you', 'in_review', 'done'] as const)(
+    'excludes %s smart folders from move destinations without hiding their sidebar section',
+    smartPreset => {
+      const { sessions, workspaceFolders } = folderDragFixture();
+      const smartFolder = { ...workspaceFolders.folders[1], smartPreset };
+      const workspaceGroups = sessions.map(session => ({
+        type: 'worktree' as const,
+        worktreeId: session.worktreeId!,
+        sessions: [session],
+        latestSession: session,
+      }));
+      renderSidebar({
+        sessions,
+        workspaceGroups,
+        workspaceFolders: {
+          ...workspaceFolders,
+          folders: [workspaceFolders.folders[0], smartFolder],
+        },
+      });
+
+      const row = dom.container.querySelector(`[data-worktree-id="${sessions[0].worktreeId}"]`);
+      if (!row) throw new Error('Workspace row missing');
+      const destinations = () =>
+        Array.from(row.querySelectorAll('[role="menuitemradio"]'), item => item.textContent);
+
+      expect(destinations()).toEqual(['Ungrouped', 'Product']);
+      expect(dom.container.querySelector(`[data-folder-id="${smartFolder.id}"]`)).not.toBeNull();
+
+      renderSidebar({
+        sessions,
+        workspaceGroups,
+        workspaceFolders: { ...workspaceFolders, folders: [smartFolder] },
+      });
+      expect(destinations()).toEqual(['Ungrouped']);
+    }
+  );
 
   it('requires confirmation before deleting a folder and allows cancellation', async () => {
     const { sessions, workspaceFolders } = folderDragFixture();

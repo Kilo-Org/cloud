@@ -468,16 +468,18 @@ function WorktreeGroupMenuItems({
               onValueChange={value => folderControls.onMove(value === 'ungrouped' ? null : value)}
             >
               <DropdownMenuRadioItem value="ungrouped">Ungrouped</DropdownMenuRadioItem>
-              {folderControls.folders.map(folder => (
-                <DropdownMenuRadioItem key={folder.id} value={folder.id}>
-                  <span
-                    aria-hidden="true"
-                    className="size-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: getWorkspaceFolderColor(folder.color) }}
-                  />
-                  <span className="max-w-48 truncate">{folder.name}</span>
-                </DropdownMenuRadioItem>
-              ))}
+              {folderControls.folders
+                .filter(folder => folder.kind === 'manual')
+                .map(folder => (
+                  <DropdownMenuRadioItem key={folder.id} value={folder.id}>
+                    <span
+                      aria-hidden="true"
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: getWorkspaceFolderColor(folder.color) }}
+                    />
+                    <span className="max-w-48 truncate">{folder.name}</span>
+                  </DropdownMenuRadioItem>
+                ))}
             </DropdownMenuRadioGroup>
           </DropdownMenuSubContent>
         </DropdownMenuSub>

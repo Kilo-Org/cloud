@@ -103,8 +103,11 @@ function configHash(config: ReadyConfig): Buffer {
  *
  * The scope is the organization, the part, and the detector configuration, but not the user, so
  * members of an organization share verdicts: the same tool definitions, system prompts, and
- * messages are scanned once for all of them. Scan latency can therefore reveal to a member that
- * someone in their organization sent the same content before, which is accepted.
+ * messages are scanned once for all of them.
+ *
+ * Timing attacks on this cache between members of the same organization are deliberately not
+ * defended against: scan latency can reveal to a member that someone in their organization sent
+ * the same text before, and we accept that within an organization. Keys never cross organizations.
  */
 export function verdictCacheKey(
   { organizationId }: Pick<EnkryptGuardrailRequest, 'organizationId'>,

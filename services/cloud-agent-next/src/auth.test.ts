@@ -243,9 +243,30 @@ describe('validateStreamTicket', () => {
         type: 'stream_ticket',
         userId: 'user-1',
         cloudAgentSessionId: 'session-1',
+        exp: expect.any(Number),
       },
     });
   });
+
+  it.each(['cloud-agent-stream', 'cloud-agent-terminal'])(
+    'requires an expiry claim on a ticket for the %s audience',
+    audience => {
+      const ticket = jwt.sign(
+        {
+          type: 'stream_ticket',
+          userId: 'user-1',
+          cloudAgentSessionId: 'session-1',
+        },
+        secret,
+        { algorithm: 'HS256', noTimestamp: true, audience }
+      );
+
+      expect(validateStreamTicket(ticket, secret, audience)).toEqual({
+        success: false,
+        error: 'Invalid ticket payload',
+      });
+    }
+  );
 
   it('rejects a stream ticket presented with the terminal audience', () => {
     const ticket = jwt.sign(

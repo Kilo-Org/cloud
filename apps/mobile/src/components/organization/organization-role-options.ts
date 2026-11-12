@@ -13,6 +13,10 @@ import {
  * organization-members-router.ts: owner management — appointing an owner, or
  * acting on an owner's membership — is reserved for owners
  * (`assertOwnerAuthority`), and an admin holds every other role.
+ *
+ * Only the organization role decides here. Web also lets Kilo staff
+ * (`isKiloAdmin`) hand out any role; that override exists for the staff console
+ * and is deliberately not mirrored in the app, which has no staff surface.
  */
 
 /**

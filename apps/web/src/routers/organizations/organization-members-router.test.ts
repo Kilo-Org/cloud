@@ -2330,6 +2330,50 @@ describe('organizations members trpc router', () => {
       }
     });
 
+    it('reports an outstanding invitation before a full organization', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const email = `${crypto.randomUUID()}@full-org-existing-invite.example.com`;
+
+      // The organization still has room while the invitation is created.
+      await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email,
+        role: 'member',
+      });
+      const { used } = await getOrganizationSeatUsage(testOrganization.id);
+
+      await withOrganizationSeats({ seat_count: used }, async () => {
+        await expect(
+          caller.organizations.members.invite({
+            organizationId: testOrganization.id,
+            email,
+            role: 'member',
+          })
+        ).rejects.toMatchObject({
+          code: 'CONFLICT',
+          message: 'This email already has a pending invitation',
+        });
+      });
+    });
+
+    it('reports an existing member before a full organization', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const { used } = await getOrganizationSeatUsage(testOrganization.id);
+
+      await withOrganizationSeats({ seat_count: used }, async () => {
+        await expect(
+          caller.organizations.members.invite({
+            organizationId: testOrganization.id,
+            email: memberUser.google_user_email,
+            role: 'member',
+          })
+        ).rejects.toMatchObject({
+          code: 'CONFLICT',
+          message: 'This user is already a member of this organization',
+        });
+      });
+    });
+
     it('should invite member for organization owner', async () => {
       const caller = await createCallerForUser(regularUser.id);
 

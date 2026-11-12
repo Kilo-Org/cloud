@@ -7,6 +7,7 @@ import {
   addUserToOrganization,
   getOrganizationById,
   getOrganizationMembers,
+  assertInviteeAddressIsAvailable,
   inviteUserToOrganization,
   getAcceptInviteUrl,
   lockOrganizationMembershipMutation,
@@ -607,6 +608,10 @@ export const organizationsMembersRouter = createTRPCRouter({
       // Owners and Kilo admins can invite any role. Billing managers can invite members only.
       try {
         const result = await db.transaction(async tx => {
+          // An existing member or an outstanding invitation answers first: a
+          // full organization must not describe an address it already has as a
+          // seat problem.
+          await assertInviteeAddressIsAvailable(tx, organizationId, email);
           // Refuse before writing anything when the organization has no free
           // seat: the advisory lock it takes makes two concurrent invites
           // serialize, so neither can take the last seat twice.

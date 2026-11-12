@@ -297,10 +297,30 @@ describe('getPillSlotSizers', () => {
   // that arrives fills its slot instead of resizing the pill beside the title.
   it('sizes both slots from the widest reading each one paints', () => {
     const sizers = getPillSlotSizers();
-    expect(sizers.percentage).toBe(formatPercent(100, i18n.language));
+    // The percentage keeps at most one decimal, so a fractional reading is a
+    // glyph wider than the whole window. The slot holds whichever is longer.
+    const fractional = formatPercent(99.9, i18n.language);
+    const whole = formatPercent(100, i18n.language);
+    expect(sizers.percentage).toBe(fractional.length >= whole.length ? fractional : whole);
     // The cost sizer holds both badge shapes: the four-decimal one below half a
     // cent is the wider of the two, so it is the reserve.
     expect(sizers.cost).toBe(formatSessionCostBadge(4_999));
+  });
+
+  // The percentage slot holds every reading the pill paints, in both shapes the
+  // formatter produces: a fractional reading and a whole window.
+  it('holds a painted percentage in both of its shapes', () => {
+    const { percentage } = getPillSlotSizers();
+    for (const painted of [0, 0.4, 5, 16.7, 42, 88.8, 99.9, 100].map(value =>
+      formatPercent(value, i18n.language)
+    )) {
+      expect(painted.length).toBeLessThanOrEqual(percentage.length);
+    }
+    // A fractional reading is longer than the whole-window one it shares the
+    // slot with, so the reserve cannot be the whole window alone.
+    expect(formatPercent(16.7, i18n.language).length).toBeGreaterThan(
+      formatPercent(100, i18n.language).length
+    );
   });
 
   // A badge the pill actually paints fits the width its slot reserved, in both
@@ -313,6 +333,10 @@ describe('getPillSlotSizers', () => {
       formatSessionCostBadge(20_000),
       formatSessionCostBadge(150_000),
       formatSessionCostBadge(980_000),
+      // The widest two-decimal badge without a grouping separator. The first
+      // grouped total is a glyph wider than the reserve and truncates inside
+      // its single line, the bound the sizer's own comment states.
+      formatSessionCostBadge(999_990_000),
     ]) {
       expect(painted).not.toBeNull();
       expect((painted ?? '').length).toBeLessThanOrEqual(cost.length);

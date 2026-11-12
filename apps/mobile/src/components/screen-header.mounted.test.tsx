@@ -1376,4 +1376,14 @@ describe('shouldStackHeaderActions', () => {
     expect(shouldStackHeaderActions(Number.NaN, 1)).toBe(false);
     expect(shouldStackHeaderActions(160, Number.NaN)).toBe(true);
   });
+
+  it('reserves the title width the caller declares instead of the list title default', () => {
+    // A detail header's title is the 18px style, narrower than the 30px list
+    // title the default reserve assumes. Declaring its own width keeps that
+    // header on one row where the default would already have reflowed it, and
+    // still reflows when the cluster leaves the title below what it needs.
+    expect(shouldStackHeaderActions(411, 1, 240)).toBe(true);
+    expect(shouldStackHeaderActions(411, 1, 240, 104)).toBe(false);
+    expect(shouldStackHeaderActions(360, 1, 240, 104)).toBe(true);
+  });
 });

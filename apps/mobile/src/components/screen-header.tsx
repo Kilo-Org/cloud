@@ -75,18 +75,24 @@ const HEADER_ACTIONS_GAP = 12;
  * too. Fixed-size children (icon buttons, a label capped at its own max-w) do
  * not grow with the font scale, so this width is taken as laid out and is not
  * scaled.
+ *
+ * `titleMinWidth` is the content width the caller's own title needs to stay
+ * readable. It defaults to the list footer's 30px title; a detail header whose
+ * title is the 18px style needs less, and declaring that width keeps the header
+ * on one row where the larger default would already have reflowed it.
  */
 export function shouldStackHeaderActions(
   width: number,
   fontScale: number,
-  headerRightWidth = 0
+  headerRightWidth = 0,
+  titleMinWidth = HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH
 ): boolean {
   if (!Number.isFinite(width)) {
     return false;
   }
   const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
   const titleWidth = width - HEADER_CONTENT_GUTTER - HEADER_ACTIONS_GAP - headerRightWidth;
-  return titleWidth < HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH * scale;
+  return titleWidth < titleMinWidth * scale;
 }
 
 /**
@@ -169,6 +175,14 @@ type ScreenHeaderProps = {
    * a cluster no wider than a single icon button.
    */
   headerRightWidth?: number;
+  /**
+   * Content width (dp, at font scale 1) this screen's own title needs to stay
+   * readable beside the trailing cluster, for the stacking decision above. The
+   * default reserves the 30px list title's width; a header whose title is the
+   * 18px style declares the smaller width it actually paints, so a cluster that
+   * still leaves the title its own text does not reflow the header.
+   */
+  titleMinWidth?: number;
   /** Keep compact fixed-width controls beside the title even on narrow screens. */
   allowHeaderRightStacking?: boolean;
   /**
@@ -315,6 +329,7 @@ export function ScreenHeader({
   size = 'default',
   headerRight,
   headerRightWidth,
+  titleMinWidth,
   allowHeaderRightStacking = true,
   headerRightShrinks = false,
   inlineActions,
@@ -349,14 +364,14 @@ export function ScreenHeader({
   const stackActions =
     allowHeaderRightStacking &&
     headerRight != null &&
-    shouldStackHeaderActions(windowWidth, fontScale, headerRightWidth ?? 0);
+    shouldStackHeaderActions(windowWidth, fontScale, headerRightWidth ?? 0, titleMinWidth);
   // The inline controls row reflows the same way: a caller that declares its
   // width drops it beneath the title before it squeezes the title's own
   // readable minimum, so the 30px Agents title never breaks inside a word.
   const stackInlineActions =
     allowInlineActionsStacking &&
     inlineActions != null &&
-    shouldStackHeaderActions(windowWidth, fontScale, inlineActionsWidth ?? 0);
+    shouldStackHeaderActions(windowWidth, fontScale, inlineActionsWidth ?? 0, titleMinWidth);
 
   // A surface that reaches the window top (a full-window modal) needs the
   // status bar and corner pad added on top of the standard gap; one that

@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { ChatScreen } from '@/components/chat/chat-screen';
+import { shouldStackHeaderActions } from '@/components/screen-header';
+import type * as ScreenHeaderModule from '@/components/screen-header';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -176,7 +178,10 @@ vi.mock('@/components/agents/session-message-list', () => ({
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', async importOriginal => ({
+  ...(await importOriginal<typeof ScreenHeaderModule>()),
+  ScreenHeader: 'ScreenHeader',
+}));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   Lock: 'Lock',
@@ -447,6 +452,38 @@ describe('the chat header', () => {
     // the app carries the same spacing.
     expect(cluster.props.className).toContain('gap-2');
     expect(cluster.props.children).toHaveLength(3);
+  });
+
+  it('marks the pill as loading while the chat still opens, and settles it after', async () => {
+    const opening = metricOf(await mount());
+    // A reopened chat resolves before it can report any usage. The pill paints
+    // its loading bar over the value row until the open finishes, so it never
+    // sits as a wide empty capsule beside the title.
+    expect(opening.props.loading).toBe(true);
+    view?.unmount();
+
+    state.status = 'idle';
+    expect(metricOf(await mount()).props.loading).toBe(false);
+  });
+
+  it('declares its trailing cluster and its own title width to the header', async () => {
+    state.status = 'idle';
+    const tree = await mount();
+    const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
+    const { headerRightWidth, titleMinWidth } = header.props as {
+      headerRightWidth: number;
+      titleMinWidth: number;
+    };
+
+    // The header reflows this cluster only when the screen declares how wide
+    // the cluster lays out and what the title needs. A 360dp window cannot hold
+    // a readable "Chat" beside the pill and its two controls, so those numbers
+    // are what moves them to their own row instead of the title painting a
+    // lone character.
+    expect(shouldStackHeaderActions(360, 1, headerRightWidth, titleMinWidth)).toBe(true);
+    // The same row holds both at an ordinary phone width, so the header keeps
+    // the single-row layout it has everywhere else.
+    expect(shouldStackHeaderActions(411, 1, headerRightWidth, titleMinWidth)).toBe(false);
   });
 });
 

@@ -113,9 +113,13 @@ type PillCostSlot = 'label' | 'loading' | 'unreported';
  * pill — and the title and trailing control beside it — after the screen
  * settled.
  *
- * The percentage reserves a whole-window reading. The cost reserves a badge in
- * both of its shapes, since one carries two decimals at or above half a cent and
- * the other four decimals below it, so the reserve is the wider of the two.
+ * The percentage reserves the widest reading the formatter paints. It keeps at
+ * most one decimal, so a fractional reading carries a glyph more than a whole
+ * window does (`16.7%` against `100%`), and both are read through the formatter
+ * so the reserve follows this language's own digits and percent sign.
+ * The cost reserves a badge in both of its shapes, since one carries two
+ * decimals at or above half a cent and the other four decimals below it, so the
+ * reserve is the wider of the two.
  *
  * The reserve stops there on purpose. A total wide enough to need a grouping
  * separator paints past it and truncates inside its one line, the way a long
@@ -128,12 +132,22 @@ type PillCostSlot = 'label' | 'loading' | 'unreported';
 const COST_SLOT_SIZER_TWO_DECIMALS_MICRODOLLARS = 12_340_000;
 const COST_SLOT_SIZER_FOUR_DECIMALS_MICRODOLLARS = 4_999;
 
+/**
+ * The percentages the slot has to hold: a fractional reading just below the
+ * whole window and the whole window itself. One of them is the widest shape the
+ * formatter produces here, whichever is longer in this language.
+ */
+const PERCENTAGE_SLOT_SIZER_VALUES = [99.9, 100];
+
 export function getPillSlotSizers() {
   const twoDecimals = formatSessionCostBadge(COST_SLOT_SIZER_TWO_DECIMALS_MICRODOLLARS) ?? '$0.00';
   const fourDecimals =
     formatSessionCostBadge(COST_SLOT_SIZER_FOUR_DECIMALS_MICRODOLLARS) ?? '$0.0000';
+  const percentage = PERCENTAGE_SLOT_SIZER_VALUES.map(value =>
+    formatPercent(value, i18n.language)
+  ).reduce((widest, reading) => (reading.length > widest.length ? reading : widest));
   return {
-    percentage: formatPercent(100, i18n.language),
+    percentage,
     cost: fourDecimals.length >= twoDecimals.length ? fourDecimals : twoDecimals,
   };
 }

@@ -75,6 +75,34 @@ type ChatScreenProps = {
  */
 const CHAT_LIST_HREF: Href = '/(app)/(tabs)/(4_chat)';
 
+/** The box each trailing icon control renders (`ICON_TARGET_BOX_CLASS`). */
+const HEADER_CONTROL_WIDTH = 48;
+/** The `gap-2` the cluster keeps between its controls. */
+const HEADER_CONTROL_GAP = 8;
+/**
+ * Width the context pill reserves at font scale 1: its ring, the value row its
+ * two slots lay out, its padding and its border. The pill paints nothing in a
+ * slot whose reading has not arrived, but it holds that width, so the header
+ * has to reserve it the same way it reserves an icon control.
+ */
+const HEADER_PILL_WIDTH = 128;
+
+/**
+ * Width the chat header's trailing cluster lays out at, in dp: the context pill
+ * and the backends and tools controls beside it. The header reserves it, so a
+ * window that cannot hold the title beside all three drops them onto their own
+ * row instead of squeezing the title down to a lone character.
+ */
+const CHAT_HEADER_ACTIONS_WIDTH =
+  HEADER_PILL_WIDTH + 2 * (HEADER_CONTROL_WIDTH + HEADER_CONTROL_GAP);
+
+/**
+ * The content width this title needs to stay readable: "Chat" in the 18px
+ * header style beside its beta pill. The header's default reserves the 30px
+ * list title's width, which is wider than this screen ever paints.
+ */
+const CHAT_HEADER_TITLE_MIN_WIDTH = 104;
+
 export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -360,7 +388,14 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         }
         headerRight={
           <View className="flex-row items-center gap-2">
-            <SessionContextMetrics {...details.metrics} />
+            <SessionContextMetrics
+              {...details.metrics}
+              // A reopened chat resolves before it can report any usage, so the
+              // pill keeps its loading bar over the value row until the open
+              // finishes. Without it the control paints its ring beside an empty
+              // capsule for as long as the chat takes to open.
+              loading={state.status === 'opening'}
+            />
             <BackendSettingsControl selectedModel={model} onSelectModel={selectProviderModel} />
             <Pressable
               onPress={() => {
@@ -378,6 +413,8 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
             </Pressable>
           </View>
         }
+        headerRightWidth={CHAT_HEADER_ACTIONS_WIDTH}
+        titleMinWidth={CHAT_HEADER_TITLE_MIN_WIDTH}
         showBackButton
       />
       <KeyboardAvoidingView className="flex-1" behavior="padding">

@@ -8,6 +8,8 @@
   "type": "module",
   "scripts": {
     "preinstall": "node ../../scripts/check-pnpm.mjs",
+    "predeploy": "pnpm run build:wrapper && pnpm run build:worker",
+    "deploy": "wrangler deploy dist/worker/index.js --no-bundle --upload-source-maps",
     "dev": "scripts/dev.sh --env dev",
     "start": "scripts/dev.sh",
     "types": "wrangler types",
@@ -40,7 +42,10 @@
     "update-default-slash-commands": "node scripts/update-default-slash-commands.mjs",
     "test:runtime-installer": "tsx --test --test-concurrency=1 test/runtime-installer/*.test.ts",
     "runtime:publish": "tsx scripts/publish-runtime.ts",
-    "test:runtime-ci": "node --test scripts/runtime-ci-admission.test.mjs scripts/runtime-manual-admission.test.mjs scripts/runtime-publication-need.test.mjs"
+    "test:runtime-ci": "node --test scripts/runtime-ci-admission.test.mjs scripts/runtime-manual-admission.test.mjs scripts/runtime-publication-need.test.mjs",
+    "postdeploy": "pnpm run sentry:sourcemaps",
+    "build:worker": "tsx scripts/build-sentry-worker.ts",
+    "sentry:sourcemaps": "tsx scripts/upload-sentry-source-maps.ts"
   },
   "dependencies": {
     "@hono/trpc-server": "0.4.2",
@@ -59,7 +64,9 @@
     "jsonwebtoken": "catalog:",
     "ulid": "catalog:",
     "workers-tagged-logger": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@sentry/cloudflare": "10.69.0",
+    "@sentry/core": "10.69.0"
   },
   "devDependencies": {
     "@cloudflare/containers": "0.3.7",
@@ -76,6 +83,7 @@
     "vitest": "catalog:",
     "wrangler": "4.158.0",
     "ws": "^8.18.0",
-    "aws4fetch": "catalog:"
+    "aws4fetch": "catalog:",
+    "@sentry/cli": "catalog:"
   }
 }

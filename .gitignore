@@ -16,6 +16,7 @@ node_modules/
 packages/trpc/dist/
 packages/harness-sdk/dist/
 **/wrapper/dist/
+/services/cloud-agent-next/dist/
 *.tsbuildinfo
 next-env.d.ts
 

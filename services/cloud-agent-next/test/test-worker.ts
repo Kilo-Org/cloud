@@ -78,6 +78,13 @@ export { SandboxControlV2, SandboxSessionV2 };
 export { EnvironmentBuild } from '../src/environment-build/environment-build-do.js';
 export { SandboxContainers } from '../src/sandbox-containers/SandboxContainers.js';
 export { PreviewPortTestDO } from './integration/helpers/preview-port-test-do.js';
+export {
+  SentrySessionProbe,
+  SentryLegacySessionProbe,
+  SentrySandboxControlProbe,
+  SentrySandboxContainerProbe,
+  SentryDisabledProbe,
+} from './integration/helpers/sentry-durable-object.js';
 
 type TestEnv = {
   CLOUD_AGENT_REPORT_QUEUE: Queue<CloudAgentQueueReport>;

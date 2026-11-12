@@ -21,6 +21,9 @@ export function genericPushContentForPushData(
   const genericTitle = () => translatePush(locale, 'generic.title', undefined, 'Kilo');
   switch (data.type) {
     case 'cloud_agent_session':
+    case 'session_live_update':
+      // The session_live_update carrier is data-only: the app draws that
+      // notification. Neither variant may show the session title.
       return {
         title: genericTitle(),
         body: translatePush(
@@ -113,17 +116,6 @@ export function genericPushContentForPushData(
           'generic.body.activeAgentsGlanceable',
           undefined,
           'Active agents have an update'
-        ),
-      };
-    case 'session_live_update':
-      // Data-only: the app draws the notification. Never the session title.
-      return {
-        title: genericTitle(),
-        body: translatePush(
-          locale,
-          'generic.body.cloudAgentSession',
-          undefined,
-          'Your agent session has an update'
         ),
       };
     default: {

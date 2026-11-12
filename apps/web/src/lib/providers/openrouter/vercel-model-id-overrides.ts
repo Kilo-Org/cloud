@@ -3,6 +3,7 @@ import {
   type VercelModelIdOverride,
 } from '@kilocode/db/schema-types';
 import { mapResolvedModelIdToVercelWithoutOverrides } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { LEGACY_OPENROUTER_MODEL_ID_OVERRIDES } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-openrouter-model-ids';
 import {
   ModelsDevProviderSchema,
@@ -11,10 +12,6 @@ import {
 
 const MODELS_DEV_OPENROUTER_PROVIDER = 'openrouter';
 const MODELS_DEV_VERCEL_PROVIDER = 'vercel';
-
-function isFreeVariant(modelId: string) {
-  return modelId.endsWith(':free') || modelId.endsWith('-free');
-}
 
 function preferredModelId(current: string | undefined, candidate: string): string {
   if (!current) return candidate;
@@ -34,7 +31,7 @@ function compareByOpenRouterModelId(a: VercelModelIdOverride, b: VercelModelIdOv
 
 /** Free and paid models share a canonical ID, so they are indexed apart and never paired. */
 function canonicalIndexKey(canonicalId: string, modelId: string) {
-  return `${isFreeVariant(modelId) ? 'free' : 'paid'}:${canonicalId}`;
+  return `${isFreeModel(modelId) ? 'free' : 'paid'}:${canonicalId}`;
 }
 
 function indexIdsByCanonicalId(

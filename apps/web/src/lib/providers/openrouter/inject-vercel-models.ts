@@ -41,7 +41,7 @@ function toVercelEndpointModel(
   model: OpenRouterModel,
   endpoint: Endpoint,
   providerDisplayName: string,
-  dataPolicy?: { training: boolean; retainsPrompts: boolean },
+  dataPolicy?: EndpointDataPolicy,
   isFree = !endpoint.pricing?.prompt
 ): OpenRouterModel {
   const freeSuffixIndex = model.name.indexOf(' (free)');
@@ -113,69 +113,96 @@ type ProviderData = ProviderModelData[number];
 type VercelOffering = {
   model: OpenRouterModel;
   endpoints: readonly Endpoint[];
-  /** Set for models only Vercel serves; snapshot models keep OpenRouter's free endpoint rules. */
-  isFree?: boolean;
-};
+} & ({ isVercelOnly: false } | { isVercelOnly: true; isFree: boolean });
 
-/**
- * Lists `model` under a provider OpenRouter knows, unless OpenRouter already lists it there. The
- * provider's own data policy applies, except that a model Kilo serves for free is assumed to train
- * on and retain prompts.
- */
-function addToOpenRouterProvider(
-  providerData: ProviderData,
-  { model, isFree }: VercelOffering,
-  endpoint: Endpoint
-) {
-  if (providerData.models.some(m => m.slug === model.slug)) return;
-  providerData.models.push(
-    toVercelEndpointModel(
-      model,
-      endpoint,
-      providerData.provider.displayName,
-      isFree ? { training: true, retainsPrompts: true } : undefined,
-      isFree
-    )
-  );
+type EndpointDataPolicy = { training: boolean; retainsPrompts: boolean };
+
+/** Vercel reports per-endpoint guarantees; a missing guarantee means training on and retaining prompts. */
+function getVercelEndpointDataPolicy(endpoint: Endpoint): EndpointDataPolicy {
+  return {
+    training: endpoint.has_no_training !== true,
+    retainsPrompts: endpoint.has_zdr !== true,
+  };
 }
 
-/**
- * Lists `model` under a provider only Vercel lists. Vercel reports per-endpoint ZDR and no-training
- * guarantees; a missing guarantee is treated as training on and retaining prompts. The provider
- * takes the worst policy of its endpoints, and a model Kilo serves for free is assumed to train on
- * and retain prompts.
- */
-function addToVercelOnlyProvider(
+/** Lists `model` under the provider, or merges in the worst data policy if it is listed there. */
+function addVercelEndpointModel(
   providerData: ProviderData,
-  { model, isFree }: VercelOffering,
-  endpoint: Endpoint
+  offering: VercelOffering,
+  endpoint: Endpoint,
+  dataPolicy: EndpointDataPolicy
 ) {
-  const endpointTraining = endpoint.has_no_training !== true;
-  const endpointRetainsPrompts = endpoint.has_zdr !== true;
-  const { dataPolicy } = providerData.provider;
-  dataPolicy.training ||= endpointTraining;
-  dataPolicy.retainsPrompts ||= endpointRetainsPrompts;
-  const training = isFree === true || endpointTraining;
-  const retainsPrompts = isFree === true || endpointRetainsPrompts;
-
-  const existing = providerData.models.find(m => m.slug === model.slug);
-  if (existing?.endpoint) {
-    existing.endpoint.data_policy = {
-      training: existing.endpoint.data_policy?.training === true || training,
-      retainsPrompts: existing.endpoint.data_policy?.retainsPrompts === true || retainsPrompts,
-    };
+  const existing = providerData.models.find(m => m.slug === offering.model.slug);
+  if (existing) {
+    if (existing.endpoint) {
+      existing.endpoint.data_policy = {
+        training: existing.endpoint.data_policy?.training === true || dataPolicy.training,
+        retainsPrompts:
+          existing.endpoint.data_policy?.retainsPrompts === true || dataPolicy.retainsPrompts,
+      };
+    }
     return;
   }
 
   providerData.models.push(
     toVercelEndpointModel(
-      model,
+      offering.model,
       endpoint,
       providerData.provider.displayName,
-      { training, retainsPrompts },
-      isFree
+      dataPolicy,
+      offering.isVercelOnly ? offering.isFree : undefined
     )
   );
+}
+
+/**
+ * Lists `model` under a provider OpenRouter knows, unless OpenRouter already lists it there.
+ * Snapshot models keep the provider's own data policy. A model only Vercel serves takes the worst
+ * of the provider's policy and the Vercel endpoint's guarantees, so that every endpoint of the model
+ * under the provider must offer a guarantee before it is reported. A model Kilo serves for free is
+ * assumed to train on and retain prompts.
+ */
+function addToOpenRouterProvider(
+  providerData: ProviderData,
+  offering: VercelOffering,
+  endpoint: Endpoint
+) {
+  if (!offering.isVercelOnly) {
+    if (providerData.models.some(m => m.slug === offering.model.slug)) return;
+    providerData.models.push(
+      toVercelEndpointModel(offering.model, endpoint, providerData.provider.displayName)
+    );
+    return;
+  }
+
+  const providerPolicy = providerData.provider.dataPolicy;
+  const endpointPolicy = getVercelEndpointDataPolicy(endpoint);
+  addVercelEndpointModel(providerData, offering, endpoint, {
+    training: offering.isFree || providerPolicy.training || endpointPolicy.training,
+    retainsPrompts:
+      offering.isFree || providerPolicy.retainsPrompts || endpointPolicy.retainsPrompts,
+  });
+}
+
+/**
+ * Lists `model` under a provider only Vercel lists, with the Vercel endpoint's guarantees. The
+ * provider takes the worst policy of its endpoints, and a model Kilo serves for free is assumed to
+ * train on and retain prompts.
+ */
+function addToVercelOnlyProvider(
+  providerData: ProviderData,
+  offering: VercelOffering,
+  endpoint: Endpoint
+) {
+  const endpointPolicy = getVercelEndpointDataPolicy(endpoint);
+  const { dataPolicy } = providerData.provider;
+  dataPolicy.training ||= endpointPolicy.training;
+  dataPolicy.retainsPrompts ||= endpointPolicy.retainsPrompts;
+  const isFree = offering.isVercelOnly && offering.isFree;
+  addVercelEndpointModel(providerData, offering, endpoint, {
+    training: isFree || endpointPolicy.training,
+    retainsPrompts: isFree || endpointPolicy.retainsPrompts,
+  });
 }
 
 /** Snapshot models that Vercel also serves, with the Vercel endpoints that serve them. */
@@ -184,10 +211,10 @@ function getSnapshotOfferings(
   vercelModels: GatewayModelMap,
   vercelModelIdOverrides: VercelModelIdOverrides
 ): VercelOffering[] {
-  return [...getUniqueModels(providerModelData)].flatMap(model => {
+  return [...getUniqueModels(providerModelData)].flatMap((model): VercelOffering[] => {
     const vercelModel =
       vercelModels[mapResolvedModelIdToVercel(model.slug, vercelModelIdOverrides)];
-    return vercelModel ? [{ model, endpoints: vercelModel.endpoints }] : [];
+    return vercelModel ? [{ model, endpoints: vercelModel.endpoints, isVercelOnly: false }] : [];
   });
 }
 
@@ -229,6 +256,7 @@ function getVercelOnlyOfferings(
           completion: pricing.output,
         },
       })),
+      isVercelOnly: true,
       isFree: isFreeModel(id),
     };
   });

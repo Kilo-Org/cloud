@@ -665,6 +665,11 @@ export async function runMatrix(
     for (const config of cells) {
       ctx.log(`design-gate: cell ${config.id}`);
       ctx.device.apply(config);
+      // A cell's config (night mode, size) recreates the Android Activity: the
+      // dev client drops its inspector target and the page list is empty until
+      // it re-attaches. waitForApp rides that window out the same way it rides
+      // a runtime reload.
+      await waitForApp(ctx.probe, ctx.clock);
       const language: LanguageTarget = config.rtl
         ? { preference: RTL_LANGUAGE, resolved: RTL_LANGUAGE, rtl: true }
         : ltrLanguage;

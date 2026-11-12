@@ -225,6 +225,7 @@ describe('IntegrationsScreen', () => {
   });
 
   it('reports an ambiguous GitHub organization as web-managed', () => {
+    state.role = 'owner';
     state.statuses.data = [
       { platform: 'github', installed: true, installation: { accountLogin: 'acme' } },
       { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
@@ -279,12 +280,14 @@ describe('IntegrationsScreen', () => {
     state.role = 'member';
     state.statuses.data = [
       { platform: 'slack', installed: true, installation: { teamName: 'Acme' } },
+      { platform: 'bitbucket', installed: true, installation: { accountLogin: 'workspace' } },
     ];
     const renderer = mount('org-1');
     const root = renderer.root;
 
     expect(actionOf(rowTitled(root, 'GitHub'))).toBeNull();
     expect(actionOf(rowTitled(root, 'Slack'))).toBeNull();
+    expect(actionOf(rowTitled(root, 'Bitbucket'))).toBeNull();
     expect(texts(root)).toContain(
       'Ask an organization owner or admin to change these connections.'
     );

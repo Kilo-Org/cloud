@@ -76,39 +76,45 @@ export function IntegrationProviderRow({
   }
   const namedAction = (action: string) => [action, label].join(t('common.sentenceJoiner'));
 
+  // A member reads the connections but changes none of them, on the web either:
+  // the page behind "Manage on the web" is the same manager-only control.
   let action: ReactNode = null;
-  if (row.installed && row.webManaged) {
-    action = (
-      <Button
-        size="sm"
-        variant="outline"
-        onPress={onManageOnWeb}
-        accessibilityLabel={namedAction(t('integrations.manageOnWeb'))}
-      >
-        <Text>{t('integrations.manageOnWeb')}</Text>
-      </Button>
-    );
-  } else if (canManage) {
-    action = row.installed ? (
-      <Button
-        size="sm"
-        variant="outline"
-        loading={disconnecting}
-        onPress={onDisconnect}
-        accessibilityLabel={namedAction(t('integrations.disconnect'))}
-      >
-        <Text>{t('integrations.disconnect')}</Text>
-      </Button>
-    ) : (
-      <Button
-        size="sm"
-        loading={connecting}
-        onPress={onConnect}
-        accessibilityLabel={namedAction(t('common.connect'))}
-      >
-        <Text>{t('common.connect')}</Text>
-      </Button>
-    );
+  if (canManage) {
+    if (row.installed && row.webManaged) {
+      action = (
+        <Button
+          size="sm"
+          variant="outline"
+          onPress={onManageOnWeb}
+          accessibilityLabel={namedAction(t('integrations.manageOnWeb'))}
+        >
+          <Text>{t('integrations.manageOnWeb')}</Text>
+        </Button>
+      );
+    } else if (row.installed) {
+      action = (
+        <Button
+          size="sm"
+          variant="outline"
+          loading={disconnecting}
+          onPress={onDisconnect}
+          accessibilityLabel={namedAction(t('integrations.disconnect'))}
+        >
+          <Text>{t('integrations.disconnect')}</Text>
+        </Button>
+      );
+    } else {
+      action = (
+        <Button
+          size="sm"
+          loading={connecting}
+          onPress={onConnect}
+          accessibilityLabel={namedAction(t('common.connect'))}
+        >
+          <Text>{t('common.connect')}</Text>
+        </Button>
+      );
+    }
   }
 
   return (

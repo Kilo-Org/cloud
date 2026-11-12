@@ -106,7 +106,7 @@ type PillCostSlot = 'label' | 'loading' | 'unreported' | 'none';
  * placeholder, so the pill paints it; a value that has not arrived paints
  * nothing at all.
  */
-export const UNKNOWN_WINDOW_LABEL = '—';
+const UNKNOWN_WINDOW_LABEL = '—';
 
 /**
  * Single selector for the session-detail header pill. Always returns content

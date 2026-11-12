@@ -143,6 +143,7 @@ export class EventServiceClient {
     // Without a handler no consumer can refresh the credential, so a refused
     // ticket is terminal for this client.
     if (!this.onUnauthorized) {
+      console.warn('[event-service] connection ticket refused; no onUnauthorized handler');
       this.stopAfterUnauthorized();
       return true;
     }

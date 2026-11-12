@@ -348,6 +348,7 @@ describe('EventServiceClient', () => {
 
   it('stops after a refused connection ticket when no unauthorized handler is configured', async () => {
     vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       const statuses = [401, 403];
       let attempt = 0;
@@ -364,17 +365,21 @@ describe('EventServiceClient', () => {
       expect(refusedFetch).toHaveBeenCalledTimes(1);
       expect(allMockWs).toHaveLength(0);
       expect(client.isConnected()).toBe(false);
+      expect(warn).toHaveBeenCalledTimes(1);
 
       await vi.advanceTimersByTimeAsync(120_000);
       expect(refusedFetch).toHaveBeenCalledTimes(1);
       expect(allMockWs).toHaveLength(0);
+      expect(warn).toHaveBeenCalledTimes(1);
     } finally {
+      warn.mockRestore();
       vi.useRealTimers();
     }
   });
 
   it('stops when a reconnect ticket is refused and no unauthorized handler is configured', async () => {
     vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       let attempt = 0;
       const refusedAfterFirst = vi.fn(async () => {
@@ -397,12 +402,15 @@ describe('EventServiceClient', () => {
       await vi.advanceTimersByTimeAsync(2_000);
       expect(refusedAfterFirst).toHaveBeenCalledTimes(2);
       expect(allMockWs).toHaveLength(1);
+      expect(warn).toHaveBeenCalledTimes(1);
 
       await vi.advanceTimersByTimeAsync(120_000);
       expect(refusedAfterFirst).toHaveBeenCalledTimes(2);
       expect(allMockWs).toHaveLength(1);
       expect(client.isConnected()).toBe(false);
+      expect(warn).toHaveBeenCalledTimes(1);
     } finally {
+      warn.mockRestore();
       vi.useRealTimers();
     }
   });

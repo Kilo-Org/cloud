@@ -208,6 +208,7 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Keep related items closer together than unrelated groups, and use the same gap for the same relation everywhere.
 - Plan long text: a label that can grow truncates with an ellipsis or wraps by design. When secondary text cannot fit, drop it before you squeeze the primary text.
 - Never shift layout when state changes. Reserve the space for spinners, status lines, errors, and copy that comes and goes, or replace content in place.
+- Never grow a row or a section header to a control's touch size. Keep the row one line tall and reach 44pt with `hitSlop` on a shared compact box from `@/lib/a11y/tap-target` (`LINE_ACTION_BOX_CLASS`, `SECTION_ACTION_BOX_CLASS`). A taller box leaves empty space above its text, and at the top of a screen that space reads as a hole under the title.
 - Do not repeat what the screen already shows: no "Enabled" beside a switch, no product name beside its logo, no description that restates the title.
 - Change only the visual properties the task names. A color fix does not change dimensions.
 
@@ -267,6 +268,7 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - Pass one `--link` per changed screen and per state it can show: loading, empty, error, and long text. Open a hard-to-reach state through a fixture link (see Fixtures).
 - The standard matrix covers the default size, dark mode, a compact screen, and right-to-left on Android, and the default size, dark mode, and right-to-left on iOS. It keeps font scale and display density at their defaults.
 - After a link opens, the gate keeps measuring for 2.5 s, so content that arrives late and moves the screen is a `layout-shift` error.
+- A scrolling screen must start with what it shows. Empty space above the first painted content, beyond the scroll content's top padding and one section break (24 dp), is a `leading-gap` error: a first block pushed down by a margin, or a box that holds its content at its bottom.
 - Shift measurements use transform-free layout frames. Navigation transforms remain visible in screenshots and motion recordings without hiding real content shifts.
 - The sampler retains the newest 400 distinct layouts. A truncation flag in the timeline and motion artifacts marks incomplete capture.
 - Fix every `error` finding, then run the gate again until it exits 0. Fix each `warning`, or give a one-line reason in the pull request.

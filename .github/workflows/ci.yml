@@ -1169,7 +1169,11 @@ jobs:
 
       - name: Run Session Ingest Postgres tests
         if: needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_session_ingest == 'true'
-        run: NODE_ENV=development pnpm --filter cloudflare-session-ingest test:postgres
+        # Copies of shared tables and the worktree regressions read the migrated
+        # schema, and this step runs alone when only the detector selects this
+        # service, so it applies the migrations instead of relying on the meter
+        # step above.
+        run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloudflare-session-ingest test:postgres
 
   # In its own job, madge runs beside the script tests instead of before them.
   dependency-cycle-check:

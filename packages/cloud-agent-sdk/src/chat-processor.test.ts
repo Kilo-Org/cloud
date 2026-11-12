@@ -983,6 +983,76 @@ describe('createChatProcessor', () => {
   });
 
   describe('synthesizeQueuedUserMessage', () => {
+    it('records the server queue time on a new unconfirmed row', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      processor.synthesizeQueuedUserMessage({
+        messageId: 'msg-queued',
+        sessionId: 'ses-1',
+        content: 'hello',
+        createdAt: 100,
+      });
+      expect(storage.getMessageInfo('msg-queued')).toMatchObject({
+        time: { created: 100 },
+        queuedAt: 100,
+        synthetic: true,
+      });
+      expect(storage.getParts('msg-queued')).toMatchObject([{ text: 'hello', synthetic: true }]);
+    });
+
+    it('records the server queue time on an optimistic row without replacing its text or attachments', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const optimistic = { ...makeUserMsg('msg-1'), synthetic: true };
+      storage.upsertMessage(optimistic);
+      const text = { ...makeTextPart('msg-1-text', 'msg-1', 'original text'), synthetic: true };
+      const file: Part = {
+        id: 'msg-1-file',
+        messageID: 'msg-1',
+        sessionID: 'ses-1',
+        type: 'file',
+        mime: 'image/png',
+        url: 'data:image/png;base64,AA==',
+        synthetic: true,
+      };
+      storage.upsertPart('msg-1', text);
+      storage.upsertPart('msg-1', file);
+      const parts = storage.getParts('msg-1');
+
+      processor.synthesizeQueuedUserMessage({
+        messageId: 'msg-1',
+        sessionId: 'ses-1',
+        content: undefined,
+        createdAt: 100,
+      });
+
+      expect(storage.getMessageInfo('msg-1')).toEqual({ ...optimistic, queuedAt: 100 });
+      expect(storage.getParts('msg-1')).toEqual(parts);
+    });
+
+    it('keeps the first queue time of a row on a repeated acknowledgement', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const input = { messageId: 'msg-1', sessionId: 'ses-1', content: 'hello' };
+      processor.synthesizeQueuedUserMessage({ ...input, createdAt: 100 });
+      processor.synthesizeQueuedUserMessage({ ...input, createdAt: 500 });
+      expect(storage.getMessageInfo('msg-1')).toMatchObject({ queuedAt: 100, synthetic: true });
+    });
+
+    it('does not change a native row on queue acknowledgement', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const native = makeUserMsg('msg-1');
+      storage.upsertMessage(native);
+      processor.synthesizeQueuedUserMessage({
+        messageId: 'msg-1',
+        sessionId: 'ses-1',
+        content: 'hello',
+        createdAt: 1,
+      });
+      expect(storage.getMessageInfo('msg-1')).toEqual(native);
+    });
+
     it('inserts a synthetic user message with text part when storage is empty', () => {
       const storage = createMemoryStorage();
       const processor = createChatProcessor(storage);
@@ -997,6 +1067,7 @@ describe('createChatProcessor', () => {
       const info = storage.getMessageInfo('msg-queued') as UserMessage;
       expect(info?.role).toBe('user');
       expect(info?.sessionID).toBe('ses-1');
+      expect(info?.synthetic).toBe(true);
       const parts = storage.getParts('msg-queued');
       expect(parts).toHaveLength(1);
       const textPart = parts[0] satisfies Part as TextPart;
@@ -1019,6 +1090,7 @@ describe('createChatProcessor', () => {
         messageId: 'msg-1',
         sessionId: 'ses-1',
         content: 'duplicate',
+        createdAt: 999,
       });
 
       expect(storage.getMessageIds()).toEqual(['msg-1']);

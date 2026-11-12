@@ -47,7 +47,7 @@ it.each([undefined, 'staging'])(
         retry_delay: 60,
         max_concurrency: env === 'staging' ? 200 : 225,
         max_batch_timeout: 0,
-        max_batch_size: env === 'staging' ? 2 : 6,
+        max_batch_size: env === 'staging' ? 2 : 3,
         queue:
           env === 'staging' ? 'usage-ingest-processing-staging-eu' : 'usage-ingest-processing-eu',
         dead_letter_queue:

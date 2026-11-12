@@ -27,7 +27,7 @@
     "consumers": [
       {
         "queue": "usage-ingest-processing-eu",
-        "max_batch_size": 6,
+        "max_batch_size": 3,
         "max_batch_timeout": 0,
         "max_retries": 20,
         "retry_delay": 60,

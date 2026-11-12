@@ -63,7 +63,7 @@ fields, but Exa log values never include the user, organization, path, cost, fea
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing-eu` | `usage-ingest-processing-dlq-eu` |
 | Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging-eu` | `usage-ingest-processing-dlq-staging-eu` |
 
-Each environment connects only its EU pair. Production uses batch6/parallelism2/cap225 (up to 450 writer calls);
+Each environment connects only its EU pair. Production uses batch3/parallelism2/cap225 (up to 450 writer calls);
 staging keeps one consumer capped at200, batch size2. Old global queues remain intact
 for a paused/drained routing rollback. See [EU preparation and cutover](eu-queues.md).
 
@@ -371,26 +371,28 @@ and [known limitations](https://developers.cloudflare.com/workers/observability/
 
 ## Queue policy
 
-Production uses batch size 6 and staging keeps batch size 2. Both allow at most
+Production uses batch size 3 and staging keeps batch size 2. Both allow at most
 two writer slots per invocation:
 
 | Consumer setting | Value | Purpose |
 |---|---|---|
-| `max_batch_size` | `6` in production, `2` in staging | Maximum messages delivered per invocation. |
+| `max_batch_size` | `3` in production, `2` in staging | Maximum messages delivered per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
 | `max_concurrency` | `225` in production, `200` in staging | Parallelism 2 allows at most `225 × 2 = 450` concurrent queue writer calls in production and `200 × 2 = 400` in staging. |
 | `max_retries` | `20` | Initial delivery plus up to twenty retries, shared across failure classes. |
 | `retry_delay` | `60` seconds | Fallback for implicit/unexpected failures; handled failures use per-message jitter below. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |
 
-The production cap `225` is an intentional single-knob trial from the previous
-`200`. Batch size 6, fill timeout 0, parallelism 2, retries, staging settings and
-the writer pool/admission limits are unchanged. `225 × 2 = 450` is a theoretical
-maximum writer HTTP call ceiling versus `400`; it is not 450 database
-connections, guaranteed active consumers or measured throughput. The trial
-window, measurement and rollback are operator decisions. Merging this source
-enables the existing scheduled production deployment but does not itself start a
-hosted trial or support a latency claim.
+The production cap `225` was an intentional single-knob trial from the previous
+`200`. During that trial, the then-current batch size 6, fill timeout 0,
+parallelism 2, retries, staging settings and the writer pool/admission limits
+stayed unchanged. `225 × 2 = 450` is a theoretical maximum writer HTTP call
+ceiling versus `400`; it is not 450 database connections, guaranteed active
+consumers or measured throughput. The trial window, measurement and rollback were
+operator decisions. Merging that trial's source enabled the existing scheduled
+production deployment but did not itself start a hosted trial or support a
+latency claim. Production batch size 3 is a later, separate change that keeps
+the cap at `225`.
 
 ### Native congestion retries and launch budget
 
@@ -444,8 +446,8 @@ leaving room for its full unchanged 160-second timeout and margin. Later unstart
 valid items retry conservatively with reason `invocation_budget`; they are neither
 ACKed nor labelled writer overload. This covers parallelism 1 fallback and growing
 batches without shortening timeouts or abandoning in-flight writes. Current
-batch 6/par 2 has three 160-second waves (480 seconds of nominal HTTP allowance),
-so normal work stays unchanged. Scheduling/AbortSignal deadlines are cooperative,
+batch 3/par 2 has two 160-second waves (320 seconds of nominal HTTP allowance),
+well within the 840-second budget, so normal work stays unchanged. Scheduling/AbortSignal deadlines are cooperative,
 not hard guarantees against runtime stalls or the platform's 900-second wall limit.
 
 The budget increase is global to each CF consumer: a continually failing valid
@@ -529,11 +531,13 @@ The two connections of nominal headroom are a starting local policy, **not
 reserved connections** or a measured global capacity bound. Other traffic can
 compete after the snapshot, a writer may perform several database operations,
 background work can outlive the awaited call, and each runtime instance has its
-own counter/pool. An admitted call can still wait. The pool maximum stays at 10,
-consumer concurrency at 225 in production (200 in staging), parallelism at 2, and
-batch size at 6 in production and 2 in staging; retry settings also stay unchanged.
-There is no new environment knob; merging this change activates queue rejection
-when the normal automatic deployment reaches the writer.
+own counter/pool. An admitted call can still wait. When queue admission landed,
+it left the pool maximum at 10, parallelism at 2, batch size at 6 in production
+and 2 in staging, and the consumer concurrency and retry settings unchanged. It
+added no environment knob; merging that change activated queue rejection when the
+normal automatic deployment reached the writer. Production consumer concurrency is
+now 225 (200 in staging) and production batch size is now 3; see
+[Queue policy](#queue-policy).
 
 Queue writes to the Enkrypt writer (`/api/internal/enkrypt-usage/record`) and the Exa
 writer (`/api/internal/exa-usage/record`) use the same guard and the same shared limit,
@@ -566,7 +570,7 @@ do not establish hosted throughput, spare capacity, or latency improvements.
 Staging uses the single EU queue `usage-ingest-processing-staging-eu`
 and its EU DLQ `usage-ingest-processing-dlq-staging-eu`. It allows at most 400 concurrent writer calls with batch 2,
 parallelism 2 and invocation cap 200. Production selects processing at cap 225
-with batch 6 and two slots, subject to the [production merge gates](eu-queues.md#production-merge-gate).
+with batch 3 and two slots, subject to the [production merge gates](eu-queues.md#production-merge-gate).
 
 `USAGE_INGEST_PARALLELISM` is the simple serial/parallel experiment control:
 
@@ -584,7 +588,7 @@ this is not a live per-request switch. No additional experiment framework or
 request-controlled switch is introduced.
 
 With timeout zero, actual batches may still contain one message. A full production
-batch shares two writer slots among six messages; later messages can wait inside the
+batch shares two writer slots among three messages; later messages can wait inside the
 invocation. Increasing batch size is a scheduling hypothesis; local tests do not establish
 batch fill or delivery-tail improvement. The 400-writer setting is a doubled
 upper bound versus the prior batch-1/cap-200 configuration, not a guarantee of
@@ -597,7 +601,7 @@ already on main; staging-host middleware remains deferred. This refresh preserve
 the sole selected EU source/DLQ, its preparation and routing rollback behavior,
 the parallelism variable, and the writer target. Keep one
 consumer per environment at parallelism 2, with production cap 225 and staging cap
-200; production batch 6 and staging batch 2 give at most 450 and 400 writer calls
+200; production batch 3 and staging batch 2 give at most 450 and 400 writer calls
 respectively. Do not reconnect a
 legacy consumer or split the cap. The queue-budget and direct runtime tests pin
 the actual EU queue names and policy. Verify the refreshed source and those
@@ -630,7 +634,7 @@ attempts disable Wrangler's global auto-provisioning for EU selections. Staging
 continues direct HTTP to its writer; production also uses its direct Frankfurt writer. The preparation step also detaches the obsolete
 environment consumer before Wrangler attaches the selected source; it preserves both queue pairs.
 See [deployment-driven cutover and routing rollback](eu-queues.md).
-Production uses its EU pair with batch6/parallelism2/cap225 and the existing retry policy.
+Production uses its EU pair with batch3/parallelism2/cap225 and the existing retry policy.
 Historical global production revisions retain normal provisioning; see the helper capability notes in [EU setup](eu-queues.md).
 `USAGE_INGEST_QUEUE` binds the source and `USAGE_INGEST_DLQ` binds its matching DLQ;
 only the source has a consumer. Exhausted failures route to that DLQ.

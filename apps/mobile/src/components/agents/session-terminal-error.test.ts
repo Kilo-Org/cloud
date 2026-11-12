@@ -523,6 +523,10 @@ describe('sessionStatusErrorMessage', () => {
     ['Commit failed'],
     ['Kilo was not responding and was restarted'],
     ['The turn made no progress'],
+    ['The turn did not complete'],
+    [
+      'The assistant finished its reply, but session completion could not be confirmed. Send a new message to continue.',
+    ],
     // A bounded workspace failure appends its own detail to the projection.
     ['Workspace setup failed: Devcontainer workspace preparation failed'],
   ] as const)('shows the safe projection copy for %s', raw => {

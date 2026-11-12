@@ -182,6 +182,18 @@ describe('BlockedPeopleScreen', () => {
     expect(action(second, 'Unmute loudmouth').props.disabled).toBe(true);
   });
 
+  it('ignores a second tap in the same list while the first is pending', async () => {
+    state.blockedLogins = ['spammer', 'second-blocked'];
+    state.pending = 'unblock';
+    state.pendingVariables = { githubLogin: 'spammer' };
+    const root = await mount();
+
+    expect(action(root, 'Unblock spammer').props.disabled).toBe(true);
+    expect(action(root, 'Unblock second-blocked').props.disabled).toBe(true);
+    expect(action(root, 'Unblock second-blocked').props.loading).toBe(false);
+    expect(action(root, 'Unmute loudmouth').props.disabled).toBe(false);
+  });
+
   it('shows the server message when a reveal is refused', async () => {
     await mount();
 

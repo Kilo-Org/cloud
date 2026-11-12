@@ -23,13 +23,17 @@ function HiddenLoginRow({
   login,
   actionLabel,
   actionA11y,
-  busy,
+  pending,
+  disabled,
   onAction,
 }: Readonly<{
   login: string;
   actionLabel: string;
   actionA11y: string;
-  busy: boolean;
+  /** This row's own request is the one in flight. */
+  pending: boolean;
+  /** The section's request is in flight, whichever row started it. */
+  disabled: boolean;
   onAction: () => void;
 }>) {
   return (
@@ -41,8 +45,8 @@ function HiddenLoginRow({
         variant="outline"
         size="sm"
         className={STATE_ACTION_CLASS}
-        disabled={busy}
-        loading={busy}
+        disabled={disabled}
+        loading={pending}
         accessibilityLabel={actionA11y}
         onPress={onAction}
       >
@@ -57,14 +61,16 @@ function HiddenLoginsSection({
   logins,
   actionLabel,
   actionA11y,
-  busyLogin,
+  pendingLogin,
+  disabled,
   onAction,
 }: Readonly<{
   title: string;
   logins: readonly string[];
   actionLabel: string;
   actionA11y: (login: string) => string;
-  busyLogin: string | null;
+  pendingLogin: string | null;
+  disabled: boolean;
   onAction: (login: string) => void;
 }>) {
   if (logins.length === 0) {
@@ -82,7 +88,8 @@ function HiddenLoginsSection({
             login={login}
             actionLabel={actionLabel}
             actionA11y={actionA11y(login)}
-            busy={busyLogin === login}
+            pending={pendingLogin === login}
+            disabled={disabled}
             onAction={() => {
               onAction(login);
             }}
@@ -159,7 +166,8 @@ export function BlockedPeopleScreen() {
           logins={hidden.data.blockedLogins}
           actionLabel={t('profile.blockedPeople.unblock')}
           actionA11y={login => t('profile.blockedPeople.unblockA11y', { login })}
-          busyLogin={unblock.isPending ? unblock.variables.githubLogin : null}
+          pendingLogin={unblock.isPending ? unblock.variables.githubLogin : null}
+          disabled={unblock.isPending}
           onAction={login => {
             unblock.mutate({ githubLogin: login });
           }}
@@ -169,7 +177,8 @@ export function BlockedPeopleScreen() {
           logins={hidden.data.mutedLogins}
           actionLabel={t('profile.blockedPeople.unmute')}
           actionA11y={login => t('profile.blockedPeople.unmuteA11y', { login })}
-          busyLogin={unmute.isPending ? unmute.variables.githubLogin : null}
+          pendingLogin={unmute.isPending ? unmute.variables.githubLogin : null}
+          disabled={unmute.isPending}
           onAction={login => {
             unmute.mutate({ githubLogin: login });
           }}

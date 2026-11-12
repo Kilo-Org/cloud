@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { matchesGlob } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, matchesGlob } from 'node:path';
 import test from 'node:test';
 
 import { load } from 'js-yaml';
@@ -217,4 +219,141 @@ test('mobile change detection pins the root workflow path family', () => {
   // would otherwise pass.
   detect.run = detect.run.replace('|^\\.github/workflows/ci\\.yml$', '');
   assert.throws(() => validate(...workflows), /must recognise/);
+});
+
+// Only a change whose whole changed-path set is under tools/oxlint skips the
+// shards and the typecheck. A missed skip costs runner minutes; a skip that also
+// covers an app path would report success without executing the suite, and a
+// release consumes that run as its proof for the commit.
+const lintOnlyCondition =
+  "needs.mobile-changes.outputs.mobile == 'true' && needs.mobile-changes.outputs.lint_only != 'true'";
+
+// Runs the detector's own shell against fixture change sets. `git` answers the
+// diffs and `node` answers the workspace selection, so the assertions read the
+// outputs GitHub receives instead of a paraphrase of the step.
+function runDetect(files, { base = 'resolved' } = {}) {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-app-detect-'));
+  try {
+    const bin = join(work, 'bin');
+    mkdirSync(bin);
+    writeFileSync(
+      join(bin, 'git'),
+      [
+        '#!/bin/sh',
+        'case "$1" in',
+        '  rev-parse)',
+        '    [ "$2" = "--verify" ] && [ "$DETECT_BASE" = "absent" ] && exit 1',
+        '    exit 0',
+        '    ;;',
+        '  diff)',
+        `    [ -n "$DETECT_FILES" ] && printf '%s\\n' "$DETECT_FILES"`,
+        '    exit 0',
+        '    ;;',
+        'esac',
+        'exit 0',
+        '',
+      ].join('\n'),
+      { mode: 0o755 }
+    );
+    writeFileSync(
+      join(bin, 'node'),
+      '#!/bin/sh\necho \'{"full":false,"packages":[],"test_only_packages":[]}\'\n',
+      { mode: 0o755 }
+    );
+    const output = join(work, 'output');
+    writeFileSync(output, '');
+    const detect = readWorkflows()[1].jobs['mobile-changes'].steps.find(
+      step => step.id === 'detect'
+    );
+    execFileSync(
+      'bash',
+      ['-e', '-o', 'pipefail', '-c', detect.run.replace(/\$\{\{[^}]*\}\}/g, 'fixture')],
+      {
+        cwd: work,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          GITHUB_OUTPUT: output,
+          DETECT_BASE: base,
+          DETECT_FILES: files.join('\n'),
+        },
+      }
+    );
+    return Object.fromEntries(
+      readFileSync(output, 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map(line => line.split('='))
+    );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+for (const [name, files, expected] of [
+  [
+    'a lint plugin alone',
+    ['tools/oxlint/anti-slop/index.ts'],
+    { mobile: 'true', lint_only: 'true' },
+  ],
+  [
+    'several lint plugins',
+    ['tools/oxlint/anti-slop/index.ts', 'tools/oxlint/anti-slop/index.test.ts'],
+    { mobile: 'true', lint_only: 'true' },
+  ],
+  [
+    'a lint plugin with an app path',
+    ['tools/oxlint/anti-slop/index.ts', 'apps/mobile/src/app/index.tsx'],
+    { mobile: 'true', lint_only: 'false' },
+  ],
+  ['an app path alone', ['apps/mobile/src/app/index.tsx'], { mobile: 'true', lint_only: 'false' }],
+  ['this workflow alone', [mobilePath], { mobile: 'true', lint_only: 'false' }],
+  ['an unrelated path alone', ['README.md'], { mobile: 'false', lint_only: 'false' }],
+  ['no changed path', [], { mobile: 'false', lint_only: 'false' }],
+]) {
+  test(`mobile change detection publishes ${JSON.stringify(expected)} for ${name}`, () => {
+    assert.deepEqual(runDetect(files), expected);
+  });
+}
+
+test('mobile change detection runs the suite when the base commit is unknown', () => {
+  assert.deepEqual(runDetect(['tools/oxlint/anti-slop/index.ts'], { base: 'absent' }), {
+    mobile: 'true',
+    lint_only: 'false',
+  });
+});
+
+test('only the shards and the typecheck skip a lint-only change', () => {
+  const mobile = readWorkflows()[1];
+  assert.equal(
+    mobile.jobs['mobile-changes'].outputs.lint_only,
+    '${{ steps.detect.outputs.lint_only }}',
+    'the detection job must publish lint_only, or the gates below silently stop applying'
+  );
+  for (const name of ['mobile-test', 'mobile-typecheck']) {
+    assert.equal(
+      mobile.jobs[name].if,
+      lintOnlyCondition,
+      `${name} must skip exactly a lint-only change`
+    );
+  }
+  for (const name of [
+    'prepare-harness-sdk',
+    'prepare-trpc',
+    'mobile-lint',
+    'i18n-leftover',
+    'check-unused',
+  ]) {
+    assert.equal(
+      mobile.jobs[name].if,
+      "needs.mobile-changes.outputs.mobile == 'true'",
+      `${name} must keep running for a lint-only change`
+    );
+  }
+  assert.equal(
+    mobile.jobs['mobile-test-result'].if,
+    '${{ !cancelled() }}',
+    'the required context must report whatever the shards did'
+  );
 });

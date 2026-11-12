@@ -4,8 +4,11 @@ name: kilo-app CI
 # the `mobile-changes` job gates the work. An unrelated PR or push still reports
 # the suite checks as skipped (a skipped job satisfies a required check) instead
 # of leaving them "Expected". A push that starts a release is inside the
-# detection below, so its run always executes the suite, and that release
-# consumes this run's conclusion for the commit. The hourly schedule and a
+# detection below and carries an app path, so its run executes the suite, and
+# that release consumes this run's conclusion for the commit. A change that only
+# edits a lint plugin skips the suite jobs (the Detect step marks it lint-only),
+# and a release that finds such a run for its commit falls back to running the
+# suite in its own workflow. The hourly schedule and a
 # manual run of main stand on the tip of main and reuse that commit's push run
 # as well, but only a run that passed and whose shard job proves the suite
 # executed. The release calls the suite through `workflow_call` for any reuse it
@@ -56,6 +59,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       mobile: ${{ steps.detect.outputs.mobile }}
+      lint_only: ${{ steps.detect.outputs.lint_only }}
     steps:
       # Full history so the change-detection step can diff against the PR's
       # base sha or the pushed commit's parent.
@@ -78,6 +82,9 @@ jobs:
       # tools/oxlint is detected on its own, because the app's oxlint configs
       # load those plugins: a change there must run the app's own lint and i18n
       # checks, and the workspace selection treats those paths as lint-only.
+      # That step also publishes `lint_only`: true when every changed path is
+      # such a plugin, so the shards and the typecheck stand down while the
+      # lint, i18n and unused-export checks still run.
       # A lockfile change matches the patterns first, so the detector below
       # never parses the lockfile and needs no installed dependencies.
       - name: Detect mobile-relevant changes
@@ -97,14 +104,25 @@ jobs:
           fi
           if ! git rev-parse --verify "${base}^{commit}" > /dev/null 2>&1; then
             echo "mobile=true" >> "$GITHUB_OUTPUT"
+            echo "lint_only=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if git diff --name-only "$base" HEAD | grep -Eq '^tools/oxlint/'; then
+          changed=$(git diff --name-only "$base" HEAD)
+          # Lint-only: the whole changed-path set is under tools/oxlint, so no
+          # type program or test reads this commit. Derived from the complete
+          # list, never from a second any-match grep: a change that also carries
+          # an app path must keep `lint_only=false`, because a release reuses a
+          # push run only when that run's shard job proves the suite executed.
+          if [ -n "$changed" ] && ! grep -qv '^tools/oxlint/' <<< "$changed"; then
+            echo "lint_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "lint_only=false" >> "$GITHUB_OUTPUT"
+          fi
+          if grep -Eq '^tools/oxlint/' <<< "$changed"; then
             echo "mobile=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if git diff --name-only "$base" HEAD \
-            | grep -Eq '^apps/mobile/|^packages/trpc/|^apps/web/src/routers/|^packages/web-shared/src/routers/|^packages/app-shared/|^packages/event-service/|^packages/notifications/|^packages/cloud-agent-sdk/|^pnpm-lock\.yaml$|^\.github/workflows/kilo-app-ci\.yml$|^\.github/workflows/ci\.yml$|^scripts/stacked-ci\.test\.mjs$'; then
+          if grep -Eq '^apps/mobile/|^packages/trpc/|^apps/web/src/routers/|^packages/web-shared/src/routers/|^packages/app-shared/|^packages/event-service/|^packages/notifications/|^packages/cloud-agent-sdk/|^pnpm-lock\.yaml$|^\.github/workflows/kilo-app-ci\.yml$|^\.github/workflows/ci\.yml$|^scripts/stacked-ci\.test\.mjs$' <<< "$changed"; then
             echo "mobile=true" >> "$GITHUB_OUTPUT"
           # The app also reads every workspace it depends on, directly or
           # through a relative import, and its tests may read other
@@ -221,9 +239,13 @@ jobs:
           # A cache hit that restored nothing must fail here, not in a consumer.
           if-no-files-found: error
 
+  # A lint-only change (every path under tools/oxlint) skips this job: a lint
+  # plugin cannot change the app's type program, and `mobile-lint` still loads
+  # it. The job stays in the workflow so the required `mobile-typecheck` context
+  # reports on every run.
   mobile-typecheck:
     needs: [mobile-changes, prepare-harness-sdk, prepare-trpc]
-    if: needs.mobile-changes.outputs.mobile == 'true'
+    if: needs.mobile-changes.outputs.mobile == 'true' && needs.mobile-changes.outputs.lint_only != 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
@@ -396,12 +418,16 @@ jobs:
   # gives up eight 4-vCPU jobs for four and the p50 wall of the whole row is
   # little different — each remaining shard runs the test share twice.
   #
+  # A lint-only change skips the shards with the typecheck: a lint plugin cannot
+  # change what the suite imports. `mobile-test-result` still runs and reports
+  # the required context.
+  #
   # The label is `vars.RUNNER_MEDIUM_LABEL` (blacksmith-4vcpu-ubuntu-2404, 4 vCPU
   # and 16 GB; a shard peaks at 0.6 GB). Repo variables are not exposed to fork
   # pull requests, so the job falls back to `ubuntu-latest` there.
   mobile-test:
     needs: [mobile-changes, prepare-harness-sdk]
-    if: needs.mobile-changes.outputs.mobile == 'true'
+    if: needs.mobile-changes.outputs.mobile == 'true' && needs.mobile-changes.outputs.lint_only != 'true'
     name: mobile-test (${{ matrix.shard }}/4)
     strategy:
       fail-fast: false

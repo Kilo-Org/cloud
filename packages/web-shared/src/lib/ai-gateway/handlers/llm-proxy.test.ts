@@ -2895,10 +2895,9 @@ describe('organization data-collection policy on provider-policy exempt routes',
     mockedIsCustomLlm.mockResolvedValue(false);
   });
 
-  // Each case builds the route its shape really produces, so the guard runs against a
-  // direct-BYOK route with a user key, not only against a `custom` provider. The model classifier
-  // calls a model data-collection-required only when it is free or a custom LLM, so the bespoke
-  // direct-BYOK case uses a free id to reach the guard at all.
+  // Each case returns the route its shape produces, so the assertion covers the real route: a
+  // direct-BYOK route with a user key, a custom LLM route, and the local fake LLM route. A model is
+  // data-collection-required when it is free or a custom LLM, so the direct-BYOK case uses a free id.
   const directByokRoute: ProviderRoute = {
     provider: {
       ...exemptProvider,
@@ -2908,13 +2907,19 @@ describe('organization data-collection policy on provider-policy exempt routes',
       },
     },
     userByok: [{ decryptedAPIKey: 'test-key', providerId: 'openai' }],
-    isFree: false,
+    isFree: true,
     bypassAccessCheck: true,
   };
   const customLlmRoute: ProviderRoute = {
     provider: exemptProvider,
     userByok: null,
     isFree: false,
+    bypassAccessCheck: true,
+  };
+  const localFakeRoute: ProviderRoute = {
+    provider: exemptProvider,
+    userByok: null,
+    isFree: true,
     bypassAccessCheck: true,
   };
   it.each([
@@ -2933,7 +2938,7 @@ describe('organization data-collection policy on provider-policy exempt routes',
     {
       shape: 'the local fake LLM',
       model: 'fake-deterministic',
-      route: customLlmRoute,
+      route: localFakeRoute,
       customLlm: false,
       localFake: true,
     },

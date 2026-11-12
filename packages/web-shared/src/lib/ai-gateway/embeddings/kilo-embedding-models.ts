@@ -7,15 +7,20 @@ export type KiloEmbeddingModel = {
   dimensionMode?: 'fixed';
 };
 
+export type DiscoveredKiloEmbeddingModel = Omit<KiloEmbeddingModel, 'dimension'> & {
+  dimension?: number;
+};
+
 export type KiloEmbeddingModelCatalog = {
   defaultModel: string;
-  models: KiloEmbeddingModel[];
+  models: DiscoveredKiloEmbeddingModel[];
   aliases: Record<string, string>;
 };
 
 export const KILO_DEFAULT_EMBEDDING_MODEL = 'mistralai/mistral-embed-2312';
 
-// Catalog snapshot checked 2026-11-12 against https://openrouter.ai/api/v1/embeddings/models.
+// Local metadata and request policy, not an availability list. Last checked 2026-11-12 against
+// https://openrouter.ai/api/v1/embeddings/models; newly discovered models may lack this metadata.
 export const KILO_EMBEDDING_MODELS = [
   {
     id: 'mistralai/codestral-embed-2505',
@@ -254,6 +259,7 @@ export const KILO_EMBEDDING_MODEL_ALIASES: Record<string, string> = {
   'mistral-embed-2312': KILO_DEFAULT_EMBEDDING_MODEL,
 };
 
+// Static local-consumer defaults/policy; gateway discovery uses the stored upstream inventory.
 export const KILO_EMBEDDING_MODEL_CATALOG = {
   defaultModel: KILO_DEFAULT_EMBEDDING_MODEL,
   models: KILO_EMBEDDING_MODELS,

@@ -2,9 +2,13 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import { AgentConversationItemView } from './agent-conversation-events';
-import { createAssistantMessage, createToolCall } from '@/src/shared/agent-conversation';
+import {
+  createAssistantMessage,
+  createConversationErrorEvent,
+  createToolCall,
+} from '@/src/shared/agent-conversation';
 import type {
   AgentConversationEvent,
   GroupedConversationItem,
@@ -472,5 +476,36 @@ describe('running tool call rendering', () => {
     expect(container.textContent).toContain('completed');
     expect(container.textContent).not.toContain('Arguments');
     expect(container.textContent).toContain('Snapshot text');
+  });
+});
+
+describe('error notice rendering', () => {
+  it('shows the failure as an alert and retries the turn on Retry', () => {
+    const event = createConversationErrorEvent({ retry: 'turn', title: 'The server is busy.' });
+    const onRetryError = vi.fn();
+
+    const { container, getByRole } = render(
+      <AgentConversationItemView item={{ event, type: 'event' }} onRetryError={onRetryError} />
+    );
+
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(container.textContent).toContain('The server is busy.');
+    fireEvent.click(getByRole('button', { name: 'Retry' }));
+    expect(onRetryError).toHaveBeenCalledWith(event);
+  });
+
+  it('offers the credits link instead of Retry when repeating cannot help', () => {
+    const event = createConversationErrorEvent({
+      action: { href: 'https://app.kilo.ai/credits', label: 'Add credits' },
+      detail: 'Your balance is zero.',
+      title: "You're out of credits.",
+    });
+
+    const { getByRole, queryByRole } = render(
+      <AgentConversationItemView item={{ event, type: 'event' }} onRetryError={vi.fn()} />
+    );
+
+    expect(queryByRole('button', { name: 'Retry' })).toBeNull();
+    expect(getByRole('link', { name: 'Add credits' }).getAttribute('target')).toBe('_blank');
   });
 });

@@ -457,8 +457,10 @@ const longConversationParallelReads = [
 const MIDDLE_SLICE_HEADER = '[tool result, beginning and end omitted]';
 
 /**
- * One read of about 250,000 characters, too long for one call, so it is scanned in three slices,
- * each a unit of its own, with the injection in the middle of the middle slice.
+ * One read of about 250,000 characters, too long for one call, so it is scanned in three
+ * overlapping slices, each a unit of its own, with the injection in the middle of the middle slice,
+ * outside the overlaps. The middle slice fills a call of its own; the first leaves room for the
+ * overlap, so it is packed with the messages before it.
  */
 function injectionInSlice(): unknown[] {
   const filler = schemaSlice(0, 250_000);
@@ -474,8 +476,8 @@ function injectionInSlice(): unknown[] {
   if (slices.length !== 3 || !slices[1]?.text.startsWith(MIDDLE_SLICE_HEADER)) {
     throw new Error(`expected the read in 3 slices, got ${slices.length}`);
   }
-  if (!slices[1].text.includes(INJECTION)) {
-    throw new Error('expected the injection whole in the middle slice');
+  if (slices.map(slice => slice.text.includes(INJECTION)).join() !== 'false,true,false') {
+    throw new Error('expected the injection whole in the middle slice only');
   }
   return messages;
 }
@@ -760,12 +762,12 @@ const steps: Step[] = [
       blocking: {
         tools: 'miss allow tools=0/3 calls=3',
         system: 'miss allow calls=1',
-        conversation: 'miss block calls=4 chunks=4',
+        conversation: 'miss block calls=3 chunks=3',
       },
       log_only: {
         tools: 'miss allow tools=0/3 calls=3',
         system: 'miss allow calls=1',
-        conversation: 'miss allow calls=4 chunks=4',
+        conversation: 'miss allow calls=3 chunks=3',
       },
     },
     check: (results, logs) => {

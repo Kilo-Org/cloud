@@ -40,9 +40,19 @@ function sliceHeader(header: string, beginning: boolean, ending: boolean): strin
 }
 
 /**
+ * Text repeated from the end of a slice at the start of the next slice of the same segment, so
+ * content of up to this length that straddles a cut is still scanned whole in one slice. Keeping a
+ * surrogate pair whole can shorten the overlap by up to two characters.
+ */
+export const ENKRYPT_SLICE_OVERLAP_CHARACTERS = 4_000;
+
+/**
  * The units of one segment: the whole segment when it fits in one Enkrypt call, and otherwise
- * consecutive slices of its body, each at most `ENKRYPT_MAX_SCAN_CHARACTERS` long, never splitting
- * a surrogate pair, its header marking the beginning or end left out.
+ * slices of its body, each at most `ENKRYPT_MAX_SCAN_CHARACTERS` long, its header marking the
+ * beginning or end left out. Cuts fall at fixed positions from the start of the body, so a slice's
+ * text, and its cache key, stay the same however the request around it changes. Each slice after
+ * the first also repeats the last `ENKRYPT_SLICE_OVERLAP_CHARACTERS` of the text before its cut.
+ * No slice starts or ends between the two halves of a surrogate pair.
  */
 function segmentUnits(segment: RequestSegment): string[] {
   const whole = renderSegment(segment);
@@ -54,18 +64,16 @@ function segmentUnits(segment: RequestSegment): string[] {
   ) {
     return [whole];
   }
+  const longestHeader = sliceHeader(header, true, true).length;
+  const step = ENKRYPT_MAX_SCAN_CHARACTERS - longestHeader - 1 - ENKRYPT_SLICE_OVERLAP_CHARACTERS;
   const units: string[] = [];
-  let start = 0;
-  while (start < body.length) {
-    const sliced = sliceHeader(header, start > 0, true);
-    const cut = start + ENKRYPT_MAX_SCAN_CHARACTERS - sliced.length - 1;
-    if (cut >= body.length) {
-      units.push(`${sliceHeader(header, start > 0, false)}\n${body.slice(start)}`);
-      break;
-    }
-    const end = splitsPair(body, cut) ? cut - 1 : cut;
+  for (let cut = 0; cut < body.length; cut += step) {
+    const overlapStart = Math.max(0, cut - ENKRYPT_SLICE_OVERLAP_CHARACTERS);
+    const start = splitsPair(body, overlapStart) ? overlapStart + 1 : overlapStart;
+    const next = cut + step;
+    const end = next >= body.length ? body.length : splitsPair(body, next) ? next - 1 : next;
+    const sliced = sliceHeader(header, start > 0, end < body.length);
     units.push(`${sliced}\n${body.slice(start, end)}`);
-    start = end;
   }
   return units;
 }

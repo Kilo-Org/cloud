@@ -18,6 +18,7 @@ import {
   type RequestToolDefinition,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import {
+  ENKRYPT_SLICE_OVERLAP_CHARACTERS,
   MAX_SPLIT_HEADER_CHARACTERS,
   scanUnits,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/scan-chunks';
@@ -1105,9 +1106,19 @@ describe('scanRequestWithVerdictCache', () => {
           '[tool result, beginning and end omitted]',
           '[tool result, beginning omitted]',
         ]);
-        expect(slices.map(sliceBody).join('')).toBe(body);
-        // A slice that fills a call is a call of its own; the last one is packed with what follows.
-        const calls = [units[0], units[1], units[2], joinSegments([units[3], units[4]])];
+        const rebuilt = slices
+          .map(sliceBody)
+          .map((text, index) => (index === 0 ? text : text.slice(ENKRYPT_SLICE_OVERLAP_CHARACTERS)))
+          .join('');
+        expect(rebuilt === body).toBe(true);
+        // The middle slice fills a call of its own; the first and last are packed with the
+        // messages next to them.
+        const calls = [
+          joinSegments([units[0], units[1]]),
+          units[2],
+          joinSegments([units[3], units[4]]),
+        ];
+        expect(units[2]).toHaveLength(ENKRYPT_MAX_SCAN_CHARACTERS);
         expect(sorted(scannedTexts(dependencies))).toEqual(sorted(calls));
         for (const text of calls) {
           expect(text.length).toBeLessThanOrEqual(ENKRYPT_MAX_SCAN_CHARACTERS);
@@ -1115,8 +1126,8 @@ describe('scanRequestWithVerdictCache', () => {
         expect(result.verdict).toEqual({ action: 'allow' });
         expect(result.report).toMatchObject({
           total_segments: 3,
-          chunks: 4,
-          attempts: 4,
+          chunks: 3,
+          attempts: 3,
           scanned_characters: sum(calls.map(text => text.length)),
         });
         expect(result.cacheEntries).toEqual(allowed(keysFor(segments)));
@@ -1207,14 +1218,25 @@ describe('scanRequestWithVerdictCache', () => {
 
       const texts = scannedTexts(dependencies);
       expect(texts).toHaveLength(2);
-      // The cut at the scan limit would fall inside a pair, so the first slice ends before it.
-      expect(texts[0]).toHaveLength(ENKRYPT_MAX_SCAN_CHARACTERS - 1);
       for (const text of texts) {
         expect(text).not.toMatch(
           /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/
         );
       }
-      expect(texts.map(sliceBody).join('')).toBe(body);
+      // The cut, and the start of the overlap before it, would each fall inside a pair, so the
+      // first slice ends one character early and the second starts one character late.
+      const [first, second] = texts.map(sliceBody);
+      const step =
+        ENKRYPT_MAX_SCAN_CHARACTERS -
+        '[user, beginning and end omitted]'.length -
+        1 -
+        ENKRYPT_SLICE_OVERLAP_CHARACTERS;
+      expect(first).toHaveLength(step - 1);
+      expect(body.startsWith(first!)).toBe(true);
+      expect(body.endsWith(second!)).toBe(true);
+      expect(first!.length + second!.length - body.length).toBe(
+        ENKRYPT_SLICE_OVERLAP_CHARACTERS - 2
+      );
     });
 
     it('rejects a segment whose header is too long to split without a call for it', async () => {

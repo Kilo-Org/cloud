@@ -622,8 +622,10 @@ are not a complete recovery mechanism. Exact recovery limits are documented in
    are restored best-effort into a replacement environment. Binary, oversized,
    truncated, ignored, or over-budget files MAY be omitted, and a partial
    recovery MUST NOT block the next turn.
-5. Every preparation attempt for an existing route, including one started after
-   a wrapper restart, MUST use the latest saved worktree recovery.
+5. A route MUST adopt the recovery saved for a later preparation, so a restart
+   restores the newest saved snapshot rather than the one captured when the route
+   was first prepared. An attempt that already received its preparation frame is
+   not re-prepared for a newer snapshot; the next attempt gets it.
 
 ### Continuity
 

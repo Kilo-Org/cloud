@@ -1383,6 +1383,8 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(row).not.toBeNull();
     expect(JSON.parse(row?.spec ?? '{}').worktreeRecovery).toEqual(latest);
 
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
     const wrapper2 = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     await wrapper2.hello({ wrapperId: 'wr_2', allocationId });
     const frame = await wrapper2.next();
@@ -1390,6 +1392,34 @@ describe('SandboxControlV2 routes and forwarding', () => {
     if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
     expect(frame.spec.worktreeRecovery).toEqual(latest);
     wrapper2.close();
+    wrapper.close();
+  });
+
+  it('adopts a later saved worktree recovery while the route is still preparing', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const prepared = {
+      files: [{ path: 'old.txt', status: 'added' as const, patch: 'old patch' }],
+    };
+    const initial = prepareInput(SESSION);
+    initial.spec = { ...initial.spec, worktreeRecovery: prepared };
+    await stub.prepare(initial);
+    expect((await readRouteRow(stub, SESSION))?.state).toBe('preparing');
+
+    const late = {
+      files: [{ path: 'src/late.ts', status: 'modified' as const, patch: 'late patch' }],
+    };
+    const reprepare = prepareInput(SESSION);
+    reprepare.spec = { ...reprepare.spec, worktreeRecovery: late };
+    await stub.prepare(reprepare);
+    const row = await readRouteRow(stub, SESSION);
+    expect(JSON.parse(row?.spec ?? '{}').worktreeRecovery).toEqual(late);
+
+    const { wrapper } = await connectAndHello(provider, 'wr_1');
+    const frame = await wrapper.next();
+    expect(frame).toMatchObject({ type: 'session.prepare' });
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.worktreeRecovery).toEqual(late);
     wrapper.close();
   });
 

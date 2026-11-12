@@ -2,7 +2,7 @@ import {
   environmentReferenceSchema,
   type SessionEnvironmentReference,
 } from '../../environment-build/reference.js';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { drizzle } from 'drizzle-orm/durable-sqlite';
 import {
   controlPlaneCredentialSourceSchema,
@@ -447,6 +447,55 @@ export async function startAttempt(
   );
 }
 
+function sameWorktreeRecovery(
+  current: ControlPlaneRouteSpec['worktreeRecovery'],
+  incoming: ControlPlaneRouteSpec['worktreeRecovery']
+): boolean {
+  return JSON.stringify(current) === JSON.stringify(incoming);
+}
+
+/**
+ * Adopts the newest saved worktree recovery on an existing route, so a later
+ * attempt (a wrapper restart) prepares from it. A frame that has not been sent
+ * yet reads the refreshed row in `sendPreparedRouteFrame`; an attempt that
+ * already received its frame is unaffected by the newer value.
+ *
+ * The update is a fenced column write, not a row upsert: a concurrent route
+ * transition (a new attempt, a failure, a deletion) must win over a stale read.
+ * Returns the updated record, or null when the route moved on first.
+ */
+function refreshRouteRecovery(
+  db: RouteDatabase,
+  existing: RouteRecord,
+  worktreeRecovery: ControlPlaneRouteSpec['worktreeRecovery']
+): RouteRecord | null {
+  if (sameWorktreeRecovery(existing.spec.worktreeRecovery, worktreeRecovery)) return existing;
+  const spec: ControlPlaneRouteSpec = { ...existing.spec, worktreeRecovery };
+  let applied = false;
+  db.transaction(tx => {
+    const row = tx
+      .select()
+      .from(routesTable)
+      .where(eq(routesTable.session_id, existing.sessionId))
+      .get();
+    if (row === undefined || row.state === 'failed' || row.attempt_id !== existing.attemptId) {
+      return;
+    }
+    tx.update(routesTable)
+      .set({ spec: JSON.stringify(spec), updated_at: Date.now() })
+      .where(
+        and(
+          eq(routesTable.session_id, existing.sessionId),
+          eq(routesTable.attempt_id, existing.attemptId),
+          eq(routesTable.state, row.state)
+        )
+      )
+      .run();
+    applied = true;
+  });
+  return applied ? { ...existing, spec } : null;
+}
+
 /**
  * The `prepare` route effect. Starts an attempt when the route is absent or
  * `failed`; any other route keeps its attempt deadline. `started` tells the
@@ -460,15 +509,13 @@ export async function ensureRoute(
 ): Promise<{ route: RouteRecord; started: boolean }> {
   const existing = await readRoute(ctx.db, spec.sessionId);
   if (existing !== null && existing.state !== 'failed') {
-    if (JSON.stringify(existing.spec.worktreeRecovery) === JSON.stringify(spec.worktreeRecovery)) {
-      return { route: existing, started: false };
+    const route = refreshRouteRecovery(ctx.db, existing, spec.worktreeRecovery);
+    if (route !== null) return { route, started: false };
+    const current = await readRoute(ctx.db, spec.sessionId);
+    if (current !== null && current.state !== 'failed') {
+      return { route: current, started: false };
     }
-    const route: RouteRecord = {
-      ...existing,
-      spec: { ...existing.spec, worktreeRecovery: spec.worktreeRecovery },
-    };
-    writeRoute(ctx.db, route);
-    return { route, started: false };
+    return { route: await startAttempt(ctx, spec, source, environment), started: true };
   }
   return { route: await startAttempt(ctx, spec, source, environment), started: true };
 }

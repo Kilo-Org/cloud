@@ -1,6 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 import {
   compute_usage_charge,
   container_usage_interval,
@@ -27,7 +27,8 @@ export async function isCodeReviewComputeBillingEnabled(owner: BillingOwner): Pr
 export async function readCodeReviewContainerCost(
   database: typeof defaultDb,
   owner: BillingOwner,
-  sessionIds: string[]
+  sessionIds: string[],
+  reviewCreatedAt: string
 ): Promise<number | null> {
   if (sessionIds.length === 0) return null;
   const [result] = await database
@@ -51,6 +52,7 @@ export async function readCodeReviewContainerCost(
     .where(
       and(
         inArray(container_usage_interval.session_id, sessionIds),
+        gte(compute_usage_charge.created_at, reviewCreatedAt),
         owner.type === 'org'
           ? eq(compute_usage_charge.organization_id, owner.id)
           : eq(compute_usage_charge.user_id, owner.id)

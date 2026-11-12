@@ -11,6 +11,7 @@ import {
   ensureOrganizationAccess,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
+import { captureException } from '@sentry/nextjs';
 import { successResult, failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import * as z from 'zod';
 import {
@@ -346,8 +347,9 @@ export const codeReviewRouter = createTRPCRouter({
       // 5s in-flight polls. `getCodeReviewById` omits the heavy JSONB, so the detail screen
       // (the one consumer) loads it explicitly here, in parallel with attempts/billing.
       const shouldLoadCouncilResult = review.review_type === 'council' && isTerminal;
-      const [attempts, billingUsage, council_result] = await Promise.all([
-        listCodeReviewAttempts(input.reviewId),
+      const attemptsPromise = listCodeReviewAttempts(input.reviewId);
+      const [attempts, billingUsage, council_result, containerCostMusd] = await Promise.all([
+        attemptsPromise,
         shouldLoadBillingUsage
           ? getSessionUsageFromBilling(
               cliSessionId,
@@ -358,6 +360,28 @@ export const codeReviewRouter = createTRPCRouter({
         shouldLoadCouncilResult
           ? getCodeReviewCouncilResult(input.reviewId)
           : Promise.resolve(null),
+        attemptsPromise.then(attempts =>
+          readCodeReviewContainerCost(
+            db,
+            review.owned_by_organization_id
+              ? { type: 'org', id: review.owned_by_organization_id }
+              : { type: 'user', id: ctx.user.id },
+            [
+              ...new Set(
+                [review.session_id, ...attempts.map(attempt => attempt.session_id)].filter(
+                  (id): id is string => id !== null
+                )
+              ),
+            ],
+            review.created_at
+          ).catch(error => {
+            captureException(error, {
+              tags: { operation: 'readCodeReviewContainerCost' },
+              extra: { reviewId: input.reviewId },
+            });
+            return null;
+          })
+        ),
       ]);
       const tokenUsage = billingUsage
         ? {
@@ -370,20 +394,6 @@ export const codeReviewRouter = createTRPCRouter({
             output: review.total_tokens_out ?? 0,
             cached: 0,
           };
-
-      const containerCostMusd = await readCodeReviewContainerCost(
-        db,
-        review.owned_by_organization_id
-          ? { type: 'org', id: review.owned_by_organization_id }
-          : { type: 'user', id: ctx.user.id },
-        [
-          ...new Set(
-            [review.session_id, ...attempts.map(attempt => attempt.session_id)].filter(
-              (id): id is string => id !== null
-            )
-          ),
-        ]
-      );
 
       let selectedModel = review.model ?? (isTerminal ? (billingUsage?.model ?? null) : null);
       if (!selectedModel && !isTerminal) {

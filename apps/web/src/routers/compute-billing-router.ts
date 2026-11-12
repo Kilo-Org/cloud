@@ -7,7 +7,7 @@ import { queryAccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-a
 import { cloudAgentSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import { TRPCError } from '@trpc/server';
 import { cloud_billing_sku } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { SANDBOX_USAGE_SKUS } from '@kilocode/worker-utils/cloud-agent-compute';
 import { isCodeReviewComputeBillingEnabled } from '@/lib/code-reviews/compute-billing';
 import {
@@ -45,7 +45,13 @@ export const computeBillingRouter = createTRPCRouter({
       const [rate] = await db
         .select({ rate: cloud_billing_sku.rate_cents_per_unit })
         .from(cloud_billing_sku)
-        .where(eq(cloud_billing_sku.id, SANDBOX_USAGE_SKUS.SandboxContainersCodeReview))
+        .where(
+          and(
+            eq(cloud_billing_sku.id, SANDBOX_USAGE_SKUS.SandboxContainersCodeReview),
+            eq(cloud_billing_sku.unit, 'second'),
+            eq(cloud_billing_sku.accepts_new_usage, true)
+          )
+        )
         .limit(1);
       return { enabled: true, hourlyUsd: rate ? Number(rate.rate) * 36 : null };
     }),

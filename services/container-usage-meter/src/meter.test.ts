@@ -103,6 +103,13 @@ describe('ContainerUsageMeter', () => {
         subject: { type: 'user', id: 'oauth/provider/user' },
       })
     ).resolves.toBe(mode);
+    expect(resolveBillingMode).toHaveBeenCalledExactlyOnceWith(
+      undefined,
+      expect.objectContaining({ enabled: false }),
+      'cloud-agent-next-sandbox-containers-code-review',
+      { type: 'user', id: 'oauth/provider/user' },
+      expect.any(Date)
+    );
     expect(applyStart).not.toHaveBeenCalled();
   });
 

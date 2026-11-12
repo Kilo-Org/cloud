@@ -10,6 +10,7 @@ jest.mock('remark-gfm', () =>
 
 import type { FilePart } from './types';
 import { TextPartRenderer, FilePartRenderer } from './part-content';
+import { PreviewLinksContext } from './use-preview';
 import type { NativeSessionState } from '@kilocode/cloud-agent-sdk';
 import { readNativeConversation } from '@kilocode/cloud-agent-sdk/native-conversation-source';
 import { kilo2AssetKey } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
@@ -242,5 +243,36 @@ describe('native tool files through the existing FilePartRenderer', () => {
     );
     expect(markup).not.toContain('<a');
     expect(markup).not.toContain('href=');
+  });
+});
+
+describe('TextPartRenderer sandbox links with a preview', () => {
+  const urlTemplate = 'https://p{port}-abc.preview.example.test';
+
+  function renderWithPreviewLinks(text: string): string {
+    return renderToStaticMarkup(
+      React.createElement(
+        PreviewLinksContext.Provider,
+        { value: { urlTemplate, open: () => undefined } },
+        React.createElement(TextPartRenderer, { text, isStreaming: false })
+      )
+    );
+  }
+
+  it.each([
+    ['http://localhost:5173', 'https://p5173-abc.preview.example.test/'],
+    ['http://127.0.0.2:5173/login', 'https://p5173-abc.preview.example.test/login'],
+    ['http://127.255.255.254:5173/a?x=1', 'https://p5173-abc.preview.example.test/a?x=1'],
+    ['http://localhost.:5173/', 'https://p5173-abc.preview.example.test/'],
+    ['http://app.localhost:5173/', 'https://p5173-abc.preview.example.test/'],
+  ])('renders a chat link to %s as the preview URL', (href, expected) => {
+    const markup = renderWithPreviewLinks(`The dev server is at [dev](${href}).`);
+    expect(markup).toContain(`href="${expected}"`);
+  });
+
+  it('leaves a link outside the sandbox as an ordinary external link', () => {
+    const markup = renderWithPreviewLinks('[docs](https://example.com:5173/guide)');
+    expect(markup).toContain('href="https://example.com:5173/guide"');
+    expect(markup).not.toContain('preview.example.test');
   });
 });

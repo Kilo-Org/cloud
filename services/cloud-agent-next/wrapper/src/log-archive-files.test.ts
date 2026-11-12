@@ -52,6 +52,24 @@ describe('private log archive collection', () => {
     }
   });
 
+  it('suppresses oversized lines before pattern redaction and retains later diagnostics', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'archive-lines-'));
+    cleanup.push(() => rmSync(directory, { force: true, recursive: true }));
+    writeFileSync(
+      join(directory, 'crafted.log'),
+      `${'-'.repeat(8 * 1024 * 1024 - 128)}\nuseful diagnostic\nAuthorization: Bearer synthetic-archive-secret`
+    );
+    const archive = prepareLogArchive([join(directory, 'crafted.log')]);
+    expect(archive).toBeDefined();
+    if (!archive) return;
+    cleanup.push(archive.cleanup);
+    const text = readFileSync(join(archive.directory, 'crafted.log'), 'utf8');
+    expect(text).toContain('[Log line suppressed: length limit]');
+    expect(text).toContain('useful diagnostic');
+    expect(text).not.toContain('synthetic-archive-secret');
+    expect(text.length).toBeLessThan(256);
+  });
+
   it('excludes oversized logs and symlinked parent directories', () => {
     const directory = mkdtempSync(join(tmpdir(), 'archive-size-'));
     cleanup.push(() => rmSync(directory, { force: true, recursive: true }));

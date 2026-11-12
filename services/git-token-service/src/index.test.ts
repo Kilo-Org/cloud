@@ -1505,6 +1505,25 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     });
   });
 
+  it('rejects provided credentials before capability or native credential issuance', async () => {
+    serviceMocks.selectUserAuthorization.mockResolvedValue({
+      selected: true,
+      credentialSource: 'provided_token',
+      token: 'provided-credential',
+      gitAuthor: { name: 'octocat', email: '1+octocat@users.noreply.github.com' },
+    });
+    const service = createService();
+    const params = { githubRepo: 'acme/repo', userId: 'user_1', allowUserAuthorization: true };
+    await expect(
+      service.issueGitHubSessionCapability({ ...params, outboundContainerId, taskScope })
+    ).resolves.toEqual({ success: false, reason: 'provided_token_not_supported' });
+    await expect(service.getCloudAgentAuthForRepo(params)).resolves.toEqual({
+      success: false,
+      reason: 'provided_token_not_supported',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['GET', 'https://api.github.com/repos/personal-user/private/contents/file', undefined],
     ['GET', 'https://api.github.com/repos/personal-user/private/zipball/main', undefined],

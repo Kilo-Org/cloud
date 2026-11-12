@@ -19,6 +19,7 @@ import { redactLogText } from './log-redaction.js';
 export type TarArchiveEntry = { directory: string; name: string };
 const MAX_BYTES = 8 * 1024 * 1024;
 const MAX_FILES = 128;
+const MAX_LINE_LENGTH = 4096;
 const MAX_ENTRIES = 1024;
 
 /** Copy bounded, regular UTF-8 log files into a private, redacted archive tree. */
@@ -72,7 +73,14 @@ export function prepareLogArchive(paths: Array<string | TarArchiveEntry>):
       const safeName = redactLogText(name);
       const destination = resolve(directory, safeName);
       if (!destination.startsWith(directory + sep)) return;
-      const safe = redactLogText(text);
+      const safe = text
+        .split('\n')
+        .map(line =>
+          line.length > MAX_LINE_LENGTH
+            ? '[Log line suppressed: length limit]'
+            : redactLogText(line)
+        )
+        .join('\n');
       const size = Buffer.byteLength(safe);
       if (outputBytes + size > MAX_BYTES) return;
       mkdirSync(dirname(destination), { recursive: true, mode: 0o700 });

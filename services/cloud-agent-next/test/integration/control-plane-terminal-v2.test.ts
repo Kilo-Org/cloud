@@ -2,6 +2,7 @@ import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { eq } from 'drizzle-orm';
+import { controlPlaneMessages } from '../../src/control-plane/session/sqlite-schema.js';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import {
   routes as routesTable,
@@ -729,6 +730,51 @@ async function openStreamSocket(
 }
 
 describe('control-plane session organization close on the Session DO', () => {
+  it('releases the organization route even when terminal revocation fails', async () => {
+    const { sessionId, sandboxId, sessionStub, wrapper } = await startTerminalSession();
+    const failure = await runInDurableObject(sessionStub, async instance => {
+      const terminals = Reflect.get(instance, 'terminals');
+      terminals.revoke = async () => {
+        throw new Error('terminal storage unavailable');
+      };
+      try {
+        await instance.closeOrgStreams(ORG_ID);
+        return null;
+      } catch (error) {
+        return error instanceof Error ? error.message : 'unknown';
+      }
+    });
+    expect(failure).toBe('terminal storage unavailable');
+    expect(await readSandboxRoute(sandboxId, sessionId)).toBeNull();
+    expect(await scopeGrantCount(sandboxId)).toBe(0);
+    expect(await awaitFrame(wrapper, 'session.release')).toMatchObject({ sessionId });
+    wrapper.close();
+  });
+
+  it('settles expired messages when terminal alarm maintenance fails', async () => {
+    const { sessionStub, wrapper } = await startTerminalSession();
+    const settled = await runInDurableObject(sessionStub, async (instance, state) => {
+      const terminals = Reflect.get(instance, 'terminals');
+      terminals.maintainAuthorization = async () => {
+        throw new Error('terminal storage unavailable');
+      };
+      const db = drizzle(state.storage);
+      const message = db.select().from(controlPlaneMessages).get();
+      if (!message) throw new Error('Initial message missing');
+      db.update(controlPlaneMessages)
+        .set({ state: 'accepted', accepted_at: 0 })
+        .where(eq(controlPlaneMessages.message_id, message.message_id))
+        .run();
+      await instance.alarm();
+      return db
+        .select({ state: controlPlaneMessages.state, reason: controlPlaneMessages.reason })
+        .from(controlPlaneMessages)
+        .all();
+    });
+    expect(settled).toEqual([{ state: 'failed', reason: 'no_outcome' }]);
+    wrapper.close();
+  });
+
   it('closes terminal browser and stream sockets for the session organization', async () => {
     const { sessionId, sandboxId, sessionStub, wrapper } = await startTerminalSession();
     const terminal = await openBrowserTerminal(sessionStub, wrapper);

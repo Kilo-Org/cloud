@@ -2461,7 +2461,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     if (this.registration === null) return;
     await this.enqueue(async () => {
-      await this.terminals.maintainAuthorization();
+      try {
+        await this.terminals.maintainAuthorization();
+      } catch {
+        logger
+          .withFields({ sessionId: this.sessionId })
+          .warn('Terminal authorization maintenance failed');
+      }
       // The alarm can wake an evicted instance; storage is authoritative.
       this.messages = await this.loadMessages();
       // Retry any report/callback obligation a previous attempt could not send.
@@ -2931,17 +2937,20 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       closed++;
     }
     closed += this.terminals.closeBrowserSockets(1000, 'session access revoked');
-    await this.terminals.revoke();
-    const peer = this.sandboxPeer();
-    if (peer !== null) {
-      // No route (an unregistered or already released sandbox) makes this a
-      // no-op. A failed release stays visible to the caller, which reports the
-      // failed revocation close instead of assuming the route is gone.
-      await withDORetry(
-        () => this.sandboxPeer() ?? peer,
-        current => current.release({ sessionId: this.sessionId }),
-        'closeOrgStreams.release'
-      );
+    try {
+      await this.terminals.revoke();
+    } finally {
+      const peer = this.sandboxPeer();
+      if (peer !== null) {
+        // No route (an unregistered or already released sandbox) makes this a
+        // no-op. A failed release stays visible to the caller, which reports the
+        // failed revocation close instead of assuming the route is gone.
+        await withDORetry(
+          () => this.sandboxPeer() ?? peer,
+          current => current.release({ sessionId: this.sessionId }),
+          'closeOrgStreams.release'
+        );
+      }
     }
     return closed;
   }

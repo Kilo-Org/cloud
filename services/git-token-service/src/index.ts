@@ -188,7 +188,8 @@ export type GetCloudAgentAuthForRepoSuccess = {
 export type GitHubUserAuthorizationFailure =
   | 'user_authorization_required'
   | 'user_authorization_revoked'
-  | 'user_authorization_unavailable';
+  | 'user_authorization_unavailable'
+  | 'provided_token_not_supported';
 export type GetCloudAgentAuthForRepoResult =
   | GetCloudAgentAuthForRepoSuccess
   | GetTokenForRepoFailure
@@ -1012,6 +1013,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
     const selection = await this.githubUserAuthorizationService.selectUserAuthorization(params);
     if (!selection.selected) return installationAuth(selection.reason);
+    if (selection.credentialSource === 'provided_token')
+      return { success: false, reason: 'provided_token_not_supported' };
 
     return {
       success: true,

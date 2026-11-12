@@ -132,9 +132,12 @@ export function registerControlLogRoutes(app: Hono<HonoContext>): void {
       if (length !== undefined && length > CONTROL_LOG_MAX_ARCHIVE_BYTES) {
         return c.text('Body too large', 413);
       }
+      const maxBytes = length ?? CONTROL_LOG_MAX_ARCHIVE_BYTES;
+      const quota = await reserveUpload(c, authorized.identity, Math.max(1, maxBytes));
+      if (quota) return quota;
       let body: Uint8Array;
       try {
-        body = await readLogUploadBody(c.req.raw, CONTROL_LOG_MAX_ARCHIVE_BYTES);
+        body = await readLogUploadBody(c.req.raw, maxBytes);
       } catch (error) {
         return error instanceof LogUploadReadError
           ? c.text(error.message, error.status)
@@ -143,8 +146,6 @@ export function registerControlLogRoutes(app: Hono<HonoContext>): void {
       if (body.byteLength === 0) return c.text('Missing request body', 400);
       const denied = await requireActiveAllocation(c, authorized.identity);
       if (denied) return denied;
-      const quota = await reserveUpload(c, authorized.identity, body.byteLength);
-      if (quota) return quota;
       try {
         await c.env.R2_BUCKET.put(
           `${archivePrefix(authorized.identity)}${CONTROL_LOG_ARCHIVE_NAME}`,
@@ -175,9 +176,12 @@ export function registerControlLogRoutes(app: Hono<HonoContext>): void {
       return c.text('Body too large', 413);
     }
 
+    const maxBytes = length ?? CONTROL_LOG_MAX_BATCH_BYTES;
+    const quota = await reserveUpload(c, authorized.identity, Math.max(1, maxBytes));
+    if (quota) return quota;
     let parsed: unknown;
     try {
-      const bytes = await readLogUploadBody(c.req.raw, CONTROL_LOG_MAX_BATCH_BYTES);
+      const bytes = await readLogUploadBody(c.req.raw, maxBytes);
       parsed = JSON.parse(
         new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes)
       );
@@ -189,12 +193,6 @@ export function registerControlLogRoutes(app: Hono<HonoContext>): void {
     if (!batch.success) return c.text('Invalid log batch', 400);
     const denied = await requireActiveAllocation(c, authorized.identity);
     if (denied) return denied;
-    const quota = await reserveUpload(
-      c,
-      authorized.identity,
-      new TextEncoder().encode(JSON.stringify(batch.data)).byteLength
-    );
-    if (quota) return quota;
     let stored: unknown;
     try {
       stored = await c.env.R2_BUCKET.put(

@@ -35,7 +35,7 @@ function fixture() {
       env
     );
   }
-  return { isLogUploadAuthorized, reserveLogUpload, getByName, put, upload };
+  return { isLogUploadAuthorized, reserveLogUpload, getByName, put, upload, app, env };
 }
 
 afterEach(() => vi.useRealTimers());
@@ -84,6 +84,76 @@ describe('control log authorization failures', () => {
     const response = await f.upload(grant);
     expect([401, 403]).toContain(response.status);
     expect(f.getByName).not.toHaveBeenCalled();
+    expect(f.put).not.toHaveBeenCalled();
+  });
+});
+
+describe('upload quota admission precedes buffering', () => {
+  const endpoints = [
+    ['files.tar.gz', 'application/gzip'],
+    ['0fce125c-54a3-4143-b503-b7775c4d2136', 'application/json'],
+  ] as const;
+  const url = (suffix: string) =>
+    `http://worker.test/sandbox-logs/${identity.sandboxId}/${identity.allocationId}/${identity.wrapperInstanceId}/${suffix}`;
+  const headers = (type: string) => ({
+    Authorization: `Bearer ${mintControlLogUploadGrant(identity, secret)}`,
+    'Content-Type': type,
+  });
+  it.each(endpoints)('rejects exhausted quota without reading %s', async (suffix, type) => {
+    const f = fixture();
+    f.reserveLogUpload.mockResolvedValue(false);
+    const pull = vi.fn((controller: ReadableStreamDefaultController<Uint8Array>) =>
+      controller.close()
+    );
+    const body = new ReadableStream({ pull }, { highWaterMark: 0 });
+    const request = new Request(url(suffix), {
+      method: 'PUT',
+      headers: headers(type),
+      body,
+      duplex: 'half',
+    } as RequestInit);
+    const response = await f.app.request(request, undefined, f.env);
+    expect(response.status).toBe(429);
+    expect(pull).not.toHaveBeenCalled();
+    expect(f.reserveLogUpload).toHaveBeenCalledOnce();
+    expect(f.put).not.toHaveBeenCalled();
+  });
+  it.each(endpoints)('charges a streamed overflow attempt for %s', async (suffix, type) => {
+    const f = fixture();
+    const body = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          expect(f.reserveLogUpload).toHaveBeenCalledOnce();
+          controller.enqueue(new Uint8Array([1, 2]));
+          controller.close();
+        },
+      },
+      { highWaterMark: 0 }
+    );
+    const request = new Request(url(suffix), {
+      method: 'PUT',
+      headers: { ...headers(type), 'Content-Length': '1' },
+      body,
+      duplex: 'half',
+    } as RequestInit);
+    const response = await f.app.request(request, undefined, f.env);
+    expect(response.status).toBe(413);
+    expect(f.reserveLogUpload).toHaveBeenCalledWith(identity, 1);
+    expect(f.put).not.toHaveBeenCalled();
+  });
+  it('charges a stalled upload before its read deadline', async () => {
+    vi.useFakeTimers();
+    const f = fixture();
+    const request = new Request(url('files.tar.gz'), {
+      method: 'PUT',
+      headers: { ...headers('application/gzip'), 'Content-Length': '1' },
+      body: new ReadableStream(),
+      duplex: 'half',
+    } as RequestInit);
+    const pending = f.app.request(request, undefined, f.env);
+    await vi.advanceTimersByTimeAsync(30_001);
+    expect((await pending).status).toBe(408);
+    expect(f.reserveLogUpload).toHaveBeenCalledWith(identity, 1);
     expect(f.put).not.toHaveBeenCalled();
   });
 });

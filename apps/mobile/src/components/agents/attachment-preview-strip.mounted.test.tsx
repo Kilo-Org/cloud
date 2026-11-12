@@ -1341,6 +1341,7 @@ describe('AttachmentPreviewStrip — control hit targets', () => {
 
   /** The chip's inset reserves, and the end inset of the Remove badge row. */
   async function chipReserves(status: 'uploaded' | 'error'): Promise<{
+    badgeEndDp: number;
     columnEndDp: number;
     rowEndDp: number;
     rowStartDp: number;
@@ -1354,30 +1355,32 @@ describe('AttachmentPreviewStrip — control hit targets', () => {
       progress: null,
     });
     const renderer = await mount([attachment]);
+    const badgeEndDp = sideDp(removeBadgeRow(renderer.root).props.className, 'end');
     const result = {
+      badgeEndDp,
       columnEndDp: sideDp(fileColumn(renderer.root).props.className, 'end'),
       rowEndDp: sideDp(fileRow(renderer.root).props.className, 'end'),
       rowStartDp: sideDp(fileRow(renderer.root).props.className, 'start'),
     };
-    const badgeEndDp = sideDp(removeBadgeRow(renderer.root).props.className, 'end');
     renderer.unmount();
-    expect(badgeEndDp).toBe(7);
     return result;
   }
 
-  it('reserves the Remove badge width at the end of the document text column', async () => {
-    const { columnEndDp, rowEndDp, rowStartDp } = await chipReserves('uploaded');
+  it('keeps the text column clear of the Remove badge box', async () => {
+    const { badgeEndDp, columnEndDp, rowEndDp, rowStartDp } = await chipReserves('uploaded');
 
-    // The text must end where the 28 dp badge starts, never under it.
-    expect(columnEndDp).toBeGreaterThanOrEqual(28);
+    // The badge box starts `badgeEndDp` from the chip's end plus its own
+    // 28 dp, and the text ends after the row inset and the column inset. A
+    // shrunken row inset fails here even though the column reserve holds.
+    expect(rowEndDp + columnEndDp).toBeGreaterThanOrEqual(28 + badgeEndDp);
     // The reserve stays on the column, so the row keeps equal opposite insets.
     expect(rowStartDp).toBe(rowEndDp);
   });
 
-  it('reserves the badge width on a chip that also offers Retry', async () => {
-    const { columnEndDp, rowStartDp } = await chipReserves('error');
+  it('keeps the text column clear of the badge on a chip that also offers Retry', async () => {
+    const { badgeEndDp, columnEndDp, rowEndDp, rowStartDp } = await chipReserves('error');
 
-    expect(columnEndDp).toBeGreaterThanOrEqual(28);
+    expect(rowEndDp + columnEndDp).toBeGreaterThanOrEqual(28 + badgeEndDp);
     // Retry's badge is 24.5 dp inside a `p-1` inset, so its box is 28 dp.
     expect(rowStartDp).toBeGreaterThanOrEqual(28);
   });

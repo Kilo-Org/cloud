@@ -1,0 +1,105 @@
+name: Dependency submission
+
+# Feeds GitHub's dependency graph with what the KiloClaw image installs outside
+# pnpm-lock.yaml, so Dependabot alerts cover it.
+#
+# The dependency graph reads pnpm-lock.yaml in full, but nothing the Dockerfile
+# resolves at build time: the global `npm install -g` of OpenClaw and the other
+# CLIs (pinned at the top level only, every transitive dependency floats), the
+# OpenClaw bundled plugin runtime deps, the plugin tarballs (installed with npm,
+# not from pnpm-lock.yaml), and the Go tools. None of it ever raised
+# an alert. This job builds the image from the pushed commit, scans it with
+# syft and submits every package with an advisory ecosystem under one manifest,
+# services/kiloclaw/Dockerfile (scripts/dependency-snapshot.mjs).
+#
+# Alerts on that manifest get no Dependabot PR: fix them by bumping the
+# pin in the Dockerfile (or the base image), or with a plugin-level pin. The
+# graph keeps the latest snapshot per correlator, so the job only needs to run
+# when an input changes; the weekly run picks up what a floating transitive
+# dependency resolves to now.
+#
+# The kilo-app Android build is submitted by kilo-app-release.yml, from the SBOM
+# of the bundle it ships.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/kiloclaw/Dockerfile'
+      - 'services/kiloclaw/plugins/kiloclaw-customizer/package.json'
+      - 'services/kiloclaw/plugins/kilo-chat/package.json'
+      - 'services/kiloclaw/plugins/kiloclaw-morning-briefing/package.json'
+      - 'scripts/dependency-snapshot.mjs'
+      - '.github/workflows/dependency-submission.yml'
+  schedule:
+    - cron: '17 5 * * 1' # weekly, Monday
+  workflow_dispatch:
+
+concurrency:
+  group: dependency-submission-kiloclaw
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  kiloclaw-image:
+    if: github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    name: KiloClaw image
+    permissions:
+      contents: write # required by the dependency submission API
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          persist-credentials: false
+
+      - name: Setup Docker Buildx
+        uses: useblacksmith/setup-docker-builder@5241b2e9423e8b1fa37ed6050ecb62d0fb9a4e38 # v1.6.0
+
+      # Same build as deploy-kiloclaw.yml, loaded locally instead of pushed.
+      - name: Build image
+        uses: useblacksmith/build-push-action@cbd1f60d194a98cb3be5523b15134501eaf0fbf3 # v2.1.0
+        with:
+          context: services/kiloclaw
+          file: services/kiloclaw/Dockerfile
+          build-contexts: |
+            workspace=.
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: kiloclaw-dependency-graph:${{ github.sha }}
+          build-args: |
+            CONTROLLER_COMMIT=${{ github.sha }}
+
+      - name: Generate image SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: docker:kiloclaw-dependency-graph:${{ github.sha }}
+          format: cyclonedx-json
+          output-file: ${{ runner.temp }}/kiloclaw.cyclonedx.json
+          upload-artifact: true
+          upload-artifact-retention: 30
+          artifact-name: kiloclaw-dependency-sbom-${{ github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Build snapshot
+        run: >-
+          node scripts/dependency-snapshot.mjs
+          --sbom "$RUNNER_TEMP/kiloclaw.cyclonedx.json"
+          --manifest services/kiloclaw/Dockerfile
+          --source services/kiloclaw/Dockerfile
+          --correlator dependency-submission-kiloclaw-image
+          > "$RUNNER_TEMP/kiloclaw-snapshot.json"
+
+      - name: Submit snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: gh api --method POST "repos/$REPO/dependency-graph/snapshots" --input "$RUNNER_TEMP/kiloclaw-snapshot.json"

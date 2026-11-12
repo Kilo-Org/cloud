@@ -3,6 +3,24 @@
 # Please see the documentation for all configuration options:
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
+# Where alerts come from. Alerts are computed from the dependency graph, not
+# from this file:
+#
+# - pnpm-lock.yaml: read in full by the dependency graph, every resolved
+#   package of every workspace.
+# - services/kiloclaw/Dockerfile: what the KiloClaw image installs outside
+#   pnpm-lock.yaml (global npm CLIs and their transitive dependencies, plugin
+#   tarballs, Go tools), submitted by dependency-submission.yml.
+# - apps/mobile (Android App Bundle): the Maven libraries of the shipped AAB,
+#   submitted by kilo-app-release.yml.
+#
+# Alerts on the submitted manifests get no Dependabot PR, since there is no
+# lockfile for it to edit: fix them by bumping the pin in the Dockerfile (or
+# the base image), or the Expo / React Native dependency that brings the
+# Android library in. Not covered: the Cloud Agent and Gastown
+# container images, and services/kiloclaw/controller/bun.lock (only used by
+# Dockerfile.local; the shipped controller is built from pnpm-lock.yaml).
+
 version: 2
 updates:
   - package-ecosystem: 'npm' # See documentation for possible values

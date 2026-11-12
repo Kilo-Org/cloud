@@ -46,6 +46,20 @@ log `error_name`, never the error message. Enkrypt schema rejections log only
 issue codes and top-level schema field names. Deploy the consumer that routes tagged Enkrypt
 messages before this ingress, and this ingress before any gateway publishes to it.
 
+Authenticated `POST /exa-usage` is the matching ingress for the Exa route's
+fallback copy. It accepts one bare `ExaUsageRecordSchema` record and sends exactly
+one `{kind: 'exa_usage', v: 1, record}` message to the same `USAGE_INGEST_QUEUE`;
+there is no new queue or binding. It authenticates with its own Worker secret,
+`USAGE_INGEST_EXA_PUBLISH_SECRET` (store it with
+`wrangler secret put USAGE_INGEST_EXA_PUBLISH_SECRET`), because its producer is
+`kilocode-app`, not the gateway: the LLM publish secret is not accepted there, and
+the Exa secret is not accepted on `/usage` or `/enkrypt-usage`. Until that secret
+is set the path returns 503 without reading the body. Limits, statuses, events and
+logging match `/enkrypt-usage`, with `usage_kind: "exa_usage"`; an LLM body, an
+Enkrypt record or an envelope returns 400, and an Exa record on the other paths
+returns 400. Deploy the consumer that routes tagged Exa messages before this
+ingress, and this ingress before the Exa route publishes to it.
+
 | Environment | Worker | Producer and consumer queue | DLQ (no consumer) |
 |---|---|---|---|
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing-eu` | `usage-ingest-processing-dlq-eu` |

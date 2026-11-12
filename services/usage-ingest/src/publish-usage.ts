@@ -7,6 +7,7 @@ import {
 } from '@kilocode/usage-contracts';
 import { logSafely, queueMetrics } from './diagnostics';
 import { handlePublishEnkryptUsage } from './publish-enkrypt-usage';
+import { handlePublishExaUsage } from './publish-exa-usage';
 import { schemaRejectionDetails } from './rejection-diagnostics';
 
 export type Env = Omit<
@@ -15,6 +16,7 @@ export type Env = Omit<
 > & {
   USAGE_INGEST_QUEUE: Queue<UsageQueueMessage>;
   USAGE_INGEST_PUBLISH_SECRET?: string;
+  USAGE_INGEST_EXA_PUBLISH_SECRET?: string;
   USAGE_INGEST_PARALLELISM?: string;
   USAGE_WRITER_URL?: string;
   USAGE_WRITER_SECRET?: string;
@@ -177,13 +179,14 @@ export async function handleFetch(
 ): Promise<Response> {
   const entryAtMs = Date.now();
   const pathname = new URL(request.url).pathname;
-  if (pathname !== '/usage' && pathname !== '/enkrypt-usage') {
+  if (pathname !== '/usage' && pathname !== '/enkrypt-usage' && pathname !== '/exa-usage') {
     return new Response('Not Found', { status: 404 });
   }
   if (request.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'POST' } });
   }
   if (pathname === '/enkrypt-usage') return handlePublishEnkryptUsage(request, env, entryAtMs);
+  if (pathname === '/exa-usage') return handlePublishExaUsage(request, env, entryAtMs);
 
   return handlePublishUsage(request, env, entryAtMs, ctx);
 }

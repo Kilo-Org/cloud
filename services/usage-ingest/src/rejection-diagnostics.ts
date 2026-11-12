@@ -1,14 +1,15 @@
-import { EnkryptUsageWriteSchema, UsageRecordRequestSchema } from '@kilocode/usage-contracts';
+import {
+  EnkryptUsageWriteSchema,
+  ExaUsageRecordSchema,
+  UsageRecordRequestSchema,
+} from '@kilocode/usage-contracts';
 
 type ValidationError = Extract<
   ReturnType<typeof UsageRecordRequestSchema.safeParse>,
   { success: false }
 >['error'];
 
-type EnkryptValidationError = Extract<
-  ReturnType<typeof EnkryptUsageWriteSchema.safeParse>,
-  { success: false }
->['error'];
+type FlatRecordValidationError = { issues: { path: PropertyKey[]; code: string }[] };
 
 const MAX_ISSUES = 8;
 const MAX_PATH_DEPTH = 4;
@@ -187,22 +188,34 @@ export function schemaRejectionDetails(error: ValidationError, parsedJson: unkno
   };
 }
 
-const enkryptFields: readonly string[] = Object.keys(EnkryptUsageWriteSchema.shape);
-
-/** The Enkrypt record is flat, so only a top-level schema key is named; deeper segments are redacted. */
-function enkryptPath(path: PropertyKey[]): string[] {
+/** A flat record names only a top-level schema key; deeper segments are redacted. */
+function flatRecordPath(fields: readonly string[], path: PropertyKey[]): string[] {
   const [field, ...rest] = path;
   if (field === undefined) return [];
-  if (typeof field !== 'string' || !enkryptFields.includes(field)) return ['[redacted]'];
+  if (typeof field !== 'string' || !fields.includes(field)) return ['[redacted]'];
   return rest.length === 0 ? [field] : [field, '[redacted]'];
 }
 
-export function enkryptSchemaRejectionDetails(error: EnkryptValidationError): object {
+function flatRecordRejectionDetails(
+  fields: readonly string[],
+  error: FlatRecordValidationError
+): object {
   return {
     issues: error.issues.slice(0, MAX_ISSUES).map(issue => ({
       code: issueCode(issue.code),
-      path: enkryptPath(issue.path),
+      path: flatRecordPath(fields, issue.path),
     })),
     omitted_issue_count: Math.max(0, error.issues.length - MAX_ISSUES),
   };
+}
+
+const enkryptFields: readonly string[] = Object.keys(EnkryptUsageWriteSchema.shape);
+const exaFields: readonly string[] = Object.keys(ExaUsageRecordSchema.shape);
+
+export function enkryptSchemaRejectionDetails(error: FlatRecordValidationError): object {
+  return flatRecordRejectionDetails(enkryptFields, error);
+}
+
+export function exaSchemaRejectionDetails(error: FlatRecordValidationError): object {
+  return flatRecordRejectionDetails(exaFields, error);
 }

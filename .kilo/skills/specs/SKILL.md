@@ -28,6 +28,7 @@ to the user if instructions or changes will cause deviations from the original i
 | `.specs/impact-referrals.md` | Impact.com Advocate referral programs for KiloClaw and Kilo Pass |
 | `.specs/kilo-pass.md` | Kilo Pass states, provider support, credit amounts, eligibility, lifecycle |
 | `.specs/organization-sso.md` | Organization SSO enforcement — auth requirements, membership admission/removal, policy inheritance |
+| `.specs/organization-sso-domains.md` | Organization SSO domain sets — multi-domain ownership, uniqueness, WorkOS reconciliation |
 | `.specs/stripe-early-fraud-warnings.md` | Stripe Early Fraud Warning enforcement — scope, containment, financial unwinding, remediation |
 | `.specs/coding-plans.md` | Coding Plans business rules (RFC 2119 normative language) |
 

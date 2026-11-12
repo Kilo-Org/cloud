@@ -15,11 +15,11 @@ Active.
 ## Definitions
 
 - **SSO authority**: The organization whose active SSO domain and WorkOS configuration authenticate users.
-- **Direct SSO organization**: An organization that owns an SSO authority through its own `sso_domain`.
+- **Direct SSO organization**: An organization that owns an SSO authority through its own SSO domains (see [organization-sso-domains.md](organization-sso-domains.md)).
 - **SSO child organization**: An organization whose direct parent is a Direct SSO organization and which therefore inherits the parent's SSO policy.
 - **Effective SSO policy**: The SSO requirement that applies to an organization, sourced either from itself or its direct parent.
-- **Same-domain user**: A human user whose normalized primary email domain equals the Effective SSO policy domain.
-- **External user**: A human user whose normalized primary email domain does not equal the Effective SSO policy domain.
+- **Same-domain user**: A human user whose normalized primary email domain equals any domain in the Effective SSO policy's domain set.
+- **External user**: A human user whose normalized primary email domain does not equal any domain in the Effective SSO policy's domain set.
 - **Bot user**: A system or service account with `is_bot = true`.
 - **Removal tombstone**: A durable `organization_membership_removals` record showing that a user was explicitly removed from an organization.
 - **Directory-managed organization**: An organization bound to a WorkOS directory through `organizations.directory_id`.
@@ -34,7 +34,7 @@ Active.
 1. A Direct SSO organization's Effective SSO policy MUST be its own active SSO authority.
 2. An SSO child organization's Effective SSO policy MUST be its direct parent's own active SSO authority.
 3. SSO inheritance MUST NOT be transitive. An organization whose parent is itself parented is misconfigured.
-4. An SSO child organization MUST NOT own a separate SSO domain.
+4. An SSO child organization MUST NOT own a separate SSO domain. The set of domains an organization may own is defined in [organization-sso-domains.md](organization-sso-domains.md).
 5. A soft-deleted or missing parent MUST NOT provide an Effective SSO policy.
 6. Multiple independent SSO authorities MUST NOT claim the same normalized domain.
 7. Invalid, conflicting, deleted, nested, or ambiguous SSO configuration MUST fail closed for authentication and human membership admission.

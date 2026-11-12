@@ -2,11 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   computeChargesMicrodollars,
-  computeChargesRefetchInterval,
   computeHourlyUsdFromCentsPerSecond,
   isCloudAgentSessionId,
-  SESSION_COMPUTE_POLL_MS,
-  type SessionComputeCharges,
   sessionTotalMicrodollars,
 } from './session-compute-total';
 
@@ -68,32 +65,5 @@ describe('computeHourlyUsdFromCentsPerSecond', () => {
   it('agrees with the catalogue rate the sheet prints', () => {
     // The server multiplies the same column by 36 for its hourly catalogue.
     expect(computeHourlyUsdFromCentsPerSecond(0.001)).toBeCloseTo(0.036, 10);
-  });
-});
-
-describe('computeChargesRefetchInterval', () => {
-  const withRuns = (open: boolean[]): Pick<SessionComputeCharges, 'runs'> => ({
-    runs: open.map(running => ({
-      startedAt: '2026-11-12T10:00:00.000Z',
-      stoppedAt: running ? null : '2026-11-12T10:01:00.000Z',
-      running,
-      instance: 'standard-3',
-      rateCentsPerSecond: 0.2,
-      seconds: 60,
-      amountMicrodollars: 500_000,
-    })),
-  });
-
-  it('polls while a run is still open, so a stopped run cannot stay running', () => {
-    expect(computeChargesRefetchInterval(withRuns([false, true]))).toBe(SESSION_COMPUTE_POLL_MS);
-  });
-
-  it('stops polling once every run has stopped', () => {
-    expect(computeChargesRefetchInterval(withRuns([false]))).toBe(false);
-    expect(computeChargesRefetchInterval(withRuns([]))).toBe(false);
-  });
-
-  it('does not poll before the first read arrives', () => {
-    expect(computeChargesRefetchInterval(undefined)).toBe(false);
   });
 });

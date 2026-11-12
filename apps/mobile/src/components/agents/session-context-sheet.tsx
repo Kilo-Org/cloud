@@ -247,10 +247,15 @@ export function SessionContextSheet({
     olderActivityCostUsd
   );
   // The session total is the model cost plus what the sandbox cost. The read is
-  // shared with the session page's pill, so opening the sheet does not ask
-  // twice; a session with no compute scope (or another payer) answers nothing
+  // shared with the session page's pill, which owns its poll timer and stays
+  // mounted behind the sheet, so the sheet only reads the cache entry it keeps
+  // fresh. A session with no compute scope (or another payer) answers nothing
   // and the model cost stands alone.
-  const computeCharges = useSessionComputeCharges({ cloudAgentSessionId, organizationId });
+  const computeCharges = useSessionComputeCharges({
+    cloudAgentSessionId,
+    organizationId,
+    poll: false,
+  });
   const totalCostText =
     formatSessionTotalCost(
       sessionTotalMicrodollars(
@@ -421,7 +426,11 @@ export function SessionContextSheet({
             </Row>
           ) : null}
 
-          {content.cost !== null || autoApproveState !== 'unavailable' ? (
+          {/* The row paints the combined total, so its gate is that total, not
+              the model-only figure: a read-only session with no model cost can
+              still owe a workspace's positive sandbox compute, and hiding the
+              row would hide its figure and its sharing note together. */}
+          {totalCostText !== null || autoApproveState !== 'unavailable' ? (
             <Row label={t('agentChat.contextUsage.totalCost')}>
               <Text className="text-base font-medium text-foreground tabular-nums">
                 {totalCostText ?? '-'}

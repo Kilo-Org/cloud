@@ -33,26 +33,11 @@ export function computeHourlyUsdFromCentsPerSecond(rateCentsPerSecond: number): 
 }
 
 /**
- * How often a session's charges are re-read while a run is still open. The web
- * session information dialog polls its own read at this same interval.
+ * How often a session's charges are re-read while a surface showing them is on
+ * screen. The web session information dialog polls its own read at this same
+ * interval.
  */
 export const SESSION_COMPUTE_POLL_MS = 15_000;
-
-/**
- * Whether the charges read keeps polling. A run that reports `running: true`
- * can stop at any moment, and React Native has no window focus event to
- * re-trigger a read that has gone stale, so a cached `running` would keep
- * painting "now" and its last recorded amount for a sandbox that already
- * stopped. Polling while a run is open settles the row within one interval,
- * and a read with every run stopped polls no more — like the web dialog, which
- * only polls while it is open.
- */
-export function computeChargesRefetchInterval(
-  charges: Pick<SessionComputeCharges, 'runs'> | undefined
-): number | false {
-  const open = charges?.runs.some(run => run.running) ?? false;
-  return open ? SESSION_COMPUTE_POLL_MS : false;
-}
 
 /** The session's compute amount in microdollars, or null when none is recorded. */
 export function computeChargesMicrodollars(

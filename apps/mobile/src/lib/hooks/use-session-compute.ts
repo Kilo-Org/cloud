@@ -1,17 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { useTRPC } from '@/lib/trpc';
-import { computeChargesRefetchInterval, isCloudAgentSessionId } from '@/lib/session-compute-total';
+import { isCloudAgentSessionId, SESSION_COMPUTE_POLL_MS } from '@/lib/session-compute-total';
 
 /**
  * The session's recorded compute charges. One request per open session: the
  * header pill and the context sheet read the same query options, so they share
  * one cache entry instead of asking twice.
  *
- * The read keeps polling while a run is still open, because a stopped run's
- * cached row would otherwise keep reading as running: the sheet stays mounted
- * while it is closed, and React Native hands this query no focus event to
- * refresh it with.
+ * The read polls on a timer for as long as a surface showing it is mounted,
+ * which is what the web session information dialog does while it is open. The
+ * amount can change under a cached payload at any time — a run that started
+ * after an idle read, a run read before its first charged segment exists, a
+ * sibling chat's run in the same workspace — and React Native hands this query
+ * no focus event to re-trigger it with. Only one caller asks for the poll; the
+ * others read the cache entry it keeps fresh.
  *
  * A session with no reachable compute scope answers `FORBIDDEN`; callers treat
  * that as "this session has nothing to show" rather than as a failure.
@@ -19,9 +22,12 @@ import { computeChargesRefetchInterval, isCloudAgentSessionId } from '@/lib/sess
 export function useSessionComputeCharges({
   cloudAgentSessionId,
   organizationId,
+  poll = true,
 }: {
   cloudAgentSessionId: string | null | undefined;
   organizationId: string | undefined;
+  /** Whether this caller owns the shared read's timer. */
+  poll?: boolean;
 }) {
   const trpc = useTRPC();
   const addressable = isCloudAgentSessionId(cloudAgentSessionId);
@@ -32,7 +38,7 @@ export function useSessionComputeCharges({
         enabled: addressable,
         staleTime: 30_000,
         refetchOnWindowFocus: false,
-        refetchInterval: query => computeChargesRefetchInterval(query.state.data),
+        refetchInterval: poll ? SESSION_COMPUTE_POLL_MS : false,
       }
     )
   );

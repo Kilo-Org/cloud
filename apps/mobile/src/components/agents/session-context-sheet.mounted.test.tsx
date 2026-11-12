@@ -726,6 +726,19 @@ describe('SessionContextSheet total cost row', () => {
 
     await unmount(renderer);
   });
+
+  it('keeps a compute-only total and its sharing note on a read-only session', async () => {
+    holder.computeCharges = computeCharges('workspace');
+    const renderer = await mountSheet({
+      autoApproveState: 'unavailable',
+      totalCostMicrodollars: null,
+    });
+
+    expect(textValues(renderer)).toContain(formatSessionTotalCost(500_000));
+    expect(findByTestID(renderer.root, 'session-context-sheet-shared-compute')).toHaveLength(1);
+
+    await unmount(renderer);
+  });
 });
 
 /** One charged run, so the total has a compute side to add. */

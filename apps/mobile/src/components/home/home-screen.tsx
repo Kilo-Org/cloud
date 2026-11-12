@@ -68,12 +68,19 @@ export function HomeScreen() {
         // opens. The heading is the mark alone, so the row never reflows the
         // picker under it (`allowInlineActionsStacking` reserves room for a
         // heading's text that this header does not have).
-        // The account-list failure stays out of the header: the live-session
-        // card below states it and retries the same query, and the message and
-        // Retry rows this control would add made the fixed header taller, so
-        // every section moved down while the list failed and back up when it
-        // recovered (finding home-header-failure-shift).
-        inlineActions={<ContextControl inlineFailure={false} />}
+        // The account-list failure never adds rows to this fixed header, so
+        // every section keeps its place while the list fails and after it
+        // recovers (finding home-header-failure-shift). Which of the two
+        // one-row forms depends on what the body states:
+        //
+        // - With an organization active, the live-session card below states the
+        //   failure and carries its Retry, so the header draws nothing.
+        // - In the personal scope the card reports the sessions query instead
+        //   and never this one, so the header row becomes the recovery: its
+        //   label is the failure message and a press refetches the list.
+        inlineActions={
+          <ContextControl failurePlacement={context.organizationId === null ? 'row' : 'none'} />
+        }
         allowInlineActionsStacking={false}
         // The logo is the header's only visible child, so this is the brand
         // mark's leading edge: it must be the page gutter the sections, cards

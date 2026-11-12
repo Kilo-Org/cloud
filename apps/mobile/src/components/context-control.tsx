@@ -130,13 +130,21 @@ const FIELD_TRIGGER_CLASS =
  * `variant` picks the shape: `inline` is the compact label-and-chevron a header
  * or a detail row shows, and `field` is the stacked form's full-width trigger.
  *
- * `inlineFailure` is false on a surface that draws the account-list failure and
- * its own Retry itself, as Home does in its live-session card. Both Retry actions
- * refetch the same query, and the control sits in a fixed header: the message
- * line and the retry row it stacks under its label made that header grow by their
- * combined height, so the whole body moved down while the account list failed and
- * back up when it recovered (the pending-to-error jump). A surface that keeps the
- * failure here leaves the default; its body has no other Retry for that query.
+ * `failurePlacement` decides where the account-list failure goes, so a caller
+ * whose own body states it can keep a fixed header one row tall:
+ *
+ * - `rows` (default) stacks the message and a Retry under the label, for a
+ *   screen whose body has no other recovery for that query.
+ * - `row` keeps the control one row tall and makes that row the retry: the
+ *   label becomes the message and a press refetches the list. Nothing is added
+ *   below, so the header keeps its height in every state.
+ * - `none` draws neither, for a surface that states the failure and retries it
+ *   elsewhere. Two rows here made a fixed header grow by their combined height,
+ *   so the whole body moved down while the list failed and back up when it
+ *   recovered (the pending-to-error jump).
+ *
+ * The provider's own stored-choice read or write failure keeps its `rows` form
+ * under every placement: no other surface reaches it.
  */
 export function ContextControl({
   scope,
@@ -144,14 +152,14 @@ export function ContextControl({
   onSelectionChange,
   value,
   variant = 'inline',
-  inlineFailure = true,
+  failurePlacement = 'rows',
 }: Readonly<{
   scope?: ContextDisplayScope;
   showOrganizationName?: boolean;
   onSelectionChange?: (organizationId: string | null) => void;
   value?: string | null;
   variant?: 'inline' | 'field';
-  inlineFailure?: boolean;
+  failurePlacement?: 'rows' | 'row' | 'none';
 }>) {
   const context = useOrganization();
   const { token } = useAuth();
@@ -191,85 +199,123 @@ export function ContextControl({
   if (providerError) {
     // The stored choice's own read or write failed, and nothing else on the
     // screen reaches that failure: this control keeps both the message and the
-    // Retry, whatever `inlineFailure` says.
+    // Retry, whatever the caller asked for the list failure.
     errorMessage =
       providerError === 'restore'
         ? t('common.somethingWentWrong')
         : t('common.couldNotSaveSetting');
     retry = context.retry;
-  } else if (inlineFailure && nameError) {
+  } else if (failurePlacement !== 'none' && nameError) {
     errorMessage = t('organization.boundary.loadErrorTitle');
     retry = () => {
       void organizations.refetch();
     };
-  } else if (inlineFailure && unavailable) {
+  } else if (failurePlacement !== 'none' && unavailable) {
     errorMessage = t('organization.boundary.organizationUnavailable');
   }
+  // The one-row placement moves the message and the action into the control's
+  // own row: no message line and no second Retry row, so the header keeps its
+  // height. A failure without a retry action (an unavailable organization) has
+  // nothing to press, so it keeps the default rows.
+  const rowIsRetry = failurePlacement === 'row' && errorMessage !== null && retry !== undefined;
+  const placedMessage = rowIsRetry ? null : errorMessage;
   const retryBusy =
     providerError === 'save' ? context.isSaving : !providerError && organizations.isFetching;
   const disabled = !isResolved || orgs === undefined;
   const pickerBusy = pending || (orgs === undefined && token != null && organizations.isPending);
   const field = variant === 'field';
+  const rowLabel = rowIsRetry ? (errorMessage ?? label) : label;
   const content = pending ? (
     <Skeleton className="h-5 w-36 max-w-full shrink rounded" />
   ) : (
     <Text
       className={cn(
         'min-w-0 leading-[normal]',
-        field ? 'flex-1 text-base text-foreground' : 'shrink text-sm text-muted-foreground'
+        field ? 'flex-1 text-base text-foreground' : 'shrink text-sm text-muted-foreground',
+        rowIsRetry && 'text-destructive'
       )}
       numberOfLines={1}
       // Memberships of one workspace share their leading words, so the tail is
-      // what tells them apart: cutting it drops the account's own name.
-      ellipsizeMode="middle"
+      // what tells them apart: cutting it drops the account's own name. A
+      // failure message reads from its start, so only that one cuts the tail.
+      ellipsizeMode={rowIsRetry ? 'tail' : 'middle'}
     >
-      {label}
+      {rowLabel}
     </Text>
   );
 
+  // Two shapes of the same row: the retry form, for a surface whose body has no
+  // recovery of its own for this query, and the picker form every other frame
+  // shows. The read-only `scope` form only names the account.
+  const retryRow = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={rowLabel}
+      accessibilityState={{ busy: retryBusy, disabled: retryBusy }}
+      disabled={retryBusy}
+      onPress={retry}
+      className={cn(
+        field ? FIELD_TRIGGER_CLASS : cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1'),
+        'active:opacity-70'
+      )}
+    >
+      {content}
+      <View className="size-5 shrink-0 items-center justify-center">
+        {retryBusy && <ActivityIndicator size="small" color={colors.mutedForeground} />}
+      </View>
+    </Pressable>
+  );
+  const pickerRow = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={t('profile.selectAccount')}
+      accessibilityState={{ busy: pickerBusy, disabled }}
+      disabled={disabled}
+      onPress={openPicker}
+      className={cn(
+        field ? FIELD_TRIGGER_CLASS : cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1'),
+        'active:opacity-70',
+        field && disabled && 'opacity-50'
+      )}
+    >
+      {content}
+      <View className="size-5 shrink-0 items-center justify-center">
+        {pickerBusy ? (
+          <ActivityIndicator size="small" color={colors.mutedForeground} />
+        ) : (
+          <ChevronDown size={14} color={colors.mutedForeground} />
+        )}
+      </View>
+    </Pressable>
+  );
+  let row = pickerRow;
+  if (scope) {
+    row = (
+      <View
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel={rowLabel}
+        accessibilityState={{ busy: pending }}
+        className={field ? FIELD_TRIGGER_CLASS : cn(ROW_TARGET_CLASS, 'justify-center')}
+      >
+        {content}
+      </View>
+    );
+  } else if (rowIsRetry) {
+    row = retryRow;
+  }
+
   return (
     <View className="min-w-0 max-w-full">
-      {scope ? (
-        <View
-          accessible
-          accessibilityRole="text"
-          accessibilityLabel={label}
-          accessibilityState={{ busy: pending }}
-          className={field ? FIELD_TRIGGER_CLASS : cn(ROW_TARGET_CLASS, 'justify-center')}
-        >
-          {content}
-        </View>
-      ) : (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={label}
-          accessibilityHint={t('profile.selectAccount')}
-          accessibilityState={{ busy: pickerBusy, disabled }}
-          disabled={disabled}
-          onPress={openPicker}
-          className={cn(
-            field ? FIELD_TRIGGER_CLASS : cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1'),
-            'active:opacity-70',
-            field && disabled && 'opacity-50'
-          )}
-        >
-          {content}
-          <View className="size-5 shrink-0 items-center justify-center">
-            {pickerBusy ? (
-              <ActivityIndicator size="small" color={colors.mutedForeground} />
-            ) : (
-              <ChevronDown size={14} color={colors.mutedForeground} />
-            )}
-          </View>
-        </Pressable>
-      )}
-      <AccessibleStatus message={errorMessage} className="text-sm" />
+      {row}
+      <AccessibleStatus message={placedMessage} className="text-sm" />
       {picker}
-      {retry && errorMessage ? (
+      {retry && placedMessage ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('common.retry')}
-          accessibilityHint={errorMessage}
+          accessibilityHint={placedMessage}
           accessibilityState={{ busy: retryBusy, disabled: retryBusy }}
           disabled={retryBusy}
           onPress={retry}

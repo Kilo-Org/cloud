@@ -23,6 +23,7 @@ let mockAtomValues: Record<string, unknown>;
 let mockLocalSession: LocalSession | null = null;
 let mockComposerFocusRequest: ComposerFocusRequest | null = null;
 const mockSetAtom = jest.fn();
+const mockSetLocalComposer = jest.fn();
 const mockUseCloudAgentEnvironment = jest.fn();
 const mockRequestOlderMessages = jest.fn();
 const mockPlanResumeAttempt = jest.fn((): ResumeAttemptStep => 'wait');
@@ -39,6 +40,7 @@ const mockManager = {
   loadOlderMessages: jest.fn(),
   trimRetainedHistory: jest.fn(),
   setRemoteModelOverride: jest.fn(),
+  setCloudAgentModelOverride: jest.fn(),
   interrupt: jest.fn(),
   answerQuestion: jest.fn(),
   rejectQuestion: jest.fn(),
@@ -122,7 +124,7 @@ jest.mock('./useSavedWorktreeChanges', () => ({
 jest.mock('./use-cached-transcript-page', () => ({ useCachedTranscriptPage: () => null }));
 jest.mock('./local-sessions/LocalSessionsProvider', () => ({
   useLocalSession: () => mockLocalSession,
-  useLocalSessions: () => ({ restored: true }),
+  useLocalSessions: () => ({ restored: true, setLocalComposer: mockSetLocalComposer }),
 }));
 jest.mock('./useChatStackInfo', () => ({ useChatStackInfo: () => null }));
 jest.mock('./use-preview', () => ({
@@ -388,12 +390,16 @@ describe('CloudChatPage route-aware transcript phase', () => {
     mockResumeAnchorForTranscript.mockReset().mockReturnValue(null);
     mockRequestOlderMessages.mockClear();
     mockSetAtom.mockClear();
+    mockSetLocalComposer.mockReset().mockImplementation((_id, composer) => {
+      if (mockLocalSession) mockLocalSession = { ...mockLocalSession, composer };
+    });
     mockUseCloudAgentEnvironment.mockReset().mockReturnValue({ data: undefined });
     mockAtomValues = {
       sessionId: null,
       fetchedSessionData: null,
       activity: { type: 'idle' },
       activeSessionType: 'cloud-agent',
+      isReadOnly: false,
       staticMessages: [],
       dynamicMessages: [],
       pendingMessages: new Map(),
@@ -465,6 +471,7 @@ describe('CloudChatPage route-aware transcript phase', () => {
     expect(mockChatInput).toMatchObject({
       textareaDisabled: false,
       disabled: true,
+      toolbarDisabled: false,
       sendUnavailableReason: 'Creating session…',
       mode: 'code',
     });
@@ -482,6 +489,45 @@ describe('CloudChatPage route-aware transcript phase', () => {
     expect(focus).toHaveBeenCalledTimes(1);
     expect(onHandled).toHaveBeenCalledTimes(1);
     focus.mockRestore();
+  });
+
+  it('shows installed workspace modes and accepts selection changes while creation is pending', () => {
+    mockLocalSession = {
+      kiloSessionId: 'ses_b',
+      operationKey: '11111111-1111-4111-8111-111111111111',
+      organizationId: null,
+      worktreeId: 'worktree_local',
+      request: { kind: 'worktree-chat', sourceKiloSessionId: 'ses_a' },
+      repository: 'example/repository',
+      branch: 'main',
+      firstMessage: null,
+      createdAt: '2026-11-12T00:00:00.000Z',
+      sync: { state: 'syncing' },
+      composer: {
+        mode: 'code',
+        model: 'example/model',
+        variant: null,
+        runtimeAgents: [
+          { slug: 'reviewer', name: 'Workspace reviewer', model: 'example/pinned' },
+          { slug: 'hidden', name: 'Hidden agent', hidden: true },
+        ],
+      },
+    };
+    render();
+    expect(mockChatInput).toMatchObject({
+      toolbarDisabled: false,
+      disabled: true,
+      customModeOptions: [{ value: 'reviewer', label: 'Workspace reviewer' }],
+    });
+    const onModeChange = mockChatInput?.onModeChange as (mode: string) => void;
+    act(() => onModeChange('reviewer'));
+    render();
+    expect(mockChatInput).toMatchObject({
+      mode: 'reviewer',
+      model: 'example/pinned',
+      modelPickerDisabled: true,
+    });
+    expect(mockLocalSession.composer?.mode).toBe('reviewer');
   });
 
   it('renders the skeleton instead of a stale error while the started open is loading', () => {

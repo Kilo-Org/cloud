@@ -1297,23 +1297,32 @@ describe('AttachmentPreviewStrip — control hit targets', () => {
   // NativeWind's rem is 14, so one spacing unit is 3.5 dp.
   const DP_PER_SPACING_UNIT = 3.5;
 
-  /** Resolved dp of one logical spacing class (`pe-10` → 35 dp), or null. */
-  function spacingDp(className: unknown, token: 'ps' | 'pe'): number | null {
-    const match = new RegExp(`(?:^|\\s)${token}-(\\d+(?:\\.\\d+)?)(?=\\s|$)`).exec(
-      String(className)
-    );
-    return match ? Number(match[1]) * DP_PER_SPACING_UNIT : null;
+  /** Resolved dp of one side's inset class, `px-*` counting for both sides. */
+  function sideDp(className: unknown, side: 'start' | 'end'): number {
+    const text = String(className);
+    const logical = new RegExp(`(?:^|\\s)${side === 'start' ? 'ps' : 'pe'}-(\\d+(?:\\.\\d+)?)(?=\\s|$)`);
+    const match = logical.exec(text) ?? /(?:^|\s)px-(\d+(?:\.\d+)?)(?=\s|$)/.exec(text);
+    return match ? Number(match[1]) * DP_PER_SPACING_UNIT : 0;
   }
 
-  /** The file row of the document chip: the filename Text's grandparent. */
-  function fileRow(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  /** The document chip's filename column: the filename Text's parent. */
+  function fileColumn(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
     const filename = root.find(
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'Text' &&
         node.props.children === 'a-rather-long-document.pdf'
     );
-    const row = filename.parent?.parent;
+    const column = filename.parent;
+    if (!column || !String(column.props.className).includes('flex-1')) {
+      throw new Error('file column missing');
+    }
+    return column;
+  }
+
+  /** The row around the icon and the filename column. */
+  function fileRow(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+    const row = fileColumn(root).parent;
     if (!row || !String(row.props.className).includes('flex-row')) {
       throw new Error('file row missing');
     }
@@ -1328,11 +1337,11 @@ describe('AttachmentPreviewStrip — control hit targets', () => {
     );
   }
 
-  /** The document chip's filename column and the badge box, measured in dp. */
-  async function fileRowReserve(status: 'uploaded' | 'error'): Promise<{
-    badgeEndDp: number;
-    endReserveDp: number;
-    startReserveDp: number;
+  /** The chip's inset reserves, and the end inset of the Remove badge row. */
+  async function chipReserves(status: 'uploaded' | 'error'): Promise<{
+    columnEndDp: number;
+    rowEndDp: number;
+    rowStartDp: number;
   }> {
     reactNativeMock.Platform.OS = 'android';
     const attachment = makeAttachment({
@@ -1343,31 +1352,32 @@ describe('AttachmentPreviewStrip — control hit targets', () => {
       progress: null,
     });
     const renderer = await mount([attachment]);
-    const badgeEndDp = spacingDp(removeBadgeRow(renderer.root).props.className, 'pe');
-    expect(badgeEndDp).not.toBeNull();
-    const rowClass = fileRow(renderer.root).props.className;
-    // A row with no reserve on a side resolves to 0 dp.
-    const endReserveDp = spacingDp(rowClass, 'pe') ?? 0;
-    const startReserveDp = spacingDp(rowClass, 'ps') ?? 0;
+    const result = {
+      columnEndDp: sideDp(fileColumn(renderer.root).props.className, 'end'),
+      rowEndDp: sideDp(fileRow(renderer.root).props.className, 'end'),
+      rowStartDp: sideDp(fileRow(renderer.root).props.className, 'start'),
+    };
+    const badgeEndDp = sideDp(removeBadgeRow(renderer.root).props.className, 'end');
     renderer.unmount();
-    return { badgeEndDp: Number(badgeEndDp), endReserveDp, startReserveDp };
+    expect(badgeEndDp).toBe(7);
+    return result;
   }
 
-  it('reserves the Remove badge box at the end of the document file row', async () => {
-    const { badgeEndDp, endReserveDp, startReserveDp } = await fileRowReserve('uploaded');
+  it('reserves the Remove badge width at the end of the document text column', async () => {
+    const { columnEndDp, rowEndDp, rowStartDp } = await chipReserves('uploaded');
 
-    // The text column must end where the 28 dp badge starts, never under it.
-    expect(endReserveDp).toBeGreaterThanOrEqual(28 + badgeEndDp);
-    // No Retry control means no start reserve, so a filename keeps the width.
-    expect(startReserveDp).toBeLessThan(28);
+    // The text must end where the 28 dp badge starts, never under it.
+    expect(columnEndDp).toBeGreaterThanOrEqual(28);
+    // The reserve stays on the column, so the row keeps equal opposite insets.
+    expect(rowStartDp).toBe(rowEndDp);
   });
 
-  it('reserves both control corners when the chip also offers Retry', async () => {
-    const { badgeEndDp, endReserveDp, startReserveDp } = await fileRowReserve('error');
+  it('reserves the badge width on a chip that also offers Retry', async () => {
+    const { columnEndDp, rowStartDp } = await chipReserves('error');
 
-    expect(endReserveDp).toBeGreaterThanOrEqual(28 + badgeEndDp);
+    expect(columnEndDp).toBeGreaterThanOrEqual(28);
     // Retry's badge is 24.5 dp inside a `p-1` inset, so its box is 28 dp.
-    expect(startReserveDp).toBeGreaterThanOrEqual(28);
+    expect(rowStartDp).toBeGreaterThanOrEqual(28);
   });
 });
 

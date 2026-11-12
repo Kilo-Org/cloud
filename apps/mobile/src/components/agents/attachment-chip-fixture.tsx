@@ -81,7 +81,7 @@ export function AttachmentChipFixture() {
   );
 
   return (
-    <View className="flex-1 justify-end bg-background pb-2" testID="attachment-chip-fixture">
+    <View className="flex-1 justify-end bg-background pb-2">
       <AttachmentPreviewStrip
         attachments={attachments}
         onRemove={() => undefined}

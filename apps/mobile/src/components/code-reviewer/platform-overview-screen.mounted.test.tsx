@@ -695,7 +695,7 @@ describe('PlatformOverviewScreen GitLab webhook warning', () => {
       .filter(node => elementCopy(node.props.children).includes(label));
   }
 
-  async function renderWarning(scope = 'org-1'): Promise<TestRenderer.ReactTestRenderer> {
+  function renderWarning(scope = 'org-1'): Promise<TestRenderer.ReactTestRenderer> {
     webhookWarning.shown = true;
     config.data = makeConfig({
       repositorySelectionMode: 'selected',

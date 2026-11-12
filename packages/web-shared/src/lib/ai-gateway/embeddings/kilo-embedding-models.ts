@@ -15,6 +15,7 @@ export type KiloEmbeddingModelCatalog = {
 
 export const KILO_DEFAULT_EMBEDDING_MODEL = 'openai/text-embedding-3-small';
 
+// Catalog snapshot checked 2026-11-12 against https://openrouter.ai/api/v1/embeddings/models.
 export const KILO_EMBEDDING_MODELS = [
   {
     id: 'mistralai/codestral-embed-2505',
@@ -134,6 +135,114 @@ export const KILO_EMBEDDING_MODELS = [
     name: 'multi-qa-mpnet-base-dot-v1',
     dimension: 768,
     scoreThreshold: 0.35,
+  },
+  {
+    id: 'cohere/embed-5-fast',
+    name: 'Cohere Embed 5 Fast',
+    dimension: 2048,
+    scoreThreshold: 0.35,
+  },
+  {
+    id: 'cohere/embed-5-pro',
+    name: 'Cohere Embed 5 Pro',
+    dimension: 2048,
+    scoreThreshold: 0.35,
+  },
+  {
+    id: 'amazon/titan-embed-image-v1',
+    name: 'Amazon Titan Multimodal Embeddings G1',
+    dimension: 1024,
+    scoreThreshold: 0.35,
+  },
+  {
+    id: 'amazon/titan-embed-text-v1',
+    name: 'Amazon Titan Embeddings G1 - Text',
+    dimension: 1536,
+    scoreThreshold: 0.35,
+    dimensionMode: 'fixed',
+  },
+  {
+    id: 'amazon/titan-embed-text-v2',
+    name: 'Amazon Titan Text Embeddings V2',
+    dimension: 1024,
+    scoreThreshold: 0.35,
+  },
+  {
+    id: 'nvidia/nemotron-3.5-embed-1b:free',
+    name: 'NVIDIA Nemotron 3.5 Embed 1B (free)',
+    dimension: 2048,
+    scoreThreshold: 0.35,
+  },
+  {
+    id: 'nvidia/nemotron-3.5-embed-8b:free',
+    name: 'NVIDIA Nemotron 3.5 Embed 8B (free)',
+    dimension: 4096,
+    scoreThreshold: 0.35,
+  },
+  {
+    id: 'liquid/lfm-2.5-embedding-350m:free',
+    name: 'LiquidAI LFM2.5 Embedding 350M (free)',
+    dimension: 1024,
+    scoreThreshold: 0.35,
+    note: 'Retires 2026-11-13',
+    dimensionMode: 'fixed',
+  },
+  {
+    id: 'mongodb/voyage-code-4',
+    name: 'Voyage Code 4',
+    dimension: 1024,
+    scoreThreshold: 0.35,
+    note: 'code',
+  },
+  {
+    id: 'mongodb/voyage-multimodal-3.5',
+    name: 'Voyage Multimodal 3.5',
+    dimension: 1024,
+    scoreThreshold: 0.35,
+  },
+  {
+    id: 'mongodb/voyage-4-lite',
+    name: 'Voyage 4 Lite',
+    dimension: 1024,
+    scoreThreshold: 0.35,
+  },
+  {
+    id: 'mongodb/voyage-4',
+    name: 'Voyage 4',
+    dimension: 1024,
+    scoreThreshold: 0.35,
+  },
+  {
+    id: 'mongodb/voyage-4-large',
+    name: 'Voyage 4 Large',
+    dimension: 1024,
+    scoreThreshold: 0.35,
+  },
+  {
+    id: 'nvidia/nemotron-3-embed-1b:free',
+    name: 'NVIDIA Nemotron 3 Embed 1B (free)',
+    dimension: 2048,
+    scoreThreshold: 0.35,
+    dimensionMode: 'fixed',
+  },
+  {
+    id: 'google/gemini-embedding-2',
+    name: 'Gemini Embedding 2',
+    dimension: 3072,
+    scoreThreshold: 0.35,
+  },
+  {
+    id: 'google/gemini-embedding-2-preview',
+    name: 'Gemini Embedding 2 Preview',
+    dimension: 3072,
+    scoreThreshold: 0.35,
+  },
+  {
+    id: 'nvidia/llama-nemotron-embed-vl-1b-v2:free',
+    name: 'NVIDIA Llama Nemotron Embed VL 1B V2 (free)',
+    dimension: 2048,
+    scoreThreshold: 0.35,
+    note: 'Retires 2026-11-16',
   },
 ] satisfies KiloEmbeddingModel[];
 

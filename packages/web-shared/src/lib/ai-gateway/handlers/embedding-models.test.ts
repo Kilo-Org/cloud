@@ -65,11 +65,10 @@ describe('GET /api/gateway/embedding-models', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(KILO_EMBEDDING_MODEL_CATALOG);
     expect(resolveOrganizationMemberModelPolicy).toHaveBeenCalledTimes(1);
-    expect(resolveOrganizationMemberModelPolicy).toHaveBeenCalledWith({
-      organizationId: 'org-1',
-      kiloUserId: 'user-1',
-      fromDb: readDb,
-    });
+    const [policyInput] = jest.mocked(resolveOrganizationMemberModelPolicy).mock.calls[0];
+    expect(policyInput.organizationId).toBe('org-1');
+    expect(policyInput.kiloUserId).toBe('user-1');
+    expect(policyInput.fromDb === readDb).toBe(true);
     expect(getEffectiveModelDecision).toHaveBeenCalledTimes(
       KILO_EMBEDDING_MODEL_CATALOG.models.length
     );

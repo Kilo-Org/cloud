@@ -6,7 +6,7 @@ import {
   ENKRYPT_GUARDRAIL_TIMEOUT_MS,
   ENKRYPT_MAX_SCAN_CHARACTERS,
   responseBlockMessage,
-  SCAN_TOO_LARGE_MESSAGES,
+  RESPONSE_TOO_LARGE_MESSAGE,
   scanRequest,
   type EnkryptGuardrailScan,
   type EnkryptGuardrailScanResult,
@@ -70,7 +70,7 @@ type OutputScanResult = Omit<EnkryptGuardrailScanResult, 'report'> & {
 };
 
 const outputTooLarge: OutputScanResult = {
-  verdict: { action: 'block', message: SCAN_TOO_LARGE_MESSAGES.response },
+  verdict: { action: 'block', message: RESPONSE_TOO_LARGE_MESSAGE },
   usageRecords: [],
   report: null,
 };

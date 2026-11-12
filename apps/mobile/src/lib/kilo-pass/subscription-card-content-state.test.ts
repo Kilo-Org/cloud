@@ -41,7 +41,43 @@ describe('getKiloPassSubscriptionCardContentState', () => {
   it('renders the unavailable surface without a purchase CTA', () => {
     expect(
       getKiloPassSubscriptionCardContentState({
-        presentation: { kind: 'unavailable' },
+        presentation: { kind: 'unavailable', statusClass: 'inactive' },
+        presentationIsError: false,
+        presentationIsPending: false,
+      })
+    ).toEqual({
+      kind: 'card',
+      state: {
+        action: 'open-native',
+        actionLabel: null,
+        description: 'Kilo Pass purchase is not available right now.',
+        title: KILO_PASS_TITLE,
+      },
+    });
+  });
+
+  it('states that an ended pass has ended', () => {
+    expect(
+      getKiloPassSubscriptionCardContentState({
+        presentation: { kind: 'unavailable', statusClass: 'terminal' },
+        presentationIsError: false,
+        presentationIsPending: false,
+      })
+    ).toEqual({
+      kind: 'card',
+      state: {
+        action: 'open-native',
+        actionLabel: null,
+        description: 'Your Kilo Pass has ended.',
+        title: KILO_PASS_TITLE,
+      },
+    });
+  });
+
+  it('keeps the generic line for a retryable subscription', () => {
+    expect(
+      getKiloPassSubscriptionCardContentState({
+        presentation: { kind: 'unavailable', statusClass: 'retryable' },
         presentationIsError: false,
         presentationIsPending: false,
       })
@@ -59,7 +95,25 @@ describe('getKiloPassSubscriptionCardContentState', () => {
   it('renders the web-management surface with a Manage action', () => {
     expect(
       getKiloPassSubscriptionCardContentState({
-        presentation: { kind: 'web_management' },
+        presentation: { kind: 'web_management', statusClass: 'healthy' },
+        presentationIsError: false,
+        presentationIsPending: false,
+      })
+    ).toEqual({
+      kind: 'card',
+      state: {
+        action: 'open-web',
+        actionLabel: KILO_PASS_MANAGE_CTA_LABEL,
+        description: 'This Kilo Pass is managed on web',
+        title: KILO_PASS_TITLE,
+      },
+    });
+  });
+
+  it('keeps the web-management copy for an ended pass managed on web', () => {
+    expect(
+      getKiloPassSubscriptionCardContentState({
+        presentation: { kind: 'web_management', statusClass: 'terminal' },
         presentationIsError: false,
         presentationIsPending: false,
       })

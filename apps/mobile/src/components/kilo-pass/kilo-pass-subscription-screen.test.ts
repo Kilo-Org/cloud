@@ -148,7 +148,7 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
-  it('web_management: keeps the web copy and Manage, and renders no empty state', async () => {
+  it('web_management: shows the description, the web line and Manage, in order', async () => {
     mockedPlatform.OS = 'android';
     mocks.presentation.data = {
       kind: 'web_management',
@@ -157,9 +157,17 @@ describe('KiloPassSubscriptionScreen', () => {
     };
     const renderer = await renderScreen();
     expect(nodesOfType(renderer, 'EmptyState')).toHaveLength(0);
-    expect(nodesOfType(renderer, 'CenteredState')).toHaveLength(1);
-    expect(allText(renderer)).toContain('This Kilo Pass is managed on web');
-    expect(allText(renderer)).toContain('Manage');
+    // The header names the pass, and the body must not measure itself into
+    // place: a measured state lifts by half the header after its first frame.
+    expect(nodesOfType(renderer, 'CenteredState')).toHaveLength(0);
+    const bodyTexts = nodesOfType(renderer, 'Text').map(node =>
+      node.children.map(child => (typeof child === 'string' ? child : '')).join('')
+    );
+    expect(bodyTexts).toEqual([
+      'A monthly subscription that adds credits to your Kilo balance for running AI coding sessions in Kilo App.',
+      'This Kilo Pass is managed on web',
+      'Manage',
+    ]);
     const button = nodesOfType(renderer, 'Button').find(
       node => node.props.accessibilityLabel === 'Manage'
     );

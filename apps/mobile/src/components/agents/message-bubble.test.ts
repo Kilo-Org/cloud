@@ -1,7 +1,8 @@
 /* eslint-disable max-lines -- Queued-badge, delivery, and a11y seams share the direct-invocation MessageBubble harness. */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { readKilo2Messages } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
 import type * as React from 'react';
 
 import type * as PartTypes from './part-types';
@@ -146,6 +147,53 @@ vi.mock('./use-message-copy', () => ({
 const BADGE_CLASS = 'flex-row items-center gap-1 self-end pr-1';
 
 describe('MessageBubble compaction', () => {
+  beforeEach(async () => {
+    const { isTextPart } = await import('./part-types');
+    const actual = await vi.importActual<typeof PartTypes>('./part-types');
+    vi.mocked(isTextPart).mockImplementation(actual.isTextPart);
+  });
+
+  afterEach(async () => {
+    const { isTextPart } = await import('./part-types');
+    vi.mocked(isTextPart).mockReturnValue(false);
+  });
+
+  it.each([false, true])(
+    'keeps the projected Kilo v2 summary out of ordinary markdown (native content: %s)',
+    async withNativeContent => {
+      const [message] = readKilo2Messages(
+        { id: 'ses_1', location: { directory: '/workspace' }, time: { created: 1, updated: 2 } },
+        [
+          {
+            id: 'msg_compaction',
+            type: 'compaction',
+            status: 'completed',
+            summary: 'Saved context summary',
+            time: { created: 2 },
+            content: withNativeContent ? [{ type: 'text', text: 'Native compaction detail' }] : [],
+          },
+        ]
+      );
+      if (message === undefined) {
+        throw new Error('expected a projected compaction message');
+      }
+      expect(message.parts).toHaveLength(withNativeContent ? 3 : 2);
+      const tree = await renderBubble(message);
+      expect(
+        findElementByType(tree, 'PartRenderer', props => props.part === message.parts[1])
+      ).toBeNull();
+      if (withNativeContent) {
+        expect(
+          findElementByType(tree, 'PartRenderer', props => props.part === message.parts[2])?.props
+            .messageInfo
+        ).toBe(message.info);
+      } else {
+        expect(findElementByType(tree, 'CompactionSeparator')?.props.info).toBe(message.info);
+        expect(findElementByType(tree, 'PartRenderer')).toBeNull();
+      }
+    }
+  );
+
   it.each([true, false])(
     'passes live state %s to the compaction-only separator',
     async isStreaming => {
@@ -291,6 +339,7 @@ async function renderBubbleWithHandlers(
     onRetryMessage?: (m: StoredMessage) => void;
     onAddCredits?: () => void;
     retryAvailable?: boolean;
+    failureStatedByPreparation?: boolean;
     onCopyToComposer?: (text: string) => void;
     onRestoreQueued?: (m: StoredMessage) => void;
     onLongPressDetails?: (m: StoredMessage) => void;
@@ -485,6 +534,52 @@ describe('MessageBubble failure footer', () => {
       String(executionFooter?.props.className),
     ];
     expect(footerClasses.filter(name => /\btext-(start|end)\b/.test(name))).toEqual([]);
+  });
+
+  it('keeps the actions and drops the generic statement a preparation group already states', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-prep-failed'), {
+      deliveryState: { status: 'failed', error: 'boom', reason: 'execution' },
+      failureStatedByPreparation: true,
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+
+    // The group names the stage and the reason, so neither generic line is
+    // drawn a second time above it.
+    expect(findText(tree, t => t === 'Response failed')).toBe(false);
+    expect(findText(tree, t => t === 'The agent could not run this message.')).toBe(false);
+    // The turn keeps the recovery it had, in the column of the failed response.
+    expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).not.toBeNull();
+    expect(
+      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Copy to composer')
+    ).not.toBeNull();
+    expect(footerOf(tree)).not.toBeNull();
+  });
+
+  it('draws no footer when the group states the failure and no action can render', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-prep-empty'), {
+      deliveryState: { status: 'failed', error: '', reason: 'execution' },
+      failureStatedByPreparation: true,
+      retryAvailable: false,
+    });
+
+    // Nothing but a padded block would be left above the group, so the footer
+    // is skipped rather than drawn empty.
+    expect(footerOf(tree)).toBeNull();
+    expect(findText(tree, t => t === 'Response failed')).toBe(false);
+  });
+
+  it('keeps a classified statement on a turn whose preparation also failed', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-prep-credits'), {
+      deliveryState: { status: 'failed', error: '', reason: 'credits' },
+      failureStatedByPreparation: true,
+      onAddCredits: vi.fn<() => void>(),
+      onCopyToComposer: vi.fn<(text: string) => void>(),
+    });
+
+    // The balance refusal is a cause the preparation group does not carry, so
+    // its statement stays.
+    expect(findText(tree, t => t === 'Not enough credits to send this message.')).toBe(true);
   });
 
   it('states a refused send under the person’s bubble with Add credits and no Retry', async () => {

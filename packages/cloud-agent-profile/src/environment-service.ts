@@ -816,7 +816,13 @@ export async function loadEnvironmentBuildInput(
         await readVariables(tx, environmentId)
       );
       const reference = referenceOf(environment);
-      const common = { reference, commands: environment.commands, plainVars, encryptedSecrets };
+      const common = {
+        reference,
+        commands: environment.commands,
+        plainVars,
+        encryptedSecrets,
+        sandboxAllocation: environment.sandbox_allocation,
+      };
       return reference.repositories
         ? { ...common, repositories: reference.repositories }
         : { ...common, repoFullName: repositoryPathOf(environment) };

@@ -13,6 +13,7 @@ import {
 import type { EnkryptGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import type { EnkryptScanReport } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { MAX_ENKRYPT_CREDITS_PER_CALL } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
+import type { EnkryptCallLimiter } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-limiter';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
 
@@ -21,9 +22,11 @@ type ReadyEnkryptGuardrailConfig = Extract<EnkryptGuardrailConfig, { status: 're
 export const ENKRYPT_DETECT_URL = 'https://api.enkryptai.com/guardrails/detect';
 
 /**
- * Bounds every attempt of a scan together. The gateway awaits a blocking scan just before the
- * upstream request, so this is the most latency an enabled organization's request can gain. It also
- * bounds the deferred work of a log-only scan, which the request does not wait for.
+ * Bounds every attempt of a scan together, including time spent waiting for a free call slot. The
+ * input guardrail starts one deadline for all scans of a request's blocking detectors, and one for
+ * its log-only detectors. The gateway awaits the blocking scans just before the upstream request,
+ * so this is the most latency an enabled organization's request can gain. It also bounds the
+ * deferred work of the log-only scans, which the request does not wait for.
  */
 export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 60_000;
 
@@ -32,8 +35,9 @@ const MAX_ERROR_BODY_BYTES = 64 * 1024;
 const ERROR_BODY_TIMEOUT_MS = 1_000;
 
 /**
- * A larger request is not sent to Enkrypt. It is never truncated: the model would still read the
- * unscanned remainder, which is where an injected instruction in a large file read would sit.
+ * The most text one Enkrypt call scans. Longer request text is split into several calls; a scan is
+ * never truncated, since the model would still read the unscanned remainder, which is where an
+ * injected instruction in a large file read would sit.
  */
 export const ENKRYPT_MAX_SCAN_CHARACTERS = 100_000;
 
@@ -41,12 +45,10 @@ const MAX_BLOCK_MESSAGE_LENGTH = 500;
 
 const MAX_SCAN_CHARACTERS_LABEL = ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US');
 
-export const SCAN_TOO_LARGE_MESSAGES: Record<EnkryptScanPart, string> = {
-  tools: `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of tool definitions at once, so this request was not sent. Reduce the enabled tools or MCP servers, then retry. Retrying the unchanged request will not help.`,
-  system: `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of system prompt at once, so this request was not sent. Shorten the system prompt, for example by removing custom instructions or rules files, then retry. Retrying the unchanged request will not help.`,
-  conversation: `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of new conversation text at once, so this request was not sent. Compact or prune earlier conversation history, reduce tool output, or start a new session, then retry. Retrying the unchanged request will not help.`,
-  response: `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of model output at once, so this response was withheld. Ask for a shorter response, for example by lowering the maximum output tokens, then retry.`,
-};
+/** Request text is split into scans; only a segment whose header is too long to split is too large. */
+export const REQUEST_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail splits long requests into scans of at most ${MAX_SCAN_CHARACTERS_LABEL} characters, but this request has a name or label, such as a tool or file name, too long to split, so it was not sent. Shorten that name, then retry. Retrying the unchanged request will not help.`;
+
+export const RESPONSE_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${MAX_SCAN_CHARACTERS_LABEL} characters of model output at once, so this response was withheld. Ask for a shorter response, for example by lowering the maximum output tokens, then retry.`;
 
 const detectResponseSchema = z.object({
   summary: z.record(z.string(), z.unknown()),
@@ -54,14 +56,14 @@ const detectResponseSchema = z.object({
 });
 
 /**
- * What a scan covers: the request's tool definitions, its system prompt, its conversation, or the
- * model's response.
+ * What a scan covers: one of the request's tool definitions or response formats, its system
+ * prompt, its conversation, or the model's response.
  */
 export type EnkryptScanPart = 'tools' | 'system' | 'conversation' | 'response';
 
 /**
- * How much of the part `text` covers. With a cached conversation prefix, `text` is only the
- * uncached suffix plus an overlap of already-scanned text.
+ * How much of the part `text` covers. Segments with a cached verdict are left out, and the rest are
+ * packed into calls of at most `ENKRYPT_MAX_SCAN_CHARACTERS`; `chunk` locates this call among them.
  */
 export type EnkryptScanCoverage = {
   part: EnkryptScanPart;
@@ -72,6 +74,7 @@ export type EnkryptScanCoverage = {
   cachedSegments: number;
   /** Attachments, such as images, represented only by an omission marker. */
   omittedAttachments: number;
+  chunk?: { index: number; count: number };
 };
 
 export type EnkryptGuardrailScan = {
@@ -104,9 +107,9 @@ export type EnkryptUnavailableReason = 'transient' | 'timeout' | 'failed';
  * A `log_only` scan has no detector that can block, so the request does not wait for it and its
  * failures are only logged: the request is never rejected because of it.
  */
-type EnkryptScanKind = 'blocking' | 'log_only';
+export type EnkryptScanKind = 'blocking' | 'log_only';
 
-function scanKind(config: EnkryptGuardrailConfig): EnkryptScanKind {
+export function scanKind(config: EnkryptGuardrailConfig): EnkryptScanKind {
   return config.status === 'ready' && config.blockingDetectors.length === 0
     ? 'log_only'
     : 'blocking';
@@ -121,7 +124,12 @@ export type EnkryptGuardrailScanResult = {
 export type EnkryptDetectDependencies = {
   apiKey: string | undefined;
   fetch: typeof fetch;
+  /** Starts a deadline of its own when the scan starts, unless `deadline` is given. */
   timeoutMs: number;
+  /** A deadline shared with other scans of the request. */
+  deadline?: AbortSignal;
+  /** Shared by the request's scans to bound their concurrent Enkrypt calls. */
+  limiter?: EnkryptCallLimiter;
   signal: AbortSignal;
   requestLog?: {
     guardrail: EnkryptRequestLog['guardrail'];
@@ -405,6 +413,7 @@ export async function scanRequest(
       session_id: scan.sessionId,
       client_request_id: scan.clientRequestId,
       api_kind: scan.apiKind,
+      ...(coverage.chunk ? { chunk: coverage.chunk } : {}),
     },
     report: {
       scan: kind,
@@ -439,7 +448,11 @@ export async function scanRequest(
     return failedVerdict([], scope, {
       error: 'request_too_large',
       latencyMs: 0,
-      closedVerdict: { action: 'block', message: SCAN_TOO_LARGE_MESSAGES[coverage.part] },
+      closedVerdict: {
+        action: 'block',
+        message:
+          coverage.part === 'response' ? RESPONSE_TOO_LARGE_MESSAGE : REQUEST_TOO_LARGE_MESSAGE,
+      },
     });
   }
 
@@ -454,30 +467,46 @@ export async function scanRequest(
     user_metadata: { organization_id: scan.organizationId },
   };
   const body = JSON.stringify(request);
-  const signal = AbortSignal.any([deps.signal, AbortSignal.timeout(deps.timeoutMs)]);
+  const signal = AbortSignal.any([
+    deps.signal,
+    deps.deadline ?? AbortSignal.timeout(deps.timeoutMs),
+  ]);
   const startedAt = performance.now();
   const attempts: DetectAttempt[] = [];
-  let attempt: DetectAttempt;
-  do {
+  // Set when the scan ran out of time, or the client disconnected, waiting for a call slot.
+  let queueError: DetectError | null = null;
+  while (true) {
+    const slot = deps.limiter ? await deps.limiter.acquire(kind, signal) : () => {};
+    if (!slot) {
+      queueError = abortError(signal, deps) ?? 'timeout';
+      break;
+    }
     const requestLog: EnkryptRequestLog | undefined = deps.requestLog
       ? {
           guardrail: deps.requestLog.guardrail,
           scan: kind,
           part: coverage.part,
+          ...(coverage.chunk ? { chunk: coverage.chunk } : {}),
           request,
           response: null,
           status_code: null,
           error: null,
         }
       : undefined;
-    attempt = await detectOnce(body, signal, { ...deps, apiKey }, requestLog);
+    let attempt: DetectAttempt;
+    try {
+      attempt = await detectOnce(body, signal, { ...deps, apiKey }, requestLog);
+    } finally {
+      slot();
+    }
     attempts.push(attempt);
-  } while (
-    attempt.kind === 'failed' &&
-    attempt.retryable &&
-    attempts.length < MAX_ATTEMPTS &&
-    !signal.aborted
-  );
+    const retry =
+      attempt.kind === 'failed' &&
+      attempt.retryable &&
+      attempts.length < MAX_ATTEMPTS &&
+      !signal.aborted;
+    if (!retry) break;
+  }
   const latencyMs = Math.round(performance.now() - startedAt);
 
   const usageRecords = attempts.map((each): EnkryptGuardrailCall => ({
@@ -495,8 +524,10 @@ export async function scanRequest(
       : {}),
   }));
 
-  if (attempt.kind === 'failed') {
-    return failedVerdict(usageRecords, scope, { error: attempt.error, latencyMs });
+  if (queueError) return failedVerdict(usageRecords, scope, { error: queueError, latencyMs });
+  const attempt = attempts.at(-1);
+  if (attempt?.kind !== 'detected') {
+    return failedVerdict(usageRecords, scope, { error: attempt?.error ?? 'timeout', latencyMs });
   }
 
   const blocking = blockingDetectors(attempt.firedDetectors, config);

@@ -18,11 +18,13 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import {
   ENKRYPT_VERDICT_CACHE_ENABLED,
+  mostSevereVerdict,
   rememberRequestVerdict,
   scanRequestWithVerdictCache,
   type EnkryptCachedScanResult,
   type EnkryptGuardrailRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/verdict-cache';
+import { createEnkryptCallLimiter } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-limiter';
 import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
@@ -48,12 +50,13 @@ type VerdictCacheWrite = EnkryptGuardrailReport['scans'][number]['verdict_cache_
 
 /** A request's verdict acts on its most severe part: a block, then an unavailable scan. */
 export function combinedVerdict(results: EnkryptCachedScanResult[]): EnkryptGuardrailVerdict {
-  const verdicts = results.map(result => result.verdict);
-  return (
-    verdicts.find(verdict => verdict.action === 'block') ??
-    verdicts.find(verdict => verdict.action === 'unavailable') ??
-    verdicts.find(verdict => verdict.action === 'allow') ?? { action: 'skip' }
-  );
+  return mostSevereVerdict(results.map(result => result.verdict));
+}
+
+/** For tool definitions: `failed` if any write failed, else `written` if any was written. */
+function combinedWrite(writes: VerdictCacheWrite[]): VerdictCacheWrite {
+  if (writes.includes('failed')) return 'failed';
+  return writes.includes('written') ? 'written' : 'skipped';
 }
 
 type EnkryptGuardrailScans = {
@@ -91,8 +94,11 @@ export function usageRecordsWithAddedLatency(
 /**
  * Starts the organization's input guardrail scans. A null scan (no organization, or the guardrail
  * is off) makes no Enkrypt call. Blocking detectors and log-only detectors are scanned
- * concurrently, each over the request's tool definitions, system prompt, and conversation separately; only the blocking
- * calls gate the request, so log-only detectors never delay or reject it.
+ * concurrently, each over every tool definition, the system prompt, and the conversation
+ * separately; only the blocking calls gate the request, so log-only detectors never delay or
+ * reject it. All of them share at most `ENKRYPT_MAX_CONCURRENT_CALLS` Enkrypt calls in flight, and
+ * blocking calls get a free slot first, so log-only calls only delay the verdict by holding slots
+ * they already have.
  *
  * Usage records are written in an `after()` callback registered now, so a request that returns
  * early still accounts for a scan Enkrypt performed. A request's verdict cache entry is
@@ -105,6 +111,7 @@ export function startEnkryptInputGuardrail(
 ): EnkryptInputGuardrail {
   const requestLogs: Promise<EnkryptRequestLog>[] = [];
   const captureResponse = Promise.withResolvers<boolean>();
+  const limiter = createEnkryptCallLimiter();
   const runScan = async (
     resolved: EnkryptGuardrailRequest | null
   ): Promise<EnkryptCachedScanResult[]> =>
@@ -113,6 +120,7 @@ export function startEnkryptInputGuardrail(
           apiKey: ENKRYPT_API_KEY,
           fetch,
           timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
+          limiter,
           signal,
           store: verdictCacheStore,
           requestLog: {
@@ -134,7 +142,7 @@ export function startEnkryptInputGuardrail(
           verdict: { action: 'unavailable', reason: 'failed' },
           usageRecords: [],
           report: null,
-          cacheEntry: null,
+          cacheEntries: [],
         },
       ];
     });
@@ -153,9 +161,12 @@ export function startEnkryptInputGuardrail(
   const cacheWrites = [blockingResults, logOnlyResults].map(results =>
     results.then(each =>
       Promise.all(
-        each.map(async ({ cacheEntry }): Promise<VerdictCacheWrite> => {
-          if (!cacheEntry || !verdictCacheStore) return 'skipped';
-          return rememberRequestVerdict(cacheEntry, verdictCacheStore);
+        each.map(async ({ cacheEntries }): Promise<VerdictCacheWrite> => {
+          const store = verdictCacheStore;
+          if (!store) return 'skipped';
+          return combinedWrite(
+            await Promise.all(cacheEntries.map(entry => rememberRequestVerdict(entry, store)))
+          );
         })
       )
     )

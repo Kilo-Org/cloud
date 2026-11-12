@@ -183,10 +183,11 @@ function contentProps(overrides: Partial<ContentProps> = {}): ContentProps {
     onSessionPress: () => undefined,
     nonPullRefreshes: 0,
     hasActiveQuery: false,
+    hasActiveFilters: false,
     isSearching: false,
     isRetrying: false,
     searchQuery: '',
-    onClearQuery: () => undefined,
+    onClearAction: () => undefined,
     onCreateSession: () => undefined,
     ...overrides,
   };
@@ -394,8 +395,9 @@ describe('AgentSessionListContent liveness', () => {
     const renderer = mount(
       contentProps({
         isError: true,
-        hasAnySessions: isSearching,
-        hasActiveQuery: isSearching,
+        hasAnySessions: true,
+        hasActiveQuery: true,
+        hasActiveFilters: !isSearching,
         isSearching,
         searchQuery: isSearching ? 'title' : '',
         onRetry: () => {
@@ -413,25 +415,55 @@ describe('AgentSessionListContent liveness', () => {
     expect(rows(renderer).map(item => item.id)).toEqual(['recovered']);
   });
 
-  it.each([false, true])('keeps the clear control for empty searching=%s', isSearching => {
+  it.each([
+    { isSearching: true, hasActiveFilters: false, label: 'Clear search' },
+    { isSearching: false, hasActiveFilters: true, label: 'Clear filters' },
+  ])('keeps the $label control for empty searching=$isSearching', test => {
     const recovered = contentProps({
       sections: [{ title: 'Today', timeZone: 'UTC', data: [session('recovered')] }],
     });
     const renderer = mount(
       contentProps({
         hasActiveQuery: true,
-        isSearching,
-        searchQuery: isSearching ? 'missing' : '',
-        onClearQuery: () => {
+        hasActiveFilters: test.hasActiveFilters,
+        isSearching: test.isSearching,
+        searchQuery: test.isSearching ? 'missing' : '',
+        onClearAction: () => {
           renderer.update(createElement(AgentSessionListContent, recovered));
         },
       })
     );
     const texts = hosts(renderer, 'Text').map(node => node.props.children);
     expect(texts).toContain(i18n.t('agents.sessionList.noMatches'));
-    expect(texts).toContain(isSearching ? 'Clear search' : 'Clear filters');
+    expect(texts).toContain(test.label);
     press(hosts(renderer, 'Button')[0]);
     expect(rows(renderer).map(item => item.id)).toEqual(['recovered']);
+  });
+
+  it('gives each narrowing cause its own clear control and hands back that action', () => {
+    const cleared: string[] = [];
+    const renderer = mount(
+      contentProps({
+        hasActiveQuery: true,
+        hasActiveFilters: true,
+        isSearching: true,
+        searchQuery: 'missing',
+        onClearAction: action => {
+          cleared.push(action);
+        },
+      })
+    );
+    const texts = hosts(renderer, 'Text').map(node => node.props.children);
+    expect(texts).toContain(
+      `${i18n.t('agents.sessionList.tryDifferentSearch')} ${i18n.t('agents.sessionList.tryAdjustFilters')}`
+    );
+    const buttons = hosts(renderer, 'Button');
+    expect(buttons).toHaveLength(2);
+    press(buttons[0]);
+    press(buttons[1]);
+    // Clearing the search alone cannot add rows while the filter still narrows
+    // the list, so each control retires only its own cause.
+    expect(cleared).toEqual(['clear-search', 'clear-filters']);
   });
 
   it('renders empty history as its own surface, not a list of active rows', () => {

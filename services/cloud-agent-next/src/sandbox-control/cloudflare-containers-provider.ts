@@ -117,7 +117,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
   };
 
   return {
-    environmentSnapshots: true,
+    environmentSnapshots: 'launch',
     workspaceSnapshots: {
       currentImage: image => deps.getContainer(deps.logicalSandboxId).currentImage(image),
       async capture(ref, captureId) {
@@ -171,6 +171,9 @@ export function createCloudflareContainersProviderAdapter(deps: {
         ...(deps.egressAudit === true ? { egressAudit: true } : {}),
         ...(options?.deadlineAt === undefined ? {} : { deadlineAt: options.deadlineAt }),
         ...(options?.nativeImage === undefined ? {} : { nativeImage: options.nativeImage }),
+        ...(options?.snapshotDiagnostic === undefined
+          ? {}
+          : { snapshotDiagnostic: options.snapshotDiagnostic }),
         env: {
           ...env,
           CONTROL_WORKLOAD_LIMIT_MB: workloadLimitMb,

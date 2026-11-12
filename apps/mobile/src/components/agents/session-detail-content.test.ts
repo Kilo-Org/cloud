@@ -20,6 +20,7 @@ import {
   type CloudStatus,
   createSessionManager,
   createUserWebConnection,
+  type DeliveredFailedPrompt,
   type KiloSessionId,
   type MessageDeliveryState,
   type PreparationAttempt,
@@ -1580,13 +1581,19 @@ describe('session detail header right cluster', () => {
     expect(slot[0]?.props.className).toContain('shrink');
 
     // ...and the cluster inside it shrinks into that cap, so it can never paint
-    // past the slot edge. It holds the Follow control and the context pill and
-    // nothing else: the PR badge now shares the goal row instead.
+    // past the slot edge. It holds the context pill and the Follow control and
+    // nothing else: the PR badge now shares the goal row instead. The pill
+    // leads and the Follow control ends the row, so a reading that arrives
+    // widens the pill into the header's free space instead of moving the
+    // control beside it.
     const cluster = slot[0]?.children[0] as ReactTestInstance | undefined;
     expect(cluster?.props.className).toContain('min-w-0');
     expect(cluster?.props.className).toContain('shrink');
     expect(cluster?.findAllByType(SessionContextMetrics)).toHaveLength(1);
     expect(cluster?.children).toHaveLength(2);
+    const [leading] = cluster?.children ?? [];
+    expect(typeof leading).toBe('object');
+    expect((leading as ReactTestInstance | undefined)?.type).toBe(SessionContextMetrics);
 
     // The pill is the flexible part of the cluster: it shrinks into the cap
     // with it, so the cluster can never paint past the slot edge.
@@ -1602,18 +1609,26 @@ describe('session detail header right cluster', () => {
     if (priced.info.role !== 'assistant') {
       throw new Error('expected an assistant message');
     }
-    priced.info = { ...priced.info, sessionID: ROOT_ID, cost: 1234.56 };
+    priced.info = { ...priced.info, sessionID: ROOT_ID, cost: 123_456.78 };
     const { renderer } = await mountDetails([priced]);
-    const expected = formatSessionCostBadge(1234.56 * 1_000_000);
-    expect(expected).not.toBeNull();
+    const expected = formatSessionCostBadge(123_456.78 * 1_000_000);
+    if (expected === null) {
+      throw new Error('expected a formatted cost badge');
+    }
     const metrics = renderer.root.findByProps({ testID: 'session-context-metrics' });
-    const cost = metrics.find(
+    // The cost is its own value text, so it truncates on its own one line inside
+    // the capped pill instead of pushing the percentage beside it.
+    const [cost] = metrics.findAll(
       node =>
         Object.is(node.type, 'Text') &&
-        node.children.some(child => typeof child === 'string' && child === expected)
+        node.children.some(child => typeof child === 'string' && child.includes(expected))
     );
+    if (cost === undefined) {
+      throw new Error('expected the cost text');
+    }
     expect(cost.props.numberOfLines).toBe(1);
     expect(cost.props.className).toContain('shrink');
+    expect(cost.props.className).toContain('min-w-0');
   });
 });
 
@@ -4025,6 +4040,49 @@ describe('session detail composer after a failed turn', () => {
     expect(node.props.sendDisabled).toBe(true);
   });
 
+  it('withdraws the restored draft when the SDK reports the failed send was delivered', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(candidate =>
+      Object.is(candidate.type, 'ChatComposer')
+    );
+    const control = {
+      setText: vi.fn(),
+      hasContent: vi.fn(() => true),
+      restoreAttachments: vi.fn(),
+      withdrawRestoredSend: vi.fn(),
+    };
+    act(() => {
+      (composer.props.controlRef as { current: typeof control | null }).current = control;
+    });
+
+    act(() => {
+      view.store.set<DeliveredFailedPrompt | null, [DeliveredFailedPrompt | null], unknown>(
+        view.manager.atoms.deliveredFailedPrompt,
+        {
+          messageId: 'msg-delivered',
+          text: 'Delivered late',
+          sequence: 1,
+        }
+      );
+    });
+    expect(control.withdrawRestoredSend).toHaveBeenCalledExactlyOnceWith('Delivered late');
+
+    // A re-render of the same record changes nothing: one delivery, one
+    // withdrawal.
+    act(() => {
+      view.store.set<DeliveredFailedPrompt | null, [DeliveredFailedPrompt | null], unknown>(
+        view.manager.atoms.deliveredFailedPrompt,
+        {
+          messageId: 'msg-delivered',
+          text: 'Delivered late',
+          sequence: 1,
+        }
+      );
+    });
+    expect(control.withdrawRestoredSend).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the composer sendable after a non-retryable turn failure', async () => {
     const view = await mountDetails([]);
     act(() => {
@@ -4840,9 +4898,10 @@ describe('session detail read-only composer', () => {
     openSettledReport.value = false;
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
     const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
-    // The pill still holds the row its values will take instead of shrinking
-    // to a ring with no slot.
-    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(1);
+    // The pill paints its ring alone in every unresolved state, and the box
+    // around it holds the row its values will take, so nothing shrinks when the
+    // values arrive.
+    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
     expect(
       view.renderer.root.findAll(
         node =>
@@ -5149,7 +5208,7 @@ describe('session detail duplicate failure state', () => {
     expect(labels).toContain(i18n.t('agentChat.messageBubble.copyToComposer'));
   });
 
-  it('shows the failure line and a usable composer once environment setup gives up', async () => {
+  it('states a failed preparation once: the group names the failed stage and the row keeps its actions', async () => {
     goalMountOptions.resolvedType = 'cloud-agent';
     sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
     const question = 'please refactor';
@@ -5182,15 +5241,28 @@ describe('session detail duplicate failure state', () => {
       status: 'failed',
       startedAt: 0,
       completedAt: 1,
-      safeError: 'sandbox_create_failed',
+      safeError: 'invalid_configuration',
       revision: 2,
-      steps: [],
+      steps: [
+        {
+          id: 'step-sandbox',
+          key: 'sandbox_provision',
+          kind: 'phase',
+          label: 'sandbox provision',
+          status: 'failed',
+          startedAt: 0,
+          completedAt: 1,
+          revision: 1,
+          latestDetail: 'Creating sandbox',
+          safeError: 'invalid_configuration',
+        },
+      ],
     };
     act(() => {
       view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, true);
       view.store.set<CloudStatus | null, [CloudStatus | null], unknown>(
         view.manager.atoms.cloudStatus,
-        { type: 'error', message: 'sandbox_create_failed' }
+        { type: 'error', message: 'invalid_configuration' }
       );
       view.store.set<readonly PreparationAttempt[], [readonly PreparationAttempt[]], unknown>(
         view.manager.atoms.preparationAttempts,
@@ -5212,11 +5284,22 @@ describe('session detail duplicate failure state', () => {
     });
 
     const text = renderedText(view.renderer.root);
-    expect(text).toContain(i18n.t('agentChat.messageFailure.assistantTitle'));
-    expect(text).toContain(i18n.t('agentChat.messageFailure.deliveryExecution'));
+    // The failed attempt is what the group renders; its own copy (the failed
+    // stage and the reason) is covered by the group's suite.
+    const group = view.renderer.root.find(node => Object.is(node.type, 'PreparationGroup'));
+    expect(group.props.attempt).toMatchObject({
+      id: 'attempt-1',
+      triggerMessageId: USER_ID,
+      status: 'failed',
+    });
+    // The generic response-failure statement above it is gone, so the same
+    // failed turn is not read as two competing errors.
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.assistantTitle'));
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.deliveryExecution'));
     expect(placeholder()).toBe(i18n.t('common.message'));
     expect(composerProps(view).sendDisabled).toBe(false);
     expect(composerProps(view).sendDisabledReason).toBeNull();
+    // The turn keeps the recovery PR 9887 gave it.
     const labels = view.renderer.root
       .findAll(node => Object.is(node.type, 'Button'))
       .map(node => node.props.accessibilityLabel);

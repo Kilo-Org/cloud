@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 
 import { isAdminAuthorized } from './fake-llm-admin.js';
 import { supervisionScenario } from './fake-llm-supervision.js';
+import { fakeCompactionSummary } from './fake-llm-compaction.js';
 
 /** Runtime-neutral view of one inbound request. `url` is path + query. */
 export type FakeLlmRequest = {
@@ -626,14 +627,17 @@ export function extractLastUserMessageText(body: unknown): string {
     const msg = messages[i] as Message;
     if (msg?.role !== 'user') continue;
     const content = msg.content;
-    if (typeof content === 'string') return content;
-    if (Array.isArray(content)) {
-      return content
-        .filter(part => part?.type === 'text' || part?.type === undefined)
-        .map(part => part.text ?? '')
-        .join('');
-    }
-    return '';
+    const text =
+      typeof content === 'string'
+        ? content
+        : Array.isArray(content)
+          ? content
+              .filter(part => part?.type === 'text' || part?.type === undefined)
+              .map(part => part.text ?? '')
+              .join('')
+          : '';
+    if (/^\s*<system-reminder>[\s\S]*<\/system-reminder>\s*$/.test(text)) continue;
+    return text;
   }
   return '';
 }
@@ -704,6 +708,10 @@ function directiveTag(directive: Directive | null): string | undefined {
       'question',
       'first-token',
       'supervision',
+      'task',
+      'background-task',
+      'cron',
+      'wakeup',
     ].includes(directive.scenario)
   ) {
     return undefined;
@@ -1224,6 +1232,63 @@ function writeUnsupportedToolSchema(ctx: ScenarioContext, tag: string, kind: Too
   });
 }
 
+function namedCallId(tag: string, suffix: string): string {
+  const fingerprint = createHash('sha256').update(tag).digest('hex').slice(0, 12);
+  return `call_${fingerprint}_${suffix}`;
+}
+
+function hasToolResult(body: unknown, id: string): boolean {
+  if (!isRecord(body) || !Array.isArray(body.messages)) return false;
+  return body.messages.some(
+    message => isRecord(message) && message.role === 'tool' && message.tool_call_id === id
+  );
+}
+
+function resolveNamedTool(
+  tools: AdvertisedTool[],
+  names: string[],
+  args: Record<string, unknown>
+): { tool: AdvertisedTool; arguments: Record<string, unknown> } | null {
+  const tool = tools.find(candidate => names.includes(candidate.name));
+  if (!tool) return null;
+  const properties = toolProperties(tool);
+  if (!properties) return null;
+  const filtered: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(args)) {
+    if (key in properties) filtered[key] = value;
+  }
+  return supportsRequiredArguments(tool, filtered) ? { tool, arguments: filtered } : null;
+}
+
+function writeNamedToolCall(
+  ctx: ScenarioContext,
+  id: string,
+  resolved: { tool: AdvertisedTool; arguments: Record<string, unknown> }
+): void {
+  writeChunk(
+    ctx.emit,
+    makeChunk(ctx.id, ctx.model, {
+      role: 'assistant',
+      tool_calls: [
+        {
+          index: 0,
+          id,
+          type: 'function',
+          function: { name: resolved.tool.name, arguments: '' },
+        },
+      ],
+    })
+  );
+  writeChunk(
+    ctx.emit,
+    makeChunk(ctx.id, ctx.model, {
+      tool_calls: [{ index: 0, function: { arguments: JSON.stringify(resolved.arguments) } }],
+    })
+  );
+  writeFinish(ctx.emit, ctx.id, ctx.model, 1, 'tool_calls');
+  ctx.emit.end();
+}
+
 function runToolScenario(
   ctx: ScenarioContext,
   tag: string,
@@ -1682,7 +1747,14 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
             index: 0,
             id,
             type: 'function',
-            function: { name: tool.name, arguments: JSON.stringify({ name }) },
+            function: {
+              name: tool.name,
+              arguments: JSON.stringify(
+                isRecord(tool.parameters.properties) && 'id' in tool.parameters.properties
+                  ? { id: name }
+                  : { name }
+              ),
+            },
           },
         ],
       })
@@ -1714,7 +1786,117 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     }
     writeAssistantResponse(ctx, `done-${tag}`);
   },
+
+  task(args, ctx) {
+    runChildTask(args, ctx, false);
+  },
+
+  'background-task'(args, ctx) {
+    runChildTask(args, ctx, true);
+  },
+
+  cron(args, ctx) {
+    runSchedule(
+      args,
+      ctx,
+      'cron',
+      ['cron_create'],
+      'cron directive requires tag:delay, with delay like 20s'
+    );
+  },
+
+  wakeup(args, ctx) {
+    runSchedule(
+      args,
+      ctx,
+      'wakeup',
+      ['schedule_wakeup'],
+      'wakeup directive requires tag:delay, with delay like 20s'
+    );
+  },
 };
+
+function parseTagPair(raw: string): { parent: string; child: string } | null {
+  const match = stripPromptContext(raw).match(/^([A-Za-z0-9_-]+):([A-Za-z0-9_-]+)$/);
+  if (!match?.[1] || !match[2]) return null;
+  return { parent: match[1], child: match[2] };
+}
+
+function runChildTask(args: string[], ctx: ScenarioContext, background: boolean): void {
+  const parsed = parseTagPair(args[0] ?? '');
+  if (!parsed) {
+    writeJsonError(ctx.emit, 402, 'task directive requires parentTag:childTag', 'invalid_request');
+    return;
+  }
+  if (ctx.tools.length === 0) {
+    writeAssistantResponse(ctx, `done-${parsed.parent}`);
+    return;
+  }
+  const callId = namedCallId(parsed.parent, background ? 'background-task' : 'task');
+  if (hasToolResult(ctx.body, callId)) {
+    writeAssistantResponse(ctx, `done-${parsed.parent}`);
+    return;
+  }
+  const tool =
+    ctx.tools.find(candidate => candidate.name === 'subagent') ??
+    ctx.tools.find(candidate => candidate.name === 'task');
+  const properties = tool ? toolProperties(tool) : null;
+  if (background && (!properties || !('background' in properties))) {
+    writeJsonError(
+      ctx.emit,
+      422,
+      'background subagents are not advertised',
+      'unsupported_tool_schema'
+    );
+    return;
+  }
+  const resolved = resolveNamedTool(ctx.tools, tool ? [tool.name] : ['task'], {
+    description: `Drain child ${parsed.child}`,
+    prompt: `__fake__:gate:${parsed.child}:waiting`,
+    ...(tool?.name === 'subagent' ? { agent: 'explore' } : { subagent_type: 'explore' }),
+    ...(background ? { background: true } : {}),
+  });
+  if (!resolved) {
+    writeJsonError(ctx.emit, 422, 'unsupported task tool schema', 'unsupported_tool_schema');
+    return;
+  }
+  writeNamedToolCall(ctx, callId, resolved);
+}
+
+function runSchedule(
+  args: string[],
+  ctx: ScenarioContext,
+  suffix: string,
+  names: string[],
+  invalidMessage: string
+): void {
+  const match = stripPromptContext(args[0] ?? '').match(/^([A-Za-z0-9_-]+):(\d+s)$/);
+  const tag = match?.[1];
+  const delay = match?.[2];
+  if (!tag || !delay) {
+    writeJsonError(ctx.emit, 402, invalidMessage, 'invalid_request');
+    return;
+  }
+  if (ctx.tools.length === 0) {
+    writeAssistantResponse(ctx, `done-${tag}`);
+    return;
+  }
+  const callId = namedCallId(tag, suffix);
+  if (hasToolResult(ctx.body, callId)) {
+    writeAssistantResponse(ctx, `done-${tag}`);
+    return;
+  }
+  const resolved = resolveNamedTool(ctx.tools, names, {
+    prompt: `__fake__:echo:fired-${tag}`,
+    delay,
+    reason: `drain-${tag}`,
+  });
+  if (!resolved) {
+    writeJsonError(ctx.emit, 422, `unsupported ${names[0]} tool schema`, 'unsupported_tool_schema');
+    return;
+  }
+  writeNamedToolCall(ctx, callId, resolved);
+}
 
 function randomId(): string {
   return `chatcmpl-fake-${Math.random().toString(36).slice(2, 12)}`;
@@ -1803,7 +1985,7 @@ async function handleChatCompletions(
   emit.onClose(() => finalize(0, 'connection-closed'));
 
   if (directive === null) {
-    emitEcho(ctx, stripKiloPromptWrapping(prompt));
+    emitEcho(ctx, fakeCompactionSummary(prompt) ?? stripKiloPromptWrapping(prompt));
     finalize(200, 'finished');
     return;
   }

@@ -747,7 +747,7 @@ describe('SessionHistoryScreen', () => {
     expect(storedSessionIds(renderer)).toEqual([]);
     expect(historyHeaderActions(renderer).activeFilterCount).toBe(2);
     act(() => {
-      (content.props.onClearQuery as () => void)();
+      (content.props.onClearAction as (action: string) => void)('clear-filters');
     });
     expect(storedSessionIds(renderer)).toEqual(['workflow', 'code-cloud', 'code-cli', 'other']);
     expect(historyHeaderActions(renderer).activeFilterCount).toBe(0);
@@ -774,7 +774,7 @@ describe('SessionHistoryScreen', () => {
     expect(content.props.isSearching).toBe(true);
     expect(storedSessionIds(renderer)).toEqual([]);
     act(() => {
-      (content.props.onClearQuery as () => void)();
+      (content.props.onClearAction as (action: string) => void)('clear-search');
       renderer.update(
         createElement(
           QueryClientProvider,
@@ -786,6 +786,41 @@ describe('SessionHistoryScreen', () => {
     expect(findNodeByType(renderer, 'AgentSessionListContent').props.isSearching).toBe(false);
     expect(storedSessionIds(renderer)).toEqual(['code-cloud']);
     expect(historyHeaderActions(renderer).activeFilterCount).toBe(2);
+    expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
+  });
+
+  // A search and a filter can both hide the session, so each control retires
+  // only its own cause: clearing the filters must not silently drop the term the
+  // user typed, and must leave the search body in place.
+  it('keeps the search when no-result recovery says Clear filters', async () => {
+    readFilterRecord.mockResolvedValue(
+      JSON.stringify({ projectFilter: [], platformFilter: ['cloud-agent'] })
+    );
+    listState.storedSessions = sessions;
+    listState.isSearching = true;
+    const queryClient = createTestQueryClient();
+    const renderer = await renderScreen(queryClient);
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.hasActiveFilters).toBe(true);
+    expect(content.props.isSearching).toBe(true);
+    expect(historyHeaderActions(renderer).activeFilterCount).toBe(1);
+    expect(storedSessionIds(renderer)).toEqual([]);
+    act(() => {
+      (content.props.onClearAction as (action: string) => void)('clear-filters');
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(SessionHistoryScreen)
+        )
+      );
+    });
+    const cleared = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(cleared.props.hasActiveFilters).toBe(false);
+    // The term stays, so the search body keeps owning the screen.
+    expect(cleared.props.isSearching).toBe(true);
+    expect(historyHeaderActions(renderer).activeFilterCount).toBe(0);
+    expect(storedSessionIds(renderer)).toEqual([]);
     expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
   });
 
@@ -802,7 +837,11 @@ describe('SessionHistoryScreen', () => {
     expect(gateProps.onStartShouldSetResponderCapture()).toBe(false);
 
     act(() => {
-      (findNodeByType(renderer, 'AgentSessionListContent').props.onClearQuery as () => void)();
+      (
+        findNodeByType(renderer, 'AgentSessionListContent').props.onClearAction as (
+          action: string
+        ) => void
+      )('clear-search');
       renderer.update(
         createElement(
           QueryClientProvider,

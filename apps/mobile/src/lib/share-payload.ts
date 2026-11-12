@@ -322,6 +322,8 @@ export async function restoreSharePayloads(userId: string): Promise<void> {
  * A payload staged while signed out keeps its place (DEC-01 account scope): it
  * is memory-only, and a same-process sign-in still opens the gate for it. This
  * call never persists; it runs at a boundary, not inside an account session.
+ * An account's own draft keeps the staged share for that account's next
+ * sign-in.
  */
 export function clearAccountStagedSharePayloads(): void {
   const dropped = [...payloads].filter(([, entry]) => entry.stagedUserId !== null);

@@ -738,6 +738,7 @@ export function ChatComposer({
   const removeAttachmentRef = useRef(upload.removeAttachment);
   removeAttachmentRef.current = upload.removeAttachment;
   const clearDraftRef = useRef<() => void>(() => undefined);
+  const onDeliveredDraftConsumedRef = useRef<() => void>(() => undefined);
 
   useImperativeHandle(
     controlRef,
@@ -764,10 +765,14 @@ export function ChatComposer({
           removeAttachmentRef.current(id);
         }
         clearDraftRef.current();
+        // The restore this record was published for is spent: the host must not
+        // keep holding the same words against a later draft.
+        onDeliveredDraftConsumedRef.current();
       },
     }),
     []
   );
+  onDeliveredDraftConsumedRef.current = onDeliveredDraftConsumed ?? (() => undefined);
 
   function handleChangeText(value: string) {
     // A keystroke makes the draft the reader's own: a restored failed send is

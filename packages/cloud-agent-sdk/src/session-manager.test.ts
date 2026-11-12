@@ -424,6 +424,8 @@ function createStoredAssistantMessage(
   };
 }
 
+const PENDING_CONFIRMS_CAP = 20;
+
 describe('createSessionManager', () => {
   beforeEach(() => {
     jest.restoreAllMocks();
@@ -3717,6 +3719,54 @@ describe('createSessionManager', () => {
         text: 'First',
       });
       expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Second');
+    });
+
+    it('keeps the pending record bounded across sessions with no durable hook', async () => {
+      // The web manager runs without a durable read, so this map is the only
+      // memory of a failed send. Confirm the cap on real outcomes: the oldest
+      // session was evicted, the newest survived.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const sentIds: string[] = [];
+
+      for (let index = 0; index < PENDING_CONFIRMS_CAP + 1; index += 1) {
+        await mgr.switchSession(kiloId(`ses-pending-${index}`));
+        mockSession.send.mockRejectedValueOnce(new Error('ECONNRESET'));
+        const sendFor = mgr.send({
+          payload: { type: 'prompt', prompt: `Prompt ${index}`, mode: 'code' },
+        });
+        sentIds.push(mockSession.storage?.getMessageIds().at(-1)!);
+        await expect(sendFor).resolves.toBe(false);
+      }
+
+      // The oldest session's row: its record was evicted, so settling is
+      // silent.
+      await mgr.switchSession(kiloId('ses-pending-0'));
+      mockSession.storage?.upsertMessage(
+        stubUserMessage({
+          id: sentIds[0]!,
+          sessionID: kiloId('ses-pending-0'),
+          time: { created: 3 },
+          agent: 'test-agent',
+          model: { providerID: 'test-provider', modelID: 'test-model' },
+        })
+      );
+      expect(atomValue(config.store, mgr.atoms.deliveredFailedPrompt)).toBeNull();
+
+      // The newest session survived the cap: its row settles and publishes.
+      await mgr.switchSession(kiloId(`ses-pending-${PENDING_CONFIRMS_CAP}`));
+      mockSession.storage?.upsertMessage(
+        stubUserMessage({
+          id: sentIds.at(-1)!,
+          sessionID: kiloId(`ses-pending-${PENDING_CONFIRMS_CAP}`),
+          time: { created: 4 },
+          agent: 'test-agent',
+          model: { providerID: 'test-provider', modelID: 'test-model' },
+        })
+      );
+      expect(atomValue(config.store, mgr.atoms.deliveredFailedPrompt)).toMatchObject({
+        messageId: sentIds.at(-1),
+      });
     });
 
     it('records no pending confirmation when the server answered with a status', async () => {

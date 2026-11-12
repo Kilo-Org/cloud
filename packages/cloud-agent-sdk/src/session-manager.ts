@@ -2652,6 +2652,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   const pendingConfirmationBySession = new Map<KiloSessionId, Map<string, string>>();
 
+  /** Re-inserts the session's record last, so the oldest session is evicted first. */
+  function boundedPendingConfirmationInsert(
+    kiloSessionId: KiloSessionId,
+    pending: Map<string, string>
+  ): void {
+    pendingConfirmationBySession.delete(kiloSessionId);
+    pendingConfirmationBySession.set(kiloSessionId, pending);
+    if (pendingConfirmationBySession.size <= PENDING_CONFIRMATION_MAX_SESSIONS) return;
+    for (const key of pendingConfirmationBySession.keys()) {
+      if (key !== kiloSessionId && key !== activeSessionId) {
+        pendingConfirmationBySession.delete(key);
+        return;
+      }
+    }
+  }
+
   /**
    * Remember a failed send whose outcome is unknown, under the session that
    * owned the optimistic row (see `pendingConfirmationBySession`), and persist
@@ -2663,9 +2679,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     text: string
   ): void {
     const pending = pendingConfirmationBySession.get(kiloSessionId) ?? new Map<string, string>();
-    if (pending.has(messageId)) return;
     pending.set(messageId, text);
-    pendingConfirmationBySession.set(kiloSessionId, pending);
+    boundedPendingConfirmationInsert(kiloSessionId, pending);
     config.persistPendingSendConfirmation?.(kiloSessionId, messageId, text);
   }
 
@@ -2976,16 +2991,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         for (const entry of entries) {
           pending.set(entry.messageId, entry.text);
         }
-        pendingConfirmationBySession.delete(kiloSessionId);
-        pendingConfirmationBySession.set(kiloSessionId, pending);
-        if (pendingConfirmationBySession.size > PENDING_CONFIRMATION_MAX_SESSIONS) {
-          for (const key of pendingConfirmationBySession.keys()) {
-            if (key !== kiloSessionId && key !== activeSessionId) {
-              pendingConfirmationBySession.delete(key);
-              break;
-            }
-          }
-        }
+        boundedPendingConfirmationInsert(kiloSessionId, pending);
         settleDeliveredFailedPrompt(kiloSessionId);
       })
       .catch(() => {

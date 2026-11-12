@@ -332,8 +332,9 @@ export function CloudComposer({
       value !== undefined && value.trim() === restoredText;
     const showsRestoredText = sameText(valueRef.current);
     const snapshot = composerSnapshotsRef.current.get(key);
-    const snapshotHoldsRestored = sameText(snapshot?.text);
-    if (snapshotHoldsRestored) {
+    const snapshotHoldsRestored =
+      snapshot !== undefined && sameText(snapshot.text) ? snapshot : undefined;
+    if (snapshotHoldsRestored !== undefined) {
       // The snapshot's own previews are revoked by the removal below; deleting
       // it first would only leak the URLs it held.
       composerSnapshotsRef.current.delete(key);
@@ -344,8 +345,8 @@ export function CloudComposer({
     // put back are removed through the upload hook: that path revokes each
     // preview and releases its pending key, and it leaves chips the reader
     // added afterwards alone.
-    if (snapshotHoldsRestored) {
-      for (const attachment of snapshot.attachments) {
+    if (snapshotHoldsRestored !== undefined) {
+      for (const attachment of snapshotHoldsRestored.attachments) {
         attachmentUpload.removeAttachment(attachment.id);
       }
     }

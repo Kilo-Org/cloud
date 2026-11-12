@@ -470,12 +470,63 @@ describe('needsConsent gate teardown', () => {
     expect(hoisted.client.optOut).toHaveBeenCalled();
     expect(hoisted.storage.purgePostHogPersistence).toHaveBeenCalledTimes(1);
 
-    // The branch then brings up the capture-free client (flag evaluation), so
-    // finish that 110 ms resume inside the test instead of letting it outlive.
+    // No SDK start is scheduled: the user has not answered, so even the
+    // flags-only client stays unbuilt until `needsConsent` clears.
     await vi.advanceTimersByTimeAsync(120);
-    expect(hoisted.holder.options).toMatchObject({ defaultOptIn: false });
+    expect(gate.isPostHogReady()).toBe(false);
 
     rendererRef.current?.unmount();
+    vi.useRealTimers();
+  });
+
+  it('starts the flags-only client once the user answers with analytics off', async () => {
+    vi.useFakeTimers();
+    const gate = await loadPostHogWithGate();
+
+    type GateState = Parameters<typeof gate.useAnalyticsConsentGate>[0];
+    function GateWrapper(props: GateState): null {
+      gate.useAnalyticsConsentGate(props);
+      return null;
+    }
+
+    const renderer = TestRenderer.create(
+      createElement(GateWrapper, {
+        hasToken: true,
+        ...SETTLED,
+        consentChecked: true,
+        needsConsent: true,
+        email: 'test@test.com',
+        accountId: 'test-account',
+        optionalConsent: false,
+      })
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await vi.advanceTimersByTimeAsync(120);
+    expect(hoisted.holder.options).toBeUndefined();
+
+    // The user accepts with optional analytics off.
+    renderer.update(
+      createElement(GateWrapper, {
+        hasToken: true,
+        ...SETTLED,
+        consentChecked: true,
+        needsConsent: false,
+        email: 'test@test.com',
+        accountId: 'test-account',
+        optionalConsent: false,
+      })
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await vi.advanceTimersByTimeAsync(120);
+
+    expect(hoisted.holder.options).toMatchObject({ defaultOptIn: false });
+    expect(hoisted.client.capture).not.toHaveBeenCalled();
+
+    renderer.unmount();
     vi.useRealTimers();
   });
 });

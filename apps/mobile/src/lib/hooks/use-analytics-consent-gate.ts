@@ -41,11 +41,12 @@ async function discardOptionalTelemetry(epoch: number): Promise<void> {
 }
 
 /**
- * Bring telemetry up for the signed-in account. A client already running under
- * another account, or another consent state, is torn down first: its queue may
- * hold events the current consent forbids, and a consent change needs a fresh
- * client because the capture options are constructor-only. A cold start has no
- * client, so its storage survives.
+ * Bring telemetry up for the signed-in account once the user has answered the
+ * consent screen. A client already running under another account, or another
+ * consent state, is torn down first: its queue may hold events the current
+ * consent forbids, and a consent change needs a fresh client because the
+ * capture options are constructor-only. A cold start has no client, so its
+ * storage survives.
  *
  * `initPostHog` then creates the client the current consent allows — capture on
  * with optional consent, flags-only without it. A flags-only client still
@@ -106,7 +107,16 @@ export function useAnalyticsConsentGate({
       void discardOptionalTelemetry(epoch);
       return;
     }
-    if (needsConsent || !optionalConsent) {
+    if (needsConsent) {
+      // The consent screen is up and the user has not answered: start nothing,
+      // capture or flag evaluation. The answer arrives as `needsConsent: false`.
+      setTelemetryDecision(accountId, false);
+      const epoch = currentEpoch();
+      resetAppsFlyerState();
+      void discardOptionalTelemetry(epoch);
+      return;
+    }
+    if (!optionalConsent) {
       setTelemetryDecision(accountId, false);
       const epoch = currentEpoch();
       resetAppsFlyerState();

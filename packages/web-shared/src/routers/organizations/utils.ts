@@ -465,6 +465,8 @@ export async function resolveOrganizationAccess(
         await supportStepUpPort.requireFresh({
           userId: ctx.user.id,
           action: 'support_write_use',
+          actionClass: 'support_write',
+          organizationId,
           credential: ctx.credential,
           webSessionId: ctx.webSessionId ?? null,
           route: ctx.trpcPath ?? null,

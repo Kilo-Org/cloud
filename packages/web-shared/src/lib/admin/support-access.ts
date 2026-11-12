@@ -367,6 +367,10 @@ export type SupportStepUpPort = {
       | 'support_approval'
       | 'support_emergency_issue'
       | 'support_write_use';
+    /** The class the proof is minted for. A write is bound to one operation. */
+    actionClass: SupportActionClass;
+    /** The organization the action acts on. A write proof is bound to it. */
+    organizationId: string;
     credential?: SupportStepUpCredential;
     webSessionId?: string | null;
     route?: string | null;

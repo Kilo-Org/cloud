@@ -7,8 +7,15 @@ import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
 import { kilocode_users, passkey_credentials, session_step_up_proofs } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
-import { hashWebSessionId, revokeStepUpProofs } from '@kilocode/web-shared/lib/admin/step-up-store';
+import {
+  StepUpRequiredError,
+  type StepUpOperationBinding,
+} from '@kilocode/web-shared/lib/admin/privileged-access';
+import {
+  hashStepUpBinding,
+  hashWebSessionId,
+  revokeStepUpProofs,
+} from '@kilocode/web-shared/lib/admin/step-up-store';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createBearerCallerForUser, createSessionCallerForUser } from '@/routers/test-utils';
 import { assertPrivilegedPermission, requirePrivilegedActor } from './require-privileged-actor';
@@ -55,6 +62,37 @@ async function insertProof(
       expires_at: (params.expiresAt ?? new Date(verifiedAt.getTime() + 15 * 60_000)).toISOString(),
       revoked_at: params.revokedAt ? params.revokedAt.toISOString() : null,
       revoked_reason: params.revokedAt ? 'test' : null,
+    })
+    .returning();
+  return proof!;
+}
+
+/**
+ * A proof minted for one operation: the stored binding is the same hash the
+ * guard computes from its own request.
+ */
+async function insertOperationProof(
+  userId: string,
+  credentialUuid: string,
+  binding: StepUpOperationBinding
+) {
+  const verifiedAt = new Date();
+  const [proof] = await db
+    .insert(session_step_up_proofs)
+    .values({
+      kilo_user_id: userId,
+      session_id_hash: hashWebSessionId(webSessionId),
+      method: 'webauthn_uv',
+      passkey_credential_id: credentialUuid,
+      purpose: 'operation',
+      action_binding_hash: hashStepUpBinding(binding.actionClass, {
+        surface: binding.surface,
+        route: binding.route,
+        method: binding.method,
+        target: { kind: binding.targetKind, id: binding.targetId },
+      }),
+      verified_at: verifiedAt.toISOString(),
+      expires_at: new Date(verifiedAt.getTime() + 5 * 60_000).toISOString(),
     })
     .returning();
   return proof!;
@@ -269,21 +307,86 @@ describe('requirePrivilegedActor', () => {
       expect(cause?.code).toBe('STEP_UP_UNAVAILABLE');
     });
 
-    it('uses the same uniform freshness for a sensitive write', async () => {
+    it('refuses a session proof for a sensitive write', async () => {
       const { user, credential } = await setup();
       await insertProof(user.id, credential.id);
 
-      const actor = await requirePrivilegedActor(
-        {
-          permission: 'admin',
-          actionClass: 'sensitive_write',
-          inventoryId: 'trpc.admin.users',
-          target: { kind: 'user', id: 'target-user' },
-        },
-        contextFor(user)
+      const cause = await refusal(
+        requirePrivilegedActor(
+          {
+            permission: 'admin',
+            actionClass: 'sensitive_write',
+            inventoryId: 'trpc.admin.users',
+            target: { kind: 'user', id: 'target-user' },
+          },
+          contextFor(user)
+        )
       );
 
+      // A session proof never authorizes an operation class, even when fresh.
+      expect(cause).toMatchObject({
+        code: 'MFA_REQUIRED',
+        actionClass: 'sensitive_write',
+        purpose: 'operation',
+        maxAgeSeconds: 300,
+        binding: {
+          actionClass: 'sensitive_write',
+          route: 'admin.test',
+          method: 'query',
+          targetKind: 'user',
+          targetId: 'target-user',
+        },
+      });
+    });
+
+    it('accepts an operation proof bound to this action and target once', async () => {
+      const { user, credential } = await setup();
+      await insertOperationProof(user.id, credential.id, {
+        actionClass: 'sensitive_write',
+        surface: 'trpc',
+        route: 'admin.test',
+        method: 'query',
+        targetKind: 'user',
+        targetId: 'target-user',
+      });
+
+      const params = {
+        permission: 'admin' as const,
+        actionClass: 'sensitive_write' as const,
+        inventoryId: 'trpc.admin.users',
+        target: { kind: 'user' as const, id: 'target-user' },
+      };
+
+      const actor = await requirePrivilegedActor(params, contextFor(user));
       expect(actor.assurance.stepUp.status).toBe('fresh');
+
+      const reused = await refusal(requirePrivilegedActor(params, contextFor(user)));
+      expect(reused?.code).toBe('MFA_REQUIRED');
+    });
+
+    it('refuses an operation proof minted for another target', async () => {
+      const { user, credential } = await setup();
+      await insertOperationProof(user.id, credential.id, {
+        actionClass: 'sensitive_write',
+        surface: 'trpc',
+        route: 'admin.test',
+        method: 'query',
+        targetKind: 'user',
+        targetId: 'another-user',
+      });
+
+      const cause = await refusal(
+        requirePrivilegedActor(
+          {
+            permission: 'admin',
+            actionClass: 'sensitive_write',
+            target: { kind: 'user', id: 'target-user' },
+          },
+          contextFor(user)
+        )
+      );
+
+      expect(cause?.code).toBe('MFA_REQUIRED');
     });
 
     it('reuses the state measured by the admin middleware', async () => {

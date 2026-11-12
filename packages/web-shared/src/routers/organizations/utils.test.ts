@@ -26,7 +26,7 @@ import {
   support_access_grants,
   type User,
 } from '@kilocode/db/schema';
-import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
+import { hashStepUpBinding, hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
 import { and, eq } from 'drizzle-orm';
 
 /**
@@ -549,22 +549,41 @@ describe('binary support organization access', () => {
     userId: string,
     credentialId: string,
     verifiedAt = new Date(),
-    expiresAt = new Date(Date.now() + 15 * 60_000)
+    expiresAt = new Date(Date.now() + 15 * 60_000),
+    binding?: { route: string; organizationId: string }
   ) {
+    const purpose = binding ? 'operation' : 'session';
     await db.insert(session_step_up_proofs).values({
       kilo_user_id: userId,
       session_id_hash: hashWebSessionId(writeSessionId),
       method: 'webauthn_uv',
       passkey_credential_id: credentialId,
-      purpose: 'session',
+      purpose,
+      action_binding_hash: binding
+        ? hashStepUpBinding('support_write', {
+            surface: 'trpc',
+            route: binding.route,
+            method: 'mutation',
+            target: { kind: 'organization', id: binding.organizationId },
+          })
+        : null,
       verified_at: verifiedAt.toISOString(),
       expires_at: expiresAt.toISOString(),
     });
   }
 
-  async function writeCtxWithStepUpForPath(user: User, trpcPath: string): Promise<TRPCContext> {
+  async function writeCtxWithStepUpForPath(
+    user: User,
+    trpcPath: string,
+    organizationId?: string
+  ): Promise<TRPCContext> {
     const credentialId = await enroll(user.id);
-    await insertStepUpProof(user.id, credentialId);
+    if (organizationId) {
+      await insertStepUpProof(user.id, credentialId, undefined, undefined, {
+        route: trpcPath,
+        organizationId,
+      });
+    }
     return {
       user,
       credential: 'session',
@@ -574,8 +593,12 @@ describe('binary support organization access', () => {
     };
   }
 
-  async function writeCtxWithStepUp(user: User): Promise<TRPCContext> {
-    return writeCtxWithStepUpForPath(user, 'organizations.settings.updateDefaultModel');
+  async function writeCtxWithStepUp(user: User, organizationId?: string): Promise<TRPCContext> {
+    return writeCtxWithStepUpForPath(
+      user,
+      'organizations.settings.updateDefaultModel',
+      organizationId
+    );
   }
 
   function failGrantLookupQueries() {
@@ -683,7 +706,7 @@ describe('binary support organization access', () => {
       actionClass: 'support_write',
       approverKiloUserId: approver.id,
     });
-    const writeCtx = await writeCtxWithStepUp(admin);
+    const writeCtx = await writeCtxWithStepUp(admin, organization.id);
 
     await expect(ensureOrganizationAccess(writeCtx, organization.id)).resolves.toBe('admin');
   });
@@ -759,7 +782,8 @@ describe('binary support organization access', () => {
       admin.id,
       credentialId,
       new Date(Date.now() - 2 * 60 * 60_000),
-      new Date(Date.now() - 60_000)
+      new Date(Date.now() - 60_000),
+      { route: 'organizations.settings.updateDefaultModel', organizationId: organization.id }
     );
 
     await expect(
@@ -910,7 +934,7 @@ describe('binary support organization access', () => {
     });
 
     await expect(
-      ensureOrganizationAccess(await writeCtxWithStepUp(admin), organization.id)
+      ensureOrganizationAccess(await writeCtxWithStepUp(admin, organization.id), organization.id)
     ).resolves.toBe('admin');
   });
 
@@ -1044,7 +1068,10 @@ describe('binary support organization access', () => {
     });
 
     await expect(
-      ensureOrganizationAccess(await writeCtxWithStepUp(superadmin), organization.id)
+      ensureOrganizationAccess(
+        await writeCtxWithStepUp(superadmin, organization.id),
+        organization.id
+      )
     ).resolves.toBe('admin');
   });
 
@@ -1193,9 +1220,9 @@ describe('binary support organization access', () => {
       approverKiloUserId: approver.id,
     });
 
-    await expect(ensureOrganizationAccess(await writeCtxWithStepUp(admin), child.id)).resolves.toBe(
-      'admin'
-    );
+    await expect(
+      ensureOrganizationAccess(await writeCtxWithStepUp(admin, child.id), child.id)
+    ).resolves.toBe('admin');
 
     const evidence = await db
       .select()

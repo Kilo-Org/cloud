@@ -37,6 +37,7 @@ function params(overrides: Partial<Parameters<typeof RunStepUpGuard>[0]> = {}) {
     credential: 'session' as const,
     webSessionId: 'session-1',
     actionClass: 'platform_read' as const,
+    target: { kind: 'none' as const, id: null },
     enabled: true,
     route: 'admin.test',
     method: 'query',
@@ -122,5 +123,84 @@ describe('runStepUpGuard', () => {
       'admin_step_up_evaluate',
       expect.any(Error)
     );
+  });
+
+  it('passes the exact operation to the evaluation', async () => {
+    mockEvaluateStepUp.mockResolvedValue({
+      state: freshState(),
+      proof: null,
+      passkeyCount: 1,
+    });
+
+    await runStepUpGuard(
+      params({
+        actionClass: 'sensitive_write',
+        target: { kind: 'user', id: 'target-user' },
+        route: 'admin.users.update',
+        method: 'mutation',
+      })
+    );
+
+    expect(mockEvaluateStepUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionClass: 'sensitive_write',
+        operation: {
+          surface: 'trpc',
+          route: 'admin.users.update',
+          method: 'mutation',
+          target: { kind: 'user', id: 'target-user' },
+        },
+      })
+    );
+  });
+
+  it('carries the operation binding on an operation-class refusal', async () => {
+    mockEvaluateStepUp.mockResolvedValue({
+      state: { status: 'required' },
+      proof: null,
+      passkeyCount: 1,
+    });
+
+    const cause = await refusal(
+      runStepUpGuard(
+        params({
+          actionClass: 'support_write',
+          target: { kind: 'organization', id: 'org-1' },
+          route: 'admin.supportAccess.request',
+          method: 'mutation',
+        })
+      )
+    );
+
+    expect(cause).toMatchObject({
+      code: 'MFA_REQUIRED',
+      actionClass: 'support_write',
+      purpose: 'operation',
+      maxAgeSeconds: 300,
+      binding: {
+        actionClass: 'support_write',
+        surface: 'trpc',
+        route: 'admin.supportAccess.request',
+        method: 'mutation',
+        targetKind: 'organization',
+        targetId: 'org-1',
+      },
+    });
+  });
+
+  it('carries no binding on a session-class refusal', async () => {
+    mockEvaluateStepUp.mockResolvedValue({
+      state: { status: 'required' },
+      proof: null,
+      passkeyCount: 1,
+    });
+
+    const cause = await refusal(runStepUpGuard(params({ actionClass: 'platform_read' })));
+
+    expect(cause).toMatchObject({
+      purpose: 'session',
+      maxAgeSeconds: 1800,
+      binding: null,
+    });
   });
 });

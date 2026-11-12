@@ -41,7 +41,17 @@ describe('createTRPCRouteHandler step-up mapping', () => {
       );
 
       expect(response.status).toBe(403);
-      expect(await response.json()).toEqual({ error: code, message: code });
+      expect(await response.json()).toMatchObject({
+        error: code,
+        message: code,
+        stepUp: {
+          code,
+          actionClass: 'platform_read',
+          purpose: 'session',
+          maxAgeSeconds: 900,
+          binding: null,
+        },
+      });
     }
   );
 

@@ -5625,6 +5625,13 @@ export const session_step_up_proofs = pgTable(
       table.session_id_hash,
       table.expires_at
     ),
+    // The operation lookup matches user + session + binding hash; without this
+    // index the claim scans every proof of the session.
+    index('idx_session_step_up_proofs_user_session_binding').on(
+      table.kilo_user_id,
+      table.session_id_hash,
+      table.action_binding_hash
+    ),
     index('idx_session_step_up_proofs_expires_at').on(table.expires_at),
     index('idx_session_step_up_proofs_passkey_credential_id').on(table.passkey_credential_id),
     check('check_session_step_up_proofs_method', sql`${table.method} IN ('webauthn_uv')`),

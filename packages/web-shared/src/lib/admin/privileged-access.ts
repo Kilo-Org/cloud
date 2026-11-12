@@ -13,19 +13,45 @@ export type PrivilegedCredentialKind =
   | 'delegated_workload'
   | 'service_assertion';
 
-export type PrivilegedActionClass =
-  | 'platform_read'
-  | 'platform_write'
-  | 'sensitive_write'
-  | 'support_read'
-  | 'support_write'
-  | 'worker_admin';
+export const PRIVILEGED_ACTION_CLASSES = [
+  'platform_read',
+  'platform_write',
+  'sensitive_write',
+  'support_read',
+  'support_write',
+  'worker_admin',
+] as const;
 
-export type PrivilegedTargetKind = 'organization' | 'user' | 'service' | 'none';
+export type PrivilegedActionClass = (typeof PRIVILEGED_ACTION_CLASSES)[number];
+
+export const PRIVILEGED_TARGET_KINDS = ['organization', 'user', 'service', 'none'] as const;
+
+export type PrivilegedTargetKind = (typeof PRIVILEGED_TARGET_KINDS)[number];
 
 export type PrivilegedTarget = {
   kind: PrivilegedTargetKind;
   id: string | null;
+};
+
+export const STEP_UP_SURFACES = ['rest', 'trpc', 'server-component'] as const;
+
+export type StepUpSurface = (typeof STEP_UP_SURFACES)[number];
+
+/**
+ * What an operation-class step-up proof is bound to: one action class, one
+ * exact operation, and the target account where the caller knows it. The
+ * refusal carries it so the admin UI can mint the same binding; only its hash
+ * is stored.
+ */
+export type StepUpOperationBinding = {
+  actionClass: PrivilegedActionClass;
+  surface: StepUpSurface;
+  /** Exact tRPC procedure path or request pathname. */
+  route: string;
+  /** Lower-cased tRPC operation type or HTTP method. */
+  method: string;
+  targetKind: PrivilegedTargetKind;
+  targetId: string | null;
 };
 
 export type PlatformAdminPermissions = {
@@ -163,6 +189,19 @@ export type StepUpErrorCode =
   | 'STEP_UP_UNAVAILABLE';
 
 /**
+ * The client-visible step-up detail carried by a tRPC error (`data.stepUp`) and
+ * by a REST refusal (`{ error, stepUp }`). It names only the action class, the
+ * purpose and the operation binding; never the session or the proof.
+ */
+export type StepUpRequirementPayload = {
+  code: StepUpErrorCode;
+  actionClass: PrivilegedActionClass;
+  purpose: 'session' | 'operation';
+  maxAgeSeconds: number;
+  binding: StepUpOperationBinding | null;
+};
+
+/**
  * Cause attached to a FORBIDDEN tRPC error when enforcement refuses a request
  * for missing or stale step-up. The error formatter exposes only these fields
  * as `data.stepUp`, never the underlying session or proof.
@@ -172,12 +211,15 @@ export class StepUpRequiredError extends Error {
   readonly actionClass: PrivilegedActionClass;
   readonly purpose: 'session' | 'operation';
   readonly maxAgeSeconds: number;
+  /** Set for an operation-class refusal; null for a session-class one. */
+  readonly binding: StepUpOperationBinding | null;
 
   constructor(params: {
     code: StepUpErrorCode;
     actionClass: PrivilegedActionClass;
     purpose: 'session' | 'operation';
     maxAgeSeconds: number;
+    binding?: StepUpOperationBinding | null;
   }) {
     super(params.code);
     this.name = 'StepUpRequiredError';
@@ -185,5 +227,6 @@ export class StepUpRequiredError extends Error {
     this.actionClass = params.actionClass;
     this.purpose = params.purpose;
     this.maxAgeSeconds = params.maxAgeSeconds;
+    this.binding = params.binding ?? null;
   }
 }

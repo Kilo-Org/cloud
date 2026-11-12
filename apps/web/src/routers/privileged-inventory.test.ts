@@ -4,10 +4,12 @@ import path from 'node:path';
 import { rootRouter } from './root-router';
 import {
   ADMIN_AREA_POLICIES,
+  ADMIN_STEP_UP_SELF_GUARDED_ROUTES,
   actionClassForEntry,
   findPrivilegedInventoryEntry,
   internalElevationSites,
   privilegedGuardTiers,
+  resolvesOwnStepUp,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import {
   SUPPORT_NEVER_KEYS,
@@ -471,6 +473,57 @@ describe('privileged inventory covers branch-level admin reads', () => {
     }
 
     expect(stale).toEqual([]);
+  });
+});
+
+describe('admin procedures that resolve their own step-up', () => {
+  const ROUTERS_ROOT = path.join(REPO_ROOT, 'apps/web/src/routers');
+
+  function filesCallingSupportStepUp(): string[] {
+    return walkFiles(ROUTERS_ROOT)
+      .filter(file => file.endsWith('.ts') && !file.endsWith('.test.ts'))
+      .filter(file => fs.readFileSync(file, 'utf8').includes('supportStepUpPort.requireFresh('));
+  }
+
+  test('every listed route is a mounted mutation with an inventory entry', () => {
+    const problems: string[] = [];
+
+    for (const route of ADMIN_STEP_UP_SELF_GUARDED_ROUTES) {
+      const procedure = procedures[route];
+      if (!procedure) {
+        problems.push(`${route} (no procedure)`);
+        continue;
+      }
+      if ((procedure._def?.type ?? 'query') !== 'mutation') {
+        problems.push(`${route} (not a mutation)`);
+      }
+      const entry = findPrivilegedInventoryEntry({ surface: 'trpc', route, access: 'write' });
+      if (!entry) problems.push(`${route} (no inventory entry)`);
+    }
+
+    expect(problems).toEqual([]);
+  });
+
+  test('the exemption list covers the resolvers that guard themselves', () => {
+    // A resolver that calls the support step-up port is skipped by the admin
+    // middleware, so it must be listed. The count of those call sites and the
+    // length of the list must agree, so a new self-guard forces a list update.
+    const files = filesCallingSupportStepUp();
+    expect(files.length).toBeGreaterThan(0);
+
+    const callSites = files
+      .map(file => fs.readFileSync(file, 'utf8'))
+      .join('\n')
+      .match(/supportStepUpPort\.requireFresh\(/g);
+
+    expect(callSites).toHaveLength(ADMIN_STEP_UP_SELF_GUARDED_ROUTES.length);
+  });
+
+  test('a listed route is not skipped when the switch is off', () => {
+    // The exemption only removes the middleware read. The resolver's own port
+    // keeps the write classes fail-closed, which its own suite proves.
+    expect(resolvesOwnStepUp(ADMIN_STEP_UP_SELF_GUARDED_ROUTES[0]!)).toBe(true);
+    expect(resolvesOwnStepUp('admin.users.update')).toBe(false);
   });
 });
 

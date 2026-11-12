@@ -127,6 +127,7 @@ export async function requirePrivilegedActor(
       credential,
       webSessionId: ctx.webSessionId,
       actionClass: params.actionClass,
+      target,
       enabled: isAdminStepUpEnabled(),
       route: ctx.trpcPath ?? null,
       method: ctx.trpcType ?? null,

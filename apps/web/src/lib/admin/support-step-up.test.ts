@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
 import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
+import type { SupportActionClass } from '@kilocode/web-shared/lib/admin/support-access';
 
 jest.mock('@kilocode/web-shared/lib/admin/step-up-store', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/admin/step-up-store') as object;
@@ -21,10 +22,15 @@ const mockedEvaluate = (
 ).evaluateStepUp;
 const originalAdminStepUp = process.env.ADMIN_STEP_UP_ENABLED;
 
-function requireFresh(credential?: 'session' | 'human_bearer') {
+function requireFresh(
+  credential?: 'session' | 'human_bearer',
+  actionClass: SupportActionClass = 'support_write'
+) {
   return supportStepUpPort.requireFresh({
     userId: 'user-1',
     action: 'support_write_request',
+    actionClass,
+    organizationId: 'organization-1',
     credential,
     webSessionId: 'session-1',
     route: 'admin.supportAccess.request',
@@ -70,6 +76,23 @@ describe('support step-up adapter', () => {
     expect(await stepUpCode(requireFresh('session'))).toBe('MFA_REQUIRED');
   });
 
+  test('binds the proof to the organization it acts on', async () => {
+    mockedEvaluate.mockResolvedValue({ state: { status: 'required' } } as never);
+    await stepUpCode(requireFresh('session'));
+
+    expect(mockedEvaluate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionClass: 'support_write',
+        operation: {
+          surface: 'trpc',
+          route: 'admin.supportAccess.request',
+          method: 'mutation',
+          target: { kind: 'organization', id: 'organization-1' },
+        },
+      })
+    );
+  });
+
   test('an evaluation failure fails closed as STEP_UP_UNAVAILABLE', async () => {
     mockedEvaluate.mockRejectedValue(new Error('db down'));
     expect(await stepUpCode(requireFresh('session'))).toBe('STEP_UP_UNAVAILABLE');
@@ -79,5 +102,19 @@ describe('support step-up adapter', () => {
     delete process.env.ADMIN_STEP_UP_ENABLED;
     expect(await stepUpCode(requireFresh('session'))).toBe('MFA_REQUIRED');
     expect(mockedEvaluate).not.toHaveBeenCalled();
+  });
+
+  test('step-up disabled skips the read-class requirement', async () => {
+    delete process.env.ADMIN_STEP_UP_ENABLED;
+    await expect(requireFresh('session', 'support_read')).resolves.toBeUndefined();
+    expect(mockedEvaluate).not.toHaveBeenCalled();
+  });
+
+  test('a read-class request needs only a session proof', async () => {
+    mockedEvaluate.mockResolvedValue({ state: { status: 'fresh' } } as never);
+    await expect(requireFresh('session', 'support_read')).resolves.toBeUndefined();
+    expect(mockedEvaluate).toHaveBeenCalledWith(
+      expect.objectContaining({ actionClass: 'support_read' })
+    );
   });
 });

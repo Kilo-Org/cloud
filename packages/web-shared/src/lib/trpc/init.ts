@@ -26,6 +26,7 @@ import {
 import {
   actionClassForAdminProcedure,
   markPrivilegedGuard,
+  resolvesOwnStepUp,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
@@ -377,10 +378,13 @@ const adminGuardMiddleware = t.middleware(adminGuardFn);
 // Enforcement for every admin procedure when the switch is on. When it is off
 // this performs no reads. `stepUp.*` is exempt so the dialog can read status and
 // the user can lock a session; both still require an admin browser session.
+// A procedure listed in `ADMIN_STEP_UP_SELF_GUARDED_ROUTES` is exempt because
+// its resolver binds the proof to the organization it acts on; the inventory
+// test keeps that list and those resolvers in step.
 // Specialized guards chained on adminProcedure reuse `adminStepUpState`.
 const adminStepUpEnforcementMiddleware = t.middleware(async ({ ctx, path, type, next }) => {
   const enabled = isAdminStepUpEnabled();
-  if (!enabled || path.startsWith('stepUp.')) return next();
+  if (!enabled || path.startsWith('stepUp.') || resolvesOwnStepUp(path)) return next();
 
   const credential =
     ctx.credential ??
@@ -389,13 +393,14 @@ const adminStepUpEnforcementMiddleware = t.middleware(async ({ ctx, path, type, 
       tokenSource: ctx.tokenSource ?? null,
       internalApiUse: ctx.internalApiUse,
     });
-  const { actionClass } = actionClassForAdminProcedure(path, type);
+  const { actionClass, targetKind } = actionClassForAdminProcedure(path, type);
 
   const adminStepUpState = await runStepUpGuard({
     userId: ctx.user.id,
     credential,
     webSessionId: ctx.webSessionId,
     actionClass,
+    target: { kind: targetKind, id: null },
     enabled,
     route: path,
     method: type,

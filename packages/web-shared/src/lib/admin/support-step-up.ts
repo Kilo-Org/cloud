@@ -4,38 +4,57 @@ import { TRPCError } from '@trpc/server';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
 import { StepUpRequiredError } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
-import { stepUpPolicyFor } from '@kilocode/web-shared/lib/admin/step-up-policy';
-import type { SupportStepUpPort } from '@kilocode/web-shared/lib/admin/support-access';
+import {
+  isOperationStepUpClass,
+  stepUpPolicyFor,
+} from '@kilocode/web-shared/lib/admin/step-up-policy';
+import type {
+  SupportActionClass,
+  SupportStepUpPort,
+} from '@kilocode/web-shared/lib/admin/support-access';
+
+function refuse(actionClass: SupportActionClass): never {
+  const policy = stepUpPolicyFor(actionClass);
+  throw new TRPCError({
+    code: 'FORBIDDEN',
+    message: 'Step-up must be enabled for this support access change',
+    cause: new StepUpRequiredError({
+      code: 'MFA_REQUIRED',
+      actionClass,
+      purpose: policy.purpose,
+      maxAgeSeconds: Math.round(policy.maxAgeMs / 1000),
+    }),
+  });
+}
 
 /**
- * Support write authority requires a fresh session-bound passkey proof. Unlike
- * the general admin guard, this is not gated on `ADMIN_STEP_UP_ENABLED`: when
- * that switch is off, support writes are refused rather than silently allowed
- * without a proof.
+ * Step-up for support access changes.
+ *
+ * A support write needs a passkey proof minted for that one write against that
+ * one organization, and the guard spends it. That requirement does not depend
+ * on `ADMIN_STEP_UP_ENABLED`: with the switch off a support write is refused
+ * rather than allowed without a proof.
+ *
+ * A support read grant only needs a live session proof, exactly like the other
+ * session-class actions, and it is skipped while the switch is off.
+ *
+ * A missing credential is treated as non-session, so bearer or unknown callers
+ * are refused rather than silently assumed to have a passkey.
  */
 export const supportStepUpPort: SupportStepUpPort = {
   async requireFresh(params) {
-    if (!isAdminStepUpEnabled()) {
-      const policy = stepUpPolicyFor('platform_write');
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'Step-up must be enabled to issue or approve support write access',
-        cause: new StepUpRequiredError({
-          code: 'MFA_REQUIRED',
-          actionClass: 'platform_write',
-          purpose: policy.purpose,
-          maxAgeSeconds: Math.round(policy.maxAgeMs / 1000),
-        }),
-      });
+    const enabled = isAdminStepUpEnabled();
+    if (!enabled && isOperationStepUpClass(params.actionClass)) {
+      refuse(params.actionClass);
     }
+    if (!enabled) return;
 
-    // A missing credential is treated as non-session, so bearer or unknown
-    // callers are refused rather than silently assumed to have a passkey.
     await runStepUpGuard({
       userId: params.userId,
       credential: params.credential ?? 'human_bearer',
       webSessionId: params.webSessionId ?? null,
-      actionClass: 'platform_write',
+      actionClass: params.actionClass,
+      target: { kind: 'organization', id: params.organizationId },
       enabled: true,
       route: params.route ?? null,
       method: params.method ?? null,

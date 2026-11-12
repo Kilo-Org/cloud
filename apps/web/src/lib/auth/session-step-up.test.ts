@@ -11,6 +11,8 @@ import {
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { evaluateStepUp, hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
+import type { StepUpOperation } from '@kilocode/web-shared/lib/admin/step-up-binding';
+import type { StepUpOperationBinding } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   buildAuthenticationResponse,
@@ -20,6 +22,26 @@ import { createStepUpOptions, StepUpVerificationError, verifyStepUp } from './se
 
 const webSessionId = 'browser-session-one';
 const otherSessionId = 'browser-session-two';
+
+function sensitiveWriteOperation(targetUserId: string): StepUpOperation {
+  return {
+    surface: 'trpc',
+    route: 'admin.users.update',
+    method: 'mutation',
+    target: { kind: 'user', id: targetUserId },
+  };
+}
+
+function sensitiveWriteBinding(targetUserId: string): StepUpOperationBinding {
+  return {
+    actionClass: 'sensitive_write',
+    surface: 'trpc',
+    route: 'admin.users.update',
+    method: 'mutation',
+    targetKind: 'user',
+    targetId: targetUserId,
+  };
+}
 
 async function expectRefusal(promise: Promise<unknown>, code: string): Promise<void> {
   const error: unknown = await promise.then(
@@ -500,14 +522,16 @@ describe('session step-up ceremony', () => {
     );
   });
 
-  it('uses the same session proof for a sensitive write', async () => {
+  it('mints a single-use operation proof for a sensitive write', async () => {
     const user = await createAdmin();
     const authenticator = createTestAuthenticator();
     await insertCredential(user.id, authenticator);
+    const binding = sensitiveWriteBinding(user.id);
     const { challengeId, options } = await createStepUpOptions({
       userId: user.id,
       webSessionId,
       actionClass: 'sensitive_write',
+      binding,
     });
 
     const proof = await verifyStepUp(
@@ -518,19 +542,214 @@ describe('session step-up ceremony', () => {
           challenge: options.challenge,
           counter: 1,
         }),
-        { actionClass: 'sensitive_write' }
+        { actionClass: 'sensitive_write', binding }
       )
     );
-    expect(proof.purpose).toBe('session');
-    expect(proof.action_binding_hash).toBeNull();
-    expect((new Date(proof.expires_at).getTime() - Date.now()) / 60_000).toBeGreaterThan(14.9);
+    expect(proof.purpose).toBe('operation');
+    expect(proof.action_binding_hash).not.toBeNull();
+    expect(proof.consumed_at).toBeNull();
+    expect((new Date(proof.expires_at).getTime() - Date.now()) / 60_000).toBeGreaterThan(4.9);
 
-    const fresh = await evaluateStepUp({
+    // The matching operation claims the proof once.
+    const claimed = await evaluateStepUp({
       userId: user.id,
       webSessionId,
       actionClass: 'sensitive_write',
+      operation: sensitiveWriteOperation(user.id),
     });
-    expect(fresh.state.status).toBe('fresh');
+    expect(claimed.state.status).toBe('fresh');
+    expect(claimed.proof?.consumed_at).not.toBeNull();
+
+    // A second use of the same proof is refused.
+    const reused = await evaluateStepUp({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'sensitive_write',
+      operation: sensitiveWriteOperation(user.id),
+    });
+    expect(reused.state.status).toBe('required');
+  });
+
+  it('refuses an operation proof bound to a different target or class', async () => {
+    const user = await createAdmin();
+    const authenticator = createTestAuthenticator();
+    await insertCredential(user.id, authenticator);
+    const binding = sensitiveWriteBinding(user.id);
+    const { challengeId, options } = await createStepUpOptions({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'sensitive_write',
+      binding,
+    });
+    await verifyStepUp(
+      verifyParams(
+        user,
+        challengeId,
+        buildAuthenticationResponse(authenticator, {
+          challenge: options.challenge,
+          counter: 1,
+        }),
+        { actionClass: 'sensitive_write', binding }
+      )
+    );
+
+    for (const request of [
+      {
+        actionClass: 'sensitive_write' as const,
+        operation: { ...sensitiveWriteOperation(user.id), target: { kind: 'user' as const, id: 'someone-else' } },
+      },
+      {
+        actionClass: 'sensitive_write' as const,
+        operation: { ...sensitiveWriteOperation(user.id), route: 'admin.users.delete' },
+      },
+      {
+        actionClass: 'support_write' as const,
+        operation: { ...sensitiveWriteOperation(user.id), surface: 'rest' as const },
+      },
+    ]) {
+      const refused = await evaluateStepUp({
+        userId: user.id,
+        webSessionId,
+        ...request,
+      });
+      expect(refused.state.status).not.toBe('fresh');
+    }
+
+    // None of the refusals spent the proof the matching operation still owns.
+    const claimed = await evaluateStepUp({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'sensitive_write',
+      operation: sensitiveWriteOperation(user.id),
+    });
+    expect(claimed.state.status).toBe('fresh');
+  });
+
+  it('never accepts a session proof for an operation-class request', async () => {
+    const user = await createAdmin();
+    const authenticator = createTestAuthenticator();
+    await insertCredential(user.id, authenticator);
+    const { challengeId, options } = await createStepUpOptions({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'platform_read',
+    });
+    await verifyStepUp(
+      verifyParams(
+        user,
+        challengeId,
+        buildAuthenticationResponse(authenticator, {
+          challenge: options.challenge,
+          counter: 1,
+        })
+      )
+    );
+
+    const session = await evaluateStepUp({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'platform_read',
+    });
+    expect(session.state.status).toBe('fresh');
+
+    const operation = await evaluateStepUp({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'sensitive_write',
+      operation: sensitiveWriteOperation(user.id),
+    });
+    expect(operation.state.status).toBe('required');
+
+    // The session proof is still live for read-grade classes afterwards.
+    const stillFresh = await evaluateStepUp({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'platform_read',
+    });
+    expect(stillFresh.state.status).toBe('fresh');
+  });
+
+  it('keeps the 30-minute session proof for read-grade classes', async () => {
+    const user = await createAdmin();
+    const authenticator = createTestAuthenticator();
+    await insertCredential(user.id, authenticator);
+    const { challengeId, options } = await createStepUpOptions({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'support_read',
+    });
+    const proof = await verifyStepUp(
+      verifyParams(
+        user,
+        challengeId,
+        buildAuthenticationResponse(authenticator, {
+          challenge: options.challenge,
+          counter: 1,
+        }),
+        { actionClass: 'support_read' }
+      )
+    );
+    expect(proof.purpose).toBe('session');
+    expect((new Date(proof.expires_at).getTime() - Date.now()) / 60_000).toBeGreaterThan(29.9);
+
+    const first = await evaluateStepUp({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'support_read',
+    });
+    const second = await evaluateStepUp({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'support_read',
+    });
+    expect(first.state.status).toBe('fresh');
+    expect(second.state.status).toBe('fresh');
+    expect(second.proof?.consumed_at).toBeNull();
+  });
+
+  it('refuses to mint an operation proof without a binding', async () => {
+    const user = await createAdmin();
+    await insertCredential(user.id, createTestAuthenticator());
+
+    await expectRefusal(
+      createStepUpOptions({
+        userId: user.id,
+        webSessionId,
+        actionClass: 'sensitive_write',
+      }),
+      'INVALID_BINDING'
+    );
+  });
+
+  it('refuses a challenge minted for another operation', async () => {
+    const user = await createAdmin();
+    const authenticator = createTestAuthenticator();
+    await insertCredential(user.id, authenticator);
+    const binding = sensitiveWriteBinding(user.id);
+    const { challengeId, options } = await createStepUpOptions({
+      userId: user.id,
+      webSessionId,
+      actionClass: 'sensitive_write',
+      binding,
+    });
+
+    await expectRefusal(
+      verifyStepUp(
+        verifyParams(
+          user,
+          challengeId,
+          buildAuthenticationResponse(authenticator, {
+            challenge: options.challenge,
+            counter: 1,
+          }),
+          {
+            actionClass: 'sensitive_write',
+            binding: { ...binding, route: 'admin.users.delete' },
+          }
+        )
+      ),
+      'INVALID_BINDING'
+    );
   });
 
   it('supersedes the previous session proof', async () => {

@@ -1,7 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
 import * as z from 'zod';
-import { kilocode_users } from '@kilocode/db/schema';
+import { kilocode_users, support_access_grants } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
@@ -70,17 +70,20 @@ export const adminSupportAccessRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       assertSupportAccessEnabled();
-      if (input.actionClass === 'support_write') {
-        await supportStepUpPort.requireFresh({
-          userId: ctx.user.id,
-          action: 'support_write_request',
-          credential: ctx.credential,
-          webSessionId: ctx.webSessionId ?? null,
-          route: ctx.trpcPath ?? null,
-          method: ctx.trpcType ?? null,
-          surface: 'trpc',
-        });
-      }
+      // Both classes are checked here: the resolver knows the organization, and
+      // a read grant is cross-organization read authority in its own right.
+      await supportStepUpPort.requireFresh({
+        userId: ctx.user.id,
+        action:
+          input.actionClass === 'support_write' ? 'support_write_request' : 'support_read_request',
+        actionClass: input.actionClass,
+        organizationId: input.organizationId,
+        credential: ctx.credential,
+        webSessionId: ctx.webSessionId ?? null,
+        route: ctx.trpcPath ?? null,
+        method: ctx.trpcType ?? null,
+        surface: 'trpc',
+      });
       const grant = await requestSupportGrant({
         actorKiloUserId: ctx.user.id,
         organizationId: input.organizationId,
@@ -116,9 +119,22 @@ export const adminSupportAccessRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       assertSupportAccessEnabled();
       if (isSupportAccessEnabled()) {
+        // The organization is a property of the grant, and the proof must name
+        // it, so read it before the proof is claimed. A missing grant refuses
+        // here without spending a proof.
+        const [pending] = await db
+          .select({ organization_id: support_access_grants.organization_id })
+          .from(support_access_grants)
+          .where(eq(support_access_grants.id, input.grantId))
+          .limit(1);
+        if (!pending) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Grant not found' });
+        }
         await supportStepUpPort.requireFresh({
           userId: ctx.user.id,
           action: 'support_approval',
+          actionClass: 'support_write',
+          organizationId: pending.organization_id,
           credential: ctx.credential,
           webSessionId: ctx.webSessionId ?? null,
           route: ctx.trpcPath ?? null,
@@ -209,6 +225,8 @@ export const adminSupportAccessRouter = createTRPCRouter({
       await supportStepUpPort.requireFresh({
         userId: ctx.user.id,
         action: 'support_emergency_issue',
+        actionClass: 'support_write',
+        organizationId: input.organizationId,
         credential: ctx.credential,
         webSessionId: ctx.webSessionId ?? null,
         route: ctx.trpcPath ?? null,

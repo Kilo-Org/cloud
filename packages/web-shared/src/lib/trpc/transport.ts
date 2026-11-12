@@ -60,6 +60,17 @@ export const TrpcErrorDataSchema = z
         actionClass: z.string(),
         purpose: z.string(),
         maxAgeSeconds: z.number(),
+        binding: z
+          .object({
+            actionClass: z.string(),
+            surface: z.string(),
+            route: z.string(),
+            method: z.string(),
+            targetKind: z.string(),
+            targetId: z.string().nullable(),
+          })
+          .nullable()
+          .optional(),
       })
       .optional(),
   })
@@ -136,6 +147,7 @@ export const trpcErrorFormatter = (({ shape, error }) => {
               actionClass: error.cause.actionClass,
               purpose: error.cause.purpose,
               maxAgeSeconds: error.cause.maxAgeSeconds,
+              binding: error.cause.binding,
             }
           : undefined,
       ...(billingFailure ? { billingFailure } : {}),

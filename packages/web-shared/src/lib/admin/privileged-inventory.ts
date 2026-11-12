@@ -145,6 +145,23 @@ function adminEntry(id: string, route: string, policy: AdminAreaPolicy): Privile
 
 export const ADMIN_AREA_POLICIES = adminAreaPolicies;
 
+/**
+ * Admin procedures that resolve their own step-up inside the resolver, because
+ * the guard middleware cannot see the organization the operation acts on. Each
+ * one must call `supportStepUpPort.requireFresh` with a concrete organization.
+ * The inventory coverage test asserts this list is exactly the set of
+ * procedures whose source does that, and that each still has an entry.
+ */
+export const ADMIN_STEP_UP_SELF_GUARDED_ROUTES: readonly string[] = [
+  'admin.supportAccess.request',
+  'admin.supportAccess.approve',
+  'admin.supportAccess.emergencyIssue',
+];
+
+export function resolvesOwnStepUp(path: string): boolean {
+  return ADMIN_STEP_UP_SELF_GUARDED_ROUTES.includes(path);
+}
+
 const trpcEntries: PrivilegedInventoryEntry[] = [
   ...Object.entries(adminRootPolicies).map(([area, policy]) =>
     adminEntry(`trpc.admin.${area}`, `admin.${area}`, policy)
@@ -929,20 +946,42 @@ export function actionClassForEntry(
   );
 }
 
+/**
+ * The target kind the inventory expects for this entry. A generic guard reads
+ * no row, so it binds the kind the route policy names and leaves the id null.
+ */
+export function targetKindForEntry(
+  entry: PrivilegedInventoryEntry | undefined
+): PrivilegedTargetKind {
+  return entry?.target ?? 'none';
+}
+
 export function actionClassForAdminProcedure(
   path: string,
   type: string
-): { actionClass: PrivilegedActionClass; inventoryId: string | null } {
+): {
+  actionClass: PrivilegedActionClass;
+  inventoryId: string | null;
+  targetKind: PrivilegedTargetKind;
+} {
   const access: PrivilegedAccessKind = type === 'mutation' ? 'write' : 'read';
   const entry = findPrivilegedInventoryEntry({ surface: 'trpc', route: path, access });
-  return { actionClass: actionClassForEntry(entry, access), inventoryId: entry?.id ?? null };
+  return {
+    actionClass: actionClassForEntry(entry, access),
+    inventoryId: entry?.id ?? null,
+    targetKind: targetKindForEntry(entry),
+  };
 }
 
 export function actionClassForRoute(params: {
   surface: Exclude<PrivilegedSurface, 'trpc' | 'worker'>;
   route: string;
   method: string | null;
-}): { actionClass: PrivilegedActionClass; inventoryId: string | null } {
+}): {
+  actionClass: PrivilegedActionClass;
+  inventoryId: string | null;
+  targetKind: PrivilegedTargetKind;
+} {
   const access: PrivilegedAccessKind =
     params.method === 'GET' || params.method === 'HEAD' ? 'read' : 'write';
   const entry = findPrivilegedInventoryEntry({
@@ -950,5 +989,9 @@ export function actionClassForRoute(params: {
     route: params.route,
     access,
   });
-  return { actionClass: actionClassForEntry(entry, access), inventoryId: entry?.id ?? null };
+  return {
+    actionClass: actionClassForEntry(entry, access),
+    inventoryId: entry?.id ?? null,
+    targetKind: targetKindForEntry(entry),
+  };
 }

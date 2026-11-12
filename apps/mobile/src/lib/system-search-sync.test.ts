@@ -428,7 +428,12 @@ describe('SystemSearchIndexSync', () => {
     });
     const sync = new harness.SystemSearchIndexSync({
       queryClient,
-      collect: async () => ({ documents: [], sessions: null, observedSources: new Set() }),
+      collect: async () => ({
+        documents: [],
+        sessions: null,
+        observedSources: new Set(),
+        accessibleOrganizations: null,
+      }),
       fingerprints: bridge.indexedSystemSearchFingerprints,
       apply: async () => undefined,
       report,

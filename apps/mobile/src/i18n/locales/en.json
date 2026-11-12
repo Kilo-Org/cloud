@@ -2981,7 +2981,10 @@
       "alreadyInvited": "They're already invited or already a member.",
       "sendError": "Couldn't send the invite.",
       "pendingInvitation": "This email already has a pending invitation.",
-      "alreadyMember": "This person is already a member of this organization."
+      "alreadyMember": "This person is already a member of this organization.",
+      "seatsFull": "All seats are in use ({{used}}/{{total}}). Ask an organization owner to add seats before inviting more members.",
+      "seatsFullCanInviteBilling": "All seats are in use ({{used}}/{{total}}). You can still invite billing managers, who don't consume a seat.",
+      "noSeatsAvailable": "All seats are in use. Ask an organization owner to add seats before inviting more members."
     },
     "invoices": {
       "downloadA11y": "Download invoice {{number}}",

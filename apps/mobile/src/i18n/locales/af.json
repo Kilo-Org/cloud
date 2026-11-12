@@ -2901,7 +2901,10 @@
       "alreadyInvited": "Hulle is reeds genooi of is reeds 'n lid.",
       "sendError": "Kon nie die uitnodiging stuur nie.",
       "pendingInvitation": "Hierdie e-posadres het reeds 'n hangende uitnodiging.",
-      "alreadyMember": "Hierdie persoon is reeds 'n lid van hierdie organisasie."
+      "alreadyMember": "Hierdie persoon is reeds 'n lid van hierdie organisasie.",
+      "seatsFull": "Alle plekke is in gebruik ({{used}}/{{total}}). Vra 'n organisasie-eienaar om plekke by te voeg voordat jy meer lede nooi.",
+      "seatsFullCanInviteBilling": "Alle plekke is in gebruik ({{used}}/{{total}}). Jy kan steeds faktureringsbestuurders nooi, wat nie 'n plek gebruik nie.",
+      "noSeatsAvailable": "Alle plekke is in gebruik. Vra 'n organisasie-eienaar om plekke by te voeg voordat jy meer lede nooi."
     },
     "invoices": {
       "downloadA11y": "Laai faktuur {{number}} af",

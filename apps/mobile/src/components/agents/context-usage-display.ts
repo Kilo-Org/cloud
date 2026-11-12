@@ -159,16 +159,18 @@ export function getPillSlotSizers() {
 /**
  * The pill's fixed chrome, in dp: its 28dp ring, its border, its `px-2.5`
  * padding, the `gap-1.5` between the ring and the value row, and the row's own
- * `gap-1`. None of it is text, so none of it follows the font scale.
+ * `gap-1`. The classes compile at the app's 14pt rem, so the padding is 8.75 a
+ * side and the two gaps are 5.25 and 3.5. None of it is text, so none of it
+ * follows the font scale.
  */
-const PILL_CHROME_WIDTH = 60;
+const PILL_CHROME_WIDTH = 28 + 2 + 2 * 8.75 + 5.25 + 3.5;
 
 /**
  * The two value slots' reserved readings at font scale 1, in dp: the sizers the
  * slots lay out, plus the slack the painted pill leaves beside them. Both
  * readings are `Text`, so both follow the system font scale.
  */
-const PILL_READINGS_WIDTH = 68;
+const PILL_READINGS_WIDTH = 128 - PILL_CHROME_WIDTH;
 
 /**
  * Width the pill lays out at, in dp, at a font scale: its fixed chrome plus its

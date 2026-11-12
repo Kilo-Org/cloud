@@ -76,8 +76,11 @@ type ChatScreenProps = {
  */
 const CHAT_LIST_HREF: Href = '/(app)/(tabs)/(4_chat)';
 
-/** The `gap-2` the chat header's trailing cluster keeps between its controls. */
-const HEADER_CONTROL_GAP = 8;
+/**
+ * The `gap-2` the chat header's trailing cluster keeps between its controls, in
+ * dp: 0.5rem at the app's 14pt rem.
+ */
+const HEADER_CONTROL_GAP = 7;
 
 /**
  * The content width this title needs to stay readable: "Chat" in the 18px

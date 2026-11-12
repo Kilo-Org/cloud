@@ -919,6 +919,8 @@ export const AdminActionAuditAction = z.enum([
   'user.email.release',
   'user.personal_account.set_disabled',
   'user.unblock',
+  'blacklist.domain.remove',
+  'blacklist.domain.unblock',
   'organization.create',
   'organization.delete',
   'organization.parent.set',

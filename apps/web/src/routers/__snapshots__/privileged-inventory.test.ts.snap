@@ -96,6 +96,8 @@ exports[`privileged inventory covers discovered tRPC procedures the guarded proc
   "admin.autoFreeConfig.get query [admin] -> trpc.admin.autoFreeConfig",
   "admin.autoFreeConfig.set mutation [admin] -> trpc.admin.autoFreeConfig",
   "admin.blacklistDomains.get query [admin] -> trpc.admin.blacklistDomains",
+  "admin.blacklistDomains.removeDomain mutation [admin] -> trpc.admin.blacklistDomains",
+  "admin.blacklistDomains.removeDomainPreview query [admin] -> trpc.admin.blacklistDomains",
   "admin.blacklistDomains.set mutation [admin] -> trpc.admin.blacklistDomains",
   "admin.blacklistDomains.stats query [admin] -> trpc.admin.blacklistDomains",
   "admin.blacklistDomains.suspicious query [admin] -> trpc.admin.blacklistDomains",

@@ -106,8 +106,7 @@ describe('analytics identity tracker', () => {
     await tracker.observe(signedIn(EMAIL), 'device_auth');
 
     expect(analyticsMocks.initAnalytics).toHaveBeenCalledTimes(2);
-    expect(emitSignedIn).toHaveBeenCalledTimes(2);
-    expect(emitSignedIn).toHaveBeenLastCalledWith('device_auth');
+    expect(emitSignedIn.mock.calls).toStrictEqual([['stored_session'], ['device_auth']]);
     // Each activation also records the once-per-day heartbeat.
     expect(analyticsMocks.captureDailyActive).toHaveBeenCalledTimes(2);
   });

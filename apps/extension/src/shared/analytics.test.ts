@@ -39,8 +39,6 @@ import {
   ANALYTICS_SURFACE,
   EXTENSION_ACTIVE_EVENT,
   EXTENSION_SIGNED_OUT_EVENT,
-  __setExtensionVersionReaderForTests,
-  __setFirefoxPermissionsReaderForTests,
   captureDailyActive,
   captureEvent,
   getFirefoxUsageDataGranted,
@@ -50,6 +48,11 @@ import {
   setAnalyticsOptOut,
   shouldStartAnalytics,
 } from './analytics';
+// eslint-disable-next-line import/first
+import {
+  __setExtensionVersionReaderForTests,
+  __setFirefoxPermissionsReaderForTests,
+} from './analytics-environment';
 // eslint-disable-next-line import/first
 import type { AnalyticsStorageArea } from './analytics';
 
@@ -98,12 +101,12 @@ const createStorage = (
       expect(ANALYTICS_STORAGE_KEY_ALLOWLIST[key]).toBe(true);
       return values.get(key);
     },
+    get lastActiveDay() {
+      return values.get(ANALYTICS_LAST_ACTIVE_DAY_STORAGE_KEY);
+    },
     setItem: (key, value) => {
       expect(ANALYTICS_STORAGE_KEY_ALLOWLIST[key]).toBe(true);
       values.set(key, value);
-    },
-    get lastActiveDay() {
-      return values.get(ANALYTICS_LAST_ACTIVE_DAY_STORAGE_KEY);
     },
     get value() {
       return values.get(ANALYTICS_OPT_OUT_STORAGE_KEY);
@@ -571,8 +574,7 @@ describe('analytics daily active heartbeat', () => {
       await expect(captureDailyActive(storage, new Date(2026, 10, 12, 23, 59, 0))).resolves.toBe(
         false
       );
-      expect(client.capture).toHaveBeenCalledTimes(1);
-      expect(allCaptureCalls()).toHaveLength(1);
+      expect([client.capture.mock.calls.length, allCaptureCalls().length]).toStrictEqual([1, 1]);
     });
   });
 
@@ -636,6 +638,7 @@ describe('analytics daily active heartbeat', () => {
       await expect(
         captureDailyActive(brokenStorage, new Date(2026, 10, 12, 9, 0, 0))
       ).resolves.toBe(true);
+      // eslint-disable-next-line vitest/prefer-called-once -- the installed linter also requires CalledTimes
       expect(client.capture).toHaveBeenCalledTimes(1);
     });
   });
@@ -680,6 +683,7 @@ describe('analytics daily active heartbeat', () => {
       ]);
 
       expect(results).toStrictEqual([true, true]);
+      // eslint-disable-next-line vitest/prefer-called-once -- the installed linter also requires CalledTimes
       expect(client.capture).toHaveBeenCalledTimes(1);
     });
   });

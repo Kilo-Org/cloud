@@ -1067,8 +1067,10 @@ const getSelectOptionsText = async (driver: WebDriver, ariaLabel: string): Promi
   return String(result);
 };
 
-const countControls = async (driver: WebDriver, selector: string): Promise<number> =>
-  (await driver.findElements(By.css(selector))).length;
+const countControls = async (driver: WebDriver, selector: string): Promise<number> => {
+  const elements = await driver.findElements(By.css(selector));
+  return elements.length;
+};
 
 const isControlDisabled = async (driver: WebDriver, selector: string): Promise<boolean> => {
   await waitUntil(

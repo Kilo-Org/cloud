@@ -1,5 +1,14 @@
-import { PostHog } from 'posthog-js/dist/module.no-external';
+import type { PostHog } from 'posthog-js/dist/module.no-external';
 import { z } from 'zod';
+
+import { createPostHogClient, readApiKey } from './analytics-client';
+import { emailMarker, toLocalDay } from './analytics-day-marker';
+import {
+  getFirefoxUsageDataGranted,
+  isDevBuild,
+  isFirefoxBuild,
+  readExtensionVersion,
+} from './analytics-environment';
 
 export const EXTENSION_SIGNED_IN_EVENT = 'extension_signed_in';
 export const EXTENSION_SIGNED_OUT_EVENT = 'extension_signed_out';
@@ -13,6 +22,9 @@ export const ANALYTICS_LAST_ACTIVE_DAY_STORAGE_KEY = 'local:analyticsLastActiveD
 
 /** Super property that separates extension traffic from web/CLI/mobile in PostHog. */
 export const ANALYTICS_SURFACE = 'browser_extension';
+
+/** Firefox gates usage data on a built-in permission; re-exported for the settings UI. */
+export { getFirefoxUsageDataGranted };
 
 type MaybePromise<Value> = Promise<Value> | Value;
 
@@ -42,44 +54,9 @@ interface ActiveAnalyticsIdentity {
   readonly email: string;
 }
 
-const POSTHOG_API_HOST = 'https://us.i.posthog.com';
-
-// Exact MV3-safe init option set from the plan (key order sorted for lint).
-const POSTHOG_INIT_OPTIONS = {
-  advanced_disable_flags: true,
-  api_host: POSTHOG_API_HOST,
-  autocapture: false,
-  capture_pageleave: false,
-  capture_pageview: false,
-  disable_external_dependency_loading: true,
-  disable_session_recording: true,
-  persistence: 'localStorage',
-} as const;
-
-const permissionsGetAllSchema = z
-  .object({
-    data_collection: z.array(z.string()).optional(),
-  })
-  .loose();
-
 // eslint-disable-next-line unicorn/no-useless-undefined -- explicit unset sentinel
 let activeIdentity: ActiveAnalyticsIdentity | undefined = undefined;
 let lifecycleEpoch = 0;
-
-const readApiKey = (): string | undefined => {
-  const key = import.meta.env.VITE_POSTHOG_API_KEY;
-  return key !== undefined && key.trim().length > 0 ? key.trim() : undefined;
-};
-
-const createPostHogClient = (apiKey: string): PostHog => {
-  const client = new PostHog();
-  client.init(apiKey, { ...POSTHOG_INIT_OPTIONS });
-  return client;
-};
-
-const dropClient = (client: PostHog | undefined): void => {
-  client?.reset();
-};
 
 interface AnalyticsSurfaceContext {
   readonly browser: 'chrome' | 'firefox';
@@ -91,17 +68,17 @@ const publishIdentity = (
   email: string,
   context: AnalyticsSurfaceContext
 ): void => {
-  const superProperties: Record<string, string> = {
+  const superProperties = {
     browser: context.browser,
     platform: 'extension',
     surface: ANALYTICS_SURFACE,
   };
 
-  if (context.extensionVersion !== undefined) {
-    superProperties['extension_version'] = context.extensionVersion;
-  }
-
-  client.register(superProperties);
+  client.register(
+    context.extensionVersion === undefined
+      ? superProperties
+      : { ...superProperties, extension_version: context.extensionVersion }
+  );
   client.identify(email, { email });
   activeIdentity = { client, email };
 };
@@ -118,88 +95,6 @@ export const shouldStartAnalytics = ({
 export const loadAnalyticsOptOut = async (storageArea: AnalyticsStorageArea): Promise<boolean> => {
   const value = await storageArea.getItem(ANALYTICS_OPT_OUT_STORAGE_KEY);
   return value === true;
-};
-
-type FirefoxPermissionsReader = () => MaybePromise<unknown>;
-
-// eslint-disable-next-line unicorn/no-useless-undefined -- explicit unset sentinel
-let firefoxPermissionsReader: FirefoxPermissionsReader | undefined = undefined;
-
-/** Test-only seam for Firefox permission reads under Vitest (node, no chrome global). */
-export const __setFirefoxPermissionsReaderForTests = (reader?: FirefoxPermissionsReader): void => {
-  firefoxPermissionsReader = reader;
-};
-
-const readFirefoxPermissions = async (): Promise<z.infer<
-  typeof permissionsGetAllSchema
-> | null> => {
-  const raw = await (async () => {
-    if (firefoxPermissionsReader) {
-      return firefoxPermissionsReader();
-    }
-    const { browser } = await import('wxt/browser');
-    return browser.permissions.getAll();
-  })();
-
-  const parsed = permissionsGetAllSchema.safeParse(raw);
-  return parsed.success ? parsed.data : null;
-};
-
-const isTruthyEnvFlag = (value: unknown): boolean => value === true || value === 'true';
-
-// Vite injects DEV; WXT injects FIREFOX as a boolean. Vitest stubs non-DEV keys as strings.
-const isDevBuild = (): boolean => isTruthyEnvFlag(import.meta.env.DEV);
-
-const isFirefoxBuild = (): boolean => isTruthyEnvFlag(import.meta.env.FIREFOX);
-
-export const getFirefoxUsageDataGranted = async (): Promise<boolean> => {
-  if (!isFirefoxBuild()) {
-    return true;
-  }
-
-  const parsed = await readFirefoxPermissions();
-  if (parsed === null) {
-    return false;
-  }
-
-  const dataCollection = parsed.data_collection;
-  if (dataCollection === undefined) {
-    // Firefox < 140: no built-in data_collection consent surface.
-    return false;
-  }
-
-  return dataCollection.includes('technicalAndInteraction');
-};
-
-type ExtensionVersionReader = () => MaybePromise<string | undefined>;
-
-// eslint-disable-next-line unicorn/no-useless-undefined -- explicit unset sentinel
-let extensionVersionReader: ExtensionVersionReader | undefined = undefined;
-
-/** Test-only seam for the manifest version read under Vitest (node, no browser.runtime). */
-export const __setExtensionVersionReaderForTests = (reader?: ExtensionVersionReader): void => {
-  extensionVersionReader = reader;
-};
-
-/**
- * Reads the shipped extension version for the `extension_version` super property.
- * Resolves `undefined` (property omitted) rather than failing startup when the
- * manifest is unreadable.
- */
-const readExtensionVersion = async (): Promise<string | undefined> => {
-  try {
-    const raw: unknown = await (async () => {
-      if (extensionVersionReader) {
-        return extensionVersionReader();
-      }
-      const { browser } = await import('wxt/browser');
-      return browser.runtime.getManifest().version;
-    })();
-
-    return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : undefined;
-  } catch {
-    return undefined;
-  }
 };
 
 export const initAnalytics = async (
@@ -251,7 +146,7 @@ export const initAnalytics = async (
 
   if (lifecycleEpoch !== epochAtStart) {
     // Discard without identify — inert with flags/capture disabled.
-    dropClient(client);
+    client.reset();
     return false;
   }
 
@@ -279,33 +174,17 @@ export const captureEvent = (
   activeIdentity.client.capture(name, properties);
 };
 
-/** Local calendar day (not UTC): a user's WAU must not turn over at their midnight-UTC. */
-const toLocalDay = (date: Date): string => {
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const dayOfMonth = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${dayOfMonth}`;
-};
-
-/**
- * FNV-1a marker for the signed-in email, so a stored day belongs to one user
- * without putting the address itself into extension storage. Two accounts on one
- * browser profile must both count.
- */
-const emailMarker = (email: string): string => {
-  let hash = 0x81_1c_9d_c5;
-  for (let index = 0; index < email.length; index += 1) {
-    hash ^= email.codePointAt(index) ?? 0;
-    hash = Math.imul(hash, 0x01_00_01_93) >>> 0;
-  }
-  return hash.toString(16).padStart(8, '0');
-};
-
 // eslint-disable-next-line unicorn/no-useless-undefined -- explicit unset sentinel
 let activeCaptureInFlight: Promise<boolean> | undefined = undefined;
 
-const readStoredDay = async (storageArea: AnalyticsStorageArea): Promise<unknown> => {
+const storedDaySchema = z.string();
+
+const readStoredDay = async (storageArea: AnalyticsStorageArea): Promise<string | undefined> => {
   try {
-    return await storageArea.getItem(ANALYTICS_LAST_ACTIVE_DAY_STORAGE_KEY);
+    const stored = await storageArea.getItem(ANALYTICS_LAST_ACTIVE_DAY_STORAGE_KEY);
+    const parsed = storedDaySchema.safeParse(stored);
+    // An unreadable or foreign value just means "send".
+    return parsed.success ? parsed.data : undefined;
   } catch {
     // Analytics must never break the panel; an unreadable day just means "send".
     return undefined;

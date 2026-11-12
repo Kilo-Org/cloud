@@ -65,11 +65,11 @@ import {
   getVercelModelIdOverrides,
   mapModelIdToVercel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { findVercelOnlyModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import {
+  findVercelOnlyModels,
   getVendorNamesByModelPrefix,
   getVercelOnlyModelName,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
@@ -286,6 +286,7 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
   const vendorNames = getVendorNamesByModelPrefix(openRouterModels);
   const vercelOnlyModels = findVercelOnlyModels({
     openRouterModelIds: Object.keys(openRouterModelMetadata),
+    openRouterModels,
     vercelMetadata: vercelModelMetadata,
     overrides: await getVercelModelIdOverrides(),
   });

@@ -489,6 +489,46 @@ describe('injectVercelModels with models only Vercel serves', () => {
     ]);
   });
 
+  test('omits a Vercel-only model named like an OpenRouter model, along with its endpoints', () => {
+    const vercelModels: Record<string, GatewayModelWithEndpoints> = {
+      'alibaba/qwen3-vl-instruct': {
+        id: 'alibaba/qwen3-vl-instruct',
+        name: 'Qwen3 VL 235B A22B Instruct',
+        ...described,
+        endpoints: [{ provider_name: 'bedrock' }],
+      },
+      'alibaba/qwen3-vl-thinking': {
+        id: 'alibaba/qwen3-vl-thinking',
+        name: 'Qwen3 VL 235B A22B Thinking',
+        ...described,
+        endpoints: [{ provider_name: 'bedrock' }],
+      },
+      'alibaba/qwen3-vl-flash': {
+        id: 'alibaba/qwen3-vl-flash',
+        name: 'qwen3 vl 235b a22b instruct',
+        ...described,
+        endpoints: [{ provider_name: 'bedrock' }],
+      },
+    };
+    const data = providerModelData();
+
+    injectVercelModels({
+      vercelModels,
+      openRouterCatalogModels: [
+        { id: 'qwen/qwen3-vl-235b-a22b-instruct', name: 'Qwen: Qwen3 VL 235B A22B Instruct' },
+      ],
+      openRouterModelIds: ['qwen/qwen3-vl-235b-a22b-instruct'],
+      providerModelData: data,
+      vercelModelIdOverrides: new Map(),
+      updatedAt: '2026-11-02T00:00:00.000Z',
+    });
+
+    expect(data[0]?.models.map(model => model.slug).sort()).toEqual([
+      'qwen/qwen3-vl-flash',
+      'qwen/qwen3-vl-thinking',
+    ]);
+  });
+
   test("skips a Vercel-only model that Vercel's model list does not describe", () => {
     const data = providerModelData();
     injectVercelModels({

@@ -14,11 +14,11 @@ import type {
 import type { Endpoint } from '@kilocode/db/schema-types';
 import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
-import { findVercelOnlyModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import {
+  findVercelOnlyModels,
   getVendorNamesByModelPrefix,
   getVercelOnlyModelName,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 
 type ProviderModelData = Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>;
@@ -232,6 +232,7 @@ function getVercelOnlyOfferings(
   const vendorNames = getVendorNamesByModelPrefix(openRouterCatalogModels);
   return findVercelOnlyModels({
     openRouterModelIds,
+    openRouterModels: openRouterCatalogModels,
     vercelMetadata: vercelModels,
     overrides: vercelModelIdOverrides,
   }).map(vercelOnlyModel => {

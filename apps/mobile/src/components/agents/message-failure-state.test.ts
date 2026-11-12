@@ -9,7 +9,9 @@ import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 
 import {
   composeFailureLabel,
+  CREDITS_DELIVERY_REASON,
   isGenericResponseFailure,
+  type MessageDeliveryStatement,
   messageFailureLabel,
   NON_RETRYABLE_ASSISTANT_ERRORS,
   selectMessageFailure,
@@ -404,10 +406,7 @@ describe('selectMessageFailure', () => {
  * generic; every classified cause stays readable in the row.
  */
 describe('isGenericResponseFailure', () => {
-  const failureFor = (input: {
-    deliveryState?: Extract<MessageDeliveryState, { status: 'failed' }>;
-    info?: MessageInfo;
-  }) =>
+  const failureFor = (input: { deliveryState?: MessageDeliveryStatement; info?: MessageInfo }) =>
     selectMessageFailure({
       info: input.info ?? userInfo(),
       ...(input.deliveryState === undefined ? {} : { deliveryState: input.deliveryState }),
@@ -426,8 +425,8 @@ describe('isGenericResponseFailure', () => {
   });
 
   it('keeps every classified cause, and every failure of the send itself', () => {
-    const cases: (MessageInfo | Extract<MessageDeliveryState, { status: 'failed' }>)[] = [
-      { status: 'failed', error: '', reason: 'credits' },
+    const cases: (MessageInfo | MessageDeliveryStatement)[] = [
+      { status: 'failed', error: '', reason: CREDITS_DELIVERY_REASON },
       { status: 'failed', error: 'RAW_TRANSPORT_TEXT', reason: 'exhausted' },
       { status: 'failed', error: '', reason: 'interrupted' },
       assistantInfo('ProviderAuthError'),

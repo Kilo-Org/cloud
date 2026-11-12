@@ -5,7 +5,6 @@ import type {
   buildGitLabCloneUrl as BuildGitLabCloneUrl,
   getGitLabInstanceUrlForOrganization as GetGitLabInstanceUrlForOrganization,
   getGitLabInstanceUrlForUser as GetGitLabInstanceUrlForUser,
-  getGitLabProjectAccessForRequester as GetGitLabProjectAccessForRequester,
   getGitLabTokenForOrganization as GetGitLabTokenForOrganization,
   getGitLabTokenForUser as GetGitLabTokenForUser,
   validateGitLabRepoAccessForOrganization as ValidateGitLabRepoAccessForOrganization,
@@ -92,7 +91,6 @@ jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
   getGitLabInstanceUrlForOrganization: jest.fn(),
   getGitLabInstanceUrlForUser: jest.fn(),
   buildGitLabCloneUrl: jest.fn(),
-  getGitLabProjectAccessForRequester: jest.fn(),
   validateGitLabRepoAccessForOrganization: jest.fn(),
   validateGitLabRepoAccessForUser: jest.fn(),
 }));
@@ -151,9 +149,6 @@ let mockValidateGitLabRepoAccessForUser: jest.MockedFunction<
 let mockValidateGitLabRepoAccessForOrganization: jest.MockedFunction<
   typeof ValidateGitLabRepoAccessForOrganization
 >;
-let mockGetGitLabProjectAccessForRequester: jest.MockedFunction<
-  typeof GetGitLabProjectAccessForRequester
->;
 let mockGetBotUserId: jest.MockedFunction<typeof GetBotUserId>;
 
 describe('spawnCloudAgentSession delegation', () => {
@@ -179,7 +174,6 @@ describe('spawnCloudAgentSession delegation', () => {
     mockValidateGitLabRepoAccessForOrganization = jest.mocked(
       gitlab.validateGitLabRepoAccessForOrganization
     );
-    mockGetGitLabProjectAccessForRequester = jest.mocked(gitlab.getGitLabProjectAccessForRequester);
     mockGetBotUserId = jest.mocked(botUsers.getBotUserId);
     spawnCloudAgentSession = spawn.default;
   });
@@ -224,7 +218,6 @@ describe('spawnCloudAgentSession delegation', () => {
     mockBuildGitLabCloneUrl.mockReturnValue('https://gitlab.com/group/repo.git');
     mockValidateGitLabRepoAccessForUser.mockResolvedValue(true);
     mockValidateGitLabRepoAccessForOrganization.mockResolvedValue(true);
-    mockGetGitLabProjectAccessForRequester.mockResolvedValue({ outcome: 'allowed' });
     mockGetBotUserId.mockResolvedValue('bot-user-1');
     mockLinkUploadedAttachmentsFn.mockResolvedValue(linkedAttachmentKeys);
     mockReleaseRefusedAttachmentsFn.mockResolvedValue(undefined);
@@ -523,153 +516,101 @@ describe('spawnCloudAgentSession delegation', () => {
     );
   });
 
-  it('refuses an organization GitLab project when the requesting account has no GitLab connection', async () => {
-    mockGetGitLabProjectAccessForRequester.mockResolvedValue({ outcome: 'refused' });
+  it('prepares an organization Slack GitLab session without a personal GitLab connection', async () => {
+    mockGetGitLabTokenForUser.mockResolvedValue(undefined);
 
     await expect(
       spawnCloudAgentSession(
         { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
         'model',
-        organizationIntegration,
+        { ...organizationIntegration, platform: 'slack' },
         'auth-token',
         'request-gitlab-no-identity',
         undefined,
-        { requesterUserId: 'user-9' }
+        { chatPlatform: 'slack', payerUserId: 'user-9', requesterUserId: 'user-9' }
       )
-    ).resolves.toEqual(
+    ).resolves.toEqual({
+      response:
+        'Cloud Agent session started. I will post the final result back in this thread when it completes.',
+      cloudAgentSessionId: 'cloud-session-1',
+      kiloSessionId: 'kilo-session-1',
+    });
+    expect(mockValidateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
+      'organization-1',
+      'bot-user-1',
+      'group/repo'
+    );
+    expect(mockGetGitLabTokenForOrganization).toHaveBeenCalledWith('organization-1', 'bot-user-1');
+    expect(mockGetGitLabTokenForUser).not.toHaveBeenCalled();
+    expect(mockGetGitLabInstanceUrlForUser).not.toHaveBeenCalled();
+    expect(mockValidateGitLabRepoAccessForUser).not.toHaveBeenCalled();
+    expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.objectContaining({
-        response: expect.stringContaining('not available through this account'),
+        gitUrl: 'https://gitlab.com/group/repo.git',
+        gitToken: 'gitlab-org-token',
+        platform: 'gitlab',
+        kilocodeOrganizationId: 'organization-1',
+        createdOnPlatform: 'slack',
       })
     );
-    expect(mockGetGitLabProjectAccessForRequester).toHaveBeenCalledWith('user-9', 'group/repo');
-    expect(mockValidateGitLabRepoAccessForOrganization).not.toHaveBeenCalled();
-    expect(mockGetGitLabTokenForOrganization).not.toHaveBeenCalled();
-    expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 
-  it('refuses an organization GitLab project the requesting account cannot reach', async () => {
-    mockGetGitLabProjectAccessForRequester.mockResolvedValue({ outcome: 'refused' });
+  it('rejects an organization Slack GitLab project outside the organization connection before prepare', async () => {
+    mockValidateGitLabRepoAccessForOrganization.mockResolvedValue(false);
+    mockGetGitLabTokenForUser.mockResolvedValue(undefined);
 
     await expect(
       spawnCloudAgentSession(
         { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
         'model',
-        organizationIntegration,
+        { ...organizationIntegration, platform: 'slack' },
         'auth-token',
-        'request-gitlab-requester-denied',
+        'request-gitlab-org-denied',
         undefined,
-        { requesterUserId: 'user-9' }
+        { chatPlatform: 'slack', payerUserId: 'user-9' }
       )
-    ).resolves.toEqual(
-      expect.objectContaining({
-        response: expect.stringContaining('not available through this account'),
-      })
+    ).resolves.toEqual({
+      response:
+        "Error: That GitLab project is not available through this account's GitLab integration.",
+    });
+    expect(mockValidateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
+      'organization-1',
+      'bot-user-1',
+      'group/repo'
     );
-    expect(mockValidateGitLabRepoAccessForOrganization).not.toHaveBeenCalled();
     expect(mockGetGitLabTokenForOrganization).not.toHaveBeenCalled();
+    expect(mockGetGitLabTokenForUser).not.toHaveBeenCalled();
+    expect(mockBuildGitLabCloneUrl).not.toHaveBeenCalled();
     expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 
-  it('returns the retry response and starts no session when the requester lookup fails transiently', async () => {
-    mockGetGitLabProjectAccessForRequester.mockRejectedValueOnce(new Error('gitlab unavailable'));
+  it.each(['provider unavailable', 'transport timeout'])(
+    'returns the retry response without preparing a session when the organization lookup fails: %s',
+    async message => {
+      mockValidateGitLabRepoAccessForOrganization.mockRejectedValueOnce(new Error(message));
 
-    await expect(
-      spawnCloudAgentSession(
-        { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
-        'model',
-        organizationIntegration,
-        'auth-token',
-        'request-gitlab-requester-lookup-failed',
-        undefined,
-        { requesterUserId: 'user-9' }
-      )
-    ).resolves.toEqual(
-      expect.objectContaining({
-        response: expect.stringContaining('Could not verify access'),
-      })
-    );
-    expect(mockValidateGitLabRepoAccessForOrganization).not.toHaveBeenCalled();
-    expect(mockPrepareSession).not.toHaveBeenCalled();
-    expect(mockGetGitLabTokenForOrganization).not.toHaveBeenCalled();
-  });
+      await expect(
+        spawnCloudAgentSession(
+          { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
+          'model',
+          organizationIntegration,
+          'auth-token',
+          'request-gitlab-org-lookup-failed'
+        )
+      ).resolves.toEqual({
+        response: 'Error: Could not verify access to that GitLab project. Please try again.',
+      });
+      expect(mockValidateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
+        'organization-1',
+        'bot-user-1',
+        'group/repo'
+      );
+      expect(mockPrepareSession).not.toHaveBeenCalled();
+      expect(mockGetGitLabTokenForOrganization).not.toHaveBeenCalled();
+    }
+  );
 
-  it('refuses an organization GitLab project when the requesting account sits on another GitLab instance', async () => {
-    mockGetGitLabInstanceUrlForUser.mockResolvedValue('https://gitlab.example.com/');
-    mockGetGitLabInstanceUrlForOrganization.mockResolvedValue('https://gitlab.com');
-
-    await expect(
-      spawnCloudAgentSession(
-        { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
-        'model',
-        organizationIntegration,
-        'auth-token',
-        'request-gitlab-instance-mismatch',
-        undefined,
-        { requesterUserId: 'user-9' }
-      )
-    ).resolves.toEqual(
-      expect.objectContaining({
-        response: expect.stringContaining('not available through this account'),
-      })
-    );
-    expect(mockGetGitLabProjectAccessForRequester).not.toHaveBeenCalled();
-    expect(mockValidateGitLabRepoAccessForOrganization).not.toHaveBeenCalled();
-    expect(mockPrepareSession).not.toHaveBeenCalled();
-  });
-
-  it('answers an invalid instance URL on the account connection with that connection', async () => {
-    mockGetGitLabInstanceUrlForUser.mockResolvedValue('http://gitlab.example.com');
-
-    const result = await spawnCloudAgentSession(
-      { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
-      'model',
-      organizationIntegration,
-      'auth-token',
-      'request-gitlab-invalid-instance',
-      undefined,
-      { requesterUserId: 'user-9' }
-    );
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        response: expect.stringContaining('GitLab connection on your account'),
-      })
-    );
-    expect(result.response).toContain('invalid instance URL');
-    expect(result.response).not.toContain('Please try again');
-    expect(mockGetGitLabProjectAccessForRequester).not.toHaveBeenCalled();
-    expect(mockValidateGitLabRepoAccessForOrganization).not.toHaveBeenCalled();
-    expect(mockPrepareSession).not.toHaveBeenCalled();
-    expect(mockGetGitLabTokenForOrganization).not.toHaveBeenCalled();
-  });
-
-  it('answers an invalid instance URL on the integration connection with that connection', async () => {
-    mockGetGitLabInstanceUrlForUser.mockResolvedValue('https://gitlab.com');
-    mockGetGitLabInstanceUrlForOrganization.mockResolvedValue('http://gitlab.example.com');
-
-    const result = await spawnCloudAgentSession(
-      { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
-      'model',
-      organizationIntegration,
-      'auth-token',
-      'request-gitlab-invalid-integration-instance',
-      undefined,
-      { requesterUserId: 'user-9' }
-    );
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        response: expect.stringContaining("integration's GitLab connection"),
-      })
-    );
-    expect(result.response).toContain('invalid instance URL');
-    expect(result.response).not.toContain('Please try again');
-    expect(mockGetGitLabProjectAccessForRequester).not.toHaveBeenCalled();
-    expect(mockValidateGitLabRepoAccessForOrganization).not.toHaveBeenCalled();
-    expect(mockPrepareSession).not.toHaveBeenCalled();
-  });
-
-  it('refuses an organization GitLab project for a run with no requesting account', async () => {
+  it('prepares an organization GitLab project for a run with no requesting account', async () => {
     await expect(
       spawnCloudAgentSession(
         { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
@@ -678,15 +619,15 @@ describe('spawnCloudAgentSession delegation', () => {
         'auth-token',
         'request-gitlab-org-no-requester'
       )
-    ).resolves.toEqual(
-      expect.objectContaining({
-        response: expect.stringContaining('not available through this account'),
-      })
+    ).resolves.toEqual(expect.objectContaining({ cloudAgentSessionId: 'cloud-session-1' }));
+    expect(mockValidateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
+      'organization-1',
+      'bot-user-1',
+      'group/repo'
     );
-    expect(mockGetGitLabProjectAccessForRequester).not.toHaveBeenCalled();
-    expect(mockValidateGitLabRepoAccessForOrganization).not.toHaveBeenCalled();
-    expect(mockGetGitLabTokenForOrganization).not.toHaveBeenCalled();
-    expect(mockPrepareSession).not.toHaveBeenCalled();
+    expect(mockGetGitLabTokenForUser).not.toHaveBeenCalled();
+    expect(mockGetGitLabInstanceUrlForUser).not.toHaveBeenCalled();
+    expect(mockPrepareSession).toHaveBeenCalled();
   });
 
   it('prepares no session when the project lookup fails', async () => {

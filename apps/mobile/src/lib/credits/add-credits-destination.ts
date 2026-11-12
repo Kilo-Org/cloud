@@ -25,6 +25,22 @@ export function organizationBillingUrl(organizationId: string): string {
 }
 
 /**
+ * The Add credits destination of the balance a session or chat spends.
+ *
+ * A surface that records the organization paying for it settles a refusal on
+ * that organization's own page; a surface with none spends the person's own
+ * balance and keeps the in-app purchase screen.
+ */
+export function addCreditsDestinationFor(
+  organizationId: string | undefined,
+  inApp: () => void
+): AddCreditsDestination {
+  return organizationId === undefined
+    ? { kind: 'inApp', onPress: inApp }
+    : { kind: 'organization', url: organizationBillingUrl(organizationId) };
+}
+
+/**
  * The Add credits destination of the balance a chat's place spends.
  *
  * An organization's chat draws on that organization's balance, so a refusal
@@ -39,9 +55,10 @@ export function addCreditsDestinationOf(
   if (place === null) {
     return undefined;
   }
-  return place.org.kind === 'organization'
-    ? { kind: 'organization', url: organizationBillingUrl(place.org.id) }
-    : { kind: 'inApp', onPress: inApp };
+  return addCreditsDestinationFor(
+    place.org.kind === 'organization' ? place.org.id : undefined,
+    inApp
+  );
 }
 
 /**

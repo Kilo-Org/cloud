@@ -38,7 +38,7 @@ import {
 import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
-import { type AddCreditsDestination } from '@/lib/credits/add-credits-destination';
+import { addCreditsDestinationFor } from '@/lib/credits/add-credits-destination';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { MessageErrorBoundary } from '@/components/agents/message-error-boundary';
@@ -1384,12 +1384,12 @@ export function SessionDetailContent({
   }, []);
 
   // One destination object for every row: a fresh one per render would
-  // re-create each memoized row's props. A session's credit refusals are
-  // settled on the in-app purchase screen, which is the balance this surface
-  // has always offered.
-  const addCredits = useMemo<AddCreditsDestination>(
-    () => ({ kind: 'inApp', onPress: handleAddCredits }),
-    [handleAddCredits]
+  // re-create each memoized row's props. The session records the balance that
+  // pays for it, so an organization's session is settled on that organization's
+  // billing page and a personal one on the in-app purchase screen.
+  const addCredits = useMemo(
+    () => addCreditsDestinationFor(organizationId, handleAddCredits),
+    [handleAddCredits, organizationId]
   );
 
   const handleRetryMessage = useCallback(

@@ -621,6 +621,7 @@ describe('POST /api/exa/[...path]', () => {
             type: 'database',
             code: '23505',
           },
+          fallback: 'disabled',
         }
       );
       expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);

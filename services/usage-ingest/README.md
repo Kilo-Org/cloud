@@ -645,6 +645,37 @@ Human-only steps, before the flag is turned on:
 - confirm the existing DLQ alerting covers it;
 - set the flag on `kilocode-ai-gateway` and redeploy.
 
+## Exa usage fallback
+
+The `kilocode-app` Exa route keeps its direct write. Only when the direct write of
+a valid record fails (stage `record_write`, never `cost_parse`) and
+`EXA_USAGE_QUEUE_FALLBACK=true` does it send that same record, with the same `id`,
+`occurredAt`, payer and cost, once to `EXA_USAGE_INGEST_URL` (the `/exa-usage`
+endpoint) with `EXA_USAGE_INGEST_PUBLISH_SECRET`, bounded at 10 seconds. A
+successful direct write never publishes, the publish is not retried, and the direct
+write is never repeated after a publish attempt. If the failed direct write had
+actually committed (for example a post-commit error), the queued copy is answered
+`duplicate` and debits nothing more. The outcome is the `fallback` field on the
+existing `[exa] usage record failed` line: `disabled`, `not_configured`,
+`invalid_record`, `published`, `rejected` (HTTP 400, terminal), `http_error` (with
+`fallback_status`), `timeout` or `request_failed` (both with the caught error's
+name as `fallback_error`, never its message). Only `published` means the copy
+reached the queue; a `timeout` copy may or may not have been queued.
+
+Deploy order: the consumer that routes tagged Exa messages first, then the
+`/exa-usage` ingress (after `USAGE_INGEST_EXA_PUBLISH_SECRET` is set on the Worker),
+then the Exa route with its flag off. Never roll the consumer back to a version
+without Exa routing while Exa messages may be in flight or retrying; they would
+fail every retry and reach the DLQ. To stop new fallback copies, turn the flag off
+and let the consumer drain.
+
+Human-only steps before the flag is turned on:
+
+- set `USAGE_INGEST_EXA_PUBLISH_SECRET` on this Worker and the matching
+  `EXA_USAGE_INGEST_PUBLISH_SECRET`, plus `EXA_USAGE_INGEST_URL`, on `kilocode-app`;
+- name a replay owner for the mixed DLQ, with a replay that handles every kind;
+- confirm that the existing DLQ alerting covers it.
+
 ## Retention
 
 Each selected DLQ keeps messages for **14 days (1209600 seconds)**, Cloudflare's

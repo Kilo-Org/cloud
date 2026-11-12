@@ -74,6 +74,9 @@ export const CLOUD_AGENT_DISPATCH_HEALTH_SECRET = getEnvVariable(
 export const USAGE_INGEST_URL = getEnvVariable('USAGE_INGEST_URL');
 export const USAGE_INGEST_PUBLISH_SECRET = getEnvVariable('USAGE_INGEST_PUBLISH_SECRET');
 export const ENKRYPT_USAGE_QUEUE_ENABLED = getEnvVariable('ENKRYPT_USAGE_QUEUE_ENABLED') === 'true';
+export const EXA_USAGE_QUEUE_FALLBACK = getEnvVariable('EXA_USAGE_QUEUE_FALLBACK');
+export const EXA_USAGE_INGEST_URL = getEnvVariable('EXA_USAGE_INGEST_URL');
+export const EXA_USAGE_INGEST_PUBLISH_SECRET = getEnvVariable('EXA_USAGE_INGEST_PUBLISH_SECRET');
 
 // Shared secret with the MCP catalog CI job
 // (.github/workflows/kilo-mcp-catalog.yml). It authenticates only the mint in

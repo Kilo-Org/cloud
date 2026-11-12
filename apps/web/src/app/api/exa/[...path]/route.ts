@@ -16,10 +16,12 @@ import { captureException } from '@sentry/nextjs';
 import { describeDatabaseError } from '@kilocode/web-shared/lib/ai-gateway/usage-record-diagnostics';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { buildExaUsageRecord } from '@/lib/exa-usage-record';
+import { publishExaUsageFallback } from '@/lib/exa-usage-fallback';
 import {
   EXA_ALLOWED_PATHS,
   isExaAllowedPath,
   type ExaAllowedPath,
+  type ExaUsageRecord,
 } from '@kilocode/usage-contracts';
 import { z } from 'zod';
 
@@ -135,25 +137,25 @@ export async function POST(request: NextRequest) {
     }
 
     let costMicrodollars: number | undefined;
+    let record: ExaUsageRecord | undefined;
     try {
       const body: unknown = await cloned.json();
       costMicrodollars = extractCostMicrodollars(body);
       if (costMicrodollars === undefined) return;
 
-      await recordExaUsage(
-        buildExaUsageRecord({
-          id: usageId,
-          occurredAt,
-          userId: user.id,
-          organizationId,
-          path: exaPath,
-          costMicrodollars,
-          chargedToBalance: isPaidRequest,
-          freeAllowanceMicrodollars: allowance,
-          featureId,
-          type,
-        })
-      );
+      record = buildExaUsageRecord({
+        id: usageId,
+        occurredAt,
+        userId: user.id,
+        organizationId,
+        path: exaPath,
+        costMicrodollars,
+        chargedToBalance: isPaidRequest,
+        freeAllowanceMicrodollars: allowance,
+        featureId,
+        type,
+      });
+      await recordExaUsage(record);
     } catch (error) {
       captureException(error, {
         tags: {
@@ -165,6 +167,10 @@ export async function POST(request: NextRequest) {
           responseStatus: response.status,
         },
       });
+      // Only a built record whose direct write failed gets one queued copy, and the direct
+      // write is not repeated after it. `publishExaUsageFallback` reports every failure as
+      // an outcome rather than throwing.
+      const fallback = record === undefined ? undefined : await publishExaUsageFallback(record);
       const described = describeDatabaseError(error);
       const code =
         described.code !== null && /^[0-9A-Z]{5}$/.test(described.code) ? described.code : null;
@@ -185,6 +191,7 @@ export async function POST(request: NextRequest) {
                       : 'unknown',
               }
             : { type: 'database', code },
+        ...fallback,
       });
     }
   });

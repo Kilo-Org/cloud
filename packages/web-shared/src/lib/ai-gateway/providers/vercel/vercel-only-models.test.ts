@@ -4,10 +4,8 @@ import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/org
 import { getVercelModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
 import { getVercelModelIdOverrides } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import {
-  findVercelOnlyModels,
-  getVercelOnlyCatalogModels,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
+import { findVercelOnlyModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
+import { getVercelOnlyCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
 import { VercelModelSchema } from '@kilocode/db/schema-types';
 import type * as GatewayModelsCacheModule from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type * as MapModelIdToVercelModule from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
@@ -220,16 +218,6 @@ describe('getVercelOnlyCatalogModels', () => {
       context_length: 256_000,
       supported_parameters: ['max_tokens', 'tools', 'reasoning'],
       expiration_date: undefined,
-      opencode: {
-        ai_sdk_provider: undefined,
-        reasoning_options: [{ type: 'toggle' }, { type: 'effort', values: ['low', 'high'] }],
-        variants: {
-          none: { reasoning: { enabled: false, effort: 'none' } },
-          low: { reasoning: { enabled: true, effort: 'low' } },
-          high: { reasoning: { enabled: true, effort: 'high' } },
-        },
-        prompt: undefined,
-      },
     });
     expect(models[1]).toMatchObject({
       id: 'reflection/beam-free',
@@ -242,7 +230,6 @@ describe('getVercelOnlyCatalogModels', () => {
       created: 1_755_815_280,
       pricing: { prompt: '0.0000025', completion: '0.00002', input_cache_write: '0.000003' },
       expiration_date: '2027-01-15',
-      opencode: undefined,
     });
   });
 

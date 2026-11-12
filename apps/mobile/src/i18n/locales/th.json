@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ไม่สามารถเปิดผลการค้นหานี้ได้"
+  },
+  "sessionShare": {
+    "title": "แชร์เซสชัน",
+    "subtitle": "ทุกคนที่มีลิงก์จะอ่านเซสชันนี้ได้.",
+    "durationLabel": "ระยะเวลาของลิงก์",
+    "duration1h": "1 ชม.",
+    "duration1d": "1 วัน",
+    "duration7d": "7 วัน",
+    "duration30d": "30 วัน",
+    "durationForever": "ไม่หมดอายุ",
+    "includeNewMessages": "รวมข้อความใหม่",
+    "includeNewMessagesOn": "ทุกคนที่มีลิงก์นี้จะอ่านข้อความที่เพิ่มภายหลังได้ด้วย.",
+    "includeNewMessagesOff": "ลิงก์จะมีเฉพาะข้อความที่ได้รับก่อนที่คุณสร้างลิงก์.",
+    "create": "สร้างลิงก์",
+    "createFailed": "สร้างลิงก์ไม่สำเร็จ.",
+    "existingTitle": "ลิงก์ที่มีอยู่",
+    "existingDescription": "เซสชันนี้มีลิงก์แชร์อยู่แล้ว การสร้างลิงก์ใหม่จะแทนที่ลิงก์เดิมและทำให้ลิงก์เก่าใช้งานไม่ได้อีก.",
+    "rotate": "สร้างลิงก์ใหม่",
+    "revoke": "เพิกถอนลิงก์",
+    "revokeTitle": "เพิกถอนลิงก์ไหม?",
+    "revokeMessage": "ลิงก์ปัจจุบันจะใช้งานไม่ได้ทันที.",
+    "revokeFailed": "เพิกถอนลิงก์ไม่สำเร็จ.",
+    "expiresIn": "หมดอายุใน {{duration}}",
+    "neverExpires": "ไม่มีวันหมดอายุ",
+    "includesNewMessages": "รวมข้อความใหม่ด้วย.",
+    "excludesNewMessages": "ไม่รวมข้อความใหม่."
+  },
+  "sharedSession": {
+    "title": "เซสชันที่แชร์",
+    "someone": "ใครบางคน",
+    "sharedBy": "แชร์โดย {{owner}}",
+    "unavailableTitle": "ลิงก์ใช้งานไม่ได้",
+    "unavailableDescription": "ลิงก์แชร์นี้หมดอายุหรือถูกเพิกถอนแล้ว.",
+    "transcriptUnavailableTitle": "โหลดบันทึกการสนทนานี้ไม่ได้",
+    "transcriptUnavailableDescription": "ลิงก์ยังใช้งานได้ โปรดลองอีกครั้งในอีกสักครู่."
   }
 }

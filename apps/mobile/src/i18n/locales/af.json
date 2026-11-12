@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Kon nie hierdie soektogresultaat oopmaak nie"
+  },
+  "sessionShare": {
+    "title": "Deel sessie",
+    "subtitle": "Enigiemand met die skakel kan hierdie sessie lees.",
+    "durationLabel": "Skakelduur",
+    "duration1h": "1 u",
+    "duration1d": "1 d",
+    "duration7d": "7 d",
+    "duration30d": "30 d",
+    "durationForever": "Nooit",
+    "includeNewMessages": "Sluit nuwe boodskappe in",
+    "includeNewMessagesOn": "Enigiemand met hierdie skakel lees ook boodskappe wat later bygevoeg word.",
+    "includeNewMessagesOff": "Die skakel sluit slegs boodskappe in wat ontvang is voordat jy dit skep.",
+    "create": "Skep skakel",
+    "createFailed": "Kon nie die skakel skep nie.",
+    "existingTitle": "Bestaande skakel",
+    "existingDescription": "Hierdie sessie het reeds 'n deelskakel. As jy 'n nuwe een skep, word dit vervang en werk die ou skakel nie meer nie.",
+    "rotate": "Skep 'n nuwe skakel",
+    "revoke": "Herroep skakel",
+    "revokeTitle": "Herroep skakel?",
+    "revokeMessage": "Die huidige skakel hou onmiddellik op werk.",
+    "revokeFailed": "Kon nie die skakel herroep nie.",
+    "expiresIn": "Verval oor {{duration}}",
+    "neverExpires": "Verval nooit",
+    "includesNewMessages": "Nuwe boodskappe is ingesluit.",
+    "excludesNewMessages": "Nuwe boodskappe is uitgesluit."
+  },
+  "sharedSession": {
+    "title": "Gedeelde sessie",
+    "someone": "Iemand",
+    "sharedBy": "Gedeel deur {{owner}}",
+    "unavailableTitle": "Skakel nie beskikbaar nie",
+    "unavailableDescription": "Hierdie deelskakel het verval of is herroep.",
+    "transcriptUnavailableTitle": "Kon nie hierdie transkrip laai nie",
+    "transcriptUnavailableDescription": "Die skakel werk steeds. Probeer weer oor 'n oomblik."
   }
 }

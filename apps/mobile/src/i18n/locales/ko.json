@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "이 검색 결과를 열지 못했습니다"
+  },
+  "sessionShare": {
+    "title": "세션 공유",
+    "subtitle": "링크가 있는 사람은 누구나 이 세션을 볼 수 있습니다.",
+    "durationLabel": "링크 유효 기간",
+    "duration1h": "1시간",
+    "duration1d": "1일",
+    "duration7d": "7일",
+    "duration30d": "30일",
+    "durationForever": "무기한",
+    "includeNewMessages": "새 메시지 포함",
+    "includeNewMessagesOn": "이 링크가 있는 사람은 나중에 추가된 메시지도 볼 수 있습니다.",
+    "includeNewMessagesOff": "링크에는 링크를 만들기 전에 받은 메시지만 포함됩니다.",
+    "create": "링크 만들기",
+    "createFailed": "링크를 만들 수 없습니다.",
+    "existingTitle": "기존 링크",
+    "existingDescription": "이 세션에는 이미 공유 링크가 있습니다. 새 링크를 만들면 기존 링크가 대체되며 더 이상 작동하지 않습니다.",
+    "rotate": "새 링크 만들기",
+    "revoke": "링크 취소",
+    "revokeTitle": "링크를 취소하시겠습니까?",
+    "revokeMessage": "현재 링크가 즉시 작동을 멈춥니다.",
+    "revokeFailed": "링크를 취소할 수 없습니다.",
+    "expiresIn": "{{duration}} 후 만료",
+    "neverExpires": "만료 없음",
+    "includesNewMessages": "새 메시지가 포함됩니다.",
+    "excludesNewMessages": "새 메시지는 포함되지 않습니다."
+  },
+  "sharedSession": {
+    "title": "공유된 세션",
+    "someone": "알 수 없는 사용자",
+    "sharedBy": "공유자: {{owner}}",
+    "unavailableTitle": "링크를 사용할 수 없음",
+    "unavailableDescription": "이 공유 링크는 만료되었거나 취소되었습니다.",
+    "transcriptUnavailableTitle": "대화 기록을 불러올 수 없음",
+    "transcriptUnavailableDescription": "링크는 아직 유효합니다. 잠시 후 다시 시도하세요."
   }
 }

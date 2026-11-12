@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Natiijadan raadinta lama furi karin"
+  },
+  "sessionShare": {
+    "title": "Wadaag fadhiga",
+    "subtitle": "Qof kasta oo haysta xiriirka wuu akhrin karaa fadhigan.",
+    "durationLabel": "Muddada xiriirka",
+    "duration1h": "1 saac",
+    "duration1d": "1 maalin",
+    "duration7d": "7 maalmood",
+    "duration30d": "30 maalmood",
+    "durationForever": "Marnaba",
+    "includeNewMessages": "Ku dar fariimaha cusub",
+    "includeNewMessagesOn": "Qof kasta oo haysta xiriirkan wuxuu sidoo kale akhrin karaa fariimaha la soo daro hadhow.",
+    "includeNewMessagesOff": "Xiriirku wuxuu ka kooban yahay oo keliya fariimaha la helay ka hor intaadan samayn.",
+    "create": "Samee xiriir",
+    "createFailed": "Xiriirka lama samayn karin.",
+    "existingTitle": "Xiriirka jira",
+    "existingDescription": "Fadhigan wuxuu horay u leeyahay xiriir wadaag. Samaynta mid cusub ayaa beddelaysa oo xiriirkii hore ka joojinaysa shaqaynta.",
+    "rotate": "Samee xiriir cusub",
+    "revoke": "Baaji xiriirka",
+    "revokeTitle": "Baaji xiriirka?",
+    "revokeMessage": "Xiriirka hadda jira isla markiiba wuu joojinayaa shaqaynta.",
+    "revokeFailed": "Xiriirka lama baajin karin.",
+    "expiresIn": "Wuxuu dhacayaa {{duration}} gudahood",
+    "neverExpires": "Marnaba ma dhaco",
+    "includesNewMessages": "Fariimaha cusub waa lagu daray.",
+    "excludesNewMessages": "Fariimaha cusub lagama darin."
+  },
+  "sharedSession": {
+    "title": "Fadhi la wadaagay",
+    "someone": "Qof",
+    "sharedBy": "Waxaa wadaagay {{owner}}",
+    "unavailableTitle": "Xiriirka lama heli karo",
+    "unavailableDescription": "Xiriirkan wadaagga wuu dhacay ama waa la baajiyay.",
+    "transcriptUnavailableTitle": "Qoraalkan lama soo dejin karin",
+    "transcriptUnavailableDescription": "Xiriirku weli wuu shaqaynayaa. Isku day mar kale wax yar kadib."
   }
 }

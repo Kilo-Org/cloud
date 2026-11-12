@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "આ શોધ પરિણામ ખોલી શકાયું નહીં"
+  },
+  "sessionShare": {
+    "title": "સત્ર શેર કરો",
+    "subtitle": "લિંક ધરાવનાર કોઈપણ વ્યક્તિ આ સત્ર વાંચી શકે છે.",
+    "durationLabel": "લિંકની અવધિ",
+    "duration1h": "1 ક.",
+    "duration1d": "1 દિ.",
+    "duration7d": "7 દિ.",
+    "duration30d": "30 દિ.",
+    "durationForever": "ક્યારેય નહીં",
+    "includeNewMessages": "નવા સંદેશા શામેલ કરો",
+    "includeNewMessagesOn": "આ લિંક ધરાવનાર કોઈપણ વ્યક્તિ પછીથી ઉમેરાયેલા સંદેશા પણ વાંચી શકે છે.",
+    "includeNewMessagesOff": "લિંકમાં ફક્ત તમે તેને બનાવો તે પહેલાં પ્રાપ્ત થયેલા સંદેશા જ શામેલ છે.",
+    "create": "લિંક બનાવો",
+    "createFailed": "લિંક બનાવી શકાઈ નથી.",
+    "existingTitle": "હાલની લિંક",
+    "existingDescription": "આ સત્ર માટે પહેલેથી જ શેર લિંક છે. નવી લિંક બનાવવાથી તે બદલાઈ જશે અને જૂની લિંક કામ કરવાનું બંધ કરશે.",
+    "rotate": "નવી લિંક બનાવો",
+    "revoke": "લિંક રદ કરો",
+    "revokeTitle": "લિંક રદ કરવી છે?",
+    "revokeMessage": "વર્તમાન લિંક તરત જ કામ કરવાનું બંધ કરશે.",
+    "revokeFailed": "લિંક રદ કરી શકાઈ નથી.",
+    "expiresIn": "{{duration}} માં સમાપ્ત થશે",
+    "neverExpires": "ક્યારેય સમાપ્ત થતી નથી",
+    "includesNewMessages": "નવા સંદેશા શામેલ છે.",
+    "excludesNewMessages": "નવા સંદેશા શામેલ નથી."
+  },
+  "sharedSession": {
+    "title": "શેર કરેલું સત્ર",
+    "someone": "કોઈક",
+    "sharedBy": "{{owner}} દ્વારા શેર કરેલું",
+    "unavailableTitle": "લિંક ઉપલબ્ધ નથી",
+    "unavailableDescription": "આ શેર લિંકની સમયસીમા સમાપ્ત થઈ ગઈ છે અથવા તેને રદ કરવામાં આવી છે.",
+    "transcriptUnavailableTitle": "આ ટ્રાન્સક્રિપ્ટ લોડ કરી શકાઈ નથી",
+    "transcriptUnavailableDescription": "લિંક હજી પણ કામ કરે છે. થોડી વાર પછી ફરી પ્રયાસ કરો."
   }
 }

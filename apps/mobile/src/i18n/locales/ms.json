@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tidak dapat membuka hasil carian ini"
+  },
+  "sessionShare": {
+    "title": "Kongsi sesi",
+    "subtitle": "Sesiapa yang mempunyai pautan ini boleh membaca sesi ini.",
+    "durationLabel": "Tempoh pautan",
+    "duration1h": "1j",
+    "duration1d": "1h",
+    "duration7d": "7h",
+    "duration30d": "30h",
+    "durationForever": "Tiada had",
+    "includeNewMessages": "Sertakan mesej baharu",
+    "includeNewMessagesOn": "Sesiapa yang mempunyai pautan ini juga boleh membaca mesej yang ditambah kemudian.",
+    "includeNewMessagesOff": "Pautan ini hanya merangkumi mesej yang diterima sebelum anda menciptanya.",
+    "create": "Cipta pautan",
+    "createFailed": "Tidak dapat mencipta pautan.",
+    "existingTitle": "Pautan sedia ada",
+    "existingDescription": "Sesi ini sudah mempunyai pautan kongsi. Mencipta pautan baharu akan menggantikannya dan pautan lama tidak akan berfungsi lagi.",
+    "rotate": "Cipta pautan baharu",
+    "revoke": "Batalkan pautan",
+    "revokeTitle": "Batalkan pautan?",
+    "revokeMessage": "Pautan semasa akan berhenti berfungsi serta-merta.",
+    "revokeFailed": "Tidak dapat membatalkan pautan.",
+    "expiresIn": "Tamat tempoh dalam {{duration}}",
+    "neverExpires": "Tidak akan tamat tempoh",
+    "includesNewMessages": "Mesej baharu disertakan.",
+    "excludesNewMessages": "Mesej baharu tidak disertakan."
+  },
+  "sharedSession": {
+    "title": "Sesi dikongsi",
+    "someone": "Seseorang",
+    "sharedBy": "Dikongsi oleh {{owner}}",
+    "unavailableTitle": "Pautan tidak tersedia",
+    "unavailableDescription": "Pautan kongsi ini telah tamat tempoh atau dibatalkan.",
+    "transcriptUnavailableTitle": "Tidak dapat memuatkan transkrip ini",
+    "transcriptUnavailableDescription": "Pautan ini masih berfungsi. Cuba lagi sebentar lagi."
   }
 }

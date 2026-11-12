@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Otsingutulemust ei õnnestunud avada"
+  },
+  "sessionShare": {
+    "title": "Jaga seanssi",
+    "subtitle": "Kõik, kellel on link, saavad seda seanssi lugeda.",
+    "durationLabel": "Lingi kehtivus",
+    "duration1h": "1 t",
+    "duration1d": "1 p",
+    "duration7d": "7 p",
+    "duration30d": "30 p",
+    "durationForever": "Ei aegu",
+    "includeNewMessages": "Kaasa uued sõnumid",
+    "includeNewMessagesOn": "Kõik, kellel on see link, näevad ka hiljem lisatud sõnumeid.",
+    "includeNewMessagesOff": "Link sisaldab ainult sõnumeid, mis saabusid enne lingi loomist.",
+    "create": "Loo link",
+    "createFailed": "Linki ei õnnestunud luua.",
+    "existingTitle": "Olemasolev link",
+    "existingDescription": "Sellel seansil on juba jagamislink. Uue lingi loomine asendab selle ja vana link lakkab töötamast.",
+    "rotate": "Loo uus link",
+    "revoke": "Tühista link",
+    "revokeTitle": "Kas tühistada link?",
+    "revokeMessage": "Praegune link lakkab kohe töötamast.",
+    "revokeFailed": "Linki ei õnnestunud tühistada.",
+    "expiresIn": "Kehtib veel {{duration}}",
+    "neverExpires": "Ei aegu",
+    "includesNewMessages": "Uued sõnumid on kaasatud.",
+    "excludesNewMessages": "Uued sõnumid ei ole kaasatud."
+  },
+  "sharedSession": {
+    "title": "Jagatud seanss",
+    "someone": "Keegi",
+    "sharedBy": "Jagas {{owner}}",
+    "unavailableTitle": "Link pole saadaval",
+    "unavailableDescription": "See jagamislink on aegunud või tühistatud.",
+    "transcriptUnavailableTitle": "Seda transkripti ei õnnestunud laadida",
+    "transcriptUnavailableDescription": "Link töötab endiselt. Proovi hetke pärast uuesti."
   }
 }

@@ -3978,5 +3978,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Impossible d'ouvrir ce résultat de recherche"
+  },
+  "sessionShare": {
+    "title": "Partager la session",
+    "subtitle": "Toute personne disposant du lien peut lire cette session.",
+    "durationLabel": "Durée du lien",
+    "duration1h": "1 h",
+    "duration1d": "1 j",
+    "duration7d": "7 j",
+    "duration30d": "30 j",
+    "durationForever": "Jamais",
+    "includeNewMessages": "Inclure les nouveaux messages",
+    "includeNewMessagesOn": "Toute personne disposant de ce lien peut aussi lire les messages ajoutés ultérieurement.",
+    "includeNewMessagesOff": "Le lien n’inclut que les messages reçus avant sa création.",
+    "create": "Créer le lien",
+    "createFailed": "Impossible de créer le lien.",
+    "existingTitle": "Lien existant",
+    "existingDescription": "Cette session a déjà un lien de partage. En créer un nouveau le remplace et désactive l’ancien lien.",
+    "rotate": "Créer un nouveau lien",
+    "revoke": "Révoquer le lien",
+    "revokeTitle": "Révoquer le lien ?",
+    "revokeMessage": "Le lien actuel cesse immédiatement de fonctionner.",
+    "revokeFailed": "Impossible de révoquer le lien.",
+    "expiresIn": "Expire dans {{duration}}",
+    "neverExpires": "N’expire jamais",
+    "includesNewMessages": "Les nouveaux messages sont inclus.",
+    "excludesNewMessages": "Les nouveaux messages sont exclus."
+  },
+  "sharedSession": {
+    "title": "Session partagée",
+    "someone": "Quelqu’un",
+    "sharedBy": "Partagée par {{owner}}",
+    "unavailableTitle": "Lien indisponible",
+    "unavailableDescription": "Ce lien de partage a expiré ou a été révoqué.",
+    "transcriptUnavailableTitle": "Impossible de charger cette transcription",
+    "transcriptUnavailableDescription": "Le lien fonctionne toujours. Réessayez dans un instant."
   }
 }

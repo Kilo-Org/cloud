@@ -4108,5 +4108,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Níorbh fhéidir an toradh cuardaigh seo a oscailt"
+  },
+  "sessionShare": {
+    "title": "Comhroinn seisiún",
+    "subtitle": "Is féidir le duine ar bith a bhfuil an nasc aige an seisiún seo a léamh.",
+    "durationLabel": "Fad an naisc",
+    "duration1h": "1u",
+    "duration1d": "1l",
+    "duration7d": "7l",
+    "duration30d": "30l",
+    "durationForever": "Choíche",
+    "includeNewMessages": "Cuir teachtaireachtaí nua san áireamh",
+    "includeNewMessagesOn": "Léann duine ar bith a bhfuil an nasc seo aige teachtaireachtaí a chuirtear leis níos déanaí freisin.",
+    "includeNewMessagesOff": "Ní chuimsíonn an nasc ach teachtaireachtaí a fuarthas sula gcruthaíonn tú é.",
+    "create": "Cruthaigh nasc",
+    "createFailed": "Níorbh fhéidir an nasc a chruthú.",
+    "existingTitle": "Nasc atá ann cheana",
+    "existingDescription": "Tá nasc comhroinnte ag an seisiún seo cheana. Má chruthaíonn tú ceann nua, tiocfaidh sé in áit an chinn atá ann agus ní oibreoidh an seannasc a thuilleadh.",
+    "rotate": "Cruthaigh nasc nua",
+    "revoke": "Cúlghair nasc",
+    "revokeTitle": "An nasc a chúlghairm?",
+    "revokeMessage": "Stopfaidh an nasc reatha ag obair láithreach.",
+    "revokeFailed": "Níorbh fhéidir an nasc a chúlghairm.",
+    "expiresIn": "Rachaidh in éag i gceann {{duration}}",
+    "neverExpires": "Ní rachaidh in éag go deo",
+    "includesNewMessages": "Tá teachtaireachtaí nua san áireamh.",
+    "excludesNewMessages": "Níl teachtaireachtaí nua san áireamh."
+  },
+  "sharedSession": {
+    "title": "Seisiún comhroinnte",
+    "someone": "Duine éigin",
+    "sharedBy": "Comhroinnte ag {{owner}}",
+    "unavailableTitle": "Níl an nasc ar fáil",
+    "unavailableDescription": "Chuaigh an nasc comhroinnte seo in éag nó cúlghaireadh é.",
+    "transcriptUnavailableTitle": "Níorbh fhéidir an tras-scríbhinn seo a lódáil",
+    "transcriptUnavailableDescription": "Tá an nasc fós ag obair. Bain triail eile as ar ball beag."
   }
 }

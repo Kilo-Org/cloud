@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ამ ძიების შედეგის გახსნა ვერ მოხერხდა"
+  },
+  "sessionShare": {
+    "title": "სესიის გაზიარება",
+    "subtitle": "ბმულის მქონე ნებისმიერ ადამიანს შეუძლია ამ სესიის წაკითხვა.",
+    "durationLabel": "ბმულის ვადა",
+    "duration1h": "1 სთ",
+    "duration1d": "1 დღე",
+    "duration7d": "7 დღე",
+    "duration30d": "30 დღე",
+    "durationForever": "უვადო",
+    "includeNewMessages": "ახალი შეტყობინებების ჩართვა",
+    "includeNewMessagesOn": "ამ ბმულის მქონე ნებისმიერი ადამიანი მოგვიანებით დამატებულ შეტყობინებებსაც წაიკითხავს.",
+    "includeNewMessagesOff": "ბმული მოიცავს მხოლოდ იმ შეტყობინებებს, რომლებიც მის შექმნამდე იქნა მიღებული.",
+    "create": "ბმულის შექმნა",
+    "createFailed": "ბმულის შექმნა ვერ მოხერხდა.",
+    "existingTitle": "არსებული ბმული",
+    "existingDescription": "ამ სესიას უკვე აქვს გაზიარების ბმული. ახლის შექმნა მას ჩაანაცვლებს და ძველი ბმული აღარ იმუშავებს.",
+    "rotate": "ახალი ბმულის შექმნა",
+    "revoke": "ბმულის გაუქმება",
+    "revokeTitle": "გაუქმდეს ბმული?",
+    "revokeMessage": "მიმდინარე ბმული დაუყოვნებლივ შეწყვეტს მუშაობას.",
+    "revokeFailed": "ბმულის გაუქმება ვერ მოხერხდა.",
+    "expiresIn": "ვადის ამოწურვამდე: {{duration}}",
+    "neverExpires": "უვადო",
+    "includesNewMessages": "ახალი შეტყობინებები ჩართულია.",
+    "excludesNewMessages": "ახალი შეტყობინებები არ არის ჩართული."
+  },
+  "sharedSession": {
+    "title": "გაზიარებული სესია",
+    "someone": "ვიღაც",
+    "sharedBy": "გამზიარებელი: {{owner}}",
+    "unavailableTitle": "ბმული მიუწვდომელია",
+    "unavailableDescription": "ამ გაზიარების ბმულს ვადა გაუვიდა ან გაუქმებულია.",
+    "transcriptUnavailableTitle": "ტრანსკრიპტის ჩატვირთვა ვერ მოხერხდა",
+    "transcriptUnavailableDescription": "ბმული ისევ მუშაობს. ცოტა ხანში სცადეთ ხელახლა."
   }
 }

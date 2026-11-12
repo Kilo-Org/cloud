@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Не успеа отворањето на овој резултат од пребарувањето"
+  },
+  "sessionShare": {
+    "title": "Сподели сесија",
+    "subtitle": "Секој што ја има врската може да ја чита оваа сесија.",
+    "durationLabel": "Траење на врската",
+    "duration1h": "1 ч",
+    "duration1d": "1 д",
+    "duration7d": "7 д",
+    "duration30d": "30 д",
+    "durationForever": "Никогаш",
+    "includeNewMessages": "Вклучи нови пораки",
+    "includeNewMessagesOn": "Секој што ја има оваа врска ќе ги чита и пораките додадени подоцна.",
+    "includeNewMessagesOff": "Врската ги вклучува само пораките примени пред да ја создадете.",
+    "create": "Создај врска",
+    "createFailed": "Врската не може да се создаде.",
+    "existingTitle": "Постоечка врска",
+    "existingDescription": "Оваа сесија веќе има врска за споделување. Ако создадете нова, таа ќе ја замени старата и старата врска ќе престане да работи.",
+    "rotate": "Создај нова врска",
+    "revoke": "Отповикај врска",
+    "revokeTitle": "Да се отповика врската?",
+    "revokeMessage": "Тековната врска веднаш престанува да работи.",
+    "revokeFailed": "Врската не може да се отповика.",
+    "expiresIn": "Истекува за {{duration}}",
+    "neverExpires": "Никогаш не истекува",
+    "includesNewMessages": "Новите пораки се вклучени.",
+    "excludesNewMessages": "Новите пораки не се вклучени."
+  },
+  "sharedSession": {
+    "title": "Споделена сесија",
+    "someone": "Некој",
+    "sharedBy": "Споделено од {{owner}}",
+    "unavailableTitle": "Врската не е достапна",
+    "unavailableDescription": "Оваа врска за споделување истече или е отповикана.",
+    "transcriptUnavailableTitle": "Не може да се вчита овој запис",
+    "transcriptUnavailableDescription": "Врската сè уште работи. Обидете се повторно наскоро."
   }
 }

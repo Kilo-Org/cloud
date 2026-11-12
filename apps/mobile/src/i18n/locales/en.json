@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Could not open this search result"
+  },
+  "sessionShare": {
+    "title": "Share session",
+    "subtitle": "Anyone with the link can read this session.",
+    "durationLabel": "Link duration",
+    "duration1h": "1h",
+    "duration1d": "1d",
+    "duration7d": "7d",
+    "duration30d": "30d",
+    "durationForever": "Never",
+    "includeNewMessages": "Include new messages",
+    "includeNewMessagesOn": "Anyone with this link also reads messages added later.",
+    "includeNewMessagesOff": "The link includes only messages received before you create it.",
+    "create": "Create link",
+    "createFailed": "Couldn't create the link.",
+    "existingTitle": "Existing link",
+    "existingDescription": "This session already has a share link. Creating a new one replaces it and stops the old link from working.",
+    "rotate": "Create a new link",
+    "revoke": "Revoke link",
+    "revokeTitle": "Revoke link?",
+    "revokeMessage": "The current link stops working immediately.",
+    "revokeFailed": "Couldn't revoke the link.",
+    "expiresIn": "Expires in {{duration}}",
+    "neverExpires": "Never expires",
+    "includesNewMessages": "New messages are included.",
+    "excludesNewMessages": "New messages are excluded."
+  },
+  "sharedSession": {
+    "title": "Shared session",
+    "someone": "Someone",
+    "sharedBy": "Shared by {{owner}}",
+    "unavailableTitle": "Link unavailable",
+    "unavailableDescription": "This share link has expired or been revoked.",
+    "transcriptUnavailableTitle": "Couldn't load this transcript",
+    "transcriptUnavailableDescription": "The link still works. Try again in a moment."
   }
 }

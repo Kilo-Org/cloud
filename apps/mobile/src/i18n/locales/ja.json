@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "この検索結果を開けませんでした"
+  },
+  "sessionShare": {
+    "title": "セッションを共有",
+    "subtitle": "リンクを知っている人は誰でもこのセッションを閲覧できます。",
+    "durationLabel": "リンクの有効期間",
+    "duration1h": "1時間",
+    "duration1d": "1日",
+    "duration7d": "7日",
+    "duration30d": "30日",
+    "durationForever": "無期限",
+    "includeNewMessages": "新しいメッセージを含める",
+    "includeNewMessagesOn": "このリンクを知っている人は、後から追加されたメッセージも閲覧できます。",
+    "includeNewMessagesOff": "リンクには、作成前に受信したメッセージのみが含まれます。",
+    "create": "リンクを作成",
+    "createFailed": "リンクを作成できませんでした。",
+    "existingTitle": "既存のリンク",
+    "existingDescription": "このセッションにはすでに共有リンクがあります。新しいリンクを作成すると既存のリンクが置き換えられ、古いリンクは使用できなくなります。",
+    "rotate": "新しいリンクを作成",
+    "revoke": "リンクを無効化",
+    "revokeTitle": "リンクを無効化しますか？",
+    "revokeMessage": "現在のリンクはすぐに使用できなくなります。",
+    "revokeFailed": "リンクを無効化できませんでした。",
+    "expiresIn": "あと{{duration}}で期限切れ",
+    "neverExpires": "無期限",
+    "includesNewMessages": "新しいメッセージが含まれます。",
+    "excludesNewMessages": "新しいメッセージは含まれません。"
+  },
+  "sharedSession": {
+    "title": "共有セッション",
+    "someone": "不明なユーザー",
+    "sharedBy": "共有者：{{owner}}",
+    "unavailableTitle": "リンクを利用できません",
+    "unavailableDescription": "この共有リンクは期限切れか、無効化されています。",
+    "transcriptUnavailableTitle": "このトランスクリプトを読み込めませんでした",
+    "transcriptUnavailableDescription": "リンクは引き続き有効です。しばらくしてからもう一度お試しください。"
   }
 }

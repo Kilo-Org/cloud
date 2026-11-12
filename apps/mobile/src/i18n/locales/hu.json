@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nem sikerült megnyitni ezt a keresési találatot"
+  },
+  "sessionShare": {
+    "title": "Munkamenet megosztása",
+    "subtitle": "A linkkel bárki elolvashatja ezt a munkamenetet.",
+    "durationLabel": "Link érvényessége",
+    "duration1h": "1 ó",
+    "duration1d": "1 n",
+    "duration7d": "7 n",
+    "duration30d": "30 n",
+    "durationForever": "Soha",
+    "includeNewMessages": "Új üzenetek belefoglalása",
+    "includeNewMessagesOn": "A linkkel rendelkezők a később hozzáadott üzeneteket is olvashatják.",
+    "includeNewMessagesOff": "A link csak a létrehozása előtt érkezett üzeneteket tartalmazza.",
+    "create": "Link létrehozása",
+    "createFailed": "Nem sikerült létrehozni a linket.",
+    "existingTitle": "Meglévő link",
+    "existingDescription": "Ehhez a munkamenethez már tartozik megosztási link. Egy új link létrehozása lecseréli a régit, és a régi link többé nem fog működni.",
+    "rotate": "Új link létrehozása",
+    "revoke": "Link visszavonása",
+    "revokeTitle": "Visszavonod a linket?",
+    "revokeMessage": "A jelenlegi link azonnal megszűnik működni.",
+    "revokeFailed": "Nem sikerült visszavonni a linket.",
+    "expiresIn": "{{duration}} múlva lejár",
+    "neverExpires": "Nem jár le",
+    "includesNewMessages": "Az új üzenetek is benne vannak.",
+    "excludesNewMessages": "Az új üzenetek nincsenek benne."
+  },
+  "sharedSession": {
+    "title": "Megosztott munkamenet",
+    "someone": "Valaki",
+    "sharedBy": "Megosztotta: {{owner}}",
+    "unavailableTitle": "A link nem érhető el",
+    "unavailableDescription": "Ez a megosztási link lejárt, vagy visszavonták.",
+    "transcriptUnavailableTitle": "Nem sikerült betölteni az átiratot",
+    "transcriptUnavailableDescription": "A link továbbra is működik. Próbáld újra egy kicsit később."
   }
 }

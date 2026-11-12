@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Kunde inte öppna det här sökresultatet"
+  },
+  "sessionShare": {
+    "title": "Dela session",
+    "subtitle": "Alla som har länken kan läsa den här sessionen.",
+    "durationLabel": "Länkens giltighetstid",
+    "duration1h": "1 h",
+    "duration1d": "1 d",
+    "duration7d": "7 d",
+    "duration30d": "30 d",
+    "durationForever": "Aldrig",
+    "includeNewMessages": "Inkludera nya meddelanden",
+    "includeNewMessagesOn": "Alla som har den här länken kan även läsa meddelanden som läggs till senare.",
+    "includeNewMessagesOff": "Länken innehåller bara meddelanden som tagits emot innan du skapar den.",
+    "create": "Skapa länk",
+    "createFailed": "Det gick inte att skapa länken.",
+    "existingTitle": "Befintlig länk",
+    "existingDescription": "Den här sessionen har redan en delningslänk. Om du skapar en ny ersätts den och den gamla länken slutar fungera.",
+    "rotate": "Skapa en ny länk",
+    "revoke": "Återkalla länk",
+    "revokeTitle": "Återkalla länk?",
+    "revokeMessage": "Den nuvarande länken slutar fungera omedelbart.",
+    "revokeFailed": "Det gick inte att återkalla länken.",
+    "expiresIn": "Går ut om {{duration}}",
+    "neverExpires": "Går aldrig ut",
+    "includesNewMessages": "Nya meddelanden inkluderas.",
+    "excludesNewMessages": "Nya meddelanden inkluderas inte."
+  },
+  "sharedSession": {
+    "title": "Delad session",
+    "someone": "Någon",
+    "sharedBy": "Delad av {{owner}}",
+    "unavailableTitle": "Länken är inte tillgänglig",
+    "unavailableDescription": "Den här delningslänken har gått ut eller återkallats.",
+    "transcriptUnavailableTitle": "Det gick inte att läsa in det här transkriptet",
+    "transcriptUnavailableDescription": "Länken fungerar fortfarande. Försök igen om en stund."
   }
 }

@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Kunne ikke åbne dette søgeresultat"
+  },
+  "sessionShare": {
+    "title": "Del session",
+    "subtitle": "Alle med linket kan læse denne session.",
+    "durationLabel": "Linkets varighed",
+    "duration1h": "1 t",
+    "duration1d": "1 d",
+    "duration7d": "7 d",
+    "duration30d": "30 d",
+    "durationForever": "Aldrig",
+    "includeNewMessages": "Medtag nye beskeder",
+    "includeNewMessagesOn": "Alle med dette link kan også læse beskeder, der tilføjes senere.",
+    "includeNewMessagesOff": "Linket indeholder kun beskeder, der er modtaget, før du opretter det.",
+    "create": "Opret link",
+    "createFailed": "Linket kunne ikke oprettes.",
+    "existingTitle": "Eksisterende link",
+    "existingDescription": "Denne session har allerede et delingslink. Hvis du opretter et nyt, erstatter det det gamle link, som så holder op med at virke.",
+    "rotate": "Opret et nyt link",
+    "revoke": "Tilbagekald link",
+    "revokeTitle": "Tilbagekald link?",
+    "revokeMessage": "Det nuværende link holder op med at virke med det samme.",
+    "revokeFailed": "Linket kunne ikke tilbagekaldes.",
+    "expiresIn": "Udløber om {{duration}}",
+    "neverExpires": "Udløber aldrig",
+    "includesNewMessages": "Nye beskeder medtages.",
+    "excludesNewMessages": "Nye beskeder medtages ikke."
+  },
+  "sharedSession": {
+    "title": "Delt session",
+    "someone": "Nogen",
+    "sharedBy": "Delt af {{owner}}",
+    "unavailableTitle": "Link utilgængeligt",
+    "unavailableDescription": "Dette delingslink er udløbet eller blevet tilbagekaldt.",
+    "transcriptUnavailableTitle": "Udskriften kunne ikke indlæses",
+    "transcriptUnavailableDescription": "Linket virker stadig. Prøv igen om lidt."
   }
 }

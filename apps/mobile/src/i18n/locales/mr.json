@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "हा शोध परिणाम उघडता आले नाही"
+  },
+  "sessionShare": {
+    "title": "सत्र शेअर करा",
+    "subtitle": "लिंक असलेली कोणतीही व्यक्ती हे सत्र वाचू शकते.",
+    "durationLabel": "लिंकचा कालावधी",
+    "duration1h": "1 ता",
+    "duration1d": "1 दि",
+    "duration7d": "7 दि",
+    "duration30d": "30 दि",
+    "durationForever": "कधीही नाही",
+    "includeNewMessages": "नवीन संदेश समाविष्ट करा",
+    "includeNewMessagesOn": "ही लिंक असलेली कोणतीही व्यक्ती नंतर जोडलेले संदेशही वाचू शकते.",
+    "includeNewMessagesOff": "लिंकमध्ये फक्त तुम्ही ती तयार करण्यापूर्वी आलेले संदेश समाविष्ट असतात.",
+    "create": "लिंक तयार करा",
+    "createFailed": "लिंक तयार करता आली नाही.",
+    "existingTitle": "विद्यमान लिंक",
+    "existingDescription": "या सत्रासाठी आधीच शेअर लिंक आहे. नवीन लिंक तयार केल्यास ती जुन्या लिंकची जागा घेईल आणि जुनी लिंक काम करणे थांबवेल.",
+    "rotate": "नवीन लिंक तयार करा",
+    "revoke": "लिंक रद्द करा",
+    "revokeTitle": "लिंक रद्द करायची?",
+    "revokeMessage": "सध्याची लिंक त्वरित काम करणे थांबवेल.",
+    "revokeFailed": "लिंक रद्द करता आली नाही.",
+    "expiresIn": "{{duration}} मध्ये कालबाह्य होईल",
+    "neverExpires": "कधीही कालबाह्य होत नाही",
+    "includesNewMessages": "नवीन संदेश समाविष्ट आहेत.",
+    "excludesNewMessages": "नवीन संदेश वगळले आहेत."
+  },
+  "sharedSession": {
+    "title": "शेअर केलेले सत्र",
+    "someone": "कोणीतरी",
+    "sharedBy": "{{owner}} द्वारे शेअर केले",
+    "unavailableTitle": "लिंक उपलब्ध नाही",
+    "unavailableDescription": "ही शेअर लिंक कालबाह्य झाली आहे किंवा रद्द केली गेली आहे.",
+    "transcriptUnavailableTitle": "हा ट्रान्सक्रिप्ट लोड करता आला नाही",
+    "transcriptUnavailableDescription": "लिंक अजूनही काम करते. थोड्या वेळाने पुन्हा प्रयत्न करा."
   }
 }

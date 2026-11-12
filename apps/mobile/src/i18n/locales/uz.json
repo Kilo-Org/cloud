@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu qidiruv natijasini ochib bo'lmadi"
+  },
+  "sessionShare": {
+    "title": "Seansni ulashish",
+    "subtitle": "Havolaga ega har kim bu seansni oʻqiy oladi.",
+    "durationLabel": "Havola muddati",
+    "duration1h": "1 soat",
+    "duration1d": "1 kun",
+    "duration7d": "7 kun",
+    "duration30d": "30 kun",
+    "durationForever": "Muddatsiz",
+    "includeNewMessages": "Yangi xabarlarni qoʻshish",
+    "includeNewMessagesOn": "Bu havolaga ega har kim keyinroq qoʻshilgan xabarlarni ham oʻqiy oladi.",
+    "includeNewMessagesOff": "Havola faqat u yaratilishidan oldin olingan xabarlarni oʻz ichiga oladi.",
+    "create": "Havola yaratish",
+    "createFailed": "Havolani yaratib boʻlmadi.",
+    "existingTitle": "Mavjud havola",
+    "existingDescription": "Bu seans uchun ulashish havolasi allaqachon mavjud. Yangisini yaratsangiz, u eskisining oʻrnini egallaydi va eski havola ishlamay qoladi.",
+    "rotate": "Yangi havola yaratish",
+    "revoke": "Havolani bekor qilish",
+    "revokeTitle": "Havola bekor qilinsinmi?",
+    "revokeMessage": "Joriy havola darhol ishlamay qoladi.",
+    "revokeFailed": "Havolani bekor qilib boʻlmadi.",
+    "expiresIn": "Tugashiga {{duration}} qoldi",
+    "neverExpires": "Muddati tugamaydi",
+    "includesNewMessages": "Yangi xabarlar qoʻshiladi.",
+    "excludesNewMessages": "Yangi xabarlar qoʻshilmaydi."
+  },
+  "sharedSession": {
+    "title": "Ulashilgan seans",
+    "someone": "Kimdir",
+    "sharedBy": "Ulashgan: {{owner}}",
+    "unavailableTitle": "Havola mavjud emas",
+    "unavailableDescription": "Bu ulashish havolasining muddati tugagan yoki u bekor qilingan.",
+    "transcriptUnavailableTitle": "Bu transkriptni yuklab boʻlmadi",
+    "transcriptUnavailableDescription": "Havola hali ham ishlaydi. Birozdan soʻng qayta urinib koʻring."
   }
 }

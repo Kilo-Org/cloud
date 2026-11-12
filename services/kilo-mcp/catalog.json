@@ -5356,6 +5356,31 @@
     ],
     "searchBlob": "cliSessionsV2.getSessionMessagesPage Fetch a paginated page of a session's message history for incremental loading, including an event watermark when starting a fresh read. clisessionsv2 getsessionmessagespage session_id limit cursor session_id limit cursor"
   },
+  "cliSessionsV2.getSharedSession": {
+    "path": "cliSessionsV2.getSharedSession",
+    "kind": "query",
+    "summary": "Retrieve a shared CLI session using its share link token, returning the session details for viewing or resuming.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "share_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "share_token"
+      ]
+    },
+    "tags": [
+      "clisessionsv2",
+      "getsharedsession",
+      "share_token"
+    ],
+    "searchBlob": "cliSessionsV2.getSharedSession Retrieve a shared CLI session using its share link token, returning the session details for viewing or resuming. clisessionsv2 getsharedsession share_token share_token"
+  },
   "cliSessionsV2.getWatchPr": {
     "path": "cliSessionsV2.getWatchPr",
     "kind": "query",

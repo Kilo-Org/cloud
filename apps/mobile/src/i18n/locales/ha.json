@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ba a iya buɗe wannan sakamakon binciken ba"
+  },
+  "sessionShare": {
+    "title": "Raba zama",
+    "subtitle": "Duk wanda ke da hanyar haɗin zai iya karanta wannan zaman.",
+    "durationLabel": "Tsawon lokacin hanyar haɗi",
+    "duration1h": "Awa 1",
+    "duration1d": "Kwana 1",
+    "duration7d": "Kwana 7",
+    "duration30d": "Kwana 30",
+    "durationForever": "Har abada",
+    "includeNewMessages": "Haɗa da sababbin saƙonni",
+    "includeNewMessagesOn": "Duk wanda ke da wannan hanyar haɗin zai kuma karanta saƙonnin da aka ƙara daga baya.",
+    "includeNewMessagesOff": "Hanyar haɗin ta ƙunshi saƙonnin da aka karɓa kafin ka ƙirƙire ta kawai.",
+    "create": "Ƙirƙiri hanyar haɗi",
+    "createFailed": "An kasa ƙirƙirar hanyar haɗin.",
+    "existingTitle": "Hanyar haɗi da ke akwai",
+    "existingDescription": "Wannan zaman ya riga yana da hanyar haɗin rabawa. Ƙirƙirar sabuwa zai maye gurbinta kuma ya hana tsohuwar hanyar haɗin aiki.",
+    "rotate": "Ƙirƙiri sabuwar hanyar haɗi",
+    "revoke": "Soke hanyar haɗi",
+    "revokeTitle": "A soke hanyar haɗi?",
+    "revokeMessage": "Hanyar haɗin ta yanzu za ta daina aiki nan take.",
+    "revokeFailed": "An kasa soke hanyar haɗin.",
+    "expiresIn": "Za ta ƙare cikin {{duration}}",
+    "neverExpires": "Ba za ta taɓa ƙarewa ba",
+    "includesNewMessages": "An haɗa da sababbin saƙonni.",
+    "excludesNewMessages": "Ba a haɗa da sababbin saƙonni ba."
+  },
+  "sharedSession": {
+    "title": "Zaman da aka raba",
+    "someone": "Wani",
+    "sharedBy": "An raba ta hannun {{owner}}",
+    "unavailableTitle": "Hanyar haɗi ba ta samuwa",
+    "unavailableDescription": "Wannan hanyar haɗin rabawa ta ƙare ko an soke ta.",
+    "transcriptUnavailableTitle": "An kasa loda wannan rubutun tattaunawa",
+    "transcriptUnavailableDescription": "Hanyar haɗin har yanzu tana aiki. Sake gwadawa nan ba da jimawa ba."
   }
 }

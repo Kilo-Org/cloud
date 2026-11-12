@@ -4043,5 +4043,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nepodařilo se otevřít tento výsledek hledání"
+  },
+  "sessionShare": {
+    "title": "Sdílet relaci",
+    "subtitle": "Kdokoli s odkazem si může tuto relaci přečíst.",
+    "durationLabel": "Platnost odkazu",
+    "duration1h": "1 h",
+    "duration1d": "1 d",
+    "duration7d": "7 d",
+    "duration30d": "30 d",
+    "durationForever": "Nikdy",
+    "includeNewMessages": "Zahrnout nové zprávy",
+    "includeNewMessagesOn": "Kdokoli s tímto odkazem uvidí i zprávy přidané později.",
+    "includeNewMessagesOff": "Odkaz obsahuje jen zprávy přijaté před jeho vytvořením.",
+    "create": "Vytvořit odkaz",
+    "createFailed": "Odkaz se nepodařilo vytvořit.",
+    "existingTitle": "Existující odkaz",
+    "existingDescription": "Tato relace už má odkaz pro sdílení. Vytvořením nového ho nahradíte a starý odkaz přestane fungovat.",
+    "rotate": "Vytvořit nový odkaz",
+    "revoke": "Zrušit odkaz",
+    "revokeTitle": "Zrušit odkaz?",
+    "revokeMessage": "Aktuální odkaz okamžitě přestane fungovat.",
+    "revokeFailed": "Odkaz se nepodařilo zrušit.",
+    "expiresIn": "Vyprší za {{duration}}",
+    "neverExpires": "Nikdy nevyprší",
+    "includesNewMessages": "Nové zprávy jsou zahrnuty.",
+    "excludesNewMessages": "Nové zprávy nejsou zahrnuty."
+  },
+  "sharedSession": {
+    "title": "Sdílená relace",
+    "someone": "Někdo",
+    "sharedBy": "Sdílí {{owner}}",
+    "unavailableTitle": "Odkaz není k dispozici",
+    "unavailableDescription": "Platnost tohoto odkazu pro sdílení vypršela nebo byl odkaz zrušen.",
+    "transcriptUnavailableTitle": "Tento přepis se nepodařilo načíst",
+    "transcriptUnavailableDescription": "Odkaz stále funguje. Zkuste to znovu za chvíli."
   }
 }

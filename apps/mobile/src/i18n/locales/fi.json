@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tämän hakutuloksen avaaminen epäonnistui"
+  },
+  "sessionShare": {
+    "title": "Jaa istunto",
+    "subtitle": "Kuka tahansa, jolla on linkki, voi lukea tämän istunnon.",
+    "durationLabel": "Linkin voimassaolo",
+    "duration1h": "1 h",
+    "duration1d": "1 pv",
+    "duration7d": "7 pv",
+    "duration30d": "30 pv",
+    "durationForever": "Ei koskaan",
+    "includeNewMessages": "Sisällytä uudet viestit",
+    "includeNewMessagesOn": "Kuka tahansa, jolla on tämä linkki, näkee myös myöhemmin lisätyt viestit.",
+    "includeNewMessagesOff": "Linkki sisältää vain viestit, jotka on vastaanotettu ennen linkin luomista.",
+    "create": "Luo linkki",
+    "createFailed": "Linkin luominen epäonnistui.",
+    "existingTitle": "Olemassa oleva linkki",
+    "existingDescription": "Tällä istunnolla on jo jakolinkki. Uuden luominen korvaa sen, ja vanha linkki lakkaa toimimasta.",
+    "rotate": "Luo uusi linkki",
+    "revoke": "Mitätöi linkki",
+    "revokeTitle": "Mitätöidäänkö linkki?",
+    "revokeMessage": "Nykyinen linkki lakkaa toimimasta välittömästi.",
+    "revokeFailed": "Linkin mitätöinti epäonnistui.",
+    "expiresIn": "Vanhenee {{duration}} kuluttua",
+    "neverExpires": "Ei vanhene",
+    "includesNewMessages": "Uudet viestit sisällytetään.",
+    "excludesNewMessages": "Uusia viestejä ei sisällytetä."
+  },
+  "sharedSession": {
+    "title": "Jaettu istunto",
+    "someone": "Joku",
+    "sharedBy": "Jakaja: {{owner}}",
+    "unavailableTitle": "Linkki ei ole käytettävissä",
+    "unavailableDescription": "Tämä jakolinkki on vanhentunut tai mitätöity.",
+    "transcriptUnavailableTitle": "Tätä transkriptiota ei voitu ladata",
+    "transcriptUnavailableDescription": "Linkki toimii yhä. Yritä hetken kuluttua uudelleen."
   }
 }

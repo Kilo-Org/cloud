@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Не можахме да отворим този резултат от търсенето"
+  },
+  "sessionShare": {
+    "title": "Споделяне на сесия",
+    "subtitle": "Всеки с връзката може да чете тази сесия.",
+    "durationLabel": "Валидност на връзката",
+    "duration1h": "1 ч",
+    "duration1d": "1 д",
+    "duration7d": "7 д",
+    "duration30d": "30 д",
+    "durationForever": "Без срок",
+    "includeNewMessages": "Включване на нови съобщения",
+    "includeNewMessagesOn": "Всеки с тази връзка може да чете и съобщенията, добавени по-късно.",
+    "includeNewMessagesOff": "Връзката включва само съобщенията, получени преди създаването ѝ.",
+    "create": "Създаване на връзка",
+    "createFailed": "Връзката не можа да бъде създадена.",
+    "existingTitle": "Съществуваща връзка",
+    "existingDescription": "Тази сесия вече има връзка за споделяне. Създаването на нова я заменя и старата връзка спира да работи.",
+    "rotate": "Създаване на нова връзка",
+    "revoke": "Отмяна на връзката",
+    "revokeTitle": "Отмяна на връзката?",
+    "revokeMessage": "Текущата връзка спира да работи незабавно.",
+    "revokeFailed": "Връзката не можа да бъде отменена.",
+    "expiresIn": "Изтича след {{duration}}",
+    "neverExpires": "Без срок на валидност",
+    "includesNewMessages": "Новите съобщения са включени.",
+    "excludesNewMessages": "Новите съобщения не са включени."
+  },
+  "sharedSession": {
+    "title": "Споделена сесия",
+    "someone": "Някой",
+    "sharedBy": "Споделено от {{owner}}",
+    "unavailableTitle": "Връзката не е достъпна",
+    "unavailableDescription": "Тази връзка за споделяне е изтекла или е отменена.",
+    "transcriptUnavailableTitle": "Преписът на сесията не можа да бъде зареден",
+    "transcriptUnavailableDescription": "Връзката все още работи. Опитайте отново след малко."
   }
 }

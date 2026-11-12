@@ -3978,5 +3978,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nije moguće otvoriti ovaj rezultat pretrage"
+  },
+  "sessionShare": {
+    "title": "Podijeli sesiju",
+    "subtitle": "Svako ko ima link može čitati ovu sesiju.",
+    "durationLabel": "Trajanje linka",
+    "duration1h": "1h",
+    "duration1d": "1d",
+    "duration7d": "7d",
+    "duration30d": "30d",
+    "durationForever": "Nikad",
+    "includeNewMessages": "Uključi nove poruke",
+    "includeNewMessagesOn": "Svako ko ima ovaj link čita i poruke dodane kasnije.",
+    "includeNewMessagesOff": "Link uključuje samo poruke primljene prije nego što ga kreirate.",
+    "create": "Kreiraj link",
+    "createFailed": "Kreiranje linka nije uspjelo.",
+    "existingTitle": "Postojeći link",
+    "existingDescription": "Ova sesija već ima link za dijeljenje. Kreiranje novog linka zamjenjuje postojeći i stari link prestaje raditi.",
+    "rotate": "Kreiraj novi link",
+    "revoke": "Opozovi link",
+    "revokeTitle": "Opozvati link?",
+    "revokeMessage": "Trenutni link odmah prestaje raditi.",
+    "revokeFailed": "Opozivanje linka nije uspjelo.",
+    "expiresIn": "Ističe za {{duration}}",
+    "neverExpires": "Nikad ne ističe",
+    "includesNewMessages": "Nove poruke su uključene.",
+    "excludesNewMessages": "Nove poruke nisu uključene."
+  },
+  "sharedSession": {
+    "title": "Podijeljena sesija",
+    "someone": "Neko",
+    "sharedBy": "Podijelio/la {{owner}}",
+    "unavailableTitle": "Link nije dostupan",
+    "unavailableDescription": "Ovaj link za dijeljenje je istekao ili je opozvan.",
+    "transcriptUnavailableTitle": "Nije moguće učitati ovaj transkript",
+    "transcriptUnavailableDescription": "Link i dalje radi. Pokušajte ponovo za trenutak."
   }
 }

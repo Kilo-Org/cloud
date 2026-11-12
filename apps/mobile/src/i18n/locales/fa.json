@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "باز کردن این نتیجه جست‌وجو ممکن نشد"
+  },
+  "sessionShare": {
+    "title": "اشتراک‌گذاری نشست",
+    "subtitle": "هر کسی که پیوند را داشته باشد می‌تواند این نشست را بخواند.",
+    "durationLabel": "مدت اعتبار پیوند",
+    "duration1h": "۱ ساعت",
+    "duration1d": "۱ روز",
+    "duration7d": "۷ روز",
+    "duration30d": "۳۰ روز",
+    "durationForever": "هرگز",
+    "includeNewMessages": "شامل پیام‌های جدید",
+    "includeNewMessagesOn": "هر کسی که این پیوند را داشته باشد، پیام‌هایی را که بعداً اضافه می‌شوند نیز می‌خواند.",
+    "includeNewMessagesOff": "پیوند فقط شامل پیام‌هایی است که پیش از ساختن آن دریافت شده‌اند.",
+    "create": "ساخت پیوند",
+    "createFailed": "پیوند ساخته نشد.",
+    "existingTitle": "پیوند موجود",
+    "existingDescription": "این نشست از قبل یک پیوند اشتراک‌گذاری دارد. ساختن پیوند جدید جایگزین آن می‌شود و پیوند قبلی دیگر کار نمی‌کند.",
+    "rotate": "ساخت پیوند جدید",
+    "revoke": "لغو پیوند",
+    "revokeTitle": "پیوند لغو شود؟",
+    "revokeMessage": "پیوند فعلی بلافاصله از کار می‌افتد.",
+    "revokeFailed": "پیوند لغو نشد.",
+    "expiresIn": "انقضا در {{duration}}",
+    "neverExpires": "بدون انقضا",
+    "includesNewMessages": "پیام‌های جدید گنجانده می‌شوند.",
+    "excludesNewMessages": "پیام‌های جدید گنجانده نمی‌شوند."
+  },
+  "sharedSession": {
+    "title": "نشست اشتراک‌گذاشته‌شده",
+    "someone": "شخصی",
+    "sharedBy": "اشتراک‌گذاری توسط {{owner}}",
+    "unavailableTitle": "پیوند در دسترس نیست",
+    "unavailableDescription": "این پیوند اشتراک‌گذاری منقضی یا لغو شده است.",
+    "transcriptUnavailableTitle": "بارگیری این رونوشت ممکن نشد",
+    "transcriptUnavailableDescription": "پیوند همچنان کار می‌کند. چند لحظه دیگر دوباره امتحان کنید."
   }
 }

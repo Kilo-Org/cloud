@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Hindi mabuksan ang resulta ng paghahanap na ito"
+  },
+  "sessionShare": {
+    "title": "Ibahagi ang session",
+    "subtitle": "Mababasa ng sinumang may link ang session na ito.",
+    "durationLabel": "Tagal ng link",
+    "duration1h": "1 oras",
+    "duration1d": "1 araw",
+    "duration7d": "7 araw",
+    "duration30d": "30 araw",
+    "durationForever": "Hindi kailanman",
+    "includeNewMessages": "Isama ang mga bagong mensahe",
+    "includeNewMessagesOn": "Mababasa rin ng sinumang may link na ito ang mga mensaheng idaragdag pa sa susunod.",
+    "includeNewMessagesOff": "Kasama lang sa link ang mga mensaheng natanggap bago mo ito ginawa.",
+    "create": "Gumawa ng link",
+    "createFailed": "Hindi magawa ang link.",
+    "existingTitle": "Umiiral na link",
+    "existingDescription": "May share link na ang session na ito. Kapag gumawa ka ng bago, papalitan nito ang luma at hindi na gagana ang lumang link.",
+    "rotate": "Gumawa ng bagong link",
+    "revoke": "Bawiin ang link",
+    "revokeTitle": "Bawiin ang link?",
+    "revokeMessage": "Agad na hindi na gagana ang kasalukuyang link.",
+    "revokeFailed": "Hindi mabawi ang link.",
+    "expiresIn": "Mag-e-expire sa loob ng {{duration}}",
+    "neverExpires": "Hindi mag-e-expire",
+    "includesNewMessages": "Kasama ang mga bagong mensahe.",
+    "excludesNewMessages": "Hindi kasama ang mga bagong mensahe."
+  },
+  "sharedSession": {
+    "title": "Ibinahaging session",
+    "someone": "Isang user",
+    "sharedBy": "Ibinahagi ng {{owner}}",
+    "unavailableTitle": "Hindi available ang link",
+    "unavailableDescription": "Nag-expire na o binawi na ang share link na ito.",
+    "transcriptUnavailableTitle": "Hindi ma-load ang transcript na ito",
+    "transcriptUnavailableDescription": "Gumagana pa rin ang link. Subukang muli maya-maya."
   }
 }

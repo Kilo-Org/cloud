@@ -3978,5 +3978,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Neizdevās atvērt šo meklēšanas rezultātu"
+  },
+  "sessionShare": {
+    "title": "Kopīgot sesiju",
+    "subtitle": "Ikviens, kam ir saite, var lasīt šo sesiju.",
+    "durationLabel": "Saites derīguma termiņš",
+    "duration1h": "1 st.",
+    "duration1d": "1 d.",
+    "duration7d": "7 d.",
+    "duration30d": "30 d.",
+    "durationForever": "Nekad",
+    "includeNewMessages": "Iekļaut jaunus ziņojumus",
+    "includeNewMessagesOn": "Ikviens, kam ir šī saite, lasīs arī vēlāk pievienotos ziņojumus.",
+    "includeNewMessagesOff": "Saitē ir iekļauti tikai ziņojumi, kas saņemti pirms tās izveides.",
+    "create": "Izveidot saiti",
+    "createFailed": "Neizdevās izveidot saiti.",
+    "existingTitle": "Esošā saite",
+    "existingDescription": "Šai sesijai jau ir kopīgošanas saite. Izveidojot jaunu, tā tiks aizstāta un vecā saite vairs nedarbosies.",
+    "rotate": "Izveidot jaunu saiti",
+    "revoke": "Atsaukt saiti",
+    "revokeTitle": "Atsaukt saiti?",
+    "revokeMessage": "Pašreizējā saite nekavējoties pārstās darboties.",
+    "revokeFailed": "Neizdevās atsaukt saiti.",
+    "expiresIn": "Derīga vēl {{duration}}",
+    "neverExpires": "Derīga bez termiņa",
+    "includesNewMessages": "Jauni ziņojumi tiek iekļauti.",
+    "excludesNewMessages": "Jauni ziņojumi netiek iekļauti."
+  },
+  "sharedSession": {
+    "title": "Kopīgota sesija",
+    "someone": "Kāds",
+    "sharedBy": "Kopīgoja {{owner}}",
+    "unavailableTitle": "Saite nav pieejama",
+    "unavailableDescription": "Šīs kopīgošanas saites derīguma termiņš ir beidzies, vai tā ir atsaukta.",
+    "transcriptUnavailableTitle": "Neizdevās ielādēt šo sarunas ierakstu",
+    "transcriptUnavailableDescription": "Saite joprojām darbojas. Mēģiniet vēlreiz pēc brīža."
   }
 }

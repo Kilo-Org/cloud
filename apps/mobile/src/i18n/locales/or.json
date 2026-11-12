@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ଏହି ଖୋଜା ଫଳାଫଳ ଖୋଲିହେଲା ନାହିଁ"
+  },
+  "sessionShare": {
+    "title": "ସେସନ୍ ସେୟାର କରନ୍ତୁ",
+    "subtitle": "ଲିଙ୍କ୍ ଥିବା ଯେକେହି ଏହି ସେସନ୍ ପଢ଼ିପାରିବେ।",
+    "durationLabel": "ଲିଙ୍କ୍ ଅବଧି",
+    "duration1h": "1 ଘଣ୍ଟା",
+    "duration1d": "1 ଦିନ",
+    "duration7d": "7 ଦିନ",
+    "duration30d": "30 ଦିନ",
+    "durationForever": "କେବେ ନୁହେଁ",
+    "includeNewMessages": "ନୂଆ ମେସେଜ୍ ଅନ୍ତର୍ଭୁକ୍ତ କରନ୍ତୁ",
+    "includeNewMessagesOn": "ଏହି ଲିଙ୍କ୍ ଥିବା ଯେକେହି ପରେ ଯୋଡ଼ାଯାଇଥିବା ମେସେଜ୍ ମଧ୍ୟ ପଢ଼ିପାରିବେ।",
+    "includeNewMessagesOff": "ଏହି ଲିଙ୍କ୍‌ରେ କେବଳ ଆପଣ ଏହାକୁ ତିଆରି କରିବା ପୂର୍ବରୁ ପ୍ରାପ୍ତ ମେସେଜ୍ ଅନ୍ତର୍ଭୁକ୍ତ।",
+    "create": "ଲିଙ୍କ୍ ତିଆରି କରନ୍ତୁ",
+    "createFailed": "ଲିଙ୍କ୍ ତିଆରି କରିହେଲା ନାହିଁ।",
+    "existingTitle": "ବିଦ୍ୟମାନ ଲିଙ୍କ୍",
+    "existingDescription": "ଏହି ସେସନ୍‌ର ପୂର୍ବରୁ ଏକ ସେୟାର ଲିଙ୍କ୍ ଅଛି। ନୂଆ ଲିଙ୍କ୍ ତିଆରି କଲେ ଏହା ବଦଳିଯିବ ଏବଂ ପୁରୁଣା ଲିଙ୍କ୍ କାମ କରିବା ବନ୍ଦ ହୋଇଯିବ।",
+    "rotate": "ନୂଆ ଲିଙ୍କ୍ ତିଆରି କରନ୍ତୁ",
+    "revoke": "ଲିଙ୍କ୍ ପ୍ରତ୍ୟାହାର କରନ୍ତୁ",
+    "revokeTitle": "ଲିଙ୍କ୍ ପ୍ରତ୍ୟାହାର କରିବେ?",
+    "revokeMessage": "ବର୍ତ୍ତମାନର ଲିଙ୍କ୍ ତୁରନ୍ତ କାମ କରିବା ବନ୍ଦ କରିଦେବ।",
+    "revokeFailed": "ଲିଙ୍କ୍ ପ୍ରତ୍ୟାହାର କରିହେଲା ନାହିଁ।",
+    "expiresIn": "{{duration}} ପରେ ମିଆଦ ସରିବ",
+    "neverExpires": "ମିଆଦ କେବେ ସରିବ ନାହିଁ",
+    "includesNewMessages": "ନୂଆ ମେସେଜ୍ ଅନ୍ତର୍ଭୁକ୍ତ।",
+    "excludesNewMessages": "ନୂଆ ମେସେଜ୍ ଅନ୍ତର୍ଭୁକ୍ତ ନୁହେଁ।"
+  },
+  "sharedSession": {
+    "title": "ସେୟାର କରାଯାଇଥିବା ସେସନ୍",
+    "someone": "କେହି ଜଣେ",
+    "sharedBy": "{{owner}} ଦ୍ୱାରା ସେୟାର କରାଯାଇଛି",
+    "unavailableTitle": "ଲିଙ୍କ୍ ଉପଲବ୍ଧ ନାହିଁ",
+    "unavailableDescription": "ଏହି ସେୟାର ଲିଙ୍କ୍‌ର ମିଆଦ ସରିଯାଇଛି କିମ୍ବା ଏହାକୁ ପ୍ରତ୍ୟାହାର କରାଯାଇଛି।",
+    "transcriptUnavailableTitle": "ଏହି ଟ୍ରାନ୍ସକ୍ରିପ୍ଟ ଲୋଡ୍ କରିହେଲା ନାହିଁ",
+    "transcriptUnavailableDescription": "ଲିଙ୍କ୍ ଏବେ ବି କାମ କରୁଛି। କିଛି ସମୟ ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
   }
 }

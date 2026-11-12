@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "دا د لټون پایله پرانیستل نه شو"
+  },
+  "sessionShare": {
+    "title": "ناسته شریکه کړئ",
+    "subtitle": "هر څوک چې دا لینک ولري، دا ناسته لوستلی شي.",
+    "durationLabel": "د لینک موده",
+    "duration1h": "۱ ساعت",
+    "duration1d": "۱ ورځ",
+    "duration7d": "۷ ورځې",
+    "duration30d": "۳۰ ورځې",
+    "durationForever": "هېڅکله",
+    "includeNewMessages": "نوي پیغامونه شامل کړئ",
+    "includeNewMessagesOn": "هر څوک چې دا لینک ولري، وروسته اضافه شوي پیغامونه هم لوستلی شي.",
+    "includeNewMessagesOff": "لینک یوازې هغه پیغامونه لري چې د لینک له جوړولو مخکې ترلاسه شوي وي.",
+    "create": "لینک جوړ کړئ",
+    "createFailed": "لینک جوړ نه شو.",
+    "existingTitle": "موجود لینک",
+    "existingDescription": "دا ناسته لا دمخه د شریکولو لینک لري. نوی لینک جوړول به یې ځای ونیسي او زوړ لینک به نور کار ونه کړي.",
+    "rotate": "نوی لینک جوړ کړئ",
+    "revoke": "لینک لغوه کړئ",
+    "revokeTitle": "لینک لغوه کړئ؟",
+    "revokeMessage": "اوسنی لینک سمدلاسه له کاره لوېږي.",
+    "revokeFailed": "لینک لغوه نه شو.",
+    "expiresIn": "په {{duration}} کې پای ته رسېږي",
+    "neverExpires": "هېڅکله نه ختمېږي",
+    "includesNewMessages": "نوي پیغامونه شامل دي.",
+    "excludesNewMessages": "نوي پیغامونه شامل نه دي."
+  },
+  "sharedSession": {
+    "title": "شریکه شوې ناسته",
+    "someone": "یو څوک",
+    "sharedBy": "د {{owner}} لخوا شریک شوې",
+    "unavailableTitle": "لینک شتون نه لري",
+    "unavailableDescription": "د شریکولو دا لینک پای ته رسېدلی یا لغوه شوی دی.",
+    "transcriptUnavailableTitle": "د خبرو دا لیکنه بار نه شوه",
+    "transcriptUnavailableDescription": "لینک لا هم کار کوي. یوه شېبه وروسته بیا هڅه وکړئ."
   }
 }

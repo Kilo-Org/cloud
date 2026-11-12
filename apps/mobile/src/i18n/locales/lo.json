@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ບໍ່ສາມາດເປີດຜົນການຄົ້ນຫານີ້ໄດ້"
+  },
+  "sessionShare": {
+    "title": "ແບ່ງປັນເຊດຊັນ",
+    "subtitle": "ທຸກຄົນທີ່ມີລິ້ງສາມາດອ່ານເຊດຊັນນີ້ໄດ້.",
+    "durationLabel": "ໄລຍະເວລາຂອງລິ້ງ",
+    "duration1h": "1 ຊມ",
+    "duration1d": "1 ມື້",
+    "duration7d": "7 ມື້",
+    "duration30d": "30 ມື້",
+    "durationForever": "ບໍ່ມີກຳນົດ",
+    "includeNewMessages": "ລວມຂໍ້ຄວາມໃໝ່",
+    "includeNewMessagesOn": "ທຸກຄົນທີ່ມີລິ້ງນີ້ຈະອ່ານຂໍ້ຄວາມທີ່ເພີ່ມເຂົ້າມາພາຍຫຼັງໄດ້ນຳ.",
+    "includeNewMessagesOff": "ລິ້ງນີ້ລວມສະເພາະຂໍ້ຄວາມທີ່ໄດ້ຮັບກ່ອນທີ່ທ່ານຈະສ້າງລິ້ງເທົ່ານັ້ນ.",
+    "create": "ສ້າງລິ້ງ",
+    "createFailed": "ບໍ່ສາມາດສ້າງລິ້ງໄດ້.",
+    "existingTitle": "ລິ້ງທີ່ມີຢູ່ແລ້ວ",
+    "existingDescription": "ເຊດຊັນນີ້ມີລິ້ງແບ່ງປັນແລ້ວ. ການສ້າງລິ້ງໃໝ່ຈະແທນທີ່ລິ້ງເກົ່າ ແລະ ເຮັດໃຫ້ລິ້ງເກົ່າໃຊ້ບໍ່ໄດ້ອີກ.",
+    "rotate": "ສ້າງລິ້ງໃໝ່",
+    "revoke": "ຍົກເລີກລິ້ງ",
+    "revokeTitle": "ຍົກເລີກລິ້ງບໍ?",
+    "revokeMessage": "ລິ້ງປັດຈຸບັນຈະໃຊ້ບໍ່ໄດ້ທັນທີ.",
+    "revokeFailed": "ບໍ່ສາມາດຍົກເລີກລິ້ງໄດ້.",
+    "expiresIn": "ໝົດອາຍຸໃນ {{duration}}",
+    "neverExpires": "ບໍ່ມີວັນໝົດອາຍຸ",
+    "includesNewMessages": "ລວມຂໍ້ຄວາມໃໝ່ດ້ວຍ.",
+    "excludesNewMessages": "ບໍ່ລວມຂໍ້ຄວາມໃໝ່."
+  },
+  "sharedSession": {
+    "title": "ເຊດຊັນທີ່ແບ່ງປັນ",
+    "someone": "ບາງຄົນ",
+    "sharedBy": "ແບ່ງປັນໂດຍ {{owner}}",
+    "unavailableTitle": "ລິ້ງໃຊ້ບໍ່ໄດ້",
+    "unavailableDescription": "ລິ້ງແບ່ງປັນນີ້ໝົດອາຍຸ ຫຼື ຖືກຍົກເລີກແລ້ວ.",
+    "transcriptUnavailableTitle": "ບໍ່ສາມາດໂຫຼດບົດບັນທຶກນີ້ໄດ້",
+    "transcriptUnavailableDescription": "ລິ້ງຍັງໃຊ້ໄດ້ຢູ່. ລອງໃໝ່ອີກຄັ້ງໃນອີກຈັກໜ່ອຍ."
   }
 }

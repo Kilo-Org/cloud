@@ -3978,5 +3978,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "לא ניתן היה לפתוח את תוצאת החיפוש הזו"
+  },
+  "sessionShare": {
+    "title": "שיתוף סשן",
+    "subtitle": "כל מי שיש לו את הקישור יכול לקרוא את הסשן הזה.",
+    "durationLabel": "תוקף הקישור",
+    "duration1h": "שעה",
+    "duration1d": "יום",
+    "duration7d": "7 ימים",
+    "duration30d": "30 ימים",
+    "durationForever": "ללא הגבלה",
+    "includeNewMessages": "כולל הודעות חדשות",
+    "includeNewMessagesOn": "כל מי שיש לו את הקישור יוכל לקרוא גם הודעות שיתווספו בהמשך.",
+    "includeNewMessagesOff": "הקישור כולל רק הודעות שהתקבלו לפני יצירתו.",
+    "create": "יצירת קישור",
+    "createFailed": "לא ניתן היה ליצור את הקישור.",
+    "existingTitle": "קישור קיים",
+    "existingDescription": "לסשן הזה כבר יש קישור שיתוף. יצירת קישור חדש תחליף אותו, והקישור הישן יפסיק לעבוד.",
+    "rotate": "יצירת קישור חדש",
+    "revoke": "ביטול הקישור",
+    "revokeTitle": "לבטל את הקישור?",
+    "revokeMessage": "הקישור הנוכחי יפסיק לעבוד מיד.",
+    "revokeFailed": "לא ניתן היה לבטל את הקישור.",
+    "expiresIn": "התוקף יפוג בעוד {{duration}}",
+    "neverExpires": "ללא תפוגה",
+    "includesNewMessages": "הודעות חדשות נכללות.",
+    "excludesNewMessages": "הודעות חדשות אינן נכללות."
+  },
+  "sharedSession": {
+    "title": "סשן משותף",
+    "someone": "מישהו",
+    "sharedBy": "שותף על ידי {{owner}}",
+    "unavailableTitle": "הקישור אינו זמין",
+    "unavailableDescription": "תוקפו של קישור השיתוף הזה פג או שהוא בוטל.",
+    "transcriptUnavailableTitle": "לא ניתן היה לטעון את התמליל",
+    "transcriptUnavailableDescription": "הקישור עדיין פעיל. אפשר לנסות שוב בעוד רגע."
   }
 }

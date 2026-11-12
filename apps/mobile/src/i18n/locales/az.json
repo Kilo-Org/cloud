@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu axtarış nəticəsi açılmadı"
+  },
+  "sessionShare": {
+    "title": "Sessiyanı paylaş",
+    "subtitle": "Linki olan hər kəs bu sessiyanı oxuya bilər.",
+    "durationLabel": "Linkin müddəti",
+    "duration1h": "1 saat",
+    "duration1d": "1 gün",
+    "duration7d": "7 gün",
+    "duration30d": "30 gün",
+    "durationForever": "Müddətsiz",
+    "includeNewMessages": "Yeni mesajları daxil et",
+    "includeNewMessagesOn": "Bu linki olan hər kəs sonradan əlavə edilən mesajları da oxuyur.",
+    "includeNewMessagesOff": "Link yalnız onu yaratmazdan əvvəl alınan mesajları əhatə edir.",
+    "create": "Link yarat",
+    "createFailed": "Linki yaratmaq alınmadı.",
+    "existingTitle": "Mövcud link",
+    "existingDescription": "Bu sessiyanın artıq paylaşım linki var. Yenisini yaratsanız, o köhnəsini əvəz edəcək və köhnə link işləməyəcək.",
+    "rotate": "Yeni link yarat",
+    "revoke": "Linki ləğv et",
+    "revokeTitle": "Link ləğv edilsin?",
+    "revokeMessage": "Cari link dərhal işləməyi dayandırır.",
+    "revokeFailed": "Linki ləğv etmək alınmadı.",
+    "expiresIn": "Müddəti {{duration}} sonra bitir",
+    "neverExpires": "Müddəti bitmir",
+    "includesNewMessages": "Yeni mesajlar daxildir.",
+    "excludesNewMessages": "Yeni mesajlar daxil deyil."
+  },
+  "sharedSession": {
+    "title": "Paylaşılan sessiya",
+    "someone": "Kimsə",
+    "sharedBy": "Paylaşan: {{owner}}",
+    "unavailableTitle": "Link əlçatan deyil",
+    "unavailableDescription": "Bu paylaşım linkinin müddəti bitib və ya o ləğv edilib.",
+    "transcriptUnavailableTitle": "Bu transkripti yükləmək alınmadı",
+    "transcriptUnavailableDescription": "Link hələ də işləyir. Bir az sonra yenidən cəhd edin."
   }
 }

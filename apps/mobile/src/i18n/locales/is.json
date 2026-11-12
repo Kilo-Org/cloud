@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ekki tókst að opna þessa leitarniðurstöðu"
+  },
+  "sessionShare": {
+    "title": "Deila lotu",
+    "subtitle": "Allir sem hafa tengilinn geta lesið þessa lotu.",
+    "durationLabel": "Gildistími tengils",
+    "duration1h": "1 klst.",
+    "duration1d": "1 d.",
+    "duration7d": "7 d.",
+    "duration30d": "30 d.",
+    "durationForever": "Aldrei",
+    "includeNewMessages": "Taka með ný skilaboð",
+    "includeNewMessagesOn": "Allir sem hafa þennan tengil geta einnig lesið skilaboð sem bætast við síðar.",
+    "includeNewMessagesOff": "Tengillinn nær aðeins yfir skilaboð sem bárust áður en þú bjóst hann til.",
+    "create": "Búa til tengil",
+    "createFailed": "Ekki tókst að búa til tengilinn.",
+    "existingTitle": "Fyrirliggjandi tengill",
+    "existingDescription": "Þessi lota er þegar með deilitengil. Ef þú býrð til nýjan kemur hann í stað þess gamla og gamli tengillinn hættir að virka.",
+    "rotate": "Búa til nýjan tengil",
+    "revoke": "Afturkalla tengil",
+    "revokeTitle": "Afturkalla tengil?",
+    "revokeMessage": "Núverandi tengill hættir strax að virka.",
+    "revokeFailed": "Ekki tókst að afturkalla tengilinn.",
+    "expiresIn": "Rennur út eftir {{duration}}",
+    "neverExpires": "Rennur aldrei út",
+    "includesNewMessages": "Ný skilaboð eru tekin með.",
+    "excludesNewMessages": "Ný skilaboð eru ekki tekin með."
+  },
+  "sharedSession": {
+    "title": "Samnýtt lota",
+    "someone": "Einhver",
+    "sharedBy": "Deilt af {{owner}}",
+    "unavailableTitle": "Tengill ekki tiltækur",
+    "unavailableDescription": "Þessi deilitengill er útrunninn eða hefur verið afturkallaður.",
+    "transcriptUnavailableTitle": "Ekki tókst að hlaða þessu endurriti",
+    "transcriptUnavailableDescription": "Tengillinn virkar enn. Reyndu aftur eftir smástund."
   }
 }

@@ -4043,5 +4043,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Не вдалося відкрити цей результат пошуку"
+  },
+  "sessionShare": {
+    "title": "Поділитися сесією",
+    "subtitle": "Будь-хто з посиланням може читати цю сесію.",
+    "durationLabel": "Термін дії посилання",
+    "duration1h": "1 год",
+    "duration1d": "1 дн.",
+    "duration7d": "7 дн.",
+    "duration30d": "30 дн.",
+    "durationForever": "Безстроково",
+    "includeNewMessages": "Включати нові повідомлення",
+    "includeNewMessagesOn": "Будь-хто з цим посиланням також читатиме повідомлення, додані пізніше.",
+    "includeNewMessagesOff": "Посилання містить лише повідомлення, отримані до його створення.",
+    "create": "Створити посилання",
+    "createFailed": "Не вдалося створити посилання.",
+    "existingTitle": "Наявне посилання",
+    "existingDescription": "Для цієї сесії вже є посилання для спільного доступу. Нове посилання замінить його, і старе перестане працювати.",
+    "rotate": "Створити нове посилання",
+    "revoke": "Відкликати посилання",
+    "revokeTitle": "Відкликати посилання?",
+    "revokeMessage": "Поточне посилання одразу перестане працювати.",
+    "revokeFailed": "Не вдалося відкликати посилання.",
+    "expiresIn": "Спливає через {{duration}}",
+    "neverExpires": "Безстрокове",
+    "includesNewMessages": "Нові повідомлення включено.",
+    "excludesNewMessages": "Нові повідомлення не включено."
+  },
+  "sharedSession": {
+    "title": "Спільна сесія",
+    "someone": "Хтось",
+    "sharedBy": "Власник: {{owner}}",
+    "unavailableTitle": "Посилання недоступне",
+    "unavailableDescription": "Термін дії цього посилання сплив, або його відкликано.",
+    "transcriptUnavailableTitle": "Не вдалося завантажити транскрипт",
+    "transcriptUnavailableDescription": "Посилання досі працює. Спробуйте ще раз за мить."
   }
 }

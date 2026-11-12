@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ఈ శోధన ఫలితాన్ని తెరవలేకపోయాము"
+  },
+  "sessionShare": {
+    "title": "సెషన్‌ను షేర్ చేయండి",
+    "subtitle": "లింక్ ఉన్న ఎవరైనా ఈ సెషన్‌ను చదవగలరు.",
+    "durationLabel": "లింక్ వ్యవధి",
+    "duration1h": "1గం",
+    "duration1d": "1రో",
+    "duration7d": "7రో",
+    "duration30d": "30రో",
+    "durationForever": "గడువు లేదు",
+    "includeNewMessages": "కొత్త సందేశాలను చేర్చండి",
+    "includeNewMessagesOn": "ఈ లింక్ ఉన్న ఎవరైనా తర్వాత జోడించిన సందేశాలను కూడా చదవగలరు.",
+    "includeNewMessagesOff": "మీరు లింక్‌ను సృష్టించే ముందు వచ్చిన సందేశాలు మాత్రమే లింక్‌లో ఉంటాయి.",
+    "create": "లింక్‌ను సృష్టించండి",
+    "createFailed": "లింక్‌ను సృష్టించలేకపోయాము.",
+    "existingTitle": "ఇప్పటికే ఉన్న లింక్",
+    "existingDescription": "ఈ సెషన్‌కు ఇప్పటికే షేర్ లింక్ ఉంది. కొత్తది సృష్టిస్తే అది దీని స్థానాన్ని తీసుకుంటుంది, పాత లింక్ పనిచేయడం ఆగిపోతుంది.",
+    "rotate": "కొత్త లింక్‌ను సృష్టించండి",
+    "revoke": "లింక్‌ను రద్దు చేయండి",
+    "revokeTitle": "లింక్‌ను రద్దు చేయాలా?",
+    "revokeMessage": "ప్రస్తుత లింక్ వెంటనే పనిచేయడం ఆగిపోతుంది.",
+    "revokeFailed": "లింక్‌ను రద్దు చేయలేకపోయాము.",
+    "expiresIn": "{{duration}} లో గడువు ముగుస్తుంది",
+    "neverExpires": "గడువు ఎప్పటికీ ముగియదు",
+    "includesNewMessages": "కొత్త సందేశాలు చేర్చబడ్డాయి.",
+    "excludesNewMessages": "కొత్త సందేశాలు మినహాయించబడ్డాయి."
+  },
+  "sharedSession": {
+    "title": "షేర్ చేసిన సెషన్",
+    "someone": "ఎవరో ఒకరు",
+    "sharedBy": "{{owner}} షేర్ చేశారు",
+    "unavailableTitle": "లింక్ అందుబాటులో లేదు",
+    "unavailableDescription": "ఈ షేర్ లింక్ గడువు ముగిసింది లేదా రద్దు చేయబడింది.",
+    "transcriptUnavailableTitle": "ఈ ట్రాన్స్‌క్రిప్ట్‌ను లోడ్ చేయలేకపోయాము",
+    "transcriptUnavailableDescription": "లింక్ ఇప్పటికీ పనిచేస్తుంది. కాసేపట్లో మళ్లీ ప్రయత్నించండి."
   }
 }

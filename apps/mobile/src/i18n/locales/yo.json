@@ -3913,5 +3913,40 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "A kò lè ṣí àbájọ́ ìwádìí yìí"
+  },
+  "sessionShare": {
+    "title": "Pín ìgbà iṣẹ́",
+    "subtitle": "Ẹnikẹ́ni tó bá ní ìjápọ̀ náà lè ka ìgbà iṣẹ́ yìí.",
+    "durationLabel": "Iye àkókò ìjápọ̀",
+    "duration1h": "Wákàtí 1",
+    "duration1d": "Ọjọ́ 1",
+    "duration7d": "Ọjọ́ 7",
+    "duration30d": "Ọjọ́ 30",
+    "durationForever": "Títí láé",
+    "includeNewMessages": "Fi àwọn ìfiránṣẹ́ tuntun kún un",
+    "includeNewMessagesOn": "Ẹnikẹ́ni tó bá ní ìjápọ̀ yìí yóò tún ka àwọn ìfiránṣẹ́ tí a bá fi kún un lẹ́yìn náà.",
+    "includeNewMessagesOff": "Ìjápọ̀ náà ní àwọn ìfiránṣẹ́ tí o gbà kí o tó ṣẹ̀dá rẹ̀ nìkan.",
+    "create": "Ṣẹ̀dá ìjápọ̀",
+    "createFailed": "Kò ṣeé ṣe láti ṣẹ̀dá ìjápọ̀ náà.",
+    "existingTitle": "Ìjápọ̀ tó wà tẹ́lẹ̀",
+    "existingDescription": "Ìgbà iṣẹ́ yìí ti ní ìjápọ̀ ìpínpín tẹ́lẹ̀. Ṣíṣẹ̀dá tuntun yóò rọ́pò rẹ̀, ìjápọ̀ àtijọ́ yóò sì dẹ́kun iṣẹ́.",
+    "rotate": "Ṣẹ̀dá ìjápọ̀ tuntun",
+    "revoke": "Fagilé ìjápọ̀",
+    "revokeTitle": "Fagilé ìjápọ̀?",
+    "revokeMessage": "Ìjápọ̀ lọ́wọ́lọ́wọ́ yóò dẹ́kun iṣẹ́ lẹ́sẹ̀kẹsẹ̀.",
+    "revokeFailed": "Kò ṣeé ṣe láti fagilé ìjápọ̀ náà.",
+    "expiresIn": "Yóò dópin lẹ́yìn {{duration}}",
+    "neverExpires": "Kò ní dópin láé",
+    "includesNewMessages": "A fi àwọn ìfiránṣẹ́ tuntun kún un.",
+    "excludesNewMessages": "A kò fi àwọn ìfiránṣẹ́ tuntun kún un."
+  },
+  "sharedSession": {
+    "title": "Ìgbà iṣẹ́ tí a pín",
+    "someone": "Ẹnìkan",
+    "sharedBy": "{{owner}} ló pín in",
+    "unavailableTitle": "Ìjápọ̀ kò ṣeé lò",
+    "unavailableDescription": "Ìjápọ̀ ìpínpín yìí ti dópin tàbí a ti fagilé e.",
+    "transcriptUnavailableTitle": "Kò ṣeé ṣe láti gbé àkọsílẹ̀ yìí jáde",
+    "transcriptUnavailableDescription": "Ìjápọ̀ náà ṣì ń ṣiṣẹ́. Gbìyànjú lẹ́ẹ̀kan sí i láìpẹ́."
   }
 }

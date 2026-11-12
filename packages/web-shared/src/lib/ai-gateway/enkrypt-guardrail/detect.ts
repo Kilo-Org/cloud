@@ -93,6 +93,16 @@ export type EnkryptGuardrailScan = EnkryptScanContext & {
   coverage: EnkryptScanCoverage;
 };
 
+/** The fields that identify a scan's request in logs. */
+export function scanLogFields(scan: EnkryptScanContext) {
+  return {
+    organization_id: scan.organizationId,
+    session_id: scan.sessionId,
+    client_request_id: scan.clientRequestId,
+    api_kind: scan.apiKind,
+  };
+}
+
 /**
  * `skip`: no scan gates the request, because the organization has no guardrail or its detectors
  * only log. An unavailable guardrail's `reason` is `transient` when an automatic retry could
@@ -410,13 +420,7 @@ export async function scanRequest(
   const kind = scanKind(config);
   const scope: ScanScope = {
     kind,
-    logFields: {
-      organization_id: scan.organizationId,
-      session_id: scan.sessionId,
-      client_request_id: scan.clientRequestId,
-      api_kind: scan.apiKind,
-      ...(coverage.chunk ? { chunk: coverage.chunk } : {}),
-    },
+    logFields: { ...scanLogFields(scan), ...(coverage.chunk ? { chunk: coverage.chunk } : {}) },
     report: {
       scan: kind,
       part: coverage.part,

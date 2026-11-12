@@ -11,6 +11,7 @@ import {
   type EnkryptScanContext,
   type EnkryptScanCoverage,
   scanKind,
+  scanLogFields,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import {
   joinSegments,
@@ -344,15 +345,6 @@ function combineChunks(results: EnkryptGuardrailScanResult[]): EnkryptGuardrailS
   };
 }
 
-function logFields(request: EnkryptScanContext) {
-  return {
-    organization_id: request.organizationId,
-    session_id: request.sessionId,
-    client_request_id: request.clientRequestId,
-    api_kind: request.apiKind,
-  };
-}
-
 /**
  * A part's verdict cache lookup, done before any of the request's scans start: the Enkrypt calls it
  * still needs, and how to turn their results into the part's result.
@@ -430,7 +422,7 @@ async function planSegmentsPart(
       latency_ms: 0,
       chunks: 0,
     };
-    console.debug('[enkrypt-guardrail] decision', { ...logFields(request), ...report });
+    console.debug('[enkrypt-guardrail] decision', { ...scanLogFields(request), ...report });
     return {
       scans: [],
       finish: () => ({
@@ -627,7 +619,10 @@ async function planTools(
       });
       const report = toolsReport(scanKind(config), config, status, outcomes);
       if (report.tools_cached > 0) {
-        console.debug('[enkrypt-guardrail] tool definitions', { ...logFields(request), ...report });
+        console.debug('[enkrypt-guardrail] tool definitions', {
+          ...scanLogFields(request),
+          ...report,
+        });
       }
       return {
         verdict: mostSevereVerdict(

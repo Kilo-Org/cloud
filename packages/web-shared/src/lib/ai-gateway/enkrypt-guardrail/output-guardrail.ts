@@ -5,6 +5,7 @@ import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import {
   ENKRYPT_GUARDRAIL_TIMEOUT_MS,
   ENKRYPT_MAX_SCAN_CHARACTERS,
+  scanLogFields,
   scanRequest,
   type EnkryptGuardrailScanResult,
   type EnkryptGuardrailVerdict,
@@ -309,13 +310,7 @@ export async function guardEnkryptOutput({
       captureResponse: captureResponse.promise,
     },
   };
-  const logFields = {
-    guardrail: 'output',
-    organization_id: scan.organizationId,
-    session_id: scan.sessionId,
-    client_request_id: scan.clientRequestId,
-    api_kind: scan.apiKind,
-  };
+  const logFields = { guardrail: 'output', ...scanLogFields(scan) };
   const report: EnkryptOutputGuardrailReport = {
     settings: guardrailSettings(scan.config),
     held_back: blocking !== null,

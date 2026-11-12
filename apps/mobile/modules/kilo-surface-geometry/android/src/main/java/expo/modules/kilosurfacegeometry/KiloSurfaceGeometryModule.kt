@@ -167,6 +167,17 @@ private class SurfaceGeometryObserver(
   private var clipWalk = IntArray(0)
   private var previousClipWalk = IntArray(0)
 
+  // The ancestor path the measurement descends, leaf first, in a buffer reused
+  // like the clip walk: it grows by doubling and allocates nothing once the
+  // surface's depth has been seen.
+  private var chain = arrayOfNulls<View>(0)
+
+  // The visible display frame is a window-session value, not a cached view
+  // property, so it is read only on a pass that can move it, and `measure` reads
+  // the cached rect. This flag says whether the cached rect is the one the
+  // current pass must read.
+  private var frameFresh = false
+
   fun observes(view: View): Boolean = !stopped && root.get() === view
 
   fun start() {
@@ -211,8 +222,14 @@ private class SurfaceGeometryObserver(
 
   override fun onGlobalLayout() {
     if (stopped || !attached) return
-    dirty = true
-    snapshot()
+    val view = root.get() ?: return
+    // The layout pass and the pre-draw pass of one traversal share a signal:
+    // this pass writes the baselines it measured with, so the following
+    // pre-draw pass finds nothing changed and measures nothing. A layout can
+    // move the visible display frame without an insets change, so this pass
+    // marks the cached frame stale and lets the signal read it.
+    frameFresh = false
+    if (signalChanged(view) || dirty) snapshot()
   }
 
   override fun onViewAttachedToWindow(view: View) {
@@ -220,6 +237,7 @@ private class SurfaceGeometryObserver(
     attached = true
     dirty = true
     attachTree()
+    frameFresh = false
     snapshot()
   }
 
@@ -232,14 +250,16 @@ private class SurfaceGeometryObserver(
   }
 
   /**
-   * The allocation-free signal the pre-draw pass gates on. It covers every input
+   * The allocation-free signal both passes gate on. It covers every input
    * `measure` reads between layout events: the root's height, attachment, shown
    * state and window visibility, its screen location written into the
    * preallocated array, the ancestor scroll offsets, the ancestor walk's alpha
    * product, clip bounds, clipping flags and transform chain, and the window
    * insets, visible display frame and soft-input mode the safe-area and keyboard
-   * branches read. A change here is the only thing that starts a measurement
-   * between layout events.
+   * branches read. A change here or a dirty pass is the only thing that starts a
+   * measurement, and the layout pass and the pre-draw pass of one traversal
+   * share the baselines this writes, so at most one measurement runs per
+   * traversal.
    */
   private fun signalChanged(root: View): Boolean {
     root.getLocationOnScreen(windowLocation)
@@ -288,10 +308,13 @@ private class SurfaceGeometryObserver(
     // move without a layout pass, so compare the platform insets value (the
     // source `ViewCompat.getRootWindowInsets` wraps) and the frame the
     // measurement would read. `getRootWindowInsets` is API 23+; minSdk is 24.
+    // The frame costs a window-session query, so it is read only when it can
+    // have moved: the first pass, the layout pass that clears the flag, and an
+    // insets change. Every other pass compares the cached values.
     val windowInsets = root.rootWindowInsets
     val insetsChanged = windowInsets != lastWindowInsets
+    if (!frameFresh || insetsChanged) refreshDisplayFrame(root)
     val windowRoot = root.rootView
-    windowRoot.getWindowVisibleDisplayFrame(displayFrame)
     val softInputMode =
       (windowRoot.layoutParams as? WindowManager.LayoutParams)?.softInputMode ?: 0
 
@@ -348,6 +371,12 @@ private class SurfaceGeometryObserver(
     lastClipCount = count
   }
 
+  /** Reads the window's visible display frame into the cached rect, once per pass that needs it. */
+  private fun refreshDisplayFrame(root: View) {
+    root.rootView.getWindowVisibleDisplayFrame(displayFrame)
+    frameFresh = true
+  }
+
   fun snapshot(): Map<String, Any> {
     val root = root.get()
     if (stopped || root == null) {
@@ -355,6 +384,7 @@ private class SurfaceGeometryObserver(
       current.set(0f, 0f, 0f, 0f, 0f, 1.0)
       return current.toMap()
     }
+    if (!frameFresh) refreshDisplayFrame(root)
     measure(root, current)
     dirty = false
     if (!hasMeasured || !current.sameAs(previous)) {
@@ -394,7 +424,8 @@ private class SurfaceGeometryObserver(
     val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
     val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
     val dockedKeyboard = insets.isVisible(WindowInsetsCompat.Type.ime()) && ime.bottom > bars.bottom
-    windowRoot.getWindowVisibleDisplayFrame(displayFrame)
+    // The safe-area and keyboard branches read the frame the signal cached for
+    // this pass: the measurement never queries the window session itself.
     safeWindow.set(windowBounds)
     safeWindow.top += bars.top
     if (!dockedKeyboard || windowBounds.bottom > displayFrame.bottom) {
@@ -417,25 +448,47 @@ private class SurfaceGeometryObserver(
       result.set(0f, 0f, height, safeTop, safeBottom, density)
       return
     }
+    // Each ancestor's screen transform is its parent's with its own factors
+    // applied first, so one walk collects the path and one descent prepends a
+    // level's factors to the transform already built for its parent. Asking
+    // `localToScreen` for every clipping ancestor instead re-walked to the
+    // window root on each level, which made the work grow with the square of
+    // the depth.
+    var depth = 0
     var ancestor: View? = root
-    var alpha = 1f
     while (ancestor != null) {
-      alpha *= ancestor.alpha
+      if (depth == chain.size) chain = chain.copyOf(maxOf(2, depth * 2))
+      chain[depth] = ancestor
+      depth += 1
+      ancestor = ancestor.parent as? View
+    }
+    // `chain[0 until depth]` was just written, so the reads below cannot be null.
+    localToScreen(chain[depth - 1]!!, ancestorMatrix)
+    var alpha = 1f
+    var level = depth - 1
+    while (level >= 0) {
+      val view = chain[level]!!
+      if (level < depth - 1) {
+        val parent = chain[level + 1]!!
+        ancestorMatrix.preTranslate(-parent.scrollX.toFloat(), -parent.scrollY.toFloat())
+        ancestorMatrix.preTranslate(view.left.toFloat(), view.top.toFloat())
+        ancestorMatrix.preConcat(view.matrix)
+      }
+      alpha *= view.alpha
       if (alpha <= 0.01f) {
         result.set(0f, 0f, height, safeTop, safeBottom, density)
         return
       }
-      val clip = ancestor.clipBounds
+      val clip = view.clipBounds
       if (clip != null) {
         clipBounds.set(clip)
-        localToScreen(ancestor, ancestorMatrix)
         ancestorMatrix.mapRect(clipBounds)
         if (!visible.intersect(clipBounds)) {
           result.set(0f, 0f, height, safeTop, safeBottom, density)
           return
         }
       }
-      ancestor = ancestor.parent as? View
+      level -= 1
     }
     if (dockedKeyboard) {
       val mode = (windowRoot.layoutParams as? WindowManager.LayoutParams)?.softInputMode

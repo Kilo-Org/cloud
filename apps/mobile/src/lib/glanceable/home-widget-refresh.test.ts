@@ -41,7 +41,7 @@ vi.mock('expo', () => ({ requireOptionalNativeModule: () => mocks.native }));
 
 vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.test' }));
 
-vi.mock('@/lib/glanceable-android/live-update', () => ({
+vi.mock('@/glanceable-android/live-update', () => ({
   setWidgetSnapshot: vi.fn(),
   end: vi.fn(),
 }));
@@ -137,6 +137,30 @@ describe('syncHomeWidgetRefresh', () => {
       expiresAt: Date.now() + 30 * 86_400_000,
     });
 
+    await syncHomeWidgetRefresh(CONTEXT);
+
+    expect(mocks.widgetCredential).toHaveBeenCalledTimes(2);
+    expect(mocks.configure).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a non-tRPC error carrying an UNAUTHORIZED code and keeps publishing', async () => {
+    // The catch also covers the native configure call and the presentation
+    // builders, so a bare top-level code is not a server verdict on the
+    // credential: it must not silence refresh.
+    mocks.widgetCredential.mockRejectedValue(
+      Object.assign(new Error('widget store rejected the payload'), { code: 'UNAUTHORIZED' })
+    );
+    await syncHomeWidgetRefresh(CONTEXT);
+
+    expect(mocks.captureException).toHaveBeenCalledTimes(1);
+    expect(mocks.captureException.mock.calls[0]?.[1]).toMatchObject({
+      tags: { 'error.subsystem': 'home_widget', 'error.operation': 'configure_native_refresh' },
+    });
+
+    mocks.widgetCredential.mockResolvedValue({
+      token: 'fresh-token',
+      expiresAt: Date.now() + 30 * 86_400_000,
+    });
     await syncHomeWidgetRefresh(CONTEXT);
 
     expect(mocks.widgetCredential).toHaveBeenCalledTimes(2);

@@ -20,7 +20,7 @@ import { isSignOutTeardownActive } from '@/lib/auth/token-owner';
 import { API_BASE_URL } from '@/lib/config';
 import { isAlreadyReportedNetworkError } from '@/lib/telemetry/app-error-reporting';
 import { trpcClient } from '@/lib/trpc';
-import { readTrpcErrorField } from '@/lib/trpc-error';
+import { isTrpcClientError, readTrpcErrorField } from '@/lib/trpc-error';
 
 import { getTerminalBlankEpoch, isGlanceableOrgLost } from './cleanup';
 import { isGlanceableFixtureHeld } from './fixture-hold';
@@ -110,7 +110,7 @@ async function handleRefreshFailure(
   error: unknown,
   state: { scopeKey: string; authEpoch: number }
 ): Promise<void> {
-  if (readTrpcErrorField(error, 'code') === 'UNAUTHORIZED') {
+  if (isTrpcClientError(error) && readTrpcErrorField(error, 'code') === 'UNAUTHORIZED') {
     revokedCredential = state;
     // `clear` also drops the cached credential, so the next allowed attempt
     // starts from a fresh query instead of the dead token.

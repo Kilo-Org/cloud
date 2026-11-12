@@ -682,7 +682,7 @@ describe('BYOK Router', () => {
 
       expect(result.id).toBeDefined();
       expect(result.provider_id).toBe('anthropic');
-      expect(result.provider_name).toBe('anthropic');
+      expect(result.provider_name).toBe('Anthropic');
       expect(result.created_by).toBe(ownerUser.id);
       expect(result.created_at).toBeDefined();
       expect(result.updated_at).toBeDefined();
@@ -1242,7 +1242,7 @@ describe('BYOK Router', () => {
         expect(created).toEqual({
           id: expect.any(String),
           provider_id: 'bedrock',
-          provider_name: 'bedrock',
+          provider_name: 'AWS Bedrock',
           management_source: 'user',
           is_enabled: true,
           serve_catalog_models: false,

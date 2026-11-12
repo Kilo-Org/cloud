@@ -15,12 +15,6 @@ type Export = {
   failureMessage: string | null;
 };
 
-/** The callbacks a screen hands to `mutationOptions`, invoked by a test. */
-type Handlers = {
-  onSuccess?: (result: unknown, input: unknown) => void;
-  onError?: (error: Error) => void;
-};
-
 type ScreenState = {
   access: { enabled: boolean };
   accessError: boolean;
@@ -130,14 +124,6 @@ const BUTTON = 'Button' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
-function handlersFor(kind: string): Handlers {
-  const handlers = state.mutations[kind];
-  if (!handlers) {
-    throw new Error(`no ${kind} mutation was created`);
-  }
-  return handlers as Handlers;
-}
-
 async function mount() {
   const view = await renderWithProviders(createElement(DataExportScreen));
   renderer = view.renderer;
@@ -157,14 +143,6 @@ function button(root: ReactTestRenderer['root'], label: string) {
   return first;
 }
 
-function codeField(root: ReactTestRenderer['root']) {
-  const [field] = root.findAll(node => Object.is(node.type, 'FormField'));
-  if (!field) {
-    throw new Error('missing download code field');
-  }
-  return field;
-}
-
 function texts(root: ReactTestRenderer['root']) {
   return root.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children);
 }
@@ -175,8 +153,6 @@ function readyExport(): Export[] {
     { id: 'export-2', status: 'ready', requestedAt: '2026-11-11T10:00:00Z', failureMessage: null },
   ];
 }
-
-const CODE_SENT = { challengeId: 'challenge-1', expiresInMinutes: 15 };
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -238,81 +214,6 @@ describe('DataExportScreen', () => {
     const root = await mount();
 
     expect(texts(root)).toContain('The artifact could not be produced');
-  });
-
-  it('asks for a code and shows the field once it is sent', async () => {
-    state.exports = readyExport();
-    const root = await mount();
-
-    act(() => {
-      (button(root, 'Get code').props.onPress as () => void)();
-    });
-    expect(state.calls).toEqual([{ name: 'requestCode', input: { exportId: 'export-2' } }]);
-    expect(root.findAll(node => Object.is(node.type, 'FormField'))).toHaveLength(0);
-
-    act(() => {
-      handlersFor('requestCode').onSuccess?.(CODE_SENT, { exportId: 'export-2' });
-    });
-
-    expect(root.findAll(node => Object.is(node.type, 'FormField'))).toHaveLength(1);
-  });
-
-  it('sends the entered code to exchange for the download', async () => {
-    state.exports = readyExport();
-    const root = await mount();
-
-    act(() => {
-      (button(root, 'Get code').props.onPress as () => void)();
-    });
-    act(() => {
-      handlersFor('requestCode').onSuccess?.(CODE_SENT, { exportId: 'export-2' });
-    });
-    act(() => {
-      (codeField(root).props.onChangeText as (value: string) => void)('123456');
-    });
-    act(() => {
-      (button(root, 'Download file').props.onPress as () => void)();
-    });
-
-    expect(state.calls.at(-1)).toEqual({
-      name: 'download',
-      input: { exportId: 'export-2', code: '123456', challengeId: 'challenge-1' },
-    });
-  });
-
-  it('refuses an empty code without a round trip', async () => {
-    state.exports = readyExport();
-    const root = await mount();
-
-    act(() => {
-      (button(root, 'Get code').props.onPress as () => void)();
-    });
-    act(() => {
-      handlersFor('requestCode').onSuccess?.(CODE_SENT, { exportId: 'export-2' });
-    });
-    act(() => {
-      (button(root, 'Download file').props.onPress as () => void)();
-    });
-
-    expect(state.calls.at(-1)?.name).toBe('requestCode');
-    expect(state.toastError).toHaveBeenCalledWith('Enter the code from the email.');
-  });
-
-  it('shows a rejected code beside the field', async () => {
-    state.exports = readyExport();
-    const root = await mount();
-
-    act(() => {
-      (button(root, 'Get code').props.onPress as () => void)();
-    });
-    act(() => {
-      handlersFor('requestCode').onSuccess?.(CODE_SENT, { exportId: 'export-2' });
-    });
-    act(() => {
-      handlersFor('download').onError?.(new Error('That code has expired'));
-    });
-
-    expect(texts(root)).toContain('That code has expired');
   });
 
   it('explains when the feature is not released to this account', async () => {

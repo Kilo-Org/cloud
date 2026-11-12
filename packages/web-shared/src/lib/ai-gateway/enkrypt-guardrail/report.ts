@@ -119,7 +119,10 @@ export type EnkryptToolScanReport = z.infer<typeof EnkryptToolScanReportSchema>;
 
 const VerdictCacheWriteSchema = z.enum(['written', 'failed', 'skipped']);
 
-/** The verdict cache write of a scan: for tool definitions, `failed` if any write failed, else `written` if any was written. */
+/**
+ * The verdict cache writes of a scan, one per cached segment or slice: `failed` if any write failed,
+ * else `written` if any was written, else `skipped`.
+ */
 const verdictCacheWriteShape = { verdict_cache_write: VerdictCacheWriteSchema };
 
 /**

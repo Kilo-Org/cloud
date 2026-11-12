@@ -67,7 +67,7 @@ function ProviderRow({ provider }: Readonly<{ provider: ProviderOption }>) {
  * screen without the provider list pushing the field off a phone.
  */
 export function ProviderKeyProviderPickerScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const trpc = useTRPC();
   const colors = useThemeColors();
   const inputRef = useRef<TextInput>(null);
@@ -76,14 +76,18 @@ export function ProviderKeyProviderPickerScreen() {
 
   const filtered = useMemo(() => {
     const rows = providers.data ?? [];
-    const needle = query.trim().toLowerCase();
+    // Fold in the reader's language: Turkish has no bare i, so a lowercased
+    // search term must be built with the same locale the names are read in.
+    const needle = query.trim().toLocaleLowerCase(i18n.language);
     if (needle === '') {
       return rows;
     }
     return rows.filter(
-      provider => provider.name.toLowerCase().includes(needle) || provider.id.includes(needle)
+      provider =>
+        provider.name.toLocaleLowerCase(i18n.language).includes(needle) ||
+        provider.id.includes(needle)
     );
-  }, [providers.data, query]);
+  }, [providers.data, query, i18n.language]);
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<ProviderOption>) => <ProviderRow provider={item} />,

@@ -985,16 +985,23 @@ describe('ChatComposer toolbar row', () => {
   });
 
   it('renders one chip row, never two, in either container', async () => {
+    // The row is the only unclamped, overflow-hidden Animated.View in the
+    // composer, so a second one would be a second row rather than an unrelated
+    // node that happens to carry a layout handler.
     const isRow = (type: unknown, props: Record<string, unknown>) =>
-      Object.is(type, 'Animated.View') && typeof props.onLayout === 'function';
+      Object.is(type, 'Animated.View') &&
+      maxHeightOf(props.style) === 10_000 &&
+      (props.style as { overflow?: unknown } | null | undefined)?.overflow === 'hidden';
 
     toolbarShown.value = true;
     keyboardState.height = 0;
     insidePane.value = false;
-    expect(collectNodes(await mount(makeProps({})), isRow)).toHaveLength(1);
+    const outside = collectNodes(await mount(makeProps({})), isRow);
+    expect(outside).toHaveLength(1);
 
     insidePane.value = true;
-    expect(collectNodes(await mount(makeProps({})), isRow)).toHaveLength(1);
+    const inside = collectNodes(await mount(makeProps({})), isRow);
+    expect(inside).toHaveLength(1);
   });
 
   it('holds one height inside the keyboard-follow pane, and follows only the chip', async () => {

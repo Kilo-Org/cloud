@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+} from 'react';
 import { useAtomValue } from 'jotai';
 import { AlertCircle, ArrowDown, ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -103,6 +111,7 @@ export function ChildSessionDrawer({
   }, [manager, selectedSessionId]);
   const { requestOlderMessages, tryLoadOlderFromScroll } = useOlderMessagesPagination({
     scrollElementRef: scrollContainerRef,
+    scrollContentRef: messagesContentRef,
     hasOlderMessages: readyPagination.hasOlder,
     isLoadingOlderMessages: readyPagination.isLoadingOlder,
     olderMessagesError: readyPagination.olderError,
@@ -169,10 +178,17 @@ export function ChildSessionDrawer({
     void manager.hydrateChildSession(selectedSessionId);
   }, [manager, selectedSessionId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!shouldAutoScroll) return;
+    scrollToBottomNow();
     scheduleScrollToBottom();
-  }, [hydrationState.status, messages, scheduleScrollToBottom, shouldAutoScroll]);
+  }, [
+    hydrationState.status,
+    messages,
+    scheduleScrollToBottom,
+    scrollToBottomNow,
+    shouldAutoScroll,
+  ]);
 
   useEffect(() => {
     if (!shouldAutoScroll || typeof ResizeObserver === 'undefined') return;

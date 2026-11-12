@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useLayoutEffect, useRef, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
 import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 
 export const OLDER_MESSAGES_NEAR_TOP_PX = 80;
@@ -163,6 +163,7 @@ export function shouldAnnounceOlderMessagesArrival({
 
 type UseOlderMessagesPaginationInputs = {
   scrollElementRef: RefObject<HTMLElement | null>;
+  scrollContentRef?: RefObject<HTMLElement | null>;
   hasOlderMessages: boolean;
   isLoadingOlderMessages: boolean;
   olderMessagesError: OlderMessagesError | null;
@@ -178,6 +179,7 @@ type UseOlderMessagesPaginationInputs = {
 
 export function useOlderMessagesPagination({
   scrollElementRef,
+  scrollContentRef,
   hasOlderMessages,
   isLoadingOlderMessages,
   olderMessagesError,
@@ -239,6 +241,24 @@ export function useOlderMessagesPagination({
     scrollElementRef,
   ]);
 
+  const tryAutoloadOlderMessages = useCallback(() => {
+    if (!autoloadOnMount) return;
+    if (!ready || olderMessagesError || initialPositionedRef?.current === false) return;
+    if (isProgrammaticScrollRef.current) return;
+    const el = scrollElementRef.current;
+    if (el && canAutoloadOlderMessages(el) && el.scrollTop < OLDER_MESSAGES_NEAR_TOP_PX) {
+      requestOlderMessages();
+    }
+  }, [
+    autoloadOnMount,
+    initialPositionedRef,
+    isProgrammaticScrollRef,
+    olderMessagesError,
+    ready,
+    requestOlderMessages,
+    scrollElementRef,
+  ]);
+
   useLayoutEffect(() => {
     if (!ready) return;
     const wasLoading = wasLoadingRef.current;
@@ -260,14 +280,7 @@ export function useOlderMessagesPagination({
       restoreScrollAfterPrepend(el, previousPosition);
       lastScrollTopRef.current = el.scrollTop;
       isProgrammaticScrollRef.current = false;
-      if (
-        canAutoloadOlderMessages(el) &&
-        autoloadOnMount &&
-        el.scrollTop < OLDER_MESSAGES_NEAR_TOP_PX &&
-        olderMessagesError === null
-      ) {
-        requestOlderMessages();
-      }
+      tryAutoloadOlderMessages();
     });
   }, [
     isLoadingOlderMessages,
@@ -277,25 +290,38 @@ export function useOlderMessagesPagination({
     ready,
     requestOlderMessages,
     scrollElementRef,
-    autoloadOnMount,
+    tryAutoloadOlderMessages,
   ]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!ready || !autoloadOnMount) return;
     if (olderMessagesError) return;
     const el = scrollElementRef.current;
     if (!el) return;
-    if (!canAutoloadOlderMessages(el)) return;
-    if (el.scrollHeight <= el.clientHeight) {
-      requestOlderMessages();
-    }
+    let frame = 0;
+    const scheduleCheck = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(tryAutoloadOlderMessages);
+    };
+    scheduleCheck();
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleCheck);
+    observer?.observe(el);
+    const content = scrollContentRef?.current;
+    if (content) observer?.observe(content);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer?.disconnect();
+    };
   }, [
     autoloadOnMount,
     olderMessagesError,
     overflowCheckKey,
     ready,
-    requestOlderMessages,
+    resetKey,
+    scrollContentRef,
     scrollElementRef,
+    tryAutoloadOlderMessages,
   ]);
 
   const tryLoadOlderFromScroll = useCallback(

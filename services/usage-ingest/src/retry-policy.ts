@@ -2,16 +2,14 @@
 export function usageRetryDelaySeconds(
   attempts: unknown,
   admissionRejected: boolean,
-  random: () => number = Math.random,
-  firstAdmissionRetryMaxSeconds?: string
+  random: () => number = Math.random
 ): number {
   const attempt =
     typeof attempts === 'number' && Number.isSafeInteger(attempts) && attempts > 0
       ? Math.min(attempts, 21)
       : 1;
   if (attempt === 1 && admissionRejected) {
-    const max = firstAdmissionRetryMaxSeconds === '4' ? 4 : 2;
-    return 1 + Math.floor(random() * max);
+    return 1 + Math.floor(random() * 4);
   }
   let base = Math.min(300, 2 ** Math.min(attempt - 1, 9));
   if (!admissionRejected) base = Math.max(60, base);

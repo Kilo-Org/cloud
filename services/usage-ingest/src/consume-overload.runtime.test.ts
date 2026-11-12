@@ -7,7 +7,7 @@ import { expect, it, vi } from 'vitest';
 import { unstable_readConfig, unstable_startWorker } from 'wrangler';
 import { usage } from './usage.test-fixture';
 
-async function testQueueRetryConfig(firstRetryMax: string | undefined) {
+async function testQueueRetryDelay(randomValue: number) {
   const calls: unknown[] = [];
   let statuses: (number | 'recorded' | 'duplicate' | 'admission')[] = [];
   let mixedStatus: number | 'admission' | undefined;
@@ -67,7 +67,7 @@ async function testQueueRetryConfig(firstRetryMax: string | undefined) {
     const main = join(directory, 'entry.ts');
     await writeFile(
       main,
-      `import worker from ${JSON.stringify(fileURLToPath(new URL('./index.ts', import.meta.url).href))}; Math.random = () => 0.99; export default worker;`
+      `import worker from ${JSON.stringify(fileURLToPath(new URL('./index.ts', import.meta.url).href))}; Math.random = () => ${randomValue}; export default worker;`
     );
     // Compile the production entrypoint with its compatibility settings, without remote bindings.
     await writeFile(
@@ -79,9 +79,6 @@ async function testQueueRetryConfig(firstRetryMax: string | undefined) {
         compatibility_flags: service.compatibility_flags,
         vars: {
           ...service.vars,
-          ...(firstRetryMax === undefined
-            ? {}
-            : { USAGE_INGEST_ADMISSION_FIRST_RETRY_MAX_SECONDS: firstRetryMax }),
           USAGE_WRITER_URL: `http://127.0.0.1:${address.port}/api/internal/usage/record`,
           USAGE_WRITER_SECRET: 'synthetic-writer-secret',
           USAGE_WRITER_PROTECTION_BYPASS: 'synthetic-bypass-secret',
@@ -215,7 +212,10 @@ async function testQueueRetryConfig(firstRetryMax: string | undefined) {
       expect(result.retryMessages).toEqual([
         {
           msgId: 'queue-0',
-          delaySeconds: status === 'admission' ? (firstRetryMax === '4' ? 4 : 2) : 120,
+          delaySeconds:
+            status === 'admission'
+              ? 1 + Math.floor(randomValue * 4)
+              : 60 + Math.floor(randomValue * 61),
         },
       ]);
     }
@@ -251,8 +251,8 @@ async function testQueueRetryConfig(firstRetryMax: string | undefined) {
   }
 }
 
-it.each([undefined, '2', '4', 'invalid'])(
-  'reports workerd overload and retry config %s',
-  testQueueRetryConfig,
+it.each([0, 0.25, 0.5, 0.99])(
+  'reports workerd overload and direct retry delay with random %s',
+  testQueueRetryDelay,
   30_000
 );

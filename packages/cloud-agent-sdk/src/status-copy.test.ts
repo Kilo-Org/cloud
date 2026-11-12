@@ -126,6 +126,7 @@ jest.mock('./session', () => ({
   REMOTE_SESSION_EXIT_NOT_SUPPORTED: 'Remote session exit is not supported for the current session',
   REMOTE_SESSION_CREATION_NOT_SUPPORTED:
     'Remote session creation is not supported for the current session',
+  REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED: 'This session is still loading. Try again in a moment.',
   createCloudAgentSession: jest.fn(
     (sessionConfig: {
       onResolved?: (resolved: ResolvedSession) => void;

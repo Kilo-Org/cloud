@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
+import {
+  cloudAgentSessionIdSchema,
+  cloudAgentWorktreeIdSchema,
+  MESSAGE_ID_PATTERN,
+} from '@kilocode/session-ingest-contracts';
 import { CLOUD_AGENT_NEXT_AUDIENCE, KILO_API_AUDIENCE } from './internal-service-token-audiences';
 
 export const PARENT_WORKSPACE_CALLBACK_URL = 'workspace:new-chat';
@@ -143,8 +147,6 @@ const scopedPrepareSessionSchema = z
     path: ['upstreamBranch'],
   });
 
-const childSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
-const childMessageIdSchema = z.string().regex(/^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$/);
 // Discovery is scope-neutral; auth context pins any signed organization, and the
 // shared input stays empty so it cannot carry one.
 const MODELS_LIST_PROCEDURE = 'models.list';
@@ -168,28 +170,28 @@ const scopedChildOperations = {
   },
   getSession: {
     kind: 'query',
-    schema: z.object({ cloudAgentSessionId: childSessionIdSchema }).strict(),
+    schema: z.object({ cloudAgentSessionId: cloudAgentSessionIdSchema }).strict(),
   },
   getMessageResult: {
     kind: 'query',
     schema: z
       .object({
-        cloudAgentSessionId: childSessionIdSchema,
-        messageId: childMessageIdSchema,
+        cloudAgentSessionId: cloudAgentSessionIdSchema,
+        messageId: z.string().regex(MESSAGE_ID_PATTERN),
         expectedWorktreeId: cloudAgentWorktreeIdSchema.optional(),
       })
       .strict(),
   },
   interruptSession: {
     kind: 'mutation',
-    schema: z.object({ sessionId: childSessionIdSchema }).strict(),
+    schema: z.object({ sessionId: cloudAgentSessionIdSchema }).strict(),
   },
   sendMessage: {
     kind: 'mutation',
     schema: z
       .object({
-        cloudAgentSessionId: childSessionIdSchema,
-        messageId: childMessageIdSchema,
+        cloudAgentSessionId: cloudAgentSessionIdSchema,
+        messageId: z.string().regex(MESSAGE_ID_PATTERN),
         payload: z
           .object({
             type: z.literal('prompt'),
@@ -216,7 +218,7 @@ const scopedFolderOperations = {
     kind: 'mutation',
     schema: z
       .object({
-        cloudAgentSessionId: childSessionIdSchema,
+        cloudAgentSessionId: cloudAgentSessionIdSchema,
         worktreeId: cloudAgentWorktreeIdSchema,
         folderId: z.uuid().nullable(),
       })

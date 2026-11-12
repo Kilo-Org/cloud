@@ -12,7 +12,6 @@ export default {
     supportedChatApis: ['chat_completions', 'messages', 'responses'],
     responseTransforms: null,
   }),
-  transformRequest() {},
   models: cachedDirectByokModelList('martian'),
   provider_listing: {
     dataPolicy: {

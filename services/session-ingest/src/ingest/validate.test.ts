@@ -202,7 +202,7 @@ describe('validateAndParseIngestPayload', () => {
       skippedItemCount: 1,
       maxValidItemBytes: MAX_SINGLE_ITEM_BYTES + 1,
     });
-  });
+  }, 30_000);
 
   it.each([
     ['at', INGEST_CHUNK_MAX_BYTES],

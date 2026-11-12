@@ -90,7 +90,9 @@ const hoisted = vi.hoisted(() => {
 
   const deepLinkLaunch = {
     clearAccountBoundPendingDeepLink: vi.fn(),
+    getPendingDeepLinkSnapshot: vi.fn<() => string | null>(() => null),
     setCurrentDeepLinkUserId: vi.fn(),
+    setPendingDeepLink: vi.fn(),
   };
 
   // The legacy-exchange branch of the bootstrap load. Resolves null (a failed
@@ -168,6 +170,11 @@ const lastOpenedSessionMock = vi.hoisted(() => ({
 
 const nativeLauncherSurfacesMock = vi.hoisted(() => ({
   clearLauncherSurfaces: vi.fn(),
+  takeAccountIndependentLaunchUrl: vi.fn<() => string | null>(() => null),
+}));
+
+const lastRouteMock = vi.hoisted(() => ({
+  clearLastRoute: vi.fn(),
 }));
 
 // Hoisted so the unauthorized-handler tests can capture the handler the
@@ -255,7 +262,9 @@ vi.mock('@/lib/appsflyer', () => ({
 
 vi.mock('@/lib/deep-link-launch', () => ({
   clearAccountBoundPendingDeepLink: hoisted.deepLinkLaunch.clearAccountBoundPendingDeepLink,
+  getPendingDeepLinkSnapshot: hoisted.deepLinkLaunch.getPendingDeepLinkSnapshot,
   setCurrentDeepLinkUserId: hoisted.deepLinkLaunch.setCurrentDeepLinkUserId,
+  setPendingDeepLink: hoisted.deepLinkLaunch.setPendingDeepLink,
 }));
 
 vi.mock('@/lib/auth/exchange-legacy-token', () => ({
@@ -311,6 +320,8 @@ vi.mock('@/lib/consent', () => ({
 vi.mock('@/lib/last-opened-session', () => lastOpenedSessionMock);
 
 vi.mock('@/lib/native-launcher-surfaces', () => nativeLauncherSurfacesMock);
+
+vi.mock('@/lib/last-route', () => lastRouteMock);
 
 vi.mock('@/lib/auth/trpc-unauthorized', () => ({
   setTrpcUnauthorizedHandler: unauthorizedMock.setTrpcUnauthorizedHandler,
@@ -940,6 +951,72 @@ describe('sign-out teardown ordering', () => {
     unmount();
   });
 
+  it('clears the launcher surfaces and the durable session records on sign-in (account switch)', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
+    lastOpenedSessionMock.clearLastOpenedSession.mockClear();
+    lastRouteMock.clearLastRoute.mockClear();
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    // The switch owns the device's own surfaces and records: the dynamic
+    // shortcuts/tile are dropped natively and both durable records are deleted,
+    // like the sign-out body.
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+    expect(lastOpenedSessionMock.clearLastOpenedSession).toHaveBeenCalledTimes(1);
+    expect(lastRouteMock.clearLastRoute).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('keeps a parked account-independent launch destination on sign-in', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl.mockReturnValueOnce(
+      'kiloapp:///cloud/sessions/new'
+    );
+    hoisted.deepLinkLaunch.setPendingDeepLink.mockClear();
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    // The launcher clear that runs at this boundary takes the parked URL with
+    // it, so the destination that names no account is staged for this account
+    // and the signed-in mount still opens where the Quick Action points.
+    expect(nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl).toHaveBeenCalled();
+    expect(hoisted.deepLinkLaunch.setPendingDeepLink).toHaveBeenCalledWith(
+      expect.stringContaining('/agent-chat/new'),
+      'universal-link'
+    );
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('keeps the destination already in the pending slot over the parked one', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl.mockReturnValueOnce(
+      'kiloapp:///cloud/sessions/new'
+    );
+    hoisted.deepLinkLaunch.getPendingDeepLinkSnapshot.mockReturnValue(
+      '/(app)/pr-review/github/octocat/hello/7'
+    );
+    hoisted.deepLinkLaunch.setPendingDeepLink.mockClear();
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    // The parked URL has no deadline and the captured link is live, so the
+    // occupied slot keeps the destination the person opened.
+    expect(hoisted.deepLinkLaunch.setPendingDeepLink).not.toHaveBeenCalled();
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
   it('clears the local preferences on sign-out', async () => {
     const { ctx } = await mountAndGetContext();
 
@@ -982,10 +1059,11 @@ describe('sign-out teardown ordering', () => {
       await ctx.signOut();
     });
 
-    // The dynamic shortcuts/tile are dropped natively and the durable record is
-    // deleted locally, so the next account never sees the previous session.
+    // The dynamic shortcuts/tile are dropped natively and the durable records
+    // are deleted locally, with the other account-scoped members.
     expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
     expect(lastOpenedSessionMock.clearLastOpenedSession).toHaveBeenCalledTimes(1);
+    expect(lastRouteMock.clearLastRoute).toHaveBeenCalledTimes(1);
   });
 
   it('regression: sign-out deletes run through deleteAccountMetadata and land after in-flight metadata writes', async () => {

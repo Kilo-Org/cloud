@@ -168,6 +168,31 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
+  it('returns metadata and a small snapshot without serializing message history', async () => {
+    const sessionId = newSessionId();
+    const stub = await registerSession({
+      sessionId,
+      sandboxId: await generateSandboxId(sessionId),
+      kiloSessionId: kiloSessionId(),
+    });
+    const summary = await stub.getSessionMetadataSummary();
+    const snapshot = await stub.getSession();
+    expect(summary.metadata).toEqual(await stub.getMetadata());
+    expect(summary.snapshot.type).toBe('found');
+    expect(snapshot.type).toBe('found');
+    if (snapshot.type !== 'found') throw new Error('Missing snapshot');
+    const { messages, ...expected } = snapshot;
+    expect(summary.snapshot).toEqual(expected);
+    expect(summary.snapshot).not.toHaveProperty('messages');
+    expect(summary.currentMessage).toBeNull();
+    expect(messages).toEqual([]);
+    const missing = sessions.get(sessions.idFromName(newSessionId()));
+    expect(await missing.getSessionMetadataSummary()).toEqual({
+      metadata: null,
+      snapshot: { type: 'session-not-found' },
+      currentMessage: null,
+    });
+  });
   it('exposes interrupt and send without explicit hosted lifecycle operations', () => {
     const procedures = appRouter._def.procedures;
     expect(procedures).not.toHaveProperty('getHostedSessionLifecycle');

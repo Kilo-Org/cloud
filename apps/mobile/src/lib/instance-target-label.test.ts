@@ -6,6 +6,7 @@ import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import {
   cloudAgentTargetLabel,
   formatInstanceTarget,
+  formatInstanceValue,
   resolveRunningOnLabel,
 } from './instance-target-label';
 
@@ -26,6 +27,16 @@ describe('formatInstanceTarget', () => {
     expect(formatInstanceTarget(instance({ name: 'laptop', projectName: 'kilo' }))).toBe(
       'laptop · kilo'
     );
+  });
+});
+
+describe('formatInstanceValue', () => {
+  it('names the computer alone, so the closed selector keeps its whole name', () => {
+    const target = instance({ name: 'Dev seed computer (read-only)', projectName: 'kilo' });
+
+    expect(formatInstanceValue(target)).toBe('Dev seed computer (read-only)');
+    // The full target stays available for the accessibility label.
+    expect(formatInstanceTarget(target)).toBe('Dev seed computer (read-only) · kilo');
   });
 });
 

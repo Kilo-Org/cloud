@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import {
   requestNotSentReason,
   type RequestLogByokCandidate,
+  type RequestLogByokFailoverAttempt,
   type RequestLogRoutingDetails,
   type RequestLogRoutingStep,
 } from '@/lib/request-logs/routing-details';
@@ -38,7 +39,26 @@ const TONE_LABELS: Record<StepTone, string> = {
 
 function byokOutcomeTone(outcome: string): StepTone {
   if (outcome === 'selected' || outcome === 'skipped') return outcome;
+  if (outcome === 'failed') return 'rejected';
   return 'info';
+}
+
+/** The routing decision predates failover, so the attempts decide which keys failed or served. */
+function withFailoverOutcomes(
+  candidates: RequestLogByokCandidate[],
+  attempts: RequestLogByokFailoverAttempt[]
+): RequestLogByokCandidate[] {
+  if (attempts.length === 0) return candidates;
+  const outcomes = new Map<string, string>();
+  for (const attempt of attempts) {
+    for (const providerId of attempt.byok_provider_ids) {
+      outcomes.set(providerId, attempt.outcome === 'served' ? 'selected' : 'failed');
+    }
+  }
+  return candidates.map(candidate => {
+    const outcome = outcomes.get(candidate.provider_id);
+    return outcome ? { ...candidate, outcome } : candidate;
+  });
 }
 
 function FlowNode({
@@ -125,8 +145,45 @@ function KiloStepDetails({ step }: { step: RequestLogRoutingStep }) {
   );
 }
 
+function failoverStopLabels(stopReason: string | undefined): { title: string; detail: string } {
+  switch (stopReason) {
+    case 'budget-exhausted':
+      return {
+        title: 'BYOK failover ran out of time',
+        detail: 'Too little time was left to try another key, so the last error was returned.',
+      };
+    case 'model-unavailable':
+      return {
+        title: 'BYOK failover reached a gateway that does not list this model',
+        detail: 'No further keys were tried, and the model-not-found error was returned.',
+      };
+    case 'client-disconnected':
+      return {
+        title: 'The client disconnected during BYOK failover',
+        detail: 'No further keys were tried.',
+      };
+    default:
+      return {
+        title: 'Every BYOK key that could serve the request failed',
+        detail: "The last key's error was returned.",
+      };
+  }
+}
+
+function FailoverNote({ attempts }: { attempts: RequestLogByokFailoverAttempt[] }) {
+  const failed = attempts.filter(attempt => attempt.outcome !== 'served').length;
+  return (
+    <p className="text-muted-foreground text-xs">
+      {failed === 1 ? '1 BYOK key failed' : `${failed} BYOK keys failed`} before this attempt. See
+      BYOK failover.
+    </p>
+  );
+}
+
 function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
   const result = routing.result;
+  const attempts = routing.byok_failover_attempts;
+  const finalAttempt = attempts.at(-1);
   if (!result) {
     return (
       <FlowNode tone="info" icon={Flag} isLast>
@@ -151,7 +208,26 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
       </FlowNode>
     );
   }
-  const { title, paidBy } = describeResult(result);
+  if (finalAttempt?.outcome === 'failed') {
+    const stopped = failoverStopLabels(finalAttempt.stop_reason);
+    return (
+      <FlowNode tone="rejected" icon={Flag} isLast>
+        <span className="text-sm font-medium">{stopped.title}</span>
+        <p className="text-muted-foreground text-xs">
+          {stopped.detail} Kilo credits were not used. See BYOK failover.
+        </p>
+      </FlowNode>
+    );
+  }
+  const { title, paidBy } = describeResult(
+    finalAttempt
+      ? {
+          ...result,
+          provider_type: finalAttempt.provider_type ?? result.provider_type,
+          byok_provider_ids: finalAttempt.byok_provider_ids,
+        }
+      : result
+  );
   return (
     <FlowNode tone="selected" icon={Flag} isLast>
       <span className="text-sm font-medium">{title}</span>
@@ -160,18 +236,21 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
           Paid by: <span className="text-foreground">{paidBy}</span>
         </p>
       )}
+      {finalAttempt && <FailoverNote attempts={attempts} />}
     </FlowNode>
   );
 }
 
 export function RoutingDecisionFlow({ routing }: { routing: RequestLogRoutingDetails }) {
   const byokStepIndex = routing.steps.findIndex(step => step.step === 'byok-key');
-  const showCandidatesSeparately = byokStepIndex === -1 && routing.byok_candidates.length > 0;
+  const candidates = withFailoverOutcomes(routing.byok_candidates, routing.byok_failover_attempts);
+  const showCandidatesSeparately = byokStepIndex === -1 && candidates.length > 0;
+  const failedOver = routing.byok_failover_attempts.length > 0;
 
   return (
     <ol className="flex flex-col" aria-label="Provider selection steps">
       {routing.steps.map((step, index) => {
-        const described = describeStep(step);
+        const described = describeStep(step, { failedOver });
         return (
           <FlowNode
             key={`${step.step}-${index}`}
@@ -186,8 +265,8 @@ export function RoutingDecisionFlow({ routing }: { routing: RequestLogRoutingDet
             {described.detail && (
               <p className="text-muted-foreground text-xs">{described.detail}</p>
             )}
-            {index === byokStepIndex && routing.byok_candidates.length > 0 && (
-              <ByokCandidates candidates={routing.byok_candidates} />
+            {index === byokStepIndex && candidates.length > 0 && (
+              <ByokCandidates candidates={candidates} />
             )}
             {step.step === 'kilo' && <KiloStepDetails step={step} />}
           </FlowNode>
@@ -196,7 +275,7 @@ export function RoutingDecisionFlow({ routing }: { routing: RequestLogRoutingDet
       {showCandidatesSeparately && (
         <FlowNode tone="info" icon={Info} isLast={false}>
           <span className="text-sm font-medium">BYOK keys</span>
-          <ByokCandidates candidates={routing.byok_candidates} />
+          <ByokCandidates candidates={candidates} />
         </FlowNode>
       )}
       <ResultNode routing={routing} />

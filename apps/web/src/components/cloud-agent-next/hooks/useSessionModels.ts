@@ -62,6 +62,7 @@ type UseSessionModelsInput = Omit<
   sessionIdFromParams: string | null;
   knownModels: readonly KnownModel[];
   currentUserId?: string;
+  loadGatewayCatalog?: boolean;
 };
 
 type SessionModels = {
@@ -120,13 +121,19 @@ export function useSessionModels(input: UseSessionModelsInput): UseSessionModels
     sessionIdFromParams
   );
   const usesGateway = activeSessionType !== 'remote' || remoteModelState.protocol === 'legacy';
+  const usesComposerModel = activeSessionType !== 'remote';
+  // Only the selected, known model may stand in for the owning account's catalog.
+  const requestCatalog =
+    input.loadGatewayCatalog !== false ||
+    !usesComposerModel ||
+    !knownModels.some(model => model.id === gatewayModelId);
   const gatewayModels = useOrganizationModels(
     gatewayOrganization.organizationId,
-    usesGateway && gatewayOrganization.resolved
+    usesGateway && gatewayOrganization.resolved && requestCatalog
   );
-  const catalogLoaded = gatewayOrganization.resolved && !gatewayModels.isLoadingModels;
+  const catalogLoaded =
+    requestCatalog && gatewayOrganization.resolved && !gatewayModels.isLoadingModels;
   // A remote session's model comes from its CLI, not from the composer settings.
-  const usesComposerModel = activeSessionType !== 'remote';
   const catalog = useMemo(
     () =>
       withKnownModel(

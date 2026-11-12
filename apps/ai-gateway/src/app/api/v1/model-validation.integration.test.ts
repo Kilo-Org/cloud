@@ -53,7 +53,7 @@ import { POST as organizationValidator } from './organizations/[id]/models/valid
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
 import { RUNTIME_PROXY_ATTESTATION_HEADER } from '@kilocode/worker-utils/runtime-proxy-attestation';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { auto_routing_custom_routers } from '@kilocode/db/schema';
 
 jest.mock('../../../../../../services/cloud-agent-next/src/logger', () => ({
@@ -297,7 +297,7 @@ describe('cloud-agent model validation through real web authentication', () => {
         org.id,
         { type: 'member', kiloUserId: user.id, allowNonMember: true },
         'member',
-        { countryCode: null }
+        { countryCode: null, fromDb: readDb }
       );
     }
   );

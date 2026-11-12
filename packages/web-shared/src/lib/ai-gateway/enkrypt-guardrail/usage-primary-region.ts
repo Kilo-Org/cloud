@@ -8,7 +8,7 @@ import {
   ENKRYPT_USAGE_WRITE_PATH,
   EnkryptUsageWriteResponseSchema,
   type EnkryptUsageWriteInput,
-} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-write';
+} from '@kilocode/usage-contracts';
 
 /** Must stay below the endpoint's `maxDuration`; matches `recordUsageInPrimaryRegion`. */
 const HANDOFF_TIMEOUT_MS = 90_000;

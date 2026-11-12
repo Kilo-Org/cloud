@@ -1,6 +1,7 @@
 export { default } from './server.js';
 export { SandboxContainment, SandboxSmallContainment } from './legacy-runtime-tombstones.js';
 export { ContainersOutbound } from './sandbox-containers/containers-outbound.js';
+export { SessionSyncAuthorization } from './session-sync-authorization.js';
 // Production `SANDBOX_CONTROL` / `SANDBOX_SESSION` bindings. `wrangler.jsonc`
 // class names stay `SandboxControl` and `SandboxSession`.
 export { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sandbox-do.js';

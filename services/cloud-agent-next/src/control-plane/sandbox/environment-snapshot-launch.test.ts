@@ -43,6 +43,7 @@ const RESOLVED: SnapshotResolution = {
   snapshot: {
     snapshotId: 'snap-1',
     baseImage: 'registry.example/app:1',
+    provider: 'cloudflare-containers',
     revision: 1,
     capturedAt: Date.parse('2026-10-24T21:32:19Z'),
     buildId: '22222222-2222-4222-8222-222222222222',
@@ -176,15 +177,23 @@ describe('environmentLaunchCandidate for a V2 environment', () => {
 
 describe('environment snapshot lookup', () => {
   it('returns the coordinator resolution within the budget', async () => {
+    const requests: unknown[] = [];
     const namespace = {
-      getByName: () => ({ resolveSnapshot: async () => RESOLVED }),
+      getByName: () => ({
+        resolveSnapshot: async (request: unknown) => {
+          requests.push(request);
+          return RESOLVED;
+        },
+      }),
     } as unknown as DurableObjectNamespace<never>;
     const lookup = await lookupEnvironmentSnapshot({
       namespace: namespace as never,
       candidate: { reference: REFERENCE, actorUserId: 'user-1', buildCommands: 0 },
+      provider: 'vercel',
       launchDeadlineAt: Date.now() + 60_000,
     });
     expect(lookup).toEqual({ kind: 'resolved', resolution: RESOLVED });
+    expect(requests).toEqual([{ reference: REFERENCE, actorUserId: 'user-1', provider: 'vercel' }]);
     expect(snapshotStart(RESOLVED)).toEqual({
       snapshotId: 'snap-1',
       baseImage: 'registry.example/app:1',
@@ -199,6 +208,7 @@ describe('environment snapshot lookup', () => {
     const lookup = await lookupEnvironmentSnapshot({
       namespace: namespace as never,
       candidate: { reference: REFERENCE, actorUserId: 'user-1', buildCommands: 0 },
+      provider: 'cloudflare-containers',
       launchDeadlineAt: Date.now() + 50,
     });
     expect(lookup).toEqual({ kind: 'timeout' });
@@ -219,6 +229,7 @@ describe('environment snapshot lookup', () => {
       lookupEnvironmentSnapshot({
         namespace: namespace as never,
         candidate: { reference: REFERENCE, actorUserId: 'user-1', buildCommands: 0 },
+        provider: 'cloudflare-containers',
         launchDeadlineAt: Date.now() + 60_000,
       })
     ).resolves.toEqual({ kind: 'unavailable' });
@@ -227,6 +238,7 @@ describe('environment snapshot lookup', () => {
       lookupEnvironmentSnapshot({
         namespace: undefined,
         candidate: { reference: REFERENCE, actorUserId: 'user-1', buildCommands: 0 },
+        provider: 'cloudflare-containers',
         launchDeadlineAt: Date.now() + 60_000,
       })
     ).resolves.toEqual({ kind: 'unavailable' });
@@ -297,6 +309,11 @@ describe('environmentSnapshotDecision', () => {
       'incompatible',
       'environment_snapshot_incompatible',
       'Environment snapshot is unavailable. Rebuild the environment.',
+    ],
+    [
+      'provider_mismatch',
+      'environment_not_supported',
+      "This session runs on different compute than the environment's snapshot. Use the environment's compute.",
     ],
   ] as const)(
     'explains a %s snapshot without exposing build IDs',
@@ -545,10 +562,48 @@ describe('environmentSnapshotDecision', () => {
     });
   });
 
-  it('names the rebuild action after a required snapshot start fails', () => {
+  it('asks for a message retry before a rebuild after a transient provider start failure', () => {
     expect(environmentSnapshotStartBlock({ ...CANDIDATE, buildCommands: 1 }, BUILD_ID)).toEqual({
       reason: 'environment_snapshot_start_failed',
-      detail: 'Environment snapshot is unavailable. Rebuild the environment.',
+      detail:
+        'Sandbox could not start from the environment snapshot. Send the message again to retry. Rebuild the environment only if this failure repeats.',
+      environmentId: REFERENCE.environmentId,
+      buildId: BUILD_ID,
+    });
+  });
+
+  it.each([
+    [
+      'expired',
+      'environment_snapshot_expired',
+      'Environment snapshot is unavailable. Rebuild the environment.',
+    ],
+    [
+      'image_mismatch',
+      'environment_snapshot_incompatible',
+      'Environment snapshot is unavailable. Rebuild the environment.',
+    ],
+    [
+      'provenance',
+      'environment_snapshot_incompatible',
+      'Environment snapshot is unavailable. Rebuild the environment.',
+    ],
+    [
+      'missing',
+      'environment_snapshot_unavailable',
+      'Environment snapshot is unavailable. Rebuild the environment.',
+    ],
+    [
+      'unsupported',
+      'environment_snapshot_incompatible',
+      'Environment snapshot is unavailable. Rebuild the environment.',
+    ],
+  ] as const)('keeps permanent provider failure %s actionable', (failureReason, reason, detail) => {
+    expect(
+      environmentSnapshotStartBlock({ ...CANDIDATE, buildCommands: 1 }, BUILD_ID, failureReason)
+    ).toEqual({
+      reason,
+      detail,
       environmentId: REFERENCE.environmentId,
       buildId: BUILD_ID,
     });

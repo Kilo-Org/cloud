@@ -17,11 +17,24 @@ export const authMiddleware = createMiddleware<HonoContext>(
     const cloudAgentAuthorityAllowed =
       procedureName === 'prepareSession' ||
       (procedureName !== null && isCloudAgentManagementPath(procedureName));
-    const result = await validateKiloToken(authHeader ?? null, {
-      secret: nextAuthSecret,
-      connectionString: c.env.HYPERDRIVE.connectionString,
-      ...(cloudAgentAuthorityAllowed ? { allowCloudAgentAuthority: true } : {}),
-    });
+    let result: Awaited<ReturnType<typeof validateKiloToken>>;
+    try {
+      result = await validateKiloToken(authHeader ?? null, {
+        secret: nextAuthSecret,
+        connectionString: c.env.HYPERDRIVE.connectionString,
+        ...(cloudAgentAuthorityAllowed ? { allowCloudAgentAuthority: true } : {}),
+      });
+    } catch (error) {
+      // A failed credential lookup (e.g. a database outage) is not an invalid credential.
+      logger
+        .withFields({ error: error instanceof Error ? error.message : String(error) })
+        .error('Authentication check unavailable');
+      return buildTrpcErrorResponse(
+        503,
+        'Authentication is temporarily unavailable',
+        procedureName ?? undefined
+      );
+    }
 
     if (!result.success) {
       logger.withFields({ error: result.error }).warn('Authentication failed');

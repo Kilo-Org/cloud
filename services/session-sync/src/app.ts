@@ -5,6 +5,7 @@ import { cors } from 'hono/cors';
 import { z } from 'zod';
 
 import { authorize, exchange, type Principal } from './auth';
+import { authorizeCloudAgentUpload } from './cloud-agent-upload';
 import { uploadBlob } from './blob-upload';
 import { getSessionSyncDOStub, type SessionSyncDO } from './dos/SessionSyncDO';
 import type { Env } from './env';
@@ -188,7 +189,8 @@ app.post('/v1/auth/exchange', c => exchange(c.req.raw, c.env));
 app.route('/v1', live);
 
 app.use('/v1/sessions/*', async (c, next) => {
-  const principal = await authorize(c.req.raw, c.env);
+  const principal =
+    (await authorizeCloudAgentUpload(c.req.raw, c.env)) ?? (await authorize(c.req.raw, c.env));
   if (principal instanceof Response) return principal;
   c.set('principal', principal);
   const metrics = requestMetrics(c.req.raw);

@@ -98,18 +98,20 @@ export type DirectByokProvider = DirectByokProviderBase &
 
 /**
  * The upstream of a provider that takes the stored credential as a bearer API key, with the chat
- * APIs it serves. Spread the result into the provider.
+ * APIs it serves and the no-op request transform. Spread the result into the provider; a provider
+ * that rewrites the request declares its own `transformRequest` after the spread.
  */
 export function apiKeyUpstream(upstream: {
   apiUrl: string;
   apiUrlOverrides?: ProviderApiUrlOverrides;
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
   responseTransforms: ProviderResponseTransforms | null;
-}): Pick<DirectByokProvider, 'resolveUpstream'> & {
+}): Pick<DirectByokProvider, 'resolveUpstream' | 'transformRequest'> & {
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
 } {
   return {
     supportedChatApis: upstream.supportedChatApis,
+    transformRequest() {},
     async resolveUpstream({ credential }) {
       return {
         apiUrl: upstream.apiUrl,

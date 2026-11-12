@@ -1167,6 +1167,19 @@ export async function restoreSession(
           log('snapshot missing info.id — likely an error response');
           return result;
         }
+        // Every outcome above returned already, so this is a well-formed export
+        // of one session. Its identity must be the session that asked for it:
+        // the transcript and its file diffs belong to that identity.
+        if (snapshotInfoValidation.infoId !== kiloSessionId) {
+          log(
+            `snapshot belongs to a different session; refusing to import expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${snapshotInfoValidation.infoId ?? '(missing)'} bytes=${bytesWritten}`
+          );
+          return fail(
+            `snapshot belongs to a different session (${bytesWritten} bytes)`,
+            null,
+            'download'
+          );
+        }
       } catch {
         return classifyDownloadFailure(
           options.signal,
@@ -1190,6 +1203,15 @@ export async function restoreSession(
         log(
           `provided snapshot metadata inspected status=${providedInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${providedInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${providedInfoValidation.infoId === kiloSessionId}`
         );
+        if (
+          providedInfoValidation.validation === 'valid' &&
+          providedInfoValidation.infoId !== kiloSessionId
+        ) {
+          log(
+            `provided snapshot belongs to a different session; refusing to import expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${providedInfoValidation.infoId ?? '(missing)'}`
+          );
+          return fail('snapshot belongs to a different session', null, 'download');
+        }
       } catch {
         options.signal?.throwIfAborted();
         log(`provided snapshot metadata inspection failed expectedKiloSessionId=${kiloSessionId}`);

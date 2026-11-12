@@ -598,7 +598,14 @@ describe('cold-hot sandbox identity', () => {
       waitForOwnedContainer,
     });
 
-    const result = await coldHot({ config, conversation: 'echo:hi' }, localEnvironment(sandbox));
+    const reclaimSessions = vi.fn(async () => {});
+    const result = await coldHot(
+      { config, conversation: 'echo:hi' },
+      {
+        ...localEnvironment(sandbox),
+        reclaimSessions,
+      }
+    );
 
     expect(result.ok).toBe(true);
     expect(result.message).toContain('cold-sandbox=container_cold');
@@ -611,6 +618,12 @@ describe('cold-hot sandbox identity', () => {
         timeoutMs: 240_000,
       })
     );
+    expect(reclaimSessions).toHaveBeenCalledWith([
+      { sessionId: SESSION_ID, kiloSessionId: KILO_SESSION_ID },
+    ]);
+    expect(mocks.deleteSession).toHaveBeenCalled();
+    const firstDelete = Math.min(...mocks.deleteSession.mock.invocationCallOrder);
+    expect(reclaimSessions.mock.invocationCallOrder[0]).toBeLessThan(firstDelete);
   });
 
   it('ignores an unrelated container that appears while the cold container persists', async () => {
@@ -785,6 +798,73 @@ describe('unknown-model', () => {
 });
 
 describe('collectChildMessageText', () => {
+  function nativeMessage(
+    parentID: string,
+    text: string,
+    type = 'assistant',
+    extraContent: unknown[] = []
+  ): StreamEvent {
+    return streamEvent('kilocode', {
+      type: 'conversation.message.updated',
+      properties: {
+        sessionID: KILO_SESSION_ID,
+        source: {
+          version: 'v2',
+          session: {
+            id: KILO_SESSION_ID,
+            location: { directory: '/workspace' },
+            time: { created: 1, updated: 2 },
+          },
+        },
+        message: {
+          id: 'msg_native_assistant',
+          type,
+          time: { created: 1 },
+          content: [
+            { type: 'text', text },
+            { type: 'reasoning', text: 'not answer text' },
+            ...extraContent,
+          ],
+        },
+        parentID,
+      },
+    });
+  }
+
+  it('reads the latest native v2 assistant snapshot with the matching parent', () => {
+    const events = [nativeMessage(COLD_MESSAGE_ID, 'hel'), nativeMessage(COLD_MESSAGE_ID, 'hello')];
+    expect(collectChildMessageText(events, COLD_MESSAGE_ID)).toBe('hello');
+    expect(hasCorrelatedStreamProgress(events, COLD_MESSAGE_ID)).toBe(true);
+    expect(collectChildMessageText(events, 'unrelated')).toBe('');
+    expect(hasCorrelatedStreamProgress(events, 'unrelated')).toBe(false);
+    expect(
+      collectChildMessageText([nativeMessage(COLD_MESSAGE_ID, 'user', 'user')], COLD_MESSAGE_ID)
+    ).toBe('');
+  });
+
+  it('excludes transient CLI progress items from a native snapshot', () => {
+    const spinner = {
+      type: 'text',
+      text: ' Thinking...',
+      metadata: { 'kilocode.lifecycle': 'transient' },
+    };
+    expect(
+      collectChildMessageText(
+        [nativeMessage(COLD_MESSAGE_ID, 'hello', 'assistant', [spinner])],
+        COLD_MESSAGE_ID
+      )
+    ).toBe('hello');
+  });
+
+  it('does not retain native text replaced by an empty snapshot', () => {
+    expect(
+      collectChildMessageText(
+        [nativeMessage(COLD_MESSAGE_ID, 'removed'), nativeMessage(COLD_MESSAGE_ID, '')],
+        COLD_MESSAGE_ID
+      )
+    ).toBe('');
+  });
+
   it('keeps the latest text snapshot per part id', () => {
     const events = [
       assistantMessageEvent(COLD_MESSAGE_ID, COLD_ASSISTANT_MESSAGE_ID),

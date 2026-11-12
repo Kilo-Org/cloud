@@ -2,14 +2,14 @@ import { requireCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custo
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { ModelStatsBenchmarksSchema, modelStats } from '@kilocode/db/schema';
-import { unprefixKiloGatewayModelId } from '@kilocode/worker-utils/kilo-model-id';
 import { eq } from 'drizzle-orm';
+import { lookupModelWithKiloGatewayFallback } from './model-id-lookup';
 
 const TerminalBenchSchema = ModelStatsBenchmarksSchema.unwrap()
   .pick({ kiloBench: true })
   .optional();
 
-const TTL = process.env.NODE_ENV === 'test' ? 0 : 5 * 60 * 1000;
+const TTL_MS = 5 * 60 * 1000;
 
 export type TerminalBenchSummary = {
   overallScore: number;
@@ -57,10 +57,7 @@ export function terminalBenchFor(
   summaries: TerminalBenchSummaries,
   id: string
 ): TerminalBenchSummary | undefined {
-  const exact = summaries.get(id);
-  if (exact) return exact;
-  const unprefixed = unprefixKiloGatewayModelId(id);
-  return unprefixed ? summaries.get(unprefixed) : undefined;
+  return lookupModelWithKiloGatewayFallback(id, candidate => summaries.get(candidate));
 }
 
 async function loadTerminalBench(): Promise<TerminalBenchSummaries> {
@@ -80,12 +77,8 @@ async function loadActiveRows(): Promise<Row[]> {
 }
 
 export const getTerminalBenchSummaries = createCachedFetch(
-  () =>
-    loadTerminalBench().catch(err => {
-      console.error('[terminal-bench] Failed to load model summaries:', err);
-      throw err;
-    }),
-  TTL,
+  loadTerminalBench,
+  TTL_MS,
   new Map<string, TerminalBenchSummary>(),
   { name: 'terminalBenchSummaries' }
 );

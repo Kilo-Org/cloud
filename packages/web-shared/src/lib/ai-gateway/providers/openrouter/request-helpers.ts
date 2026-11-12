@@ -349,7 +349,8 @@ function mapReasoningDetailsToReasoningString(
           case ReasoningDetailType.Text:
             return detail.text ?? '';
           case ReasoningDetailType.Summary:
-            return detail.summary;
+            // Summaries are separate output metadata, not raw reasoning text.
+            return '';
           case ReasoningDetailType.Encrypted:
             // Opaque provider-specific blob; not representable as a reasoning string.
             return '';

@@ -132,11 +132,16 @@ function createFeedFactory(options: { failOpens?: number } = {}): {
     callbacks: KiloFeedCallbacks
   ) => { open(): Promise<void>; close(): void };
   feeds: FakeFeedRecord[];
+  /** Refuses the next `count` opens, as a dead Kilo listener does. */
+  failOpens(count: number): void;
 } {
   const feeds: FakeFeedRecord[] = [];
   let remainingFailures = options.failOpens ?? 0;
   return {
     feeds,
+    failOpens(count) {
+      remainingFailures = count;
+    },
     openFeed: (source, callbacks) => {
       const record: FakeFeedRecord = {
         callbacks,
@@ -204,6 +209,7 @@ function createRuntime(options: {
   timers?: ControlPlaneTimers;
   onRestart?: KiloRuntimeOptions['onRestart'];
   onEvent?: KiloRuntimeOptions['onEvent'];
+  onFeedInterrupted?: KiloRuntimeOptions['onFeedInterrupted'];
   sampleMemory?: KiloRuntimeOptions['sampleMemory'];
   memoryHolds?: boolean[];
   readSnapshot?: KiloRuntimeOptions['readSnapshot'];
@@ -228,6 +234,7 @@ function createRuntime(options: {
     log: message => logs.push(message),
     onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
     onEvent: options.onEvent,
+    onFeedInterrupted: options.onFeedInterrupted,
     ...(options.isIdle
       ? {
           isIdle: async () => options.isIdle!(),
@@ -680,6 +687,14 @@ describe('createKiloRuntime', () => {
       });
       const client = await runtime.ensure();
       client.submit = async () => undefined;
+      client.drainSession = async input => {
+        turns.observeKiloEvent({
+          type: 'session.drained',
+          properties: { sessionID: input.sessionId, token: input.token },
+          nativeRuntimeId: runtime.nativeRuntimeId!,
+        });
+        return true;
+      };
       const turns = createTurnManager({
         timers: TEST_TIMERS,
         runtimes: { get: () => runtime },
@@ -750,6 +765,14 @@ describe('createKiloRuntime', () => {
       const submitted: string[] = [];
       client.submit = async input => {
         submitted.push(input.messageId ?? '');
+      };
+      client.drainSession = async input => {
+        turns.observeKiloEvent({
+          type: 'session.drained',
+          properties: { sessionID: input.sessionId, token: input.token },
+          nativeRuntimeId: runtime.nativeRuntimeId!,
+        });
+        return true;
       };
       const turns = createTurnManager({
         timers: TEST_TIMERS,
@@ -1030,12 +1053,107 @@ describe('createKiloRuntime', () => {
     await runtime.shutdown();
   });
 
+  it('reports v2 established feed loss synchronously before reconnecting, but not retirement', async () => {
+    const feed = createFeedFactory();
+    const gaps: string[] = [];
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      scheduler: createScheduler(),
+      feed,
+      probe: createProbe(true),
+      onFeedInterrupted: id => gaps.push(id),
+    });
+    const client = await runtime.ensure();
+    client.drainSession = async () => true;
+    const first = feed.feeds[0]!;
+    first.callbacks.onFailure();
+    expect(gaps).toEqual([first.nativeRuntimeId]);
+    await waitFor(() => feed.feeds.length === 2);
+    await runtime.shutdown();
+    expect(gaps).toEqual([first.nativeRuntimeId]);
+  });
+
+  it('does not report an opening failure as established feed history loss', async () => {
+    const gaps: string[] = [];
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      scheduler: createScheduler(),
+      feed: createFeedFactory({ failOpens: 1 }),
+      probe: createProbe(true),
+      onFeedInterrupted: id => gaps.push(id),
+    });
+    expect(await runtime.ensure().catch(error => error)).toBeInstanceOf(Error);
+    expect(gaps).toEqual([]);
+    await runtime.shutdown();
+  });
+
+  it.each([0, 1])(
+    'restarts a crashed Kilo for its exit after %i earlier successful reconnects',
+    async earlierReconnects => {
+      const spawner = createSpawner();
+      const feed = createFeedFactory();
+      const scheduler = createScheduler();
+      const { runtime, logs } = createRuntime({
+        spawner,
+        feed,
+        probe: createProbe(true),
+        scheduler,
+        timers: timers({ sseSilenceMs: 60_000, healthRequestMs: 1_000 }),
+      });
+      const limit = CONTROL_PLANE_TIMERS.wrapper.sseReconnectLimit;
+      const client = await runtime.ensure();
+      client.drainSession = async () => true;
+      if (earlierReconnects > 0) {
+        feed.feeds[0]!.callbacks.onFailure();
+        await waitFor(() => feed.feeds.length === 2);
+        feed.feeds[1]!.callbacks.onEvent({
+          type: 'server.heartbeat',
+          properties: {},
+          nativeRuntimeId: 'r',
+        });
+        await Bun.sleep(1);
+        scheduler.advance(10_000);
+      }
+      feed.failOpens(limit - earlierReconnects);
+      feed.feeds.at(-1)!.callbacks.onFailure();
+      // The listener died first; the spawned process reports its exit a little later.
+      await waitFor(() => feed.feeds.length >= 1 + limit);
+      await Bun.sleep(20);
+      spawner.processes[0]!.exit();
+      await waitFor(() => logs.some(line => line.includes('kilo restarting')));
+      expect(logs.find(line => line.includes('kilo restarting'))).toContain('reason=exit');
+      await runtime.shutdown();
+    }
+  );
+
+  it('restarts a live Kilo as hung when its refused reopens spend the budget', async () => {
+    const spawner = createSpawner();
+    const feed = createFeedFactory();
+    const { runtime, logs } = createRuntime({
+      spawner,
+      feed,
+      probe: createProbe(true),
+      scheduler: createScheduler(),
+      timers: timers({ sseSilenceMs: 60_000, healthRequestMs: 50 }),
+    });
+    await runtime.ensure();
+    feed.failOpens(CONTROL_PLANE_TIMERS.wrapper.sseReconnectLimit);
+    feed.feeds[0]!.callbacks.onFailure();
+    await waitFor(() => logs.some(line => line.includes('kilo restarting')));
+    expect(logs.find(line => line.includes('kilo restarting'))).toContain(
+      '"trigger":"sse_reconnect_budget"'
+    );
+    await runtime.shutdown();
+  });
+
   it('reconnects the stream and counts it when the health probe answers', async () => {
     const spawner = createSpawner();
     const scheduler = createScheduler();
     const feed = createFeedFactory();
     const probe = createProbe(true);
+    const gaps: string[] = [];
     const { runtime, restarts } = createRuntime({
+      onFeedInterrupted: id => gaps.push(id),
       spawner,
       feed,
       probe,
@@ -1061,6 +1179,8 @@ describe('createKiloRuntime', () => {
     expect(feed.feeds[0]!.closed).toBe(1);
     expect(spawner.spawnCount()).toBe(1);
     expect(restarts).toEqual([]);
+    // V1 retains main's reconnect behavior without drain-completion notifications.
+    expect(gaps).toEqual([]);
     await runtime.shutdown();
   });
 
@@ -1660,6 +1780,10 @@ describe('Kilo observation recovery', () => {
     const client = await created.runtime.ensure();
     client.submit = async input => {
       submissions.push(input.messageId ?? '');
+    };
+    client.drainSession = async input => {
+      event('session.drained', { sessionID: input.sessionId, token: input.token });
+      return true;
     };
     client.interrupt = async input => {
       aborts.push(input.sessionId);

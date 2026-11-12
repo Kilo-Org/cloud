@@ -61,6 +61,7 @@ import {
   conversationRetentionKey,
   retainConversationAcrossMounts,
 } from '@/lib/pr-review/discussion/conversation-retention';
+import { createLauncherSurfacesPublisher } from '@/lib/launcher-surfaces-publish';
 import { type ConversationComment } from '@/lib/pr-review/discussion/review-discussion-types';
 import {
   clearSessionScopedState,
@@ -117,6 +118,9 @@ const mocks = vi.hoisted(() => ({
   forgetRemoteMcp: vi.fn(),
   clearTrustedImageHosts: vi.fn(),
   clearRepoSelectionSenders: vi.fn(),
+  clearLauncherSurfaces: vi.fn(),
+  clearLastOpenedSession: vi.fn(),
+  clearLastRoute: vi.fn(),
   notifyArtifactsChanged: vi.fn(),
   reapTempFiles: vi.fn(),
   resetArtifactMirrorSyncState: vi.fn(),
@@ -174,6 +178,17 @@ vi.mock('@/lib/chat/settings-tools-switch', () => ({
 vi.mock('@/lib/hooks/repo-selection-senders', () => ({
   clearRepoSelectionSenders: mocks.clearRepoSelectionSenders,
 }));
+// The OS launcher surfaces and the two durable records are device-wide and their
+// modules reach the native launcher bridge and SecureStore on import, so the
+// boundary suite observes their clears through these spies. Their own suites
+// pin what each clear removes.
+vi.mock('@/lib/native-launcher-surfaces', () => ({
+  clearLauncherSurfaces: mocks.clearLauncherSurfaces,
+}));
+vi.mock('@/lib/last-opened-session', () => ({
+  clearLastOpenedSession: mocks.clearLastOpenedSession,
+}));
+vi.mock('@/lib/last-route', () => ({ clearLastRoute: mocks.clearLastRoute }));
 // The platform provider bridge: sign-out has to tell an open Files app the tree
 // changed, or it keeps the listing it read before the wipe.
 vi.mock('@/lib/artifacts/artifact-provider-native', () => ({
@@ -201,6 +216,9 @@ const SESSION_MEMBERS = [
   mocks.clearRepoSelectionSenders,
   shareMock.clearAccountStagedSharePayloads,
   shareMock.clearAccountStagedShareNavigation,
+  mocks.clearLauncherSurfaces,
+  mocks.clearLastOpenedSession,
+  mocks.clearLastRoute,
 ];
 
 /** Android mirror root: `Paths.document` plus the mirror folder name. */
@@ -284,6 +302,47 @@ describe('clearSessionScopedState', () => {
     });
     // The members after it still ran.
     expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the OS launcher surfaces and the durable last-session records', () => {
+    // The shortcuts/tile labels and the two records belong to the account that
+    // wrote them, and both boundaries drop them with the other account-scoped
+    // members.
+    clearSessionScopedState();
+
+    expect(mocks.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+    expect(mocks.clearLastOpenedSession).toHaveBeenCalledTimes(1);
+    expect(mocks.clearLastRoute).toHaveBeenCalledTimes(1);
+
+    clearSessionScopedState();
+
+    expect(mocks.clearLauncherSurfaces).toHaveBeenCalledTimes(2);
+    expect(mocks.clearLastOpenedSession).toHaveBeenCalledTimes(2);
+    expect(mocks.clearLastRoute).toHaveBeenCalledTimes(2);
+  });
+
+  it('makes the live launcher publisher write its derivation again', () => {
+    // The parent layout stays mounted across an account switch, and the
+    // derived list can match the one just written, so the boundary reaches the
+    // mounted publisher as well as the OS surface.
+    const publish = vi.fn<(payload: unknown) => void>();
+    const publisher = createLauncherSurfacesPublisher(publish, () => {
+      mocks.clearLauncherSurfaces();
+    });
+    const launcherTargets = {
+      newAgentUrl: 'kiloapp:///cloud/sessions/new',
+      needsInputUrl: null,
+      openLastSessionUrl: null,
+    };
+    const translate = (key: string): string => key;
+
+    publisher.apply(launcherTargets, translate);
+    expect(publish).toHaveBeenCalledTimes(1);
+
+    clearSessionScopedState();
+
+    publisher.apply(launcherTargets, translate);
+    expect(publish).toHaveBeenCalledTimes(2);
   });
 
   it('drops the retained PR discussion conversation', () => {

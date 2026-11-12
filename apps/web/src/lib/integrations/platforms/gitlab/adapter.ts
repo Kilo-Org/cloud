@@ -469,12 +469,6 @@ export type GitLabProject = {
   archived: boolean;
   marked_for_deletion_on?: string | null;
   marked_for_deletion_at?: string | null;
-  /**
-   * Access the requesting credential holds on the project, as reported by the
-   * instance. The value is provider input with no shape guarantee, so a caller
-   * that reads it validates it before use.
-   */
-  permissions?: unknown;
 };
 
 function isActiveGitLabProject(project: GitLabProject): boolean {
@@ -1904,44 +1898,6 @@ export async function addReactionToMR(
     mrIid,
     emoji,
   });
-}
-
-/**
- * A non-ok HTTP response from the GitLab single-project read. The status is the
- * only provider detail a caller can act on; the response body is never
- * included, so a message built from this error cannot leak a token or a
- * project path.
- */
-export class GitLabProjectFetchError extends Error {
-  constructor(readonly status: number) {
-    super(`GitLab project fetch failed: ${status}`);
-    this.name = 'GitLabProjectFetchError';
-  }
-}
-
-export async function getGitLabProject(
-  accessToken: string,
-  projectPath: string,
-  instanceUrl: string = DEFAULT_GITLAB_URL
-): Promise<GitLabProject> {
-  const encodedPath = encodeURIComponent(projectPath);
-
-  const response = await fetchGitLab(
-    buildGitLabUrl(instanceUrl, `/api/v4/projects/${encodedPath}`),
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const bodyExcerpt = providerErrorExcerpt(await response.text());
-    logExceptInTest('GitLab project fetch failed:', { status: response.status, bodyExcerpt });
-    throw new GitLabProjectFetchError(response.status);
-  }
-
-  return (await response.json()) as GitLabProject;
 }
 
 export async function fetchGitLabRepositorySize(

@@ -68,36 +68,118 @@ const NOT_MODEL_WRITTEN_FIELDS = new Set([
 ]);
 
 /**
+ * Fields never scanned: those the model did not write, signatures and encrypted content under any
+ * name, such as `reasoning_signature`, and reasoning summaries, which restate the raw reasoning and
+ * are not fed back to the model.
+ */
+function isScannedField(key: string): boolean {
+  return !NOT_MODEL_WRITTEN_FIELDS.has(key) && !/summary|signature|encrypted/i.test(key);
+}
+
+/**
  * Output types the gateway does not know yet, such as new tool calls, are scanned as JSON so that
  * they are checked rather than skipped.
  */
 function unknownOutputText(value: Record<string, unknown>): Text {
-  return jsonText(
-    Object.fromEntries(Object.entries(value).filter(([key]) => !NOT_MODEL_WRITTEN_FIELDS.has(key)))
-  );
+  return jsonText(Object.fromEntries(Object.entries(value).filter(([key]) => isScannedField(key))));
 }
 
-const chatMessageSchema = z.object({
-  content: z
-    .union([z.string(), z.array(z.object({ type: z.string(), text, refusal: text }))])
-    .nullish(),
+const contentPartSchema = z.looseObject({ type: z.string(), text, refusal: text });
+
+const functionSchema = z.looseObject({ name: text, arguments: text });
+
+const chatMessageSchema = z.looseObject({
+  content: z.union([z.string(), z.array(contentPartSchema)]).nullish(),
   refusal: text,
   reasoning: text,
   reasoning_content: text,
-  reasoning_details: z.array(z.object({ type: z.string(), text })).nullish(),
+  reasoning_details: z.array(z.looseObject({ type: z.string(), text })).nullish(),
   tool_calls: z
     .array(
-      z.object({
+      z.looseObject({
         index: z.number().optional(),
-        function: z.object({ name: text, arguments: text }).nullish(),
-        custom: z.object({ name: text, input: text }).nullish(),
+        function: functionSchema.nullish(),
+        custom: z.looseObject({ name: text, input: text }).nullish(),
       })
     )
     .nullish(),
-  function_call: z.object({ name: text, arguments: text }).nullish(),
+  function_call: functionSchema.nullish(),
 });
 
 type ChatMessage = z.infer<typeof chatMessageSchema>;
+
+/**
+ * Message fields read above, and those that are not model output: the role, and annotations, such
+ * as citations of web search results.
+ */
+const KNOWN_CHAT_MESSAGE_FIELDS = new Set([
+  ...Object.keys(chatMessageSchema.shape),
+  'role',
+  'annotations',
+]);
+
+const BASE64_DATA_URL = /^data:[^,]*;base64,/i;
+
+/**
+ * Adds the strings of a value the gateway does not know, each under its path, so text streamed in
+ * pieces across deltas, such as an audio transcript, joins in order like `content`. Type tags are
+ * not model output, and base64 data URLs, such as generated images or audio, are not text, so
+ * neither is scanned.
+ */
+function addUnknownStrings(groups: TextGroups, path: string, value: unknown) {
+  if (typeof value === 'string') {
+    if (!BASE64_DATA_URL.test(value)) groups.add(path, value);
+  } else if (Array.isArray(value)) {
+    value.forEach((item, index) => addUnknownStrings(groups, `${path}.${index}`, item));
+  } else if (value !== null && typeof value === 'object') {
+    for (const [key, item] of Object.entries(value)) {
+      if (key !== 'type' && isScannedField(key)) addUnknownStrings(groups, `${path}.${key}`, item);
+    }
+  }
+}
+
+/** Adds the strings of the fields of `value` that are not in `known`, as `addUnknownStrings` does. */
+function addUnknownFields(
+  groups: TextGroups,
+  path: string,
+  value: object | null | undefined,
+  known: ReadonlySet<string>
+) {
+  if (!value) return;
+  addUnknownStrings(
+    groups,
+    path,
+    Object.fromEntries(Object.entries(value).filter(([key]) => !known.has(key)))
+  );
+}
+
+type ContentPart = z.infer<typeof contentPartSchema>;
+
+/**
+ * Content part fields that are not model output: annotations, such as citations, log probabilities,
+ * which repeat the text token by token, and image references, which are not text.
+ */
+const NOT_OUTPUT_PART_FIELDS = ['annotations', 'logprobs', 'image_url'];
+
+const KNOWN_PART_FIELDS = {
+  text: new Set(['text', ...NOT_OUTPUT_PART_FIELDS]),
+  refusal: new Set(['refusal', ...NOT_OUTPUT_PART_FIELDS]),
+};
+
+/**
+ * Adds the text of a content part, or its refusal, to `group`, and the strings of its other fields
+ * under `path`, so part types the gateway does not know yet, such as an audio transcript, and new
+ * fields of known ones are scanned too.
+ */
+function addContentPart(groups: TextGroups, group: string, path: string, part: ContentPart) {
+  const field = part.type === 'refusal' ? 'refusal' : 'text';
+  groups.add(group, part[field]);
+  addUnknownFields(groups, path, part, KNOWN_PART_FIELDS[field]);
+}
+
+const FUNCTION_FIELDS = new Set(['name', 'arguments']);
+const CUSTOM_TOOL_FIELDS = new Set(['name', 'input']);
+const TOOL_CALL_FIELDS = new Set(['function', 'custom']);
 
 const chatCompletionSchema = z.object({
   choices: z.array(
@@ -128,23 +210,42 @@ function chatReasoning(message: ChatMessage): Text {
     .join('');
 }
 
+/** Reasoning detail types read by `chatReasoning`; others are scanned like unknown fields. */
+const KNOWN_REASONING_DETAIL_TYPES = new Set([
+  'reasoning.text',
+  'reasoning.summary',
+  'reasoning.encrypted',
+]);
+
 function addChatMessage(groups: TextGroups, choice: string, message: ChatMessage) {
   groups.add(`${choice}:reasoning`, chatReasoning(message));
+  for (const detail of message.reasoning_details ?? []) {
+    if (!KNOWN_REASONING_DETAIL_TYPES.has(detail.type)) {
+      addUnknownStrings(groups, `${choice}:reasoning:${detail.type}`, detail);
+    }
+  }
   const { content } = message;
   if (typeof content === 'string') groups.add(`${choice}:content`, content);
   else {
     for (const part of content ?? []) {
-      groups.add(`${choice}:content`, part.type === 'refusal' ? part.refusal : part.text);
+      addContentPart(groups, `${choice}:content`, `${choice}:content:${part.type}`, part);
     }
   }
   groups.add(`${choice}:refusal`, message.refusal);
   groups.add(`${choice}:function:name`, message.function_call?.name);
   groups.add(`${choice}:function:arguments`, message.function_call?.arguments);
+  addUnknownFields(groups, `${choice}:function`, message.function_call, FUNCTION_FIELDS);
   (message.tool_calls ?? []).forEach((call, position) => {
     const tool = `${choice}:tool:${call.index ?? position}`;
     groups.add(`${tool}:name`, call.function?.name ?? call.custom?.name);
     groups.add(`${tool}:arguments`, call.function?.arguments ?? call.custom?.input);
+    // Tool call types the gateway does not know yet, and new fields of known ones.
+    addUnknownFields(groups, tool, call, TOOL_CALL_FIELDS);
+    addUnknownFields(groups, `${tool}:function`, call.function, FUNCTION_FIELDS);
+    addUnknownFields(groups, `${tool}:custom`, call.custom, CUSTOM_TOOL_FIELDS);
   });
+  // Fields the gateway does not know yet, such as an audio transcript, still reach the client.
+  addUnknownFields(groups, `${choice}:extra`, message, KNOWN_CHAT_MESSAGE_FIELDS);
 }
 
 const addChatCompletion: AddJson = (groups, json) => {
@@ -211,10 +312,14 @@ const messagesEventSchema = z.object({
   index: z.number().optional(),
   content_block: anthropicBlockSchema.optional(),
   delta: z
-    .object({ type: z.string().optional(), text, thinking: text, partial_json: text })
+    .looseObject({ type: z.string().optional(), text, thinking: text, partial_json: text })
     .optional(),
 });
 
+/**
+ * Citations quote their sources, so they are not model output. Delta types the gateway does not
+ * know yet are scanned like unknown fields; a block has no finished copy to scan instead.
+ */
 const addMessagesEvent: AddJson = (groups, json) => {
   const parsed = messagesEventSchema.safeParse(json);
   if (!parsed.success) return false;
@@ -224,9 +329,21 @@ const addMessagesEvent: AddJson = (groups, json) => {
     addAnthropicBlock(groups, key, content_block);
   }
   if (type === 'content_block_delta' && delta) {
-    if (delta.type === 'text_delta') groups.add(key, delta.text);
-    if (delta.type === 'thinking_delta') groups.add(key, delta.thinking);
-    if (delta.type === 'input_json_delta') groups.add(key, delta.partial_json);
+    switch (delta.type) {
+      case 'text_delta':
+        groups.add(key, delta.text);
+        break;
+      case 'thinking_delta':
+        groups.add(key, delta.thinking);
+        break;
+      case 'input_json_delta':
+        groups.add(key, delta.partial_json);
+        break;
+      case 'citations_delta':
+        break;
+      default:
+        addUnknownStrings(groups, `${key}:delta`, delta);
+    }
   }
   return true;
 };
@@ -236,7 +353,7 @@ const responsesItemSchema = z.looseObject({
   name: text,
   arguments: text,
   input: text,
-  content: z.array(z.object({ type: z.string(), text, refusal: text })).nullish(),
+  content: z.array(contentPartSchema).nullish(),
 });
 
 type ResponsesItem = z.infer<typeof responsesItemSchema>;
@@ -250,7 +367,7 @@ function addResponsesItem(groups: TextGroups, key: string, item: ResponsesItem) 
     case 'message':
     case 'reasoning':
       (item.content ?? []).forEach((part, index) =>
-        groups.add(`${key}:content:${index}`, part.type === 'refusal' ? part.refusal : part.text)
+        addContentPart(groups, `${key}:content:${index}`, `${key}:content:${index}`, part)
       );
       return;
     case 'function_call':

@@ -426,3 +426,29 @@ describe('pushDataSchema active_agents_glanceable snapshot shape', () => {
     expect('accountEpoch' in parsed).toBe(false);
   });
 });
+
+describe('pushDataSchema session_live_update approvalKey', () => {
+  const sessionLiveUpdate = (approvalKey: unknown) => ({
+    type: 'session_live_update',
+    schemaVersion: 1,
+    event: 'update',
+    content: {
+      sessionId: 'session-1',
+      title: null,
+      statusKind: 'needsInput',
+      statusSince: '2026-11-12T09:00:00.000Z',
+      scheduledAt: null,
+      awaitingPermission: approvalKey !== null,
+      approvalKey,
+      updatedAt: '2026-11-12T09:01:00.000Z',
+    },
+  });
+
+  it('accepts lowercase SHA-256 hex and null, and nothing else', () => {
+    expect(pushDataSchema.safeParse(sessionLiveUpdate('a'.repeat(64))).success).toBe(true);
+    expect(pushDataSchema.safeParse(sessionLiveUpdate(null)).success).toBe(true);
+    for (const key of ['a'.repeat(63), 'a'.repeat(65), 'A'.repeat(64), 'per_raw_permission', '']) {
+      expect(pushDataSchema.safeParse(sessionLiveUpdate(key)).success).toBe(false);
+    }
+  });
+});

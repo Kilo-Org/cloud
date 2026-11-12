@@ -143,13 +143,42 @@ export function getPillSlotSizers() {
   const twoDecimals = formatSessionCostBadge(COST_SLOT_SIZER_TWO_DECIMALS_MICRODOLLARS) ?? '$0.00';
   const fourDecimals =
     formatSessionCostBadge(COST_SLOT_SIZER_FOUR_DECIMALS_MICRODOLLARS) ?? '$0.0000';
-  const percentage = PERCENTAGE_SLOT_SIZER_VALUES.map(value =>
-    formatPercent(value, i18n.language)
-  ).reduce((widest, reading) => (reading.length > widest.length ? reading : widest));
+  let percentage = '';
+  for (const value of PERCENTAGE_SLOT_SIZER_VALUES) {
+    const reading = formatPercent(value, i18n.language);
+    if (reading.length > percentage.length) {
+      percentage = reading;
+    }
+  }
   return {
     percentage,
     cost: fourDecimals.length >= twoDecimals.length ? fourDecimals : twoDecimals,
   };
+}
+
+/**
+ * The pill's fixed chrome, in dp: its 28dp ring, its border, its `px-2.5`
+ * padding, the `gap-1.5` between the ring and the value row, and the row's own
+ * `gap-1`. None of it is text, so none of it follows the font scale.
+ */
+const PILL_CHROME_WIDTH = 60;
+
+/**
+ * The two value slots' reserved readings at font scale 1, in dp: the sizers the
+ * slots lay out, plus the slack the painted pill leaves beside them. Both
+ * readings are `Text`, so both follow the system font scale.
+ */
+const PILL_READINGS_WIDTH = 68;
+
+/**
+ * Width the pill lays out at, in dp, at a font scale: its fixed chrome plus its
+ * reserved readings scaled. A header that reserves its trailing cluster uses
+ * this, so the width it reserves is the width the pill paints at that scale —
+ * and a reading that arrives still fills the slot it already showed.
+ */
+export function getHeaderPillWidth(fontScale: number): number {
+  const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
+  return PILL_CHROME_WIDTH + PILL_READINGS_WIDTH * scale;
 }
 
 /**

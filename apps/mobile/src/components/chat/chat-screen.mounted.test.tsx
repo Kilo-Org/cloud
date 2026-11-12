@@ -1,10 +1,11 @@
 /* eslint-disable max-lines -- every chat screen behavior shares this one mocked harness */
 /* eslint-disable typescript-eslint/no-deprecated -- the DOM-free `test-renderer` mounts React/RN trees under vitest (see src/test/render-with-providers.tsx) */
-import { createElement, type ReactElement } from 'react';
+import { type ComponentProps, createElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { ChatScreen } from '@/components/chat/chat-screen';
+import { type SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { shouldStackHeaderActions } from '@/components/screen-header';
 import type * as ScreenHeaderModule from '@/components/screen-header';
 import { act, type ReactTestRenderer } from '@/test/renderer';
@@ -58,6 +59,8 @@ const router = vi.hoisted(() => ({
   push: vi.fn<(href: string) => void>(),
   dismissTo: vi.fn<(href: string) => void>(),
 }));
+/** The window the mounted chat measures itself against. */
+const device = vi.hoisted(() => ({ fontScale: 1 }));
 vi.mock('expo-router', () => ({ useRouter: () => router }));
 const backendUi = vi.hoisted(() => ({
   profiles: [] as StoredChatBackend[],
@@ -240,6 +243,7 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
+  useWindowDimensions: () => ({ width: 411, height: 800, fontScale: device.fontScale }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 24, left: 0, right: 0 }),
@@ -265,6 +269,7 @@ beforeEach(() => {
   state.effort = null;
   state.images = false;
   keyboard.progress = 0;
+  device.fontScale = 1;
   state.send.mockClear();
 });
 afterEach(() => {
@@ -425,7 +430,7 @@ describe('the chat transcript while it opens', () => {
   });
 });
 
-type Metric = ReactElement<{ onPress: () => void; info: unknown }>;
+type Metric = ReactElement<ComponentProps<typeof SessionContextMetrics>>;
 
 function metricOf(tree: ReactTestRenderer): Metric {
   const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
@@ -469,23 +474,49 @@ describe('the chat header', () => {
   it('declares its trailing cluster and its own title width to the header', async () => {
     state.status = 'idle';
     const tree = await mount();
-    const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
-    const { headerRightWidth, titleMinWidth } = header.props as {
-      headerRightWidth: number;
-      titleMinWidth: number;
-    };
+    const { headerRightWidth, titleMinWidth } = headerPropsOf(tree);
 
     // The header reflows this cluster only when the screen declares how wide
     // the cluster lays out and what the title needs. A 360dp window cannot hold
     // a readable "Chat" beside the pill and its two controls, so those numbers
     // are what moves them to their own row instead of the title painting a
     // lone character.
-    expect(shouldStackHeaderActions(360, 1, headerRightWidth, titleMinWidth)).toBe(true);
+    expect(shouldStackHeaderActions(360, 1, { headerRightWidth, titleMinWidth })).toBe(true);
     // The same row holds both at an ordinary phone width, so the header keeps
     // the single-row layout it has everywhere else.
-    expect(shouldStackHeaderActions(411, 1, headerRightWidth, titleMinWidth)).toBe(false);
+    expect(shouldStackHeaderActions(411, 1, { headerRightWidth, titleMinWidth })).toBe(false);
+  });
+
+  it('reserves the cluster at the scale its readings paint at', async () => {
+    state.status = 'idle';
+    const atDefaultScale = headerPropsOf(await mount());
+    view?.unmount();
+
+    device.fontScale = 2;
+    const atLargeScale = headerPropsOf(await mount());
+
+    // The icon controls are fixed boxes; the pill's readings are text. A large
+    // font therefore widens the cluster by the readings alone.
+    expect(atLargeScale.headerRightWidth).toBeGreaterThan(atDefaultScale.headerRightWidth);
+    expect(atLargeScale.titleMinWidth).toBe(atDefaultScale.titleMinWidth);
+    // A window the unscaled reserve keeps on one row is too narrow for the row
+    // at this scale, and the header must reflow it rather than squeeze the
+    // title below the width its own text needs.
+    expect(shouldStackHeaderActions(560, 2, atDefaultScale)).toBe(false);
+    expect(shouldStackHeaderActions(560, 2, atLargeScale)).toBe(true);
   });
 });
+
+type HeaderProps = { headerRightWidth: number; titleMinWidth: number };
+
+function headerPropsOf(tree: ReactTestRenderer): HeaderProps {
+  const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
+  const { headerRightWidth, titleMinWidth } = header.props as Partial<HeaderProps>;
+  if (headerRightWidth === undefined || titleMinWidth === undefined) {
+    throw new Error('the header was given no widths');
+  }
+  return { headerRightWidth, titleMinWidth };
+}
 
 function details(tree: ReactTestRenderer) {
   return tree.root.find(node => (node.type as string) === 'ChatDetailsSheet').props as {
@@ -500,8 +531,10 @@ describe('the chat details', () => {
     const tree = await mount();
 
     expect(details(tree)).toMatchObject({ visible: false, model: 'm1', record: state.record });
+    const openMetrics = metricOf(tree).props.onPress;
+    expect(openMetrics).toBeDefined();
     act(() => {
-      metricOf(tree).props.onPress();
+      openMetrics?.();
     });
     expect(details(tree).visible).toBe(true);
     act(() => {

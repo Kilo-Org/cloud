@@ -17,6 +17,7 @@ import {
   getContextSheetContent,
   getContextTone,
   getHeaderPillContent,
+  getHeaderPillWidth,
   getIndeterminateArcFraction,
   getMetricsAccessibilityLabel,
   getPillSlotSizers,
@@ -347,6 +348,22 @@ describe('getPillSlotSizers', () => {
     const sizers = getPillSlotSizers();
     expect(sizers.percentage.length).toBeGreaterThan(0);
     expect(sizers.cost.length).toBeGreaterThan(0);
+  });
+});
+
+describe('getHeaderPillWidth', () => {
+  // A header reserves this width beside the title, so the reserve has to be the
+  // width the pill paints: the rows grow with the font scale, the chrome does not.
+  it('grows by its text alone as the font scale rises', () => {
+    const atOne = getHeaderPillWidth(1);
+    const atTwo = getHeaderPillWidth(2);
+    expect(atTwo).toBeGreaterThan(atOne);
+    expect(atTwo).toBeLessThan(atOne * 2);
+  });
+
+  it('reads a missing or unusable scale as the default', () => {
+    expect(getHeaderPillWidth(Number.NaN)).toBe(getHeaderPillWidth(1));
+    expect(getHeaderPillWidth(0)).toBe(getHeaderPillWidth(1));
   });
 });
 

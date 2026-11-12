@@ -65,31 +65,38 @@ const HEADER_CONTENT_GUTTER = 44;
  */
 const HEADER_ACTIONS_GAP = 12;
 
+type HeaderStackingWidths = {
+  /**
+   * Width the caller's trailing cluster lays out at, in dp — the widths the
+   * caller renders, not a worst case it may never show. A cluster wide enough
+   * to leave the title below its readable minimum reflows too. It is taken as
+   * laid out and is not scaled here, so a caller whose cluster paints text at
+   * the current scale declares the width it lays out at in that scale.
+   */
+  headerRightWidth?: number;
+  /**
+   * Content width the caller's own title needs to stay readable, at font scale
+   * 1. It defaults to the list footer's 30px title; a detail header whose title
+   * is the 18px style needs less, and declaring that width keeps the header on
+   * one row where the larger default would already have reflowed it.
+   */
+  titleMinWidth?: number;
+};
+
 /**
  * Whether the header's actions drop to their own row instead of sharing the
  * title's. `width` is the window width in dp; `fontScale` is the system font
  * scale, so a large font reflows before a small one at the same width.
- * `headerRightWidth` is the width the caller's trailing cluster lays out at, in
- * dp — the widths the caller renders, not a worst case it may never show. A
- * cluster wide enough to leave the title below its readable minimum reflows
- * too. Fixed-size children (icon buttons, a label capped at its own max-w) do
- * not grow with the font scale, so this width is taken as laid out and is not
- * scaled.
- *
- * `titleMinWidth` is the content width the caller's own title needs to stay
- * readable. It defaults to the list footer's 30px title; a detail header whose
- * title is the 18px style needs less, and declaring that width keeps the header
- * on one row where the larger default would already have reflowed it.
  */
 export function shouldStackHeaderActions(
   width: number,
   fontScale: number,
-  headerRightWidth = 0,
-  titleMinWidth = HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH
+  widths: HeaderStackingWidths = {}
 ): boolean {
   if (!Number.isFinite(width)) {
     return false;
   }
+  const { headerRightWidth = 0, titleMinWidth = HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH } = widths;
   const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
   const titleWidth = width - HEADER_CONTENT_GUTTER - HEADER_ACTIONS_GAP - headerRightWidth;
   return titleWidth < titleMinWidth * scale;
@@ -171,8 +178,11 @@ type ScreenHeaderProps = {
    * Width the `headerRight` cluster lays out at, in dp. The stacking decision
    * reserves it (see `shouldStackHeaderActions`), so a wide cluster reflows the
    * actions onto their own row instead of squeezing the title to a few
-   * characters. Pass the widths of the controls actually rendered. Omit it for
-   * a cluster no wider than a single icon button.
+   * characters. Pass the widths of the controls actually rendered: a cluster
+   * whose text grows with the font scale declares the width it lays out at in
+   * the current scale, and a cluster of fixed-size controls declares the same
+   * width at every scale. Omit it for a cluster no wider than a single icon
+   * button.
    */
   headerRightWidth?: number;
   /**
@@ -364,14 +374,20 @@ export function ScreenHeader({
   const stackActions =
     allowHeaderRightStacking &&
     headerRight != null &&
-    shouldStackHeaderActions(windowWidth, fontScale, headerRightWidth ?? 0, titleMinWidth);
+    shouldStackHeaderActions(windowWidth, fontScale, {
+      headerRightWidth: headerRightWidth ?? 0,
+      titleMinWidth,
+    });
   // The inline controls row reflows the same way: a caller that declares its
   // width drops it beneath the title before it squeezes the title's own
   // readable minimum, so the 30px Agents title never breaks inside a word.
   const stackInlineActions =
     allowInlineActionsStacking &&
     inlineActions != null &&
-    shouldStackHeaderActions(windowWidth, fontScale, inlineActionsWidth ?? 0, titleMinWidth);
+    shouldStackHeaderActions(windowWidth, fontScale, {
+      headerRightWidth: inlineActionsWidth ?? 0,
+      titleMinWidth,
+    });
 
   // A surface that reaches the window top (a full-window modal) needs the
   // status bar and corner pad added on top of the standard gap; one that

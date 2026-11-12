@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { type ChatComposerSendOptions } from '@/components/agents/chat-composer';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
+import { getHeaderPillWidth } from '@/components/agents/context-usage-display';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { PartDetailSheetHost } from '@/components/agents/part-detail-sheet-host';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
@@ -23,16 +24,16 @@ import { useOrganization } from '@/lib/organization-context';
 import { useChat, useChatList, useChatPlace } from '@/lib/chat/use-chat';
 import { CHAT_UNAVAILABLE_KEY } from '@/lib/chat/state';
 import { asMessages } from '@/lib/chat/turns';
-import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-store';
 import { useTargetSupportsImages } from '@/lib/chat/backend-capabilities';
 import { rememberModelFacts } from '@/lib/chat/layers';
-import { requiresBackendDisclosure } from '@/lib/chat/backend-model-options';
-import { chatTargetKind, CREDITS_FAILURE_KEY, resolveChatTarget } from '@/lib/chat/backend-target';
+import { CREDITS_FAILURE_KEY, resolveChatTarget } from '@/lib/chat/backend-target';
 import { useLocalModels } from '@/lib/chat/local-models';
+import { switchChatModel } from '@/lib/chat/model-switch';
 import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { type EffortChoices, effortOfVariant, variantOfEffort } from '@/lib/chat/effort';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, ICON_TARGET_DP } from '@/lib/a11y/tap-target';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { cn } from '@/lib/utils';
 
 import { ChatTitle } from './chat-title';
@@ -75,26 +76,8 @@ type ChatScreenProps = {
  */
 const CHAT_LIST_HREF: Href = '/(app)/(tabs)/(4_chat)';
 
-/** The box each trailing icon control renders (`ICON_TARGET_BOX_CLASS`). */
-const HEADER_CONTROL_WIDTH = 48;
-/** The `gap-2` the cluster keeps between its controls. */
+/** The `gap-2` the chat header's trailing cluster keeps between its controls. */
 const HEADER_CONTROL_GAP = 8;
-/**
- * Width the context pill reserves at font scale 1: its ring, the value row its
- * two slots lay out, its padding and its border. The pill paints nothing in a
- * slot whose reading has not arrived, but it holds that width, so the header
- * has to reserve it the same way it reserves an icon control.
- */
-const HEADER_PILL_WIDTH = 128;
-
-/**
- * Width the chat header's trailing cluster lays out at, in dp: the context pill
- * and the backends and tools controls beside it. The header reserves it, so a
- * window that cannot hold the title beside all three drops them onto their own
- * row instead of squeezing the title down to a lone character.
- */
-const CHAT_HEADER_ACTIONS_WIDTH =
-  HEADER_PILL_WIDTH + 2 * (HEADER_CONTROL_WIDTH + HEADER_CONTROL_GAP);
 
 /**
  * The content width this title needs to stay readable: "Chat" in the 18px
@@ -121,6 +104,14 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const localModels = useLocalModels();
   const mcp = useMcpSettings(place, state.sessionId);
   const colors = useThemeColors();
+  // The cluster reserves the width it lays out at: the pill at this font scale,
+  // plus the two fixed icon boxes beside it and their gaps. The pill's readings
+  // are text and grow with the scale, so the reserve follows it; the boxes do
+  // not. A window that cannot hold the title beside the whole cluster drops it
+  // onto its own row instead of squeezing the title to a lone character.
+  const fontScale = useLiveFontScale();
+  const headerActionsWidth =
+    getHeaderPillWidth(fontScale) + 2 * (ICON_TARGET_DP + HEADER_CONTROL_GAP);
   // What the tools control is in right now, in the same words the sheet's Kilo
   // row draws. `count` is carried for the available state and ignored by the rest.
   const mcpStatusText = t(mcp.view.statusKey, { count: mcp.view.toolCount });
@@ -168,38 +159,16 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   }, [models]);
 
   const selectModel = (modelId: string, variantId: string | null) => {
-    const accept = () => {
-      setPicked(modelId);
-      setPickedVariant(variantId);
-    };
-    if (!requiresBackendDisclosure(model, modelId)) {
-      accept();
-      return;
-    }
-    const epoch = currentAuthEpoch();
-    const name = availableOptions.find(option => option.id === modelId)?.name ?? modelId;
-    const local = chatTargetKind(modelId) === 'local';
-    Alert.alert(
-      t(local ? 'modelChat.localModels.switchTitle' : 'modelChat.backends.switchTitle'),
-      t(local ? 'modelChat.localModels.switchMessage' : 'modelChat.backends.switchMessage', {
-        name,
-      }),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t(
-            local ? 'modelChat.localModels.switchConfirm' : 'modelChat.backends.switchConfirm'
-          ),
-          onPress: () => {
-            if (isCurrentAuthEpoch(epoch)) {
-              accept();
-            }
-          },
-        },
-      ],
-      // Android back dismisses, which equals Cancel: the model stays as is.
-      { cancelable: true }
-    );
+    switchChatModel({
+      currentModel: model,
+      nextModel: modelId,
+      nextModelName: availableOptions.find(option => option.id === modelId)?.name ?? modelId,
+      t,
+      accept: () => {
+        setPicked(modelId);
+        setPickedVariant(variantId);
+      },
+    });
   };
 
   // The provider control chooses the model this chat sends to, so the choice
@@ -413,7 +382,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
             </Pressable>
           </View>
         }
-        headerRightWidth={CHAT_HEADER_ACTIONS_WIDTH}
+        headerRightWidth={headerActionsWidth}
         titleMinWidth={CHAT_HEADER_TITLE_MIN_WIDTH}
         showBackButton
       />

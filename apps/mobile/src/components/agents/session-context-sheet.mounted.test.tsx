@@ -71,6 +71,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+}));
 vi.mock('@/components/ui/text', async () => {
   const React = await import('react');
   return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };

@@ -1,6 +1,5 @@
 import { type SessionShareDuration } from '@kilocode/session-ingest-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,11 +11,10 @@ import {
   ShareActiveLink,
   type ShareCopyState,
 } from './session-share-active-link';
-import { useConfirmDialog } from '@/components/ui/dialog';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
-import { WEB_BASE_URL } from '@/lib/config';
 import { notificationHaptic } from '@/lib/haptics';
 import { useTRPC } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -88,7 +86,12 @@ export function SessionShareSection({
 
   const shareMutation = useMutation({
     ...trpc.cliSessionsV2.share.mutationOptions(),
-    onSuccess: created => {
+    // Loaded here, not at module scope: the session sheet's mounted test runs
+    // in a node environment, and `@/lib/config` reaches Expo's runtime setup,
+    // which that environment cannot evaluate. The app reads the same value
+    // before the first share can complete.
+    onSuccess: async created => {
+      const { WEB_BASE_URL } = await import('@/lib/config');
       setCreatedUrl(`${WEB_BASE_URL}/s/${created.share_token}`);
       setShareCopyState('idle');
       setActionError(null);
@@ -130,7 +133,9 @@ export function SessionShareSection({
       return;
     }
     try {
-      const copied = await Clipboard.setStringAsync(createdUrl);
+      // Imported at press time for the same reason as `@/lib/config` above.
+      const { setStringAsync } = await import('expo-clipboard');
+      const copied = await setStringAsync(createdUrl);
       if (!copied) {
         throw new Error('Clipboard rejected the share link');
       }
@@ -273,12 +278,12 @@ export function SessionShareSection({
 
       {actions}
 
+      {dialog}
       {actionError !== null ? (
         <Text className="text-xs text-destructive" testID="session-share-error">
           {actionError}
         </Text>
       ) : null}
-      {dialog}
     </View>
   );
 }

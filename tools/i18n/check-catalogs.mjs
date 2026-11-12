@@ -178,6 +178,9 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'profile.providerDiscord',
   'common.github',
   'common.gitlab',
+  // Store names, used inside sentences the receipt and management rows build.
+  'common.appStore',
+  'common.googlePlay',
   'profile.providerGoogle',
   'profile.providerLinkedin',
   'profile.providerChatgpt',

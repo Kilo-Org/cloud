@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { Platform, useWindowDimensions, View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { canOpenExternalBilling } from '@/lib/credits/external-billing-link';
 import { openExternalUrl } from '@/lib/external-link';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { cn } from '@/lib/utils';
@@ -105,9 +106,9 @@ export function AddCreditsRow({ url, onPress, className, emphasis, inline }: Add
   const narrow = isNarrowLayout(width);
   // App Store review: iOS must not show an in-app CTA that opens an external
   // purchase/billing page, so the external `url` variant stays Android-only —
-  // gate it here so no call site can surface it on iOS. An in-app `onPress`
-  // CTA is platform-agnostic and shows on both platforms.
-  if (!onPress && Platform.OS === 'ios') {
+  // the shared gate keeps it here so no call site can surface it on iOS. An
+  // in-app `onPress` CTA is platform-agnostic and shows on both platforms.
+  if (!onPress && !canOpenExternalBilling()) {
     return null;
   }
   const button = (

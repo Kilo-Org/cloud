@@ -22,6 +22,9 @@
     "expired": "Caducado"
   },
   "common": {
+    "creditHistory": "Historial de créditos",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Cancelar",
@@ -245,6 +248,10 @@
     "notAdded": "Has iniciado sesión. No se añadió {{provider}} a tu cuenta."
   },
   "profile": {
+    "creditHistorySubtitle": "Compras, recibos y actividad de créditos",
+    "invoicesSubtitle": "Descarga las facturas de tus compras",
+    "manageBilling": "Gestionar la facturación en kilo.ai",
+    "manageBillingIosNote": "Los métodos de pago, la recarga automática y los datos de facturación se gestionan en kilo.ai.",
     "codeReviewerSubtitle": "Revisiones automáticas de PR",
     "securityAgentSubtitle": "Encontrar y corregir vulnerabilidades",
     "reviews": "Revisiones",
@@ -2210,6 +2217,26 @@
     "onlyFirstFilesAttached_many": "Solo se adjuntarán los primeros {{displayCount}} archivos."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Historial de facturación",
+      "billingHistoryEmpty": "Aún no hay historial de facturación.",
+      "cancel": "Cancelar suscripción",
+      "cancelDescription": "Tu Kilo Pass seguirá activo hasta el final del periodo de facturación y no se renovará.",
+      "cancelScheduled": "Se cancela el {{date}}",
+      "cancelScheduledChange": "Cancelar cambio programado",
+      "cancelled": "Suscripción cancelada",
+      "changePlan": "Cambiar de plan en kilo.ai",
+      "changePlanIosNote": "Los cambios a planes de pago están disponibles en kilo.ai.",
+      "creditHistoryEmpty": "Aún no hay créditos de Kilo Pass.",
+      "manageInStore": "Gestionar en {{store}}",
+      "resume": "Reanudar suscripción",
+      "resumeCancelledDescription": "Tu Kilo Pass volverá a renovarse automáticamente.",
+      "resumePausedDescription": "Tu Kilo Pass se reanuda ahora, antes de la fecha de reanudación programada.",
+      "resumed": "Suscripción reanudada",
+      "scheduledChange": "Cambio programado",
+      "scheduledChangeCancelDescription": "Tu Kilo Pass mantendrá su plan actual y se renovará como hasta ahora.",
+      "scheduledChangeSummary": "{{plan}} el {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass no está disponible.",
     "couldNotLoad": "No se pudo cargar Kilo Pass. Inténtalo de nuevo.",
@@ -3748,6 +3775,24 @@
     "deleteCommand": "Eliminar el comando {{position}}"
   },
   "credits": {
+    "history": {
+      "appStoreReceipt": "Recibo del App Store",
+      "deductionFallback": "Deducción de créditos",
+      "emptyDescription": "Aquí aparecerán las compras de créditos, los recibos y el uso.",
+      "emptyTitle": "No hay historial de créditos",
+      "googlePlayReceipt": "Recibo de Google Play",
+      "kind": {
+        "adjustment": "Ajuste",
+        "balanceNeutral": "Sin efecto en el saldo",
+        "deduction": "Deducción",
+        "grant": "Créditos otorgados",
+        "purchase": "Compra"
+      },
+      "purchaseFallback": "Compra de créditos",
+      "receipt": "Recibo",
+      "receiptA11y": "Abrir el recibo de {{description}}",
+      "receiptUnavailable": "No hay ningún recibo disponible para esta compra."
+    },
     "title": "Comprar créditos",
     "description": "Los créditos son una compra única que se añade a tu saldo de Kilo para ejecutar sesiones de codificación con IA en Kilo App. La tienda cobra en tu cuenta y los créditos se añaden cuando la tienda confirma el pago.",
     "nextExpiry": "{{amount}} en créditos caducan el {{date}} (UTC). Los créditos con la caducidad más próxima se usan primero.",
@@ -3933,5 +3978,8 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "No se pudo abrir este resultado de búsqueda"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Las facturas de tus compras personales aparecerán aquí cuando se te facture."
   }
 }

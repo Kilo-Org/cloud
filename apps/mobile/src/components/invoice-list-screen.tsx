@@ -1,0 +1,385 @@
+import type { inferRouterOutputs, MobileRouter } from '@kilocode/trpc/mobile';
+import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
+import { Download, FileText } from '@/components/ui/icons';
+import { memo, type ReactNode, useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Pressable, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { toast } from 'sonner-native';
+
+import { EmptyState } from '@/components/empty-state';
+import { QueryError } from '@/components/query-error';
+import { ScreenHeader } from '@/components/screen-header';
+import { useTabBarBottomPadding } from '@/components/tab-screen';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { formatDate, formatMoneyFromCents } from '@/lib/format';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import {
+  getInvoiceDownloadErrorMessage,
+  selectInvoiceRowState,
+  shareInvoicePdf,
+} from '@/lib/invoice-download';
+import { selectInvoiceErrorVariant } from '@/lib/organization-invoice-error-variant';
+import { cn, firstNonEmpty } from '@/lib/utils';
+
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
+
+/** One Stripe invoice, in the shape both invoice scopes return. */
+export type Invoice = RouterOutputs['user']['invoicesPage']['entries'][number];
+
+/**
+ * What the list reads from a scope's paged invoice query. The personal and the
+ * organization procedures return the same page, so the list takes the fields it
+ * renders instead of either query's concrete type — the two differ in their
+ * error class, which is exactly what this boundary hides.
+ */
+type InvoiceListQuery = {
+  readonly isPending: boolean;
+  readonly isError: boolean;
+  readonly isFetching: boolean;
+  readonly isFetchNextPageError: boolean;
+  readonly isFetchingNextPage: boolean;
+  readonly error: unknown;
+  readonly data: { readonly pages: readonly unknown[] } | undefined;
+  readonly refetch: () => unknown;
+  readonly fetchNextPage: () => unknown;
+};
+
+// FlashList takes `contentContainerStyle` (no className), so the FlatList's
+// `grow gap-3 px-6 pt-4` content classes map to their pixel values. FlashList v2
+// positions every cell absolutely and has no `gap` handling (2.3.2 ships zero
+// `gap` references), so the 12px inter-row gap rides on the measured item
+// separator instead of `contentContainerStyle.gap`. The old container `gap` also
+// sat between the last row and the pagination footer; FlashList's separator only
+// spans items, so that boundary carries the same 12px as `pt-3` on the footer.
+const listStyle = { flex: 1 } satisfies ViewStyle;
+const listContentContainerStyle = {
+  flexGrow: 1,
+  paddingHorizontal: 24,
+  paddingTop: 16,
+} satisfies ViewStyle;
+
+const InvoiceRowSeparator = () => <View className="h-3" />;
+
+const STATUS_LABEL_KEYS = {
+  paid: 'organization.invoices.status.paid',
+  open: 'organization.invoices.status.open',
+  void: 'organization.invoices.status.void',
+  draft: 'common.draft',
+  uncollectible: 'organization.invoices.status.uncollectible',
+  unknown: 'common.unknown',
+} satisfies Record<string, string>;
+
+/**
+ * The badge every status without a hue of its own wears: the gray the model
+ * badges use, which differs from the row's `bg-secondary` in both themes (the
+ * theme's `--muted` equals `--secondary`, so a `bg-muted` pill has no band on
+ * this row). `text-ink2` stays readable on it; the muted foreground does not.
+ */
+const NEUTRAL_BADGE = {
+  pillClass: 'bg-neutral-200 dark:bg-neutral-700',
+  textClass: 'text-ink2',
+} as const;
+
+const STATUS_META = {
+  paid: {
+    pillClass: 'bg-good',
+    textClass: 'text-good-foreground',
+  },
+  open: {
+    pillClass: 'bg-warn',
+    textClass: 'text-warn-foreground',
+  },
+  void: NEUTRAL_BADGE,
+} as const satisfies Record<string, { pillClass: string; textClass: string }>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+}
+
+function statusMeta(status: string) {
+  const meta = lookup(STATUS_META, status);
+  const labelKey = lookup(STATUS_LABEL_KEYS, status);
+  return {
+    label: labelKey ? i18n.t(labelKey) : status,
+    pillClass: meta?.pillClass ?? NEUTRAL_BADGE.pillClass,
+    textClass: meta?.textClass ?? NEUTRAL_BADGE.textClass,
+  };
+}
+
+function InvoiceRowSkeleton() {
+  return (
+    <View className="gap-1.5 rounded-lg bg-secondary p-3">
+      <Skeleton className="h-4 w-40 rounded" />
+      <Skeleton className="h-3 w-24 rounded" />
+    </View>
+  );
+}
+
+/**
+ * Every row reserves the action's box on the trailing edge, so the download
+ * glyph never shifts an invoice number and a row without a PDF still lines its
+ * amount up with the rows that carry the action. 20 dp is the spinner's box.
+ */
+
+function InvoiceRowContent({
+  invoice,
+  action,
+}: Readonly<{
+  invoice: Invoice;
+  action?: ReactNode;
+}>) {
+  const { t } = useTranslation();
+  const meta = statusMeta(invoice.status);
+  const title = firstNonEmpty(
+    invoice.number,
+    invoice.description,
+    t('organization.invoices.invoiceFallback')
+  );
+
+  return (
+    <View className="flex-row items-center gap-3">
+      <View className="min-w-0 flex-1 gap-1">
+        <View className="flex-row items-center justify-between gap-3">
+          <Text className="min-w-0 flex-1 text-sm font-medium text-foreground" numberOfLines={1}>
+            {title}
+          </Text>
+          <Text className="text-sm font-medium text-foreground">
+            {formatMoneyFromCents(invoice.amount_due, i18n.language)}
+          </Text>
+        </View>
+        <View className="flex-row items-center justify-between">
+          <Text className="text-xs text-muted-foreground">
+            {formatDate(new Date(invoice.created * 1000), i18n.language)}
+          </Text>
+          <View className={cn('rounded-full px-2 py-0.5', meta.pillClass)}>
+            <Text className={cn('text-[11px] font-medium', meta.textClass)}>{meta.label}</Text>
+          </View>
+        </View>
+      </View>
+      <View className="w-5 items-center justify-center">{action}</View>
+    </View>
+  );
+}
+
+const InvoiceRow = memo(function InvoiceRow({ invoice }: Readonly<{ invoice: Invoice }>) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const [sharing, setSharing] = useState(false);
+  const rowState = selectInvoiceRowState({
+    invoicePdf: invoice.invoice_pdf,
+    sharing,
+  });
+
+  if (rowState === 'no-affordance') {
+    return (
+      <View className="rounded-lg bg-secondary p-3">
+        <InvoiceRowContent invoice={invoice} />
+      </View>
+    );
+  }
+
+  async function handleDownload() {
+    if (invoice.invoice_pdf === null) {
+      return;
+    }
+    setSharing(true);
+    try {
+      await shareInvoicePdf({
+        id: invoice.id,
+        number: invoice.number,
+        description: invoice.description,
+        invoice_pdf: invoice.invoice_pdf,
+      });
+    } catch (error) {
+      toast.error(getInvoiceDownloadErrorMessage(error));
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  const busy = rowState === 'busy';
+
+  return (
+    <Pressable
+      onPress={() => {
+        void handleDownload();
+      }}
+      disabled={busy}
+      accessibilityState={{ busy }}
+      accessibilityRole="button"
+      accessibilityLabel={t('organization.invoices.downloadA11y', {
+        number: firstNonEmpty(invoice.number, invoice.description, invoice.id),
+      })}
+      className="rounded-lg bg-secondary p-3 active:opacity-80 disabled:opacity-60"
+    >
+      <InvoiceRowContent
+        invoice={invoice}
+        action={
+          busy ? (
+            <ActivityIndicator size="small" color={colors.mutedForeground} />
+          ) : (
+            <Download size={14} color={colors.mutedForeground} />
+          )
+        }
+      />
+    </Pressable>
+  );
+});
+
+type InvoiceListScreenProps = Readonly<{
+  /** The screen's own title: the personal and organization lists differ. */
+  title: string;
+  /** The scope's paged invoice read, flattened by its own hook. */
+  query: InvoiceListQuery;
+  entries: readonly Invoice[];
+  hasMore: boolean;
+  emptyTitle: string;
+  emptyDescription: string;
+}>;
+
+/**
+ * The invoice list both scopes render: a person's own invoices and an
+ * organization's are the same Stripe shape, so the rows, the paging footer and
+ * every state live here once. A scope supplies its read and its empty copy.
+ */
+export function InvoiceListScreen({
+  title,
+  query,
+  entries,
+  hasMore,
+  emptyTitle,
+  emptyDescription,
+}: InvoiceListScreenProps) {
+  const { t } = useTranslation();
+  const paddingBottom = useTabBarBottomPadding();
+  const committedConnectivity = useCommittedConnectivityStatus();
+
+  // `InvoiceRow` is memoized at module scope, so the renderer keeps one identity
+  // across data updates and only the changed rows re-render.
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<Invoice>) => <InvoiceRow invoice={item} />,
+    []
+  );
+
+  const isLoading = query.isPending;
+  const hasLoadedPages = (query.data?.pages.length ?? 0) > 0;
+  const isFirstPageError = query.isError && !hasLoadedPages;
+
+  // NOT_FOUND maps to the not-found state; FORBIDDEN/UNAUTHORIZED map to the
+  // permission state. A read that settled by failing on a confirmed-offline
+  // device is a connectivity failure, a request that ran out its deadline is a
+  // slow response, and `unknown` keeps the retryable neutral copy.
+  const errorVariant = selectInvoiceErrorVariant(query.error, committedConnectivity);
+  // A thrown NOT_FOUND/FORBIDDEN/UNAUTHORIZED can't be fixed by retrying — show
+  // a permanent state with no Retry. Those two variants are the only ones the
+  // classifier takes from the thrown code, so they are the permanent set.
+  const isPermanentError = errorVariant === 'not-found' || errorVariant === 'permission';
+
+  // A later-page failure must keep the already-loaded rows and offer an inline
+  // retry instead of replacing the list. Read `isFetchNextPageError`, not
+  // `isError`: a failed background refetch of page 1 also raises `isError`,
+  // and the inline Retry calls `fetchNextPage()`, which can never clear it.
+  const isLaterPageError = query.isFetchNextPageError;
+
+  let body: ReactNode = null;
+  if (isLoading) {
+    body = (
+      <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-6 pt-4">
+        <InvoiceRowSkeleton />
+        <InvoiceRowSkeleton />
+        <InvoiceRowSkeleton />
+      </Animated.View>
+    );
+  } else if (isFirstPageError) {
+    body = (
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        <QueryError
+          variant={errorVariant}
+          onRetry={isPermanentError ? undefined : () => void query.refetch()}
+          isRetrying={query.isFetching}
+        />
+      </Animated.View>
+    );
+  } else if (entries.length === 0 && !hasMore && !isLaterPageError) {
+    body = <EmptyState icon={FileText} title={emptyTitle} description={emptyDescription} />;
+  } else {
+    const footer = (
+      // The former container gap also separated the last row from this footer
+      // block, which the item separator does not cover.
+      <View className="pt-3">
+        {hasMore && !isLaterPageError && (
+          <View className="items-center gap-3 px-6 py-4">
+            <Text variant="muted" className="text-center text-xs">
+              {t('organization.invoices.truncated')}
+            </Text>
+            <Button
+              variant="outline"
+              size="sm"
+              onPress={() => void query.fetchNextPage()}
+              loading={query.isFetchingNextPage}
+              accessibilityLabel={t('common.loadMore')}
+            >
+              <Text>{t('common.loadMore')}</Text>
+            </Button>
+          </View>
+        )}
+        {isLaterPageError && (
+          <View className="items-center gap-3 px-6 py-4">
+            <Text variant="muted" className="text-center text-xs">
+              {t('common.couldnTLoadMore')}
+            </Text>
+            <Button
+              variant="outline"
+              size="sm"
+              className={STATE_ACTION_CLASS}
+              onPress={() => void query.fetchNextPage()}
+              loading={query.isFetchingNextPage}
+              accessibilityLabel={t('common.retry')}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          </View>
+        )}
+        <View style={{ height: paddingBottom }} pointerEvents="none" />
+      </View>
+    );
+
+    body = (
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        <FlashList
+          style={listStyle}
+          data={entries}
+          keyExtractor={item => item.id}
+          renderItem={renderItem}
+          getItemType={() => 'invoice'}
+          ItemSeparatorComponent={InvoiceRowSeparator}
+          contentContainerStyle={listContentContainerStyle}
+          ListEmptyComponent={
+            <EmptyState
+              placement="top"
+              icon={FileText}
+              title={emptyTitle}
+              description={emptyDescription}
+            />
+          }
+          ListFooterComponent={footer}
+        />
+      </Animated.View>
+    );
+  }
+
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader title={title} />
+      {body}
+    </View>
+  );
+}

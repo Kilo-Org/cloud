@@ -497,23 +497,33 @@ function CreditsPageContent() {
                             : 'Does not expire'}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="link"
-                            className="h-auto p-0"
-                            disabled={receiptMutation.isPending}
-                            onClick={() => openReceipt(entry.id)}
-                          >
-                            {isOpeningReceipt ? (
-                              <>
-                                <Loader2 className="size-3 animate-spin motion-reduce:animate-none" />
-                                Opening...
-                              </>
-                            ) : (
-                              <>
-                                View invoice <ExternalLink className="size-3" />
-                              </>
-                            )}
-                          </Button>
+                          {/* A pack bought in the app has no Stripe invoice: the
+                              store's own record is its receipt. */}
+                          {entry.creditSource === 'apple' || entry.creditSource === 'google_play' ? (
+                            <span className="type-body text-muted-foreground">
+                              {entry.creditSource === 'apple'
+                                ? 'Receipt from the App Store'
+                                : 'Receipt from Google Play'}
+                            </span>
+                          ) : (
+                            <Button
+                              variant="link"
+                              className="h-auto p-0"
+                              disabled={receiptMutation.isPending}
+                              onClick={() => openReceipt(entry.id)}
+                            >
+                              {isOpeningReceipt ? (
+                                <>
+                                  <Loader2 className="size-3 animate-spin motion-reduce:animate-none" />
+                                  Opening...
+                                </>
+                              ) : (
+                                <>
+                                  View invoice <ExternalLink className="size-3" />
+                                </>
+                              )}
+                            </Button>
+                          )}
                         </TableCell>
                       </tr>
                     );

@@ -22,6 +22,9 @@
     "expired": "Хугацаа нь дууссан"
   },
   "common": {
+    "creditHistory": "Кредитийн түүх",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Цуцлах",
@@ -245,6 +248,10 @@
     "notAdded": "Та нэвтэрсэн байна. {{provider}} таны бүртгэлд нэмэгдсэнгүй."
   },
   "profile": {
+    "creditHistorySubtitle": "Худалдан авалт, баримт, кредитийн гүйлгээ",
+    "invoicesSubtitle": "Худалдан авалтынхаа нэхэмжлэхийг татаж авах",
+    "manageBilling": "Төлбөрөө kilo.ai дээр удирдах",
+    "manageBillingIosNote": "Төлбөрийн хэрэгсэл, автомат цэнэглэлт болон төлбөрийн мэдээллийг kilo.ai дээр удирдана.",
     "codeReviewerSubtitle": "PR-ийн автомат хяналт",
     "securityAgentSubtitle": "Эмзэг байдлыг олж, арилгах",
     "reviews": "Кодын хяналт",
@@ -2722,6 +2729,26 @@
     "onlyFirstFilesAttached_other": "Зөвхөн эхний {{displayCount}} файл хавсаргагдана."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Төлбөрийн түүх",
+      "billingHistoryEmpty": "Төлбөрийн түүх одоогоор алга.",
+      "cancel": "Захиалгыг цуцлах",
+      "cancelDescription": "Таны Kilo Pass төлбөрийн хугацаа дуустал идэвхтэй байх бөгөөд дахин сунгагдахгүй.",
+      "cancelScheduled": "Цуцлагдах огноо: {{date}}",
+      "cancelScheduledChange": "Товлосон өөрчлөлтийг цуцлах",
+      "cancelled": "Захиалга цуцлагдлаа",
+      "changePlan": "Багцаа kilo.ai дээр өөрчлөх",
+      "changePlanIosNote": "Төлбөртэй багцын өөрчлөлтийг kilo.ai дээр хийх боломжтой.",
+      "creditHistoryEmpty": "Kilo Pass-ын кредит одоогоор алга.",
+      "manageInStore": "{{store}} дээр удирдах",
+      "resume": "Захиалгыг сэргээх",
+      "resumeCancelledDescription": "Таны Kilo Pass дахин автоматаар сунгагдаж эхэлнэ.",
+      "resumePausedDescription": "Таны Kilo Pass товлосон огнооноосоо өмнө одоо сэргэнэ.",
+      "resumed": "Захиалга сэргэлээ",
+      "scheduledChange": "Товлосон өөрчлөлт",
+      "scheduledChangeCancelDescription": "Таны Kilo Pass одоогийн багцаараа үлдэж, одоогийнхоо адил сунгагдана.",
+      "scheduledChangeSummary": "{{date}} өдрөөс {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass-д хандах боломжгүй байна.",
     "couldNotLoad": "Kilo Pass-ыг ачаалж чадсангүй. Дахин оролдоно уу.",
@@ -3687,6 +3714,24 @@
     "deleteCommand": "{{position}} дугаар командыг устгах"
   },
   "credits": {
+    "history": {
+      "appStoreReceipt": "App Store-ын баримт",
+      "deductionFallback": "Кредитийн хасалт",
+      "emptyDescription": "Кредитийн худалдан авалт, баримт, хэрэглээ энд харагдана.",
+      "emptyTitle": "Кредитийн түүх алга",
+      "googlePlayReceipt": "Google Play-н баримт",
+      "kind": {
+        "adjustment": "Залруулга",
+        "balanceNeutral": "Үлдэгдэлд нөлөөгүй",
+        "deduction": "Хасалт",
+        "grant": "Кредит олголт",
+        "purchase": "Худалдан авалт"
+      },
+      "purchaseFallback": "Кредит худалдан авалт",
+      "receipt": "Баримт",
+      "receiptA11y": "Баримтыг нээх: {{description}}",
+      "receiptUnavailable": "Энэ худалдан авалтад баримт байхгүй байна."
+    },
     "title": "Кредит худалдан авах",
     "description": "Кредит нь Kilo App дээр AI кодчилолын сессүүдийг ажиллуулахын тулд таны Kilo үлдэгдэлд нэмэгддэг нэг удаагийн худалдан авалт юм. Дэлгүүр таны данснаас төлбөр авч, дэлгүүр төлбөрийг баталгаажуулсны дараа кредит нэмэгдэнэ.",
     "nextExpiry": "{{amount}} кредитийн хугацаа {{date}} (UTC) өдөр дуусна. Хугацаа хамгийн эрт дуусах кредитийг эхэлж ашиглана.",
@@ -3868,5 +3913,8 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Энэ хайлтын үр дүнг нээж чадсангүй"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Төлбөр нэхэмжлэгдсэний дараа өөрийн худалдан авалтын нэхэмжлэхүүд энд харагдана."
   }
 }

@@ -22,6 +22,9 @@
     "expired": "Έληξε"
   },
   "common": {
+    "creditHistory": "Ιστορικό μονάδων",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Ακύρωση",
@@ -245,6 +248,10 @@
     "notAdded": "Έχεις συνδεθεί. Το {{provider}} δεν προστέθηκε στον λογαριασμό σου."
   },
   "profile": {
+    "creditHistorySubtitle": "Αγορές, αποδείξεις και δραστηριότητα μονάδων",
+    "invoicesSubtitle": "Λήψη τιμολογίων για τις αγορές σας",
+    "manageBilling": "Διαχείριση χρεώσεων στο kilo.ai",
+    "manageBillingIosNote": "Οι τρόποι πληρωμής, η αυτόματη ανανέωση υπολοίπου και τα στοιχεία χρέωσης διαχειρίζονται στο kilo.ai.",
     "codeReviewerSubtitle": "Αυτόματοι έλεγχοι PR",
     "securityAgentSubtitle": "Εντοπισμός και αποκατάσταση ευπαθειών",
     "reviews": "Έλεγχοι κώδικα",
@@ -2722,6 +2729,26 @@
     "onlyFirstFilesAttached_other": "Θα επισυναφθούν μόνο τα πρώτα {{displayCount}} αρχεία."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Ιστορικό χρεώσεων",
+      "billingHistoryEmpty": "Δεν υπάρχει ακόμα ιστορικό χρεώσεων.",
+      "cancel": "Ακύρωση συνδρομής",
+      "cancelDescription": "Το Kilo Pass σας παραμένει ενεργό μέχρι το τέλος της περιόδου χρέωσης και δεν θα ανανεωθεί.",
+      "cancelScheduled": "Ακυρώνεται στις {{date}}",
+      "cancelScheduledChange": "Ακύρωση προγραμματισμένης αλλαγής",
+      "cancelled": "Η συνδρομή ακυρώθηκε",
+      "changePlan": "Αλλαγή προγράμματος στο kilo.ai",
+      "changePlanIosNote": "Οι αλλαγές επί πληρωμή προγραμμάτων είναι διαθέσιμες στο kilo.ai.",
+      "creditHistoryEmpty": "Δεν υπάρχουν ακόμα μονάδες Kilo Pass.",
+      "manageInStore": "Διαχείριση στο {{store}}",
+      "resume": "Επανέναρξη συνδρομής",
+      "resumeCancelledDescription": "Το Kilo Pass σας θα ανανεώνεται ξανά αυτόματα.",
+      "resumePausedDescription": "Το Kilo Pass σας επανενεργοποιείται τώρα, πριν από την προγραμματισμένη ημερομηνία επανέναρξης.",
+      "resumed": "Η συνδρομή επανενεργοποιήθηκε",
+      "scheduledChange": "Προγραμματισμένη αλλαγή",
+      "scheduledChangeCancelDescription": "Το Kilo Pass σας παραμένει στο τρέχον πρόγραμμα και ανανεώνεται όπως και τώρα.",
+      "scheduledChangeSummary": "{{plan}} στις {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Το Kilo Pass δεν είναι διαθέσιμο.",
     "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση του Kilo Pass. Δοκίμασε ξανά.",
@@ -3687,6 +3714,24 @@
     "deleteCommand": "Διαγραφή εντολής {{position}}"
   },
   "credits": {
+    "history": {
+      "appStoreReceipt": "Απόδειξη από το App Store",
+      "deductionFallback": "Αφαίρεση μονάδων",
+      "emptyDescription": "Οι αγορές μονάδων, οι αποδείξεις και η χρήση θα εμφανίζονται εδώ.",
+      "emptyTitle": "Δεν υπάρχει ιστορικό μονάδων",
+      "googlePlayReceipt": "Απόδειξη από το Google Play",
+      "kind": {
+        "adjustment": "Προσαρμογή",
+        "balanceNeutral": "Χωρίς επίδραση στο υπόλοιπο",
+        "deduction": "Αφαίρεση",
+        "grant": "Παροχή μονάδων",
+        "purchase": "Αγορά"
+      },
+      "purchaseFallback": "Αγορά μονάδων",
+      "receipt": "Απόδειξη",
+      "receiptA11y": "Άνοιγμα της απόδειξης για {{description}}",
+      "receiptUnavailable": "Δεν υπάρχει διαθέσιμη απόδειξη για αυτήν την αγορά."
+    },
     "title": "Αγορά πιστώσεων",
     "description": "Οι πιστώσεις είναι μια εφάπαξ αγορά που προστίθεται στο υπόλοιπό σας Kilo για την εκτέλεση συνεδριών προγραμματισμού με AI στην Εφαρμογή Kilo. Το κατάστημα χρεώνει τον λογαριασμό σας και οι πιστώσεις προστίθενται αφού το κατάστημα επιβεβαιώσει την πληρωμή.",
     "nextExpiry": "Πιστώσεις ύψους {{amount}} λήγουν {{date}} (UTC). Οι πιστώσεις με την πιο κοντινή λήξη χρησιμοποιούνται πρώτες.",
@@ -3868,5 +3913,8 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Δεν ήταν δυνατό το άνοιγμα αυτού του αποτελέσματος αναζήτησης"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Τα τιμολόγια για τις δικές σας αγορές θα εμφανίζονται εδώ μόλις χρεωθείτε."
   }
 }

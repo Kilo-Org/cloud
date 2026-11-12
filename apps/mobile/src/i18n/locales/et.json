@@ -22,6 +22,9 @@
     "expired": "Aegunud"
   },
   "common": {
+    "creditHistory": "Krediitide ajalugu",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Tühista",
@@ -245,6 +248,10 @@
     "notAdded": "Oled sisse logitud. {{provider}} jäi sinu kontole lisamata."
   },
   "profile": {
+    "creditHistorySubtitle": "Ostud, kviitungid ja krediiditegevus",
+    "invoicesSubtitle": "Laadi alla oma ostude arved",
+    "manageBilling": "Halda arveldust saidil kilo.ai",
+    "manageBillingIosNote": "Makseviise, automaatset täiendamist ja arveldusandmeid hallatakse saidil kilo.ai.",
     "codeReviewerSubtitle": "Automaatsed PR-ülevaatused",
     "securityAgentSubtitle": "Leia ja kõrvalda turvanõrkused",
     "reviews": "Ülevaatused",
@@ -2722,6 +2729,26 @@
     "onlyFirstFilesAttached_other": "Lisatakse ainult esimesed {{displayCount}} faili."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Arveldusajalugu",
+      "billingHistoryEmpty": "Arveldusajalugu veel puudub.",
+      "cancel": "Tühista tellimus",
+      "cancelDescription": "Sinu Kilo Pass jääb aktiivseks arveldusperioodi lõpuni ega uuene.",
+      "cancelScheduled": "Tühistatakse {{date}}",
+      "cancelScheduledChange": "Tühista ajastatud muudatus",
+      "cancelled": "Tellimus tühistati",
+      "changePlan": "Muuda paketti saidil kilo.ai",
+      "changePlanIosNote": "Tasulisi pakette saab muuta saidil kilo.ai.",
+      "creditHistoryEmpty": "Kilo Passi krediite veel pole.",
+      "manageInStore": "Halda poes {{store}}",
+      "resume": "Jätka tellimust",
+      "resumeCancelledDescription": "Sinu Kilo Pass hakkab taas automaatselt uuenema.",
+      "resumePausedDescription": "Sinu Kilo Pass jätkub kohe, enne kavandatud jätkamise kuupäeva.",
+      "resumed": "Tellimus jätkub",
+      "scheduledChange": "Ajastatud muudatus",
+      "scheduledChangeCancelDescription": "Sinu Kilo Pass jääb praegusele paketile ja uueneb samamoodi nagu praegu.",
+      "scheduledChangeSummary": "{{plan}} alates {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Passi laadimine ei õnnestunud.",
     "couldNotLoad": "Kilo Passi ei õnnestunud laadida. Proovi uuesti.",
@@ -3687,6 +3714,24 @@
     "deleteCommand": "Kustuta käsk {{position}}"
   },
   "credits": {
+    "history": {
+      "appStoreReceipt": "Kviitung App Store'ist",
+      "deductionFallback": "Krediidi mahaarvamine",
+      "emptyDescription": "Krediidiostud, kviitungid ja kasutus kuvatakse siin.",
+      "emptyTitle": "Krediitide ajalugu puudub",
+      "googlePlayReceipt": "Kviitung Google Playst",
+      "kind": {
+        "adjustment": "Korrigeerimine",
+        "balanceNeutral": "Saldot ei mõjuta",
+        "deduction": "Mahaarvamine",
+        "grant": "Tasuta krediit",
+        "purchase": "Ost"
+      },
+      "purchaseFallback": "Krediidiost",
+      "receipt": "Kviitung",
+      "receiptA11y": "Ava kviitung: {{description}}",
+      "receiptUnavailable": "Selle ostu kohta kviitung puudub."
+    },
     "title": "Osta krediiti",
     "description": "Krediit on ühekordne ost, mis lisatakse sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis. Pood võtab tasu sinu kontolt ja krediit lisatakse pärast seda, kui pood makse kinnitab.",
     "nextExpiry": "Krediit summas {{amount}} aegub {{date}} (UTC). Esmalt kasutatakse kõige varem aeguvaid krediite.",
@@ -3868,5 +3913,8 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Otsingutulemust ei õnnestunud avada"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Sinu enda ostude arved kuvatakse siin pärast arve esitamist."
   }
 }

@@ -22,6 +22,9 @@
     "expired": "Utgånget"
   },
   "common": {
+    "creditHistory": "Kredithistorik",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Avbryt",
@@ -245,6 +248,10 @@
     "notAdded": "Du är inloggad. {{provider}} lades inte till i ditt konto."
   },
   "profile": {
+    "creditHistorySubtitle": "Köp, kvitton och kreditaktivitet",
+    "invoicesSubtitle": "Ladda ned fakturor för dina köp",
+    "manageBilling": "Hantera fakturering på kilo.ai",
+    "manageBillingIosNote": "Betalningsmetoder, automatisk påfyllning och faktureringsuppgifter hanteras på kilo.ai.",
     "codeReviewerSubtitle": "Automatiska PR-granskningar",
     "securityAgentSubtitle": "Hitta och åtgärda sårbarheter",
     "reviews": "Granskningar",
@@ -2722,6 +2729,26 @@
     "onlyFirstFilesAttached_other": "Endast de första {{displayCount}} filerna bifogas."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Faktureringshistorik",
+      "billingHistoryEmpty": "Ingen faktureringshistorik än.",
+      "cancel": "Avsluta prenumeration",
+      "cancelDescription": "Ditt Kilo Pass är aktivt till slutet av faktureringsperioden och förnyas inte.",
+      "cancelScheduled": "Avslutas {{date}}",
+      "cancelScheduledChange": "Avbryt schemalagd ändring",
+      "cancelled": "Prenumerationen har avslutats",
+      "changePlan": "Byt plan på kilo.ai",
+      "changePlanIosNote": "Byten av betalplan görs på kilo.ai.",
+      "creditHistoryEmpty": "Inga Kilo Pass-krediter än.",
+      "manageInStore": "Hantera i {{store}}",
+      "resume": "Återuppta prenumeration",
+      "resumeCancelledDescription": "Ditt Kilo Pass börjar förnyas automatiskt igen.",
+      "resumePausedDescription": "Ditt Kilo Pass återupptas nu, före det schemalagda återupptagningsdatumet.",
+      "resumed": "Prenumerationen har återupptagits",
+      "scheduledChange": "Schemalagd ändring",
+      "scheduledChangeCancelDescription": "Ditt Kilo Pass behåller sin nuvarande plan och förnyas som vanligt.",
+      "scheduledChangeSummary": "{{plan}} den {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Det gick inte att läsa in Kilo Pass.",
     "couldNotLoad": "Kilo Pass kunde inte läsas in. Försök igen.",
@@ -3687,6 +3714,24 @@
     "deleteCommand": "Ta bort kommando {{position}}"
   },
   "credits": {
+    "history": {
+      "appStoreReceipt": "Kvitto från App Store",
+      "deductionFallback": "Kreditavdrag",
+      "emptyDescription": "Kreditköp, kvitton och användning visas här.",
+      "emptyTitle": "Ingen kredithistorik",
+      "googlePlayReceipt": "Kvitto från Google Play",
+      "kind": {
+        "adjustment": "Justering",
+        "balanceNeutral": "Saldoneutral",
+        "deduction": "Avdrag",
+        "grant": "Kredittilldelning",
+        "purchase": "Köp"
+      },
+      "purchaseFallback": "Kreditköp",
+      "receipt": "Kvitto",
+      "receiptA11y": "Öppna kvittot för {{description}}",
+      "receiptUnavailable": "Det finns inget kvitto för det här köpet."
+    },
     "title": "Köp krediter",
     "description": "Krediter är ett engångsköp som läggs till på ditt Kilo-saldo för att köra AI-kodningssessioner i Kilo-appen. Butiken debiterar ditt konto och krediterna läggs till efter att butiken bekräftar betalningen.",
     "nextExpiry": "{{amount}} i krediter går ut {{date}} (UTC). Krediter som går ut först används först.",
@@ -3868,5 +3913,8 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Kunde inte öppna det här sökresultatet"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Fakturor för dina egna köp visas här när du har fakturerats."
   }
 }

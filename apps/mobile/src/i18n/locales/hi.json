@@ -22,6 +22,9 @@
     "expired": "समय समाप्त"
   },
   "common": {
+    "creditHistory": "क्रेडिट हिस्ट्री",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "। ",
     "listJoiner": ", ",
     "cancel": "रद्द करें",
@@ -245,6 +248,10 @@
     "notAdded": "आपने साइन इन कर लिया है। {{provider}} आपके खाते में नहीं जोड़ा गया।"
   },
   "profile": {
+    "creditHistorySubtitle": "खरीदारी, रसीदें और क्रेडिट गतिविधि",
+    "invoicesSubtitle": "अपनी खरीदारी के इनवॉइस डाउनलोड करें",
+    "manageBilling": "kilo.ai पर बिलिंग मैनेज करें",
+    "manageBillingIosNote": "पेमेंट के तरीके, ऑटो टॉप-अप और बिलिंग की जानकारी kilo.ai पर मैनेज की जाती है।",
     "codeReviewerSubtitle": "स्वचालित PR समीक्षाएँ",
     "securityAgentSubtitle": "सुरक्षा की कमियाँ खोजें और ठीक करें",
     "reviews": "समीक्षाएँ",
@@ -2180,6 +2187,26 @@
     "onlyFirstFilesAttached_other": "केवल पहली {{displayCount}} फ़ाइलें संलग्न की जाएँगी।"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "बिलिंग हिस्ट्री",
+      "billingHistoryEmpty": "अभी कोई बिलिंग हिस्ट्री नहीं है।",
+      "cancel": "सब्सक्रिप्शन रद्द करें",
+      "cancelDescription": "आपका Kilo Pass बिलिंग अवधि खत्म होने तक चालू रहेगा और रिन्यू नहीं होगा।",
+      "cancelScheduled": "{{date}} को रद्द होगा",
+      "cancelScheduledChange": "शेड्यूल किया गया बदलाव रद्द करें",
+      "cancelled": "सब्सक्रिप्शन रद्द हो गया",
+      "changePlan": "kilo.ai पर प्लान बदलें",
+      "changePlanIosNote": "पेड प्लान में बदलाव kilo.ai पर किए जा सकते हैं।",
+      "creditHistoryEmpty": "अभी कोई Kilo Pass क्रेडिट नहीं है।",
+      "manageInStore": "{{store}} में मैनेज करें",
+      "resume": "सब्सक्रिप्शन फिर से शुरू करें",
+      "resumeCancelledDescription": "आपका Kilo Pass फिर से अपने-आप रिन्यू होने लगेगा।",
+      "resumePausedDescription": "आपका Kilo Pass अपनी तय तारीख से पहले, अभी फिर से शुरू हो जाएगा।",
+      "resumed": "सब्सक्रिप्शन फिर से शुरू हो गया",
+      "scheduledChange": "शेड्यूल किया गया बदलाव",
+      "scheduledChangeCancelDescription": "आपका Kilo Pass मौजूदा प्लान पर ही रहेगा और पहले की तरह रिन्यू होगा।",
+      "scheduledChangeSummary": "{{date}} को {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass उपलब्ध नहीं है।",
     "couldNotLoad": "Kilo Pass लोड नहीं हो सका। फिर से कोशिश करें।",
@@ -3687,6 +3714,24 @@
     "deleteCommand": "आदेश {{position}} हटाएँ"
   },
   "credits": {
+    "history": {
+      "appStoreReceipt": "App Store की रसीद",
+      "deductionFallback": "क्रेडिट कटौती",
+      "emptyDescription": "क्रेडिट की खरीदारी, रसीदें और इस्तेमाल यहां दिखेंगे।",
+      "emptyTitle": "कोई क्रेडिट हिस्ट्री नहीं",
+      "googlePlayReceipt": "Google Play की रसीद",
+      "kind": {
+        "adjustment": "समायोजन",
+        "balanceNeutral": "बैलेंस पर असर नहीं",
+        "deduction": "कटौती",
+        "grant": "मुफ़्त क्रेडिट",
+        "purchase": "खरीदारी"
+      },
+      "purchaseFallback": "क्रेडिट खरीदारी",
+      "receipt": "रसीद",
+      "receiptA11y": "{{description}} की रसीद खोलें",
+      "receiptUnavailable": "इस खरीदारी की रसीद उपलब्ध नहीं है।"
+    },
     "title": "क्रेडिट खरीदें",
     "description": "क्रेडिट एक बार की खरीद है जो Kilo App में AI कोडिंग सत्र चलाने के लिए आपके Kilo बैलेंस में जोड़ी जाती है। स्टोर आपके खाते से शुल्क लेता है और स्टोर द्वारा भुगतान की पुष्टि के बाद क्रेडिट जोड़े जाते हैं।",
     "nextExpiry": "{{amount}} के क्रेडिट की समय-सीमा {{date}} (UTC) को समाप्त होगी। सबसे पहले समाप्त होने वाले क्रेडिट पहले इस्तेमाल होते हैं।",
@@ -3868,5 +3913,8 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "यह खोज परिणाम खोला नहीं जा सका"
+  },
+  "invoices": {
+    "personalEmptyDescription": "आपसे बिलिंग होने के बाद, आपकी अपनी खरीदारी के इनवॉइस यहां दिखेंगे।"
   }
 }

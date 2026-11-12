@@ -22,6 +22,9 @@
     "expired": "Verval"
   },
   "common": {
+    "creditHistory": "Kredietgeskiedenis",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Kanselleer",
@@ -245,6 +248,10 @@
     "notAdded": "Jy is aangemeld. {{provider}} is nie by jou rekening gevoeg nie."
   },
   "profile": {
+    "creditHistorySubtitle": "Aankope, kwitansies en kredietaktiwiteit",
+    "invoicesSubtitle": "Laai fakture vir jou aankope af",
+    "manageBilling": "Bestuur fakturering op kilo.ai",
+    "manageBillingIosNote": "Betaalmetodes, outomatiese aanvulling en faktureringsbesonderhede word op kilo.ai bestuur.",
     "codeReviewerSubtitle": "Outomatiese PR-hersienings",
     "securityAgentSubtitle": "Vind en verhelp kwesbaarhede",
     "reviews": "Hersienings",
@@ -2722,6 +2729,26 @@
     "onlyFirstFilesAttached_other": "Slegs die eerste {{displayCount}} lêers sal aangeheg word."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Faktureringsgeskiedenis",
+      "billingHistoryEmpty": "Nog geen faktureringsgeskiedenis nie.",
+      "cancel": "Kanselleer intekening",
+      "cancelDescription": "Jou Kilo Pass bly aktief tot aan die einde van die faktureringstydperk en sal nie hernu nie.",
+      "cancelScheduled": "Word op {{date}} gekanselleer",
+      "cancelScheduledChange": "Kanselleer geskeduleerde verandering",
+      "cancelled": "Intekening gekanselleer",
+      "changePlan": "Verander plan op kilo.ai",
+      "changePlanIosNote": "Veranderinge aan betaalde planne is op kilo.ai beskikbaar.",
+      "creditHistoryEmpty": "Nog geen Kilo Pass-krediete nie.",
+      "manageInStore": "Bestuur in {{store}}",
+      "resume": "Hervat intekening",
+      "resumeCancelledDescription": "Jou Kilo Pass sal weer outomaties hernu.",
+      "resumePausedDescription": "Jou Kilo Pass word nou hervat, voor die geskeduleerde hervattingsdatum.",
+      "resumed": "Intekening hervat",
+      "scheduledChange": "Geskeduleerde verandering",
+      "scheduledChangeCancelDescription": "Jou Kilo Pass bly op die huidige plan en hernu soos tans.",
+      "scheduledChangeSummary": "{{plan}} op {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass is nie beskikbaar nie.",
     "couldNotLoad": "Kilo Pass kon nie gelaai word nie. Probeer weer.",
@@ -3687,6 +3714,24 @@
     "deleteCommand": "Skrap opdrag {{position}}"
   },
   "credits": {
+    "history": {
+      "appStoreReceipt": "Kwitansie van die App Store",
+      "deductionFallback": "Kredietaftrekking",
+      "emptyDescription": "Kredietaankope, kwitansies en gebruik sal hier verskyn.",
+      "emptyTitle": "Geen kredietgeskiedenis nie",
+      "googlePlayReceipt": "Kwitansie van Google Play",
+      "kind": {
+        "adjustment": "Aanpassing",
+        "balanceNeutral": "Saldoneutraal",
+        "deduction": "Aftrekking",
+        "grant": "Kredniettoekenning",
+        "purchase": "Aankoop"
+      },
+      "purchaseFallback": "Kredietaankoop",
+      "receipt": "Kwitansie",
+      "receiptA11y": "Maak die kwitansie vir {{description}} oop",
+      "receiptUnavailable": "Geen kwitansie is vir hierdie aankoop beskikbaar nie."
+    },
     "title": "Koop krediete",
     "description": "Krediete is 'n eenmalige aankoop wat by jou Kilo-saldo gevoeg word om AI-koderingsessies in Kilo App te laat loop. Die winkel hef jou rekening en krediete word bygevoeg nadat die winkel betaling bevestig.",
     "nextExpiry": "{{amount}} aan krediete verval op {{date}} (UTC). Krediete met die vroegste vervaldatum word eerste gebruik.",
@@ -3868,5 +3913,8 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Kon nie hierdie soektogresultaat oopmaak nie"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Fakture vir jou eie aankope sal hier verskyn sodra jy gefaktureer is."
   }
 }

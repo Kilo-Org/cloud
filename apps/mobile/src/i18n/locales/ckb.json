@@ -22,6 +22,9 @@
     "expired": "بەسەرچوو"
   },
   "common": {
+    "creditHistory": "مێژووی کرێدیت",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": "، ",
     "cancel": "هەڵبوەشێنەوە",
@@ -245,6 +248,10 @@
     "notAdded": "چوویتە ژوورەوە. {{provider}} بۆ هەژمارەکەت زیاد نەکرا."
   },
   "profile": {
+    "creditHistorySubtitle": "کڕینەکان، پسوولەکان و چالاکیی کرێدیت",
+    "invoicesSubtitle": "فاکتۆرەکانی کڕینەکانت دابگرە",
+    "manageBilling": "بەڕێوەبردنی پارەدان لە kilo.ai",
+    "manageBillingIosNote": "ڕێگاکانی پارەدان، پڕکردنەوەی خۆکار و وردەکاریی پارەدان لە kilo.ai بەڕێوە دەبرێن.",
     "codeReviewerSubtitle": "پێداچوونەوەی خۆکاری PR",
     "securityAgentSubtitle": "دۆزینەوە و چارەسەرکردنی لاوازییە ئەمنییەکان",
     "reviews": "پێداچوونەوەکان",
@@ -2722,6 +2729,26 @@
     "onlyFirstFilesAttached_other": "تەنها یەکەم {{displayCount}} فایل هاوپێچ دەکرێن."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "مێژووی پارەدان",
+      "billingHistoryEmpty": "هێشتا هیچ مێژوویەکی پارەدان نییە.",
+      "cancel": "هەڵوەشاندنەوەی بەشداریکردن",
+      "cancelDescription": "Kilo Passەکەت تا کۆتایی ماوەی پارەدان چالاک دەمێنێتەوە و نوێ ناکرێتەوە.",
+      "cancelScheduled": "لە {{date}} هەڵدەوەشێتەوە",
+      "cancelScheduledChange": "هەڵوەشاندنەوەی گۆڕانکاریی خشتەکراو",
+      "cancelled": "بەشداریکردن هەڵوەشێنرایەوە",
+      "changePlan": "گۆڕینی پلان لە kilo.ai",
+      "changePlanIosNote": "گۆڕینی پلانە پارەدارەکان لە kilo.ai بەردەستە.",
+      "creditHistoryEmpty": "هێشتا هیچ کرێدیتێکی Kilo Pass نییە.",
+      "manageInStore": "بەڕێوەبردن لە {{store}}",
+      "resume": "دەستپێکردنەوەی بەشداریکردن",
+      "resumeCancelledDescription": "Kilo Passەکەت دیسان بە شێوەی خۆکار نوێ دەکرێتەوە.",
+      "resumePausedDescription": "Kilo Passەکەت ئێستا دەست پێدەکاتەوە، پێش بەرواری خشتەکراوی دەستپێکردنەوەی.",
+      "resumed": "بەشداریکردن دەستی پێکردەوە",
+      "scheduledChange": "گۆڕانکاریی خشتەکراو",
+      "scheduledChangeCancelDescription": "Kilo Passەکەت لەسەر پلانی ئێستای دەمێنێتەوە و وەک ئێستا نوێ دەکرێتەوە.",
+      "scheduledChangeSummary": "{{plan}} لە {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass بەردەست نییە.",
     "couldNotLoad": "نەتوانرا Kilo Pass بار بکرێت. دووبارە هەوڵ بدە.",
@@ -3687,6 +3714,24 @@
     "deleteCommand": "فەرمانی {{position}} بسڕەوە"
   },
   "credits": {
+    "history": {
+      "appStoreReceipt": "پسوولە لە App Store",
+      "deductionFallback": "لێبڕینی کرێدیت",
+      "emptyDescription": "کڕین، پسوولە و بەکارهێنانی کرێدیت لێرە دەردەکەون.",
+      "emptyTitle": "هیچ مێژوویەکی کرێدیت نییە",
+      "googlePlayReceipt": "پسوولە لە Google Play",
+      "kind": {
+        "adjustment": "ڕێکخستنەوە",
+        "balanceNeutral": "بێ کاریگەری لەسەر باڵانس",
+        "deduction": "لێبڕین",
+        "grant": "بەخشینی کرێدیت",
+        "purchase": "کڕین"
+      },
+      "purchaseFallback": "کڕینی کرێدیت",
+      "receipt": "پسوولە",
+      "receiptA11y": "کردنەوەی پسوولەی {{description}}",
+      "receiptUnavailable": "هیچ پسوولەیەک بۆ ئەم کڕینە بەردەست نییە."
+    },
     "title": "کرێدیت بکڕە",
     "description": "کرێدیت کڕینێکی یەکجارە کە بۆ تەوازنی Kiloت زیاد دەکرێت بۆ بەڕێوەبردنی دانیشتنەکانی کۆدکردنی AI لە ئەپی Kilo. فرۆشگا پارە لە هەژمارەکەت وەردەگرێت و کرێدیت دوای پشتڕاستکردنەوەی پارەدان لەلایەن فرۆشگاوە زیاد دەکرێت.",
     "nextExpiry": "{{amount}} کرێدیت لە {{date}} (UTC) بەسەر دەچێت. ئەو کرێدیتانەی زووتر بەسەر دەچن یەکەم جار بەکاردەهێنرێن.",
@@ -3868,5 +3913,8 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "نەتوانرا ئەم ئەنجامی گەڕانە بکرێتەوە"
+  },
+  "invoices": {
+    "personalEmptyDescription": "فاکتۆرەکانی کڕینەکانی خۆت دوای ئەوەی پارەت لێ وەردەگیرێت لێرە دەردەکەون."
   }
 }

@@ -6,6 +6,11 @@ import { useQuery } from '@tanstack/react-query';
 import { CenteredState } from '@/components/centered-state';
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
+import {
+  KiloPassCreditHistorySection,
+  KiloPassBillingHistorySection,
+} from '@/components/kilo-pass/kilo-pass-history-sections';
+import { KiloPassManagementSections } from '@/components/kilo-pass/kilo-pass-management';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Crown } from '@/components/ui/icons';
@@ -13,6 +18,7 @@ import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
+import { isStoreManagedPass, type KiloPassSubscriptionState } from '@/lib/kilo-pass/management';
 import { getKiloPassDetailState, type KiloPassDetail } from '@/lib/kilo-pass/state';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -90,14 +96,19 @@ function KiloPassErrorScreen({ onRetry }: { onRetry: () => void }) {
 }
 
 /**
- * The two states this surface can show for a resolved account: a pass with the
- * same details the web console prints, or the message that the app does not
- * offer one. Nothing here manages, cancels, or buys a pass.
+ * A resolved pass: the same details the web console prints, the actions the
+ * subscriber can take from the phone, and both ledgers.
  */
-function KiloPassDetailBody({ detail }: { detail: Extract<KiloPassDetail, { kind: 'active' }> }) {
+function KiloPassDetailBody({
+  subscription,
+  detail,
+}: Readonly<{
+  subscription: KiloPassSubscriptionState;
+  detail: Extract<KiloPassDetail, { kind: 'active' }>;
+}>) {
   return (
     <KiloPassFrame>
-      <DetailScreenScrollView contentContainerClassName="grow justify-center gap-4 px-5">
+      <DetailScreenScrollView contentContainerClassName="grow gap-5 px-5 pb-8">
         <View className="gap-1">
           <Text className="text-base font-semibold text-foreground">{detail.planLabel}</Text>
           <Text
@@ -123,6 +134,10 @@ function KiloPassDetailBody({ detail }: { detail: Extract<KiloPassDetail, { kind
             ))}
           </View>
         ) : null}
+        <KiloPassManagementSections subscription={subscription} />
+        <KiloPassCreditHistorySection />
+        {/* A store-sold pass has no Stripe invoices, and the read rejects one. */}
+        {!isStoreManagedPass(subscription) && <KiloPassBillingHistorySection />}
       </DetailScreenScrollView>
     </KiloPassFrame>
   );
@@ -141,8 +156,9 @@ function KiloPassMessageBody({ message }: { message: string }) {
 export function KiloPassSubscriptionScreen() {
   const trpc = useTRPC();
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
+  const subscription = stateQuery.data?.subscription;
   const detail = getKiloPassDetailState({
-    subscription: stateQuery.data?.subscription,
+    subscription,
     isError: stateQuery.isError,
     isPending: stateQuery.isPending,
   });
@@ -166,5 +182,10 @@ export function KiloPassSubscriptionScreen() {
   if (detail.kind === 'ended') {
     return <KiloPassMessageBody message={t('kiloPass.purchaseUnavailableEnded')} />;
   }
-  return <KiloPassDetailBody detail={detail} />;
+  if (subscription == null) {
+    // An active detail is derived from a subscription, so this only narrows the
+    // type; the message keeps the screen total rather than throwing on it.
+    return <KiloPassMessageBody message={t('kiloPass.notAvailableInApp')} />;
+  }
+  return <KiloPassDetailBody subscription={subscription} detail={detail} />;
 }

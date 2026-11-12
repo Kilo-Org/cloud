@@ -22,6 +22,9 @@
     "expired": "Yeroon isaa darbeera"
   },
   "common": {
+    "creditHistory": "Seenaa kireeditii",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Dhiisi",
@@ -245,6 +248,10 @@
     "notAdded": "Seentee jirta. {{provider}} herrega keetti hin dabalamne."
   },
   "profile": {
+    "creditHistorySubtitle": "Bittaa, nagahee fi sochii kireeditii",
+    "invoicesSubtitle": "Beeksisa kaffaltii bittaa keetii buufadhu",
+    "manageBilling": "Kaffaltii kilo.ai irratti bulchi",
+    "manageBillingIosNote": "Malli kaffaltii, guutinsi ofumaanii fi odeeffannoon kaffaltii kilo.ai irratti bulchamu.",
     "codeReviewerSubtitle": "Sakatta'iinsa PR ofumaan raawwatamu",
     "securityAgentSubtitle": "Hanqinoota nageenyaa barbaadiitii sirreessi",
     "reviews": "Sakatta'iinsa",
@@ -2722,6 +2729,26 @@
     "onlyFirstFilesAttached_other": "Faayiloonni jalqabaa {{displayCount}} qofa dabalamu."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Seenaa kaffaltii",
+      "billingHistoryEmpty": "Ammaaf seenaan kaffaltii hin jiru.",
+      "cancel": "Miseensummaa haqi",
+      "cancelDescription": "Kilo Pass kee hanga xumura yeroo kaffaltii hojiirra tura, hin haaromfamu.",
+      "cancelScheduled": "{{date}} irratti haqama",
+      "cancelScheduledChange": "Jijjiirama karoorfame haqi",
+      "cancelled": "Miseensummaan haqameera",
+      "changePlan": "Karoora kilo.ai irratti jijjiiri",
+      "changePlanIosNote": "Jijjiiramni karoora kaffaltii kilo.ai irratti argama.",
+      "creditHistoryEmpty": "Ammaaf kireeditiin Kilo Pass hin jiru.",
+      "manageInStore": "{{store}} keessatti bulchi",
+      "resume": "Miseensummaa itti fufsiisi",
+      "resumeCancelledDescription": "Kilo Pass kee ammas ofumaan haaromfamuu jalqaba.",
+      "resumePausedDescription": "Kilo Pass kee guyyaa itti fufuuf karoorfame dura, amma itti fufa.",
+      "resumed": "Miseensummaan itti fufeera",
+      "scheduledChange": "Jijjiirama karoorfame",
+      "scheduledChangeCancelDescription": "Kilo Pass kee karoora ammaa irratti hafee akkuma har'aa haaromfama.",
+      "scheduledChangeSummary": "{{plan}} {{date}} irratti"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass hin argamu.",
     "couldNotLoad": "Kilo Pass fe'uun hin danda'amne. Irra deebi'ii yaali.",
@@ -3687,6 +3714,24 @@
     "deleteCommand": "Ajaja {{position}} balleessi"
   },
   "credits": {
+    "history": {
+      "appStoreReceipt": "Nagahee App Store irraa",
+      "deductionFallback": "Hir'isa kireeditii",
+      "emptyDescription": "Bittaan kireeditii, nagaheewwanii fi itti fayyadamni asitti mul'atu.",
+      "emptyTitle": "Seenaan kireeditii hin jiru",
+      "googlePlayReceipt": "Nagahee Google Play irraa",
+      "kind": {
+        "adjustment": "Sirreeffama",
+        "balanceNeutral": "Haftee hin jijjiirre",
+        "deduction": "Hir'isa",
+        "grant": "Kireeditii kenname",
+        "purchase": "Bittaa"
+      },
+      "purchaseFallback": "Bittaa kireeditii",
+      "receipt": "Nagahee",
+      "receiptA11y": "Nagahee {{description}} bani",
+      "receiptUnavailable": "Bittaa kanaaf nagaheen hin jiru."
+    },
     "title": "Kireedita bituu",
     "description": "Kireeditiin bittaa yeroo tokkoo kan baalansii Kilo kee irratti dabalame ta'ee, shumarra code AI Kilo App keessatti hojjechuuf oola. Suuqii ammaataa kee irraa kaffaltii fudhata, suuqiin kaffaltii erga mirkaneesse booda kireeditiin dabalama.",
     "nextExpiry": "Kireeditiin {{amount}} gaafa {{date}} (UTC) yeroon isaa darba. Kireeditiin dursee yeroon isaa darbu dursa itti fayyadamama.",
@@ -3868,5 +3913,8 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu'aa barbaachuu kana banuun hin danda'amne"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Beeksisni kaffaltii bittaa mataa keetii erga kaffaltiin siif herregamee booda asitti mul'ata."
   }
 }

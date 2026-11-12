@@ -22,6 +22,9 @@
     "expired": "Skada"
   },
   "common": {
+    "creditHistory": "Storja tal-krediti",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Ikkanċella",
@@ -245,6 +248,10 @@
     "notAdded": "Dħalt. {{provider}} ma żdiedx mal-kont tiegħek."
   },
   "profile": {
+    "creditHistorySubtitle": "Xiri, irċevuti u attività tal-krediti",
+    "invoicesSubtitle": "Niżżel il-fatturi tax-xiri tiegħek",
+    "manageBilling": "Immaniġġja l-ħlasijiet fuq kilo.ai",
+    "manageBillingIosNote": "Il-metodi ta' ħlas, it-top-up awtomatiku u d-dettalji tal-ħlas jiġu mmaniġġjati fuq kilo.ai.",
     "codeReviewerSubtitle": "Reviżjonijiet awtomatiċi tal-PR",
     "securityAgentSubtitle": "Sib u rrimedja l-vulnerabbiltajiet",
     "reviews": "Reviżjonijiet",
@@ -2881,6 +2888,26 @@
     "onlyFirstFilesAttached_many": "Se jinthemżu l-ewwel {{displayCount}} fajls biss."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "Storja tal-ħlasijiet",
+      "billingHistoryEmpty": "Għad m'hemm l-ebda storja tal-ħlasijiet.",
+      "cancel": "Ikkanċella l-abbonament",
+      "cancelDescription": "Il-Kilo Pass tiegħek jibqa' attiv sal-aħħar tal-perjodu tal-ħlas u ma jiġġeddidx.",
+      "cancelScheduled": "Jiġi kkanċellat nhar {{date}}",
+      "cancelScheduledChange": "Ikkanċella l-bidla skedata",
+      "cancelled": "Abbonament ikkanċellat",
+      "changePlan": "Biddel il-pjan fuq kilo.ai",
+      "changePlanIosNote": "Il-bidliet fil-pjanijiet imħallsa huma disponibbli fuq kilo.ai.",
+      "creditHistoryEmpty": "Għad m'hemm l-ebda krediti tal-Kilo Pass.",
+      "manageInStore": "Immaniġġja fuq {{store}}",
+      "resume": "Kompli l-abbonament",
+      "resumeCancelledDescription": "Il-Kilo Pass tiegħek jerġa' jibda jiġġedded awtomatikament.",
+      "resumePausedDescription": "Il-Kilo Pass tiegħek ikompli issa, qabel id-data skedata biex jerġa' jibda.",
+      "resumed": "L-abbonament reġa' beda",
+      "scheduledChange": "Bidla skedata",
+      "scheduledChangeCancelDescription": "Il-Kilo Pass tiegħek jibqa' fuq il-pjan attwali tiegħu u jiġġedded bħalma jagħmel illum.",
+      "scheduledChangeSummary": "{{plan}} nhar {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass mhux disponibbli.",
     "couldNotLoad": "Kilo Pass ma setax jitgħabba. Erġa' pprova.",
@@ -3870,6 +3897,24 @@
     "deleteCommand": "Ħassar l-kmand {{position}}"
   },
   "credits": {
+    "history": {
+      "appStoreReceipt": "Irċevuta mill-App Store",
+      "deductionFallback": "Tnaqqis tal-krediti",
+      "emptyDescription": "Ix-xiri, l-irċevuti u l-użu tal-krediti se jidhru hawn.",
+      "emptyTitle": "L-ebda storja tal-krediti",
+      "googlePlayReceipt": "Irċevuta minn Google Play",
+      "kind": {
+        "adjustment": "Aġġustament",
+        "balanceNeutral": "Newtrali għall-bilanċ",
+        "deduction": "Tnaqqis",
+        "grant": "Għotja ta' krediti",
+        "purchase": "Xiri"
+      },
+      "purchaseFallback": "Xiri ta' krediti",
+      "receipt": "Irċevuta",
+      "receiptA11y": "Iftaħ l-irċevuta għal {{description}}",
+      "receiptUnavailable": "M'hemmx irċevuta disponibbli għal dan ix-xiri."
+    },
     "title": "Ixtri krediti",
     "description": "Il-krediti huma xiri ta' darba li jiżdied mal-bilanċ Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo. Il-ħanut jaddebita l-kont tiegħek u l-krediti jiżdiedu wara li l-ħanut jikkonferma l-ħlas.",
     "nextExpiry": "{{amount}} fi krediti jiskadu: {{date}} (UTC). Il-krediti li jiskadu l-ewwel jintużaw l-ewwel.",
@@ -4063,5 +4108,8 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ma stajniex niftħu dan ir-riżultat tat-tfittxija"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Il-fatturi għax-xiri tiegħek stess se jidhru hawn ladarba tiġi ddebitat."
   }
 }

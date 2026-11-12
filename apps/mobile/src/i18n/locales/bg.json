@@ -22,6 +22,9 @@
     "expired": "Изтекло"
   },
   "common": {
+    "creditHistory": "История на кредитите",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Откажи",
@@ -245,6 +248,10 @@
     "notAdded": "Влязъл си. {{provider}} не беше добавен към акаунта ти."
   },
   "profile": {
+    "creditHistorySubtitle": "Покупки, разписки и активност по кредитите",
+    "invoicesSubtitle": "Изтеглете фактури за покупките си",
+    "manageBilling": "Управление на плащанията в kilo.ai",
+    "manageBillingIosNote": "Методите на плащане, автоматичното зареждане и данните за плащане се управляват в kilo.ai.",
     "codeReviewerSubtitle": "Автоматични прегледи на PR",
     "securityAgentSubtitle": "Откривай и отстранявай уязвимости",
     "reviews": "Прегледи",
@@ -2722,6 +2729,26 @@
     "onlyFirstFilesAttached_other": "Ще бъдат прикачени само първите {{displayCount}} файла."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "История на плащанията",
+      "billingHistoryEmpty": "Все още няма история на плащанията.",
+      "cancel": "Анулиране на абонамента",
+      "cancelDescription": "Вашият Kilo Pass остава активен до края на периода на плащане и няма да бъде подновен.",
+      "cancelScheduled": "Анулира се на {{date}}",
+      "cancelScheduledChange": "Отмяна на планираната промяна",
+      "cancelled": "Абонаментът е анулиран",
+      "changePlan": "Смяна на плана в kilo.ai",
+      "changePlanIosNote": "Промени в платените планове са достъпни в kilo.ai.",
+      "creditHistoryEmpty": "Все още няма кредити от Kilo Pass.",
+      "manageInStore": "Управление в {{store}}",
+      "resume": "Възобновяване на абонамента",
+      "resumeCancelledDescription": "Вашият Kilo Pass отново ще се подновява автоматично.",
+      "resumePausedDescription": "Вашият Kilo Pass се възобновява сега, преди планираната дата за възобновяване.",
+      "resumed": "Абонаментът е възобновен",
+      "scheduledChange": "Планирана промяна",
+      "scheduledChangeCancelDescription": "Вашият Kilo Pass остава на текущия си план и се подновява както досега.",
+      "scheduledChangeSummary": "{{plan}} на {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass не е достъпен.",
     "couldNotLoad": "Не успяхме да заредим Kilo Pass. Опитай отново.",
@@ -3687,6 +3714,24 @@
     "deleteCommand": "Изтрийте команда {{position}}"
   },
   "credits": {
+    "history": {
+      "appStoreReceipt": "Разписка от App Store",
+      "deductionFallback": "Приспадане на кредити",
+      "emptyDescription": "Покупките на кредити, разписките и използването ще се показват тук.",
+      "emptyTitle": "Няма история на кредитите",
+      "googlePlayReceipt": "Разписка от Google Play",
+      "kind": {
+        "adjustment": "Корекция",
+        "balanceNeutral": "Без промяна в баланса",
+        "deduction": "Приспадане",
+        "grant": "Безплатни кредити",
+        "purchase": "Покупка"
+      },
+      "purchaseFallback": "Покупка на кредити",
+      "receipt": "Разписка",
+      "receiptA11y": "Отваряне на разписката за {{description}}",
+      "receiptUnavailable": "Няма налична разписка за тази покупка."
+    },
     "title": "Купи кредити",
     "description": "Кредитите са еднократна покупка, добавена към вашия Kilo баланс за стартиране на AI сесии за кодиране в приложението Kilo. Магазинът таксува акаунта ви и кредитите се добавят, след като магазинът потвърди плащането.",
     "nextExpiry": "Срокът на {{amount}} кредити изтича на {{date}} (UTC). Първо се използват кредитите с най-ранен срок на валидност.",
@@ -3868,5 +3913,8 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Не можахме да отворим този резултат от търсенето"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Фактурите за личните ви покупки ще се показват тук, след като бъдете таксувани."
   }
 }

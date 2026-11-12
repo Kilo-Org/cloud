@@ -22,6 +22,9 @@
     "expired": "បានផុតកំណត់"
   },
   "common": {
+    "creditHistory": "ប្រវត្តិក្រេឌីត",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": "។ ",
     "listJoiner": ", ",
     "cancel": "បោះបង់",
@@ -245,6 +248,10 @@
     "notAdded": "អ្នកបានចូលហើយ។ {{provider}} មិនត្រូវបានបន្ថែមទៅគណនីរបស់អ្នកទេ។"
   },
   "profile": {
+    "creditHistorySubtitle": "ការទិញ បង្កាន់ដៃ និងសកម្មភាពក្រេឌីត",
+    "invoicesSubtitle": "ទាញយកវិក្កយបត្រសម្រាប់ការទិញរបស់អ្នក",
+    "manageBilling": "គ្រប់គ្រងការទូទាត់នៅលើ kilo.ai",
+    "manageBillingIosNote": "វិធីសាស្ត្រទូទាត់ ការបញ្ចូលក្រេឌីតស្វ័យប្រវត្តិ និងព័ត៌មានលម្អិតអំពីការទូទាត់ ត្រូវបានគ្រប់គ្រងនៅលើ kilo.ai។",
     "codeReviewerSubtitle": "ការពិនិត្យ PR ដោយស្វ័យប្រវត្តិ",
     "securityAgentSubtitle": "ស្វែងរក និងដោះស្រាយចំណុចខ្សោយផ្នែកសុវត្ថិភាព",
     "reviews": "ការពិនិត្យ",
@@ -2722,6 +2729,26 @@
     "onlyFirstFilesAttached_other": "នឹងភ្ជាប់តែឯកសារ {{displayCount}} ដំបូងប៉ុណ្ណោះ។"
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "ប្រវត្តិការទូទាត់",
+      "billingHistoryEmpty": "មិនទាន់មានប្រវត្តិការទូទាត់នៅឡើយទេ។",
+      "cancel": "បោះបង់ការជាវ",
+      "cancelDescription": "Kilo Pass របស់អ្នកនៅតែសកម្មរហូតដល់ចុងវគ្គទូទាត់ ហើយនឹងមិនបន្តទៀតទេ។",
+      "cancelScheduled": "នឹងបោះបង់នៅថ្ងៃ {{date}}",
+      "cancelScheduledChange": "បោះបង់ការផ្លាស់ប្តូរដែលបានកំណត់ពេល",
+      "cancelled": "បានបោះបង់ការជាវ",
+      "changePlan": "ប្តូរគម្រោងនៅលើ kilo.ai",
+      "changePlanIosNote": "ការប្តូរគម្រោងបង់ប្រាក់អាចធ្វើបាននៅលើ kilo.ai។",
+      "creditHistoryEmpty": "មិនទាន់មានក្រេឌីត Kilo Pass នៅឡើយទេ។",
+      "manageInStore": "គ្រប់គ្រងនៅក្នុង {{store}}",
+      "resume": "បន្តការជាវឡើងវិញ",
+      "resumeCancelledDescription": "Kilo Pass របស់អ្នកនឹងចាប់ផ្តើមបន្តដោយស្វ័យប្រវត្តិម្តងទៀត។",
+      "resumePausedDescription": "Kilo Pass របស់អ្នកនឹងបន្តឡើងវិញឥឡូវនេះ មុនកាលបរិច្ឆេទបន្តដែលបានកំណត់។",
+      "resumed": "បានបន្តការជាវឡើងវិញ",
+      "scheduledChange": "ការផ្លាស់ប្តូរដែលបានកំណត់ពេល",
+      "scheduledChangeCancelDescription": "Kilo Pass របស់អ្នកនៅតែប្រើគម្រោងបច្ចុប្បន្ន ហើយបន្តដូចសព្វថ្ងៃ។",
+      "scheduledChangeSummary": "{{plan}} នៅថ្ងៃ {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "ផ្ទុក Kilo Pass មិនបានទេ។",
     "couldNotLoad": "មិនអាចផ្ទុក Kilo Pass បានទេ។ ព្យាយាមម្តងទៀត។",
@@ -3687,6 +3714,24 @@
     "deleteCommand": "លុបពាក្យបញ្ជា {{position}}"
   },
   "credits": {
+    "history": {
+      "appStoreReceipt": "បង្កាន់ដៃពី App Store",
+      "deductionFallback": "ការកាត់ក្រេឌីត",
+      "emptyDescription": "ការទិញក្រេឌីត បង្កាន់ដៃ និងការប្រើប្រាស់នឹងបង្ហាញនៅទីនេះ។",
+      "emptyTitle": "គ្មានប្រវត្តិក្រេឌីត",
+      "googlePlayReceipt": "បង្កាន់ដៃពី Google Play",
+      "kind": {
+        "adjustment": "ការកែតម្រូវ",
+        "balanceNeutral": "មិនប៉ះពាល់សមតុល្យ",
+        "deduction": "ការកាត់",
+        "grant": "ការផ្តល់ក្រេឌីត",
+        "purchase": "ការទិញ"
+      },
+      "purchaseFallback": "ការទិញក្រេឌីត",
+      "receipt": "បង្កាន់ដៃ",
+      "receiptA11y": "បើកបង្កាន់ដៃសម្រាប់ {{description}}",
+      "receiptUnavailable": "មិនមានបង្កាន់ដៃសម្រាប់ការទិញនេះទេ។"
+    },
     "title": "ទិញឥណទាន",
     "description": "ឥណទានគឺជាការទិញតែម្តងដែលបន្ថែមទៅសមតុល្យ Kilo របស់អ្នកសម្រាប់ដំណើរការវគ្គសរសេរកូដ AI នៅក្នុង Kilo App។ ហាងគិតប្រាក់ពីគណនីរបស់អ្នក ហើយឥណទានត្រូវបានបន្ថែមបន្ទាប់ពីហាងបញ្ជាក់ការបង់ប្រាក់។",
     "nextExpiry": "ឥណទានចំនួន {{amount}} នឹងផុតកំណត់នៅ {{date}} (UTC)។ ឥណទានដែលផុតកំណត់មុនគេនឹងត្រូវប្រើមុន។",
@@ -3868,5 +3913,8 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "មិនអាចបើកលទ្ធផលស្វែងរកនេះបានទេ"
+  },
+  "invoices": {
+    "personalEmptyDescription": "វិក្កយបត្រសម្រាប់ការទិញផ្ទាល់ខ្លួនរបស់អ្នកនឹងបង្ហាញនៅទីនេះ បន្ទាប់ពីអ្នកត្រូវបានគិតប្រាក់។"
   }
 }

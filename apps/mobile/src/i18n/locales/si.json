@@ -22,6 +22,9 @@
     "expired": "කල් ඉකුත් වී ඇත"
   },
   "common": {
+    "creditHistory": "ක්‍රෙඩිට් ඉතිහාසය",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "අවලංගු කරන්න",
@@ -245,6 +248,10 @@
     "notAdded": "ඔබ පිවිස ඇත. {{provider}} ඔබේ ගිණුමට එක් නොකෙරිණි."
   },
   "profile": {
+    "creditHistorySubtitle": "මිලදී ගැනීම්, රිසිට්පත් සහ ක්‍රෙඩිට් ක්‍රියාකාරකම්",
+    "invoicesSubtitle": "ඔබේ මිලදී ගැනීම් සඳහා ඉන්වොයිස් බාගන්න",
+    "manageBilling": "kilo.ai හි බිල්පත් කළමනාකරණය කරන්න",
+    "manageBillingIosNote": "ගෙවීම් ක්‍රම, ස්වයංක්‍රීය ටොප්-අප් සහ බිල්පත් විස්තර kilo.ai හි කළමනාකරණය කෙරේ.",
     "codeReviewerSubtitle": "ස්වයංක්‍රීය PR සමාලෝචන",
     "securityAgentSubtitle": "ආරක්ෂක දුර්වලතා සොයා පිළියම් යොදන්න",
     "reviews": "සමාලෝචන",
@@ -2722,6 +2729,26 @@
     "onlyFirstFilesAttached_other": "පළමු ගොනු {{displayCount}} ක් පමණක් අමුණනු ඇත."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "බිල්පත් ඉතිහාසය",
+      "billingHistoryEmpty": "තවම බිල්පත් ඉතිහාසයක් නැත.",
+      "cancel": "දායකත්වය අවලංගු කරන්න",
+      "cancelDescription": "ඔබේ Kilo Pass බිල්පත් කාලපරිච්ඡේදය අවසන් වන තෙක් සක්‍රියව පවතින අතර නැවත අලුත් නොකෙරේ.",
+      "cancelScheduled": "{{date}} දින අවලංගු වේ",
+      "cancelScheduledChange": "සැලසුම් කළ වෙනස අවලංගු කරන්න",
+      "cancelled": "දායකත්වය අවලංගු කරන ලදී",
+      "changePlan": "kilo.ai හි සැලැස්ම වෙනස් කරන්න",
+      "changePlanIosNote": "ගෙවන සැලසුම් වෙනස් කිරීම් kilo.ai හි ලබා ගත හැක.",
+      "creditHistoryEmpty": "තවම Kilo Pass ක්‍රෙඩිට් නැත.",
+      "manageInStore": "{{store}} හි කළමනාකරණය කරන්න",
+      "resume": "දායකත්වය නැවත අරඹන්න",
+      "resumeCancelledDescription": "ඔබේ Kilo Pass නැවතත් ස්වයංක්‍රීයව අලුත් වීමට පටන් ගනී.",
+      "resumePausedDescription": "ඔබේ Kilo Pass එහි නියමිත නැවත ආරම්භ දිනයට පෙර, දැන්ම නැවත ආරම්භ වේ.",
+      "resumed": "දායකත්වය නැවත ආරම්භ විය",
+      "scheduledChange": "සැලසුම් කළ වෙනස",
+      "scheduledChangeCancelDescription": "ඔබේ Kilo Pass එහි වත්මන් සැලැස්මේම පවතින අතර දැනට මෙන්ම අලුත් වේ.",
+      "scheduledChangeSummary": "{{date}} දින {{plan}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass ලබාගත නොහැක.",
     "couldNotLoad": "Kilo Pass පූරණය කළ නොහැකි විය. නැවත උත්සාහ කරන්න.",
@@ -3687,6 +3714,24 @@
     "deleteCommand": "විධානය {{position}} මකන්න"
   },
   "credits": {
+    "history": {
+      "appStoreReceipt": "App Store වෙතින් ලැබුණු රිසිට්පත",
+      "deductionFallback": "ක්‍රෙඩිට් අඩු කිරීම",
+      "emptyDescription": "ක්‍රෙඩිට් මිලදී ගැනීම්, රිසිට්පත් සහ භාවිතය මෙහි දිස් වේ.",
+      "emptyTitle": "ක්‍රෙඩිට් ඉතිහාසයක් නැත",
+      "googlePlayReceipt": "Google Play වෙතින් ලැබුණු රිසිට්පත",
+      "kind": {
+        "adjustment": "ගැලපීම",
+        "balanceNeutral": "ශේෂයට බලපෑමක් නැත",
+        "deduction": "අඩු කිරීම",
+        "grant": "ක්‍රෙඩිට් ප්‍රදානය",
+        "purchase": "මිලදී ගැනීම"
+      },
+      "purchaseFallback": "ක්‍රෙඩිට් මිලදී ගැනීම",
+      "receipt": "රිසිට්පත",
+      "receiptA11y": "{{description}} සඳහා රිසිට්පත විවෘත කරන්න",
+      "receiptUnavailable": "මෙම මිලදී ගැනීම සඳහා රිසිට්පතක් නොමැත."
+    },
     "title": "ක්‍රෙඩිට් මිලදී ගන්න",
     "description": "ක්‍රෙඩිට් යනු Kilo App හි AI කේතීකරණ සැසි ක්‍රියාත්මක කිරීම සඳහා ඔබේ Kilo ශේෂයට එක් කරන එක්-වරක් මිලදී ගැනීමකි. ගබඩාව ඔබේ ගිණුමෙන් අය කරන අතර ගබඩාව ගෙවීම තහවුරු කිරීමෙන් පසු ක්‍රෙඩිට් එක් කෙරේ.",
     "nextExpiry": "{{amount}} ක ක්‍රෙඩිට් {{date}} (UTC) දින කල් ඉකුත් වේ. ඉක්මනින්ම කල් ඉකුත් වන ක්‍රෙඩිට් පළමුව භාවිත කෙරේ.",
@@ -3868,5 +3913,8 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "මෙම සෙවුම් ප්‍රතිඵලය විවෘත කිරීමට නොහැකි විය"
+  },
+  "invoices": {
+    "personalEmptyDescription": "ඔබෙන් බිල්පත් අය කළ පසු, ඔබේම මිලදී ගැනීම් සඳහා ඉන්වොයිස් මෙහි දිස් වේ."
   }
 }

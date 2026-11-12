@@ -22,6 +22,9 @@
     "expired": "Platnosť vypršala"
   },
   "common": {
+    "creditHistory": "História kreditov",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
     "cancel": "Zrušiť",
@@ -245,6 +248,10 @@
     "notAdded": "Ste prihlásený. {{provider}} nebol pridaný do vášho účtu."
   },
   "profile": {
+    "creditHistorySubtitle": "Nákupy, doklady a pohyby kreditov",
+    "invoicesSubtitle": "Stiahnite si faktúry za svoje nákupy",
+    "manageBilling": "Spravovať fakturáciu na kilo.ai",
+    "manageBillingIosNote": "Spôsoby platby, automatické dobíjanie a fakturačné údaje sa spravujú na kilo.ai.",
     "codeReviewerSubtitle": "Automatické kontroly PR",
     "securityAgentSubtitle": "Vyhľadávať a odstraňovať zraniteľnosti",
     "reviews": "Kontroly",
@@ -2828,6 +2835,26 @@
     "onlyFirstFilesAttached_many": "Priložia sa len prvé súbory ({{displayCount}})."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "História fakturácie",
+      "billingHistoryEmpty": "Zatiaľ žiadna história fakturácie.",
+      "cancel": "Zrušiť predplatné",
+      "cancelDescription": "Váš Kilo Pass zostane aktívny do konca fakturačného obdobia a nebude sa obnovovať.",
+      "cancelScheduled": "Zruší sa {{date}}",
+      "cancelScheduledChange": "Zrušiť naplánovanú zmenu",
+      "cancelled": "Predplatné bolo zrušené",
+      "changePlan": "Zmeniť plán na kilo.ai",
+      "changePlanIosNote": "Zmeny platených plánov sú dostupné na kilo.ai.",
+      "creditHistoryEmpty": "Zatiaľ žiadne kredity z Kilo Pass.",
+      "manageInStore": "Spravovať v obchode {{store}}",
+      "resume": "Obnoviť predplatné",
+      "resumeCancelledDescription": "Váš Kilo Pass sa bude opäť automaticky obnovovať.",
+      "resumePausedDescription": "Váš Kilo Pass sa obnoví hneď, ešte pred plánovaným dátumom obnovenia.",
+      "resumed": "Predplatné bolo obnovené",
+      "scheduledChange": "Naplánovaná zmena",
+      "scheduledChangeCancelDescription": "Váš Kilo Pass zostane na aktuálnom pláne a bude sa obnovovať ako doteraz.",
+      "scheduledChangeSummary": "{{plan}} od {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass nie je dostupný.",
     "couldNotLoad": "Kilo Pass sa nepodarilo načítať. Skúste to znova.",
@@ -3809,6 +3836,24 @@
     "deleteCommand": "Odstrániť príkaz {{position}}"
   },
   "credits": {
+    "history": {
+      "appStoreReceipt": "Doklad v obchode App Store",
+      "deductionFallback": "Odpočet kreditov",
+      "emptyDescription": "Tu sa zobrazia nákupy kreditov, doklady a ich využitie.",
+      "emptyTitle": "Žiadna história kreditov",
+      "googlePlayReceipt": "Doklad v obchode Google Play",
+      "kind": {
+        "adjustment": "Úprava",
+        "balanceNeutral": "Bez vplyvu na zostatok",
+        "deduction": "Odpočet",
+        "grant": "Pridelené kredity",
+        "purchase": "Nákup"
+      },
+      "purchaseFallback": "Nákup kreditov",
+      "receipt": "Doklad",
+      "receiptA11y": "Otvoriť doklad za {{description}}",
+      "receiptUnavailable": "Pre tento nákup nie je k dispozícii doklad."
+    },
     "title": "Kúpiť kredity",
     "description": "Kredity sú jednorazový nákup pridaný do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo. Obchod vám strhne platbu z účtu a kredity sa pripíšu po potvrdení platby obchodom.",
     "nextExpiry": "Platnosť kreditov v hodnote {{amount}} sa skončí {{date}} (UTC). Najprv sa čerpajú kredity s najskorším koncom platnosti.",
@@ -3998,5 +4043,8 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nepodarilo sa otvoriť tento výsledok vyhľadávania"
+  },
+  "invoices": {
+    "personalEmptyDescription": "Faktúry za vaše vlastné nákupy sa tu zobrazia po vyúčtovaní."
   }
 }

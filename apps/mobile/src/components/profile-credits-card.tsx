@@ -12,6 +12,7 @@ import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
 import { BalanceBlock, type BalanceBlockState } from '@/components/profile-balance-block';
 import { useContextPicker } from '@/components/context-control';
 import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
+import { PersonalCreditsLinks } from '@/components/credits/credits-links';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -363,6 +364,10 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         retryActionLabel={t('common.retry')}
         onRetry={retryBalance}
       />
+      {/* The person's own history and invoices sit under their balance; an
+          organization's balance has no personal rows, so only the personal
+          selection carries them. */}
+      {selectedOrgId == null && <PersonalCreditsLinks />}
       {/* One loading indicator per section: while the balance slot shows its
           skeleton, the KiloPass card reserves its slot quietly instead of
           stacking a second skeleton card. The card's queries still run from

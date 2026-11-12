@@ -22,6 +22,9 @@
     "expired": "انتهت الصلاحية"
   },
   "common": {
+    "creditHistory": "سجل الرصيد",
+    "appStore": "App Store",
+    "googlePlay": "Google Play",
     "sentenceJoiner": ". ",
     "listJoiner": "، ",
     "cancel": "إلغاء",
@@ -245,6 +248,10 @@
     "notAdded": "لقد سجّلت الدخول. لم تتم إضافة {{provider}} إلى حسابك."
   },
   "profile": {
+    "creditHistorySubtitle": "المشتريات والإيصالات ونشاط الرصيد",
+    "invoicesSubtitle": "نزّل فواتير مشترياتك",
+    "manageBilling": "إدارة الفوترة على kilo.ai",
+    "manageBillingIosNote": "تتم إدارة طرق الدفع وإعادة الشحن التلقائي وتفاصيل الفوترة على kilo.ai.",
     "codeReviewerSubtitle": "مراجعات PR تلقائية",
     "securityAgentSubtitle": "اكتشاف الثغرات ومعالجتها",
     "reviews": "المراجعات",
@@ -2300,6 +2307,26 @@
     "onlyFirstFilesAttached_many": "ستُرفق الملفات الأولى فقط، وعددها {{displayCount}}."
   },
   "kiloPass": {
+    "manage": {
+      "billingHistory": "سجل الفوترة",
+      "billingHistoryEmpty": "لا يوجد سجل فوترة بعد.",
+      "cancel": "إلغاء الاشتراك",
+      "cancelDescription": "يظل Kilo Pass نشطًا حتى نهاية فترة الفوترة ولن يتم تجديده.",
+      "cancelScheduled": "يُلغى في {{date}}",
+      "cancelScheduledChange": "إلغاء التغيير المجدول",
+      "cancelled": "تم إلغاء الاشتراك",
+      "changePlan": "تغيير الخطة على kilo.ai",
+      "changePlanIosNote": "تتوفر تغييرات الخطط المدفوعة على kilo.ai.",
+      "creditHistoryEmpty": "لا يوجد رصيد من Kilo Pass بعد.",
+      "manageInStore": "الإدارة في {{store}}",
+      "resume": "استئناف الاشتراك",
+      "resumeCancelledDescription": "سيعود Kilo Pass إلى التجديد التلقائي مجددًا.",
+      "resumePausedDescription": "سيُستأنف Kilo Pass الآن، قبل موعد الاستئناف المجدول.",
+      "resumed": "تم استئناف الاشتراك",
+      "scheduledChange": "تغيير مجدول",
+      "scheduledChangeCancelDescription": "سيبقى Kilo Pass على خطته الحالية ويتجدد كما هو الآن.",
+      "scheduledChangeSummary": "{{plan}} في {{date}}"
+    },
     "title": "Kilo Pass",
     "unavailable": "Kilo Pass غير متاح.",
     "couldNotLoad": "تعذّر تحميل Kilo Pass. حاول مرة أخرى.",
@@ -3931,6 +3958,24 @@
     "deleteCommand": "احذف الأمر {{position}}"
   },
   "credits": {
+    "history": {
+      "appStoreReceipt": "الإيصال من App Store",
+      "deductionFallback": "خصم من الرصيد",
+      "emptyDescription": "ستظهر هنا مشتريات الرصيد والإيصالات والاستخدام.",
+      "emptyTitle": "لا يوجد سجل للرصيد",
+      "googlePlayReceipt": "الإيصال من Google Play",
+      "kind": {
+        "adjustment": "تعديل",
+        "balanceNeutral": "دون تأثير على الرصيد",
+        "deduction": "خصم",
+        "grant": "منحة رصيد",
+        "purchase": "شراء"
+      },
+      "purchaseFallback": "شراء رصيد",
+      "receipt": "الإيصال",
+      "receiptA11y": "فتح إيصال {{description}}",
+      "receiptUnavailable": "لا يتوفر إيصال لعملية الشراء هذه."
+    },
     "title": "شراء الرصيد",
     "description": "الرصيد عملية شراء لمرة واحدة تُضاف إلى رصيدك في Kilo لتشغيل جلسات البرمجة بالذكاء الاصطناعي في تطبيق Kilo. يتقاضى المتجر المبلغ من حسابك وتُضاف الأرصدة بعد تأكيد المتجر للدفع.",
     "nextExpiry": "تنتهي صلاحية رصيد بقيمة {{amount}} في {{date}} (UTC). يُستخدم الرصيد الأقرب انتهاءً أولاً.",
@@ -4128,5 +4173,8 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "تعذّر فتح نتيجة البحث هذه"
+  },
+  "invoices": {
+    "personalEmptyDescription": "ستظهر هنا فواتير مشترياتك الشخصية بعد إصدار أول فاتورة لك."
   }
 }

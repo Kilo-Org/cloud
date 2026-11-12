@@ -2849,6 +2849,38 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "Audit-Log",
+      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation mit Enterprise-Plan können deren Audit-Log einsehen.",
+      "emptyTitle": "Keine Audit-Ereignisse",
+      "emptyDescription": "Hier erscheinen Aktionen, die in dieser Organisation ausgeführt werden.",
+      "truncated": "Es werden die neuesten Ereignisse angezeigt."
+    },
+    "billing": {
+      "title": "Abrechnung",
+      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation können deren Abrechnung sehen.",
+      "subscription": "Abonnement",
+      "state": "Status",
+      "stateNone": "Kein Abonnement",
+      "statePastDue": "Überfällig",
+      "stateCancelsOn": "Endet am {{date}}",
+      "stateCancelsAtPeriodEnd": "Endet zum Ende des Zeitraums",
+      "stateTrialEndsOn": "Testphase endet am {{date}}",
+      "stateTrialing": "Testphase",
+      "stateRenewsOn": "Verlängert sich am {{date}}",
+      "scheduledChange": "Geplante Änderung",
+      "seatsDropTo": "Sinkt am {{date}} auf {{seats}} Nutzerplätze",
+      "seats": "Nutzerplätze",
+      "autoTopUp": "Automatische Aufladung",
+      "autoTopUpAmount": "Aufladebetrag",
+      "autoTopUpThreshold": "Bei Guthaben unter",
+      "manageOnWeb": "Änderungen erfolgen im Web",
+      "changePlan": "Plan ändern",
+      "buySeats": "Nutzerplätze kaufen",
+      "setupAutoTopUp": "Automatische Aufladung einrichten",
+      "webAddress": "Webadresse {{url}}",
+      "opensOnWeb": "Wird im Web geöffnet"
+    },
     "boundary": {
       "backToProfile": "Zurück zum Profil",
       "loadErrorMessage": "Prüfe deine Verbindung und versuche es erneut.",
@@ -2856,14 +2888,20 @@
       "loadErrorTitle": "Deine Organisationen konnten nicht geladen werden.",
       "membershipLostNotice": "Du hast keinen Zugriff mehr auf diese Organisation. Gewechselt zu {{target}}.",
       "noOrganization": "Keine Organisation",
-      "noOrganizationDescription": "Dieses Konto gehört keiner Organisation an. Erstelle eine Organisation oder tritt einer auf der Website bei, um Organisationsfunktionen wie Mitgliedseinladungen und Warnungen bei niedrigem Guthaben zu nutzen.",
-      "openWebOrganizations": "Organisationen auf der Website öffnen",
+      "noOrganizationDescription": "Dieses Konto gehört zu keiner Organisation. Erstelle eine, um Organisationsfunktionen wie Mitgliedereinladungen und Warnungen bei niedrigem Guthaben zu nutzen, oder tritt im Web einer Organisation bei, zu der du eingeladen wurdest.",
       "organizationUnavailable": "Die Organisation ist nicht verfügbar.",
       "selectDescriptionWithOrganizations": "Du gehörst einer oder mehreren Organisationen an. Wähle das Konto aus, das dieser Bildschirm verwenden soll.",
       "selectOrganization": "Organisation auswählen",
       "unavailableDescription": "Diese Organisation ist nicht mehr verfügbar. Wähle in deinem Profil eine andere Organisation aus, um fortzufahren.",
       "unavailableSessionsDescription": "Diese Organisation ist nicht mehr verfügbar. Deren Sitzungen können nicht geladen werden.",
       "accessDeniedDescription": "Du hast keinen Zugriff auf diese Organisation."
+    },
+    "create": {
+      "title": "Organisation erstellen",
+      "description": "Eine Organisation teilt Credits, Agents und Einstellungen mit deinem Team.",
+      "nameLabel": "Name der Organisation",
+      "nameRequired": "Gib einen Namen für die Organisation ein.",
+      "trialNote": "Mit dem Erstellen beginnt deine 14-tägige Enterprise-Testphase. Pläne kaufst du im Web."
     },
     "creditActivity": {
       "emptyDescription": "Hier erscheinen Käufe, Verbrauch und Guthabenanpassungen dieser Organisation, sobald sie erfasst werden.",
@@ -2985,6 +3023,22 @@
       "ownRoleChange": "Sie können Ihre eigene Rolle nicht ändern.",
       "inviteExpired": "Diese Einladung ist abgelaufen.",
       "inviteAccepted": "Diese Einladung wurde bereits angenommen."
+    },
+    "settingsOnWeb": {
+      "title": "Organisationseinstellungen im Web",
+      "usageDetails": "Nutzungsdetails",
+      "providersAndModels": "Anbieter und Modelle",
+      "groups": "Gruppen",
+      "guardrails": "Guardrails",
+      "byok": "Eigenen Schlüssel verwenden",
+      "ssoAndDomain": "SSO und Domain",
+      "emailPreferences": "E-Mail-Einstellungen",
+      "dataCollection": "Datenerfassung",
+      "auditLogs": "Audit-Logs",
+      "requestLogs": "Anfrage-Logs",
+      "integrations": "Integrationen",
+      "subOrganizations": "Unterorganisationen",
+      "distributeFunds": "Guthaben verteilen"
     },
     "usageStats": {
       "inputTokens": "Eingabe-Tokens",

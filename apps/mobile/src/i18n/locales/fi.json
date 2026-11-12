@@ -2857,6 +2857,38 @@
     "sendFeedback": "Lähetä palautetta"
   },
   "organization": {
+    "auditLog": {
+      "title": "Tarkastusloki",
+      "permissionDenied": "Vain Enterprise-paketin organisaation omistaja, ylläpitäjä tai laskutusvastaava voi lukea organisaation tarkastuslokia.",
+      "emptyTitle": "Ei tarkastustapahtumia",
+      "emptyDescription": "Tässä organisaatiossa tehdyt toiminnot näkyvät täällä.",
+      "truncated": "Näytetään viimeisimmät tapahtumat."
+    },
+    "billing": {
+      "title": "Laskutus",
+      "permissionDenied": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi nähdä organisaation laskutuksen.",
+      "subscription": "Tilaus",
+      "state": "Tila",
+      "stateNone": "Ei tilausta",
+      "statePastDue": "Erääntynyt",
+      "stateCancelsOn": "Peruuntuu {{date}}",
+      "stateCancelsAtPeriodEnd": "Peruuntuu kauden lopussa",
+      "stateTrialEndsOn": "Kokeilu päättyy {{date}}",
+      "stateTrialing": "Kokeilu",
+      "stateRenewsOn": "Uusiutuu {{date}}",
+      "scheduledChange": "Ajoitettu muutos",
+      "seatsDropTo": "Laskee {{seats}} käyttäjäpaikkaan {{date}}",
+      "seats": "Käyttäjäpaikat",
+      "autoTopUp": "Automaattinen täydennys",
+      "autoTopUpAmount": "Täydennyksen määrä",
+      "autoTopUpThreshold": "Kun saldo laskee alle",
+      "manageOnWeb": "Muutokset tehdään verkossa",
+      "changePlan": "Vaihda pakettia",
+      "buySeats": "Osta käyttäjäpaikkoja",
+      "setupAutoTopUp": "Ota automaattinen täydennys käyttöön",
+      "webAddress": "Verkko-osoite {{url}}",
+      "opensOnWeb": "Avautuu verkossa"
+    },
     "boundary": {
       "backToProfile": "Takaisin profiiliin",
       "loadErrorMessage": "Tarkista yhteys ja yritä uudelleen.",
@@ -2864,14 +2896,20 @@
       "loadErrorTitle": "Organisaatioitasi ei voitu ladata.",
       "membershipLostNotice": "Sinulla ei ole enää pääsyä tähän organisaatioon. Vaihdettu {{target}}.",
       "noOrganization": "Ei organisaatiota",
-      "noOrganizationDescription": "Tämä tili ei kuulu mihinkään organisaatioon. Luo organisaatio tai liity sellaiseen verkossa käyttääksesi organisaatio-ominaisuuksia, kuten jäsenkutsuja ja alhaisen saldon hälytyksiä.",
-      "openWebOrganizations": "Avaa organisaatiot verkossa",
+      "noOrganizationDescription": "Tämä tili ei kuulu mihinkään organisaatioon. Luo organisaatio, niin voit käyttää organisaatio-ominaisuuksia, kuten jäsenkutsuja ja alhaisen saldon ilmoituksia, tai avaa verkkosivusto liittyäksesi organisaatioon, johon sinut on kutsuttu.",
       "organizationUnavailable": "Organisaatio ei ole käytettävissä.",
       "selectDescriptionWithOrganizations": "Kuulut yhteen tai useampaan organisaatioon. Valitse tili, jota tämän näytön tulee käyttää.",
       "selectOrganization": "Valitse organisaatio",
       "unavailableDescription": "Tämä organisaatio ei ole enää käytettävissä. Jatka valitsemalla toinen organisaatio profiilistasi.",
       "unavailableSessionsDescription": "Tämä organisaatio ei ole enää käytettävissä. Sen istuntoja ei voida ladata.",
       "accessDeniedDescription": "Sinulla ei ole pääsyä tähän organisaatioon."
+    },
+    "create": {
+      "title": "Luo organisaatio",
+      "description": "Organisaation avulla tiimisi käyttää yhteisiä krediittejä, agentteja ja asetuksia.",
+      "nameLabel": "Organisaation nimi",
+      "nameRequired": "Anna organisaation nimi.",
+      "trialNote": "14 päivän Enterprise-kokeilusi alkaa, kun luot organisaation. Paketit ostetaan verkossa."
     },
     "creditActivity": {
       "emptyDescription": "Organisaation ostot, käyttö ja krediittien muutokset näkyvät tässä sitä mukaa kuin niitä kertyy.",
@@ -2980,6 +3018,22 @@
       "ownRoleChange": "Et voi vaihtaa omaa rooliasi.",
       "inviteExpired": "Tämä kutsu on vanhentunut.",
       "inviteAccepted": "Tämä kutsu on jo hyväksytty."
+    },
+    "settingsOnWeb": {
+      "title": "Organisaation asetukset verkossa",
+      "usageDetails": "Käytön tiedot",
+      "providersAndModels": "Palveluntarjoajat ja mallit",
+      "groups": "Ryhmät",
+      "guardrails": "Suojakaiteet",
+      "byok": "Oma avain",
+      "ssoAndDomain": "SSO ja verkkotunnus",
+      "emailPreferences": "Sähköpostiasetukset",
+      "dataCollection": "Tiedonkeruu",
+      "auditLogs": "Tarkastuslokit",
+      "requestLogs": "Pyyntölokit",
+      "integrations": "Integraatiot",
+      "subOrganizations": "Alaorganisaatiot",
+      "distributeFunds": "Jaa varoja"
     },
     "usageStats": {
       "inputTokens": "Syötetokenit",

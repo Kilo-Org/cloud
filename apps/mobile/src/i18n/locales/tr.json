@@ -2849,6 +2849,38 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "Denetim günlüğü",
+      "permissionDenied": "Denetim günlüğünü yalnızca Enterprise planındaki kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir.",
+      "emptyTitle": "Denetim olayı yok",
+      "emptyDescription": "Bu kuruluşta gerçekleştirilen işlemler burada görünür.",
+      "truncated": "En son olaylar gösteriliyor."
+    },
+    "billing": {
+      "title": "Faturalandırma",
+      "permissionDenied": "Faturalandırma bilgilerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görebilir.",
+      "subscription": "Abonelik",
+      "state": "Durum",
+      "stateNone": "Abonelik yok",
+      "statePastDue": "Ödemesi gecikmiş",
+      "stateCancelsOn": "{{date}} tarihinde iptal edilecek",
+      "stateCancelsAtPeriodEnd": "Dönem sonunda iptal edilecek",
+      "stateTrialEndsOn": "Deneme {{date}} tarihinde bitiyor",
+      "stateTrialing": "Deneme",
+      "stateRenewsOn": "{{date}} tarihinde yenilenecek",
+      "scheduledChange": "Planlanmış değişiklik",
+      "seatsDropTo": "{{date}} tarihinde {{seats}} lisansa düşecek",
+      "seats": "Lisanslar",
+      "autoTopUp": "Otomatik yükleme",
+      "autoTopUpAmount": "Yükleme tutarı",
+      "autoTopUpThreshold": "Bakiye şunun altına düştüğünde",
+      "manageOnWeb": "Değişiklikler web'de yapılır",
+      "changePlan": "Planı değiştir",
+      "buySeats": "Lisans satın al",
+      "setupAutoTopUp": "Otomatik yüklemeyi ayarla",
+      "webAddress": "Web adresi {{url}}",
+      "opensOnWeb": "Web'de açılır"
+    },
     "boundary": {
       "backToProfile": "Profile geri dön",
       "loadErrorMessage": "Bağlantını kontrol edip tekrar dene.",
@@ -2856,14 +2888,20 @@
       "loadErrorTitle": "Kuruluşların yüklenemedi.",
       "membershipLostNotice": "Bu kuruluşa artık erişimin yok. {{target}}'e geçildi.",
       "noOrganization": "Kuruluş yok",
-      "noOrganizationDescription": "Bu hesap bir kuruluşun parçası değil. Üye davetleri ve düşük bakiye uyarıları gibi kuruluş özelliklerini kullanmak için web sitesinde bir kuruluş oluştur veya birine katıl.",
-      "openWebOrganizations": "Kuruluşları web sitesinde aç",
+      "noOrganizationDescription": "Bu hesap bir kuruluşa bağlı değil. Üye davetleri ve düşük bakiye uyarıları gibi kuruluş özelliklerini kullanmak için bir kuruluş oluşturun ya da davet edildiğiniz bir kuruluşa katılmak için web'i açın.",
       "organizationUnavailable": "Kuruluş kullanılamıyor.",
       "selectDescriptionWithOrganizations": "Bir veya daha fazla kuruluşa aitsin. Bu ekranın kullanması gereken hesabı seç.",
       "selectOrganization": "Bir kuruluş seç",
       "unavailableDescription": "Bu kuruluş artık kullanılamıyor. Devam etmek için profilinden başka bir kuruluş seç.",
       "unavailableSessionsDescription": "Bu kuruluş artık kullanılamıyor. Oturumları yüklenemiyor.",
       "accessDeniedDescription": "Bu kuruluşa erişimin yok."
+    },
+    "create": {
+      "title": "Kuruluş oluştur",
+      "description": "Kuruluş; kredileri, ajanları ve ayarları ekibinizle paylaşır.",
+      "nameLabel": "Kuruluş adı",
+      "nameRequired": "Bir kuruluş adı girin.",
+      "trialNote": "14 günlük Enterprise denemeniz kuruluşu oluşturduğunuzda başlar. Planlar web üzerinden satın alınır."
     },
     "creditActivity": {
       "emptyDescription": "Bu kuruluşun satın alımları, kullanımı ve kredi düzeltmeleri gerçekleştikçe burada görünür.",
@@ -2985,6 +3023,22 @@
       "ownRoleChange": "Kendi rolünüzü değiştiremezsiniz.",
       "inviteExpired": "Bu davetin süresi dolmuş.",
       "inviteAccepted": "Bu davet zaten kabul edilmiş."
+    },
+    "settingsOnWeb": {
+      "title": "Web'deki kuruluş ayarları",
+      "usageDetails": "Kullanım ayrıntıları",
+      "providersAndModels": "Sağlayıcılar ve modeller",
+      "groups": "Gruplar",
+      "guardrails": "Koruma kuralları",
+      "byok": "Kendi anahtarınızı kullanın",
+      "ssoAndDomain": "SSO ve alan adı",
+      "emailPreferences": "E-posta tercihleri",
+      "dataCollection": "Veri toplama",
+      "auditLogs": "Denetim günlükleri",
+      "requestLogs": "İstek günlükleri",
+      "integrations": "Entegrasyonlar",
+      "subOrganizations": "Alt kuruluşlar",
+      "distributeFunds": "Fonları dağıt"
     },
     "usageStats": {
       "inputTokens": "Girdi tokenları",

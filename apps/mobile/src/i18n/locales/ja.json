@@ -2849,6 +2849,38 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "監査ログ",
+      "permissionDenied": "監査ログを閲覧できるのは、Enterpriseプランの組織のオーナー、管理者、または請求管理者のみです。",
+      "emptyTitle": "監査イベントはありません",
+      "emptyDescription": "この組織で行われた操作がここに表示されます。",
+      "truncated": "最新のイベントを表示しています。"
+    },
+    "billing": {
+      "title": "請求",
+      "permissionDenied": "請求情報を表示できるのは、組織のオーナー、管理者、請求管理者のみです。",
+      "subscription": "サブスクリプション",
+      "state": "状態",
+      "stateNone": "サブスクリプションなし",
+      "statePastDue": "支払い期限超過",
+      "stateCancelsOn": "{{date}}に解約",
+      "stateCancelsAtPeriodEnd": "期間終了時に解約",
+      "stateTrialEndsOn": "トライアルは{{date}}に終了",
+      "stateTrialing": "トライアル中",
+      "stateRenewsOn": "{{date}}に更新",
+      "scheduledChange": "予定されている変更",
+      "seatsDropTo": "{{date}}に{{seats}}シートに減少",
+      "seats": "シート数",
+      "autoTopUp": "自動チャージ",
+      "autoTopUpAmount": "チャージ額",
+      "autoTopUpThreshold": "残高がこの額を下回ったとき",
+      "manageOnWeb": "変更はWebで行います",
+      "changePlan": "プランを変更",
+      "buySeats": "シートを購入",
+      "setupAutoTopUp": "自動チャージを設定",
+      "webAddress": "Webアドレス {{url}}",
+      "opensOnWeb": "Webで開きます"
+    },
     "boundary": {
       "backToProfile": "プロフィールに戻る",
       "loadErrorMessage": "接続を確認して、もう一度お試しください。",
@@ -2856,14 +2888,20 @@
       "loadErrorTitle": "組織を読み込めませんでした。",
       "membershipLostNotice": "この組織にアクセスできなくなりました。{{target}}に切り替えました。",
       "noOrganization": "組織なし",
-      "noOrganizationDescription": "このアカウントは組織に属していません。メンバーの招待や残高不足のアラートなどの組織機能を使用するには、ウェブで組織を作成するか参加してください。",
-      "openWebOrganizations": "ウェブで組織を開く",
+      "noOrganizationDescription": "このアカウントはどの組織にも所属していません。メンバーの招待や残高不足アラートなどの組織機能を使うには組織を作成してください。招待された組織に参加する場合はWebを開いてください。",
       "organizationUnavailable": "組織を利用できません。",
       "selectDescriptionWithOrganizations": "あなたは1つ以上の組織に所属しています。この画面で使用するアカウントを選択してください。",
       "selectOrganization": "組織を選択",
       "unavailableDescription": "この組織は利用できなくなりました。続行するには、プロフィールから組織を選択してください。",
       "unavailableSessionsDescription": "この組織は利用できなくなりました。セッションを読み込めません。",
       "accessDeniedDescription": "この組織にアクセスする権限がありません。"
+    },
+    "create": {
+      "title": "組織を作成",
+      "description": "組織では、クレジット、エージェント、設定をチームで共有できます。",
+      "nameLabel": "組織名",
+      "nameRequired": "組織名を入力してください。",
+      "trialNote": "作成すると、14日間のEnterpriseトライアルが始まります。プランはWebで購入できます。"
     },
     "creditActivity": {
       "emptyDescription": "この組織でクレジットの購入、利用、残高調整があると、ここに表示されます。",
@@ -2985,6 +3023,22 @@
       "ownRoleChange": "自分の役割は変更できません。",
       "inviteExpired": "この招待は有効期限が切れています。",
       "inviteAccepted": "この招待はすでに承諾されています。"
+    },
+    "settingsOnWeb": {
+      "title": "Webでの組織設定",
+      "usageDetails": "使用状況の詳細",
+      "providersAndModels": "プロバイダーとモデル",
+      "groups": "グループ",
+      "guardrails": "ガードレール",
+      "byok": "独自のキーを使用",
+      "ssoAndDomain": "SSOとドメイン",
+      "emailPreferences": "メール設定",
+      "dataCollection": "データ収集",
+      "auditLogs": "監査ログ",
+      "requestLogs": "リクエストログ",
+      "integrations": "連携",
+      "subOrganizations": "サブ組織",
+      "distributeFunds": "資金の配分"
     },
     "usageStats": {
       "inputTokens": "入力トークン",

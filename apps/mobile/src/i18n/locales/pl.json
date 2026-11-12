@@ -2955,6 +2955,38 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "Dziennik audytu",
+      "permissionDenied": "Dziennik audytu może przeglądać tylko właściciel, administrator lub menedżer rozliczeń organizacji w planie Enterprise.",
+      "emptyTitle": "Brak zdarzeń audytu",
+      "emptyDescription": "Tutaj pojawiają się działania podjęte w tej organizacji.",
+      "truncated": "Wyświetlane są najnowsze zdarzenia."
+    },
+    "billing": {
+      "title": "Rozliczenia",
+      "permissionDenied": "Rozliczenia organizacji może zobaczyć tylko jej właściciel, administrator lub menedżer rozliczeń.",
+      "subscription": "Subskrypcja",
+      "state": "Stan",
+      "stateNone": "Brak subskrypcji",
+      "statePastDue": "Zaległa płatność",
+      "stateCancelsOn": "Zostanie anulowana {{date}}",
+      "stateCancelsAtPeriodEnd": "Zostanie anulowana z końcem okresu",
+      "stateTrialEndsOn": "Okres próbny kończy się {{date}}",
+      "stateTrialing": "Okres próbny",
+      "stateRenewsOn": "Odnawia się {{date}}",
+      "scheduledChange": "Zaplanowana zmiana",
+      "seatsDropTo": "Liczba miejsc zmniejszy się do {{seats}} dnia {{date}}",
+      "seats": "Miejsca",
+      "autoTopUp": "Automatyczne doładowanie",
+      "autoTopUpAmount": "Kwota doładowania",
+      "autoTopUpThreshold": "Gdy saldo spadnie poniżej",
+      "manageOnWeb": "Zmiany wprowadza się w wersji internetowej",
+      "changePlan": "Zmień plan",
+      "buySeats": "Kup miejsca",
+      "setupAutoTopUp": "Skonfiguruj automatyczne doładowanie",
+      "webAddress": "Adres internetowy {{url}}",
+      "opensOnWeb": "Otwiera się w przeglądarce"
+    },
     "boundary": {
       "backToProfile": "Wróć do profilu",
       "loadErrorMessage": "Sprawdź połączenie i spróbuj ponownie.",
@@ -2962,14 +2994,20 @@
       "loadErrorTitle": "Nie udało się wczytać twoich organizacji.",
       "membershipLostNotice": "Nie masz już dostępu do tej organizacji. Przełączono na {{target}}.",
       "noOrganization": "Brak organizacji",
-      "noOrganizationDescription": "To konto nie należy do organizacji. Utwórz organizację lub dołącz do niej w przeglądarce, aby korzystać z funkcji organizacji, takich jak zaproszenia dla członków i alerty o niskim saldzie.",
-      "openWebOrganizations": "Otwórz organizacje w przeglądarce",
+      "noOrganizationDescription": "To konto nie należy do żadnej organizacji. Utwórz organizację, aby korzystać z funkcji takich jak zapraszanie członków i alerty o niskim saldzie, lub otwórz wersję internetową, aby dołączyć do organizacji, do której Cię zaproszono.",
       "organizationUnavailable": "Organizacja jest niedostępna.",
       "selectDescriptionWithOrganizations": "Należysz do jednej lub więcej organizacji. Wybierz konto, którego ma używać ten ekran.",
       "selectOrganization": "Wybierz organizację",
       "unavailableDescription": "Ta organizacja nie jest już dostępna. Wybierz inną w swoim profilu, aby kontynuować.",
       "unavailableSessionsDescription": "Ta organizacja nie jest już dostępna. Nie można wczytać jej sesji.",
       "accessDeniedDescription": "Nie masz dostępu do tej organizacji."
+    },
+    "create": {
+      "title": "Utwórz organizację",
+      "description": "Organizacja udostępnia Twojemu zespołowi wspólne kredyty, agentów i ustawienia.",
+      "nameLabel": "Nazwa organizacji",
+      "nameRequired": "Wpisz nazwę organizacji.",
+      "trialNote": "Po utworzeniu organizacji rozpocznie się 14-dniowy okres próbny planu Enterprise. Plany kupuje się w wersji internetowej."
     },
     "creditActivity": {
       "emptyDescription": "Tutaj na bieżąco pojawiają się doładowania, zużycie środków i korekty salda tej organizacji.",
@@ -3091,6 +3129,22 @@
       "ownRoleChange": "Nie możesz zmienić własnej roli.",
       "inviteExpired": "To zaproszenie wygasło.",
       "inviteAccepted": "To zaproszenie zostało już przyjęte."
+    },
+    "settingsOnWeb": {
+      "title": "Ustawienia organizacji w wersji internetowej",
+      "usageDetails": "Szczegóły użycia",
+      "providersAndModels": "Dostawcy i modele",
+      "groups": "Grupy",
+      "guardrails": "Zabezpieczenia",
+      "byok": "Własny klucz",
+      "ssoAndDomain": "SSO i domena",
+      "emailPreferences": "Ustawienia e-mail",
+      "dataCollection": "Zbieranie danych",
+      "auditLogs": "Dzienniki audytu",
+      "requestLogs": "Dzienniki żądań",
+      "integrations": "Integracje",
+      "subOrganizations": "Organizacje podrzędne",
+      "distributeFunds": "Rozdziel środki"
     },
     "usageStats": {
       "inputTokens": "Tokeny wejściowe",

@@ -2857,6 +2857,38 @@
     "sendFeedback": "Alefaso ny hevitrao"
   },
   "organization": {
+    "auditLog": {
+      "title": "Rakitry ny fanaraha-maso",
+      "permissionDenied": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny faktiora amin'ny drafitra Enterprise ihany no afaka mamaky ny rakitry ny fanaraha-maso.",
+      "emptyTitle": "Tsy misy hetsika voarakitra",
+      "emptyDescription": "Eto no miseho ireo hetsika natao tao amin'ity fikambanana ity.",
+      "truncated": "Ireo hetsika farany indrindra no aseho."
+    },
+    "billing": {
+      "title": "Faktiora",
+      "permissionDenied": "Ny tompon'ny fikambanana, ny mpitantana na ny mpiandraikitra ny faktiora ihany no afaka mahita ny faktioran'ny fikambanana.",
+      "subscription": "Famandrihana",
+      "state": "Toe-javatra",
+      "stateNone": "Tsy misy famandrihana",
+      "statePastDue": "Tara ny fandoavana",
+      "stateCancelsOn": "Hofoanana amin'ny {{date}}",
+      "stateCancelsAtPeriodEnd": "Hofoanana amin'ny faran'ny vanim-potoana",
+      "stateTrialEndsOn": "Hifarana amin'ny {{date}} ny fanandramana",
+      "stateTrialing": "Fanandramana",
+      "stateRenewsOn": "Havaozina amin'ny {{date}}",
+      "scheduledChange": "Fanovana voalahatra",
+      "seatsDropTo": "Hidina ho toerana {{seats}} amin'ny {{date}}",
+      "seats": "Toerana",
+      "autoTopUp": "Famenoana ho azy",
+      "autoTopUpAmount": "Vola hampidirina",
+      "autoTopUpThreshold": "Rehefa latsaka ambanin'ny ny ambim-bola",
+      "manageOnWeb": "Ao amin'ny tranonkala no anaovana ny fanovana",
+      "changePlan": "Ovao ny drafitra",
+      "buySeats": "Mividiana toerana",
+      "setupAutoTopUp": "Alamino ny famenoana ho azy",
+      "webAddress": "Adiresy amin'ny tranonkala {{url}}",
+      "opensOnWeb": "Misokatra ao amin'ny tranonkala"
+    },
     "boundary": {
       "backToProfile": "Miverena amin'ny mombamomba anao",
       "loadErrorMessage": "Jereo ny fifandraisanao ary andramo indray.",
@@ -2864,14 +2896,20 @@
       "loadErrorTitle": "Tsy voaray ny fikambananao.",
       "membershipLostNotice": "Tsy manana alalana hiditra amin'ity fikambanana ity intsony ianao. Nafindra tany amin'ny {{target}}.",
       "noOrganization": "Tsy misy fikambanana",
-      "noOrganizationDescription": "Ity kaonty ity dia tsy anisan'ny fikambanana. Mamorona na midira ao amin'ny fikambanana ao amin'ny tranonkala mba hampiasa ny endriky ny fikambanana toy ny fanasana mpikambana sy ny fampitandremana momba ny fifandanjana ambany.",
-      "openWebOrganizations": "Manokatra fikambanana ao amin'ny tranonkala",
+      "noOrganizationDescription": "Tsy anisan'ny fikambanana ity kaonty ity. Mamorona iray mba hampiasana ireo endri-javatra ho an'ny fikambanana toy ny fanasana mpikambana sy ny fampitandremana rehefa ambany ny ambim-bola, na sokafy ny tranonkala mba hidirana amin'ny fikambanana nanasana anao.",
       "organizationUnavailable": "Tsy azo idirana ny fikambanana.",
       "selectDescriptionWithOrganizations": "Anisan'ny fikambanana iray na maromaro ianao. Misafidiana ny kaonty tokony hampiasain'ity efijery ity.",
       "selectOrganization": "Misafidiana fikambanana",
       "unavailableDescription": "Tsy azo idirana intsony ity fikambanana ity. Misafidiana iray ao amin'ny mombamomba anao mba hanohizana.",
       "unavailableSessionsDescription": "Tsy azo idirana intsony ity fikambanana ity. Tsy azo alaina ny sesiony azy.",
       "accessDeniedDescription": "Tsy manana alalana hiditra amin'ity fikambanana ity ianao."
+    },
+    "create": {
+      "title": "Hamorona fikambanana",
+      "description": "Mizara kredit, agent ary fikirakirana amin'ny ekipanao ny fikambanana.",
+      "nameLabel": "Anaran'ny fikambanana",
+      "nameRequired": "Ampidiro ny anaran'ny fikambanana.",
+      "trialNote": "Manomboka rehefa mamorona azy ianao ny fanandramana Enterprise 14 andro. Amin'ny tranonkala no ividianana ny drafitra."
     },
     "creditActivity": {
       "emptyDescription": "Hiseho eto ny fividianana, ny fampiasana ary ny fanitsiana kireditra ho an'ity fikambanana ity rehefa mitranga.",
@@ -2980,6 +3018,22 @@
       "ownRoleChange": "Tsy afaka manova ny andraikitrao ianao.",
       "inviteExpired": "Efa lany andro io fanasana io.",
       "inviteAccepted": "Efa nekena io fanasana io."
+    },
+    "settingsOnWeb": {
+      "title": "Fikirakiran'ny fikambanana amin'ny tranonkala",
+      "usageDetails": "Antsipirian'ny fampiasana",
+      "providersAndModels": "Mpamatsy sy modely",
+      "groups": "Vondrona",
+      "guardrails": "Fefy fiarovana",
+      "byok": "Ampiasao ny lakilenao manokana",
+      "ssoAndDomain": "SSO sy sehatra",
+      "emailPreferences": "Safidy mailaka",
+      "dataCollection": "Fanangonana angona",
+      "auditLogs": "Rakitry ny fanaraha-maso",
+      "requestLogs": "Rakitry ny fangatahana",
+      "integrations": "Fampifandraisana",
+      "subOrganizations": "Zana-pikambanana",
+      "distributeFunds": "Hizara vola"
     },
     "usageStats": {
       "inputTokens": "Sombin-tsoratra miditra",

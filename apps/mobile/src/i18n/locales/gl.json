@@ -2857,6 +2857,38 @@
     "sendFeedback": "Enviar comentarios"
   },
   "organization": {
+    "auditLog": {
+      "title": "Rexistro de auditoría",
+      "permissionDenied": "Só un propietario, administrador ou xestor de facturación dunha organización co plan Enterprise pode ler o seu rexistro de auditoría.",
+      "emptyTitle": "Non hai eventos de auditoría",
+      "emptyDescription": "Aquí aparecen as accións realizadas nesta organización.",
+      "truncated": "Móstranse os eventos máis recentes."
+    },
+    "billing": {
+      "title": "Facturación",
+      "permissionDenied": "Só o propietario, un administrador ou un xestor de facturación da organización pode ver a súa facturación.",
+      "subscription": "Subscrición",
+      "state": "Estado",
+      "stateNone": "Sen subscrición",
+      "statePastDue": "Pagamento vencido",
+      "stateCancelsOn": "Cancélase o {{date}}",
+      "stateCancelsAtPeriodEnd": "Cancélase ao final do período",
+      "stateTrialEndsOn": "A proba remata o {{date}}",
+      "stateTrialing": "Proba",
+      "stateRenewsOn": "Renóvase o {{date}}",
+      "scheduledChange": "Cambio programado",
+      "seatsDropTo": "Baixa a {{seats}} prazas o {{date}}",
+      "seats": "Prazas",
+      "autoTopUp": "Recarga automática",
+      "autoTopUpAmount": "Importe da recarga",
+      "autoTopUpThreshold": "Cando o saldo baixe de",
+      "manageOnWeb": "Os cambios fanse na web",
+      "changePlan": "Cambiar plan",
+      "buySeats": "Mercar prazas",
+      "setupAutoTopUp": "Configurar recarga automática",
+      "webAddress": "Enderezo web {{url}}",
+      "opensOnWeb": "Ábrese na web"
+    },
     "boundary": {
       "backToProfile": "Volver ao perfil",
       "loadErrorMessage": "Comproba a túa conexión e téntao de novo.",
@@ -2864,14 +2896,20 @@
       "loadErrorTitle": "Non se puideron cargar as túas organizacións.",
       "membershipLostNotice": "Xa non tes acceso a esta organización. Cambiado a {{target}}.",
       "noOrganization": "Sen organización",
-      "noOrganizationDescription": "Esta conta non forma parte dunha organización. Crea unha ou únete a unha na web para usar funcións de organización como as invitacións de membros e as alertas de saldo baixo.",
-      "openWebOrganizations": "Abrir as organizacións na web",
+      "noOrganizationDescription": "Esta conta non forma parte de ningunha organización. Crea unha para usar funcións da organización, como os convites a membros e as alertas de saldo baixo, ou abre a web para unirte a unha á que te convidaron.",
       "organizationUnavailable": "A organización non está dispoñible.",
       "selectDescriptionWithOrganizations": "Pertences a unha ou máis organizacións. Escolle a conta que debe usar esta pantalla.",
       "selectOrganization": "Seleccionar unha organización",
       "unavailableDescription": "Esta organización xa non está dispoñible. Escolle unha desde o teu perfil para continuar.",
       "unavailableSessionsDescription": "Esta organización xa non está dispoñible. Non se poden cargar as súas sesións.",
       "accessDeniedDescription": "Non tes acceso a esta organización."
+    },
+    "create": {
+      "title": "Crear organización",
+      "description": "Unha organización comparte créditos, axentes e configuración co teu equipo.",
+      "nameLabel": "Nome da organización",
+      "nameRequired": "Introduce un nome para a organización.",
+      "trialNote": "A túa proba de 14 días de Enterprise comeza cando a crees. Os plans cómpranse na web."
     },
     "creditActivity": {
       "emptyDescription": "Aquí aparecerán as compras, o consumo e os axustes de créditos desta organización a medida que se produzan.",
@@ -2980,6 +3018,22 @@
       "ownRoleChange": "Non podes cambiar o teu propio rol.",
       "inviteExpired": "Esta invitación caducou.",
       "inviteAccepted": "Esta invitación xa foi aceptada."
+    },
+    "settingsOnWeb": {
+      "title": "Configuración da organización na web",
+      "usageDetails": "Detalles de uso",
+      "providersAndModels": "Provedores e modelos",
+      "groups": "Grupos",
+      "guardrails": "Barreiras de protección",
+      "byok": "Usa a túa propia clave",
+      "ssoAndDomain": "SSO e dominio",
+      "emailPreferences": "Preferencias de correo electrónico",
+      "dataCollection": "Recollida de datos",
+      "auditLogs": "Rexistros de auditoría",
+      "requestLogs": "Rexistros de solicitudes",
+      "integrations": "Integracións",
+      "subOrganizations": "Suborganizacións",
+      "distributeFunds": "Distribuír fondos"
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",

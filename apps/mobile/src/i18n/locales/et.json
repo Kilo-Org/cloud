@@ -2857,6 +2857,38 @@
     "sendFeedback": "Saada tagasisidet"
   },
   "organization": {
+    "auditLog": {
+      "title": "Auditilogi",
+      "permissionDenied": "Auditilogi saavad lugeda ainult Enterprise-plaaniga organisatsiooni omanik, administraator või arvelduse haldur.",
+      "emptyTitle": "Auditisündmusi pole",
+      "emptyDescription": "Siin kuvatakse selles organisatsioonis tehtud toimingud.",
+      "truncated": "Kuvatakse viimased sündmused."
+    },
+    "billing": {
+      "title": "Arveldus",
+      "permissionDenied": "Arveldusteavet näevad ainult organisatsiooni omanik, administraator või arvelduse haldur.",
+      "subscription": "Tellimus",
+      "state": "Olek",
+      "stateNone": "Tellimus puudub",
+      "statePastDue": "Makse hilinenud",
+      "stateCancelsOn": "Tühistatakse {{date}}",
+      "stateCancelsAtPeriodEnd": "Tühistatakse perioodi lõpus",
+      "stateTrialEndsOn": "Prooviperiood lõpeb {{date}}",
+      "stateTrialing": "Prooviperiood",
+      "stateRenewsOn": "Uueneb {{date}}",
+      "scheduledChange": "Plaanitud muudatus",
+      "seatsDropTo": "{{date}} väheneb {{seats}} kasutajakohani",
+      "seats": "Kasutajakohad",
+      "autoTopUp": "Automaatne täiendamine",
+      "autoTopUpAmount": "Täiendamise summa",
+      "autoTopUpThreshold": "Kui saldo langeb alla",
+      "manageOnWeb": "Muudatused tehakse veebis",
+      "changePlan": "Muuda plaani",
+      "buySeats": "Osta kasutajakohti",
+      "setupAutoTopUp": "Seadista automaatne täiendamine",
+      "webAddress": "Veebiaadress {{url}}",
+      "opensOnWeb": "Avaneb veebis"
+    },
     "boundary": {
       "backToProfile": "Tagasi profiilile",
       "loadErrorMessage": "Kontrolli ühendust ja proovi uuesti.",
@@ -2864,14 +2896,20 @@
       "loadErrorTitle": "Sinu organisatsioone ei õnnestunud laadida.",
       "membershipLostNotice": "Sul puudub enam juurdepääs sellele organisatsioonile. Nüüd kasutusel: {{target}}.",
       "noOrganization": "Organisatsioon puudub",
-      "noOrganizationDescription": "See konto ei kuulu ühtegi organisatsiooni. Organisatsiooni funktsioonide, nagu liikmekutsed ja väikese saldo hoiatused, kasutamiseks loo organisatsioon või liitu sellega veebis.",
-      "openWebOrganizations": "Ava organisatsioonid veebis",
+      "noOrganizationDescription": "See konto ei kuulu ühtegi organisatsiooni. Loo organisatsioon, et kasutada selliseid funktsioone nagu liikmete kutsumine ja madala saldo hoiatused, või ava veeb, et liituda organisatsiooniga, kuhu sind kutsuti.",
       "organizationUnavailable": "Organisatsioon pole saadaval.",
       "selectDescriptionWithOrganizations": "Kuulud ühte või mitmesse organisatsiooni. Vali konto, mida see ekraan peaks kasutama.",
       "selectOrganization": "Vali organisatsioon",
       "unavailableDescription": "See organisatsioon pole enam saadaval. Jätkamiseks vali kontovalijast teine konto.",
       "unavailableSessionsDescription": "See organisatsioon pole enam saadaval. Selle seansse ei saa laadida.",
       "accessDeniedDescription": "Sul puudub juurdepääs sellele organisatsioonile."
+    },
+    "create": {
+      "title": "Loo organisatsioon",
+      "description": "Organisatsioon jagab krediiti, agente ja seadeid sinu meeskonnaga.",
+      "nameLabel": "Organisatsiooni nimi",
+      "nameRequired": "Sisesta organisatsiooni nimi.",
+      "trialNote": "Sinu 14-päevane Enterprise'i prooviperiood algab organisatsiooni loomisel. Plaane saab osta veebis."
     },
     "creditActivity": {
       "emptyDescription": "Siin kuvatakse selle organisatsiooni ostud, krediidikasutus ja krediidi korrigeerimised kohe, kui need toimuvad.",
@@ -2980,6 +3018,22 @@
       "ownRoleChange": "Sa ei saa oma rolli muuta.",
       "inviteExpired": "See kutse on aegunud.",
       "inviteAccepted": "See kutse on juba vastu võetud."
+    },
+    "settingsOnWeb": {
+      "title": "Organisatsiooni seaded veebis",
+      "usageDetails": "Kasutuse üksikasjad",
+      "providersAndModels": "Teenusepakkujad ja mudelid",
+      "groups": "Grupid",
+      "guardrails": "Kaitsepiirangud",
+      "byok": "Kasuta oma võtit",
+      "ssoAndDomain": "SSO ja domeen",
+      "emailPreferences": "E-posti eelistused",
+      "dataCollection": "Andmete kogumine",
+      "auditLogs": "Auditilogid",
+      "requestLogs": "Päringulogid",
+      "integrations": "Integratsioonid",
+      "subOrganizations": "Alamorganisatsioonid",
+      "distributeFunds": "Jaota vahendeid"
     },
     "usageStats": {
       "inputTokens": "Sisendtokenid",

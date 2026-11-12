@@ -2857,6 +2857,38 @@
     "sendFeedback": "አስተያየት ይላኩ"
   },
   "organization": {
+    "auditLog": {
+      "title": "የኦዲት መዝገብ",
+      "permissionDenied": "የኦዲት መዝገቡን ማንበብ የሚችሉት በEnterprise ዕቅድ ላይ ያሉ የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው።",
+      "emptyTitle": "ምንም የኦዲት ክስተቶች የሉም",
+      "emptyDescription": "በዚህ ድርጅት ውስጥ የተወሰዱ እርምጃዎች እዚህ ይታያሉ።",
+      "truncated": "የቅርብ ጊዜዎቹ ክስተቶች እየታዩ ነው።"
+    },
+    "billing": {
+      "title": "ክፍያ",
+      "permissionDenied": "የድርጅቱን የክፍያ መረጃ ማየት የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ ኃላፊ ብቻ ናቸው።",
+      "subscription": "የደንበኝነት ምዝገባ",
+      "state": "ሁኔታ",
+      "stateNone": "የደንበኝነት ምዝገባ የለም",
+      "statePastDue": "ክፍያው ጊዜው አልፏል",
+      "stateCancelsOn": "{{date}} ላይ ይሰረዛል",
+      "stateCancelsAtPeriodEnd": "በክፍያ ጊዜው መጨረሻ ላይ ይሰረዛል",
+      "stateTrialEndsOn": "ሙከራው {{date}} ላይ ያበቃል",
+      "stateTrialing": "ሙከራ",
+      "stateRenewsOn": "{{date}} ላይ ይታደሳል",
+      "scheduledChange": "የታቀደ ለውጥ",
+      "seatsDropTo": "{{date}} ላይ ወደ {{seats}} የተጠቃሚ ፈቃዶች ይቀንሳል",
+      "seats": "የተጠቃሚ ፈቃዶች",
+      "autoTopUp": "ራስ-ሰር መሙላት",
+      "autoTopUpAmount": "የመሙያ መጠን",
+      "autoTopUpThreshold": "ቀሪ ሂሳብ ከዚህ በታች ሲወርድ",
+      "manageOnWeb": "ለውጦች የሚደረጉት በድር ላይ ነው",
+      "changePlan": "ዕቅድ ይቀይሩ",
+      "buySeats": "የተጠቃሚ ፈቃዶችን ይግዙ",
+      "setupAutoTopUp": "ራስ-ሰር መሙላትን ያዋቅሩ",
+      "webAddress": "የድር አድራሻ {{url}}",
+      "opensOnWeb": "በድር ላይ ይከፈታል"
+    },
     "boundary": {
       "backToProfile": "ወደ መገለጫ ይመለሱ",
       "loadErrorMessage": "ግንኙነትህን አረጋግጠህ እንደገና ሞክር።",
@@ -2864,14 +2896,20 @@
       "loadErrorTitle": "ድርጅቶችዎን መጫን አልተቻለም።",
       "membershipLostNotice": "ይህን ድርጅት ከእንግዲህ የመድረስ ፈቃድ የለዎትም። ወደ {{target}} ተቀይሯል።",
       "noOrganization": "ድርጅት የለም",
-      "noOrganizationDescription": "ይህ መለያ የድርጅት አካል አይደለም። እንደ አባል ግብዣዎች እና ዝቅተኛ ቀሪ ሂሳብ ማንቂያዎች ያሉ የድርጅት ባህሪያትን ለመጠቀም በድር ላይ አንዱን ይፍጠሩ ወይም ይቀላቀሉ።",
-      "openWebOrganizations": "ድርጅቶችን በድር ላይ ይክፈቱ",
+      "noOrganizationDescription": "ይህ መለያ የማንኛውም ድርጅት አካል አይደለም። እንደ የአባላት ግብዣ እና የዝቅተኛ ቀሪ ሂሳብ ማንቂያዎች ያሉ የድርጅት ባህሪያትን ለመጠቀም ድርጅት ይፍጠሩ፣ ወይም የተጋበዙበትን ድርጅት ለመቀላቀል ድሩን ይክፈቱ።",
       "organizationUnavailable": "ድርጅቱ አይገኝም።",
       "selectDescriptionWithOrganizations": "እርስዎ አንድ ወይም ከዚያ በላይ ድርጅቶች አባል ነዎት። ይህ ማያ ገጽ መጠቀም ያለበትን መለያ ይምረጡ።",
       "selectOrganization": "ድርጅት ይምረጡ",
       "unavailableDescription": "ይህ ድርጅት ከእንግዲህ አይገኝም። ለመቀጠል ከመገለጫዎ ሌላ ድርጅት ይምረጡ።",
       "unavailableSessionsDescription": "ይህ ድርጅት ከእንግዲህ አይገኝም። የዚህ ድርጅት ክፍለ ጊዜዎችን መጫን አይቻልም።",
       "accessDeniedDescription": "ይህን ድርጅት የመድረስ ፈቃድ የለዎትም።"
+    },
+    "create": {
+      "title": "ድርጅት ይፍጠሩ",
+      "description": "ድርጅት ክሬዲቶችን፣ ኤጀንቶችን እና ቅንብሮችን ከቡድንዎ ጋር ያጋራል።",
+      "nameLabel": "የድርጅት ስም",
+      "nameRequired": "የድርጅት ስም ያስገቡ።",
+      "trialNote": "የ14 ቀን የEnterprise ሙከራዎ ድርጅቱን ሲፈጥሩ ይጀምራል። ዕቅዶች የሚገዙት በድር ላይ ነው።"
     },
     "creditActivity": {
       "emptyDescription": "የዚህ ድርጅት ግዢዎች፣ አጠቃቀም እና የክሬዲት ማስተካከያዎች ሲኖሩ እዚህ ይታያሉ።",
@@ -2980,6 +3018,22 @@
       "ownRoleChange": "የራስዎን ሚና መቀየር አይችሉም።",
       "inviteExpired": "ይህ ግብዣ ጊዜው አልፎበታል።",
       "inviteAccepted": "ይህ ግብዣ አስቀድሞ ተቀብሏል።"
+    },
+    "settingsOnWeb": {
+      "title": "በድር ላይ ያሉ የድርጅት ቅንብሮች",
+      "usageDetails": "የአጠቃቀም ዝርዝሮች",
+      "providersAndModels": "አቅራቢዎች እና ሞዴሎች",
+      "groups": "ቡድኖች",
+      "guardrails": "የጥበቃ ገደቦች",
+      "byok": "የራስዎን ቁልፍ ይጠቀሙ",
+      "ssoAndDomain": "SSO እና ጎራ",
+      "emailPreferences": "የኢሜይል ምርጫዎች",
+      "dataCollection": "የውሂብ አሰባሰብ",
+      "auditLogs": "የኦዲት መዝገቦች",
+      "requestLogs": "የጥያቄ መዝገቦች",
+      "integrations": "ውህደቶች",
+      "subOrganizations": "ንዑስ ድርጅቶች",
+      "distributeFunds": "ገንዘብ ያከፋፍሉ"
     },
     "usageStats": {
       "inputTokens": "የግብዓት ቶከኖች",

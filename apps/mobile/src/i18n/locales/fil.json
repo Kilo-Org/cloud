@@ -2857,6 +2857,38 @@
     "sendFeedback": "Magpadala ng puna"
   },
   "organization": {
+    "auditLog": {
+      "title": "Audit log",
+      "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon na nasa Enterprise plan ang puwedeng magbasa ng audit log nito.",
+      "emptyTitle": "Walang audit event",
+      "emptyDescription": "Dito lalabas ang mga aksyong ginawa sa organisasyong ito.",
+      "truncated": "Ipinapakita ang mga pinakabagong event."
+    },
+    "billing": {
+      "title": "Pagsingil",
+      "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon ang makakakita ng pagsingil nito.",
+      "subscription": "Subscription",
+      "state": "Katayuan",
+      "stateNone": "Walang subscription",
+      "statePastDue": "Lampas na sa takdang petsa",
+      "stateCancelsOn": "Makakansela sa {{date}}",
+      "stateCancelsAtPeriodEnd": "Makakansela sa katapusan ng panahon",
+      "stateTrialEndsOn": "Matatapos ang trial sa {{date}}",
+      "stateTrialing": "Trial",
+      "stateRenewsOn": "Magre-renew sa {{date}}",
+      "scheduledChange": "Nakaiskedyul na pagbabago",
+      "seatsDropTo": "Bababa sa {{seats}} puwesto sa {{date}}",
+      "seats": "Mga puwesto",
+      "autoTopUp": "Auto top-up",
+      "autoTopUpAmount": "Halaga ng top-up",
+      "autoTopUpThreshold": "Kapag bumaba ang balanse sa",
+      "manageOnWeb": "Sa web ginagawa ang mga pagbabago",
+      "changePlan": "Palitan ang plano",
+      "buySeats": "Bumili ng mga puwesto",
+      "setupAutoTopUp": "I-set up ang auto top-up",
+      "webAddress": "Web address {{url}}",
+      "opensOnWeb": "Bubuksan sa web"
+    },
     "boundary": {
       "backToProfile": "Bumalik sa profile",
       "loadErrorMessage": "Suriin ang koneksyon mo at subukan muli.",
@@ -2864,14 +2896,20 @@
       "loadErrorTitle": "Hindi ma-load ang iyong mga organisasyon.",
       "membershipLostNotice": "Wala ka nang access sa organisasyong ito. Lumipat sa {{target}}.",
       "noOrganization": "Walang organisasyon",
-      "noOrganizationDescription": "Ang account na ito ay hindi bahagi ng isang organisasyon. Gumawa o sumali sa isang organisasyon sa web upang magamit ang mga feature ng organisasyon tulad ng mga imbitasyon ng miyembro at mga alerto sa mababang balanse.",
-      "openWebOrganizations": "Buksan ang mga organisasyon sa web",
+      "noOrganizationDescription": "Hindi bahagi ng anumang organisasyon ang account na ito. Gumawa ng isa para magamit ang mga feature ng organisasyon tulad ng pag-imbita ng miyembro at mga alerto sa mababang balanse, o buksan ang web para sumali sa organisasyong nag-imbita sa iyo.",
       "organizationUnavailable": "Hindi ma-access ang organisasyon.",
       "selectDescriptionWithOrganizations": "Kasapi ka ng isa o higit pang organisasyon. Piliin ang account na dapat gamitin ng screen na ito.",
       "selectOrganization": "Pumili ng organisasyon",
       "unavailableDescription": "Hindi na ma-access ang organisasyong ito. Pumili ng isa mula sa iyong profile para magpatuloy.",
       "unavailableSessionsDescription": "Hindi na ma-access ang organisasyong ito. Hindi ma-load ang mga session nito.",
       "accessDeniedDescription": "Wala kang access sa organisasyong ito."
+    },
+    "create": {
+      "title": "Gumawa ng organisasyon",
+      "description": "Sa isang organisasyon, nagbabahagi ka ng mga credit, agent at setting sa iyong team.",
+      "nameLabel": "Pangalan ng organisasyon",
+      "nameRequired": "Maglagay ng pangalan ng organisasyon.",
+      "trialNote": "Magsisimula ang iyong 14 na araw na Enterprise trial kapag ginawa mo ito. Sa web binibili ang mga plano."
     },
     "creditActivity": {
       "emptyDescription": "Lalabas dito ang mga pagbili, paggamit, at pagsasaayos ng kredito para sa organisasyong ito habang nangyayari ang mga ito.",
@@ -2980,6 +3018,22 @@
       "ownRoleChange": "Hindi mo maaaring baguhin ang iyong sariling tungkulin.",
       "inviteExpired": "Nag-expire na ang imbitasyong ito.",
       "inviteAccepted": "Tinanggap na ang imbitasyong ito."
+    },
+    "settingsOnWeb": {
+      "title": "Mga setting ng organisasyon sa web",
+      "usageDetails": "Mga detalye ng paggamit",
+      "providersAndModels": "Mga provider at model",
+      "groups": "Mga grupo",
+      "guardrails": "Mga guardrail",
+      "byok": "Gamitin ang sarili mong key",
+      "ssoAndDomain": "SSO at domain",
+      "emailPreferences": "Mga kagustuhan sa email",
+      "dataCollection": "Pangongolekta ng data",
+      "auditLogs": "Mga audit log",
+      "requestLogs": "Mga request log",
+      "integrations": "Mga integration",
+      "subOrganizations": "Mga sub-organisasyon",
+      "distributeFunds": "Ipamahagi ang pondo"
     },
     "usageStats": {
       "inputTokens": "Mga papasok na token",

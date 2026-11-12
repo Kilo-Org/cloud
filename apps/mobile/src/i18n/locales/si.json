@@ -2857,6 +2857,38 @@
     "sendFeedback": "අදහස් යවන්න"
   },
   "organization": {
+    "auditLog": {
+      "title": "විගණන ලොගය",
+      "permissionDenied": "Enterprise සැලැස්මේ ඇති සංවිධානයක විගණන ලොගය කියවිය හැක්කේ එහි හිමිකරුට, පරිපාලකට හෝ බිල්පත් කළමනාකරුට පමණි.",
+      "emptyTitle": "විගණන සිදුවීම් නැත",
+      "emptyDescription": "මෙම සංවිධානයේ සිදු කළ ක්‍රියා මෙහි දිස් වේ.",
+      "truncated": "නවතම සිදුවීම් පෙන්වයි."
+    },
+    "billing": {
+      "title": "බිල්පත්",
+      "permissionDenied": "සංවිධානයේ බිල්පත් තොරතුරු බැලිය හැක්කේ හිමිකරුට, පරිපාලකට හෝ බිල්පත් කළමනාකරුට පමණි.",
+      "subscription": "දායකත්වය",
+      "state": "තත්ත්වය",
+      "stateNone": "දායකත්වයක් නැත",
+      "statePastDue": "ගෙවීම ප්‍රමාද වී ඇත",
+      "stateCancelsOn": "{{date}} දින අවලංගු වේ",
+      "stateCancelsAtPeriodEnd": "කාල සීමාව අවසානයේ අවලංගු වේ",
+      "stateTrialEndsOn": "අත්හදා බැලීම {{date}} දින අවසන් වේ",
+      "stateTrialing": "අත්හදා බැලීම",
+      "stateRenewsOn": "{{date}} දින අලුත් වේ",
+      "scheduledChange": "නියමිත වෙනස්කම",
+      "seatsDropTo": "{{date}} දින සාමාජික ස්ථාන {{seats}} දක්වා අඩු වේ",
+      "seats": "සාමාජික ස්ථාන",
+      "autoTopUp": "ස්වයංක්‍රීය ටොප්-අප්",
+      "autoTopUpAmount": "ටොප්-අප් මුදල",
+      "autoTopUpThreshold": "ශේෂය මෙයට වඩා අඩු වූ විට",
+      "manageOnWeb": "වෙනස්කම් කරනු ලබන්නේ වෙබයේදීය",
+      "changePlan": "සැලැස්ම වෙනස් කරන්න",
+      "buySeats": "සාමාජික ස්ථාන මිලදී ගන්න",
+      "setupAutoTopUp": "ස්වයංක්‍රීය ටොප්-අප් සකසන්න",
+      "webAddress": "වෙබ් ලිපිනය {{url}}",
+      "opensOnWeb": "වෙබයේ විවෘත වේ"
+    },
     "boundary": {
       "backToProfile": "පැතිකඩට ආපසු යන්න",
       "loadErrorMessage": "ඔබේ අන්තර්ජාල සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
@@ -2864,14 +2896,20 @@
       "loadErrorTitle": "ඔබේ සංවිධාන පූරණය කළ නොහැකි විය.",
       "membershipLostNotice": "ඔබට මෙම සංවිධානයට තවදුරටත් ප්‍රවේශ වීමට අවසර නොමැත. {{target}} වෙත මාරු විය.",
       "noOrganization": "සංවිධානයක් නැත",
-      "noOrganizationDescription": "මෙම ගිණුම සංවිධානයක කොටසක් නොවේ. සාමාජික ආරාධනා සහ අඩු ශේෂ ඇඟවීම් වැනි සංවිධාන විශේෂාංග භාවිත කිරීමට වෙබ් අඩවියේ සංවිධානයක් සාදන්න හෝ එකකට එකතු වන්න.",
-      "openWebOrganizations": "වෙබ් අඩවියේ සංවිධාන විවෘත කරන්න",
+      "noOrganizationDescription": "මෙම ගිණුම කිසිදු සංවිධානයක කොටසක් නොවේ. සාමාජික ආරාධනා සහ අඩු ශේෂ ඇඟවීම් වැනි සංවිධාන විශේෂාංග භාවිත කිරීමට එකක් සාදන්න, නැතහොත් ඔබට ආරාධනා කළ සංවිධානයකට එක්වීමට වෙබය විවෘත කරන්න.",
       "organizationUnavailable": "සංවිධානය ලබා ගත නොහැක.",
       "selectDescriptionWithOrganizations": "ඔබ එකක් හෝ වැඩි සංඛ්‍යාවක සංවිධානවලට අයත් වේ. මෙම තිරය භාවිත කළ යුතු ගිණුම තෝරන්න.",
       "selectOrganization": "සංවිධානයක් තෝරන්න",
       "unavailableDescription": "මෙම සංවිධානය තවදුරටත් ලබා ගත නොහැක. ඉදිරියට යාමට ඔබේ පැතිකඩෙන් සංවිධානයක් තෝරන්න.",
       "unavailableSessionsDescription": "මෙම සංවිධානය තවදුරටත් ලබා ගත නොහැක. එහි සැසි පූරණය කළ නොහැක.",
       "accessDeniedDescription": "ඔබට මෙම සංවිධානයට ප්‍රවේශ වීමට අවසර නොමැත."
+    },
+    "create": {
+      "title": "සංවිධානයක් සාදන්න",
+      "description": "සංවිධානයක් ඔබේ කණ්ඩායම සමඟ ණය, නියෝජිතයන් සහ සැකසීම් බෙදා ගනී.",
+      "nameLabel": "සංවිධානයේ නම",
+      "nameRequired": "සංවිධානයේ නමක් ඇතුළත් කරන්න.",
+      "trialNote": "ඔබ එය සෑදූ විට ඔබේ දින 14ක Enterprise අත්හදා බැලීම ආරම්භ වේ. සැලසුම් මිලදී ගනු ලබන්නේ වෙබයෙනි."
     },
     "creditActivity": {
       "emptyDescription": "මෙම සංවිධානයේ ක්‍රෙඩිට් මිලදී ගැනීම්, භාවිතය සහ ගැළපීම් සිදු වන විට මෙහි දිස්වේ.",
@@ -2980,6 +3018,22 @@
       "ownRoleChange": "ඔබට ඔබේම භූමිකාව වෙනස් කළ නොහැක.",
       "inviteExpired": "මෙම ආරාධනය කල් ඉකුත් වී ඇත.",
       "inviteAccepted": "මෙම ආරාධනය දැනටමත් පිළිගෙන ඇත."
+    },
+    "settingsOnWeb": {
+      "title": "වෙබයේ ඇති සංවිධාන සැකසීම්",
+      "usageDetails": "භාවිත විස්තර",
+      "providersAndModels": "සපයන්නන් සහ මාදිලි",
+      "groups": "කණ්ඩායම්",
+      "guardrails": "ආරක්ෂක සීමා",
+      "byok": "ඔබේම යතුර භාවිත කරන්න",
+      "ssoAndDomain": "SSO සහ වසම",
+      "emailPreferences": "ඊමේල් මනාප",
+      "dataCollection": "දත්ත එකතු කිරීම",
+      "auditLogs": "විගණන ලොග",
+      "requestLogs": "ඉල්ලීම් ලොග",
+      "integrations": "ඒකාබද්ධ කිරීම්",
+      "subOrganizations": "උප සංවිධාන",
+      "distributeFunds": "අරමුදල් බෙදා හරින්න"
     },
     "usageStats": {
       "inputTokens": "ආදාන ටෝකන",

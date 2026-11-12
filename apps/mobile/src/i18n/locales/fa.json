@@ -2857,6 +2857,38 @@
     "sendFeedback": "ارسال بازخورد"
   },
   "organization": {
+    "auditLog": {
+      "title": "گزارش حسابرسی",
+      "permissionDenied": "فقط مالک، ادمین یا مدیر صورتحساب سازمانی که طرح Enterprise دارد می‌تواند گزارش حسابرسی آن را ببیند.",
+      "emptyTitle": "هیچ رویداد حسابرسی‌ای وجود ندارد",
+      "emptyDescription": "اقداماتی که در این سازمان انجام می‌شود اینجا نمایش داده می‌شود.",
+      "truncated": "جدیدترین رویدادها نمایش داده می‌شوند."
+    },
+    "billing": {
+      "title": "صورت‌حساب",
+      "permissionDenied": "فقط مالک، مدیر یا مسئول صورت‌حساب سازمان می‌تواند صورت‌حساب آن را ببیند.",
+      "subscription": "اشتراک",
+      "state": "وضعیت",
+      "stateNone": "بدون اشتراک",
+      "statePastDue": "پرداخت معوق",
+      "stateCancelsOn": "در {{date}} لغو می‌شود",
+      "stateCancelsAtPeriodEnd": "در پایان دوره لغو می‌شود",
+      "stateTrialEndsOn": "دوره آزمایشی در {{date}} به پایان می‌رسد",
+      "stateTrialing": "دوره آزمایشی",
+      "stateRenewsOn": "در {{date}} تمدید می‌شود",
+      "scheduledChange": "تغییر زمان‌بندی‌شده",
+      "seatsDropTo": "در {{date}} به {{seats}} مجوز کاربری کاهش می‌یابد",
+      "seats": "مجوزهای کاربری",
+      "autoTopUp": "شارژ خودکار",
+      "autoTopUpAmount": "مبلغ شارژ",
+      "autoTopUpThreshold": "هنگام کاهش موجودی به زیر",
+      "manageOnWeb": "تغییرات در وب انجام می‌شود",
+      "changePlan": "تغییر طرح",
+      "buySeats": "خرید مجوز کاربری",
+      "setupAutoTopUp": "راه‌اندازی شارژ خودکار",
+      "webAddress": "نشانی وب {{url}}",
+      "opensOnWeb": "در وب باز می‌شود"
+    },
     "boundary": {
       "backToProfile": "بازگشت به پروفایل",
       "loadErrorMessage": "اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید.",
@@ -2864,14 +2896,20 @@
       "loadErrorTitle": "بارگذاری سازمان‌های شما ممکن نشد.",
       "membershipLostNotice": "شما دیگر به این سازمان دسترسی ندارید. به {{target}} تغییر یافت.",
       "noOrganization": "بدون سازمان",
-      "noOrganizationDescription": "این حساب بخشی از هیچ سازمانی نیست. برای استفاده از ویژگی‌های سازمان مانند دعوت اعضا و هشدارهای موجودی کم، در وب یک سازمان ایجاد کنید یا به یکی بپیوندید.",
-      "openWebOrganizations": "باز کردن سازمان‌ها در وب",
+      "noOrganizationDescription": "این حساب عضو هیچ سازمانی نیست. برای استفاده از قابلیت‌های سازمان مانند دعوت اعضا و هشدار موجودی کم، یک سازمان ایجاد کنید، یا وب را باز کنید تا به سازمانی که به آن دعوت شده‌اید بپیوندید.",
       "organizationUnavailable": "سازمان در دسترس نیست.",
       "selectDescriptionWithOrganizations": "شما عضو یک یا چند سازمان هستید. حسابی را انتخاب کنید که این صفحه باید استفاده کند.",
       "selectOrganization": "انتخاب سازمان",
       "unavailableDescription": "این سازمان دیگر در دسترس نیست. برای ادامه، در پروفایل خود سازمان دیگری انتخاب کنید.",
       "unavailableSessionsDescription": "این سازمان دیگر در دسترس نیست. جلسات آن قابل بارگذاری نیست.",
       "accessDeniedDescription": "شما به این سازمان دسترسی ندارید."
+    },
+    "create": {
+      "title": "ایجاد سازمان",
+      "description": "سازمان، اعتبارها، عامل‌ها و تنظیمات را با تیم شما به اشتراک می‌گذارد.",
+      "nameLabel": "نام سازمان",
+      "nameRequired": "نام سازمان را وارد کنید.",
+      "trialNote": "دورهٔ آزمایشی ۱۴ روزهٔ Enterprise شما با ایجاد سازمان شروع می‌شود. طرح‌ها از طریق وب خریداری می‌شوند."
     },
     "creditActivity": {
       "emptyDescription": "خریدها، مصرف و اصلاحات اعتبار این سازمان به‌محض ثبت در اینجا نمایش داده می‌شوند.",
@@ -2980,6 +3018,22 @@
       "ownRoleChange": "شما نمی‌توانید نقش خودتان را تغییر دهید.",
       "inviteExpired": "این دعوت‌نامه منقضی شده است.",
       "inviteAccepted": "این دعوت‌نامه قبلاً پذیرفته شده است."
+    },
+    "settingsOnWeb": {
+      "title": "تنظیمات سازمان در وب",
+      "usageDetails": "جزئیات مصرف",
+      "providersAndModels": "ارائه‌دهندگان و مدل‌ها",
+      "groups": "گروه‌ها",
+      "guardrails": "محدودیت‌های ایمنی",
+      "byok": "استفاده از کلید خودتان",
+      "ssoAndDomain": "SSO و دامنه",
+      "emailPreferences": "تنظیمات ایمیل",
+      "dataCollection": "جمع‌آوری داده",
+      "auditLogs": "گزارش‌های حسابرسی",
+      "requestLogs": "گزارش‌های درخواست",
+      "integrations": "یکپارچه‌سازی‌ها",
+      "subOrganizations": "زیرسازمان‌ها",
+      "distributeFunds": "توزیع اعتبار"
     },
     "usageStats": {
       "inputTokens": "توکن‌های ورودی",

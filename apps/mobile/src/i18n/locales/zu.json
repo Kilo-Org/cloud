@@ -2857,6 +2857,38 @@
     "sendFeedback": "Thumela impendulo"
   },
   "organization": {
+    "auditLog": {
+      "title": "Irekhodi lokucwaninga",
+      "permissionDenied": "Ngumnikazi wenhlangano, umlawuli noma umphathi wokukhokha ohlelweni lwe-Enterprise kuphela ongafunda irekhodi layo lokucwaninga.",
+      "emptyTitle": "Azikho izehlakalo zokucwaninga",
+      "emptyDescription": "Izenzo ezenziwa kule nhlangano zivela lapha.",
+      "truncated": "Kuboniswa izehlakalo zakamuva kakhulu."
+    },
+    "billing": {
+      "title": "Ukukhokha",
+      "permissionDenied": "Ngumnikazi wenhlangano, umlawuli noma umphathi wokukhokha kuphela ongabona ukukhokha kwayo.",
+      "subscription": "Ukubhalisela",
+      "state": "Isimo",
+      "stateNone": "Akukho ukubhalisela",
+      "statePastDue": "Kwedlule usuku lokukhokha",
+      "stateCancelsOn": "Kuzokhanselwa ngo-{{date}}",
+      "stateCancelsAtPeriodEnd": "Kuzokhanselwa ekupheleni kwesikhathi",
+      "stateTrialEndsOn": "Isikhathi sokuzama siphela ngo-{{date}}",
+      "stateTrialing": "Isikhathi sokuzama",
+      "stateRenewsOn": "Kuzovuselelwa ngo-{{date}}",
+      "scheduledChange": "Ushintsho oluhleliwe",
+      "seatsDropTo": "Kwehlela ezikhaleni ezingu-{{seats}} ngo-{{date}}",
+      "seats": "Izikhala",
+      "autoTopUp": "Ukugcwalisa okuzenzakalelayo",
+      "autoTopUpAmount": "Inani lokugcwalisa",
+      "autoTopUpThreshold": "Uma ibhalansi yehla ngaphansi",
+      "manageOnWeb": "Izinguquko zenziwa kuwebhu",
+      "changePlan": "Shintsha uhlelo",
+      "buySeats": "Thenga izikhala",
+      "setupAutoTopUp": "Setha ukugcwalisa okuzenzakalelayo",
+      "webAddress": "Ikheli lewebhu {{url}}",
+      "opensOnWeb": "Kuvuleka kuwebhu"
+    },
     "boundary": {
       "backToProfile": "Buyela kuphrofayili",
       "loadErrorMessage": "Hlola uxhumano lwakho bese uzama futhi.",
@@ -2864,14 +2896,20 @@
       "loadErrorTitle": "Asikwazanga ukulayisha izinhlangano zakho.",
       "membershipLostNotice": "Awusenayo imvume yokufinyelela kule nhlangano. Ushintshelwe ku-{{target}}.",
       "noOrganization": "Ayikho inhlangano",
-      "noOrganizationDescription": "Le akhawunti ayiyona ingxenye yenhlangano. Dala noma ujoyine inhlangano kuwebhu ukuze usebenzise izici zenhlangano njengezimemo zamalungu nezexwayiso zebhalansi ephansi.",
-      "openWebOrganizations": "Vula izinhlangano kuwebhu",
+      "noOrganizationDescription": "Le akhawunti ayiyona ingxenye yenhlangano. Dala eyodwa ukuze usebenzise izici zenhlangano ezifana nokumema amalungu nezexwayiso zebhalansi ephansi, noma uvule iwebhu ukuze ujoyine leyo omenyelwe kuyo.",
       "organizationUnavailable": "Inhlangano ayitholakali.",
       "selectDescriptionWithOrganizations": "Uyingxenye yenhlangano eyodwa noma ngaphezulu. Khetha i-akhawunti okufanele isikrini sisisebenzise.",
       "selectOrganization": "Khetha inhlangano",
       "unavailableDescription": "Le nhlangano ayisatholakali. Khetha enye kuphrofayili yakho ukuze uqhubeke.",
       "unavailableSessionsDescription": "Le nhlangano ayisatholakali. Amaseshini ayo awakwazi ukulayishwa.",
       "accessDeniedDescription": "Awunayo imvume yokufinyelela kule nhlangano."
+    },
+    "create": {
+      "title": "Dala inhlangano",
+      "description": "Inhlangano yabelana ngamakhredithi, ama-ejenti nezilungiselelo nethimba lakho.",
+      "nameLabel": "Igama lenhlangano",
+      "nameRequired": "Faka igama lenhlangano.",
+      "trialNote": "Isivivinyo sakho se-Enterprise sezinsuku eziyi-14 siqala uma uyidala. Izinhlelo zithengwa kuwebhu."
     },
     "creditActivity": {
       "emptyDescription": "Ukuthengwa, ukusetshenziswa nokulungiswa kwamakhredithi ale nhlangano kuzovela lapha njengoba kwenzeka.",
@@ -2980,6 +3018,22 @@
       "ownRoleChange": "Awukwazi ukushintsha iqhaza lakho.",
       "inviteExpired": "Lesi simemo sesiphelelwe yisikhathi.",
       "inviteAccepted": "Lesi simemo sesamukelwe kakade."
+    },
+    "settingsOnWeb": {
+      "title": "Izilungiselelo zenhlangano kuwebhu",
+      "usageDetails": "Imininingwane yokusetshenziswa",
+      "providersAndModels": "Abahlinzeki namamodeli",
+      "groups": "Amaqembu",
+      "guardrails": "Izivikelo",
+      "byok": "Sebenzisa ukhiye wakho",
+      "ssoAndDomain": "I-SSO nesizinda",
+      "emailPreferences": "Okuncamelayo kwe-imeyili",
+      "dataCollection": "Ukuqoqwa kwedatha",
+      "auditLogs": "Amarekhodi okucwaninga",
+      "requestLogs": "Amarekhodi ezicelo",
+      "integrations": "Ukuxhumanisa",
+      "subOrganizations": "Izinhlangano ezingaphansi",
+      "distributeFunds": "Yaba izimali"
     },
     "usageStats": {
       "inputTokens": "Amathokheni okufakiwe",

@@ -67,6 +67,15 @@ export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
     webPath: '/organizations/*/overview',
     appPath: '/(app)/(tabs)/(3_profile)/organization/<1>',
   },
+  // The bare organization route: the web dashboard, and where an accepted
+  // invitation lands (`apps/web` redirects to `/organizations/<id>`). The two
+  // literal pages under the same shape are not ids, so their links stay in the
+  // browser — the create form must open where the account is asked.
+  {
+    webPath: '/organizations/*',
+    appPath: '/(app)/(tabs)/(3_profile)/organization/<1>',
+    exclusions: ['new', 'create'],
+  },
   // Provider rows BEFORE the GitHub row: `/pr-review/gitlab/x/123` has the
   // same segment count as a GitHub PR path, and the literal platform segment
   // must win over the GitHub wildcards. The GitHub row stays byte-identical

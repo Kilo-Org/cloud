@@ -2849,6 +2849,38 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "Nhật ký kiểm tra",
+      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức dùng gói Enterprise mới có thể xem nhật ký kiểm tra của tổ chức.",
+      "emptyTitle": "Không có sự kiện kiểm tra",
+      "emptyDescription": "Các hành động được thực hiện trong tổ chức này sẽ hiển thị tại đây.",
+      "truncated": "Đang hiển thị các sự kiện gần đây nhất."
+    },
+    "billing": {
+      "title": "Thanh toán",
+      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem thông tin thanh toán.",
+      "subscription": "Gói đăng ký",
+      "state": "Trạng thái",
+      "stateNone": "Không có gói đăng ký",
+      "statePastDue": "Quá hạn thanh toán",
+      "stateCancelsOn": "Hủy vào {{date}}",
+      "stateCancelsAtPeriodEnd": "Hủy vào cuối kỳ",
+      "stateTrialEndsOn": "Dùng thử kết thúc vào {{date}}",
+      "stateTrialing": "Dùng thử",
+      "stateRenewsOn": "Gia hạn vào {{date}}",
+      "scheduledChange": "Thay đổi đã lên lịch",
+      "seatsDropTo": "Giảm xuống {{seats}} suất vào {{date}}",
+      "seats": "Suất sử dụng",
+      "autoTopUp": "Tự động nạp tiền",
+      "autoTopUpAmount": "Số tiền nạp",
+      "autoTopUpThreshold": "Khi số dư xuống dưới",
+      "manageOnWeb": "Các thay đổi được thực hiện trên web",
+      "changePlan": "Đổi gói",
+      "buySeats": "Mua suất sử dụng",
+      "setupAutoTopUp": "Thiết lập tự động nạp tiền",
+      "webAddress": "Địa chỉ web {{url}}",
+      "opensOnWeb": "Mở trên web"
+    },
     "boundary": {
       "backToProfile": "Quay lại hồ sơ",
       "loadErrorMessage": "Kiểm tra kết nối và thử lại.",
@@ -2856,14 +2888,20 @@
       "loadErrorTitle": "Không thể tải danh sách tổ chức của bạn.",
       "membershipLostNotice": "Bạn không còn quyền truy cập vào tổ chức này. Đã chuyển sang {{target}}.",
       "noOrganization": "Không có tổ chức",
-      "noOrganizationDescription": "Tài khoản này không thuộc tổ chức nào. Hãy tạo hoặc tham gia một tổ chức trên web để sử dụng các tính năng của tổ chức như lời mời thành viên và cảnh báo số dư thấp.",
-      "openWebOrganizations": "Mở tổ chức trên web",
+      "noOrganizationDescription": "Tài khoản này không thuộc tổ chức nào. Hãy tạo một tổ chức để dùng các tính năng của tổ chức như mời thành viên và cảnh báo số dư thấp, hoặc mở web để tham gia tổ chức mà bạn đã được mời.",
       "organizationUnavailable": "Không thể truy cập tổ chức.",
       "selectDescriptionWithOrganizations": "Bạn thuộc một hoặc nhiều tổ chức. Chọn tài khoản mà màn hình này nên sử dụng.",
       "selectOrganization": "Chọn một tổ chức",
       "unavailableDescription": "Bạn không còn truy cập được tổ chức này. Hãy chọn tổ chức khác trong hồ sơ để tiếp tục.",
       "unavailableSessionsDescription": "Bạn không còn truy cập được tổ chức này. Không thể tải phiên của tổ chức này.",
       "accessDeniedDescription": "Bạn không có quyền truy cập vào tổ chức này."
+    },
+    "create": {
+      "title": "Tạo tổ chức",
+      "description": "Tổ chức giúp bạn chia sẻ tín dụng, tác nhân và cài đặt với nhóm của mình.",
+      "nameLabel": "Tên tổ chức",
+      "nameRequired": "Nhập tên tổ chức.",
+      "trialNote": "Bản dùng thử Enterprise 14 ngày sẽ bắt đầu khi bạn tạo tổ chức. Bạn mua gói trên web."
     },
     "creditActivity": {
       "emptyDescription": "Các khoản nạp tiền, chi phí sử dụng và điều chỉnh số dư của tổ chức sẽ xuất hiện tại đây khi phát sinh.",
@@ -2985,6 +3023,22 @@
       "ownRoleChange": "Bạn không thể thay đổi vai trò của chính mình.",
       "inviteExpired": "Lời mời này đã hết hạn.",
       "inviteAccepted": "Lời mời này đã được chấp nhận rồi."
+    },
+    "settingsOnWeb": {
+      "title": "Cài đặt tổ chức trên web",
+      "usageDetails": "Chi tiết sử dụng",
+      "providersAndModels": "Nhà cung cấp và mô hình",
+      "groups": "Nhóm",
+      "guardrails": "Rào chắn an toàn",
+      "byok": "Dùng khóa riêng của bạn",
+      "ssoAndDomain": "SSO và tên miền",
+      "emailPreferences": "Tùy chọn email",
+      "dataCollection": "Thu thập dữ liệu",
+      "auditLogs": "Nhật ký kiểm tra",
+      "requestLogs": "Nhật ký yêu cầu",
+      "integrations": "Tích hợp",
+      "subOrganizations": "Tổ chức con",
+      "distributeFunds": "Phân bổ tiền"
     },
     "usageStats": {
       "inputTokens": "Token đầu vào",

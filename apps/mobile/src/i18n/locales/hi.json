@@ -2849,6 +2849,38 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "ऑडिट लॉग",
+      "permissionDenied": "Enterprise प्लान पर सिर्फ़ संगठन के मालिक, एडमिन या बिलिंग मैनेजर ही इसका ऑडिट लॉग देख सकते हैं।",
+      "emptyTitle": "कोई ऑडिट इवेंट नहीं",
+      "emptyDescription": "इस संगठन में की गई कार्रवाइयाँ यहाँ दिखती हैं।",
+      "truncated": "सबसे हाल के इवेंट दिखाए जा रहे हैं।"
+    },
+    "billing": {
+      "title": "बिलिंग",
+      "permissionDenied": "संगठन की बिलिंग सिर्फ़ उसके ओनर, एडमिन या बिलिंग मैनेजर देख सकते हैं।",
+      "subscription": "सब्सक्रिप्शन",
+      "state": "स्थिति",
+      "stateNone": "कोई सब्सक्रिप्शन नहीं",
+      "statePastDue": "भुगतान बकाया है",
+      "stateCancelsOn": "{{date}} को रद्द होगा",
+      "stateCancelsAtPeriodEnd": "अवधि खत्म होने पर रद्द होगा",
+      "stateTrialEndsOn": "ट्रायल {{date}} को खत्म होगा",
+      "stateTrialing": "ट्रायल",
+      "stateRenewsOn": "{{date}} को रिन्यू होगा",
+      "scheduledChange": "तय बदलाव",
+      "seatsDropTo": "{{date}} को सीटें घटकर {{seats}} हो जाएंगी",
+      "seats": "सीटें",
+      "autoTopUp": "ऑटो टॉप-अप",
+      "autoTopUpAmount": "टॉप-अप राशि",
+      "autoTopUpThreshold": "जब बैलेंस इससे कम हो",
+      "manageOnWeb": "बदलाव वेब पर किए जाते हैं",
+      "changePlan": "प्लान बदलें",
+      "buySeats": "सीटें खरीदें",
+      "setupAutoTopUp": "ऑटो टॉप-अप सेट करें",
+      "webAddress": "वेब पता {{url}}",
+      "opensOnWeb": "वेब पर खुलता है"
+    },
     "boundary": {
       "backToProfile": "प्रोफ़ाइल पर वापस जाएँ",
       "loadErrorMessage": "अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
@@ -2856,14 +2888,20 @@
       "loadErrorTitle": "आपके संगठन लोड नहीं हो सके।",
       "membershipLostNotice": "आपको इस संगठन का ऐक्सेस अब नहीं है। {{target}} पर स्विच किया गया।",
       "noOrganization": "कोई संगठन नहीं",
-      "noOrganizationDescription": "यह खाता किसी संगठन का हिस्सा नहीं है। सदस्य आमंत्रण और कम बैलेंस अलर्ट जैसी संगठन सुविधाओं का उपयोग करने के लिए वेब पर एक संगठन बनाएँ या उसमें शामिल हों।",
-      "openWebOrganizations": "वेब पर संगठन खोलें",
+      "noOrganizationDescription": "यह अकाउंट किसी संगठन का हिस्सा नहीं है। सदस्यों को आमंत्रित करने और कम बैलेंस की सूचनाओं जैसी संगठन सुविधाओं का इस्तेमाल करने के लिए एक संगठन बनाएँ, या जिस संगठन में आपको आमंत्रित किया गया है उसमें शामिल होने के लिए वेब खोलें।",
       "organizationUnavailable": "संगठन उपलब्ध नहीं है।",
       "selectDescriptionWithOrganizations": "आप एक या अधिक संगठनों से जुड़े हैं। वह खाता चुनें जिसका इस स्क्रीन को उपयोग करना चाहिए।",
       "selectOrganization": "एक संगठन चुनें",
       "unavailableDescription": "यह संगठन अब उपलब्ध नहीं है। जारी रखने के लिए अपनी प्रोफ़ाइल से दूसरा संगठन चुनें।",
       "unavailableSessionsDescription": "यह संगठन अब उपलब्ध नहीं है। इसके सत्र लोड नहीं किए जा सकते।",
       "accessDeniedDescription": "आपको इस संगठन का ऐक्सेस नहीं है।"
+    },
+    "create": {
+      "title": "संगठन बनाएँ",
+      "description": "संगठन आपकी टीम के साथ क्रेडिट, एजेंट और सेटिंग्स शेयर करता है।",
+      "nameLabel": "संगठन का नाम",
+      "nameRequired": "संगठन का नाम डालें।",
+      "trialNote": "संगठन बनाते ही आपका 14 दिन का Enterprise ट्रायल शुरू हो जाएगा। प्लान वेब पर खरीदे जाते हैं।"
     },
     "creditActivity": {
       "emptyDescription": "इस संगठन की खरीदारी, उपयोग और क्रेडिट में बदलाव का विवरण यहाँ दिखाई देगा।",
@@ -2985,6 +3023,22 @@
       "ownRoleChange": "आप अपनी स्वयं की भूमिका नहीं बदल सकते।",
       "inviteExpired": "यह आमंत्रण समाप्त हो चुका है।",
       "inviteAccepted": "यह आमंत्रण पहले ही स्वीकार किया जा चुका है।"
+    },
+    "settingsOnWeb": {
+      "title": "वेब पर संगठन की सेटिंग्स",
+      "usageDetails": "इस्तेमाल का विवरण",
+      "providersAndModels": "प्रोवाइडर और मॉडल",
+      "groups": "ग्रुप",
+      "guardrails": "गार्डरेल",
+      "byok": "अपनी खुद की की (key) इस्तेमाल करें",
+      "ssoAndDomain": "SSO और डोमेन",
+      "emailPreferences": "ईमेल प्राथमिकताएँ",
+      "dataCollection": "डेटा कलेक्शन",
+      "auditLogs": "ऑडिट लॉग",
+      "requestLogs": "रिक्वेस्ट लॉग",
+      "integrations": "इंटीग्रेशन",
+      "subOrganizations": "सब-संगठन",
+      "distributeFunds": "फ़ंड बाँटें"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकन",

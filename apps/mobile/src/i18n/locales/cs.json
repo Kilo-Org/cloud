@@ -2963,6 +2963,38 @@
     "sendFeedback": "Odeslat zpětnou vazbu"
   },
   "organization": {
+    "auditLog": {
+      "title": "Auditní protokol",
+      "permissionDenied": "Auditní protokol organizace s plánem Enterprise si může prohlížet jen její vlastník, administrátor nebo správce fakturace.",
+      "emptyTitle": "Žádné události auditu",
+      "emptyDescription": "Zde se zobrazí akce provedené v této organizaci.",
+      "truncated": "Zobrazují se nejnovější události."
+    },
+    "billing": {
+      "title": "Fakturace",
+      "permissionDenied": "Fakturaci organizace může zobrazit pouze vlastník, administrátor nebo správce fakturace.",
+      "subscription": "Předplatné",
+      "state": "Stav",
+      "stateNone": "Bez předplatného",
+      "statePastDue": "Po splatnosti",
+      "stateCancelsOn": "Bude zrušeno {{date}}",
+      "stateCancelsAtPeriodEnd": "Bude zrušeno na konci období",
+      "stateTrialEndsOn": "Zkušební období končí {{date}}",
+      "stateTrialing": "Zkušební období",
+      "stateRenewsOn": "Obnoví se {{date}}",
+      "scheduledChange": "Naplánovaná změna",
+      "seatsDropTo": "Počet míst klesne {{date}} na {{seats}}",
+      "seats": "Uživatelská místa",
+      "autoTopUp": "Automatické dobití",
+      "autoTopUpAmount": "Částka dobití",
+      "autoTopUpThreshold": "Když zůstatek klesne pod",
+      "manageOnWeb": "Změny se provádějí na webu",
+      "changePlan": "Změnit plán",
+      "buySeats": "Koupit uživatelská místa",
+      "setupAutoTopUp": "Nastavit automatické dobití",
+      "webAddress": "Webová adresa {{url}}",
+      "opensOnWeb": "Otevře se na webu"
+    },
     "boundary": {
       "backToProfile": "Zpět na profil",
       "loadErrorMessage": "Zkontroluj připojení a zkus to znovu.",
@@ -2970,14 +3002,20 @@
       "loadErrorTitle": "Vaše organizace se nepodařilo načíst.",
       "membershipLostNotice": "Už nemáte přístup do této organizace. Přepnuto na {{target}}.",
       "noOrganization": "Žádná organizace",
-      "noOrganizationDescription": "Tento účet není součástí organizace. Vytvořte organizaci nebo se k některé připojte na webu, abyste mohli využívat funkce organizace, jako jsou pozvánky pro členy a upozornění na nízký zůstatek.",
-      "openWebOrganizations": "Otevřít organizace na webu",
+      "noOrganizationDescription": "Tento účet nepatří do žádné organizace. Vytvořte si ji, abyste mohli používat funkce organizace, jako jsou pozvánky pro členy a upozornění na nízký zůstatek, nebo otevřete web a připojte se k organizaci, do které jste byli pozváni.",
       "organizationUnavailable": "Organizace není k dispozici.",
       "selectDescriptionWithOrganizations": "Patříte k jedné nebo více organizacím. Vyberte účet, který má tato obrazovka používat.",
       "selectOrganization": "Vyberte organizaci",
       "unavailableDescription": "Tato organizace už není dostupná. Vyberte ve svém profilu jinou organizaci a pokračujte.",
       "unavailableSessionsDescription": "Tato organizace už není dostupná. Její relace nelze načíst.",
       "accessDeniedDescription": "Nemáte přístup do této organizace."
+    },
+    "create": {
+      "title": "Vytvořit organizaci",
+      "description": "V organizaci sdílíte se svým týmem kredity, agenty a nastavení.",
+      "nameLabel": "Název organizace",
+      "nameRequired": "Zadejte název organizace.",
+      "trialNote": "Po vytvoření organizace začne vaše 14denní zkušební verze plánu Enterprise. Plány se kupují na webu."
     },
     "creditActivity": {
       "emptyDescription": "Zde se budou průběžně zobrazovat nákupy, čerpání a úpravy kreditů této organizace.",
@@ -3086,6 +3124,22 @@
       "ownRoleChange": "Nemůžete změnit svou vlastní roli.",
       "inviteExpired": "Tato pozvánka vypršela.",
       "inviteAccepted": "Tato pozvánka již byla přijata."
+    },
+    "settingsOnWeb": {
+      "title": "Nastavení organizace na webu",
+      "usageDetails": "Podrobnosti o využití",
+      "providersAndModels": "Poskytovatelé a modely",
+      "groups": "Skupiny",
+      "guardrails": "Ochranná pravidla",
+      "byok": "Vlastní klíč",
+      "ssoAndDomain": "SSO a doména",
+      "emailPreferences": "Předvolby e-mailů",
+      "dataCollection": "Shromažďování dat",
+      "auditLogs": "Auditní protokoly",
+      "requestLogs": "Protokoly požadavků",
+      "integrations": "Integrace",
+      "subOrganizations": "Podorganizace",
+      "distributeFunds": "Rozdělit prostředky"
     },
     "usageStats": {
       "inputTokens": "Vstupní tokeny",

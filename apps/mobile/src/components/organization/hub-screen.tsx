@@ -4,7 +4,7 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
-import { Bell, FileText, Pencil, Receipt, Users, Wallet } from '@/components/ui/icons';
+import { Bell, CreditCard, FileText, Pencil, Receipt, Users, Wallet } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +19,7 @@ import {
   type OrgKiloPassRowState,
 } from '@/components/organization/org-kilo-pass-row-state';
 import { OrgUsageStats } from '@/components/organization/org-usage-stats';
+import { visibleOrgSettingsRows } from '@/components/organization/organization-settings-rows';
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
@@ -41,7 +42,7 @@ import {
   isMoneyRole,
   useOrgBoundary,
   useOrgKiloPassSummary,
-  useOrgWithMembers,
+  useOrgParentLink,
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
@@ -75,28 +76,15 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     setOrganizationId(organizationIdOverride);
   }, [organizationIdOverride, org, setOrganizationId]);
 
-  const orgWithMembers = useOrgWithMembers(organizationId);
   // `organizations.list` carries the org's parent link, so the billing group
   // knows from its first frame whether this org has a Kilo Pass row instead of
-  // adding one a request later and pushing the rows under it down. A device
-  // that persisted the list before that field existed hydrates an entry
-  // without it, and an entry written before an admin moved the organization
-  // under a parent still says `null`, so the membership payload fills the gap
-  // in both directions: a parent id from either payload makes this a child,
-  // because only an admin change moves an organization under a parent after
-  // creation and that id is never the stale side. A `null` confirms a
-  // top-level organization only from the freshly fetched membership payload;
-  // the list's own `null` is a cached value and leaves the link unknown until
-  // membership answers.
-  const listParentLink = org?.parentOrganizationId;
-  const membershipParentLink = orgWithMembers.data?.parent_organization_id;
-  const reportedParentLink = listParentLink ?? membershipParentLink;
-  const topLevelConfirmed = membershipParentLink === null;
-  const parentLink = reportedParentLink ?? (topLevelConfirmed ? null : undefined);
-  // No membership payload and a failed or paused fetch: the payload that would
-  // settle anything waiting on it will not arrive on its own.
-  const membershipUnavailable =
-    orgWithMembers.data == null && (orgWithMembers.isError || orgWithMembers.isPaused);
+  // adding one a request later and pushing the rows under it down. The hook
+  // reconciles that cached entry with the membership payload.
+  const {
+    membership: orgWithMembers,
+    parentLink,
+    membershipUnavailable,
+  } = useOrgParentLink(organizationId, org?.parentOrganizationId);
   // An unknown link keeps the row: it renders in its loading state instead of
   // appearing once a payload lands. Only a known child organization, which
   // carries its parent's id, has no Kilo Pass row.
@@ -194,6 +182,24 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   const planMessage = showMoney
     ? t('organization.hub.planEnded')
     : t('common.organizationTrialEnded');
+
+  // The organization dashboard's own settings, one row per area. The group
+  // waits for the membership payload because the parent link decides whether
+  // the sub-organization rows exist: painting them on the cached list entry's
+  // `null` and removing them a request later would move every row under them.
+  // It is the last group on the screen, so its arrival pushes nothing above it.
+  const settingsRows =
+    orgWithMembers.data == null && !membershipUnavailable
+      ? null
+      : visibleOrgSettingsRows(
+          {
+            role,
+            plan: org.plan,
+            isTopLevel: parentLink === null,
+            guardrailsEnabled: orgWithMembers.data?.settings.kilo_encrypt === true,
+          },
+          organizationId
+        );
 
   return (
     <View className="flex-1 bg-background">
@@ -315,6 +321,15 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
             }}
           />
           {showMoney && (
+            <ConfigureRow
+              icon={CreditCard}
+              title={t('organization.billing.title')}
+              onPress={() => {
+                router.push('/(app)/(tabs)/(3_profile)/organization/billing' as Href);
+              }}
+            />
+          )}
+          {showMoney && (
             <>
               <ConfigureRow
                 icon={Receipt}
@@ -390,6 +405,34 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
             </>
           )}
         </View>
+
+        {/* The areas this app does not reimplement. Each row opens the page
+            that already owns the setting, and the row set follows the web
+            sidebar's role and plan gates — see `visibleOrgSettingsRows`. */}
+        {settingsRows == null ? null : (
+          <View className="gap-2">
+            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+              {t('organization.settingsOnWeb.title')}
+            </Text>
+            <View className="rounded-lg bg-secondary px-3">
+              {settingsRows.map((row, index) => (
+                <ConfigureRow
+                  key={row.area}
+                  icon={row.icon}
+                  title={row.title}
+                  last={index === settingsRows.length - 1}
+                  onPress={() => {
+                    if (row.web) {
+                      void openExternalUrl(row.url, { label: row.title });
+                      return;
+                    }
+                    router.push('/(app)/(tabs)/(3_profile)/organization/audit-log' as Href);
+                  }}
+                />
+              ))}
+            </View>
+          </View>
+        )}
       </TabScreenScrollView>
 
       {renameVisible && (

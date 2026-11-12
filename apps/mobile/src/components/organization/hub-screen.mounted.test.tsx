@@ -78,6 +78,17 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     isResolving: false,
   }),
   useOrgWithMembers: () => membersQuery,
+  // Mirrors the hook's derivation over the same mocked membership payload.
+  useOrgParentLink: (_organizationId: string | null, listParentLink: string | null | undefined) => {
+    const membershipParentLink = membersQuery.data?.parent_organization_id;
+    const reportedParentLink = listParentLink ?? membershipParentLink;
+    return {
+      membership: membersQuery,
+      parentLink: reportedParentLink ?? (membershipParentLink === null ? null : undefined),
+      membershipUnavailable:
+        membersQuery.data == null && (membersQuery.isError || membersQuery.isPaused),
+    };
+  },
   useOrgKiloPassSummary: (_organizationId: string, enabled: boolean) => {
     kiloPassQuery.enabled.push(enabled);
     return { data: undefined, isError: false, refetch: vi.fn() };

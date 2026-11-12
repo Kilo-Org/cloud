@@ -2857,6 +2857,38 @@
     "sendFeedback": "Visszajelzés küldése"
   },
   "organization": {
+    "auditLog": {
+      "title": "Auditnapló",
+      "permissionDenied": "Az auditnaplót csak az Enterprise csomagot használó szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse olvashatja.",
+      "emptyTitle": "Nincsenek auditesemények",
+      "emptyDescription": "A szervezetben végrehajtott műveletek itt jelennek meg.",
+      "truncated": "A legutóbbi események láthatók."
+    },
+    "billing": {
+      "title": "Számlázás",
+      "permissionDenied": "A számlázási adatokat csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse láthatja.",
+      "subscription": "Előfizetés",
+      "state": "Állapot",
+      "stateNone": "Nincs előfizetés",
+      "statePastDue": "Fizetési hátralék",
+      "stateCancelsOn": "Megszűnik: {{date}}",
+      "stateCancelsAtPeriodEnd": "Az időszak végén megszűnik",
+      "stateTrialEndsOn": "A próbaidőszak vége: {{date}}",
+      "stateTrialing": "Próbaidőszak",
+      "stateRenewsOn": "Megújul: {{date}}",
+      "scheduledChange": "Ütemezett módosítás",
+      "seatsDropTo": "Csökkentés {{seats}} férőhelyre: {{date}}",
+      "seats": "Férőhelyek",
+      "autoTopUp": "Automatikus feltöltés",
+      "autoTopUpAmount": "Feltöltési összeg",
+      "autoTopUpThreshold": "Ha az egyenleg ez alá csökken",
+      "manageOnWeb": "A módosítások a weben végezhetők el",
+      "changePlan": "Csomag módosítása",
+      "buySeats": "Férőhelyek vásárlása",
+      "setupAutoTopUp": "Automatikus feltöltés beállítása",
+      "webAddress": "Webcím: {{url}}",
+      "opensOnWeb": "A weben nyílik meg"
+    },
     "boundary": {
       "backToProfile": "Vissza a profilhoz",
       "loadErrorMessage": "Ellenőrizd az internetkapcsolatot, és próbáld újra.",
@@ -2864,14 +2896,20 @@
       "loadErrorTitle": "Nem sikerült betölteni a szervezeteidet.",
       "membershipLostNotice": "Már nincs hozzáférésed ehhez a szervezethez. Átváltva a következőre: {{target}}.",
       "noOrganization": "Nincs szervezet",
-      "noOrganizationDescription": "Ez a fiók nem tagja egyetlen szervezetnek sem. Hozz létre vagy csatlakozz egy szervezethez a weboldalon, hogy használhasd a szervezetfunkciókat, például a tagmeghívókat és az alacsony egyenlegre vonatkozó figyelmeztetéseket.",
-      "openWebOrganizations": "Szervezetek megnyitása a weboldalon",
+      "noOrganizationDescription": "Ez a fiók nem tartozik szervezethez. Hozz létre egyet, hogy használhasd a szervezeti funkciókat, például a tagok meghívását és az alacsony egyenlegről szóló értesítéseket, vagy nyisd meg a webet, és csatlakozz egy szervezethez, amelybe meghívtak.",
       "organizationUnavailable": "A szervezet nem érhető el.",
       "selectDescriptionWithOrganizations": "Egy vagy több szervezet tagja vagy. Válaszd ki a fiókot, amelyet ennek a képernyőnek használnia kell.",
       "selectOrganization": "Szervezet kiválasztása",
       "unavailableDescription": "Ez a szervezet már nem érhető el. A folytatáshoz válassz egyet a profilodból.",
       "unavailableSessionsDescription": "Ez a szervezet már nem érhető el. A munkamenetei nem tölthetők be.",
       "accessDeniedDescription": "Nincs hozzáférésed ehhez a szervezethez."
+    },
+    "create": {
+      "title": "Szervezet létrehozása",
+      "description": "A szervezetben a csapatod közösen használja a krediteket, az ügynököket és a beállításokat.",
+      "nameLabel": "Szervezet neve",
+      "nameRequired": "Add meg a szervezet nevét.",
+      "trialNote": "A 14 napos Enterprise próbaidőszak a létrehozáskor indul. Csomagot a weben lehet vásárolni."
     },
     "creditActivity": {
       "emptyDescription": "Itt jelennek meg a szervezet kreditvásárlásai, kreditfelhasználása és egyenlegmódosításai.",
@@ -2980,6 +3018,22 @@
       "ownRoleChange": "Nem módosíthatja a saját szerepkörét.",
       "inviteExpired": "Ez a meghívó lejárt.",
       "inviteAccepted": "Ezt a meghívót már elfogadták."
+    },
+    "settingsOnWeb": {
+      "title": "Szervezeti beállítások a weben",
+      "usageDetails": "Használati részletek",
+      "providersAndModels": "Szolgáltatók és modellek",
+      "groups": "Csoportok",
+      "guardrails": "Védőkorlátok",
+      "byok": "Saját kulcs használata",
+      "ssoAndDomain": "SSO és domain",
+      "emailPreferences": "E-mail-beállítások",
+      "dataCollection": "Adatgyűjtés",
+      "auditLogs": "Auditnaplók",
+      "requestLogs": "Kérésnaplók",
+      "integrations": "Integrációk",
+      "subOrganizations": "Alszervezetek",
+      "distributeFunds": "Pénzeszközök elosztása"
     },
     "usageStats": {
       "inputTokens": "Bemeneti tokenek",

@@ -2857,6 +2857,38 @@
     "sendFeedback": "Tukuna he urupare"
   },
   "organization": {
+    "auditLog": {
+      "title": "Pūkete arotake",
+      "permissionDenied": "Mā te kaipupuri, te kaiwhakahaere, te kaiwhakahaere pire rānei o tētahi rōpū i runga i te mahere Enterprise anake e pānui tōna pūkete arotake.",
+      "emptyTitle": "Kāore he takahanga arotake",
+      "emptyDescription": "Ka puta ki konei ngā mahi i mahia i tēnei rōpū.",
+      "truncated": "E whakaatu ana i ngā takahanga hou rawa."
+    },
+    "billing": {
+      "title": "Ngā utu",
+      "permissionDenied": "Ko te rangatira, te kaiwhakahaere, te kaiwhakahaere utu rānei anake o te rōpū ka kite i ōna utu.",
+      "subscription": "Ohaurunga",
+      "state": "Tūnga",
+      "stateNone": "Kāore he ohaurunga",
+      "statePastDue": "Kua hipa te rā utu",
+      "stateCancelsOn": "Ka whakakorea ā te {{date}}",
+      "stateCancelsAtPeriodEnd": "Ka whakakorea hei te mutunga o te wā",
+      "stateTrialEndsOn": "Ka mutu te whakamātautau ā te {{date}}",
+      "stateTrialing": "Whakamātautau",
+      "stateRenewsOn": "Ka whakahoutia ā te {{date}}",
+      "scheduledChange": "Panoni kua whakaritea",
+      "seatsDropTo": "Ka heke ki te {{seats}} raihana ā te {{date}}",
+      "seats": "Ngā raihana",
+      "autoTopUp": "Whakakī aunoa",
+      "autoTopUpAmount": "Te nui whakakī",
+      "autoTopUpThreshold": "Ina heke te toenga ki raro i",
+      "manageOnWeb": "Ka whakarerekētia i te ipurangi",
+      "changePlan": "Huri mahere",
+      "buySeats": "Hoko raihana",
+      "setupAutoTopUp": "Whakaritea te whakakī aunoa",
+      "webAddress": "Wāhitau ipurangi {{url}}",
+      "opensOnWeb": "Ka tuwhera i te ipurangi"
+    },
     "boundary": {
       "backToProfile": "Hoki ki te kōtaha",
       "loadErrorMessage": "Tirohia tō hononga, ā, whakamātau anō.",
@@ -2864,14 +2896,20 @@
       "loadErrorTitle": "Kāore i taea te uta i ō rōpū.",
       "membershipLostNotice": "Kāore ō whakaaetanga uru ki tēnei rōpū anō. I whakawhiti ki {{target}}.",
       "noOrganization": "Kāore he rōpū",
-      "noOrganizationDescription": "Kāore tēnei pūkete i roto i tētahi rōpū. Waihangatia, uru atu rānei ki tētahi rōpū i runga i te paetukutuku kia whakamahi ai i ngā āhuatanga rōpū pēnei i ngā pōwhiri mema me ngā whakatūpato mō te toenga iti.",
-      "openWebOrganizations": "Whakatuwheratia ngā rōpū i runga i te paetukutuku",
+      "noOrganizationDescription": "Ehara tēnei kaute i te wāhanga o tētahi rōpū. Waihangatia tētahi hei whakamahi i ngā āhuatanga rōpū pērā i ngā pōwhiri mema me ngā matohi toenga iti, huakina rānei te ipurangi kia uru atu ki tētahi i pōwhiritia ai koe.",
       "organizationUnavailable": "Kāore e wātea ana te rōpū.",
       "selectDescriptionWithOrganizations": "Kei roto koe i tētahi rōpū, neke atu rānei. Kōwhiria te pūkete e tika ana mā tēnei mata.",
       "selectOrganization": "Kōwhiria tētahi rōpū",
       "unavailableDescription": "Kāore tēnei rōpū e wātea ana ināianei. Kōwhiria tētahi mai i tō kōtaha kia haere tonu.",
       "unavailableSessionsDescription": "Kāore tēnei rōpū e wātea ana ināianei. Kāore e taea ana te uta i ngā sesiona a tēnei rōpū.",
       "accessDeniedDescription": "Kāore ō whakaaetanga uru ki tēnei rōpū."
+    },
+    "create": {
+      "title": "Waihangatia he rōpū",
+      "description": "Ka tiritiri tētahi rōpū i ngā whiwhinga, i ngā māngai me ngā tautuhinga ki tō tīma.",
+      "nameLabel": "Te ingoa o te rōpū",
+      "nameRequired": "Tāurutia he ingoa rōpū.",
+      "trialNote": "Ka tīmata tō whakamātautau Enterprise 14-rā ina waihangatia e koe. Ka hokona ngā mahere i te ipurangi."
     },
     "creditActivity": {
       "emptyDescription": "Ka puta ki konei ngā hokonga, te whakamahinga me ngā whakatikatika moni tōmua o tēnei rōpū i te wā e mahia ana.",
@@ -2980,6 +3018,22 @@
       "ownRoleChange": "Kāore e taea e koe te huri i tō ake tūranga.",
       "inviteExpired": "Kua pau te wā o tēnei pōwhiri.",
       "inviteAccepted": "Kua whakaaetia kētia tēnei pōwhiri."
+    },
+    "settingsOnWeb": {
+      "title": "Ngā tautuhinga rōpū i te ipurangi",
+      "usageDetails": "Ngā taipitopito whakamahinga",
+      "providersAndModels": "Ngā kaiwhakarato me ngā tauira",
+      "groups": "Ngā kāhui",
+      "guardrails": "Ngā taiapa haumaru",
+      "byok": "Kawea mai tō ake kī",
+      "ssoAndDomain": "SSO me te rohe",
+      "emailPreferences": "Ngā manakohanga īmēra",
+      "dataCollection": "Kohinga raraunga",
+      "auditLogs": "Ngā pūkete arotake",
+      "requestLogs": "Ngā pūkete tono",
+      "integrations": "Ngā tūhononga",
+      "subOrganizations": "Ngā rōpū iti",
+      "distributeFunds": "Tohaina ngā pūtea"
     },
     "usageStats": {
       "inputTokens": "Ngā tōkena tāuru",

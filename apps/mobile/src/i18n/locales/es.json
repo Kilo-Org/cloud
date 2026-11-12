@@ -2902,6 +2902,38 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "Registro de auditoría",
+      "permissionDenied": "Solo un propietario, administrador o responsable de facturación de una organización con el plan Enterprise puede ver su registro de auditoría.",
+      "emptyTitle": "No hay eventos de auditoría",
+      "emptyDescription": "Aquí aparecen las acciones realizadas en esta organización.",
+      "truncated": "Se muestran los eventos más recientes."
+    },
+    "billing": {
+      "title": "Facturación",
+      "permissionDenied": "Solo el propietario, un administrador o un responsable de facturación de la organización puede ver su facturación.",
+      "subscription": "Suscripción",
+      "state": "Estado",
+      "stateNone": "Sin suscripción",
+      "statePastDue": "Pago vencido",
+      "stateCancelsOn": "Se cancela el {{date}}",
+      "stateCancelsAtPeriodEnd": "Se cancela al final del periodo",
+      "stateTrialEndsOn": "La prueba termina el {{date}}",
+      "stateTrialing": "Prueba",
+      "stateRenewsOn": "Se renueva el {{date}}",
+      "scheduledChange": "Cambio programado",
+      "seatsDropTo": "Baja a {{seats}} licencias el {{date}}",
+      "seats": "Licencias",
+      "autoTopUp": "Recarga automática",
+      "autoTopUpAmount": "Importe de recarga",
+      "autoTopUpThreshold": "Cuando el saldo baje de",
+      "manageOnWeb": "Los cambios se hacen en la web",
+      "changePlan": "Cambiar plan",
+      "buySeats": "Comprar licencias",
+      "setupAutoTopUp": "Configurar recarga automática",
+      "webAddress": "Dirección web {{url}}",
+      "opensOnWeb": "Se abre en la web"
+    },
     "boundary": {
       "backToProfile": "Volver al perfil",
       "loadErrorMessage": "Comprueba tu conexión e inténtalo de nuevo.",
@@ -2909,14 +2941,20 @@
       "loadErrorTitle": "No se pudieron cargar tus organizaciones.",
       "membershipLostNotice": "Ya no tienes acceso a esta organización. Cambiado a {{target}}.",
       "noOrganization": "Sin organización",
-      "noOrganizationDescription": "Esta cuenta no forma parte de una organización. Crea una o únete a una en la web para usar funciones de organización como invitaciones de miembros y alertas de saldo bajo.",
-      "openWebOrganizations": "Abrir organizaciones en la web",
+      "noOrganizationDescription": "Esta cuenta no forma parte de ninguna organización. Crea una para usar funciones de organización como las invitaciones a miembros y las alertas de saldo bajo, o abre la web para unirte a una a la que te hayan invitado.",
       "organizationUnavailable": "La organización no está disponible.",
       "selectDescriptionWithOrganizations": "Perteneces a una o más organizaciones. Elige la cuenta que debe usar esta pantalla.",
       "selectOrganization": "Seleccionar una organización",
       "unavailableDescription": "Esta organización ya no está disponible. Elige una de tu perfil para continuar.",
       "unavailableSessionsDescription": "Esta organización ya no está disponible. No se pueden cargar sus sesiones.",
       "accessDeniedDescription": "No tienes acceso a esta organización."
+    },
+    "create": {
+      "title": "Crear organización",
+      "description": "Una organización comparte créditos, agentes y ajustes con tu equipo.",
+      "nameLabel": "Nombre de la organización",
+      "nameRequired": "Introduce un nombre para la organización.",
+      "trialNote": "Tu prueba de 14 días de Enterprise empieza al crearla. Los planes se compran en la web."
     },
     "creditActivity": {
       "emptyDescription": "Aquí aparecerán las compras, el consumo y los ajustes de créditos de esta organización a medida que se registren.",
@@ -3038,6 +3076,22 @@
       "ownRoleChange": "No puedes cambiar tu propio rol.",
       "inviteExpired": "Esta invitación ha caducado.",
       "inviteAccepted": "Esta invitación ya ha sido aceptada."
+    },
+    "settingsOnWeb": {
+      "title": "Ajustes de la organización en la web",
+      "usageDetails": "Detalles de uso",
+      "providersAndModels": "Proveedores y modelos",
+      "groups": "Grupos",
+      "guardrails": "Barreras de seguridad",
+      "byok": "Usa tu propia clave",
+      "ssoAndDomain": "SSO y dominio",
+      "emailPreferences": "Preferencias de correo",
+      "dataCollection": "Recopilación de datos",
+      "auditLogs": "Registros de auditoría",
+      "requestLogs": "Registros de solicitudes",
+      "integrations": "Integraciones",
+      "subOrganizations": "Suborganizaciones",
+      "distributeFunds": "Distribuir fondos"
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",

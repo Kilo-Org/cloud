@@ -2849,6 +2849,38 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "审计日志",
+      "permissionDenied": "只有 Enterprise 套餐组织的所有者、管理员或账单管理员才能查看其审计日志。",
+      "emptyTitle": "暂无审计事件",
+      "emptyDescription": "此组织中执行的操作会显示在这里。",
+      "truncated": "仅显示最近的事件。"
+    },
+    "billing": {
+      "title": "账单",
+      "permissionDenied": "只有组织所有者、管理员或账单管理员才能查看组织账单。",
+      "subscription": "订阅",
+      "state": "状态",
+      "stateNone": "无订阅",
+      "statePastDue": "已逾期",
+      "stateCancelsOn": "将于 {{date}} 取消",
+      "stateCancelsAtPeriodEnd": "将于本期结束时取消",
+      "stateTrialEndsOn": "试用将于 {{date}} 结束",
+      "stateTrialing": "试用中",
+      "stateRenewsOn": "将于 {{date}} 续订",
+      "scheduledChange": "计划变更",
+      "seatsDropTo": "将于 {{date}} 减至 {{seats}} 个席位",
+      "seats": "席位",
+      "autoTopUp": "自动充值",
+      "autoTopUpAmount": "充值金额",
+      "autoTopUpThreshold": "余额低于",
+      "manageOnWeb": "请在网页端进行更改",
+      "changePlan": "更改套餐",
+      "buySeats": "购买席位",
+      "setupAutoTopUp": "设置自动充值",
+      "webAddress": "网址 {{url}}",
+      "opensOnWeb": "在网页中打开"
+    },
     "boundary": {
       "backToProfile": "返回个人资料",
       "loadErrorMessage": "请检查网络连接后重试。",
@@ -2856,14 +2888,20 @@
       "loadErrorTitle": "无法加载你的组织列表",
       "membershipLostNotice": "你已无法访问此组织。已切换至 {{target}}。",
       "noOrganization": "无组织",
-      "noOrganizationDescription": "此账户不属于任何组织。请在网页版创建或加入组织，以使用成员邀请和低余额提醒等组织功能。",
-      "openWebOrganizations": "在网页版打开组织",
+      "noOrganizationDescription": "此账户不属于任何组织。创建一个组织即可使用邀请成员、低余额提醒等组织功能；如果你已受邀加入某个组织，也可以打开网页版加入。",
       "organizationUnavailable": "此组织不可用",
       "selectDescriptionWithOrganizations": "你属于一个或多个组织。请选择此屏幕应使用的账户。",
       "selectOrganization": "选择组织",
       "unavailableDescription": "此组织已不可用。请从账户选择器中选择其他账户后继续。",
       "unavailableSessionsDescription": "此组织已不可用。无法加载其会话。",
       "accessDeniedDescription": "你无权访问此组织。"
+    },
+    "create": {
+      "title": "创建组织",
+      "description": "组织可让你的团队共享额度、智能体和设置。",
+      "nameLabel": "组织名称",
+      "nameRequired": "请输入组织名称。",
+      "trialNote": "创建组织后，14 天的 Enterprise 试用即开始。套餐需在网页上购买。"
     },
     "creditActivity": {
       "emptyDescription": "此组织的充值、用量和额度调整记录将在这里显示。",
@@ -2985,6 +3023,22 @@
       "ownRoleChange": "您无法更改自己的角色。",
       "inviteExpired": "该邀请已过期。",
       "inviteAccepted": "该邀请已被接受。"
+    },
+    "settingsOnWeb": {
+      "title": "网页版组织设置",
+      "usageDetails": "用量详情",
+      "providersAndModels": "提供商和模型",
+      "groups": "群组",
+      "guardrails": "防护规则",
+      "byok": "自带密钥",
+      "ssoAndDomain": "SSO 和域名",
+      "emailPreferences": "邮件偏好设置",
+      "dataCollection": "数据收集",
+      "auditLogs": "审计日志",
+      "requestLogs": "请求日志",
+      "integrations": "集成",
+      "subOrganizations": "子组织",
+      "distributeFunds": "分配资金"
     },
     "usageStats": {
       "inputTokens": "输入词元",

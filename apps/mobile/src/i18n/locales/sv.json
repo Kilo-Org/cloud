@@ -2857,6 +2857,38 @@
     "sendFeedback": "Skicka synpunkter"
   },
   "organization": {
+    "auditLog": {
+      "title": "Granskningslogg",
+      "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i en organisation med Enterprise-planen kan läsa organisationens granskningslogg.",
+      "emptyTitle": "Inga granskningshändelser",
+      "emptyDescription": "Åtgärder som utförs i den här organisationen visas här.",
+      "truncated": "Visar de senaste händelserna."
+    },
+    "billing": {
+      "title": "Fakturering",
+      "permissionDenied": "Endast organisationens ägare, administratörer eller faktureringsansvariga kan se dess fakturering.",
+      "subscription": "Prenumeration",
+      "state": "Status",
+      "stateNone": "Ingen prenumeration",
+      "statePastDue": "Betalning förfallen",
+      "stateCancelsOn": "Avslutas den {{date}}",
+      "stateCancelsAtPeriodEnd": "Avslutas vid periodens slut",
+      "stateTrialEndsOn": "Provperioden slutar den {{date}}",
+      "stateTrialing": "Provperiod",
+      "stateRenewsOn": "Förnyas den {{date}}",
+      "scheduledChange": "Schemalagd ändring",
+      "seatsDropTo": "Minskar till {{seats}} platser den {{date}}",
+      "seats": "Platser",
+      "autoTopUp": "Automatisk påfyllning",
+      "autoTopUpAmount": "Påfyllningsbelopp",
+      "autoTopUpThreshold": "När saldot understiger",
+      "manageOnWeb": "Ändringar görs på webben",
+      "changePlan": "Byt plan",
+      "buySeats": "Köp platser",
+      "setupAutoTopUp": "Konfigurera automatisk påfyllning",
+      "webAddress": "Webbadress {{url}}",
+      "opensOnWeb": "Öppnas på webben"
+    },
     "boundary": {
       "backToProfile": "Tillbaka till profilen",
       "loadErrorMessage": "Kontrollera anslutningen och försök igen.",
@@ -2864,14 +2896,20 @@
       "loadErrorTitle": "Det gick inte att läsa in dina organisationer.",
       "membershipLostNotice": "Du har inte längre åtkomst till den här organisationen. Växlade till {{target}}.",
       "noOrganization": "Ingen organisation",
-      "noOrganizationDescription": "Det här kontot tillhör ingen organisation. Skapa eller gå med i en organisation på webben för att använda organisationsfunktioner som medlemsinbjudningar och varningar om lågt saldo.",
-      "openWebOrganizations": "Öppna organisationer på webben",
+      "noOrganizationDescription": "Det här kontot tillhör ingen organisation. Skapa en för att använda organisationsfunktioner som medlemsinbjudningar och aviseringar om lågt saldo, eller öppna webben för att gå med i en organisation som du har bjudits in till.",
       "organizationUnavailable": "Organisationen är inte tillgänglig.",
       "selectDescriptionWithOrganizations": "Du tillhör en eller flera organisationer. Välj det konto som den här skärmen ska använda.",
       "selectOrganization": "Välj en organisation",
       "unavailableDescription": "Den här organisationen är inte längre tillgänglig. Välj en annan i din profil för att fortsätta.",
       "unavailableSessionsDescription": "Den här organisationen är inte längre tillgänglig. Det går inte att läsa in sessioner för den.",
       "accessDeniedDescription": "Du har inte åtkomst till den här organisationen."
+    },
+    "create": {
+      "title": "Skapa organisation",
+      "description": "En organisation delar krediter, agenter och inställningar med ditt team.",
+      "nameLabel": "Organisationens namn",
+      "nameRequired": "Ange ett namn på organisationen.",
+      "trialNote": "Din 14 dagar långa provperiod av Enterprise startar när du skapar organisationen. Planer köps på webben."
     },
     "creditActivity": {
       "emptyDescription": "Här visas organisationens köp, användning och kreditjusteringar efter hand.",
@@ -2980,6 +3018,22 @@
       "ownRoleChange": "Du kan inte ändra din egen roll.",
       "inviteExpired": "Den här inbjudan har gått ut.",
       "inviteAccepted": "Den här inbjudan har redan accepterats."
+    },
+    "settingsOnWeb": {
+      "title": "Organisationsinställningar på webben",
+      "usageDetails": "Användningsdetaljer",
+      "providersAndModels": "Leverantörer och modeller",
+      "groups": "Grupper",
+      "guardrails": "Skyddsräcken",
+      "byok": "Använd egen nyckel",
+      "ssoAndDomain": "SSO och domän",
+      "emailPreferences": "E-postinställningar",
+      "dataCollection": "Datainsamling",
+      "auditLogs": "Granskningsloggar",
+      "requestLogs": "Förfrågningsloggar",
+      "integrations": "Integrationer",
+      "subOrganizations": "Underorganisationer",
+      "distributeFunds": "Fördela medel"
     },
     "usageStats": {
       "inputTokens": "Inmatade token",

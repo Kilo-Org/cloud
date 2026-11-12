@@ -2849,6 +2849,38 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "감사 로그",
+      "permissionDenied": "Enterprise 요금제를 사용하는 조직의 소유자, 관리자 또는 결제 관리자만 감사 로그를 볼 수 있습니다.",
+      "emptyTitle": "감사 이벤트 없음",
+      "emptyDescription": "이 조직에서 수행된 작업이 여기에 표시됩니다.",
+      "truncated": "최근 이벤트만 표시하고 있습니다."
+    },
+    "billing": {
+      "title": "결제",
+      "permissionDenied": "조직 소유자, 관리자 또는 결제 관리자만 조직의 결제 정보를 볼 수 있습니다.",
+      "subscription": "구독",
+      "state": "상태",
+      "stateNone": "구독 없음",
+      "statePastDue": "결제 연체",
+      "stateCancelsOn": "{{date}}에 해지 예정",
+      "stateCancelsAtPeriodEnd": "기간 종료 시 해지 예정",
+      "stateTrialEndsOn": "{{date}}에 체험 종료",
+      "stateTrialing": "체험 중",
+      "stateRenewsOn": "{{date}}에 갱신",
+      "scheduledChange": "예정된 변경",
+      "seatsDropTo": "{{date}}부터 라이선스 {{seats}}개로 감소",
+      "seats": "라이선스",
+      "autoTopUp": "자동 충전",
+      "autoTopUpAmount": "충전 금액",
+      "autoTopUpThreshold": "잔액이 다음 미만일 때",
+      "manageOnWeb": "변경은 웹에서 할 수 있습니다",
+      "changePlan": "요금제 변경",
+      "buySeats": "라이선스 구매",
+      "setupAutoTopUp": "자동 충전 설정",
+      "webAddress": "웹 주소 {{url}}",
+      "opensOnWeb": "웹에서 열림"
+    },
     "boundary": {
       "backToProfile": "프로필로 돌아가기",
       "loadErrorMessage": "인터넷 연결을 확인하고 다시 시도하세요.",
@@ -2856,14 +2888,20 @@
       "loadErrorTitle": "조직 목록을 불러올 수 없습니다.",
       "membershipLostNotice": "이 조직에 더 이상 접근할 수 없습니다. {{target}}(으)로 전환되었습니다.",
       "noOrganization": "조직 없음",
-      "noOrganizationDescription": "이 계정은 조직에 속해 있지 않습니다. 멤버 초대 및 잔액 부족 알림과 같은 조직 기능을 사용하려면 웹에서 조직을 만들거나 참여하세요.",
-      "openWebOrganizations": "웹에서 조직 열기",
+      "noOrganizationDescription": "이 계정은 어떤 조직에도 속해 있지 않습니다. 멤버 초대나 잔액 부족 알림 같은 조직 기능을 사용하려면 조직을 만드세요. 초대받은 조직에 참여하려면 웹을 여세요.",
       "organizationUnavailable": "조직을 사용할 수 없습니다.",
       "selectDescriptionWithOrganizations": "귀하는 하나 이상의 조직에 속해 있습니다. 이 화면에서 사용할 계정을 선택하세요.",
       "selectOrganization": "조직 선택",
       "unavailableDescription": "이 조직은 더 이상 사용할 수 없습니다. 계속하려면 프로필에서 다른 조직을 선택하세요.",
       "unavailableSessionsDescription": "이 조직은 더 이상 사용할 수 없습니다. 세션을 불러올 수 없습니다.",
       "accessDeniedDescription": "이 조직에 접근할 권한이 없습니다."
+    },
+    "create": {
+      "title": "조직 만들기",
+      "description": "조직에서는 팀과 크레딧, 에이전트, 설정을 공유합니다.",
+      "nameLabel": "조직 이름",
+      "nameRequired": "조직 이름을 입력하세요.",
+      "trialNote": "조직을 만들면 14일간의 Enterprise 체험판이 시작됩니다. 요금제는 웹에서 구매할 수 있습니다."
     },
     "creditActivity": {
       "emptyDescription": "이 조직의 크레딧 구매, 사용 및 조정 내역이 여기에 표시됩니다.",
@@ -2985,6 +3023,22 @@
       "ownRoleChange": "자신의 역할은 변경할 수 없습니다.",
       "inviteExpired": "이 초대는 만료되었습니다.",
       "inviteAccepted": "이 초대는 이미 수락되었습니다."
+    },
+    "settingsOnWeb": {
+      "title": "웹에서 조직 설정",
+      "usageDetails": "사용량 세부정보",
+      "providersAndModels": "제공업체 및 모델",
+      "groups": "그룹",
+      "guardrails": "가드레일",
+      "byok": "자체 키 사용(BYOK)",
+      "ssoAndDomain": "SSO 및 도메인",
+      "emailPreferences": "이메일 환경설정",
+      "dataCollection": "데이터 수집",
+      "auditLogs": "감사 로그",
+      "requestLogs": "요청 로그",
+      "integrations": "통합",
+      "subOrganizations": "하위 조직",
+      "distributeFunds": "자금 배분"
     },
     "usageStats": {
       "inputTokens": "입력 토큰",

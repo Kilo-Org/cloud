@@ -2963,6 +2963,38 @@
     "sendFeedback": "Siųsti atsiliepimą"
   },
   "organization": {
+    "auditLog": {
+      "title": "Audito žurnalas",
+      "permissionDenied": "Organizacijos audito žurnalą gali skaityti tik Enterprise plano organizacijos savininkas, administratorius arba atsiskaitymų valdytojas.",
+      "emptyTitle": "Audito įvykių nėra",
+      "emptyDescription": "Čia rodomi šioje organizacijoje atlikti veiksmai.",
+      "truncated": "Rodomi naujausi įvykiai."
+    },
+    "billing": {
+      "title": "Atsiskaitymai",
+      "permissionDenied": "Organizacijos atsiskaitymų informaciją gali matyti tik jos savininkas, administratorius arba atsiskaitymų tvarkytojas.",
+      "subscription": "Prenumerata",
+      "state": "Būsena",
+      "stateNone": "Prenumeratos nėra",
+      "statePastDue": "Pradelstas mokėjimas",
+      "stateCancelsOn": "Bus atšaukta {{date}}",
+      "stateCancelsAtPeriodEnd": "Bus atšaukta laikotarpio pabaigoje",
+      "stateTrialEndsOn": "Bandomasis laikotarpis baigsis {{date}}",
+      "stateTrialing": "Bandomasis laikotarpis",
+      "stateRenewsOn": "Bus atnaujinta {{date}}",
+      "scheduledChange": "Suplanuotas pakeitimas",
+      "seatsDropTo": "{{date}} vietų skaičius sumažės iki {{seats}}",
+      "seats": "Vietos",
+      "autoTopUp": "Automatinis papildymas",
+      "autoTopUpAmount": "Papildymo suma",
+      "autoTopUpThreshold": "Kai likutis nukrenta žemiau",
+      "manageOnWeb": "Pakeitimai atliekami žiniatinklyje",
+      "changePlan": "Keisti planą",
+      "buySeats": "Pirkti vietų",
+      "setupAutoTopUp": "Nustatyti automatinį papildymą",
+      "webAddress": "Žiniatinklio adresas {{url}}",
+      "opensOnWeb": "Atidaroma žiniatinklyje"
+    },
     "boundary": {
       "backToProfile": "Grįžti į profilį",
       "loadErrorMessage": "Patikrink ryšį ir bandyk dar kartą.",
@@ -2970,14 +3002,20 @@
       "loadErrorTitle": "Nepavyko įkelti jūsų organizacijų.",
       "membershipLostNotice": "Jūs nebeturite prieigos prie šios organizacijos. Perjungta į {{target}}.",
       "noOrganization": "Nėra organizacijos",
-      "noOrganizationDescription": "Ši paskyra nepriklauso jokiai organizacijai. Kad galėtumėte naudoti organizacijos funkcijas, tokias kaip narių kvietimai ir įspėjimai apie mažą likutį, sukurkite organizaciją arba prisijunkite prie jos naršyklėje.",
-      "openWebOrganizations": "Atidaryti organizacijas naršyklėje",
+      "noOrganizationDescription": "Ši paskyra nepriklauso jokiai organizacijai. Sukurkite organizaciją, kad galėtumėte naudotis organizacijos funkcijomis, pvz., narių kvietimais ir įspėjimais apie mažą likutį, arba atidarykite žiniatinklį ir prisijunkite prie organizacijos, į kurią buvote pakviesti.",
       "organizationUnavailable": "Organizacija nepasiekiama.",
       "selectDescriptionWithOrganizations": "Priklausote vienai ar daugiau organizacijų. Pasirinkite paskyrą, kurią turėtų naudoti šis ekranas.",
       "selectOrganization": "Pasirinkite organizaciją",
       "unavailableDescription": "Ši organizacija nebepasiekiama. Norėdami tęsti, savo profilyje pasirinkite kitą organizaciją.",
       "unavailableSessionsDescription": "Ši organizacija nebepasiekiama. Jos seansų įkelti negalima.",
       "accessDeniedDescription": "Neturite prieigos prie šios organizacijos."
+    },
+    "create": {
+      "title": "Sukurti organizaciją",
+      "description": "Organizacijoje kreditai, agentai ir nustatymai bendrinami su jūsų komanda.",
+      "nameLabel": "Organizacijos pavadinimas",
+      "nameRequired": "Įveskite organizacijos pavadinimą.",
+      "trialNote": "Sukūrus organizaciją prasidės 14 dienų Enterprise bandomasis laikotarpis. Planai perkami žiniatinklyje."
     },
     "creditActivity": {
       "emptyDescription": "Čia bus rodomi šios organizacijos kreditų pirkimai, naudojimas ir koregavimai.",
@@ -3086,6 +3124,22 @@
       "ownRoleChange": "Negalite pakeisti savo paties vaidmens.",
       "inviteExpired": "Šio kvietimo galiojimas baigėsi.",
       "inviteAccepted": "Šis kvietimas jau buvo priimtas."
+    },
+    "settingsOnWeb": {
+      "title": "Organizacijos nustatymai žiniatinklyje",
+      "usageDetails": "Naudojimo informacija",
+      "providersAndModels": "Teikėjai ir modeliai",
+      "groups": "Grupės",
+      "guardrails": "Apsaugos ribos",
+      "byok": "Naudoti savo raktą",
+      "ssoAndDomain": "SSO ir domenas",
+      "emailPreferences": "El. pašto nuostatos",
+      "dataCollection": "Duomenų rinkimas",
+      "auditLogs": "Audito žurnalai",
+      "requestLogs": "Užklausų žurnalai",
+      "integrations": "Integracijos",
+      "subOrganizations": "Antrinės organizacijos",
+      "distributeFunds": "Paskirstyti lėšas"
     },
     "usageStats": {
       "inputTokens": "Įvesties žetonai",

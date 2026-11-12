@@ -149,6 +149,27 @@ describe('wildcard capture substitution', () => {
     );
   });
 
+  it('row 12: /organizations/org_123 — the dashboard an accepted invite lands on', () => {
+    expect(resolveIncomingUrl(`${WEB}/organizations/org_123`)).toBe(
+      '/(app)/(tabs)/(3_profile)/organization/org_123'
+    );
+  });
+
+  it('row 12b: /organizations/org_123/overview keeps its own row', () => {
+    expect(resolveIncomingUrl(`${WEB}/organizations/org_123/overview`)).toBe(
+      '/(app)/(tabs)/(3_profile)/organization/org_123'
+    );
+  });
+
+  it('keeps the organization create pages in the browser', () => {
+    // `/organizations/new` matches the bare row's shape but is the web create
+    // form, which must open where the account is asked to sign in.
+    expect(resolveIncomingUrl(`${WEB}/organizations/new`)).toBeNull();
+    expect(resolveIncomingUrl(`${WEB}/organizations/create`)).toBeNull();
+    expect(webPathToAppPath('/organizations/new')).toBeNull();
+    expect(webPathToAppPath('/organizations/create')).toBeNull();
+  });
+
   it('inserts captures literally — dollar substitution patterns stay verbatim', () => {
     // String replacement would run ECMA-262 GetSubstitution on the capture:
     // `$&` re-inserts the placeholder, `$'` splices the un-substituted tail.
@@ -334,8 +355,8 @@ describe('parseKiloWebPath', () => {
 });
 
 describe('aasaComponents', () => {
-  it('returns 19 entries (17 rows + 2 exclusions)', () => {
-    expect(aasaComponents()).toHaveLength(19);
+  it('returns 22 entries (19 rows + 3 exclusions)', () => {
+    expect(aasaComponents()).toHaveLength(22);
   });
 
   it('every entry has a "/" key', () => {
@@ -360,11 +381,22 @@ describe('aasaComponents', () => {
     expect(components[14]).toEqual({ '/': '/organizations/*/code-reviews/*' });
   });
 
+  it('excludes the organization create paths before the bare organization row', () => {
+    const paths = aasaComponents().map(c => c['/']);
+    const bare = paths.indexOf('/organizations/*');
+    expect(bare).toBeGreaterThan(0);
+    expect(paths[bare - 2]).toBe('/organizations/new');
+    expect(paths[bare - 1]).toBe('/organizations/create');
+    expect(aasaComponents()[bare - 2]).toMatchObject({ exclude: true });
+    expect(aasaComponents()[bare - 1]).toMatchObject({ exclude: true });
+  });
+
   it('keeps table * verbatim (Apple glob crosses /)', () => {
     const paths = aasaComponents().map(c => c['/']);
     expect(paths).toContain('/code-reviews/*');
     expect(paths).toContain('/organizations/*/code-reviews/*');
     expect(paths).toContain('/organizations/*/security-agent');
+    expect(paths).toContain('/organizations/*');
     // '**' is two Apple globs — still a glob that crosses /, so the tail
     // rows stay valid AASA output unchanged.
     expect(paths).toContain('/pr-review/gitlab/**');
@@ -389,6 +421,7 @@ describe('androidPathPatterns', () => {
       '/organizations/.*/code-reviews',
       '/organizations/.*/code-reviews/.*',
       '/organizations/.*/overview',
+      '/organizations/.*',
       '/pr-review/gitlab/.*',
       '/pr-review/bitbucket/.*',
       '/pr-review/.*/.*/.*',

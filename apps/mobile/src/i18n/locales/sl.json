@@ -2963,6 +2963,38 @@
     "sendFeedback": "Pošlji povratne informacije"
   },
   "organization": {
+    "auditLog": {
+      "title": "Revizijski dnevnik",
+      "permissionDenied": "Revizijski dnevnik lahko bere samo lastnik, skrbnik ali upravitelj obračunavanja organizacije na načrtu Enterprise.",
+      "emptyTitle": "Ni revizijskih dogodkov",
+      "emptyDescription": "Tukaj so prikazana dejanja, izvedena v tej organizaciji.",
+      "truncated": "Prikazani so najnovejši dogodki."
+    },
+    "billing": {
+      "title": "Obračunavanje",
+      "permissionDenied": "Obračunavanje organizacije si lahko ogledajo samo lastnik, skrbnik ali upravitelj obračunavanja.",
+      "subscription": "Naročnina",
+      "state": "Status",
+      "stateNone": "Ni naročnine",
+      "statePastDue": "Zamuda pri plačilu",
+      "stateCancelsOn": "Prekliče se {{date}}",
+      "stateCancelsAtPeriodEnd": "Prekliče se ob koncu obdobja",
+      "stateTrialEndsOn": "Preizkusno obdobje se konča {{date}}",
+      "stateTrialing": "Preizkusno obdobje",
+      "stateRenewsOn": "Podaljša se {{date}}",
+      "scheduledChange": "Načrtovana sprememba",
+      "seatsDropTo": "Število mest se {{date}} zmanjša na {{seats}}",
+      "seats": "Uporabniška mesta",
+      "autoTopUp": "Samodejno polnjenje",
+      "autoTopUpAmount": "Znesek polnjenja",
+      "autoTopUpThreshold": "Ko stanje pade pod",
+      "manageOnWeb": "Spremembe se izvajajo v spletu",
+      "changePlan": "Spremeni načrt",
+      "buySeats": "Kupi uporabniška mesta",
+      "setupAutoTopUp": "Nastavi samodejno polnjenje",
+      "webAddress": "Spletni naslov {{url}}",
+      "opensOnWeb": "Odpre se v spletu"
+    },
     "boundary": {
       "backToProfile": "Nazaj na profil",
       "loadErrorMessage": "Preveri povezavo in poskusi znova.",
@@ -2970,14 +3002,20 @@
       "loadErrorTitle": "Tvojih organizacij ni bilo mogoče naložiti.",
       "membershipLostNotice": "Nimaš več dostopa do te organizacije. Preklopljeno na {{target}}.",
       "noOrganization": "Ni organizacije",
-      "noOrganizationDescription": "Ta račun ni del organizacije. Ustvari ali se pridruži organizaciji na spletu, da boš lahko uporabljal funkcije organizacije, kot so povabila za člane in opozorila o nizkem stanju.",
-      "openWebOrganizations": "Odpri organizacije na spletu",
+      "noOrganizationDescription": "Ta račun ni del nobene organizacije. Ustvarite jo, da boste lahko uporabljali funkcije organizacije, kot so povabila članov in opozorila o nizkem stanju, ali odprite splet in se pridružite organizaciji, v katero ste bili povabljeni.",
       "organizationUnavailable": "Organizacija ni na voljo.",
       "selectDescriptionWithOrganizations": "Pripadaš eni ali več organizacijam. Izberi račun, ki naj ga ta zaslon uporablja.",
       "selectOrganization": "Izberi organizacijo",
       "unavailableDescription": "Ta organizacija ni več na voljo. Za nadaljevanje na svojem profilu izberi drugo.",
       "unavailableSessionsDescription": "Ta organizacija ni več na voljo. Njenih sej ni mogoče naložiti.",
       "accessDeniedDescription": "Nimaš dostopa do te organizacije."
+    },
+    "create": {
+      "title": "Ustvari organizacijo",
+      "description": "V organizaciji si z ekipo delite kredite, agente in nastavitve.",
+      "nameLabel": "Ime organizacije",
+      "nameRequired": "Vnesite ime organizacije.",
+      "trialNote": "Ko jo ustvarite, se začne vaš 14-dnevni preizkus načrta Enterprise. Načrte kupite na spletu."
     },
     "creditActivity": {
       "emptyDescription": "Tukaj se sproti prikazujejo nakupi, poraba in prilagoditve kreditov te organizacije.",
@@ -3086,6 +3124,22 @@
       "ownRoleChange": "Svoje vloge ne morete spremeniti.",
       "inviteExpired": "To povabilo je poteklo.",
       "inviteAccepted": "To povabilo je bilo že sprejeto."
+    },
+    "settingsOnWeb": {
+      "title": "Nastavitve organizacije na spletu",
+      "usageDetails": "Podrobnosti porabe",
+      "providersAndModels": "Ponudniki in modeli",
+      "groups": "Skupine",
+      "guardrails": "Varovala",
+      "byok": "Uporaba lastnega ključa",
+      "ssoAndDomain": "SSO in domena",
+      "emailPreferences": "E-poštne nastavitve",
+      "dataCollection": "Zbiranje podatkov",
+      "auditLogs": "Revizijski dnevniki",
+      "requestLogs": "Dnevniki zahtev",
+      "integrations": "Integracije",
+      "subOrganizations": "Podorganizacije",
+      "distributeFunds": "Razdeli sredstva"
     },
     "usageStats": {
       "inputTokens": "Vhodni žetoni",

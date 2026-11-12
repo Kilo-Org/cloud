@@ -2916,6 +2916,38 @@
     "sendFeedback": "Enviar opinião"
   },
   "organization": {
+    "auditLog": {
+      "title": "Registo de auditoria",
+      "permissionDenied": "Só um proprietário, administrador ou gestor de faturação de uma organização com o plano Enterprise pode consultar o respetivo registo de auditoria.",
+      "emptyTitle": "Sem eventos de auditoria",
+      "emptyDescription": "As ações realizadas nesta organização aparecem aqui.",
+      "truncated": "São apresentados os eventos mais recentes."
+    },
+    "billing": {
+      "title": "Faturação",
+      "permissionDenied": "Só o proprietário, um administrador ou um gestor de faturação da organização pode ver a faturação.",
+      "subscription": "Subscrição",
+      "state": "Estado",
+      "stateNone": "Sem subscrição",
+      "statePastDue": "Pagamento em atraso",
+      "stateCancelsOn": "Cancela a {{date}}",
+      "stateCancelsAtPeriodEnd": "Cancela no fim do período",
+      "stateTrialEndsOn": "O período experimental termina a {{date}}",
+      "stateTrialing": "Período experimental",
+      "stateRenewsOn": "Renova a {{date}}",
+      "scheduledChange": "Alteração agendada",
+      "seatsDropTo": "Desce para {{seats}} lugares a {{date}}",
+      "seats": "Lugares",
+      "autoTopUp": "Carregamento automático",
+      "autoTopUpAmount": "Valor do carregamento",
+      "autoTopUpThreshold": "Quando o saldo for inferior a",
+      "manageOnWeb": "As alterações são feitas na web",
+      "changePlan": "Alterar plano",
+      "buySeats": "Comprar lugares",
+      "setupAutoTopUp": "Configurar carregamento automático",
+      "webAddress": "Endereço web {{url}}",
+      "opensOnWeb": "Abre na web"
+    },
     "boundary": {
       "backToProfile": "Voltar ao perfil",
       "loadErrorMessage": "Verifica a tua ligação e tenta novamente.",
@@ -2923,14 +2955,20 @@
       "loadErrorTitle": "Não foi possível carregar as suas organizações.",
       "membershipLostNotice": "Já não tem acesso a esta organização. Mudou para {{target}}.",
       "noOrganization": "Sem organização",
-      "noOrganizationDescription": "Esta conta não faz parte de uma organização. Crie ou ingresse em uma organização na web para usar recursos de organização como convites de membros e alertas de saldo baixo.",
-      "openWebOrganizations": "Abrir organizações na web",
+      "noOrganizationDescription": "Esta conta não faz parte de uma organização. Crie uma para utilizar funcionalidades de organização, como convites de membros e alertas de saldo baixo, ou abra a Web para aderir a uma organização para a qual foi convidado.",
       "organizationUnavailable": "A organização não está disponível.",
       "selectDescriptionWithOrganizations": "Você pertence a uma ou mais organizações. Escolha a conta que esta tela deve usar.",
       "selectOrganization": "Selecionar uma organização",
       "unavailableDescription": "Esta organização já não está disponível. Escolha outra no seu perfil para continuar.",
       "unavailableSessionsDescription": "Esta organização já não está disponível. Não é possível carregar as suas sessões.",
       "accessDeniedDescription": "Não tem acesso a esta organização."
+    },
+    "create": {
+      "title": "Criar organização",
+      "description": "Uma organização partilha créditos, agentes e definições com a sua equipa.",
+      "nameLabel": "Nome da organização",
+      "nameRequired": "Introduza um nome para a organização.",
+      "trialNote": "O seu período experimental Enterprise de 14 dias começa quando a criar. Os planos são adquiridos na Web."
     },
     "creditActivity": {
       "emptyDescription": "As compras, a utilização e os ajustes de créditos desta organização aparecem aqui à medida que ocorrem.",
@@ -3039,6 +3077,22 @@
       "ownRoleChange": "Você não pode alterar sua própria função.",
       "inviteExpired": "Este convite expirou.",
       "inviteAccepted": "Este convite já foi aceito."
+    },
+    "settingsOnWeb": {
+      "title": "Definições da organização na Web",
+      "usageDetails": "Detalhes de utilização",
+      "providersAndModels": "Fornecedores e modelos",
+      "groups": "Grupos",
+      "guardrails": "Salvaguardas",
+      "byok": "Utilize a sua própria chave",
+      "ssoAndDomain": "SSO e domínio",
+      "emailPreferences": "Preferências de e-mail",
+      "dataCollection": "Recolha de dados",
+      "auditLogs": "Registos de auditoria",
+      "requestLogs": "Registos de pedidos",
+      "integrations": "Integrações",
+      "subOrganizations": "Suborganizações",
+      "distributeFunds": "Distribuir fundos"
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",

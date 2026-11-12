@@ -2857,6 +2857,38 @@
     "sendFeedback": "Fi èsì ránṣẹ́"
   },
   "organization": {
+    "auditLog": {
+      "title": "Àkọsílẹ̀ àyẹ̀wò",
+      "permissionDenied": "Olùní àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nínú ètò Enterprise nìkan ló lè ka àkọsílẹ̀ àyẹ̀wò rẹ̀.",
+      "emptyTitle": "Kò sí ìṣẹ̀lẹ̀ àyẹ̀wò",
+      "emptyDescription": "Àwọn ìgbésẹ̀ tí a gbé nínú àjọ yìí yóò hàn níbí.",
+      "truncated": "À ń fi àwọn ìṣẹ̀lẹ̀ tuntun jùlọ hàn."
+    },
+    "billing": {
+      "title": "Ìsanwó",
+      "permissionDenied": "Ẹni tó ni àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nìkan ló lè rí ìsanwó àjọ náà.",
+      "subscription": "Ìforúkọsílẹ̀",
+      "state": "Ipò",
+      "stateNone": "Kò sí ìforúkọsílẹ̀",
+      "statePastDue": "Ó ti kọjá ọjọ́ ìsanwó",
+      "stateCancelsOn": "Yóò dópin ní {{date}}",
+      "stateCancelsAtPeriodEnd": "Yóò dópin ní òpin sáà yìí",
+      "stateTrialEndsOn": "Ìdánwò yóò parí ní {{date}}",
+      "stateTrialing": "Ìdánwò",
+      "stateRenewsOn": "Yóò sọdọ̀tun ní {{date}}",
+      "scheduledChange": "Àyípadà tí a ṣètò",
+      "seatsDropTo": "Yóò dín kù sí ààyè {{seats}} ní {{date}}",
+      "seats": "Àwọn ààyè",
+      "autoTopUp": "Ìfikún owó aládàáṣe",
+      "autoTopUpAmount": "Iye ìfikún",
+      "autoTopUpThreshold": "Tí owó tó kù bá dín sí",
+      "manageOnWeb": "Orí wẹ́ẹ̀bù ni a ti ń ṣe àyípadà",
+      "changePlan": "Yí ètò padà",
+      "buySeats": "Ra ààyè",
+      "setupAutoTopUp": "Ṣètò ìfikún owó aládàáṣe",
+      "webAddress": "Àdírẹ́sì wẹ́ẹ̀bù {{url}}",
+      "opensOnWeb": "Yóò ṣí lórí wẹ́ẹ̀bù"
+    },
     "boundary": {
       "backToProfile": "Padà sí prófáìlì",
       "loadErrorMessage": "Ṣàyẹ̀wò ìsopọ̀ rẹ kí o tún gbìyànjú.",
@@ -2864,14 +2896,20 @@
       "loadErrorTitle": "A kò lè gbé àwọn àjọ rẹ wọlé.",
       "membershipLostNotice": "O kò ní àṣẹ láti wọ àjọ yìí mọ́. A ti yí padà sí {{target}}.",
       "noOrganization": "Kò sí àjọ",
-      "noOrganizationDescription": "Àkọọ́lẹ̀ yìí kì í ṣe apá kan àjọ. Ṣẹ̀dá tàbí dara pọ̀ mọ́ àjọ kan lórí wẹ́ẹ̀bù láti lo àwọn ẹ̀yà àjọ bíi ìpè àwọn ọmọ ẹgbẹ́ àti ìkìlọ̀ nípa ìyọkù tó kéré.",
-      "openWebOrganizations": "Ṣí àwọn àjọ lórí wẹ́ẹ̀bù",
+      "noOrganizationDescription": "Àkáǹtì yìí kò sí nínú àjọ kankan. Ṣẹ̀dá ọ̀kan láti lo àwọn ẹ̀yà àjọ bíi ìpè ọmọ ẹgbẹ́ àti ìkìlọ̀ owó tó kéré, tàbí ṣí wẹ́ẹ̀bù láti darapọ̀ mọ́ èyí tí wọ́n pè ọ́ sí.",
       "organizationUnavailable": "Àjọ náà kò sí lárọ̀ọ́wọ́tó.",
       "selectDescriptionWithOrganizations": "O jẹ́ ti àjọ kan tàbí jù bẹ́ẹ̀ lọ. Yan àkọọ́lẹ̀ tí ojú-ìwé yìí yẹ kí ó lò.",
       "selectOrganization": "Yan àjọ kan",
       "unavailableDescription": "Àjọ yìí kò sí mọ́. Yan ọ̀kan láti prófáìlì rẹ láti tẹ̀síwájú.",
       "unavailableSessionsDescription": "Àjọ yìí kò sí mọ́. Àwọn sẹ́sín rẹ̀ kò lè jẹ́ gbígba wọlé.",
       "accessDeniedDescription": "O kò ní àṣẹ láti wọ àjọ yìí."
+    },
+    "create": {
+      "title": "Ṣẹ̀dá àjọ",
+      "description": "Àjọ kan máa ń pín kírẹ́dìtì, àwọn aṣojú àti ààtò pẹ̀lú ẹgbẹ́ rẹ.",
+      "nameLabel": "Orúkọ àjọ",
+      "nameRequired": "Tẹ orúkọ àjọ kan sí i.",
+      "trialNote": "Ìdánwò Enterprise ọlọ́jọ́ 14 rẹ yóò bẹ̀rẹ̀ nígbà tí o bá ṣẹ̀dá rẹ̀. Orí wẹ́ẹ̀bù ni a ti ń ra àwọn ètò."
     },
     "creditActivity": {
       "emptyDescription": "Àwọn ìrà, lílo àti àtúnṣe kirẹ́dítì àjọ yìí yóò hàn níbí bí wọ́n ṣe ń ṣẹlẹ̀.",
@@ -2980,6 +3018,22 @@
       "ownRoleChange": "O kò lè yí ipò tirẹ padà.",
       "inviteExpired": "Ìkésíni yìí ti parí.",
       "inviteAccepted": "A ti gba ìkésíni yìí."
+    },
+    "settingsOnWeb": {
+      "title": "Ààtò àjọ lórí wẹ́ẹ̀bù",
+      "usageDetails": "Àlàyé ìlò",
+      "providersAndModels": "Àwọn olùpèsè àti àwòṣe",
+      "groups": "Àwọn ẹgbẹ́",
+      "guardrails": "Àwọn ààlà ààbò",
+      "byok": "Lo kọ́kọ́rọ́ tìrẹ",
+      "ssoAndDomain": "SSO àti dómèènì",
+      "emailPreferences": "Ààyò ímeèlì",
+      "dataCollection": "Gbígba dátà",
+      "auditLogs": "Àwọn àkọsílẹ̀ àyẹ̀wò",
+      "requestLogs": "Àwọn àkọsílẹ̀ ìbéèrè",
+      "integrations": "Àwọn ìsopọ̀",
+      "subOrganizations": "Àwọn àjọ abẹ́lé",
+      "distributeFunds": "Pín owó"
     },
     "usageStats": {
       "inputTokens": "Àwọn ìpín ọ̀rọ̀ ìgbéwọlé",

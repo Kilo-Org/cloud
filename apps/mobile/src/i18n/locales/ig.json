@@ -2857,6 +2857,38 @@
     "sendFeedback": "Ziga nzaghachi"
   },
   "organization": {
+    "auditLog": {
+      "title": "Ndekọ nyocha",
+      "permissionDenied": "Naanị onye nwe òtù, onye nchịkwa ma ọ bụ onye na-ahụ maka ịkwụ ụgwọ n'atụmatụ Enterprise nwere ike ịgụ ndekọ nyocha ya.",
+      "emptyTitle": "Enweghị ihe omume nyocha",
+      "emptyDescription": "Ihe a na-eme n'òtù a na-apụta ebe a.",
+      "truncated": "Na-egosi ihe omume kachasị ọhụrụ."
+    },
+    "billing": {
+      "title": "Ịkwụ ụgwọ",
+      "permissionDenied": "Ọ bụ naanị onye nwe òtù, onye nchịkwa ma ọ bụ onye na-ahụ maka ịkwụ ụgwọ nwere ike ịhụ ihe gbasara ịkwụ ụgwọ ya.",
+      "subscription": "Ndenye aha",
+      "state": "Ọnọdụ",
+      "stateNone": "Enweghị ndenye aha",
+      "statePastDue": "Ụgwọ agafeela oge",
+      "stateCancelsOn": "Ga-akwụsị na {{date}}",
+      "stateCancelsAtPeriodEnd": "Ga-akwụsị na njedebe oge a",
+      "stateTrialEndsOn": "Nnwale ga-agwụ na {{date}}",
+      "stateTrialing": "Nnwale",
+      "stateRenewsOn": "Ga-emegharị ọhụrụ na {{date}}",
+      "scheduledChange": "Mgbanwe a haziri",
+      "seatsDropTo": "Ga-agbada na oghere {{seats}} na {{date}}",
+      "seats": "Oghere",
+      "autoTopUp": "Mgbakwunye akpaaka",
+      "autoTopUpAmount": "Ego mgbakwunye",
+      "autoTopUpThreshold": "Mgbe ego fọdụrụ dara n'okpuru",
+      "manageOnWeb": "A na-eme mgbanwe na weebụ",
+      "changePlan": "Gbanwee atụmatụ",
+      "buySeats": "Zụta oghere",
+      "setupAutoTopUp": "Hazie mgbakwunye akpaaka",
+      "webAddress": "Adreesị weebụ {{url}}",
+      "opensOnWeb": "Na-emepe na weebụ"
+    },
     "boundary": {
       "backToProfile": "Laghachi na profaịlụ",
       "loadErrorMessage": "Lelee njikọ gị ma nwaa ọzọ.",
@@ -2864,14 +2896,20 @@
       "loadErrorTitle": "Enweghị ike ibudata ụlọ ọrụ gị.",
       "membershipLostNotice": "Ị nweghịzi ikike ịbanye n'ụlọ ọrụ a. A gbanwere gaa na {{target}}.",
       "noOrganization": "Enweghị ụlọ ọrụ",
-      "noOrganizationDescription": "Akaụntụ a esonyeghị na ụlọ ọrụ. Mepụta ma ọ bụ sonye na ụlọ ọrụ na webụ iji jiri atụmatụ ụlọ ọrụ dị ka ịkpọ ndị otu oku na ịdọ aka ná ntị gbasara obere ego n'akaụntụ.",
-      "openWebOrganizations": "Mepee ụlọ ọrụ na webụ",
+      "noOrganizationDescription": "Akaụntụ a esoghị n'òtù ọ bụla. Mepụta otu iji jiri njirimara òtù dịka ịkpọ ndị otu na ọkwa mgbe ego fọdụrụ dị ala, ma ọ bụ mepee weebụ ka ị banye n'òtù a kpọrọ gị.",
       "organizationUnavailable": "Ụlọ ọrụ adịghị.",
       "selectDescriptionWithOrganizations": "Ị so n'otu ụlọ ọrụ ma ọ bụ karịa. Họrọ akaụntụ nke ihuenyo a kwesịrị iji.",
       "selectOrganization": "Họrọ ụlọ ọrụ",
       "unavailableDescription": "Ụlọ ọrụ a adịkwaghị. Họrọ otu site na profaịlụ gị ka ị gaa n'ihu.",
       "unavailableSessionsDescription": "Ụlọ ọrụ a adịkwaghị. Enweghị ike ibudata nnọkọ ya.",
       "accessDeniedDescription": "Ị nweghị ikike ịbanye n'ụlọ ọrụ a."
+    },
+    "create": {
+      "title": "Mepụta òtù",
+      "description": "Òtù na-ekerịta kredit, agent na ntọala ya na ndị otu gị.",
+      "nameLabel": "Aha òtù",
+      "nameRequired": "Tinye aha òtù.",
+      "trialNote": "Nnwale Enterprise gị nke ụbọchị 14 na-amalite mgbe ị mepụtara ya. A na-azụ atụmatụ na weebụ."
     },
     "creditActivity": {
       "emptyDescription": "Ịzụta ego ojiji, iji ya eme ihe, na mgbanwe e mere na ya maka ụlọ ọrụ a ga-apụta ebe a.",
@@ -2980,6 +3018,22 @@
       "ownRoleChange": "Ị nweghị ike ịgbanwe ọrụ gị.",
       "inviteExpired": "Òkù a agwụla.",
       "inviteAccepted": "A nakweelarị òkù a."
+    },
+    "settingsOnWeb": {
+      "title": "Ntọala òtù na weebụ",
+      "usageDetails": "Nkọwa ojiji",
+      "providersAndModels": "Ndị na-enye ọrụ na model",
+      "groups": "Ìgwè",
+      "guardrails": "Mgbochi nchekwa",
+      "byok": "Jiri igodo nke gị",
+      "ssoAndDomain": "SSO na domain",
+      "emailPreferences": "Mmasị email",
+      "dataCollection": "Nchịkọta data",
+      "auditLogs": "Ndekọ nyocha",
+      "requestLogs": "Ndekọ arịrịọ",
+      "integrations": "Njikọ",
+      "subOrganizations": "Òtù ndị dị n'okpuru",
+      "distributeFunds": "Kesaa ego"
     },
     "usageStats": {
       "inputTokens": "Tokin ntinye",

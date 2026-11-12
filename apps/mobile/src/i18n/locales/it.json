@@ -2902,6 +2902,38 @@
     }
   },
   "organization": {
+    "auditLog": {
+      "title": "Registro di controllo",
+      "permissionDenied": "Solo un proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione con piano Enterprise può consultare il registro di controllo.",
+      "emptyTitle": "Nessun evento di controllo",
+      "emptyDescription": "Qui compaiono le azioni eseguite in questa organizzazione.",
+      "truncated": "Vengono mostrati gli eventi più recenti."
+    },
+    "billing": {
+      "title": "Fatturazione",
+      "permissionDenied": "Solo il proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione può visualizzarne la fatturazione.",
+      "subscription": "Abbonamento",
+      "state": "Stato",
+      "stateNone": "Nessun abbonamento",
+      "statePastDue": "Pagamento scaduto",
+      "stateCancelsOn": "Termina il {{date}}",
+      "stateCancelsAtPeriodEnd": "Termina alla fine del periodo",
+      "stateTrialEndsOn": "La prova termina il {{date}}",
+      "stateTrialing": "Prova",
+      "stateRenewsOn": "Si rinnova il {{date}}",
+      "scheduledChange": "Modifica programmata",
+      "seatsDropTo": "Scende a {{seats}} posti il {{date}}",
+      "seats": "Posti",
+      "autoTopUp": "Ricarica automatica",
+      "autoTopUpAmount": "Importo ricarica",
+      "autoTopUpThreshold": "Quando il saldo scende sotto",
+      "manageOnWeb": "Le modifiche si effettuano sul web",
+      "changePlan": "Cambia piano",
+      "buySeats": "Acquista posti",
+      "setupAutoTopUp": "Configura la ricarica automatica",
+      "webAddress": "Indirizzo web {{url}}",
+      "opensOnWeb": "Si apre sul web"
+    },
     "boundary": {
       "backToProfile": "Torna al profilo",
       "loadErrorMessage": "Controlla la connessione e riprova.",
@@ -2909,14 +2941,20 @@
       "loadErrorTitle": "Impossibile caricare le tue organizzazioni.",
       "membershipLostNotice": "Non hai più accesso a questa organizzazione. Passato a {{target}}.",
       "noOrganization": "Nessuna organizzazione",
-      "noOrganizationDescription": "Questo account non fa parte di un'organizzazione. Crea o unisciti a un'organizzazione sul web per usare le funzioni dell'organizzazione come gli inviti dei membri e gli avvisi di saldo basso.",
-      "openWebOrganizations": "Apri le organizzazioni sul web",
+      "noOrganizationDescription": "Questo account non fa parte di un'organizzazione. Creane una per usare funzioni come gli inviti ai membri e gli avvisi di saldo basso, oppure apri il web per unirti a un'organizzazione a cui sei stato invitato.",
       "organizationUnavailable": "L'organizzazione non è disponibile.",
       "selectDescriptionWithOrganizations": "Appartieni a una o più organizzazioni. Scegli l'account che questa schermata deve usare.",
       "selectOrganization": "Seleziona un'organizzazione",
       "unavailableDescription": "Questa organizzazione non è più disponibile. Scegline una dal tuo profilo per continuare.",
       "unavailableSessionsDescription": "Questa organizzazione non è più disponibile. Non è possibile caricare le sue sessioni.",
       "accessDeniedDescription": "Non hai accesso a questa organizzazione."
+    },
+    "create": {
+      "title": "Crea organizzazione",
+      "description": "Un'organizzazione condivide crediti, agenti e impostazioni con il tuo team.",
+      "nameLabel": "Nome dell'organizzazione",
+      "nameRequired": "Inserisci un nome per l'organizzazione.",
+      "trialNote": "La prova Enterprise di 14 giorni inizia quando crei l'organizzazione. I piani si acquistano sul web."
     },
     "creditActivity": {
       "emptyDescription": "Qui vedrai gli acquisti, i consumi e le rettifiche dei crediti dell'organizzazione man mano che avvengono.",
@@ -3038,6 +3076,22 @@
       "ownRoleChange": "Non puoi modificare il tuo ruolo.",
       "inviteExpired": "Questo invito è scaduto.",
       "inviteAccepted": "Questo invito è già stato accettato."
+    },
+    "settingsOnWeb": {
+      "title": "Impostazioni dell'organizzazione sul web",
+      "usageDetails": "Dettagli di utilizzo",
+      "providersAndModels": "Provider e modelli",
+      "groups": "Gruppi",
+      "guardrails": "Guardrail",
+      "byok": "Usa la tua chiave",
+      "ssoAndDomain": "SSO e dominio",
+      "emailPreferences": "Preferenze email",
+      "dataCollection": "Raccolta dati",
+      "auditLogs": "Registri di controllo",
+      "requestLogs": "Registri delle richieste",
+      "integrations": "Integrazioni",
+      "subOrganizations": "Sotto-organizzazioni",
+      "distributeFunds": "Distribuisci fondi"
     },
     "usageStats": {
       "inputTokens": "Token in ingresso",

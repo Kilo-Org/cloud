@@ -2910,6 +2910,38 @@
     "sendFeedback": "Trimite păreri"
   },
   "organization": {
+    "auditLog": {
+      "title": "Jurnal de audit",
+      "permissionDenied": "Jurnalul de audit poate fi citit doar de proprietarul, un administrator sau un manager de facturare al organizației, pe planul Enterprise.",
+      "emptyTitle": "Niciun eveniment de audit",
+      "emptyDescription": "Acțiunile efectuate în această organizație apar aici.",
+      "truncated": "Se afișează cele mai recente evenimente."
+    },
+    "billing": {
+      "title": "Facturare",
+      "permissionDenied": "Doar proprietarii, administratorii sau managerii de facturare ai organizației pot vedea facturarea acesteia.",
+      "subscription": "Abonament",
+      "state": "Stare",
+      "stateNone": "Fără abonament",
+      "statePastDue": "Plată restantă",
+      "stateCancelsOn": "Se anulează pe {{date}}",
+      "stateCancelsAtPeriodEnd": "Se anulează la sfârșitul perioadei",
+      "stateTrialEndsOn": "Perioada de probă se încheie pe {{date}}",
+      "stateTrialing": "Perioadă de probă",
+      "stateRenewsOn": "Se reînnoiește pe {{date}}",
+      "scheduledChange": "Modificare programată",
+      "seatsDropTo": "Numărul de locuri scade la {{seats}} pe {{date}}",
+      "seats": "Locuri",
+      "autoTopUp": "Reîncărcare automată",
+      "autoTopUpAmount": "Suma reîncărcării",
+      "autoTopUpThreshold": "Când soldul scade sub",
+      "manageOnWeb": "Modificările se fac pe web",
+      "changePlan": "Schimbă planul",
+      "buySeats": "Cumpără locuri",
+      "setupAutoTopUp": "Configurează reîncărcarea automată",
+      "webAddress": "Adresă web {{url}}",
+      "opensOnWeb": "Se deschide pe web"
+    },
     "boundary": {
       "backToProfile": "Înapoi la profil",
       "loadErrorMessage": "Verifică conexiunea și încearcă din nou.",
@@ -2917,14 +2949,20 @@
       "loadErrorTitle": "Nu s-au putut încărca organizațiile tale.",
       "membershipLostNotice": "Nu mai ai acces la această organizație. S-a comutat la {{target}}.",
       "noOrganization": "Nicio organizație",
-      "noOrganizationDescription": "Acest cont nu face parte dintr-o organizație. Creează sau alătură-te unei organizații pe site pentru a folosi funcții de organizație precum invitațiile pentru membri și alertele de sold scăzut.",
-      "openWebOrganizations": "Deschide organizațiile pe site",
+      "noOrganizationDescription": "Acest cont nu face parte dintr-o organizație. Creează una pentru a folosi funcții pentru organizații, precum invitarea membrilor și alertele de sold scăzut, sau deschide site-ul web pentru a te alătura unei organizații în care ai fost invitat.",
       "organizationUnavailable": "Organizația nu este disponibilă.",
       "selectDescriptionWithOrganizations": "Aparții unei sau mai multor organizații. Alege contul pe care ar trebui să îl folosească acest ecran.",
       "selectOrganization": "Selectează o organizație",
       "unavailableDescription": "Această organizație nu mai este disponibilă. Alege una din profilul tău pentru a continua.",
       "unavailableSessionsDescription": "Această organizație nu mai este disponibilă. Sesiunile ei nu pot fi încărcate.",
       "accessDeniedDescription": "Nu ai acces la această organizație."
+    },
+    "create": {
+      "title": "Creează o organizație",
+      "description": "O organizație partajează creditele, agenții și setările cu echipa ta.",
+      "nameLabel": "Numele organizației",
+      "nameRequired": "Introdu numele organizației.",
+      "trialNote": "Perioada de probă Enterprise de 14 zile începe când o creezi. Planurile se cumpără pe web."
     },
     "creditActivity": {
       "emptyDescription": "Achizițiile, consumul și ajustările de credite ale acestei organizații vor apărea aici pe măsură ce au loc.",
@@ -3033,6 +3071,22 @@
       "ownRoleChange": "Nu îți poți schimba propriul rol.",
       "inviteExpired": "Această invitație a expirat.",
       "inviteAccepted": "Această invitație a fost deja acceptată."
+    },
+    "settingsOnWeb": {
+      "title": "Setările organizației pe web",
+      "usageDetails": "Detalii de utilizare",
+      "providersAndModels": "Furnizori și modele",
+      "groups": "Grupuri",
+      "guardrails": "Măsuri de protecție",
+      "byok": "Folosește propria cheie",
+      "ssoAndDomain": "SSO și domeniu",
+      "emailPreferences": "Preferințe de e-mail",
+      "dataCollection": "Colectarea datelor",
+      "auditLogs": "Jurnale de audit",
+      "requestLogs": "Jurnale de cereri",
+      "integrations": "Integrări",
+      "subOrganizations": "Suborganizații",
+      "distributeFunds": "Distribuie fonduri"
     },
     "usageStats": {
       "inputTokens": "Tokenuri de intrare",

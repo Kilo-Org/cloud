@@ -1,4 +1,8 @@
-import { KILO_PASS_TITLE, type PurchasePresentationKind } from '@kilocode/app-shared/commerce';
+import {
+  KILO_PASS_TITLE,
+  type PurchasePresentationKind,
+  type PurchaseStatusClass,
+} from '@kilocode/app-shared/commerce';
 import { i18n } from '@/i18n';
 
 type KiloPassSubscriptionCardState = {
@@ -25,7 +29,7 @@ export function getKiloPassSubscriptionCardAccessibility(cardState: KiloPassSubs
 
 /** Derive the profile card solely from the server purchase presentation. */
 export function getKiloPassSubscriptionCardContentState(params: {
-  presentation: { kind: PurchasePresentationKind } | undefined;
+  presentation: { kind: PurchasePresentationKind; statusClass: PurchaseStatusClass } | undefined;
   presentationIsError: boolean;
   presentationIsPending: boolean;
 }): KiloPassSubscriptionCardContentState {
@@ -44,12 +48,23 @@ export function getKiloPassSubscriptionCardContentState(params: {
     return { kind: 'loading' };
   }
   const managedOnWeb = params.presentation.kind === 'web_management';
+  // An ended pass is a different fact from "the store does not sell this here":
+  // the user's subscription lapsed, and the generic line hides that. The stored
+  // ended date and tier stay out of the card, because the presentation carries
+  // neither.
+  const passEnded = !managedOnWeb && params.presentation.statusClass === 'terminal';
   return {
     kind: 'card',
     state: {
       action: managedOnWeb ? 'open-web' : 'open-native',
       actionLabel: managedOnWeb ? i18n.t('kiloPass.manage') : null,
-      description: i18n.t(managedOnWeb ? 'kiloPass.managedOnWeb' : 'kiloPass.purchaseUnavailable'),
+      description: i18n.t(
+        managedOnWeb
+          ? 'kiloPass.managedOnWeb'
+          : passEnded
+            ? 'kiloPass.purchaseUnavailableEnded'
+            : 'kiloPass.purchaseUnavailable'
+      ),
       title: KILO_PASS_TITLE,
     },
   };

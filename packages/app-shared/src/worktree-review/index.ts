@@ -136,18 +136,20 @@ const worktreeReviewComparisonSchema = z
 
 const worktreeReviewScopeSchema = z.enum(['uncommitted', 'against-base-branch']);
 
-const worktreeReviewCaptureSchema = z
-  .object({
-    userId: worktreeReviewIdentitySchema,
-    organizationId: worktreeReviewIdentitySchema.optional(),
-    workspaceScope: worktreeReviewIdentitySchema,
-    sourceCloudAgentSessionId: worktreeReviewIdentitySchema,
-    revision: worktreeReviewRevisionSchema,
-    scope: worktreeReviewScopeSchema.optional(),
-    capturedAt: worktreeReviewCapturedAtSchema,
-    comparison: worktreeReviewComparisonSchema,
-  })
-  .strict();
+const worktreeReviewCaptureSchema = z.object({
+  userId: worktreeReviewIdentitySchema,
+  organizationId: worktreeReviewIdentitySchema.optional(),
+  workspaceScope: worktreeReviewIdentitySchema,
+  sourceCloudAgentSessionId: worktreeReviewIdentitySchema,
+  revision: worktreeReviewRevisionSchema,
+  scope: worktreeReviewScopeSchema.optional(),
+  capturedAt: worktreeReviewCapturedAtSchema,
+  comparison: worktreeReviewComparisonSchema,
+});
+// Unknown keys are ignored rather than rejected: a capture is routinely built
+// by spreading a session snapshot, which also carries the file list and the
+// truncation flag. The web review accepted those captures before this module
+// was shared, and every field it reads is still validated here.
 
 /** A repository-relative path: no empty, `.` or `..` segment, no NUL. */
 const worktreeReviewPathSchema = z
@@ -377,7 +379,15 @@ export function cloneWorktreeReviewAnchor(anchor: WorktreeReviewAnchor): Worktre
 
 export function cloneWorktreeReviewCapture(capture: WorktreeReviewCapture): WorktreeReviewCapture {
   return {
-    ...capture,
+    // The known fields only: a caller may pass a snapshot-shaped capture, and
+    // its extra keys must not reach the stored comment or the review message.
+    userId: capture.userId,
+    organizationId: capture.organizationId,
+    workspaceScope: capture.workspaceScope,
+    sourceCloudAgentSessionId: capture.sourceCloudAgentSessionId,
+    revision: capture.revision,
+    ...(capture.scope === undefined ? {} : { scope: capture.scope }),
+    capturedAt: capture.capturedAt,
     comparison: {
       ...capture.comparison,
       ...(capture.comparison.baseRefFallback

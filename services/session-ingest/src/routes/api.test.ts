@@ -1303,7 +1303,7 @@ describe('api routes', () => {
       }
     );
 
-    it('stages an empty body by value', async () => {
+    it('answers a declared zero-length body with a no-op that writes nothing', async () => {
       const { app, ingest } = prepareIngestRoute();
       const env = directIngestEnv();
       const info = vi.spyOn(console, 'info').mockImplementation(() => {});
@@ -1315,14 +1315,47 @@ describe('api routes', () => {
       const response = await app.fetch(request, env);
 
       expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ success: true });
       expect(ingest).not.toHaveBeenCalled();
-      expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
-      expect(env.SESSION_INGEST_R2.put.mock.calls[0][1]).toBeInstanceOf(Uint8Array);
+      expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
+      expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
       expect(info).toHaveBeenCalledWith(
-        expect.objectContaining({ event: 'direct_ingest_legacy', reason: 'empty_body' })
+        expect.objectContaining({
+          event: 'direct_ingest_noop',
+          reason: 'empty_body',
+          declaredBytes: 0,
+        })
       );
       info.mockRestore();
     });
+
+    it.each([
+      ['malformed JSON', '{"data":[{"type":"message","data":{"id":"msg_1"}},broken'],
+      ['unterminated object', '{"data":['],
+    ] as const)(
+      'answers a buffered legacy body the format cannot parse with a client error',
+      async (_name, body) => {
+        const { app, ingest } = prepareIngestRoute();
+        const env = makeTestEnv();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        const response = await app.fetch(ingestRequest(body), env);
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ success: false, error: 'malformed_json' });
+        expect(ingest).not.toHaveBeenCalled();
+        expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
+        expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            event: 'direct_ingest_parse_reject',
+            reason: 'gate_percent',
+            declaredBytes: new TextEncoder().encode(body).byteLength,
+          })
+        );
+        warn.mockRestore();
+      }
+    );
 
     it.each([
       ['declared over cap', '4194305'],
@@ -4024,6 +4057,48 @@ describe('api routes', () => {
       );
       expect(badBody.status).toBe(400);
     });
+
+    it('returns 400 for a title over 200 characters', async () => {
+      vi.mocked(resolveAccessibleKiloSession).mockResolvedValueOnce({
+        kind: 'owned',
+      } as never);
+      const notifySessionRenamed = vi.fn(async () => ({ delivered: true }));
+      vi.mocked(getUserConnectionDO).mockReturnValue({ notifySessionRenamed } as never);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/rename-notify`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'x'.repeat(201) }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(400);
+      expect(notifySessionRenamed).not.toHaveBeenCalled();
+    });
+
+    it('bounds the body the route parses', async () => {
+      vi.mocked(resolveAccessibleKiloSession).mockResolvedValueOnce({
+        kind: 'owned',
+      } as never);
+      const notifySessionRenamed = vi.fn(async () => ({ delivered: true }));
+      vi.mocked(getUserConnectionDO).mockReturnValue({ notifySessionRenamed } as never);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/rename-notify`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'x'.repeat(2000) }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(413);
+      expect(notifySessionRenamed).not.toHaveBeenCalled();
+    });
   });
 
   describe('POST /session/:sessionId/title', () => {
@@ -4093,6 +4168,24 @@ describe('api routes', () => {
           }),
         })
       );
+    });
+
+    it('bounds the body the route parses', async () => {
+      const { db } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request(`http://local/session/${sessionId}/title`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: 'x'.repeat(2000), generated: true }),
+        }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(413);
+      expect(notifyUserSessionEvent).not.toHaveBeenCalled();
     });
 
     it('generated applies over a default-pattern title', async () => {

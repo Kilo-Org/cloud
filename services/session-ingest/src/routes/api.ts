@@ -39,7 +39,11 @@ import { getSessionExport } from '../services/session-export';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { handleDirectIngestRequest } from '../ingest/direct-ingest';
 import { resolveAccessibleKiloSession } from '../services/session-access';
-import { applyReportedSessionTitle, reportSessionTitleSchema } from '../services/session-title';
+import {
+  applyReportedSessionTitle,
+  reportSessionTitleSchema,
+  sessionTitleSchema,
+} from '../services/session-title';
 import { signSessionShareToken } from '../services/session-share-token';
 import { canCreateCliSessionForUser } from '../services/user-session-admission';
 import { isWorktreeSessionDeleting } from '../services/worktree-deletion';
@@ -1077,7 +1081,7 @@ api.post('/session/:sessionId/unshare', async c => {
   return c.json({ success: true }, 200);
 });
 
-api.post('/session/:sessionId/rename-notify', async c => {
+api.post('/session/:sessionId/rename-notify', bodyLimit({ maxSize: 1024 }), async c => {
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {
@@ -1085,7 +1089,7 @@ api.post('/session/:sessionId/rename-notify', async c => {
   }
 
   const bodyParse = z
-    .object({ title: z.string().trim().min(1) })
+    .object({ title: sessionTitleSchema })
     .safeParse(await c.req.json().catch(() => null));
   if (!bodyParse.success) {
     return c.json({ success: false, error: 'Invalid body', issues: bodyParse.error.issues }, 400);
@@ -1105,7 +1109,7 @@ api.post('/session/:sessionId/rename-notify', async c => {
   return c.json({ delivered }, 200);
 });
 
-api.post('/session/:sessionId/title', async c => {
+api.post('/session/:sessionId/title', bodyLimit({ maxSize: 1024 }), async c => {
   const rawSessionId = c.req.param('sessionId');
   const parsed = sessionIdSchema.safeParse(rawSessionId);
   if (!parsed.success) {

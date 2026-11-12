@@ -71,7 +71,7 @@ const unreported: HeaderPillContent = {
 
 /**
  * The same pill while the session still resolves: nothing paints, and the
- * reserved box around the pill still holds the row's width.
+ * accessibility label says a cost is coming.
  */
 const unreportedWhileLoading: HeaderPillContent = {
   ...unreported,

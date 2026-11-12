@@ -1,14 +1,9 @@
-/* eslint-disable max-lines -- one case per pill state: permission controls, the reserved box and the hugging content share these render helpers. */
+/* eslint-disable max-lines -- one case per pill state: permission controls, the hidden pill and the reading share these render helpers. */
 import { describe, expect, it, vi } from 'vitest';
 
-import { i18n } from '@/i18n';
-import { formatPercent } from '@/lib/format';
-
-import { formatSessionCostBadge } from './session-list-helpers';
-import { WIDEST_COST_MICRODOLLARS, WIDEST_PERCENTAGE_VALUE } from './session-context-metrics';
 import {
   classNameOf,
-  expectHiddenReservedBox,
+  expectHiddenPill,
   findAll,
   info,
   PILL_LAYOUT_TOKENS,
@@ -51,7 +46,7 @@ describe('SessionContextMetrics', () => {
 
   // The header control is the only way to the session's permission settings,
   // so it must register a tap while the page is still loading instead of
-  // rendering a dead, invisible reserved box.
+  // rendering a dead, invisible control.
   it('keeps the context control tappable while the session page loads', () => {
     const onPress = vi.fn<() => void>();
     const root = render({
@@ -92,7 +87,7 @@ describe('SessionContextMetrics', () => {
 
   // Usage and permission controls are both still unknown while a session
   // opens (or after a failed open), but the parent can still open the sheet,
-  // so the control must register a tap instead of a dead reserved box.
+  // so the control must register a tap instead of a dead control.
   it('keeps the context control tappable with no usage and no permission controls', () => {
     const onPress = vi.fn<() => void>();
     const root = render({
@@ -113,7 +108,7 @@ describe('SessionContextMetrics', () => {
   });
 
   it('does not expose permission controls while the session is loading and no sheet can open', () => {
-    expectHiddenReservedBox(
+    expectHiddenPill(
       render({
         info: undefined,
         totalCostMicrodollars: null,
@@ -124,7 +119,7 @@ describe('SessionContextMetrics', () => {
   });
 
   it('empty session is invisible and a11y-hidden', () => {
-    expectHiddenReservedBox(
+    expectHiddenPill(
       render({
         info: undefined,
         totalCostMicrodollars: null,
@@ -134,7 +129,7 @@ describe('SessionContextMetrics', () => {
   });
 
   it('empty session with a cost stays fully hidden', () => {
-    expectHiddenReservedBox(
+    expectHiddenPill(
       render({
         info: undefined,
         totalCostMicrodollars: 150_000,
@@ -143,8 +138,8 @@ describe('SessionContextMetrics', () => {
     );
   });
 
-  it('loading keeps the reserved invisible box', () => {
-    expectHiddenReservedBox(
+  it('loading keeps the pill hidden', () => {
+    expectHiddenPill(
       render({
         loading: true,
         hasMessages: true,
@@ -155,7 +150,7 @@ describe('SessionContextMetrics', () => {
   });
 
   it('loading wins over missing messages', () => {
-    expectHiddenReservedBox(
+    expectHiddenPill(
       render({
         loading: true,
         hasMessages: false,
@@ -226,8 +221,7 @@ describe('SessionContextMetrics', () => {
   });
 
   // The header caps the trailing cluster, and RN's flexShrink is 0 by default,
-  // so the pill, its reading and the box around it must all opt in or they
-  // paint off-screen.
+  // so the pill and its reading must all opt in or they paint off-screen.
   it('lets the pill and its reading compress inside a constrained header row', () => {
     const root = render({
       hasMessages: true,
@@ -237,10 +231,9 @@ describe('SessionContextMetrics', () => {
     });
     expect(classNameOf(root)).toContain('min-w-0');
     expect(classNameOf(root)).toContain('shrink');
-    expect(classNameOf(root)).toContain('items-end');
     const pill = pillOf(root);
     const runs = findAll(pill, el => propsOf(el).numberOfLines === 1);
-    expect(runs).toHaveLength(1);
+    expect(runs).toHaveLength(2);
     for (const run of runs) {
       expect(classNameOf(run)).toContain('shrink');
       expect(classNameOf(run)).toContain('min-w-0');
@@ -255,38 +248,35 @@ describe('SessionContextMetrics', () => {
     const pill = pillOf(root);
     expect(propsOf(pill).className ?? '').not.toContain('opacity-0');
     expect(propsOf(pill).accessibilityElementsHidden).toBeUndefined();
-    // Nothing paints beside the ring: the value run is absent from the pill, and
-    // the reserved copy that holds its width lives in the sibling box.
+    // Nothing paints beside the ring: a value that has not arrived is not a
+    // value, so no text holds a dash in its place.
     expect(findAll(pill, el => el.type === 'ContextUsageRing')).toHaveLength(1);
     expect(findAll(pill, el => el.type === 'Text')).toHaveLength(0);
   });
 
-  // The reserve is a zero-height copy of the widest reading the pill can show, so
-  // the box keeps one width while the pill paints only what arrived.
-  it('reserves the widest reading without painting it', () => {
+  // The pill hugs what it holds: the header's trailing cluster ends with the
+  // Follow control, so a reading that arrives widens the pill instead of moving
+  // that control. The reading itself is two texts with one small gap.
+  it('paints the percentage and the cost as two texts with one gap', () => {
     const root = render({
       hasMessages: true,
       info: info(),
       totalCostMicrodollars: 150_000,
       onPress: vi.fn<() => void>(),
     });
-    const percentageSizer = formatPercent(WIDEST_PERCENTAGE_VALUE, i18n.language);
-    const costSizer = formatSessionCostBadge(WIDEST_COST_MICRODOLLARS);
-    expect(costSizer).not.toBeNull();
-    const reserved = findAll(root, el => classNameOf(el).includes('h-0'));
-    expect(reserved).toHaveLength(1);
-    const reserve = reserved[0] ?? root;
-    expect(classNameOf(reserve)).toContain('overflow-hidden');
-    const runs = findAll(reserve, el => propsOf(el).numberOfLines === 1);
-    expect(runs).toHaveLength(1);
-    expect(classNameOf(runs[0] ?? root)).toContain('opacity-0');
-    expect(findAll(reserve, el => propsOf(el).children === percentageSizer)).toHaveLength(1);
-    expect(findAll(reserve, el => propsOf(el).children === costSizer)).toHaveLength(1);
+    const pill = pillOf(root);
+    const row = findAll(pill, el => classNameOf(el).includes('items-baseline'))[0];
+    expect(row).toBeDefined();
+    expect(classNameOf(row ?? root)).toContain('gap-1');
+    const texts = findAll(pill, el => el.type === 'Text');
+    expect(texts.map(el => propsOf(el).children)).toHaveLength(2);
+    expect(propsOf(texts[0] ?? root).children).toBe('16%');
+    expect(String(propsOf(texts[1] ?? root).children)).toContain('$0.15');
   });
 
   // One silhouette from the first paint: until a value exists the pill paints
   // its ring and nothing else, so a session that settles without usage never
-  // changes shape. The box around it already holds the row the values will take.
+  // grows a value slot beside it.
   it('paints the ring alone until a value exists, while loading and after', () => {
     const onPress = vi.fn<() => void>();
     const bare = (loading = false) =>
@@ -306,25 +296,5 @@ describe('SessionContextMetrics', () => {
     }
     expect(propsOf(pillOf(bare(false))).accessibilityLabel).toContain('usage unavailable');
     expect(propsOf(pillOf(bare(true))).accessibilityLabel ?? '').not.toContain('usage unavailable');
-  });
-
-  // The reserved width is what keeps the header row still, and it is the same in
-  // the loading state as in every settled state.
-  it('reserves the same width while loading as when settled', () => {
-    const onPress = vi.fn<() => void>();
-    const widthOfReserve = (loading: boolean): unknown => {
-      const [reserve] = findAll(
-        render({
-          info: undefined,
-          totalCostMicrodollars: null,
-          hasMessages: false,
-          loading,
-          onPress,
-        }),
-        el => classNameOf(el).includes('h-0')
-      );
-      return reserve === undefined ? undefined : propsOf(reserve).children;
-    };
-    expect(widthOfReserve(true)).toEqual(widthOfReserve(false));
   });
 });

@@ -79,8 +79,7 @@ export type HeaderPillContent = {
    *
    * - `label`: the session's cost, as text.
    * - `loading`: the session is still resolving, so the pill paints nothing and
-   *   the accessibility label says a cost is coming. The reserved box around the
-   *   pill already holds the row's width, so no bar is needed to hold it.
+   *   the accessibility label says a cost is coming.
    * - `unreported`: the session settled without a cost, so nothing will fill
    *   it and the pill paints only the values it has.
    * - `none`: no cost to paint.
@@ -145,9 +144,8 @@ export function getHeaderPillContent({
 
   const costText = hasMessages ? formatSessionCostBadge(totalCostMicrodollars) : null;
   // Nothing has reported usage yet, so the pill paints nothing beside its ring:
-  // a value that has not arrived is not a value, and the reserved box around the
-  // pill already keeps the header row still until one does. The pill therefore
-  // has one silhouette from its first paint, whichever state it settles into.
+  // a value that has not arrived is not a value, and painting a dash for it
+  // would read as a reading that is still pending.
   if (!hasMessages) {
     return {
       primary: null,

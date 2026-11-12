@@ -94,7 +94,7 @@ export const PILL_LAYOUT_TOKENS = [
   'h-[44px]',
   'flex-row',
   'items-center',
-  'gap-1',
+  'gap-2',
   'rounded-full',
   'border',
   'border-border',
@@ -107,17 +107,12 @@ export const PILL_LAYOUT_TOKENS = [
   'min-w-0',
 ] as const;
 
-export function expectHiddenReservedBox(root: React.ReactElement): void {
+export function expectHiddenPill(root: React.ReactElement): void {
   expect(root.type).toBe('View');
-  // The reserve itself never hides: the box holds the widest content in every
-  // state, so the trailing cluster keeps its width. Only the pill paints
-  // nothing while there is nothing to open.
-  expect(classNameOf(root)).toContain('items-end');
   const pill = pillOf(root);
-  const className = classNameOf(pill);
-  expect(className).toContain('opacity-0');
+  expect(classNameOf(pill)).toContain('opacity-0');
   for (const token of PILL_LAYOUT_TOKENS) {
-    expect(className).toContain(token);
+    expect(classNameOf(pill)).toContain(token);
   }
   expect(findAll(root, el => el.type === 'ContextUsageRing').length).toBeGreaterThan(0);
   const props = propsOf(pill);

@@ -1562,13 +1562,17 @@ describe('session detail header right cluster', () => {
     expect(slot[0]?.props.className).toContain('shrink');
 
     // ...and the cluster inside it shrinks into that cap, so it can never paint
-    // past the slot edge. It holds the Follow control and the context pill and
-    // nothing else: the PR badge now shares the goal row instead.
+    // past the slot edge. It holds the context pill and the Follow control and
+    // nothing else: the PR badge now shares the goal row instead. The pill
+    // leads and the Follow control ends the row, so a reading that arrives
+    // widens the pill into the header's free space instead of moving the
+    // control beside it.
     const cluster = slot[0]?.children[0] as ReactTestInstance | undefined;
     expect(cluster?.props.className).toContain('min-w-0');
     expect(cluster?.props.className).toContain('shrink');
     expect(cluster?.findAllByType(SessionContextMetrics)).toHaveLength(1);
     expect(cluster?.children).toHaveLength(2);
+    expect(cluster?.children[0]?.type).toBe(SessionContextMetrics);
 
     // The pill is the flexible part of the cluster: it shrinks into the cap
     // with it, so the cluster can never paint past the slot edge.
@@ -1591,9 +1595,8 @@ describe('session detail header right cluster', () => {
       throw new Error('expected a formatted cost badge');
     }
     const metrics = renderer.root.findByProps({ testID: 'session-context-metrics' });
-    // The reading is one text run and the cost is a nested run inside it, so the
-    // whole reading truncates on one line inside the pill instead of pushing a
-    // neighbour.
+    // The cost is its own value text, so it truncates on its own one line inside
+    // the capped pill instead of pushing the percentage beside it.
     const [cost] = metrics.findAll(
       node =>
         Object.is(node.type, 'Text') &&
@@ -1602,10 +1605,9 @@ describe('session detail header right cluster', () => {
     if (cost === undefined) {
       throw new Error('expected the cost text');
     }
-    const run = cost.parent;
-    expect(run?.props.numberOfLines).toBe(1);
-    expect(run?.props.className).toContain('shrink');
-    expect(run?.props.className).toContain('min-w-0');
+    expect(cost.props.numberOfLines).toBe(1);
+    expect(cost.props.className).toContain('shrink');
+    expect(cost.props.className).toContain('min-w-0');
   });
 });
 

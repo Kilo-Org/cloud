@@ -3735,7 +3735,8 @@ describe('createSessionManager', () => {
         const sendFor = mgr.send({
           payload: { type: 'prompt', prompt: `Prompt ${index}`, mode: 'code' },
         });
-        sentIds.push(mockSession.storage?.getMessageIds().at(-1)!);
+        const pendingId = mockSession.storage?.getMessageIds().at(-1);
+        sentIds.push(pendingId ?? '');
         await expect(sendFor).resolves.toBe(false);
       }
 

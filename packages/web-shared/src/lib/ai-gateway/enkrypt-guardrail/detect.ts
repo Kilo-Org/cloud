@@ -417,23 +417,11 @@ export async function scanRequest(
   deps: EnkryptDetectDependencies
 ): Promise<EnkryptGuardrailScanResult> {
   const { text, config, coverage } = scan;
-  const kind = scanKind(config);
   const scope: ScanScope = {
     logFields: { ...scanLogFields(scan), ...(coverage.chunk ? { chunk: coverage.chunk } : {}) },
-    report: {
-      scan: kind,
-      part: coverage.part,
-      detectors_enabled: config.status === 'ready' ? enabledDetectors(config) : [],
-      detectors_blocking: config.status === 'ready' ? config.blockingDetectors : [],
-      verdict_cache: coverage.cache,
-      total_characters: coverage.totalCharacters,
-      total_segments: coverage.totalSegments,
-      cached_characters: coverage.cachedCharacters,
-      cached_segments: coverage.cachedSegments,
-      omitted_attachments: coverage.omittedAttachments,
-      scanned_characters: text.length,
-    },
+    report: { ...coverageReport(config, coverage), scanned_characters: text.length },
   };
+  const kind = scope.report.scan;
 
   if (text.length === 0) {
     const report = scanReport(scope, { decision: 'allowed', latencyMs: 0 });
@@ -552,27 +540,54 @@ export async function scanRequest(
   };
 }
 
+type CoverageReport = Pick<
+  EnkryptScanReport,
+  | 'scan'
+  | 'part'
+  | 'detectors_enabled'
+  | 'detectors_blocking'
+  | 'verdict_cache'
+  | 'total_characters'
+  | 'total_segments'
+  | 'cached_characters'
+  | 'cached_segments'
+  | 'omitted_attachments'
+>;
+
+/** The report fields naming the detectors a scan uses. */
+export function detectorsReport(
+  config: EnkryptGuardrailConfig
+): Pick<EnkryptScanReport, 'detectors_enabled' | 'detectors_blocking'> {
+  return config.status === 'ready'
+    ? {
+        detectors_enabled: ENKRYPT_DETECTOR_IDS.filter(id => config.detectors[id] !== undefined),
+        detectors_blocking: config.blockingDetectors,
+      }
+    : { detectors_enabled: [], detectors_blocking: [] };
+}
+
+/** The report fields describing what a scan covers, and with which detectors. */
+export function coverageReport(
+  config: EnkryptGuardrailConfig,
+  coverage: EnkryptScanCoverage
+): CoverageReport {
+  return {
+    scan: scanKind(config),
+    part: coverage.part,
+    ...detectorsReport(config),
+    verdict_cache: coverage.cache,
+    total_characters: coverage.totalCharacters,
+    total_segments: coverage.totalSegments,
+    cached_characters: coverage.cachedCharacters,
+    cached_segments: coverage.cachedSegments,
+    omitted_attachments: coverage.omittedAttachments,
+  };
+}
+
 type ScanScope = {
   logFields: Record<string, unknown>;
-  report: Pick<
-    EnkryptScanReport,
-    | 'scan'
-    | 'part'
-    | 'detectors_enabled'
-    | 'detectors_blocking'
-    | 'verdict_cache'
-    | 'total_characters'
-    | 'total_segments'
-    | 'cached_characters'
-    | 'cached_segments'
-    | 'omitted_attachments'
-    | 'scanned_characters'
-  >;
+  report: CoverageReport & Pick<EnkryptScanReport, 'scanned_characters'>;
 };
-
-function enabledDetectors(config: ReadyEnkryptGuardrailConfig): EnkryptDetectorId[] {
-  return ENKRYPT_DETECTOR_IDS.filter(id => config.detectors[id] !== undefined);
-}
 
 function scanReport(
   scope: ScanScope,

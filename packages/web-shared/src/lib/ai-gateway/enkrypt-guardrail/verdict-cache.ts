@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import * as z from 'zod';
 import { ENKRYPT_DETECTOR_IDS } from '@kilocode/db/schema-types';
 import {
+  coverageReport,
+  detectorsReport,
   guardrailBlockMessage,
   scanRequest,
   type EnkryptDetectDependencies,
@@ -400,19 +402,10 @@ async function planSegmentsPart(
   };
   const block = cachedBlock(units);
   if (block && cache) {
-    const { config } = cache;
     const { detectors } = block;
     const report: EnkryptInputPartScanReport = {
-      scan: 'blocking',
+      ...coverageReport(cache.config, coverage),
       part,
-      detectors_enabled: ENKRYPT_DETECTOR_IDS.filter(id => config.detectors[id] !== undefined),
-      detectors_blocking: config.blockingDetectors,
-      verdict_cache: 'hit',
-      total_characters: coverage.totalCharacters,
-      total_segments: coverage.totalSegments,
-      cached_characters: coverage.cachedCharacters,
-      cached_segments: coverage.cachedSegments,
-      omitted_attachments: coverage.omittedAttachments,
       scanned_characters: 0,
       decision: 'blocked',
       error: null,
@@ -516,11 +509,7 @@ function toolsReport(
   return {
     scan: kind,
     part: 'tools',
-    detectors_enabled:
-      config.status === 'ready'
-        ? ENKRYPT_DETECTOR_IDS.filter(id => config.detectors[id] !== undefined)
-        : [],
-    detectors_blocking: config.status === 'ready' ? config.blockingDetectors : [],
+    ...detectorsReport(config),
     verdict_cache: cache,
     tools_total: outcomes.length,
     tools_cached: cached.length,

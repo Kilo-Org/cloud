@@ -2833,6 +2833,136 @@ describe.each([
   });
 });
 
+describe('organization data-collection policy on provider-policy exempt routes', () => {
+  const exemptProvider = {
+    ...provider,
+    type: 'custom',
+    apiUrl: 'https://upstream.example.com/v1',
+  } satisfies Provider;
+
+  function setOrganizationDataCollection(dataCollection: 'allow' | 'deny') {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-123', microdollars_used: 0 } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { data_collection: dataCollection },
+      plan: 'enterprise',
+    });
+  }
+
+  function privateCustomLlm(publicId: string): CustomLlm {
+    return {
+      public_id: publicId,
+      encrypted_api_key: null,
+      definition: {
+        display_name: 'Custom model',
+        context_length: 1000,
+        max_completion_tokens: 100,
+        base_url: 'https://upstream.example.com/v1',
+        organization_ids: [],
+      },
+    };
+  }
+
+  /** The local fake LLM counts as a free model only while it is enabled for local development. */
+  function enableLocalFakeLlm() {
+    return jest.replaceProperty(process, 'env', {
+      ...process.env,
+      NODE_ENV: 'development',
+      FAKE_LLM_URL: 'http://127.0.0.1:8811',
+    } as NodeJS.ProcessEnv);
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setUserAuth();
+    mockedFindCustomLlm.mockResolvedValue(null);
+    mockedIsCustomLlm.mockResolvedValue(false);
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'custom', choices: [] }),
+    });
+  });
+
+  afterEach(() => {
+    // `clearAllMocks` keeps implementations, so restore the module-level custom LLM stubs.
+    mockedFindCustomLlm.mockResolvedValue(null);
+    mockedIsCustomLlm.mockResolvedValue(false);
+  });
+
+  // The three route shapes that `getProvider` marks `bypassAccessCheck`. Its model classifier only
+  // calls a model data-collection-required when it is free or a custom LLM, so the bespoke
+  // direct-BYOK case uses a free id to reach the guard on that shape at all.
+  it.each([
+    { route: 'a non-public custom LLM', model: 'acme/private-model', customLlm: true },
+    {
+      route: 'a bespoke direct-BYOK id with a free model',
+      model: 'acme/bespoke-model:free',
+      customLlm: false,
+    },
+    { route: 'the local fake LLM', model: 'fake-deterministic', customLlm: false, localFake: true },
+  ])(
+    'rejects a data-collection-required model on $route for an organization that denies data collection',
+    async ({ model, customLlm, localFake }) => {
+      setOrganizationDataCollection('deny');
+      if (customLlm) mockCustomLlm(privateCustomLlm(model));
+      const localFakeEnv = localFake ? enableLocalFakeLlm() : null;
+      try {
+        mockedGetProvider.mockImplementationOnce(async ({ request }) => {
+          // The organization preference is on the request before routing picks an exempt route.
+          expect(request.body.provider).toEqual(
+            expect.objectContaining({ data_collection: 'deny' })
+          );
+          return providerResult({
+            provider: exemptProvider,
+            userByok: null,
+            isFree: false,
+            bypassAccessCheck: true,
+          });
+        });
+
+        const { handleLlmProxyRequest } = await import('./llm-proxy');
+        const response = await handleLlmProxyRequest(makeRequest(makeBody(model)) as never);
+
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toMatchObject({
+          error_type: 'data_collection_required',
+        });
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      } finally {
+        localFakeEnv?.restore();
+      }
+    }
+  );
+
+  it('serves an exempt route whose model needs data collection for an organization that allows it', async () => {
+    setOrganizationDataCollection('allow');
+    mockCustomLlm(privateCustomLlm('acme/private-model'));
+    mockedGetProvider.mockImplementationOnce(async ({ request }) => {
+      expect(request.body.provider).toEqual(expect.objectContaining({ data_collection: 'allow' }));
+      return providerResult({
+        provider: exemptProvider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: true,
+      });
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('acme/private-model')) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('kilo-auto/efficient classifier billing', () => {
   beforeEach(() => {
     jest.clearAllMocks();

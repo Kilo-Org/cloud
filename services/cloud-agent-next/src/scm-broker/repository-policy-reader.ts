@@ -1,6 +1,6 @@
 import { REPOSITORY_ACCESS_PROTOCOL_VERSION } from '@kilocode/worker-utils/workspace-repository-access';
 import { WorkerEntrypoint } from 'cloudflare:workers';
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, max } from 'drizzle-orm';
 import { cli_sessions_v2, cloud_agent_sessions } from '@kilocode/db/schema';
 import type {
   WorkspaceRepositoryPolicyLookup,
@@ -46,7 +46,7 @@ export class RepositoryPolicyReader extends WorkerEntrypoint<Env> {
     if (!input.scopeId) return null;
     const db = getPgDb(this.env);
     const rows = await db
-      .selectDistinct({ sandboxId: cloud_agent_sessions.sandbox_id })
+      .select({ sandboxId: cloud_agent_sessions.sandbox_id })
       .from(cloud_agent_sessions)
       .innerJoin(
         cli_sessions_v2,
@@ -64,7 +64,9 @@ export class RepositoryPolicyReader extends WorkerEntrypoint<Env> {
               ]
             : [])
         )
-      );
+      )
+      .groupBy(cloud_agent_sessions.sandbox_id)
+      .orderBy(desc(max(cloud_agent_sessions.created_at)));
     for (const row of rows) {
       if (!row.sandboxId) continue;
       const policy = await this.readAt(row.sandboxId, input);

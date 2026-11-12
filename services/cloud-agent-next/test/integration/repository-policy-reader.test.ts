@@ -6,10 +6,10 @@ import { RepositoryPolicyReader } from '../../src/scm-broker/repository-policy-r
 const ledger = vi.hoisted(() => ({ rows: [] as { sandboxId: string | null }[] }));
 vi.mock('../../src/db/pg.js', () => ({
   getPgDb: () => ({
-    selectDistinct: () => ({
+    select: () => ({
       from: () => ({
         innerJoin: () => ({
-          where: async () => ledger.rows,
+          where: () => ({ groupBy: () => ({ orderBy: async () => ledger.rows }) }),
         }),
       }),
     }),

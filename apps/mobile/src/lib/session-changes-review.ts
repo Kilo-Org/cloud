@@ -7,7 +7,7 @@ import {
   addWorktreeReviewComment,
   createWorktreeReviewAnchorFromPatch,
   removeWorktreeReviewComment,
-  sameWorktreeReviewCapture,
+  sameWorktreeReviewContent,
   serializeWorktreeReview,
   updateWorktreeReviewComment,
   type WorktreeReviewAnchor,
@@ -99,6 +99,10 @@ export function sessionChangesCaptureForFile({
  * capture moved since they were written, so the quote and line number the agent
  * would receive are no longer provably current. The review cannot be sent until
  * those comments are re-anchored by adding them again on the current diff.
+ *
+ * A refresh that changes no file moves `capturedAt` only, which is still
+ * current: the comparison is `sameWorktreeReviewContent`, the same identity the
+ * web applies without rebasing a comment.
  */
 export function sessionChangesStaleCommentIds({
   draft,
@@ -129,7 +133,7 @@ export function sessionChangesStaleCommentIds({
       snapshot,
       file: { path: comment.anchor.path, ...(scope === undefined ? {} : { scope }) },
     });
-    if (current === null || !sameWorktreeReviewCapture(comment.anchor.capture, current)) {
+    if (current === null || !sameWorktreeReviewContent(comment.anchor.capture, current)) {
       stale.add(comment.id);
     }
   }

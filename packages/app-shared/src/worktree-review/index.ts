@@ -368,6 +368,30 @@ export function sameWorktreeReviewCapture(
   );
 }
 
+/**
+ * Whether two captures describe the same saved review content: the same account,
+ * organization and worktree, the same session, the same per-file revision and
+ * the same comparison. `capturedAt` is deliberately excluded: a capture refresh
+ * that changes no file still moves `capturedAt`, and both surfaces treat that as
+ * still current (the web re-anchors such a comment onto the new capture rather
+ * than rejecting it). Use `sameWorktreeReviewCapture` when every field,
+ * `capturedAt` included, must match.
+ */
+export function sameWorktreeReviewContent(
+  left: WorktreeReviewCapture,
+  right: WorktreeReviewCapture
+): boolean {
+  return (
+    sameWorktreeReviewScope(left, right) &&
+    left.sourceCloudAgentSessionId === right.sourceCloudAgentSessionId &&
+    left.revision === right.revision &&
+    left.scope === right.scope &&
+    left.comparison.baseRef === right.comparison.baseRef &&
+    left.comparison.mergeBase === right.comparison.mergeBase &&
+    left.comparison.head === right.comparison.head
+  );
+}
+
 export function cloneWorktreeReviewAnchor(anchor: WorktreeReviewAnchor): WorktreeReviewAnchor {
   return {
     capture: cloneWorktreeReviewCapture(anchor.capture),

@@ -12,6 +12,7 @@ import {
   sessionChangesFileKey,
   sessionChangesFilePatch,
   type SessionChangesSnapshot,
+  sessionChangesStaleCommentIds,
   updateSessionChangesComment,
 } from '@/lib/session-changes-review';
 
@@ -181,6 +182,72 @@ describe('getSessionChangesReviewBlock', () => {
         model: 'kilo/x',
       })
     ).toBeUndefined();
+  });
+});
+
+describe('sessionChangesStaleCommentIds', () => {
+  const draft = () => {
+    const added = addSessionChangesComment(EMPTY_SESSION_CHANGES_DRAFT, {
+      id: 'comment-1',
+      anchor: anchor(),
+      text: 'Keep this line.',
+    });
+    if (!added.ok) {
+      throw new Error(added.error);
+    }
+    return added.draft;
+  };
+
+  const staleFor = (snapshotValue: SessionChangesSnapshot) =>
+    sessionChangesStaleCommentIds({
+      draft: draft(),
+      snapshot: snapshotValue,
+      userId: 'user-one',
+      organizationId: undefined,
+      cloudAgentSessionId: 'workspace_00000000-0000-4000-8000-000000000000',
+      worktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+    });
+
+  it('keeps comments current when a refresh only moves the capture time', () => {
+    // A refresh that changes no file moves capturedAt alone; the web re-anchors
+    // such a comment onto the new capture instead of refusing it.
+    const refreshed: SessionChangesSnapshot = {
+      ...snapshot,
+      capturedAt: '2026-11-12T11:30:00.000Z',
+    };
+    expect(staleFor(refreshed).size).toBe(0);
+  });
+
+  it('marks a comment stale when its file moved to a new revision', () => {
+    const bumped: SessionChangesSnapshot = {
+      ...snapshot,
+      revision: 5,
+      capturedAt: '2026-11-12T11:30:00.000Z',
+      files: snapshot.files.map(listed => ({ ...listed, revision: 5 })),
+    };
+    expect([...staleFor(bumped)]).toEqual(['comment-1']);
+  });
+
+  it('marks a comment stale when its file is no longer listed', () => {
+    const removed: SessionChangesSnapshot = {
+      ...snapshot,
+      revision: 5,
+      files: [],
+    };
+    expect([...staleFor(removed)]).toEqual(['comment-1']);
+  });
+
+  it('leaves every comment current while the session is still loading', () => {
+    expect(
+      sessionChangesStaleCommentIds({
+        draft: draft(),
+        snapshot: null,
+        userId: 'user-one',
+        organizationId: undefined,
+        cloudAgentSessionId: 'workspace_00000000-0000-4000-8000-000000000000',
+        worktreeId: null,
+      }).size
+    ).toBe(0);
   });
 });
 

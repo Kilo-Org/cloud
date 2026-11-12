@@ -365,7 +365,7 @@ test('accepts a spaced catalog that pads both separator keys', context => {
 
 test('accepts a catalog whose conjunction is a prefix letter joined to the next word', context => {
   // Arabic writes the waw as a prefix of the noun it governs, so the catalog
-  // pads the space before the conjunction and none after it. Only the junction
+  // pads the space before the conjunction and none after it. The junction
   // before the conjunction is the separator the two keys have to agree on.
   const english = {
     login: {
@@ -388,6 +388,64 @@ test('accepts a catalog whose conjunction is a prefix letter joined to the next 
   });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stderr, '');
+});
+
+test('rejects a detached conjunction in a catalog that writes one prefix letter', context => {
+  // The prefix letter joins the noun it governs, so a space after it splits the
+  // conjunction from that noun — the defect this rule exists to catch.
+  const english = {
+    login: {
+      termsPrefix: 'By continuing you agree to our ',
+      terms: 'Terms',
+      termsConnector: ' and ',
+    },
+  };
+  const result = runChecker(context, {
+    language: 'ar',
+    english,
+    translated: {
+      login: {
+        termsPrefix: 'بالمتابعة، توافق على ',
+        terms: 'الشروط',
+        termsConnector: ' و ',
+      },
+    },
+    source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ar: "login\.termsConnector" must end without a space, because this catalog writes the conjunction as a prefix of the next word/
+  );
+});
+
+test('rejects a separately written conjunction that lost its trailing space', context => {
+  // A catalog that writes the conjunction as a word of its own pads both sides;
+  // keeping only the leading space runs it into the noun after the link.
+  const english = {
+    login: {
+      termsPrefix: 'By continuing you agree to our ',
+      terms: 'Terms',
+      termsConnector: ' and ',
+    },
+  };
+  const result = runChecker(context, {
+    language: 'de',
+    english,
+    translated: {
+      login: {
+        termsPrefix: 'Wenn du fortfährst, akzeptierst du unsere ',
+        terms: 'Bedingungen',
+        termsConnector: ' und',
+      },
+    },
+    source: "t('login.termsPrefix'); t('login.terms'); t('login.termsConnector');",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/de: "login\.termsConnector" must end with a space, because this catalog writes the conjunction as a separate word/
+  );
 });
 
 test('rejects a conjunction that starts without the space its prefix carries', context => {

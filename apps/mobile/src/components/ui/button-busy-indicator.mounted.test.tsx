@@ -5,17 +5,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Button, BUTTON_BUSY_OVERLAY_CLASS, type ButtonProps } from './button';
 
+// Every token the ink table names, with a distinct value each: a mark drawn
+// from the wrong token renders a different colour, so the case below fails
+// instead of passing on two tokens that happen to share a value.
 const theme = vi.hoisted(() => ({
   colors: {
     foreground: '#123456',
     primary: '#345678',
     primaryForeground: '#abcdef',
+    secondaryForeground: '#223344',
+    destructive: '#654321',
+    destructiveSolidForeground: '#fedcba',
     accentSoftTintForeground: '#1a1a10',
   },
 }));
+const platform = vi.hoisted(() => ({ OS: 'android' }));
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
+  Platform: platform,
   Pressable: 'Pressable',
   Text: 'Text',
   View: 'View',
@@ -46,6 +54,7 @@ function render(props: ButtonProps) {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  platform.OS = 'android';
 });
 
 describe('Button busy mark', () => {
@@ -66,22 +75,41 @@ describe('Button busy mark', () => {
     }
   });
 
-  it('paints a full ring track in the label ink, so the mark never shrinks to the arc sweep', () => {
-    // Android's indeterminate arc sweeps from near-zero, so a still capture of
-    // the platform control can show a speck of ink. The track holds the mark at
-    // the label's line height in every frame, and it paints the same ink the
-    // label does: a diluted track reads as a faint gray ring on the pale
-    // accent-soft fill instead of the olive the label carries.
-    const root = render({ variant: 'accent-soft', loading: true });
-    const overlay = root.find(n => n.props.className === BUTTON_BUSY_OVERLAY_CLASS);
-    const track = overlay.find(
+  // The label paints from the same table entry the mark does, so every variant
+  // draws its busy mark in the ink its own label carries. Listing the pairs here
+  // rather than deriving them keeps the contract independent of the table.
+  it.each([
+    ['default', theme.colors.primaryForeground],
+    ['destructive', theme.colors.destructiveSolidForeground],
+    ['outline', theme.colors.foreground],
+    ['outline-destructive', theme.colors.destructive],
+    ['secondary', theme.colors.secondaryForeground],
+    ['ghost', theme.colors.foreground],
+    ['link', theme.colors.primary],
+    ['accent-soft', theme.colors.accentSoftTintForeground],
+  ] as const)('draws the %s mark in the ink its own label paints', (variant, ink) => {
+    const root = render({ variant, loading: true, accessibilityLabel: 'Send' });
+
+    expect(busyMarks(root)[0]?.props.color).toBe(ink);
+    const track = root.find(
       n => n.type === View && `${n.props.className ?? ''}`.includes('rounded-full')
     );
-
-    expect(track.props.style).toMatchObject({ width: 17, height: 17, borderColor: '#1a1a10' });
-    expect(`${track.props.className ?? ''}`).toContain('border-2');
-    expect(`${track.props.className ?? ''}`).not.toMatch(/\bopacity-/);
+    expect(track.props.style).toMatchObject({ borderColor: ink });
   });
+  it.each(['default', 'icon'] as const)(
+    'leaves the native iOS spinner unobstructed for size %s',
+    size => {
+      platform.OS = 'ios';
+      const root = render({ loading: true, size, accessibilityLabel: 'Send' });
+      const paintedTracks = root.findAll(node => {
+        const style = node.props.style as { borderColor?: string } | undefined;
+        return node.type === View && style?.borderColor !== undefined;
+      });
+
+      expect(busyMarks(root)).toHaveLength(1);
+      expect(paintedTracks).toHaveLength(0);
+    }
+  );
 
   it('keeps the busy state and name on the button, not on the mark', () => {
     const root = render({ loading: true, accessibilityLabel: 'Send' });

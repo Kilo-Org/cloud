@@ -25,10 +25,8 @@ function loadLocalEnv(): void {
   process.env.POSTGRES_CONNECT_TIMEOUT ??= '30000';
   process.env.POSTGRES_MAX_QUERY_TIME ??= '30000';
   process.env.POSTGRES_SCRIPT_URL ??= process.env.POSTGRES_URL;
-  process.env.NEXT_PUBLIC_GASTOWN_URL ??= 'http://localhost:8787';
   process.env.NEXT_PUBLIC_KILO_CHAT_URL ??= 'http://localhost:8788';
   process.env.NEXT_PUBLIC_EVENT_SERVICE_URL ??= 'http://localhost:8789';
-  process.env.NEXT_PUBLIC_WASTELAND_URL ??= 'http://localhost:8790';
 }
 
 function printUsage(): void {

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TRPCError } from '@trpc/server';
+import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import {
   CloudAgentAuthoritySchema,
   cloudAgentAuthorityProcedure,
@@ -19,20 +19,12 @@ import {
   verifyKiloTokenForPolicy,
 } from '@kilocode/worker-utils/kilo-token-policy';
 import { backendUrlForSandbox } from './kilo/kilo-targets.js';
-import type { SessionMetadata } from './persistence/session-metadata.js';
+import {
+  isLegacySharedSandboxWorkspace,
+  type SessionMetadata,
+} from './persistence/session-metadata.js';
 
 export const CLOUD_AGENT_PARENT_AUTHORITY_DENIED = 'Cloud Agent parent authority denied';
-
-export function assertCloudAgentIsolatedAllocation(
-  scoped: boolean,
-  allocation: string | undefined
-): void {
-  if (scoped && allocation === 'cloudflare-shared')
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Cloud Agent spawn authority requires an isolated sandbox',
-    });
-}
 
 export const CLOUD_AGENT_MCP_URL = 'https://mcp.kiloapps.io/mcp';
 
@@ -101,15 +93,34 @@ const workerPreparationMetadataSchema = z
     clientProvenance: z.enum(['browser', 'mobile']).optional(),
     kilocodeOrganizationId: z.string().optional(),
     githubIntegrationId: z.uuid().optional(),
+    // These fields are resolved by the web app, not accepted by the scoped MCP tool.
+    stackOnWorktreeId: z.never().optional(),
+    baseBranch: z.string().min(1).max(256).optional(),
+    baseSha: z
+      .string()
+      .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i)
+      .optional(),
+    parentWorktreeId: cloudAgentWorktreeIdSchema.optional(),
   })
   .passthrough();
 
 export function validateScopedWorkerPreparation(authority: CloudAgentAuthority, rawInput: unknown) {
   const parsed = workerPreparationMetadataSchema.parse(rawInput);
+  const hasBase = parsed.baseBranch !== undefined || parsed.baseSha !== undefined;
+  if (
+    parsed.parentWorktreeId === undefined
+      ? hasBase
+      : parsed.baseBranch === undefined || parsed.baseSha === undefined
+  ) {
+    throw new Error('Stacked preparation requires a parent worktree, base branch, and base commit');
+  }
   const input = { ...parsed };
   for (const key of Object.keys(workerPreparationMetadataSchema.shape)) delete input[key];
   return validateCloudAgentAuthorityRequest(authority, cloudAgentAuthorityProcedure(authority), {
     ...input,
+    ...(parsed.parentWorktreeId === undefined
+      ? {}
+      : { stackOnWorktreeId: parsed.parentWorktreeId }),
     ...(parsed.kilocodeOrganizationId === undefined
       ? {}
       : { organizationId: parsed.kilocodeOrganizationId }),
@@ -127,9 +138,7 @@ export function assertCloudAgentParentAuthority(
     !metadata ||
     !isWorkspaceAnchorMetadata(metadata) ||
     metadata.allowSubagentSessions !== true ||
-    metadata.workspace?.sandboxAllocation === 'cloudflare-shared' ||
-    metadata.workspace?.sandboxRoute?.kind === 'shared' ||
-    metadata.workspace?.sandboxKind === 'shared' ||
+    isLegacySharedSandboxWorkspace(metadata.workspace) ||
     !metadata.identity.sessionId.startsWith('workspace_') ||
     metadata.identity.sessionId !== scope.parentSessionId ||
     metadata.identity.userId !== scope.ownerId ||
@@ -233,4 +242,59 @@ export async function authorizeCloudAgentChild(
   const current = RuntimeAuthorizationSchema.parse(await input.authorization());
   assertCloudAgentParentAuthority(await input.metadata(), current, input.authority);
   return { token: issued.token, seal: await sealRuntimeAuthorization(child, input.secret) };
+}
+
+/**
+ * Mint the runtime authorization for a new sibling chat in the parent's
+ * workspace. Unlike a child, the sibling shares the parent's worktree and has
+ * no spawn lineage, so it is a workspace root with its own authorization.
+ */
+export async function authorizeCloudAgentWorkspaceSibling(input: {
+  parentSessionId: string;
+  siblingSessionId: string;
+  secret: string;
+  connectionString: string;
+  metadata: () => Promise<SessionMetadata | null>;
+  authorization: () => Promise<unknown>;
+}): Promise<{ token: string; seal: string }> {
+  if (
+    !input.siblingSessionId.startsWith('workspace_') ||
+    input.siblingSessionId === input.parentSessionId
+  ) {
+    throw new Error('Cloud Agent sibling requires an independent workspace session');
+  }
+  const metadata = await input.metadata();
+  if (metadata?.identity.sessionId !== input.parentSessionId) {
+    throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+  }
+  const authorization = RuntimeAuthorizationSchema.parse(await input.authorization());
+  const now = Math.floor(Date.now() / 1000);
+  const scope: CloudAgentAuthority = {
+    version: 1,
+    ownerId: metadata.identity.userId,
+    parentSessionId: metadata.identity.sessionId,
+    organizationId: metadata.identity.orgId ?? null,
+    authorizationId: authorization.id,
+    expiresAt: Math.floor(Date.parse(authorization.delegationExpiresAt) / 1000),
+  };
+  if (scope.expiresAt <= now) throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+  assertCloudAgentParentAuthority(metadata, authorization, scope);
+  const sibling = RuntimeAuthorizationSchema.parse({
+    ...authorization,
+    id: crypto.randomUUID(),
+    resourceId: input.siblingSessionId,
+    issuedAt: new Date().toISOString(),
+  });
+  const issued = await renewRuntimeAuthorization({
+    authorization: sibling,
+    secret: input.secret,
+    connectionString: input.connectionString,
+  });
+  const current = RuntimeAuthorizationSchema.parse(await input.authorization());
+  const currentMetadata = await input.metadata();
+  if (currentMetadata?.identity.sessionId !== input.parentSessionId) {
+    throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+  }
+  assertCloudAgentParentAuthority(currentMetadata, current, scope);
+  return { token: issued.token, seal: await sealRuntimeAuthorization(sibling, input.secret) };
 }

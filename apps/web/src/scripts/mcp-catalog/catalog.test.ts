@@ -133,9 +133,14 @@ describe('mcp-catalog catalog', () => {
       // Native-only credential issuers are withheld by exact path.
       expect(isDenylistedPath('activeSessions.widgetCredential')).toBe(true);
       expect(isDenylistedPath('agentBriefing.updateContextPreferences')).toBe(true);
+      expect(isDenylistedPath('githubApps.provideUserToken')).toBe(true);
       expect(isDenylistedPath('agentBriefing.estimateSummary')).toBe(false);
       expect(isDenylistedPath('agentBriefing.dismiss')).toBe(false);
       expect(isDenylistedPath('activeSessions.getToken')).toBe(false);
+      // Start fresh discards workspace changes behind an in-app confirmation.
+      expect(isDenylistedPath('cloudAgentNext.removeWorkspaceSnapshot')).toBe(true);
+      expect(isDenylistedPath('organizations.cloudAgentNext.removeWorkspaceSnapshot')).toBe(true);
+      expect(isDenylistedPath('cloudAgentNext.getWorkspaceSnapshotRecovery')).toBe(false);
     });
 
     it('withholds Vercel secrets and resource mutations while retaining status reads', () => {

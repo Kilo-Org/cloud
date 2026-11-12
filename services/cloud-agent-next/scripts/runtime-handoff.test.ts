@@ -6,11 +6,8 @@ import { fixtureRuntime } from '../test/runtime-installer/fixtures.js';
 import { localDirectoryArtifactStore, publishRuntimeRelease } from './publish-runtime.js';
 import { publishRuntimeHandoff, loadRuntimeHandoff, runtimeHandoffKey } from './runtime-handoff.js';
 import { runtimeBaseInputId, type RuntimeBase } from './runtime-base.js';
-import { parse } from 'jsonc-parser';
-import { URL } from 'node:url';
 import { prepareRuntimeDeployment } from './prepare-runtime-deploy.js';
 import { RUNTIME_BASE_ABI } from '../src/sandbox-control/runtime-release.js';
-import { KILO_CLI_VERSION } from '../src/shared/kilo-cli-version.js';
 import {
   runtimeArtifactObjectKey,
   runtimeArtifactReleaseKey,
@@ -86,6 +83,86 @@ describe('retained exact-SHA handoff', () => {
     ).rejects.toThrow('stored-byte');
   });
 });
+describe('Kilo v2 release in the handoff', () => {
+  const kilo2Org = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
+  async function withKilo2() {
+    const f = await fixture();
+    const kilo2 = await fixtureRuntime('B', 'B', { cliExecutable: 'package/bin/kilo2' });
+    const published = await publishRuntimeRelease(f.store, kilo2);
+    return { ...f, kilo2, kilo2Published: published };
+  }
+  const prepare = (f: Awaited<ReturnType<typeof fixture>>, kilo2?: { orgIds: string[] }) =>
+    prepareRuntimeDeployment({
+      config: {
+        r2_buckets: [{ binding: 'RUNTIME_RELEASE_BUCKET', bucket_name: 'runtime-test' }],
+        vars: {},
+        containers: [
+          {
+            class_name: 'SandboxContainers',
+            scheduling_policy: 'durable_object',
+            images: { 'runtime-free': { dockerfile: './Dockerfile.containers.runtime-free' } },
+          },
+        ],
+      },
+      startup: { mode: 'downloaded', image: 'runtime-free', ...(kilo2 ? { kilo2 } : {}) },
+      environment: 'production',
+      sourceSha: f.sourceSha,
+      bucket: 'runtime-test',
+      accountId: 'c'.repeat(32),
+      baseInputId: f.base.inputId,
+      store: f.store,
+      verifyBase: () => {},
+    });
+
+  it('records the v2 release and renders it only for a v2 catalog target', async () => {
+    const f = await withKilo2();
+    const handoff = await publishRuntimeHandoff({
+      ...f,
+      descriptor: f.packaged.descriptor,
+      kilo2Descriptor: f.kilo2.descriptor,
+    });
+    expect(handoff.kilo2DescriptorSha256).toBe(f.kilo2Published.descriptor.sha256);
+    const loaded = await loadRuntimeHandoff(f.store, f.sourceSha, f.base.inputId);
+    expect(loaded.kilo2Descriptor).toEqual(f.kilo2.descriptor);
+    const rendered = await prepare(f, { orgIds: [kilo2Org] });
+    expect(rendered?.vars).toMatchObject({
+      RUNTIME_RELEASE_DESCRIPTOR: f.published.descriptor.sha256,
+      RUNTIME_RELEASE_DESCRIPTOR_KILO2: f.kilo2Published.descriptor.sha256,
+      RUNTIME_KILO2_ORG_IDS: kilo2Org,
+    });
+    expect((await prepare(f))?.vars).not.toHaveProperty('RUNTIME_RELEASE_DESCRIPTOR_KILO2');
+  });
+  it('rejects a v2 target when the handoff has no v2 release', async () => {
+    const f = await fixture();
+    await publishRuntimeHandoff({ ...f, descriptor: f.packaged.descriptor });
+    await expect(prepare(f, { orgIds: [kilo2Org] })).rejects.toThrow('Kilo v2 runtime handoff');
+  });
+  it('rejects swapped or corrupt harness releases before writing the handoff', async () => {
+    const f = await withKilo2();
+    await expect(
+      publishRuntimeHandoff({
+        ...f,
+        descriptor: f.packaged.descriptor,
+        kilo2Descriptor: f.packaged.descriptor,
+      })
+    ).rejects.toThrow('Kilo v2 release');
+    await expect(publishRuntimeHandoff({ ...f, descriptor: f.kilo2.descriptor })).rejects.toThrow(
+      'Kilo v1 release'
+    );
+    await fs.writeFile(
+      path.join(f.root, runtimeArtifactReleaseKey(f.kilo2Published.descriptor.sha256)),
+      'corrupt'
+    );
+    await expect(
+      publishRuntimeHandoff({
+        ...f,
+        descriptor: f.packaged.descriptor,
+        kilo2Descriptor: f.kilo2.descriptor,
+      })
+    ).rejects.toThrow('descriptor');
+    expect(await f.store.getBytes(runtimeHandoffKey(f.sourceSha))).toBeNull();
+  });
+});
 describe('deployment preparation', () => {
   const config = () => ({
     r2_buckets: [{ binding: 'RUNTIME_RELEASE_BUCKET', bucket_name: 'runtime-test' }],
@@ -95,50 +172,23 @@ describe('deployment preparation', () => {
         class_name: 'SandboxContainers',
         scheduling_policy: 'durable_object',
         images: {
-          app: {
-            dockerfile: './Dockerfile.containers',
+          'runtime-free': {
+            dockerfile: './Dockerfile.containers.runtime-free',
           },
         },
       },
     ],
   });
-  it('accepts the real all-in-one image with pinned build variables', async () => {
-    const f = await fixture();
-    await publishRuntimeHandoff({ ...f, descriptor: f.packaged.descriptor });
-    const raw = parse(await fs.readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
-    raw.r2_buckets = [
-      ...raw.r2_buckets,
-      { binding: 'RUNTIME_RELEASE_BUCKET', bucket_name: 'runtime-test' },
-    ];
-    const result = await prepareRuntimeDeployment({
-      config: raw,
-      startup: { mode: 'downloaded', image: 'all-in-one' },
-      environment: 'production',
-      sourceSha: f.sourceSha,
-      bucket: 'runtime-test',
-      accountId: 'c'.repeat(32),
-      baseInputId: f.base.inputId,
-      store: f.store,
-      verifyBase: () => {},
-    });
-    expect(
-      result?.containers?.find(container => container.class_name === 'SandboxContainers')?.images
-        ?.app
-    ).toMatchObject({
-      dockerfile: './Dockerfile.containers',
-      build_vars: { KILOCODE_CLI_VERSION: KILO_CLI_VERSION },
-    });
-  });
-  it('rejects mixed all-in-one image fields before base verification', async () => {
+  it('rejects mixed image fields before base verification', async () => {
     const f = await fixture();
     await publishRuntimeHandoff({ ...f, descriptor: f.packaged.descriptor });
     const changed = config();
-    Object.assign(changed.containers[0].images.app, { image: f.base.image });
+    Object.assign(changed.containers[0].images['runtime-free'], { image: f.base.image });
     let verified = false;
     await expect(
       prepareRuntimeDeployment({
         config: changed,
-        startup: { mode: 'downloaded', image: 'all-in-one' },
+        startup: { mode: 'downloaded', image: 'runtime-free' },
         environment: 'production',
         sourceSha: f.sourceSha,
         bucket: 'runtime-test',
@@ -152,29 +202,30 @@ describe('deployment preparation', () => {
     ).rejects.toThrow('configuration drift');
     expect(verified).toBe(false);
   });
-  it('preinstalled does not touch unavailable publication storage', async () => {
+  it('rejects preinstalled before touching publication storage', async () => {
     const f = await fixture();
     let reads = 0;
-    const result = await prepareRuntimeDeployment({
-      config: config(),
-      startup: { mode: 'preinstalled', image: 'all-in-one' },
-      environment: 'production',
-      sourceSha: f.sourceSha,
-      bucket: 'runtime-test',
-      accountId: 'c'.repeat(32),
-      baseInputId: f.base.inputId,
-      store: {
-        ...f.store,
-        getBytes: async () => {
-          reads++;
-          throw new Error('storage unavailable');
+    await expect(
+      prepareRuntimeDeployment({
+        config: config(),
+        startup: { mode: 'preinstalled', image: 'all-in-one' } as never,
+        environment: 'production',
+        sourceSha: f.sourceSha,
+        bucket: 'runtime-test',
+        accountId: 'c'.repeat(32),
+        baseInputId: f.base.inputId,
+        store: {
+          ...f.store,
+          getBytes: async () => {
+            reads++;
+            throw new Error('storage unavailable');
+          },
         },
-      },
-      verifyBase: () => {
-        throw new Error('must not verify base');
-      },
-    });
-    expect(result?.vars?.RUNTIME_STARTUP_MODE).toBe('preinstalled');
+        verifyBase: () => {
+          throw new Error('must not verify base');
+        },
+      })
+    ).rejects.toThrow();
     expect(reads).toBe(0);
   });
   it('renders the verified digest and descriptor only after verification', async () => {
@@ -186,7 +237,6 @@ describe('deployment preparation', () => {
       startup: {
         mode: 'downloaded',
         image: 'runtime-free',
-        interactiveOrgIds: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
       },
       environment: 'production',
       sourceSha: f.sourceSha,
@@ -200,16 +250,16 @@ describe('deployment preparation', () => {
       },
     });
     expect(order).toEqual(['verified']);
-    expect(result?.containers?.[0].images?.app).toEqual({ dockerfile: './Dockerfile.containers' });
+    expect(result?.containers?.[0].images?.app).toBeUndefined();
     expect(result?.containers?.[0].images?.['runtime-free']).toEqual({ image: f.base.image });
-    expect(result?.vars?.RUNTIME_INTERACTIVE_ORG_IDS).toBe('9d278969-5453-4ae3-a51f-a8d2274a7b56');
+    expect(result?.vars?.RUNTIME_INTERACTIVE_ORG_IDS).toBeUndefined();
     expect(result?.vars?.RUNTIME_RELEASE_DESCRIPTOR).toBe(f.published.descriptor.sha256);
   });
   it('configuration drift prevents base verification and deployment', async () => {
     const f = await fixture();
     await publishRuntimeHandoff({ ...f, descriptor: f.packaged.descriptor });
     const changed = config();
-    changed.containers[0].images.app.dockerfile = './untrusted';
+    changed.containers[0].images['runtime-free'].dockerfile = './untrusted';
     let verified = false;
     await expect(
       prepareRuntimeDeployment({
@@ -237,7 +287,7 @@ describe('deployment preparation', () => {
       prepareRuntimeDeployment({
         config: changed,
         environment: 'production',
-        startup: { mode: 'downloaded', image: 'all-in-one' },
+        startup: { mode: 'downloaded', image: 'runtime-free' },
         sourceSha: f.sourceSha,
         bucket: 'runtime-test',
         accountId: 'c'.repeat(32),

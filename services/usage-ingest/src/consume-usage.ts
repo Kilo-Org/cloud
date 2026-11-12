@@ -1,7 +1,19 @@
-import { UsageRecordRequestSchema } from '@kilocode/usage-contracts';
-import { recordUsage, type UsageWriteOutcome } from '@kilocode/worker-utils/usage-writer-client';
+import {
+  ENKRYPT_USAGE_WRITE_PATH,
+  EXA_USAGE_WRITE_PATH,
+  type LlmUsageQueueMessage,
+} from '@kilocode/usage-contracts';
+import {
+  recordLlmUsage,
+  recordEnkryptUsage,
+  recordExaUsage,
+  type EnkryptUsageWriteOutcome,
+  type ExaUsageWriteOutcome,
+  type LlmUsageWriteOutcome,
+} from '@kilocode/worker-utils/usage-writer-client';
 import type { Env } from './publish-usage';
 import { logSafely, queueMetrics } from './diagnostics';
+import { parseQueuedUsage, type QueuedUsage } from './queued-usage';
 import { usageRetryDelaySeconds } from './retry-policy';
 
 const INVOCATION_BUDGET_MS = 840_000;
@@ -18,12 +30,7 @@ function sampleDelivery(messageId: string, attempts: number): boolean {
 
 type Diagnostics = { batch_size: number; handler_entry_at_ms: number };
 
-function diagnosticFields(
-  env: Env,
-  entryAtMs: number,
-  batch: MessageBatch<unknown>
-): Diagnostics | undefined {
-  if (env.USAGE_INGEST_DIAGNOSTICS !== 'all') return undefined;
+function diagnosticFields(entryAtMs: number, batch: MessageBatch<unknown>): Diagnostics {
   return { batch_size: batch.messages.length, handler_entry_at_ms: entryAtMs };
 }
 
@@ -38,8 +45,8 @@ async function processQueue(
   startedAtMs: number
 ): Promise<void> {
   const lastLaunchAtMs = startedAtMs + INVOCATION_BUDGET_MS - MIN_LAUNCH_REMAINING_MS;
-  const diagnostics = diagnosticFields(env, entryAtMs, batch);
-  const batchId = diagnostics === undefined ? undefined : crypto.randomUUID();
+  const diagnostics = diagnosticFields(entryAtMs, batch);
+  const batchId = crypto.randomUUID();
   const parallelism = env.USAGE_INGEST_PARALLELISM === '2' ? 2 : 1;
   let nextIndex = 0;
   let writerOverloaded = false;
@@ -91,12 +98,56 @@ async function processQueue(
   if (unexpectedErrors.length > 0) throw unexpectedErrors[0];
 }
 
+const LLM_WRITER_PATH = '/api/internal/usage/record';
+
+/**
+ * Non-LLM writers live next to the LLM writer, so their URL replaces the documented path suffix
+ * of `USAGE_WRITER_URL`. Any other shape is treated as missing config.
+ */
+function writerUrlFor(path: string, llmWriterUrl: string | undefined): string | undefined {
+  if (!llmWriterUrl?.endsWith(LLM_WRITER_PATH)) return undefined;
+  return llmWriterUrl.slice(0, -LLM_WRITER_PATH.length) + path;
+}
+
+function recordQueuedUsage(
+  usage: Exclude<QueuedUsage, { kind: 'invalid' }>,
+  env: Env
+): Promise<LlmUsageWriteOutcome | EnkryptUsageWriteOutcome | ExaUsageWriteOutcome> {
+  const config = {
+    secret: env.USAGE_WRITER_SECRET,
+    protectionBypass: env.USAGE_WRITER_PROTECTION_BYPASS,
+    source: 'queue',
+  } as const;
+  if (usage.kind === 'llm') {
+    return recordLlmUsage(usage.usage, { url: env.USAGE_WRITER_URL, ...config });
+  }
+  if (usage.kind === 'exa_usage') {
+    return recordExaUsage(usage.record, {
+      url: writerUrlFor(EXA_USAGE_WRITE_PATH, env.USAGE_WRITER_URL),
+      ...config,
+    });
+  }
+  return recordEnkryptUsage(usage.record, {
+    url: writerUrlFor(ENKRYPT_USAGE_WRITE_PATH, env.USAGE_WRITER_URL),
+    ...config,
+  });
+}
+
+/** LLM logs keep their existing fields; only tagged messages add `usage_kind`. */
+function usageIdentity(parsed: QueuedUsage, llmFields: (usage: LlmUsageQueueMessage) => object) {
+  if (parsed.kind === 'llm') return llmFields(parsed.usage);
+  if (parsed.kind === 'enkrypt_usage' || parsed.kind === 'exa_usage') {
+    return { usage_id: parsed.record.id, usage_kind: parsed.kind };
+  }
+  return parsed.usageKind === 'llm' ? {} : { usage_kind: parsed.usageKind };
+}
+
 async function processMessage(
   message: Message<unknown>,
   env: Env,
   batch: MessageBatch<unknown>,
-  diagnostics: Diagnostics | undefined,
-  batchId: string | undefined,
+  diagnostics: Diagnostics,
+  batchId: string,
   lastLaunchAtMs: number,
   entryAtMs: number,
   startedAtMs: number
@@ -105,42 +156,36 @@ async function processMessage(
   const timestampMs = message.timestamp.getTime();
   const queueWaitMs = Math.max(0, Date.now() - timestampMs);
   const handlerEntryQueueAgeMs = Math.max(0, entryAtMs - timestampMs);
-  const parsed = UsageRecordRequestSchema.safeParse(message.body);
-  if (diagnostics !== undefined)
-    logSafely('info', () => ({
-      event: 'usage_ingest_handler_entry',
-      queue: batch.queue,
-      batch_id: batchId,
-      ...diagnostics,
-      message_start_at_ms: Date.now(),
-      queue_message_id: message.id,
-      message_timestamp_ms: message.timestamp.getTime(),
-      delivery_attempts: message.attempts,
-      ...(parsed.success
-        ? {
-            usage_id: parsed.data.core.id,
-            event_created_at_ms: Date.parse(parsed.data.core.created_at),
-          }
-        : {}),
-      ...queueMetrics(batch),
-    }));
+  const parsed = parseQueuedUsage(message.body);
+  logSafely('info', () => ({
+    event: 'usage_ingest_handler_entry',
+    queue: batch.queue,
+    batch_id: batchId,
+    ...diagnostics,
+    message_start_at_ms: Date.now(),
+    queue_message_id: message.id,
+    message_timestamp_ms: message.timestamp.getTime(),
+    delivery_attempts: message.attempts,
+    ...usageIdentity(parsed, usage => ({
+      usage_id: usage.core.id,
+      event_created_at_ms: Date.parse(usage.core.created_at),
+    })),
+    ...queueMetrics(batch),
+  }));
   let outcome:
-    | UsageWriteOutcome
-    | { kind: 'unavailable'; reason: 'invalid_event' | 'invocation_budget' };
+    | LlmUsageWriteOutcome
+    | EnkryptUsageWriteOutcome
+    | ExaUsageWriteOutcome
+    | { kind: 'unavailable'; reason: 'invalid_event' | 'unsupported_kind' | 'invocation_budget' };
   let writerDurationMs: number | undefined;
-  if (!parsed.success) {
-    outcome = { kind: 'unavailable', reason: 'invalid_event' };
+  if (parsed.kind === 'invalid') {
+    outcome = { kind: 'unavailable', reason: parsed.reason };
   } else if (performance.now() > lastLaunchAtMs) {
     // Leave room for the full existing HTTP timeout; never abandon an in-flight write.
     outcome = { kind: 'unavailable', reason: 'invocation_budget' };
   } else {
     const writerStartedAt = performance.now();
-    outcome = await recordUsage(parsed.data, {
-      url: env.USAGE_WRITER_URL,
-      secret: env.USAGE_WRITER_SECRET,
-      protectionBypass: env.USAGE_WRITER_PROTECTION_BYPASS,
-      source: 'queue',
-    });
+    outcome = await recordQueuedUsage(parsed, env);
     if (outcome.kind !== 'unavailable' || outcome.reason !== 'missing_config') {
       writerDurationMs = Math.round(performance.now() - writerStartedAt);
     }
@@ -161,7 +206,8 @@ async function processMessage(
   logSafely(level, () => ({
     event: 'usage_ingest_processing',
     queue: batch.queue,
-    ...(diagnostics === undefined ? {} : { batch_id: batchId, ...diagnostics }),
+    batch_id: batchId,
+    ...diagnostics,
     outcome: outcome.kind,
     ...('reason' in outcome ? { reason: outcome.reason } : {}),
     queue_action: acknowledged ? 'ack' : 'retry',
@@ -180,12 +226,10 @@ async function processMessage(
     sampleDelivery(message.id, message.attempts)
       ? { handler_entry_queue_age_ms: handlerEntryQueueAgeMs, slot_wait_ms: slotWaitMs }
       : {}),
-    ...(parsed.success
-      ? {
-          usage_id: parsed.data.core.id,
-          event_age_ms: Math.max(0, Date.now() - Date.parse(parsed.data.core.created_at)),
-        }
-      : {}),
+    ...usageIdentity(parsed, usage => ({
+      usage_id: usage.core.id,
+      event_age_ms: Math.max(0, Date.now() - Date.parse(usage.core.created_at)),
+    })),
     ...(writerDurationMs === undefined ? {} : { writer_duration_ms: writerDurationMs }),
   }));
   return { acknowledged, overloaded, retryDelaySeconds };

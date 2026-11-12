@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The failure selector and the every-catalog label check share one subject. */
 import { describe, expect, it } from 'vitest';
 
 import { type MessageInfo } from '@kilocode/cloud-agent-sdk';
@@ -8,6 +9,9 @@ import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 
 import {
   composeFailureLabel,
+  CREDITS_DELIVERY_REASON,
+  isGenericResponseFailure,
+  type MessageDeliveryStatement,
   messageFailureLabel,
   NON_RETRYABLE_ASSISTANT_ERRORS,
   selectMessageFailure,
@@ -25,6 +29,17 @@ function userInfo(): MessageInfo {
 }
 
 type AssistantError = NonNullable<Extract<MessageInfo, { role: 'assistant' }>['error']>;
+
+/** The Kilo gateway's answer to a paid request from an account with no balance. */
+const GATEWAY_CREDITS_BODY = JSON.stringify({
+  error: {
+    title: 'Paid Model - Credits Required',
+    message: 'Add credits to continue, or switch to a free model',
+    balance: 0,
+    buyCreditsUrl: 'https://app.kilo.ai/profile',
+  },
+  error_type: 'usage_limit_exceeded',
+});
 
 function assistantInfo(errorName: string): MessageInfo {
   return {
@@ -54,6 +69,22 @@ function assistantInfoWithoutError(): MessageInfo {
   return info;
 }
 
+/** One catalog value by its dotted path, from a loaded catalog object. */
+function catalogString(catalog: unknown, path: string): string {
+  let value: unknown = catalog;
+  for (const key of path.split('.')) {
+    if (value === null || typeof value !== 'object') {
+      value = undefined;
+      break;
+    }
+    value = (value as Record<string, unknown>)[key];
+  }
+  if (typeof value !== 'string') {
+    throw new TypeError(`no catalog string at ${path}`);
+  }
+  return value;
+}
+
 describe('selectMessageFailure', () => {
   it('returns null when there is no failed delivery and no assistant error', () => {
     expect(selectMessageFailure({ info: userInfo() })).toBeNull();
@@ -69,25 +100,33 @@ describe('selectMessageFailure', () => {
   describe('delivery', () => {
     it('maps every delivery reason to fixed copy and never emits raw error text', () => {
       const cases = [
-        { reason: 'interrupted', title: 'Failed to deliver', detail: 'You stopped this message.' },
+        {
+          reason: 'interrupted',
+          title: 'You stopped this message.',
+          detail: null,
+          error: false,
+        },
         {
           reason: 'exhausted',
-          title: 'Failed to deliver',
+          title: 'Message not sent',
           detail: 'We could not deliver this message after several attempts.',
+          error: true,
         },
       ] as const;
 
-      for (const { reason, title, detail } of cases) {
+      for (const { reason, title, detail, error } of cases) {
         const result = selectMessageFailure({
           info: userInfo(),
           deliveryState: { status: 'failed', error: 'RAW_TRANSPORT_TEXT', reason },
         });
         expect(result).not.toBeNull();
         expect(result?.kind).toBe('delivery');
+        expect(result?.side).toBe('user');
+        expect(result?.error).toBe(error);
         expect(result?.title).toBe(title);
         expect(result?.detail).toBe(detail);
         expect(result?.title).not.toContain('RAW_TRANSPORT_TEXT');
-        expect(result?.detail).not.toContain('RAW_TRANSPORT_TEXT');
+        expect(result?.detail ?? '').not.toContain('RAW_TRANSPORT_TEXT');
         // The raw transport text stays reachable behind the copy action only.
         expect(result?.copyDetail).toBe('RAW_TRANSPORT_TEXT');
         expect(result?.canRetry).toBe(true);
@@ -95,18 +134,57 @@ describe('selectMessageFailure', () => {
       }
     });
 
-    it('states an agent-execution failure once, in the assistant-failure copy', () => {
+    it('states an agent-execution failure in the assistant-failure copy and names the failed run', () => {
       const result = selectMessageFailure({
         info: userInfo(),
         deliveryState: { status: 'failed', error: 'RAW_TRANSPORT_TEXT', reason: 'execution' },
       });
       expect(result).not.toBeNull();
       expect(result?.kind).toBe('delivery');
+      // The row is the user's question, but the statement is the failed
+      // response: it takes the assistant's column, not the bubble's.
+      expect(result?.side).toBe('assistant');
+      expect(result?.error).toBe(true);
       expect(result?.title).toBe('Response failed');
-      expect(result?.detail).toBeNull();
+      // The second line names what failed, where the provider's own failures
+      // state their reason.
+      expect(result?.detail).toBe('The agent could not run this message.');
       expect(result?.copyDetail).toBe('RAW_TRANSPORT_TEXT');
       expect(result?.canRetry).toBe(true);
       expect(result?.canCopy).toBe(true);
+    });
+
+    it('states the balance that refused the send, with Add credits and no Retry', () => {
+      const result = selectMessageFailure({
+        info: userInfo(),
+        deliveryState: { status: 'failed', error: '', reason: 'credits' },
+      });
+      expect(result).not.toBeNull();
+      expect(result?.kind).toBe('delivery');
+      // The send never left, so the statement sits under the person's own bubble.
+      expect(result?.side).toBe('user');
+      expect(result?.error).toBe(true);
+      expect(result?.title).toBe('Not enough credits to send this message.');
+      // The action under it carries the recovery; a detail line would repeat the
+      // cause the title already names.
+      expect(result?.detailKey).toBeNull();
+      expect(result?.detail).toBeNull();
+      expect(result?.copyDetail).toBe('');
+      // A re-send meets the same balance, so the row offers the action that
+      // settles it instead of a Retry.
+      expect(result?.canRetry).toBe(false);
+      expect(result?.canAddCredits).toBe(true);
+      expect(result?.canCopy).toBe(true);
+    });
+
+    it('offers Add credits on a refused send even where a re-send is impossible', () => {
+      const result = selectMessageFailure({
+        info: userInfo(),
+        deliveryState: { status: 'failed', error: '', reason: 'credits' },
+        retryAvailable: false,
+      });
+      expect(result?.canRetry).toBe(false);
+      expect(result?.canAddCredits).toBe(true);
     });
 
     it('exposes no copy detail when the delivery failure carries no transport text', () => {
@@ -142,6 +220,7 @@ describe('selectMessageFailure', () => {
         const result = selectMessageFailure({ info: assistantInfo(name) });
         expect(result, name).not.toBeNull();
         expect(result?.kind).toBe('assistant');
+        expect(result?.side).toBe('assistant');
         expect(result?.title).toBe('Response failed');
         expect(result?.detail, name).toBe(detail);
         expect(result?.detail).not.toContain('RAW_PROVIDER_TEXT');
@@ -178,7 +257,81 @@ describe('selectMessageFailure', () => {
       const result = selectMessageFailure({ info });
 
       expect(result?.canRetry).toBe(false);
+      // The row has no recovery action left, so the detail line states that the
+      // refusal is final instead of repeating the transient-failure line.
+      expect(result?.detailKey).toBe('agentChat.messageFailure.assistantProviderRefused');
+      expect(result?.detail).toBe('The provider refused this request and it cannot be retried.');
       expect(JSON.stringify(result)).not.toContain('RAW_PROVIDER_TEXT');
+    });
+
+    it('states a credits refusal the gateway named, and offers the action that settles it', () => {
+      const info = assistantInfo('APIError') as Extract<MessageInfo, { role: 'assistant' }>;
+      info.error = {
+        name: 'APIError',
+        data: {
+          message: 'RAW_PROVIDER_TEXT',
+          statusCode: 402,
+          isRetryable: false,
+          responseBody: GATEWAY_CREDITS_BODY,
+        },
+      };
+
+      const result = selectMessageFailure({ info });
+
+      expect(result?.detailKey).toBe('agentChat.messageFailure.assistantCreditsRefusal');
+      expect(result?.detail).toBe(i18n.t('agentChat.messageFailure.assistantCreditsRefusal'));
+      expect(result?.detail).toBe('Not enough credits for this request.');
+      // A session can run anywhere, so the statement never names the execution
+      // surface the account did not choose.
+      expect(result?.detail).not.toContain('Cloud Agent');
+      expect(result?.canAddCredits).toBe(true);
+      // The same request meets the same block, so the row keeps no resend.
+      expect(result?.canRetry).toBe(false);
+      expect(JSON.stringify(result)).not.toContain('RAW_PROVIDER_TEXT');
+    });
+
+    it('accepts the gateway name the direct-provider path answers with', () => {
+      const info = assistantInfo('APIError') as Extract<MessageInfo, { role: 'assistant' }>;
+      info.error = {
+        name: 'APIError',
+        data: {
+          message: 'RAW_PROVIDER_TEXT',
+          statusCode: 402,
+          isRetryable: false,
+          responseBody:
+            '{"error":{"message":"Insufficient credits"},"error_type":"insufficient_credits"}',
+        },
+      };
+
+      expect(selectMessageFailure({ info })?.canAddCredits).toBe(true);
+    });
+
+    it('keeps the final-refusal line for a payment status a provider key caused', () => {
+      const info = assistantInfo('APIError') as Extract<MessageInfo, { role: 'assistant' }>;
+      info.error = {
+        name: 'APIError',
+        data: {
+          message: 'RAW_PROVIDER_TEXT',
+          statusCode: 402,
+          isRetryable: false,
+          responseBody: '{"error":{"message":"Upstream request failed"}}',
+        },
+      };
+
+      const result = selectMessageFailure({ info });
+
+      expect(result?.detailKey).toBe('agentChat.messageFailure.assistantProviderRefused');
+      expect(result?.canAddCredits).toBe(false);
+    });
+
+    it('does not read a payment status alone as a credit block', () => {
+      const info = assistantInfo('APIError') as Extract<MessageInfo, { role: 'assistant' }>;
+      info.error = {
+        name: 'APIError',
+        data: { message: 'RAW_PROVIDER_TEXT', statusCode: 402, isRetryable: false },
+      };
+
+      expect(selectMessageFailure({ info })?.canAddCredits).toBe(false);
     });
 
     it('keeps Retry when the gateway marked the failure retryable', () => {
@@ -188,7 +341,10 @@ describe('selectMessageFailure', () => {
         data: { message: 'RAW_PROVIDER_TEXT', isRetryable: true },
       };
 
-      expect(selectMessageFailure({ info })?.canRetry).toBe(true);
+      const result = selectMessageFailure({ info });
+
+      expect(result?.canRetry).toBe(true);
+      expect(result?.detailKey).toBe('agentChat.messageFailure.assistantProviderError');
     });
 
     it('keeps Retry for a session written before the retryability flag existed', () => {
@@ -198,13 +354,92 @@ describe('selectMessageFailure', () => {
         data: { message: 'RAW_PROVIDER_TEXT' },
       } as unknown as AssistantError;
 
-      expect(selectMessageFailure({ info })?.canRetry).toBe(true);
+      const result = selectMessageFailure({ info });
+
+      expect(result?.canRetry).toBe(true);
+      expect(result?.detailKey).toBe('agentChat.messageFailure.assistantProviderError');
     });
 
     it('never sets canCopy true for an assistant row', () => {
       const result = selectMessageFailure({ info: assistantInfo('APIError') });
       expect(result?.canCopy).toBe(false);
     });
+  });
+
+  describe('retryAvailable', () => {
+    it('keeps an assistant failure copy but drops Retry for a session that cannot send', () => {
+      const result = selectMessageFailure({
+        info: assistantInfo('APIError'),
+        retryAvailable: false,
+      });
+
+      expect(result?.title).toBe('Response failed');
+      expect(result?.detail).toBe('The provider returned an error.');
+      expect(result?.canRetry).toBe(false);
+    });
+
+    it('drops Retry from a delivery failure and keeps its copy action', () => {
+      const result = selectMessageFailure({
+        info: userInfo(),
+        deliveryState: { status: 'failed', error: 'RAW_TRANSPORT_TEXT', reason: 'exhausted' },
+        retryAvailable: false,
+      });
+
+      expect(result?.detail).toBe('We could not deliver this message after several attempts.');
+      expect(result?.canRetry).toBe(false);
+      expect(result?.canCopy).toBe(true);
+    });
+
+    it('leaves the provider verdict in charge when the caller does not say', () => {
+      expect(selectMessageFailure({ info: assistantInfo('APIError') })?.canRetry).toBe(true);
+      expect(
+        selectMessageFailure({ info: assistantInfo('APIError'), retryAvailable: true })?.canRetry
+      ).toBe(true);
+    });
+  });
+});
+
+/**
+ * A failed preparation states its own cause in the group it renders, so the
+ * question's row keeps only its actions where its statement would repeat the
+ * same failed turn. Only the statement with no cause of its own is that
+ * generic; every classified cause stays readable in the row.
+ */
+describe('isGenericResponseFailure', () => {
+  const failureFor = (input: { deliveryState?: MessageDeliveryStatement; info?: MessageInfo }) =>
+    selectMessageFailure({
+      info: input.info ?? userInfo(),
+      ...(input.deliveryState === undefined ? {} : { deliveryState: input.deliveryState }),
+    });
+
+  it('reads a failed run and an unclassified assistant error as generic', () => {
+    const execution = failureFor({
+      deliveryState: { status: 'failed', error: '', reason: 'execution' },
+    });
+    expect(execution).not.toBeNull();
+    expect(execution && isGenericResponseFailure(execution)).toBe(true);
+
+    const unknown = failureFor({ info: assistantInfo('UnknownError') });
+    expect(unknown).not.toBeNull();
+    expect(unknown && isGenericResponseFailure(unknown)).toBe(true);
+  });
+
+  it('keeps every classified cause, and every failure of the send itself', () => {
+    const cases: (MessageInfo | MessageDeliveryStatement)[] = [
+      { status: 'failed', error: '', reason: CREDITS_DELIVERY_REASON },
+      { status: 'failed', error: 'RAW_TRANSPORT_TEXT', reason: 'exhausted' },
+      { status: 'failed', error: '', reason: 'interrupted' },
+      assistantInfo('ProviderAuthError'),
+      assistantInfo('ContextOverflowError'),
+      assistantInfo('APIError'),
+    ];
+
+    for (const entry of cases) {
+      const failure =
+        'status' in entry ? failureFor({ deliveryState: entry }) : failureFor({ info: entry });
+      expect(failure, JSON.stringify(entry)).not.toBeNull();
+      expect(failure && isGenericResponseFailure(failure), JSON.stringify(entry)).toBe(false);
+    }
   });
 });
 
@@ -224,21 +459,6 @@ describe('messageFailureLabel', () => {
   // the implementation misses still lands next to the template's own.
   const ADJACENT_TERMINATORS = /[\p{Sentence_Terminal}\u2026]{2}/u;
   const PLACEHOLDER = '{{title}}';
-
-  function catalogString(catalog: unknown, path: string): string {
-    let value: unknown = catalog;
-    for (const key of path.split('.')) {
-      if (value === null || typeof value !== 'object') {
-        value = undefined;
-        break;
-      }
-      value = (value as Record<string, unknown>)[key];
-    }
-    if (typeof value !== 'string') {
-      throw new TypeError(`no catalog string at ${path}`);
-    }
-    return value;
-  }
 
   it('states the failure once, in one terminator, in every catalog', async () => {
     try {
@@ -338,5 +558,51 @@ describe('composeFailureLabel', () => {
     expect(composeFailureLabel('تعذّر تسليم الرسالة.', 'خطأ: {{title}}.')).toBe(
       'خطأ: تعذّر تسليم الرسالة.'
     );
+  });
+});
+
+/**
+ * The gateway's credits refusal reaches a session that runs in the cloud and one
+ * that runs on a computer the person connected, so the statement names the
+ * account's credits for the request and never the surface the person did not
+ * choose. Every language is checked: a translator works from the key name and
+ * its context, and one locale that keeps the old product name would state the
+ * wrong cause on the rows of that language.
+ */
+describe('credits refusal copy', () => {
+  const CREDITS_KEYS = [
+    'agentChat.messageFailure.assistantCreditsRefusal',
+    'agentChat.session.notEnoughCredits',
+  ] as const;
+
+  it('names no execution surface in any catalog', async () => {
+    try {
+      for (const language of SUPPORTED_LANGUAGES) {
+        // The active language is one piece of global i18next state, so each
+        // catalog has to be measured before the next one is selected.
+        // eslint-disable-next-line no-await-in-loop
+        await i18n.changeLanguage(language);
+        const catalog: unknown = CATALOG_LOADERS[language]();
+        for (const key of CREDITS_KEYS) {
+          expect(catalogString(catalog, key), `${language} ${key}`).not.toContain('Cloud Agent');
+        }
+      }
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
+  it('states the cause for the request in the language the finding reported', async () => {
+    try {
+      await i18n.changeLanguage('pt-BR');
+      expect(i18n.t('agentChat.messageFailure.assistantCreditsRefusal')).toBe(
+        'Créditos insuficientes para esta solicitação.'
+      );
+      expect(i18n.t('agentChat.session.notEnoughCredits')).toBe(
+        'Créditos insuficientes para esta solicitação. Adicione créditos e tente novamente.'
+      );
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });

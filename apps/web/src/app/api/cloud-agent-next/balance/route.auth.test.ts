@@ -45,7 +45,7 @@ jest.mock('@kilocode/web-shared/lib/constants', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({ getEnvVariable: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
-  getBlacklistedDomains: async () => [],
+  isEmailBlacklisted: async () => false,
 }));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   warnExceptInTest: jest.fn(),

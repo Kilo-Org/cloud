@@ -5,10 +5,18 @@ import { t } from '../auth.js';
 import type { TRPCContext } from '../../types.js';
 import { createSessionStartHandlers } from './session-start.js';
 
-function environmentLoad(layer: Record<string, unknown>, sandboxAllocation: string | null = null) {
+function environmentLoad(
+  layer: Record<string, unknown>,
+  sandboxAllocation: string | null = null,
+  egress: {
+    egressMode: 'allowlist' | 'unrestricted' | null;
+    egressAllowlist: string[] | null;
+  } = { egressMode: null, egressAllowlist: null }
+) {
   return {
     layer,
     sandboxAllocation,
+    ...egress,
     reference: {
       environmentId: '123e4567-e89b-12d3-a456-426614174099',
       owner: { type: 'user' as const, id: 'user-123' },
@@ -20,6 +28,7 @@ function environmentLoad(layer: Record<string, unknown>, sandboxAllocation: stri
 
 const {
   mergeProfileConfigurationMock,
+  getBuiltinAgentSettingsMock,
   loadEnvironmentForSessionMock,
   assertKiloModelAvailableMock,
   assertRepositoryAccessMock,
@@ -27,6 +36,7 @@ const {
   startNewSessionMock,
 } = vi.hoisted(() => ({
   mergeProfileConfigurationMock: vi.fn().mockResolvedValue({}),
+  getBuiltinAgentSettingsMock: vi.fn().mockResolvedValue({}),
   loadEnvironmentForSessionMock: vi.fn().mockResolvedValue({ status: 'none' }),
   assertKiloModelAvailableMock: vi.fn().mockResolvedValue(undefined),
   assertRepositoryAccessMock: vi.fn().mockResolvedValue(undefined),
@@ -48,6 +58,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
   return {
     ...actual,
     mergeProfileConfiguration: mergeProfileConfigurationMock,
+    getBuiltinAgentSettings: getBuiltinAgentSettingsMock,
     loadEnvironmentForSession: loadEnvironmentForSessionMock,
   };
 });
@@ -91,6 +102,7 @@ describe('startSession environment propagation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mergeProfileConfigurationMock.mockResolvedValue({});
+    getBuiltinAgentSettingsMock.mockResolvedValue({});
     loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
     assertRepositoryAccessMock.mockResolvedValue(undefined);
     assertOrganizationMembershipMock.mockResolvedValue(undefined);
@@ -143,6 +155,32 @@ describe('startSession environment propagation', () => {
             setupCommands: ['env-setup'],
           }),
         }),
+      }),
+      expect.objectContaining({ userId: 'test-user-123' }),
+      { billingOrigin: 'cloud-agent' }
+    );
+  });
+
+  it('carries a saved allowlist into the grouped create', async () => {
+    loadEnvironmentForSessionMock.mockResolvedValueOnce({
+      status: 'match',
+      environment: environmentLoad({}, null, {
+        egressMode: 'allowlist',
+        egressAllowlist: ['api.example.com'],
+      }),
+    });
+    const caller = router.createCaller(createContext());
+
+    await caller.start({
+      message: { prompt: 'Restricted network' },
+      agent: { mode: 'code', model: 'kilo/test-model' },
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { createdOnPlatform: 'cloud-agent-web' },
+    });
+
+    expect(startNewSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runtime: { egressMode: 'allowlist', egressAllowlist: ['api.example.com'] },
       }),
       expect.objectContaining({ userId: 'test-user-123' }),
       { billingOrigin: 'cloud-agent' }

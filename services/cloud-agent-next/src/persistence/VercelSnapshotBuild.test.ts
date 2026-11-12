@@ -12,6 +12,9 @@ import {
   verifySandboxLaunchCredential,
 } from '../sandbox-control/credential.js';
 import { encodeVercelProviderRef } from '../sandbox-control/vercel-provider.js';
+import { ProviderCreationError } from '../sandbox-control/provider.js';
+import { RUNTIME_TOOLCHAIN } from '../shared/runtime-toolchain.js';
+import { GH_STACK_INSTALL_PATH, RUNTIME_DISTRIBUTION } from '../shared/runtime-distribution.js';
 
 const mocks = vi.hoisted(() => {
   class CredentialMissingError extends Error {}
@@ -32,7 +35,6 @@ const mocks = vi.hoisted(() => {
     createSandbox: vi.fn(),
     inspectByName: vi.fn(),
     executeCommand: vi.fn(),
-    writeFiles: vi.fn(),
     listCommands: vi.fn(),
     getCommand: vi.fn(),
     stopSession: vi.fn(),
@@ -56,8 +58,8 @@ const mocks = vi.hoisted(() => {
     fetchCredential: vi.fn(),
     resolveAccess: vi.fn(),
     projectStatus: vi.fn(),
-    getArtifacts: vi.fn(),
     getIdentity: vi.fn(),
+    downloadedStartup: vi.fn(),
   };
 });
 
@@ -101,14 +103,13 @@ vi.mock('../byoc/vercel-credential-resolver.js', () => ({
   projectByocVercelStatus: mocks.projectStatus,
 }));
 
-vi.mock('../byoc/vercel-runtime-artifacts.js', () => ({
-  getVercelRuntimeArtifacts: mocks.getArtifacts,
-}));
-
 vi.mock('../byoc/vercel-runtime-identity.js', () => ({
   getVercelRuntimeIdentity: mocks.getIdentity,
   VERCEL_RUNTIME_BUN_VERSION: '1.3.14',
-  VERCEL_RUNTIME_KILO_CLI_VERSION: '7.4.20',
+}));
+
+vi.mock('../sandbox-control/downloaded-startup.js', () => ({
+  downloadedStartup: mocks.downloadedStartup,
 }));
 
 vi.mock('../agent-sandbox/vercel/vercel-sandbox-rest-client.js', () => ({
@@ -246,6 +247,7 @@ function createBuild(
   const env = {
     WORKER_URL: 'https://worker.invalid',
     NEXTAUTH_SECRET: 'snapshot-test-signing-secret',
+    RUNTIME_RELEASE_DESCRIPTOR: 'descriptor-test',
     SANDBOX_CONTROL: { getByName: () => mocks.control },
   };
   return new VercelSnapshotBuild(ctx as never, env as never);
@@ -376,7 +378,6 @@ beforeEach(() => {
   mocks.client.listSnapshots.mockResolvedValue([]);
   mocks.client.stopSession.mockResolvedValue({ status: 'stopped' });
   mocks.client.deleteSnapshot.mockResolvedValue(undefined);
-  mocks.client.writeFiles.mockResolvedValue(undefined);
   mocks.client.executeCommand.mockImplementation(async (_sessionId, input) =>
     input.wait === false
       ? { id: 'command-test', exitCode: null }
@@ -386,22 +387,14 @@ beforeEach(() => {
         }
   );
   mocks.getIdentity.mockResolvedValue({
-    wrapperVersion: '2.4.0',
-    releasedAt: '2026-09-08',
+    wrapperVersion: 'downloaded-base-v1',
+    releasedAt: '2026-10-23',
     digest: 'digest-test',
   });
-  mocks.getArtifacts.mockResolvedValue([
-    {
-      path: 'usr/local/bin/kilocode-control-plane-wrapper.js',
-      bytes: new TextEncoder().encode('control-wrapper'),
-      sha256: 'b'.repeat(64),
-    },
-    {
-      path: 'usr/local/bin/kilocode-control-plane-supervisor.sh',
-      bytes: new TextEncoder().encode('supervisor'),
-      sha256: 'c'.repeat(64),
-    },
-  ]);
+  mocks.downloadedStartup.mockResolvedValue({
+    argv: ['/bin/sh', '-c', 'exec /bin/sh /usr/local/bin/kilocode-control-plane-supervisor.sh'],
+    user: 'root',
+  });
 });
 
 describe('VercelSnapshotBuild persistence isolation', () => {
@@ -1863,6 +1856,17 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     expect(identity?.allocationId).toBe(FIRST_GENERATION);
     if (!identity) throw new Error('Expected signed validator identity');
     expect(launch.env.PROVIDER_INSTANCE_ID).toBe(providerRef);
+    expect(mocks.downloadedStartup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        descriptor: 'descriptor-test',
+        sandboxId: `ses-byoc-validator-${FIRST_GENERATION.replaceAll('-', '')}`,
+        allocationId: FIRST_GENERATION,
+        deadlineAt: createdAt + 600_000,
+      })
+    );
+    expect(launch.command).toBe('/bin/sh');
+    expect(launch.args.at(-1)).toContain(`# byoc-call-home:${FIRST_GENERATION}`);
+    expect(launch.sudo).toBe(true);
     expect(mocks.control.initializeSnapshotValidator).toHaveBeenCalledWith({
       build: {
         organizationId: ORGANIZATION_ID,
@@ -1984,7 +1988,7 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     );
     await fixture.build.alarm();
     mocks.client.listCommands.mockResolvedValueOnce([
-      { id: 'recovered-command', args: [`byoc-call-home:${FIRST_GENERATION}`] },
+      { id: 'recovered-command', args: [`exec supervisor # byoc-call-home:${FIRST_GENERATION}`] },
     ]);
 
     await runNextAlarm(fixture);
@@ -1996,6 +2000,85 @@ describe('VercelSnapshotBuild runtime preparation', () => {
       step: 'verify_validator_call_home',
       validator_wrapper_command_id: 'recovered-command',
     });
+  });
+
+  it('retries a transient runtime startup failure instead of failing the build', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, {
+      step: 'launch_validator_wrapper',
+      snapshot_id: 'snapshot-validator',
+      validator_session_id: 'validator-session',
+    });
+    mocks.downloadedStartup.mockRejectedValueOnce(new Error('runtime storage unavailable'));
+
+    await fixture.build.alarm();
+
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'launch_validator_wrapper',
+      retry_count: 1,
+      last_error: 'runtime_startup_unavailable',
+    });
+    expect(mocks.client.executeCommand).not.toHaveBeenCalled();
+
+    await runNextAlarm(fixture);
+
+    expect(mocks.client.executeCommand).toHaveBeenCalledOnce();
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'verify_validator_call_home',
+      validator_wrapper_requested: 1,
+    });
+  });
+
+  it('projects the runtime startup failure after its retry budget is exhausted', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, {
+      step: 'launch_validator_wrapper',
+      snapshot_id: 'snapshot-validator',
+      validator_session_id: 'validator-session',
+      retry_count: 5,
+    });
+    mocks.downloadedStartup.mockRejectedValueOnce(new Error('runtime storage unavailable'));
+
+    await fixture.build.alarm();
+
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'project_failure',
+      last_error: 'runtime_startup_unavailable',
+    });
+    expect(mocks.client.executeCommand).not.toHaveBeenCalled();
+
+    await runNextAlarm(fixture);
+
+    expect(mocks.projectStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        setupStatus: 'failed',
+        setupError: 'runtime_startup_unavailable',
+      })
+    );
+  });
+
+  it('fails the build for a permanent runtime configuration error', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, {
+      step: 'launch_validator_wrapper',
+      snapshot_id: 'snapshot-validator',
+      validator_session_id: 'validator-session',
+    });
+    mocks.downloadedStartup.mockRejectedValueOnce(
+      new ProviderCreationError('invalid_configuration')
+    );
+
+    await fixture.build.alarm();
+
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'project_failure',
+      last_error: 'provider_configuration_failed',
+    });
+    expect(mocks.client.executeCommand).not.toHaveBeenCalled();
   });
 
   it('retries validator registration before recording a wrapper launch intent', async () => {
@@ -2209,37 +2292,80 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     expect(command.args[1]).toContain('test -w /workspace');
   });
 
-  it('stages runtime artifacts in tmp and installs validated root-owned files with sudo', async () => {
+  it('installs the base toolchain from pinned bytes and re-checks it by digest', async () => {
     const fixture = createFixture();
     await fixture.build.start(startInput());
     updateRow(fixture, {
-      step: 'upload_runtime_artifacts',
+      step: 'install_node_dependencies',
       builder_session_id: 'builder-session',
     });
 
     await fixture.build.alarm();
 
-    expect(mocks.client.writeFiles).toHaveBeenCalledWith('builder-session', '/tmp', [
-      expect.objectContaining({ path: 'kilocode-control-plane-wrapper.js' }),
-      expect.objectContaining({ path: 'kilocode-control-plane-supervisor.sh' }),
-      expect.objectContaining({ path: 'kilo-runtime-manifest.json' }),
-    ]);
-    const manifest = JSON.parse(
-      mocks.client.writeFiles.mock.calls[0]?.[2]?.find(
-        (file: { path: string }) => file.path === 'kilo-runtime-manifest.json'
-      )?.content
+    const command = mocks.client.executeCommand.mock.calls[0]?.[1];
+    expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.bun.url);
+    expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.bun.sha256);
+    expect(command.args[1]).not.toContain('https://registry.npmjs.org/@kilocode/cli/');
+    expect(command.args[1]).toContain("check_sha256 '/usr/local/bin/bun'");
+    expect(command.args[1]).not.toContain('npm install -g --loglevel=error "$work/package.tgz"');
+    expect(command.args[1]).toContain(
+      `https://github.com/github/gh-stack/releases/download/v${RUNTIME_DISTRIBUTION.ghStack}/linux-amd64`
     );
-    expect(manifest.controlWrapperSha256).toBe('b'.repeat(64));
+    expect(command.args[1]).toContain(
+      `curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --retry 3 --retry-delay 2 'https://github.com/github/gh-stack/`
+    );
+    expect(command.args[1]).toContain(
+      `echo '${RUNTIME_DISTRIBUTION.ghStackSha256}  /tmp/gh-stack' | sha256sum -c -`
+    );
+    expect(command.args[1]).toContain(
+      `sudo install -D -m 0755 /tmp/gh-stack '${GH_STACK_INSTALL_PATH}'`
+    );
+    expect(command.args[1]).toContain(
+      `test "$(sha256sum '${GH_STACK_INSTALL_PATH}' | cut -d' ' -f1)" = '${RUNTIME_DISTRIBUTION.ghStackSha256}'`
+    );
+    expect(command.args[1]).not.toContain('| bash');
+  });
+
+  it.each(['upload_runtime_artifacts', 'verify_runtime_artifacts'] as const)(
+    'resumes a stored retired step %s at the current install step',
+    async step => {
+      const fixture = createFixture();
+      await fixture.build.start(startInput());
+      updateRow(fixture, {
+        step,
+        builder_session_id: 'builder-session',
+      });
+
+      await fixture.build.alarm();
+
+      const command = mocks.client.executeCommand.mock.calls[0]?.[1];
+      expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.bun.url);
+      expect(command.args[1]).not.toContain('https://registry.npmjs.org/@kilocode/cli/');
+      expect(command.args[1]).not.toContain('kilocode-control-plane-wrapper');
+      expect(storedRow(fixture)).toMatchObject({ step: 'snapshot_builder' });
+    }
+  );
+
+  it('snapshots the base image without baking a CLI or control wrapper', async () => {
+    const fixture = createFixture();
+    await fixture.build.start(startInput());
+    updateRow(fixture, {
+      step: 'install_node_dependencies',
+      builder_session_id: 'builder-session',
+    });
 
     await fixture.build.alarm();
 
     const command = mocks.client.executeCommand.mock.calls[0]?.[1];
-    expect(command.args[1]).toContain(
-      'sudo install -m 0755 /tmp/kilocode-control-plane-wrapper.js /usr/local/bin/kilocode-control-plane-wrapper.js'
-    );
-    expect(command.args[1]).toContain(
-      'sudo install -m 0644 /tmp/kilo-runtime-manifest.json /usr/local/share/kilo/runtime-manifest.json'
-    );
-    expect(command.args[1]).toContain('sha256sum /usr/local/bin/kilocode-control-plane-wrapper.js');
+    expect(command.args[1]).toContain(RUNTIME_TOOLCHAIN.bun.url);
+    expect(command.args[1]).not.toContain('https://registry.npmjs.org/@kilocode/cli/');
+    expect(command.args[1]).toContain('git --version');
+    expect(command.args[1]).not.toContain('kilocode-control-plane-wrapper');
+    expect(storedRow(fixture)).toMatchObject({
+      step: 'snapshot_builder',
+      snapshot_source_session_id: 'builder-session',
+      snapshot_baseline_json: null,
+      snapshot_requested: 0,
+    });
   });
 });

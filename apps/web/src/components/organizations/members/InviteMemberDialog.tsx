@@ -36,9 +36,24 @@ import {
   useOrganizationWithMembers,
 } from '@/app/api/organizations/hooks';
 import { usePostHog } from 'posthog-js/react';
-import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 
-const emailSchema = z.email();
+// The procedure's own address rule: syntax plus the 254-character maximum a
+// mail system delivers. Kept beside the field so an over-length address is
+// reported before the round trip, not as a server rejection toast.
+const emailSchema = z
+  .email({ message: 'Please enter a valid email address' })
+  .max(254, 'Email address must be 254 characters or fewer');
+
+/**
+ * The field's own sentence for an address it cannot send: the rule above writes
+ * each one, so a well-formed but over-length address names its length instead of
+ * being called invalid. `null` means the field may send.
+ */
+export function inviteEmailErrorMessage(value: string): string | null {
+  const result = emailSchema.safeParse(value.trim());
+  if (result.success) return null;
+  return result.error.issues[0]?.message ?? 'Please enter a valid email address';
+}
 
 /**
  * Success copy for the invite mutation. The invitation is created but the email
@@ -129,22 +144,11 @@ export function InviteMemberDialog({
 
   const isEmailValid = useMemo(() => {
     if (!email.trim()) return false;
-    return emailSchema.safeParse(email.trim()).success;
+    return inviteEmailErrorMessage(email) === null;
   }, [email]);
 
-  const emailDomainMatchesDirectSSODomain = useMemo(() => {
-    const policy = organizationData?.effectiveSsoPolicy;
-    if (!email.trim() || !policy?.required || policy.source !== 'self' || !policy.domain) {
-      return false;
-    }
-    const emailDomain = getLowerDomainFromEmail(email.trim());
-    return emailDomain === policy.domain;
-  }, [email, organizationData?.effectiveSsoPolicy]);
-
-  const ssoErrorText = `Members of your enterprise domain (@${organizationData?.effectiveSsoPolicy.domain}) should sign in through your SSO provider to join this organization.`;
-
   const shouldShowEmailError = useMemo(() => {
-    return email.trim() && !isEmailFocused && !isEmailValid;
+    return email.trim().length > 0 && !isEmailFocused && !isEmailValid;
   }, [email, isEmailFocused, isEmailValid]);
 
   const inviteMemberMutation = useInviteMember();
@@ -175,12 +179,7 @@ export function InviteMemberDialog({
     }
 
     if (!isEmailValid) {
-      toast.error('Please enter a valid email address');
-      return;
-    }
-
-    if (emailDomainMatchesDirectSSODomain) {
-      toast.error(ssoErrorText);
+      toast.error(inviteEmailErrorMessage(email) ?? 'Please enter a valid email address');
       return;
     }
 
@@ -255,17 +254,9 @@ export function InviteMemberDialog({
                         handleInviteMember();
                       }
                     }}
-                    aria-invalid={shouldShowEmailError || emailDomainMatchesDirectSSODomain}
-                    aria-describedby={
-                      shouldShowEmailError || emailDomainMatchesDirectSSODomain
-                        ? 'invite-email-error'
-                        : undefined
-                    }
-                    className={
-                      shouldShowEmailError || emailDomainMatchesDirectSSODomain
-                        ? 'border-red-500 focus:border-red-500'
-                        : ''
-                    }
+                    aria-invalid={shouldShowEmailError}
+                    aria-describedby={shouldShowEmailError ? 'invite-email-error' : undefined}
+                    className={shouldShowEmailError ? 'border-red-500 focus:border-red-500' : ''}
                     disabled={!hasSeatsAvailable}
                   />
                 </div>
@@ -313,7 +304,7 @@ export function InviteMemberDialog({
               </div>
             </div>
 
-            {(shouldShowEmailError || emailDomainMatchesDirectSSODomain) && (
+            {shouldShowEmailError && (
               <div className="rounded-md border border-red-800 bg-red-950/30 p-3">
                 <div className="flex items-center gap-2">
                   <svg
@@ -328,8 +319,7 @@ export function InviteMemberDialog({
                     />
                   </svg>
                   <p id="invite-email-error" className="text-sm text-red-300" role="alert">
-                    {shouldShowEmailError && 'Please enter a valid email address'}
-                    {emailDomainMatchesDirectSSODomain && ssoErrorText}
+                    {inviteEmailErrorMessage(email) ?? 'Please enter a valid email address'}
                   </p>
                 </div>
               </div>
@@ -358,7 +348,6 @@ export function InviteMemberDialog({
               onClick={handleInviteMember}
               disabled={
                 !isEmailValid ||
-                emailDomainMatchesDirectSSODomain ||
                 inviteMemberMutation.isPending ||
                 !canInviteMembers ||
                 !hasSeatsAvailable

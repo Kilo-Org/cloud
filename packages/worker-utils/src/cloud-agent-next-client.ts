@@ -12,7 +12,10 @@ import {
   CODE_REVIEW_TERMINAL_REASONS,
   type CodeReviewTerminalReason as CloudAgentTerminalReason,
 } from '@kilocode/db/schema-types';
+import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
+import type { GateThreshold } from '@kilocode/app-shared/code-review';
 import type { EgressMode } from './egress-allowlist.js';
+import type { SandboxAllocationInput } from './sandbox-allocation.js';
 import {
   GetEgressAuditResponseSchema,
   type GetEgressAuditInput,
@@ -70,8 +73,8 @@ export type CloudAgentPrepareSessionInput = {
   upstreamBranch?: string;
   callbackTarget?: CallbackTarget;
   createdOnPlatform?: string;
-  gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
-  sandboxAllocation?: 'isolated-standard';
+  gateThreshold?: GateThreshold;
+  sandboxAllocation?: SandboxAllocationInput;
   egressMode?: EgressMode;
   egressAllowlist?: string[];
   egressAudit?: boolean;
@@ -90,6 +93,7 @@ export type CloudAgentPrepareSessionInput = {
 export type CloudAgentPrepareSessionOutput = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
+  worktreeId?: CloudAgentWorktreeId;
   /** `true` when the response replays an already-settled create for the same `operationKey`. */
   replayed?: boolean;
 };

@@ -32,7 +32,6 @@ export const APPSFLYER_APP_ID: string = required('appsFlyerAppId');
 export const CLOUD_AGENT_WS_URL: string = required('cloudAgentWsUrl');
 export const SESSION_INGEST_WS_URL: string = required('sessionIngestWsUrl');
 
-export const KILO_CHAT_URL: string = required('kiloChatUrl');
 export const EVENT_SERVICE_URL: string = required('eventServiceUrl');
 export const NOTIFICATIONS_URL: string = required('notificationsUrl');
 export const POSTHOG_API_KEY: string = required('posthogApiKey');
@@ -50,6 +49,13 @@ const KILO_MCP_URL_PRODUCTION = 'https://mcp.kiloapps.io';
 export const KILO_MCP_URL: string | undefined =
   optional('kiloMcpUrl') ??
   (extra?.isProductionBuild === true ? KILO_MCP_URL_PRODUCTION : undefined);
+// The native remote preview requires a development bundle and an explicit relay.
+export const SESSION_SYNC_URL: string | undefined = __DEV__
+  ? process.env.EXPO_PUBLIC_SESSION_SYNC_URL
+  : undefined;
+if (SESSION_SYNC_URL) {
+  assertUrlScheme('sessionSyncUrl', SESSION_SYNC_URL, ['https:'], { allowInsecure: true });
+}
 export const GOOGLE_WEB_CLIENT_ID: string | undefined = optional('googleWebClientId');
 export const GOOGLE_IOS_CLIENT_ID: string | undefined = optional('googleIosClientId');
 export const PLAY_INTEGRITY_PROJECT_NUMBER: string | undefined = optional(

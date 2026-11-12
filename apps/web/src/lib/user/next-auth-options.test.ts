@@ -1,15 +1,52 @@
+import type * as watchwoodModule from '@/lib/auth/watchwood';
+import type * as linkingModule from '@/lib/account-linking-session';
+import type * as userModule from '@/lib/user';
+import type * as userServerModule from '@kilocode/web-shared/lib/user/server';
+
+jest.mock('next/headers', () => ({ cookies: jest.fn(), headers: jest.fn() }));
+jest.mock('@/lib/auth/watchwood', () => ({
+  ...jest.requireActual<typeof watchwoodModule>('@/lib/auth/watchwood'),
+  readWatchwoodSignupAssessment: jest.fn(),
+}));
+jest.mock('@/lib/user/sso', () => ({ processSSOUserLogin: jest.fn() }));
+jest.mock('@/lib/user', () => ({
+  ...jest.requireActual<typeof userModule>('@/lib/user'),
+  findAndSyncExistingUser: jest.fn(
+    jest.requireActual<typeof userModule>('@/lib/user').findAndSyncExistingUser
+  ),
+}));
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
+  ...jest.requireActual<typeof userServerModule>('@kilocode/web-shared/lib/user/server'),
+  getUserFromSession: jest.fn(),
+  isBlockedTLD: jest.fn(),
+}));
+jest.mock('@/lib/account-linking-session', () => ({
+  ...jest.requireActual<typeof linkingModule>('@/lib/account-linking-session'),
+  getAccountLinkingSession: jest.fn(),
+}));
+
 import { describe, test, expect } from '@jest/globals';
+import { cookies, headers } from 'next/headers';
+import { readWatchwoodSignupAssessment } from '@/lib/auth/watchwood';
+import { processSSOUserLogin } from '@/lib/user/sso';
+import { getAccountLinkingSession } from '@/lib/account-linking-session';
+import * as userServer from '@kilocode/web-shared/lib/user/server';
+import * as userLib from '@/lib/user';
 import { sessionAuthOptions } from '@kilocode/web-shared/lib/user/server';
 import {
   parseLinkedInProfileName,
   parseAnacondaProfile,
   parseOpenAiProfile,
   profileProvesEmailOwnership,
+  githubEmailsProveOwnership,
   authOptions,
   parseSignInRedirectContext,
+  getInvitationTokenFromCallbackPath,
+  preserveSignInRedirectContext,
 } from '@/lib/user/next-auth-options';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createSignInTicket } from '@/lib/auth/passkey';
+import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
 import {
   openai_chatgpt_connections,
   organizations,
@@ -17,11 +54,15 @@ import {
   user_auth_provider,
 } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  insertTestUser,
+  insertTestUserAndGoogleAuth,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Account, Profile } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
-import { OPENAI_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
+import jwt from 'jsonwebtoken';
+import { NEXTAUTH_SECRET, OPENAI_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
 import {
   OPENAI_IDENTITY_SCOPE,
   OPENAI_ISSUER,
@@ -85,6 +126,17 @@ describe('parseLinkedInProfileName', () => {
       expect(typeof result).toBe('string');
       expect(result).not.toBe(true);
       expect(result).not.toBe(false);
+    });
+  });
+});
+
+describe('Discord OAuth provider', () => {
+  test('configures the issuer for Discord authorization responses', () => {
+    expect(authOptions.providers.find(provider => provider.id === 'discord')).toMatchObject({
+      authorization: 'https://discord.com/api/oauth2/authorize?scope=identify+email',
+      token: 'https://discord.com/api/oauth2/token',
+      userinfo: 'https://discord.com/api/users/@me',
+      options: { issuer: 'https://discord.com' },
     });
   });
 });
@@ -227,12 +279,33 @@ describe('sessionAuthOptions', () => {
     expect(authOptions.logger).toBe(sessionAuthOptions.logger);
     expect(authOptions.pages).toBe(sessionAuthOptions.pages);
     expect(authOptions.debug).toBe(sessionAuthOptions.debug);
-    expect(authOptions.callbacks?.session).toBe(sessionAuthOptions.callbacks.session);
+    // Server reads keep the per-session claim; the browser-facing session
+    // callback wraps it and removes that claim.
+    expect(authOptions.callbacks?.session).not.toBe(sessionAuthOptions.callbacks.session);
 
     // A session read runs the jwt callback without a trigger.
     const token = { kiloUserId: 'user-id', version: 3 } as JWT;
     await expect(authOptions.callbacks?.jwt?.({ token } as never)).resolves.toBe(token);
     await expect(sessionAuthOptions.callbacks.jwt({ token } as never)).resolves.toBe(token);
+  });
+
+  test('server reads expose webSessionId and the browser response strips it', async () => {
+    const token = {
+      kiloUserId: 'user-id',
+      version: 3,
+      webSessionId: 'per-session-id',
+    } as JWT;
+    const session = {
+      user: { id: 'user-id', email: 'user@example.com' },
+      expires: new Date(Date.now() + 60_000).toISOString(),
+    } as never;
+
+    const serverSession = await sessionAuthOptions.callbacks.session({ session, token } as never);
+    expect(serverSession.webSessionId).toBe('per-session-id');
+
+    const browserSession = await authOptions.callbacks!.session!({ session, token } as never);
+    expect(browserSession).not.toHaveProperty('webSessionId');
+    expect(browserSession).not.toHaveProperty('webSessionPepper');
   });
 });
 
@@ -440,6 +513,66 @@ describe('profileProvesEmailOwnership', () => {
   test('rejects undefined', () => {
     expect(profileProvesEmailOwnership(undefined)).toBe(false);
   });
+
+  test('accepts a Discord profile with verified true', () => {
+    expect(profileProvesEmailOwnership({ verified: true }, 'discord')).toBe(true);
+  });
+
+  test('rejects a Discord profile with verified false', () => {
+    expect(profileProvesEmailOwnership({ verified: false }, 'discord')).toBe(false);
+  });
+
+  test('rejects a Discord profile without the verified flag', () => {
+    expect(profileProvesEmailOwnership({ email_verified: true }, 'discord')).toBe(false);
+  });
+
+  test('rejects a GitHub profile without the email list proof', () => {
+    expect(profileProvesEmailOwnership({ login: 'octocat' }, 'github')).toBe(false);
+  });
+
+  test('keeps the generic claim rule for GitLab', () => {
+    expect(profileProvesEmailOwnership({ confirmed_at: '2024-01-01' }, 'gitlab')).toBe(false);
+    expect(profileProvesEmailOwnership({ email_verified: true }, 'gitlab')).toBe(true);
+  });
+});
+
+describe('githubEmailsProveOwnership', () => {
+  test('accepts the verified flag for the address the sign-in uses', () => {
+    expect(
+      githubEmailsProveOwnership(
+        [
+          { email: 'Other@Example.com', primary: false, verified: false, visibility: 'private' },
+          { email: 'Used@Example.com', primary: true, verified: true, visibility: 'public' },
+        ],
+        'used@example.com'
+      )
+    ).toBe(true);
+  });
+
+  test('rejects an unverified address and a verified different address', () => {
+    expect(
+      githubEmailsProveOwnership(
+        [{ email: 'used@example.com', primary: true, verified: false, visibility: null }],
+        'used@example.com'
+      )
+    ).toBe(false);
+    expect(
+      githubEmailsProveOwnership(
+        [{ email: 'other@example.com', primary: true, verified: true, visibility: null }],
+        'used@example.com'
+      )
+    ).toBe(false);
+  });
+
+  test('rejects a malformed payload', () => {
+    expect(githubEmailsProveOwnership({ email: 'used@example.com' }, 'used@example.com')).toBe(
+      false
+    );
+    expect(githubEmailsProveOwnership(null, 'used@example.com')).toBe(false);
+    expect(githubEmailsProveOwnership([{ email: 'used@example.com' }], 'used@example.com')).toBe(
+      false
+    );
+  });
 });
 
 describe('parseSignInRedirectContext', () => {
@@ -492,6 +625,263 @@ describe('parseSignInRedirectContext', () => {
     expect(parseSignInRedirectContext(cookie)).toEqual({
       callbackPath: '/device-auth?code=xyz',
     });
+  });
+});
+
+describe('getInvitationTokenFromCallbackPath', () => {
+  test('extracts an invitation token from the WorkOS sign-in callback URL', () => {
+    const callbackUrl = getSignInCallbackUrl({ callbackPath: '/users/accept-invite/invite-token' });
+    const context = parseSignInRedirectContext(callbackUrl);
+    expect(getInvitationTokenFromCallbackPath(context.callbackPath)).toBe('invite-token');
+  });
+
+  test('decodes the token and ignores the query and fragment', () => {
+    expect(getInvitationTokenFromCallbackPath('/users/accept-invite/invite%2Dtoken?x=1#next')).toBe(
+      'invite-token'
+    );
+  });
+
+  test.each([
+    undefined,
+    '/users/accept-invite',
+    '/users/accept-invite/',
+    '/users/accept-invite/token/more',
+    '/users/accept-invited/token',
+    'https://example.com/users/accept-invite/token',
+    '/users/accept-invite/%invalid',
+  ])('ignores non-invitation or malformed callback %s', callback => {
+    expect(getInvitationTokenFromCallbackPath(callback)).toBeUndefined();
+  });
+});
+
+describe('preserveSignInRedirectContext', () => {
+  test('preserves the invitation when SSO sign-in fails or is enforced', () => {
+    for (const url of [
+      '/users/sign_in?error=OAUTH_ERROR',
+      '/users/sign_in?sso=true&domain=example.com',
+    ]) {
+      const result = new URL(
+        preserveSignInRedirectContext(url, {
+          callbackPath: '/users/accept-invite/invite-token',
+        }),
+        'https://example.com'
+      );
+      expect(result.searchParams.get('callbackPath')).toBe('/users/accept-invite/invite-token');
+    }
+  });
+
+  test('does not preserve an unsafe callback', () => {
+    expect(
+      preserveSignInRedirectContext('/users/sign_in?error=OAUTH_ERROR', {
+        callbackPath: 'https://evil.example.com',
+      })
+    ).toBe('/users/sign_in?error=OAUTH_ERROR');
+  });
+});
+
+describe('WorkOS sign-in callback', () => {
+  const callbackPath = '/users/accept-invite/invite-token';
+  const requestHeaders = new Headers({ 'accept-language': 'en-US', 'x-vercel-ip-country': 'US' });
+  const watchwood = { status: 'assessed', riskScore: 0.4, latencyMs: 12, assessedAt: 123 } as const;
+  const signInArgs = {
+    user: { id: 'workos-user', email: 'user@example.com', name: 'Test User', image: null },
+    account: { provider: 'workos', providerAccountId: 'workos-user', type: 'oauth' as const },
+    profile: undefined,
+  };
+
+  beforeEach(() => {
+    const callbackUrl = getSignInCallbackUrl({ callbackPath });
+    jest.mocked(cookies).mockResolvedValue({
+      get: (name: string) => {
+        if (name === 'next-auth.callback-url') return { name, value: callbackUrl };
+        if (name === 'impact_click_id') return { name, value: 'impact-click' };
+        return undefined;
+      },
+    } as Awaited<ReturnType<typeof cookies>>);
+    jest.mocked(headers).mockResolvedValue(requestHeaders as Awaited<ReturnType<typeof headers>>);
+    jest.mocked(getAccountLinkingSession).mockResolvedValue(null);
+    jest.mocked(readWatchwoodSignupAssessment).mockResolvedValue(watchwood);
+    jest.mocked(processSSOUserLogin).mockResolvedValue(true);
+    jest.mocked(userLib.findAndSyncExistingUser).mockResolvedValue(null);
+    jest.mocked(userServer.isBlockedTLD).mockResolvedValue(false);
+  });
+
+  afterEach(() => {
+    jest
+      .mocked(userLib.findAndSyncExistingUser)
+      .mockImplementation(
+        jest.requireActual<typeof userModule>('@/lib/user').findAndSyncExistingUser
+      );
+    jest.clearAllMocks();
+  });
+
+  test('forwards the Watchwood assessment, tracking context and invitation token', async () => {
+    await expect(authOptions.callbacks!.signIn!(signInArgs)).resolves.toBe(true);
+
+    expect(processSSOUserLogin).toHaveBeenCalledTimes(1);
+    expect(processSSOUserLogin).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'workos', google_user_email: 'user@example.com' }),
+      requestHeaders,
+      'impact-click',
+      expect.objectContaining({ watchwood, locale: 'en-US', countryCode: 'US' }),
+      'invite-token'
+    );
+  });
+
+  test('preserves the invitation callback on an SSO error redirect', async () => {
+    jest.mocked(processSSOUserLogin).mockResolvedValue('/users/sign_in?error=OAUTH_ERROR');
+
+    const result = await authOptions.callbacks!.signIn!(signInArgs);
+    expect(typeof result).toBe('string');
+    if (typeof result !== 'string') throw new Error('Expected an SSO error redirect');
+    const redirect = new URL(result, 'https://example.com');
+    expect(redirect.pathname).toBe('/users/sign_in');
+    expect(redirect.searchParams.get('error')).toBe('OAUTH_ERROR');
+    expect(redirect.searchParams.get('callbackPath')).toBe(callbackPath);
+  });
+
+  test('does not forward the invitation or Watchwood context during account linking', async () => {
+    jest.mocked(getAccountLinkingSession).mockResolvedValue({
+      existingUserId: 'existing-user',
+      targetProvider: 'workos',
+      createdAt: Date.now(),
+    });
+    jest
+      .mocked(userServer.getUserFromSession)
+      .mockResolvedValue({ id: 'existing-user' } as Awaited<
+        ReturnType<typeof userServer.getUserFromSession>
+      >);
+
+    await expect(authOptions.callbacks!.signIn!(signInArgs)).resolves.toBe(true);
+    expect(processSSOUserLogin).toHaveBeenCalledTimes(1);
+    expect(processSSOUserLogin).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'workos' }),
+      requestHeaders,
+      null,
+      { watchwood: undefined },
+      undefined
+    );
+    expect(readWatchwoodSignupAssessment).not.toHaveBeenCalled();
+  });
+});
+
+describe('Sign-in verification address', () => {
+  const turnstileGuid = '0f4d7b9a-2c1e-4a55-9d1b-6a1f6f0c3a10';
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    // The test env file labels itself as a Vercel environment; clear the labels
+    // so each case picks the platform branch it means to exercise.
+    process.env = { ...originalEnv };
+    delete process.env.VERCEL;
+    delete process.env.VERCEL_ENV;
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  async function signInWithTurnstile(turnstileIp: string, requestHeaders: Headers) {
+    const user = await insertTestUserAndGoogleAuth({
+      google_user_email: `turnstile-${crypto.randomUUID()}@gmail.com`,
+      google_user_name: 'Turnstile User',
+    });
+    const now = Math.floor(Date.now() / 1000);
+    const verification = jwt.sign(
+      { guid: turnstileGuid, ip: turnstileIp, iat: now, exp: now + 3600 },
+      NEXTAUTH_SECRET,
+      { algorithm: 'HS256' }
+    );
+
+    jest.mocked(cookies).mockResolvedValue({
+      get: (name: string) => (name === 'turnstile_jwt' ? { name, value: verification } : undefined),
+      delete: jest.fn(),
+    } as unknown as Awaited<ReturnType<typeof cookies>>);
+    jest.mocked(headers).mockResolvedValue(requestHeaders as Awaited<ReturnType<typeof headers>>);
+    jest.mocked(getAccountLinkingSession).mockResolvedValue(null);
+    jest.mocked(readWatchwoodSignupAssessment).mockResolvedValue(undefined);
+    jest
+      .mocked(userLib.findAndSyncExistingUser)
+      .mockImplementation(
+        jest.requireActual<typeof userModule>('@/lib/user').findAndSyncExistingUser
+      );
+    jest.mocked(userServer.isBlockedTLD).mockResolvedValue(false);
+
+    const profile = {
+      sub: `subject-${user.id}`,
+      email: user.google_user_email,
+      email_verified: true,
+      name: user.google_user_name,
+    };
+
+    return authOptions.callbacks!.signIn!({
+      user: {
+        id: user.id,
+        email: user.google_user_email,
+        name: user.google_user_name,
+        image: null,
+      },
+      account: { provider: 'google', providerAccountId: `google-${user.id}`, type: 'oauth' },
+      profile,
+    });
+  }
+
+  test('accepts a forwarded chain whose client hop is the recorded address', async () => {
+    await expect(
+      signInWithTurnstile(
+        '203.0.113.7',
+        new Headers({ 'x-forwarded-for': '203.0.113.7, 10.0.0.1' })
+      )
+    ).resolves.toBe(true);
+  });
+
+  test('accepts a single-entry forwarded header for the recorded address', async () => {
+    await expect(
+      signInWithTurnstile('203.0.113.7', new Headers({ 'x-forwarded-for': '203.0.113.7' }))
+    ).resolves.toBe(true);
+  });
+
+  test('accepts the platform address when Vercel labels a multi-entry chain', async () => {
+    process.env.VERCEL = '1';
+
+    await expect(
+      signInWithTurnstile(
+        '198.51.100.5',
+        new Headers({
+          'x-forwarded-for': '198.51.100.5, 10.0.0.1',
+          'x-vercel-forwarded-for': '198.51.100.5, 10.0.0.2',
+        })
+      )
+    ).resolves.toBe(true);
+  });
+
+  test('refuses a client address that differs from the recorded one', async () => {
+    const result = await signInWithTurnstile(
+      '203.0.113.7',
+      new Headers({ 'x-forwarded-for': '198.51.100.5, 10.0.0.1' })
+    );
+
+    expect(result).toContain('error=IP_MISMATCH');
+  });
+
+  test('refuses an unlabelled forwarded chain when Vercel labels the sign-in', async () => {
+    process.env.VERCEL = '1';
+
+    const result = await signInWithTurnstile(
+      '203.0.113.7',
+      new Headers({ 'x-forwarded-for': '203.0.113.7, 10.0.0.1' })
+    );
+
+    expect(result).toContain('error=IP_MISMATCH');
+  });
+
+  test('refuses when the client address cannot be resolved', async () => {
+    const result = await signInWithTurnstile(
+      '203.0.113.7',
+      new Headers({ 'accept-language': 'en-US' })
+    );
+
+    expect(result).toContain('error=IP_MISMATCH');
   });
 });
 
@@ -598,5 +988,7 @@ describe('passkey provider', () => {
     expect(token.kiloUserId).toBe(user.id);
     expect(token.authProvider).toBe('passkey');
     expect(token.webSessionPepper).toBe('passkey-web-session-pepper');
+    // 32 random bytes, base64url, minted only on the sign-in trigger.
+    expect(token.webSessionId).toMatch(/^[A-Za-z0-9_-]{43}$/);
   });
 });

@@ -11,6 +11,7 @@ import {
   STORE_FAILURE_PLAY_KEY,
   STORE_TIMEOUT_KEY,
   STORE_TIMEOUT_PLAY_KEY,
+  type StoreCreditProductsDiagnostics,
   StoreCreditProductsError,
 } from './store-products-loader';
 import { type BackendStoreCreditProduct, type StoreProductFetchOptions } from './store-products';
@@ -51,6 +52,23 @@ const PLAY_REQUESTED_IDS = ['credits_usd10', 'credits_usd50', 'credits_usd100', 
 function loadBackendProducts() {
   return vi.fn().mockResolvedValue(backendResponse);
 }
+
+/** A store SDK failure: an Error carrying the SDK's own name and code. */
+function storeSdkFailure(code: string): Error {
+  return Object.assign(new Error('Failed to query product for sku'), {
+    name: '[expo-iap]: PurchaseError',
+    code,
+  });
+}
+
+const appStoreFailureDiagnostics: StoreCreditProductsDiagnostics = {
+  storefront: 'app_store',
+  backendPackCount: 4,
+  storeListingCount: 0,
+  matchedCount: 0,
+  requestedProductIds: APPLE_REQUESTED_IDS,
+  returnedProductIds: [],
+};
 
 describe('loadStoreCreditProducts', () => {
   it('reads the backend catalog once and requests the storefront ids it drives', async () => {
@@ -199,6 +217,7 @@ describe('loadStoreCreditProducts', () => {
       },
       contexts: {
         creditCatalogQuery: {
+          catalogKey: STORE_TIMEOUT_KEY,
           storefront: 'app_store',
           backendPackCount: 4,
           storeListingCount: 0,
@@ -343,6 +362,7 @@ describe('StoreCreditProductsError telemetry', () => {
       },
       contexts: {
         creditCatalogQuery: {
+          catalogKey: NO_MATCHING_CREDIT_PRODUCTS_KEY,
           storefront: 'play',
           backendPackCount: 4,
           storeListingCount: 2,
@@ -354,32 +374,31 @@ describe('StoreCreditProductsError telemetry', () => {
     });
   });
 
-  it('files a store failure as an error under the storefront error fingerprint', () => {
-    const cause = new Error('Failed to query product');
-    const error = new StoreCreditProductsError(
-      NO_MATCHING_CREDIT_PRODUCTS_KEY,
-      {
-        storefront: 'app_store',
-        backendPackCount: 4,
-        storeListingCount: 0,
-        matchedCount: 0,
-        requestedProductIds: APPLE_REQUESTED_IDS,
-        returnedProductIds: [],
-      },
-      { cause }
-    );
+  it('files a store failure as an error under the store failure fingerprint', () => {
+    const error = new StoreCreditProductsError(STORE_FAILURE_KEY, appStoreFailureDiagnostics, {
+      cause: storeSdkFailure('service-error'),
+    });
 
     expect(error[TELEMETRY_DESCRIPTION_KEY]).toEqual({
       level: 'error',
-      fingerprint: ['credit-catalog-query', 'store-error', 'app_store'],
+      fingerprint: [
+        'credit-catalog-query',
+        'store-error',
+        'app_store',
+        'purchase-error',
+        'service-error',
+      ],
       tags: {
         'error.subsystem': 'credits',
         'error.operation': 'load-store-products',
         'credits.storefront': 'app_store',
         'credits.outcome': 'store-error',
+        'credits.store-error-name': 'purchase-error',
+        'credits.store-error-code': 'service-error',
       },
       contexts: {
         creditCatalogQuery: {
+          catalogKey: STORE_FAILURE_KEY,
           storefront: 'app_store',
           backendPackCount: 4,
           storeListingCount: 0,
@@ -389,6 +408,109 @@ describe('StoreCreditProductsError telemetry', () => {
         },
       },
     });
+  });
+
+  it('keeps two store error codes apart as two fingerprints for one storefront', () => {
+    const first = new StoreCreditProductsError(STORE_FAILURE_KEY, appStoreFailureDiagnostics, {
+      cause: storeSdkFailure('service-error'),
+    });
+    const second = new StoreCreditProductsError(STORE_FAILURE_KEY, appStoreFailureDiagnostics, {
+      cause: storeSdkFailure('query-product'),
+    });
+
+    const firstFingerprint = first[TELEMETRY_DESCRIPTION_KEY].fingerprint;
+    const secondFingerprint = second[TELEMETRY_DESCRIPTION_KEY].fingerprint;
+    expect(firstFingerprint).not.toEqual(secondFingerprint);
+    expect(firstFingerprint.slice(0, 3)).toEqual(secondFingerprint.slice(0, 3));
+    expect(first[TELEMETRY_DESCRIPTION_KEY].tags?.['credits.store-error-code']).toBe(
+      'service-error'
+    );
+    expect(second[TELEMETRY_DESCRIPTION_KEY].tags?.['credits.store-error-code']).toBe(
+      'query-product'
+    );
+  });
+
+  it('names the store failure in the message and keeps the catalog key on the error', () => {
+    const error = new StoreCreditProductsError(STORE_FAILURE_KEY, appStoreFailureDiagnostics, {
+      cause: storeSdkFailure('service-error'),
+    });
+
+    expect(error.message).toBe('Store credit pack lookup failed: purchase-error (service-error)');
+    expect(error.name).toBe('StoreCreditProductsError');
+    expect(error.key).toBe(STORE_FAILURE_KEY);
+    expect(error.message).not.toContain(STORE_FAILURE_KEY);
+  });
+
+  it('spells a long store code in short words so the report title keeps it', () => {
+    const error = new StoreCreditProductsError(STORE_FAILURE_KEY, appStoreFailureDiagnostics, {
+      cause: storeSdkFailure('purchase-verification-finish-failed'),
+    });
+
+    expect(error.message).toBe(
+      'Store credit pack lookup failed: purchase-error (purchase verification finish failed)'
+    );
+    expect(error[TELEMETRY_DESCRIPTION_KEY].tags?.['credits.store-error-code']).toBe(
+      'purchase-verification-finish-failed'
+    );
+  });
+
+  it('keeps a valid code when the name is not a usable value', () => {
+    const error = new StoreCreditProductsError(STORE_FAILURE_KEY, appStoreFailureDiagnostics, {
+      cause: { name: 42, code: 'service-error' },
+    });
+
+    expect(error[TELEMETRY_DESCRIPTION_KEY].fingerprint).toEqual([
+      'credit-catalog-query',
+      'store-error',
+      'app_store',
+      'unknown',
+      'service-error',
+    ]);
+    expect(error.message).toBe('Store credit pack lookup failed: unknown (service-error)');
+  });
+
+  it('never carries the store SDK message text', () => {
+    const error = new StoreCreditProductsError(STORE_FAILURE_KEY, appStoreFailureDiagnostics, {
+      cause: Object.assign(new Error('Failed to query product for alice@example.com'), {
+        name: '[expo-iap]: PurchaseError',
+        code: 'service-error',
+      }),
+    });
+    const declared = JSON.stringify(error[TELEMETRY_DESCRIPTION_KEY]);
+
+    expect(error.message).not.toContain('alice@example.com');
+    expect(declared).not.toContain('Failed to query product');
+    expect(declared).not.toContain('alice@example.com');
+  });
+
+  it('keeps a bounded identity when the cause carries no name or code', () => {
+    const error = new StoreCreditProductsError(STORE_FAILURE_KEY, appStoreFailureDiagnostics, {
+      cause: new TypeError('store bridge exploded'),
+    });
+
+    expect(error[TELEMETRY_DESCRIPTION_KEY].fingerprint).toEqual([
+      'credit-catalog-query',
+      'store-error',
+      'app_store',
+      'type-error',
+      'uncoded',
+    ]);
+    expect(error.message).toBe('Store credit pack lookup failed: type-error (uncoded)');
+  });
+
+  it('places both identity fields when the cause has neither', () => {
+    const error = new StoreCreditProductsError(STORE_FAILURE_KEY, appStoreFailureDiagnostics, {
+      cause: 'the store rejected with a string',
+    });
+
+    expect(error[TELEMETRY_DESCRIPTION_KEY].fingerprint).toEqual([
+      'credit-catalog-query',
+      'store-error',
+      'app_store',
+      'unknown',
+      'uncoded',
+    ]);
+    expect(error.message).toBe('Store credit pack lookup failed: unknown (uncoded)');
   });
 });
 

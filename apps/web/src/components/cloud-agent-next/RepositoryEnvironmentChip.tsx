@@ -11,12 +11,12 @@ import {
 } from '@/hooks/useCloudAgentEnvironments';
 import { useCloudAgentSettingsCanManage } from '@/hooks/useCloudAgentSettings';
 import { EnvironmentDialog } from './EnvironmentDialog';
-import { memberMatchesRepository } from './environment-display';
-
-const chipClassName =
-  'inline-flex max-w-full items-center gap-1.5 rounded-md border border-border/50 bg-muted/30 px-2 py-1 text-xs text-muted-foreground';
-const interactiveClassName =
-  'cursor-pointer transition-colors hover:border-border hover:bg-muted/60 hover:text-foreground';
+import { additionalEnvironmentMembers } from './environment-display';
+import {
+  contextSegmentClassName,
+  interactiveContextSegmentClassName,
+  SegmentText,
+} from './session-context-segments';
 
 type RepositoryEnvironmentChipProps = {
   organizationId?: string;
@@ -51,10 +51,10 @@ export function RepositoryEnvironmentChip({
   const label =
     environments.length > 0 ? (
       <>
-        <Boxes className="size-3 shrink-0" aria-hidden />
-        <span className={cn('truncate', !environment && 'text-status-warning font-medium')}>
+        <Boxes className="size-3.5 shrink-0" aria-hidden />
+        <SegmentText className={cn('max-w-48', !environment && 'text-status-warning font-medium')}>
           {environment ? environment.name : 'Choose environment'}
-        </span>
+        </SegmentText>
         {environment && (
           <span className="shrink-0">
             <span aria-hidden>· </span>
@@ -65,7 +65,7 @@ export function RepositoryEnvironmentChip({
       </>
     ) : (
       <>
-        <Plus className="size-3 shrink-0" aria-hidden />
+        <Plus className="size-3.5 shrink-0" aria-hidden />
         <span>Set up environment</span>
       </>
     );
@@ -77,7 +77,12 @@ export function RepositoryEnvironmentChip({
           <PopoverTrigger asChild>
             <button
               type="button"
-              className={cn(chipClassName, interactiveClassName)}
+              className={cn(
+                contextSegmentClassName,
+                interactiveContextSegmentClassName,
+                environment && 'text-foreground',
+                pickerOpen && 'bg-muted/60 text-foreground'
+              )}
               aria-label="Choose environment"
             >
               {label}
@@ -93,6 +98,7 @@ export function RepositoryEnvironmentChip({
             <ul className="max-h-72 overflow-y-auto">
               {environments.map(candidate => {
                 const members = environmentMembers(candidate);
+                const additionalMembers = additionalEnvironmentMembers(candidate, repository);
                 return (
                   <li key={candidate.id}>
                     <button
@@ -120,19 +126,12 @@ export function RepositoryEnvironmentChip({
                             {members.length} {members.length === 1 ? 'repo' : 'repos'}
                           </span>
                         </span>
-                        <span className="mt-1 block space-y-1 border-l pl-2">
-                          {members.map(member => {
-                            const isSelectedRepository = memberMatchesRepository(
-                              member,
-                              repository
-                            );
-                            return (
+                        {additionalMembers.length > 0 && (
+                          <span className="mt-1 block space-y-1 border-l pl-2">
+                            {additionalMembers.map(member => (
                               <span
                                 key={`${member.platform}:${member.repoFullName}`}
-                                className={cn(
-                                  'flex items-center gap-2',
-                                  !isSelectedRepository && 'text-muted-foreground'
-                                )}
+                                className="text-muted-foreground flex items-center gap-2"
                               >
                                 <span
                                   className="min-w-0 flex-1 truncate"
@@ -140,15 +139,10 @@ export function RepositoryEnvironmentChip({
                                 >
                                   {member.repoFullName}
                                 </span>
-                                {isSelectedRepository && (
-                                  <span className="text-muted-foreground shrink-0 text-[9px]">
-                                    Selected repository
-                                  </span>
-                                )}
                               </span>
-                            );
-                          })}
-                        </span>
+                            ))}
+                          </span>
+                        )}
                       </span>
                     </button>
                   </li>
@@ -172,9 +166,9 @@ export function RepositoryEnvironmentChip({
       ) : (
         <button
           type="button"
-          className={cn(chipClassName, interactiveClassName)}
+          className={cn(contextSegmentClassName, interactiveContextSegmentClassName)}
           aria-label="Set up environment"
-          title="Save setup commands, variables, secrets, and a sandbox size for this repository."
+          title={`Save setup commands, variables, secrets, a sandbox size, and network access for ${repositoryLabel}.`}
           onClick={() => setDialogOpen(true)}
         >
           {label}

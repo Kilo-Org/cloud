@@ -44,7 +44,7 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
   beforeEach(() => {
     clearSecretCacheForTest();
     userResultByUserId.clear();
-    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
+    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blocked: false });
   });
 
   it('accepts a token with the current user pepper', async () => {
@@ -123,16 +123,16 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
   });
 
   it('rejects a user token with a null pepper when the stored pepper is non-null', async () => {
-    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
+    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blocked: false });
     const { token } = await signToken({ pepper: null, tokenSource: 'kilo-chat' });
 
     await expect(verifyToken(token)).resolves.toBeNull();
   });
 
-  it('rejects tokens for blocked users (pepper matches, but blocked_reason is set)', async () => {
+  it('rejects tokens for a blocked account when the pepper also matches', async () => {
     userResultByUserId.set('user-xyz-789', {
       pepper: 'pepper-current',
-      blockedReason: 'manual block',
+      blocked: true,
     });
     const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
 
@@ -142,16 +142,16 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
   it('rejects tokens for blocked users even when the stored pepper is null', async () => {
     userResultByUserId.set('user-xyz-789', {
       pepper: null,
-      blockedReason: 'soft-deleted at 2026-01-01T00:00:00.000Z',
+      blocked: true,
     });
     const { token } = await signToken({ pepper: null, tokenSource: 'kilo-chat' });
 
     await expect(verifyToken(token)).resolves.toBeNull();
   });
 
-  it('accepts tokens when blockedReason is null and pepper matches', async () => {
-    // Explicitly confirm null blockedReason + matching pepper passes.
-    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
+  it('accepts tokens for an unblocked account when the pepper matches', async () => {
+    // Explicitly confirm the unblocked flag plus a matching pepper passes.
+    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blocked: false });
     const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
 
     await expect(verifyToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });
@@ -381,7 +381,7 @@ describe('verifyKiloBearerAgainstCurrentPepper', () => {
     ).resolves.toBeNull();
     userResultByUserId.set('user-xyz-789', {
       pepper: 'pepper-current',
-      blockedReason: 'manual block',
+      blocked: true,
     });
     await expect(
       verifyKiloBearerAgainstCurrentPepper({ ...params, getUserPepper, allowBlocked: true })
@@ -487,7 +487,7 @@ describe('internal service tokens (no apiTokenPepper, no env)', () => {
   beforeEach(() => {
     clearSecretCacheForTest();
     userResultByUserId.clear();
-    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
+    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blocked: false });
   });
 
   async function signInternalToken(): Promise<string> {
@@ -525,7 +525,7 @@ describe('internal service tokens (no apiTokenPepper, no env)', () => {
   });
 
   it('fails when blocked_reason is set', async () => {
-    userResultByUserId.set('user-xyz-789', { pepper: null, blockedReason: 'manual block' });
+    userResultByUserId.set('user-xyz-789', { pepper: null, blocked: true });
     const token = await signInternalToken();
 
     await expect(verifyInternalToken(token)).resolves.toBeNull();
@@ -536,7 +536,7 @@ describe('C15 deviceSessionId compatibility', () => {
   beforeEach(() => {
     clearSecretCacheForTest();
     userResultByUserId.clear();
-    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
+    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blocked: false });
   });
 
   it('accepts a token carrying deviceSessionId claim', async () => {

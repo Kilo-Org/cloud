@@ -1,9 +1,13 @@
 import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
-import { CURRENCY_ZERO_THRESHOLD, formatCurrency, formatNumber } from '@/lib/format';
+import {
+  CURRENCY_ZERO_THRESHOLD,
+  formatClockTime,
+  formatCurrency,
+  formatNumber,
+} from '@/lib/format';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
-import { dateTimeFormat } from '@/lib/intl-cache';
-import { platformLabel } from '@/lib/platform-label';
+import { isUnknownOrigin, platformLabel, remoteAgentState } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 /**
@@ -13,6 +17,9 @@ import { parseTimestamp, timeAgo } from '@/lib/utils';
 export type SessionSection = {
   title: string;
   data: StoredSession[];
+  /** The zone this section's day boundary was computed in, so a row under it
+   * names the same day the heading does. */
+  timeZone: string;
 };
 
 /** Platform buckets offered by the session filters, in display order. */
@@ -181,7 +188,7 @@ function clockTime(timestamp: string | null | undefined): string | null {
   if (Number.isNaN(date.getTime())) {
     return null;
   }
-  return dateTimeFormat(i18n.language, { hour: 'numeric', minute: '2-digit' }).format(date);
+  return formatClockTime(date, i18n.language);
 }
 
 /**
@@ -192,50 +199,6 @@ function clockTime(timestamp: string | null | undefined): string | null {
  */
 export function formatScheduledWake(at: string): string | null {
   return clockTime(at);
-}
-
-/**
- * Time meta for one session row: the label the row draws, plus the clock time
- * when the relative label was replaced because it restated the row's section.
- */
-type SessionRowTimeMeta = {
-  visible: string;
-  /** The clock time that replaced the relative label, or `null` when it stands. */
-  clock: string | null;
-};
-
-/**
- * Time meta for a session row that sits under a date section heading.
- *
- * `formatMeta` renders the relative day word, and in the Yesterday section that
- * word is the heading directly above the row (`YESTERDAY` under `YESTERDAY`),
- * so the row restated its own section. When the two strings match — the same
- * locale-folded text on screen, not a bucket rule — the row shows the clock
- * time of its own timestamp instead. Every other heading (Today, a weekday,
- * Older) never matches the relative label it renders, so those rows keep it.
- *
- * `clock` is the replacement when one was made, so the spoken label says the
- * same clock time instead of repeating the section, and `null` when the
- * relative label stands. `nowMs` is the caller's sampled clock, as in
- * {@link formatMeta}.
- */
-export function sectionAwareTimeMeta(
-  timestamp: string | null | undefined,
-  sectionTitle: string | null | undefined,
-  nowMs?: number
-): SessionRowTimeMeta {
-  const relative = formatMeta(timestamp, nowMs);
-  if (!sectionTitle || relative === '') {
-    return { visible: relative, clock: null };
-  }
-  if (
-    relative.toLocaleLowerCase(i18n.language) !==
-    sectionTitle.trim().toLocaleLowerCase(i18n.language)
-  ) {
-    return { visible: relative, clock: null };
-  }
-  const clock = clockTime(timestamp);
-  return clock === null ? { visible: relative, clock: null } : { visible: clock, clock };
 }
 
 /**
@@ -412,7 +375,7 @@ export function selectRemoteRowSpokenMeta(params: {
       composeActiveSessionSpokenMeta(params.costSpoken, params.timeSpoken),
     ].filter(Boolean);
     // Intl unit lists still add a conjunction in Arabic; the outer label owns its connector.
-    return parts.join(', ') || null;
+    return parts.join(i18n.t('common.listJoiner')) || null;
   }
   if (params.scheduled) {
     return params.scheduledWake;
@@ -427,10 +390,16 @@ export function selectRemoteRowSpokenMeta(params: {
  * Pinned-tray label for an active session. Reuses `platformLabel` when the
  * origin is known, otherwise falls back to 'LIVE'. An undefined, empty, or
  * 'unknown' origin is treated as unknown and returns 'LIVE' rather than a
- * definitive (and potentially wrong) label.
+ * definitive (and potentially wrong) label: this row is live, so the word
+ * names its state and the row draws the live glyph beside it. A stored row
+ * never takes this path — `storedSessionEyebrowLabel` shows the neutral origin
+ * label instead.
+ *
+ * The word is catalog copy, so its text changes per locale. A row that renders
+ * it takes its tint from {@link remoteAgentState}, never from the string.
  */
 export function remoteAgentLabel(createdOnPlatform: string | undefined): string {
-  if (!createdOnPlatform || createdOnPlatform === 'unknown') {
+  if (remoteAgentState(createdOnPlatform) === 'live') {
     return i18n.t('agents.sessionList.live');
   }
   return platformLabel(createdOnPlatform);
@@ -482,8 +451,9 @@ export function repoNameFromGitUrl(gitUrl: string | null | undefined): string | 
 
 /**
  * Canonical eyebrow label for a stored session: repo name (uppercased) when
- * a git URL is present, else the platform fallback. Replaces the legacy
- * platform-only label in the Agents list.
+ * a git URL is present, else the origin label from `platformLabel`. A stored
+ * row has no live state, so an unrecorded origin reads the neutral origin
+ * label, never "LIVE".
  */
 export function storedSessionEyebrowLabel(session: {
   git_url: string | null;
@@ -508,37 +478,40 @@ export function remoteSessionEyebrowLabel(session: {
 }
 
 /**
+ * Tint key for a remote row's eyebrow, next to the label it belongs to: `live`
+ * for a state word, `platform` for the kind of agent the row ran on, and
+ * `repository` when the eyebrow names the repository it ran in.
+ */
+export function remoteSessionEyebrowState(session: {
+  gitUrl?: string | null;
+  createdOnPlatform?: string;
+}): 'live' | 'platform' | 'repository' {
+  return repoNameFromGitUrl(session.gitUrl)
+    ? 'repository'
+    : remoteAgentState(session.createdOnPlatform);
+}
+
+/**
+ * Tint key for a stored row's eyebrow, next to {@link storedSessionEyebrowLabel}:
+ * `repository` when the eyebrow names the repository the row ran in, `unknown`
+ * for the placeholder of an origin the row cannot name, and `platform` when it
+ * names only the kind of agent the row ran on.
+ */
+export function storedSessionEyebrowState(session: {
+  git_url: string | null;
+  created_on_platform: string;
+}): 'unknown' | 'platform' | 'repository' {
+  if (repoNameFromGitUrl(session.git_url)) {
+    return 'repository';
+  }
+  return isUnknownOrigin(session.created_on_platform) ? 'unknown' : 'platform';
+}
+
+/**
  * Whether the Active now row's long-press menu may offer Exit session.
  * Cloud-agent rows carry the sentinel `connectionId` and have no CLI
  * connection to receive `exit_cli`; only real CLI rows can be exited.
  */
 export function canExitSessionFromList(session: { connectionId: string }): boolean {
   return session.connectionId !== CLOUD_AGENT_CONNECTION_ID;
-}
-
-/**
- * Compose the provenance subtitle for a session row.
- *
- *   - both branch and PR number → `"branch · #N"`
- *   - branch only → the branch
- *   - PR number only → `"#N"`
- *   - neither → `null`
- */
-export function composeSessionProvenanceSubtitle(params: {
-  branch: string | null | undefined;
-  prNumber: number | null | undefined;
-}): string | null {
-  const { branch, prNumber } = params;
-  const hasBranch = branch != null && branch !== '';
-  const hasPr = prNumber != null;
-  if (hasBranch && hasPr) {
-    return `${branch} · #${prNumber}`;
-  }
-  if (hasBranch) {
-    return branch;
-  }
-  if (hasPr) {
-    return `#${prNumber}`;
-  }
-  return null;
 }

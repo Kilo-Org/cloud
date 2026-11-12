@@ -236,35 +236,35 @@ describe('getToolDisplay mapping', () => {
 
   it('maps websearch, codesearch, and webfetch from query or url', () => {
     expect(getDisplay(makeToolPart('websearch', completed({ query: 'search terms' })))).toEqual({
-      title: 'websearch',
+      title: 'searching online',
       subtitle: 'search terms',
     });
     expect(
       getDisplay(makeToolPart('websearch', completed({ url: 'https://example.com' })))
-    ).toEqual({ title: 'websearch', subtitle: 'https://example.com' });
+    ).toEqual({ title: 'searching online', subtitle: 'https://example.com' });
     expect(
       getDisplay(makeToolPart('websearch', completed({ query: '', url: 'https://example.com' })))
-    ).toEqual({ title: 'websearch', subtitle: 'https://example.com' });
+    ).toEqual({ title: 'searching online', subtitle: 'https://example.com' });
     expect(getDisplay(makeToolPart('websearch', completed()))).toEqual({
-      title: 'websearch',
-      subtitle: 'websearch',
+      title: 'searching online',
+      subtitle: 'searching online',
     });
     expect(getDisplay(makeToolPart('codesearch', completed({ query: 'foo' })))).toEqual({
-      title: 'codesearch',
+      title: 'searching code',
       subtitle: 'foo',
     });
     expect(getDisplay(makeToolPart('webfetch', completed({ url: 'https://example.com' })))).toEqual(
-      { title: 'webfetch', subtitle: 'https://example.com' }
+      { title: 'fetching a web page', subtitle: 'https://example.com' }
     );
   });
 
-  it('maps todo read and todo write', () => {
+  it('maps todo read and todo write to the one todo list label', () => {
     expect(getDisplay(makeToolPart('todoread', completed()))).toEqual({
-      title: 'todoread',
+      title: 'todo list',
       subtitle: 'Read plan',
     });
     expect(getDisplay(makeToolPart('todowrite', completed()))).toEqual({
-      title: 'todowrite',
+      title: 'todo list',
       subtitle: 'Update plan',
     });
   });
@@ -334,6 +334,59 @@ describe('getToolDisplay mapping', () => {
     });
   });
 
+  it('maps a sent file to its label and the file name', () => {
+    const attachment: FilePart = { ...makeAttachment('text/plain'), filename: 'random.txt' };
+    expect(
+      getDisplay(
+        makeToolPart('send_file', {
+          ...completed({ path: '/tmp/random.txt' }),
+          attachments: [attachment],
+        })
+      )
+    ).toEqual({ title: 'Sent file', subtitle: 'random.txt' });
+  });
+
+  it('names the sent file from the input path until the attachment arrives', () => {
+    expect(getDisplay(makeToolPart('send_file', completed({ filePath: '/w/report.pdf' })))).toEqual(
+      {
+        title: 'Sent file',
+        subtitle: 'report.pdf',
+      }
+    );
+  });
+
+  it('reports the action, not the outcome, while a send is unfinished', () => {
+    // A running call must not claim a delivery, and a failed one must not read
+    // as a successful send.
+    expect(getDisplay(makeToolPart('send_file', running({ path: '/tmp/random.txt' })))).toEqual({
+      title: 'Send file',
+      subtitle: 'random.txt',
+    });
+    expect(getDisplay(makeToolPart('send_file', errorState({ path: '/tmp/random.txt' })))).toEqual({
+      title: 'Send file',
+      subtitle: 'random.txt',
+    });
+  });
+
+  it('marks only the completed send for a header without the repeated name', () => {
+    // The completed part renders a file chip that names the file, so its header
+    // shows the label alone. An unfinished part has no chip yet, so its header
+    // keeps the name in the prefix.
+    expect(
+      getToolDisplay(makeToolPart('send_file', completed({ path: '/a.txt' }))).headerTitleOnly
+    ).toBe(true);
+    expect(
+      getToolDisplay(makeToolPart('send_file', running({ path: '/a.txt' }))).headerTitleOnly
+    ).toBe(undefined);
+  });
+
+  it('keeps the sent-file label alone when the part carries no file name', () => {
+    expect(getDisplay(makeToolPart('send_file', completed()))).toEqual({
+      title: 'Sent file',
+      subtitle: undefined,
+    });
+  });
+
   it('summarizes a generic tool from its arguments', () => {
     expect(
       getDisplay(makeToolPart('lookup', completed({ description: 'Find matching records' })))
@@ -350,7 +403,7 @@ describe('getToolDisplay mapping', () => {
           })
         )
       )
-    ).toEqual({ title: 'question', subtitle: 'Which fields should the sheet show?' });
+    ).toEqual({ title: 'asking you questions', subtitle: 'Which fields should the sheet show?' });
   });
 
   it('uses the running/completed state title for the generic subtitle', () => {
@@ -509,6 +562,10 @@ describe('getToolDisplay translatable provenance', () => {
     expect(getToolDisplay(makeToolPart('read', completed({ filePath: 'a.ts' }))).translatable).toBe(
       true
     );
+    expect(getToolDisplay(makeToolPart('send_file', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('send_file', completed({ path: '/tmp/random.txt' }))).translatable
+    ).toBe(true);
   });
 
   it('keeps the fallback bash/glob/grep/list/patch labels out of translation', () => {
@@ -534,7 +591,7 @@ describe('getToolDisplay translatable provenance', () => {
     expect(getToolDisplay(makeToolPart('patch', completed())).translatable).toBe(false);
   });
 
-  it('keeps the raw websearch/codesearch/webfetch ids out of translation', () => {
+  it('keeps the web search, code search and web fetch labels out of translation', () => {
     expect(getToolDisplay(makeToolPart('websearch', completed())).translatable).toBe(false);
     expect(
       getToolDisplay(makeToolPart('websearch', completed({ query: 'search terms' }))).translatable

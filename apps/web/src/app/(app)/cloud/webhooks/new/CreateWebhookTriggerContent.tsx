@@ -137,6 +137,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
         sandboxAllocation: formData.sandboxAllocation ?? undefined,
         promptTemplate: formData.promptTemplate,
         profileId: formData.profileId,
+        environmentId: formData.environmentId,
         bodySchema: formData.bodySchema,
         autoCommit: formData.autoCommit,
         condenseOnComplete: formData.condenseOnComplete,

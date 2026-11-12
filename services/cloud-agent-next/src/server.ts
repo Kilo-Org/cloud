@@ -58,14 +58,17 @@ import {
 import {
   logRuntimeProxyRequestFailed,
   readUpstreamFailureEvidence,
+  runtimeProxyRequestShape,
 } from './runtime-credential-proxy-diagnostics.js';
 import { deriveKiloSandboxTargets, deriveLoopbackFacadeTargets } from './kilo/kilo-targets.js';
 import {
   inferRuntimeCredentialProxyRoute,
   resolveRuntimeCredentialProxyScopeIngestRoute,
   resolveRuntimeCredentialProxyScopedIngestRoute,
+  runtimeProxyAttestationAudience,
   type RuntimeCredentialProxyRoute,
 } from './kilo/runtime-credential-proxy-routes.js';
+import { readBoundedBody } from './utils/read-bounded-body.js';
 import {
   encodeCloudAgentSessionScopeV2ViewHeaders,
   forwardCloudAgentSessionScopeRequest,
@@ -75,7 +78,6 @@ import type { ScopeGrantView } from './control-plane/sandbox/scope-view.js';
 import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_HEADER,
-  type RuntimeProxyAttestationAudience,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import { TRPCError } from '@trpc/server';
 import {
@@ -87,6 +89,8 @@ import { getVercelSnapshotBuildStub } from './byoc/vercel-snapshot-build-stub.js
 import { getVercelRuntimeIdentity } from './byoc/vercel-runtime-identity.js';
 import { z } from 'zod';
 import { isOrgInList } from './sandbox-id.js';
+import { registerVercelScmBrokerRoute } from './scm-broker/vercel-route.js';
+import { isAllowedStreamWebSocketOrigin, isAllowedWebSocketOrigin } from './ws-origin.js';
 
 const app = new Hono<HonoContext>();
 
@@ -111,15 +115,6 @@ function snapshotBuildOwnerKey(input: z.infer<typeof SnapshotBuildOwnerSchema>):
 
 function snapshotBuildOwnerId(input: z.infer<typeof SnapshotBuildOwnerSchema>): string {
   return input.organizationId !== undefined ? input.organizationId : input.userId;
-}
-
-function isAllowedWebSocketOrigin(env: Env, origin: string | undefined): boolean {
-  const allowedOrigins = (env.WS_ALLOWED_ORIGINS || '')
-    .split(',')
-    .map(value => value.trim())
-    .filter(Boolean);
-  const isRealOrigin = origin !== undefined && origin !== 'null';
-  return allowedOrigins.length === 0 || !isRealOrigin || allowedOrigins.includes(origin);
 }
 
 function createTerminalForwardRequest(
@@ -167,7 +162,7 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
     return new Response('Invalid ptyId parameter', { status: 400 });
   }
 
-  if (!isAllowedWebSocketOrigin(env, request.headers.get('Origin') ?? undefined)) {
+  if (!isAllowedWebSocketOrigin(env, request.headers.get('Origin'))) {
     logger.withFields({ cloudAgentSessionId, ptyId }).warn('/terminal: Origin not allowed');
     return new Response('Origin not allowed', { status: 403 });
   }
@@ -289,6 +284,8 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
   return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
 });
 
+registerVercelScmBrokerRoute(app);
+
 app.get('/health', (c: Context<HonoContext>) => {
   return c.json({
     status: 'ok',
@@ -345,7 +342,7 @@ app.get('/internal/byoc/vercel-runtime-identity', async (c: Context<HonoContext>
   if (unauthorized) return unauthorized;
 
   try {
-    return c.json(await getVercelRuntimeIdentity(c.env), 200, { 'Cache-Control': 'no-store' });
+    return c.json(await getVercelRuntimeIdentity(), 200, { 'Cache-Control': 'no-store' });
   } catch {
     return c.text('Vercel runtime identity could not be resolved', 502);
   }
@@ -525,29 +522,6 @@ function sanitizeRuntimeProxyResponse(response: Response): Response {
   });
 }
 
-async function readBoundedBody(request: Request, maximumBytes: number): Promise<string | null> {
-  if (!request.body) return null;
-  const reader = request.body.getReader();
-  const decoder = new TextDecoder();
-  let size = 0;
-  let value = '';
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) return value + decoder.decode();
-      const bytes = new Uint8Array(chunk.value);
-      size += bytes.byteLength;
-      if (size > maximumBytes) {
-        await reader.cancel();
-        return null;
-      }
-      value += decoder.decode(bytes, { stream: true });
-    }
-  } catch {
-    return null;
-  }
-}
-
 async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Response> {
   const handle = runtimeProxyAuthorization(c.req.raw);
   if (!handle) return c.text('Unauthorized', 401);
@@ -571,10 +545,29 @@ async function forwardRuntimeCredentialProxy(
   path: string
 ): Promise<Response> {
   if (!claims || !isControlSession(claims.sessionId)) return c.text('Unauthorized', 401);
+  const correlation = { sessionId: claims.sessionId, kiloSessionId: claims.kiloSessionId };
+  const requestShape = (organizationId: string | undefined) =>
+    runtimeProxyRequestShape({
+      route,
+      method: c.req.method,
+      path,
+      organizationId,
+      kiloSessionId: claims.kiloSessionId,
+    });
+  // One diagnostic per refused request: the path, method or body has no allowlist entry.
+  const rejectRoute = (organizationId: string | undefined): Response => {
+    logRuntimeProxyRequestFailed({
+      upstreamAttempted: false,
+      rejectionStage: 'route',
+      request: requestShape(organizationId),
+      ...correlation,
+    });
+    return c.text('Not found', 404);
+  };
   let bodyText: string | undefined;
   if (route === 'ingest' && path === '/api/session' && c.req.method === 'POST') {
     bodyText = (await readBoundedBody(c.req.raw, 8192)) ?? undefined;
-    if (bodyText === undefined) return c.text('Not found', 404);
+    if (bodyText === undefined) return rejectRoute(undefined);
   }
   let credential: {
     token: string;
@@ -615,7 +608,7 @@ async function forwardRuntimeCredentialProxy(
       contentType: c.req.header('content-type'),
       bodyText,
     });
-    if (adopted === null) return c.text('Not found', 404);
+    if (adopted === null) return rejectRoute(credential.organizationId);
     upstream = adopted.upstream;
     if (adopted.kind === 'scoped') {
       const v2Headers = encodeCloudAgentSessionScopeV2ViewHeaders(scopeView);
@@ -649,11 +642,10 @@ async function forwardRuntimeCredentialProxy(
         bodyText
       );
   }
-  if (!upstream) return c.text('Not found', 404);
+  if (!upstream) return rejectRoute(credential.organizationId);
   try {
     // The route allowlist is resolved above before a proof is issued.
-    const audience: RuntimeProxyAttestationAudience =
-      route === 'backend' ? 'kilo-api' : route === 'ingest' ? 'session-ingest' : 'kilo-gateway';
+    const audience = runtimeProxyAttestationAudience(route, path);
     const proof = await issueRuntimeProxyAttestation({
       secret: await resolveSecret(c.env.NEXTAUTH_SECRET).then(value => {
         if (!value) throw new Error('Authentication unavailable');
@@ -688,8 +680,8 @@ async function forwardRuntimeCredentialProxy(
         upstreamAttempted: true,
         upstreamStatus: response.status,
         evidence: await readUpstreamFailureEvidence(response),
-        sessionId: claims.sessionId,
-        kiloSessionId: claims.kiloSessionId,
+        request: requestShape(credential.organizationId),
+        ...correlation,
       });
     }
     return sanitizeRuntimeProxyResponse(response);
@@ -750,6 +742,11 @@ app.get('/stream', async (c: Context<HonoContext>) => {
   if (!cloudAgentSessionId) {
     logger.warn('/stream: Missing cloudAgentSessionId parameter');
     return c.text('Missing cloudAgentSessionId parameter', 400);
+  }
+
+  if (!isAllowedStreamWebSocketOrigin(c.env, c.req.header('Origin'))) {
+    logger.withFields({ cloudAgentSessionId }).warn('/stream: Origin not allowed');
+    return c.text('Origin not allowed', 403);
   }
 
   const ticket = url.searchParams.get('ticket');
@@ -828,6 +825,9 @@ app.get('/terminal', async (c: Context<HonoContext>) => {
   return handleTerminalWebSocket(c.req.raw, c.env);
 });
 
+/** Concurrent revocation closes per wave. */
+const ORG_STREAM_CLOSE_CONCURRENCY = 8;
+
 app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
   const unauthorized = requireInternalApi(c);
   if (unauthorized) return unauthorized;
@@ -859,10 +859,35 @@ app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
       )
     );
 
-  for (const row of rows) {
+  // The caller bounds this request, and a close that has a route to retire can
+  // refresh the provider policy or stop its sandbox. Matching closes therefore
+  // run in waves of eight, so the sessions of one wave share the caller's
+  // budget and the request keeps a bounded number of concurrent DO calls.
+  const sessionIds = rows.flatMap(row => {
     const sessionId = row.cloudAgentSessionId;
-    if (!sessionId || !isControlSession(sessionId)) continue;
-    await getSandboxSessionStub(c.env, userId, sessionId).closeOrgStreams(organizationId);
+    return sessionId && isControlSession(sessionId) ? [sessionId] : [];
+  });
+  for (let index = 0; index < sessionIds.length; index += ORG_STREAM_CLOSE_CONCURRENCY) {
+    await Promise.all(
+      sessionIds.slice(index, index + ORG_STREAM_CLOSE_CONCURRENCY).map(async sessionId => {
+        try {
+          await getSandboxSessionStub(c.env, userId, sessionId).closeOrgStreams(organizationId);
+        } catch (error) {
+          // One session's failed close (an unreachable Durable Object, or a
+          // release that could not finish) must not stop the others. Every
+          // later grant is issued only on a current membership, so authority
+          // ends at the next issuance: until then the session keeps the grant
+          // it already holds.
+          logger
+            .withFields({
+              cloudAgentSessionId: sessionId,
+              userId,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            .error('/internal/streams/close: session close failed');
+        }
+      })
+    );
   }
 
   return c.body(null, 204);
@@ -984,5 +1009,4 @@ export default {
   },
 };
 
-export { Sandbox } from '@cloudflare/sandbox';
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';

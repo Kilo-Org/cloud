@@ -2,7 +2,7 @@ import 'server-only';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration, SlackOAuthCredential } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
@@ -12,7 +12,8 @@ import { WebClient } from '@slack/web-api';
 import type { SlackInstallation } from '@chat-adapter/slack';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
-import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveOrganizationBotModel } from '@/lib/bot/organization-model';
+import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   decryptSlackBotToken,
   getSlackCredentialByIntegrationId,
@@ -185,28 +186,41 @@ export async function getInstallation(
     .where(
       and(...getOwnershipConditions(owner), eq(platform_integrations.platform, PLATFORM.SLACK))
     )
+    // A row that records the workspace in `platform_installation_id` is the one
+    // inbound events resolve to. Prefer it over a legacy row that carries the
+    // workspace id only in `platform_account_id`, so an update targets that row
+    // instead of colliding with it in the owner-scoped unique index.
+    .orderBy(
+      sql`${platform_integrations.platform_installation_id} IS NULL`,
+      platform_integrations.id
+    )
     .limit(1);
 
   return integration || null;
 }
 
 /**
- * Get Slack installation by Slack team ID
- * Used to identify which Kilo Code user/org owns the installation when receiving Slack events
+ * A row can record its workspace in `platform_account_id` while
+ * `platform_installation_id` is empty. Rows the duplicate-workspace migration
+ * detached carry `duplicate_slack_platform_installation_id` in the metadata.
  */
-export async function getInstallationByTeamId(teamId: string): Promise<PlatformIntegration | null> {
-  const [integration] = await db
-    .select()
-    .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.platform, PLATFORM.SLACK),
-        eq(platform_integrations.platform_installation_id, teamId)
-      )
-    )
-    .limit(1);
+function legacySlackWorkspaceCondition(teamId: string) {
+  return and(
+    eq(platform_integrations.platform_account_id, teamId),
+    isNull(platform_integrations.platform_installation_id),
+    sql`${platform_integrations.metadata}->>'duplicate_slack_platform_installation_id' IS NULL`
+  );
+}
 
-  return integration || null;
+/**
+ * Rows that record a workspace: its canonical row, plus a legacy row that carries
+ * the workspace id only in `platform_account_id`.
+ */
+function recordsSlackWorkspaceCondition(teamId: string) {
+  return or(
+    eq(platform_integrations.platform_installation_id, teamId),
+    legacySlackWorkspaceCondition(teamId)
+  );
 }
 
 function isOwnedBy(integration: PlatformIntegration, owner: Owner): boolean {
@@ -216,17 +230,33 @@ function isOwnedBy(integration: PlatformIntegration, owner: Owner): boolean {
 }
 
 /**
+ * The complement of `isOwnedBy` as a filter. `NOT` over the nullable owner columns
+ * would drop rows, so each owner is compared with `IS NOT DISTINCT FROM` and the
+ * other owner column with `IS NULL`.
+ */
+function isOwnedByAnotherOwner(owner: Owner) {
+  return owner.type === 'user'
+    ? sql`NOT (${platform_integrations.owned_by_user_id} IS NOT DISTINCT FROM ${owner.id} AND ${platform_integrations.owned_by_organization_id} IS NULL)`
+    : sql`NOT (${platform_integrations.owned_by_organization_id} IS NOT DISTINCT FROM ${owner.id} AND ${platform_integrations.owned_by_user_id} IS NULL)`;
+}
+
+/**
  * Find a Slack `platform_integrations` row for `teamId` that belongs to a
  * different Kilo owner. Callers use this before persisting a workspace
  * installation so a workspace owned elsewhere is rejected without writing to
  * the shared Chat SDK installation state.
+ *
+ * A workspace resolves to the row that holds it as its canonical installation id.
+ * Only when no such row exists do rows that record the workspace in
+ * `platform_account_id` take part, matching how `upsertSlackInstallation` reads the
+ * bound workspace of an existing row.
  */
 export async function getConflictingSlackInstallation(
   owner: Owner,
   teamId: string,
   database: typeof db | DrizzleTransaction = db
 ): Promise<PlatformIntegration | null> {
-  const integrations = await database
+  const [canonical] = await database
     .select()
     .from(platform_integrations)
     .where(
@@ -235,9 +265,25 @@ export async function getConflictingSlackInstallation(
         eq(platform_integrations.platform_installation_id, teamId)
       )
     )
-    .limit(2);
+    .limit(1);
 
-  return integrations.find(integration => !isOwnedBy(integration, owner)) ?? null;
+  if (canonical) {
+    return isOwnedBy(canonical, owner) ? null : canonical;
+  }
+
+  const [conflicting] = await database
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.SLACK),
+        legacySlackWorkspaceCondition(teamId),
+        isOwnedByAnotherOwner(owner)
+      )
+    )
+    .limit(1);
+
+  return conflicting ?? null;
 }
 
 function isSlackWorkspaceUniqueViolation(error: unknown): boolean {
@@ -393,6 +439,10 @@ export async function upsertSlackInstallation(
     delete metadata.model_slug;
   }
   delete metadata.access_token;
+  // The row becomes the active record of this workspace, so the markers that
+  // identified it as a detached duplicate no longer describe it.
+  delete metadata.duplicate_slack_platform_installation_id;
+  delete metadata.duplicate_slack_platform_installation_detached_at;
 
   if (existing) {
     try {
@@ -523,16 +573,23 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
   return { success: true };
 }
 
+/**
+ * Remove every row that records a workspace after Slack reports the app removed
+ * from it. A row that records the workspace in the account id is removed with the
+ * canonical row; a row the duplicate-workspace migration detached is left in place.
+ */
 export async function deleteInstallationByTeamId(teamId: string) {
-  const integration = await getInstallationByTeamId(teamId);
+  const deleted = await db
+    .delete(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.SLACK),
+        recordsSlackWorkspaceCondition(teamId)
+      )
+    )
+    .returning({ id: platform_integrations.id });
 
-  if (!integration) {
-    return { success: true, deleted: false };
-  }
-
-  await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
-
-  return { success: true, deleted: true };
+  return { success: true, deleted: deleted.length > 0 };
 }
 
 /**
@@ -624,7 +681,9 @@ export async function updateModel(
 }
 
 /**
- * Get the model for a Slack integration
+ * Get the model for a Slack integration. For organization-owned integrations,
+ * resolves the stored model through the organization's current policy, falling
+ * back to the allowed default; a user-owned integration keeps its stored model.
  */
 export async function getModel(owner: Owner): Promise<string | null> {
   const integration = await getInstallation(owner);
@@ -634,7 +693,14 @@ export async function getModel(owner: Owner): Promise<string | null> {
   }
 
   const metadata = integration.metadata as { model_slug?: string } | null;
-  return metadata?.model_slug || null;
+  const storedModelSlug = metadata?.model_slug || null;
+  if (!storedModelSlug) {
+    return null;
+  }
+  return resolveOrganizationBotModel({
+    organizationId: owner.type === 'org' ? owner.id : null,
+    storedModelSlug,
+  });
 }
 
 /*

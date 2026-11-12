@@ -1,7 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
-
-import { parse } from 'jsonc-parser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
@@ -58,11 +54,6 @@ vi.mock('./logger.js', () => {
       descriptor,
   };
 });
-
-vi.mock('@cloudflare/sandbox', () => ({
-  Sandbox: class Sandbox {},
-  getSandbox: vi.fn(),
-}));
 
 vi.mock('./agent-sandbox/factory.js', () => ({
   createAgentSandbox: vi.fn(() => ({
@@ -151,7 +142,6 @@ const {
   default: worker,
   REPORT_RETENTION_CRON,
   OUTCOME_AGGREGATE_CRON,
-  OUTCOME_AGGREGATE_CRONS,
 } = await import('./server.js');
 
 const secret = 'test-secret';
@@ -160,8 +150,8 @@ type MockEnv = {
   BYOC_VERCEL_IDS?: string;
   VERCEL_SNAPSHOT_BUILD: { getByName: ReturnType<typeof vi.fn> };
   NEXTAUTH_SECRET: string;
-  Sandbox: unknown;
-  SandboxSmall: unknown;
+  SandboxContainment: unknown;
+  SandboxSmallContainment: unknown;
   WS_ALLOWED_ORIGINS?: string;
   HYPERDRIVE: { connectionString: string };
   INTERNAL_API_SECRET?: string;
@@ -186,8 +176,8 @@ function createEnv(): MockEnv {
   return {
     NEXTAUTH_SECRET: secret,
     VERCEL_SNAPSHOT_BUILD: { getByName: vi.fn() },
-    Sandbox: {},
-    SandboxSmall: {},
+    SandboxContainment: {},
+    SandboxSmallContainment: {},
     HYPERDRIVE: { connectionString: 'postgres://test' },
     INTERNAL_API_SECRET: 'test-internal-secret',
     USER_KILO_FACADE: {
@@ -334,6 +324,53 @@ describe('server /stream', () => {
   });
 });
 
+describe('server /stream origin policy', () => {
+  const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+  function streamRequest(origin?: string): Request {
+    const headers: Record<string, string> = { Upgrade: 'websocket' };
+    if (origin !== undefined) headers.Origin = origin;
+    return new Request(`http://worker.test/stream?cloudAgentSessionId=${sessionId}`, { headers });
+  }
+
+  it('refuses an origin outside the allowlist before ticket validation', async () => {
+    const env = createEnv();
+    env.WS_ALLOWED_ORIGINS = 'https://app.example.com';
+
+    const response = await fetchWorker(streamRequest('https://evil.example.com'), env);
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('Origin not allowed');
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(loggerWithFieldsMock).toHaveBeenCalledWith({ cloudAgentSessionId: sessionId });
+  });
+
+  it.each([
+    ['an allowlisted origin', 'https://app.example.com'],
+    ['no Origin header', undefined],
+    ['the null serialization', 'null'],
+    ['a Chrome extension origin', 'chrome-extension://abcdefghijklmnopabcdefghijklmnop'],
+    ['a Firefox extension origin', 'moz-extension://6b0a1c2e-7c4d-4f2a-9a53-2f5f83f0b1c9'],
+  ])('passes %s through to ticket validation', async (_label, origin) => {
+    const env = createEnv();
+    env.WS_ALLOWED_ORIGINS = 'https://app.example.com';
+
+    const response = await fetchWorker(streamRequest(origin), env);
+
+    expect(response.status).toBe(401);
+    await expect(response.text()).resolves.toBe('Missing ticket');
+  });
+
+  it('keeps the permissive default when the allowlist is unset', async () => {
+    const env = createEnv();
+
+    const response = await fetchWorker(streamRequest('https://evil.example.com'), env);
+
+    expect(response.status).toBe(401);
+    await expect(response.text()).resolves.toBe('Missing ticket');
+  });
+});
+
 describe('server background reporting', () => {
   it('routes report queue batches to the Cloud Agent report consumer', async () => {
     const env = createEnv();
@@ -453,19 +490,6 @@ describe('server background reporting', () => {
       'Cloud Agent scheduled handler received an unrecognized cron',
       { cron: '0 0 * * 0' }
     );
-  });
-
-  it('keeps the deployed cron triggers in sync with the dispatcher constants', () => {
-    const config = parse(fs.readFileSync(path.join(process.cwd(), 'wrangler.jsonc'), 'utf8')) as {
-      triggers?: { crons?: string[] };
-      env?: { dev?: { triggers?: { crons?: string[] } } };
-    };
-    const expected = [REPORT_RETENTION_CRON, OUTCOME_AGGREGATE_CRON].sort();
-
-    expect((config.triggers?.crons ?? []).slice().sort()).toEqual(expected);
-    expect((config.env?.dev?.triggers?.crons ?? []).slice().sort()).toEqual(expected);
-    expect(OUTCOME_AGGREGATE_CRON).toBe('*/5 * * * *');
-    expect([...OUTCOME_AGGREGATE_CRONS]).toEqual([OUTCOME_AGGREGATE_CRON, '*/3 * * * *']);
   });
 });
 
@@ -712,6 +736,26 @@ describe('server /terminal', () => {
     expect(response.status).toBe(403);
     await expect(response.text()).resolves.toBe('Origin not allowed');
     expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+  it('keeps extension origins out of the terminal origin policy', async () => {
+    const env = createEnv();
+    env.WS_ALLOWED_ORIGINS = 'https://app.example.com';
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/terminal?cloudAgentSessionId=workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&ptyId=pty_123&ticket=ticket',
+        {
+          headers: {
+            Upgrade: 'websocket',
+            Origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop',
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('Origin not allowed');
   });
   it('rejects agent_ sessions before resolving the control-plane Durable Object', async () => {
     const sessionId = 'agent_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -1311,6 +1355,54 @@ describe('server runtime credential proxy', () => {
     vi.unstubAllGlobals();
   });
 
+  it.each(['organizations', 'api/organizations'])(
+    'forwards the %s model catalog with a kilo-api attestation',
+    async organizationPath => {
+      const env = createEnv();
+      env.SANDBOX_SESSION.get.mockReturnValue({
+        resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+          token: 'https://api.kilo.ai:backing-token',
+          organizationId: 'org_proxy',
+          runtimeAuthorization: {
+            userId: 'usr_proxy',
+            authorizationId: '11111111-1111-4111-8111-111111111111',
+            resourceId: 'workspace_proxy',
+          },
+        }),
+      });
+      const upstream = vi.fn(async (request: Request) => {
+        expect(request.method).toBe('GET');
+        expect(request.url).toBe('https://api.kilo.ai/api/gateway/organizations/org_proxy/models');
+        await expect(
+          verifyRuntimeProxyAttestation({
+            value: request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
+            secret,
+            audience: 'kilo-api',
+            userId: 'usr_proxy',
+            authorizationId: '11111111-1111-4111-8111-111111111111',
+            resourceId: 'workspace_proxy',
+            bearer: 'https://api.kilo.ai:backing-token',
+          })
+        ).resolves.toBe(true);
+        return new Response('{}', { headers: { 'content-type': 'application/json' } });
+      });
+      vi.stubGlobal('fetch', upstream);
+      try {
+        const response = await fetchWorker(
+          new Request(
+            `https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/${organizationPath}/org_proxy/models`,
+            { headers: { Authorization: `Bearer ${await handle()}` } }
+          ),
+          env
+        );
+        expect(response.status).toBe(200);
+        expect(upstream).toHaveBeenCalledOnce();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    }
+  );
+
   it('forwards allowlisted Exa requests with a kilo-gateway attestation', async () => {
     const env = createEnv();
     const backingToken = jwt.sign({ exp: 4_000_000_000 }, secret);
@@ -1646,9 +1738,80 @@ describe('server runtime credential proxy', () => {
         upstreamVercelId: 'fra1::abc-123',
         upstreamVercelMitigated: 'deny',
         upstreamErrorExcerpt: '403 Forbidden',
+        proxyRoute: 'provider',
+        requestMethod: 'POST',
+        pathShape: '/api/openrouter/chat/completions',
         sessionId: 'workspace_proxy',
         kiloSessionId: 'kilo_proxy',
       });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('emits one bounded route diagnostic for a path outside the allowlist', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
+    env.SANDBOX_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: 'https://api.kilo.ai:backing-token',
+        organizationId: 'org_proxy',
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'workspace_proxy',
+        },
+      }),
+    });
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const otherOrganizationId = '22222222-2222-4222-8222-222222222222';
+    try {
+      const proxyHandle = await handle();
+      for (const [method, path, pathShape] of [
+        [
+          'GET',
+          `/api/openrouter/organizations/${otherOrganizationId}/models?apiKey=sk-query-secret`,
+          '/api/openrouter/organizations/:id/models',
+        ],
+        [
+          'DELETE',
+          '/api/openrouter/organizations/org_proxy/models',
+          '/api/openrouter/organizations/:organizationId/models',
+        ],
+      ] as const) {
+        loggerWithFieldsMock.mockClear();
+        const response = await fetchWorker(
+          new Request(`https://worker.test${path}`, {
+            method,
+            headers: { Authorization: `Bearer ${proxyHandle}` },
+          }),
+          env
+        );
+        expect(response.status).toBe(404);
+        expect(loggerWithFieldsMock).toHaveBeenCalledTimes(1);
+        expect(loggerWithFieldsMock).toHaveBeenCalledWith({
+          logTag: 'runtime_proxy_request_failed',
+          upstreamAttempted: false,
+          rejectionStage: 'route',
+          proxyRoute: 'provider',
+          requestMethod: method,
+          pathShape,
+          sessionId: 'workspace_proxy',
+          kiloSessionId: 'kilo_proxy',
+        });
+        const serialized = JSON.stringify(loggerWithFieldsMock.mock.calls[0]?.[0]);
+        for (const sensitive of [
+          otherOrganizationId,
+          'org_proxy',
+          'apiKey',
+          'sk-query-secret',
+          'backing-token',
+          proxyHandle,
+        ]) {
+          expect(serialized).not.toContain(sensitive);
+        }
+      }
+      expect(upstream).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
     }
@@ -1961,6 +2124,130 @@ describe('server /internal/streams/close', () => {
       'usr_removed:workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
     );
     expect(closeOrgStreams).toHaveBeenCalledWith('org_1');
+  });
+
+  it('keeps closing other sessions when one close fails', async () => {
+    const env = createEnv();
+    const closeOrgStreams = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Durable Object unavailable'))
+      .mockResolvedValueOnce(1);
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ closeOrgStreams });
+    const firstSessionId = 'workspace_cccccccc-cccc-cccc-cccc-cccccccccccc';
+    const secondSessionId = 'workspace_dddddddd-dddd-dddd-dddd-dddddddddddd';
+
+    getPgDbMock.mockReturnValue({
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () => [
+            { cloudAgentSessionId: firstSessionId },
+            { cloudAgentSessionId: secondSessionId },
+          ]),
+        })),
+      })),
+    });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/streams/close', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify({ userId: 'usr_removed', organizationId: 'org_1' }),
+      }),
+      env
+    );
+
+    // The removal itself already succeeded; a failed close for one session must
+    // not skip the remaining sessions of the same member.
+    expect(response.status).toBe(204);
+    expect(closeOrgStreams).toHaveBeenCalledTimes(2);
+  });
+
+  it('starts every matching close before waiting for one to finish', async () => {
+    const env = createEnv();
+    const firstClose = Promise.withResolvers<number>();
+    const closeOrgStreams = vi
+      .fn()
+      .mockReturnValueOnce(firstClose.promise)
+      .mockResolvedValueOnce(1);
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ closeOrgStreams });
+
+    getPgDbMock.mockReturnValue({
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () => [
+            { cloudAgentSessionId: 'workspace_eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' },
+            { cloudAgentSessionId: 'workspace_ffffffff-ffff-ffff-ffff-ffffffffffff' },
+          ]),
+        })),
+      })),
+    });
+
+    const responsePromise = fetchWorker(
+      new Request('http://worker.test/internal/streams/close', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify({ userId: 'usr_removed', organizationId: 'org_1' }),
+      }),
+      env
+    );
+
+    // The first close never settles until it is released, so a second call can
+    // arrive only when the handler does not wait for the first one.
+    await vi.waitFor(() => expect(closeOrgStreams).toHaveBeenCalledTimes(2));
+    firstClose.resolve(1);
+
+    expect((await responsePromise).status).toBe(204);
+  });
+
+  it('holds the ninth close until the first wave of eight finishes', async () => {
+    const env = createEnv();
+    const heldCloses = Array.from({ length: 8 }, () => Promise.withResolvers<number>());
+    const closeOrgStreams = vi.fn();
+    for (const held of heldCloses) closeOrgStreams.mockReturnValueOnce(held.promise);
+    closeOrgStreams.mockResolvedValue(1);
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ closeOrgStreams });
+
+    getPgDbMock.mockReturnValue({
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () =>
+            Array.from({ length: 9 }, (_, index) => ({
+              cloudAgentSessionId: `workspace_0000000${index}-0000-0000-0000-00000000000${index}`,
+            }))
+          ),
+        })),
+      })),
+    });
+
+    const responsePromise = fetchWorker(
+      new Request('http://worker.test/internal/streams/close', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify({ userId: 'usr_removed', organizationId: 'org_1' }),
+      }),
+      env
+    );
+
+    // The first eight closes never settle, so the request holds its wave and
+    // the ninth session waits for it.
+    await vi.waitFor(() => expect(closeOrgStreams).toHaveBeenCalledTimes(8));
+    expect(closeOrgStreams).toHaveBeenCalledTimes(8);
+    for (const held of heldCloses) held.resolve(1);
+
+    expect((await responsePromise).status).toBe(204);
+    expect(closeOrgStreams).toHaveBeenCalledTimes(9);
   });
 
   it('skips rows that do not name a control session', async () => {

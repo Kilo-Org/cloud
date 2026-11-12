@@ -2,6 +2,7 @@ import { SETUP_SCRIPT_LIMITS } from './setup-script';
 import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
 import type { EncryptedEnvelope } from '@kilocode/encryption';
+import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import { MASKED_SECRET_VALUE, type ProfileOwner } from './types';
 
 export const ENVIRONMENT_SECRET_PLACEHOLDER = '<unchanged>';
@@ -130,8 +131,14 @@ type EnvironmentCreateInputBase = {
   plainVars?: Record<string, string>;
   secrets?: Record<string, string>;
   commands?: string[];
+  /** Commands run in every session after setup. Not a build input. */
+  startCommands?: string[];
   /** Saved sandbox allocation key; null or absent uses the owner's default. */
   sandboxAllocation?: string | null;
+  /** Saved network policy; absent keeps the legacy unrestricted behavior. */
+  egressMode?: EgressMode;
+  /** Additional allowed exact hostnames; requires allowlist mode. */
+  egressAllowlist?: string[];
 };
 
 /** A V1 environment: one repository, stored in the identity columns. */
@@ -167,8 +174,13 @@ export type EnvironmentUpdateInput = {
   plainVars?: Record<string, string>;
   secrets?: EnvironmentSecretChange[];
   commands?: string[];
+  /** Replaces the start commands when supplied. Never advances the revision. */
+  startCommands?: string[];
   /** Absent keeps the stored allocation; null clears it. */
   sandboxAllocation?: string | null;
+  /** Absent keeps the stored policy; a supplied mode replaces it. */
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
 };
 
 /** The primitives a repository environment contributes to a session. */
@@ -176,6 +188,11 @@ export type EnvironmentSessionLayer = {
   envVars?: Record<string, string>;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
   setupCommands?: string[];
+  /**
+   * Commands every session runs after setup, including a session whose
+   * environment snapshot already ran the setup commands.
+   */
+  startCommands?: string[];
   /** Present for a V2 environment only: its repositories. Absence means V1. */
   repositories?: EnvironmentReferenceRepository[];
 };
@@ -204,6 +221,9 @@ export type EnvironmentForSession = {
   reference: EnvironmentReference;
   /** Saved allocation key, unvalidated; the Worker checks eligibility. */
   sandboxAllocation: string | null;
+  /** Saved policy; both null means the legacy unrestricted default. */
+  egressMode: EgressMode | null;
+  egressAllowlist: string[] | null;
 };
 
 type EnvironmentBuildInputBase = {
@@ -211,6 +231,11 @@ type EnvironmentBuildInputBase = {
   commands: string[];
   plainVars: Record<string, string>;
   encryptedSecrets: Record<string, EncryptedEnvelope>;
+  /**
+   * The environment's saved allocation key, unvalidated. Build admission
+   * resolves it with the repository and context settings to pin one target.
+   */
+  sandboxAllocation: string | null;
 };
 
 /**
@@ -264,8 +289,12 @@ export type EnvironmentResponse = {
   updatedAt: string;
   plainVars: EnvironmentPlainVarResponse[];
   commands: string[];
+  startCommands: string[];
   configurationRevision: number;
   sandboxAllocation: string | null;
+  /** Saved policy; both null means the legacy unrestricted default. */
+  egressMode: EgressMode | null;
+  egressAllowlist: string[] | null;
   /** Secret key names only. Values and envelopes are never returned. */
   secretKeys: string[];
 } & EnvironmentIdentityResponse;
@@ -343,15 +372,20 @@ export function validateEnvironmentSecrets(
   return out;
 }
 
-export function validateEnvironmentCommands(commands: string[] | undefined): string[] {
+export function validateEnvironmentCommands(
+  commands: string[] | undefined,
+  kind: 'Setup' | 'Start' = 'Setup'
+): string[] {
   const list = commands ?? [];
   if (list.length > ENVIRONMENT_LIMITS.MAX_COMMANDS) {
-    throw badRequest(`Maximum ${ENVIRONMENT_LIMITS.MAX_COMMANDS} setup commands allowed`);
+    throw badRequest(
+      `Maximum ${ENVIRONMENT_LIMITS.MAX_COMMANDS} ${kind.toLowerCase()} commands allowed`
+    );
   }
   for (const command of list) {
     if (command.length === 0 || command.length > ENVIRONMENT_LIMITS.MAX_COMMAND_LENGTH) {
       throw badRequest(
-        `Setup commands must be 1-${ENVIRONMENT_LIMITS.MAX_COMMAND_LENGTH} characters`
+        `${kind} commands must be 1-${ENVIRONMENT_LIMITS.MAX_COMMAND_LENGTH} characters`
       );
     }
   }

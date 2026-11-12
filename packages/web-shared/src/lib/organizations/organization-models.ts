@@ -11,7 +11,7 @@ import {
   getEffectiveModelDecision,
   evaluateEffectiveModelAccessPolicy,
   type EffectiveOrganizationModelPolicy,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { listAvailableCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
 import { getDirectByokModelsForOrganization } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
@@ -172,7 +172,7 @@ async function applyModelPolicyToCatalog(
   // record would grow with the catalog rather than with the request.
   if (inferenceCheck.withoutProviders > 0) {
     console.debug(
-      `[getModelUserByokProviders] no user byok providers for ${inferenceCheck.withoutProviders} of ${inferenceCheck.checked} models`
+      `[applyModelPolicyToCatalog] no user byok providers for ${inferenceCheck.withoutProviders} of ${inferenceCheck.checked} models`
     );
   }
   return { filteredModels, allowedProvidersByModel };

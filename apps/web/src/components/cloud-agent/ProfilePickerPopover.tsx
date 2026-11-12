@@ -16,8 +16,14 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import {
+  contextSegmentClassName,
+  interactiveContextSegmentClassName,
+  SegmentText,
+} from '@/components/cloud-agent-next/session-context-segments';
 import { type ProfileSummaryWithOwner } from '@/hooks/useCloudAgentProfiles';
 import { useSessionProfileLayers } from '@/hooks/useSessionProfileLayers';
+import { useCloudAgentSettingsDeepLink } from '@/components/cloud-agent-next/settings/useCloudAgentSettingsDeepLink';
 import { ProfilesListDialog } from './ProfilesListDialog';
 
 type ProfilePickerPopoverProps = {
@@ -26,7 +32,7 @@ type ProfilePickerPopoverProps = {
   onOverrideProfileSelect: (id: string | null) => void;
   repoFullName?: string;
   platform?: 'github' | 'gitlab';
-  /** The session's environment. A V2 environment skips the binding and the implicit default. */
+  /** The session's environment. A V2 environment skips the repo binding; the effective default still applies. */
   environment?: { repositories?: unknown } | null;
 };
 
@@ -43,17 +49,30 @@ export function ProfilePickerPopover({
   const [showManageProfiles, setShowManageProfiles] = useState(false);
   const [openToNewProfile, setOpenToNewProfile] = useState(false);
   const [editProfileId, setEditProfileId] = useState<string | null>(null);
+  const { setSection, clearSection } = useCloudAgentSettingsDeepLink();
 
   // Reset override-picker mode whenever the popover closes.
   useEffect(() => {
     if (!open) setPickingOverride(false);
   }, [open]);
 
+  const openManageProfiles = () => {
+    setShowManageProfiles(true);
+    setSection('profiles');
+  };
+
+  const closeManageProfiles = () => {
+    setShowManageProfiles(false);
+    setOpenToNewProfile(false);
+    setEditProfileId(null);
+    clearSection();
+  };
+
   const openEditDialog = (profileId: string) => {
     setOpen(false);
     setOpenToNewProfile(false);
     setEditProfileId(profileId);
-    setShowManageProfiles(true);
+    openManageProfiles();
   };
 
   const {
@@ -99,15 +118,19 @@ export function ProfilePickerPopover({
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
+            type="button"
             className={cn(
-              'inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
-              'border border-border/50 bg-muted/30 hover:bg-muted/60 hover:border-border',
-              'text-muted-foreground hover:text-foreground',
-              open && 'border-border bg-muted/60 text-foreground'
+              contextSegmentClassName,
+              interactiveContextSegmentClassName,
+              open && 'bg-muted/60 text-foreground'
             )}
           >
-            <Layers className="h-3 w-3 shrink-0" />
-            {chipName ? <span className="font-medium">{chipName}</span> : <span>No profile</span>}
+            <Layers className="size-3.5 shrink-0" aria-hidden="true" />
+            {chipName ? (
+              <SegmentText className="max-w-48 font-medium">{chipName}</SegmentText>
+            ) : (
+              <span>No profile</span>
+            )}
             <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
           </button>
         </PopoverTrigger>
@@ -156,7 +179,7 @@ export function ProfilePickerPopover({
               onClick={() => {
                 setOpen(false);
                 setOpenToNewProfile(true);
-                setShowManageProfiles(true);
+                openManageProfiles();
               }}
             >
               <Plus className="h-3 w-3 shrink-0" />
@@ -167,7 +190,7 @@ export function ProfilePickerPopover({
               onClick={() => {
                 setOpen(false);
                 setOpenToNewProfile(false);
-                setShowManageProfiles(true);
+                openManageProfiles();
               }}
             >
               <FolderCog className="h-3 w-3 shrink-0" />
@@ -180,16 +203,18 @@ export function ProfilePickerPopover({
       <ProfilesListDialog
         organizationId={organizationId}
         open={showManageProfiles}
-        onOpenChange={open => {
-          setShowManageProfiles(open);
-          if (!open) {
-            setOpenToNewProfile(false);
-            setEditProfileId(null);
+        onOpenChange={nextOpen => {
+          if (nextOpen) {
+            setShowManageProfiles(true);
+            setSection('profiles');
+            return;
           }
+          closeManageProfiles();
         }}
+        onSectionChange={setSection}
         onProfileSelect={id => {
           onOverrideProfileSelect(id);
-          setShowManageProfiles(false);
+          closeManageProfiles();
         }}
         openToNewProfile={openToNewProfile}
         initialSelectedProfileId={editProfileId}

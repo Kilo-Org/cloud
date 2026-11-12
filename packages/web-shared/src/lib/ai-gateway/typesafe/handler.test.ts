@@ -1,16 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { z } from 'zod';
+import { captureException } from '@sentry/nextjs';
+import type * as Sentry from '@sentry/nextjs';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { TypeSafeClient, choice, noul, score } from '@typesafe-ai/sdk';
 import type { User } from '@kilocode/db/schema';
-import type { StoredModel } from '@kilocode/db';
+import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { after, NextRequest, NextResponse } from 'next/server';
 import type * as NextServer from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
@@ -20,9 +22,11 @@ import {
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   getOrganizationProviderPrivacy,
+  INVALID_TOKEN_CODE,
   modelNotAllowedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import type * as LlmProxyHelpers from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
@@ -54,6 +58,10 @@ jest.mock('next/server', () => ({
   ...jest.requireActual<typeof NextServer>('next/server'),
   after: jest.fn(),
 }));
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<typeof Sentry>('@sentry/nextjs'),
+  captureException: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   errorExceptInTest: jest.fn(),
   warnExceptInTest: jest.fn(),
@@ -78,14 +86,20 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
-  resolveOrganizationMemberModelDecision: jest.fn(),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    resolveOrganizationMemberModelDecision: jest.fn(),
+  })
+);
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
   isGatewayAccountRateLimited: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => ({
+  ...jest.requireActual<typeof LlmProxyHelpers>(
+    '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers'
+  ),
   creditsBlockedResponse: jest.fn(),
   extractFraudAndProjectHeaders: jest.fn(),
   extractHeaderAndLimitLength: jest.fn(),
@@ -123,7 +137,7 @@ const METERED_LATENCY_MS = CLOCK_STEP_MS;
 const METERED_COMPLETE_REQUEST_MS = 2 * CLOCK_STEP_MS;
 const OTHER_SYSTEM_ONE_MODEL = 'respan/span-01-lite:free';
 const SYSTEM_ONE_ALIAS = '~typesafe/jev-latest';
-const pricedSystemOneModels: Record<string, StoredModel> = {
+const pricedSystemOneModels: Record<string, GatewayModelWithEndpoints> = {
   [TYPESAFE_MODEL]: {
     id: TYPESAFE_MODEL,
     name: 'TypeSafe: Jev 1.13',
@@ -443,8 +457,6 @@ describe('handleSystemOneRequest', () => {
         mode: 'code',
         user_byok: false,
         isStreaming: false,
-        botId: 'bot-123',
-        tokenSource: 'api-key',
         ttfb_ms: expect.any(Number),
       })
     );
@@ -580,6 +592,25 @@ describe('handleSystemOneRequest', () => {
     expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(deferredUsageCallbacks()).toHaveLength(0);
+  });
+
+  it('answers a rejected credential with INVALID_TOKEN', async () => {
+    jest.mocked(getUserFromAuth).mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json(
+        { success: false as const, error: 'Invalid API token' },
+        { status: 401 }
+      ),
+      credentialsRejected: true,
+    });
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('WWW-Authenticate')).toBe('Bearer error="invalid_token"');
+    await expect(response.json()).resolves.toMatchObject({ error: { code: INVALID_TOKEN_CODE } });
+    expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it('rate limits before authentication or upstream work', async () => {
@@ -880,12 +911,6 @@ describe('handleSystemOneRequest', () => {
       message: 'OpenRouter System One request failed',
       latency: null,
     },
-    {
-      case: 'an unreadable success body',
-      arrange: () => mockedFetch.mockResolvedValue(new Response('not JSON', { status: 200 })),
-      message: 'OpenRouter System One response body was unreadable',
-      latency: METERED_LATENCY_MS,
-    },
   ])(
     'records a zero-cost attempt row when the upstream call ends with $case',
     async ({ arrange, message, latency }) => {
@@ -917,6 +942,163 @@ describe('handleSystemOneRequest', () => {
     }
   );
 
+  it.each([
+    { bodyFailure: 'invalid JSON', recovered: false, readError: { errorName: 'SyntaxError' } },
+    { bodyFailure: 'invalid JSON', recovered: true, readError: { errorName: 'SyntaxError' } },
+    { bodyFailure: 'read failure', recovered: false, readError: { errorName: 'Error' } },
+    { bodyFailure: 'read failure', recovered: true, readError: { errorName: 'Error' } },
+  ])(
+    'reconciles an unreadable $bodyFailure response using its header id (recovered: $recovered)',
+    async ({ bodyFailure, recovered, readError }) => {
+      mockMeteredClock();
+      const messageId = 'gen-systemone-header';
+      const body =
+        bodyFailure === 'read failure'
+          ? new ReadableStream({ start: controller => controller.error(new Error('private body')) })
+          : 'private body, not JSON';
+      mockedFetch.mockResolvedValue(
+        new Response(body, {
+          status: 201,
+          headers: { 'content-type': 'application/json', 'x-generation-id': messageId },
+        })
+      );
+      if (recovered) {
+        jest
+          .mocked(fetchGeneration)
+          .mockResolvedValue({ data: { id: messageId } } as OpenRouterGeneration);
+        jest.mocked(mapToUsageStats).mockReturnValue({ ...reconciledStats, messageId });
+      }
+
+      const response = await handleSystemOneRequest(makeRequest());
+
+      expect(response.status).toBe(502);
+      expect(await response.json()).toEqual({
+        message: 'Upstream request failed',
+        error_type: 'upstream_error',
+      });
+      expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+      await runAfter();
+      expect(fetchGeneration).toHaveBeenCalledWith(messageId, OPENROUTER);
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledTimes(1);
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageId,
+          model: TYPESAFE_MODEL,
+          hasError: true,
+          status_code: 201,
+          latency: METERED_LATENCY_MS,
+          cost_mUsd: recovered ? 124 : 0,
+          market_cost: recovered ? 124 : 0,
+          inputTokens: recovered ? 23 : 0,
+          outputTokens: recovered ? 7 : 0,
+          streamed: false,
+          cancelled: false,
+          is_byok: false,
+        }),
+        expect.objectContaining({
+          status_code: 201,
+          ttfb_ms: METERED_LATENCY_MS,
+          bouncer: expect.objectContaining({
+            requestId: expect.any(String),
+            accountId: `user:${user.id}`,
+          }),
+        })
+      );
+      expect(captureException).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(
+        new Error('Unable to read or parse upstream usage response'),
+        {
+          tags: { source: 'usage_response_parsing', api_kind: 'systemone' },
+          extra: {
+            usageId: undefined,
+            kiloUserId: user.id,
+            organizationId: undefined,
+            provider: 'openrouter',
+            messageId,
+            ...readError,
+          },
+        }
+      );
+      expect(errorExceptInTest).not.toHaveBeenCalled();
+    }
+  );
+
+  const rootZodIssue = { errorName: 'ZodError', issues: [{ path: '', code: 'invalid_type' }] };
+  it.each([
+    [null, rootZodIssue],
+    [7, rootZodIssue],
+    [[], rootZodIssue],
+    [
+      { answers: 'private answer' },
+      {
+        errorName: 'ZodError',
+        issues: [
+          { path: 'id', code: 'invalid_type' },
+          { path: 'model', code: 'invalid_type' },
+          { path: 'answers', code: 'invalid_type' },
+          { path: 'usage', code: 'invalid_type' },
+        ],
+      },
+    ],
+    [
+      { ...upstreamBody, id: undefined, usage: 'private usage' },
+      {
+        errorName: 'ZodError',
+        issues: [
+          { path: 'id', code: 'invalid_type' },
+          { path: 'usage', code: 'invalid_type' },
+        ],
+      },
+    ],
+  ])(
+    'records malformed response %j using its header id and upstream status',
+    async (body, readError) => {
+      mockMeteredClock();
+      setAuth('org-123');
+      mockedFetch.mockResolvedValue(
+        Response.json(body, {
+          status: 202,
+          headers: { 'x-generation-id': 'gen-malformed-header' },
+        })
+      );
+
+      expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
+
+      await runAfter();
+      expect(fetchGeneration).toHaveBeenCalledWith('gen-malformed-header', OPENROUTER);
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledTimes(1);
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageId: 'gen-malformed-header',
+          model: TYPESAFE_MODEL,
+          hasError: true,
+          status_code: 202,
+          cost_mUsd: 0,
+          market_cost: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          latency: METERED_LATENCY_MS,
+        }),
+        expect.objectContaining({ status_code: 202, ttfb_ms: METERED_LATENCY_MS })
+      );
+      expect(captureException).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(
+        new Error('Unable to read or parse upstream usage response'),
+        {
+          tags: { source: 'usage_response_parsing', api_kind: 'systemone' },
+          extra: {
+            usageId: undefined,
+            kiloUserId: user.id,
+            organizationId: 'org-123',
+            provider: 'openrouter',
+            messageId: 'gen-malformed-header',
+            ...readError,
+          },
+        }
+      );
+    }
+  );
+
   it('records a duration-bound attempt row when the upstream call times out', async () => {
     mockedFetch.mockRejectedValue(
       new DOMException('The operation was aborted due to timeout', 'TimeoutError')
@@ -942,7 +1124,14 @@ describe('handleSystemOneRequest', () => {
     ['fractional tokens', { ...upstreamBody.usage, output_tokens: 1.5 }],
   ])('reconciles the cost of an upstream %s rejection', async (_name, usage) => {
     mockMeteredClock();
-    mockedFetch.mockResolvedValue(Response.json({ ...upstreamBody, usage }));
+    mockedFetch.mockResolvedValue(
+      Response.json(
+        { ...upstreamBody, usage },
+        {
+          headers: { 'x-generation-id': 'gen-other-header' },
+        }
+      )
+    );
     jest.mocked(fetchGeneration).mockResolvedValue({
       data: { id: upstreamBody.id },
     } as OpenRouterGeneration);
@@ -954,9 +1143,7 @@ describe('handleSystemOneRequest', () => {
       message: 'Invalid upstream response',
       error_type: 'upstream_error',
     });
-    expect(errorExceptInTest).toHaveBeenCalledWith(
-      'Invalid OpenRouter System One response or missing usage'
-    );
+    expect(captureException).toHaveBeenCalledTimes(1);
     await runAfter();
     expect(fetchGeneration).toHaveBeenCalledWith(
       upstreamBody.id,
@@ -972,12 +1159,12 @@ describe('handleSystemOneRequest', () => {
     expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
       expect.objectContaining({
         hasError: true,
-        status_code: 502,
+        status_code: 200,
         latency: METERED_LATENCY_MS,
         cost_mUsd: 124,
         market_cost: 124,
       }),
-      expect.objectContaining({ status_code: 502, ttfb_ms: METERED_LATENCY_MS })
+      expect.objectContaining({ status_code: 200, ttfb_ms: METERED_LATENCY_MS })
     );
   });
 
@@ -991,8 +1178,8 @@ describe('handleSystemOneRequest', () => {
     await runAfter();
     expect(fetchGeneration).not.toHaveBeenCalled();
     expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
-      expect.objectContaining({ messageId: null, hasError: true, cost_mUsd: 0, status_code: 502 }),
-      expect.objectContaining({ status_code: 502 })
+      expect.objectContaining({ messageId: null, hasError: true, cost_mUsd: 0, status_code: 200 }),
+      expect.objectContaining({ status_code: 200 })
     );
   });
 
@@ -1011,30 +1198,38 @@ describe('handleSystemOneRequest', () => {
         hasError: true,
         latency: METERED_LATENCY_MS,
         cost_mUsd: 0,
-        status_code: 502,
+        status_code: 200,
       }),
-      expect.objectContaining({ status_code: 502, ttfb_ms: METERED_LATENCY_MS })
+      expect.objectContaining({ status_code: 200, ttfb_ms: METERED_LATENCY_MS })
     );
   });
 
-  it('attributes an unusable body to the model the provider named', async () => {
-    mockedFetch.mockResolvedValue(
-      Response.json({
-        id: upstreamBody.id,
-        model: OTHER_SYSTEM_ONE_MODEL,
-        answers: { billing: { type: 'noul', noul: 0.5 } },
-      })
-    );
+  it.each([false, true])(
+    'attributes an unusable body to its provider model (recovered: %s)',
+    async recovered => {
+      mockedFetch.mockResolvedValue(
+        Response.json({
+          id: upstreamBody.id,
+          model: OTHER_SYSTEM_ONE_MODEL,
+          answers: { billing: { type: 'noul', noul: 0.5 } },
+        })
+      );
+      if (recovered) {
+        jest
+          .mocked(fetchGeneration)
+          .mockResolvedValue({ data: { id: upstreamBody.id } } as OpenRouterGeneration);
+        jest.mocked(mapToUsageStats).mockReturnValue({ ...reconciledStats, model: null });
+      }
 
-    expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
+      expect((await handleSystemOneRequest(makeRequest())).status).toBe(502);
 
-    await runAfter();
-    expect(mapToUsageStats).not.toHaveBeenCalled();
-    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
-      expect.objectContaining({ messageId: upstreamBody.id, model: OTHER_SYSTEM_ONE_MODEL }),
-      expect.anything()
-    );
-  });
+      await runAfter();
+      expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+        expect.objectContaining({ messageId: upstreamBody.id, model: OTHER_SYSTEM_ONE_MODEL }),
+        expect.anything()
+      );
+    }
+  );
 
   it('attributes an unusable body without a model name to the resolved model', async () => {
     mockedFetch.mockResolvedValue(Response.json({ answers: { billing: { type: 'noul' } } }));
@@ -1070,6 +1265,18 @@ describe('handleSystemOneRequest', () => {
       expect.objectContaining({ cost_mUsd: 0, market_cost: 124, hasError: true }),
       expect.objectContaining({ is_free: true })
     );
+  });
+
+  it('does not recover deferred accounting errors as parsing failures', async () => {
+    const accountingError = new Error('Accounting unavailable');
+    jest.mocked(logMicrodollarUsageAndReportToBouncer).mockRejectedValue(accountingError);
+
+    expect((await handleSystemOneRequest(makeRequest())).status).toBe(200);
+
+    await expect(runAfter()).rejects.toBe(accountingError);
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledTimes(1);
+    expect(captureException).not.toHaveBeenCalled();
+    expect(fetchGeneration).not.toHaveBeenCalled();
   });
 
   it('answers 499 without sending or recording when the client left before the upstream call', async () => {

@@ -81,6 +81,9 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 }));
 vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
+// The zero state's glyph comes from the icon set, whose native renderer the
+// pure project does not load.
+vi.mock('@/components/ui/icons', () => ({ Bot: 'Bot' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
 // The briefing card reaches the native SQLCipher dismissal journal; these
 // assertions cover the live card and the section header only.
@@ -97,6 +100,21 @@ vi.mock('@/components/home/section-header', async () => {
   };
 });
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The shared empty state is measured on the device; the section only decides
+// which state it draws, so the mock keeps its title and hint readable as Text.
+// The factory is hoisted above the static imports, so it loads React itself.
+vi.mock('@/components/empty-state', async () => {
+  const { createElement: create } = await import('react');
+  return {
+    EmptyState: (props: { icon: unknown; title: string; description?: ReactNode }) =>
+      create(
+        'EmptyState',
+        props,
+        create('Text', {}, props.title),
+        props.description === undefined ? null : create('Text', {}, props.description)
+      ),
+  };
+});
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
@@ -211,7 +229,9 @@ afterEach(() => {
 });
 
 function newestButton() {
-  const button = nodes('Pressable').find(
+  // Count rows are buttons too; the newest block is drawn after them, so the
+  // last button is the one that opens the session.
+  const button = nodes('Pressable').findLast(
     candidate => candidate.props.accessibilityRole === 'button'
   );
   if (!button) {
@@ -279,11 +299,41 @@ describe('Home live section', () => {
     await render({ ...settled, activeSessions: [session('a1')] });
     expect(node('SectionHeader').props.label).toBe(i18n.t('home.agentSessions'));
     (node('SectionHeader').props.onActionPress as () => void)();
-    expect(navigateSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/');
-    expect(dismissToSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/');
+    // An empty params object is what clears a lingering status filter.
+    expect(navigateSpy).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(2_agents)/',
+      params: {},
+    });
+    expect(dismissToSpy).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(2_agents)/',
+      params: {},
+    });
     expect(navigateSpy.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
       dismissToSpy.mock.invocationCallOrder[0] ?? 0
     );
+  });
+
+  it('opens the agents index narrowed to the tapped status', async () => {
+    await render({
+      ...settled,
+      activeSessions: [session('older', 'idle', { statusUpdatedAt: new Date().toISOString() })],
+    });
+
+    const row = nodes('Pressable').find(candidate => candidate.props.testID === 'home-status-idle');
+    if (!row) {
+      throw new Error('Missing idle status row');
+    }
+    expect(row.props.accessibilityRole).toBe('button');
+    (row.props.onPress as () => void)();
+
+    expect(navigateSpy).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(2_agents)/',
+      params: { status: 'idle' },
+    });
+    expect(dismissToSpy).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(2_agents)/',
+      params: { status: 'idle' },
+    });
   });
 
   it('shows a skeleton until the live list resolves', async () => {
@@ -296,12 +346,18 @@ describe('Home live section', () => {
     expect(text()).toContain('a1');
   });
 
-  it('draws the zero state in the loaded card frame when the accepted live list is empty', async () => {
+  it('draws the zero state as its one message, without four zero counts', async () => {
     await render();
-    for (const label of ['Needs input', 'Working', 'Scheduled', 'Idle']) {
-      expect(text()).toContain(`0\n${label}`);
-    }
+    // The zero state is the shared empty state: a title and one hint, so the
+    // card does not read as a blank frame with a lone line in it.
     expect(text()).toContain(i18n.t('home.noLiveSessions'));
+    expect(text()).toContain(i18n.t('agents.sessionList.noSessionsYetDescription'));
+    expect(nodes('EmptyState')).toHaveLength(1);
+    // The count rows' labels are the only place the card names the four
+    // states, so their absence proves the card dropped the zero counts.
+    for (const label of ['Needs input', 'Working', 'Scheduled', 'Idle']) {
+      expect(text()).not.toContain(label);
+    }
     // Nothing to open: the newest block is not a button.
     expect(
       nodes('Pressable').some(pressable => pressable.props.accessibilityRole === 'button')
@@ -326,38 +382,21 @@ describe('Home live section', () => {
     expect(text()).toContain('live-1');
   });
 
-  it('does not reuse the previous session node when the card settles into the zero state', async () => {
+  it('leaves no button behind when the card settles into the zero state', async () => {
     await render({ ...settled, activeSessions: [session('live-1', 'running')] });
     const live = newestButton();
     expect(live.props.accessibilityLabel).toContain('live-1');
 
     await render();
-    const zero = nodes('Pressable').find(
-      pressable =>
-        pressable.findAll(
-          child =>
-            Object.is(child.type, 'Text') && child.children.includes(i18n.t('home.noLiveSessions'))
-        ).length > 0
-    );
-    if (!zero) {
-      throw new Error('Missing the zero-state newest block');
-    }
-    // The zero state must be its own native view: React Native keeps a prop it
-    // stops receiving, so the reused Android view would go on announcing the
-    // previous session and its button role.
-    expect(zero).not.toBe(live);
-    expect(zero.props.accessibilityLabel).toBeUndefined();
-    expect(zero.props.accessibilityRole).toBeUndefined();
-    expect(
-      nodes('Pressable').some(pressable =>
-        String(pressable.props.accessibilityLabel ?? '').includes('live-1')
-      )
-    ).toBe(false);
+    // The zero state draws no press target at all, so the Android view that
+    // announced the previous session and its button role has nothing to reuse.
+    expect(nodes('Pressable')).toHaveLength(0);
+    expect(nodes('EmptyState')).toHaveLength(1);
 
     // Returning to a session mounts a labelled control again.
     await render({ ...settled, activeSessions: [session('live-2', 'busy')] });
     const revived = newestButton();
-    expect(revived).not.toBe(zero);
+    expect(revived).not.toBe(live);
     expect(revived.props.accessibilityLabel).toContain('live-2');
   });
 

@@ -15,6 +15,9 @@ export type RuleId =
   | 'rtl-mirror'
   | 'safe-area'
   | 'unsettled'
+  | 'loading-placeholder'
+  | 'capture-alignment'
+  | 'blank-frame'
   | 'env-mismatch';
 
 export type ElementRef = {

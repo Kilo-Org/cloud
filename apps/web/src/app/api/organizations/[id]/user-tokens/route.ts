@@ -7,6 +7,7 @@ import {
   canIssueLegacyOrganizationToken,
   createDelegatedResourceToken,
   isDelegableResource,
+  isPagesResource,
   TypedResourceDelegationError,
   type DelegableResource,
 } from '@/lib/auth/resource-delegation';
@@ -46,7 +47,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const organizationId = (await params).id;
 
   // Verify user has access to the organization (any member role is sufficient)
-  const result = await getAuthorizedOrgContext(organizationId);
+  const result = await getAuthorizedOrgContext(organizationId, undefined, {
+    requestMethod: request.method,
+  });
 
   if (!result.success) {
     return result.nextResponse;
@@ -64,6 +67,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     body && typeof body === 'object' ? (body as { resource?: unknown }).resource : undefined;
   if (resource !== undefined && !isDelegableResource(resource)) {
     return NextResponse.json({ error: 'Unsupported resource' }, { status: 400 });
+  }
+  if (resource !== undefined && isPagesResource(resource)) {
+    return NextResponse.json(
+      { error: 'Organization credentials cannot mint Pages tokens' },
+      { status: 403 }
+    );
   }
   if (resource !== undefined) {
     if (!isResourceTokenIssuanceEnabled('delegated-resource')) {

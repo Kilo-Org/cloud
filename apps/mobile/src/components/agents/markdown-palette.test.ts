@@ -26,6 +26,7 @@ const colors = {
   mutedSoft: '#A9A39A',
   hairSoft: 'rgba(20, 15, 10, 0.05)',
   controlIdle: '#F0EEE6',
+  skeletonFill: '#F0EEE6',
   ringTrack: 'rgba(20, 15, 10, 0.05)',
   accentSoft: '#FFDD00',
   accentSoftForeground: '#1A1A10',
@@ -54,11 +55,5 @@ describe('markdown palette', () => {
     const palette = getPalette('user', colors);
 
     expect(palette.textColor).toBe(colors.accentSoftForeground);
-  });
-
-  it('uses primary-foreground for kilo-chat user bubbles (bg-primary)', () => {
-    const palette = getPalette('kilo-chat-user', colors);
-
-    expect(palette.textColor).toBe(colors.primaryForeground);
   });
 });

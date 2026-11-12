@@ -6,22 +6,25 @@ import {
   logMicrodollarUsageAndReportToBouncer,
   processTokenData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
-import { startInactiveSpan, captureException, captureMessage } from '@sentry/nextjs';
+import { startInactiveSpan, captureMessage } from '@sentry/nextjs';
 import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@kilocode/web-shared/lib/constants';
 import { summarizeUserPayments } from '@kilocode/web-shared/lib/creditTransactions';
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import { type User } from '@kilocode/db/schema';
 import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 
 import type { Span } from '@sentry/nextjs';
 import { debugSaveProxyResponseStream } from '@kilocode/web-shared/lib/debugUtils';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { ManagedGatewayId } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import type {
   OpenRouterChatCompletionRequest,
   OpenRouterProviderConfig,
   GatewayRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { limitHeaderValue } from '@kilocode/web-shared/lib/ai-gateway/header-limits';
 import { normalizeProjectId } from '@kilocode/web-shared/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@kilocode/web-shared/lib/userAgent';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
@@ -30,7 +33,6 @@ import { sentryRootSpan } from '../getRootSpan';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
-  OpenRouterError,
   PromptInfo,
   VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
@@ -49,9 +51,13 @@ import {
   computeVercelCostFields,
   drainSseStream,
   extractVercelIsByok,
+  parseUsageWithRecovery,
   providerReportsIsByok,
   readResponseText,
   reportUpstreamStreamError,
+  upstreamStreamErrorSchema,
+  usageCostSchema,
+  vercelProviderMetadataSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -79,7 +85,8 @@ export function invalidPathResponse() {
     {
       error: 'Invalid path',
       error_type: ProxyErrorType.invalid_path,
-      message: 'This endpoint only accepts the path `/chat/completions`.',
+      message:
+        'This endpoint only accepts the paths `/chat/completions`, `/responses` and `/messages`.',
     },
     { status: 400 }
   );
@@ -258,6 +265,23 @@ export function inferenceProvidersNotAllowedResponse(inferenceProviders: readonl
       error: error,
       error_type: ProxyErrorType.provider_not_allowed,
       message: error,
+    },
+    { status: 403 }
+  );
+}
+
+const MANAGED_GATEWAY_NAMES = {
+  openrouter: 'OpenRouter',
+  vercel: 'the Vercel AI Gateway',
+} as const satisfies Record<ManagedGatewayId, string>;
+
+export function managedGatewayDisabledResponse(gateway: ManagedGatewayId) {
+  const error = `This request would be routed through ${MANAGED_GATEWAY_NAMES[gateway]}, which your organization has disabled.`;
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.provider_not_allowed,
+      message: `${error} Select another model or ask an organization admin to update the gateway settings on the Providers & Models page.`,
     },
     { status: 403 }
   );
@@ -542,12 +566,46 @@ export function chatGptReconnectResponse(message: string) {
   );
 }
 
-export function modelDoesNotExistOnOpenRouterResponse(model: string) {
+/**
+ * Returned when the owner's Claude billing connection cannot bill. The request
+ * was refused before any upstream call, and it must not be served on another
+ * payer's allowance. The owner is told what happened and what an admin can do.
+ */
+export function claudeBillingUnavailableResponse(message: string, retryable = false) {
+  const error = `${message} Manage the connection at ${APP_URL}/byok.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { status: retryable ? 503 : 400, headers: retryable ? { 'Retry-After': '1' } : undefined }
+  );
+}
+
+/**
+ * Returned when the organization's shared-services Claude connection was linked
+ * by a person who is gone. The reconnect action lives on the organization's
+ * billing page, so an owner following the message can perform it there. Only an
+ * organization owner can reconnect it, so the request fails instead of moving to
+ * another billing path, and no retry helps.
+ */
+export function claudeBillingReconnectResponse(
+  message: string,
+  organizationId: string | undefined
+) {
+  const settings = organizationId
+    ? `${APP_URL}/organizations/${organizationId}/byok`
+    : `${APP_URL}/byok`;
+  const error = `${message} An organization owner must reconnect Claude billing at ${settings}.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { status: 400 }
+  );
+}
+
+export function unknownModelResponse(model: string) {
   const error =
     `The requested model '${model}' does not exist. ` +
     `Please use an exact model id as listed on /api/gateway/models. ` +
     `If this is a newly released model, please try again in a few minutes.`;
-  errorExceptInTest(`[modelDoesNotExistOnOpenRouterResponse] ${error}`);
+  errorExceptInTest(`[unknownModelResponse] ${error}`);
   return NextResponse.json(
     {
       error,
@@ -715,12 +773,8 @@ export function accountForMicrodollarUsage(
     openrouterRequestSpan,
     servingProvider
   );
-  after(accounting);
+  after(accounting.usagePromise);
   return accounting;
-}
-
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -728,7 +782,7 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
  * such as "unknown field" can be attributed from logs alone.
  */
 function describeRequestFields(request: unknown): Record<string, string> {
-  if (!isObjectRecord(request)) {
+  if (!isRecord(request)) {
     return {};
   }
   const fields: Record<string, string> = {
@@ -736,7 +790,7 @@ function describeRequestFields(request: unknown): Record<string, string> {
   };
   if (Array.isArray(request.messages)) {
     const messageFields = new Set(
-      request.messages.filter(isObjectRecord).flatMap(message => Object.keys(message))
+      request.messages.filter(isRecord).flatMap(message => Object.keys(message))
     );
     fields.messageFields = [...messageFields].sort().join(',');
   }
@@ -820,7 +874,7 @@ export function getOrganizationProviderPrivacy(
 }
 
 export function extractHeaderAndLimitLength(request: NextRequest, name: string) {
-  return request.headers.get(name)?.slice(0, 500)?.trim() || null;
+  return limitHeaderValue(request.headers.get(name));
 }
 
 export function extractFraudAndProjectHeaders(request: NextRequest) {
@@ -937,6 +991,15 @@ function reasoningBudgetBucket(value: unknown): string | null {
   return 'gt64k';
 }
 
+/**
+ * The Vercel inference region set on the upstream request. Clients cannot send `providerOptions`,
+ * so the value always comes from `applyVercelSettings` and stays within the known regions.
+ */
+export function extractInferenceRegion(body: GatewayRequest['body']): string | null {
+  const inferenceRegion = body.providerOptions?.gateway?.inferenceRegion;
+  return inferenceRegion?.scope === 'zone' ? inferenceRegion.geoRegion : null;
+}
+
 function isReasoningObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -994,45 +1057,37 @@ export type FimUsage = {
   total_tokens: number;
 };
 
-export type MistralFimCompletion = {
-  id: string;
-  object: 'fim.completion';
-  model: string;
-  usage: FimUsage;
-  created: number;
-  choices: Array<{
-    index: number;
-    text: string;
-    finish_reason: string;
-  }>;
-};
+const fimUsageSchema = z.object({
+  prompt_tokens: z.number(),
+  completion_tokens: z.number(),
+  total_tokens: z.number().optional(),
+});
 
-/**
- * A streamed FIM chunk. Mistral sends the text in `delta.content` and usage in
- * its final chunk. Inception sends the text in `text`, and usage only in an extra
- * final chunk with no choices when the request sets `stream_options.include_usage`.
- */
-type FimStreamChunk = {
-  id: string;
-  model: string;
-  created: number;
-  choices: Array<{
-    index: number;
-    delta?: {
-      content?: string;
-    };
-    text?: string;
-    finish_reason: string | null;
-  }>;
-  usage?: FimUsage;
-  error?: OpenRouterError;
-};
+const fimResponseSchema = z.object({
+  id: z.string().nullish(),
+  model: z.string().nullish(),
+  usage: fimUsageSchema.nullish(),
+  choices: z
+    .array(
+      z.object({
+        delta: z.object({ content: z.string().nullish() }).nullish(),
+        text: z.string().nullish(),
+      })
+    )
+    .nullish(),
+  error: upstreamStreamErrorSchema.nullish(),
+});
 
-function computeInceptionFimMicrodollarCost(usage: FimUsage): number {
+function computeInceptionFimMicrodollarCost(
+  usage: Pick<FimUsage, 'prompt_tokens' | 'completion_tokens'>
+): number {
   return Math.round(usage.prompt_tokens * 0.25 + usage.completion_tokens * 0.75);
 }
 
-function computeFimMicrodollarCost(usage: FimUsage, provider: ProviderType): number {
+function computeFimMicrodollarCost(
+  usage: Pick<FimUsage, 'prompt_tokens' | 'completion_tokens'>,
+  provider: ProviderType
+): number {
   switch (provider) {
     case 'mistral':
       return Math.round(usage.prompt_tokens * 0.3 + usage.completion_tokens * 0.9);
@@ -1049,24 +1104,23 @@ function parseMistralFimUsageFromString(
   provider: ProviderType,
   statusCode: number
 ): MicrodollarUsageStats {
-  const json = parseUsageResponse(response, statusCode) as Partial<MistralFimCompletion>;
+  const json = fimResponseSchema.parse(parseUsageResponse(response, statusCode));
   const usage = json.usage;
   if (!usage && statusCode < 400) {
     throw new Error('SUSPICIOUS: No FIM usage information');
   }
-  const cost_mUsd = usage ? computeFimMicrodollarCost(usage, provider) : 0;
 
   return {
     messageId: json.id ?? null,
     model: json.model ?? null,
     responseContent: json.choices?.[0]?.text || '',
-    hasError: !json.model || statusCode >= 400,
+    hasError: !json.model || json.error != null || statusCode >= 400,
     inference_provider: provider,
     inputTokens: usage?.prompt_tokens ?? 0,
     outputTokens: usage?.completion_tokens ?? 0,
     cacheHitTokens: 0,
     cacheWriteTokens: 0,
-    cost_mUsd,
+    cost_mUsd: 0,
     is_byok: null,
     upstream_id: null,
     finish_reason: null,
@@ -1104,7 +1158,7 @@ async function parseMistralFimUsageFromStream(
   let effectiveStatusCode = statusCode;
   const startedAt = performance.now();
   let firstTokenReceived = false;
-  let usage: FimUsage | undefined;
+  let usage: z.infer<typeof fimUsageSchema> | undefined;
 
   const onEvent = (event: EventSourceMessage) => {
     if (!firstTokenReceived) {
@@ -1115,51 +1169,42 @@ async function parseMistralFimUsageFromStream(
 
     if (event.data === '[DONE]') return;
 
-    try {
-      const json = JSON.parse(event.data) as FimStreamChunk;
+    const json = fimResponseSchema.parse(JSON.parse(event.data));
 
-      if (json.error) {
-        reportedError = true;
-        if (typeof json.error.code === 'number') effectiveStatusCode = json.error.code;
-        reportUpstreamStreamError({
-          label: 'FIM upstream error',
-          source: 'fim_sse_processing',
-          error: json.error,
-          usesUserCredentials,
-          logContext: { provider, messageId: json.id ?? messageId, model: json.model ?? model },
-          sentryExtra: { json, event },
-        });
-      }
-
-      model = json.model ?? model;
-      messageId = json.id ?? messageId;
-      usage = json.usage ?? usage;
-
-      const choice = json.choices?.[0];
-      const contentDelta = choice?.delta?.content ?? choice?.text;
-      if (contentDelta) {
-        responseContent += contentDelta;
-      }
-    } catch (e) {
+    if (json.error != null) {
       reportedError = true;
-      if (statusCode < 400) {
-        captureException(e, {
-          tags: { source: 'fim_sse_parsing' },
-          extra: { eventData: event.data },
-        });
-      }
+      if (typeof json.error.code === 'number') effectiveStatusCode = json.error.code;
+      reportUpstreamStreamError({
+        label: 'FIM upstream error',
+        source: 'fim_sse_processing',
+        error: json.error,
+        usesUserCredentials,
+        logContext: { provider, messageId: json.id ?? messageId, model: json.model ?? model },
+        sentryExtra: { provider, messageId: json.id ?? messageId, model: json.model ?? model },
+      });
+    }
+
+    model = json.model ?? model;
+    messageId = json.id ?? messageId;
+    usage = json.usage ?? usage;
+
+    const choice = json.choices?.[0];
+    const contentDelta = choice?.delta?.content ?? choice?.text;
+    if (contentDelta) {
+      responseContent += contentDelta;
     }
   };
 
-  const { wasAborted, timing } = await drainSseStream(
+  const { wasAborted, malformedEventCount, timing } = await drainSseStream(
     stream,
     onEvent,
     streamProcessingSpan,
-    requestStartedAt
+    requestStartedAt,
+    () => ({ messageId, model })
   );
   if (!firstTokenReceived) timeToFirstTokenSpan.end();
 
-  if (!usage && !reportedError && !wasAborted) {
+  if (!usage && !reportedError && !wasAborted && malformedEventCount === 0) {
     captureMessage('SUSPICIOUS: No usage info in FIM stream', {
       level: 'error',
       tags: { source: 'fim_usage_processing' },
@@ -1171,13 +1216,13 @@ async function parseMistralFimUsageFromStream(
     messageId,
     model,
     responseContent,
-    hasError: reportedError || wasAborted,
+    hasError: reportedError || wasAborted || malformedEventCount > 0,
     inference_provider: provider,
     inputTokens: usage?.prompt_tokens ?? 0,
     outputTokens: usage?.completion_tokens ?? 0,
     cacheHitTokens: 0,
     cacheWriteTokens: 0,
-    cost_mUsd: usage ? computeFimMicrodollarCost(usage, provider) : 0,
+    cost_mUsd: 0,
     is_byok: null,
     upstream_id: null,
     finish_reason: null,
@@ -1198,11 +1243,11 @@ export function countAndStoreFimUsage(
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedResponse, logFileExtension);
 
-  const statusCode = usageContext.status_code ?? 0;
+  const statusCode = clonedResponse.status;
   const { requestStartedAt } = usageContext;
-  const usageStatsPromise = !clonedResponse.body
-    ? Promise.resolve(null)
-    : usageContext.isStreaming
+  const usageStatsPromise = parseUsageWithRecovery(clonedResponse, usageContext, () => {
+    if (!clonedResponse.body) return null;
+    return usageContext.isStreaming
       ? parseMistralFimUsageFromStream(
           clonedResponse.body,
           requestSpan,
@@ -1211,45 +1256,31 @@ export function countAndStoreFimUsage(
           usageContext.user_byok,
           requestStartedAt
         )
-      : readResponseText(clonedResponse.body, requestStartedAt)
-          .then(({ text, timing }) => ({
-            ...parseMistralFimUsageFromString(text, usageContext.provider, statusCode),
-            ...timing,
-          }))
-          .catch(error => {
-            if (statusCode < 400) {
-              captureException(error, {
-                tags: { source: 'fim_usage_processing' },
-                extra: { statusCode },
-              });
-            }
-            return null;
-          });
+      : readResponseText(clonedResponse.body, requestStartedAt).then(({ text, timing }) => ({
+          ...parseMistralFimUsageFromString(text, usageContext.provider, statusCode),
+          ...timing,
+        }));
+  });
 
-  after(
-    usageStatsPromise.then(usageStats => {
-      if (!usageStats) {
-        if (statusCode < 400) {
-          captureMessage('SUSPICIOUS: No FIM usage information', {
-            level: 'error',
-            tags: { source: 'fim_usage_processing' },
-            extra: { usageContext },
-          });
-        }
-        return;
-      }
+  const usagePromise = usageStatsPromise.then(usageStats => {
+    usageStats.cost_mUsd =
+      usageStats.inputTokens || usageStats.outputTokens
+        ? computeFimMicrodollarCost(
+            { prompt_tokens: usageStats.inputTokens, completion_tokens: usageStats.outputTokens },
+            usageContext.provider
+          )
+        : 0;
+    usageStats.market_cost = usageStats.cost_mUsd;
 
-      usageStats.market_cost = usageStats.cost_mUsd;
+    if (usageContext.is_free || usageContext.user_byok) {
+      usageStats.cost_mUsd = 0;
+      usageStats.cacheDiscount_mUsd = 0;
+    }
 
-      if (usageContext.is_free || usageContext.user_byok) {
-        usageStats.cost_mUsd = 0;
-        usageStats.cacheDiscount_mUsd = 0;
-      }
-
-      // Persist billing, then report the same request to bouncer's usage ledger.
-      return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
-    })
-  );
+    return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
+  });
+  after(usagePromise);
+  return { statsPromise: usageStatsPromise, usagePromise };
 }
 
 // ============================================================================
@@ -1268,20 +1299,19 @@ export function extractEditPromptInfo(body: { messages: EditMessage[] }): Prompt
   };
 }
 
-type EditUsage = FimUsage & {
-  cached_input_tokens?: number;
-};
+const editUsageSchema = fimUsageSchema.extend({ cached_input_tokens: z.number().optional() });
 
-type MercuryEditCompletionResponse = {
-  id?: string;
-  model?: string;
-  usage?: EditUsage;
-  choices?: Array<{
-    index?: number;
-    message?: { role?: string; content?: string };
-    finish_reason?: string | null;
-  }>;
-};
+const editResponseSchema = z.object({
+  id: z.string().nullish(),
+  model: z.string().nullish(),
+  usage: editUsageSchema.nullish(),
+  choices: z
+    .array(z.object({ message: z.object({ content: z.string().nullish() }).nullish() }))
+    .nullish(),
+  error: upstreamStreamErrorSchema.nullish(),
+});
+
+type EditUsage = z.infer<typeof editUsageSchema>;
 
 function getEditCacheHitTokens(usage: EditUsage): number {
   return Math.min(usage.prompt_tokens, Math.max(usage.cached_input_tokens ?? 0, 0));
@@ -1315,22 +1345,33 @@ export function parseEditUsageFromResponse(
   provider: ProviderType,
   statusCode: number
 ): MicrodollarUsageStats {
-  const json = parseUsageResponse(response, statusCode) as MercuryEditCompletionResponse;
+  const json = editResponseSchema.parse(parseUsageResponse(response, statusCode));
+  const stats = extractEditUsage(json, provider, statusCode);
+  priceEditUsage(stats, json.usage, provider);
+  return stats;
+}
+
+function extractEditUsage(
+  json: z.infer<typeof editResponseSchema>,
+  provider: ProviderType,
+  statusCode: number
+): MicrodollarUsageStats {
+  if (!json.model && !json.error && !json.usage && statusCode < 400) {
+    throw new Error('Unexpected edit response');
+  }
   const usage = json.usage;
   const cacheHitTokens = usage ? getEditCacheHitTokens(usage) : 0;
   return {
     messageId: json.id ?? null,
     model: json.model ?? null,
     responseContent: json.choices?.[0]?.message?.content || '',
-    hasError: !json.model || statusCode >= 400,
+    hasError: !json.model || json.error != null || statusCode >= 400,
     inference_provider: provider,
     inputTokens: usage?.prompt_tokens ?? 0,
     outputTokens: usage?.completion_tokens ?? 0,
     cacheHitTokens,
     cacheWriteTokens: 0,
-    cost_mUsd: usage ? computeEditMicrodollarCost(usage, provider) : 0,
-    cacheDiscount_mUsd:
-      usage && provider === 'inception' ? Math.round(cacheHitTokens * (0.25 - 0.025)) : undefined,
+    cost_mUsd: 0,
     is_byok: null,
     upstream_id: null,
     finish_reason: null,
@@ -1343,6 +1384,18 @@ export function parseEditUsageFromResponse(
   };
 }
 
+function priceEditUsage(
+  stats: MicrodollarUsageStats,
+  usage: EditUsage | null | undefined,
+  provider: ProviderType
+) {
+  stats.cost_mUsd = usage ? computeEditMicrodollarCost(usage, provider) : 0;
+  stats.cacheDiscount_mUsd =
+    usage && provider === 'inception'
+      ? Math.round(getEditCacheHitTokens(usage) * (0.25 - 0.025))
+      : undefined;
+}
+
 export function countAndStoreEditUsage(
   clonedResponse: Response,
   usageContext: MicrodollarUsageContext,
@@ -1350,89 +1403,64 @@ export function countAndStoreEditUsage(
 ) {
   debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
 
-  const statusCode = usageContext.status_code ?? 0;
-  const usageStatsPromise = !clonedResponse.body
-    ? Promise.resolve(null)
-    : readResponseText(clonedResponse.body, usageContext.requestStartedAt)
-        .then(({ text, timing }) => ({
-          ...parseEditUsageFromResponse(text, usageContext.provider, statusCode),
-          ...timing,
-        }))
-        .catch(error => {
-          if (statusCode < 400) {
-            captureException(error, {
-              tags: { source: 'edit_usage_processing' },
-              extra: { statusCode },
-            });
-          }
-          return null;
-        });
+  const statusCode = clonedResponse.status;
+  let usage: EditUsage | null | undefined;
+  const usageStatsPromise = parseUsageWithRecovery(clonedResponse, usageContext, async () => {
+    if (!clonedResponse.body) return null;
+    const { text, timing } = await readResponseText(
+      clonedResponse.body,
+      usageContext.requestStartedAt
+    );
+    const json = editResponseSchema.parse(parseUsageResponse(text, statusCode));
+    const stats = extractEditUsage(json, usageContext.provider, statusCode);
+    usage = json.usage;
+    return { ...stats, ...timing };
+  });
 
-  after(
-    usageStatsPromise.then(usageStats => {
-      requestSpan?.end();
-      if (!usageStats) {
-        if (statusCode < 400) {
-          captureMessage('SUSPICIOUS: No edit usage information', {
-            level: 'error',
-            tags: { source: 'edit_usage_processing' },
-            extra: { usageContext },
-          });
-        }
-        return;
-      }
+  const usagePromise = usageStatsPromise.then(usageStats => {
+    requestSpan?.end();
+    priceEditUsage(usageStats, usage, usageContext.provider);
+    usageStats.market_cost = usageStats.cost_mUsd;
 
-      usageStats.market_cost = usageStats.cost_mUsd;
+    if (usageContext.is_free || usageContext.user_byok) {
+      usageStats.cost_mUsd = 0;
+      usageStats.cacheDiscount_mUsd = 0;
+    }
 
-      if (usageContext.is_free || usageContext.user_byok) {
-        usageStats.cost_mUsd = 0;
-        usageStats.cacheDiscount_mUsd = 0;
-      }
-
-      return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
-    })
-  );
+    return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
+  });
+  after(usagePromise);
+  return { statsPromise: usageStatsPromise, usagePromise };
 }
 
 // ============================================================================
 // Embedding-Specific Code
 // ============================================================================
 
-// OpenRouter adds `cost`, `is_byok` and `cost_details` to the usage object.
-// Vercel AI Gateway reports only tokens there and puts the cost in
-// `providerMetadata.gateway`.
-type EmbeddingUsage = {
-  prompt_tokens: number;
-  total_tokens: number;
-  cost?: number;
-  is_byok?: boolean | null;
-  cost_details?: { upstream_inference_cost: number };
-};
+const embeddingResponseSchema = z.object({
+  id: z.string().nullish(),
+  model: z.string().nullish(),
+  provider: z.string().nullish(),
+  usage: usageCostSchema
+    .extend({ prompt_tokens: z.number(), total_tokens: z.number().optional() })
+    .nullish(),
+  providerMetadata: vercelProviderMetadataSchema.nullish(),
+  error: upstreamStreamErrorSchema.nullish(),
+});
 
-// Upstream error bodies (`{ error: {...} }`) carry neither model nor usage.
-type EmbeddingResponse = {
-  id?: string;
-  object?: 'list';
-  model?: string;
-  usage?: EmbeddingUsage;
-  providerMetadata?: VercelProviderMetaData;
-};
-
-type TranscriptionUsage = {
-  total_tokens?: number;
-  input_tokens?: number;
-  output_tokens?: number;
-  cost?: number;
-  is_byok?: boolean | null;
-  cost_details?: { upstream_inference_cost: number };
-};
-
-type TranscriptionResponse = {
-  id?: string;
-  model?: string;
-  text?: string;
-  usage?: TranscriptionUsage;
-};
+const transcriptionResponseSchema = z.object({
+  id: z.string().nullish(),
+  model: z.string().nullish(),
+  text: z.string().nullish(),
+  usage: usageCostSchema
+    .extend({
+      input_tokens: z.number().nullish(),
+      output_tokens: z.number().nullish(),
+      total_tokens: z.number().nullish(),
+    })
+    .nullish(),
+  error: upstreamStreamErrorSchema.nullish(),
+});
 
 // An upstream error can arrive without a JSON body, such as an empty 429 or an
 // HTML error page from an edge proxy. It still carries no usage, so treat it like
@@ -1456,9 +1484,21 @@ export function parseEmbeddingUsageFromResponse(
   statusCode: number,
   provider: ProviderType
 ): MicrodollarUsageStats {
-  const json = parseUsageResponse(responseText, statusCode) as EmbeddingResponse;
+  const json = embeddingResponseSchema.parse(parseUsageResponse(responseText, statusCode));
+  const stats = extractEmbeddingUsage(json, statusCode);
+  priceEmbeddingUsage(stats, json, provider);
+  return stats;
+}
+
+function extractEmbeddingUsage(
+  json: z.infer<typeof embeddingResponseSchema>,
+  statusCode: number
+): MicrodollarUsageStats {
+  if (json.model == null && !json.error && !json.usage && statusCode < 400) {
+    throw new Error('Unexpected embedding response');
+  }
   const usage = json.usage;
-  const hasError = !json.model || statusCode >= 400;
+  const hasError = !json.model || json.error != null || statusCode >= 400;
 
   if (!usage && !hasError) {
     captureMessage('SUSPICIOUS: No embedding usage information', {
@@ -1468,12 +1508,12 @@ export function parseEmbeddingUsageFromResponse(
     });
   }
 
-  const base = {
+  return {
     messageId: json.id ?? null,
     model: json.model ?? null,
     responseContent: '',
     hasError,
-    inference_provider: null,
+    inference_provider: json.provider ?? null,
     upstream_id: null,
     finish_reason: null,
     latency: null,
@@ -1482,7 +1522,21 @@ export function parseEmbeddingUsageFromResponse(
     streamed: false,
     cancelled: false,
     status_code: statusCode,
+    inputTokens: usage?.prompt_tokens ?? 0,
+    outputTokens: 0,
+    cacheHitTokens: 0,
+    cacheWriteTokens: 0,
+    cost_mUsd: 0,
+    is_byok: null,
   };
+}
+
+function priceEmbeddingUsage(
+  stats: MicrodollarUsageStats,
+  json: z.infer<typeof embeddingResponseSchema>,
+  provider: ProviderType
+) {
+  const usage = json.usage;
   // With BYOK, OpenRouter's `cost` is only its 5% fee; the shared OpenRouter
   // cost logic bills `cost_details.upstream_inference_cost` instead.
   const vercelGateway = json.providerMetadata?.gateway;
@@ -1490,7 +1544,7 @@ export function parseEmbeddingUsageFromResponse(
     usage?.cost != null || usage?.is_byok != null
       ? computeOpenRouterCostFields(
           usage,
-          base,
+          stats,
           'embedding_usage_processing',
           providerReportsIsByok(provider),
           provider
@@ -1499,14 +1553,7 @@ export function parseEmbeddingUsageFromResponse(
         ? embeddingVercelCosts(vercelGateway)
         : { cost_mUsd: 0, is_byok: null };
 
-  return {
-    ...base,
-    inputTokens: usage?.prompt_tokens ?? 0,
-    outputTokens: 0,
-    cacheHitTokens: 0,
-    cacheWriteTokens: 0,
-    ...cost,
-  };
+  Object.assign(stats, cost);
 }
 
 /**
@@ -1523,13 +1570,27 @@ export function parseTranscriptionUsageFromResponse(
   provider: ProviderType,
   generationId: string | null
 ): MicrodollarUsageStats {
-  const json = parseUsageResponse(responseText, statusCode) as TranscriptionResponse;
+  const json = transcriptionResponseSchema.parse(parseUsageResponse(responseText, statusCode));
+  const stats = extractTranscriptionUsage(json, statusCode, requestedModel, generationId);
+  priceTranscriptionUsage(stats, json, provider);
+  return stats;
+}
+
+function extractTranscriptionUsage(
+  json: z.infer<typeof transcriptionResponseSchema>,
+  statusCode: number,
+  requestedModel: string,
+  generationId: string | null
+): MicrodollarUsageStats {
+  if (json.text == null && json.model == null && !json.error && statusCode < 400) {
+    throw new Error('Unexpected transcription response');
+  }
   const messageId = json.id ?? generationId;
-  const base = {
+  return {
     messageId,
     model: json.model ?? requestedModel,
     responseContent: json.text ?? '',
-    hasError: statusCode >= 400 || typeof json.text !== 'string',
+    hasError: statusCode >= 400 || json.error != null || typeof json.text !== 'string',
     inference_provider: null,
     upstream_id: null,
     finish_reason: null,
@@ -1539,23 +1600,28 @@ export function parseTranscriptionUsageFromResponse(
     streamed: false,
     cancelled: false,
     status_code: statusCode,
-  };
-  const cost = computeOpenRouterCostFields(
-    json.usage ?? {},
-    base,
-    'transcription_usage_processing',
-    messageId === null && providerReportsIsByok(provider),
-    provider
-  );
-
-  return {
-    ...base,
     inputTokens: json.usage?.input_tokens ?? 0,
     outputTokens: json.usage?.output_tokens ?? 0,
     cacheHitTokens: 0,
     cacheWriteTokens: 0,
-    ...cost,
+    cost_mUsd: 0,
+    is_byok: null,
   };
+}
+
+function priceTranscriptionUsage(
+  stats: MicrodollarUsageStats,
+  json: z.infer<typeof transcriptionResponseSchema>,
+  provider: ProviderType
+) {
+  const cost = computeOpenRouterCostFields(
+    json.usage ?? {},
+    stats,
+    'transcription_usage_processing',
+    stats.messageId === null && providerReportsIsByok(provider),
+    provider
+  );
+  Object.assign(stats, cost);
 }
 
 export function extractEmbeddingPromptInfo(body: { input: unknown }): PromptInfo {
@@ -1577,84 +1643,77 @@ export function extractEmbeddingPromptInfo(body: { input: unknown }): PromptInfo
 export function countAndStoreEmbeddingUsage(
   clonedResponse: Response,
   usageContext: MicrodollarUsageContext,
-  requestSpan: Span | undefined
+  requestSpan: Span | undefined,
+  servingProvider?: Provider
 ) {
   debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
 
-  const statusCode = usageContext.status_code ?? 0;
-  const usageStatsPromise = !clonedResponse.body
-    ? Promise.resolve(null)
-    : clonedResponse
-        .text()
-        .then(text => parseEmbeddingUsageFromResponse(text, statusCode, usageContext.provider))
-        .catch(() => null);
+  const statusCode = clonedResponse.status;
+  let json: z.infer<typeof embeddingResponseSchema> | undefined;
+  const usageStatsPromise = parseUsageWithRecovery(clonedResponse, usageContext, async () => {
+    if (!clonedResponse.body) return null;
+    const parsed = embeddingResponseSchema.parse(
+      parseUsageResponse(await clonedResponse.text(), statusCode)
+    );
+    const stats = extractEmbeddingUsage(parsed, statusCode);
+    json = parsed;
+    return stats;
+  });
 
-  after(
-    usageStatsPromise.then(usageStats => {
-      requestSpan?.end();
-      if (!usageStats) {
-        if (statusCode < 400) {
-          captureMessage('SUSPICIOUS: No embedding usage information', {
-            level: 'error',
-            tags: { source: 'embedding_usage_processing' },
-            extra: { usageContext },
-          });
-        }
-        return;
-      }
+  const usagePromise = usageStatsPromise.then(usageStats => {
+    requestSpan?.end();
+    if (!json) return processTokenData(usageStats, usageContext, servingProvider);
+    priceEmbeddingUsage(usageStats, json, usageContext.provider);
 
-      // Preserve the real upstream cost before free-model or BYOK zeroing.
-      usageStats.market_cost = usageStats.cost_mUsd;
+    // Preserve the real upstream cost before free-model or BYOK zeroing.
+    usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.is_free || usageContext.user_byok) {
-        usageStats.cost_mUsd = 0;
-      }
+    if (usageContext.is_free || usageContext.user_byok) {
+      usageStats.cost_mUsd = 0;
+    }
 
-      return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
-    })
-  );
+    return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
+  });
+  after(usagePromise);
+  return { statsPromise: usageStatsPromise, usagePromise };
 }
 
 export function countAndStoreTranscriptionUsage(
   clonedResponse: Response,
   usageContext: MicrodollarUsageContext,
-  requestSpan: Span | undefined
+  requestSpan: Span | undefined,
+  servingProvider?: Provider
 ) {
   debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
 
-  const statusCode = usageContext.status_code ?? 0;
-  const usageStatsPromise = !clonedResponse.body
-    ? Promise.resolve(null)
-    : readResponseText(clonedResponse.body, usageContext.requestStartedAt)
-        .then(({ text, timing }) => ({
-          ...parseTranscriptionUsageFromResponse(
-            text,
-            statusCode,
-            usageContext.requested_model,
-            usageContext.provider,
-            clonedResponse.headers.get('x-generation-id')
-          ),
-          ...timing,
-        }))
-        .catch(() => null);
+  const statusCode = clonedResponse.status;
+  let json: z.infer<typeof transcriptionResponseSchema> | undefined;
+  const usageStatsPromise = parseUsageWithRecovery(clonedResponse, usageContext, async () => {
+    if (!clonedResponse.body) return null;
+    const { text, timing } = await readResponseText(
+      clonedResponse.body,
+      usageContext.requestStartedAt
+    );
+    const parsed = transcriptionResponseSchema.parse(parseUsageResponse(text, statusCode));
+    const stats = extractTranscriptionUsage(
+      parsed,
+      statusCode,
+      usageContext.requested_model,
+      clonedResponse.headers.get('x-generation-id')
+    );
+    json = parsed;
+    return { ...stats, ...timing };
+  });
 
-  after(
-    usageStatsPromise.then(usageStats => {
-      requestSpan?.end();
-      if (!usageStats) {
-        if (statusCode < 400) {
-          captureMessage('SUSPICIOUS: No transcription usage information', {
-            level: 'error',
-            tags: { source: 'transcription_usage_processing' },
-            extra: { usageContext },
-          });
-        }
-        return;
-      }
-
-      return processTokenData(usageStats, usageContext);
-    })
-  );
+  const usagePromise = usageStatsPromise.then(usageStats => {
+    requestSpan?.end();
+    if (json) {
+      priceTranscriptionUsage(usageStats, json, usageContext.provider);
+    }
+    return processTokenData(usageStats, usageContext, servingProvider);
+  });
+  after(usagePromise);
+  return { statsPromise: usageStatsPromise, usagePromise };
 }
 
 // ============================================================================

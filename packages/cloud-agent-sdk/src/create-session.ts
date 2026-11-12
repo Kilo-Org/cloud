@@ -24,6 +24,15 @@ export type { CreateRemoteSessionInput } from './transport';
 /** Delivered error string for old-CLI strict-parse rejection of extended create_session. */
 const INVALID_CREATE_SESSION_COMMAND = 'invalid create_session command';
 
+/**
+ * True when `create_session` failed because an old CLI's strict parser rejected
+ * the extended wire shape. Extended-field creates degrade with one bare
+ * `{ protocolVersion: 1 }` retry on exactly this error.
+ */
+export function isInvalidCreateSessionCommand(error: unknown): boolean {
+  return error instanceof CommandDeliveredError && error.message === INVALID_CREATE_SESSION_COMMAND;
+}
+
 /** `create_session` wire data: protocol v1 plus any defined inheritance fields. */
 export type CreateSessionWireData = {
   protocolVersion: 1;
@@ -61,8 +70,13 @@ export function buildCreateSessionWireData(
 }
 
 /**
- * True when the wire data differs from the bare `{ protocolVersion: 1 }` form
- * that every supported CLI accepts.
+ * True when the non-clone inheritance fields (`agent`, `model`, `orgId`,
+ * `directory`) make the wire data differ from the bare
+ * `{ protocolVersion: 1 }` form that every supported CLI accepts.
+ *
+ * The callers gate the clone fields (`cloneFromKiloSessionId`,
+ * `cloneUpToMessageId`) separately, because a clone id must never take the
+ * bare retry.
  */
 export function hasExtendedCreateSessionFields(data: CreateSessionWireData): boolean {
   return (
@@ -196,12 +210,7 @@ export async function createRemoteSessionOnConnection(
     // Old form is one bare protocolVersion 1 retry for extended fields; a
     // clone id must never use that fallback because it would create a fresh
     // session.
-    if (
-      !hasCloneField &&
-      hasExtendedFields &&
-      error instanceof CommandDeliveredError &&
-      error.message === INVALID_CREATE_SESSION_COMMAND
-    ) {
+    if (!hasCloneField && hasExtendedFields && isInvalidCreateSessionCommand(error)) {
       return connection.sendCommandToConnection({
         command: 'create_session',
         data: { protocolVersion: 1 },

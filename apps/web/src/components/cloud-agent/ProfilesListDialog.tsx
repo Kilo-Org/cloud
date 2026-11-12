@@ -1,12 +1,16 @@
 /** Opens profile management in Cloud Agent settings. */
 'use client';
 
-import { CloudAgentSettingsDialog } from '@/components/cloud-agent-next/settings/CloudAgentSettingsDialog';
+import {
+  CloudAgentSettingsDialog,
+  type SettingsSection,
+} from '@/components/cloud-agent-next/settings/CloudAgentSettingsDialog';
 
 type ProfilesListDialogProps = {
   organizationId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSectionChange?: (section: SettingsSection) => void;
   onProfileSelect?: (profileId: string) => void;
   openToNewProfile?: boolean;
   initialSelectedProfileId?: string | null;

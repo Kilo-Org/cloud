@@ -108,9 +108,12 @@ export function classifyControlPlaneFailure(
       return { stage: 'pre_dispatch', code: 'payment_required' };
     case 'container_limit_reached':
       return { stage: 'pre_dispatch', code: 'container_limit_reached' };
+    case 'account_blocked':
+      return { stage: 'pre_dispatch', code: 'account_blocked' };
     case 'billing_unavailable':
       return { stage: 'pre_dispatch', code: 'admission_billing_unavailable' };
     case 'invalid_configuration':
+    case 'sandbox_create_failed':
       return PRE_DISPATCH_SANDBOX_CONNECT;
     case 'agent_unavailable':
       return dispatchState === 'accepted'

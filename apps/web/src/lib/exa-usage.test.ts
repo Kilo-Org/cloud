@@ -1,17 +1,29 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
+  credit_transactions,
   exa_monthly_usage,
   exa_usage_log,
+  kilo_pass_org_agreements,
+  kilo_pass_org_allocation_plan_rows,
+  kilo_pass_org_audit_records,
+  kilo_pass_org_issuance_snapshots,
+  kilo_pass_org_qualifying_spend_events,
   kilocode_users,
   organization_user_usage,
   organizations,
 } from '@kilocode/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { getExaMonthlyUsage, getExaFreeAllowanceMicrodollars, recordExaUsage } from './exa-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { activatePaidAgreement, createPendingAgreement } from './kilo-pass-org/service';
+import type { ExaUsageRecord } from '@kilocode/usage-contracts';
+
+function usageIdentity() {
+  return { id: crypto.randomUUID(), occurredAt: new Date().toISOString() };
+}
 
 // Mock next/server's after function which requires request context
 jest.mock('next/server', () => ({
@@ -27,9 +39,52 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 describe('Exa Usage Tracking', () => {
+  const passFixtureOrganizationIds: string[] = [];
+  const passFixtureAgreementIds: string[] = [];
+
   afterEach(async () => {
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(exa_monthly_usage);
+
+    const organizationIds = passFixtureOrganizationIds.splice(0);
+    const agreementIds = passFixtureAgreementIds.splice(0);
+    if (organizationIds.length === 0) return;
+
+    await db
+      .delete(kilo_pass_org_qualifying_spend_events)
+      .where(
+        inArray(
+          kilo_pass_org_qualifying_spend_events.allocation_container_organization_id,
+          organizationIds
+        )
+      );
+    await db
+      .delete(kilo_pass_org_issuance_snapshots)
+      .where(
+        inArray(
+          kilo_pass_org_issuance_snapshots.allocation_container_organization_id,
+          organizationIds
+        )
+      );
+    await db
+      .delete(kilo_pass_org_audit_records)
+      .where(inArray(kilo_pass_org_audit_records.agreement_id, agreementIds));
+    await db
+      .delete(kilo_pass_org_allocation_plan_rows)
+      .where(
+        inArray(
+          kilo_pass_org_allocation_plan_rows.allocation_container_organization_id,
+          organizationIds
+        )
+      );
+    await db
+      .delete(kilo_pass_org_agreements)
+      .where(inArray(kilo_pass_org_agreements.parent_organization_id, organizationIds));
+    await db
+      .delete(credit_transactions)
+      .where(inArray(credit_transactions.organization_id, organizationIds));
+    await db.delete(exa_usage_log).where(inArray(exa_usage_log.organization_id, organizationIds));
+    await db.delete(organizations).where(inArray(organizations.id, organizationIds));
   });
 
   describe('getExaFreeAllowanceMicrodollars', () => {
@@ -86,8 +141,9 @@ describe('Exa Usage Tracking', () => {
       const user = await insertTestUser();
 
       await recordExaUsage({
+        ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 7000,
         chargedToBalance: false,
@@ -110,8 +166,9 @@ describe('Exa Usage Tracking', () => {
       const user = await insertTestUser();
 
       await recordExaUsage({
+        ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 3000,
         chargedToBalance: false,
@@ -119,8 +176,9 @@ describe('Exa Usage Tracking', () => {
       });
 
       await recordExaUsage({
+        ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/contents',
         costMicrodollars: 5000,
         chargedToBalance: false,
@@ -142,8 +200,9 @@ describe('Exa Usage Tracking', () => {
 
       // First request sets the allowance to 10M
       await recordExaUsage({
+        ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 1000,
         chargedToBalance: false,
@@ -152,8 +211,9 @@ describe('Exa Usage Tracking', () => {
 
       // Second request passes a different allowance (simulating a mid-month change)
       await recordExaUsage({
+        ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 2000,
         chargedToBalance: false,
@@ -175,8 +235,9 @@ describe('Exa Usage Tracking', () => {
       const user = await insertTestUser();
 
       await recordExaUsage({
+        ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 5000,
         chargedToBalance: false,
@@ -184,8 +245,9 @@ describe('Exa Usage Tracking', () => {
       });
 
       await recordExaUsage({
+        ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 3000,
         chargedToBalance: true,
@@ -208,8 +270,9 @@ describe('Exa Usage Tracking', () => {
       });
 
       await recordExaUsage({
+        ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 7000,
         chargedToBalance: true,
@@ -229,6 +292,7 @@ describe('Exa Usage Tracking', () => {
       const organization = await createTestOrganization('Exa usage organization', user.id, 50_000);
 
       await recordExaUsage({
+        ...usageIdentity(),
         userId: user.id,
         organizationId: organization.id,
         path: '/contents',
@@ -258,8 +322,9 @@ describe('Exa Usage Tracking', () => {
 
       await expect(
         recordExaUsage({
+          ...usageIdentity(),
           userId: missingUserId,
-          organizationId: undefined,
+          organizationId: null,
           path: '/search',
           costMicrodollars: 1000,
           chargedToBalance: true,
@@ -283,8 +348,9 @@ describe('Exa Usage Tracking', () => {
       const user = await insertTestUser({ microdollars_used: 0 });
 
       await recordExaUsage({
+        ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 7000,
         chargedToBalance: false,
@@ -305,8 +371,9 @@ describe('Exa Usage Tracking', () => {
 
       // Personal request
       await recordExaUsage({
+        ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 3000,
         chargedToBalance: false,
@@ -315,6 +382,7 @@ describe('Exa Usage Tracking', () => {
 
       // Org request
       await recordExaUsage({
+        ...usageIdentity(),
         userId: user.id,
         organizationId: orgId,
         path: '/search',
@@ -340,8 +408,9 @@ describe('Exa Usage Tracking', () => {
       const user = await insertTestUser();
 
       await recordExaUsage({
+        ...usageIdentity(),
         userId: user.id,
-        organizationId: undefined,
+        organizationId: null,
         path: '/search',
         costMicrodollars: 1000,
         chargedToBalance: false,
@@ -388,6 +457,279 @@ describe('Exa Usage Tracking', () => {
       // Should sum both rows: 3M + 5M = 8M
       expect(result.usage).toBe(8_000_000);
       expect(result.freeAllowance).toBe(10_000_000);
+    });
+
+    describe('idempotency', () => {
+      async function activePassFixture(occurredAt: Date) {
+        const passWindow = {
+          start: new Date(Date.UTC(occurredAt.getUTCFullYear(), occurredAt.getUTCMonth(), 1)),
+          end: new Date(Date.UTC(occurredAt.getUTCFullYear(), occurredAt.getUTCMonth() + 1, 1)),
+        };
+        const owner = await insertTestUser();
+        const organization = await createTestOrganization(
+          `exa-pass-${crypto.randomUUID()}`,
+          owner.id,
+          50_000
+        );
+        passFixtureOrganizationIds.push(organization.id);
+        const agreement = await createPendingAgreement({
+          parentOrganizationId: organization.id,
+          actorUserId: owner.id,
+          tier: 'tier_19',
+          cadence: 'monthly',
+          paidSeatCount: 1,
+          issuanceAnchorAt: passWindow.start,
+          providerSubscriptionId: `sub_${crypto.randomUUID()}`,
+          providerSeatAddOnItemId: `si_${crypto.randomUUID()}`,
+          initialAllocations: [],
+        });
+        passFixtureAgreementIds.push(agreement.agreementId);
+        await activatePaidAgreement({
+          agreementId: agreement.agreementId,
+          recipientUserId: owner.id,
+          paidFrom: passWindow.start,
+          paidUntil: passWindow.end,
+          paidSeatCount: 1,
+          firstWindow: passWindow,
+          isBridge: false,
+        });
+        return { owner, organization };
+      }
+
+      test('records a repeated personal charge once and reports duplicate', async () => {
+        const user = await insertTestUser({
+          microdollars_used: 0,
+          total_microdollars_acquired: 100_000_000,
+        });
+        const input: ExaUsageRecord = {
+          ...usageIdentity(),
+          userId: user.id,
+          organizationId: null,
+          path: '/search',
+          costMicrodollars: 7000,
+          chargedToBalance: true,
+          freeAllowanceMicrodollars: 10_000_000,
+        };
+
+        await expect(recordExaUsage(input)).resolves.toBe('recorded');
+        await expect(recordExaUsage(input)).resolves.toBe('duplicate');
+
+        const logRows = await db
+          .select()
+          .from(exa_usage_log)
+          .where(eq(exa_usage_log.kilo_user_id, user.id));
+        expect(logRows).toHaveLength(1);
+
+        const monthlyRows = await db
+          .select()
+          .from(exa_monthly_usage)
+          .where(eq(exa_monthly_usage.kilo_user_id, user.id));
+        expect(monthlyRows).toHaveLength(1);
+        expect(monthlyRows[0]).toMatchObject({
+          total_cost_microdollars: 7000,
+          total_charged_microdollars: 7000,
+          request_count: 1,
+        });
+
+        const [updated] = await db
+          .select({ microdollars_used: kilocode_users.microdollars_used })
+          .from(kilocode_users)
+          .where(eq(kilocode_users.id, user.id));
+        expect(updated.microdollars_used).toBe(7000);
+      });
+
+      test('records a repeated ordinary organization charge once and reports duplicate', async () => {
+        const user = await insertTestUser();
+        const organization = await createTestOrganization(
+          `exa-org-${crypto.randomUUID()}`,
+          user.id,
+          50_000
+        );
+        const input: ExaUsageRecord = {
+          ...usageIdentity(),
+          userId: user.id,
+          organizationId: organization.id,
+          path: '/contents',
+          costMicrodollars: 9000,
+          chargedToBalance: true,
+          freeAllowanceMicrodollars: 10_000_000,
+        };
+
+        await expect(recordExaUsage(input)).resolves.toBe('recorded');
+        await expect(recordExaUsage(input)).resolves.toBe('duplicate');
+
+        const logRows = await db
+          .select()
+          .from(exa_usage_log)
+          .where(eq(exa_usage_log.kilo_user_id, user.id));
+        expect(logRows).toHaveLength(1);
+
+        const monthlyRows = await db
+          .select()
+          .from(exa_monthly_usage)
+          .where(eq(exa_monthly_usage.kilo_user_id, user.id));
+        expect(monthlyRows).toHaveLength(1);
+        expect(monthlyRows[0]).toMatchObject({
+          total_cost_microdollars: 9000,
+          total_charged_microdollars: 9000,
+          request_count: 1,
+        });
+
+        const [chargedOrganization] = await db
+          .select({ microdollars_used: organizations.microdollars_used })
+          .from(organizations)
+          .where(eq(organizations.id, organization.id));
+        expect(chargedOrganization.microdollars_used).toBe(9000);
+
+        const [memberUsage] = await db
+          .select()
+          .from(organization_user_usage)
+          .where(eq(organization_user_usage.organization_id, organization.id));
+        expect(memberUsage).toMatchObject({
+          kilo_user_id: user.id,
+          microdollar_usage: 9000,
+        });
+      });
+
+      test('records a repeated Kilo Pass organization charge once and reports duplicate', async () => {
+        const occurredAt = new Date();
+        const { owner, organization } = await activePassFixture(occurredAt);
+        const input: ExaUsageRecord = {
+          id: crypto.randomUUID(),
+          occurredAt: occurredAt.toISOString(),
+          userId: owner.id,
+          organizationId: organization.id,
+          path: '/contents',
+          costMicrodollars: 9000,
+          chargedToBalance: true,
+          freeAllowanceMicrodollars: 10_000_000,
+        };
+
+        await expect(recordExaUsage(input)).resolves.toBe('recorded');
+        await expect(recordExaUsage(input)).resolves.toBe('duplicate');
+
+        const logRows = await db
+          .select()
+          .from(exa_usage_log)
+          .where(eq(exa_usage_log.organization_id, organization.id));
+        expect(logRows).toHaveLength(1);
+
+        const monthlyRows = await db
+          .select()
+          .from(exa_monthly_usage)
+          .where(eq(exa_monthly_usage.organization_id, organization.id));
+        expect(monthlyRows).toHaveLength(1);
+        expect(monthlyRows[0]).toMatchObject({
+          total_cost_microdollars: 9000,
+          total_charged_microdollars: 9000,
+          request_count: 1,
+        });
+
+        const credits = await db
+          .select()
+          .from(credit_transactions)
+          .where(eq(credit_transactions.organization_id, organization.id));
+        const consumptionCredits = credits.filter(
+          credit => credit.credit_category === `kpo:consumption:exa:${input.id}`
+        );
+        expect(consumptionCredits).toHaveLength(1);
+        expect(consumptionCredits[0].amount_microdollars).toBe(-9000);
+
+        const events = await db
+          .select()
+          .from(kilo_pass_org_qualifying_spend_events)
+          .where(
+            eq(
+              kilo_pass_org_qualifying_spend_events.allocation_container_organization_id,
+              organization.id
+            )
+          );
+        expect(events).toHaveLength(1);
+        expect(events[0].spent_microdollars).toBe(9000);
+
+        const [chargedOrganization] = await db
+          .select({ microdollars_used: organizations.microdollars_used })
+          .from(organizations)
+          .where(eq(organizations.id, organization.id));
+        expect(chargedOrganization.microdollars_used).toBe(9000);
+      });
+
+      test('records concurrent duplicate submissions once', async () => {
+        const user = await insertTestUser({
+          microdollars_used: 0,
+          total_microdollars_acquired: 100_000_000,
+        });
+        const input: ExaUsageRecord = {
+          ...usageIdentity(),
+          userId: user.id,
+          organizationId: null,
+          path: '/search',
+          costMicrodollars: 7000,
+          chargedToBalance: true,
+          freeAllowanceMicrodollars: 10_000_000,
+        };
+
+        const results = await Promise.all([
+          recordExaUsage(input),
+          recordExaUsage(input),
+          recordExaUsage(input),
+        ]);
+        expect(results.sort()).toEqual(['duplicate', 'duplicate', 'recorded']);
+
+        const logRows = await db
+          .select()
+          .from(exa_usage_log)
+          .where(eq(exa_usage_log.kilo_user_id, user.id));
+        expect(logRows).toHaveLength(1);
+
+        const monthlyRows = await db
+          .select()
+          .from(exa_monthly_usage)
+          .where(eq(exa_monthly_usage.kilo_user_id, user.id));
+        expect(monthlyRows).toHaveLength(1);
+        expect(monthlyRows[0]).toMatchObject({
+          total_cost_microdollars: 7000,
+          total_charged_microdollars: 7000,
+          request_count: 1,
+        });
+
+        const [updated] = await db
+          .select({ microdollars_used: kilocode_users.microdollars_used })
+          .from(kilocode_users)
+          .where(eq(kilocode_users.id, user.id));
+        expect(updated.microdollars_used).toBe(7000);
+      });
+
+      test('records separate charges for different ids', async () => {
+        const user = await insertTestUser();
+        const base: Omit<ExaUsageRecord, 'id' | 'occurredAt'> = {
+          userId: user.id,
+          organizationId: null,
+          path: '/search',
+          costMicrodollars: 4000,
+          chargedToBalance: false,
+          freeAllowanceMicrodollars: 10_000_000,
+        };
+
+        await expect(recordExaUsage({ ...base, ...usageIdentity() })).resolves.toBe('recorded');
+        await expect(recordExaUsage({ ...base, ...usageIdentity() })).resolves.toBe('recorded');
+
+        const logRows = await db
+          .select()
+          .from(exa_usage_log)
+          .where(eq(exa_usage_log.kilo_user_id, user.id));
+        expect(logRows).toHaveLength(2);
+
+        const monthlyRows = await db
+          .select()
+          .from(exa_monthly_usage)
+          .where(eq(exa_monthly_usage.kilo_user_id, user.id));
+        expect(monthlyRows).toHaveLength(1);
+        expect(monthlyRows[0]).toMatchObject({
+          total_cost_microdollars: 8000,
+          request_count: 2,
+        });
+      });
     });
   });
 });

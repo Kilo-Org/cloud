@@ -1,11 +1,16 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { WorkspaceFolderColor } from '@/lib/cloud-agent/workspace-folders';
+import {
+  controlPlaneSessionIdSchema,
+  getInitializedSmartDoneFoldersStorageKey,
+} from '../workspace-folders';
+import { positionBetween } from '@/lib/todos/position';
 import { workspaceFoldersQueryKey } from './sidebar-queries';
 import type { useSidebarPreferences } from './useSidebarPreferences';
 
@@ -36,14 +41,51 @@ export function useWorkspaceFolders(
   const { mutateAsync: assignWorktree } = useMutation(
     trpc.workspaceFolders.moveWorktree.mutationOptions()
   );
+  const { mutateAsync: assignSession } = useMutation(
+    trpc.workspaceFolders.moveSession.mutationOptions()
+  );
   const { mutateAsync: reorder } = useMutation(trpc.workspaceFolders.reorder.mutationOptions());
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
 
-  const refresh = useCallback(
-    () => queryClient.invalidateQueries({ queryKey }),
-    [queryClient, queryKey]
-  );
+  useEffect(() => {
+    const doneFolders =
+      foldersQuery.data?.folders.filter(
+        folder => folder.kind === 'smart' && folder.smartPreset === 'done'
+      ) ?? [];
+    if (doneFolders.length === 0 || typeof window === 'undefined') return;
+
+    const storageKey = getInitializedSmartDoneFoldersStorageKey(currentUserId, organizationId);
+    let initialized: string[] = [];
+    try {
+      const parsed: unknown = JSON.parse(window.localStorage.getItem(storageKey) ?? '[]');
+      if (Array.isArray(parsed)) {
+        initialized = parsed.filter((value): value is string => typeof value === 'string');
+      }
+    } catch {
+      initialized = [];
+    }
+    const unseen = doneFolders.filter(folder => !initialized.includes(folder.id));
+    if (unseen.length === 0) return;
+
+    try {
+      window.localStorage.setItem(
+        storageKey,
+        JSON.stringify([...initialized, ...unseen.map(folder => folder.id)])
+      );
+    } catch {
+      // A full or blocked storage still collapses the folders for this mount.
+    }
+    setCollapsedFolderIds(ids => [...new Set([...ids, ...unseen.map(folder => folder.id)])]);
+  }, [currentUserId, foldersQuery.data?.folders, organizationId, setCollapsedFolderIds]);
+
+  const refresh = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey }),
+      queryClient.invalidateQueries(trpc.cliSessionsV2.listWorkspaces.pathFilter()),
+      queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter()),
+    ]);
+  }, [queryClient, queryKey, trpc]);
 
   const run = useCallback(
     async (mutation: () => Promise<unknown>, successMessage: string): Promise<boolean> => {
@@ -98,13 +140,14 @@ export function useWorkspaceFolders(
   );
 
   const moveWorktree = useCallback(
-    async (worktreeId: string, folderId: string | null) => {
+    async (worktreeId: string, folderId: string | null, position?: string | null) => {
       const moved = await run(
         () =>
           assignWorktree({
             worktreeId: cloudAgentWorktreeIdSchema.parse(worktreeId),
             folderId,
             organizationId: organizationId ?? null,
+            ...(position === undefined ? {} : { position }),
           }),
         folderId ? 'Workspace moved to folder' : 'Workspace moved to Ungrouped'
       );
@@ -114,6 +157,30 @@ export function useWorkspaceFolders(
     [assignWorktree, organizationId, run, setCollapsedFolderIds]
   );
 
+  const moveSession = useCallback(
+    async (sessionId: string, folderId: string | null) => {
+      const moved = await run(
+        () =>
+          assignSession({
+            sessionId: controlPlaneSessionIdSchema.parse(sessionId),
+            folderId,
+            organizationId: organizationId ?? null,
+          }),
+        folderId ? 'Session moved to folder' : 'Session moved to Ungrouped'
+      );
+      if (moved) {
+        // The destination folder changes how the sidebar groups the session,
+        // so the sessions and worktree-details queries must refetch too.
+        void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
+        void queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter());
+        void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter());
+        if (folderId) setCollapsedFolderIds(ids => ids.filter(id => id !== folderId));
+      }
+      return moved;
+    },
+    [assignSession, organizationId, queryClient, run, setCollapsedFolderIds, trpc]
+  );
+
   const reorderFolders = useCallback(
     (folderIds: string[]) =>
       run(
@@ -121,6 +188,50 @@ export function useWorkspaceFolders(
         'Folder order updated'
       ),
     [organizationId, reorder, run]
+  );
+
+  /**
+   * Manual order treats every unpositioned row as before every positioned row.
+   * A drag inside such a container therefore has to initialize all of its rows;
+   * writing only the dragged row cannot place it among its unpositioned peers.
+   * This runs only on an explicit drag/reorder action, once per container.
+   */
+  const initializeWorktreePositions = useCallback(
+    async (orderedWorktreeIds: readonly string[], folderId: string | null): Promise<boolean> => {
+      if (savingRef.current || orderedWorktreeIds.length > 200) return false;
+      savingRef.current = true;
+      setIsSaving(true);
+      try {
+        const positions: string[] = [];
+        let previous: string | null = null;
+        for (let index = 0; index < orderedWorktreeIds.length; index++) {
+          const position = positionBetween(previous, null);
+          positions.push(position);
+          previous = position;
+        }
+        await Promise.all(
+          orderedWorktreeIds.map((worktreeId, index) =>
+            assignWorktree({
+              worktreeId: cloudAgentWorktreeIdSchema.parse(worktreeId),
+              folderId,
+              organizationId: organizationId ?? null,
+              position: positions[index],
+            })
+          )
+        );
+        await refresh();
+        toast.success('Workspace order saved');
+        return true;
+      } catch {
+        await refresh();
+        toast.error('Could not save workspace order. Please try again.');
+        return false;
+      } finally {
+        savingRef.current = false;
+        setIsSaving(false);
+      }
+    },
+    [assignWorktree, organizationId, refresh]
   );
 
   const toggleFolder = useCallback(
@@ -144,6 +255,8 @@ export function useWorkspaceFolders(
     setFolderColor,
     deleteFolder,
     moveWorktree,
+    moveSession,
+    initializeWorktreePositions,
     reorderFolders,
     refresh,
   };

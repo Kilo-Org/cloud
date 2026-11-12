@@ -278,6 +278,40 @@ describe('codeReviewRouter.cancel', () => {
     expect(storedReview?.completed_at).toBeTruthy();
   });
 
+  it('reports that nothing changed when the review finished before the local cancel', async () => {
+    const integration = await insertGitHubIntegration(testUser.id, 'lite');
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'queued', {
+          platform_integration_id: integration.id,
+          check_run_id: 777,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+    // The status read that precedes the cancel saw a queued review; by the time
+    // the guarded cancel runs, the worker path has finished it.
+    mockCancelReview.mockImplementation(async () => {
+      await db
+        .update(cloud_agent_code_reviews)
+        .set({ status: 'completed', completed_at: new Date().toISOString() })
+        .where(eq(cloud_agent_code_reviews.id, review.id));
+      return { success: false, reviewId: review.id };
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.cancel({ reviewId: review.id });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+
+    expect(result).toEqual({ success: false, error: 'Code review is no longer running' });
+    expect(storedReview?.status).toBe('completed');
+    expect(storedReview?.error_message).toBeNull();
+    expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+  });
+
   it('cancels pending reviews locally without calling the Worker', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)
@@ -752,6 +786,71 @@ describe('personalReviewAgent.createManualReviewJob', () => {
       id: testUser.id,
       userId: testUser.id,
     });
+  });
+
+  it('replays the review an accepted start created when a retry carries the same operation key', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const operationKey = '0f7b7d0e-9d43-4d8f-9a11-2b0c3d4e5f60';
+
+    const first = await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+      operationKey,
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    // The retry a stalled start sends: the first attempt was already accepted,
+    // its response lost, so the same key must resolve to the same review.
+    const retry = await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+      operationKey,
+    });
+
+    expect(retry).toEqual(first);
+    // The replay repeats no provider read and creates no second row.
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    const rows = await db
+      .select({
+        id: cloud_agent_code_reviews.id,
+        manualOperationKey: cloud_agent_code_reviews.manual_operation_key,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.repo_full_name, repo));
+
+    expect(rows).toEqual([{ id: first.reviewId, manualOperationKey: operationKey }]);
+  });
+
+  it('refuses an operation key that already produced a review for another change', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const operationKey = '4b2b6b0f-1234-4c9a-8f1d-0a1b2c3d4e5f';
+
+    await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+      operationKey,
+    });
+
+    const rejection = await caller.personalReviewAgent
+      .createManualReviewJob({
+        platform: 'github',
+        url: `https://github.com/${repo}/pull/2`,
+        modelSlug: 'test-model',
+        operationKey,
+      })
+      .then(
+        () => {
+          throw new Error('Expected createManualReviewJob to reject');
+        },
+        error => error as { code?: string; message?: string }
+      );
+
+    expect(rejection.code).toBe('CONFLICT');
+    expect(rejection.message).toBe('operation_key_reuse_mismatch');
   });
 
   // The local (DEBUG_SHOW_DEV_UI) path reads the pull request from the provider's
@@ -2154,6 +2253,192 @@ describe('review agent config REVIEW.md setting', () => {
 
     expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: true }));
     expect(config?.config).not.toHaveProperty('max_review_time_minutes');
+  });
+
+  it('forces GitLab repository_selection_mode to selected on a full save with the mode omitted', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'gitlab',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      selectedRepositoryIds: [101],
+      autoConfigureWebhooks: false,
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'gitlab'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [101],
+      })
+    );
+  });
+
+  it('forces GitLab repository_selection_mode to selected on a full save with the mode "all"', async () => {
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: testUser.id,
+      platform: 'gitlab',
+      integration_type: 'oauth',
+      integration_status: 'active',
+      metadata: { webhook_secret: 'webhook-secret' },
+    });
+    const caller = await createCallerForUser(testUser.id);
+
+    const result = await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'gitlab',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      repositorySelectionMode: 'all',
+      selectedRepositoryIds: [202],
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'gitlab'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [202],
+      })
+    );
+    // The clamp resolves the saved mode to 'selected', so the GitLab webhook
+    // sync runs for the selection the client sent.
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-token',
+      'webhook-secret',
+      [202],
+      [],
+      {},
+      'https://gitlab.com'
+    );
+    expect(result.webhookSync).toEqual({ created: 0, updated: 0, deleted: 0, errors: [] });
+  });
+});
+
+describe('review agent config repository_selection_mode reads', () => {
+  let testUser: User;
+  let organization: Organization;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+    organization = await createTestOrganization('Selection Mode Org', testUser.id, 0, {}, false);
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(agent_configs)
+      .where(
+        or(
+          eq(agent_configs.owned_by_user_id, testUser.id),
+          eq(agent_configs.owned_by_organization_id, organization.id)
+        )
+      );
+  });
+
+  afterAll(async () => {
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('reports selected for a personal GitLab config stored with the mode "all"', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'all',
+        selected_repository_ids: [101],
+      },
+      is_enabled: true,
+      created_by: testUser.id,
+    });
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.personalReviewAgent.getReviewConfig({ platform: 'gitlab' });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+    expect(returned.selectedRepositoryIds).toEqual([101]);
+  });
+
+  it('reports selected for the personal GitLab default config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.personalReviewAgent.getReviewConfig({ platform: 'gitlab' });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+    expect(returned.selectedRepositoryIds).toEqual([]);
+  });
+
+  it('reports all for the personal GitHub default config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
+
+    expect(returned.repositorySelectionMode).toBe('all');
+  });
+
+  it('reports selected for an organization GitLab config stored with the mode "all"', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'all',
+        selected_repository_ids: [303],
+      },
+      is_enabled: true,
+      created_by: testUser.id,
+    });
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'gitlab',
+    });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+    expect(returned.selectedRepositoryIds).toEqual([303]);
+  });
+
+  it('reports selected for the organization GitLab default config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'gitlab',
+    });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
+  });
+
+  it('keeps the organization Bitbucket default selected', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const returned = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'bitbucket',
+    });
+
+    expect(returned.repositorySelectionMode).toBe('selected');
   });
 });
 

@@ -46,7 +46,7 @@ import {
   type SecurityRemediationAdmissionRejectionReason,
   type SecurityRemediationOrigin,
 } from '@kilocode/worker-utils/security-remediation-policy';
-import { and, asc, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, isNotNull, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   getAnalysisActorById,
@@ -58,11 +58,17 @@ import {
   type SecurityFindingRecord,
 } from './db/queries.js';
 import { InsufficientCreditsError } from './launch.js';
-import { logger } from './logger.js';
+import { logger, sanitizedExceptionName } from './logger.js';
 import { generateControlToken } from './token.js';
 import { type QueueOwner, type SecurityAgentConfig } from './types.js';
 
 const REMEDIATION_LAUNCH_MAX_ATTEMPTS = 3;
+// The dispatcher cron runs every minute, so a contended row is not selected again at once.
+const REMEDIATION_CONTENDED_DEFERRAL_SECONDS = 60;
+const REMEDIATION_PREPARE_SESSION_TIMEOUT_MS = 60_000;
+const REMEDIATION_PRELAUNCH_RECOVERY_LIMIT = 100;
+const REMEDIATION_PRELAUNCH_FAILURE_CODE = 'PRELAUNCH_TIMEOUT';
+const REMEDIATION_PRELAUNCH_READ_FAILURE_CODE = 'PRELAUNCH_READ_FAILED';
 const APPLY_AUTO_REMEDIATION_SCAN_LIMIT = 200;
 const ACTIVE_ATTEMPT_STATUSES = ['queued', 'launching', 'running'] as const;
 const AUTOMATIC_DEDUPE_STATUSES = [
@@ -885,6 +891,22 @@ export async function admitRemediationAttempt(params: {
   });
 }
 
+function ownedLaunchingClaimWhere(attempt: Pick<SecurityRemediationAttempt, 'id' | 'claim_token'>) {
+  return and(
+    eq(security_remediation_attempts.id, attempt.id),
+    eq(security_remediation_attempts.claim_token, attempt.claim_token ?? ''),
+    eq(security_remediation_attempts.status, 'launching')
+  );
+}
+
+function ownedActiveClaimWhere(attempt: Pick<SecurityRemediationAttempt, 'id' | 'claim_token'>) {
+  return and(
+    eq(security_remediation_attempts.id, attempt.id),
+    eq(security_remediation_attempts.claim_token, attempt.claim_token ?? ''),
+    inArray(security_remediation_attempts.status, ['launching', 'running'])
+  );
+}
+
 async function claimAttemptForLaunch(db: WorkerDb, attemptId: string, jobId: string) {
   const claimToken = randomUUID();
   const rows = await db.execute<SecurityRemediationAttempt>(sql`
@@ -921,6 +943,32 @@ async function claimAttemptForLaunch(db: WorkerDb, attemptId: string, jobId: str
   return rows.rows[0] ?? null;
 }
 
+export async function deferContendedRemediationAttempt(
+  db: WorkerDb,
+  attemptId: string
+): Promise<void> {
+  await db.execute<{ id: string }>(sql`
+    UPDATE security_remediation_attempts AS attempt
+    SET
+      next_retry_at = now() + make_interval(secs => ${REMEDIATION_CONTENDED_DEFERRAL_SECONDS}),
+      updated_at = now()
+    WHERE attempt.id = ${attemptId}::uuid
+      AND attempt.status = 'queued'
+      AND coalesce(attempt.next_retry_at, '-infinity'::timestamptz) <= now()
+      AND EXISTS (
+        SELECT 1
+        FROM security_remediation_attempts AS active
+        WHERE active.id <> attempt.id
+          AND active.status IN ('launching', 'running')
+          AND (
+            (attempt.owned_by_organization_id IS NOT NULL AND active.owned_by_organization_id = attempt.owned_by_organization_id)
+            OR (attempt.owned_by_user_id IS NOT NULL AND active.owned_by_user_id = attempt.owned_by_user_id)
+            OR active.repo_full_name = attempt.repo_full_name
+          )
+      )
+  `);
+}
+
 function nextRetryAt(attemptCount: number): string {
   const baseDelayMs = 30_000 * 2 ** Math.max(0, attemptCount - 1);
   const cappedDelayMs = Math.min(10 * 60 * 1000, baseDelayMs);
@@ -934,11 +982,19 @@ async function transitionAttemptLaunchFailure(params: {
   failureCode: string;
   errorMessage: string;
   retryable: boolean;
-}): Promise<boolean> {
+  recoverClaimedBefore?: Date;
+}): Promise<{ applied: boolean; terminal: boolean }> {
   const terminal =
     !params.retryable || params.attempt.launch_attempt_count >= REMEDIATION_LAUNCH_MAX_ATTEMPTS;
-  await params.db.transaction(async tx => {
-    await tx
+  const claimWhere = params.recoverClaimedBefore
+    ? and(
+        ownedLaunchingClaimWhere(params.attempt),
+        lte(security_remediation_attempts.claimed_at, params.recoverClaimedBefore.toISOString()),
+        isNull(security_remediation_attempts.cancellation_requested_at)
+      )
+    : ownedActiveClaimWhere(params.attempt);
+  const applied = await params.db.transaction(async tx => {
+    const rows = await tx
       .update(security_remediation_attempts)
       .set({
         status: terminal ? 'failed' : 'queued',
@@ -951,12 +1007,10 @@ async function transitionAttemptLaunchFailure(params: {
         completed_at: terminal ? sql`now()` : null,
         updated_at: sql`now()`,
       })
-      .where(
-        and(
-          eq(security_remediation_attempts.id, params.attempt.id),
-          eq(security_remediation_attempts.claim_token, params.attempt.claim_token ?? '')
-        )
-      );
+      .where(claimWhere)
+      .returning({ id: security_remediation_attempts.id });
+    if (rows.length === 0) return false;
+
     if (terminal) {
       await tx
         .update(security_remediations)
@@ -981,16 +1035,17 @@ async function transitionAttemptLaunchFailure(params: {
         });
       }
     }
+    return true;
   });
-  if (terminal && params.finding) {
+  if (applied && terminal) {
     await settleSecurityRemediationLedgerRow({
       db: params.db,
-      finding: params.finding,
+      finding: params.finding ?? null,
       attempt: params.attempt,
       terminalStatus: 'failed',
     });
   }
-  return terminal;
+  return { applied, terminal: applied && terminal };
 }
 
 async function blockAttempt(params: {
@@ -999,9 +1054,9 @@ async function blockAttempt(params: {
   finding?: SecurityFindingRecord;
   reason: string;
   summary: string;
-}): Promise<void> {
-  await params.db.transaction(async tx => {
-    await tx
+}): Promise<boolean> {
+  const applied = await params.db.transaction(async tx => {
+    const rows = await tx
       .update(security_remediation_attempts)
       .set({
         status: 'blocked',
@@ -1010,7 +1065,10 @@ async function blockAttempt(params: {
         completed_at: sql`now()`,
         updated_at: sql`now()`,
       })
-      .where(eq(security_remediation_attempts.id, params.attempt.id));
+      .where(ownedLaunchingClaimWhere(params.attempt))
+      .returning({ id: security_remediation_attempts.id });
+    if (rows.length === 0) return false;
+
     await tx
       .update(security_remediations)
       .set({
@@ -1033,13 +1091,108 @@ async function blockAttempt(params: {
         metadata: { blocked_reason_code: params.reason },
       });
     }
+    return true;
   });
-  await settleSecurityRemediationLedgerRow({
-    db: params.db,
-    finding: params.finding ?? null,
-    attempt: params.attempt,
-    terminalStatus: 'blocked',
-  });
+  if (applied) {
+    await settleSecurityRemediationLedgerRow({
+      db: params.db,
+      finding: params.finding ?? null,
+      attempt: params.attempt,
+      terminalStatus: 'blocked',
+    });
+  }
+  return applied;
+}
+
+export async function recoverStaleRemediationLaunchAttempts(
+  db: WorkerDb,
+  params: { env: CloudflareEnv; claimedBefore: Date }
+): Promise<{ requeuedCount: number; failedCount: number; cancelledCount: number }> {
+  const rows = await db
+    .select()
+    .from(security_remediation_attempts)
+    .where(
+      and(
+        eq(security_remediation_attempts.status, 'launching'),
+        isNotNull(security_remediation_attempts.claim_token),
+        isNotNull(security_remediation_attempts.claimed_at),
+        lte(security_remediation_attempts.claimed_at, params.claimedBefore.toISOString())
+      )
+    )
+    .orderBy(asc(security_remediation_attempts.claimed_at), asc(security_remediation_attempts.id))
+    .limit(REMEDIATION_PRELAUNCH_RECOVERY_LIMIT);
+
+  let requeuedCount = 0;
+  let failedCount = 0;
+  let cancelledCount = 0;
+
+  for (const attempt of rows) {
+    try {
+      if (attempt.cancellation_requested_at !== null) {
+        const finding = await getSecurityFindingById(db, attempt.finding_id);
+        if (!finding) {
+          logger.warn('Stale remediation launch cancellation has no finding', {
+            attempt_id: attempt.id,
+          });
+          continue;
+        }
+        const applied = await finalizeAttemptCancellation({
+          db,
+          finding,
+          attempt,
+          summary: 'Cancelled before Cloud Agent initiation',
+          expectedAttempt: {
+            claimToken: attempt.claim_token ?? '',
+            status: 'launching',
+          },
+        });
+        if (!applied) continue;
+        cancelledCount += 1;
+        await emitRemediationTerminalLifecycleEvent({
+          env: params.env,
+          db,
+          attempt,
+          status: 'cancelled',
+        });
+        continue;
+      }
+
+      const terminal = attempt.launch_attempt_count >= REMEDIATION_LAUNCH_MAX_ATTEMPTS;
+      let finding: SecurityFindingRecord | null = null;
+      if (terminal) {
+        finding = await getSecurityFindingById(db, attempt.finding_id);
+      }
+
+      const transition = await transitionAttemptLaunchFailure({
+        db,
+        attempt,
+        finding: finding ?? undefined,
+        failureCode: REMEDIATION_PRELAUNCH_FAILURE_CODE,
+        errorMessage: 'Remediation launch did not start before the prelaunch timeout',
+        retryable: true,
+        recoverClaimedBefore: params.claimedBefore,
+      });
+      if (!transition.applied) continue;
+      if (transition.terminal) {
+        failedCount += 1;
+        await emitRemediationTerminalLifecycleEvent({
+          env: params.env,
+          db,
+          attempt,
+          status: 'failed',
+        });
+      } else {
+        requeuedCount += 1;
+      }
+    } catch (error) {
+      logger.warn('Failed to recover stale remediation launch attempt', {
+        attempt_id: attempt.id,
+        exception_name: sanitizedExceptionName(error),
+      });
+    }
+  }
+
+  return { requeuedCount, failedCount, cancelledCount };
 }
 
 async function samePackageOpenPrExists(params: {
@@ -1128,21 +1281,26 @@ async function finalizeAttemptCancellation(params: {
   finding: SecurityFindingRecord;
   attempt: SecurityRemediationAttempt;
   summary: string;
-}): Promise<void> {
-  await finalizeAttemptOutcome({
+  expectedAttempt: ExpectedAttemptFence;
+}): Promise<boolean> {
+  const applied = await finalizeAttemptOutcome({
     db: params.db,
     finding: params.finding,
     attempt: params.attempt,
     result: { status: 'cancelled', summary: params.summary, validation: [] },
     finalAssistantMessage: undefined,
     actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+    expectedAttempt: params.expectedAttempt,
   });
-  await settleSecurityRemediationLedgerRow({
-    db: params.db,
-    finding: params.finding,
-    attempt: params.attempt,
-    terminalStatus: 'cancelled',
-  });
+  if (applied) {
+    await settleSecurityRemediationLedgerRow({
+      db: params.db,
+      finding: params.finding,
+      attempt: params.attempt,
+      terminalStatus: 'cancelled',
+    });
+  }
+  return applied;
 }
 
 function buildRemediationCallbackTarget(
@@ -1168,6 +1326,11 @@ function buildRemediationCallbackTarget(
   };
 }
 
+type LaunchAttemptResult =
+  | { status: 'launched' }
+  | { status: 'cancelled' }
+  | { status: 'claim-lost' };
+
 async function launchAttempt(params: {
   db: WorkerDb;
   env: CloudflareEnv;
@@ -1175,7 +1338,7 @@ async function launchAttempt(params: {
   finding: SecurityFindingRecord;
   owner: QueueOwner;
   actor: ActorUser;
-}): Promise<void> {
+}): Promise<LaunchAttemptResult> {
   if (!params.finding.platform_integration_id) {
     throw new Error('Security remediation finding is missing its GitHub integration');
   }
@@ -1218,6 +1381,7 @@ async function launchAttempt(params: {
         Authorization: `Bearer ${authToken}`,
         'x-internal-api-key': internalApiSecret,
       },
+      signal: AbortSignal.timeout(REMEDIATION_PREPARE_SESSION_TIMEOUT_MS),
       body: JSON.stringify(
         buildRemediationPrepareSessionBody({
           prompt,
@@ -1238,16 +1402,21 @@ async function launchAttempt(params: {
   if (!prepare.success) throw new Error('Invalid prepareSession response shape');
   const { cloudAgentSessionId, kiloSessionId } = prepare.data.result.data;
   if (await getAttemptCancellationRequestedAt(params.db, params.attempt.id)) {
-    await finalizeAttemptCancellation({
+    const cancelled = await finalizeAttemptCancellation({
       db: params.db,
       finding: params.finding,
       attempt: params.attempt,
       summary: 'Cancelled before Cloud Agent initiation',
+      expectedAttempt: {
+        claimToken: params.attempt.claim_token ?? '',
+        status: 'launching',
+      },
     });
-    return;
+    return { status: cancelled ? 'cancelled' : 'claim-lost' };
   }
-  await params.db.transaction(async tx => {
-    await tx
+
+  const runningTransitioned = await params.db.transaction(async tx => {
+    const rows = await tx
       .update(security_remediation_attempts)
       .set({
         status: 'running',
@@ -1257,17 +1426,17 @@ async function launchAttempt(params: {
         launched_at: sql`now()`,
         updated_at: sql`now()`,
       })
-      .where(
-        and(
-          eq(security_remediation_attempts.id, params.attempt.id),
-          eq(security_remediation_attempts.claim_token, params.attempt.claim_token ?? '')
-        )
-      );
+      .where(ownedLaunchingClaimWhere(params.attempt))
+      .returning({ id: security_remediation_attempts.id });
+    if (rows.length === 0) return false;
+
     await tx
       .update(security_remediations)
       .set({ status: 'running', updated_at: sql`now()` })
       .where(eq(security_remediations.id, params.attempt.remediation_id));
+    return true;
   });
+  if (!runningTransitioned) return { status: 'claim-lost' };
 
   if (await getAttemptCancellationRequestedAt(params.db, params.attempt.id)) {
     await interruptCloudAgentSession({
@@ -1275,13 +1444,17 @@ async function launchAttempt(params: {
       authToken,
       cloudAgentSessionId,
     });
-    await finalizeAttemptCancellation({
+    const cancelled = await finalizeAttemptCancellation({
       db: params.db,
       finding: params.finding,
       attempt: params.attempt,
       summary: 'Cancelled before Cloud Agent initiation',
+      expectedAttempt: {
+        claimToken: params.attempt.claim_token ?? '',
+        status: 'running',
+      },
     });
-    return;
+    return { status: cancelled ? 'cancelled' : 'claim-lost' };
   }
 
   const initiateResponse = await params.env.CLOUD_AGENT_NEXT.fetch(
@@ -1306,7 +1479,15 @@ async function launchAttempt(params: {
   await params.db
     .update(security_remediation_attempts)
     .set({ execution_id: initiate.data.result.data.executionId, updated_at: sql`now()` })
-    .where(eq(security_remediation_attempts.id, params.attempt.id));
+    .where(
+      and(
+        eq(security_remediation_attempts.id, params.attempt.id),
+        eq(security_remediation_attempts.claim_token, params.attempt.claim_token ?? ''),
+        eq(security_remediation_attempts.status, 'running')
+      )
+    );
+
+  return { status: 'launched' };
 }
 
 export async function processRemediationAttempt(params: {
@@ -1317,86 +1498,133 @@ export async function processRemediationAttempt(params: {
   const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   const jobId = randomUUID();
   const attempt = await claimAttemptForLaunch(db, params.attemptId, jobId);
-  if (!attempt) return 'skipped';
-  const finding = await getSecurityFindingById(db, attempt.finding_id);
-  const owner =
-    attempt.owned_by_organization_id !== null
-      ? ({ type: 'org', id: attempt.owned_by_organization_id } as const)
-      : attempt.owned_by_user_id !== null
-        ? ({ type: 'user', id: attempt.owned_by_user_id } as const)
-        : null;
-  if (!finding || !owner) {
-    await blockAttempt({
-      db,
-      attempt,
-      reason: 'FINDING_UNAVAILABLE',
-      summary: 'Finding or owner missing before launch',
-    });
-    return 'failed';
-  }
-
-  const runtime = await getRuntimeConfig(db, owner);
-  const blockState = await getBlockState(db, finding.id, attempt.analysis_fingerprint, attempt.id);
-  const decision = decideSecurityRemediationEligibility({
-    finding,
-    config: runtime.config,
-    isAgentEnabled: runtime.isAgentEnabled,
-    repoFullNamesInScope: runtime.repoFullNamesInScope,
-    origin: attempt.origin,
-    blockState,
-    allowManualRetry: attempt.origin === 'manual',
-  });
-  if (!decision.eligible) {
-    await blockAttempt({
-      db,
-      attempt,
-      finding,
-      reason: decision.reason.toUpperCase(),
-      summary: `Remediation no longer eligible: ${decision.reason}`,
-    });
-    await emitRemediationTerminalLifecycleEvent({
-      env: params.env,
-      db,
-      attempt,
-      status: 'blocked',
-    });
-    return 'skipped';
-  }
-  if (
-    attempt.origin !== 'manual' &&
-    (await samePackageOpenPrExists({ db, finding, attemptId: attempt.id }))
-  ) {
-    await blockAttempt({
-      db,
-      attempt,
-      finding,
-      reason: 'COVERED_BY_EXISTING_REMEDIATION_PR',
-      summary: 'Another open remediation PR covers same package and manifest',
-    });
-    await emitRemediationTerminalLifecycleEvent({
-      env: params.env,
-      db,
-      attempt,
-      status: 'blocked',
-    });
+  if (!attempt) {
+    await deferContendedRemediationAttempt(db, params.attemptId);
     return 'skipped';
   }
 
-  const actor = await actorForAttempt({ db, attempt, owner });
-  if (!actor) {
-    await transitionAttemptLaunchFailure({
-      db,
-      attempt,
-      finding,
-      failureCode: 'ACTOR_RESOLUTION_FAILED',
-      errorMessage: 'Remediation actor unavailable',
-      retryable: false,
-    });
-    await emitRemediationTerminalLifecycleEvent({ env: params.env, db, attempt, status: 'failed' });
-    return 'failed';
-  }
+  let finding: SecurityFindingRecord | null = null;
+  let owner: QueueOwner | null = null;
+  let actor: ActorUser | null = null;
+
   try {
-    await launchAttempt({ db, env: params.env, attempt, finding, owner, actor });
+    finding = await getSecurityFindingById(db, attempt.finding_id);
+    owner =
+      attempt.owned_by_organization_id !== null
+        ? ({ type: 'org', id: attempt.owned_by_organization_id } as const)
+        : attempt.owned_by_user_id !== null
+          ? ({ type: 'user', id: attempt.owned_by_user_id } as const)
+          : null;
+    if (!finding || !owner) {
+      await blockAttempt({
+        db,
+        attempt,
+        reason: 'FINDING_UNAVAILABLE',
+        summary: 'Finding or owner missing before launch',
+      });
+      return 'failed';
+    }
+
+    const runtime = await getRuntimeConfig(db, owner);
+    const blockState = await getBlockState(
+      db,
+      finding.id,
+      attempt.analysis_fingerprint,
+      attempt.id
+    );
+    const decision = decideSecurityRemediationEligibility({
+      finding,
+      config: runtime.config,
+      isAgentEnabled: runtime.isAgentEnabled,
+      repoFullNamesInScope: runtime.repoFullNamesInScope,
+      origin: attempt.origin,
+      blockState,
+      allowManualRetry: attempt.origin === 'manual',
+    });
+    if (!decision.eligible) {
+      const applied = await blockAttempt({
+        db,
+        attempt,
+        finding,
+        reason: decision.reason.toUpperCase(),
+        summary: `Remediation no longer eligible: ${decision.reason}`,
+      });
+      if (applied) {
+        await emitRemediationTerminalLifecycleEvent({
+          env: params.env,
+          db,
+          attempt,
+          status: 'blocked',
+        });
+      }
+      return 'skipped';
+    }
+    if (
+      attempt.origin !== 'manual' &&
+      (await samePackageOpenPrExists({ db, finding, attemptId: attempt.id }))
+    ) {
+      const applied = await blockAttempt({
+        db,
+        attempt,
+        finding,
+        reason: 'COVERED_BY_EXISTING_REMEDIATION_PR',
+        summary: 'Another open remediation PR covers same package and manifest',
+      });
+      if (applied) {
+        await emitRemediationTerminalLifecycleEvent({
+          env: params.env,
+          db,
+          attempt,
+          status: 'blocked',
+        });
+      }
+      return 'skipped';
+    }
+
+    actor = await actorForAttempt({ db, attempt, owner });
+    if (!actor) {
+      const transition = await transitionAttemptLaunchFailure({
+        db,
+        attempt,
+        finding,
+        failureCode: 'ACTOR_RESOLUTION_FAILED',
+        errorMessage: 'Remediation actor unavailable',
+        retryable: false,
+      });
+      if (transition.terminal) {
+        await emitRemediationTerminalLifecycleEvent({
+          env: params.env,
+          db,
+          attempt,
+          status: 'failed',
+        });
+      }
+      return 'failed';
+    }
+  } catch (error) {
+    const transition = await transitionAttemptLaunchFailure({
+      db,
+      attempt,
+      finding: finding ?? undefined,
+      failureCode: REMEDIATION_PRELAUNCH_READ_FAILURE_CODE,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      retryable: true,
+    });
+    if (transition.terminal) {
+      await emitRemediationTerminalLifecycleEvent({
+        env: params.env,
+        db,
+        attempt,
+        status: 'failed',
+      });
+    }
+    return 'failed';
+  }
+
+  try {
+    const launch = await launchAttempt({ db, env: params.env, attempt, finding, owner, actor });
+    if (launch.status === 'claim-lost' || launch.status === 'cancelled') return 'skipped';
+
     try {
       await recordRemediationAudit({
         db,
@@ -1419,7 +1647,7 @@ export async function processRemediationAttempt(params: {
     }
     return 'launched';
   } catch (error) {
-    const terminal = await transitionAttemptLaunchFailure({
+    const transition = await transitionAttemptLaunchFailure({
       db,
       attempt,
       finding,
@@ -1428,7 +1656,7 @@ export async function processRemediationAttempt(params: {
       errorMessage: error instanceof Error ? error.message : String(error),
       retryable: !(error instanceof InsufficientCreditsError),
     });
-    if (terminal) {
+    if (transition.terminal) {
       await emitRemediationTerminalLifecycleEvent({
         env: params.env,
         db,
@@ -1585,6 +1813,11 @@ async function recoverPrByExpectedBranch(params: {
   };
 }
 
+type ExpectedAttemptFence = {
+  claimToken: string;
+  status: 'launching' | 'running';
+};
+
 async function finalizeAttemptOutcome(params: {
   db: WorkerDb;
   finding: SecurityFindingRecord;
@@ -1592,7 +1825,8 @@ async function finalizeAttemptOutcome(params: {
   result: StructuredRemediationResult;
   finalAssistantMessage: string | undefined;
   actor: SecurityFindingAuditActor;
-}): Promise<void> {
+  expectedAttempt?: ExpectedAttemptFence;
+}): Promise<boolean> {
   const status = params.result.status;
   const auditAction =
     status === 'pr_opened'
@@ -1605,29 +1839,43 @@ async function finalizeAttemptOutcome(params: {
             ? SecurityAuditLogAction.RemediationCancelled
             : SecurityAuditLogAction.RemediationFailed;
 
-  await params.db.transaction(async tx => {
-    await tx
-      .update(security_remediation_attempts)
-      .set({
-        status,
-        structured_result: params.result,
-        final_assistant_message: params.finalAssistantMessage ?? null,
-        validation_evidence: params.result.validation ?? null,
-        risk_notes: params.result.riskNotes ?? null,
-        draft_reason: params.result.draftReason ?? null,
-        failure_code: status === 'failed' ? 'CLOUD_AGENT_FAILED' : null,
-        blocked_reason: status === 'blocked' ? (params.result.errorReason ?? 'Blocked') : null,
-        last_error_redacted:
-          status === 'failed' || status === 'blocked' ? (params.result.errorReason ?? null) : null,
-        pr_url: params.result.prUrl ?? null,
-        pr_number: params.result.prNumber ?? null,
-        pr_draft: params.result.draft ?? null,
-        pr_head_branch: params.result.headBranch ?? null,
-        pr_base_branch: params.result.baseBranch ?? null,
-        completed_at: sql`now()`,
-        updated_at: sql`now()`,
-      })
-      .where(eq(security_remediation_attempts.id, params.attempt.id));
+  const applied = await params.db.transaction(async tx => {
+    const attemptValues = {
+      status,
+      structured_result: params.result,
+      final_assistant_message: params.finalAssistantMessage ?? null,
+      validation_evidence: params.result.validation ?? null,
+      risk_notes: params.result.riskNotes ?? null,
+      draft_reason: params.result.draftReason ?? null,
+      failure_code: status === 'failed' ? 'CLOUD_AGENT_FAILED' : null,
+      blocked_reason: status === 'blocked' ? (params.result.errorReason ?? 'Blocked') : null,
+      last_error_redacted:
+        status === 'failed' || status === 'blocked' ? (params.result.errorReason ?? null) : null,
+      pr_url: params.result.prUrl ?? null,
+      pr_number: params.result.prNumber ?? null,
+      pr_draft: params.result.draft ?? null,
+      pr_head_branch: params.result.headBranch ?? null,
+      pr_base_branch: params.result.baseBranch ?? null,
+      completed_at: sql`now()`,
+      updated_at: sql`now()`,
+    };
+    const attemptUpdate = tx.update(security_remediation_attempts).set(attemptValues);
+
+    if (params.expectedAttempt) {
+      const rows = await attemptUpdate
+        .where(
+          and(
+            eq(security_remediation_attempts.id, params.attempt.id),
+            eq(security_remediation_attempts.claim_token, params.expectedAttempt.claimToken),
+            eq(security_remediation_attempts.status, params.expectedAttempt.status)
+          )
+        )
+        .returning({ id: security_remediation_attempts.id });
+      if (rows.length === 0) return false;
+    } else {
+      await attemptUpdate.where(eq(security_remediation_attempts.id, params.attempt.id));
+    }
+
     await tx
       .update(security_remediations)
       .set({
@@ -1650,7 +1898,9 @@ async function finalizeAttemptOutcome(params: {
       action: auditAction,
       actor: params.actor,
       occurredAt: new Date().toISOString(),
-      beforeState: { remediation_status: params.attempt.status },
+      beforeState: {
+        remediation_status: params.expectedAttempt?.status ?? params.attempt.status,
+      },
       afterState: {
         remediation_status: status,
         ...(params.result.prNumber ? { pr_number: params.result.prNumber } : {}),
@@ -1667,7 +1917,9 @@ async function finalizeAttemptOutcome(params: {
         ...(status === 'blocked' ? { blocked_reason_code: 'blocked' } : {}),
       },
     });
+    return true;
   });
+  return applied;
 }
 
 async function finalizeAttemptAsFailed(params: {
@@ -2532,25 +2784,48 @@ export async function discoverQueuedRemediationAttempts(
   db: WorkerDb,
   limit: number
 ): Promise<string[]> {
-  const rows = await db
-    .select({ id: security_remediation_attempts.id })
-    .from(security_remediation_attempts)
-    .where(
-      and(
-        eq(security_remediation_attempts.status, 'queued'),
-        lte(
-          sql`coalesce(${security_remediation_attempts.next_retry_at}, '-infinity'::timestamptz)`,
-          sql`now()`
+  const rows = await db.execute<{ id: string }>(sql`
+    WITH due AS (
+      SELECT
+        attempt.id,
+        attempt.priority,
+        attempt.queued_at,
+        CASE
+          WHEN attempt.owned_by_organization_id IS NOT NULL
+            THEN 'org:' || attempt.owned_by_organization_id::text
+          ELSE 'user:' || attempt.owned_by_user_id
+        END AS owner_key
+      FROM security_remediation_attempts AS attempt
+      WHERE attempt.status = 'queued'
+        AND coalesce(attempt.next_retry_at, '-infinity'::timestamptz) <= now()
+        AND NOT EXISTS (
+          SELECT 1
+          FROM security_remediation_attempts AS active
+          WHERE active.id <> attempt.id
+            AND active.status IN ('launching', 'running')
+            AND (
+              (attempt.owned_by_organization_id IS NOT NULL AND active.owned_by_organization_id = attempt.owned_by_organization_id)
+              OR (attempt.owned_by_user_id IS NOT NULL AND active.owned_by_user_id = attempt.owned_by_user_id)
+            )
         )
-      )
+    ),
+    ranked AS (
+      SELECT
+        due.id,
+        due.priority,
+        due.queued_at,
+        row_number() OVER (
+          PARTITION BY due.owner_key
+          ORDER BY due.priority, due.queued_at, due.id
+        ) AS owner_rank
+      FROM due
     )
-    .orderBy(
-      asc(security_remediation_attempts.priority),
-      asc(security_remediation_attempts.queued_at),
-      asc(security_remediation_attempts.id)
-    )
-    .limit(limit);
-  return rows.map(row => row.id);
+    SELECT ranked.id
+    FROM ranked
+    ORDER BY ranked.owner_rank, ranked.priority, ranked.queued_at, ranked.id
+    LIMIT ${limit}
+  `);
+  return rows.rows.map(row => row.id);
 }
 
 export async function consumeRemediationAttemptBatch(

@@ -1,9 +1,21 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
+
+// The checker parses with oxc through the shared scanner, so a fixture links the
+// repository's dependency tree at its own root.
+const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
 
 const ENGLISH = {
   agents: {
@@ -43,6 +55,13 @@ function runChecker(
     [`apps/mobile/src/i18n/locales/${language}.json`]: JSON.stringify(translated),
     'packages/notifications/src/locales/en.json': '{}',
     [`packages/notifications/src/locales/${language}.json`]: '{}',
+    // The push locale module the catalog checker reads: one import and one
+    // registry entry per fixture catalog, as the real module writes them.
+    'packages/notifications/src/i18n.ts': [
+      `import en from './locales/en.json';`,
+      `import ${language.replaceAll('-', '_')} from './locales/${language}.json';`,
+      `const pushCatalogs = { 'en': en, '${language}': ${language.replaceAll('-', '_')} };`,
+    ].join('\n'),
     ...extraFiles,
   };
   for (const [path, content] of Object.entries(files)) {
@@ -58,10 +77,12 @@ function runChecker(
     copyFileSync(new URL(`./${name}`, import.meta.url), join(toolDir, name));
   }
   mkdirSync(join(root, 'tools/lib'), { recursive: true });
-  copyFileSync(
-    new URL('../lib/source-files.mjs', import.meta.url),
-    join(root, 'tools/lib/source-files.mjs')
-  );
+  for (const name of ['ast.mjs', 'catalogs.mjs', 'source-files.mjs']) {
+    copyFileSync(new URL(`../lib/${name}`, import.meta.url), join(root, 'tools/lib', name));
+  }
+  // The shared scanner parses with oxc, a root dependency: resolve it the way
+  // the repository does, from the fixture's own root.
+  symlinkSync(join(REPO, 'node_modules'), join(root, 'node_modules'), 'dir');
   const result = spawnSync(process.execPath, [join(toolDir, 'check-catalogs.mjs')], {
     cwd: root,
     encoding: 'utf8',
@@ -144,6 +165,46 @@ test('rejects unused English plural siblings', context => {
     result.stderr,
     /mobile: en\.json defines "agents\.liveCount_other", which no source file uses/
   );
+});
+
+test('ignores a call written in a comment or a string', context => {
+  const source = [
+    "t('agents.title');",
+    "t('agents.liveCount', { count: 2 });",
+    "// t('agents.commentedOut') named the key before this screen moved",
+    `const note = "t('agents.quotedInText') is not a call";`,
+    'void note;',
+  ].join('\n');
+  const result = runChecker(context, { source });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('does not count a key named only in a comment as a use', context => {
+  const english = { agents: { title: 'Agents', retired: 'Retired agents' } };
+  const translated = { agents: { title: 'Localized agents', retired: 'Localized retirees' } };
+  const result = runChecker(context, {
+    english,
+    translated,
+    source: "t('agents.title');\n// 'agents.retired' left with the old screen",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile: en\.json defines "agents\.retired", which no source file uses/
+  );
+});
+
+test('still rejects a template-literal key', context => {
+  const source = [
+    "t('agents.title');",
+    "t('agents.liveCount', { count: 2 });",
+    'const page = 1;',
+    't(`agents.page${page}`);',
+  ].join('\n');
+  const result = runChecker(context, { source });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /t\(\) called with a template literal; the key check cannot see it/);
 });
 
 test('ignores a mounted-harness helper while a source file still reports its keys', context => {
@@ -918,3 +979,186 @@ for (const [miscased, name] of [
     );
   });
 }
+
+const ARMENIAN_TERMINATORS = {
+  work: {
+    empty: 'Nothing to do.',
+    waiting: 'Waiting...',
+    retry: 'Try again',
+    host: 'Open kilo.ai',
+    note: 'Contact support',
+  },
+};
+const ARMENIAN_TERMINATORS_SOURCE =
+  "t('work.empty');\nt('work.waiting');\nt('work.retry');\nt('work.host');\nt('work.note');";
+
+test('accepts Armenian copy that closes its sentences with «։»', context => {
+  const result = runChecker(context, {
+    language: 'hy',
+    english: ARMENIAN_TERMINATORS,
+    translated: {
+      work: {
+        empty: 'Անելիք չկա։',
+        waiting: 'Սպասում ենք...',
+        retry: 'Կրկին փորձել',
+        host: 'Բացել kilo.ai',
+        note: 'Էլ. հասցե',
+      },
+    },
+    source: ARMENIAN_TERMINATORS_SOURCE,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+for (const [name, value, mark] of [
+  ['a terminal period', 'Անելիք չկա.', '.'],
+  ['a period before the next sentence', 'Չհաջողվեց. Կրկին փորձեք', '.'],
+  ['a terminal colon', 'Չհաջողվեց պատասխանել:', ':'],
+]) {
+  test(`rejects Armenian copy with ${name}`, context => {
+    const result = runChecker(context, {
+      language: 'hy',
+      english: ARMENIAN_TERMINATORS,
+      translated: {
+        work: {
+          empty: value,
+          waiting: 'Սպասում ենք...',
+          retry: 'Կրկին փորձել',
+          host: 'Բացել kilo.ai',
+          note: 'Էլ. հասցե',
+        },
+      },
+      source: ARMENIAN_TERMINATORS_SOURCE,
+    });
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(
+      result.stderr,
+      new RegExp(
+        `mobile/hy: "work\\.empty" ends a sentence with the ASCII "${mark}"; Armenian writes «։»`
+      )
+    );
+  });
+}
+
+test('rejects Armenian copy with a period that joins two sentences', context => {
+  const result = runChecker(context, {
+    language: 'hy',
+    english: ARMENIAN_TERMINATORS,
+    translated: {
+      work: {
+        empty: 'Մուտքագրեք հասցեն. այն պահպանվում է',
+        waiting: 'Սպասում ենք...',
+        retry: 'Կրկին փորձել',
+        host: 'Բացել kilo.ai',
+        note: 'Էլ. հասցե',
+      },
+    },
+    source: ARMENIAN_TERMINATORS_SOURCE,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/hy: "work\.empty" joins two sentences with the ASCII "\."; Armenian writes «։» and «՝»/
+  );
+});
+
+test('leaves another locale’s ASCII sentence terminator alone', context => {
+  const result = runChecker(context, {
+    language: 'ru',
+    english: ARMENIAN_TERMINATORS,
+    translated: {
+      work: {
+        empty: 'Нечего делать.',
+        waiting: 'Ждём...',
+        retry: 'Повторить',
+        host: 'Открыть kilo.ai',
+        note: 'Эл. адрес',
+      },
+    },
+    source: ARMENIAN_TERMINATORS_SOURCE,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('rejects a notification catalog the push locale registry omits', context => {
+  const result = runChecker(context, {
+    extraFiles: {
+      'packages/notifications/src/i18n.ts': [
+        `import en from './locales/en.json';`,
+        `import ru from './locales/ru.json';`,
+        `const pushCatalogs = { 'en': en };`,
+      ].join('\n'),
+    },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /notifications: catalog "ru\.json" has no push locale registry entry/
+  );
+});
+
+test('rejects a push locale registry entry with no catalog import', context => {
+  const result = runChecker(context, {
+    extraFiles: {
+      'packages/notifications/src/i18n.ts': [
+        `import en from './locales/en.json';`,
+        `import ru from './locales/ru.json';`,
+        `const pushCatalogs = { 'en': en, 'ru': ru, 'de': ru };`,
+      ].join('\n'),
+    },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /notifications: the push locale registry names "de" with no catalog/);
+});
+
+test('rejects a notification catalog file the push locale module does not import', context => {
+  const result = runChecker(context, {
+    extraFiles: {
+      'packages/notifications/src/i18n.ts': [
+        `import en from './locales/en.json';`,
+        `const pushCatalogs = { 'en': en };`,
+      ].join('\n'),
+    },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /notifications: catalog "ru\.json" has no import in packages\/notifications\/src\/i18n\.ts/
+  );
+});
+
+test('rejects a push locale registry entry bound to another catalog', context => {
+  const result = runChecker(context, {
+    extraFiles: {
+      'packages/notifications/src/i18n.ts': [
+        `import en from './locales/en.json';`,
+        `import ru from './locales/ru.json';`,
+        `const pushCatalogs = { 'en': en, 'ru': en };`,
+      ].join('\n'),
+    },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /notifications: the push locale registry binds "ru" to "en" instead of the "ru" catalog import/
+  );
+});
+
+test('rejects a push locale registry with no initializer', context => {
+  const result = runChecker(context, {
+    extraFiles: {
+      'packages/notifications/src/i18n.ts': [
+        `import en from './locales/en.json';`,
+        `import ru from './locales/ru.json';`,
+        `let pushCatalogs;`,
+      ].join('\n'),
+    },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /notifications\/src\/i18n\.ts: the push locale registry has no initializer/
+  );
+});

@@ -1,6 +1,11 @@
 import { GetObjectCommand, NoSuchKey, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
 import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import type { ApiRequestLog } from '@kilocode/db/schema';
+import {
+  EnkryptScanKindSchema,
+  EnkryptScanPartSchema,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { createR2Client } from '@kilocode/web-shared/lib/r2/create-client';
 
@@ -8,6 +13,38 @@ export type ApiRequestLogBlobUpload = {
   columns: Pick<ApiRequestLog, 'request_r2_key' | 'response_r2_key'>;
   uploadError: string | null;
 };
+
+const enkryptRequestLogSchema = z.object({
+  guardrail: z.enum(['input', 'output']),
+  scan: EnkryptScanKindSchema,
+  part: EnkryptScanPartSchema,
+  /** Which of the input part's chunks the call scanned; each chunk is scanned by its own calls. */
+  chunk: z.object({ index: z.number(), count: z.number() }).optional(),
+  request: z.object({
+    text: z.string(),
+    detectors: z.record(z.string(), z.unknown()),
+    user_metadata: z.object({ organization_id: z.string() }),
+  }),
+  response: z.string().nullable(),
+  response_truncated: z.boolean().optional(),
+  status_code: z.number().nullable(),
+  error: z.string().nullable(),
+});
+
+export type EnkryptRequestLog = z.infer<typeof enkryptRequestLogSchema>;
+
+export const apiRequestLogBlobSchema = z.object({
+  version: z.literal(1),
+  request: z.record(z.string(), z.unknown()),
+  response: z.string().nullable(),
+  enkrypt: z
+    .array(
+      // Blobs written before scans were split into parts have no `part`, but still hold the
+      // request and response bodies.
+      enkryptRequestLogSchema.extend({ part: enkryptRequestLogSchema.shape.part.optional() })
+    )
+    .optional(),
+});
 
 type ApiRequestLogStorage = { client: S3Client; bucket: string };
 
@@ -36,60 +73,42 @@ function getStorage(): ApiRequestLogStorage {
   return storage;
 }
 
-async function putBlob(
-  { client, bucket }: ApiRequestLogStorage,
-  key: string,
-  body: string,
-  contentType: string
-) {
-  await client.send(
-    new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType })
-  );
-  return key;
-}
-
-/**
- * Never throws. Each body is uploaded independently, so the key of every
- * object that was written is returned even when the other upload fails;
- * this keeps all written objects referenced by their row.
- */
 export async function uploadApiRequestLogBlobs({
   request,
   response,
+  enkrypt,
 }: {
-  request: string;
+  request: Record<string, unknown>;
   response: string | undefined;
+  enkrypt?: EnkryptRequestLog[];
 }): Promise<ApiRequestLogBlobUpload> {
-  let resolvedStorage: ApiRequestLogStorage;
   try {
-    resolvedStorage = getStorage();
+    const { client, bucket } = getStorage();
+    const key = `${new Date().toISOString().slice(0, 10)}/${randomUUID()}/record.v1.json`;
+    const body = {
+      version: 1,
+      request,
+      response: response ?? null,
+      ...(enkrypt?.length ? { enkrypt } : {}),
+    } satisfies z.infer<typeof apiRequestLogBlobSchema>;
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: JSON.stringify(body),
+        ContentType: 'application/json; charset=utf-8',
+      })
+    );
+    return {
+      columns: { request_r2_key: key, response_r2_key: key },
+      uploadError: null,
+    };
   } catch (error) {
     return {
       columns: { request_r2_key: null, response_r2_key: null },
       uploadError: String(error),
     };
   }
-
-  const prefix = `${new Date().toISOString().slice(0, 10)}/${randomUUID()}`;
-  const [requestResult, responseResult] = await Promise.allSettled([
-    putBlob(resolvedStorage, `${prefix}/request.json`, request, 'application/json; charset=utf-8'),
-    response === undefined
-      ? null
-      : putBlob(resolvedStorage, `${prefix}/response.txt`, response, 'text/plain; charset=utf-8'),
-  ]);
-
-  const uploadErrors = [
-    requestResult.status === 'rejected' ? `request: ${String(requestResult.reason)}` : null,
-    responseResult.status === 'rejected' ? `response: ${String(responseResult.reason)}` : null,
-  ].filter(error => error !== null);
-
-  return {
-    columns: {
-      request_r2_key: requestResult.status === 'fulfilled' ? requestResult.value : null,
-      response_r2_key: responseResult.status === 'fulfilled' ? responseResult.value : null,
-    },
-    uploadError: uploadErrors.length > 0 ? uploadErrors.join('; ') : null,
-  };
 }
 
 /** Returns null when the object does not exist. */

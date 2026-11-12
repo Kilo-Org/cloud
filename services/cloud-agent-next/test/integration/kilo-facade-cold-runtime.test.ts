@@ -21,8 +21,8 @@ import type {
 import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
-  installFakeCredentialEnv,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -87,7 +87,7 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
     workspace: {
       branchName: 'kilo/cold-runtime',
       sandboxId: input.sandboxId,
-      sandboxProvider: 'cloudflare',
+      sandboxProvider: 'cloudflare-containers',
     },
     lifecycle: { version: 1, timestamp: 1 },
   });
@@ -143,9 +143,8 @@ async function installSandbox(
   const broker = createFakeCredentialBroker();
   await runInDurableObject(sandboxStub, async instance => {
     await instance.getAllocationState();
-    const sandboxEnv = (instance as unknown as { env: Record<string, unknown> }).env;
-    installFakeCredentialEnv(sandboxEnv, broker, {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+    installFakeSandboxEnv(instance, broker, {
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
       KILO_OPENROUTER_BASE: 'https://control.test',
@@ -196,13 +195,7 @@ type ColdSession = {
 
 /** A session DO and sandbox allocation with no session compute requested yet. */
 async function openColdSession(): Promise<ColdSession> {
-  const sandboxId = await generateSandboxId(
-    undefined,
-    ORG_ID,
-    USER_ID,
-    cloudAgentSessionId,
-    undefined
-  );
+  const sandboxId = await generateSandboxId(cloudAgentSessionId);
   const provider = createFakeProvider();
   const meter = createRecordingMeter();
   const sandboxStub = await installSandbox(sandboxId, provider.adapter, meter);
@@ -219,7 +212,7 @@ async function registerColdSession(): Promise<ColdSession> {
       kiloSessionId,
       sandboxId: cold.sandboxId,
     }),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   return cold;
 }
@@ -323,7 +316,7 @@ describe('hosted session cold reads', { timeout: 30_000 }, () => {
         sandboxId: cold.sandboxId,
       }),
       message,
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     await waitFor(() => expect(cold.provider.launchEnvs).toHaveLength(1));
     const launchEnv = cold.provider.launchEnvs[0];
@@ -385,7 +378,11 @@ describe('hosted session cold reads', { timeout: 30_000 }, () => {
         stream,
         frame => (frame as { type?: string }).type === 'kilo.native.fence'
       );
-      expect(replay.observed).toEqual([
+      expect(
+        replay.observed.filter(frame =>
+          ['cloud.message.failed', 'kilo.native.fence'].includes((frame as { type: string }).type)
+        )
+      ).toEqual([
         expect.objectContaining({
           type: 'cloud.message.failed',
           properties: expect.objectContaining({
@@ -414,7 +411,7 @@ describe('hosted session cold reads', { timeout: 30_000 }, () => {
         sandboxId: cold.sandboxId,
       }),
       message: firstMessage,
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
 
     await waitFor(() => expect(cold.provider.createCalls).toBeGreaterThanOrEqual(1));

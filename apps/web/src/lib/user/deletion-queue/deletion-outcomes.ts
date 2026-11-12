@@ -16,6 +16,7 @@ import {
   type UserDeletionTaskProgress,
 } from '@kilocode/db/schema-types';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { lockGitHubIdentityWrites } from '@kilocode/db/github-identity';
 import { anonymizeCloudUserData } from '@/lib/user';
 import { disableUserAccessForDeletion } from '@/lib/user/deletion-queue/deletion-access';
 import { catalogEntryFor, teardownStepKeys } from '@/lib/user/deletion-queue/deletion-catalog';
@@ -161,6 +162,8 @@ async function persistAnonymizeSuccessTx(params: {
     }
 
     await tx.execute(sql.raw(`SET LOCAL statement_timeout = ${Math.floor(timeoutMs)}`));
+    // GitHub identity writers take this lock before the user row. Keep the same order.
+    await lockGitHubIdentityWrites(tx, userId);
     const [user] = await tx
       .select({ id: kilocode_users.id })
       .from(kilocode_users)
@@ -283,12 +286,13 @@ async function persistTaskDispositionTx(
   const { request, step, stepKey, outcome } = params;
 
   switch (outcome.kind) {
-    case 'continue':
+    case 'continue': {
+      const continueDelayMs = outcome.delayMs ?? USER_DELETION_CONTINUE_DELAY_MS;
       await tx
         .update(user_deletion_steps)
         .set({
           status: UserDeletionStepStatus.Pending,
-          available_at: sql`now() + interval '${sql.raw(String(USER_DELETION_CONTINUE_DELAY_MS / 1000))} seconds'`,
+          available_at: sql`now() + interval '${sql.raw(String(Math.max(1, Math.ceil(continueDelayMs / 1000))))} seconds'`,
           claim_token: null,
           claimed_until: null,
           progress_json: outcome.progress ?? step.progress_json,
@@ -306,6 +310,7 @@ async function persistTaskDispositionTx(
         },
       });
       break;
+    }
     case 'retry': {
       const nextWindow = step.window_attempt_count + 1;
       const nextLifetime = step.lifetime_attempt_count + 1;

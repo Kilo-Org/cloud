@@ -1,6 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type OpenAI from 'openai';
 import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import type {
   GatewayRequest,
   GatewayResponsesRequest,
@@ -188,10 +189,6 @@ function hasCacheableMessagesContent(message: Anthropic.MessageParam) {
     : message.content.some(isCacheableMessagesContentBlock);
 }
 
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
 const CACHE_CONTROL_NODE_BUDGET = 100_000;
 
 function containsCacheControl(value: unknown): boolean {
@@ -206,7 +203,7 @@ function containsCacheControl(value: unknown): boolean {
     let children: readonly unknown[];
     if (Array.isArray(current)) {
       children = current;
-    } else if (isObjectRecord(current)) {
+    } else if (isRecord(current)) {
       if (
         Object.hasOwn(current, 'cache_control') ||
         Object.hasOwn(current, 'prompt_cache_breakpoint')
@@ -352,7 +349,8 @@ function mapReasoningDetailsToReasoningString(
           case ReasoningDetailType.Text:
             return detail.text ?? '';
           case ReasoningDetailType.Summary:
-            return detail.summary;
+            // Summaries are separate output metadata, not raw reasoning text.
+            return '';
           case ReasoningDetailType.Encrypted:
             // Opaque provider-specific blob; not representable as a reasoning string.
             return '';
@@ -362,6 +360,8 @@ function mapReasoningDetailsToReasoningString(
 
     if (reasoningText) {
       messageWithReasoning[field] = reasoningText;
+    } else if (legacyReasoning && !messageWithReasoning[field]) {
+      messageWithReasoning[field] = legacyReasoning;
     }
   }
 }

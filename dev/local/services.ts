@@ -44,7 +44,6 @@ const groups: ServiceGroup[] = [
     groupDependsOn: ['git-token-service', 'notifications'],
   },
   { id: 'code-review', label: 'Code Review', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
-  { id: 'gastown', label: 'Gastown', alwaysOn: false, groupDependsOn: ['git-token-service'] },
   {
     id: 'security-agent',
     label: 'Security Agent',
@@ -121,12 +120,15 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres', 'redis', 'redis-http'],
     dir: 'apps/ai-gateway',
   },
-  // A no-behavior placeholder for now (see services/scim-sync/README.md): it
-  // runs with the core stack so every local session exercises the Worker and
-  // its Durable Object binding. No dependencies and no secrets.
+  // Applies WorkOS directory events by calling the app's internal SCIM
+  // endpoints, so it needs Next.js up and Postgres behind it — the same
+  // dependencies `user-data-export` declares for the same reason. Without a
+  // `WORKOS_API_KEY` in `services/scim-sync/.dev.vars` the poll fails and
+  // reports the failure, which is harmless: the alarm retries and nothing is
+  // applied.
   'cloudflare-scim-sync': {
     group: 'core',
-    dependsOn: [],
+    dependsOn: ['postgres', 'nextjs'],
     dir: 'services/scim-sync',
   },
   'user-data-export': {
@@ -299,16 +301,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'deletion-mock',
     dependsOn: [],
     dir: 'dev/local/scripts',
-  },
-  'cloudflare-gastown': {
-    group: 'gastown',
-    dependsOn: ['postgres', 'cloudflare-git-token-service', 'container-usage-meter', 'nextjs'],
-    dir: 'services/gastown',
-  },
-  'cloudflare-wasteland': {
-    group: 'gastown',
-    dependsOn: ['postgres', 'nextjs'],
-    dir: 'services/wasteland',
   },
 };
 
@@ -622,15 +614,8 @@ export function getAllInfraProfiles(): string[] {
   return [...new Set(Object.values(INFRA_PROFILES))];
 }
 
-// Wrangler always pulls its container egress-interceptor sidecar
-// (cloudflare/proxy-everything) with --platform linux/amd64. On Apple Silicon
-// the emulated amd64 proxy crashes at startup ("setsockopt: protocol not
-// available" — its transparent-proxy socket options don't survive Rosetta),
-// which surfaces as "Failed to start container" for every local container.
-// Point wrangler at the same proxy version's linux/arm64 manifest instead:
-// pulling a single-platform manifest digest with --platform amd64 only warns.
-// Keep the digest in sync with DEFAULT_CONTAINER_EGRESS_INTERCEPTOR_IMAGE in
-// the pinned wrangler/miniflare version (tag 3cb1195).
+// Wrangler's amd64 egress proxy crashes under Apple Silicon emulation. Pin its
+// arm64 manifest; keep aligned with the pinned Wrangler/Miniflare proxy version.
 const CONTAINER_EGRESS_IMAGE_ARM64 =
   'cloudflare/proxy-everything:3cb1195@sha256:78c7910f4575a511d928d7824b1cbcaec6b7c4bf4dbb3fafaeeae3104030e73c';
 

@@ -6,6 +6,7 @@ import { type SdkStatusMessageCode } from '@kilocode/cloud-agent-sdk';
 import { i18n } from '@/i18n';
 
 import { type MessageFailure } from './message-failure-state';
+import { SESSION_HISTORY_FAILURES } from './session-history-failures';
 import {
   buildTerminalErrorCopyText,
   classifyTerminalError,
@@ -100,6 +101,7 @@ describe('describeTerminalFailure', () => {
       variant,
       message: i18n.t(key),
       retryable,
+      retryWith: 'session',
       detail: message,
       title: expect.any(String),
     });
@@ -185,8 +187,31 @@ describe('resolveSessionTerminalError', () => {
       title: "Couldn't load this session",
       message: 'Failed to load session details',
       retryable: true,
+      retryWith: 'session',
       detail: 'boom',
     });
+  });
+
+  it.each([
+    SESSION_HISTORY_FAILURES.too_large.message,
+    SESSION_HISTORY_FAILURES.invalid_data.message,
+  ])('offers no Retry for a stored transcript that cannot be read: %s', message => {
+    // The stored page is oversize or unreadable, so the same read answers the
+    // same way every time: the reader gets the permanent not-available state
+    // instead of a Retry that cannot succeed.
+    expect(
+      resolveSessionTerminalError({ error: message, statusIndicator: null, messageCount: 0 })
+    ).toMatchObject({ retryable: false, detail: message });
+  });
+
+  it('still offers Retry for a transient transcript read failure', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: SESSION_HISTORY_FAILURES.retryable_failure.message,
+        statusIndicator: null,
+        messageCount: 0,
+      })
+    ).toMatchObject({ retryable: true });
   });
 
   it('never shows the English transport message to the reader', () => {
@@ -198,6 +223,7 @@ describe('resolveSessionTerminalError', () => {
       title: "Couldn't load this session",
       message: 'Connection trouble. Please retry in a moment.',
       retryable: true,
+      retryWith: 'session',
       detail: 'Connection failed. Please retry in a moment.',
     });
   });
@@ -210,6 +236,7 @@ describe('resolveSessionTerminalError', () => {
       title: 'Access denied',
       message: "You don't have permission to view this.",
       retryable: false,
+      retryWith: 'session',
       detail: 'You are not authorized to use the Cloud Agent.',
     });
   });
@@ -226,6 +253,7 @@ describe('resolveSessionTerminalError', () => {
       title: "Couldn't load this session",
       message: 'Connection trouble. Please retry in a moment.',
       retryable: true,
+      retryWith: 'session',
       detail: 'Connection lost. Please retry in a moment.',
     });
   });
@@ -238,8 +266,69 @@ describe('resolveSessionTerminalError', () => {
       title: "Couldn't load this session",
       message: 'Failed to load session details',
       retryable: false,
+      retryWith: 'session',
       detail: 'Session terminated',
     });
+  });
+
+  // The SDK's own lost-transport code is a retryable failure whatever type the
+  // indicator carries: a screen that kept the skeleton beside the status line
+  // showed a loading state and a failure in the same frame.
+  it.each(['error', 'info', 'progress', 'warning'] as const)(
+    'resolves the lost-transport code carried by a %s indicator',
+    type => {
+      expect(
+        resolveSessionTerminalError({
+          error: null,
+          statusIndicator: {
+            type,
+            message: 'Agent connection lost',
+            code: 'agent-connection-lost',
+          },
+          messageCount: 0,
+        })
+      ).toEqual({
+        variant: 'server',
+        title: "Couldn't load this session",
+        message: 'Connection trouble. Please retry in a moment.',
+        retryable: true,
+        retryWith: 'session',
+        detail: 'Agent connection lost',
+      });
+    }
+  );
+
+  it('resolves an exhausted app-wide leg while the open still has nothing to show', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: null,
+        statusIndicator: null,
+        messageCount: 0,
+        connectionLost: true,
+      })
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: 'Connection trouble. Please retry in a moment.',
+      retryable: true,
+      retryWith: 'connection',
+      detail: '',
+    });
+  });
+
+  it('leaves a loaded transcript to its own status line when the connection is lost', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: null,
+        statusIndicator: {
+          type: 'error',
+          message: 'Agent connection lost',
+          code: 'agent-connection-lost',
+        },
+        messageCount: 2,
+        connectionLost: true,
+      })
+    ).toBeNull();
   });
 
   it.each([
@@ -272,6 +361,7 @@ describe('resolveSessionTerminalError', () => {
       title: "Couldn't load this session",
       message: "This model isn't available for Cloud Agent. Choose another model and try again.",
       retryable: false,
+      retryWith: 'session',
       detail:
         'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.',
     });
@@ -285,6 +375,7 @@ describe('resolveSessionTerminalError', () => {
       title: 'Not found',
       message: 'This item may have been removed or is no longer available.',
       retryable: false,
+      retryWith: 'session',
       detail: 'This session is no longer available.',
     });
   });
@@ -330,19 +421,19 @@ describe('sessionStatusErrorMessage', () => {
     ['Unauthorized: Unauthorized', 'The response failed.'],
     [
       'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
-      'Not enough credits to run Cloud Agent. Add credits and try again.',
+      'Not enough credits for this request. Add credits and try again.',
     ],
     // The DO's safe projection is the producer for a real credits failure; it
     // writes the phrase lowercase.
     [
       'Assistant request failed: insufficient credits',
-      'Not enough credits to run Cloud Agent. Add credits and try again.',
+      'Not enough credits for this request. Add credits and try again.',
     ],
     // Both SDK status strings for a failed delivery reach the delivery copy:
     // session-manager's exhaustion indicator and the cloud status written for
     // `cloud.message.failed` (also the normalizer's fallback).
-    ['Message failed to deliver', 'Failed to deliver'],
-    ['Message delivery failed', 'Failed to deliver'],
+    ['Message failed to deliver', 'Message not sent'],
+    ['Message delivery failed', 'Message not sent'],
   ] as const)('maps %s to typed copy', (raw, expected) => {
     expect(sessionStatusErrorMessage({ message: raw })).toBe(expected);
   });
@@ -355,7 +446,7 @@ describe('sessionStatusErrorMessage', () => {
     ['session-stopped', 'Session stopped', 'Session stopped'],
     ['session-terminated', 'Session terminated', 'The response failed.'],
     ['failed-to-stop-execution', 'Failed to stop execution', 'Failed to stop execution'],
-    ['message-delivery-failed', 'Message failed to deliver', 'Failed to deliver'],
+    ['message-delivery-failed', 'Message failed to deliver', 'Message not sent'],
     ['commit-failed', 'Commit failed', 'Commit failed'],
     [
       'not-authorized',
@@ -365,7 +456,7 @@ describe('sessionStatusErrorMessage', () => {
     [
       'insufficient-credits',
       'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
-      'Not enough credits to run Cloud Agent. Add credits and try again.',
+      'Not enough credits for this request. Add credits and try again.',
     ],
     [
       'previous-task-in-progress',
@@ -405,7 +496,7 @@ describe('sessionStatusErrorMessage', () => {
     ['Agent connection lost', 'The response failed.'],
     ['Session terminated', 'The response failed.'],
     ['Failed to stop execution', 'The response failed.'],
-    ['Message failed to deliver', 'Failed to deliver'],
+    ['Message failed to deliver', 'Message not sent'],
   ] as const)('keeps the code-less fallback for %s', (raw, expected) => {
     expect(sessionStatusErrorMessage({ message: raw })).toBe(expected);
   });
@@ -455,12 +546,15 @@ describe('sessionStatusErrorMessage', () => {
 function assistantFailure(detail: string | null): MessageFailure {
   return {
     kind: 'assistant',
+    side: 'assistant',
+    error: true,
     titleKey: 'agentChat.messageFailure.assistantTitle',
     title: 'Response failed',
     detailKey: null,
     detail,
     copyDetail: '',
     canRetry: true,
+    canAddCredits: false,
     canCopy: false,
   };
 }
@@ -468,28 +562,56 @@ function assistantFailure(detail: string | null): MessageFailure {
 describe('statusIndicatorDuplicatesMessageFailure', () => {
   const deliveryFailure: MessageFailure = {
     kind: 'delivery',
+    side: 'user',
+    error: true,
     titleKey: 'agentChat.messageFailure.deliveryTitle',
-    title: 'Failed to deliver',
+    title: 'Message not sent',
     detailKey: 'agentChat.messageFailure.deliveryExhausted',
     detail: 'We could not deliver this message after several attempts.',
     copyDetail: 'Unauthorized: Unauthorized',
     canRetry: true,
+    canAddCredits: false,
     canCopy: true,
   };
 
   // An agent-execution delivery failure renders the assistant-failure title
   // (message-failure-state.ts), so the status line must not state the same
-  // failure a second time in either of its two copies.
+  // failure a second time in any of its copies.
   const executionFailure: MessageFailure = {
     kind: 'delivery',
+    side: 'assistant',
+    error: true,
     titleKey: 'agentChat.messageFailure.assistantTitle',
     title: 'Response failed',
-    detailKey: null,
-    detail: null,
+    detailKey: 'agentChat.messageFailure.deliveryExecution',
+    detail: 'The agent could not run this message.',
     copyDetail: 'Message delivery failed',
     canRetry: true,
+    canAddCredits: false,
     canCopy: true,
   };
+
+  it('suppresses the credits line a credits failure row already carries', () => {
+    const failure: MessageFailure = {
+      kind: 'assistant',
+      side: 'assistant',
+      error: true,
+      titleKey: 'agentChat.messageFailure.assistantTitle',
+      title: 'Response failed',
+      detailKey: 'agentChat.messageFailure.assistantCreditsRefusal',
+      detail: i18n.t('agentChat.messageFailure.assistantCreditsRefusal'),
+      copyDetail: '',
+      canRetry: false,
+      canAddCredits: true,
+      canCopy: false,
+    };
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message: 'Assistant request failed: insufficient credits' },
+        failure,
+      })
+    ).toBe(true);
+  });
 
   it('suppresses an unclassified session error the last row already states', () => {
     expect(
@@ -560,7 +682,7 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
   it('suppresses the SDK delivery line the agent-execution row states as a response failure', () => {
     // `normalizer.ts` writes `Message delivery failed` as the status indicator
     // for an execution failure with no error text, while the row renders the
-    // assistant-failure title. The footer's "Failed to deliver" would restate
+    // assistant-failure title. The footer's delivery line would restate
     // the same failed run.
     expect(
       statusIndicatorDuplicatesMessageFailure({

@@ -30,6 +30,7 @@ function EditTab() {
 
   const [inputValue, setInputValue] = useState('');
   const [tldInputValue, setTldInputValue] = useState('');
+  const [loadedVersion, setLoadedVersion] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [tldHasChanges, setTldHasChanges] = useState(false);
 
@@ -37,6 +38,7 @@ function EditTab() {
     if (data) {
       setInputValue(data.domains.join('\n'));
       setTldInputValue((data.blocked_signup_tlds ?? []).join('\n'));
+      setLoadedVersion(data.version);
       setHasChanges(false);
       setTldHasChanges(false);
     }
@@ -81,6 +83,8 @@ function EditTab() {
   );
 
   function handleSave() {
+    if (!data || loadedVersion !== data.version) return;
+
     const domains = inputValue
       .split(/[\n|]/)
       .map(part => part.trim().toLowerCase())
@@ -93,11 +97,22 @@ function EditTab() {
 
     // Only send the TLD list when it was edited, so a tab opened before a
     // deploy cannot reset a list it never loaded.
-    mutation.mutate({ domains, ...(tldHasChanges ? { blocked_tlds } : {}) });
+    mutation.mutate({
+      domains,
+      expected_version: loadedVersion,
+      ...(tldHasChanges ? { blocked_tlds } : {}),
+    });
   }
 
   if (isLoading) {
     return <div className="text-muted-foreground py-8 text-sm">Loading...</div>;
+  }
+  if (!data) {
+    return (
+      <div role="alert" className="text-destructive py-8 text-sm">
+        Failed to load the blacklist. Reload this page before editing.
+      </div>
+    );
   }
 
   const domainCount = data?.domains.length ?? 0;
@@ -164,7 +179,11 @@ function EditTab() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button onClick={handleSave} disabled={mutation.isPending || !hasChanges} size="sm">
+          <Button
+            onClick={handleSave}
+            disabled={mutation.isPending || !hasChanges || loadedVersion !== data.version}
+            size="sm"
+          >
             {mutation.isPending ? 'Saving...' : 'Save'}
           </Button>
           {data?.updated_by_email && (
@@ -177,9 +196,9 @@ function EditTab() {
 
         <div className="text-muted-foreground text-xs">
           <p>
-            Domains and signup TLDs are stored in Redis, so changes apply without a deploy. Auth
-            checks cache the lists for up to a minute. The BLACKLIST_DOMAINS and BLOCKED_SIGNUP_TLDS
-            env vars are fallbacks when Redis has no data.
+            Changes apply without a deploy. Domains are stored in Postgres and signup TLDs in Redis;
+            access checks can take up to a minute to see a change. BLOCKED_SIGNUP_TLDS is the
+            fallback until a TLD list is saved.
           </p>
         </div>
       </CardContent>

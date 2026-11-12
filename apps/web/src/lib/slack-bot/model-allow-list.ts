@@ -4,17 +4,22 @@ import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/orga
 import {
   getEffectiveModelDecision,
   resolveOrganizationDefaultModelPolicy,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+  type EffectiveOrganizationModelPolicy,
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 /**
  * Get a default model that is allowed for an organization, or `null` when the
  * organization's model-access policy allows none of the candidates. Callers must
  * treat `null` as "no model configured" and store no model for it.
  * Priority: org default model > global default > preferred models.
+ *
+ * A caller that already resolved the organization's default policy passes it in,
+ * so one decision path does not resolve the same policy twice.
  */
 export async function getDefaultAllowedModel(
   organizationId: string,
-  globalDefault = PRIMARY_DEFAULT_MODEL
+  globalDefault = PRIMARY_DEFAULT_MODEL,
+  policy?: EffectiveOrganizationModelPolicy
 ): Promise<string | null> {
   const organization = await getOrganizationById(organizationId);
   if (!organization) {
@@ -27,17 +32,18 @@ export async function getDefaultAllowedModel(
   // did. The organization's own `default_model` is only consulted on the
   // restricted path below, after `isAllowed` accepts it, because it may hold a
   // non-routable virtual id such as `organization-auto`.
-  const policy = await resolveOrganizationDefaultModelPolicy({ organizationId });
+  const resolvedPolicy =
+    policy ?? (await resolveOrganizationDefaultModelPolicy({ organizationId }));
   const isUnrestricted =
-    policy.memberGrant.mode === 'unrestricted' &&
-    policy.organizationModelDenyList.length === 0 &&
-    !policy.organizationProviderCeiling;
+    resolvedPolicy.memberGrant.mode === 'unrestricted' &&
+    resolvedPolicy.organizationModelDenyList.length === 0 &&
+    !resolvedPolicy.organizationProviderCeiling;
   if (isUnrestricted) {
     return globalDefault;
   }
 
   const isAllowed = async (modelId: string) =>
-    (await getEffectiveModelDecision(policy, modelId)).allowed;
+    (await getEffectiveModelDecision(resolvedPolicy, modelId)).allowed;
 
   // Check if the organization's default model is allowed
   const orgDefaultModel = organization.settings?.default_model;

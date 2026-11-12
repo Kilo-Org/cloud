@@ -57,10 +57,10 @@ type RowPlatformPresentation = Readonly<{
 
 /**
  * Shared list/card platform glyph + VoiceOver rule for stored and live rows.
- * Icon only for `variant === 'list'` while the eyebrow draws no status
- * glyph. Platform is spoken only when an icon is shown, the row is not
- * needs-input, and the eyebrow is a repo name (so the badge does not
- * already speak the platform).
+ * Icon only for `variant === 'list'`, while the eyebrow draws no status glyph
+ * and names a repository: a row without a repository renders the platform
+ * label as its eyebrow, so the glyph would repeat the word beside it. Platform
+ * is spoken only when an icon is shown and the row is not needs-input.
  */
 export function selectRowPlatformPresentation({
   platform,
@@ -69,11 +69,15 @@ export function selectRowPlatformPresentation({
   statusGlyph,
   gitUrl,
 }: RowPlatformPresentationInput): RowPlatformPresentation {
-  const iconKind = variant === 'list' && !statusGlyph ? sessionPlatformIconKind(platform) : null;
-  const spokenPlatform =
-    iconKind != null && !needsInput && repoNameFromGitUrl(gitUrl) != null
-      ? (platform ?? undefined)
-      : undefined;
+  // Truthiness, not a null check: a git URL whose project segment is empty
+  // yields `''`, and the label helpers fall back to the platform label there.
+  // The glyph must fall back with them, or the row states its type twice.
+  const eyebrowNamesRepo = Boolean(repoNameFromGitUrl(gitUrl));
+  const iconKind =
+    variant === 'list' && !statusGlyph && eyebrowNamesRepo
+      ? sessionPlatformIconKind(platform)
+      : null;
+  const spokenPlatform = iconKind != null && !needsInput ? (platform ?? undefined) : undefined;
   return {
     iconKind,
     spokenPlatform: spokenPlatform === '' ? undefined : spokenPlatform,

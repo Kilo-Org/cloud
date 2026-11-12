@@ -104,17 +104,28 @@ export function collectSearchPages<T extends { session_id: string }>(
  * Gates:
  * - No more pages to fetch (`hasNextPage !== true`).
  * - A page fetch is already in flight (`isFetchingNextPage`).
+ * - The last next-page attempt failed (`isFetchNextPageError`). The end of a
+ *   list is reached again on every content-size change, and the footer's retry
+ *   line changes the content height, so auto-loading here would re-fire the
+ *   failed request and leave the retry unreachable. Recovery belongs to the
+ *   footer's Retry until a page lands.
  * - The current data is stale `keepPreviousData` that does not match the
  *   committed query (`isPlaceholderData`). This prevents loading the wrong
  *   page before the fresh results arrive.
  *
  * Unfiltered lists have no placeholder concept (`isPlaceholderData` is
- * always `false`), so only the first two gates apply.
+ * always `false`), so only the other gates apply.
  */
 export function shouldLoadMoreSessions(params: {
   hasNextPage: boolean | undefined;
   isFetchingNextPage: boolean;
+  isFetchNextPageError: boolean;
   isPlaceholderData: boolean;
 }): boolean {
-  return params.hasNextPage === true && !params.isFetchingNextPage && !params.isPlaceholderData;
+  return (
+    params.hasNextPage === true &&
+    !params.isFetchingNextPage &&
+    !params.isFetchNextPageError &&
+    !params.isPlaceholderData
+  );
 }

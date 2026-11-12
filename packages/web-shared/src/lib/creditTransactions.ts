@@ -22,6 +22,7 @@ export async function getCreditTransactionsSummaryByUserId(
       count(*) as credit_transaction_count
     from public.credit_transactions
     where kilo_user_id = ${kiloUserId}
+      and organization_id is null
   `
   );
   const result = rows[0] as {
@@ -40,6 +41,10 @@ export async function getCreditTransactionsSummaryByUserId(
 export async function getCreditTransactionsSummaryForOrganization(
   organizationId: Organization['id']
 ): Promise<CreditSummary> {
+  // Same visibility rule as the paged list below: the per-request accounting
+  // entries (`kpo:consumption:*`) are internal bookkeeping, so the count and
+  // the balances report only grants, purchases, transfers and adjustments.
+  // Excluding them here is intended, not an oversight; keep both filters in step.
   const { rows } = await db.execute(
     sql`
     select
@@ -83,6 +88,7 @@ export async function summarizeUserPayments(kiloUserId: string, fromDb: typeof d
         and(
           eq(credit_transactions.kilo_user_id, kiloUserId),
           eq(credit_transactions.is_free, false),
+          isNull(credit_transactions.organization_id),
           gt(credit_transactions.amount_microdollars, 0),
           notExists(
             fromDb
@@ -252,6 +258,14 @@ export async function getCreditTransactionsForOrganizationPage(
       .where(
         and(
           eq(credit_transactions.organization_id, organizationId),
+          // Visibility rule for the organization readers that list transactions
+          // in this module: the per-request accounting entries
+          // (`kpo:consumption:*`) are internal bookkeeping, so the paged list,
+          // its summary and the admin list show only grants, purchases,
+          // transfers and adjustments. A page therefore ends when the visible
+          // rows run out, which can be before the organization's total row
+          // count. That is intended, not a lost page. The paid-history checks
+          // below are outside this rule and read the table unfiltered.
           or(
             isNull(credit_transactions.credit_category),
             notLike(credit_transactions.credit_category, 'kpo:consumption:%')

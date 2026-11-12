@@ -5,6 +5,7 @@
  * `resolveSession` determines the session type and routes to Cloud Agent,
  * CLI live, or CLI historical transport.
  */
+import type { ToolDisplayMode } from './tool-detail-marker';
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { NormalizedEvent, ServiceEvent } from './normalizer';
 import type { SuggestionAction } from './types';
@@ -14,7 +15,7 @@ import { createChatProcessor } from './chat-processor';
 import { heartbeatDataSchema, sessionsListDataSchema } from './schemas';
 import { createServiceState } from './service-state';
 import type { ServiceState } from './service-state';
-import { createCloudAgentTransport } from './cloud-agent-transport';
+import { createCloudAgentTransport, type CloudAgentTransportConfig } from './cloud-agent-transport';
 import { createCliLiveTransport } from './cli-live-transport';
 import { createCliHistoricalTransport } from './cli-historical-transport';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
@@ -167,10 +168,19 @@ type CloudAgentSessionTransport = {
         options: { cursor?: string }
       ) => Promise<SessionSnapshotPageOutcome | null>)
     | undefined;
+  fetchCloudSnapshotPage?:
+    | ((
+        sessionId: CloudAgentSessionId,
+        options: { cursor?: string; limit?: number; kiloSessionId?: string }
+      ) => Promise<unknown>)
+    | undefined;
+  initialSnapshotRead?: CloudAgentTransportConfig['initialSnapshotRead'];
   /** Called by the transport after a successful initial bounded page read. */
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
   websocketHeaders?: WebSocketHeaders | undefined;
+  /** Requests bounded completed-tool previews in historical stream replay. */
+  toolDisplay?: ToolDisplayMode | undefined;
 
   userWebConnection?: UserWebConnection | undefined;
 };
@@ -193,6 +203,7 @@ type CloudAgentSession = {
   ) => unknown | Promise<unknown>;
   retryRemoteModels: () => void;
   retryRemoteCommands: () => void;
+  observeProjected: (messages: SessionSnapshot['messages']) => void;
   createRemoteSession: (input?: CreateRemoteSessionInput) => Promise<KiloSessionId>;
   exitRemoteSession: () => Promise<void>;
 
@@ -296,7 +307,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       // carry on rather than surfacing a session error for a single chat
       // event, so the transcript keeps streaming.
       try {
-        chatProcessor.process(event);
+        if (!chatProcessor.process(event)) return;
       } catch (error) {
         console.error(`[Session] Failed to process ${event.type}:`, error);
       }
@@ -385,7 +396,10 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
             'CloudAgentSession transport.getTicket is required for Cloud Agent sessions'
           );
         }
-        if (!config.transport.fetchSnapshot) {
+        if (
+          !config.transport.fetchSnapshot &&
+          !resolved.cloudAgentSessionId.startsWith('workspace_')
+        ) {
           throw new Error(
             'CloudAgentSession transport.fetchSnapshot is required for Cloud Agent sessions'
           );
@@ -404,6 +418,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           api: config.transport.api,
           getTicket: config.transport.getTicket,
           fetchSnapshot: config.transport.fetchSnapshot,
+          fetchCloudSnapshotPage: config.transport.fetchCloudSnapshotPage,
+          initialSnapshotRead: config.transport.initialSnapshotRead,
           ...(config.transport.fetchSnapshotPage
             ? { fetchSnapshotPage: config.transport.fetchSnapshotPage }
             : {}),
@@ -412,6 +428,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           onError: config.onError,
           lifecycleHooks: config.transport.lifecycleHooks,
           websocketHeaders: config.transport.websocketHeaders,
+          toolDisplay: config.transport.toolDisplay,
         });
       }
       case 'read-only': {
@@ -576,6 +593,9 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     },
     retryRemoteCommands() {
       transport?.retryRemoteCommands?.();
+    },
+    observeProjected(messages) {
+      transport?.observeProjected?.(messages);
     },
     createRemoteSession: async (input?: CreateRemoteSessionInput) => {
       if (!transport?.createSession) {

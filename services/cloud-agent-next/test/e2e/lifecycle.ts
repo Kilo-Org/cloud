@@ -102,7 +102,13 @@ async function findOwnedSandboxes(
   sessionId: string,
   kiloSessionId: string | undefined,
   knownIds: Set<string>
-) {
+): Promise<SandboxContainer[]> {
+  if (sessionId.startsWith('workspace_') && kiloSessionId !== undefined) {
+    // One discovery already probes every primary; probing it again per candidate
+    // made each poll cost N² docker execs and outlast the allocation budget.
+    const runtime = await findControlPlaneKiloRuntime(kiloSessionId).catch(() => null);
+    return runtime && !knownIds.has(runtime.container.id) ? [runtime.container] : [];
+  }
   const candidates = sessionId.startsWith('workspace_')
     ? await listSandboxContainers()
     : await listSandboxesForAgentSession(sessionId);
@@ -270,10 +276,10 @@ async function retryTransientDocker<T>(step: () => Promise<T>, retryMs: number):
 
 /**
  * Stop the sandbox families (primary and `-proxy`) that `sessions` provably own.
- * Each local session has its own `ses-…` sandbox (`PER_SESSION_SANDBOX_ORG_IDS`
- * is `*` in the dev config), and its proxy is named after it, so once the
- * gate has deleted the sessions nothing can address that sandbox again. One
- * sandbox is stopped once even when several sessions share it (a worktree's
+ * One sandbox serves one workspace, so each local workspace has its own sandbox
+ * and its proxy is named after it. Reclaim runs before session deletion: deleting
+ * a native root first destroys the live ownership proof and leaks the container.
+ * One sandbox is stopped once even when several sessions share it (a worktree's
  * chats); the sessions' own worktrees are the only extra directories the
  * exclusivity proof accepts. A sandbox whose ownership cannot be proven is left
  * running and reported, never killed. Never throws.

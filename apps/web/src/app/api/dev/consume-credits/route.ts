@@ -97,11 +97,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       mode: null,
       auto_model: null,
       reasoning_setting: null,
+      inference_region: null,
       ttfb_ms: null,
     };
 
-    // Use the existing countAndStoreUsage function
-    await countAndStoreUsage(mockResponse, usageContext, undefined);
+    await countAndStoreUsage(mockResponse, usageContext, undefined).usagePromise;
 
     // Reset the balance cache using the proper function
     await forceImmediateExpirationRecomputation(kiloUserId);

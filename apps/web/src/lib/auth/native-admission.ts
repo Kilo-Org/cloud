@@ -118,9 +118,11 @@ const CHALLENGE_RATE_LIMIT_ID = 'native-admission-challenge';
  * Issue a server-side challenge for native admission.
  *
  * Uses the shared `@vercel/firewall` check per client IP, matching the email
- * sign-in rate-limit pattern. A limited caller is refused. A non-limited answer
- * that carries an error is reported through the shared throttled reporter, so
- * the limiter keeps a complete telemetry record, and the challenge is issued.
+ * sign-in rate-limit pattern. Only an answer that permits the caller issues a
+ * challenge: a limited caller is refused, and so is any answer that carries an
+ * error, including a rule that is not configured. The unconfigured rule is
+ * reported through the shared throttled reporter, so it stays visible without
+ * one report per request.
  */
 export async function issueAdmissionChallenge(
   request: NextRequest,
@@ -139,7 +141,9 @@ export async function issueAdmissionChallenge(
     );
   }
 
-  if (rateLimited) {
+  // Only an answer that permits the caller issues a challenge: a limited
+  // caller and an answer that carries an error both refuse here.
+  if (rateLimited || error) {
     throw new ChallengeRateLimitError();
   }
 
@@ -276,8 +280,11 @@ export type VerifyAdmissionOk = {
   ok: true;
   /** Platform that verified */
   platform: AdmissionPlatform;
-  /** The keyId for the attested/asserted key */
-  keyId: string;
+  /**
+   * The keyId for the attested/asserted key. Absent when the platform has no
+   * persistent key to track, which means the caller persists nothing.
+   */
+  keyId?: string;
   /** DER-encoded SPKI public key (base64) — set on attestation only */
   publicKey?: string;
   /** Sign count from the assertion authenticator data — set on assertion only */
@@ -313,7 +320,7 @@ export async function verifyAdmissionAsync(
   if (isDevSentinel(admission)) {
     // Android shape on purpose: no key id means nothing is persisted and the
     // device session is created without an attested-key binding.
-    return { ok: true, platform: 'android', keyId: '' };
+    return { ok: true, platform: 'android' };
   }
 
   // Route to platform-specific verifier
@@ -449,12 +456,8 @@ async function verifyAndroidAdmission(
   }
 
   // Android Play Integrity tokens are per-request — no persistent key
-  // tracking. We return an empty keyId so the caller skips persistence.
-  return {
-    ok: true,
-    platform: 'android',
-    keyId: '',
-  };
+  // tracking. The result carries no key id, so the caller persists nothing.
+  return { ok: true, platform: 'android' };
 }
 
 // ── Key persistence (after settlement) ─────────────────────────────────────
@@ -480,12 +483,17 @@ export async function persistAttestedKey(
   // Android has no persistent key tracking — skip.
   if (verification.platform === 'android') return;
 
+  // A result without a key id has nothing to persist. Every verifier that
+  // reaches here carries one.
+  const { keyId } = verification;
+  if (keyId === undefined) return;
+
   if (verification.publicKey !== undefined) {
     // Attestation: insert new key
     await executor
       .insert(native_attested_keys)
       .values({
-        key_id: verification.keyId,
+        key_id: keyId,
         kilo_user_id: userId,
         platform: verification.platform,
         public_key: verification.publicKey,
@@ -497,7 +505,7 @@ export async function persistAttestedKey(
     // Verify the inserted key belongs to this user (cross-user collision check)
     const inserted = await executor.query.native_attested_keys.findFirst({
       where: and(
-        eq(native_attested_keys.key_id, verification.keyId),
+        eq(native_attested_keys.key_id, keyId),
         eq(native_attested_keys.platform, verification.platform)
       ),
     });
@@ -519,7 +527,7 @@ export async function persistAttestedKey(
       })
       .where(
         and(
-          eq(native_attested_keys.key_id, verification.keyId),
+          eq(native_attested_keys.key_id, keyId),
           eq(native_attested_keys.platform, verification.platform),
           eq(native_attested_keys.kilo_user_id, userId)
         )

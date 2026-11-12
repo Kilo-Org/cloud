@@ -92,11 +92,17 @@ export function createSessionSearchController({
 export type SearchRestoreDecision = {
   /** True when the input should be seeded from the restored value. */
   shouldSeed: boolean;
-  /** The query to seed (empty string when nothing was stored). */
+  /**
+   * The committed query: the restored text, trimmed, exactly what typing the
+   * same text commits. A whitespace-only draft commits an empty query, so the
+   * list body matches its appearance in the field.
+   */
   query: string;
-  /** Whether the seeded text is non-empty (in-field X + list filter). */
+  /** Visible field text, exactly as stored (may be whitespace only). */
+  text: string;
+  /** Whether the restored field text is non-empty (in-field X). */
   hasText: boolean;
-  /** True when the uncontrolled input must remount to show the seeded text. */
+  /** True when the uncontrolled input must remount to show the restored text. */
   shouldRemount: boolean;
 };
 
@@ -107,6 +113,10 @@ export type SearchRestoreDecision = {
  * string persisted by a clear) seeds an empty query, so a previously committed
  * non-empty query is never reloaded; a settle that lands after a clear is
  * ignored rather than restoring the text the user just removed.
+ *
+ * The committed query is the trimmed text, so a restored draft behaves like
+ * typing it: a whitespace-only draft shows the full list. The field itself
+ * keeps the stored text, spaces included.
  */
 export function resolveSearchRestoreDecision(input: {
   settled: boolean;
@@ -114,13 +124,14 @@ export function resolveSearchRestoreDecision(input: {
   restoredQuery: string | null;
 }): SearchRestoreDecision {
   if (!input.settled || input.hasInteracted) {
-    return { shouldSeed: false, query: '', hasText: false, shouldRemount: false };
+    return { shouldSeed: false, query: '', text: '', hasText: false, shouldRemount: false };
   }
-  const query = input.restoredQuery ?? '';
+  const text = input.restoredQuery ?? '';
   return {
     shouldSeed: true,
-    query,
-    hasText: query.length > 0,
-    shouldRemount: query.length > 0,
+    query: text.trim(),
+    text,
+    hasText: text.length > 0,
+    shouldRemount: text.length > 0,
   };
 }

@@ -7,6 +7,8 @@ import {
   findingSearchDocument,
   inboxPrSearchDocument,
   planSystemSearchUpdate,
+  providerInboxSourceScope,
+  providerPrSearchDocument,
   recentPrSearchDocument,
   recentsSourceScope,
   storedSessionSearchDocument,
@@ -394,6 +396,99 @@ describe('planSystemSearchUpdate', () => {
     });
 
     expect(plan.remove).toEqual([personal.id]);
+  });
+
+  it('removes an organization’s entries once a settled membership list drops it', () => {
+    const personal = sessionDocument('a', 'Alpha');
+    const organizationSession = storedSessionSearchDocument({
+      session_id: 'b',
+      title: 'Beta',
+      organization_id: 'org-1',
+    });
+    const organizationFinding = findingSearchDocument({ id: 'f-1', title: 'XSS' }, 'org-1');
+    if (organizationSession === null) {
+      throw new Error('expected an organization session document');
+    }
+    // The cache still holds the last payload the dropped scope delivered, so
+    // its rows are re-collected: the removal must not depend on them going
+    // missing, and the same pass must not re-add them.
+    const documents = [personal, organizationSession, organizationFinding];
+    const plan = planSystemSearchUpdate({
+      indexed: documents,
+      documents,
+      observedSources: new Set(),
+      accessibleOrganizations: new Set(['org-2']),
+    });
+
+    expect(plan.add).toEqual([]);
+    expect(plan.remove).toEqual([organizationSession.id, organizationFinding.id]);
+  });
+
+  it('keeps an organization’s entries while the membership list has not settled', () => {
+    const organizationSession = storedSessionSearchDocument({
+      session_id: 'b',
+      title: 'Beta',
+      organization_id: 'org-1',
+    });
+    const organizationFinding = findingSearchDocument({ id: 'f-1', title: 'XSS' }, 'org-1');
+    if (organizationSession === null) {
+      throw new Error('expected an organization session document');
+    }
+    // A list that never arrived — absent from the cache, still loading, or
+    // failed — names no organization, which is ignorance rather than a loss.
+    const plan = planSystemSearchUpdate({
+      indexed: [organizationSession, organizationFinding],
+      documents: [],
+      observedSources: new Set(),
+      accessibleOrganizations: null,
+    });
+
+    expect(plan.remove).toEqual([]);
+  });
+
+  it('leaves personal and account-level entries alone when the list names no organizations', () => {
+    const personalSession = sessionDocument('a', 'Alpha');
+    const personalFinding = findingSearchDocument(
+      { id: 'f-1', title: 'SQL injection' },
+      'personal'
+    );
+    const github = inboxPrSearchDocument({ owner: 'o', repo: 'r', number: 1, title: 'PR' });
+    const gitlabRecents = recentPrSearchDocument({
+      owner: 'group/sub',
+      repo: 'repo',
+      number: 12,
+      title: 'Nested MR',
+      platform: 'gitlab',
+    });
+    const plan = planSystemSearchUpdate({
+      indexed: [personalSession, personalFinding, github, gitlabRecents],
+      documents: [],
+      observedSources: new Set(),
+      // The account belongs to no organization at all: that says nothing about
+      // the scopes that belong to the account rather than to one.
+      accessibleOrganizations: new Set(),
+    });
+
+    expect(plan.remove).toEqual([]);
+  });
+
+  it('removes a provider inbox entry whose organization the list dropped', () => {
+    // A GitLab inbox row keeps its scope in the fingerprint, because the route
+    // cannot name the organization the query ran under.
+    const document = providerPrSearchDocument(
+      { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 },
+      'Nested MR',
+      providerInboxSourceScope('gitlab', 'org-1')
+    );
+    const plan = planSystemSearchUpdate({
+      indexed: [document],
+      documents: [document],
+      observedSources: new Set(),
+      accessibleOrganizations: new Set(['org-2']),
+    });
+
+    expect(plan.add).toEqual([]);
+    expect(plan.remove).toEqual([document.id]);
   });
 
   it('keeps a GitLab pull request when only the GitHub provider was enumerated', () => {

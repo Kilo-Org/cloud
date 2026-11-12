@@ -1,5 +1,29 @@
 {
+  "nativeRemote": {
+    "title": "ნატიური დისტანციური დემო",
+    "sessionsEmpty": "ნატიური სესიები ჯერ არ არის",
+    "hosts": "ონლაინ ჰოსტები",
+    "hostsEmpty": "ონლაინ ჰოსტები არ არის",
+    "directory": "გაშვების დირექტორია",
+    "createSession": "ნატიური სესიის შექმნა",
+    "queueIfOffline": "მოთხოვნის რიგში ჩაყენება, თუ ჰოსტი გათიშულია",
+    "prompt": "მოთხოვნა ან /command",
+    "localClear": "ლოკალური ხედის გასუფთავება",
+    "abort": "სვლის შეწყვეტა",
+    "failed": "ნატიური დისტანციური მოქმედება ვერ შესრულდა",
+    "creationUnknown": "შექმნის შედეგი უცნობია. ხელახლა ცდამდე განაახლეთ სესიები.",
+    "commandFailed": "შემსრულებლის ბრძანება ვერ შესრულდა",
+    "invalidReply": "შემსრულებლის არასწორი პასუხი",
+    "unsafeCommand": "გამოიყენეთ /compact, /new, /skill, /models, /agents ან /clear (მხოლოდ ლოკალურად).",
+    "status": "კავშირი: {{connection}} · შემსრულებელი: {{runner}}",
+    "presenceStatus": "ჰოსტები: {{connection}}",
+    "commandStatus": "ბრძანების მიწოდება: {{status}}",
+    "delivered": "მიწოდებულია",
+    "expired": "ვადაგასულია"
+  },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "გაუქმება",
     "done": "მზადაა",
     "retry": "ხელახლა ცდა",
@@ -107,9 +131,7 @@
     "scheduled": "დაგეგმილი",
     "keepEditing": "რედაქტირების გაგრძელება",
     "keepRunning": "მუშაობის გაგრძელება",
-    "kiloclaw": "KiloClaw",
     "newSession": "ახალი სესია",
-    "noKiloclawInstances": "KiloClaw-ის ინსტანციები არ არის",
     "noModelsAvailable": "მოდელები ხელმისაწვდომი არ არის",
     "notFound": "ვერ მოიძებნა.",
     "online": "ქსელშია",
@@ -189,6 +211,7 @@
     "resendCode": "კოდის ხელახლა გაგზავნა",
     "termsPrefix": "გაგრძელებით ეთანხმები ჩვენს ",
     "terms": "პირობებს",
+    "termsInSentence": "პირობებს",
     "termsConnector": " და ",
     "termsSuffix": ".",
     "moreSignInOptions": "შესვლის სხვა გზები",
@@ -205,6 +228,21 @@
     "pleaseEnterEmail": "შეიყვანე შენი ელფოსტის მისამართი.",
     "signInCodeField": "შესვლის კოდი",
     "or": "ან"
+  },
+  "pendingLink": {
+    "description": "{{email}} უკვე გამოიყენება ანგარიშის მიერ. {{provider}}-ის დასამატებლად შედი მისი ერთ-ერთი მეთოდით.",
+    "emailCode": "შესვლის კოდის გამოგზავნა ელფოსტით",
+    "continueInBrowser": "ბრაუზერში გაგრძელება",
+    "startAgain": "თავიდან დაწყება",
+    "expired": "{{provider}}-ის დამატების ეს მოთხოვნა ვადაგასულია.",
+    "noMethods": "ამ ანგარიშს შესვლის სხვა მეთოდი არ აქვს, ამიტომ {{provider}}-ის დამატება შეუძლებელია.",
+    "linked": "{{provider}} დაემატა შენს ანგარიშს.",
+    "failedExpired": "{{provider}} არ დაემატა, რადგან მოთხოვნას ვადა გაუვიდა.",
+    "failedWrongAccount": "{{provider}} არ დაემატა, რადგან სხვა ანგარიშში შეხვედი.",
+    "failedAccountAlreadyLinked": "{{provider}} არ დაემატა, რადგან ის უკვე დაკავშირებულია სხვა ანგარიშთან.",
+    "failedProviderAlreadyLinked": "{{provider}} არ დაემატა, რადგან შენს ანგარიშს უკვე აქვს სხვა {{provider}}-ით შესვლა.",
+    "failedLinking": "{{provider}}-ის დამატება შენს ანგარიშზე ვერ მოხერხდა.",
+    "notAdded": "შესული ხარ. {{provider}} არ დაემატა შენს ანგარიშს."
   },
   "profile": {
     "codeReviewerSubtitle": "PR-ების ავტომატური შემოწმება",
@@ -225,6 +263,7 @@
     "confirmDeletion": "წაშლის დადასტურება",
     "credits": "კრედიტები",
     "failedToLoadBalance": "ბალანსის ჩატვირთვა ვერ მოხერხდა. ხელახლა ჩასატვირთად შეეხეთ.",
+    "balanceLoadFailed": "ბალანსის ჩატვირთვა ვერ მოხერხდა",
     "hideBalance": "ბალანსის დამალვა",
     "showBalance": "ბალანსის ჩვენება",
     "balanceHidden": "ბალანსი დამალულია",
@@ -243,6 +282,8 @@
     "providerTestAccount": "სატესტო ანგარიში",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "კორპორაციული SSO",
     "passkeysTitle": "წვდომის გასაღებები",
     "passkeysSubtitle": "შესვლა პაროლის გარეშე",
@@ -265,7 +306,8 @@
     "renamePasskey": "წვდომის გასაღების სახელის შეცვლა",
     "removePasskey": "წვდომის გასაღების წაშლა",
     "removePasskeyTitle": "წავშალო წვდომის გასაღები?",
-    "removePasskeyMessage": "ამ წვდომის გასაღებით ვეღარ შეძლებთ შესვლას."
+    "removePasskeyMessage": "ამ წვდომის გასაღებით ვეღარ შეძლებთ შესვლას.",
+    "changelog": "სიახლეები"
   },
   "preferences": {
     "general": "ზოგადი",
@@ -308,7 +350,6 @@
     "noFilesChangedDescription": "ამ შერწყმის მოთხოვნაში ფაილები არ შეცვლილა.",
     "fileList": {
       "openNavigator": "ფაილების ნავიგატორის გახსნა",
-      "filesViewed": "ფაილები · ნანახია {{total}}-დან {{viewed}}",
       "listed": "(ჩამოთვლილი)",
       "layout": "განლაგება",
       "unified": "გაერთიანებული",
@@ -321,7 +362,11 @@
       "retryLoadingFiles": "ფაილების ჩატვირთვის ხელახლა ცდა",
       "filterPlaceholder": "ფილტრი ფაილის მისამართით",
       "viewedCount": "ნანახია {{total}}-დან {{viewed}}",
+      "viewedCount_one": "ნანახია {{total}}-დან {{viewed}}",
+      "viewedCount_other": "ნანახია {{total}}-დან {{viewed}}",
       "viewedOfListed": "სიაში მოცემული {{total}} ფაილიდან ნანახია {{viewed}}",
+      "viewedOfListed_one": "სიაში მოცემული {{total}} ფაილიდან ნანახია {{viewed}}",
+      "viewedOfListed_other": "სიაში მოცემული {{total}} ფაილიდან ნანახია {{viewed}}",
       "loadingFiles": "იტვირთება {{total}}-დან {{loaded}}…",
       "failedToLoadAllFiles": "ყველა ფაილის ჩატვირთვა ვერ მოხერხდა.",
       "couldNotLoadMoreFiles": "დამატებითი ფაილების ჩატვირთვა ვერ მოხერხდა.",
@@ -653,7 +698,7 @@
       "continueInPersonal": "გაგრძელება პირად ანგარიშზე"
     },
     "composer": {
-      "commentBodyPlaceholder": "კომენტარის ტექსტი",
+      "commentBodyPlaceholder": "შენი კომენტარი",
       "commentBody": "კომენტარის ტექსტი",
       "commentNow": "კომენტარის ახლავე გამოქვეყნება",
       "addToReview": "განხილვაში დამატება",
@@ -674,10 +719,10 @@
     },
     "connect": {
       "checkFailedTitle": "GitHub-თან კავშირის შემოწმება ვერ მოხერხდა.",
-      "checkFailedMessage": "ჩატვირთვის დასრულებამდე შესვლის სტატუსი მიუწვდომელია.",
+      "checkFailedMessage": "GitHub-თან დაკავშირება ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
       "checkFailedTitleGitLab": "GitLab-თან კავშირის შემოწმება ვერ მოხერხდა.",
       "checkFailedTitleBitbucket": "Bitbucket-თან კავშირის შემოწმება ვერ მოხერხდა.",
-      "providerCheckFailedMessage": "კავშირის სტატუსი მიუწვდომელია ჩატვირთვამდე.",
+      "providerCheckFailedMessage": "პროვაიდერთან დაკავშირება ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
       "reconnectTitle": "GitHub-თან ხელახლა დაკავშირება",
       "reconnectTitleGitLab": "GitLab-თან ხელახლა დაკავშირება",
       "reconnectTitleBitbucket": "Bitbucket-თან ხელახლა დაკავშირება",
@@ -870,23 +915,18 @@
     "previewGenericDescription": "შეტყობინებები მხოლოდ ახალ მოვლენას აღნიშნავს. ტექსტის წასაკითხად გახსენით Kilo.",
     "channel": {
       "agentProgress": "აგენტის პროგრესი",
-      "chat": "ჩატის შეტყობინებები",
-      "kiloclaw": "KiloClaw-ის აქტივობა",
       "balance": "ბალანსის შესახებ გაფრთხილებები",
       "security": "უსაფრთხოების პრობლემები",
       "spend": "ხარჯვის შეტყობინებები",
       "followedSessions": "მოყოლილი სესიები"
     },
     "category": {
-      "chatMessagesSubtitle": "პასუხები თქვენს საუბრებში",
       "agentAttentionTitle": "აგენტს თქვენი ჩარევა სჭირდება",
       "agentAttentionSubtitle": "კითხვები, ნებართვისა და დამატებითი ინფორმაციის მოთხოვნები",
       "agentUpdatesTitle": "აგენტის განახლებები",
       "agentUpdatesSubtitle": "აგენტის შეტყობინებები დავალების შესრულებისას",
       "sessionStatusTitle": "სესიის სტატუსი",
       "sessionStatusSubtitle": "დასრულდა / ჩაიშალა / სამართავად მზადაა",
-      "kiloclawActivitySubtitle": "ინსტანცია მზადაა / ჩაიშალა, დაგეგმილი მოქმედებები",
-      "kiloclawActivityUnavailable": "გაუშვით KiloClaw ინსტანცია KiloClaw აქტივობის მისაღებად.",
       "balanceAlertsSubtitle": "ორგანიზაციის დაბალი ბალანსის გაფრთხილებები",
       "balanceAlertsUnavailable": "შეუერთდით ორგანიზაციას ბალანსის გაფრთხილებების მისაღებად.",
       "securityFindingsSubtitle": "ახლად აღმოჩენილი პრობლემები და SLA-ის შეხსენებები",
@@ -918,72 +958,23 @@
   },
   "tabs": {
     "home": "მთავარი",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, ჩანართი, {{total}}-დან {{position}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "ეგზემპლარის შეცვლა",
-      "couldNotLoadInstances": "ეგზემპლარების ჩატვირთვა ვერ მოხერხდა.",
-      "noInstancesDescription": "ჩატის დასაწყებად გამართე ეგზემპლარი.",
-      "setUpKiloclaw": "KiloClaw-ის გამართვა",
-      "currentInstance": "{{title}}, მიმდინარე"
+    "errors": {
+      "messageTooLong": "შეტყობინება ძალიან გრძელია — გამოიყენე {{limit}} სიმბოლოზე ნაკლები."
     },
     "conversation": {
-      "failedToLoad": "საუბრის ჩატვირთვა ვერ მოხერხდა.",
-      "notFound": "საუბარი ვერ მოიძებნა.",
       "untitled": "უსათაურო",
-      "leaveTitle": "დატოვო საუბარი?",
-      "leaveMessage": "საუბარი შენი სიიდან წაიშლება.",
-      "openHint": "ხსნის საუბარს. სახელის შესაცვლელად ან საუბრის დასატოვებლად დიდხანს დააჭირე.",
-      "unread": "წაუკითხავი",
-      "optionsFor": "საუბრის მოქმედებები: {{title}}",
-      "options": "საუბრის მოქმედებები",
-      "renameTitle": "საუბრის სახელის შეცვლა",
-      "renamePlaceholder": "ახალი სახელი",
-      "couldNotReachBot": "ბოტთან დაკავშირება ვერ მოხერხდა. სცადე ხელახლა.",
-      "messageDeliveryFailed": "შეტყობინების ბოტისთვის მიწოდება ვერ მოხერხდა.",
-      "couldNotSignIn": "ჩატში შესვლა ვერ მოხერხდა.",
-      "couldNotRefreshMessages": "შეტყობინებების განახლება ვერ მოხერხდა.",
-      "couldNotLoadHistory": "საუბრის ისტორიის ჩატვირთვა ვერ მოხერხდა.",
-      "leave": "დატოვება",
-      "untitledConversation": "უსათაურო საუბარი",
-      "createFailed": "საუბრის შექმნა ვერ მოხერხდა.",
-      "leaveFailed": "საუბრის დატოვება ვერ მოხერხდა."
-    },
-    "reactions": {
-      "common": "ხშირად გამოყენებული",
-      "reactWith": "რეაქციის დამატება: {{reaction}}",
-      "accessibility": "{{emoji}} რეაქცია, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "პასუხი ადრესატს:",
-      "cancelReply": "პასუხის გაუქმება",
-      "openInstance": "ეგზემპლარის გახსნა",
-      "attachFile": "ფაილის მიმაგრება",
-      "cancelEdit": "რედაქტირების გაუქმება"
+      "renamePlaceholder": "ახალი სახელი"
     },
     "conversationList": {
-      "couldNotLoad": "საუბრების ჩატვირთვა ვერ მოხერხდა.",
-      "emptyTitle": "ჯერ საუბრები არ არის",
-      "emptyDescription": "შექმენი საუბარი, რათა KiloClaw-ის შენს ეგზემპლარს ესაუბრო.",
-      "create": "საუბრის შექმნა",
-      "newConversation": "ახალი საუბარი",
-      "openInstanceSettings": "ეგზემპლარის პარამეტრების გახსნა",
       "today": "დღეს",
       "yesterday": "გუშინ",
-      "thisWeek": "ამ კვირაში",
       "older": "ადრინდელი"
     },
     "attachment": {
-      "open": "გახსნა: {{filename}}",
-      "openFailed": "მიმაგრებული ფაილის გახსნა ვერ მოხერხდა. შეამოწმე კავშირი და სცადე ხელახლა.",
       "attachFailed": "ფაილის მიმაგრება ვერ მოხერხდა.",
-      "limit": "შეგიძლია მაქსიმუმ {{displayCount}} ფაილი მიამაგრო.",
-      "sizeRejection": "ფაილის ზომა აჭარბებს დასაშვებ ზღვარს ({{limit}}): {{filename}}.",
-      "unreadable": "ფაილის წაკითხვა ვერ მოხერხდა: {{filename}}.",
-      "pastedImage": "ჩასმული სურათი",
-      "defaultName": "დანართი",
       "classificationDenied": "შესრულებადი ფაილების მიმაგრება შეუძლებელია.",
       "classificationEmpty": "ფაილი ცარიელია.",
       "classificationTooLarge": "ფაილის ზომა 20 MB-ს არ უნდა აღემატებოდეს.",
@@ -993,426 +984,20 @@
       "networkError": "ქსელში შეცდომა მოხდა.",
       "uploadFailed": "ატვირთვა ვერ მოხერხდა.",
       "nothingToPaste": "ჩასასმელი არაფერია.",
-      "metadataStripFailed": "ფოტოს მეტამონაცემების წაშლა ვერ მოხერხდა.",
-      "limit_one": "შეგიძლია მაქსიმუმ {{displayCount}} ფაილი მიამაგრო.",
-      "limit_other": "შეგიძლია მაქსიმუმ {{displayCount}} ფაილი მიამაგრო."
+      "metadataStripFailed": "ფოტოს მეტამონაცემების წაშლა ვერ მოხერხდა."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, {{status}}",
-      "retryUploading": "ატვირთვის ხელახლა ცდა: {{filename}}",
-      "remove": "მოშორება: {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[წაშლილი შეტყობინება]",
-      "yourMessage": "შენი შეტყობინება",
-      "messageFrom": "შეტყობინების ავტორი: {{author}}",
-      "moreActions": "მეტი მოქმედება",
-      "notDelivered": "არ არის მიწოდებული",
-      "edited": "(რედაქტირებული)",
-      "image": "სურათი"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "messageActions": {
-      "copied": "დაკოპირდა",
-      "copyFailed": "კოპირება ვერ მოხერხდა.",
-      "title": "შეტყობინების მოქმედებები",
-      "deleteTitle": "წაიშალოს შეტყობინება?",
-      "deleteMessage": "შეტყობინება საუბრიდან წაიშლება.",
-      "deleteFailed": "შეტყობინების წაშლა ვერ მოხერხდა.",
-      "removeReactionFailed": "რეაქციის მოხსნა ვერ მოხერხდა.",
-      "addReactionFailed": "რეაქციის დამატება ვერ მოხერხდა.",
-      "retrySend": "გაგზავნის ხელახლა ცდა",
-      "moreReactions": "მეტი რეაქცია",
-      "edit": "რედაქტირება",
-      "sendFailed": "შეტყობინების გაგზავნა ვერ მოხერხდა.",
-      "retrySendFailed": "შეტყობინების ხელახლა გაგზავნა ვერ მოხერხდა.",
-      "editFailed": "შეტყობინების რედაქტირება ვერ მოხერხდა.",
-      "executeFailed": "მოქმედების შესრულება ვერ მოხერხდა."
+      "edit": "რედაქტირება"
     },
     "attachmentPicker": {
-      "takePhoto": "ფოტოს გადაღება",
-      "photoLibrary": "ფოტოგალერეა",
-      "files": "ფაილები",
       "cameraAccessMessage": "ფოტოს გადასაღებად პარამეტრებში კამერაზე წვდომა დაუშვი."
     },
-    "typingIndicator": {
-      "someone": "ვიღაც",
-      "typing_one": "{{name}} წერს...",
-      "typing": "{{names}} წერენ...",
-      "typing_other": "{{names}} წერენ..."
-    },
     "botStatus": {
-      "offline": "კავშირის გარეშე",
-      "loadingUser": "მომხმარებელი იტვირთება...",
-      "waitingForStatus": "ბოტის სტატუსის ლოდინი...",
-      "offlineMessage": "ბოტი ქსელთან არ არის დაკავშირებული. შეტყობინებების გაცვლა კავშირის აღდგენის შემდეგ გაგრძელდება."
-    },
-    "errors": {
-      "notAllowed": "ეს მოქმედება დაუშვებელია.",
-      "messageTooLong": "შეტყობინება ძალიან გრძელია — გამოიყენე {{limit}} სიმბოლოზე ნაკლები.",
-      "titleTooLong": "სათაური ძალიან გრძელია — გამოიყენე {{limit}} სიმბოლოზე ნაკლები.",
-      "messageEmpty": "შეტყობინება ცარიელი არ უნდა იყოს."
+      "offline": "კავშირის გარეშე"
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "KiloClaw-ის ინსტანციების ჩატვირთვა ვერ მოხერხდა.",
-    "billing": {
-      "title": "გადახდები",
-      "continueMonthToMonth": "ყოველთვიური გადახდით გაგრძელება",
-      "plan": "გეგმა",
-      "finalTermEnds": "ბოლო პერიოდი სრულდება",
-      "afterFinalTerm": "ბოლო პერიოდის შემდეგ",
-      "lessThanOneDay": "1 დღეზე ნაკლები",
-      "ends": "მთავრდება",
-      "expires": "იწურება",
-      "noActivePlan": "აქტიური ტარიფი არ არის",
-      "noActivePlanDescription": "KiloClaw-ის აქტიური გამოწერა არ გაქვს.",
-      "managedByAdmin": "გადახდებს შენი ორგანიზაციის ადმინისტრატორი მართავს.",
-      "couldNotLoad": "გადახდების მონაცემების ჩატვირთვა ვერ მოხერხდა.",
-      "manageOnWeb": "გადახდების მართვა ვებსაიტზე",
-      "earlybird": "ადრეული წვდომა",
-      "finalCommitTermEndsOn": "შენი Commit ტარიფის ბოლო პერიოდი სრულდება {{date}}. გააგრძელე სტანდარტული ტარიფით {{price}} ფასად, წინააღმდეგ შემთხვევაში ჰოსტინგი დასრულდება.",
-      "freeTrial": "უფასო საცდელი პერიოდი",
-      "hostingEnds": "ჰოსტინგი მთავრდება",
-      "renews": "განახლდება",
-      "standardMonthToMonth": "სტანდარტული, ყოველთვიური გადახდით",
-      "standardStartsOn": "სტანდარტული ტარიფი ამოქმედდება {{date}}, {{price}} ფასად.",
-      "yourStandardMonthlyPrice": "შენი სტანდარტული ტარიფის ყოველთვიური ფასი",
-      "perMonth": "/თვეში",
-      "earlybirdAccessUntil": "ადრეული წვდომა მოქმედებს {{date}}-მდე.",
-      "earlybirdEnding": "ადრეული წვდომის დასრულებამდე დარჩა {{remaining}}.",
-      "paymentPastDue": "გადახდის ვადა გადაცილებულია. განაახლე გადახდის მეთოდი.",
-      "subscriptionCancels": "გამოწერა გაუქმდება {{date}}.",
-      "trialDaysRemaining": "საცდელი პერიოდის დასრულებამდე დარჩა {{remaining}}.",
-      "trialEndingSoon": "საცდელი პერიოდი მალე დასრულდება: {{remaining}}.",
-      "planName": {
-        "standard": "სტანდარტული"
-      },
-      "commit": "კომიტი"
-    },
-    "changelog": {
-      "title": "სიახლეები",
-      "couldNotLoad": "ცვლილებების ჟურნალის ჩატვირთვა ვერ მოხერხდა.",
-      "noUpdates": "განახლებები ჯერ არ არის",
-      "noUpdatesDescription": "ცვლილებების ჟურნალის ჩანაწერები აქ გამოჩნდება.",
-      "recentUpdates": "ბოლო განახლებები",
-      "manageVersion": "ვერსიის მართვა",
-      "redeployRequired": "საჭიროა ხელახალი განთავსება",
-      "redeploySuggested": "რეკომენდებულია ხელახალი განთავსება",
-      "upgradeRequired": "საჭიროა განახლება"
-    },
-    "dashboard": {
-      "title": "მთავარი პანელი",
-      "couldNotLoad": "მთავარი პანელის ჩატვირთვა ვერ მოხერხდა.",
-      "renameInstance": "ინსტანციის სახელის შეცვლა",
-      "renamePlaceholder": "ახალი სახელი (მაქსიმუმ 50 სიმბოლო)",
-      "someDetailsFailed": "ზოგიერთი მიმდინარე მონაცემის ჩატვირთვა ვერ მოხერხდა.",
-      "destroy": "სამუდამოდ წაშლა",
-      "destroyMessage": "შენი KiloClaw ინსტანცია და მისი ყველა მონაცემი სამუდამოდ წაიშლება. ამ მოქმედების გაუქმება შეუძლებელია.",
-      "destroyTitle": "ინსტანციის სამუდამოდ წაშლა",
-      "instance": "ინსტანცია",
-      "couldNotCheckStatus": "სერვისის სტატუსის შემოწმება ვერ მოხერხდა.",
-      "dangerZone": "საშიში ზონა",
-      "destroying": "იშლება…",
-      "serviceDegraded": "სერვისი შეფერხებით მუშაობს — სტატუსის სანახავად შეეხე",
-      "up": "მუშაობს"
-    },
-    "channels": {
-      "title": "არხები",
-      "couldNotLoad": "არხების ჩატვირთვა ვერ მოხერხდა.",
-      "noChannels": "არხები ხელმისაწვდომი არ არის",
-      "noChannelsDescription": "არხების ინტეგრაციები აქ გამოჩნდება.",
-      "connected": "{{label}} დაკავშირებულია",
-      "disconnectMessage": "წაიშალოს {{label}}? ეს არხი გაითიშება.",
-      "disconnectTitle": "არხის გათიშვა"
-    },
-    "devicePairing": {
-      "title": "მოწყობილობის დაწყვილება",
-      "refreshRequests": "დაწყვილების მოთხოვნების განახლება",
-      "couldNotLoad": "დაწყვილების მოთხოვნების ჩატვირთვა ვერ მოხერხდა.",
-      "noPending": "დასადასტურებელი მოთხოვნები არ არის",
-      "noPendingDescription": "არხებისა და მოწყობილობების დაწყვილების მოთხოვნები აქ გამოჩნდება.",
-      "channelRequests": "არხების მოთხოვნები",
-      "deviceRequests": "მოწყობილობების მოთხოვნები",
-      "approveDeviceMessage": "მიეცეს {{platform}}-ს შენს ინსტანციასთან დაკავშირების უფლება?",
-      "approveDeviceTitle": "მოწყობილობის დადასტურება",
-      "approveMessage": "მიეცეს {{label}}-ს (კოდი: {{code}}) შენს ინსტანციასთან დაკავშირების უფლება?",
-      "approveTitle": "დაწყვილების მოთხოვნის დადასტურება",
-      "unknownDevice": "უცნობი მოწყობილობა"
-    },
-    "execPolicy": {
-      "title": "შესრულების პოლიტიკა",
-      "couldNotLoad": "ბრძანებების შესრულების წესის ჩატვირთვა ვერ მოხერხდა.",
-      "alwaysAsk": "ყოველთვის დადასტურებით",
-      "alwaysAskDescription": "ყოველი ბრძანება შესრულებამდე დაადასტურე. ეს ყველაზე უსაფრთხო ვარიანტია.",
-      "neverAsk": "დადასტურების გარეშე",
-      "neverAskDescription": "ბრძანებები დადასტურების გარეშე შესრულდება. ეს უფრო სწრაფია, მაგრამ ნაკლებად უსაფრთხო."
-    },
-    "google": {
-      "title": "Google-ის ანგარიში",
-      "couldNotLoad": "Google-ის ანგარიშის სტატუსის ჩატვირთვა ვერ მოხერხდა.",
-      "disconnected": "Google-ის ანგარიში გაითიშა. ცვლილების ასამოქმედებლად ხელახლა განათავსე ინსტანცია.",
-      "setupCommand": "გამართვის ბრძანება",
-      "setupCommandHelp": "Google-ის ანგარიშის დასაკავშირებლად ეს ბრძანება შენი კომპიუტერის ტერმინალში გაუშვი. კომპიუტერზე Docker უნდა იყოს დაყენებული.",
-      "failedToLoadCommand": "გამართვის ბრძანების ჩატვირთვა ვერ მოხერხდა.",
-      "gmailNotifications": "Gmail-ის შეტყობინებები",
-      "disconnect": "Google-ის ანგარიშის გათიშვა",
-      "copied": "დაკოპირდა",
-      "copyCommand": "ბრძანების კოპირება",
-      "disconnectConfirm": "გათიშვა",
-      "disconnectMessage": "წაიშალოს შენი Google ანგარიში ამ ინსტანციიდან? Gmail-ის შეტყობინებები გამოირთვება. ცვლილებების ასამოქმედებლად გათიშვის შემდეგ ხელახლა განათავსე ინსტანცია.",
-      "disconnectTitle": "Google-ის გათიშვა"
-    },
-    "modelList": {
-      "noMatches": "ძიებას არცერთი მოდელი არ შეესაბამება",
-      "noModelsDescription": "მოდელები აქ გამოჩნდება, როცა ხელმისაწვდომი გახდება.",
-      "noResultsFor": "„{{query}}“-სთვის შედეგები ვერ მოიძებნა."
-    },
-    "secrets": {
-      "title": "საიდუმლო მონაცემები",
-      "couldNotLoad": "საიდუმლო მონაცემების ჩატვირთვა ვერ მოხერხდა.",
-      "noSecrets": "საიდუმლო მონაცემები არ არის",
-      "noSecretsDescription": "საიდუმლო მონაცემებით დასაკავშირებელი ინტეგრაციები აქ გამოჩნდება.",
-      "removeMessage": "წაიშალოს {{label}}? ეს ხელსაწყო ავტორიზაციის მონაცემებზე წვდომას დაკარგავს.",
-      "removeTitle": "საიდუმლო მონაცემების წაშლა",
-      "saved": "{{label}} შენახულია",
-      "hide": "{{label}}-ის დამალვა",
-      "show": "{{label}}-ის ჩვენება",
-      "allFieldsRequired": "{{label}}-ის დასაკავშირებლად ყველა ველის შევსებაა საჭირო.",
-      "setupGuideFallback": "გამართვის სახელმძღვანელო",
-      "setupGuideA11y": "{{label}}-ის გამართვის გზამკვლევი",
-      "setupGuide": "გამართვის სახელმძღვანელო",
-      "saving": "ინახება…",
-      "removing": "იშლება…",
-      "updateToken": "ტოკენის განახლება"
-    },
-    "versionPin": {
-      "title": "ვერსიის დაფიქსირება",
-      "couldNotLoad": "ვერსიის მონაცემების ჩატვირთვა ვერ მოხერხდა.",
-      "couldNotLoadMore": "დამატებითი ვერსიების ჩატვირთვა ვერ მოხერხდა.",
-      "loadMore": "დამატებითი ვერსიების ჩატვირთვა",
-      "showingLatest": "ნაჩვენებია ბოლო 100 ვერსია.",
-      "availableVersions": "ხელმისაწვდომი ვერსიები",
-      "noVersions": "ვერსიები ხელმისაწვდომი არ არის",
-      "noVersionsDescription": "OpenClaw-ის ხელმისაწვდომი ვერსიები აქ გამოჩნდება.",
-      "unpin": "დაფიქსირების მოხსნა",
-      "unpinMessage": "დაბრუნდეს უახლეს ხელმისაწვდომ ვერსიაზე?",
-      "unpinTitle": "ვერსიის დაფიქსირების მოხსნა",
-      "confirmPin": "დაფიქსირების დადასტურება",
-      "followingLatest": "ყოველთვის უახლესი",
-      "latest": "უახლესი",
-      "pin": "დაფიქსირება",
-      "pinnedByAdmin": "ვერსია ადმინისტრატორმა დააფიქსირა — შესაცვლელად დაუკავშირდი მას.",
-      "pinnedTo": "დაფიქსირებული ვერსია: {{version}}",
-      "reasonOptional": "მიზეზი (არასავალდებულო)",
-      "reasonPlaceholder": "ვერსიის დაფიქსირების მიზეზი",
-      "replaceAdminPin": "ადმინისტრატორის მიერ დაფიქსირებული ვერსიის შეცვლა",
-      "replacesAdminPin": "ეს ადმინისტრატორის მიერ დაფიქსირებულ ვერსიას ჩაანაცვლებს (ამჟამად: {{label}})."
-    },
-    "redeploy": "ხელახალი განთავსება",
-    "redeployMessage": "ნამდვილად გინდა ამ ინსტანციის ხელახლა განთავსება?",
-    "redeployTitle": "ინსტანციის ხელახალი განთავსება",
-    "controls": {
-      "redeploying": "ხელახლა თავსდება…",
-      "restart": "გადატვირთვა",
-      "restartOpenClawMessage": "ნამდვილად გინდა OpenClaw-ის პროცესის გადატვირთვა?",
-      "restartOpenClawTitle": "OpenClaw-ის გადატვირთვა",
-      "restarting": "იტვირთება ხელახლა…",
-      "start": "გაშვება",
-      "startMessage": "ნამდვილად გინდა ამ ინსტანციის გაშვება?",
-      "startTitle": "ინსტანციის გაშვება",
-      "stop": "შეჩერება",
-      "stopMessage": "ნამდვილად გინდა ამ ინსტანციის შეჩერება?",
-      "stopTitle": "ინსტანციის შეჩერება",
-      "stopping": "ჩერდება…"
-    },
-    "empty": {
-      "finishingSetup": "გამართვა სრულდება",
-      "finishingSetupDescription": "ცოტა მოიცადე, შენი ანგარიშის მომზადებას ვასრულებთ. ამას, ჩვეულებრივ, ცოტა დრო სჭირდება.",
-      "getStarted": "დაწყება",
-      "noInstancesDescription": "შექმენი პირველი ინსტანცია კოდის წერის აგენტების გასაშვებად."
-    },
-    "instance": {
-      "backToInstances": "ინსტანციების სიაში დაბრუნება",
-      "couldNotLoad": "ინსტანციის ჩატვირთვა ვერ მოხერხდა.",
-      "notFound": "ინსტანცია ვერ მოიძებნა",
-      "notFoundDescription": "შესაძლოა, ეს ინსტანცია წაიშალა ან ბმული აღარ მოქმედებს."
-    },
-    "list": {
-      "createInstance": "ინსტანციის შექმნა",
-      "organizations": "ორგანიზაციები",
-      "accessIssue": {
-        "trialExpired": "საცდელი პერიოდი დასრულდა — ინსტანციის გამოყენების გასაგრძელებლად გააფორმე გამოწერა",
-        "subscriptionCanceled": "გამოწერა არააქტიურია — ინსტანციის გამოყენების გასაგრძელებლად ხელახლა გააფორმე გამოწერა",
-        "subscriptionPastDue": "გადახდის პრობლემაა — ინსტანციის გამოყენების გასაგრძელებლად განაახლე გადახდის მონაცემები",
-        "quarantined": "ინსტანცია კარანტინშია, საჭიროა ხელით შემოწმება",
-        "multipleCurrentConflict": "ანგარიშს სჭირდება შემოწმება",
-        "nonCanonicalEarlybird": "ძველი ტარიფი შემოწმებას საჭიროებს"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "{{name}}-თან საუბარი",
-        "ready": "{{name}} მზად არის",
-        "warmedUp": "ყველაფერი მზად არის. როცა მზად იქნები, მიესალმე."
-      },
-      "flow": {
-        "genericErrorBody": "ამჯერად შენი ინსტანციის გამართვა ვერ დავასრულეთ.",
-        "manualReviewBody": "ინსტანციის შექმნამდე შენი ანგარიშის მდგომარეობა უნდა შემოწმდეს. გააგრძელე kilo.ai-ზე.",
-        "manualReviewTitle": "გამართვა ხელით შემოწმებას საჭიროებს",
-        "openKiloAi": "kilo.ai-ის გახსნა",
-        "provisioning": "რესურსების მომზადება",
-        "review": "შემოწმება",
-        "identityTitle": "ბოტის იდენტობის შექმნა",
-        "couldNotLoad": "საწყისი გამართვის მდგომარეობის ჩატვირთვა ვერ მოხერხდა.",
-        "finishingSetup": "გამართვას ვასრულებთ — ცოტა მოიცადე, სანამ შენს ანგარიშს მოვამზადებთ.",
-        "ready": "მზად არის",
-        "settingUp": "იმართება…"
-      },
-      "unavailableDescription": "ინსტანციის მოსამზადებლად KiloClaw-ის აქტიური გამოწერაა საჭირო. არსებული ინსტანციები და გამოწერები ჩვეულ რეჟიმში გააგრძელებს მუშაობას.",
-      "unavailableTitle": "KiloClaw-ის ახალი ინსტანციები მიუწვდომელია",
-      "identity": {
-        "chooseAvatar": "ავატარის არჩევა",
-        "namePlaceholder": "ბოტის სახელი",
-        "selectAvatar": "{{name}}-ის არჩევა ავატარად",
-        "personality": "ხასიათი",
-        "changePersonality": "ხასიათის შეცვლა",
-        "location": "მდებარეობა",
-        "locationPlaceholder": "ქალაქი ან რეგიონი (არასავალდებულო)",
-        "useCurrentLocation": "მიმდინარე მდებარეობის გამოყენება",
-        "locationDeniedTitle": "მდებარეობაზე წვდომა უარყოფილია",
-        "locationDeniedMessage": "მიმდინარე მდებარეობის გამოსაყენებლად პარამეტრებში ჩართე მდებარეობაზე წვდომა.",
-        "locationValidationFailed": "მდებარეობის შემოწმება ვერ მოხერხდა.",
-        "locationResolveFailed": "შენი მდებარეობის განსაზღვრა ვერ მოხერხდა. მისი ხელით შესწორება შეგიძლია.",
-        "locationGetFailed": "შენი მდებარეობის მიღება ვერ მოხერხდა. შეიყვანე ხელით.",
-        "nature": {
-          "aiAssistantLabel": "ხელოვნური ინტელექტის ასისტენტი",
-          "aiAssistantVibe": "დამხმარე, კომპეტენტური, პროფესიონალი",
-          "digitalCreatureLabel": "ციფრული არსება",
-          "digitalCreatureVibe": "უჩვეულო, ცოცხალი, ცოტა არაპროგნოზირებადი",
-          "virtualCompanionLabel": "ვირტუალური კომპანიონი",
-          "virtualCompanionVibe": "თბილი, ყურადღებიანი, გულწრფელად მზრუნველი",
-          "somethingWeirderLabel": "რაღაც უფრო უცნაური…",
-          "somethingWeirderVibe": "თავად განსაზღვრე"
-        }
-      },
-      "notifications": {
-        "mockMessage": "მზადაა! შენ მიერ მოთხოვნილი შეჯამება შევადგინე. როცა მზად იქნები, ნახე.",
-        "settingUp": "შეტყობინებები იმართება…",
-        "stayInTheLoop": "არ გამოგრჩეს სიახლეები",
-        "getNotified": "მიიღე შეტყობინება, როცა {{name}} დავალებას დაასრულებს, რათა არცერთი პასუხი არ გამოგრჩეს.",
-        "now": "ახლა",
-        "skipForNow": "ამჯერად გამოტოვება",
-        "couldNotEnable": "შეტყობინებების ჩართვა ვერ მოხერხდა."
-      },
-      "provisioning": {
-        "queryErrorTitle": "გამართვის მდგომარეობა ვერ შემოწმდა",
-        "queryErrorBody": "{{name}}-ის გამართვის შემოწმებისას კავშირი გაწყდა. შესაძლოა, გამართვა ჯერ კიდევ მიმდინარეობს. ხელახლა სცადე ან ცოტა ხანში შეამოწმე.",
-        "stoppedTitle": "გამართვა შეჩერდა",
-        "stoppedBody": "{{name}}-ის ინსტანცია გამართვისას მოულოდნელად შეჩერდა.",
-        "stalledTitle": "რაღაც შეფერხდა",
-        "stalledBody": "{{name}}-ის გამართვა ვერ დავასრულეთ. ხელახლა სცადე. თუ პრობლემა განმეორდება, მოგვწერე {{supportEmail}}-ზე.",
-        "timeoutTitle": "მოსალოდნელზე მეტხანს გრძელდება",
-        "timeoutBody": "{{name}}-ის გამართვას ჩვეულებრივზე მეტი დრო სჭირდება (უკვე {{displayMinutes}} წუთზე მეტია).",
-        "continueInBackground": "ფონზე გაგრძელება",
-        "settingUp": "{{name}}-ის გამართვა",
-        "connectingToAgent": "აგენტთან კავშირი მყარდება",
-        "startingSandbox": "იზოლირებული გარემო ეშვება",
-        "backgroundHint": "ამას, ჩვეულებრივ, ერთ წუთზე ნაკლები სჭირდება. შეგიძლია ეს ეკრანი დახურო — მუშაობას ფონზე გავაგრძელებთ."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "კოდი {{code}}",
-      "gatewayProcess": "კარიბჭის პროცესი",
-      "lastExit": "ბოლო დასრულება",
-      "memory": "მეხსიერება",
-      "region": "რეგიონი",
-      "resources": "რესურსები",
-      "restarts": "გადატვირთვები",
-      "state": "მდგომარეობა",
-      "uptime": "უწყვეტი მუშაობის დრო",
-      "crashed": "ავარიულად შეჩერდა",
-      "destroying": "იშლება",
-      "provisioned": "მომზადებულია",
-      "restarting": "იტვირთება ხელახლა",
-      "running": "მუშაობს",
-      "shuttingDown": "ითიშება",
-      "starting": "იწყება",
-      "stopped": "შეჩერებულია",
-      "stopping": "ჩერდება",
-      "unknown": "უცნობი",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "მოწინავე",
-      "frontierDescription": "უმაღლესი წარმადობა. იყენებს მოწინავე მოდელებს მსჯელობის უნარით.",
-      "balancedDescription": "სიჩქარისა და შესაძლებლობების კარგი ბალანსი ნაკლებ ფასად.",
-      "autoModelA11y": "ავტომატური მოდელი: {{label}}",
-      "currentModel": "მიმდინარე მოდელი",
-      "browseAllModels": "ან აირჩიე 500-ზე მეტი მოდელიდან",
-      "browseAllModelsA11y": "ყველა მოდელის დათვალიერება, 500-ზე მეტი ვარიანტი"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "KiloClaw-ის გამოყენების გასაგრძელებლად ბრაუზერით გადადი kilo.ai/claw-ზე. აპში გამოწერის გაფორმება შეუძლებელია.",
-      "subscriptionCanceledTitle": "ვებსაიტზე გამოწერა",
-      "subscriptionCanceledBody": "KiloClaw-ის გამოსაყენებლად ბრაუზერით გადადი kilo.ai/claw-ზე. აპში გამოწერის გაფორმება შეუძლებელია.",
-      "subscriptionCanceledCta": "kilo.ai/claw-ის გახსნა",
-      "subscriptionPastDueTitle": "გადახდის მონაცემების განახლება ვებსაიტზე",
-      "subscriptionPastDueBody": "შენს ბოლო გადახდაზე პრობლემა წარმოიშვა. გადახდის მონაცემების გასაახლებლად ბრაუზერით გადადი kilo.ai/claw-ზე. აპში გადახდების მართვა შეუძლებელია.",
-      "quarantinedTitle": "ინსტანციას სჭირდება აღდგენა",
-      "quarantinedBody": "შენი KiloClaw ინსტანცია კარანტინშია და ამჟამად მისი გამოყენება შეუძლებელია. აღსადგენად ჩვენი გუნდის დახმარებაა საჭირო.",
-      "multipleCurrentConflictBody": "შენს ანგარიშზე ერთზე მეტი აქტიური გამოწერა ვიპოვეთ. ორმაგი დარიცხვის თავიდან ასაცილებლად მომსახურება შევაჩერეთ.",
-      "multipleCurrentConflictCta": "kilo.ai-ზე გაგრძელება",
-      "nonCanonicalEarlybirdTitle": "აღმოჩენილია ძველი ტარიფი",
-      "nonCanonicalEarlybirdBody": "ადრეული წვდომის შენი ტარიფი მობილურზე გამოყენებამდე ხელით უნდა შემოწმდეს.",
-      "iosTitle": "KiloClaw ხელმისაწვდომი არ არის iOS-ზე",
-      "iosBody": "ამ ანგარიშისთვის KiloClaw-ზე წვდომა iOS აპის გარეთ იმართება.",
-      "iosContact": "კითხვები გაქვს? მოგვწერე {{supportEmail}}-ზე.",
-      "quarantinedCta": "დაგვიკავშირდით ელფოსტით",
-      "nonCanonicalEarlybirdCta": "შეამოწმეთ თქვენი ტარიფი kilo.ai-ზე"
-    },
-    "instanceCard": {
-      "needsAttention": "{{name}}-ს სჭირდება ყურადღება: {{label}}",
-      "openUnread_one": "{{name}}-ის გახსნა, {{displayCount}} წაუკითხავი შეტყობინება",
-      "openUnread": "{{name}}-ის გახსნა, {{displayCount}} წაუკითხავი შეტყობინება",
-      "openUnread_other": "{{name}}-ის გახსნა, {{displayCount}} წაუკითხავი შეტყობინება",
-      "openSettings": "{{name}}-ის პარამეტრების გახსნა",
-      "fixOnKiloAi": "შესწორება kilo.ai-ზე: {{label}}"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "მოწყობილობების მოთხოვნების დადასტურება",
-      "execPolicyDescription": "უსაფრთხოების პარამეტრები",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "ხელოვნური ინტელექტის მოდელის არჩევა",
-      "secretsDescription": "დაშიფრული ავტორიზაციის მონაცემები",
-      "versionPinDescription": "კონკრეტულ ვერსიაზე დაფიქსირება"
-    },
-    "avatar": {
-      "arcade": "არკადა",
-      "brain": "ტვინი",
-      "creature": "არსება",
-      "crystal": "კრისტალი",
-      "custom": "მორგებული ავატარი",
-      "dragon": "დრაკონი",
-      "explorer": "მკვლევარი",
-      "flame": "ალი",
-      "lightning": "ელვა",
-      "magicWand": "ჯადოსნური კვერთხი",
-      "moon": "მთვარე",
-      "operator": "ოპერატორი",
-      "orbit": "ორბიტა",
-      "oracle": "ორაკული",
-      "rainbow": "ცისარტყელა",
-      "robot": "რობოტი",
-      "satellite": "თანამგზავრი",
-      "sparkles": "ნაპერწკლები",
-      "strongArm": "ძლიერი მკლავი",
-      "talisman": "თილისმა"
-    },
-    "remoteSpawnFilesNotSupported": "ამ ინსტანციას ფაილების მიღება არ შეუძლია.",
-    "instanceSwitcherTitle": "KiloClaw-ის ინსტანცია"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2082,6 +1667,7 @@
       "actionFailed": "ეს მოქმედება ვერ დასრულდა. სცადე ხელახლა.",
       "actionBlocked": "ეს მოქმედება ვერ დასრულდა. ხელახლა ცდამდე პრობლემა ჯერ უნდა მოგვარდეს.",
       "syncNoRepositories": "სინქრონიზაციის არეალში რეპოზიტორიები არ არის. აირჩიე რეპოზიტორიები, რომლებსაც უსაფრთხოების აგენტი აკონტროლებს, შემდეგ კვლავ დაასინქრონე.",
+      "syncNoRepositoriesNoManage": "სინქრონიზაციის არეალში რეპოზიტორიები არ არის. სანამ სინქრონიზაცია შესრულდება, რეპოზიტორიები უნდა დააკავშიროს ორგანიზაციის მფლობელმა, ადმინისტრატორმა ან ანგარიშსწორების მენეჯერმა.",
       "syncIntegrationInactive": "უსაფრთხოების აგენტის GitHub კავშირი აქტიური არ არის. ხელახლა დაუკავშირე Kilo GitHub აპი, შემდეგ კვლავ დაასინქრონე.",
       "syncMissingPermission": "Kilo GitHub აპი მოწყვლადობის შეტყობინებებს ვერ კითხულობს. მიანიჭე ეს ნებართვა GitHub-ში, შემდეგ კვლავ დაასინქრონე.",
       "configConflict": "უსაფრთხოების აგენტის პარამეტრები სხვაგან შეიცვალა. გადახედე უახლეს პარამეტრებს და კვლავ შეინახე."
@@ -2224,7 +1810,7 @@
       "costSpoken": "ღირებულება {{cost}}",
       "costSpokenWithTime": "ღირებულება {{cost}}, {{time}}",
       "pullRequest": "შერწყმის მოთხოვნა {{number}}",
-      "spokenJoiner": "და"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ის გახსნა ვერ მოხერხდა",
@@ -2269,11 +1855,12 @@
       "emptyDescription": "დასაწყებად ქვემოთ გაგზავნეთ შეტყობინება.",
       "scrollToBottom": "ბოლომდე გადახვევა",
       "emptyTitle": "შეტყობინებები ჯერ არ არის",
+      "emptyReadOnlyTitle": "ამ სესიაში შეტყობინებები არ არის",
       "renameAccessibility": "სესიის სახელის შეცვლა: {{title}}",
       "cloningSession": "სესია კლონირდება…",
       "couldNotLoadThisSession": "ამ სესიის ჩატვირთვა ვერ მოხერხდა.",
       "cloneFailedRetry": "ამ სესიის კლონირება ვერ მოხერხდა. სცადეთ ხელახლა.",
-      "notEnoughCredits": "Cloud Agent-ის გასაშვებად კრედიტები საკმარისი არ არის. დაამატეთ კრედიტები და სცადეთ ხელახლა.",
+      "notEnoughCredits": "ამ მოთხოვნისთვის კრედიტები საკმარისი არ არის. დაამატეთ კრედიტები და სცადეთ ხელახლა.",
       "previousTaskFinishing": "წინა დავალების დასრულება ჯერ კიდევ მიმდინარეობს. ცოტა ხანს დაელოდეთ.",
       "serviceUnavailable": "სერვისი ახლა მიუწვდომელია. სცადეთ ხელახლა.",
       "connectionTrouble": "კავშირის პრობლემა წარმოიშვა. ცოტა ხანში სცადეთ ხელახლა.",
@@ -2368,7 +1955,7 @@
       "selectRepositoryToStart": "დასაწყებად აირჩიეთ რეპოზიტორია.",
       "enterPromptToStart": "დასაწყებად დაამატეთ პრომპტი.",
       "enterPromptOrFileToStart": "დასაწყებად დაამატეთ პრომპტი ან ფაილი.",
-      "connectProviderToStart": "დასაწყებად დააკავშირეთ პროვაიდერი.",
+      "connectProviderToStart": "რეპოზიტორიები მოდის GitHub-ის, GitLab-ის ან Bitbucket-ის დაკავშირებული ანგარიშიდან.",
       "promptPlaceholder": "რაზე გსურთ მუშაობა?",
       "couldNotLoadModels": "მოდელების ჩატვირთვა ვერ მოხერხდა.",
       "prefillRepoAndModelUnavailable": "საწყისი სესიის რეპოზიტორია და მოდელი აღარ არის ხელმისაწვდომი. ქვემოთ აირჩიეთ სხვა რეპოზიტორია და მოდელი.",
@@ -2383,7 +1970,7 @@
       "discardWithUploadsMessage": "თქვენი მოთხოვნა და ატვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება.",
       "discardFailed": "მონახაზის წაშლა ვერ მოხერხდა. სცადეთ ხელახლა.",
       "remoteHint": "თქვენს კომპიუტერზე გასაშვებლად გაუშვით Kilo იქ და დატოვეთ გაშვებული.",
-      "continueFrom": "გრძელდება სესია: {{title}}.",
+      "continueFrom": "გრძელდება სესია: „{{title}}“.",
       "importingSession": "სესიის იმპორტი მიმდინარეობს…",
       "cliCannotContinue": "ამ CLI-ს სესიის გაგრძელება არ შეუძლია. აირჩიეთ Cloud Agent ან სხვა CLI.",
       "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა.",
@@ -2415,7 +2002,8 @@
       "selectedProfile": "არჩეული პროფილი",
       "manualOverrides": "მექანიკური უგულებელყოფა",
       "openSettingsToReview": "გადასახედად გახსენით პარამეტრები",
-      "profileSelection": "პროფილის შერჩევა"
+      "profileSelection": "პროფილის შერჩევა",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "განახლდა {{displayCount}} ფაილი.",
@@ -2435,6 +2023,23 @@
       "toolList": "ჩამოთვლა",
       "toolPatch": "ცვლილებების შეტანა",
       "toolTask": "დავალება",
+      "toolWebFetch": "ვებგვერდის ჩამოტვირთვა",
+      "toolWebSearch": "ვებში ძებნა",
+      "toolCodeSearch": "კოდის ძებნა",
+      "toolTodo": "გეგმის მართვა",
+      "toolSkill": "უნარის ჩატვირთვა",
+      "toolLsp": "ენის სერვერი",
+      "toolBrowser": "ინტეგრირებული ბრაუზერი",
+      "toolNotebook": "ნოუთბუქის ფაილი",
+      "toolBoard": "საერთო დაფა",
+      "toolQuestion": "მომხმარებლისთვის კითხვის დასმა",
+      "toolSuggest": "შემოთავაზების გაკეთება",
+      "toolRecall": "შენახული მეხსიერების გახსენება",
+      "toolRepoClone": "რეპოზიტორიის კლონირება",
+      "toolRepoOverview": "რეპოზიტორიის მიმოხილვა",
+      "toolSemanticSearch": "სემანტიკური ძებნა",
+      "toolSendFile": "ფაილი გაიგზავნა",
+      "toolSendFileAction": "ფაილის გაგზავნა",
       "readTodos": "გეგმის წაკითხვა",
       "updateTodos": "გეგმის განახლება",
       "linesBadge": "{{displayCount}} სტრიქონი",
@@ -2535,7 +2140,21 @@
       "thought": "მსჯელობა",
       "showDetails": "დეტალების ჩვენება",
       "pending": "მოლოდინში…",
-      "running": "მიმდინარეობს…"
+      "running": "მიმდინარეობს…",
+      "field": {
+        "filePath": "ფაილის გზა",
+        "path": "გზა",
+        "offset": "გადახრა",
+        "limit": "შეზღუდვა",
+        "pattern": "ნიმუში",
+        "include": "ჩართვა",
+        "patchText": "შესწორების ტექსტი",
+        "query": "მოთხოვნა",
+        "prompt": "მითითება",
+        "header": "სათაური",
+        "question": "კითხვა",
+        "options": "ვარიანტები"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "შიგთავსის ჩვენება ვერ მოხერხდა."
@@ -2550,6 +2169,8 @@
       "assistantStopped": "პასუხის შექმნა შეწყდა.",
       "assistantContextOverflow": "საუბარი ძალიან გრძელია ამ მოდელისთვის.",
       "assistantProviderError": "პროვაიდერმა შეცდომა დააბრუნა.",
+      "assistantProviderRefused": "პროვაიდერმა უარყო ეს მოთხოვნა და მისი განმეორებითი ცდა შეუძლებელია.",
+      "assistantCreditsRefusal": "ამ მოთხოვნისთვის კრედიტები საკმარისი არ არის.",
       "assistantOutputLimit": "პასუხმა მოდელის გამოტანის ლიმიტს მიაღწია.",
       "assistantStructuredOutput": "პასუხი არ შეესაბამება საჭირო ფორმატს.",
       "assistantFailed": "პასუხის შექმნა ვერ მოხერხდა."
@@ -2582,6 +2203,7 @@
       "preparingEnvironment": "გარემოს მომზადება",
       "preparationComplete": "მომზადება დასრულდა",
       "preparationFailed": "მომზადება ვერ მოხერხდა",
+      "preparationStageFailed": "{{stage}} ვერ მოხერხდა",
       "setupCommand": "გამართვის ბრძანება {{index}}",
       "setupCommandOf": "გამართვის ბრძანება {{index}}, სულ {{displayCount}}",
       "stepWorkspaceSetup": "სამუშაო სივრცის მომზადება",
@@ -2601,10 +2223,14 @@
       "stepFailed": "გარემოს მომზადება ვერ მოხერხდა",
       "stepUnknown": "გარემოს მომზადება",
       "detailCreatingSandbox": "სენდბოქსის შექმნა",
+      "detailStartingSandbox": "სენდბოქსის გაშვება",
+      "detailCloningRepository": "რეპოზიტორიის კლონირება",
       "detailUpdatingRepository": "რეპოზიტორიის განახლება",
       "detailCheckingOutBranch": "ბრენჩზე გადასვლა",
+      "detailSettingUpBranch": "ბრენჩის მომზადება",
       "detailRunningSetupCommands": "გამართვის ბრძანებების გაშვება",
       "detailSavingRepository": "რეპოზიტორიის შენახვა სწრაფი გაშვებისთვის",
+      "detailStartingKilo": "Kilo-ს გაშვება",
       "detailStartingKiloRuntime": "Kilo runtime-ის გაშვება",
       "detailPreparingKiloSession": "Kilo-ს სესიის მომზადება",
       "detailWaitingForPreviousSandbox": "წინა სენდბოქსის გაჩერების მოლოდინი",
@@ -2620,7 +2246,7 @@
       "detailSetupCommandTimedOut": "გამართვის ბრძანება {{index}}-ის ვადა ამოიწურა",
       "detailColdRestore": "ცივი აღდგენა, სნეპშოტი გამოყენებულია, აღდგენილია {{total}} ფაილიდან {{applied}}",
       "detailProgressPercent": "დასრულებულია {{percent}}%",
-      "detailRestoreIncompleteReport": "სესიის აღდგენა არასრულია: არააღდგენილი ფაილები — {{total}}-დან {{skipped}} ({{reasons}}).",
+      "detailRestoreIncompleteFiles": "არააღდგენილი ფაილები — {{total}}-დან {{skipped}} ({{reasons}}).",
       "detailRestoreIncompleteMissing": "აკლია: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} და კიდევ {{omitted}}",
       "detailReasonPatchFailed": "პაჩი არ გამოიყენებოდა",
@@ -2652,6 +2278,10 @@
     "permissionCard": {
       "title": "საჭიროა ნებართვა",
       "allowQuestion": "დავუშვათ {{permission}}?",
+      "subjectExternalDirectory": "პროექტის გარეთ არსებული დირექტორია",
+      "subjectDoomLoop": "იმავე ხელსაწყოს გამოძახების ციკლი",
+      "subjectAgentManager": "ქვეაგენტების მართვა",
+      "subjectSandboxEscalation": "სენდბოქსის გარეთ ბრძანების გაშვება",
       "appliesTo": "ვრცელდება:",
       "denyPermission": "ნებართვის უარყოფა",
       "deny": "უარყოფა",
@@ -2693,7 +2323,7 @@
       "positionHint": "({{displayCount}}-დან 1)",
       "movedPastPrompt": "აგენტი უკვე გასცდა ამ მოთხოვნას. სესიის გაგრძელებისას ეს ბარათი დაიხურება.",
       "waitingForAnswer": "აგენტი თქვენს პასუხს ელოდება. სანამ ამ კითხვას უპასუხებთ, აგენტისთვის თქვენი შეტყობინების გაგზავნა შეჩერებულია.",
-      "waitingForPermission": "აგენტი ნებართვას ელოდება. სანამ ამ მოთხოვნაზე გადაწყვეტილებას მიიღებთ, აგენტისთვის თქვენი შეტყობინების გაგზავნა შეჩერებულია."
+      "waitingForPermission": "სანამ ამ მოთხოვნაზე გადაწყვეტილებას მიიღებთ, აგენტისთვის თქვენი შეტყობინების გაგზავნა შეჩერებულია."
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -2782,10 +2412,6 @@
       "moveLeft": "{{filename}}-ის მარცხნივ გადატანა",
       "moveRight": "{{filename}}-ის მარჯვნივ გადატანა"
     },
-    "attachmentPasteHint": {
-      "accessibility": "სურათის ჩასმა ბუფერიდან",
-      "label": "სურათის ჩასმა ბუფერიდან"
-    },
     "attachmentPicker": {
       "camera": "კამერა",
       "photoLibrary": "ფოტოგალერეა",
@@ -2873,16 +2499,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "კონტექსტის ფანჯრის ზომა მიუწვდომელია",
-      "tapToViewDetails": "შეეხეთ კონტექსტის დეტალების სანახავად.",
-      "costSuffix": ", ღირებულება {{cost}}",
-      "tokensWindowUnavailable": "კონტექსტი: {{used}} ტოკენი, ფანჯრის ზომა უცნობია",
-      "tokensUsage": "კონტექსტი: {{window}} ტოკენიდან გამოყენებულია {{used}}, ანუ {{percentage}}",
+      "tapToViewDetails": " შეეხეთ კონტექსტის დეტალების სანახავად.",
+      "costClause": ", ღირებულება {{cost}}",
+      "loadingCostSpoken": "ღირებულება {{cost}}.",
+      "tokensWindowUnavailable": "კონტექსტი: {{used}} ტოკენი, ფანჯრის ზომა უცნობია{{costClause}}.",
+      "tokensUsage": "კონტექსტი: {{window}} ტოკენიდან გამოყენებულია {{used}}, ანუ {{percentage}}{{costClause}}.",
       "title": "კონტექსტის გამოყენება",
       "used": "გამოყენებულია",
       "provider": "პროვაიდერი",
       "totalCost": "საერთო ღირებულება",
       "usageReflectsLatest": "მოხმარების მონაცემები ასისტენტის ბოლო დასრულებულ პასუხს ასახავს.",
-      "usageUnavailable": "კონტექსტის გამოყენება მიუწვდომელია",
+      "usageUnavailable": "კონტექსტის გამოყენება მიუწვდომელია{{costClause}}.",
       "tokenUsage": "ტოკენების გამოყენება",
       "cacheRate": "ქეშის გამოყენების წილი",
       "modelsCount": "მოდელები ({{displayCount}})",
@@ -2963,7 +2590,6 @@
   },
   "addCredits": {
     "cta": "კრედიტების დამატება",
-    "description": "მუშაობის გასაგრძელებლად დაამატეთ კრედიტები.",
     "billingPage": "ანგარიშსწორების გვერდი"
   },
   "deviceSessions": {
@@ -2982,7 +2608,8 @@
     "signOutThisDeviceTitle": "გავიდეთ ამ მოწყობილობიდან?",
     "signOutThisSessionTitle": "გავიდეთ ამ სესიიდან?",
     "signOutThisSessionMessage": "მოწყობილობაზე {{device}} ანგარიშიდან გახვალთ. მოწყობილობას API-ზე წვდომა კიდევ ერთ საათამდე შეიძლება შეუნარჩუნდეს.",
-    "webBrowser": "ვებბრაუზერი"
+    "webBrowser": "ვებბრაუზერი",
+    "unknownDevice": "უცნობი მოწყობილობა"
   },
   "forceUpdate": {
     "couldNotOpenStore": "აპლიკაციების მაღაზიის გახსნა ვერ მოხერხდა.",
@@ -3105,6 +2732,8 @@
     "retryHint": "ხელახლა ამოწმებს Kilo Pass-ის მდგომარეობას.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Kilo Pass-ის შეძენა ამჟამად შეუძლებელია.",
+    "purchaseUnavailableTitle": "ამჟამად შეუძლებელია",
+    "purchaseUnavailableEnded": "თქვენი Kilo Pass დასრულდა.",
     "kiloPassManagement": "Kilo Pass-ის მართვა",
     "kiloPassSetup": "Kilo Pass-ის გამართვა",
     "subscriptionHeaderDescription": "ყოველთვიური გამოწერა, რომელიც თქვენს Kilo ბალანსს კრედიტებს ამატებს AI კოდირების სესიებისთვის Kilo აპში.",
@@ -3464,9 +3093,9 @@
       "searching": "ვებ ძიება",
       "thinking": "დაფიქრება"
     },
-    "planOf": "/",
+    "planProgress": "{{total}}-დან {{done}}",
     "filesChanged": "შეცვლილი ფაილები",
-    "finishedIn": "დასრულდა",
+    "finishedIn": "დასრულდა {{duration}}-ში",
     "noActivityFor": "აქტივობა არ არის",
     "prOpened": "Pull request გაიხსნა",
     "permissionWants": "სურს გაშვება",
@@ -3774,7 +3403,7 @@
     "reasoningEffort": {
       "modelFlag": "ეს მოდელი მხარს უჭერს მსჯელობის ინტენსივობას"
     },
-    "creditsRequired": "ამ მესიჯის გასაგზავნად საკმარისი კრედიტები არ გაქვთ. დაამატეთ კრედიტები და სცადეთ ხელახლა."
+    "creditsRequired": "ამ მესიჯის გასაგზავნად საკმარისი კრედიტები არ გაქვთ."
   },
   "settingsTools": {
     "confirmTitle": "დავადასტუროთ ეს ცვლილება?"
@@ -3808,8 +3437,8 @@
     "saved": "ხარჯვის შეტყობინების პარამეტრები შენახულია",
     "loadError": "ხარჯვის შეტყობინებები ვერ ჩაიტვირთა.",
     "saveError": "ხარჯვის შეტყობინებები ვერ შეინახა.",
-    "empty": "ხარჯვის შეტყობინებები გამორთულია. ჩართე ისინი ამ სფეროს ბილინგის კონტაქტების გასაფრთხილებლად.",
-    "noSpend": "ხარჯვა ჯერ არ არის დაფიქსირებული",
+    "sendAlerts": "გაგზავნე შეტყობინებები",
+    "noSpend": "ჯერ არაფერია დაფიქსირებული",
     "spend24h": "ხარჯვა ბოლო 24 საათში",
     "multiplierError": "შეიყვანე 1 ან მეტი მამრავლი",
     "permissionDenied": "ხარჯვის შეტყობინებების მართვის უფლება არ გაქვთ.",
@@ -3967,6 +3596,7 @@
       "namePlaceholder": "ჩემი აგენტი",
       "promptPlaceholder": "შენ ხარ...",
       "tools": "ხელსაწყოები",
+      "wholeToolRule": "ეს აგენტი ერთდროულად ყველა ხელსაწყოზე ერთ წესს იყენებს: {{rule}}. ეს გადამრთველები მხოლოდ წაკითხვადია.",
       "visibility": "ხილვადობა",
       "visibilityPrimary": "პირველადი — ნაჩვენებია ამომრჩეველში",
       "visibilitySubagent": "სუბაგენტი — გამოძახება შესაძლებელია მხოლოდ სხვებისგან",
@@ -4008,6 +3638,7 @@
     },
     "repoBindings": {
       "title": "ნაგულისხმევი პროფილები რეპოსთვის",
+      "entryLabel": "ნაგულისხმევი პროფილები",
       "add": "ნაგულისხმევი დამატება",
       "empty": "ნაგულისხმევი კონფიგურაცია არ არის",
       "emptyDescription": "დაამატეთ ნაგულისხმევი პროფილის ავტომატურად გამოსაყენებლად რეპოს სესიების დაწყებისას.",
@@ -4208,12 +3839,15 @@
     "snapshotSummaryFailed": "AI შეჯამება ვერ შესრულდა. თქვენი სტრუქტურირებული ანგარიში კვლავ ხელმისაწვდომია.",
     "scheduledContextEnabled": "დაგეგმილი ანგარიშები",
     "scheduledContextSettings": "დაგეგმილი ანგარიშები · {{context}}",
-    "scheduledContextHint": "ჩართეთ მდგომარეობის დაგეგმილი დაფიქსირება და ფასიანი AI შეჯამებები მხოლოდ ამ კონტექსტისთვის. შერჩეული, კონფიდენციალური მონაცემებისგან გასუფთავებული ფრაგმენტები და სტრუქტურირებული ფაქტები იგზავნება თქვენს მოდელთან. შეჯამებების ენა ინახება მხოლოდ მაშინ, როცა ანგარიშის პარამეტრებს თავად ცვლით, და შეესაბამება იმ დროს აპში არჩეულ ენას. აპის ენის შეცვლა შენახულ ენას ავტომატურად არ ცვლის. გადასახადი ამ კონტექსტის ბალანსიდან ჩამოიჭრება. ანგარიშები, რომლებშიც აქტივობა არ შერჩეულა, AI-ს არ იყენებს.",
+    "scheduledContextHint": "ჩართეთ მდგომარეობის დაგეგმილი დაფიქსირება და ფასიანი AI შეჯამებები მხოლოდ ამ კონტექსტისთვის. შერჩეული, კონფიდენციალური მონაცემებისგან გასუფთავებული ფრაგმენტები და სტრუქტურირებული ფაქტები იგზავნება თქვენს მოდელთან. შეჯამებებისთვის გამოიყენება აპის ენა, რომელიც შენახულია ანგარიშის პარამეტრების განახლების დროს. გადასახადი ამ კონტექსტის ბალანსიდან ჩამოიჭრება. ანგარიშები, რომლებშიც აქტივობა არ შერჩეულა, AI-ს არ იყენებს.",
     "snapshotSafeguards": "თითო შეჯამების დროისა და ხარჯის ლიმიტები ვრცელდება თითოეულ დაგეგმილ ანგარიშზე და არა დღიურ ბიუჯეტზე.",
     "snapshotEstimateInputTooLarge": "ამ ანგარიშში არჩეული მოდელისთვის მეტისმეტად ბევრი მასალაა.",
-    "quietSnapshot": "ამ ანგარიშისთვის სესიის აქტივობა არ შერჩეულა. შერჩევა ეფუძნება ხელმისაწვდომ მონაცემებს და შესაძლოა არასრული იყოს. AI შეჯამება არ მოთხოვნილა, მოდელი არ გამოძახებულა და საფასური არ ჩამოჭრილა.",
+    "quietSnapshot": "ამ ანგარიშისთვის სესიის აქტივობა არ შერჩეულა. AI შეჯამება არ მოთხოვნილა და საფასური არ ჩამოჭრილა.",
     "noEnabledContexts": "დაგეგმილი ანგარიშებისთვის არცერთი კონტექსტი არ არის ჩართული",
     "sourceBlocker": "სესია ყურადღებას საჭიროებს",
     "sourceMetadata": "დაფიქსირებული სესიის მეტამონაცემები"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "ამ ძიების შედეგის გახსნა ვერ მოხერხდა"
   }
 }

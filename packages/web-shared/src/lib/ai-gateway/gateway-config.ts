@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
 export const DEFAULT_VERCEL_ROUTING_ENABLED = true;
 
@@ -58,3 +59,68 @@ export const GatewayConfigInputSchema = z.object({
   vercel_routing_opt_out_models: vercelRoutingOptOutModels,
   note: note.nullable(),
 });
+
+export const ORGANIZATION_FEATURE_ORGANIZATIONS_MAX_COUNT = 1000;
+
+const storedOrganizationIds = z.array(z.string().transform(id => id.toLowerCase())).default([]);
+
+/**
+ * Per-feature lists of the organizations a feature is enabled for, stored under
+ * `organization_features` in the gateway configuration. A feature missing from
+ * a saved configuration is enabled for no organization.
+ */
+export const OrganizationFeaturesSchema = z.object({
+  experimental_byok: storedOrganizationIds,
+  enkrypt_output_guardrail: storedOrganizationIds,
+  gateway_settings: storedOrganizationIds,
+});
+
+export type OrganizationFeatures = z.infer<typeof OrganizationFeaturesSchema>;
+export type OrganizationFeature = keyof OrganizationFeatures;
+
+export const ORGANIZATION_FEATURES = OrganizationFeaturesSchema.keyof().options;
+
+export const ORGANIZATION_FEATURE_DESCRIPTIONS = {
+  experimental_byok: {
+    label: 'Direct Amazon Bedrock and Google Vertex AI BYOK',
+    description: 'Lets the organization add direct Amazon Bedrock and Google Vertex AI keys.',
+  },
+  enkrypt_output_guardrail: {
+    label: 'Enkrypt output guardrails',
+    description:
+      'Lets the organization configure Enkrypt output guardrails in AI Guardrails. Existing output guardrails keep running when this feature is removed.',
+  },
+  gateway_settings: {
+    label: 'Gateway settings',
+    description:
+      'Lets the organization turn off OpenRouter or the Vercel AI Gateway, and pin Vercel AI Gateway requests to a region, on its Providers & Models page.',
+  },
+} as const satisfies Record<OrganizationFeature, { label: string; description: string }>;
+
+export const ORGANIZATION_DATA_REGION_NAMES = {
+  us: 'United States',
+  eu: 'European Union',
+  au: 'Australia',
+  jp: 'Japan',
+} as const satisfies Record<OrganizationDataRegion, string>;
+
+export const DEFAULT_ORGANIZATION_FEATURES: OrganizationFeatures = OrganizationFeaturesSchema.parse(
+  {}
+);
+
+/** Reads the organization features from a stored gateway configuration. */
+export const GatewayOrganizationFeaturesConfigSchema = z.object({
+  organization_features: OrganizationFeaturesSchema.prefault({}),
+});
+
+const organizationIdsInput = z
+  .array(z.guid())
+  .max(ORGANIZATION_FEATURE_ORGANIZATIONS_MAX_COUNT)
+  .transform(ids => [...new Set(ids.map(id => id.toLowerCase()))]);
+
+/** Schema for the admin organization-features mutation input. */
+export const OrganizationFeaturesInputSchema = z.object({
+  experimental_byok: organizationIdsInput,
+  enkrypt_output_guardrail: organizationIdsInput,
+  gateway_settings: organizationIdsInput,
+}) satisfies z.ZodType<OrganizationFeatures, unknown>;

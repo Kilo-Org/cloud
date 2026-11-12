@@ -16,9 +16,11 @@ import { RequestDeadlineError } from '@kilocode/event-service';
 import {
   fetchMobileSessionSnapshotPage,
   readMobileSessionSnapshotPage,
+} from '@/components/agents/mobile-session-page-adapter';
+import {
   SESSION_HISTORY_FAILURES,
   SessionHistoryFailureError,
-} from '@/components/agents/mobile-session-page-adapter';
+} from '@/components/agents/session-history-failures';
 import { type AgentMode } from '@/components/agents/mode-normalize';
 import { CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import {
@@ -33,6 +35,11 @@ import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-conn
 import { answerSessionPermission } from '@/lib/glanceable/approve-ask';
 import { cacheToolAttachment } from '@/components/agents/tool-card-image-cache';
 import { cacheFilePart } from '@/components/agents/file-part-cache';
+import {
+  clearPendingSendConfirmation,
+  persistPendingSendConfirmation,
+  readPendingSendConfirmations,
+} from '@/lib/persist/pending-send-confirmations';
 import {
   persistResolvedDeliveryFailure,
   readResolvedDeliveryFailures,
@@ -317,6 +324,27 @@ export function createMobileAgentSessionManager({
     persistResolvedDeliveryFailure: (id: KiloSessionId, messageId: string) => {
       void persistResolvedDeliveryFailure(resolvedDeliveryOwner, id, messageId);
     },
+    // Durable memory of sends whose outcome the transport could not confirm:
+    // the route that sent one may be gone before the server's record arrives,
+    // and the draft the composer restored survives that teardown.
+    // eslint-disable-next-line @typescript-eslint/promise-function-async -- passthrough returns the promise directly
+    readPendingSendConfirmations: (id: KiloSessionId) =>
+      readPendingSendConfirmations(resolvedDeliveryOwner.userId, id),
+    persistPendingSendConfirmation: (id: KiloSessionId, messageId: string, text: string) => {
+      void persistPendingSendConfirmation({
+        owner: resolvedDeliveryOwner,
+        sessionId: id,
+        messageId,
+        text,
+      });
+    },
+    clearPendingSendConfirmation: (id: KiloSessionId, messageId: string) => {
+      void clearPendingSendConfirmation({
+        owner: resolvedDeliveryOwner,
+        sessionId: id,
+        messageId,
+      });
+    },
     // A tRPC call whose client control-plane deadline expired never got an
     // answer: the open is stalled, not failed. The manager keeps the skeleton
     // (then the slow-load state with Retry) instead of a premature error
@@ -348,6 +376,7 @@ export function createMobileAgentSessionManager({
         cloudAgentSessionId = memo.cloudAgentSessionId;
       } else {
         const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
+        organizationId ??= session.organization_id ?? undefined;
         cloudAgentSessionId = session.cloud_agent_session_id as CloudAgentSessionId | null;
       }
       if (cloudAgentSessionId) {
@@ -420,6 +449,25 @@ export function createMobileAgentSessionManager({
       }
       const outcome = await fetchMobileSessionSnapshotPage(id, options);
       return outcome;
+    },
+    fetchCloudSnapshotPage: async (sessionId, options) => {
+      const page = organizationId
+        ? await trpcClient.organizations.cloudAgentNext.getSessionMessagesPage.query({
+            sessionId,
+            ...options,
+            organizationId,
+          })
+        : await trpcClient.cloudAgentNext.getSessionMessagesPage.query({ sessionId, ...options });
+      return page;
+    },
+    fetchCloudSession: async sessionId => {
+      const metadata = organizationId
+        ? await trpcClient.organizations.cloudAgentNext.getSession.query({
+            cloudAgentSessionId: sessionId,
+            organizationId,
+          })
+        : await trpcClient.cloudAgentNext.getSession.query({ cloudAgentSessionId: sessionId });
+      return metadata;
     },
     api: {
       send: async input => {

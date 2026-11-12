@@ -4,8 +4,9 @@ on:
   schedule:
     # The pull_request trigger below covers every change to a setup input, so the
     # clock trigger only sweeps for drift (a moved upstream image, an expiring
-    # external dependency). Four sweeps a day keep that detection cheap.
-    - cron: '17 */6 * * *'
+    # external dependency). One sweep a day is enough for that: an upstream break
+    # is found within a day, and a setup change never waits for the clock.
+    - cron: '17 4 * * *'
   workflow_dispatch:
   pull_request:
     branches: [main]
@@ -28,6 +29,10 @@ concurrency:
 
 jobs:
   setup-smoke:
+    # Guard: a fork with Actions enabled can trigger this on schedule or via
+    # workflow_dispatch, and it posts issue comments via GITHUB_TOKEN. Only
+    # the canonical repo needs this smoke test.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 45
 
@@ -51,11 +56,16 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
+      # The shared store keeps this install warm when a pull request moves the
+      # lockfile; a lockfile-keyed setup-node cache misses and downloads every
+      # package from the registry.
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
       - name: Enable Corepack
         run: |
@@ -67,10 +77,21 @@ jobs:
           printf '#!/usr/bin/env bash\nexport PATH="%s"\nexec "%s/pnpm" "$@"\n' "$PATH" "$PNPM_HOME" | sudo tee /usr/local/bin/pnpm >/dev/null
           sudo chmod +x /usr/local/bin/pnpm
 
-      - name: Install tmux
+      # The ubuntu-24.04 runner image already ships tmux (the job log of an earlier
+      # run reported "tmux is already the newest version"), so only install it when
+      # the image lacks it. Each apt call is bounded: when the fleet's apt egress
+      # degrades, an unbounded apt waits out the job's 45-minute timeout instead of
+      # failing fast with a clear error.
+      - name: Ensure tmux is installed
         run: |
-          sudo apt-get update
-          sudo apt-get install -y tmux
+          if command -v tmux >/dev/null 2>&1; then
+            echo "tmux is already installed: $(tmux -V)"
+            exit 0
+          fi
+
+          timeout --kill-after=30s 300s sudo apt-get update
+          timeout --kill-after=30s 300s sudo apt-get install -y tmux
+          tmux -V
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -104,8 +125,11 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright.outputs.version }}
 
-      - name: Install Playwright browsers
-        run: pnpm --filter web exec playwright install --with-deps chromium
+      # No --with-deps: the runner image already ships the Chromium system
+      # libraries, and the apt-get behind --with-deps can hang until the job
+      # timeout when the fleet's apt egress degrades.
+      - name: Install Playwright Chromium
+        run: pnpm --filter web exec playwright install chromium
 
       - name: Start dev stack
         run: pnpm dev:start --no-attach
@@ -172,7 +196,7 @@ jobs:
         run: pnpm dev:stop --force
 
       - name: Upload setup smoke artifacts
-        if: always()
+        if: failure() || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: setup-smoke-artifacts

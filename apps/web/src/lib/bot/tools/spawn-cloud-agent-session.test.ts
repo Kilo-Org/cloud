@@ -12,21 +12,25 @@ import type {
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import type { getBotUserId as GetBotUserId } from '@/lib/bot-users/bot-user-service';
 import type { resolveGitHubRepositoryForOwner as ResolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
+import type { authorizeGitHubRepository as AuthorizeGitHubRepository } from '@/lib/bot/github-repository-permission';
 import type SpawnCloudAgentSession from './spawn-cloud-agent-session';
 import { INSUFFICIENT_CREDITS_RESPONSE } from '@/lib/cloud-agent-next/run-session';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 
 const mockGetGitHubIntegrationById =
   jest.fn<(...args: unknown[]) => Promise<PlatformIntegration | null>>();
-const mockAuthorizeGitHubRepositoryFn =
-  jest.fn<(params: unknown) => Promise<{ allowed: true } | { allowed: false; markdown: string }>>();
+const mockAuthorizeGitHubRepositoryFn = jest.fn<typeof AuthorizeGitHubRepository>();
 
-function authorizeGitHubRepository(params: unknown) {
+function authorizeGitHubRepository(params: Parameters<typeof AuthorizeGitHubRepository>[0]) {
   return mockAuthorizeGitHubRepositoryFn(params);
 }
 
 jest.mock('@/lib/bot/github-repository-permission', () => ({
   authorizeGitHubRepository,
+}));
+
+jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
+  assertGitHubInstallationRuntimeAuthorized: jest.fn(),
 }));
 
 const mockLinkUploadedAttachmentsFn = jest.fn<(...args: unknown[]) => Promise<string[]>>();
@@ -318,6 +322,88 @@ describe('spawnCloudAgentSession delegation', () => {
     expect(mockPrepareSession).toHaveBeenCalled();
   });
 
+  it('prepares an organization Slack session without a linked GitHub identity through its connection', async () => {
+    const slackIntegration = {
+      owned_by_organization_id: 'organization-1',
+      owned_by_user_id: null,
+      platform: 'slack',
+    } as PlatformIntegration;
+    mockAuthorizeGitHubRepositoryFn.mockImplementation(
+      jest.requireActual<{ authorizeGitHubRepository: typeof AuthorizeGitHubRepository }>(
+        '@/lib/bot/github-repository-permission'
+      ).authorizeGitHubRepository
+    );
+
+    await expect(
+      spawnCloudAgentSession(
+        { githubRepo: 'owner/repo', prompt: 'Read the source', mode: 'ask' },
+        'model',
+        slackIntegration,
+        'auth-token',
+        'request-chat-allowed',
+        undefined,
+        { chatPlatform: 'slack', payerUserId: 'user-without-github' }
+      )
+    ).resolves.toEqual({
+      response:
+        'Cloud Agent session started. I will post the final response back in this thread when it completes.',
+      cloudAgentSessionId: 'cloud-session-1',
+      kiloSessionId: 'kilo-session-1',
+    });
+
+    expect(mockResolveGitHubRepositoryForOwner).toHaveBeenCalledTimes(1);
+    expect(mockResolveGitHubRepositoryForOwner).toHaveBeenCalledWith(
+      { type: 'org', id: 'organization-1' },
+      'owner/repo',
+      'agent'
+    );
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        githubRepo: 'owner/repo',
+        githubIntegrationId: 'github-association-1',
+        githubAccessPurpose: 'agent',
+        kilocodeOrganizationId: 'organization-1',
+        mode: 'ask',
+      })
+    );
+  });
+
+  it('rejects an unavailable organization Slack repository without a linked GitHub identity before prepare', async () => {
+    const slackIntegration = {
+      ...organizationIntegration,
+      platform: 'slack',
+    } as PlatformIntegration;
+    mockAuthorizeGitHubRepositoryFn.mockImplementation(
+      jest.requireActual<{ authorizeGitHubRepository: typeof AuthorizeGitHubRepository }>(
+        '@/lib/bot/github-repository-permission'
+      ).authorizeGitHubRepository
+    );
+    mockResolveGitHubRepositoryForOwner.mockResolvedValue(null);
+
+    await expect(
+      spawnCloudAgentSession(
+        { githubRepo: 'other/repo', prompt: 'Read the source', mode: 'ask' },
+        'model',
+        slackIntegration,
+        'auth-token',
+        'request-chat-unavailable',
+        undefined,
+        { chatPlatform: 'slack', payerUserId: 'user-without-github' }
+      )
+    ).resolves.toEqual({
+      response:
+        "Error: That GitHub repository is not uniquely available through this organization's approved GitHub connections.",
+    });
+    expect(mockResolveGitHubRepositoryForOwner).toHaveBeenCalledTimes(1);
+    expect(mockResolveGitHubRepositoryForOwner).toHaveBeenCalledWith(
+      { type: 'org', id: 'organization-1' },
+      'other/repo',
+      'agent'
+    );
+    expect(mockGetGitHubIntegrationById).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+  });
+
   it('rejects GitHub repositories outside the owner inventory', async () => {
     mockResolveGitHubRepositoryForOwner.mockResolvedValue(null);
 
@@ -426,6 +512,143 @@ describe('spawnCloudAgentSession delegation', () => {
         kilocodeOrganizationId: 'organization-1',
       })
     );
+  });
+
+  it('prepares an organization Slack GitLab session without a personal GitLab connection', async () => {
+    mockGetGitLabTokenForUser.mockResolvedValue(undefined);
+
+    await expect(
+      spawnCloudAgentSession(
+        { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
+        'model',
+        { ...organizationIntegration, platform: 'slack' },
+        'auth-token',
+        'request-gitlab-no-identity',
+        undefined,
+        { chatPlatform: 'slack', payerUserId: 'user-9' }
+      )
+    ).resolves.toEqual({
+      response:
+        'Cloud Agent session started. I will post the final result back in this thread when it completes.',
+      cloudAgentSessionId: 'cloud-session-1',
+      kiloSessionId: 'kilo-session-1',
+    });
+    expect(mockValidateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
+      'organization-1',
+      'bot-user-1',
+      'group/repo'
+    );
+    expect(mockGetGitLabTokenForOrganization).toHaveBeenCalledWith('organization-1', 'bot-user-1');
+    expect(mockGetGitLabTokenForUser).not.toHaveBeenCalled();
+    expect(mockGetGitLabInstanceUrlForUser).not.toHaveBeenCalled();
+    expect(mockValidateGitLabRepoAccessForUser).not.toHaveBeenCalled();
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gitUrl: 'https://gitlab.com/group/repo.git',
+        gitToken: 'gitlab-org-token',
+        platform: 'gitlab',
+        kilocodeOrganizationId: 'organization-1',
+        createdOnPlatform: 'slack',
+      })
+    );
+  });
+
+  it('returns the specific connection reply for an invalid organization GitLab instance URL', async () => {
+    mockGetGitLabInstanceUrlForOrganization.mockResolvedValue('http://gitlab.example.test');
+
+    await expect(
+      spawnCloudAgentSession(
+        { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
+        'model',
+        { ...organizationIntegration, platform: 'slack' },
+        'auth-token',
+        'request-gitlab-invalid-organization-instance',
+        undefined,
+        { chatPlatform: 'slack', payerUserId: 'user-9' }
+      )
+    ).resolves.toEqual({
+      response:
+        "Error: The GitLab connection for this integration has an invalid instance URL. Update the integration's GitLab connection in Kilo Code settings.",
+    });
+    expect(mockGetGitLabInstanceUrlForUser).not.toHaveBeenCalled();
+    expect(mockValidateGitLabRepoAccessForOrganization).not.toHaveBeenCalled();
+    expect(mockGetGitLabTokenForOrganization).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+  });
+
+  it('rejects an organization Slack GitLab project outside the organization connection before prepare', async () => {
+    mockValidateGitLabRepoAccessForOrganization.mockResolvedValue(false);
+    mockGetGitLabTokenForUser.mockResolvedValue(undefined);
+
+    await expect(
+      spawnCloudAgentSession(
+        { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
+        'model',
+        { ...organizationIntegration, platform: 'slack' },
+        'auth-token',
+        'request-gitlab-org-denied',
+        undefined,
+        { chatPlatform: 'slack', payerUserId: 'user-9' }
+      )
+    ).resolves.toEqual({
+      response:
+        "Error: That GitLab project is not available through this account's GitLab integration.",
+    });
+    expect(mockValidateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
+      'organization-1',
+      'bot-user-1',
+      'group/repo'
+    );
+    expect(mockGetGitLabTokenForOrganization).not.toHaveBeenCalled();
+    expect(mockGetGitLabTokenForUser).not.toHaveBeenCalled();
+    expect(mockBuildGitLabCloneUrl).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+  });
+
+  it.each(['provider unavailable', 'transport timeout'])(
+    'returns the retry response without preparing a session when the organization lookup fails: %s',
+    async message => {
+      mockValidateGitLabRepoAccessForOrganization.mockRejectedValueOnce(new Error(message));
+
+      await expect(
+        spawnCloudAgentSession(
+          { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
+          'model',
+          organizationIntegration,
+          'auth-token',
+          'request-gitlab-org-lookup-failed'
+        )
+      ).resolves.toEqual({
+        response: 'Error: Could not verify access to that GitLab project. Please try again.',
+      });
+      expect(mockValidateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
+        'organization-1',
+        'bot-user-1',
+        'group/repo'
+      );
+      expect(mockPrepareSession).not.toHaveBeenCalled();
+      expect(mockGetGitLabTokenForOrganization).not.toHaveBeenCalled();
+    }
+  );
+
+  it('prepares an organization GitLab project for a run with no requesting account', async () => {
+    await expect(
+      spawnCloudAgentSession(
+        { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
+        'model',
+        organizationIntegration,
+        'auth-token',
+        'request-gitlab-org-no-requester'
+      )
+    ).resolves.toEqual(expect.objectContaining({ cloudAgentSessionId: 'cloud-session-1' }));
+    expect(mockValidateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
+      'organization-1',
+      'bot-user-1',
+      'group/repo'
+    );
+    expect(mockGetGitLabTokenForUser).not.toHaveBeenCalled();
+    expect(mockGetGitLabInstanceUrlForUser).not.toHaveBeenCalled();
+    expect(mockPrepareSession).toHaveBeenCalled();
   });
 
   it('prepares no session when the project lookup fails', async () => {

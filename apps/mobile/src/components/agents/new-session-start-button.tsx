@@ -3,18 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { cn } from '@/lib/utils';
-
-/**
- * A Start held back by the lapsed-plan explanation takes the inactive control
- * pair on a dark screen. `--primary-disabled` there is a light neutral, a plate
- * that stands out of the near-black page like an enabled control; the inactive
- * fill stays a dim surface and the `--ink2` label keeps its contrast on it.
- * Light keeps the disabled primary pair it always had, so the control still
- * reads as the same one the empty form shows.
- */
-const PLAN_BLOCKED_FILL_CLASS = 'bg-primary-disabled dark:bg-control-idle';
-const PLAN_BLOCKED_LABEL_CLASS = 'dark:text-ink2';
 
 type NewSessionStartBlockedAction = {
   label: string;
@@ -36,14 +24,6 @@ type NewSessionStartButtonProps = {
    * leave the prompt draft on the screen.
    */
   startBlockedAction?: NewSessionStartBlockedAction | null;
-  /**
-   * The lapsed-plan explanation already names why Start cannot run, so the
-   * control takes the inactive fill on a dark screen instead of the light
-   * disabled plate: the dark `--primary-disabled` is a light neutral that
-   * stands out of the near-black page like an enabled control, while this
-   * pair stays a dim surface the `--ink2` label reads on.
-   */
-  blockedByPlan?: boolean;
   onStartSession: () => void;
 };
 
@@ -69,11 +49,9 @@ export function NewSessionStartButton({
   isStarting,
   startBlockedReason = null,
   startBlockedAction = null,
-  blockedByPlan = false,
   onStartSession,
 }: Readonly<NewSessionStartButtonProps>) {
   const { t } = useTranslation();
-  const planBlocked = blockedByPlan && isStartDisabled;
 
   const reason = (
     <AccessibleStatus message={startBlockedReason} tone="status" className="mt-6 text-sm" />
@@ -108,12 +86,12 @@ export function NewSessionStartButton({
         {action}
         <Button
           size="lg"
-          className={cn('mt-6', planBlocked && PLAN_BLOCKED_FILL_CLASS)}
+          className="mt-6"
           disabled={isStartDisabled}
           loading={isStarting}
           onPress={onStartSession}
         >
-          <Text className={planBlocked ? PLAN_BLOCKED_LABEL_CLASS : undefined}>{label}</Text>
+          <Text>{label}</Text>
         </Button>
       </>
     );
@@ -125,14 +103,12 @@ export function NewSessionStartButton({
       {action}
       <Button
         size="lg"
-        className={cn('mt-6', planBlocked && PLAN_BLOCKED_FILL_CLASS)}
+        className="mt-6"
         disabled={isStartDisabled}
         loading={isStarting}
         onPress={onStartSession}
       >
-        <Text className={planBlocked ? PLAN_BLOCKED_LABEL_CLASS : undefined}>
-          {isStarting ? t('common.starting') : t('agentChat.newSession.startSession')}
-        </Text>
+        <Text>{isStarting ? t('common.starting') : t('agentChat.newSession.startSession')}</Text>
       </Button>
     </>
   );

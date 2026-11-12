@@ -21,8 +21,8 @@ import type {
 import {
   createFakeCredentialBroker,
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
-  installFakeCredentialEnv,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -58,7 +58,11 @@ function metadata(sandboxId: string) {
     auth: { kiloSessionId, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'git', url: 'https://github.com/acme/widgets.git', platform: 'github' },
-    workspace: { branchName: 'kilo/system-feed', sandboxId, sandboxProvider: 'cloudflare' },
+    workspace: {
+      branchName: 'kilo/system-feed',
+      sandboxId,
+      sandboxProvider: 'cloudflare-containers',
+    },
     lifecycle: { version: 1, timestamp: 1 },
   });
 }
@@ -104,17 +108,13 @@ async function installSandbox(sandboxId: string, provider: ProviderAdapter): Pro
   const broker = createFakeCredentialBroker();
   await runInDurableObject(sandboxStub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(
-      (instance as unknown as { env: Record<string, unknown> }).env,
-      broker,
-      {
-        SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
-        WORKER_URL: 'https://control.test',
-        KILOCODE_BACKEND_BASE_URL: 'https://control.test',
-        KILO_OPENROUTER_BASE: 'https://control.test',
-        KILO_SESSION_INGEST_URL: 'https://control.test',
-      }
-    );
+    installFakeSandboxEnv(instance, broker, {
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
+      WORKER_URL: 'https://control.test',
+      KILOCODE_BACKEND_BASE_URL: 'https://control.test',
+      KILO_OPENROUTER_BASE: 'https://control.test',
+      KILO_SESSION_INGEST_URL: 'https://control.test',
+    });
     Object.assign(instance, { createProviderAdapter: () => provider, provider });
     installFakeRuntimeProxyPeer(instance);
   });
@@ -149,13 +149,7 @@ type ActiveSession = {
 };
 
 async function startReadySession(): Promise<ActiveSession> {
-  const sandboxId = await generateSandboxId(
-    undefined,
-    ORG_ID,
-    USER_ID,
-    cloudAgentSessionId,
-    undefined
-  );
+  const sandboxId = await generateSandboxId(cloudAgentSessionId);
   const provider = createCountingProvider();
   await installSandbox(sandboxId, provider.adapter);
 
@@ -168,7 +162,7 @@ async function startReadySession(): Promise<ActiveSession> {
   await stub.createSessionWithInitialAdmission({
     metadata: metadata(sandboxId),
     message,
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
 
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));

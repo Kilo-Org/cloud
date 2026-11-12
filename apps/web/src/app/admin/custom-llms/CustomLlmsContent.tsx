@@ -96,6 +96,18 @@ const CREDENTIAL_FORMATS: { title: string; description: ReactNode; example: stri
 }`,
   },
   {
+    title: 'Google Cloud service account',
+    description: <>Paste the service account key JSON and add the type.</>,
+    example: `{
+  "type": "service_account",
+  "project_id": "my-project",
+  "private_key_id": "...",
+  "private_key": "-----BEGIN PRIVATE KEY-----\\n...",
+  "client_email": "...",
+  ...
+}`,
+  },
+  {
     title: 'Amazon Bedrock IAM access keys',
     description: (
       <>
@@ -104,9 +116,8 @@ const CREDENTIAL_FORMATS: { title: string; description: ReactNode; example: stri
         <code className="text-foreground break-all">
           https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1
         </code>
-        . Requests are signed with AWS SigV4. Bedrock API keys use{' '}
-        <code className="text-foreground">api_key</code> on OpenAI-compatible routes and{' '}
-        <code className="text-foreground">x-api-key</code> on Anthropic Messages routes.
+        . Requests are signed with AWS SigV4. For a Bedrock API key, use an API key credential
+        instead.
       </>
     ),
     example: `{
@@ -431,20 +442,15 @@ export function CustomLlmsContent() {
 
   return (
     <div className="flex w-full flex-col gap-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Custom LLMs</h2>
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" />
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-muted-foreground text-sm">
+          Models served directly from an upstream with Kilo-managed, encrypted credentials.
+        </p>
+        <Button onClick={openCreate} size="sm">
+          <Plus />
           Add Custom LLM
         </Button>
       </div>
-
-      <p className="text-muted-foreground">
-        Manage custom LLM definitions stored in the <code>custom_llm2</code> table. Each entry has a{' '}
-        <code>public_id</code>, encrypted credentials (such as API keys, Google Cloud
-        service-account keys, or Amazon Bedrock IAM access keys), and a JSON <code>definition</code>{' '}
-        validated against <code>CustomLlmDefinitionSchema</code>.
-      </p>
 
       {isLoading ? (
         <div className="text-center">Loading...</div>
@@ -616,44 +622,60 @@ export function CustomLlmsContent() {
                   options={{ ...JSON_EDITOR_OPTIONS, ariaLabel: 'Custom LLM definition JSON' }}
                 />
               </div>
-              <p className="text-muted-foreground mt-1 text-xs">
-                Set <code>disable_url_suffix</code> to <code>true</code> to use{' '}
-                <code>base_url</code> exactly, without suffixes such as <code>/messages</code>. Add{' '}
-                <code>&quot;internal_id&quot;: &quot;provider-model&quot;</code> to send an upstream{' '}
-                <code>model</code>; omit <code>internal_id</code> to remove <code>model</code> from
-                the outbound request body.
-              </p>
-              <p className="text-muted-foreground mt-1 text-xs">
-                Public ID may only contain lowercase letters, digits, and <code>. / -</code>. It
-                must not start with <code>kilo/</code>, <code>kilo-auto/</code>,{' '}
-                <code>kilocode/</code>, or a direct BYOK provider prefix, and must not be an
-                OpenRouter model or a free model ID such as <code>stealth/…-alpha</code>.
-              </p>
-              <p className="text-muted-foreground mt-1 text-xs">
-                Set <code>api_kinds</code> to a subset of <code>chat_completions</code>,{' '}
-                <code>messages</code>, and <code>responses</code> when the upstream serves several
-                APIs. It must include the API clients use, which{' '}
-                <code>opencode_settings.ai_sdk_provider</code> picks: Messages for{' '}
-                <code>anthropic</code>, Responses for <code>openai</code>, and Chat Completions
-                otherwise. Without it, only that API is served.
-              </p>
-              <p className="text-muted-foreground mt-1 text-xs">
-                Custom LLMs are free for users unless the definition sets <code>pricing</code>, a
-                list of tiers in the same format as a custom pricing entry&apos;s{' '}
-                <code>pricing</code>. Priced custom LLMs bill users like other paid models and are
-                not available to signed-out users. To make the model available to every user, or
-                every signed-in user when it sets <code>pricing</code>, replace{' '}
-                <code>organization_ids</code> and <code>group_ids</code> with{' '}
-                <code>
-                  &quot;public&quot;: {'{'} &quot;inference_providers&quot;: [&quot;acme&quot;],
-                  &quot;description&quot;: &quot;…&quot; {'}'}
-                </code>
-                . Organization provider allow lists apply to these providers. Unknown providers
-                appear in the provider list after the next provider sync. Without{' '}
-                <code>public</code>, <code>organization_ids</code>, or <code>group_ids</code>, the
-                model is stored but nobody can use it. Saved changes reach every server within a
-                minute.
-              </p>
+              <details className="group mt-2 text-xs">
+                <summary className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 flex w-fit cursor-pointer list-none items-center gap-1 rounded-sm select-none focus-visible:ring-[3px] focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+                  <ChevronRight
+                    className="size-3.5 transition-transform group-open:rotate-90"
+                    aria-hidden="true"
+                  />
+                  Definition rules
+                </summary>
+                <ul className="bg-muted text-muted-foreground mt-2 flex list-disc flex-col gap-1.5 rounded-md p-3 pl-7">
+                  <li>
+                    Public IDs use lowercase letters, digits, and <code>. / -</code>, and must not
+                    start with <code>kilo/</code>, <code>kilo-auto/</code>, <code>kilocode/</code>,
+                    or a direct BYOK provider prefix, or be an OpenRouter model.
+                  </li>
+                  <li>
+                    <code>internal_id</code> is sent upstream as <code>model</code>; without it,{' '}
+                    <code>model</code> is removed from the request body.{' '}
+                    <code>disable_url_suffix</code> uses <code>base_url</code> without suffixes such
+                    as <code>/messages</code>.
+                  </li>
+                  <li>
+                    <code>api_kinds</code> lists the served APIs (<code>chat_completions</code>,{' '}
+                    <code>messages</code>, <code>responses</code>). It must include the one{' '}
+                    <code>opencode_settings.ai_sdk_provider</code> picks: Messages for{' '}
+                    <code>anthropic</code>, Responses for <code>openai</code>, otherwise Chat
+                    Completions, which is also the only API served without it.
+                  </li>
+                  <li>
+                    IDs ending in <code>-free</code> or starting with <code>stealth/</code> are free
+                    and must not set <code>pricing</code>; public free models work signed out. Other
+                    models need <code>pricing</code> tiers in the custom pricing format, or users
+                    are billed only what the upstream reports.
+                  </li>
+                  <li>
+                    With <code>pricing</code>, set{' '}
+                    <code>&quot;may_train_on_prompts&quot;: false</code> only for zero data
+                    retention upstreams.
+                  </li>
+                  <li>
+                    Grant access with <code>organization_ids</code> or <code>group_ids</code>, or
+                    replace them with{' '}
+                    <code>
+                      &quot;public&quot;: {'{'} &quot;inference_providers&quot;: [&quot;acme&quot;],
+                      &quot;description&quot;: &quot;…&quot; {'}'}
+                    </code>{' '}
+                    to offer it to everyone, subject to organization provider allow lists. Without
+                    any of these, nobody can use the model.
+                  </li>
+                  <li>
+                    Routing picks up changes within about a minute; public models and new providers
+                    appear in the model list after the next provider sync.
+                  </li>
+                </ul>
+              </details>
             </div>
 
             {editor.validationError && (
@@ -693,7 +715,7 @@ export function CustomLlmsContent() {
                   <p>
                     Signed-in Kilo users will be billed for{' '}
                     <code className="font-mono">{pendingChange.input.public_id}</code> at the
-                    definition&apos;s pricing. Signed-out users will no longer be able to use it.
+                    definition&apos;s pricing.
                   </p>
                 ) : pendingChange?.priced ? (
                   <p>
@@ -703,9 +725,11 @@ export function CustomLlmsContent() {
                   </p>
                 ) : (
                   <p>
-                    Every Kilo user, including signed-out users, will be able to use{' '}
-                    <code className="font-mono">{pendingChange?.input.public_id}</code> for free.
-                    Kilo pays for all usage.
+                    Every Kilo user will be able to use{' '}
+                    <code className="font-mono">{pendingChange?.input.public_id}</code> without
+                    being charged. Kilo pays for all usage. Unless the public ID ends in{' '}
+                    <code>-free</code> or starts with <code>stealth/</code>, only signed-in users
+                    with credits can use it.
                   </p>
                 )}
                 <p>

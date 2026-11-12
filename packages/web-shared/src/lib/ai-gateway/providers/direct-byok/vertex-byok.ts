@@ -3,7 +3,7 @@ import { DirectByokModelEndpointSchema } from '@kilocode/db/schema-types';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
-import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
+import { cachedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import { DirectVertexCredentialsSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type {
   DirectByokModel,
@@ -15,6 +15,7 @@ import {
   type GatewayChatApiKind,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 
 /**
  * Vertex AI serves Gemini and the managed open and partner models through its
@@ -103,10 +104,6 @@ export function getGcpVertexMistralLocation(location: string) {
   return location === 'eu' || location.startsWith('europe-')
     ? MISTRAL_EU_LOCATION
     : MISTRAL_US_LOCATION;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function deleteFieldsExcept(value: object, allowed: ReadonlySet<string>) {
@@ -261,7 +258,7 @@ export default {
       request.body.model = toGcpVertexOpenApiModelId(request.body.model);
     }
   },
-  models: cachedEnhancedDirectByokModelList({ providerId: 'vertex-byok', recommendedModels: [] }),
+  models: cachedDirectByokModelList('vertex-byok'),
   async resolveUpstream({ credential, model, stream }) {
     return resolveGcpVertexUpstream(credential, model, stream);
   },

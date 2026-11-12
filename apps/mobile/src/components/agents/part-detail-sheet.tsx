@@ -1,5 +1,5 @@
 import { type Part } from '@kilocode/cloud-agent-sdk';
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +29,8 @@ type PartDetailSheetProps = {
   visible: boolean;
   part: Part | null;
   onClose: () => void;
+  /** Fires after the native dismiss animation completes. */
+  onDismiss?: () => void;
 };
 
 function renderPartContent(part: Part | null): ReactNode {
@@ -67,8 +69,10 @@ function renderPartContent(part: Part | null): ReactNode {
  * Mono text display mode: defaults to `wrap`, delivered to mounted mono blocks
  * through `MonoScrollSheetContext` with a presence tracker that shows the
  * `Text display` segmented control only while mono content is mounted. The
- * mode survives stream-driven re-renders and resets to `wrap` when the sheet
- * closes (visible -> false), because the host keeps the sheet mounted.
+ * mode survives stream-driven re-renders and the leave animation
+ * (`visible -> false` only starts it) and resets to `wrap` when the native
+ * dismissal reports through `onDismiss`, because the host keeps the sheet
+ * mounted. The failed-image state resets on the same report.
  *
  * While a reasoning part streams, the sheet auto-follows the growing text:
  * follow stops on drag or momentum and resumes when the user returns to the
@@ -76,7 +80,12 @@ function renderPartContent(part: Part | null): ReactNode {
  * plain `Text` instead of `SelectableText` for frame rate, then swaps back to
  * the selectable path when the part finishes.
  */
-export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailSheetProps>) {
+export function PartDetailSheet({
+  visible,
+  part,
+  onClose,
+  onDismiss,
+}: Readonly<PartDetailSheetProps>) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const detailTitle = part ? getPartDetailTitle(part) : null;
@@ -98,12 +107,11 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
       setMonoCount(count => count - 1);
     };
   }, []);
-  useEffect(() => {
-    if (!visible) {
-      setTextMode('wrap');
-      setFailedImage(null);
-    }
-  }, [visible]);
+  const handleDismiss = useCallback(() => {
+    setTextMode('wrap');
+    setFailedImage(null);
+    onDismiss?.();
+  }, [onDismiss]);
   const sheetContext = useMemo(
     () => ({ mode: textMode, track: trackMonoBlock }),
     [textMode, trackMonoBlock]
@@ -133,7 +141,7 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
   );
 
   return (
-    <SessionPageSheet visible={visible} onClose={onClose} dismissible>
+    <SessionPageSheet visible={visible} onClose={onClose} onDismiss={handleDismiss} dismissible>
       <SheetHeader
         title={shownTitle}
         onDone={onClose}

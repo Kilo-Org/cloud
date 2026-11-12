@@ -1,6 +1,12 @@
 import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it } from 'vitest';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { eq } from 'drizzle-orm';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
+import {
+  routes as routesTable,
+  scopeGrants as scopeGrantsTable,
+} from '../../src/control-plane/sandbox/sqlite-schema.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-identity.js';
@@ -18,8 +24,8 @@ import type {
 import {
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
-  installFakeCredentialEnv,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
@@ -68,7 +74,7 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
     workspace: {
       branchName: 'kilo/b10t',
       sandboxId: input.sandboxId,
-      sandboxProvider: 'cloudflare',
+      sandboxProvider: 'cloudflare-containers',
     },
     lifecycle: { version: 1, timestamp: 1 },
   });
@@ -115,8 +121,8 @@ async function injectProvider(
   const broker = createFakeCredentialBroker();
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance.env, broker, {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+    installFakeSandboxEnv(instance, broker, {
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
       KILO_OPENROUTER_BASE: 'https://control.test',
@@ -186,10 +192,10 @@ async function startTerminalSandbox(): Promise<{
   provider: FakeProvider;
   wrapper: FakeWrapper;
 }> {
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+  const sandboxId = await generateSandboxId(newSessionId());
   const provider = createFakeProvider();
   const stub = await injectProvider(sandboxId, provider);
-  await stub.ensureAllocation({ provider: 'cloudflare', allocationName: sandboxId });
+  await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   const wrapper = await connectAndHello(provider, sandboxId, WRAPPER_ID);
   return { sandboxId, stub, provider, wrapper };
@@ -266,10 +272,10 @@ describe('control-plane terminals on the Sandbox DO (B10)', () => {
   });
 
   it('returns a retryable not_ready when no wrapper is connected', async () => {
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const sandboxId = await generateSandboxId(newSessionId());
     const provider = createFakeProvider();
     const stub = await injectProvider(sandboxId, provider);
-    await stub.ensureAllocation({ provider: 'cloudflare', allocationName: sandboxId });
+    await stub.ensureAllocation({ provider: 'cloudflare-containers', allocationName: sandboxId });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
 
     await expect(
@@ -361,14 +367,14 @@ async function startTerminalSession(): Promise<{
   wrapper: FakeWrapper;
 }> {
   const sessionId = newSessionId();
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+  const sandboxId = await generateSandboxId(sessionId);
   const provider = createFakeProvider();
   await injectProvider(sandboxId, provider);
   const sessionStub = sessions.getByName(sessionDoName(USER_ID, sessionId));
   await sessionStub.createSessionWithInitialAdmission({
     metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
     message: promptPayload(messageId()),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   const wrapper = await connectAndHello(provider, sandboxId, WRAPPER_ID);
@@ -445,14 +451,14 @@ describe('control-plane terminals on the Session DO (B10)', () => {
 
   it('refuses a terminal before the route is ready', async () => {
     const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const sandboxId = await generateSandboxId(sessionId);
     const provider = createFakeProvider();
     await injectProvider(sandboxId, provider);
     const sessionStub = sessions.getByName(sessionDoName(USER_ID, sessionId));
     await sessionStub.createSessionWithInitialAdmission({
       metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
       message: promptPayload(messageId()),
-      sandboxSelection: { provider: 'cloudflare' },
+      sandboxSelection: { provider: 'cloudflare-containers' },
     });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
 
@@ -530,6 +536,27 @@ function closedWith(socket: WebSocket): Promise<ChannelClose> {
   return promise;
 }
 
+/** The sandbox-side route row for one session, or null once it was released. */
+async function readSandboxRoute(
+  sandboxId: string,
+  sessionId: string
+): Promise<{ state: string } | null> {
+  return runInDurableObject(sandboxes.getByName(sandboxId), async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
+    return rows[0] === undefined ? null : { state: rows[0].state };
+  });
+}
+
+/** Scope grants the sandbox still holds, so a release can be proven complete. */
+function scopeGrantCount(sandboxId: string): Promise<number> {
+  return runInDurableObject(
+    sandboxes.getByName(sandboxId),
+    (_instance, state) =>
+      drizzle(state.storage, { logger: false }).select().from(scopeGrantsTable).all().length
+  );
+}
+
 async function openBrowserTerminal(
   sessionStub: DurableObjectStub<SandboxSessionV2>,
   wrapper: FakeWrapper
@@ -599,9 +626,10 @@ async function openStreamSocket(
 
 describe('control-plane session organization close on the Session DO', () => {
   it('closes terminal browser and stream sockets for the session organization', async () => {
-    const { sessionStub, wrapper } = await startTerminalSession();
+    const { sessionId, sandboxId, sessionStub, wrapper } = await startTerminalSession();
     const terminal = await openBrowserTerminal(sessionStub, wrapper);
     const stream = await openStreamSocket(sessionStub);
+    expect(await readSandboxRoute(sandboxId, sessionId)).toEqual({ state: 'ready' });
 
     await expect(sessionStub.closeOrgStreams(ORG_ID)).resolves.toBe(2);
 
@@ -619,6 +647,11 @@ describe('control-plane session organization close on the Session DO', () => {
       reason: 'Browser disconnected',
     });
 
+    // The session's route is released: its row and organization-attributed
+    // grant are gone, and the wrapper is told to end that session's runtime.
+    expect(await readSandboxRoute(sandboxId, sessionId)).toBeNull();
+    expect(await awaitFrame(wrapper, 'session.release')).toMatchObject({ sessionId });
+
     // The terminal record stays running.
     const record = await runInDurableObject(sessionStub, (_instance, state) =>
       state.storage.get<{ state: string }>('control_terminal:pty_1')
@@ -627,14 +660,45 @@ describe('control-plane session organization close on the Session DO', () => {
     wrapper.close();
   });
 
+  it('refuses a revoked session its next organization-granted route', async () => {
+    const { sessionId, sandboxId, sessionStub, wrapper } = await startTerminalSession();
+    // The owner leaves the organization while the route is ready.
+    await runInDurableObject(sandboxes.getByName(sandboxId), instance => {
+      instance.organizationMembershipFor = async () => false;
+    });
+    await expect(sessionStub.closeOrgStreams(ORG_ID)).resolves.toBe(0);
+    expect(await readSandboxRoute(sandboxId, sessionId)).toBeNull();
+    await awaitFrame(wrapper, 'session.release');
+
+    // The next send cannot obtain a new organization-attributed grant, so the
+    // message fails instead of running inside the organization's sandbox.
+    const revokedMessageId = messageId();
+    await sessionStub.send({
+      messageId: revokedMessageId,
+      turn: { type: 'prompt', prompt: 'hello again' },
+      agent: { mode: 'code', model: 'test/model' },
+    });
+    await waitFor(async () => {
+      const result = await sessionStub.getMessageResult(revokedMessageId);
+      expect(result).toMatchObject({ type: 'found', result: { status: 'failed' } });
+    });
+    // The refused preparation leaves a failed route with no grant and no scope
+    // grant row, so nothing organization-attributed is left to renew.
+    expect(await readSandboxRoute(sandboxId, sessionId)).toMatchObject({ state: 'failed' });
+    expect(await scopeGrantCount(sandboxId)).toBe(0);
+    wrapper.close();
+  });
+
   it('leaves terminal browser and stream sockets open for an unrelated organization', async () => {
-    const { sessionStub, wrapper } = await startTerminalSession();
+    const { sessionId, sandboxId, sessionStub, wrapper } = await startTerminalSession();
     const terminal = await openBrowserTerminal(sessionStub, wrapper);
     const stream = await openStreamSocket(sessionStub);
 
     await expect(sessionStub.closeOrgStreams('org_elsewhere')).resolves.toBe(0);
     expect(terminal.socket.readyState).toBe(WebSocket.OPEN);
     expect(stream.socket.readyState).toBe(WebSocket.OPEN);
+    // A different organization neither releases the route nor ends its runtime.
+    expect(await readSandboxRoute(sandboxId, sessionId)).toEqual({ state: 'ready' });
 
     await expect(sessionStub.closeOrgStreams(ORG_ID)).resolves.toBe(2);
     await expect(terminal.closed).resolves.toEqual({
@@ -649,6 +713,7 @@ describe('control-plane session organization close on the Session DO', () => {
       code: 1000,
       reason: 'Browser disconnected',
     });
+    expect(await readSandboxRoute(sandboxId, sessionId)).toBeNull();
     wrapper.close();
   });
 });

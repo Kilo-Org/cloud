@@ -1,19 +1,20 @@
 import fs from 'node:fs/promises';
 import { appendFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import {
   ENVIRONMENT_BUILD_LOG_PATH,
   type EnvironmentBuildResult,
 } from '../../../src/shared/environment-build-protocol.js';
 import {
-  SETUP_COMMAND_HARD_TIMEOUT_MS,
   SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
   createRepositoryPreparation,
 } from '../control-plane/repository-preparation.js';
+import { createOwnedProcessScope } from '../control/owned-processes.js';
 import { writeWorkspaceStamp } from '../control-plane/workspace-stamp.js';
-import { git } from '../utils.js';
+import { git, type ProcessSpawn } from '../utils.js';
 import { runSetupScript } from '../setup-script.js';
 import { BuilderRefusedError, createBuilderClient } from './client.js';
-import { removeBuildCredentials, stopOtherProcesses } from './cleanup.js';
+import { removeBuildCredentials, stopOtherProcesses, stopOwnedProcesses } from './cleanup.js';
 import { createBuildReporter } from './reporter.js';
 import { runEnvironmentBuild } from './run.js';
 import { takeRunner } from './runner-file.js';
@@ -67,10 +68,30 @@ async function main(): Promise<void> {
     return idleUntilStopped();
   }
 
+  const ownedScope = process.pid === 1 ? undefined : createOwnedProcessScope();
+  if (
+    ownedScope !== undefined &&
+    !(await ownedScope.captureSpawnBaseline()) &&
+    !(await ownedScope.captureSpawnBaseline())
+  ) {
+    ownedScope.dispose();
+    log('environment builder process baseline unavailable; setup was not started');
+    await client
+      .result({
+        outcome: 'failed',
+        step: 'cleanup',
+        reason: 'cleanup_failed',
+        detail: 'Setup process baseline is unavailable. No build commands were started.',
+      })
+      .catch(() => undefined);
+    return idleUntilStopped();
+  }
+
+  const { deadlineAt } = input;
   const controller = new AbortController();
   const deadline = setTimeout(
     () => controller.abort(new Error('build deadline')),
-    Math.max(0, input.deadlineAt - Date.now())
+    Math.max(0, deadlineAt - Date.now())
   );
   const reporter = createBuildReporter({
     client,
@@ -88,7 +109,9 @@ async function main(): Promise<void> {
         inheritEnv: false,
         ...(signal ? { signal } : {}),
         inactivityTimeoutMs: SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
-        hardTimeoutMs: SETUP_COMMAND_HARD_TIMEOUT_MS,
+        // A build installs and warms what sessions later reuse, so a setup
+        // command may use the rest of the build deadline.
+        hardTimeoutMs: Math.max(1, deadlineAt - Date.now()),
         ...(onOutput ? { onOutput } : {}),
       }),
     sleep: (ms, signal) =>
@@ -109,19 +132,33 @@ async function main(): Promise<void> {
   });
 
   let result: EnvironmentBuildResult;
-  try {
-    result = await runEnvironmentBuild({
+  let ownedStopped = false;
+  const outsideScope: ProcessSpawn = (command, args, options) => spawn(command, args, options);
+  const runGit = (args: string[], options?: Parameters<typeof git>[1]) =>
+    git(args, ownedStopped ? { ...options, spawn: outsideScope } : options);
+  const run = () =>
+    runEnvironmentBuild({
       input,
       reporter,
       repository,
-      runGit: (args, options) => git(args, options),
-      stopProcesses: () => stopOtherProcesses(),
+      runGit,
+      stopProcesses: async () => {
+        if (ownedScope === undefined) {
+          await stopOtherProcesses();
+          return;
+        }
+        await stopOwnedProcesses(ownedScope);
+        // Cleanup's short Git reads must not re-enter the sealed scope.
+        ownedStopped = true;
+      },
       cleanup: removeBuildCredentials,
       writeStamp: (directory, stamp) => writeWorkspaceStamp(directory, true, stamp),
       signal: controller.signal,
       inherited,
       logPath,
     });
+  try {
+    result = await (ownedScope === undefined ? run() : ownedScope.run(run));
   } finally {
     clearTimeout(deadline);
   }

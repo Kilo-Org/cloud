@@ -1,8 +1,92 @@
 import type { Part, TextPart } from '@kilocode/app-shared/opencode';
 import { partSettledAt } from '../part-utils';
+import { isPreviewOfStoredTool } from '../tool-detail-marker';
 import type { MessageInfo } from '../types';
 
+function compareIds(left: string, right: string): number {
+  if (left < right) return -1;
+  return left > right ? 1 : 0;
+}
+
+/**
+ * Rows ordered by their own creation time, id as the tiebreak, so the store's
+ * id order never stands in for the transcript's order.
+ *
+ * The store keeps `messageIds` sorted by id because that order is the only one
+ * it can maintain incrementally. A CLI mints ids that rise with the clock, so
+ * that order used to agree with `time.created`; a session written by another
+ * client, an import, or an older id scheme holds ids in any order, and the
+ * worker's history read orders every page by `time.created`
+ * (`compareKiloSdkMessageInfo`). Reading the id order as the transcript order
+ * showed such a session out of sequence, with a newer turn above older rows.
+ *
+ * An optimistic or queued row is stamped with the device clock, and every
+ * stored row carries the writer's clock, so the two cannot be ranked against
+ * each other while a phone's clock disagrees with the writer's. Both are marked
+ * `synthetic` until the server echoes the row, and an unconfirmed row closes the
+ * transcript for the turn it belongs to, so they rank after every timed row.
+ *
+ * Returns `ids` itself while the array already follows that order, so an
+ * unchanged transcript keeps its reference. A row whose time is unreadable
+ * keeps the array as it is: the wire boundary rejects such a row, and a guess
+ * here would reorder a transcript on data the store cannot place.
+ */
+function orderMessageIdsByCreated(
+  ids: readonly string[],
+  messages: ReadonlyMap<string, MessageInfo>
+): readonly string[] {
+  const rows: Array<{ id: string; created: number; unconfirmed: boolean }> = [];
+  for (const id of ids) {
+    const info = messages.get(id);
+    const unconfirmed = info?.role === 'user' && info.synthetic === true;
+    const created: unknown = info?.time?.created;
+    if (!unconfirmed && (typeof created !== 'number' || !Number.isFinite(created))) return ids;
+    rows.push({
+      id,
+      created: typeof created === 'number' && Number.isFinite(created) ? created : 0,
+      unconfirmed,
+    });
+  }
+  let ordered = true;
+  for (let index = 1; index < rows.length; index += 1) {
+    const previous = rows[index - 1];
+    const current = rows[index];
+    if (previous === undefined || current === undefined) return ids;
+    if (compareCreatedRows(previous, current) > 0) {
+      ordered = false;
+      break;
+    }
+  }
+  if (ordered) return ids;
+  rows.sort(compareCreatedRows);
+  return rows.map(row => row.id);
+}
+
+function compareCreatedRows(
+  left: { id: string; created: number; unconfirmed: boolean },
+  right: { id: string; created: number; unconfirmed: boolean }
+): number {
+  if (left.unconfirmed !== right.unconfirmed) return left.unconfirmed ? 1 : -1;
+  if (left.created !== right.created) return left.created < right.created ? -1 : 1;
+  return compareIds(left.id, right.id);
+}
+
+/**
+ * The transcript's row order: creation time first, then the causality repair
+ * that keeps an assistant reply behind the prompt it answers.
+ */
 function orderMessageIds(
+  ids: readonly string[],
+  messages: ReadonlyMap<string, MessageInfo>
+): readonly string[] {
+  const ordered = orderMessageIdsByCreated(ids, messages);
+  const causal = orderCausalMessageIds(ordered, messages);
+  if (causal === ids) return ids;
+  if (causal.length === ids.length && causal.every((id, index) => id === ids[index])) return ids;
+  return causal;
+}
+
+function orderCausalMessageIds(
   ids: readonly string[],
   messages: ReadonlyMap<string, MessageInfo>
 ): readonly string[] {
@@ -261,7 +345,8 @@ function upsertPartDroppingStaleSyntheticParts(
   arr: Part[],
   part: Part,
   eventTime: number | undefined,
-  evidence: PartOrderingEvidence
+  evidence: PartOrderingEvidence,
+  authoritative = false
 ): Part[] {
   const nextPart = clonePart(part);
   const incomingIsSynthetic = Reflect.get(part, 'synthetic') === true;
@@ -287,10 +372,14 @@ function upsertPartDroppingStaleSyntheticParts(
       existing === undefined ? undefined : storedPartUpdateTime(evidence, existing);
     if (
       existing !== undefined &&
+      !authoritative &&
       isStaleToolLifecycleUpdate(existing, part, storedEventTime, eventTime)
     ) {
       return arr;
     }
+    // A later history page or replay may carry a bounded preview of a tool call
+    // this storage already holds in full; keep the complete copy.
+    if (existing !== undefined && isPreviewOfStoredTool(existing, part)) return arr;
     const nextArr = [...filtered];
     nextArr[idx] = nextPart;
     // Remember the ordering evidence the accepted update actually won on: its

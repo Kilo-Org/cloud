@@ -7,11 +7,16 @@ import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 import { NewSessionPromptControls as renderPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { Text as renderText } from '@/components/ui/text';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 
 import '@/i18n';
 import * as ReactI18next from 'react-i18next';
 
 const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
+const keyboardMotion = vi.hoisted(() => ({ value: 0 }));
+vi.mock('@/components/keyboard-motion-provider', () => ({
+  useKeyboardMotionProgress: () => keyboardMotion,
+}));
 const TEXT_DIRECTIONS = [
   { direction: 'LTR', isRTL: false, style: undefined },
   {
@@ -91,6 +96,7 @@ vi.mock('react-native', () => ({
 
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
+  createAnimatedComponent: (component: unknown) => component,
   FadeIn: { duration: vi.fn() },
   FadeOut: { duration: vi.fn() },
   // The composer's top fade resizes on the UI thread; there is none here, so
@@ -319,6 +325,7 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     returnSendsMessage.current = false;
     layoutDirection.isRTL = false;
     dimensions.current = { fontScale: 1, height: 800, scale: 1, width: 400 };
+    keyboardMotion.value = 0;
   });
 
   it('shows the prefill failure row with retry and discard only when delivery failed', async () => {
@@ -510,19 +517,19 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     const { isCreating, attachmentMax, paperclipDisabled } = options;
     const element = renderPrompt({ ...defaultProps(), isCreating, attachmentMax });
 
-    expect(
-      findElementByType(
-        element,
-        'Pressable',
-        ReactI18next.getI18n().t('agentChat.composer.addAttachment')
-      )
-    ).toMatchObject({
+    const paperclip = findElementByType(
+      element,
+      'Pressable',
+      ReactI18next.getI18n().t('agentChat.composer.addAttachment')
+    );
+    expect(paperclip).toMatchObject({
       disabled: paperclipDisabled,
       accessibilityState: { disabled: paperclipDisabled },
-      // 31.5pt frame (h-9 at NativeWind's 14pt rem) + 8.25pt per side = 48dp,
-      // Android's minimum (WCAG 2.5.8 AA).
-      hitSlop: { top: 8.25, bottom: 8.25, left: 8.25, right: 8.25 },
+      // A control-size audit reads the pressable's own rect, so the shared
+      // 48dp box is the target and no slop is added on top of it.
+      className: expect.stringContaining(ICON_TARGET_BOX_CLASS),
     });
+    expect(paperclip?.hitSlop).toBeUndefined();
     expect(findElementByType(element, ComposerPasteButton)).toMatchObject({ disabled: isCreating });
     // The microphone is part of the row whether or not the OS recognizer
     // answers available; a tap says why it cannot start.
@@ -610,5 +617,39 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     expect(input?.style).toEqual(
       expect.arrayContaining([expect.objectContaining({ height: 160 })])
     );
+  });
+
+  it('interpolates from the compact closed preference to the typing preference', async () => {
+    const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+    for (const { progress, height } of [
+      { progress: -0.1, height: 40 },
+      { progress: 0, height: 40 },
+      { progress: 0.5, height: 64 },
+      { progress: 1, height: 88 },
+      { progress: 1.1, height: 88 },
+    ]) {
+      keyboardMotion.value = progress;
+      const element = renderPrompt({
+        ...defaultProps(),
+        lineCount: 3,
+        keyboardClosedLineCount: 1,
+      }) as Node;
+      const input = findElementByType(element, 'TextInput');
+
+      expect(input?.style).toEqual(expect.arrayContaining([expect.objectContaining({ height })]));
+    }
+  });
+
+  it('keeps at least one full line when native keyboard progress exceeds its destination', async () => {
+    const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+    keyboardMotion.value = 1.1;
+    const element = renderPrompt({
+      ...defaultProps(),
+      lineCount: 1,
+      keyboardClosedLineCount: 3,
+    }) as Node;
+    const input = findElementByType(element, 'TextInput');
+
+    expect(input?.style).toEqual(expect.arrayContaining([expect.objectContaining({ height: 40 })]));
   });
 });

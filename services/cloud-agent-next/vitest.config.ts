@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { defineConfig, type Plugin } from 'vitest/config';
-import { binaryAsArrayBuffer } from './test/plugins/binary-as-arraybuffer.js';
 
 // Mirrors the wrangler.jsonc Text rule for `**/*.sql`: Durable Object migrations
 // import migration SQL as modules. `vitest related` analyzes every test file's
@@ -18,7 +17,7 @@ const sqlAsText: Plugin = {
 
 // Unit tests - run in Node (fast, supports vi.mock and global mocking)
 export default defineConfig({
-  plugins: [sqlAsText, binaryAsArrayBuffer],
+  plugins: [sqlAsText],
   test: {
     name: 'unit',
     globals: true,
@@ -32,7 +31,7 @@ export default defineConfig({
     },
     server: {
       deps: {
-        external: ['@cloudflare/sandbox', '@cloudflare/containers'],
+        external: ['@cloudflare/containers'],
       },
     },
   },

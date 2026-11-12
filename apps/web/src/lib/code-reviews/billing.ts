@@ -10,6 +10,7 @@
 
 import { captureException } from '@sentry/nextjs';
 import type { CloudAgentCodeReview, PlatformIntegration } from '@kilocode/db/schema';
+import { CLAUDE_BILLING_RECONNECT_MESSAGE } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -40,6 +41,20 @@ export const CODE_REVIEW_BILLING_CHECK_TITLE = 'Insufficient credits to run revi
 /** GitHub check run summary and GitLab commit status description. */
 export const CODE_REVIEW_BILLING_CHECK_SUMMARY =
   'Review could not start because the account has insufficient credits.';
+
+/**
+ * User-facing reason stored on a review whose organization must reconnect its
+ * Claude billing link. Adding credits does not fix this state, so the copy names
+ * the reconnect and the person who can perform it.
+ */
+export const CODE_REVIEW_RECONNECT_FAILURE_MESSAGE = `${CLAUDE_BILLING_RECONNECT_MESSAGE} An organization owner must reconnect Claude billing, then re-run the review.`;
+
+/** GitHub check run title for a review that waits on a Claude billing reconnect. */
+export const CODE_REVIEW_RECONNECT_CHECK_TITLE = 'Reconnect Claude billing to run this review';
+
+/** GitHub check run summary and GitLab commit status description. */
+export const CODE_REVIEW_RECONNECT_CHECK_SUMMARY =
+  'Review could not start because the organization must reconnect its Claude billing link.';
 
 const CODE_REVIEW_BILLING_NOTICE_BODY = `${CODE_REVIEW_BILLING_NOTICE_MARKER}
 **Kilo Code Review could not run — your account is out of credits.**
@@ -118,9 +133,23 @@ export async function postCodeReviewBillingNotice(
   return false;
 }
 
+/** The check-run and commit-status copy that explains a provider refusal. */
+type ProviderGateCopy = { title: string; summary: string };
+
+const BILLING_GATE_COPY: ProviderGateCopy = {
+  title: CODE_REVIEW_BILLING_CHECK_TITLE,
+  summary: CODE_REVIEW_BILLING_CHECK_SUMMARY,
+};
+
+const RECONNECT_GATE_COPY: ProviderGateCopy = {
+  title: CODE_REVIEW_RECONNECT_CHECK_TITLE,
+  summary: CODE_REVIEW_RECONNECT_CHECK_SUMMARY,
+};
+
 async function closeProviderGate(
   review: CloudAgentCodeReview,
-  integration: PlatformIntegration
+  integration: PlatformIntegration,
+  gate: ProviderGateCopy
 ): Promise<void> {
   const detailsUrl = `${APP_URL}/code-reviews/${review.id}`;
 
@@ -137,8 +166,8 @@ async function closeProviderGate(
         conclusion: 'action_required',
         detailsUrl,
         output: {
-          title: CODE_REVIEW_BILLING_CHECK_TITLE,
-          summary: CODE_REVIEW_BILLING_CHECK_SUMMARY,
+          title: gate.title,
+          summary: gate.summary,
         },
       },
       integration.github_app_type ?? 'standard'
@@ -153,20 +182,23 @@ async function closeProviderGate(
       review.platform_project_id ?? review.repo_full_name,
       review.head_sha,
       'failed',
-      { targetUrl: detailsUrl, description: CODE_REVIEW_BILLING_CHECK_TITLE },
+      { targetUrl: detailsUrl, description: gate.title },
       getGitLabInstanceUrl(integration)
     );
   }
 }
 
 /**
- * Record a billing failure on the provider without throwing: close the gate
- * (GitHub check / GitLab commit status) and post the notice. Provider failures
- * are logged and captured so a review that is already terminal still reports
- * cleanly.
+ * Record a provider refusal without throwing: close the gate (GitHub check /
+ * GitLab commit status) with the refusal copy and, when the refusal has one,
+ * post the pull-request notice. Provider failures are logged and captured so a
+ * review that is already terminal still reports cleanly.
  */
-export async function finalizeCodeReviewBillingFailure(
-  review: CloudAgentCodeReview
+async function finalizeProviderFailure(
+  review: CloudAgentCodeReview,
+  tag: string,
+  gate: ProviderGateCopy,
+  notice: boolean
 ): Promise<void> {
   if (!review.platform_integration_id) return;
 
@@ -174,7 +206,7 @@ export async function finalizeCodeReviewBillingFailure(
   try {
     integration = await getIntegrationById(review.platform_integration_id);
   } catch (error) {
-    errorExceptInTest('[code-review-billing] Failed to load integration', {
+    errorExceptInTest(`[${tag}] Failed to load integration`, {
       reviewId: review.id,
       error,
     });
@@ -182,28 +214,51 @@ export async function finalizeCodeReviewBillingFailure(
   if (!integration) return;
 
   try {
-    await closeProviderGate(review, integration);
+    await closeProviderGate(review, integration, gate);
   } catch (error) {
-    errorExceptInTest('[code-review-billing] Failed to close provider gate', {
+    errorExceptInTest(`[${tag}] Failed to close provider gate`, {
       reviewId: review.id,
       error,
     });
     captureException(error, {
-      tags: { operation: 'code-review-billing-close-provider-gate' },
+      tags: { operation: `${tag}-close-provider-gate` },
       extra: { reviewId: review.id },
     });
   }
 
+  if (!notice) return;
+
   try {
     await postCodeReviewBillingNotice(review, integration);
   } catch (error) {
-    errorExceptInTest('[code-review-billing] Failed to post billing notice', {
+    errorExceptInTest(`[${tag}] Failed to post billing notice`, {
       reviewId: review.id,
       error,
     });
     captureException(error, {
-      tags: { operation: 'code-review-billing-post-notice' },
+      tags: { operation: `${tag}-post-notice` },
       extra: { reviewId: review.id },
     });
   }
+}
+
+/**
+ * Record a billing failure on the provider: close the gate and post the notice.
+ */
+export async function finalizeCodeReviewBillingFailure(
+  review: CloudAgentCodeReview
+): Promise<void> {
+  await finalizeProviderFailure(review, 'code-review-billing', BILLING_GATE_COPY, true);
+}
+
+/**
+ * Record a review that waits on an organization's Claude billing reconnect.
+ * The gate names the reconnect requirement. No pull-request notice is posted:
+ * the billing notice names credits, and the check run and the stored review
+ * message already explain the refusal.
+ */
+export async function finalizeCodeReviewReconnectFailure(
+  review: CloudAgentCodeReview
+): Promise<void> {
+  await finalizeProviderFailure(review, 'code-review-reconnect', RECONNECT_GATE_COPY, false);
 }

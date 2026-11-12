@@ -6,7 +6,7 @@ import { signKiloToken } from '@kilocode/worker-utils';
 import { and, eq } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import {
   buildAssistantMessageItem,
   buildSessionItem,
@@ -20,6 +20,7 @@ import {
   parseSessionIngestServiceStatus,
   type SessionIngestItem,
 } from '../lib/mobile-sheet-fixtures';
+import { seedTokenSigningParams } from '../lib/token-signing';
 
 export const usage = '<email> [seconds] [deltaIntervalMs] [historyTurns] [historyCharsPerTurn]';
 
@@ -178,6 +179,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('NEXTAUTH_SECRET is not set for this worktree.');
   }
 
+  assertLocalSeedDatabase('app:live-cli-stream');
   const db = getSeedDb();
   const [user] = await db
     .select({
@@ -216,8 +218,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     userId: user.id,
     pepper: user.apiTokenPepper,
     secret,
-    expiresInSeconds: seconds + 600,
-    env: process.env.NODE_ENV ?? 'development',
+    ...seedTokenSigningParams(seconds + 600),
     extra: user.isAdmin ? { isAdmin: true } : undefined,
   });
 

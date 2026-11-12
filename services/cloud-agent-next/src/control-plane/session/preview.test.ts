@@ -1,35 +1,36 @@
 import { describe, expect, it, vi } from 'vitest';
 import { parseSessionMetadata } from '../../persistence/session-metadata.js';
-import type { PreviewTargetResult } from '../sandbox/preview-target.js';
+import type { PreviewSandboxScope, PreviewTargetResult } from '../sandbox/preview-target.js';
 import { createControlPlanePreview } from './preview.js';
 
-vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
-
 const SESSION_ID = 'workspace_11111111-1111-4111-8111-111111111111';
+const WORKTREE_ID = 'worktree_11111111-1111-4111-8111-111111111111';
 const SANDBOX_ID = 'ses-11111111111141118111111111111111';
 
-function metadata(
-  platform: string,
-  sandboxId: string | null = SANDBOX_ID,
-  sessionId = SESSION_ID,
-  worktreeId?: string
-) {
+function metadata(input: {
+  platform: string;
+  sandboxId?: string | null;
+  sessionId?: string;
+  worktreeId?: string;
+  orgId?: string;
+}) {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
     identity: {
-      sessionId,
+      sessionId: input.sessionId ?? SESSION_ID,
       userId: 'user_1',
-      createdOnPlatform: platform,
+      createdOnPlatform: input.platform,
+      ...(input.orgId === undefined ? {} : { orgId: input.orgId }),
     },
     auth: { kiloSessionId: 'kilo_session_1' },
     agent: { mode: 'code', model: 'test-model' },
     workspace:
-      sandboxId === null
+      input.sandboxId === null
         ? { sandboxProvider: 'cloudflare' }
         : {
-            sandboxId,
+            sandboxId: input.sandboxId ?? SANDBOX_ID,
             sandboxProvider: 'cloudflare',
-            ...(worktreeId ? { worktreeId } : {}),
+            ...(input.worktreeId === undefined ? {} : { worktreeId: input.worktreeId }),
           },
     lifecycle: { version: 1, timestamp: 1 },
   });
@@ -38,11 +39,20 @@ function metadata(
 const COORDINATES: PreviewTargetResult = {
   status: 'ok',
   coordinates: {
-    provider: 'cloudflare',
-    allocationName: SANDBOX_ID,
-    containment: false,
+    provider: 'cloudflare-containers',
+    logicalSandboxId: SESSION_ID,
+    allocationRef: SANDBOX_ID,
   },
 };
+
+function scope(overrides: Partial<PreviewSandboxScope> = {}): PreviewSandboxScope {
+  return {
+    ownerId: 'user_1',
+    organizationId: null,
+    scopeId: SESSION_ID,
+    ...overrides,
+  };
+}
 
 function fixture(
   input: {
@@ -50,20 +60,24 @@ function fixture(
     sandboxId?: string | null;
     sessionId?: string;
     worktreeId?: string;
+    orgId?: string;
     result?: PreviewTargetResult;
   } = {}
 ) {
-  const resolveTarget = vi.fn(async () => input.result ?? COORDINATES);
+  const resolveTarget = vi.fn(
+    async (_sandboxId: string, _scope: PreviewSandboxScope) => input.result ?? COORDINATES
+  );
   const preview = createControlPlanePreview({
     getMetadata: () =>
       input.platform === '__missing__' || input.sandboxId === '__missing__'
         ? null
-        : metadata(
-            input.platform ?? 'cloud-agent-web',
-            input.sandboxId,
-            input.sessionId,
-            input.worktreeId
-          ),
+        : metadata({
+            platform: input.platform ?? 'cloud-agent-web',
+            ...(input.sandboxId === undefined ? {} : { sandboxId: input.sandboxId }),
+            ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }),
+            ...(input.worktreeId === undefined ? {} : { worktreeId: input.worktreeId }),
+            ...(input.orgId === undefined ? {} : { orgId: input.orgId }),
+          }),
     resolveTarget,
   });
   return { preview, resolveTarget };
@@ -87,14 +101,23 @@ describe('V2 control-plane preview resolver', () => {
   it.each(['desktop', 'agent-manager'])(
     'allows preview for an inherited %s hosted worktree session',
     async platform => {
-      const { preview, resolveTarget } = fixture({
-        platform,
-        worktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
-      });
+      const { preview, resolveTarget } = fixture({ platform, worktreeId: WORKTREE_ID });
       await expect(preview.resolve()).resolves.toEqual(COORDINATES);
-      expect(resolveTarget).toHaveBeenCalledWith(SANDBOX_ID);
+      expect(resolveTarget).toHaveBeenCalledWith(SANDBOX_ID, scope({ scopeId: WORKTREE_ID }));
     }
   );
+
+  it('uses the session id as the scope for a session without a hosted worktree', async () => {
+    const { preview, resolveTarget } = fixture();
+    await expect(preview.resolve()).resolves.toEqual(COORDINATES);
+    expect(resolveTarget).toHaveBeenCalledWith(SANDBOX_ID, scope());
+  });
+
+  it('passes the stored organization into the sandbox scope', async () => {
+    const { preview, resolveTarget } = fixture({ orgId: 'org_1' });
+    await expect(preview.resolve()).resolves.toEqual(COORDINATES);
+    expect(resolveTarget).toHaveBeenCalledWith(SANDBOX_ID, scope({ organizationId: 'org_1' }));
+  });
 
   it('rejects a native desktop session without a hosted worktree', async () => {
     const { preview, resolveTarget } = fixture({ platform: 'desktop' });
@@ -114,11 +137,11 @@ describe('V2 control-plane preview resolver', () => {
     expect(resolveTarget).not.toHaveBeenCalled();
   });
 
-  it('asks the sandbox for coordinates without its own route check', async () => {
-    const { preview, resolveTarget } = fixture();
+  it('asks the sandbox for coordinates for the resolved workspace scope', async () => {
+    const { preview, resolveTarget } = fixture({ worktreeId: WORKTREE_ID });
     await expect(preview.resolve()).resolves.toEqual(COORDINATES);
     expect(resolveTarget).toHaveBeenCalledTimes(1);
-    expect(resolveTarget).toHaveBeenCalledWith(SANDBOX_ID);
+    expect(resolveTarget).toHaveBeenCalledWith(SANDBOX_ID, scope({ scopeId: WORKTREE_ID }));
   });
 
   it('passes a sandbox failure result through unchanged', async () => {

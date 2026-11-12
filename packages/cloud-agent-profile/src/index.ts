@@ -22,7 +22,7 @@ export { MASKED_SECRET_VALUE } from './types';
 
 // Pure resolution helpers
 export {
-  appliesImplicitProfiles,
+  appliesRepoBindings,
   resolveProfileLayers,
   type ProfileLayer,
   type ProfileLayerSource,
@@ -130,6 +130,9 @@ export {
 
 export type { SkillsShSource } from './skills-sh';
 
+// Size-limit copy shared by the profile and runtime contracts
+export { LIMIT_UNIT, overLimitMessage, overTotalMessage } from './contracts/limit-copy';
+
 // Agent CRUD + session helpers
 export {
   MAX_PROFILE_AGENTS,
@@ -220,6 +223,25 @@ export {
   type SandboxAllocationCandidates,
   type RepositoryAllocationSetting,
 } from './sandbox-allocation-settings-service';
+
+// User-scoped built-in agent overrides (model, variant, visibility)
+export {
+  CLOUD_AGENT_BUILTIN_AGENTS,
+  CLOUD_AGENT_BUILTIN_AGENT_SLUGS,
+  BuiltinAgentOverrideSchema,
+  BuiltinAgentSettingsSchema,
+  BuiltinAgentSettingsInputSchema,
+  getCloudAgentBuiltinAgent,
+  normalizeBuiltinAgentSettings,
+  hasBuiltinAgentSettings,
+  MAX_BUILTIN_AGENT_MODEL_LENGTH,
+  MAX_BUILTIN_AGENT_VARIANT_LENGTH,
+  type CloudAgentBuiltinAgentDefinition,
+  type CloudAgentBuiltinAgentSlug,
+  type BuiltinAgentOverride,
+  type BuiltinAgentSettings,
+} from './builtin-agents';
+export { getBuiltinAgentSettings, setBuiltinAgentSettings } from './builtin-agent-settings-service';
 
 // Local config import (preview diff + selective upsert)
 export {

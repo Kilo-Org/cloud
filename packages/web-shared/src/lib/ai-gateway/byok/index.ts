@@ -1,17 +1,12 @@
 import { type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { byok_api_keys } from '@kilocode/db/schema';
 import { ByokApiKeySettingsSchema } from '@kilocode/db/schema-types';
-import { and, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import type { BYOKApiKeyEnvelope, EncryptedData } from '@kilocode/db/schema-types';
-import { claimFailureReport } from '@kilocode/web-shared/lib/ai-gateway/byok/failure-reports';
-import {
-  decryptByokEnvelope,
-  getByokKmsClientConfig,
-  type ByokKmsContext,
-} from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
-import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import type { BYOKApiKeyEnvelope } from '@kilocode/db/schema-types';
+import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
+import { decryptByokEnvelope } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
+import type { ByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-context';
 import {
   GatewayUserByokProviderIdSchema,
   UserByokProviderIdSchema,
@@ -28,11 +23,11 @@ import {
   getVercelModelsFromDatabase,
   getVercelModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
-  type StoredModelMap,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type { GatewayModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
@@ -42,7 +37,7 @@ export type ByokSourceDb = typeof db | DrizzleTransaction;
 
 async function deriveModelInferenceUserByokProviders(
   modelId: string,
-  vercelModelMetadata: StoredModelMap
+  vercelModelMetadata: GatewayModelMap
 ): Promise<UserByokProviderId[]> {
   const providers: UserByokProviderId[] = [
     ...new Set(
@@ -67,7 +62,7 @@ async function deriveModelInferenceUserByokProviders(
  * callers that may see custom LLM ids exclude them separately.
  */
 export function isGatewayUserByokEligibleModel(modelId: string): boolean {
-  return !isFreeModelExcludingCustomLlms(modelId);
+  return !isFreeModel(modelId);
 }
 
 export async function getModelGatewayUserByokProviders(
@@ -86,7 +81,7 @@ export async function getModelGatewayUserByokProviders(
   );
 }
 
-async function getVercelModelMetadata(caller: string): Promise<StoredModelMap | null> {
+async function getVercelModelMetadata(caller: string): Promise<GatewayModelMap | null> {
   const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
   if (Object.keys(vercelModelMetadata).length === 0) {
     console.error('[%s] no Vercel model metadata', caller);
@@ -186,17 +181,50 @@ export type EnabledByokProvider = {
 
 export type ByokKeyState = EnabledByokProvider & { isEnabled: boolean; priority?: number };
 
+const encryptedByokKeyColumns = {
+  id: byok_api_keys.id,
+  encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
+  organization_id: byok_api_keys.organization_id,
+  kilo_user_id: byok_api_keys.kilo_user_id,
+  provider_id: byok_api_keys.provider_id,
+};
+
+function reportByokDecryptFailure(keyId: string, error: unknown): void {
+  // A key that stays undecryptable reports once per window instead of once per lookup.
+  if (claimReportWindow(keyId, Date.now())) {
+    captureException(error, { tags: { source: 'byok_decrypt' } });
+  }
+}
+
+const byokKeyStateColumns = {
+  provider_id: byok_api_keys.provider_id,
+  settings: byok_api_keys.settings,
+  is_enabled: byok_api_keys.is_enabled,
+};
+
+function toByokKeyState(row: {
+  provider_id: string;
+  settings: unknown;
+  is_enabled: boolean;
+}): ByokKeyState | null {
+  const providerId = UserByokProviderIdSchema.safeParse(row.provider_id);
+  return providerId.success
+    ? {
+        providerId: providerId.data,
+        serveCatalogModels: servesCatalogModels(row.settings),
+        isEnabled: row.is_enabled,
+        priority: getByokKeyPriority(row.settings),
+      }
+    : null;
+}
+
 async function selectByokKeyStates(
   fromDb: ByokSourceDb,
   owner: ByokOwner,
   { enabledOnly }: { enabledOnly: boolean }
 ): Promise<ByokKeyState[]> {
   const rows = await fromDb
-    .select({
-      provider_id: byok_api_keys.provider_id,
-      settings: byok_api_keys.settings,
-      is_enabled: byok_api_keys.is_enabled,
-    })
+    .select(byokKeyStateColumns)
     .from(byok_api_keys)
     .where(
       and(
@@ -206,19 +234,7 @@ async function selectByokKeyStates(
     )
     .orderBy(...BYOK_KEY_ORDER);
 
-  return rows.flatMap(row => {
-    const providerId = UserByokProviderIdSchema.safeParse(row.provider_id);
-    return providerId.success
-      ? [
-          {
-            providerId: providerId.data,
-            serveCatalogModels: servesCatalogModels(row.settings),
-            isEnabled: row.is_enabled,
-            priority: getByokKeyPriority(row.settings),
-          },
-        ]
-      : [];
-  });
+  return rows.flatMap(row => toByokKeyState(row) ?? []);
 }
 
 export async function getEnabledByokProviders(
@@ -238,6 +254,48 @@ export async function getByokKeyStates(
   owner: ByokOwner
 ): Promise<ByokKeyState[]> {
   return selectByokKeyStates(fromDb, owner, { enabledOnly: false });
+}
+
+export type StoredByokKeys = {
+  /** Every key the owner stored, enabled or not, in `getByokKeyStates` order. */
+  keys: ByokKeyState[];
+  /** Decrypts the enabled stored key of a provider in `keys`, from the same read. */
+  decrypt(providerId: UserByokProviderId): Promise<BYOKResult>;
+};
+
+/**
+ * `getByokKeyStates` with the ciphertext of each key, for routing: it decides from this one read
+ * and decrypts only the key it picks, so a key cannot vanish between the decision and the
+ * decryption. Previews that must not touch key material use `getByokKeyStates` instead.
+ */
+export async function getStoredByokKeys(
+  fromDb: ByokSourceDb,
+  owner: ByokOwner
+): Promise<StoredByokKeys> {
+  const rows = await fromDb
+    .select({ ...byokKeyStateColumns, ...encryptedByokKeyColumns })
+    .from(byok_api_keys)
+    .where(eq(ownerColumn(owner), owner.id))
+    .orderBy(...BYOK_KEY_ORDER);
+
+  return {
+    keys: rows.flatMap(row => toByokKeyState(row) ?? []),
+    async decrypt(providerId) {
+      // Keys are unique per owner and provider.
+      const row = rows.find(candidate => candidate.provider_id === providerId);
+      if (!row?.is_enabled) throw new Error(`No enabled BYOK key for ${providerId}`);
+      const priority = getByokKeyPriority(row.settings);
+      try {
+        return {
+          ...(await decryptByokRow(row)),
+          ...(priority !== undefined && { priority }),
+        };
+      } catch (error) {
+        reportByokDecryptFailure(row.id, error);
+        throw error;
+      }
+    },
+  };
 }
 
 export async function getUserByokProviderIds(
@@ -300,7 +358,11 @@ export async function addUserByokAvailability(
         enabledProviderIds: enabledProviders,
         allowedProviders: getAllowedProviders(model.id),
       });
-      return { ...model, hasUserByokAvailable };
+      return {
+        ...model,
+        hasUserByokAvailable,
+        ...(hasUserByokAvailable ? { isFree: false } : {}),
+      };
     })
   );
   // One record per pass: the availability pass touches every catalog model, so a
@@ -359,7 +421,9 @@ export function addDirectByokCatalogAvailability(
 ): OpenRouterModel[] {
   if (directByokCatalogModelIds.size === 0) return models;
   return models.map(model =>
-    directByokCatalogModelIds.has(model.id) ? { ...model, hasUserByokAvailable: true } : model
+    directByokCatalogModelIds.has(model.id)
+      ? { ...model, hasUserByokAvailable: true, isFree: false }
+      : model
   );
 }
 
@@ -390,18 +454,18 @@ export function getByokKmsContext(row: {
 
 export async function decryptByokRow(row: {
   id: string;
-  encrypted_api_key: EncryptedData;
   encrypted_api_key_envelope: BYOKApiKeyEnvelope | null;
   organization_id: string | null;
   kilo_user_id: string | null;
   provider_id: string;
 }) {
-  // The legacy column is always written alongside the envelope, so with the KMS service
-  // unconfigured (rollback) it is still valid and we read it instead of failing.
-  const decryptedAPIKey =
-    row.encrypted_api_key_envelope && getByokKmsClientConfig()
-      ? await decryptByokEnvelope(row.encrypted_api_key_envelope, getByokKmsContext(row))
-      : decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY);
+  if (!row.encrypted_api_key_envelope) {
+    throw new Error(`BYOK key ${row.id} has no encryption envelope`);
+  }
+  const decryptedAPIKey = await decryptByokEnvelope(
+    row.encrypted_api_key_envelope,
+    getByokKmsContext(row)
+  );
   return {
     decryptedAPIKey,
     providerId: UserByokProviderIdSchema.parse(row.provider_id),
@@ -416,53 +480,17 @@ export async function getByokCredentials(
   owner: ByokOwner,
   providerIds: UserByokProviderId[]
 ): Promise<ByokCredential[]> {
-  return queryByokCredentials(fromDb, owner, providerIds, undefined);
-}
-
-/**
- * The owner's enabled keys in catalog mode for `providerIds`, in `BYOK_KEY_ORDER`. Keys outside catalog
- * mode are filtered out before decryption, so they cost no KMS round-trips and a key that cannot
- * be decrypted cannot fail the lookup.
- */
-export async function getCatalogModeByokCredentials(
-  fromDb: ByokSourceDb,
-  owner: ByokOwner,
-  providerIds: UserByokProviderId[]
-): Promise<ByokCredential[]> {
-  return queryByokCredentials(
-    fromDb,
-    owner,
-    providerIds,
-    sql`(${byok_api_keys.settings}->>'serve_catalog_models')::boolean is true`
-  );
-}
-
-async function queryByokCredentials(
-  fromDb: ByokSourceDb,
-  owner: ByokOwner,
-  providerIds: UserByokProviderId[],
-  extraCondition: SQL | undefined
-): Promise<ByokCredential[]> {
   if (providerIds.length === 0) {
     return [];
   }
   const rows = await fromDb
-    .select({
-      id: byok_api_keys.id,
-      encrypted_api_key: byok_api_keys.encrypted_api_key,
-      encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
-      organization_id: byok_api_keys.organization_id,
-      kilo_user_id: byok_api_keys.kilo_user_id,
-      provider_id: byok_api_keys.provider_id,
-      settings: byok_api_keys.settings,
-    })
+    .select({ ...encryptedByokKeyColumns, settings: byok_api_keys.settings })
     .from(byok_api_keys)
     .where(
       and(
         eq(ownerColumn(owner), owner.id),
         eq(byok_api_keys.is_enabled, true),
-        inArray(byok_api_keys.provider_id, providerIds),
-        extraCondition
+        inArray(byok_api_keys.provider_id, providerIds)
       )
     )
     .orderBy(...BYOK_KEY_ORDER);
@@ -483,10 +511,7 @@ async function queryByokCredentials(
       continue;
     }
     failures.push(result.reason);
-    // A key that stays undecryptable reports once per window instead of once per lookup.
-    if (claimFailureReport(rows[index].id, Date.now())) {
-      captureException(result.reason, { tags: { source: 'byok_decrypt' } });
-    }
+    reportByokDecryptFailure(rows[index].id, result.reason);
   }
 
   // Fail closed when no key could be decrypted so the request never falls back to Kilo-paid routing.

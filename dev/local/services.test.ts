@@ -286,12 +286,15 @@ test('registers user data export with worktree-aware ports and dependencies', ()
   assert.equal(service.dir, 'services/user-data-export');
   assert.equal(service.port, 8818 + portOffset);
   assert.deepEqual(service.dependsOn, ['postgres', 'nextjs']);
+  // `cloudflare-scim-sync` now resolves after `nextjs` rather than before the
+  // core workers: it applies directory events by calling the app's internal
+  // SCIM endpoints, so it declares `postgres` and `nextjs` and the topological
+  // order places it accordingly.
   assert.deepEqual(resolveTargets(['data-export']), [
     'local-kms',
     'postgres',
     'redis',
     'stripe',
-    'cloudflare-scim-sync',
     'byok-kms',
     'cloudflare-git-token-service',
     'cloudflare-session-ingest',
@@ -299,6 +302,7 @@ test('registers user data export with worktree-aware ports and dependencies', ()
     'ai-gateway',
     'nextjs',
     'user-data-export',
+    'cloudflare-scim-sync',
   ]);
 });
 
@@ -388,14 +392,14 @@ test('keeps auto routing package dev script compatible with local launcher flags
   assert.equal(launcherFlags.filter(part => part === '--ip').length, 1);
 });
 
-test('starts the container usage meter whenever Gastown starts', () => {
-  // Gastown's TownContainerDO binds container-usage-meter via a service binding,
-  // which only connects when the meter is registered in the same local Wrangler
-  // dev registry. Starting Gastown must therefore always launch the meter.
-  const gastownTargets = resolveTargets(['gastown']);
+test('starts the container usage meter whenever the cloud-agent group starts', () => {
+  // Cloud Agent binds container-usage-meter via a service binding, which only
+  // connects when the meter is registered in the same local Wrangler dev
+  // registry. Starting the cloud-agent group must therefore always launch it.
+  const cloudAgentTargets = resolveTargets(['cloud-agent']);
   assert.ok(
-    gastownTargets.includes('container-usage-meter'),
-    `expected container-usage-meter in gastown start targets, got: ${gastownTargets.join(', ')}`
+    cloudAgentTargets.includes('container-usage-meter'),
+    `expected container-usage-meter in cloud-agent start targets, got: ${cloudAgentTargets.join(', ')}`
   );
 
   const meter = getService('container-usage-meter');
@@ -405,8 +409,7 @@ test('starts the container usage meter whenever Gastown starts', () => {
 });
 
 test('binds the container usage meter under its unsuffixed Wrangler name', () => {
-  // Gastown binds CONTAINER_USAGE to service "container-usage-meter" with no
-  // "-dev" suffix. The meter's dev script must not pass --env (which would
+  // Producers bind to service "container-usage-meter" with no "-dev" suffix. The meter's dev script must not pass --env (which would
   // register it as a different name) and must accept the launcher's flags.
   const meter = getService('container-usage-meter');
   const packageJson = JSON.parse(fs.readFileSync(`${meter.dir}/package.json`, 'utf-8')) as {

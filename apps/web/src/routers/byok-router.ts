@@ -16,8 +16,6 @@ import {
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { byok_api_keys, MODELS_BY_PROVIDER_ADMIN_URL } from '@kilocode/db/schema';
 import { and, eq, ne, sql } from 'drizzle-orm';
-import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import {
   CreateBYOKKeyInputSchema,
@@ -59,10 +57,19 @@ import {
   getByokKmsContext,
   getModelGatewayUserByokProviders,
   servesCatalogModels,
+  type ByokOwner,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { encryptByokForStorage } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { GatewayAuthenticationError, type GatewayProviderOptions } from '@ai-sdk/gateway';
-import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import {
+  getVercelModelIdOverrides,
+  mapModelIdToVercel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import {
+  findVercelOnlyModels,
+  getVendorNamesByModelPrefix,
+  getVercelOnlyModelName,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
@@ -134,23 +141,23 @@ function inRouteOrder<T extends { provider_id: string; settings: unknown }>(keys
   }));
 }
 
-function ownedPersonalKeys(userId: string) {
-  return and(
-    eq(byok_api_keys.kilo_user_id, userId),
-    ne(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+function ownedKeys(owner: ByokOwner) {
+  return eq(
+    owner.type === 'organization' ? byok_api_keys.organization_id : byok_api_keys.kilo_user_id,
+    owner.id
   );
 }
 
-async function writePersonalKeyPriorities(
+async function writeKeyPriorities(
   tx: DrizzleTransaction,
-  userId: string,
+  owner: ByokOwner,
   keyIds: readonly string[]
 ) {
   for (const [priority, id] of keyIds.entries()) {
     await tx
       .update(byok_api_keys)
       .set({ settings: sql`${byok_api_keys.settings} || ${JSON.stringify({ priority })}::jsonb` })
-      .where(and(eq(byok_api_keys.id, id), ownedPersonalKeys(userId)));
+      .where(and(eq(byok_api_keys.id, id), ownedKeys(owner)));
   }
 }
 
@@ -186,11 +193,14 @@ async function toBYOKApiKeyResponse(
   };
 }
 
-function rejectUnavailableExperimentalProvider(
+async function rejectUnavailableExperimentalProvider(
   providerId: string,
   organizationId: string | null | undefined
 ) {
-  if (isExperimentalByokProviderId(providerId) && !isExperimentalByokEnabled(organizationId)) {
+  if (
+    isExperimentalByokProviderId(providerId) &&
+    !(await isExperimentalByokEnabled(organizationId))
+  ) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: `Provider ${providerId} is not available yet.`,
@@ -231,14 +241,14 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
 
   if (Object.keys(vercelModelMetadata).length === 0) {
     throw new Error(
-      'No Vercel model metadata in the database, use the admin panel at ' +
+      'No Vercel model metadata in the database, refresh the metadata cache in the admin panel at ' +
         MODELS_BY_PROVIDER_ADMIN_URL
     );
   }
 
   if (Object.keys(openRouterModelMetadata).length === 0) {
     throw new Error(
-      'No OpenRouter model metadata in the database, use the admin panel at ' +
+      'No OpenRouter model metadata in the database, refresh the metadata cache in the admin panel at ' +
         MODELS_BY_PROVIDER_ADMIN_URL
     );
   }
@@ -252,21 +262,38 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
     result[providerId].push(model.name + ' (' + model.id + ')');
   };
 
-  for (const openRouterModel of Object.values(openRouterModelMetadata)) {
-    if (isAutoSmallFreeModel(openRouterModel.id)) continue;
-    for (const providerId of await getModelGatewayUserByokProviders(openRouterModel.id)) {
-      addSupportedModel(providerId, openRouterModel);
+  const addGatewayModel = async (model: { id: string; name: string }) => {
+    for (const providerId of await getModelGatewayUserByokProviders(model.id)) {
+      addSupportedModel(providerId, model);
     }
-    const vercelModel = vercelModelMetadata[await mapModelIdToVercel(openRouterModel.id)];
-    if (!vercelModel) continue;
-    if (vercelModel.type !== 'language') continue;
+    const vercelModel = vercelModelMetadata[await mapModelIdToVercel(model.id)];
+    if (vercelModel?.type !== 'language') return;
     for (const endpoint of vercelModel.endpoints) {
       const providerId = getVercelUserByokProviderIdForEndpoint(
         endpoint.provider_name ?? endpoint.tag
       );
       if (!providerId) continue;
-      addSupportedModel(providerId, openRouterModel);
+      addSupportedModel(providerId, model);
     }
+  };
+
+  const openRouterModels = Object.values(openRouterModelMetadata);
+  for (const openRouterModel of openRouterModels) {
+    if (isAutoSmallFreeModel(openRouterModel.id)) continue;
+    await addGatewayModel(openRouterModel);
+  }
+
+  const vendorNames = getVendorNamesByModelPrefix(openRouterModels);
+  const vercelOnlyModels = findVercelOnlyModels({
+    openRouterModelIds: Object.keys(openRouterModelMetadata),
+    vercelMetadata: vercelModelMetadata,
+    overrides: await getVercelModelIdOverrides(),
+  });
+  for (const vercelOnlyModel of vercelOnlyModels) {
+    await addGatewayModel({
+      id: vercelOnlyModel.id,
+      name: getVercelOnlyModelName(vercelOnlyModel, vendorNames),
+    });
   }
 
   for (const provider of DIRECT_BYOK_PROVIDERS) {
@@ -334,31 +361,49 @@ export const byokRouter = createTRPCRouter({
     }),
 
   /**
-   * Sets the priority of every personal key: each request uses the first key in this order that can
+   * Sets the priority of every scoped key: each request uses the first key in this order that can
    * serve it. The ChatGPT connection is not a listed key and keeps its own step.
    */
   reorder: baseProcedure
     .input(ReorderBYOKKeysInputSchema)
     .output(z.array(BYOKApiKeyResponseSchema))
     .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse[]> => {
+      const { organizationId } = input;
+      const organizationRole = organizationId
+        ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_MANAGE_ROLES)
+        : null;
+      const owner = byokOwner(ctx.user.id, organizationId);
       const keys = await db.transaction(async tx => {
         const owned = await tx
           .select({ id: byok_api_keys.id })
           .from(byok_api_keys)
-          .where(ownedPersonalKeys(ctx.user.id))
+          .where(and(ownedKeys(owner), ne(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)))
           .for('update');
         const ownedIds = new Set(owned.map(key => key.id));
         if (owned.length !== input.keyIds.length || input.keyIds.some(id => !ownedIds.has(id))) {
           throw new TRPCError({ code: 'CONFLICT', message: KEYS_CHANGED_MESSAGE });
         }
-        await writePersonalKeyPriorities(tx, ctx.user.id, input.keyIds);
+        await writeKeyPriorities(tx, owner, input.keyIds);
+        if (organizationId) {
+          await createAuditLog({
+            action: 'organization.settings.change',
+            actor_email: ctx.user.google_user_email,
+            actor_id: ctx.user.id,
+            actor_name: ctx.user.google_user_name,
+            message: 'Updated BYOK key priorities',
+            organization_id: organizationId,
+            tx,
+          });
+        }
         return tx
           .select(BYOK_KEY_COLUMNS)
           .from(byok_api_keys)
-          .where(eq(byok_api_keys.kilo_user_id, ctx.user.id))
+          .where(ownedKeys(owner))
           .orderBy(...BYOK_KEY_ORDER);
       });
-      return Promise.all(inRouteOrder(keys).map(key => toBYOKApiKeyResponse(key, null)));
+      return Promise.all(
+        inRouteOrder(keys).map(key => toBYOKApiKeyResponse(key, organizationRole))
+      );
     }),
 
   /**
@@ -392,11 +437,9 @@ export const byokRouter = createTRPCRouter({
         ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES)
         : null;
 
-      rejectUnavailableExperimentalProvider(provider_id, organizationId);
+      await rejectUnavailableExperimentalProvider(provider_id, organizationId);
       validateUserByokCredential(provider_id, api_key);
 
-      // Encrypt the API key
-      const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
       const keyId = crypto.randomUUID();
       const envelope = await encryptByokForStorage({
         apiKey: api_key,
@@ -417,7 +460,6 @@ export const byokRouter = createTRPCRouter({
           organization_id: organizationId ?? null,
           kilo_user_id: organizationId ? null : ctx.user.id,
           provider_id,
-          encrypted_api_key: encrypted,
           encrypted_api_key_envelope: envelope,
           created_by: ctx.user.id,
         })
@@ -486,10 +528,12 @@ export const byokRouter = createTRPCRouter({
       }
 
       rejectManagedKeyMutation(existingKey.management_source);
-      rejectUnavailableExperimentalProvider(existingKey.provider_id, existingKey.organization_id);
+      await rejectUnavailableExperimentalProvider(
+        existingKey.provider_id,
+        existingKey.organization_id
+      );
       validateUserByokCredential(existingKey.provider_id, api_key);
 
-      const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
       const envelope = await encryptByokForStorage({
         apiKey: api_key,
         context: getByokKmsContext(existingKey),
@@ -497,7 +541,7 @@ export const byokRouter = createTRPCRouter({
       });
       const [updatedKey] = await db
         .update(byok_api_keys)
-        .set({ encrypted_api_key: encrypted, encrypted_api_key_envelope: envelope })
+        .set({ encrypted_api_key_envelope: envelope })
         .where(eq(byok_api_keys.id, id))
         .returning(BYOK_KEY_COLUMNS);
 
@@ -661,7 +705,6 @@ export const byokRouter = createTRPCRouter({
           organization_id: byok_api_keys.organization_id,
           kilo_user_id: byok_api_keys.kilo_user_id,
           provider_id: byok_api_keys.provider_id,
-          encrypted_api_key: byok_api_keys.encrypted_api_key,
           encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
           management_source: byok_api_keys.management_source,
         })

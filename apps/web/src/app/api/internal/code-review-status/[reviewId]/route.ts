@@ -22,7 +22,7 @@ import * as z from 'zod';
 import {
   updateCodeReviewStatus,
   updateCodeReviewStatusIfNonTerminal,
-  updateCodeReviewUsage,
+  backfillCodeReviewUsage,
   getCodeReviewById,
   getSessionUsageFromBilling,
   updateCodeReviewAttemptForCallback,
@@ -501,6 +501,7 @@ const SESSIONLESS_PRE_DISPATCH_FAILURE_CODES: ReadonlySet<string> = new Set([
 function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalReason): boolean {
   return (
     terminalReason === 'billing' ||
+    terminalReason === 'account_blocked' ||
     terminalReason === 'model_not_found' ||
     terminalReason === 'user_cancelled' ||
     terminalReason === 'superseded' ||
@@ -742,7 +743,7 @@ async function getReviewUsageData(reviewId: string) {
     return persistedUsage;
   }
 
-  updateCodeReviewUsage(reviewId, {
+  backfillCodeReviewUsage(reviewId, {
     ...(review.model == null ? { model: billing.model } : {}),
     totalTokensIn: billing.totalTokensIn,
     totalTokensOut: billing.totalTokensOut,

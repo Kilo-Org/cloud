@@ -1,4 +1,4 @@
-import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
@@ -20,6 +20,7 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { useMessageDetailsCopyFeedback } from './message-details-copy';
 import { getMessageDetailsContent } from './message-details-content';
+import { type MessageDeliveryStatement } from './message-failure-state';
 import { MessageTextSelectSheet } from './message-text-select-sheet';
 import { Row, TokenRow } from './session-detail-rows';
 import { SessionPageSheet } from './session-page-sheet';
@@ -36,7 +37,7 @@ type MessageDetailsSheetProps = {
   message: StoredMessage | null;
   modelOptions: SessionModelOption[];
   /** The selected message's delivery state; a failed one adds the transport detail to Copy. */
-  deliveryState?: MessageDeliveryState;
+  deliveryState?: MessageDeliveryStatement;
   onClose: () => void;
   canCancelQueued?: boolean;
   isCancelingQueued?: boolean;

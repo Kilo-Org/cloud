@@ -108,6 +108,11 @@ vi.mock('@/lib/persist/resolved-delivery-failures', () => ({
   readResolvedDeliveryFailures: vi.fn(async () => []),
   persistResolvedDeliveryFailure: vi.fn(async () => undefined),
 }));
+vi.mock('@/lib/persist/pending-send-confirmations', () => ({
+  readPendingSendConfirmations: vi.fn(async () => []),
+  persistPendingSendConfirmation: vi.fn(async () => undefined),
+  clearPendingSendConfirmation: vi.fn(async () => undefined),
+}));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
   CLOUD_AGENT_WS_URL: 'wss://ws.test',
@@ -207,6 +212,17 @@ vi.mock('expo-router', () => ({
     addListener: () => () => undefined,
   }),
   useRouter: () => ({ replace: vi.fn(), setParams: vi.fn() }),
+}));
+
+// The on-screen entity publisher reaches the app-action bridge, which imports
+// the root `expo` entry and does not parse under the node test environment.
+vi.mock('@/lib/app-actions/native-bridge', () => ({
+  setNativeVisibleSession: vi.fn(() => Promise.resolve()),
+}));
+// The publisher reads the privacy lock's status; outside a provider it would
+// throw, and the status is not the subject of these assertions.
+vi.mock('@/lib/app-unlock-context', () => ({
+  useAppUnlock: () => ({ status: 'unlocked' }),
 }));
 
 // `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
@@ -383,7 +399,7 @@ vi.mock('@/components/agents/use-session-detail-rename', () => ({
     title: 'Test session',
   }),
 }));
-vi.mock('@/components/kilo-chat/hooks/use-cli-session-presence', () => ({
+vi.mock('@/lib/hooks/use-cli-session-presence', () => ({
   resolveLoadedCliSessionPresenceId: () => null,
   useCliSessionPresence: vi.fn(),
 }));
@@ -637,6 +653,7 @@ function makeManager() {
       olderMessagesOmittedItemCount: { value: 0 },
       resolvedDeliveryFailures: { value: new Set<string>() },
       supersededInFlightMessageIds: { value: new Set<string>() },
+      deliveredFailedPrompt: { value: null },
     },
     switchSession: vi.fn(),
     send: vi.fn(),

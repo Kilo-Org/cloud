@@ -6,6 +6,7 @@ import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 import { type resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
 import { Paperclip } from '@/components/ui/icons';
 import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-control';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type useVoiceInput } from '@/lib/voice-input/use-voice-input';
@@ -43,12 +44,12 @@ export function NewSessionPromptControls({
         <Pressable
           onPress={handlePaperclipPress}
           disabled={paperclipDisabled}
-          // The 31.5pt frame (h-9 at NativeWind's 14pt rem) carries 8.25pt of
-          // hit slop per side: 31.5 + 16.5 = 48dp, Android's minimum
-          // (WCAG 2.5.8 AA), with the visual and the row height unchanged.
-          hitSlop={{ top: 8.25, bottom: 8.25, left: 8.25, right: 8.25 }}
+          // The pressable's own box is what a control-size audit measures, and
+          // `hitSlop` never moves that rect, so the target has to be the class:
+          // the shared 48dp box clears the 44pt design target on its own.
           className={cn(
-            'h-9 w-9 items-center justify-center rounded-full active:opacity-70',
+            ICON_TARGET_BOX_CLASS,
+            'rounded-full active:opacity-70',
             paperclipDisabled && 'opacity-50'
           )}
           accessibilityRole="button"

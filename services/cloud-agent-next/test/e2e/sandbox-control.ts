@@ -122,8 +122,9 @@ export type ExclusiveLayoutInput = {
 
 /**
  * Decide whether a control-plane Kilo root is the only worktree under its
- * parent. `sessions/<sessionId>` is the control-plane session workspace and
- * `worktrees/<worktreeId>` the worktree-sibling layout; both are legitimate.
+ * parent. `/workspace/app` is the isolated control-plane workspace,
+ * `sessions/<sessionId>` the shared-sandbox session workspace and
+ * `worktrees/<worktreeId>` the worktree-sibling layout; all are legitimate.
  * The guard is the directory count plus the allowlist plus the listener set,
  * not the parent name: every sibling directory and every Kilo listener must be
  * the target directory or a harness-supplied `allowedDirectories` entry, so an
@@ -146,13 +147,13 @@ export function computeExclusiveLayout(input: ExclusiveLayoutInput): {
     .readdirSync(parent)
     .filter(name => fs.statSync(path.join(parent, name)).isDirectory())
     .map(name => path.join(parent, name));
-  const sessionParent =
+  const knownLayout =
+    directory === '/workspace/app' ||
     path.basename(parent) === 'worktrees' ||
-    path.basename(parent) === 'sessions' ||
-    directory === '/workspace/app';
+    path.basename(parent) === 'sessions';
   return {
     exclusive:
-      sessionParent &&
+      knownLayout &&
       directories.includes(directory) &&
       directories.every(candidate => allowed.has(candidate)) &&
       listeners.every(listener => allowed.has(listener.directory)),
@@ -169,7 +170,8 @@ const request = JSON.parse(process.argv[1] ?? '{}');
 
 // __EXCLUSIVE_LAYOUT__
 
-const KILO_SERVER_BASENAMES = new Set(['kilo', '.kilo']);
+const KILO_SERVER_BASENAMES = new Set(['kilo', '.kilo', 'kilo2', '.kilo2']);
+const kilo2Servers = new Set();
 
 // Each kilo serve has its own Basic credential in its environment. It stays in
 // this script and never goes into the JSON result.
@@ -240,6 +242,8 @@ function kiloListeners() {
     try {
       const argv = fs.readFileSync('/proc/' + processId + '/cmdline', 'utf8').split('\0');
       if (!isKiloServeArgv(argv)) continue;
+      if (argv.some((arg, index) => ['kilo2', '.kilo2'].includes(path.basename(arg)) && argv[index + 1] === 'serve'))
+        kilo2Servers.add(serverUrl);
       const cwd = fs.readlinkSync('/proc/' + processId + '/cwd');
       const directory = fs.realpathSync(cwd);
       if (!path.isAbsolute(cwd) || cwd !== directory) continue;
@@ -268,7 +272,7 @@ function sameListener(left, right) {
 }
 
 async function getRoot(serverUrl, kiloSessionId, directory = request.directory) {
-  const endpoint = new URL('/session/' + encodeURIComponent(kiloSessionId), serverUrl);
+  const endpoint = new URL((kilo2Servers.has(serverUrl) ? '/api' : '') + '/session/' + encodeURIComponent(kiloSessionId), serverUrl);
   endpoint.searchParams.set('directory', directory);
   const response = await fetch(endpoint, {
     headers: kiloHeaders(serverUrl),
@@ -276,7 +280,10 @@ async function getRoot(serverUrl, kiloSessionId, directory = request.directory) 
     redirect: 'error',
   });
   if (!response.ok) return null;
-  const root = await response.json();
+  const decoded = await response.json();
+  const root = kilo2Servers.has(serverUrl) && decoded.data
+    ? { ...decoded.data, directory: decoded.data.location?.directory }
+    : decoded;
   if (
     typeof root !== 'object' ||
     root === null ||
@@ -798,6 +805,43 @@ export async function stopOwnedControlPlaneSandbox(
   executeDocker: DockerCommandExecutor = executeDockerCommand,
   allowedDirectories: readonly string[] = []
 ): Promise<string[]> {
+  if (
+    !(await proveOwnedControlPlaneSandbox(
+      sandbox,
+      kiloSessionId,
+      executeDocker,
+      allowedDirectories
+    ))
+  )
+    return [];
+  return killSandboxFamily(sandbox, executeDocker);
+}
+
+/**
+ * Fault injection: kill only the proven primary. workerd caches the warm proxy
+ * across primary restarts; killing it breaks later starts of that container
+ * (see `injectColdPrimaryFault`).
+ */
+export async function killOwnedControlPlanePrimary(
+  sandbox: SandboxContainer,
+  kiloSessionId: string,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<string[]> {
+  if (!(await proveOwnedControlPlaneSandbox(sandbox, kiloSessionId, executeDocker, []))) return [];
+  await killContainer(sandbox.id, executeDocker);
+  return [sandbox.name];
+}
+
+/**
+ * Prove that a running primary still exclusively owns `kiloSessionId`'s root.
+ * Returns false when the container is already gone, so there is nothing to stop.
+ */
+async function proveOwnedControlPlaneSandbox(
+  sandbox: SandboxContainer,
+  kiloSessionId: string,
+  executeDocker: DockerCommandExecutor,
+  allowedDirectories: readonly string[]
+): Promise<boolean> {
   if (!(await isSandboxContainerRunning(sandbox.id, executeDocker))) {
     // The named container is absent or not running: there is nothing left to
     // stop. After a scenario kills or the wrapper retires the runtime this is
@@ -805,7 +849,7 @@ export async function stopOwnedControlPlaneSandbox(
     console.warn(
       `stop-owned-sandbox(${kiloSessionId}): ${sandbox.name} is already gone; no stop issued`
     );
-    return [];
+    return false;
   }
   const runtime = await findControlPlaneKiloRuntime(kiloSessionId, executeDocker);
   if (!runtime || runtime.container.id !== sandbox.id || runtime.container.name !== sandbox.name) {
@@ -816,7 +860,7 @@ export async function stopOwnedControlPlaneSandbox(
       console.warn(
         `stop-owned-sandbox(${kiloSessionId}): ${sandbox.name} vanished before ownership proof; no stop issued`
       );
-      return [];
+      return false;
     }
     throw new Error('Cannot prove the original sandbox still owns the requested root');
   }
@@ -832,11 +876,11 @@ export async function stopOwnedControlPlaneSandbox(
       console.warn(
         `stop-owned-sandbox(${kiloSessionId}): ${sandbox.name} vanished during exclusive proof; no stop issued`
       );
-      return [];
+      return false;
     }
     throw error;
   }
-  return killSandboxFamily(sandbox, executeDocker);
+  return true;
 }
 
 /**
@@ -1330,13 +1374,12 @@ export async function listSandboxContainers(
     const [id, name, image] = line.split('\t');
     if (!id || !name || !image) continue;
     // Match sandbox DO container names. cloudflare/containers uses a naming
-    // scheme that includes the DO class name; we match on `Sandbox` (covers
-    // both `Sandbox` and `SandboxSmall`) plus the dev worker prefix when
-    // present. Relaxed match keeps the harness robust to wrangler version
-    // changes.
+    // scheme that includes the DO class name, so `Sandbox` covers the native
+    // `SandboxContainers` provider and the retired tombstone names. Keep the
+    // relaxed image fallback so the harness survives wrangler naming changes.
     const isSandbox =
       (name.includes('cloud-agent-next-dev') || name.includes('cloud-agent-next')) &&
-      (name.includes('Sandbox') || image.includes('cloudflare/sandbox'));
+      (name.includes('Sandbox') || image.toLowerCase().includes('sandboxcontainers'));
     if (!isSandbox) continue;
     result.push({ id, name, image, isProxy: name.endsWith('-proxy') });
   }

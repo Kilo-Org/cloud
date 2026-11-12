@@ -57,6 +57,68 @@ function metadata(overrides: Record<string, unknown> = {}) {
 
 const selection = { provider: 'cloudflare' as const };
 
+describe('trusted runtime origin', () => {
+  it.each(['cloud-agent-web', 'cloud-agent', 'code-review', 'agent-manager', undefined])(
+    'preserves the worker origin %s separately from a client web claim',
+    billingOrigin => {
+      const input = metadata({
+        identity: {
+          sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+          userId: 'usr_1',
+          createdOnPlatform: 'cloud-agent-web',
+          billingOrigin,
+        },
+      });
+      const registration = buildControlPlaneSessionRegistration(input, selection);
+      const parsed = controlPlanePrepareInputSchema.parse({
+        spec: registration.spec,
+        credentials: registration.credentials,
+      });
+      expect(parsed.credentials).toMatchObject({ createdOnPlatform: 'cloud-agent-web' });
+      expect(parsed.credentials.billingOrigin).toBe(billingOrigin);
+    }
+  );
+});
+
+describe('workspace tail snapshot authority', () => {
+  it('carries a registered workspace from metadata, without inferring one for standalone sessions', () => {
+    const workspaceId = 'worktree_00000000-0000-4000-8000-000000000001';
+    const registered = buildControlPlaneSessionRegistration(
+      metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare',
+          worktreeId: workspaceId,
+        },
+      }),
+      selection
+    );
+    expect(registered.credentials.workspaceId).toBe(workspaceId);
+    expect(registered.credentials.scopeId).toBe(workspaceId);
+    expect(
+      buildControlPlaneSessionRegistration(metadata(), selection).credentials.workspaceId
+    ).toBeUndefined();
+  });
+
+  it('rejects caller-supplied workspace restore provenance at both registration boundaries', () => {
+    const registration = buildControlPlaneSessionRegistration(metadata(), selection);
+    const spec = {
+      ...registration.spec,
+      workspaceSnapshot: {
+        workspaceId: 'worktree_00000000-0000-4000-8000-000000000001',
+        directory: registration.spec.directory,
+        sourceAllocationId: 'source',
+      },
+    };
+    expect(controlPlaneRouteSpecSchema.safeParse(spec).success).toBe(true);
+    expect(controlPlaneRegistrationRouteSpecSchema.safeParse(spec).success).toBe(false);
+    expect(
+      controlPlanePrepareInputSchema.safeParse({ spec, credentials: registration.credentials })
+        .success
+    ).toBe(false);
+  });
+});
+
 describe('egress policy registration', () => {
   it.each(
     ([undefined, 'unrestricted', 'allowlist'] as const).flatMap(egressMode =>
@@ -325,7 +387,7 @@ describe('migrated origin permissions', () => {
         webfetch: 'deny',
         websearch: 'deny',
         codesearch: 'deny',
-        bash: { git: 'allow' },
+        bash: { git: createdOnPlatform === 'security-remediation' ? 'allow' : 'deny' },
       });
       expect(spec.permission?.bash).toMatchObject(
         createdOnPlatform === 'security-remediation'
@@ -336,10 +398,13 @@ describe('migrated origin permissions', () => {
               curl: 'deny',
             }
           : {
-              'git push': 'deny',
+              'git *': 'deny',
+              'git diff': 'allow',
               'gh pr create': 'deny',
               'gh api repos/*/issues/*/comments --input*': 'allow',
               'gh api repos/*/issues/comments/* -X PATCH*': 'allow',
+              'find *-exec*': 'deny',
+              'sort *--compress-program*': 'deny',
             }
       );
       expect(spec.env).toMatchObject({
@@ -381,7 +446,7 @@ describe('runtime authorization admission', () => {
     }
   );
 
-  it('preserves direct SCM admission independently of modern runtime authorization', () => {
+  it('upgrades saved direct selection to mandatory containment', () => {
     const modern = metadata({
       auth: {
         kiloSessionId: 'ses_12345678901234567890123456',
@@ -396,8 +461,8 @@ describe('runtime authorization admission', () => {
     );
     expect(registration.spec.runtimeIsolation).toBe('per-session');
     expect(registration.sandboxSelection?.containment).toMatchObject({
-      kilocode: false,
-      github: false,
+      kilocode: true,
+      github: true,
     });
   });
 
@@ -419,16 +484,16 @@ describe('runtime authorization admission', () => {
     ).toThrow(SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE);
   });
 
-  it('rejects unsupported Vercel direct mode and invalid modern proxy configuration at registration', () => {
+  it('requires containment on Vercel and rejects invalid modern proxy configuration', () => {
     const vercel = metadata({
       workspace: { sandboxId: 'ses-0123456789abcdef', sandboxProvider: 'vercel' },
     });
-    expect(() =>
+    expect(
       buildControlPlaneSessionRegistration(vercel, {
         provider: 'vercel',
         containment: { kilocode: false, github: false },
-      })
-    ).toThrow('Vercel requires credential containment');
+      }).sandboxSelection?.containment
+    ).toMatchObject({ kilocode: true, github: true });
     const modern = metadata({
       auth: {
         kiloSessionId: 'ses_12345678901234567890123456',
@@ -682,6 +747,9 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
           envVars: { USER_SETTING: 'private-profile-env' },
           encryptedSecrets: { DATABASE_URL: envelope },
           runtimeSkills: [{ name: 'bitbucket-cloud-review', rawMarkdown: 'Review' }],
+          runtimeInstructions: [
+            { name: 'profile-proof', content: 'SYNTHETIC_PROFILE_INSTRUCTION' },
+          ],
           runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', config: {} }],
           kiloCommands: [{ name: 'review-now', template: 'Review' }],
         },
@@ -696,6 +764,7 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
       { name: 'bitbucket-cloud-review', rawMarkdown: 'Review' },
     ]);
     expect(registration.spec.runtimeAgents).toBeUndefined();
+    expect(registration.spec.runtimeInstructions).toBeUndefined();
     expect(registration.spec.kiloCommands).toBeUndefined();
     expect(registration.spec.runtimeIsolation).toBe('per-session');
     expect(registration.spec.permission).toMatchObject({
@@ -1037,6 +1106,9 @@ describe('buildControlPlaneSessionRegistration session directory', () => {
 
 describe('profile runtime delivery', () => {
   const profile = {
+    runtimeInstructions: [
+      { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
+    ],
     runtimeSkills: [
       {
         name: 'review',
@@ -1054,7 +1126,7 @@ describe('profile runtime delivery', () => {
     kiloCommands: [{ name: 'review-now', template: 'Review $ARGUMENTS', agent: 'reviewer' }],
   };
 
-  it.each(['runtimeSkills', 'runtimeAgents', 'kiloCommands'] as const)(
+  it.each(['runtimeSkills', 'runtimeAgents', 'kiloCommands', 'runtimeInstructions'] as const)(
     'delivers %s with compatibility isolation',
     key => {
       const registration = buildControlPlaneSessionRegistration(
@@ -1093,6 +1165,29 @@ describe('profile runtime delivery', () => {
       env: { PROJECT: 'demo' },
       setupCommands: ['echo setup'],
     });
+  });
+
+  it('delivers the environment setup command boundary through prepare', () => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        profile: {
+          setupCommands: ['env-setup', 'inline-setup'],
+          environmentSetupCommandCount: 1,
+        },
+      }),
+      selection
+    );
+
+    expect(registration.spec).toMatchObject({
+      setupCommands: ['env-setup', 'inline-setup'],
+      environmentSetupCommandCount: 1,
+    });
+    expect(
+      controlPlanePrepareInputSchema.parse({
+        spec: registration.spec,
+        credentials: registration.credentials,
+      }).spec.environmentSetupCommandCount
+    ).toBe(1);
   });
 
   it('accepts an inherited worktree profile without per-session isolation', () => {

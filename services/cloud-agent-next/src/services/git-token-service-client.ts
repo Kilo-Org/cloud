@@ -1,13 +1,15 @@
 import { logger } from '../logger.js';
 import {
+  githubBrokerRejectionProvenanceSchema,
+  type GitHubBrokerRejectionProvenance,
   githubRepositoryAuthorizationResultSchema,
   type GitHubRepositoryAuthorizationFailureReason,
 } from '@kilocode/worker-utils/github-authorization';
 import type {
   BitbucketTokenFailureReason,
+  GetGitLabTokenFailureReason,
   GitAuthorConfig,
   GitTokenService,
-  KiloSessionCapabilityTargets,
   ManagedGitHubFallbackReason,
 } from '../types.js';
 
@@ -62,9 +64,11 @@ export type ResolvedGitHubToken = {
 };
 
 export type ResolveGitHubTokenError = {
+  rejectionProvenance?: GitHubBrokerRejectionProvenance;
   reason:
     | GitHubRepositoryAuthorizationFailureReason
     | 'capability_configuration_error'
+    | 'repository_permissions_unavailable'
     | 'invalid_targets'
     | 'invalid_capability'
     | 'expired_capability'
@@ -152,6 +156,7 @@ export type ResolvedCloudAgentGitHubCapability = {
 };
 
 type IssueCloudAgentGitHubSessionCapabilityParams = {
+  permissionScope?: 'repository';
   accessPurpose?: 'workflow' | 'agent';
   githubRepo: string;
   userId: string;
@@ -334,11 +339,27 @@ export async function issueCloudAgentGitHubSessionCapability(
   try {
     const result = await env.GIT_TOKEN_SERVICE.issueGitHubSessionCapability(params);
     if (!result.success) {
+      const provenance = githubBrokerRejectionProvenanceSchema.safeParse(
+        result.rejectionProvenance
+      );
       return {
         success: false,
         error: {
           reason: result.reason,
+          ...(provenance.success ? { rejectionProvenance: provenance.data } : {}),
           message: `GitHub managed auth lookup failed (${result.reason})`,
+        },
+      };
+    }
+    if (
+      params.permissionScope &&
+      (result.permissionScope !== params.permissionScope || result.source !== 'installation')
+    ) {
+      return {
+        success: false,
+        error: {
+          reason: 'capability_configuration_error',
+          message: 'Repository-only GitHub authority is unavailable',
         },
       };
     }
@@ -385,9 +406,30 @@ export type ResolvedCloudAgentGitLabCapability = {
   glabIsOAuth2: boolean;
 };
 
+export type ManagedGitLabTokenFailureReason =
+  | GetGitLabTokenFailureReason
+  | 'service_not_configured'
+  | 'rpc_error';
+
 export type ResolveManagedGitLabTokenResult =
   | { success: true; token: string; instanceUrl: string; glabIsOAuth2: boolean }
-  | { success: false; reason: string };
+  | { success: false; reason: ManagedGitLabTokenFailureReason };
+
+/**
+ * A failure the token service reports about its own state, not about the
+ * caller's access: the credential cannot be resolved until the service or the
+ * provider credential recovers.
+ */
+export function isServiceSideManagedGitLabTokenFailure(
+  reason: ManagedGitLabTokenFailureReason
+): boolean {
+  return (
+    reason === 'service_not_configured' ||
+    reason === 'rpc_error' ||
+    reason === 'database_not_configured' ||
+    reason === 'token_refresh_failed'
+  );
+}
 
 export type ManagedBitbucketTokenFailureReason =
   | BitbucketTokenFailureReason
@@ -552,55 +594,5 @@ export async function resolveManagedGitLabToken(
   } catch {
     logger.error('Failed to call git-token-service getGitLabToken');
     return { success: false, reason: 'rpc_error' };
-  }
-}
-
-export type ResolvedCloudAgentKiloCapability = {
-  capability: string;
-};
-
-export async function issueCloudAgentKiloSessionCapability(
-  env: GitTokenServiceEnv,
-  params: {
-    userId: string;
-    cloudAgentSessionId: string;
-    kiloSessionId: string;
-    outboundContainerId: string;
-    userToken: string;
-    targets: KiloSessionCapabilityTargets;
-  }
-): Promise<
-  | { success: true; value: ResolvedCloudAgentKiloCapability }
-  | { success: false; error: ResolveGitHubTokenError }
-> {
-  if (!env.GIT_TOKEN_SERVICE) {
-    return {
-      success: false,
-      error: {
-        reason: 'service_not_configured',
-        message: 'git-token-service capability issuance is not configured',
-      },
-    };
-  }
-
-  try {
-    const result = await env.GIT_TOKEN_SERVICE.issueKiloSessionCapability(params);
-    if (!result.success) {
-      return {
-        success: false,
-        error: {
-          reason: result.reason,
-          message: `Kilo session capability issuance failed (${result.reason})`,
-        },
-      };
-    }
-    logger.info('Issued Kilo session capability via git-token-service');
-    return { success: true, value: { capability: result.capability } };
-  } catch {
-    logger.error('Failed to issue Kilo session capability');
-    return {
-      success: false,
-      error: { reason: 'rpc_error', message: 'git-token-service RPC failed' },
-    };
   }
 }

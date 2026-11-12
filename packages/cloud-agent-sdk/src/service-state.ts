@@ -12,6 +12,7 @@
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { ServiceEvent } from './normalizer';
+import { upsertByRequestId } from './pending-requests';
 import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
 import {
   PREPARATION_MAX_ATTEMPTS,
@@ -172,23 +173,6 @@ type ServiceReplayBatch = {
   hadSessionInfo: boolean;
 };
 
-/**
- * FIFO upsert. A repeat of the same requestId replaces the entry in place —
- * the wrapper replays pending requests after a snapshot, and a replay must
- * not enqueue a duplicate card. A new requestId goes to the back, so the
- * oldest pending request is always the head.
- */
-function upsertByRequestId<T extends { requestId: string }>(
-  list: readonly T[],
-  next: T
-): readonly T[] {
-  const index = list.findIndex(entry => entry.requestId === next.requestId);
-  if (index === -1) return [...list, next];
-  const copy = [...list];
-  copy[index] = next;
-  return copy;
-}
-
 function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   let config = initialConfig;
   let rootSessionId = config.rootSessionId;
@@ -197,6 +181,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   let cloudStatus: CloudStatus | null = null;
   let setupLog: string[] = [];
   let preparationAttempts: PreparationAttempt[] = [];
+  let pendingPreparationSteps: Extract<ServiceEvent, { type: 'preparing' }>[] = [];
   let commits: readonly SessionCommit[] = [];
   const seenCommits = new Set<string>();
   let sessionInfo: SessionInfo | null = null;
@@ -490,7 +475,17 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
 
   function processPreparing(event: Extract<ServiceEvent, { type: 'preparing' }>): void {
     if (event.version === 2 && event.attemptId && event.triggerMessageId && event.action) {
-      const attempt = processPreparationEvent(event);
+      let attempt = processPreparationEvent(event);
+      if (attempt) {
+        const attemptId = attempt.id;
+        const pending = pendingPreparationSteps.filter(step => step.attemptId === attemptId);
+        pendingPreparationSteps = pendingPreparationSteps.filter(
+          step => step.attemptId !== attemptId
+        );
+        for (const step of pending) {
+          attempt = processPreparationEvent(step) ?? attempt;
+        }
+      }
       // Only an event that actually advanced the attempt may move cloudStatus.
       // Stale duplicates and replayed snapshots of a finished attempt would
       // otherwise flip a ready session back to 'preparing' and permanently
@@ -518,7 +513,12 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       config.onPreparationFailed?.(event.message);
     } else {
       cloudStatus = { type: 'preparing', step: event.step, message: event.message };
-      if (event.step === 'setup_commands' && event.message) {
+      if (
+        (event.step === 'setup_commands' ||
+          event.step === 'session_setup_commands' ||
+          event.step === 'start_commands') &&
+        event.message
+      ) {
         setupLog = [...setupLog.slice(-(PREPARATION_MAX_SETUP_LOG_ENTRIES - 1)), event.message];
       }
     }
@@ -612,7 +612,24 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         .slice(-PREPARATION_MAX_ATTEMPTS);
       return preparationAttempts.includes(attempt) ? attempt : null;
     }
-    if (!existing) return null;
+    if (!existing) {
+      // Materialized step rows can precede their parent attempt in cursor replay.
+      if (event.action === 'step_snapshot' && event.stepId && event.stepSnapshot) {
+        const pending = pendingPreparationSteps.find(
+          step => step.attemptId === event.attemptId && step.stepId === event.stepId
+        );
+        if (pending?.stepSnapshot && pending.stepSnapshot.revision > event.stepSnapshot.revision) {
+          return null;
+        }
+        pendingPreparationSteps = [
+          ...pendingPreparationSteps.filter(
+            step => step.attemptId !== event.attemptId || step.stepId !== event.stepId
+          ),
+          event,
+        ].slice(-(PREPARATION_MAX_ATTEMPTS * PREPARATION_MAX_STEPS));
+      }
+      return null;
+    }
     if (event.action === 'attempt_completed' || event.action === 'attempt_failed') {
       if (existing.revision >= event.revision || existing.status !== 'running') return null;
       const status = event.action === 'attempt_completed' ? 'completed' : 'failed';
@@ -657,7 +674,14 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       existingStep.status === 'running'
     ) {
       if (event.action === 'step_progress' && event.detail !== undefined) {
-        nextStep = { ...existingStep, latestDetail: event.detail, revision: event.revision };
+        nextStep = {
+          ...existingStep,
+          latestDetail: event.detail,
+          ...(event.snapshotCapturedAt === undefined
+            ? {}
+            : { snapshotCapturedAt: event.snapshotCapturedAt }),
+          revision: event.revision,
+        };
       } else if (event.action === 'step_output' && event.output !== undefined) {
         const tail = utf8Tail(
           `${existingStep.outputTail ?? ''}${event.output}`,
@@ -1174,6 +1198,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     },
     clearPreparationAttempts(): void {
       preparationAttempts = [];
+      pendingPreparationSteps = [];
       notify();
     },
     getQuestion: () => questions[0] ?? null,
@@ -1247,6 +1272,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       cloudStatus = null;
       setupLog = [];
       preparationAttempts = [];
+      pendingPreparationSteps = [];
       commits = [];
       seenCommits.clear();
       sessionInfo = null;

@@ -1,7 +1,3 @@
-/**
- * Cloudflare Worker entry point for AI Attributions Tracking
- */
-
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { useWorkersLogger } from 'workers-tagged-logger';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
@@ -43,7 +39,6 @@ const app = new Hono<HonoContext>();
 // The runtime middleware is fully compatible; only the .d.ts is stale.
 app.use('*', useWorkersLogger('ai-attribution') as unknown as MiddlewareHandler);
 
-// Health check endpoint (no auth required)
 app.get('/health', c => {
   return c.json({
     status: 'ok',
@@ -58,7 +53,6 @@ app.use('/attributions/*', authMiddleware);
 app.use('/attributions/*', attributionRateLimitMiddleware);
 app.use('/attributions/*', identityMiddleware);
 
-// GET /attributions/whoami - Test authentication and return user info
 app.get('/attributions/whoami', c => {
   return c.json(
     resSuccess({
@@ -69,12 +63,10 @@ app.get('/attributions/whoami', c => {
   );
 });
 
-// POST /attributions/track - Track a new attribution
 app.post('/attributions/track', async c => {
   const user_id = c.get('user_id');
   const organization_id = c.get('organization_id');
 
-  // Read the body with a bounded reader against the fixed byte budget.
   let bodyText: string | undefined;
   try {
     const declaredLength = Number(c.req.header('Content-Length') ?? Number.NaN);
@@ -101,7 +93,6 @@ app.post('/attributions/track', async c => {
     return c.json(resError('Invalid request payload'), 400);
   }
 
-  // Parse and validate request body
   let payload: AttributionsTrackRequestBody;
   try {
     const body: unknown = bodyText === undefined ? {} : JSON.parse(bodyText);
@@ -122,14 +113,12 @@ async function trackAttribution(
 ) {
   const env = c.env;
 
-  // Get DurableObject stub
   const stub = getAttributionTrackerDO(env, {
     organization_id,
     project_id: payload.project_id,
     file_path: payload.file_path,
   });
 
-  // Track attribution
   try {
     const result = await stub.trackAttribution({
       ...payload,
@@ -151,14 +140,8 @@ async function trackAttribution(
   }
 }
 
-// ============================================================================
-// Admin Routes (service-to-service communication)
-// ============================================================================
-
-// Apply admin auth middleware to all /admin/* routes
 app.use('/admin/*', adminAuthMiddleware);
 
-// GET /admin/health - Admin health check (verifies admin auth is working)
 app.get('/admin/health', c => {
   return c.json(
     resSuccess({
@@ -168,12 +151,9 @@ app.get('/admin/health', c => {
   );
 });
 
-// GET /admin/attributions - Get lines added for a given organization/project/file_path
-// Optionally filter by branch. Returns an object where keys are line hashes and values are arrays of line numbers
 app.get('/admin/attributions', async c => {
   const env = c.env;
 
-  // Parse and validate query params
   let params: AdminAttributionsQueryParams;
   try {
     const query = c.req.query();
@@ -188,7 +168,6 @@ app.get('/admin/attributions', async c => {
     return c.json(resError('Invalid query parameters:\n' + errMsg), 400);
   }
 
-  // Get DurableObject stub
   const target = {
     organization_id: params.organization_id,
     project_id: params.project_id,
@@ -196,7 +175,6 @@ app.get('/admin/attributions', async c => {
   };
   const stub = getAttributionTrackerDO(env, target);
 
-  // Get lines added grouped by hash, optionally filtered by branch
   try {
     const linesAddedByHash = await stub.getLinesAddedByHash(target, params.branch);
     return c.json(resSuccess({ lines_added: linesAddedByHash }));
@@ -210,12 +188,9 @@ app.get('/admin/attributions', async c => {
   }
 });
 
-// GET /admin/attribution-events - Get attribution events with ordered line hashes for flexible retention
-// This endpoint returns data structured for the LCS-based retention calculation
 app.get('/admin/attribution-events', async c => {
   const env = c.env;
 
-  // Parse and validate query params
   let params: AdminAttributionsQueryParams;
   try {
     const query = c.req.query();
@@ -230,7 +205,6 @@ app.get('/admin/attribution-events', async c => {
     return c.json(resError('Invalid query parameters:\n' + errMsg), 400);
   }
 
-  // Get DurableObject stub
   const target = {
     organization_id: params.organization_id,
     project_id: params.project_id,
@@ -238,10 +212,8 @@ app.get('/admin/attribution-events', async c => {
   };
   const stub = getAttributionTrackerDO(env, target);
 
-  // Get attribution events with ordered line hashes
   try {
     const events = await stub.getAttributionEvents(target, params.branch);
-    // Validate response shape
     const validatedEvents = events.map(e => AttributionEventResponse.parse(e));
     return c.json(resSuccess({ events: validatedEvents }));
   } catch (error) {
@@ -254,12 +226,9 @@ app.get('/admin/attribution-events', async c => {
   }
 });
 
-// GET /admin/debug-data - Get all debug data for a Durable Object
-// This endpoint returns the same data as the /debug/do route but as JSON for the admin panel
 app.get('/admin/debug-data', async c => {
   const env = c.env;
 
-  // Parse and validate query params
   let params: AdminAttributionsQueryParams;
   try {
     const query = c.req.query();
@@ -274,7 +243,6 @@ app.get('/admin/debug-data', async c => {
     return c.json(resError('Invalid query parameters:\n' + errMsg), 400);
   }
 
-  // Get DurableObject stub
   const target = {
     organization_id: params.organization_id,
     project_id: params.project_id,
@@ -282,7 +250,6 @@ app.get('/admin/debug-data', async c => {
   };
   const stub = getAttributionTrackerDO(env, target);
 
-  // Get debug data from the DO
   try {
     const debugData = await stub.getDebugData(target);
     const doKey = attributionTrackerKey(target);
@@ -297,11 +264,9 @@ app.get('/admin/debug-data', async c => {
   }
 });
 
-// DELETE /admin/attribution/:id - Delete a single attribution and its associated lines
 app.delete('/admin/attribution/:id', async c => {
   const env = c.env;
 
-  // Parse and validate params
   let params: AdminDeleteAttributionParams;
   try {
     const query = c.req.query();
@@ -317,7 +282,6 @@ app.delete('/admin/attribution/:id', async c => {
     return c.json(resError('Invalid parameters:\n' + errMsg), 400);
   }
 
-  // Get DurableObject stub
   const target = {
     organization_id: params.organization_id,
     project_id: params.project_id,
@@ -325,7 +289,6 @@ app.delete('/admin/attribution/:id', async c => {
   };
   const stub = getAttributionTrackerDO(env, target);
 
-  // Delete the attribution
   try {
     const deleted = await stub.deleteAttribution(target, params.attribution_id);
     if (!deleted) {
@@ -342,12 +305,10 @@ app.delete('/admin/attribution/:id', async c => {
   }
 });
 
-// 404 handler
 app.notFound(c => {
   return c.json({ success: false, error: 'Not found' }, 404);
 });
 
-// Error handler
 app.onError((err, c) => {
   logger.error('Unhandled error', {
     error: err.message,

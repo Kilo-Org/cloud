@@ -399,6 +399,20 @@ describe('organization admin router', () => {
         { platform: PLATFORM.LINEAR, installation_count: 1 },
       ]);
     });
+
+    it('returns the Stripe customer id regardless of the admin org role', async () => {
+      await db
+        .update(organizations)
+        .set({ stripe_customer_id: 'cus_admin_details_test' })
+        .where(eq(organizations.id, testOrganization.id));
+
+      const caller = await createCallerForUser(adminUser.id);
+      const result = await caller.organizations.admin.getDetails({
+        organizationId: testOrganization.id,
+      });
+
+      expect(result.stripe_customer_id).toBe('cus_admin_details_test');
+    });
   });
 
   describe('nullifyCredits', () => {

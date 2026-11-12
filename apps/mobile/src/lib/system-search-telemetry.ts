@@ -12,6 +12,25 @@ const SYSTEM_SEARCH_TIMEOUT_CODE = 'ERR_SYSTEM_SEARCH_TIMEOUT';
 
 const SystemSearchTimeoutSchema = z.looseObject({ code: z.literal(SYSTEM_SEARCH_TIMEOUT_CODE) });
 
+/**
+ * The code the Android module rejects a consumed tap with when it could not
+ * read the index to resolve the picked identifier. The tap is still in the
+ * module's slot, so the same consume is what retries it.
+ */
+const SYSTEM_SEARCH_UNRESOLVED_CODE = 'ERR_SYSTEM_SEARCH_UNRESOLVED';
+
+const SystemSearchUnresolvedSchema = z.looseObject({
+  code: z.literal(SYSTEM_SEARCH_UNRESOLVED_CODE),
+});
+
+/**
+ * Whether a rejected slot read reports a picked result that could not be
+ * resolved yet, rather than a call that failed for another reason.
+ */
+export function isSystemSearchUnresolvedFailure(error: unknown): boolean {
+  return SystemSearchUnresolvedSchema.safeParse(error).success;
+}
+
 type SystemSearchOperation = 'sync' | 'clear';
 
 /**

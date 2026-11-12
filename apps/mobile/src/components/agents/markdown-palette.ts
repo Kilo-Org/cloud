@@ -5,19 +5,13 @@ import {
   tokenSchemeForSurface,
 } from '@/lib/pr-review/diff/syntax-colors';
 
-export type MarkdownVariant = 'assistant' | 'kilo-chat-user' | 'user';
+export type MarkdownVariant = 'assistant' | 'user';
 
 export type MarkdownPalette = {
   textColor: string;
   mutedTextColor: string;
   codeBackground: string;
   borderColor: string;
-  // The syntax token scheme for code fences in this variant, derived from the
-  // real code-card surface — the bubble tinted by `codeBackground`
-  // (`compositeOver`), classified by `tokenSchemeForSurface` — rather than the
-  // app color scheme: a dark-theme user bubble is bright lime while a
-  // light-theme kilo-chat bubble is dark olive. Optional so hand-written test
-  // palettes can omit it and fall back to the app scheme in `CodeBlock`.
   codeTokenScheme?: TokenScheme;
 };
 
@@ -42,22 +36,6 @@ function withAlpha(color: string, alpha: number): string {
 }
 
 export function getPalette(variant: MarkdownVariant, colors: ThemeColors): MarkdownPalette {
-  if (variant === 'kilo-chat-user') {
-    // kilo-chat user bubbles sit on bg-primary; use primary-foreground ink.
-    const ink = colors.primaryForeground;
-    const codeBackground = withAlpha(ink, 0.1);
-    return {
-      textColor: ink,
-      mutedTextColor: withAlpha(ink, 0.7),
-      codeBackground,
-      borderColor: withAlpha(ink, 0.2),
-      // Classify the real code card, not the bare bubble: the 10% ink tint is
-      // enough to move the card (the light-theme white tint lifts the olive
-      // primary #4F5A10 to #616B28, where the `dark` token values must clear
-      // 4.5:1 to stay legible).
-      codeTokenScheme: tokenSchemeForSurface(compositeOver(codeBackground, colors.primary)),
-    };
-  }
   if (variant === 'user') {
     // Agent chat user bubbles sit on accent-soft (lime); use ink-on-lime.
     const ink = colors.accentSoftForeground;

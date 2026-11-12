@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { SearchX } from '@/components/ui/icons';
 
-import { CenteredState, STATE_SURFACE_FALLBACK_MS } from './centered-state';
+import { CenteredState } from './centered-state';
 import { type useStateSurface } from './centered-state-surface';
 import { EmptyState } from './empty-state';
 import { InvalidRouteState } from './invalid-route-state';
@@ -88,6 +88,17 @@ const contentLayout: Partial<LayoutChangeEvent> = {
   nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 700 } },
 };
 
+/**
+ * The placement a state carries while its geometry is pending or rejected: the
+ * content stays where it is, centered, until a measurement places it.
+ */
+const UNPLACED_FALLBACK_STYLE = {
+  flexGrow: 1,
+  justifyContent: 'center',
+  paddingTop: 16,
+  paddingBottom: 16,
+};
+
 async function mount(props: Partial<ComponentPropsWithRef<typeof CenteredState>> = {}) {
   let rerender: (() => void) | undefined = undefined;
   function Harness() {
@@ -127,6 +138,18 @@ async function mount(props: Partial<ComponentPropsWithRef<typeof CenteredState>>
       });
     },
   };
+}
+
+/**
+ * The state paints whatever its placement status. No caller hides it behind a
+ * measurement window any more, so its content stays at full opacity and in the
+ * accessibility tree from the first frame — a hidden data state is a blank
+ * body, which is what a reopened screen used to show.
+ */
+function expectPainted(mounted: { content: () => ViewProps }) {
+  const content = mounted.content();
+  expect(content.className ?? '').not.toContain('opacity-0');
+  expect(content.importantForAccessibility).not.toBe('no-hide-descendants');
 }
 
 beforeEach(() => {
@@ -245,9 +268,8 @@ describe('CenteredState measurements', () => {
     async nativeViewportFillsSurface => {
       native.surface.nativeViewportFillsSurface = nativeViewportFillsSurface;
       const mounted = await mount();
-      expect(mounted.content().accessibilityElementsHidden).toBe(true);
+      expectPainted(mounted);
       mounted.settle();
-      expect(mounted.content().accessibilityElementsHidden).toBe(false);
       expect(mounted.scroll().contentContainerStyle).toEqual({
         flexGrow: 1,
         minHeight: nativeViewportFillsSurface ? 420 : 340,
@@ -258,49 +280,64 @@ describe('CenteredState measurements', () => {
     }
   );
 
-  it('waits for finite native viewport bounds', async () => {
+  it('waits for finite native viewport bounds without hiding the state', async () => {
     const mounted = await mount();
     act(() => {
       for (const onMeasure of native.measurements.splice(0)) {
         onMeasure(0, Number.NaN, 400, Number.NaN);
       }
     });
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    // An unreadable native reading leaves the pending placement in charge; the
+    // state itself stays painted.
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
     act(() => {
       mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
     });
     mounted.settle();
-    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expect(mounted.scroll().contentContainerStyle).toMatchObject({ minHeight: 340 });
     mounted.unmount();
   });
 
-  it('rejects old viewport results after the surface changes', async () => {
+  it('keeps a revealed state on screen and drops stale geometry after the surface changes', async () => {
     const mounted = await mount();
     mounted.settle();
     act(() => {
       mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
     });
+    expect(mounted.scroll().contentContainerStyle).toMatchObject({ minHeight: 340 });
     const stale = native.measurements.splice(0);
     native.surface.frame = { top: 300, bottom: 800 };
     mounted.rerender();
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    // The band moved under the state: it still paints, at the pending
+    // placement, while it waits for a measurement of the new band.
+    expectPainted(mounted);
     act(() => {
       for (const onMeasure of stale) {
         onMeasure(0, 80, 400, 340);
       }
     });
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    // A viewport measured against the old frame is not reused for the new one.
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
     mounted.settle(380, 340);
-    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      minHeight: 340,
+      paddingTop: 16,
+      paddingBottom: 16,
+    });
     mounted.unmount();
   });
 
-  it('clears readiness on detach and ignores the detached request', async () => {
+  it('keeps a revealed state on screen with its placement when its scroller detaches', async () => {
     const mounted = await mount();
     mounted.settle();
     act(() => {
       mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
     });
+    const placed = mounted.scroll().contentContainerStyle;
     const stale = native.measurements.splice(0);
     const props = mounted.renderer.root.findByType(ScrollView).props as ComponentPropsWithRef<
       typeof ScrollView
@@ -312,87 +349,94 @@ describe('CenteredState measurements', () => {
     act(() => {
       ref(null);
     });
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    // The host view re-attaches on a screen's return, and the band it had is
+    // the band it still has: the placement must survive the gap rather than
+    // re-center and jump back.
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     act(() => {
       for (const onMeasure of stale) {
         onMeasure(0, 80, 400, 340);
       }
     });
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     act(() => {
       ref(native.scroll as ScrollViewInstance);
     });
     mounted.settle();
-    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     mounted.unmount();
   });
 
-  it('waits for a new valid measurement after the surface detaches', async () => {
+  it('keeps the state painted while the surface re-measures', async () => {
     const mounted = await mount();
     mounted.settle();
+    expectPainted(mounted);
+    const placed = mounted.scroll().contentContainerStyle;
     const frame = native.surface.frame;
     native.surface.frame = null;
     mounted.rerender();
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    // The band is unknown for a moment: the state still paints, at the pending
+    // placement, instead of disappearing from the body.
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
     native.surface.frame = frame;
     mounted.rerender();
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    mounted.settle();
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual(placed);
+    // An unreadable re-measure leaves the state painted at the pending
+    // placement; the next readable measurement places it again.
     mounted.settle(0, 0);
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    expectPainted(mounted);
     act(() => {
       mounted.scroll().onLayout?.(contentLayout as LayoutChangeEvent);
     });
     mounted.settle();
-    expect(mounted.content().accessibilityElementsHidden).toBe(false);
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      minHeight: 340,
+      paddingTop: 16,
+      paddingBottom: 16,
+    });
     mounted.unmount();
   });
 });
 
-describe('CenteredState measurement fallback', () => {
-  it('reveals the content once the measurement window passes', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    try {
-      // Never calling `settle()` is exactly the measurement that never lands:
-      // the native geometry callback stays queued while the surface is
-      // measured.
-      const mounted = await mount();
-      expect(mounted.content().accessibilityElementsHidden).toBe(true);
+describe('CenteredState first-frame paint', () => {
+  it('paints the state before the surface measures and keeps it painted', async () => {
+    // A reopened screen measures its surface late, and the surface detaches and
+    // re-attaches while the tab bar and the nav transition land. Hiding the
+    // state for that window left an empty history body blank for more than a
+    // second on a device, so the state paints at its pending placement at once.
+    const mounted = await mount();
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual(UNPLACED_FALLBACK_STYLE);
 
-      await act(async () => {
-        vi.advanceTimersByTime(STATE_SURFACE_FALLBACK_MS);
-        await Promise.resolve();
-      });
+    const cycle = () => {
+      native.surface.frame = null;
+      mounted.rerender();
+      expectPainted(mounted);
+      native.surface.frame = { top: 0, bottom: 500 };
+      mounted.rerender();
+      expectPainted(mounted);
+    };
+    cycle();
+    cycle();
 
-      expect(mounted.content().accessibilityElementsHidden).toBe(false);
-      expect(mounted.content().className).not.toContain('opacity-0');
-
-      // A real measurement still wins and replaces the fallback placement.
-      mounted.settle();
-      expect(mounted.scroll().contentContainerStyle).toEqual({
-        flexGrow: 1,
-        minHeight: 340,
-        paddingTop: 16,
-        paddingBottom: 16,
-      });
-      mounted.unmount();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('keeps the hidden-until-measured contract inside the window', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    try {
-      const mounted = await mount();
-      await act(async () => {
-        vi.advanceTimersByTime(STATE_SURFACE_FALLBACK_MS - 1);
-        await Promise.resolve();
-      });
-      expect(mounted.content().accessibilityElementsHidden).toBe(true);
-      mounted.unmount();
-    } finally {
-      vi.useRealTimers();
-    }
+    // A real measurement still wins and replaces the pending placement.
+    mounted.settle();
+    expectPainted(mounted);
+    expect(mounted.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      minHeight: 340,
+      paddingTop: 16,
+      paddingBottom: 16,
+    });
+    mounted.unmount();
   });
 
   it('reserves the surface bottom band once while the layout measurement is pending', async () => {
@@ -405,7 +449,7 @@ describe('CenteredState measurement fallback', () => {
     native.surface.bottomInset = 96;
     native.surface.bottomReservation = 96;
     const mounted = await mount();
-    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    expectPainted(mounted);
     expect(mounted.scroll().contentContainerStyle).toEqual({
       flexGrow: 1,
       justifyContent: 'center',

@@ -862,6 +862,7 @@ export const ManyVariables: Story = {
       isDefault: false,
       createdAt: '2025-01-01T00:00:00Z',
       updatedAt: '2025-01-01T00:00:00Z',
+      lastUsedAt: null,
       vars: Array.from({ length: 20 }, (_, i) => ({
         key: `ENV_VAR_${i + 1}`,
         value: i % 3 === 0 ? '***' : `value_${i + 1}`,
@@ -892,6 +893,7 @@ export const ManyCommands: Story = {
       isDefault: false,
       createdAt: '2025-01-01T00:00:00Z',
       updatedAt: '2025-01-01T00:00:00Z',
+      lastUsedAt: null,
       vars: [],
       commands: Array.from({ length: 15 }, (_, i) => ({
         sequence: i,

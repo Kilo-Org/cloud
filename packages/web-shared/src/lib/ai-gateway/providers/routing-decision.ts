@@ -1,5 +1,9 @@
 import * as z from 'zod';
 import {
+  EnkryptGuardrailReportSchema,
+  EnkryptOutputGuardrailReportSchema,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
+import {
   UserByokProviderIdSchema,
   type UserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -8,6 +12,8 @@ import {
   ProviderTypeSchema,
   type ProviderType,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { getByokKeyDefaultRank } from '@kilocode/web-shared/lib/ai-gateway/byok/route-order';
+import type { KeyPlanStep } from '@kilocode/web-shared/lib/ai-gateway/providers/route-plan';
 
 const ByokCandidateRouteSchema = z.enum(['direct-byok', 'vercel-byok', 'gateway-byok']);
 
@@ -18,7 +24,6 @@ const ByokCandidateSkipReasonSchema = z.enum([
   'model-unavailable',
   'provider-settings',
   'ignored-by-request',
-  'not-loaded',
 ]);
 
 export type ByokCandidateSkipReason = z.infer<typeof ByokCandidateSkipReasonSchema>;
@@ -100,10 +105,22 @@ const RoutingDecisionStepSchema = z.union([
     outcome: z.literal('skipped'),
     reason: z.literal('unavailable'),
   }),
+  /** A catalog-mode key that serves ranks above the connection, so it is not checked. */
   z.object({
     step: z.literal('chatgpt'),
     outcome: z.literal('deferred'),
     reason: z.literal('catalog-key-serves'),
+  }),
+  z.object({ step: z.literal('claude-billing'), outcome: z.literal('selected') }),
+  z.object({
+    step: z.literal('claude-billing'),
+    outcome: z.literal('rejected'),
+    reason: z.enum(['unavailable', 'reconnect']),
+  }),
+  z.object({
+    step: z.literal('claude-billing'),
+    outcome: z.literal('skipped'),
+    reason: z.literal('unavailable'),
   }),
   z.object({
     step: z.literal('byok-key'),
@@ -123,17 +140,11 @@ const RoutingDecisionStepSchema = z.union([
     supported_api_kinds: z.array(GatewayChatApiKindSchema),
   }),
   z.object({
-    step: z.literal('unsupported-api-kind'),
-    outcome: z.literal('skipped'),
-    provider_id: UserByokProviderIdSchema,
-    supported_api_kinds: z.array(GatewayChatApiKindSchema),
-    reason: z.literal('not-loaded'),
-  }),
-  z.object({
     step: z.literal('kilo'),
     outcome: z.literal('selected'),
     gateway: z.enum(['vercel', 'openrouter']),
     bounded_spending: z.boolean(),
+    organization_disabled_vercel_ai_gateway: z.boolean(),
     kilo_ignored_providers: z.array(z.string()),
   }),
 ]);
@@ -145,6 +156,7 @@ const SelectedRouteSchema = z.enum([
   'custom-llm',
   'direct-byok-model',
   'chatgpt',
+  'claude-billing',
   ...ByokCandidateRouteSchema.options,
   'unsupported-api-kind',
   'kilo',
@@ -158,6 +170,7 @@ const PayerSchema = z.enum([
   'custom-llm-credential',
   'owner-byok-key',
   'chatgpt-subscription',
+  'customer-claude-organization',
   'kilo',
 ]);
 
@@ -173,7 +186,13 @@ const RoutingDecisionResultSchema = z.discriminatedUnion('kind', [
     is_free: z.boolean(),
   }),
   z.object({
-    kind: z.enum(['chatgpt-reconnect', 'custom-llm-unavailable', 'direct-byok-catalog-only']),
+    kind: z.enum([
+      'chatgpt-reconnect',
+      'claude-billing-unavailable',
+      'claude-billing-reconnect',
+      'custom-llm-unavailable',
+      'direct-byok-catalog-only',
+    ]),
   }),
 ]);
 
@@ -190,12 +209,21 @@ const ProviderRoutingDecisionSchema = z.object({
 
 export type ProviderRoutingDecision = z.infer<typeof ProviderRoutingDecisionSchema>;
 
-/** A `kilo/<usage id>.json` object in the AI provider metadata bucket. */
+/** A `<usage_id>.json` object in the AI provider metadata bucket. */
 export const KiloRoutingDecisionRecordSchema = ProviderRoutingDecisionSchema.extend({
   schema_version: z.literal(1),
   /** The `microdollar_usage` and `microdollar_usage_metadata` id of the request. */
   usage_id: z.uuid(),
   created_at: z.iso.datetime(),
+  vercel: z
+    .object({
+      metadata: z.record(z.string(), z.unknown()),
+    })
+    .optional(),
+  /** The organization's Enkrypt input guardrail, when it applied to the request. */
+  enkrypt: EnkryptGuardrailReportSchema.optional(),
+  /** The organization's Enkrypt output guardrail, when it applied to the response. */
+  enkrypt_output: EnkryptOutputGuardrailReportSchema.optional(),
 });
 
 export type KiloRoutingDecisionRecord = z.infer<typeof KiloRoutingDecisionRecordSchema>;
@@ -228,6 +256,8 @@ function payerOf(route: SelectedRoute): Payer {
       return 'custom-llm-credential';
     case 'chatgpt':
       return 'chatgpt-subscription';
+    case 'claude-billing':
+      return 'customer-claude-organization';
     case 'kilo':
       return 'kilo';
     case 'direct-byok-model':
@@ -247,20 +277,32 @@ export function createRoutingDecisionRecorder(
   request: Pick<ProviderRoutingDecision, 'requested_model' | 'api_kind' | 'owner_type'>
 ) {
   const steps: RoutingDecisionStep[] = [];
+  let keySteps: KeyPlanStep[] = [];
   let candidates: RoutingDecisionByokCandidate[] = [];
 
   return {
     step(step: RoutingDecisionStep) {
       steps.push(step);
     },
-    rankByokCandidates(ranked: RoutingDecisionByokCandidate[]) {
-      candidates = ranked;
+    /** Lists the key steps of the route plan as candidates, none reached yet. */
+    recordByokCandidates(planKeySteps: readonly KeyPlanStep[]) {
+      keySteps = [...planKeySteps];
+      candidates = keySteps.map(({ route, key, routeOrder }) => ({
+        route,
+        provider_id: key.providerId,
+        priority: key.priority ?? null,
+        default_rank: getByokKeyDefaultRank(key.providerId),
+        route_order: routeOrder,
+        outcome: 'unreached',
+      }));
     },
+    /** A selected key keeps the reason it was skipped at its own rank. */
     markByokCandidate(
-      index: number,
+      step: KeyPlanStep,
       outcome: RoutingDecisionByokCandidate['outcome'],
       reason?: ByokCandidateSkipReason
     ) {
+      const index = keySteps.indexOf(step);
       const candidate = candidates[index];
       if (!candidate) return;
       candidates[index] = { ...candidate, outcome, ...(reason ? { reason } : {}) };

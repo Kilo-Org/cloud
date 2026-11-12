@@ -27,6 +27,7 @@ export const CloudAgentRunFailureClassifications = [
   { failureStage: 'pre_dispatch', failureCode: 'payment_required' },
   { failureStage: 'pre_dispatch', failureCode: 'admission_billing_unavailable' },
   { failureStage: 'pre_dispatch', failureCode: 'container_limit_reached' },
+  { failureStage: 'pre_dispatch', failureCode: 'account_blocked' },
   { failureStage: 'pre_dispatch', failureCode: 'delivery_failure_unknown' },
   { failureStage: 'post_dispatch_no_activity', failureCode: 'wrapper_disconnected' },
   { failureStage: 'post_dispatch_no_activity', failureCode: 'wrapper_no_output' },
@@ -66,6 +67,7 @@ export const CloudAgentRunContainerSchema = z
     snapshotId: OperationalIdentifierSchema.optional(),
     runtimeBuildId: OperationalIdentifierSchema.optional(),
     startSource: z.enum(['image', 'snapshot']).optional(),
+    runtimeHarness: z.enum(['kilo', 'kilo2']).optional(),
   })
   .strict();
 

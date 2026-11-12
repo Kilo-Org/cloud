@@ -20,7 +20,7 @@ export function getWorkspaceFolderColor(color: WorkspaceFolderColor): string {
   );
 }
 
-const controlPlaneSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
+export const controlPlaneSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
 const collapsedFolderIdsSchema = z.array(z.uuid());
 
 export function isFolderWorkspace(group: SidebarWorktreeGroup): boolean {
@@ -64,7 +64,8 @@ export function groupWorkspacesByFolder(
 
 export type WorkspaceFolderDragItem =
   | { type: 'worktree'; id: string }
-  | { type: 'folder'; id: string };
+  | { type: 'folder'; id: string }
+  | { type: 'session'; id: string };
 
 export type WorkspaceFolderDropTarget =
   | { type: 'folder'; id: string; placement: 'before' | 'after' }
@@ -72,7 +73,8 @@ export type WorkspaceFolderDropTarget =
 
 export type WorkspaceFolderDropAction =
   | { type: 'move-worktree'; worktreeId: string; folderId: string | null }
-  | { type: 'reorder-folders'; folderIds: string[] };
+  | { type: 'reorder-folders'; folderIds: string[] }
+  | { type: 'move-session'; sessionId: string; folderId: string | null };
 
 export function getWorkspaceFolderDropAction(
   drag: WorkspaceFolderDragItem | null,
@@ -81,7 +83,18 @@ export function getWorkspaceFolderDropAction(
   worktreeIds: ReadonlySet<string>
 ): WorkspaceFolderDropAction | null {
   if (!drag || !target) return null;
-  if (target.type === 'folder' && !folders.some(folder => folder.id === target.id)) return null;
+  const targetFolder =
+    target.type === 'folder' ? folders.find(folder => folder.id === target.id) : undefined;
+  if (target.type === 'folder' && targetFolder === undefined) return null;
+  // Smart folders compute their members, so the server refuses manual moves into them.
+  if (drag.type !== 'folder' && targetFolder?.kind === 'smart') return null;
+
+  if (drag.type === 'session') {
+    // Sessions are only draggable while ungrouped, so Ungrouped has nothing to
+    // change. Report no action so the drop zone is not advertised.
+    if (target.type === 'ungrouped') return null;
+    return { type: 'move-session', sessionId: drag.id, folderId: target.id };
+  }
 
   if (drag.type === 'worktree') {
     if (!worktreeIds.has(drag.id)) return null;
@@ -99,6 +112,13 @@ export function getWorkspaceFolderDropAction(
   return reordered.every((id, position) => id === folderIds[position])
     ? null
     : { type: 'reorder-folders', folderIds: reordered };
+}
+
+export function getInitializedSmartDoneFoldersStorageKey(
+  userId: string,
+  organizationId?: string
+): string {
+  return `cloud-workspace-folders:smart-done:${encodeURIComponent(userId)}:${organizationId ? `org:${encodeURIComponent(organizationId)}` : 'personal'}`;
 }
 
 export function getCollapsedWorkspaceFoldersStorageKey(

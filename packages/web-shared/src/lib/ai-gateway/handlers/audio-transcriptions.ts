@@ -1,4 +1,3 @@
-import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
@@ -14,28 +13,20 @@ import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
 import {
   countAndStoreTranscriptionUsage,
-  extractFraudAndProjectHeaders,
-  extractHeaderAndLimitLength,
   invalidRequestResponse,
   modelDoesNotExistResponse,
-  modelNotAllowedResponse,
-  creditsBlockedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import {
-  getEffectiveProviderPrivacy,
-  providerPrivacySchema,
-} from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
-import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { providerPreferencesSchema } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import {
-  isFreeModel,
-  isFreeModelExcludingCustomLlms,
-} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
-import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  emitApiMetricsForResponse,
+  emitGatewayApiMetrics,
+} from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
@@ -45,15 +36,20 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/transcriptions/transcription-request';
 import type { PromptInfo } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import {
+  gatewayUsageContextBase,
+  organizationProviderPreferences,
+  paidUsageRejection,
+  readGatewayBalance,
+  resolveGatewayCaller,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import {
   bareIpLiteral,
   bouncerDecideTier,
   rawClientIp,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 import { signedInBouncerRequest } from '@kilocode/web-shared/lib/bouncer/request';
-
-const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 
 async function transcriptionProxyRequest(params: {
   body: Record<string, unknown> | FormData;
@@ -190,34 +186,13 @@ export async function handleAudioTranscriptionsRequest(
   }
 
   const authSpan = startInactiveSpan({ name: 'auth-check' });
-  const {
-    user: maybeUser,
-    authFailedResponse,
-    organizationId: authOrganizationId,
-    botId: authBotId,
-    tokenSource: authTokenSource,
-  } = await getUserFromAuth({
-    adminOnly: false,
-    expectedAudience: KILO_GATEWAY_AUDIENCE,
-  });
+  const caller = resolveGatewayCaller(
+    await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
+    { allowAnonymous: false, passThroughAuthFailure: true }
+  );
   authSpan.end();
-
-  const organizationId: string | undefined = authOrganizationId;
-  const botId: string | undefined = authBotId;
-  const tokenSource: string | undefined = authTokenSource;
-
-  if (authFailedResponse || !maybeUser) {
-    return NextResponse.json(
-      {
-        error: {
-          code: PAID_MODEL_AUTH_REQUIRED,
-          message: 'You need to sign in to use speech-to-text.',
-        },
-        error_type: ProxyErrorType.paid_model_auth_required,
-      },
-      { status: 401 }
-    );
-  }
+  if (caller.kind === 'rejected') return caller.response;
+  const { user, organizationId } = caller;
 
   // Custom LLMs are served only through chat routes; never forward their ids
   // elsewhere. Checked after auth so anonymous callers cannot probe for them.
@@ -225,15 +200,13 @@ export async function handleAudioTranscriptionsRequest(
     return modelDoesNotExistResponse();
   }
 
-  const user = maybeUser;
-
-  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
+  const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt });
   const { provider, userByok } = await getTranscriptionProvider();
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
 
   const bouncer = signedInBouncerRequest({
     ip: bareIpLiteral(ipAddress),
-    ja4Digest: fraudHeaders.http_x_vercel_ja4_digest,
+    ja4Digest: usageBase.context.fraudHeaders.http_x_vercel_ja4_digest,
     userId: user.id,
     organizationId,
     feature,
@@ -252,38 +225,19 @@ export async function handleAudioTranscriptionsRequest(
   }
 
   const usageContext: MicrodollarUsageContext = {
+    ...usageBase.context,
     api_kind: 'audio_transcriptions',
-    kiloUserId: user.id,
     provider: provider.type,
     requested_model: requestedModelLowerCased,
-    is_free: isFreeModelExcludingCustomLlms(requestedModelLowerCased),
-    custom_llm_pricing: null,
+    is_free: isFreeModel(requestedModelLowerCased),
     promptInfo,
-    max_tokens: null,
-    has_middle_out_transform: null,
-    reasoning_setting: null,
-    fraudHeaders,
     isStreaming: false,
-    organizationId,
-    prior_microdollar_usage: user.microdollars_used,
-    posthog_distinct_id: user.google_user_email,
-    project_id: projectId,
-    status_code: null,
-    editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-    machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
     has_tools: false,
-    botId,
-    tokenSource,
     feature,
-    session_id: null,
-    mode: null,
-    auto_model: null,
-    ttfb_ms: null,
-    requestStartedAt,
     bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+      clientAttributed: usageBase.clientAttributed,
       requestedLogprobs: false,
       samples: null,
       // Audio carries no user text, so there is no prompt to hash.
@@ -293,41 +247,42 @@ export async function handleAudioTranscriptionsRequest(
 
   setTag('ui.ai_model', requestedModel);
 
-  const freeRequest = await isFreeModel(requestedModelLowerCased);
-  const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
-    await getBalanceAndOrgSettings(organizationId, user, readDb, freeRequest ? undefined : 'usage');
+  const account = await readGatewayBalance(user, organizationId, requestedModelLowerCased);
+  const { balance, settings, plan, payer } = account;
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).
-  if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
-    return await creditsBlockedResponse({
-      user,
-      balance,
-      organizationId,
-      balanceLimitedByUserAllowance,
-    });
-  }
+  const creditsBlocked = paidUsageRejection({
+    user,
+    organizationId,
+    account,
+    exempt: usageContext.is_free || !!userByok,
+  });
+  if (creditsBlocked) return await creditsBlocked();
 
   // OpenRouter's transcription endpoint accepts the same provider preferences
-  // as chat, so the organization data-collection policy is forwarded with the
-  // request instead of rejecting it.
+  // as chat, so the organization data-collection policy and provider routes are
+  // forwarded with the request instead of rejecting it.
   const requestProvider = parsedRequest.kind === 'json' ? parsedRequest.body.provider : undefined;
-  const requestPrivacy = providerPrivacySchema.optional().safeParse(requestProvider);
+  const requestPrivacy = providerPreferencesSchema.optional().safeParse(requestProvider);
   if (!requestPrivacy.success) return invalidRequestResponse();
-  const effectivePrivacy = getEffectiveProviderPrivacy(
-    requestPrivacy.data,
-    settings?.data_collection
-  );
-
-  if (organizationId) {
-    const { decision } = await resolveOrganizationMemberModelDecision({
-      organizationId,
-      kiloUserId: user.id,
-      modelId: requestedModelLowerCased,
-      fromDb: readDb,
-    });
-    if (!decision.allowed) return modelNotAllowedResponse();
-  }
+  const organizationDecision = organizationId
+    ? (
+        await resolveOrganizationMemberModelDecision({
+          organizationId,
+          kiloUserId: user.id,
+          modelId: requestedModelLowerCased,
+          fromDb: readDb,
+        })
+      ).decision
+    : undefined;
+  const preferences = organizationProviderPreferences({
+    decision: organizationDecision,
+    settings,
+    requestProvider: requestPrivacy.data,
+  });
+  if (preferences.kind === 'rejected') return preferences.response;
+  const organizationProvider = preferences.provider;
 
   // The one decide for this request, awaited just before the upstream call within its 500 ms
   // budget. Only an enforced verdict rejects; every other outcome sends the request.
@@ -353,15 +308,15 @@ export async function handleAudioTranscriptionsRequest(
     upstreamForm.append('safety_identifier', safetyIdentifier);
     upstreamForm.append('user', safetyIdentifier);
     // The multipart form takes the provider preferences as a JSON string.
-    if (Object.keys(effectivePrivacy).length > 0) {
-      upstreamForm.append('provider', JSON.stringify(effectivePrivacy));
+    if (organizationProvider) {
+      upstreamForm.append('provider', JSON.stringify(organizationProvider));
     }
     upstreamBody = upstreamForm;
   } else {
     parsedRequest.body.safety_identifier = generateProviderSpecificHash(user.id, provider);
     parsedRequest.body.user = parsedRequest.body.safety_identifier;
-    if (Object.keys(effectivePrivacy).length > 0) {
-      parsedRequest.body.provider = { ...requestProvider, ...effectivePrivacy };
+    if (organizationProvider) {
+      parsedRequest.body.provider = { ...requestProvider, ...organizationProvider };
     }
     upstreamBody = buildUpstreamBody(parsedRequest.body);
   }
@@ -379,24 +334,20 @@ export async function handleAudioTranscriptionsRequest(
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.status_code = response.status;
 
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: false,
-      isStreaming: false,
-      userByok: !!userByok,
-      provider: provider.type,
-      requestedModel: requestedModelLowerCased,
-      resolvedModel: normalizeModelId(requestedModelLowerCased),
-      toolsAvailable: [],
-      toolsUsed: [],
-      ttfbMs,
-      statusCode: response.status,
-    },
-    response.clone(),
-    requestStartedAt
-  );
+  const metricsParams = {
+    kiloUserId: user.id,
+    organizationId,
+    isAnonymous: false,
+    isStreaming: false,
+    userByok: !!userByok,
+    provider: provider.type,
+    requestedModel: requestedModelLowerCased,
+    resolvedModel: normalizeModelId(requestedModelLowerCased),
+    toolsAvailable: [],
+    toolsUsed: [],
+    ttfbMs,
+    statusCode: response.status,
+  };
 
   const upstreamErrorResponse = await applyUpstreamErrorPolicy({
     response,
@@ -407,8 +358,17 @@ export async function handleAudioTranscriptionsRequest(
     organizationId,
     model: requestedModelLowerCased,
   });
-  if (upstreamErrorResponse) return upstreamErrorResponse;
+  if (upstreamErrorResponse) {
+    emitGatewayApiMetrics({ ...metricsParams, completeRequestMs: ttfbMs });
+    return upstreamErrorResponse;
+  }
 
-  countAndStoreTranscriptionUsage(response.clone(), usageContext, span);
+  const accounting = countAndStoreTranscriptionUsage(
+    response.clone(),
+    usageContext,
+    span,
+    provider
+  );
+  emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
   return wrapInSafeNextResponse(response);
 }

@@ -1,6 +1,6 @@
 ---
 name: kilo-mcp
-description: Use when working with the Kilo MCP server, its general kilo_search and kilo_call tools, or its parent-scoped child-session tools. Covers model ID discovery, child workspace launches and callbacks, API discovery, query/mutation safety, and the top-level catalog areas.
+description: Use when working with the Kilo MCP server, its general kilo_search and kilo_call tools, or its parent-scoped child-session tools. Covers model ID discovery, child workspace launches and callbacks, API discovery, query/mutation safety.
 ---
 
 <!--
@@ -18,7 +18,7 @@ and `kilo_call`. Parent-scoped Cloud Agent connections instead expose the dedica
 child-session tools described below. Use the tool names published by your client;
 it may prefix them with the MCP server name.
 
-The changes are recorded in `services/kilo-mcp/CHANGELOG.md`.
+See `services/kilo-mcp/CHANGELOG.md`.
 
 ## General API connections
 
@@ -34,29 +34,28 @@ an admin guard carries `admin: true`; an opted-in admin connection also gets
 and `submit_otp`, which runs it once the user approves with their authenticator
 code. A row whose top segment is `debug` carries `debug: true`.
 
-The catalog is `services/kilo-mcp/catalog.json`. This skill is generated from
-it, and the catalog wins when the two disagree — read the catalog, not this
-file, for current detail.
+The catalog at `services/kilo-mcp/catalog.json` is authoritative.
+Read it for current endpoint details.
 
 ## Parent-scoped child sessions
 
 These connections publish `search_models`, `generate_message_id`, `spawn_session`,
 `list_child_sessions`, `get_session`, `get_message_result`, `send_message`, `interrupt_session`,
-`list_folders`, and `assign_workspace_to_folder`.
+`list_environments`, `list_folders`, and `assign_workspace_to_folder`.
 They do not expose API `search` or `call`.
 
 1. Launch only when the user explicitly requests a Cloud Agent session. Children have independent sandboxes/worktrees; use local tools for this worktree.
 2. Resolve the requested model or established user preference with `search_models`; copy its exact `id`. Otherwise browse with `{}` and ask the user to choose. No implicit default: `isPreferred` is a recommendation. Omit `variant` unless requested; pass only a supported variant separately. Never guess or substitute IDs. `alias_target` names a floating alias's target; discovery does not prove policy approval.
 3. Call `spawn_session` with repository, self-contained task prompt, mode, exact model ID, and fresh UUID `operationKey`. Include constraints, verification, and Git/PR instructions. It starts immediately with multi-chat support. Organization and `createdOnPlatform` are inherited, not caller inputs.
-4. Set `callbackTarget: { "url": "session:parent" }` for completion/failure/interruption messages; omit for none. Prefer callbacks over polling; never wait in a tool for one.
+4. Set `callbackTarget` to `{"url":"workspace:new-chat"}` (parent workspace) or `{"url":"workspace:<session-id>"}` (this chat); omit for none. Prefer callbacks.
 5. `list_child_sessions` recovers IDs and `initialMessageId` when recorded; `get_session` checks status; `get_message_result` reads outcomes. Before a new authorized follow-up, call `generate_message_id({})` and copy its `messageId` into `send_message`. This generates no work. Retain it for retries; never replace it after an uncertain send. Initial tasks use `initialMessageId`; report if absent, never invent it. Admission, queued/running, and missing results are not completion. `interrupt_session` is for authorized Stop.
 6. `list_folders` discovers existing folder IDs, not workspace membership. Use `assign_workspace_to_folder` with `folderId` and the child's `cloudAgentSessionId`/`worktreeId` from listing or status. It files the whole worktree, including sibling chats; `folderId: null` unfiles it. Only this parent's child workspaces are movable. Folder creation, editing, deletion, and reordering are unavailable.
 7. After an ambiguous mutation failure, reconcile state before retrying. Keep the same `operationKey` or follow-up `messageId` for that same submission.
 8. Omitted `autoCommit` requests no automatic commit/push; follow-ups do not inherit it. Set `true` per authorized message. If publication is forbidden, set `false` and prohibit it in the prompt: `false` cannot restrict agent Git tools or cancel another prompt's request. Request PR creation in the prompt.
+9. Use `list_environments({repository:{platform:"github",fullName:"owner/repo"}})` for scoped summaries. Pass a returned `id` as `spawn_session.requestedEnvironment.id`; never guess IDs.
 
-Authority/callbacks belong to the canonical parent (original root chat), even from
-siblings. Only direct children are manageable, never unrelated sessions or the
-parent. No grandchildren.
+Callbacks return to the canonical parent workspace. Manage only direct children,
+never the parent. No grandchildren.
 
 ### Examples
 
@@ -67,7 +66,7 @@ const child = await spawn_session({
   githubRepo: 'owner/repo', model: modelId, mode: 'code',
   prompt: 'Fix the bug, run focused tests, and report. Do not commit, push, or create a PR.',
   operationKey: launchUuid, autoCommit: false,
-  callbackTarget: { url: 'session:parent' },
+  callbackTarget: { url: 'workspace:new-chat' },
 });
 ```
 
@@ -88,8 +87,6 @@ After the callback, or as one bounded check:
 ```js
 await get_message_result({ cloudAgentSessionId: child.cloudAgentSessionId, messageId });
 ```
-
-Retain publication constraints in `followUpTask`.
 
 ## Reporting feedback and bugs
 
@@ -113,15 +110,18 @@ exist as an org-scoped mirror under `organizations`, for example
 - `agentProfiles`
 - `appReportedMessages`
 - `byok`
+- `claudeBilling`
 - `cliSessions`
 - `cliSessionsV2`
 - `cloudAgentNext`
+- `cloudAgentNextFailures`
 - `cloudAgentNextFeedback`
 - `cloudAgentSettings`
 - `cloudEnvironments`
 - `codeIndexing`
 - `codeReviews`
 - `codingPlans`
+- `computeBilling`
 - `credits`
 - `debug`
 - `discord`
@@ -147,6 +147,7 @@ exist as an org-scoped mirror under `organizations`, for example
 - `securityAuditLog`
 - `slack`
 - `spendAlerts`
+- `stepUp`
 - `todos`
 - `unifiedSessions`
 - `usageAnalytics`

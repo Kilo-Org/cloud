@@ -1,14 +1,21 @@
 import { NextResponse } from 'next/server';
-import { KILO_EMBEDDING_MODEL_CATALOG } from '@kilocode/web-shared/lib/ai-gateway/embeddings/kilo-embedding-models';
+import { getKiloEmbeddingModelCatalogFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/embeddings/openrouter-embedding-models';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   getEffectiveModelDecision,
   resolveOrganizationMemberModelPolicy,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 export async function handleEmbeddingModelsRequest(): Promise<NextResponse> {
+  const catalog = await getKiloEmbeddingModelCatalogFromDatabase();
+  if (!catalog) {
+    return NextResponse.json(
+      { error: 'Embedding model metadata is temporarily unavailable.' },
+      { status: 503, headers: { 'Retry-After': '30' } }
+    );
+  }
   const auth = await getUserFromAuth({
     adminOnly: false,
     expectedAudience: KILO_GATEWAY_AUDIENCE,
@@ -22,7 +29,7 @@ export async function handleEmbeddingModelsRequest(): Promise<NextResponse> {
       fromDb: readDb,
     });
     const models = [];
-    for (const model of KILO_EMBEDDING_MODEL_CATALOG.models) {
+    for (const model of catalog.models) {
       if ((await getEffectiveModelDecision(policy, model.id)).allowed) models.push(model);
     }
     if (models.length === 0) {
@@ -33,18 +40,14 @@ export async function handleEmbeddingModelsRequest(): Promise<NextResponse> {
     }
     const modelIds = new Set(models.map(model => model.id));
     const aliases = Object.fromEntries(
-      Object.entries(KILO_EMBEDDING_MODEL_CATALOG.aliases).filter(([, modelId]) =>
-        modelIds.has(modelId)
-      )
+      Object.entries(catalog.aliases).filter(([, modelId]) => modelIds.has(modelId))
     );
     return NextResponse.json({
-      ...KILO_EMBEDDING_MODEL_CATALOG,
-      defaultModel: modelIds.has(KILO_EMBEDDING_MODEL_CATALOG.defaultModel)
-        ? KILO_EMBEDDING_MODEL_CATALOG.defaultModel
-        : models[0].id,
+      ...catalog,
+      defaultModel: modelIds.has(catalog.defaultModel) ? catalog.defaultModel : models[0].id,
       models,
       aliases,
     });
   }
-  return NextResponse.json(KILO_EMBEDDING_MODEL_CATALOG);
+  return NextResponse.json(catalog);
 }

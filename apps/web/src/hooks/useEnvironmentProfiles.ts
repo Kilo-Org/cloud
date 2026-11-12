@@ -1,6 +1,6 @@
 'use client';
 
-import { appliesImplicitProfiles, resolveProfileLayers } from '@kilocode/cloud-agent-profile';
+import { appliesRepoBindings, resolveProfileLayers } from '@kilocode/cloud-agent-profile';
 import {
   useCombinedProfiles,
   useProfile,
@@ -14,23 +14,25 @@ export function useEnvironmentProfiles({
   repository,
   selectedProfileId,
   environment,
+  enabled = true,
 }: {
   organizationId?: string;
   repository?: { platform: string; fullName: string };
   selectedProfileId?: string | null;
-  /** The environment being edited or used. A V2 environment skips the binding and the implicit default. */
+  /** The environment being edited or used. A V2 environment skips the repo binding; the effective default still applies. */
   environment?: { repositories?: unknown } | null;
+  enabled?: boolean;
 }) {
-  const personal = useProfiles({ enabled: !organizationId });
+  const personal = useProfiles({ enabled: enabled && !organizationId });
   const combined = useCombinedProfiles({
     organizationId: organizationId ?? '',
-    enabled: !!organizationId,
+    enabled: enabled && !!organizationId,
   });
-  const bindings = useRepoBindings({ organizationId });
+  const bindings = useRepoBindings({ organizationId, enabled });
   const summaries = organizationId ? combined.data?.allProfiles : personal.data;
-  const implicitProfiles = appliesImplicitProfiles(environment);
+  const binds = appliesRepoBindings(environment);
   const binding =
-    !implicitProfiles || repository?.platform === 'bitbucket'
+    !binds || repository?.platform === 'bitbucket'
       ? undefined
       : bindings.data?.find(
           candidate =>
@@ -39,11 +41,9 @@ export function useEnvironmentProfiles({
         );
   const layers = resolveProfileLayers({
     repoBindingProfileId: binding?.profileId ?? null,
-    effectiveDefaultProfileId: !implicitProfiles
-      ? null
-      : organizationId
-        ? (combined.data?.effectiveDefaultId ?? null)
-        : (personal.data?.find(profile => profile.isDefault)?.id ?? null),
+    effectiveDefaultProfileId: organizationId
+      ? (combined.data?.effectiveDefaultId ?? null)
+      : (personal.data?.find(profile => profile.isDefault)?.id ?? null),
     explicitOverrideProfileId: selectedProfileId ?? null,
   });
   const ownerFor = (id: string | undefined) =>
@@ -53,11 +53,11 @@ export function useEnvironmentProfiles({
       : undefined;
   const base = useProfile(layers.base?.profileId ?? '', {
     organizationId: ownerFor(layers.base?.profileId),
-    enabled: !!summaries,
+    enabled: enabled && !!summaries,
   });
   const top = useProfile(layers.top?.profileId ?? '', {
     organizationId: ownerFor(layers.top?.profileId),
-    enabled: !!summaries,
+    enabled: enabled && !!summaries,
   });
   const queries = [
     organizationId ? combined : personal,

@@ -8,6 +8,7 @@ import {
 import { and, count, eq, inArray, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { encryptWithPublicKey } from '@kilocode/encryption';
+import { egressPolicySchema, type EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import {
   encryptedEnvelopeSchema,
   assertValidEnvironmentKey,
@@ -93,6 +94,43 @@ function encryptValue(publicKeyBase64: string, value: string): string {
   }
   const publicKey = Buffer.from(publicKeyBase64, 'base64');
   return JSON.stringify(encryptWithPublicKey(value, publicKey));
+}
+
+type EnvironmentEgressColumns = {
+  egress_mode: EgressMode;
+  egress_allowlist: string[] | null;
+};
+
+/**
+ * Validates a supplied network policy with the shared egress contract and
+ * converts it to the stored columns. Absent mode retains the stored policy.
+ * Allowlist mode always stores a list, so the "None" choice is an empty one.
+ */
+function resolveEnvironmentEgressPolicy(input: {
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
+}): EnvironmentEgressColumns | undefined {
+  if (input.egressMode === undefined) {
+    if (input.egressAllowlist !== undefined) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'egressAllowlist requires egressMode to be allowlist',
+      });
+    }
+    return undefined;
+  }
+
+  const parsed = egressPolicySchema.safeParse({
+    egressMode: input.egressMode,
+    egressAllowlist: input.egressAllowlist,
+  });
+  if (!parsed.success) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid egress policy' });
+  }
+
+  return parsed.data.egressMode === 'allowlist'
+    ? { egress_mode: 'allowlist', egress_allowlist: parsed.data.egressAllowlist ?? [] }
+    : { egress_mode: 'unrestricted', egress_allowlist: null };
 }
 
 function toBaseResponseColumns(environment: CloudAgentEnvironment): {
@@ -284,8 +322,10 @@ export async function createEnvironment(
   const plainVars = validateEnvironmentPlainVars(input.plainVars);
   const secrets = validateEnvironmentSecrets(input.secrets);
   const commands = validateEnvironmentCommands(input.commands);
+  const startCommands = validateEnvironmentCommands(input.startCommands, 'Start');
   assertNoPlainSecretCollision(plainVars, Object.keys(secrets));
   validateEnvironmentVarCount(Object.keys(plainVars).length + Object.keys(secrets).length);
+  const egress = resolveEnvironmentEgressPolicy(input);
 
   if (input.owner.type === 'organization') {
     await lockActiveOrganization(tx, input.owner.id);
@@ -300,7 +340,10 @@ export async function createEnvironment(
       name,
       ...repositoryColumns,
       commands,
+      start_commands: startCommands,
       sandbox_allocation: input.sandboxAllocation ?? null,
+      egress_mode: egress?.egress_mode ?? null,
+      egress_allowlist: egress?.egress_allowlist ?? null,
     })
     .returning({ id: cloud_agent_environments.id });
 
@@ -343,7 +386,12 @@ export async function updateEnvironment(
     input.plainVars === undefined ? undefined : validateEnvironmentPlainVars(input.plainVars);
   const commands =
     input.commands === undefined ? undefined : validateEnvironmentCommands(input.commands);
+  const startCommands =
+    input.startCommands === undefined
+      ? undefined
+      : validateEnvironmentCommands(input.startCommands, 'Start');
   const secretChanges = input.secrets;
+  const egress = resolveEnvironmentEgressPolicy(input);
 
   if (secretChanges !== undefined) {
     for (const change of secretChanges) {
@@ -429,14 +477,17 @@ export async function updateEnvironment(
       ? undefined
       : planRepositoriesUpdate(environment, input.repositories);
 
-  // Name and allocation are not build inputs; they never advance the revision.
-  if (name !== undefined || input.sandboxAllocation !== undefined) {
+  // Name, allocation and network policy are not build inputs; they never advance the revision.
+  if (name !== undefined || input.sandboxAllocation !== undefined || egress !== undefined) {
     await tx
       .update(cloud_agent_environments)
       .set({
         ...(name !== undefined ? { name } : {}),
         ...(input.sandboxAllocation !== undefined
           ? { sandbox_allocation: input.sandboxAllocation }
+          : {}),
+        ...(egress !== undefined
+          ? { egress_mode: egress.egress_mode, egress_allowlist: egress.egress_allowlist }
           : {}),
       })
       .where(eq(cloud_agent_environments.id, input.environmentId));
@@ -472,6 +523,14 @@ export async function updateEnvironment(
     await tx
       .update(cloud_agent_environments)
       .set({ commands })
+      .where(eq(cloud_agent_environments.id, input.environmentId));
+  }
+
+  // Start commands never run in a build, so they never advance the revision.
+  if (startCommands !== undefined) {
+    await tx
+      .update(cloud_agent_environments)
+      .set({ start_commands: startCommands })
       .where(eq(cloud_agent_environments.id, input.environmentId));
   }
 
@@ -578,6 +637,9 @@ export async function getEnvironment(
     ...identityResponseOf(environment),
     plainVars,
     commands: environment.commands,
+    startCommands: environment.start_commands,
+    egressMode: environment.egress_mode,
+    egressAllowlist: environment.egress_allowlist,
     secretKeys: secretKeys.map(row => row.key),
   };
 }
@@ -709,10 +771,13 @@ export async function loadEnvironmentForSession(
             envVars: plainVars,
             encryptedSecrets,
             setupCommands: environment.commands,
+            startCommands: environment.start_commands,
             ...(repositories ? { repositories: repositories.map(referenceRepositoryOf) } : {}),
           },
           reference: referenceOf(environment),
           sandboxAllocation: environment.sandbox_allocation,
+          egressMode: environment.egress_mode,
+          egressAllowlist: environment.egress_allowlist,
         },
       };
     },
@@ -751,7 +816,13 @@ export async function loadEnvironmentBuildInput(
         await readVariables(tx, environmentId)
       );
       const reference = referenceOf(environment);
-      const common = { reference, commands: environment.commands, plainVars, encryptedSecrets };
+      const common = {
+        reference,
+        commands: environment.commands,
+        plainVars,
+        encryptedSecrets,
+        sandboxAllocation: environment.sandbox_allocation,
+      };
       return reference.repositories
         ? { ...common, repositories: reference.repositories }
         : { ...common, repoFullName: repositoryPathOf(environment) };

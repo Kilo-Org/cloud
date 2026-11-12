@@ -16,6 +16,7 @@ import {
   getDeviceAuthAppModeFromRequestUrl,
 } from '@/app/device-auth/device-auth-url';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
+import { getPendingLinkBySecret } from '@/lib/auth/pending-link';
 
 /**
  * The optional body of a pairing request. A caller that names the OAuth client
@@ -24,6 +25,7 @@ import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-t
  */
 const CreateCodesBodySchema = z.object({
   requesting_client: requestingClientSchema.optional(),
+  pendingLinkToken: z.string().trim().min(1).max(512).optional(),
 });
 
 /**
@@ -33,12 +35,18 @@ const CreateCodesBodySchema = z.object({
  */
 async function readRequestingClient(
   request: Request
-): Promise<{ ok: true; client: RequestingClient | null } | { ok: false }> {
+): Promise<
+  { ok: true; client: RequestingClient | null; pendingLinkToken?: string } | { ok: false }
+> {
   const body: unknown = await request.json().catch(() => null);
   const parsed = CreateCodesBodySchema.safeParse(body ?? {});
   if (!parsed.success) return { ok: false };
   const payload = parsed.data.requesting_client;
-  return { ok: true, client: payload ? toRequestingClient(payload) : null };
+  return {
+    ok: true,
+    client: payload ? toRequestingClient(payload) : null,
+    ...(parsed.data.pendingLinkToken ? { pendingLinkToken: parsed.data.pendingLinkToken } : {}),
+  };
 }
 
 export const POST = withRestTiming('/api/device-auth/codes', async (request: Request) => {
@@ -49,6 +57,13 @@ export const POST = withRestTiming('/api/device-auth/codes', async (request: Req
   const requestingClient = await readRequestingClient(request);
   if (!requestingClient.ok) {
     return NextResponse.json({ error: 'Invalid requesting client' }, { status: 400 });
+  }
+
+  if (
+    requestingClient.pendingLinkToken &&
+    !(await getPendingLinkBySecret(requestingClient.pendingLinkToken))
+  ) {
+    return NextResponse.json({ error: 'PENDING_LINK_EXPIRED' }, { status: 400 });
   }
 
   try {
@@ -62,6 +77,9 @@ export const POST = withRestTiming('/api/device-auth/codes', async (request: Req
       userAgent,
       ipAddress,
       ...(requestingClient.client ? { requestingClient: requestingClient.client } : {}),
+      ...(requestingClient.pendingLinkToken
+        ? { pendingLinkToken: requestingClient.pendingLinkToken }
+        : {}),
     });
 
     const verificationUrl = buildDeviceAuthVerificationUrl(APP_URL, userCode, {

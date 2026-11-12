@@ -12,7 +12,6 @@ import {
   partIdSchema,
   sessionDiffFileSchema,
   type KiloSdkMessagesCursor,
-  type KiloSdkMessagesLegacyCursor,
   type SessionDiffFile,
   type SessionDiffRead,
 } from '@kilocode/session-ingest-contracts';
@@ -84,7 +83,7 @@ type ItemDataRef = Pick<typeof ingestItems.$inferSelect, 'item_data' | 'item_dat
 
 type MaterializedKiloSdkMessage = {
   info: Record<string, unknown>;
-  identity: KiloSdkMessagesLegacyCursor;
+  identity: KiloSdkMessagesCursor;
 };
 
 type PersistedKiloSdkMessageStorageIdentity = {
@@ -275,10 +274,7 @@ function resolveKiloSdkHistoryCandidateOutcome(
   return materialized;
 }
 
-function hasOlderKiloSdkMessageRows(
-  db: DrizzleSqliteDODatabase,
-  beforeMessageItemId: string
-): boolean {
+function hasOlderKiloSdkMessageRows(db: DrizzleSqliteDODatabase, beforeRowId: number): boolean {
   return Boolean(
     db
       .select({ id: ingestItems.id })
@@ -287,7 +283,8 @@ function hasOlderKiloSdkMessageRows(
         and(
           eq(ingestItems.item_type, 'message'),
           gte(ingestItems.item_id, MESSAGE_ITEM_ID_RANGE.start),
-          lt(ingestItems.item_id, beforeMessageItemId)
+          lt(ingestItems.item_id, MESSAGE_ITEM_ID_RANGE.end),
+          lt(ingestItems.id, beforeRowId)
         )
       )
       .limit(1)
@@ -295,23 +292,51 @@ function hasOlderKiloSdkMessageRows(
   );
 }
 
+/**
+ * The stored row a continuation cursor names. A bounded page continues below
+ * the row it last read, so the cursor's message id has to resolve back to that
+ * row; `message/<id>` is unique and indexed.
+ */
+function messageRowIdForCursor(
+  db: DrizzleSqliteDODatabase,
+  cursor: KiloSdkMessagesCursor
+): number | undefined {
+  return db
+    .select({ id: ingestItems.id })
+    .from(ingestItems)
+    .where(eq(ingestItems.item_id, messageItemId(cursor.id)))
+    .get()?.id;
+}
+
+/**
+ * Orders one page newest first by the message's own creation time, id as the
+ * tiebreak - the order `compareKiloSdkMessageInfo` gives the unbounded read and
+ * the order every client shows. A bounded page is collected in the order the
+ * rows were written (`ingest_items.id`), which follows the clock only while the
+ * stored message id does; sorting the page here makes its own contents
+ * chronological whatever the ids look like.
+ */
+function sortKiloSdkPageNewestFirst(page: MaterializedKiloSdkMessage[]): void {
+  page.sort(
+    (left, right) =>
+      right.identity.time - left.identity.time || compareId(right.identity.id, left.identity.id)
+  );
+}
+
 function finishBoundedKiloSdkMessageInfoEnumeration(
   db: DrizzleSqliteDODatabase,
   pageNewestFirst: MaterializedKiloSdkMessage[],
   omittedItemCount: number,
-  lastConsumedMessageStorageIdentity: PersistedKiloSdkMessageStorageIdentity | undefined
+  frontier: { rowId: number; cursor?: KiloSdkMessagesCursor } | undefined
 ): KiloSdkMessageInfoEnumeration | KiloSdkHistoryTooLarge {
-  if (
-    !lastConsumedMessageStorageIdentity ||
-    !hasOlderKiloSdkMessageRows(db, lastConsumedMessageStorageIdentity.itemId)
-  ) {
+  sortKiloSdkPageNewestFirst(pageNewestFirst);
+  if (frontier === undefined || !hasOlderKiloSdkMessageRows(db, frontier.rowId)) {
     return { pageNewestFirst, nextCursor: null, omittedItemCount };
   }
-  const oldestReturnedMessage = pageNewestFirst[pageNewestFirst.length - 1];
-  if (
-    !oldestReturnedMessage ||
-    messageItemId(oldestReturnedMessage.identity.id) !== lastConsumedMessageStorageIdentity.itemId
-  ) {
+  // The page stopped on a row this read could not carry as a cursor (an
+  // oversized or malformed row). Continuing from anything else could skip it,
+  // so the read fails instead of handing out a cursor that loses rows.
+  if (frontier.cursor === undefined) {
     return {
       kind: 'too_large',
       maximumBytes: MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
@@ -320,7 +345,7 @@ function finishBoundedKiloSdkMessageInfoEnumeration(
   }
   return {
     pageNewestFirst,
-    nextCursor: tryEncodeKiloSdkMessagesCursor(oldestReturnedMessage.identity),
+    nextCursor: tryEncodeKiloSdkMessagesCursor(frontier.cursor),
     omittedItemCount,
   };
 }
@@ -335,8 +360,12 @@ async function enumerateBoundedKiloSdkMessageInfos(
   const pageNewestFirst: MaterializedKiloSdkMessage[] = [];
   let omittedItemCount = 0;
   let consumedRowCount = 0;
-  let lastConsumedMessageStorageIdentity: PersistedKiloSdkMessageStorageIdentity | undefined;
-  let scanBeforeItemId = before ? messageItemId(before.id) : MESSAGE_ITEM_ID_RANGE.end;
+  let frontier: { rowId: number; cursor?: KiloSdkMessagesCursor } | undefined;
+  // A cursor whose row is gone (a cleared or trimmed store) restarts at the
+  // newest page: the client dedupes by message id, and the fresh cursor the
+  // page returns resumes ordinary paging.
+  const cursorRowId = before === undefined ? undefined : messageRowIdForCursor(db, before);
+  let scanBeforeRowId = cursorRowId;
   while (
     pageNewestFirst.length < limit &&
     consumedRowCount < KILO_SDK_HISTORY_BOUNDED_MESSAGE_SCAN_ROW_WORK_CAP
@@ -348,10 +377,11 @@ async function enumerateBoundedKiloSdkMessageInfos(
         and(
           eq(ingestItems.item_type, 'message'),
           gte(ingestItems.item_id, MESSAGE_ITEM_ID_RANGE.start),
-          lt(ingestItems.item_id, scanBeforeItemId)
+          lt(ingestItems.item_id, MESSAGE_ITEM_ID_RANGE.end),
+          scanBeforeRowId === undefined ? undefined : lt(ingestItems.id, scanBeforeRowId)
         )
       )
-      .orderBy(desc(ingestItems.item_id))
+      .orderBy(desc(ingestItems.id))
       .limit(
         Math.min(
           KILO_SDK_HISTORY_ENUMERATION_BATCH_SIZE,
@@ -380,7 +410,7 @@ async function enumerateBoundedKiloSdkMessageInfos(
           db,
           pageNewestFirst,
           omittedItemCount,
-          lastConsumedMessageStorageIdentity
+          frontier
         );
       } else {
         const outcome = resolveKiloSdkHistoryCandidateOutcome(materialized, 'skip', 'message_scan');
@@ -394,6 +424,7 @@ async function enumerateBoundedKiloSdkMessageInfos(
           } else {
             omittedItemCount += 1;
           }
+          frontier = { rowId: row.id };
         } else if (outcome.kind !== 'value') {
           return outcome;
         } else {
@@ -407,13 +438,14 @@ async function enumerateBoundedKiloSdkMessageInfos(
               return omittedRows;
             }
             omittedItemCount += omittedRows.count;
+            frontier = { rowId: row.id };
           } else {
             pageNewestFirst.push({ info: outcome.value, identity });
+            frontier = { rowId: row.id, cursor: identity };
           }
         }
       }
-      lastConsumedMessageStorageIdentity = storageIdentity;
-      scanBeforeItemId = storageIdentity.itemId;
+      scanBeforeRowId = row.id;
       consumedRowCount += 1;
       if (pageNewestFirst.length === limit) break;
     }
@@ -428,7 +460,7 @@ async function enumerateBoundedKiloSdkMessageInfos(
     db,
     pageNewestFirst,
     omittedItemCount,
-    lastConsumedMessageStorageIdentity
+    frontier
   );
 }
 
@@ -548,7 +580,7 @@ function directPartIdCondition(range: PartItemIdentityRange) {
 
 function countKiloSdkMessagePartRows(
   db: DrizzleSqliteDODatabase,
-  identity: KiloSdkMessagesLegacyCursor,
+  identity: KiloSdkMessagesCursor,
   afterRowId = 0
 ): KiloSdkMessagePartRowCount {
   return countKiloSdkMessagePartRowsByMessageId(db, identity.id, afterRowId);
@@ -570,7 +602,7 @@ async function hydrateKiloSdkMessageParts(
   db: DrizzleSqliteDODatabase,
   r2: R2Bucket,
   budget: KiloSdkHistoryReadBudget,
-  identity: KiloSdkMessagesLegacyCursor,
+  identity: KiloSdkMessagesCursor,
   oversizedItemPolicy: KiloSdkOversizedItemPolicy
 ): Promise<
   | {
@@ -885,7 +917,7 @@ function parseItemObject(value: string): Record<string, unknown> | null {
   }
 }
 
-function readMessageIdentity(message: Record<string, unknown>): KiloSdkMessagesLegacyCursor | null {
+function readMessageIdentity(message: Record<string, unknown>): KiloSdkMessagesCursor | null {
   const parsed = z
     .object({
       id: messageIdSchema,

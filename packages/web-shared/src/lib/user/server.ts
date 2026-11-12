@@ -10,9 +10,11 @@ import {
   verifyRuntimeProxyAttestation,
 } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import { NextResponse } from 'next/server';
+import { TRPCError } from '@trpc/server';
 import { headers } from 'next/headers';
 
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { NextAuthOptions, JWT, LoggerInstance, Session } from 'next-auth';
 import { getServerSession } from 'next-auth';
@@ -29,7 +31,7 @@ import {
 } from '@kilocode/worker-utils/account-access';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
-import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { isAdminStepUpEnabled, NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import jwt from 'jsonwebtoken';
 import {
   logExceptInTest,
@@ -40,8 +42,19 @@ import {
   authViaTokenFromHeaders,
   clientIpFromHeaders,
   emitAdminAccessEvent,
+  emitPrivilegedAccessEvent,
+  methodFromHeaders,
   routeFromHeaders,
+  userAgentProductFromHeaders,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
+import {
+  deriveCredentialKind,
+  StepUpRequiredError,
+  type PrivilegedCredentialKind,
+} from '@kilocode/web-shared/lib/admin/privileged-access';
+import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-inventory';
+import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
+import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
@@ -58,8 +71,8 @@ import {
 } from '@kilocode/worker-utils/kilo-token-policy';
 
 import {
-  getBlacklistedDomains,
   getBlockedSignupTlds,
+  isEmailBlacklisted,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 // NextAuth calls a user-provided `debug` logger regardless of the `debug` option,
@@ -93,6 +106,7 @@ export const sessionAuthOptions = {
       session.isAdmin = castToken.isAdmin || false; // Ensure isAdmin is always defined
       session.kiloUserId = castToken.kiloUserId;
       session.webSessionPepper = castToken.webSessionPepper ?? castToken.pepper ?? null;
+      session.webSessionId = castToken.webSessionId;
       session.isNewUser = castToken.isNewUser || false;
       session.authProvider = castToken.authProvider;
       session.authenticatedAt = castToken.authenticatedAt;
@@ -148,7 +162,17 @@ export type RequiredPermissions = {
   expectedAudience?: string;
   // Derive from an actual Request URL or fixed route path, never a request header.
   requestPathname?: string;
+  /** The actual Request method when the caller has one; preferred over headers. */
+  requestMethod?: string;
   requestHeaders?: Headers;
+  /** How this admin read arrived; server components are not REST routes. */
+  stepUpSurface?: 'rest' | 'server-component';
+  /**
+   * Layout-only escape hatch: authenticate the admin but let the caller render
+   * the verification interstitial instead of returning a 403. Never use on a
+   * data route.
+   */
+  skipStepUpGuard?: boolean;
 };
 
 type GetAuthResponse =
@@ -165,18 +189,30 @@ type GetAuthResponse =
        * false.
        */
       credentialsRejected?: boolean;
+      /**
+       * True when authorization refused a request that presented a credential.
+       * The authentication response is the answer for such a request.
+       */
+      authorizationRefused?: boolean;
+      rejectionReason?: 'empty_organization_context';
       isNewUser?: undefined;
-      organizationId?: undefined;
-      internalApiUse?: undefined;
-      botId?: undefined;
-      tokenSource?: undefined;
-      deviceSessionId?: undefined;
-      cloudAgentAuthority?: undefined;
+      organizationId?: Organization['id'];
+      internalApiUse?: boolean;
+      botId?: string;
+      tokenSource?: string;
+      deviceSessionId?: string;
+      cloudAgentAuthority?: CloudAgentAuthority;
+      credential?: undefined;
+      webSessionId?: undefined;
+      webSessionPepper?: undefined;
+      authenticatedAt?: undefined;
     }
   | {
       user: User;
       authFailedResponse: null;
       credentialsRejected?: undefined;
+      authorizationRefused?: undefined;
+      rejectionReason?: undefined;
       isNewUser?: boolean;
       organizationId?: Organization['id'];
       internalApiUse?: boolean;
@@ -184,29 +220,148 @@ type GetAuthResponse =
       tokenSource?: string;
       deviceSessionId?: string;
       cloudAgentAuthority?: CloudAgentAuthority;
+      credential?: PrivilegedCredentialKind;
+      /** Server-only per-session id for MFA step-up; never sent to the browser. */
+      webSessionId?: string;
+      /** Server-only pepper the session was minted with, for primary re-reads. */
+      webSessionPepper?: string | null;
+      /** Unix seconds when the browser session signed in. */
+      authenticatedAt?: number;
     };
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
   const headersList = opts.requestHeaders ?? (await headers());
   const result = await resolveUserFromAuth(opts, headersList);
+  // Every admin audit event of one request carries the surface it arrived on,
+  // so the same request lands in one inventory entry whichever way it resolves.
+  const surface = opts.stepUpSurface ?? 'rest';
 
   // Admin audit trail: emit exactly one identity-attributed event per authorized
   // admin request. Guarded strictly on adminOnly so the millions of
   // adminOnly:false calls never log.
   if (opts.adminOnly === true && result.user) {
     emitAdminAccessEvent({
-      surface: 'rest',
+      surface,
       kind: 'admin_guard',
       user: result.user,
       authViaToken: authViaTokenFromHeaders(headersList),
       tokenSource: result.tokenSource ?? null,
+      credential: deriveCredentialKind({
+        authViaToken: authViaTokenFromHeaders(headersList),
+        tokenSource: result.tokenSource ?? null,
+        internalApiUse: result.internalApiUse,
+        delegatedWorkload: result.cloudAgentAuthority !== undefined,
+      }),
       route: routeFromHeaders(headersList),
-      // No reliable HTTP method header is available here; do not fabricate one.
-      method: null,
+      method: methodFromHeaders(headersList, opts.requestMethod),
+      userAgentProduct: userAgentProductFromHeaders(headersList),
       ip: clientIpFromHeaders(headersList),
     });
   }
 
+  if (opts.adminOnly === true && result.user) {
+    const credential = deriveCredentialKind({
+      authViaToken: authViaTokenFromHeaders(headersList),
+      tokenSource: result.tokenSource ?? null,
+      internalApiUse: result.internalApiUse,
+      delegatedWorkload: result.cloudAgentAuthority !== undefined,
+    });
+    if (isAdminStepUpEnabled() && !opts.skipStepUpGuard) {
+      const route = routeFromHeaders(headersList);
+      const method = methodFromHeaders(headersList, opts.requestMethod);
+      const { actionClass, inventoryId } = actionClassForRoute({
+        surface,
+        route: route ?? '',
+        method,
+      });
+      try {
+        await runStepUpGuard({
+          userId: result.user.id,
+          credential,
+          webSessionId: result.webSessionId,
+          actionClass,
+          enabled: true,
+          route,
+          method,
+          surface,
+        });
+      } catch (error) {
+        // One privileged-access outcome per guarded non-session request:
+        // `denied` for a policy verdict, `failed` for an unexpected throw.
+        // Session traffic stays on `admin_guard`.
+        const emitOutcome = (outcome: 'denied' | 'failed') => {
+          if (credential === 'session') return;
+          emitPrivilegedAccessEvent({
+            surface,
+            user: result.user,
+            credential,
+            outcome,
+            actionClass,
+            actionId: inventoryId,
+            target: null,
+            wouldBlock: true,
+            userAgentProduct: userAgentProductFromHeaders(headersList),
+            tokenSource: result.tokenSource ?? null,
+            route,
+            method,
+            ip: clientIpFromHeaders(headersList),
+          });
+        };
+        if (error instanceof TRPCError && error.cause instanceof StepUpRequiredError) {
+          emitOutcome('denied');
+          return authError(403, error.cause.code, result.user.id);
+        }
+        // Fail closed. The guard normally converts evaluation failures itself;
+        // this covers anything unexpected around it.
+        emitOutcome('failed');
+        reportStepUpFailure('admin_step_up_rest', error);
+        return authError(403, 'STEP_UP_UNAVAILABLE', result.user.id);
+      }
+    }
+  }
+
+  if (opts.adminOnly === true && authViaTokenFromHeaders(headersList)) {
+    const credential = deriveCredentialKind({
+      authViaToken: true,
+      tokenSource: result.tokenSource ?? null,
+      internalApiUse: result.internalApiUse,
+      delegatedWorkload: result.cloudAgentAuthority !== undefined,
+    });
+    const route = routeFromHeaders(headersList);
+    const method = methodFromHeaders(headersList, opts.requestMethod);
+    const { actionClass, inventoryId } = actionClassForRoute({
+      surface,
+      route: route ?? '',
+      method,
+    });
+    emitPrivilegedAccessEvent({
+      surface,
+      user: result.user ?? undefined,
+      credential,
+      outcome: result.user ? 'succeeded' : 'denied',
+      actionClass,
+      actionId: inventoryId,
+      target: null,
+      wouldBlock: credential !== 'session',
+      userAgentProduct: userAgentProductFromHeaders(headersList),
+      tokenSource: result.tokenSource ?? null,
+      route,
+      method,
+      ip: clientIpFromHeaders(headersList),
+    });
+  }
+
+  if (result.user) {
+    return {
+      ...result,
+      credential: deriveCredentialKind({
+        authViaToken: authViaTokenFromHeaders(headersList),
+        tokenSource: result.tokenSource ?? null,
+        internalApiUse: result.internalApiUse,
+        delegatedWorkload: result.cloudAgentAuthority !== undefined,
+      }),
+    };
+  }
   return result;
 }
 
@@ -217,6 +372,20 @@ export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuth
   }
 
   return resolveUserFromSession({ adminOnly: false }, db);
+}
+
+/**
+ * Session-only read for MFA step-up. It refuses any bearer credential and
+ * reads the primary so a proof minted a moment ago is usable immediately. The
+ * caller still enforces the route's Origin check before trusting the session.
+ */
+export async function getUserFromSessionForStepUp(): Promise<GetAuthResponse> {
+  const headersList = await headers();
+  if (headersList.has('authorization')) {
+    return authError(401, 'Unauthorized', '?');
+  }
+
+  return resolveUserFromSession({ adminOnly: true }, db);
 }
 
 export async function getUserFromSessionForCredentialIssuanceOrRedirect(
@@ -234,7 +403,7 @@ export async function getUserFromSessionForCredentialIssuanceOrRedirect(
   if (!user) {
     redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
-  if (user.blocked_reason) {
+  if (isBlockedAccount(user)) {
     redirect('/account-blocked');
   }
   return user;
@@ -269,18 +438,13 @@ export async function getUserFromBearerForCredentialExchange(
     return authError(401, 'Unauthorized', auth.userId);
   }
 
-  const result = await validateUserAuthorization(
-    auth.userId,
+  const result = await validateUserAuthorization({
+    kiloUserId: auth.userId,
     user,
-    { adminOnly: false },
-    false,
-    undefined,
-    undefined,
-    db,
-    undefined,
-    undefined,
-    auth.claims.deviceSessionId
-  );
+    opts: { adminOnly: false },
+    isNewUser: false,
+    deviceSessionId: auth.claims.deviceSessionId,
+  });
   if (!result.user) return result;
   if (!isKiloCredentialExchangeEligible(auth, policy)) {
     return authError(401, 'Unauthorized', auth.userId);
@@ -338,10 +502,15 @@ async function resolveUserFromAuth(
       });
     }
 
+    const internalApiUse = authorizationValidationResult.internalApiUse;
+    const tokenSource = authorizationValidationResult.tokenSource;
     const scope = authorizationValidationResult.cloudAgentAuthority;
     if (scope && opts.adminOnly) {
       return authError(403, 'Scoped credentials cannot access admin APIs', scope.ownerId, {
         credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority: scope,
       });
     }
     const fromDb = scope ? db : readDb;
@@ -356,7 +525,12 @@ async function resolveUserFromAuth(
             authorizationValidationResult.apiTokenPepper
           ))
     ) {
-      return authError(401, 'Invalid API token', user.id, { credentialsRejected: true });
+      return authError(401, 'Invalid API token', user.id, {
+        credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority: scope,
+      });
     }
     // A token-bound organization is signed; the request header is mutable.
     // Legacy and personal tokens intentionally continue to use the header.
@@ -364,31 +538,36 @@ async function resolveUserFromAuth(
     if (scope && headerOrganizationId !== null && headerOrganizationId !== scope.organizationId) {
       return authError(403, 'Scoped organization mismatch', scope.ownerId, {
         credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority: scope,
       });
     }
     const organizationId = scope
       ? (scope.organizationId ?? undefined)
       : requestOrganizationId(authorizationValidationResult.organizationId, headerOrganizationId);
-    const internalApiUse = authorizationValidationResult.internalApiUse;
     const botId = authorizationValidationResult.botId;
-    const tokenSource = authorizationValidationResult.tokenSource;
     const deviceSessionId = authorizationValidationResult.deviceSessionId;
 
-    const result = await validateUserAuthorization(
-      authorizationValidationResult.kiloUserId,
+    const result = await validateUserAuthorization({
+      kiloUserId: authorizationValidationResult.kiloUserId,
       user,
       opts,
-      false,
+      isNewUser: false,
       organizationId,
       internalApiUse,
       fromDb,
       botId,
       tokenSource,
-      deviceSessionId
-    );
+      deviceSessionId,
+      cloudAgentAuthority: scope,
+    });
     if (scope && !isCloudAgentAuthorityHttpPathAllowed(scope, opts.requestPathname)) {
       return authError(401, 'Cloud Agent authority has expired', scope.ownerId, {
         credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority: scope,
       });
     }
     return result.user ? { ...result, cloudAgentAuthority: scope } : result;
@@ -413,15 +592,18 @@ async function resolveUserFromSession(
     return authError(401, 'Reauthentication required', maybeKiloUserId);
 
   // NOTE: we currently do not thread organization id through here as its only used for extension-originated requests
-  return await validateUserAuthorization(
-    maybeKiloUserId,
+  return await validateUserAuthorization({
+    kiloUserId: maybeKiloUserId,
     user,
     opts,
-    session.isNewUser,
-    undefined,
-    undefined,
-    fromDb
-  );
+    isNewUser: session.isNewUser,
+    fromDb,
+    webSession: {
+      id: session.webSessionId,
+      pepper: session.webSessionPepper,
+      authenticatedAt: session.authenticatedAt,
+    },
+  });
 }
 
 export async function getUserFromAuthOrRedirect(
@@ -431,7 +613,7 @@ export async function getUserFromAuthOrRedirect(
   if (!user) {
     redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
-  if (user.blocked_reason) {
+  if (isBlockedAccount(user)) {
     redirect('/account-blocked');
   }
   return user;
@@ -460,36 +642,84 @@ function authError(
   status: number,
   error: string,
   kiloUserId: string,
-  options?: { credentialsRejected?: boolean }
+  options?: {
+    credentialsRejected?: boolean;
+    authorizationRefused?: boolean;
+    rejectionReason?: 'empty_organization_context';
+    internalApiUse?: boolean;
+    tokenSource?: string;
+    cloudAgentAuthority?: CloudAgentAuthority;
+  }
 ) {
   console.warn(`AUTH-FAIL ${status} (${kiloUserId}): ${error}`);
   return {
     user: null,
     authFailedResponse: NextResponse.json(failureResult(error), { status }),
     credentialsRejected: options?.credentialsRejected ?? false,
+    authorizationRefused: options?.authorizationRefused ?? false,
+    internalApiUse: options?.internalApiUse,
+    tokenSource: options?.tokenSource,
+    cloudAgentAuthority: options?.cloudAgentAuthority,
+    ...(options?.rejectionReason && { rejectionReason: options.rejectionReason }),
   };
 }
 
-async function validateUserAuthorization(
-  kiloUserId: string,
-  user: User | undefined,
-  opts: RequiredPermissions,
-  isNewUser?: boolean,
-  organizationId?: Organization['id'],
-  internalApiUse?: boolean,
-  fromDb: typeof db = db,
-  botId?: string,
-  tokenSource?: string,
-  deviceSessionId?: string
-): Promise<GetAuthResponse> {
+type UserAuthorizationRequest = {
+  kiloUserId: string;
+  user: User | undefined;
+  opts: RequiredPermissions;
+  isNewUser?: boolean;
+  organizationId?: Organization['id'];
+  internalApiUse?: boolean;
+  fromDb?: typeof db;
+  botId?: string;
+  tokenSource?: string;
+  deviceSessionId?: string;
+  cloudAgentAuthority?: CloudAgentAuthority;
+  webSession?: { id?: string; pepper?: string | null; authenticatedAt?: number };
+};
+
+async function validateUserAuthorization({
+  kiloUserId,
+  user,
+  opts,
+  isNewUser,
+  organizationId,
+  internalApiUse,
+  fromDb = db,
+  botId,
+  tokenSource,
+  deviceSessionId,
+  cloudAgentAuthority,
+  webSession,
+}: UserAuthorizationRequest): Promise<GetAuthResponse> {
   if (!user) {
-    return authError(401, 'User not found', kiloUserId);
-  } else if (await isUserBlacklistedByDomain(user)) {
-    return authError(403, 'Access denied (R0)', kiloUserId);
-  } else if (!opts.DANGEROUS_allowBlockedUsers && user.blocked_reason) {
-    return report_blocked_user(kiloUserId);
+    return authError(401, 'User not found', kiloUserId, {
+      internalApiUse,
+      tokenSource,
+      cloudAgentAuthority,
+    });
+  } else if (await isUserBlacklistedByDomain(user, readDb)) {
+    return authError(403, 'Access denied (R0)', kiloUserId, {
+      authorizationRefused: true,
+      internalApiUse,
+      tokenSource,
+      cloudAgentAuthority,
+    });
+  } else if (!opts.DANGEROUS_allowBlockedUsers && isBlockedAccount(user)) {
+    return authError(403, 'Access denied (R1)', kiloUserId, {
+      authorizationRefused: true,
+      internalApiUse,
+      tokenSource,
+      cloudAgentAuthority,
+    });
   } else if (opts.adminOnly && !user.is_admin) {
-    return authError(403, 'Access denied (nonadmin)', kiloUserId);
+    return authError(403, 'Access denied (nonadmin)', kiloUserId, {
+      authorizationRefused: true,
+      internalApiUse,
+      tokenSource,
+      cloudAgentAuthority,
+    });
   }
 
   // A credential bound to a device session is only valid while that session is
@@ -508,18 +738,31 @@ async function validateUserAuthorization(
       // not degrade into an anonymous request.
       return authError(401, 'Device session is no longer active', kiloUserId, {
         credentialsRejected: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority,
       });
     }
   }
 
-  if (organizationId) {
+  if (organizationId !== undefined) {
     const uuidResult = uuid.safeParse(organizationId);
     if (!uuidResult.success) {
-      return authError(400, 'Invalid organization ID format', kiloUserId);
+      return authError(400, 'Invalid organization ID format', kiloUserId, {
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority,
+        ...(organizationId === '' && { rejectionReason: 'empty_organization_context' }),
+      });
     }
     const isMember = await isOrganizationMember(fromDb, organizationId, kiloUserId);
     if (!isMember) {
-      return authError(403, 'Access denied (not a member of the organization)', kiloUserId);
+      return authError(403, 'Access denied (not a member of the organization)', kiloUserId, {
+        authorizationRefused: true,
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority,
+      });
     }
   }
 
@@ -532,6 +775,9 @@ async function validateUserAuthorization(
     botId,
     tokenSource,
     deviceSessionId,
+    webSessionId: webSession?.id,
+    webSessionPepper: webSession?.pepper,
+    authenticatedAt: webSession?.authenticatedAt,
   };
 }
 
@@ -554,16 +800,11 @@ async function readActiveDeviceSession(
   return session !== undefined;
 }
 
-export async function isUserBlacklistedByDomain(
-  existingUser: Pick<User, 'google_user_email'>
+export function isUserBlacklistedByDomain(
+  existingUser: Pick<User, 'google_user_email'>,
+  fromDb: typeof db = db
 ): Promise<boolean> {
-  const domains = await getBlacklistedDomains();
-  return isEmailBlacklistedByDomain(existingUser.google_user_email, domains);
-}
-
-export async function isEmailBlacklistedByDomainAsync(email: string): Promise<boolean> {
-  const domains = await getBlacklistedDomains();
-  return isEmailBlacklistedByDomain(email, domains);
+  return isEmailBlacklisted(existingUser.google_user_email, fromDb);
 }
 
 /**

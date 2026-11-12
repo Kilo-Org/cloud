@@ -15,6 +15,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type * as SessionOwnership from '@/lib/cloud-agent/session-ownership';
+import type * as PreviewWorktreeAccess from '@/lib/cloud-agent-next/preview-worktree-access';
 import type {
   GetWorktreeChangesOutput,
   GetWorktreeFileOutput,
@@ -104,6 +105,7 @@ const mockGetSession = jest.fn<(cloudAgentSessionId: string) => Promise<{ model?
 const mockGetMessageResult = jest.fn<CloudAgentNextClient['getMessageResult']>();
 const mockGetEgressAudit =
   jest.fn<(input: CloudAgentClientModule.GetEgressAuditInput) => Promise<unknown>>();
+const mockGetSessionMessagesPage = jest.fn<CloudAgentNextClient['getSessionMessagesPage']>();
 const mockCreateWorktreeChat = jest.fn<typeof CreateWorktreeChat>();
 
 const mockCancelQueuedMessage =
@@ -123,21 +125,23 @@ const mockGetSandboxSelectionOptions =
   jest.fn<(input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>>();
 const mockGetPreviewOptions =
   jest.fn<
-    (input: {
-      cloudAgentSessionId: string;
-      organizationId?: string;
-    }) => Promise<{ enabled: false } | { enabled: true; hostTemplate: string }>
+    (
+      input: CloudAgentClientModule.GetPreviewOptionsInput
+    ) => Promise<{ enabled: false } | { enabled: true; hostTemplate: string }>
   >();
+const mockListPreviewServices = jest.fn<CloudAgentNextClient['listPreviewServices']>();
 
 const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   getSandboxSelectionOptions: mockGetSandboxSelectionOptions,
   getPreviewOptions: mockGetPreviewOptions,
+  listPreviewServices: mockListPreviewServices,
   prepareSession: mockPrepareSession,
   initiateFromPreparedSession: mockInitiateFromPreparedSession,
   sendMessage: mockSendMessage,
   getSession: mockGetSession,
   getMessageResult: mockGetMessageResult,
   getEgressAudit: mockGetEgressAudit,
+  getSessionMessagesPage: mockGetSessionMessagesPage,
   cancelQueuedMessage: mockCancelQueuedMessage,
   getSandboxStatus: mockGetSandboxStatus,
   getWorktreeChanges: mockGetWorktreeChanges,
@@ -163,6 +167,8 @@ const mockIsFeatureFlagEnabledOrDevelopment =
   jest.fn<(flagName: string, distinctId: string) => Promise<boolean>>();
 const mockVerifyUserOwnsSessionV2ByCloudAgentId =
   jest.fn<typeof verifyUserOwnsSessionV2ByCloudAgentId>();
+const mockVerifyUserOwnsPreviewWorktree =
+  jest.fn<typeof PreviewWorktreeAccess.verifyUserOwnsPreviewWorktree>();
 const mockReleaseRefusedSend = jest.fn<typeof releaseRefusedSend>(async () => {});
 const mockSignPreviewTicket = jest.fn<typeof StreamTicketModule.signPreviewTicket>();
 const mockGetBalanceForUser = jest.fn<(user: User) => Promise<{ balance: number }>>();
@@ -270,6 +276,10 @@ jest.mock('@/lib/cloud-agent/session-ownership', () => ({
   verifyUserOwnsSessionV2ByCloudAgentId: mockVerifyUserOwnsSessionV2ByCloudAgentId,
 }));
 
+jest.mock('@/lib/cloud-agent-next/preview-worktree-access', () => ({
+  verifyUserOwnsPreviewWorktree: mockVerifyUserOwnsPreviewWorktree,
+}));
+
 jest.mock('@/lib/cloud-agent/stream-ticket', () => {
   const actual = jest.requireActual<typeof StreamTicketModule>('@/lib/cloud-agent/stream-ticket');
   mockSignPreviewTicket.mockImplementation(actual.signPreviewTicket);
@@ -277,6 +287,8 @@ jest.mock('@/lib/cloud-agent/stream-ticket', () => {
 });
 
 let createCaller: (ctx: { user: User; headersList?: Headers }) => {
+  getSession: (input: { cloudAgentSessionId: string }) => Promise<unknown>;
+  getSessionMessagesPage: CloudAgentNextClient['getSessionMessagesPage'];
   getSandboxSelectionOptions: (input: {
     devcontainer?: boolean;
   }) => Promise<SandboxSelectionCapabilities>;
@@ -322,18 +334,20 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
   refreshWorktreeChanges: (input: {
     cloudAgentSessionId: string;
   }) => Promise<RefreshWorktreeChangesOutput>;
-  createPreview: (input: {
-    cloudAgentSessionId: `workspace_${string}`;
-    port: number;
-    path?: string;
-  }) => Promise<{
+  createPreview: (
+    input:
+      | { worktreeId: `worktree_${string}`; port: number; path?: string }
+      | { cloudAgentSessionId: `workspace_${string}`; port: number; path?: string }
+  ) => Promise<{
     url: string;
     expiresAt: number;
   }>;
-  getPreviewOptions: (input: {
-    cloudAgentSessionId: `workspace_${string}`;
-    organizationId?: string;
-  }) => Promise<{ enabled: false } | { enabled: true; urlTemplate: string }>;
+  getPreviewOptions: (
+    input:
+      | { worktreeId: `worktree_${string}`; organizationId?: string }
+      | { cloudAgentSessionId: `workspace_${string}`; organizationId?: string }
+  ) => Promise<{ enabled: false } | { enabled: true; urlTemplate: string }>;
+  listPreviewServices: CloudAgentNextClient['listPreviewServices'];
   checkEligibility: () => Promise<{
     balance: number;
     minBalance: number;
@@ -348,6 +362,105 @@ beforeAll(async () => {
   const { createCallerFactory } = await import('@kilocode/web-shared/lib/trpc/init');
   const mod = await import('./cloud-agent-next-router');
   createCaller = createCallerFactory(mod.cloudAgentNextRouter);
+});
+
+describe('cloudAgentNextRouter.getSession concurrency', () => {
+  it('mints the request token in parallel but never contacts the Worker before ownership passes', async () => {
+    jest.clearAllMocks();
+    let resolveOwnership!: (value: null) => void;
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveOwnership = resolve;
+      })
+    );
+    const reading = createCaller({
+      user: { id: 'oauth/concurrency', is_admin: false } as User,
+      headersList: new Headers(),
+    }).getSession({ cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc' });
+    const denied = expect(reading).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await new Promise(resolve => setImmediate(resolve));
+    expect(mockCreateControlTokenForRequest).toHaveBeenCalledTimes(1);
+    expect(mockGetSession).not.toHaveBeenCalled();
+    resolveOwnership(null);
+    await denied;
+    expect(mockGetSession).not.toHaveBeenCalled();
+  });
+});
+
+describe('cloudAgentNextRouter.getSessionMessagesPage', () => {
+  const user = { id: 'oauth/history-owner', is_admin: false } as User;
+  const input = {
+    sessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    cursor: 'older',
+    limit: 25,
+  };
+  const page = {
+    kind: 'success' as const,
+    info: { id: 'ses_12345678901234567890123456' },
+    messages: [],
+    nextCursor: null,
+    omittedItemCount: 0,
+    updateCursor: 42,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockVerifyUserOwnsSessionV2ByCloudAgentId
+      .mockReset()
+      .mockResolvedValue({ kiloSessionId: page.info.id });
+    mockGetSessionMessagesPage.mockReset().mockResolvedValue(page);
+  });
+
+  it('checks ownership then proxies the DO page with a control token and no paid-execution gates', async () => {
+    await expect(createCaller({ user }).getSessionMessagesPage(input)).resolves.toEqual(page);
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).toHaveBeenCalledWith(
+      expect.anything(),
+      user.id,
+      input.sessionId
+    );
+    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
+    expect(mockGetSessionMessagesPage).toHaveBeenCalledWith(input);
+    expect(mockCreateCloudAgentNextClientForModel).not.toHaveBeenCalled();
+    expect(mockComputeCloudAgentNextBalanceCheckEligibility).not.toHaveBeenCalled();
+  });
+
+  it('denies another owner before calling the DO', async () => {
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockResolvedValueOnce(null);
+    await expect(createCaller({ user }).getSessionMessagesPage(input)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    expect(mockGetSessionMessagesPage).not.toHaveBeenCalled();
+  });
+
+  it('authorizes only the root workspace before forwarding the native child selector', async () => {
+    const childInput = { ...input, kiloSessionId: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb' };
+    await createCaller({ user }).getSessionMessagesPage(childInput);
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).toHaveBeenCalledTimes(1);
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).toHaveBeenCalledWith(
+      expect.anything(),
+      user.id,
+      input.sessionId
+    );
+    expect(mockGetSessionMessagesPage).toHaveBeenCalledWith(childInput);
+  });
+
+  it('rejects legacy references before any owner or Worker lookup', async () => {
+    await expect(
+      createCaller({ user }).getSessionMessagesPage({
+        ...input,
+        sessionId: 'agent_12345678-1234-4234-9234-123456789abc',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+    expect(mockGetSessionMessagesPage).not.toHaveBeenCalled();
+  });
+
+  it('validates the DO mutation cursor at the web response boundary', async () => {
+    mockGetSessionMessagesPage.mockResolvedValueOnce({ ...page, updateCursor: -1 });
+    await expect(createCaller({ user }).getSessionMessagesPage(input)).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+  });
 });
 
 describe('cloudAgentNextRouter worktree changes access', () => {
@@ -767,6 +880,44 @@ describe('cloudAgentNextRouter attachment forwarding', () => {
     });
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { model: 'kilo/free-model', isFree: true },
+    { model: 'kilo/selected-paid-model', isFree: false },
+  ])(
+    'uses the selected command model for eligibility and dispatch: $model',
+    async ({ model, isFree }) => {
+      mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValueOnce({
+        isFree,
+        hasUserByokAvailable: false,
+      });
+      const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+      const payload = {
+        type: 'command' as const,
+        command: 'review',
+        arguments: '',
+        mode: 'code',
+        model,
+        variant: 'high',
+      };
+
+      await caller.sendMessage({
+        cloudAgentSessionId: 'agent_123',
+        messageId: SEND_MESSAGE_ID,
+        payload,
+      });
+
+      expect(mockGetSession).not.toHaveBeenCalled();
+      expect(mockComputeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
+        expect.objectContaining({ modelId: model })
+      );
+      expect(mockCreateCloudAgentNextClientForModel).toHaveBeenCalledWith('cloud-agent-token', {
+        isFree,
+        hasUserByokAvailable: false,
+      });
+      expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({ payload }));
+    }
+  );
 
   it('routes free follow-up command turns through the balance-skip client using the session model', async () => {
     mockGetSession.mockResolvedValueOnce({ model: 'kilo/free-model' });
@@ -1450,8 +1601,8 @@ describe('cloudAgentNextRouter.getSandboxSelectionOptions', () => {
   it('forwards personal capability discovery with the caller token', async () => {
     const capabilities: SandboxSelectionCapabilities = {
       enabled: true,
-      defaultDestination: getSandboxAllocationRequest('cloudflare-single'),
-      options: [{ allocation: getSandboxAllocationRequest('cloudflare-single') }],
+      defaultDestination: getSandboxAllocationRequest('cloudflare-containers-standard-3'),
+      options: [{ allocation: getSandboxAllocationRequest('cloudflare-containers-standard-3') }],
     };
     mockGetSandboxSelectionOptions.mockResolvedValueOnce(capabilities);
     const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
@@ -1762,7 +1913,7 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     await expect(
       caller.prepareSession({
         ...sandboxInput,
-        sandboxAllocation: 'cloudflare-single',
+        sandboxAllocation: 'cloudflare-containers-standard-3',
         devcontainer: true,
       })
     ).rejects.toThrow('Sandbox selection is not available with dev containers');
@@ -2084,6 +2235,46 @@ describe('cloudAgentNextRouter.createPreview', () => {
     expect(result.expiresAt).toBe(decoded.exp);
   });
 
+  it('mints a worktree ticket after verifying the caller owns the worktree', async () => {
+    const worktreeId = 'worktree_12345678-1234-4234-9234-123456789abc';
+    mockVerifyUserOwnsPreviewWorktree.mockResolvedValue(true);
+    const caller = createCaller({ user });
+
+    const result = await caller.createPreview({ worktreeId, port: 5173 });
+
+    expect(mockVerifyUserOwnsPreviewWorktree).toHaveBeenCalledWith(
+      expect.anything(),
+      user.id,
+      worktreeId
+    );
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+    expect(mockSignPreviewTicket).toHaveBeenCalledWith({
+      userId: user.id,
+      worktreeId,
+      port: 5173,
+    });
+
+    const ticket = new URL(result.url).searchParams.get('ticket') ?? '';
+    const decoded = jwt.verify(ticket, NEXTAUTH_SECRET, {
+      algorithms: ['HS256'],
+      audience: 'cloud-agent-preview',
+    }) as jwt.JwtPayload & { worktreeId?: string; cloudAgentSessionId?: string };
+    expect(decoded.worktreeId).toBe(worktreeId);
+    expect(decoded.cloudAgentSessionId).toBeUndefined();
+  });
+
+  it('does not mint a ticket for a worktree the caller does not own', async () => {
+    const worktreeId = 'worktree_12345678-1234-4234-9234-123456789abc';
+    mockVerifyUserOwnsPreviewWorktree.mockResolvedValue(false);
+    const caller = createCaller({ user });
+
+    await expect(caller.createPreview({ worktreeId, port: 5173 })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    expect(mockSignPreviewTicket).not.toHaveBeenCalled();
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+  });
+
   it('keeps a local ws worker origin and its port', async () => {
     process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL = 'ws://localhost:8794';
     mockVerifyUserOwnsSessionV2ByCloudAgentId.mockResolvedValue({
@@ -2176,10 +2367,7 @@ describe('cloudAgentNextRouter.getPreviewOptions', () => {
       enabled: false,
     });
     expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
-    expect(mockGetPreviewOptions).toHaveBeenCalledWith({
-      cloudAgentSessionId,
-      organizationId: undefined,
-    });
+    expect(mockGetPreviewOptions).toHaveBeenCalledWith({ cloudAgentSessionId });
   });
 
   it('returns disabled when the Worker call fails', async () => {
@@ -2192,15 +2380,6 @@ describe('cloudAgentNextRouter.getPreviewOptions', () => {
     });
     expect(warn).toHaveBeenCalledTimes(1);
     warn.mockRestore();
-  });
-
-  it('passes the route organization to the Worker gate', async () => {
-    const organizationId = '11111111-1111-4111-8111-111111111111';
-    mockGetPreviewOptions.mockResolvedValueOnce({ enabled: false });
-    const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
-
-    await caller.getPreviewOptions({ cloudAgentSessionId, organizationId });
-    expect(mockGetPreviewOptions).toHaveBeenCalledWith({ cloudAgentSessionId, organizationId });
   });
 
   it('puts the Worker host template on the browser-facing Worker scheme', async () => {
@@ -2228,5 +2407,133 @@ describe('cloudAgentNextRouter.getPreviewOptions', () => {
       enabled: true,
       urlTemplate: 'http://p{port}-abc.localhost:8794',
     });
+  });
+
+  it('passes a worktree target to the Worker gate', async () => {
+    const worktreeId = 'worktree_12345678-1234-4234-9234-123456789abc';
+    mockGetPreviewOptions.mockResolvedValueOnce({
+      enabled: true,
+      hostTemplate: 'w{port}-abc.preview.example.com',
+    });
+    const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
+
+    await expect(caller.getPreviewOptions({ worktreeId })).resolves.toEqual({
+      enabled: true,
+      urlTemplate: 'https://w{port}-abc.preview.example.com',
+    });
+    expect(mockGetPreviewOptions).toHaveBeenCalledWith({
+      worktreeId,
+      organizationId: undefined,
+    });
+  });
+});
+
+describe('cloudAgentNextRouter.listPreviewServices', () => {
+  const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+  const worktreeId = 'worktree_12345678-1234-4234-9234-123456789abc';
+  const user = { id: 'oauth/user', is_admin: false } as User;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockListPreviewServices.mockReset();
+    mockVerifyUserOwnsPreviewWorktree.mockReset();
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockReset().mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+  });
+
+  it('authorizes a personal worktree before discovering its services', async () => {
+    mockVerifyUserOwnsPreviewWorktree.mockResolvedValue(true);
+    mockListPreviewServices.mockResolvedValue({ services: [], status: 'running' });
+    const caller = createCaller({ user });
+    await expect(caller.listPreviewServices({ worktreeId })).resolves.toEqual({
+      services: [],
+      status: 'running',
+    });
+    expect(mockVerifyUserOwnsPreviewWorktree).toHaveBeenCalledWith(
+      expect.anything(),
+      user.id,
+      worktreeId
+    );
+    expect(mockListPreviewServices).toHaveBeenCalledWith({ worktreeId });
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unowned worktree before discovery', async () => {
+    mockVerifyUserOwnsPreviewWorktree.mockResolvedValue(false);
+    const caller = createCaller({ user });
+    await expect(caller.listPreviewServices({ worktreeId })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    expect(mockListPreviewServices).not.toHaveBeenCalled();
+    expect(mockCreateControlTokenForRequest).not.toHaveBeenCalled();
+  });
+
+  it('checks personal ownership and forwards the session id to the Worker', async () => {
+    mockListPreviewServices.mockResolvedValue({
+      services: [{ port: 3001, name: 'Next.js' }],
+      status: 'running',
+    });
+    const caller = createCaller({ user });
+
+    await expect(caller.listPreviewServices({ cloudAgentSessionId })).resolves.toEqual({
+      services: [{ port: 3001, name: 'Next.js' }],
+      status: 'running',
+    });
+
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).toHaveBeenCalledWith(
+      expect.anything(),
+      user.id,
+      cloudAgentSessionId
+    );
+    expect(mockCreateControlTokenForRequest).toHaveBeenCalledWith(
+      user,
+      'cloud-agent-next',
+      expect.objectContaining({ tokenSource: 'cloud-agent' })
+    );
+    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
+    expect(mockListPreviewServices).toHaveBeenCalledWith({ cloudAgentSessionId });
+  });
+
+  it('passes a non-running status through without inventing services', async () => {
+    mockListPreviewServices.mockResolvedValue({ services: [], status: 'not_running' });
+    const caller = createCaller({ user });
+
+    await expect(caller.listPreviewServices({ cloudAgentSessionId })).resolves.toEqual({
+      services: [],
+      status: 'not_running',
+    });
+  });
+
+  it('refuses a session the caller does not own before the Worker call', async () => {
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockResolvedValue(null);
+    const caller = createCaller({ user });
+
+    await expect(caller.listPreviewServices({ cloudAgentSessionId })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    expect(mockCreateControlTokenForRequest).not.toHaveBeenCalled();
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    expect(mockListPreviewServices).not.toHaveBeenCalled();
+  });
+
+  it('propagates a Worker discovery failure', async () => {
+    mockListPreviewServices.mockRejectedValue(new Error('scan transport failed'));
+    const caller = createCaller({ user });
+
+    await expect(caller.listPreviewServices({ cloudAgentSessionId })).rejects.toThrow(
+      'scan transport failed'
+    );
+  });
+
+  it('rejects a non-workspace session id at the input boundary', async () => {
+    const caller = createCaller({ user });
+
+    await expect(
+      caller.listPreviewServices({
+        cloudAgentSessionId: 'agent_12345678-1234-4234-9234-123456789abc' as `workspace_${string}`,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
   });
 });

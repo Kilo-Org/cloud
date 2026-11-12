@@ -35,6 +35,7 @@ const launch = {
   mode: 'code',
   prompt: 'Implement the child task',
   autoInitiate: true,
+  operationKey: '33333333-3333-4333-8333-333333333333',
 };
 
 function claims(overrides: Record<string, unknown> = {}) {
@@ -230,15 +231,70 @@ describe('Cloud Agent authority contract', () => {
       validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', launch, now + 3600)
     ).toEqual(launch);
   });
-  it('accepts only the parent callback destination without widening spawn authority', () => {
-    const request = { ...launch, callbackTarget: { url: 'session:parent' } };
+  it('accepts only the workspace callback destinations without widening spawn authority', () => {
+    for (const target of [
+      { url: 'workspace:new-chat' },
+      { url: 'workspace:workspace_12345678-1234-4234-8234-123456789abc' },
+    ]) {
+      const request = { ...launch, callbackTarget: target };
+      expect(
+        validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', request)
+      ).toEqual(request);
+    }
+    const schema = cloudAgentAuthorityInputSchema(scope);
+    expect(schema).toHaveProperty('properties.callbackTarget.anyOf');
+    expect(JSON.stringify(schema)).toContain('workspace:new-chat');
+    expect(JSON.stringify(schema)).toContain('workspace:workspace_');
+    expect(JSON.stringify(schema)).not.toContain('session:parent');
+  });
+  it.each([null, organizationId])('allows a stacked launch in its pinned scope: %s', orgId => {
+    const authority = { ...scope, organizationId: orgId };
+    const input = {
+      ...launch,
+      stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+      operationKey: '33333333-3333-4333-8333-333333333333',
+      ...(orgId === null ? {} : { organizationId: orgId }),
+    };
     expect(
-      validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', request)
-    ).toEqual(request);
-    expect(cloudAgentAuthorityInputSchema(scope)).toHaveProperty(
-      'properties.callbackTarget.properties.url.const',
-      'session:parent'
+      validateCloudAgentAuthorityRequest(authority, cloudAgentAuthorityProcedure(authority), input)
+    ).toEqual(input);
+    expect(cloudAgentAuthorityInputSchema(authority)).toHaveProperty(
+      'properties.stackOnWorktreeId.type',
+      'string'
     );
+  });
+  it.each([
+    { stackOnWorktreeId: 'worktree_invalid' },
+    { stackOnWorktreeId: 'workspace_11111111-1111-4111-8111-111111111111' },
+    {
+      stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+      upstreamBranch: 'main',
+      operationKey: '33333333-3333-4333-8333-333333333333',
+    },
+    { stackOnWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111', baseBranch: 'main' },
+    { baseSha: 'a'.repeat(40) },
+    { parentWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111' },
+  ])('rejects malformed or caller-resolved stack input %j', options => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, cloudAgentAuthorityProcedure(scope), {
+        ...launch,
+        ...options,
+      })
+    ).toThrow();
+  });
+  it('lets an orchestrator stack on another worker while receiving the callback itself', () => {
+    const authority = {
+      ...scope,
+      parentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+    };
+    const input = {
+      ...launch,
+      stackOnWorktreeId: 'worktree_44444444-4444-4444-8444-444444444444',
+      callbackTarget: { url: 'workspace:new-chat' },
+    };
+    expect(
+      validateCloudAgentAuthorityRequest(authority, cloudAgentAuthorityProcedure(authority), input)
+    ).toEqual(input);
   });
   it.each([
     { parentCloudAgentSessionId: 'workspace_sibling' },
@@ -264,10 +320,21 @@ describe('Cloud Agent authority contract', () => {
     { runtimeSkills: [] },
     { callbackTarget: {} },
     { callbackTarget: { url: 'https://example.com/callback' } },
+    { callbackTarget: { url: 'session:parent' } },
     { callbackTarget: { url: 'session:workspace_sibling' } },
-    { callbackTarget: { url: 'session:parent', headers: { Authorization: 'private' } } },
-    { callbackTarget: { url: 'session:parent', sessionId: 'workspace_sibling' } },
+    { callbackTarget: { url: 'workspace:not-a-session' } },
+    {
+      callbackTarget: {
+        url: 'workspace:workspace_12345678-1234-4234-8234-123456789abc',
+        token: 'a'.repeat(64),
+      },
+    },
+    { callbackTarget: { url: 'workspace:new-chat', headers: { Authorization: 'private' } } },
     { sandboxAllocation: {} },
+    { egressMode: 'allowlist' },
+    { egressMode: 'unrestricted' },
+    { egressAllowlist: [] },
+    { runtime: {} },
     { futureEscapeField: true },
   ])('rejects widened raw launch %j', overrides => {
     expect(() =>
@@ -298,8 +365,6 @@ describe('Cloud Agent authority contract', () => {
   });
   it.each([
     undefined,
-    '/api/gastown/token',
-    '/api/wasteland/token',
     '/api/profile',
     '/api/trpc/cloudAgentNext.deleteSession',
     '/api/trpc/cloudAgentNext.prepareSession,user.getMe',
@@ -437,6 +502,7 @@ describe('Cloud Agent authority contract', () => {
       'cloudAgentNext.interruptSession',
       'cloudAgentNext.sendMessage',
       'models.list',
+      'cloudEnvironments.list',
       'workspaceFolders.list',
       'workspaceFolders.moveWorktree',
     ]);
@@ -448,10 +514,12 @@ describe('Cloud Agent authority contract', () => {
       'organizations.cloudAgentNext.interruptSession',
       'organizations.cloudAgentNext.sendMessage',
       'models.list',
+      'cloudEnvironments.list',
       'workspaceFolders.list',
       'workspaceFolders.moveWorktree',
     ]);
     expect(cloudAgentAuthorityProcedureKind('models.list')).toBe('query');
+    expect(cloudAgentAuthorityProcedureKind('cloudEnvironments.list')).toBe('query');
   });
 
   it.each([
@@ -537,6 +605,187 @@ describe('Cloud Agent authority contract', () => {
         '/api/trpc/models.list,organizations.cloudAgentNext.getSession'
       )
     ).toBe(true);
+  });
+
+  it.each([
+    ['personal', scope],
+    ['organization', { ...scope, organizationId }],
+  ] as const)('permits scoped environment listing for %s authority', (_label, authority) => {
+    const repository = { platform: 'github', fullName: 'acme/repo' };
+    const input =
+      authority.organizationId === null ? { repository } : { repository, organizationId };
+    expect(validateCloudAgentAuthorityRequest(authority, 'cloudEnvironments.list', input)).toEqual(
+      input
+    );
+    expect(cloudAgentAuthorityProcedureKind('cloudEnvironments.list')).toBe('query');
+    expect(cloudAgentAuthorityInputSchema(authority, 'cloudEnvironments.list')).toMatchObject({
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        repository: { type: 'object' },
+        ...(authority.organizationId === null
+          ? {}
+          : { organizationId: { const: authority.organizationId } }),
+      },
+      required: expect.arrayContaining(['repository']),
+    });
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(authority, '/api/trpc/cloudEnvironments.list')
+    ).toBe(true);
+  });
+
+  it.each([
+    ['null', null],
+    ['array', []],
+    ['missing repository', {}],
+    ['extra field', { repository: { platform: 'github', fullName: 'acme/repo' }, extra: true }],
+    ['unknown platform', { repository: { platform: 'local', fullName: 'acme/repo' } }],
+    ['gitlab repository', { repository: { platform: 'gitlab', projectPath: 'group/project' } }],
+    [
+      'bitbucket repository',
+      {
+        repository: {
+          platform: 'bitbucket',
+          workspaceUuid: organizationId,
+          repositoryUuid: organizationId,
+        },
+      },
+    ],
+    ['empty repository', { repository: { platform: 'github', fullName: '' } }],
+    [
+      'widened repository',
+      {
+        repository: { platform: 'github', fullName: 'acme/repo', workspaceUuid: organizationId },
+      },
+    ],
+    [
+      'organizationId on personal authority',
+      { repository: { platform: 'github', fullName: 'acme/repo' }, organizationId },
+    ],
+  ] as const)('rejects widened cloudEnvironments.list input: %s', (_label, input) => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, 'cloudEnvironments.list', input)
+    ).toThrow();
+  });
+
+  it.each([
+    ['missing organizationId', { repository: { platform: 'github', fullName: 'acme/repo' } }],
+    [
+      'other organizationId',
+      {
+        repository: { platform: 'github', fullName: 'acme/repo' },
+        organizationId: '33333333-3333-4333-8333-333333333333',
+      },
+    ],
+  ] as const)('binds organization environment listing: %s', (_label, input) => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(
+        { ...scope, organizationId },
+        'cloudEnvironments.list',
+        input
+      )
+    ).toThrow();
+  });
+
+  it.each([
+    'cloudEnvironments.listAll',
+    'cloudEnvironments.get',
+    'cloudEnvironments.create',
+    'cloudEnvironments.update',
+    'cloudEnvironments.delete',
+    'organizations.cloudEnvironments.list',
+  ])('does not permit adjacent environment path %s', procedure => {
+    expect(cloudAgentAuthorityProcedures(scope)).not.toContain(procedure);
+    expect(() => cloudAgentAuthorityProcedureKind(procedure)).toThrow();
+    expect(() => cloudAgentAuthorityInputSchema(scope, procedure)).toThrow();
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, procedure, {
+        repository: { platform: 'github', fullName: 'acme/repo' },
+      })
+    ).toThrow();
+    expect(isCloudAgentAuthorityHttpPathAllowed(scope, `/api/trpc/${procedure}`)).toBe(false);
+  });
+
+  it('expires environment listing with the authority', () => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(
+        scope,
+        'cloudEnvironments.list',
+        { repository: { platform: 'github', fullName: 'acme/repo' } },
+        scope.expiresAt
+      )
+    ).toThrow();
+    expect(
+      isCloudAgentAuthorityHttpPathAllowed(
+        { ...scope, expiresAt: now - 1 },
+        '/api/trpc/cloudEnvironments.list'
+      )
+    ).toBe(false);
+  });
+
+  it('accepts the requested environment on a launch', () => {
+    const requestedEnvironment = {
+      id: organizationId,
+      repositories: [
+        { repoFullName: 'acme/other', branch: 'feature/child' },
+        { repoFullName: 'acme/third' },
+      ],
+    };
+    const request = { ...launch, requestedEnvironment };
+    expect(
+      validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', request)
+    ).toEqual(request);
+    expect(cloudAgentAuthorityInputSchema(scope)).toMatchObject({
+      properties: {
+        requestedEnvironment: { type: 'object' },
+      },
+    });
+    expect(
+      validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', {
+        ...launch,
+        requestedEnvironment: { id: organizationId },
+      })
+    ).toMatchObject({ requestedEnvironment: { id: organizationId } });
+  });
+
+  it.each([
+    { requestedEnvironment: { id: 'not-a-uuid' } },
+    { requestedEnvironment: { id: organizationId, extra: true } },
+    { requestedEnvironment: { id: organizationId, repositories: [{ repoFullName: '' }] } },
+    {
+      requestedEnvironment: {
+        id: organizationId,
+        repositories: [{ repoFullName: 'acme/other', branch: '' }],
+      },
+    },
+    {
+      requestedEnvironment: {
+        id: organizationId,
+        repositories: [{ repoFullName: 'acme/other', branch: 'b'.repeat(256) }],
+      },
+    },
+    {
+      requestedEnvironment: {
+        id: organizationId,
+        repositories: Array.from({ length: 101 }, () => ({ repoFullName: 'acme/other' })),
+      },
+    },
+    {
+      requestedEnvironment: {
+        id: organizationId,
+        repositories: [{ repoFullName: 'acme/other', extra: true }],
+      },
+    },
+    { requireEnvironmentChoice: true },
+    { requireEnvironmentChoice: false },
+    { requireEnvironmentChoice: 'true' },
+  ])('rejects widened or invalid launch environment input: %j', override => {
+    expect(() =>
+      validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', {
+        ...launch,
+        ...override,
+      })
+    ).toThrow();
   });
 });
 

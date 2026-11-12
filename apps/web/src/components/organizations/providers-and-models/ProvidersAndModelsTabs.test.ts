@@ -1,5 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { createRequire } from 'node:module';
+import { OrganizationGroupModelAccessPolicySchema } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.schema';
+import type { OrganizationGroupModelAccessPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import React, { act, createElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { ModelsTab as ModelsTabComponent } from './ModelsTab';
@@ -34,21 +36,19 @@ jest.mock('@tanstack/react-query', () => ({
   useQuery: () => ({
     isLoading: false,
     isError: false,
-    data: {
-      policyType: 'model_access',
-      catalog: {
-        providers: [
-          {
-            slug: 'shown-provider',
-            displayName: 'Shown provider',
-            dataPolicy: { training: false, retainsPrompts: false },
-            models: [{ slug: 'vendor/shown-model', name: 'Shown model', endpoint: {} }],
-          },
-        ],
-      },
-    },
+    data: { policyType: 'model_access', catalog: { providers: mockProviders } },
   }),
 }));
+
+const defaultProviders = [
+  {
+    slug: 'shown-provider',
+    displayName: 'Shown provider',
+    dataPolicy: { training: false, retainsPrompts: false },
+    models: [{ slug: 'vendor/shown-model', name: 'Shown model', endpoint: {} }],
+  },
+];
+let mockProviders = defaultProviders;
 jest.mock('@/lib/trpc/utils', () => ({
   useTRPC: () => ({
     organizations: { groups: { getPolicyEditorData: { queryOptions: () => ({}) } } },
@@ -204,6 +204,7 @@ describe('providers and models tabs', () => {
     root = undefined;
     cleanup?.();
     cleanup = undefined;
+    mockProviders = defaultProviders;
   });
 
   function mount(node: React.ReactNode) {
@@ -379,6 +380,53 @@ describe('providers and models tabs', () => {
     expect(button(container, 'Enable all shown (0)').disabled).toBe(true);
     expect(button(container, 'Disable all shown (0)').disabled).toBe(true);
     expect(container.textContent).not.toContain('Enabled provider');
+  });
+
+  it('saves the full model catalog and hidden selections from both tabs', () => {
+    const visibleModelIds = Array.from({ length: 604 }, (_, index) => `vendor/model-${index}`);
+    const hiddenModelIds = ['vendor/hidden-one', 'vendor/hidden-two', 'vendor/hidden-three'];
+    mockProviders = [
+      {
+        ...defaultProviders[0],
+        models: visibleModelIds.map(slug => ({ slug, name: slug, endpoint: {} })),
+      },
+    ];
+    const savedPolicies: OrganizationGroupModelAccessPolicy[] = [];
+    const container = mount(
+      createElement(ModelAccessPolicyEditor, {
+        organizationId: 'organization',
+        policy: {
+          type: 'model_access',
+          data: {
+            mode: 'selected',
+            model_allow_list: hiddenModelIds,
+            provider_allow_list: ['hidden-provider'],
+          },
+        },
+        isSaving: false,
+        onSave: policy => savedPolicies.push(policy),
+        onCancel: jest.fn(),
+      })
+    );
+
+    click(button(container, 'Enable all shown (604)'));
+    click(button(container, 'Save policy'));
+    click(button(container, 'Enable all shown (1)'));
+    click(button(container, 'Save policy'));
+
+    expect(savedPolicies).toHaveLength(2);
+    for (const [index, policy] of savedPolicies.entries()) {
+      expect(OrganizationGroupModelAccessPolicySchema.safeParse(policy).success).toBe(true);
+      expect(policy.data.mode).toBe('selected');
+      if (policy.data.mode !== 'selected') throw new Error('Expected selected policy');
+      expect(policy.data.model_allow_list).toHaveLength(607);
+      expect(policy.data.model_allow_list).toEqual(
+        expect.arrayContaining([...visibleModelIds, ...hiddenModelIds])
+      );
+      expect(policy.data.provider_allow_list).toEqual(
+        index === 0 ? ['hidden-provider'] : ['hidden-provider', 'shown-provider']
+      );
+    }
   });
 
   it('preserves hidden group selections when bulk actions are saved', () => {

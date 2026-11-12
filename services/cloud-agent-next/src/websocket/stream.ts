@@ -24,6 +24,7 @@ import type {
   CommandsAvailableData,
 } from '../shared/protocol.js';
 import { logger } from '../logger.js';
+import { projectKilocodeEventForDisplay } from '../shared/tool-display-projection.js';
 import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
 
 /**
@@ -50,6 +51,7 @@ const REPLAY_BATCH_BYTES = 1_048_576; // 1 MiB
 export function formatStreamEvent(event: StoredEvent, sessionId: SessionId): StreamEvent {
   return {
     eventId: event.id,
+    ...(event.mutation_cursor === undefined ? {} : { cursor: event.mutation_cursor }),
     ...(event.execution_id
       ? { executionId: event.execution_id as StreamEvent['executionId'] }
       : {}),
@@ -99,6 +101,8 @@ export type StreamHandlerOptions = {
   readPendingInteractions?: () => ConnectedEventData['pendingInteractions'];
   getPreparationSnapshots?: () => Promise<StoredEvent[]>;
   reconcileMaterializedEvents?: boolean;
+  getUpdateCursor?: () => number;
+  getAncillaryBootstrap?: () => Promise<{ events: StoredEvent[]; omittedItemCount: number }>;
 };
 
 /**
@@ -154,6 +158,14 @@ export function createStreamHandler(
 
       const url = new URL(request.url);
       const filters = parseStreamFilters(url, sessionId);
+      if (
+        options?.getUpdateCursor &&
+        url.searchParams.has('afterCursor') &&
+        (filters.afterCursor === undefined || url.searchParams.getAll('afterCursor').length !== 1)
+      ) {
+        return new Response('Invalid mutation cursor', { status: 400 });
+      }
+      const updateCursor = options?.getUpdateCursor?.();
       const skipReplay = url.searchParams.get('replay') === 'false';
       const bootstrap = url.searchParams.get('bootstrap') === 'true';
       const pair = new WebSocketPair();
@@ -175,7 +187,11 @@ export function createStreamHandler(
         .info('Client stream WebSocket registered');
 
       if (!skipReplay) {
-        await this.replayEvents(server, filters);
+        const replayed = await this.replayEvents(server, filters, undefined, updateCursor);
+        if (!replayed && updateCursor !== undefined) {
+          server.close(1011, 'Historical replay failed');
+          return new Response(null, { status: 101, webSocket: client });
+        }
       }
 
       if (options?.reconcileMaterializedEvents) {
@@ -191,12 +207,18 @@ export function createStreamHandler(
           server.send(
             JSON.stringify({
               ...formatStreamEvent({ ...snapshot, id: 0 }, sessionId),
-              eventId: 0,
+              eventId: updateCursor === undefined ? 0 : snapshot.id,
             })
           );
         }
       };
       if (options?.reconcileMaterializedEvents) await sendPreparationSnapshots();
+
+      const ancillary = await options?.getAncillaryBootstrap?.();
+      for (const event of ancillary?.events ?? []) {
+        if (!matchesFilters({ ...event, id: 0 }, filters)) continue;
+        server.send(JSON.stringify(formatStreamEvent(event, sessionId)));
+      }
 
       const derivedPendingInteractions = options?.readPendingInteractions
         ? undefined
@@ -254,11 +276,12 @@ export function createStreamHandler(
       }
 
       const connectedData: ConnectedEventData = {};
+      if (ancillary) connectedData.ancillaryOmittedItemCount = ancillary.omittedItemCount;
       if (bootstrap) connectedData.bootstrapPending = true;
       if (cloudStatus) connectedData.cloudStatus = cloudStatus;
       if (sessionStatus) connectedData.sessionStatus = sessionStatus;
       if (pendingInteractions) connectedData.pendingInteractions = pendingInteractions;
-      if (options?.reconcileMaterializedEvents) {
+      if (options?.reconcileMaterializedEvents || updateCursor !== undefined) {
         connectedData.activeMessageId =
           queued.find(message => message.delivery === 'sent')?.messageId ?? null;
       }
@@ -267,6 +290,7 @@ export function createStreamHandler(
           eventId: 0,
           sessionId,
           streamEventType: 'connected' as const,
+          ...(updateCursor === undefined ? {} : { cursor: updateCursor }),
           timestamp: new Date().toISOString(),
           data: connectedData,
         })
@@ -338,6 +362,7 @@ export function createStreamHandler(
             eventId: 0,
             sessionId,
             streamEventType: 'bootstrap.complete',
+            ...(updateCursor === undefined ? {} : { cursor: updateCursor }),
             timestamp: new Date().toISOString(),
             data: {},
           })
@@ -364,14 +389,16 @@ export function createStreamHandler(
     async replayEvents(
       ws: WebSocket,
       filters: StreamFilters,
-      materialized?: 'updates' | 'removals'
-    ): Promise<void> {
+      materialized?: 'updates' | 'removals',
+      throughCursor = options?.getUpdateCursor?.()
+    ): Promise<boolean> {
       const startedAt = Date.now();
       let totalBytesSent = 0;
       let totalEventsSent = 0;
       let replayRounds = 0;
       try {
         let cursor: EventId | undefined = materialized ? undefined : filters.fromId;
+        let afterCursor = throughCursor === undefined ? undefined : filters.afterCursor;
 
         for (;;) {
           if (ws.readyState !== WebSocket.OPEN) break;
@@ -381,7 +408,7 @@ export function createStreamHandler(
           replayRounds++;
 
           for (const event of eventQueries.iterateByFilters({
-            fromId: cursor,
+            ...(afterCursor === undefined ? { fromId: cursor } : { afterCursor, throughCursor }),
             executionIds: filters.executionIds,
             eventTypes: filters.eventTypes,
             startTime: filters.startTime,
@@ -389,6 +416,11 @@ export function createStreamHandler(
             ...(materialized ? { materialized } : {}),
           })) {
             cursor = event.id;
+            if (afterCursor !== undefined) {
+              if (event.mutation_cursor === undefined || event.mutation_cursor <= afterCursor)
+                throw new Error('Historical replay did not advance its mutation cursor');
+              afterCursor = event.mutation_cursor;
+            }
             eventsRead++;
             if (
               !materialized &&
@@ -397,6 +429,17 @@ export function createStreamHandler(
             )
               continue;
             const formatted = formatStreamEvent(event, sessionId);
+            // Replay uses the same revisioned preview as history pages, so a
+            // reconnect does not redownload the tool bodies a page omitted.
+            if (
+              filters.toolDisplay === 'preview' &&
+              event.stream_event_type === 'kilocode' &&
+              event.mutation_cursor !== undefined
+            )
+              formatted.data = projectKilocodeEventForDisplay(
+                formatted.data,
+                event.mutation_cursor
+              );
             const message = JSON.stringify(materialized ? { ...formatted, eventId: 0 } : formatted);
             ws.send(message);
             bytesSent += message.length;
@@ -418,6 +461,7 @@ export function createStreamHandler(
             socketOpen: ws.readyState === WebSocket.OPEN,
           })
           .info('Client stream replay completed');
+        return true;
       } catch (error) {
         logger
           .withFields({
@@ -434,6 +478,7 @@ export function createStreamHandler(
             createErrorMessage('WS_INTERNAL_ERROR', 'Failed to replay historical events')
           )
         );
+        return false;
       }
     },
 

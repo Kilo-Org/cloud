@@ -1,11 +1,11 @@
-/* eslint-disable max-lines -- The login screen keeps its device-auth branches, keyboard padding, and language picker together. */
+/* eslint-disable max-lines -- The login screen keeps its device-auth branches, keyboard inset, and language picker together. */
 import * as Clipboard from 'expo-clipboard';
 import { type Href, useRouter } from 'expo-router';
 import { Globe } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { I18nManager, Pressable, ScrollView, View } from 'react-native';
-import { useKeyboardState } from 'react-native-keyboard-controller';
+import { Pressable, View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
@@ -13,16 +13,28 @@ import logo from '@/../assets/images/logo.png';
 import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
 import { CenteredState } from '@/components/centered-state';
 import { IdleAuth } from '@/components/login/idle-auth';
-import { errorMessage, resolveKeyboardBottomPadding } from '@/components/login-screen-state';
+import {
+  errorMessage,
+  resolveBottomChromePadding,
+  resolveFieldActionReserve,
+} from '@/components/login-screen-state';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth/auth-context';
+import { type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
+import { announcePendingLinkOutcome, pendingLinkOutcome } from '@/lib/auth/pending-link';
+import {
+  readPendingLinkOffer,
+  recordPendingLinkOutcome,
+  setPendingLinkOffer,
+  takePendingLinkOutcome,
+} from '@/lib/auth/pending-link-state';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   clearPersistedLoginDrafts,
@@ -45,6 +57,8 @@ export function LoginScreen() {
     error,
     verificationUrl,
     resumed,
+    pendingLink: pendingLinkResult,
+    expiredPendingLinkToken,
     start,
     cancel,
     openBrowser,
@@ -53,17 +67,45 @@ export function LoginScreen() {
   const colors = useThemeColors();
   const insets = useScreenInsets();
   const { t } = useTranslation();
+  const fontScale = useLiveFontScale();
+  // The space the keyboard reveal keeps below a focused field is the height of
+  // what the form renders under that field, reported by the form itself: a
+  // refusal that wraps in a long catalog is measured instead of assumed. The
+  // action-and-gaps floor covers the first frame, before anything reported a
+  // height, and the provider rows above the field never count.
+  const [belowFieldHeight, setBelowFieldHeight] = useState(0);
+  const fieldActionReserve = resolveFieldActionReserve({ fontScale, belowFieldHeight });
   const [persistFailed, setPersistFailed] = useState(false);
   const [authFormBusy, setAuthFormBusy] = useState(false);
   const [draft, setDraft] = useState<{
     email: string;
     ssoRecovery: SsoRecoveryDraft | null;
   } | null>(null);
+  // Held in the module rather than in this screen: the screen unmounts while a
+  // browser sign-in is pending and right after the device approved one, and a
+  // remount must return to the same link instead of the plain landing.
+  const [pendingLink, setPendingLink] = useState<PendingLinkOffer | null>(readPendingLinkOffer);
+  const updatePendingLink = useCallback((offer: PendingLinkOffer | null) => {
+    setPendingLinkOffer(offer);
+    setPendingLink(offer);
+  }, []);
 
   // Set once this mount completes a sign-in: the unmount persistence then
   // stays off, because the signed-in session owns the screen and a typed
   // email from the abandoned attempt must not survive into the next login.
   const signedInRef = useRef(false);
+
+  // The outcome of the last link-resolution survives a remount the same way the
+  // offer does, so a mount that follows an activity restart still tells the
+  // person what happened — once, then the record is gone. Past the link's own
+  // deadline the notice would describe a link nobody can still resolve.
+  useEffect(() => {
+    const offer = readPendingLinkOffer();
+    const outcome = takePendingLinkOutcome();
+    if (!offer || Date.now() < offer.expiresAt) {
+      announcePendingLinkOutcome(outcome, offer);
+    }
+  }, []);
 
   const persistToken = useCallback(
     async (tokenValue: string, refreshTokenValue?: string, expiresInValue?: number) => {
@@ -74,9 +116,13 @@ export function LoginScreen() {
         // The message renders from the catalog at draw time, so a language
         // switch re-renders it in the new language.
         setPersistFailed(true);
+        return;
       }
+      announcePendingLinkOutcome(takePendingLinkOutcome(), pendingLink);
+      // The link is resolved: a later login must not restore it.
+      updatePendingLink(null);
     },
-    [signIn]
+    [pendingLink, signIn, updatePendingLink]
   );
 
   // Every provider's completed sign-in — device code, email code, Apple,
@@ -134,6 +180,15 @@ export function LoginScreen() {
     }
   }, [sessionEnded, t]);
 
+  // The approved code carries the outcome of the link it resolved. Record it here, before the
+  // effect below persists the token and announces it, so a mount that follows an activity
+  // restart can still reach it.
+  useEffect(() => {
+    if (status === 'approved' && pendingLink) {
+      recordPendingLinkOutcome(pendingLinkOutcome(pendingLinkResult));
+    }
+  }, [pendingLink, pendingLinkResult, status]);
+
   useEffect(() => {
     if (status === 'approved' && token) {
       void persistToken(token, refreshToken, expiresIn);
@@ -141,11 +196,9 @@ export function LoginScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- persistToken is stable except for signIn identity; only re-run on a newly approved token
   }, [status, token]);
 
-  // The `KeyboardProvider` at the root measures the keyboard once in native
-  // code, so this screen reads the height instead of listening to React Native's
-  // keyboard events. The provider also clears the height when the app leaves the
-  // foreground, which the listener pair used to do itself.
-  const keyboardHeight = useKeyboardState(state => state.height);
+  // The keyboard is reserved by the scroll view below: `KeyboardAwareScrollView`
+  // owns the IME inset and scrolls the focused field into view, so this screen
+  // neither reads the height nor pads for it.
 
   if (status === 'approved') {
     if (persistFailed) {
@@ -177,19 +230,20 @@ export function LoginScreen() {
   }
 
   // One padded wrapper for both platforms: the bottom inset is reserved at
-  // rest, and while the IME is up the provider's keyboard height is reserved
-  // instead (see `resolveKeyboardBottomPadding`). The ScrollView's centered form
-  // then re-centres in the space that stays above the keyboard, so "Continue" is
-  // never left under the keyboard, the navigation bar, or the home indicator.
-  const bottomPadding = resolveKeyboardBottomPadding({
-    keyboardHeight,
-    bottomInset: insets.bottom,
-  });
+  // rest, and the scroll view reserves the keyboard itself. The scroll content
+  // then stays clear of the navigation bar, the home indicator, and the IME.
+  const bottomPadding = resolveBottomChromePadding({ bottomInset: insets.bottom });
   // The Globe stays enabled on idle, denied, expired, and error (those render
   // an interactive IdleAuth form); it is disabled while a device-auth flow
   // (pending/approved) or a busy auth action owns the screen.
   const globeDisabled = status === 'pending' || authFormBusy;
-  const globeTrailingInset = (I18nManager.isRTL ? insets.left : insets.right) + 16;
+  // The globe owns the screen's first row, and the scroll content starts below
+  // it: the logo used to share the control's band on a compact screen because
+  // the scroller began at the window top while the globe was an absolute overlay.
+  // The root's side paddings already carry `insets.left`/`insets.right`, so
+  // `paddingEnd` keeps the same RTL-aware clearance from the cutout that the old
+  // absolute `end` offset measured.
+  const headerRowStyle = { paddingTop: insets.top + 8, paddingEnd: 16 } as const;
   // A terminal device-auth error — an expired code, denied access, or the poll
   // timing out — renders its message above the idle form. Idle, every terminal
   // error, and a start that has not answered yet share the same single IdleAuth
@@ -201,26 +255,60 @@ export function LoginScreen() {
   // indicator below instead of a wholesale swap to the spinner.
   const startInFlight = status === 'pending' && !code;
   const showTerminalError = status === 'denied' || status === 'expired' || status === 'error';
-  const showIdleForm = status === 'idle' ? draft !== null : showTerminalError || startInFlight;
+  // The idle form paints on the first frame, before the stored draft resolves.
+  // A shorter placeholder instead of the form would grow the centered column
+  // into its place and lift the logo and the heading off the position they had
+  // already painted; painting the form reserves that space by construction.
+  const showIdleForm = status === 'idle' || showTerminalError || startInFlight;
+  // The form reads its seed once, so a stored address or SSO recovery reaches
+  // it through one remount when the restore lands. The module draft keeps the
+  // value a person already typed, so that remount cannot replace it.
+  const restoredDraft = draft !== null && (draft.email !== '' || draft.ssoRecovery !== null);
 
   return (
     // One wrapper owns the vertical space on both platforms: it paints the
-    // screen background and reserves the bottom padding resolved above, so the
-    // ScrollView's centered form stays above the keyboard, the navigation bar,
-    // and the home indicator.
+    // screen background and reserves the bottom chrome resolved above, so the
+    // centered form stays clear of the navigation bar and the home indicator.
+    // The keyboard inset belongs to the scroll view inside it.
     <View
       className="flex-1 bg-background"
-      // eslint-disable-next-line react-native/no-inline-styles -- dynamic keyboard and safe-area padding
+      // eslint-disable-next-line react-native/no-inline-styles -- dynamic chrome and safe-area padding
       style={{
         paddingBottom: bottomPadding,
         paddingLeft: insets.left,
         paddingRight: insets.right,
       }}
     >
-      <ScrollView
+      <View className="flex-row justify-end" style={headerRowStyle}>
+        <Pressable
+          onPress={() => {
+            setLanguagePickerBridge({ beforeReload: persistLoginDrafts });
+            router.push('/(auth)/language-picker' as Href);
+          }}
+          disabled={globeDisabled}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.language')}
+          accessibilityState={{ disabled: globeDisabled }}
+          className={cn(
+            ICON_TARGET_BOX_CLASS,
+            'rounded-full active:opacity-70 disabled:opacity-50'
+          )}
+        >
+          <Globe size={22} color={colors.foreground} />
+        </Pressable>
+      </View>
+      <KeyboardAwareScrollView
         className="flex-1 bg-background"
         contentContainerClassName="flex-grow items-center justify-center gap-6 px-6 py-8"
         keyboardShouldPersistTaps="handled"
+        // The space the form keeps below the focused field while the keyboard is
+        // up: its own measured height, floored at the primary action plus the
+        // form gaps at the current text scale. Nothing below the field — a
+        // refusal that wraps, the action, the remaining controls — can then end
+        // on the keyboard edge. Layout mode grows the scroll length by the IME
+        // height, which is what lets that position sit on the keyboard's top.
+        bottomOffset={fieldActionReserve}
+        mode="layout"
       >
         <View className="w-full max-w-sm items-center gap-2">
           <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel={t('login.logo')} />
@@ -247,21 +335,23 @@ export function LoginScreen() {
             </Text>
           )}
 
-          {status === 'idle' && draft === null && (
-            <>
-              {/* Form-sized placeholder until the SecureStore draft restore finishes. */}
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-11 w-full" />
-            </>
-          )}
-
           {showIdleForm && (
             <IdleAuth
+              key={restoredDraft ? 'restored-draft' : 'blank-draft'}
               start={start}
               initialEmail={draft?.email ?? ''}
               initialSsoRecovery={draft?.ssoRecovery ?? null}
               onBusyChange={setAuthFormBusy}
+              onBelowFieldHeightChange={setBelowFieldHeight}
               onSignInStart={clearError}
+              pendingLink={pendingLink}
+              pendingLinkRefused={
+                pendingLink !== null && pendingLink.token === expiredPendingLinkToken
+              }
+              onPendingLink={updatePendingLink}
+              onClearPendingLink={() => {
+                updatePendingLink(null);
+              }}
             />
           )}
 
@@ -332,25 +422,7 @@ export function LoginScreen() {
             </View>
           )}
         </View>
-      </ScrollView>
-      <Pressable
-        onPress={() => {
-          setLanguagePickerBridge({ beforeReload: persistLoginDrafts });
-          router.push('/(auth)/language-picker' as Href);
-        }}
-        disabled={globeDisabled}
-        accessibilityRole="button"
-        accessibilityLabel={t('common.language')}
-        accessibilityState={{ disabled: globeDisabled }}
-        className={cn(
-          ICON_TARGET_BOX_CLASS,
-          'absolute rounded-full active:opacity-70 disabled:opacity-50'
-        )}
-        // eslint-disable-next-line react-native/no-inline-styles -- safe-area + RTL-aware trailing edge
-        style={{ top: insets.top + 8, end: globeTrailingInset }}
-      >
-        <Globe size={22} color={colors.foreground} />
-      </Pressable>
+      </KeyboardAwareScrollView>
     </View>
   );
 }

@@ -8,7 +8,7 @@ import {
 import {
   resolveOrganizationMemberModelPolicy,
   type EffectiveOrganizationModelPolicy,
-} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   getOrganizationByokProviderIds,
   hasInferenceProviderUserByokForModel,
@@ -43,12 +43,15 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'),
   getDirectByokCatalogModelIds: jest.fn(async () => new Set()),
 }));
-jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
-  ...jest.requireActual<object>(
-    '@kilocode/web-shared/lib/organizations/effective-model-access.server'
-  ),
-  resolveOrganizationMemberModelPolicy: jest.fn(),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
+  () => ({
+    ...jest.requireActual<object>(
+      '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server'
+    ),
+    resolveOrganizationMemberModelPolicy: jest.fn(),
+  })
+);
 
 function policy(
   overrides: Partial<EffectiveOrganizationModelPolicy> = {}

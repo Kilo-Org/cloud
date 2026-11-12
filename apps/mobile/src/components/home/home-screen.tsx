@@ -68,7 +68,19 @@ export function HomeScreen() {
         // opens. The heading is the mark alone, so the row never reflows the
         // picker under it (`allowInlineActionsStacking` reserves room for a
         // heading's text that this header does not have).
-        inlineActions={<ContextControl />}
+        // The account-list failure never adds rows to this fixed header, so
+        // every section keeps its place while the list fails and after it
+        // recovers (finding home-header-failure-shift). Which of the two
+        // one-row forms depends on what the body states:
+        //
+        // - With an organization active, the live-session card below states the
+        //   failure and carries its Retry, so the header draws nothing.
+        // - In the personal scope the card reports the sessions query instead
+        //   and never this one, so the header row becomes the recovery: its
+        //   label is the failure message and a press refetches the list.
+        inlineActions={
+          <ContextControl failurePlacement={context.organizationId === null ? 'row' : 'none'} />
+        }
         allowInlineActionsStacking={false}
         // The logo is the header's only visible child, so this is the brand
         // mark's leading edge: it must be the page gutter the sections, cards
@@ -112,7 +124,7 @@ export function HomeScreen() {
               />
               <UpNextSection organizationId={context.organizationId} enabled={context.isReady} />
               {context.isReady && (
-                <View className="gap-2 pt-4">
+                <View className="gap-2 pt-2">
                   <NewTaskButton organizationId={context.organizationId} />
                   <NewTaskFromPictureButton organizationId={context.organizationId} />
                 </View>

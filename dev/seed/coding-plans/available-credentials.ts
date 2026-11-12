@@ -4,7 +4,7 @@ import { coding_plan_key_inventory } from '@kilocode/db/schema';
 import type { EncryptedData } from '@kilocode/db/schema-types';
 import { and, eq, inArray } from 'drizzle-orm';
 
-import { getSeedDb } from '../lib/db';
+import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import type { SeedResult } from '../index';
 
 const PROVIDERS = {
@@ -123,6 +123,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     };
   });
   const fingerprints = credentials.map(credential => credential.fingerprint);
+  assertLocalSeedDatabase('coding-plans:available-credentials');
   const db = getSeedDb();
 
   const consumed = await db

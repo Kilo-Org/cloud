@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { overLimitMessage, overTotalMessage } from '../contracts/limit-copy';
 
 /**
  * Field constraints for the session (runtime) delivery contract, mirrored from
@@ -50,7 +51,15 @@ const SKILL_FILE_PATH_PATTERN = /^[a-zA-Z0-9._\-/]+$/;
 const RuntimeSkillFilesContractSchema = z
   .record(
     z.string().min(1).max(RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_PATH_LENGTH),
-    z.string().max(RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILE_SIZE)
+    z
+      .string()
+      .max(
+        RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILE_SIZE,
+        overLimitMessage(
+          'Skill companion file',
+          RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILE_SIZE
+        )
+      )
   )
   .refine(
     files => Object.keys(files).length <= RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES,
@@ -79,7 +88,11 @@ const RuntimeSkillFilesContractSchema = z
     if (total > RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL) {
       ctx.addIssue({
         code: 'custom',
-        message: `Skill companion files total ${total} bytes, exceeds ${RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL}`,
+        message: overTotalMessage(
+          'Skill companion files',
+          total,
+          RUNTIME_LIMITS.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL
+        ),
       });
     }
   });
@@ -90,7 +103,13 @@ export const RuntimeSkillContractSchema = z.object({
     .min(1)
     .max(RUNTIME_LIMITS.MAX_RUNTIME_SKILL_NAME_LENGTH)
     .regex(/^[a-z0-9][a-z0-9-]*$/, 'Skill name must be a slug'),
-  rawMarkdown: z.string().min(1).max(RUNTIME_LIMITS.MAX_RUNTIME_SKILL_MARKDOWN),
+  rawMarkdown: z
+    .string()
+    .min(1)
+    .max(
+      RUNTIME_LIMITS.MAX_RUNTIME_SKILL_MARKDOWN,
+      overLimitMessage('Skill markdown', RUNTIME_LIMITS.MAX_RUNTIME_SKILL_MARKDOWN)
+    ),
   files: RuntimeSkillFilesContractSchema.optional(),
 });
 
@@ -138,7 +157,13 @@ export const RuntimeKiloCommandContractSchema = z.object({
     .min(1)
     .max(RUNTIME_LIMITS.MAX_RUNTIME_KILO_COMMAND_NAME_LENGTH)
     .regex(/^[a-z][a-z0-9-]*$/, 'Command name must start with a letter and be a slug'),
-  template: z.string().min(1).max(RUNTIME_LIMITS.MAX_RUNTIME_KILO_COMMAND_TEMPLATE),
+  template: z
+    .string()
+    .min(1)
+    .max(
+      RUNTIME_LIMITS.MAX_RUNTIME_KILO_COMMAND_TEMPLATE,
+      overLimitMessage('Command template', RUNTIME_LIMITS.MAX_RUNTIME_KILO_COMMAND_TEMPLATE)
+    ),
   description: z
     .string()
     .max(RUNTIME_LIMITS.MAX_RUNTIME_KILO_COMMAND_DESCRIPTION)

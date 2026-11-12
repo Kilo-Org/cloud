@@ -1,7 +1,7 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only'; // This file imports the database and can therefore only be used on the server side.
 import Stripe from 'stripe';
-import { client } from '@kilocode/web-shared/lib/stripe-client';
+import { client, invalidateStripePaymentMethodCache } from '@kilocode/web-shared/lib/stripe-client';
 import {
   getStripeChargeInvoice,
   getStripeInvoiceChargeId,
@@ -57,6 +57,7 @@ import { processTopUp } from '@kilocode/web-shared/lib/credits';
 import type { PaidCreditGrant } from '@kilocode/web-shared/lib/paidCreditPolicy';
 import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
+import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 import {
   STRIPE_SUB_QUERY_STRING_KEY,
   TOPUP_CANCELED_QUERY_STRING_KEY,
@@ -686,6 +687,9 @@ export async function detachAllPaymentMethods(user: User) {
       await client.paymentMethods.detach(paymentMethod.id);
     })
   );
+  // Cards changed for this customer; the next payment-method read must ask
+  // Stripe again instead of serving the answer cached before the removal.
+  invalidateStripePaymentMethodCache(user.stripe_customer_id);
 
   // Also clear auto-top-up settings
   await db
@@ -770,11 +774,17 @@ export async function ensurePaymentMethodStored(
   } catch (error) {
     const context = {
       tags: { source: 'stripe_payment_method_storage' },
-      extra: { kiloUserId, paymentMethod, organizationId },
+      extra: {
+        kiloUserId,
+        paymentMethodId: paymentMethod.id,
+        paymentMethodType: paymentMethod.type,
+        organizationId,
+      },
     };
-    captureException(error, context);
+    const safeError = sanitizeErrorForTelemetry(error);
+    captureException(safeError, context);
     if (process.env.NODE_ENV !== 'test')
-      console.error('Error saving payment method for user ' + kiloUserId, error, context);
+      console.error('Error saving payment method for user ' + kiloUserId, safeError, context);
     return null;
   }
 }
@@ -851,7 +861,7 @@ async function handleAutoTopUpSetup(
       'Missing auto top-up payment method despite setup_future_usage: "off_session"',
       {
         kilo_user_id: user.id,
-        paymentIntent,
+        payment_intent_id: paymentIntent.id,
         ...config,
       }
     );
@@ -924,7 +934,7 @@ async function handleOrgAutoTopUpSetup(
       'Missing org auto top-up payment method despite setup_future_usage: "off_session"',
       {
         organizationId,
-        paymentIntent,
+        payment_intent_id: paymentIntent.id,
         ...config,
       }
     );
@@ -970,6 +980,15 @@ async function handleOrgAutoTopUpSetup(
     .where(eq(organizations.id, organizationId));
 }
 
+function getSafeStripeChargeLogContext(charge: Stripe.Charge, paymentIntent: Stripe.PaymentIntent) {
+  return {
+    chargeId: charge.id,
+    paymentIntentId: paymentIntent.id,
+    customerId: stripeReferenceId(charge.customer) ?? null,
+    paymentIntentType: paymentIntent.metadata.type ?? null,
+  };
+}
+
 async function handleSuccessfulCharge(
   event: Stripe.ChargeSucceededEvent
 ): Promise<Stripe.PaymentIntent> {
@@ -1001,7 +1020,7 @@ export async function handleSuccessfulChargeWithPayment(
       sentryLogger('stripe', 'warning')('Org top-up missing kiloUserId in PaymentIntent metadata', {
         payment_intent_id: paymentIntent.id,
         charge_id: charge.id,
-        metadata: paymentIntent.metadata,
+        organization_id: organizationId,
       });
       return;
     }
@@ -1059,9 +1078,8 @@ export async function handleSuccessfulChargeWithPayment(
   const user = await findUserByStripeCustomerId(charge.customer as string);
   if (!user) {
     warnExceptInTest(
-      `No user found for charge ${charge.id} with customer ID ${charge.customer as string}. Skipping processing.`,
-      paymentIntent,
-      charge
+      'No user found for Stripe charge; skipping processing.',
+      getSafeStripeChargeLogContext(charge, paymentIntent)
     );
     return;
   }
@@ -1109,9 +1127,7 @@ export async function handleSuccessfulChargeWithPayment(
       // Unknown charge type - log warning but don't process
       warnExceptInTest(
         'Unknown charge type (not stripe-checkout-topup, not auto-topup-setup). Ignoring.',
-        charge.customer,
-        charge,
-        paymentIntent
+        getSafeStripeChargeLogContext(charge, paymentIntent)
       );
     }
     return;
@@ -1267,12 +1283,16 @@ async function handlePaymentMethodEvent(
       .update(payment_methods)
       .set({ ...auto_deleted_at })
       .where(eq(payment_methods.stripe_id, paymentMethod.id));
+    const stripeCustomerId = stripeReferenceId(paymentMethod.customer);
+    if (stripeCustomerId) invalidateStripePaymentMethodCache(stripeCustomerId);
     return;
   }
 
   const user = await findUserByStripeCustomer(paymentMethod.customer);
   if (!user) return;
   await ensurePaymentMethodStored(user.id, paymentMethod);
+  // Attaching or updating a card changes the answer for this customer.
+  invalidateStripePaymentMethodCache(user.stripe_customer_id);
 }
 
 type AutoTopUpOwner = { type: 'user'; id: string } | { type: 'organization'; id: string };

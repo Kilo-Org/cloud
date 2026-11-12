@@ -42,7 +42,7 @@ async function readPermissionId(input: AskBindingInput): Promise<string | null> 
   // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
   const pending = require('./pending-permission') as typeof PendingPermission;
   const cloudAgentSessionId = await session.resolveCloudAgentSessionId(input.kiloSessionId);
-  return pending.resolvePendingPermissionId({
+  return pending.resolveLeadingPendingPermissionId({
     cloudAgentSessionId,
     organizationId: input.organizationId,
   });

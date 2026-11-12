@@ -1,0 +1,149 @@
+diff --git a/dist/recyclerview/RecyclerViewManager.js b/dist/recyclerview/RecyclerViewManager.js
+index 1aa651d9d985a36d3c6ef69f20407f51ca0e3e6f..8e1ad7923d29562cfdb9f11a06fa275c88ccd61d 100644
+--- a/dist/recyclerview/RecyclerViewManager.js
++++ b/dist/recyclerview/RecyclerViewManager.js
+@@ -267,7 +267,17 @@ export class RecyclerViewManager {
+     }
+     getDataKey(index) {
+         var _a, _b, _c;
+-        return ((_c = (_b = (_a = this.propsRef).keyExtractor) === null || _b === void 0 ? void 0 : _b.call(_a, this.propsRef.data[index], index)) !== null && _c !== void 0 ? _c : index.toString());
++        // The list reads this key from the engaged range and from the
++        // maintainVisibleContentPosition anchor, and both can still name an
++        // index past the end of a data set that just shrank. Answer with the
++        // index for an item that is not there, like the viewability manager
++        // does, so the list's keyExtractor is never handed an undefined item.
++        const data = this.propsRef.data;
++        const item = data === null || data === void 0 ? void 0 : data[index];
++        if (item === undefined) {
++            return index.toString();
++        }
++        return ((_c = (_b = (_a = this.propsRef).keyExtractor) === null || _b === void 0 ? void 0 : _b.call(_a, item, index)) !== null && _c !== void 0 ? _c : index.toString());
+     }
+     getLayoutManagerClass() {
+         // throw errors for incompatible props
+@@ -333,7 +343,14 @@ export class RecyclerViewManager {
+     }
+     getItemType(index) {
+         var _a, _b, _c;
+-        return ((_c = (_b = (_a = this.propsRef).getItemType) === null || _b === void 0 ? void 0 : _b.call(_a, this.propsRef.data[index], index)) !== null && _c !== void 0 ? _c : "default").toString();
++        // Same stale index as `getDataKey`: an item that is not there has no
++        // type to ask about, and the list's own default is the honest answer.
++        const data = this.propsRef.data;
++        const item = data === null || data === void 0 ? void 0 : data[index];
++        if (item === undefined) {
++            return "default";
++        }
++        return ((_c = (_b = (_a = this.propsRef).getItemType) === null || _b === void 0 ? void 0 : _b.call(_a, item, index)) !== null && _c !== void 0 ? _c : "default").toString();
+     }
+     overrideItemLayout(index, layout) {
+         var _a, _b;
+diff --git a/dist/recyclerview/RenderStackManager.js b/dist/recyclerview/RenderStackManager.js
+index 9cd6cd739bfa8440f8d18f47ddb0d637a15ac5b3..00c2d5855f7cf1e0880492a59854dc57d62bcf9f 100644
+--- a/dist/recyclerview/RenderStackManager.js
++++ b/dist/recyclerview/RenderStackManager.js
+@@ -54,12 +54,28 @@ export class RenderStackManager {
+         });
+         // First pass: process items that already have optimized keys
+         for (const index of engagedIndices) {
++            // The engaged range is computed from the layout manager, so it can
++            // still name indices past the end of a data set that just shrank.
++            // Bound it exactly like the retained-key pass above; otherwise the
++            // stable-id and item-type lookups below read past the data and hand
++            // the list's keyExtractor an undefined item.
++            if (index >= dataLength) {
++                continue;
++            }
+             if (this.hasOptimizedKey(getStableId(index))) {
+                 this.syncItem(index, getItemType(index), getStableId(index));
+             }
+         }
+         // Second pass: process remaining items that need new keys
+         for (const index of engagedIndices) {
++            // The engaged range is computed from the layout manager, so it can
++            // still name indices past the end of a data set that just shrank.
++            // Bound it exactly like the retained-key pass above; otherwise the
++            // stable-id and item-type lookups below read past the data and hand
++            // the list's keyExtractor an undefined item.
++            if (index >= dataLength) {
++                continue;
++            }
+             if (!this.hasOptimizedKey(getStableId(index))) {
+                 this.syncItem(index, getItemType(index), getStableId(index));
+             }
+diff --git a/src/recyclerview/RecyclerViewManager.ts b/src/recyclerview/RecyclerViewManager.ts
+index 41704d03e807f962c17ca8d008738c7a387d9b2a..8af474d8cf080b9b01a6248bf95d20053538800c 100644
+--- a/src/recyclerview/RecyclerViewManager.ts
++++ b/src/recyclerview/RecyclerViewManager.ts
+@@ -352,10 +352,16 @@ export class RecyclerViewManager<T> {
+   }
+ 
+   getDataKey(index: number): string {
+-    return (
+-      this.propsRef.keyExtractor?.(this.propsRef.data![index], index) ??
+-      index.toString()
+-    );
++    // The list reads this key from the engaged range and from the
++    // maintainVisibleContentPosition anchor, and both can still name an index
++    // past the end of a data set that just shrank. Answer with the index for
++    // an item that is not there, like the viewability manager does, so the
++    // list's keyExtractor is never handed an undefined item to dereference.
++    const item = this.propsRef.data?.[index];
++    if (item === undefined) {
++      return index.toString();
++    }
++    return this.propsRef.keyExtractor?.(item, index) ?? index.toString();
+   }
+ 
+   private getLayoutManagerClass() {
+@@ -440,10 +446,13 @@ export class RecyclerViewManager<T> {
+   }
+ 
+   private getItemType(index: number): string {
+-    return (
+-      this.propsRef.getItemType?.(this.propsRef.data![index], index) ??
+-      "default"
+-    ).toString();
++    // Same stale index as `getDataKey`: an item that is not there has no type
++    // to ask about, and the list's own default is the honest answer.
++    const item = this.propsRef.data?.[index];
++    if (item === undefined) {
++      return "default";
++    }
++    return (this.propsRef.getItemType?.(item, index) ?? "default").toString();
+   }
+ 
+   private overrideItemLayout(index: number, layout: SpanSizeInfo) {
+diff --git a/src/recyclerview/RenderStackManager.ts b/src/recyclerview/RenderStackManager.ts
+index a2ccc530f982a99648581a7ad2fe20416f2fd731..f2a69df265e70ebce10d5aed1cf11241768c3817 100644
+--- a/src/recyclerview/RenderStackManager.ts
++++ b/src/recyclerview/RenderStackManager.ts
+@@ -85,6 +85,14 @@ export class RenderStackManager {
+ 
+     // First pass: process items that already have optimized keys
+     for (const index of engagedIndices) {
++      // The engaged range is computed from the layout manager, so it can still
++      // name indices past the end of a data set that just shrank. Bound it
++      // exactly like the retained-key pass above; otherwise the stable-id and
++      // item-type lookups below read past the data and hand the list's
++      // keyExtractor an undefined item.
++      if (index >= dataLength) {
++        continue;
++      }
+       if (this.hasOptimizedKey(getStableId(index))) {
+         this.syncItem(index, getItemType(index), getStableId(index));
+       }
+@@ -92,6 +100,14 @@ export class RenderStackManager {
+ 
+     // Second pass: process remaining items that need new keys
+     for (const index of engagedIndices) {
++      // The engaged range is computed from the layout manager, so it can still
++      // name indices past the end of a data set that just shrank. Bound it
++      // exactly like the retained-key pass above; otherwise the stable-id and
++      // item-type lookups below read past the data and hand the list's
++      // keyExtractor an undefined item.
++      if (index >= dataLength) {
++        continue;
++      }
+       if (!this.hasOptimizedKey(getStableId(index))) {
+         this.syncItem(index, getItemType(index), getStableId(index));
+       }

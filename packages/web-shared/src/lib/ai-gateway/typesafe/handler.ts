@@ -2,23 +2,21 @@ import { randomUUID } from 'crypto';
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import { wrapInSafeNextResponse } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
-  getOrganizationProviderPrivacy,
-  creditsBlockedResponse,
-  extractFraudAndProjectHeaders,
-  extractHeaderAndLimitLength,
-  modelNotAllowedResponse,
-  wrapInSafeNextResponse,
-} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+  gatewayUsageContextBase,
+  organizationProviderPreferences,
+  paidUsageRejection,
+  resolveGatewayCaller,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
@@ -30,8 +28,9 @@ import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { parseUsageWithRecovery } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { fetchGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
@@ -43,7 +42,6 @@ import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getEffectiveProviderPrivacy } from '../provider-privacy';
-import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   getOpenRouterModelsMetadataFromDatabase,
@@ -68,7 +66,6 @@ import {
  */
 const SYSTEM_ONE_UPSTREAM_TIMEOUT_MS = 10 * 60 * 1000;
 
-/** Only a body that carries a generation id can have its cost reconciled. */
 const generationIdSchema = z.object({ id: z.string().min(1) });
 
 /** A body the gateway could not use may still name the model the provider billed. */
@@ -107,12 +104,12 @@ export async function handleSystemOneRequest(request: NextRequest) {
   if (await isGatewayAccountRateLimited(request, gatewayRateLimitKey(request.headers, ipAddress))) {
     return errorResponse('Rate limit exceeded', 'rate_limit_exceeded', 429);
   }
-
-  const { user, authFailedResponse, organizationId, botId, tokenSource } = await getUserFromAuth({
-    adminOnly: false,
-    expectedAudience: KILO_GATEWAY_AUDIENCE,
-  });
-  if (authFailedResponse) return authFailedResponse;
+  const caller = resolveGatewayCaller(
+    await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
+    { allowAnonymous: false, passThroughAuthFailure: true }
+  );
+  if (caller.kind === 'rejected') return caller.response;
+  const { user, organizationId } = caller;
 
   let body: unknown;
   try {
@@ -125,7 +122,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     return errorResponse(z.prettifyError(parsed.error), 'invalid_request', 400);
   }
   const { model: requestedModel } = parsed.data;
-  const isFree = isFreeModelExcludingCustomLlms(requestedModel);
+  const isFree = isFreeModel(requestedModel);
   if (!(await isSystemOneModel(requestedModel))) {
     return errorResponse(
       `The requested model '${requestedModel}' is not a System One model`,
@@ -135,11 +132,12 @@ export async function handleSystemOneRequest(request: NextRequest) {
   }
   const resolvedModel = await resolveOpenRouterModelAlias(requestedModel);
 
-  const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
-    await getBalanceAndOrgSettings(organizationId, user, readDb, 'usage');
-  if (!canSpendPaidUsage(balance)) {
-    return creditsBlockedResponse({ user, balance, organizationId, balanceLimitedByUserAllowance });
-  }
+  // Unlike `readGatewayBalance`, System One funds free models from usage and
+  // blocks them at a zero balance too.
+  const account = await getBalanceAndOrgSettings(organizationId, user, readDb, 'usage');
+  const { balance, settings, plan, payer } = account;
+  const creditsBlocked = paidUsageRejection({ user, organizationId, account, exempt: false });
+  if (creditsBlocked) return await creditsBlocked();
 
   // Admit the request when the balance covers the cost bound: the schema bounds the bytes it can
   // carry, and the bound prices those bytes plus the answer generation at the model's current
@@ -167,33 +165,29 @@ export async function handleSystemOneRequest(request: NextRequest) {
     );
   }
 
-  const providerConfig = getOrganizationProviderPrivacy(settings);
-  const effectivePrivacy = getEffectiveProviderPrivacy(
-    parsed.data.provider,
-    settings?.data_collection
-  );
-  let providerPolicy =
-    Object.keys(effectivePrivacy).length > 0
-      ? { ...providerConfig, ...effectivePrivacy }
-      : providerConfig;
-  if (organizationId) {
-    const { decision } = await resolveOrganizationMemberModelDecision({
-      organizationId,
-      kiloUserId: user.id,
-      modelId: resolvedModel,
-      providerLookup: getProviderSlugsForModel,
-      fromDb: readDb,
-    });
-    if (!decision.allowed) return modelNotAllowedResponse();
-    if (decision.eligibleProviderRoutes) {
-      const only = withoutVirtualProvider([...decision.eligibleProviderRoutes]);
-      if (only.length === 0) return modelNotAllowedResponse();
-      providerPolicy = { ...providerPolicy, only };
-    }
-  }
+  const organizationDecision = organizationId
+    ? (
+        await resolveOrganizationMemberModelDecision({
+          organizationId,
+          kiloUserId: user.id,
+          modelId: resolvedModel,
+          providerLookup: getProviderSlugsForModel,
+          fromDb: readDb,
+        })
+      ).decision
+    : undefined;
+  const preferences = organizationProviderPreferences({
+    decision: organizationDecision,
+    settings,
+    requestProvider: parsed.data.provider,
+  });
+  if (preferences.kind === 'rejected') return preferences.response;
+  const requestPrivacy = getEffectiveProviderPrivacy(parsed.data.provider);
+  const providerPolicy =
+    preferences.provider ?? (Object.keys(requestPrivacy).length > 0 ? requestPrivacy : undefined);
 
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
-  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
+  const usageBase = gatewayUsageContextBase(request, caller, { requestStartedAt: startedAt });
 
   // Resolve bouncer's identity once for this request. System One is always signed
   // in, so its usage row uses a payer-safe IP that drops shared Kilo infrastructure.
@@ -205,7 +199,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const bouncerVerdictPromise = startBouncerDecide({
     requestId: bouncerRequestId,
     ip: bouncerIp,
-    ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
+    ja4: normalizeJa4(usageBase.context.fraudHeaders.http_x_vercel_ja4_digest),
     account: {
       accountId: bouncerAccountId(user.id, organizationId),
       userId: user.id,
@@ -215,7 +209,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
   });
 
   const kiloUserId = user.id;
-  const mode = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
+  const { mode } = usageBase.context;
   function emitMetrics(statusCode: number, ttfbMs: number, inferenceProvider?: string | null) {
     emitGatewayApiMetrics({
       kiloUserId,
@@ -240,45 +234,25 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
 
-  const editorName = extractHeaderAndLimitLength(request, 'x-kilocode-editorname');
-  const machineId = extractHeaderAndLimitLength(request, 'x-kilocode-machineid');
-  const sessionId = extractHeaderAndLimitLength(request, 'X-KiloCode-TaskId');
-
   const usageContextOf = (statusCode: number, ttfb: number | null): MicrodollarUsageContext => ({
+    ...usageBase.context,
     api_kind: 'systemone',
-    kiloUserId: user.id,
     provider: 'openrouter',
     requested_model: requestedModel,
     is_free: isFree,
-    custom_llm_pricing: null,
     promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
-    max_tokens: null,
-    has_middle_out_transform: null,
-    reasoning_setting: null,
-    fraudHeaders,
     isStreaming: false,
-    organizationId,
-    prior_microdollar_usage: user.microdollars_used,
-    posthog_distinct_id: user.google_user_email,
-    project_id: projectId,
     status_code: statusCode,
-    editor_name: editorName,
-    machine_id: machineId,
     user_byok: false,
     has_tools: false,
-    botId,
-    tokenSource,
     feature,
-    session_id: sessionId,
-    mode,
-    auto_model: null,
     ttfb_ms: ttfb,
     bouncer: {
       requestId: bouncerRequestId,
       occurredAt: new Date(startedAtMs),
       accountId: bouncerAccountId(user.id, organizationId),
       clientIp: payerSharingIp(bouncerIp, feature),
-      clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+      clientAttributed: usageBase.clientAttributed,
       requestedLogprobs: false,
       samples: null,
       // System One input is a typed classification payload, not a conversation,
@@ -353,28 +327,27 @@ export async function handleSystemOneRequest(request: NextRequest) {
    * body did not carry a usable cost. Reconcile it through the generation
    * endpoint the rest of the gateway uses for the same purpose.
    */
-  const deferReconciledUsage = (generationId: string, ttfb: number, model?: string) => {
-    const cancelled = request.signal.aborted;
-    const context = usageContextOf(502, ttfb);
+  const deferReconciledUsage = (stats: MicrodollarUsageStats, context: MicrodollarUsageContext) => {
     after(async () => {
-      const generation = await fetchGeneration(generationId, OPENROUTER);
+      const generation = stats.messageId
+        ? await fetchGeneration(stats.messageId, OPENROUTER)
+        : undefined;
       if (!generation) {
-        await logMicrodollarUsageAndReportToBouncer(
-          zeroCostUsageStats({ messageId: generationId, model, statusCode: 502, cancelled, ttfb }),
-          context
-        );
+        await logMicrodollarUsageAndReportToBouncer(stats, context);
         return;
       }
       const reconciled = mapToUsageStats(generation, '', user.id, OPENROUTER.type);
       await logMicrodollarUsageAndReportToBouncer(
         {
           ...reconciled,
+          messageId: reconciled.messageId ?? stats.messageId,
+          model: reconciled.model ?? stats.model,
           hasError: true,
-          status_code: 502,
-          cancelled,
+          status_code: stats.status_code,
+          cancelled: stats.cancelled,
           // The generation lookup carries no latency, so the gateway's own
           // measurement is the one this row reports, as it does for the other rows.
-          latency: ttfb,
+          latency: stats.latency,
           // Same split the answered path records: the provider cost stays on the
           // row as `market_cost`, and a free model charges nothing.
           cost_mUsd: isFree ? 0 : reconciled.cost_mUsd,
@@ -389,8 +362,14 @@ export async function handleSystemOneRequest(request: NextRequest) {
    * A failed upstream call still owes its attempt row. The row reports the first-byte time the
    * gateway measured, which is absent only when no response ever arrived.
    */
-  const upstreamFailureResponse = (error: unknown, measuredTtfbMs: number | null) => {
-    deferZeroCostUsage(null, isUpstreamTimeoutError(error) ? 504 : 502, measuredTtfbMs);
+  const upstreamFailureResponse = (
+    error: unknown,
+    measuredTtfbMs: number | null,
+    recordUsage = true
+  ) => {
+    if (recordUsage) {
+      deferZeroCostUsage(null, isUpstreamTimeoutError(error) ? 504 : 502, measuredTtfbMs);
+    }
     if (request.signal.aborted) {
       return errorResponse(
         'The client disconnected before the response was sent, so the request was cancelled.',
@@ -453,55 +432,52 @@ export async function handleSystemOneRequest(request: NextRequest) {
   }
 
   let responseBody: unknown;
-  try {
+  let bodyRead = false;
+  let providerCost = 0;
+  const context = usageContextOf(response.status, ttfbMs);
+  const stats = await parseUsageWithRecovery(response, context, async () => {
     responseBody = await response.json();
-  } catch (error) {
-    // The provider received the request and may have billed it, so this row keeps the
-    // first-byte time the gateway measured before the body turned out to be unreadable.
-    errorExceptInTest('OpenRouter System One response body was unreadable', error);
-    return upstreamFailureResponse(error, ttfbMs);
-  }
-
-  const result = systemOneResponseSchema.safeParse(responseBody);
-  emitMetrics(response.status, ttfbMs, result.success ? result.data.provider : undefined);
-  if (!result.success) {
-    errorExceptInTest('Invalid OpenRouter System One response or missing usage');
-    // A body the gateway could not accept may still name the model the provider
-    // billed, and the row must attribute the attempt the same way an answered
-    // request does.
+    bodyRead = true;
+    const { id, model, provider, usage } = systemOneResponseSchema.parse(responseBody);
+    providerCost = usage.cost;
+    return {
+      ...zeroCostUsageStats({
+        messageId: id,
+        model,
+        statusCode: response.status,
+        cancelled: request.signal.aborted,
+        ttfb: ttfbMs,
+      }),
+      hasError: false,
+      inference_provider: provider ?? null,
+      inputTokens: usage.input_tokens,
+      outputTokens: usage.output_tokens,
+    };
+  });
+  emitMetrics(response.status, ttfbMs, stats.inference_provider);
+  if (stats.hasError) {
     const reportedModel = providerModelSchema.safeParse(responseBody);
-    const model = reportedModel.success ? reportedModel.data.model : undefined;
     const generationId = generationIdSchema.safeParse(responseBody);
-    if (generationId.success) deferReconciledUsage(generationId.data.id, ttfbMs, model);
-    else deferZeroCostUsage(null, 502, ttfbMs, model);
+    deferReconciledUsage(
+      {
+        ...stats,
+        messageId: generationId.success ? generationId.data.id : stats.messageId,
+        model: reportedModel.success ? reportedModel.data.model : resolvedModel,
+        latency: ttfbMs,
+        streamed: false,
+        cancelled: request.signal.aborted,
+        market_cost: 0,
+        is_byok: false,
+      },
+      context
+    );
+    if (!bodyRead) return upstreamFailureResponse(undefined, ttfbMs, false);
     return errorResponse('Invalid upstream response', 'upstream_error', 502);
   }
 
-  const { id, model, provider, usage } = result.data;
-  const cost = toMicrodollars(usage.cost);
-  const stats: MicrodollarUsageStats = {
-    messageId: id,
-    model,
-    responseContent: '',
-    hasError: false,
-    inference_provider: provider ?? null,
-    upstream_id: null,
-    finish_reason: null,
-    latency: ttfbMs,
-    moderation_latency: null,
-    generation_time: null,
-    streamed: false,
-    cancelled: request.signal.aborted,
-    status_code: response.status,
-    cost_mUsd: isFree ? 0 : cost,
-    market_cost: cost,
-    inputTokens: usage.input_tokens,
-    outputTokens: usage.output_tokens,
-    cacheWriteTokens: 0,
-    cacheHitTokens: 0,
-    is_byok: false,
-  };
-  const context = usageContextOf(response.status, ttfbMs);
+  const cost = toMicrodollars(providerCost);
+  stats.cost_mUsd = isFree ? 0 : cost;
+  stats.market_cost = cost;
   after(async () => {
     await logMicrodollarUsageAndReportToBouncer(stats, context);
   });

@@ -18,8 +18,6 @@ vi.mock('../balance-validation.js', async importOriginal => ({
   validateBalanceOnly: vi.fn(),
 }));
 
-vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
-
 vi.mock('../logger.js', async importOriginal => ({
   ...(await importOriginal<typeof LoggerModule>()),
   logger: {

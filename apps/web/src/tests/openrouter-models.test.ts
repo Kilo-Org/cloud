@@ -9,6 +9,7 @@ import {
   getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
   getRawOpenRouterModels,
+  resetOpenRouterModelsCaches,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import type * as FreeModel from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
@@ -267,6 +268,7 @@ beforeEach(() => {
   jest.mocked(getAvailableModelsForOrganization).mockReset().mockResolvedValue(null);
   jest.mocked(getCustomLlmsById).mockReset().mockResolvedValue(new Map());
   invalidateModelStatsCache();
+  resetOpenRouterModelsCaches();
   mockRows.mockReset().mockResolvedValue(new Map());
   jest.spyOn(Date, 'now').mockReturnValue(Date.parse(enkryptBenchmark.ingestedAt));
   jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -472,7 +474,7 @@ describe('GET /api/v1/models', () => {
     });
     jest.mocked(getCustomLlmsById).mockResolvedValue(
       new Map([
-        ['acme/public-model', customLlm('acme/public-model', true)],
+        ['acme/public-model-free', customLlm('acme/public-model-free', true)],
         ['acme/private-model', customLlm('acme/private-model', false)],
         ['acme/claude-review', customLlm('acme/claude-review', true)],
         ['some-other-model', customLlm('some-other-model', true)],
@@ -487,8 +489,8 @@ describe('GET /api/v1/models', () => {
     const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
 
     expect(response.status).toBe(200);
-    expect(responseData.data.find(item => item.id === 'acme/public-model')).toMatchObject({
-      name: 'Custom acme/public-model',
+    expect(responseData.data.find(item => item.id === 'acme/public-model-free')).toMatchObject({
+      name: 'Custom acme/public-model-free',
       description: 'Public custom model',
       isFree: true,
       mayTrainOnYourPrompts: true,
@@ -1040,6 +1042,7 @@ describe('final Enkrypt serialization boundaries', () => {
         default_parameters: {},
         preferredIndex: undefined,
         hasUserByokAvailable: true,
+        isFree: false,
         opencode: { ai_sdk_provider: undefined, variants: undefined },
         enkrypt: publishedEnkryptBenchmark,
       };

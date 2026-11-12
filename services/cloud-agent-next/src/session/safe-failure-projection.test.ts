@@ -572,6 +572,13 @@ describe('projectSafeFailure', () => {
     expect(SafeFailureProjectionSchema.parse(failure)).toEqual(failure);
   });
 
+  it('names a blocked account instead of a generic failure', () => {
+    expect(projectSafeFailure({ failureCode: 'account_blocked' })).toEqual({
+      code: 'account_blocked',
+      message: 'This account is blocked.',
+    });
+  });
+
   it('describes no-output failures as a lack of execution progress during the watchdog window', () => {
     expect(projectSafeFailure({ failureCode: 'wrapper_no_output' })?.message).toBe(
       'Agent wrapper made no execution progress during the watchdog window'
@@ -582,6 +589,8 @@ describe('projectSafeFailure', () => {
     ['git_clone_timeout', 'Repository clone timed out'],
     ['git_authentication_failed', 'Repository authentication failed'],
     ['setup_command_failed', 'Setup command failed'],
+    ['workspace_snapshot_start_failed', 'Workspace snapshot could not be restored'],
+    ['environment_snapshot_required', 'Sandbox could not start from the environment snapshot'],
     ['workspace_setup_unknown', 'Workspace setup failed'],
   ] as const)('derives an allowlisted message for %s', (failureSubtype, message) => {
     expect(projectSafeFailure({ failureCode: 'workspace_setup_failed', failureSubtype })).toEqual({

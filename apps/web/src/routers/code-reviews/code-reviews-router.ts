@@ -19,17 +19,13 @@ import {
   getCodeReviewById,
   getCodeReviewCouncilResult,
   cancelCodeReview,
-  resetCodeReviewForRetry,
-  updateCheckRunId,
   listCodeReviewAttempts,
   getCodeReviewAttemptForReview,
-  ensureCurrentCodeReviewAttemptFromReview,
-  createCodeReviewAttempt,
   getLatestCodeReviewAttempt,
   getSessionUsageFromBilling,
 } from '@/lib/code-reviews/db/code-reviews';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
-import { createCheckRun, updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
+import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { setCommitStatus } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
   getValidGitLabProjectAccessToken,
@@ -52,10 +48,8 @@ import { DEFAULT_LIST_LIMIT } from '@/lib/code-reviews/core/constants';
 import { selectedModelFromReviewSources } from '@/lib/code-reviews/core/model-selection';
 import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
-import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
-import { getCodeReviewActionRequiredState } from '@/lib/code-reviews/action-required';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 import { cliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
@@ -66,88 +60,28 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { v2SnapshotToLogEntries, v1BlobToLogEntries } from '@/lib/code-reviews/session-log';
 import { codeReviewAnalyticsRouter } from './code-review-analytics-router';
 import {
-  getManualCodeReviewConfig,
   getManualCodeReviewConfigForDetail,
   isLocalKiloCodeReview,
   shouldPublishCodeReviewToProvider,
 } from '@/lib/code-reviews/manual-config';
-import { isLocalCodeReviewDevelopmentEnabled } from '@kilocode/web-shared/lib/config.server';
 import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
+import {
+  retryFailedCodeReview,
+  type CodeReviewRetryRefusalReason,
+} from '@/lib/code-reviews/retry-review';
 
 /**
- * Re-creates the PR gate check (GitHub Check Run / GitLab commit status)
- * after a review has been reset for retry. Without this, `updatePRGateCheck()`
- * would be a no-op for all subsequent status callbacks because `check_run_id`
- * was cleared during reset.
+ * The answer a person gets when the reviewer configuration refuses a retry.
+ * The sequence owns the decision, so the message is chosen from its reason.
  */
-async function recreatePRGateCheck(review: CloudAgentCodeReview, actor: GitLabCredentialActor) {
-  const platform = CodeReviewPlatformSchema.parse(review.platform);
-  if (!shouldPublishCodeReviewToProvider(review)) return;
-  if (platform === PLATFORM.BITBUCKET || !review.platform_integration_id) return;
-
-  const integration = await getIntegrationById(review.platform_integration_id);
-  if (!integration) return;
-
-  const detailsUrl = `${APP_URL}/code-reviews/${review.id}`;
-
-  if (platform === PLATFORM.GITHUB && integration.platform_installation_id) {
-    const appType = integration.github_app_type ?? 'standard';
-    if (appType === 'lite') return;
-
-    const [repoOwner, repoName] = review.repo_full_name.split('/');
-    const checkRunId = await createCheckRun(
-      integration.platform_installation_id,
-      repoOwner,
-      repoName,
-      review.head_sha,
-      {
-        detailsUrl,
-        output: { title: 'Kilo Code Review queued', summary: 'Waiting for a review slot...' },
-      },
-      appType
-    );
-    try {
-      await updateCheckRunId(review.id, checkRunId);
-    } catch (dbError) {
-      // Cancel the orphaned check run so it doesn't block merging
-      try {
-        await updateCheckRun(
-          integration.platform_installation_id,
-          repoOwner,
-          repoName,
-          checkRunId,
-          { status: 'completed', conclusion: 'cancelled' },
-          appType
-        );
-        logExceptInTest(
-          `[retrigger] Cancelled orphaned check run ${checkRunId} for ${review.repo_full_name}#${review.pr_number}`
-        );
-      } catch (cancelError) {
-        logExceptInTest('[retrigger] Failed to cancel orphaned check run:', cancelError);
-      }
-      throw dbError;
-    }
-    logExceptInTest(
-      `[retrigger] Created check run ${checkRunId} for ${review.repo_full_name}#${review.pr_number}`
-    );
-  } else if (platform === PLATFORM.GITLAB) {
-    const accessToken = review.platform_project_id
-      ? await getValidGitLabProjectAccessToken(integration, review.platform_project_id, actor)
-      : await getValidGitLabToken(integration, actor);
-    const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
-    const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
-
-    await setCommitStatus(
-      accessToken,
-      review.platform_project_id ?? review.repo_full_name,
-      review.head_sha,
-      'pending',
-      { targetUrl: detailsUrl, description: 'Kilo Code Review queued' },
-      instanceUrl
-    );
-    logExceptInTest(
-      `[retrigger] Set commit status 'pending' on ${review.repo_full_name}!${review.pr_number}`
-    );
+function retryRefusalMessage(reason: CodeReviewRetryRefusalReason): string {
+  switch (reason) {
+    case 'local_development_only':
+      return 'Local Code Reviewer jobs can only be retried in local development.';
+    case 'action_required':
+      return 'Code Reviewer is disabled because configuration needs attention. Fix settings, enable Code Reviewer again, then retry this review.';
+    case 'reviewer_disabled':
+      return 'Enable Code Reviewer before retrying this review.';
   }
 }
 
@@ -206,6 +140,38 @@ async function cancelPRGateCheck(review: CloudAgentCodeReview, actor: GitLabCred
       `[cancel] Set commit status 'canceled' on ${review.repo_full_name}!${review.pr_number}`
     );
   }
+}
+
+/**
+ * Cancels a review locally, then settles its ledger row and finalizes its PR
+ * gate check — but only when the guarded cancel actually changed a row.
+ *
+ * A review that reached a terminal state between the caller's status read and
+ * this write is left untouched, and then there is nothing to settle: the row's
+ * own terminal transition already settled the ledger. Reporting `false` keeps
+ * the caller from answering with a success it did not achieve.
+ */
+async function cancelReviewLocally(
+  review: CloudAgentCodeReview,
+  credentialActor: GitLabCredentialActor
+): Promise<boolean> {
+  const cancelled = await cancelCodeReview(review.id);
+  if (!cancelled) return false;
+
+  await settleCodeReviewLedgerRow({
+    reviewId: review.id,
+    status: 'cancelled',
+    terminalReason: 'user_cancelled',
+    triggerSource: review.trigger_source,
+  });
+
+  try {
+    await cancelPRGateCheck(review, credentialActor);
+  } catch (gateError) {
+    logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+  }
+
+  return true;
 }
 
 export const codeReviewRouter = createTRPCRouter({
@@ -548,17 +514,8 @@ export const codeReviewRouter = createTRPCRouter({
                 status: review.status,
               }
             );
-            await cancelCodeReview(input.reviewId);
-            await settleCodeReviewLedgerRow({
-              reviewId: input.reviewId,
-              status: 'cancelled',
-              terminalReason: review.terminal_reason,
-              triggerSource: review.trigger_source,
-            });
-            try {
-              await cancelPRGateCheck(review, credentialActor);
-            } catch (gateError) {
-              logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+            if (!(await cancelReviewLocally(review, credentialActor))) {
+              return failureResult('Code review is no longer running');
             }
             return successResult({ message: 'Code review cancelled successfully' });
           }
@@ -570,17 +527,8 @@ export const codeReviewRouter = createTRPCRouter({
         } catch (workerError) {
           if (review.status === 'queued' && !review.session_id) {
             console.error('Worker cancel failed, updating DB directly:', workerError);
-            await cancelCodeReview(input.reviewId);
-            await settleCodeReviewLedgerRow({
-              reviewId: input.reviewId,
-              status: 'cancelled',
-              terminalReason: review.terminal_reason,
-              triggerSource: review.trigger_source,
-            });
-            try {
-              await cancelPRGateCheck(review, credentialActor);
-            } catch (gateError) {
-              logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+            if (!(await cancelReviewLocally(review, credentialActor))) {
+              return failureResult('Code review is no longer running');
             }
             return successResult({ message: 'Code review cancelled (worker unreachable)' });
           }
@@ -590,17 +538,8 @@ export const codeReviewRouter = createTRPCRouter({
       }
 
       // For pending reviews (not yet dispatched to worker), update DB and finalize gate
-      await cancelCodeReview(input.reviewId);
-      await settleCodeReviewLedgerRow({
-        reviewId: input.reviewId,
-        status: 'cancelled',
-        terminalReason: review.terminal_reason,
-        triggerSource: review.trigger_source,
-      });
-      try {
-        await cancelPRGateCheck(review, credentialActor);
-      } catch (gateError) {
-        logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+      if (!(await cancelReviewLocally(review, credentialActor))) {
+        return failureResult('Code review is no longer running');
       }
 
       return successResult({ message: 'Code review cancelled successfully' });
@@ -672,76 +611,25 @@ export const codeReviewRouter = createTRPCRouter({
           owner = { type: 'user', id: review.owned_by_user_id as string, userId: ctx.user.id };
         }
 
-        const platform = CodeReviewPlatformSchema.parse(review.platform);
-        const manualConfig = getManualCodeReviewConfig(review);
-        if (manualConfig?.outputMode === 'kilo' && !isLocalCodeReviewDevelopmentEnabled()) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Local Code Reviewer jobs can only be retried in local development.',
-          });
+        const retry = await retryFailedCodeReview({
+          review,
+          owner,
+          retryReason: 'manual_retrigger',
+        });
+
+        if (retry.outcome === 'refused') {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: retryRefusalMessage(retry.reason) });
         }
 
-        if (!manualConfig) {
-          const agentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
-          const actionRequiredState = getCodeReviewActionRequiredState(agentConfig);
-          if (actionRequiredState) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message:
-                'Code Reviewer is disabled because configuration needs attention. Fix settings, enable Code Reviewer again, then retry this review.',
-            });
-          }
-
-          if (!agentConfig?.is_enabled) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'Enable Code Reviewer before retrying this review.',
-            });
-          }
-        }
-
-        const currentAttempt = await ensureCurrentCodeReviewAttemptFromReview(review);
-
-        // Reset the review for retry. The reset is a status CAS: it only matches reviews
-        // still in a retriggable terminal state. A concurrent retrigger that already flipped
-        // the row to 'pending' yields zero rows, so we reject the duplicate without dispatching.
-        const resetCount = await resetCodeReviewForRetry(input.reviewId);
-        if (resetCount === 0) {
+        if (retry.outcome === 'already_in_flight') {
           throw new TRPCError({
             code: 'CONFLICT',
             message: 'This code review is already being retried.',
           });
         }
 
-        await createCodeReviewAttempt({
-          codeReviewId: input.reviewId,
-          retryOfAttemptId: currentAttempt.id,
-          retryReason: 'manual_retrigger',
-          status: 'pending',
-        });
-
-        // Re-create PR gate check so status callbacks can update it.
-        try {
-          await recreatePRGateCheck(review, {
-            userId: owner.userId,
-            ...(owner.type === 'org' ? { organizationId: owner.id } : {}),
-          });
-        } catch (gateError) {
-          // Non-blocking — the review still retries even if the gate check fails
-          logExceptInTest('[retrigger] Failed to re-create PR gate check:', gateError);
-        }
-
-        // Try to dispatch the review
-        await tryDispatchPendingReviews(owner);
-
-        // Dispatch owns the retry from here: a worker that refuses the job marks
-        // the review failed again. Returning success would report a retry that
-        // never started, and the caller would show the queued state for it.
-        const retriedReview = await getCodeReviewById(input.reviewId);
-        if (retriedReview?.status === 'failed') {
-          return failureResult(
-            retriedReview.error_message ?? 'The code review retry did not start'
-          );
+        if (retry.outcome === 'still_failed') {
+          return failureResult(retry.errorMessage ?? 'The code review retry did not start');
         }
 
         return successResult({ message: 'Code review retriggered successfully' });

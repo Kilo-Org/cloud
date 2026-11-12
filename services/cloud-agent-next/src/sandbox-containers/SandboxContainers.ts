@@ -1,15 +1,19 @@
 import {
-  MAX_SNAPSHOT_START_FAILURES,
-  SNAPSHOT_START_FAILURES_KEY,
-  parseSnapshotStartFailures,
-  recordSnapshotStartFailure,
+  classifySnapshotStartFailure,
+  type SnapshotStartFailureReason,
+  type SnapshotLaunchDiagnosticContext,
 } from './snapshot-start-failures.js';
+import { billingFailureFromAdmission } from '../billing-failure.js';
 import { getBillingContext } from '@kilocode/container-usage';
 import { withTimeout } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
+import { containerCapacityEnforced } from '../container-concurrency.js';
 import { billingHeartbeatSeconds } from '../container-usage.js';
 import { resolveControlPlaneTimers } from '../shared/control-plane-timers.js';
 import { logger } from '../logger.js';
+import type { BillingStopDetails } from '../metered-billing-lifecycle.js';
+import { getSandboxControlStub } from '../sandbox-control/stub.js';
+import { withDORetry } from '../utils/do-retry.js';
 import {
   CONTROL_PROCESS_MATCH,
   CONTROL_WRAPPER_LOG_PATH,
@@ -24,6 +28,7 @@ import { fetchPreviewPort, previewNotRunningResponse } from '../preview/containe
 import { isReservedPreviewPort } from '../shared/reserved-ports.js';
 import {
   ENVIRONMENT_BUILD_RUNNER_DELIVERY_SCRIPT,
+  ENVIRONMENT_BUILD_RUNNER_ENV,
   type EnvironmentBuildRunner,
 } from '../shared/environment-build-protocol.js';
 import {
@@ -71,7 +76,7 @@ import {
   nativeEgressPolicySchema,
   type NativeEgressPolicy,
 } from './egress-policy.js';
-import type { RuntimeStartupConfig } from '../shared/runtime-startup-config.js';
+import type { NativeRuntimeImage } from '../sandbox-control/startup-selection.js';
 
 export type { ContainerInstanceSize, ContainersStartSource } from './native-start.js';
 export type { NativeCaptureResult } from './native-capture.js';
@@ -89,7 +94,8 @@ export type ContainersLaunchInput = {
   /** Environment snapshot selected for this allocation; absent starts from the image. */
   snapshot?: NativeStartSnapshot;
   deadlineAt?: number;
-  nativeImage?: RuntimeStartupConfig['image'];
+  nativeImage?: NativeRuntimeImage;
+  snapshotDiagnostic?: SnapshotLaunchDiagnosticContext;
 };
 
 /**
@@ -97,7 +103,7 @@ export type ContainersLaunchInput = {
  * only builders, from the image, with internet egress and no interception: the
  * builder holds a build-scoped repository credential, not contained aliases.
  */
-const BUILDER_RUNNER_ENV = 'KILO_BUILDER_RUNNER';
+const BUILDER_RUNNER_ENV = ENVIRONMENT_BUILD_RUNNER_ENV;
 /** Atomic, owner-only write of the runner file; the value comes from exec env. */
 
 export type ContainersBuilderLaunchInput = {
@@ -113,6 +119,7 @@ export type ContainersLaunchResult = {
   started: boolean;
   startSource: ContainersStartSource;
   snapshotFailed?: true;
+  snapshotFailureReason?: SnapshotStartFailureReason;
 };
 
 export type ContainersObservation = {
@@ -156,7 +163,10 @@ type ResolvedStart = NativeStartPlan & {
 };
 
 /** A start that did not reach its main process, reported to the caller instead of thrown. */
-type StartFailure = { snapshotFailed: true };
+type StartFailure = {
+  snapshotFailed: true;
+  snapshotFailureReason: SnapshotStartFailureReason;
+};
 
 type DelayedSchedule<T> = {
   taskId: string;
@@ -520,7 +530,9 @@ export class SandboxContainers extends DurableObject<Env> {
     record: ContainersRecord,
     ref: string,
     start: ResolvedStart,
-    policy: Pick<ContainersLaunchInput, 'egressAllowlist' | 'egressAudit'> | undefined,
+    policy:
+      | Pick<ContainersLaunchInput, 'egressAllowlist' | 'egressAudit' | 'snapshotDiagnostic'>
+      | undefined,
     deadlineAt: number | undefined
   ): Promise<ContainersLaunchResult> {
     const container = this.requiredContainer();
@@ -548,12 +560,16 @@ export class SandboxContainers extends DurableObject<Env> {
     if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
       throw new WrapperExecTimeoutError();
     }
-    const failure = await this.runStart(start, async () => {
-      const issuedAt = Date.now();
-      await this.startContainerAndActivateBilling(container, record, start.options);
-      await this.awaitMainProcess(container, start, issuedAt, deadlineAt);
-      await this.activateBillingIfRunning(container, record);
-    });
+    const failure = await this.runStart(
+      start,
+      async () => {
+        const issuedAt = Date.now();
+        await this.startContainerAndActivateBilling(container, record, start.options);
+        await this.awaitMainProcess(container, start, issuedAt, deadlineAt);
+        await this.activateBillingIfRunning(container, record);
+      },
+      policy?.snapshotDiagnostic
+    );
     if (failure !== null) return { started: false, startSource: start.source, ...failure };
     await this.writeRunning(ref, 'clear');
     return { started: true, startSource: start.source };
@@ -580,17 +596,9 @@ export class SandboxContainers extends DurableObject<Env> {
     mainProcess: NativeMainProcess,
     allowSnapshot: boolean
   ): Promise<ResolvedStart> {
-    const failures =
-      input.snapshot === undefined
-        ? []
-        : parseSnapshotStartFailures(await this.ctx.storage.get(SNAPSHOT_START_FAILURES_KEY));
-    const snapshotRejected =
-      input.snapshot !== undefined &&
-      (failures.find(record => record.snapshotId === input.snapshot?.snapshotId)?.failures ?? 0) >=
-        MAX_SNAPSHOT_START_FAILURES;
     const plan = planNativeStart(
       {
-        image: this.containerImage(input.nativeImage ?? 'all-in-one'),
+        image: this.containerImage(input.nativeImage ?? 'runtime-free'),
         instance: input.instance,
         mainProcess,
         env: input.env,
@@ -602,9 +610,8 @@ export class SandboxContainers extends DurableObject<Env> {
         command: input.command,
         ...(input.snapshot === undefined ? {} : { snapshot: input.snapshot }),
       },
-      allowSnapshot && !snapshotRejected
+      allowSnapshot
     );
-    if (snapshotRejected) plan.reason = 'restore_failures';
     logControlDiagnostic('snapshot_lookup', {
       sandboxId: this.sandboxNameForLog(),
       source: plan.source,
@@ -624,34 +631,36 @@ export class SandboxContainers extends DurableObject<Env> {
   }
 
   /**
-   * Run one physical start. A failed snapshot start is reported, not thrown, so
-   * the caller can retry the same allocation from the image once. A runtime
-   * installer that exited with a typed code is reported the same way, so the
-   * provider maps it to its reason. Every other failure throws.
+   * Run one physical start. A failed snapshot start is reported with its reason
+   * so the Sandbox DO can retry the same artifact or fail the route; it is never
+   * retried from the image here. The reason is classified from the error text
+   * only: a container that stops before confirming the main process carries no
+   * exit code, so it is reported as transient. Every other failure throws.
    */
   private async runStart(
     start: ResolvedStart,
-    attempt: () => Promise<void>
+    attempt: () => Promise<void>,
+    diagnostic?: SnapshotLaunchDiagnosticContext
   ): Promise<StartFailure | null> {
+    const startedAt = diagnostic?.startedAt ?? Date.now();
     try {
       await attempt();
       return null;
     } catch (error) {
       if (start.source === 'repository' && start.snapshotId !== null) {
-        const failures = parseSnapshotStartFailures(
-          await this.ctx.storage.get(SNAPSHOT_START_FAILURES_KEY)
-        );
-        await this.ctx.storage.put(
-          SNAPSHOT_START_FAILURES_KEY,
-          recordSnapshotStartFailure(failures, start.snapshotId)
-        );
+        const snapshotFailureReason = classifySnapshotStartFailure(error);
         logControlDiagnostic('snapshot_start_failed', {
           sandboxId: this.sandboxNameForLog(),
-          reason: 'repository_start_failed',
+          allocationId: diagnostic?.allocationId,
+          source: diagnostic?.source ?? 'image',
+          failureStage: 'provider_snapshot',
+          reason: snapshotFailureReason,
           errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
           cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
+          attempt: diagnostic?.attempt ?? 1,
+          elapsedMs: Math.max(0, Date.now() - startedAt),
         });
-        return { snapshotFailed: true };
+        return { snapshotFailed: true, snapshotFailureReason };
       }
       throw error;
     }
@@ -794,10 +803,11 @@ export class SandboxContainers extends DurableObject<Env> {
     if (!container || typeof container.destroy !== 'function') {
       throw new Error('Native container destruction is unavailable');
     }
+    const stoppedAtMs = container.running ? Date.now() : undefined;
     await container.destroy();
     const record = await this.readRecord();
     await this.writeRecord(this.terminalRecord(record));
-    await this.settleBillingAtStop(record);
+    await this.settleBillingAtStop(record, stoppedAtMs);
   }
 
   async getBillingRuntimeStatus() {
@@ -1331,7 +1341,7 @@ export class SandboxContainers extends DurableObject<Env> {
     );
   }
 
-  private containerImage(nativeImage: RuntimeStartupConfig['image']): string {
+  private containerImage(nativeImage: NativeRuntimeImage): string {
     const imageName =
       nativeImage === 'runtime-free' ? RUNTIME_FREE_CONTAINER_IMAGE : CONTAINER_IMAGE;
     const image = this.requiredContainer().images[imageName];
@@ -1369,6 +1379,7 @@ export class SandboxContainers extends DurableObject<Env> {
       return stopPath('no_container_not_started', 'terminal');
     }
     const destroyStartedAt = Date.now();
+    const stoppedAtMs = container.running ? destroyStartedAt : undefined;
     try {
       await withTimeout(container.destroy(), DESTROY_TIMEOUT_MS, 'container destroy timed out');
     } catch (error) {
@@ -1383,7 +1394,7 @@ export class SandboxContainers extends DurableObject<Env> {
     }
     const current = await this.readRecord();
     await this.writeRecord(this.terminalRecord(current));
-    await this.settleBillingAtStop(current);
+    await this.settleBillingAtStop(current, stoppedAtMs);
     return stopPath('destroyed', 'terminal', { destroyMs: Date.now() - destroyStartedAt });
   }
 
@@ -1412,7 +1423,7 @@ export class SandboxContainers extends DurableObject<Env> {
 
   /** The stored outcome of one capture, or null when this DO never recorded it. */
   /** The image a launch uses now; environment snapshots must match it. */
-  async currentImage(nativeImage: RuntimeStartupConfig['image']): Promise<string> {
+  async currentImage(nativeImage: NativeRuntimeImage): Promise<string> {
     return this.containerImage(nativeImage);
   }
 
@@ -1660,16 +1671,54 @@ export class SandboxContainers extends DurableObject<Env> {
     await this.activateBillingIfRunning(container, record);
   }
 
-  private async settleBillingAtStop(record: ContainersRecord): Promise<void> {
+  private async settleBillingAtStop(record: ContainersRecord, stoppedAtMs?: number): Promise<void> {
     const billing = this.billingForRecord(record);
     if (!billing) return;
-    await billing.onContainerStopped({ reason: 'runtime_signal' });
+    await billing.onContainerStopped({ reason: 'runtime_signal', stoppedAtMs });
   }
 
-  private async stopBillingContainer(): Promise<void> {
+  private async stopBillingContainer(budget?: BillingStopDetails): Promise<void> {
     const record = await this.readRecord();
-    if (record.allocationRef === null) return;
-    await this.stop(record.allocationRef);
+    if (record.allocationRef === null) {
+      logger.warn('Native billing stop has no allocation');
+      return;
+    }
+    const context = await getBillingContext(this.ctx.storage);
+    if (!context) {
+      logger
+        .withFields({ allocationRef: record.allocationRef })
+        .warn('Native billing stop has no billing context');
+      return;
+    }
+    const request = {
+      allocationRef: record.allocationRef,
+      billingFailure: billingFailureFromAdmission(context.subject, {
+        code:
+          budget?.code === 'INSUFFICIENT_CREDITS' ? 'insufficient_credits' : 'meter_unavailable',
+        remainingMicrodollars: budget?.remainingMicrodollars,
+        minimumRequiredMicrodollars: budget?.minimumRequiredMicrodollars,
+      }),
+    };
+    this.ctx.waitUntil(
+      Promise.resolve()
+        .then(() =>
+          withDORetry(
+            () => getSandboxControlStub(this.env, context.instanceId),
+            stub => stub.requestBillingStop(request),
+            'requestNativeBillingStop'
+          )
+        )
+        .then(async owned => {
+          if (!owned && (await this.stop(request.allocationRef)) === 'retryable') {
+            throw new Error('Native billing stop remained retryable');
+          }
+        })
+        .catch(error => {
+          logger
+            .withFields({ errorName: error instanceof Error ? error.name : 'UnknownError' })
+            .warn('Native billing stop notification failed');
+        })
+    );
   }
 
   private async destroyBillingContainer(): Promise<void> {
@@ -1685,9 +1734,10 @@ export class SandboxContainers extends DurableObject<Env> {
       container: this,
       storage: this.ctx.storage,
       meter: this.env.CONTAINER_USAGE_METER,
+      enforceContainerCapacity: containerCapacityEnforced(this.env),
       heartbeatSeconds: billingHeartbeatSeconds(this.env.CONTAINER_BILLING_HEARTBEAT_SECONDS),
       isContainerRunning: () => this.ctx.container?.running === true,
-      stopContainer: () => this.stopBillingContainer(),
+      stopContainer: budget => this.stopBillingContainer(budget),
       destroyContainer: () => this.destroyBillingContainer(),
       durableObjectId: this.ctx.id.toString(),
       waitUntil: promise => this.ctx.waitUntil(promise),

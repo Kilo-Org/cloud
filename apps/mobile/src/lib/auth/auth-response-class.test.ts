@@ -72,6 +72,17 @@ describe('classifyAuthResponse', () => {
     });
   });
 
+  it('classifies a 408 as retryable and carries Retry-After', () => {
+    expect(
+      classifyAuthResponse({ path: '/api/auth/native/token', status: 408, retryAfterHeader: '12' })
+    ).toEqual({ kind: 'retry', status: 408, retryAfterMs: 12_000 });
+    expect(classifyAuthResponse({ path: '/api/auth/native/token', status: 408 })).toEqual({
+      kind: 'retry',
+      status: 408,
+      retryAfterMs: undefined,
+    });
+  });
+
   it('classifies a 429 as retryable and carries Retry-After', () => {
     expect(
       classifyAuthResponse({ path: '/api/auth/native/otp', status: 429, retryAfterHeader: '12' })
@@ -131,7 +142,6 @@ describe('terminal failure reporting', () => {
     reportAuthTerminalFailure('/api/auth/native/token', 401);
 
     expect(events).toHaveLength(1);
-    expect(events[0]?.level).toBe('error');
     expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/token', '401']);
   });
 
@@ -147,29 +157,68 @@ describe('terminal failure reporting', () => {
     expect(events).toHaveLength(2);
   });
 
-  it('files the stored credential expiry as a warning and every other terminal refusal as an error', () => {
+  it('files a refused attempt credential as a warning, not a defect', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+
+    reportAuthTerminalFailure('/api/auth/native/token', 401);
+
+    // native/token takes no bearer: its 401 refuses the code, ticket or ID
+    // token the attempt presented, which a mistyped code produces.
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.tags).toEqual({
+      'error.subsystem': 'auth',
+      'auth.outcome': 'terminal',
+      'auth.route': '/api/auth/native/token',
+      'http.status': 401,
+    });
+    expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/token', '401']);
+  });
+
+  it('files a refused passkey ceremony as a warning', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+
+    reportAuthTerminalFailure('/api/auth/passkey/authenticate', 401);
+
+    expect(events.map(event => event.level)).toEqual(['warning']);
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['auth-terminal', '/api/auth/passkey/authenticate', '401'],
+    ]);
+  });
+
+  it('files the stored credential expiry as a warning', () => {
     const events: TelemetryEvent[] = [];
     setTelemetrySink(event => {
       events.push(event);
     });
 
     reportAuthTerminalFailure('/api/auth/native/refresh', 401);
-    reportAuthTerminalFailure('/api/auth/native/refresh', 400);
-    reportAuthTerminalFailure('/api/auth/native/token', 401);
 
-    // The expiry is the expected end of a session; the other two name defects.
-    expect(events.map(event => event.level)).toEqual(['warning', 'error', 'error']);
-    // Same event identity either way: one route and status keeps one issue.
-    expect(events[0]?.tags).toEqual({
-      'error.subsystem': 'auth',
-      'auth.outcome': 'terminal',
-      'auth.route': '/api/auth/native/refresh',
-      'http.status': 401,
-    });
+    expect(events.map(event => event.level)).toEqual(['warning']);
     expect(events.map(event => event.fingerprint)).toEqual([
       ['auth-terminal', '/api/auth/native/refresh', '401'],
+    ]);
+  });
+
+  it('keeps every terminal status other than a 401 at error', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+
+    reportAuthTerminalFailure('/api/auth/native/token', 400);
+    reportAuthTerminalFailure('/api/auth/native/refresh', 400);
+
+    expect(events.map(event => event.level)).toEqual(['error', 'error']);
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['auth-terminal', '/api/auth/native/token', '400'],
       ['auth-terminal', '/api/auth/native/refresh', '400'],
-      ['auth-terminal', '/api/auth/native/token', '401'],
     ]);
   });
 

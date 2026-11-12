@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
+import { createVercelProviderMetadataCollector } from '@kilocode/web-shared/lib/r2/vercel-provider-metadata';
 
 jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual<object>('@sentry/nextjs'),
@@ -309,6 +310,162 @@ describe('parseMessagesMicrodollarUsageFromStream approval tests', () => {
 });
 
 describe('parseMessagesMicrodollarUsageFromStream', () => {
+  test.each([
+    'not-json',
+    'null',
+    '42',
+    '[]',
+    '{}',
+    '{"type":"message_start"}',
+    '{"type":"message_start","message":null}',
+    '{"type":"content_block_delta"}',
+    '{"type":"message_delta","delta":42}',
+    '{"type":"message_delta","usage":{"output_tokens":"invalid"}}',
+  ])('retains later usage after malformed event %s', async malformedEvent => {
+    jest.mocked(captureException).mockClear();
+    const events = [
+      malformedEvent,
+      JSON.stringify({
+        type: 'message_start',
+        message: {
+          id: 'msg_recovered',
+          model: 'test-model',
+          provider: 'Anthropic',
+          usage: { input_tokens: 10, cache_read_input_tokens: 3 },
+        },
+      }),
+      JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: 'Hello' } }),
+      JSON.stringify({
+        type: 'message_delta',
+        delta: { stop_reason: 'end_turn' },
+        usage: { output_tokens: 7, cost: 0.002, is_byok: false },
+      }),
+    ];
+
+    const result = await parseMessagesMicrodollarUsageFromStream(
+      streamFromText(events.map(event => `data: ${event}\n\n`).join('')),
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200,
+      false
+    );
+
+    expect(result).toMatchObject({
+      messageId: 'msg_recovered',
+      model: 'test-model',
+      inference_provider: 'Anthropic',
+      responseContent: 'Hello',
+      inputTokens: 13,
+      outputTokens: 7,
+      cacheHitTokens: 3,
+      cost_mUsd: 2000,
+      hasError: true,
+      finish_reason: 'end_turn',
+    });
+    jest.mocked(captureException).mockClear();
+  });
+
+  test('treats error:null as no error', async () => {
+    const result = await parseMessagesMicrodollarUsageFromStream(
+      streamFromText(
+        'data: {"type":"error","error":null}\n\n' +
+          'data: {"type":"message_start","message":{"id":"msg_1","model":"model","usage":{"input_tokens":3}}}\n\n' +
+          'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}\n\n'
+      ),
+      'fake-user-id',
+      undefined,
+      'direct-byok',
+      200,
+      true
+    );
+
+    expect(result).toMatchObject({ hasError: false, inputTokens: 3, outputTokens: 2 });
+  });
+
+  test.each([undefined, null])('retains message_delta usage without delta=%s', async delta => {
+    const events = [
+      {
+        type: 'message_start',
+        message: { id: 'msg_1', model: 'model', usage: { input_tokens: 10 } },
+      },
+      {
+        type: 'message_delta',
+        delta,
+        usage: { output_tokens: 7 },
+        provider_metadata: { gateway: { marketCost: '0.002' } },
+      },
+    ];
+    const result = await parseMessagesMicrodollarUsageFromStream(
+      streamFromText(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')),
+      'fake-user-id',
+      undefined,
+      'vercel',
+      200,
+      false
+    );
+
+    expect(result).toMatchObject({
+      inputTokens: 10,
+      outputTokens: 7,
+      cost_mUsd: 2000,
+      hasError: false,
+      finish_reason: null,
+    });
+  });
+
+  test('releases metadata capture on [DONE] without waiting for the connection to close', async () => {
+    const collector = createVercelProviderMetadataCollector();
+    const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+    const writer = writable.getWriter();
+    const metadata = { gateway: { generationId: 'gen_messages', marketCost: '0.12' } };
+    let parsed = false;
+    const parsing = parseMessagesMicrodollarUsageFromStream(
+      readable,
+      'fake-user-id',
+      undefined,
+      'vercel',
+      200,
+      false,
+      undefined,
+      {
+        captureRoutingDecision: jest.fn(),
+        captureVercelMetadata: value => collector.capture(value, 'messages'),
+        captureEnkryptReport: jest.fn(),
+        captureEnkryptOutputReport: jest.fn(),
+        waitFor: jest.fn(),
+      }
+    ).then(result => {
+      parsed = true;
+      return result;
+    });
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await writer.write(
+        new TextEncoder().encode(
+          `data: ${JSON.stringify({ type: 'message_start', message: { id: 'msg_1', model: 'model', usage: { input_tokens: 3, output_tokens: 1 }, provider_metadata: metadata } })}\n\ndata: [DONE]\n\n`
+        )
+      );
+      await Promise.race([
+        collector.completed,
+        new Promise<never>((_resolve, reject) => {
+          timeout = setTimeout(() => reject(new Error('Metadata capture waited for EOF')), 1000);
+        }),
+      ]);
+      expect(collector.snapshot()).toEqual(metadata);
+      expect(parsed).toBe(false);
+    } finally {
+      clearTimeout(timeout);
+      await writer.close();
+    }
+    expect(await parsing).toMatchObject({
+      cost_mUsd: 120_000,
+      inputTokens: 3,
+      outputTokens: 1,
+      hasError: false,
+    });
+  });
+
   test.each([false, true])(
     'retains Vercel start-frame cost and routing metadata with a final delta=%s',
     async hasDelta => {
@@ -560,5 +717,52 @@ describe('parseMessagesMicrodollarUsageFromString approval tests', () => {
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
+  });
+});
+
+describe('parseMessagesMicrodollarUsageFromString validation', () => {
+  test.each([
+    'not-json',
+    'null',
+    '42',
+    '[]',
+    '{"model":42}',
+    '{"model":"model","usage":{"input_tokens":"invalid"}}',
+    '{"model":"model","content":{}}',
+    '{"model":"model","content":[{"type":"text"}]}',
+    '{"model":"model","provider_metadata":{"gateway":{"routing":{"modelAttempts":{}}}}}',
+  ])('rejects malformed nonstream response %s', response => {
+    expect(() => parseMessagesMicrodollarUsageFromString(response, 200, 'openrouter')).toThrow();
+  });
+
+  test('records an upstream error body without a model as an error', () => {
+    const result = parseMessagesMicrodollarUsageFromString(
+      '{"type":"error","error":{"type":"rate_limit_error","message":"Rate limited"}}',
+      429,
+      'openrouter'
+    );
+
+    expect(result).toMatchObject({
+      model: null,
+      hasError: true,
+      status_code: 429,
+      inputTokens: 0,
+      outputTokens: 0,
+      cost_mUsd: 0,
+    });
+  });
+
+  test('keeps usage when stop_reason is not a string', () => {
+    const result = parseMessagesMicrodollarUsageFromString(
+      '{"model":"model","stop_reason":3,"usage":{"input_tokens":10,"output_tokens":2}}',
+      200,
+      'openrouter'
+    );
+    expect(result).toMatchObject({
+      finish_reason: 3,
+      hasError: false,
+      inputTokens: 10,
+      outputTokens: 2,
+    });
   });
 });

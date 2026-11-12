@@ -21,8 +21,8 @@ import type {
 import {
   FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
-  FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
-  installFakeCredentialEnv,
+  FAKE_SANDBOX_CONTAINERS_NAMESPACE,
+  installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -58,6 +58,7 @@ function metadata(input: {
   kiloSessionId: string;
   sandboxId: string;
   workspacePath?: string;
+  worktreeId?: string;
 }) {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
@@ -73,7 +74,8 @@ function metadata(input: {
     workspace: {
       branchName: 'kilo/test-branch',
       sandboxId: input.sandboxId,
-      sandboxProvider: 'cloudflare',
+      sandboxProvider: 'cloudflare-containers',
+      ...(input.worktreeId === undefined ? {} : { worktreeId: input.worktreeId }),
       ...(input.workspacePath === undefined ? {} : { workspacePath: input.workspacePath }),
     },
     lifecycle: { version: 1, timestamp: 1 },
@@ -126,8 +128,8 @@ async function installSandbox(
   const broker = createFakeCredentialBroker();
   await runInDurableObject(sandboxStub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance.env, broker, {
-      SandboxSmallContainment: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
+    installFakeSandboxEnv(instance, broker, {
+      SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
       WORKER_URL: 'https://control.test',
       KILOCODE_BACKEND_BASE_URL: 'https://control.test',
       KILO_OPENROUTER_BASE: 'https://control.test',
@@ -190,7 +192,7 @@ function startWrapperPump(wrapper: FakeWrapper, recording: Recording): () => voi
   };
 }
 
-/** Two sessions on one sandbox: only a shared sandbox hosts more than one workspace. */
+/** Two sessions on one native isolated sandbox sharing the same worktree. */
 async function setupSiblingPair(): Promise<{
   sandboxStub: DurableObjectStub<SandboxControlV2>;
   sessionA: string;
@@ -204,8 +206,10 @@ async function setupSiblingPair(): Promise<{
 }> {
   const sessionA = newSessionId();
   const sessionB = newSessionId();
-  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, sessionA, undefined, {
-    sandboxAllocation: 'cloudflare-shared',
+  const worktreeId = `worktree_${crypto.randomUUID()}`;
+  const workspacePath = '/workspace/worktrees/shared';
+  const sandboxId = await generateSandboxId(sessionA, {
+    sandboxAllocation: 'cloudflare-containers-standard-3',
   });
   const provider = createFakeProvider();
   const sandboxStub = await installSandbox(sandboxId, provider.adapter);
@@ -213,9 +217,15 @@ async function setupSiblingPair(): Promise<{
   const stubA = sessions.getByName(sessionDoName(USER_ID, sessionA));
   const messageA = messageId();
   await stubA.createSessionWithInitialAdmission({
-    metadata: metadata({ sessionId: sessionA, kiloSessionId: kiloSessionId(), sandboxId }),
+    metadata: metadata({
+      sessionId: sessionA,
+      kiloSessionId: kiloSessionId(),
+      sandboxId,
+      worktreeId,
+      workspacePath,
+    }),
     message: promptPayload(messageA, 'first'),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
 
   const stubB = sessions.getByName(sessionDoName(USER_ID, sessionB));
@@ -224,9 +234,10 @@ async function setupSiblingPair(): Promise<{
       sessionId: sessionB,
       kiloSessionId: kiloSessionId(),
       sandboxId,
-      workspacePath: '/workspace/worktrees/shared',
+      worktreeId,
+      workspacePath,
     }),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   const messageB = messageId();
   await stubB.send(promptPayload(messageB, 'second'));
@@ -274,7 +285,7 @@ async function registerOnlySession(): Promise<{
   peer: FakeSandboxPeer;
 }> {
   const sessionId = newSessionId();
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+  const sandboxId = await generateSandboxId(sessionId);
   const stub = sessions.getByName(sessionId);
   const peer = new FakeSandboxPeer();
   await runInDurableObject(stub, instance => {
@@ -282,7 +293,7 @@ async function registerOnlySession(): Promise<{
   });
   await stub.registerSessionFromMetadata({
     metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
-    sandboxSelection: { provider: 'cloudflare' },
+    sandboxSelection: { provider: 'cloudflare-containers' },
   });
   return { sessionId, stub, peer };
 }

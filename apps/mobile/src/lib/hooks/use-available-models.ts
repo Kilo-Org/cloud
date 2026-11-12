@@ -13,6 +13,9 @@ import { i18n } from '@/i18n';
 import { collator } from '@/lib/intl-cache';
 import { formatShortModelDisplayName } from '@/lib/model-display-name';
 import { catalogVariantEfforts } from '@/lib/chat/effort';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
+import { TELEMETRY_DESCRIPTION_KEY, type TelemetryDescription } from '@/lib/telemetry/error-sink';
+import { isExpectedHttpStatus } from '@/lib/telemetry/network-errors';
 
 const THINKING_EFFORT_KEYS = {
   none: 'models.thinkingEffort.none',
@@ -166,6 +169,53 @@ export const OpenRouterModelsResponseSchema = z.object({
  */
 export const OrganizationDefaultsResponseSchema = z.object({ defaultModel: z.string() });
 
+/** The model-catalog endpoints this module reads. */
+type ModelCatalogEndpoint = 'models' | 'org-defaults';
+
+/**
+ * A non-ok answer from a model-catalog read.
+ *
+ * It declares its own telemetry so the failure is attributed to this read
+ * instead of the app-wide catch-all `app-error` grouping: the expected statuses
+ * the shared network policy treats as answers (a locked keychain or a
+ * sign-out teardown, no credits, a stale id, a rate limit) are warnings, every
+ * other status is an error, and the fingerprint names the endpoint, the status
+ * and, for the models list, the audience. The global fetch wrapper already owns
+ * every error-status response (one event for a status that names a defect, a
+ * breadcrumb for an expected one), so this declares `report: 'none'`: a second
+ * record here would duplicate it.
+ */
+class ModelCatalogFetchError extends Error {
+  readonly [TELEMETRY_DESCRIPTION_KEY]: TelemetryDescription;
+
+  constructor(args: {
+    endpoint: ModelCatalogEndpoint;
+    status: number;
+    statusText: string;
+    audience?: OrganizationModelAudience;
+    message: string;
+  }) {
+    super(args.message);
+    this.name = 'ModelCatalogFetchError';
+    const expected = isExpectedHttpStatus(args.status);
+    this[TELEMETRY_DESCRIPTION_KEY] = {
+      level: expected ? 'warning' : 'error',
+      report: 'none',
+      fingerprint: [
+        'models-fetch',
+        args.endpoint,
+        `http.${args.status}`,
+        ...(args.audience === undefined ? [] : [args.audience]),
+      ],
+      tags: {
+        'error.subsystem': 'model-catalog',
+        'error.operation': args.endpoint,
+        'http.status': args.status,
+      },
+    };
+  }
+}
+
 /**
  * The catalogue is a small static list from our own API, and the row that
  * consumes it shows a loading caption while the request is pending. A wall-clock
@@ -174,7 +224,7 @@ export const OrganizationDefaultsResponseSchema = z.object({ defaultModel: z.str
  * refused or reset connection still rejects and surfaces the error + Retry,
  * while a stalled response resolves when the backend answers.
  */
-async function fetchModels(
+export async function fetchModels(
   organizationId: string | undefined,
   audience: OrganizationModelAudience
 ): Promise<ModelResponse> {
@@ -189,13 +239,19 @@ async function fetchModels(
     },
   });
   if (!response.ok) {
-    throw new Error(`Failed to fetch models: ${response.status} ${response.statusText}`);
+    throw new ModelCatalogFetchError({
+      endpoint: 'models',
+      status: response.status,
+      statusText: response.statusText,
+      audience,
+      message: `Failed to fetch models: ${response.status} ${response.statusText}`,
+    });
   }
 
   return OpenRouterModelsResponseSchema.parse(await response.json());
 }
 
-async function fetchOrgDefaults(organizationId: string): Promise<{ defaultModel: string }> {
+export async function fetchOrgDefaults(organizationId: string): Promise<{ defaultModel: string }> {
   const token = await getAuthTokenForRequest();
   const response = await fetch(`${API_BASE_URL}/api/organizations/${organizationId}/defaults`, {
     headers: {
@@ -204,7 +260,12 @@ async function fetchOrgDefaults(organizationId: string): Promise<{ defaultModel:
     },
   });
   if (!response.ok) {
-    throw new Error(`Failed to fetch org defaults: ${response.status} ${response.statusText}`);
+    throw new ModelCatalogFetchError({
+      endpoint: 'org-defaults',
+      status: response.status,
+      statusText: response.statusText,
+      message: `Failed to fetch org defaults: ${response.status} ${response.statusText}`,
+    });
   }
   return OrganizationDefaultsResponseSchema.parse(await response.json());
 }
@@ -223,16 +284,8 @@ export function useOrgDefaultModel(organizationId: string | undefined) {
     },
     enabled: Boolean(organizationId),
     staleTime: 60_000,
-    // The org default must settle even while the online manager reports
-    // offline: NetInfo can hold the device offline while the backend is
-    // reachable, and a paused read leaves `isLoading` false with no request and
-    // no failure, so the model picker's auto-selection waits on a value that
-    // never arrives. See `use-current-user-id`.
-    networkMode: 'always',
-    // `networkMode: 'always'` also disables the derived reconnect refetch
-    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
-    // 'always'` when it is undefined), so ask for it explicitly.
-    refetchOnReconnect: true,
+    // The model picker's auto-selection waits on this value.
+    ...SETTLE_WHILE_OFFLINE,
   });
   return { defaultModel: data?.defaultModel, isLoading };
 }
@@ -250,16 +303,9 @@ export function useAvailableModels(
     queryKey: ['available-models', organizationId, audience] as const,
     queryFn: fetchModels.bind(null, organizationId, audience),
     staleTime: 60_000,
-    // The catalogue must settle even while the online manager reports offline:
-    // NetInfo can hold the device offline while the backend is reachable, and a
-    // paused read sends no request, reports `isLoading` false and reaches no
-    // error, so the picker lists no model and auto-selection never resolves.
-    // See `use-current-user-id`.
-    networkMode: 'always',
-    // `networkMode: 'always'` also disables the derived reconnect refetch
-    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
-    // 'always'` when it is undefined), so ask for it explicitly.
-    refetchOnReconnect: true,
+    // A paused catalogue read leaves the picker with no model to list, so
+    // auto-selection never resolves.
+    ...SETTLE_WHILE_OFFLINE,
   });
 
   const models = useMemo(() => toModelOptions(data), [data]);

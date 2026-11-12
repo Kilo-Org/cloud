@@ -245,6 +245,52 @@ pnpm test
 This runs the web, web environment, and local development-tool tests. They
 should pass against the local PostgreSQL database.
 
+### Watchwood signup shadow
+
+Watchwood collects browser evidence before authentication and records advisory assessments when the web app reaches new-account creation.
+Existing Turnstile and Bouncer decisions remain authoritative.
+Native account creation does not participate.
+
+Collection is disabled until all Watchwood variables in `ENVIRONMENT.md` are configured.
+There are no database migrations or required production changes for a disabled deployment.
+Before activation, confirm that the OpenAI organization and its dedicated key have access to Watchwood.
+The owner configures shared values with:
+
+```bash
+pnpm web:env set WATCHWOOD_ORG_ID
+pnpm web:env set WATCHWOOD_API_KEY
+pnpm web:env set WATCHWOOD_SHADOW_ENABLED
+```
+
+Set the enabled value to exact `true`, then redeploy.
+The browser receives only the organization and a server-generated signup identity.
+The server sends the token and trusted client IP to OpenAI, without email or phone signals.
+Production assessments require Vercel's trusted client-IP header.
+Production without Vercel skips assessment rather than trusting caller-supplied forwarding headers.
+Only local development and tests use the forwarded-header fallback.
+Turnstile verification signs a separate trusted-IP claim for Watchwood; existing authentication fields retain their behavior.
+Watchwood skips older proofs without that claim instead of changing authentication admission.
+Tokens remain transient; signed, HttpOnly cookies carry the signup identity and assessment through authentication redirects.
+The optional SDK device cookie stays disabled.
+
+The browser allows at most two seconds for shadow submission.
+After the mount request reports collection disabled, submission skips Watchwood without another request.
+An unresolved configuration request retains the bounded fail-open path.
+The server allows one second for body reads, Redis budgets, and the upstream check.
+It retries an upstream server error once and does not retry client errors.
+Upstream redirects count as errors and are never followed.
+Missing tokens, blocked scripts, invalid responses, unavailable services, and high risk scores do not refuse signup.
+Redis budgets limit assessments per verified Turnstile context and client IP; exhausted budgets reduce coverage, not signup admission.
+Each budget increment sets its expiry atomically.
+
+Logs named `[auth] Watchwood signup attempt` describe assessment coverage, failures, scores, and latency.
+Logs named `[auth] Watchwood signup shadow` correlate new-account attempts with existing signup outcomes through `operationId`.
+Both events carry `shadow: true` and `enforced: false`.
+The risk score ranges from zero to one; it is not a probability.
+Do not interpret a missing assessment as a low score.
+Observe coverage, conversion, latency, and confirmed abuse before proposing enforcement.
+To disable collection, set `WATCHWOOD_SHADOW_ENABLED` to `false` and redeploy.
+
 ### CLI session storage verification
 
 After migrating the local database, run the session-copy and account-cleanup
@@ -324,6 +370,14 @@ Require a remote iOS build without permitting a local compilation fallback:
 KILO_REMOTE_NATIVE=required pnpm dev:mobile:ios build <udid>
 ```
 
+### iOS app actions
+
+App Intents and the session entity compile in the app target, not the static Expo pod.
+Their Swift sources live in `apps/mobile/modules/kilo-app-actions/ios/AppIntents`.
+The prebuild plugin copies those sources into the app and adds them to its existing Sources phase.
+The pod keeps the catalog and dispatcher; the app delegate installs the typed visible-session publisher before React starts.
+The podspec excludes the app-target sources, so each declaration compiles once.
+
 ### Mobile PR review entry
 
 The PR review entry screen keeps the account picker beside the title.
@@ -344,6 +398,15 @@ Use `emptyDeepLink` for empty history.
 The fixture requires a development build and refuses non-loopback API URLs or accounts outside the reserved example domain.
 Keep optional analytics off and avoid billing surfaces; the seed creates no Stripe customer.
 
+### Mobile Profile credits
+
+Balance reads preserve the expiry note and purchase action across loading, failed, and ready states.
+The failed state shows a localized retry action with a complete spoken failure label.
+The note remains readable to screen readers without intercepting the retry touch area.
+Balance and expiry amounts stay masked until the stored privacy preference loads.
+
+An empty credit block list shows no expiring credits, not an error.
+
 ## Common Development Commands
 
 | Command | Description |
@@ -359,7 +422,7 @@ Keep optional analytics off and avoid billing surfaces; the seed creates no Stri
 | `pnpm lint` | Lint all source files |
 | `pnpm format` | Format all supported files with oxfmt |
 | `pnpm format:changed` | Format only files changed since `main` |
-| `pnpm validate` | Run the root typecheck, lint, and test scripts |
+| `pnpm validate` | Run the root typecheck, lint, and test scripts, then the dependency cycle check |
 | `pnpm drizzle migrate` | Apply pending database migrations |
 | `pnpm drizzle generate` | Generate a new migration after schema changes |
 | `pnpm drizzle:verify-bootstrap` | Create a temporary empty database and verify `pnpm drizzle migrate` bootstraps it cleanly |
@@ -614,12 +677,12 @@ With `auto`, the primary worktree gets offset 0 (default ports), and secondary w
 
 `pnpm dev:start` also passes a worktree-local Wrangler service-discovery registry at `.wrangler/dev-registry` into its tmux session. For worktrees with distinct `kilo-dev-*` session names, this allows concurrent offset Worker stacks such as `agents` to use the same local Worker names without resolving bindings to Workers running from sibling worktrees. The absolute registry path is recorded in `dev/logs/manifest.json` for diagnostics.
 
-Infrastructure containers (`postgres` on 5432, `redis` on 6379, `redis-http` on 8079, `grafana` on 4000) follow the offset too, and a worktree with an offset runs them in its own Docker Compose project. It therefore has its own database, its own volume, and its own container lifecycle: `pnpm dev:stop` tears down only that worktree's containers, and no sibling worktree loses its connections. Run `pnpm drizzle migrate` and seed the data you need in each worktree — a new worktree starts with an empty database. The primary checkout keeps the default project and the default ports.
+Infrastructure containers (`postgres` on 5432, `redis` on 6379, `redis-http` on 8079, `grafana` on 4000) follow the offset too, and a worktree with an offset runs them in its own Docker Compose project. It therefore has its own database, its own volume, and its own container lifecycle: `pnpm dev:stop` tears down only that worktree's containers, and no sibling worktree loses its connections. Run `pnpm drizzle migrate` and seed the data you need in each worktree — a new worktree starts with an empty database. Seeds that store a BYOK key (`app:byok-e2e-fixture`, `coding-plans:demo-data`, `coding-plans:occupied-minimax-byok`) call the local `byok-kms` service, so run them while `pnpm dev:start` (or `docker compose -f dev/docker-compose.yml up -d local-kms` plus `pnpm dev:byok-kms`) is running. When `.env.local` leaves the KMS variables blank, the seed uses this worktree's local service and dev token. The primary checkout keeps the default project and the default ports.
 
 `pnpm dev:infra-env` publishes the endpoints, and `pnpm dev:start`, `pnpm dev:env`, and `pnpm test:db` call it for you:
 
 - `dev/.env` carries `COMPOSE_PROJECT_NAME` and one `KILO_*_PORT` per container. Docker Compose reads that file by default, so a plain `docker compose -f dev/docker-compose.yml …` in a terminal uses the same project and ports.
-- `.env.local` gets this worktree's `POSTGRES_URL`, `REDIS_URL`, and `UPSTASH_REDIS_REST_URL`, which is what Next.js, drizzle-kit, and `pnpm dev:seed` read. A value that names another host (a remote database, a tunnel) is left alone.
+- `.env.local` gets this worktree's `POSTGRES_URL`, `REDIS_URL`, `UPSTASH_REDIS_REST_URL`, and `BYOK_KMS_SERVICE_URL` (plus the dev `BYOK_KMS_SERVICE_TOKEN` when it is empty), which is what Next.js, drizzle-kit, and `pnpm dev:seed` read. A value that names another host (a remote database, a tunnel) is left alone.
 - `apps/web/.env.test.local` gets this worktree's `POSTGRES_URL`, and nothing else. The Jest setup loads `apps/web/.env.test`, which commits the default port, with `override: true`, and it never loads `.env.local`. `.env.test.local` is the last file that setup loads, so it is the one place a worktree can put its own port. Without it, every worktree's `pnpm test` runs against port 5432, and two worktrees drop each other's `postgres-<worker>` databases mid-run.
 - Every worker command gets `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`, because each `wrangler.jsonc` commits a `localConnectionString` on the default port.
 
@@ -722,7 +785,13 @@ Manual creation, historical period selection, preparation drafts, and manual sum
 
 Pricing estimates use the model picker's configured provider prices and the stored target for model aliases.
 The gateway preserves bounded-request price ceilings and model access checks.
-Usage receipts retain the existing committed-versus-queued settlement behavior.
+Each charged retry retains a distinct usage receipt with its committed or queued delivery state.
+A usage identifier marks an attempt the gateway billed, including an answer the caller never received.
+The summary worker stops a transient retry when it observes that identifier.
+A delayed receipt can still permit another charged attempt; this check does not enforce a cumulative spending ceiling.
+Settlement waits for every recorded receipt, within the existing delivery window.
+A later receipt reopens settlement after an earlier attempt settled.
+The displayed cost sums usage rows once, including rows delivered after another attempt.
 Tiered custom pricing uses the highest tier reachable from the request’s bounded input length.
 The default summary model is `~deepseek/deepseek-flash-latest`.
 
@@ -740,3 +809,17 @@ Disable the old briefing cron jobs and settle outstanding briefing usage before 
 Quiesce old event producers before the migration, then deploy the matching web, gateway, notification, and session-ingest code.
 Enable contexts explicitly after deployment.
 Do not treat an unshipped user interface as proof that its ingestion code is inactive.
+
+### Summary retry rollout
+
+The gateway marks a refusal that replaces an already-accounted answer.
+The summary worker must not retry that refusal.
+The repeat guard reads the usage identifier the deployed gateway already writes for a billed attempt, so it adds no gateway behavior.
+The scheduled workflow promotes the gateway marker producer before the matching web retry consumer.
+Web promotion requires successful gateway staging and promotion, or both gateway jobs skipped.
+A failed, cancelled, or mismatched gateway rollout blocks web promotion.
+Manual deployments must use the same producer-first order.
+
+Charge accounting retains the deployed receipt fields in `chargeAccounting.generations`.
+Charged attempts share a generation identifier but retain distinct usage identifiers and delivery states.
+An older reader therefore retains every attempt when it reconciles or rewrites the accounting record.

@@ -588,7 +588,6 @@ describe('isKiloCredentialExchangeEligible', () => {
     ['botId', ''],
     ['internalApiUse', false],
     ['createdOnPlatform', ''],
-    ['gastownAccess', false],
     ['isAdmin', false],
     ['orgMemberships', []],
     ['organizationId', ''],
@@ -623,7 +622,6 @@ describe('isKiloCredentialExchangeEligible', () => {
     'botId',
     'internalApiUse',
     'createdOnPlatform',
-    'gastownAccess',
     'isAdmin',
     'orgMemberships',
     'organizationId',
@@ -632,7 +630,7 @@ describe('isKiloCredentialExchangeEligible', () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     const value =
-      marker === 'isAdmin' || marker === 'internalApiUse' || marker === 'gastownAccess'
+      marker === 'isAdmin' || marker === 'internalApiUse'
         ? true
         : marker === 'orgMemberships'
           ? [{ orgId: 'synthetic-org', role: 'member' }]
@@ -754,7 +752,6 @@ describe('isKiloCredentialExchangeEligible', () => {
     ['an organization role', { extra: { organizationRole: 'member' } }],
     ['organization memberships', { extra: { orgMemberships: [] } }],
     ['an admin marker', { extra: { isAdmin: false } }],
-    ['a Gastown marker', { extra: { gastownAccess: false } }],
     ['a wrong audience', { audience: 'kilo-gateway' }],
     ['a missing pepper', { pepper: undefined }],
   ] satisfies [string, Partial<Parameters<typeof buildModernKiloTokenPayload>[0]>][])(

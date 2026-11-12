@@ -1,4 +1,4 @@
-import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
@@ -10,6 +10,11 @@ import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
+import {
+  apiRequestLogBlobSchema,
+  uploadApiRequestLogBlobs,
+  type EnkryptRequestLog,
+} from '@kilocode/web-shared/lib/r2/api-request-log';
 import { GET } from './route';
 
 jest.mock('next/server', () => {
@@ -294,6 +299,410 @@ describe('GET /admin/api/api-request-log/download', () => {
       await db.delete(api_request_log).where(eq(api_request_log.kilo_user_id, userId));
     }
   });
+
+  it('exports combined request and response bodies with a single R2 GET and DB-sourced error', async () => {
+    const key = '2026-08-01/combined/log.json';
+    const request = { messages: [{ role: 'user', content: 'hello' }] };
+    const response = 'data: {"choices":[]}\n\ndata: [DONE]\n\n';
+    const error = { response_body_read_error: 'upstream disconnected' };
+    fakeR2.objects.set(`${BUCKET}/${key}`, JSON.stringify({ version: 1, request, response }));
+    const [row] = await db
+      .insert(api_request_log)
+      .values({ ...baseRow, request_r2_key: key, response_r2_key: key, error })
+      .returning({ id: api_request_log.id });
+    const send = jest.spyOn(fakeR2, 'send');
+
+    const entries = await downloadEntries();
+
+    expect(Object.keys(entries)).toHaveLength(3);
+    expect(readEntry(entries, `_${row.id}_request.json`)).toBe(JSON.stringify(request, null, 2));
+    expect(readEntry(entries, `_${row.id}_response.txt`)).toBe(response);
+    expect(JSON.parse(readEntry(entries, `_${row.id}_error.json`))).toEqual(error);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.any(GetObjectCommand));
+    expect(send.mock.calls[0][0]).toMatchObject({ input: { Bucket: BUCKET, Key: key } });
+  });
+
+  it('uploads and exports the full ordered Enkrypt input/output call array, including retries', async () => {
+    const request = { messages: [{ role: 'user', content: 'hello' }] };
+    const response = 'data: [DONE]\n\n';
+    const inputRequest = {
+      text: 'hello',
+      detectors: { toxicity: { enabled: true, threshold: 0.5 }, custom: ['policy'] },
+      user_metadata: { organization_id: 'org-1' },
+    };
+    const outputRequest = { ...inputRequest, text: 'world' };
+    const enkrypt: EnkryptRequestLog[] = [
+      {
+        guardrail: 'input',
+        scan: 'blocking',
+        part: 'conversation',
+        request: inputRequest,
+        response: 'Service unavailable',
+        status_code: 503,
+        error: 'Enkrypt returned 503',
+      },
+      {
+        guardrail: 'input',
+        scan: 'blocking',
+        part: 'conversation',
+        request: inputRequest,
+        response: '{"summary":{"toxicity":0}}',
+        status_code: 200,
+        error: null,
+      },
+      {
+        guardrail: 'output',
+        scan: 'log_only',
+        part: 'response',
+        request: outputRequest,
+        response: null,
+        status_code: null,
+        error: 'Enkrypt request timed out',
+      },
+      {
+        guardrail: 'output',
+        scan: 'log_only',
+        part: 'response',
+        request: outputRequest,
+        response: '{"summary":{"toxicity":0}}',
+        status_code: 200,
+        error: null,
+      },
+    ];
+    const send = jest.spyOn(fakeR2, 'send');
+
+    const upload = await uploadApiRequestLogBlobs({ request, response, enkrypt });
+
+    expect(upload.uploadError).toBeNull();
+    expect(upload.columns.request_r2_key).toEqual(expect.stringMatching(/\/record\.v1\.json$/));
+    expect(upload.columns.response_r2_key).toBe(upload.columns.request_r2_key);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
+    const body = fakeR2.objects.get(`${BUCKET}/${upload.columns.request_r2_key}`);
+    if (!body) throw new Error('Missing uploaded envelope');
+    expect(JSON.parse(body)).toEqual({ version: 1, request, response, enkrypt });
+    expect(apiRequestLogBlobSchema.parse(JSON.parse(body)).enkrypt).toEqual(enkrypt);
+    const [row] = await db
+      .insert(api_request_log)
+      .values({ ...baseRow, ...upload.columns })
+      .returning({ id: api_request_log.id, created_at: api_request_log.created_at });
+    send.mockClear();
+
+    const entries = await downloadEntries();
+
+    const timestamp = row.created_at.replaceAll(':', '-').replaceAll(' ', '_');
+    expect(Object.keys(entries)).toEqual([
+      `${timestamp}_${row.id}_request.json`,
+      `${timestamp}_${row.id}_response.txt`,
+      `${timestamp}_${row.id}_enkrypt.json`,
+    ]);
+    expect(readEntry(entries, `_${row.id}_request.json`)).toBe(JSON.stringify(request, null, 2));
+    expect(readEntry(entries, `_${row.id}_response.txt`)).toBe(response);
+    expect(readEntry(entries, `_${row.id}_enkrypt.json`)).toBe(JSON.stringify(enkrypt, null, 2));
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(expect.any(GetObjectCommand));
+  });
+
+  it.each([undefined, []])(
+    'omits empty Enkrypt uploads (%j) from the version-1 envelope',
+    async enkrypt => {
+      const request = { request: true };
+      const send = jest.spyOn(fakeR2, 'send');
+
+      const upload = await uploadApiRequestLogBlobs({ request, response: undefined, enkrypt });
+
+      expect(upload.uploadError).toBeNull();
+      expect(upload.columns.response_r2_key).toBe(upload.columns.request_r2_key);
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send).toHaveBeenCalledWith(expect.any(PutObjectCommand));
+      const body = fakeR2.objects.get(`${BUCKET}/${upload.columns.request_r2_key}`);
+      if (!body) throw new Error('Missing uploaded envelope');
+      expect(JSON.parse(body)).toEqual({ version: 1, request, response: null });
+    }
+  );
+
+  it.each([undefined, []])(
+    'omits the Enkrypt export when the persisted array is absent or empty (%j)',
+    async enkrypt => {
+      const key = '2026-08-01/no-enkrypt/log.json';
+      const request = { request: true };
+      const response = '{"response":true}';
+      fakeR2.objects.set(
+        `${BUCKET}/${key}`,
+        JSON.stringify({ version: 1, request, response, enkrypt })
+      );
+      const [row] = await db
+        .insert(api_request_log)
+        .values({ ...baseRow, request_r2_key: key, response_r2_key: key })
+        .returning({ id: api_request_log.id });
+      const send = jest.spyOn(fakeR2, 'send');
+
+      const entries = await downloadEntries();
+
+      expect(Object.keys(entries)).toHaveLength(2);
+      expect(readEntry(entries, `_${row.id}_request.json`)).toBe(JSON.stringify(request, null, 2));
+      expect(readEntry(entries, `_${row.id}_response.json`)).toBe(
+        JSON.stringify({ response: true }, null, 2)
+      );
+      expect(Object.keys(entries).some(name => name.endsWith('_enkrypt.json'))).toBe(false);
+      expect(send).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('exports a combined log whose Enkrypt calls predate scan parts', async () => {
+    const key = '2026-08-01/before-parts/log.json';
+    const request = { request: true };
+    const enkrypt = [
+      {
+        guardrail: 'input',
+        scan: 'log_only',
+        request: { text: 'hello', detectors: {}, user_metadata: { organization_id: 'org' } },
+        response: null,
+        status_code: 200,
+        error: null,
+      },
+    ];
+    fakeR2.objects.set(
+      `${BUCKET}/${key}`,
+      JSON.stringify({ version: 1, request, response: '{"response":true}', enkrypt })
+    );
+    const [row] = await db
+      .insert(api_request_log)
+      .values({ ...baseRow, request_r2_key: key, response_r2_key: key })
+      .returning({ id: api_request_log.id });
+
+    const entries = await downloadEntries();
+
+    expect(readEntry(entries, `_${row.id}_request.json`)).toBe(JSON.stringify(request, null, 2));
+    expect(readEntry(entries, `_${row.id}_enkrypt.json`)).toBe(JSON.stringify(enkrypt, null, 2));
+  });
+
+  it('exports chunked Enkrypt calls with their chunk and calls from before chunking', async () => {
+    const key = '2026-08-01/chunked/log.json';
+    const request = { request: true };
+    const response = '{"response":true}';
+    const inputRequest = {
+      text: 'first chunk',
+      detectors: { injection_attack: { enabled: true } },
+      user_metadata: { organization_id: 'org' },
+    };
+    const enkrypt: EnkryptRequestLog[] = [
+      {
+        guardrail: 'input',
+        scan: 'blocking',
+        part: 'system',
+        chunk: { index: 0, count: 2 },
+        request: inputRequest,
+        response: '{"summary":{"injection_attack":0}}',
+        status_code: 200,
+        error: null,
+      },
+      {
+        guardrail: 'input',
+        scan: 'blocking',
+        part: 'system',
+        chunk: { index: 1, count: 2 },
+        request: { ...inputRequest, text: 'second chunk' },
+        response: null,
+        status_code: null,
+        error: 'Enkrypt request timed out',
+      },
+      {
+        guardrail: 'input',
+        scan: 'log_only',
+        part: 'conversation',
+        request: inputRequest,
+        response: '{"summary":{"injection_attack":0}}',
+        status_code: 200,
+        error: null,
+      },
+    ];
+    const body = JSON.stringify({ version: 1, request, response, enkrypt });
+    fakeR2.objects.set(`${BUCKET}/${key}`, body);
+    expect(apiRequestLogBlobSchema.parse(JSON.parse(body)).enkrypt).toEqual(enkrypt);
+    const [row] = await db
+      .insert(api_request_log)
+      .values({ ...baseRow, request_r2_key: key, response_r2_key: key })
+      .returning({ id: api_request_log.id });
+
+    const entries = await downloadEntries();
+
+    expect(readEntry(entries, `_${row.id}_request.json`)).toBe(JSON.stringify(request, null, 2));
+    expect(readEntry(entries, `_${row.id}_enkrypt.json`)).toBe(JSON.stringify(enkrypt, null, 2));
+  });
+
+  it('omits the response file for a combined log with a null response', async () => {
+    const key = '2026-08-01/no-response/log.json';
+    fakeR2.objects.set(
+      `${BUCKET}/${key}`,
+      JSON.stringify({ version: 1, request: { request: true }, response: null })
+    );
+    const [row] = await db
+      .insert(api_request_log)
+      .values({ ...baseRow, request_r2_key: key, response_r2_key: key })
+      .returning({ id: api_request_log.id });
+    const send = jest.spyOn(fakeR2, 'send');
+
+    const entries = await downloadEntries();
+
+    expect(Object.keys(entries)).toEqual([expect.stringContaining(`_${row.id}_request.json`)]);
+    expect(JSON.parse(readEntry(entries, `_${row.id}_request.json`))).toEqual({ request: true });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('exports DB errors without R2 reads when upload failure leaves both keys null', async () => {
+    const error = { r2_upload_error: 'R2 unavailable' };
+    const [row] = await db
+      .insert(api_request_log)
+      .values({ ...baseRow, request_r2_key: null, response_r2_key: null, error })
+      .returning({ id: api_request_log.id });
+    const send = jest.spyOn(fakeR2, 'send');
+
+    const entries = await downloadEntries();
+
+    expect(Object.keys(entries)).toEqual([expect.stringContaining(`_${row.id}_error.json`)]);
+    expect(JSON.parse(readEntry(entries, `_${row.id}_error.json`))).toEqual(error);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['invalid JSON', 'private-invalid-json-body'],
+    [
+      'unsupported version',
+      JSON.stringify({ version: 2, request: { content: 'private' }, response: null }),
+    ],
+    ['string request', JSON.stringify({ version: 1, request: 'private', response: null })],
+    ['array request', JSON.stringify({ version: 1, request: ['private'], response: null })],
+    ['null request', JSON.stringify({ version: 1, request: null, response: null })],
+    [
+      'non-string response',
+      JSON.stringify({ version: 1, request: { content: 'private' }, response: {} }),
+    ],
+    ['missing response', JSON.stringify({ version: 1, request: { content: 'private' } })],
+    [
+      'non-array Enkrypt calls',
+      JSON.stringify({ version: 1, request: { content: 'private' }, response: null, enkrypt: {} }),
+    ],
+    [
+      'malformed Enkrypt call',
+      JSON.stringify({
+        version: 1,
+        request: { content: 'private' },
+        response: null,
+        enkrypt: [{ guardrail: 'input' }],
+      }),
+    ],
+  ])(
+    'records load errors for a combined log with %s without exposing its payload',
+    async (_, body) => {
+      const key = '2026-08-01/malformed/log.json';
+      fakeR2.objects.set(`${BUCKET}/${key}`, body);
+      const [row] = await db
+        .insert(api_request_log)
+        .values({ ...baseRow, request_r2_key: key, response_r2_key: key })
+        .returning({ id: api_request_log.id });
+      const send = jest.spyOn(fakeR2, 'send');
+
+      const entries = await downloadEntries();
+
+      expect(Object.keys(entries)).toHaveLength(2);
+      for (const kind of ['request', 'response']) {
+        const content = readEntry(entries, `_${row.id}_${kind}_load-error.txt`);
+        expect(content).toBe(`Failed to decode ${key} from R2: Invalid API request log envelope`);
+        expect(content).not.toContain('private');
+      }
+      expect(send).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('records load errors for a missing combined object without aborting other rows', async () => {
+    const key = '2026-08-01/missing/log.json';
+    const error = { response_body_read_error: 'upstream disconnected' };
+    const [missing, present] = await db
+      .insert(api_request_log)
+      .values([
+        { ...baseRow, request_r2_key: key, response_r2_key: key, error },
+        { ...baseRow, request_r2_key: 'legacy/request.json' },
+      ])
+      .returning({ id: api_request_log.id });
+    fakeR2.objects.set(`${BUCKET}/legacy/request.json`, '{"legacy":true}');
+    const send = jest.spyOn(fakeR2, 'send');
+
+    const entries = await downloadEntries();
+
+    expect(Object.keys(entries)).toHaveLength(4);
+    for (const kind of ['request', 'response']) {
+      expect(readEntry(entries, `_${missing.id}_${kind}_load-error.txt`)).toBe(
+        `Failed to load ${key} from R2: Object not found`
+      );
+    }
+    expect(JSON.parse(readEntry(entries, `_${missing.id}_error.json`))).toEqual(error);
+    expect(JSON.parse(readEntry(entries, `_${present.id}_request.json`))).toEqual({ legacy: true });
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['GET', 'body read'])(
+    'records a combined object %s failure for both bodies with a single R2 GET',
+    async failure => {
+      const key = '2026-08-01/unreadable/log.json';
+      await db.insert(api_request_log).values({
+        ...baseRow,
+        request_r2_key: key,
+        response_r2_key: key,
+      });
+      const send = fakeR2.send.bind(fakeR2);
+      const sendSpy = jest.spyOn(fakeR2, 'send').mockImplementation(async command => {
+        if (command instanceof GetObjectCommand && command.input.Key === key) {
+          if (failure === 'GET') {
+            throw new Error('R2 GET failed');
+          }
+          return {
+            Body: {
+              transformToString: async () => {
+                throw new Error('R2 body read failed');
+              },
+            },
+          };
+        }
+        return send(command);
+      });
+
+      const entries = await downloadEntries();
+
+      expect(Object.keys(entries)).toHaveLength(2);
+      for (const kind of ['request', 'response']) {
+        expect(readEntry(entries, `_${kind}_load-error.txt`)).toBe(
+          `Failed to load ${key} from R2: Error: R2 ${failure} failed`
+        );
+      }
+      expect(sendSpy).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each(['request', 'response'] as const)(
+    'retains the raw legacy %s body when only that key is populated',
+    async kind => {
+      const key = `2026-08-01/partial/${kind}.json`;
+      const body = { version: 1, request: 'legacy body, not an envelope', response: null };
+      fakeR2.objects.set(`${BUCKET}/${key}`, JSON.stringify(body));
+      const [row] = await db
+        .insert(api_request_log)
+        .values({
+          ...baseRow,
+          request_r2_key: kind === 'request' ? key : null,
+          response_r2_key: kind === 'response' ? key : null,
+        })
+        .returning({ id: api_request_log.id });
+      const send = jest.spyOn(fakeR2, 'send');
+
+      const entries = await downloadEntries();
+
+      expect(Object.keys(entries)).toEqual([expect.stringContaining(`_${row.id}_${kind}.json`)]);
+      expect(JSON.parse(readEntry(entries, `_${row.id}_${kind}.json`))).toEqual(body);
+      expect(send).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('streams a complete ZIP of R2-backed bodies across backpressured DB batches', async () => {
     // The first batch must exceed both the Node and web stream queues. This

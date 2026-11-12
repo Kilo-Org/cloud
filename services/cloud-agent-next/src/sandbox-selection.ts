@@ -14,12 +14,7 @@ import {
   type SandboxAllocation,
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
-import { isCloudflareContainersEnrolled } from './agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
-import {
-  credentialContainmentEnabled,
-  getDefaultSandboxDestination,
-  isOrgInList,
-} from './sandbox-id.js';
+import { getDefaultSandboxDestination, isOrgInList } from './sandbox-id.js';
 import type { Env } from './types.js';
 
 export { isSandboxAllocationAvailable } from '@kilocode/worker-utils/sandbox-allocation';
@@ -27,6 +22,18 @@ export { isSandboxAllocationAvailable } from '@kilocode/worker-utils/sandbox-all
 type SelectionOwner = { userId: string; orgId?: string };
 
 export type SessionRepositoryType = 'github' | 'gitlab' | 'bitbucket' | 'git';
+
+export const RETIRED_SANDBOX_ALLOCATION_MESSAGE =
+  'This sandbox allocation has been retired. Choose Cloudflare Containers or Vercel BYOC.';
+
+/**
+ * Retired allocations a new session cannot choose. `cloudflare-shared` is gone
+ * because every sandbox serves one workspace. `cloudflare-single` is not here:
+ * it is the compatibility alias for the native containers default.
+ */
+export function isRetiredSandboxAllocation(allocation: SandboxAllocation): boolean {
+  return allocation === 'cloudflare-shared' || allocation === 'isolated-standard';
+}
 
 /**
  * Provider tool capability a session needs from its sandbox image. `review`
@@ -71,60 +78,12 @@ export function sandboxAllocationUnavailableReason(
       }
       return vercelUnavailableReason;
     case 'cloudflare-containers':
-      if (!isCloudflareContainersEnrolled(env, { orgId: owner.orgId })) {
-        return 'Cloudflare containers are not enabled for this account';
-      }
       return undefined;
     default: {
       const exhaustive: never = provider;
       return `Sandbox allocation provider ${String(exhaustive)} is not supported`;
     }
   }
-}
-
-/**
- * Repository-compatibility gate for an allocation. Contained Vercel resolves
- * Git credentials only for GitHub, so a saved Vercel choice is ineligible for a
- * GitLab/Bitbucket/Git repository and must fall through to the next candidate.
- */
-export function sandboxAllocationRepositoryUnavailableReason(
-  allocation: SandboxAllocation,
-  repositoryType: SessionRepositoryType
-): string | undefined {
-  if (getSandboxAllocationProvider(allocation) === 'vercel' && repositoryType !== 'github') {
-    return 'Vercel sandboxes support GitHub repositories only';
-  }
-  return undefined;
-}
-
-type SelectionOption = SandboxSelectionCapabilities['options'][number];
-
-/**
- * With credential containment, new sandbox-small sessions run on the native
- * containers size. The picker offers that size in place of the Cloudflare
- * single sandbox, and hides the single sandbox when the native size is already
- * available on its own.
- */
-function nativeSmallInPlaceOfSingle(options: SelectionOption[]): SelectionOption[] {
-  const isNative = (option: SelectionOption) =>
-    getSandboxAllocation(option.allocation) === CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION;
-  const single = options.find(
-    option => getSandboxAllocation(option.allocation) === 'cloudflare-single'
-  );
-  const nativeAvailable = options.some(
-    option => isNative(option) && option.unavailableReason === undefined
-  );
-  if (!single || nativeAvailable) return options.filter(option => option !== single);
-  return options
-    .filter(option => !isNative(option))
-    .map(option =>
-      option === single
-        ? {
-            ...single,
-            allocation: getSandboxAllocationRequest(CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION),
-          }
-        : option
-    );
 }
 
 export function getSandboxSelectionCapabilities(
@@ -149,7 +108,6 @@ export function getSandboxSelectionCapabilities(
     };
   }
 
-  const repositoryType = options?.repositoryType;
   const capability = options?.capability;
   // Report every selectable allocation with its unavailability reasons so the
   // picker can show disabled entries; a reason-bearing option is unavailable.
@@ -161,21 +119,15 @@ export function getSandboxSelectionCapabilities(
       capability,
       options?.vercelUnavailableReason
     );
-    const repositoryUnavailableReason = repositoryType
-      ? sandboxAllocationRepositoryUnavailableReason(allocation, repositoryType)
-      : undefined;
     return {
       allocation: getSandboxAllocationRequest(allocation),
       ...(unavailableReason ? { unavailableReason } : {}),
-      ...(repositoryUnavailableReason ? { repositoryUnavailableReason } : {}),
     };
   });
   return {
     enabled: true,
     defaultDestination: getDefaultSandboxDestination(env, owner),
-    options: credentialContainmentEnabled(env)
-      ? nativeSmallInPlaceOfSingle(candidates)
-      : candidates,
+    options: candidates,
   };
 }
 
@@ -209,6 +161,11 @@ export function assertSandboxAllocationAvailable(
   repositoryType?: SessionRepositoryType,
   capability?: SandboxAllocationCapability
 ): void {
+  // Retired explicit choices are rejected with a specific reason; a saved value
+  // is skipped before this check and falls through to the default.
+  if (isRetiredSandboxAllocation(allocation)) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: RETIRED_SANDBOX_ALLOCATION_MESSAGE });
+  }
   const capabilities = getSandboxSelectionCapabilities(env, owner, {
     ...(repositoryType ? { repositoryType } : {}),
     ...(capability ? { capability } : {}),
@@ -220,15 +177,17 @@ export function assertSandboxAllocationAvailable(
     });
   }
   if (isSandboxAllocationAvailable(capabilities, allocation)) return;
+  const effectiveAllocation =
+    allocation === 'cloudflare-single' ? CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION : allocation;
   const option = capabilities.options.find(
-    candidate => getSandboxAllocation(candidate.allocation) === allocation
+    candidate => getSandboxAllocation(candidate.allocation) === effectiveAllocation
   );
   throw new TRPCError({
     code: 'BAD_REQUEST',
     message:
       option?.unavailableReason ??
       option?.repositoryUnavailableReason ??
-      sandboxAllocationUnavailableReason(env, owner, allocation, capability) ??
+      sandboxAllocationUnavailableReason(env, owner, effectiveAllocation, capability) ??
       'Sandbox allocation is unavailable',
   });
 }

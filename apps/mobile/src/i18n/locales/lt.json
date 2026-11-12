@@ -1,5 +1,29 @@
 {
+  "nativeRemote": {
+    "title": "Nuotolinio valdymo per v2 CLI demonstracija",
+    "sessionsEmpty": "Dar nėra v2 CLI sesijų",
+    "hosts": "Prisijungę vykdymo procesai",
+    "hostsEmpty": "Nėra prisijungusių vykdymo procesų",
+    "directory": "Darbinis katalogas",
+    "createSession": "Sukurti v2 CLI sesiją",
+    "queueIfOffline": "Įtraukti užklausą į eilę, jei vykdymo procesas atsijungęs",
+    "prompt": "Užklausa arba /command",
+    "localClear": "Išvalyti vietinį rodinį",
+    "abort": "Nutraukti ėjimą",
+    "failed": "Nepavyko atlikti nuotolinio v2 CLI veiksmo",
+    "creationUnknown": "Sukūrimo rezultatas nežinomas. Prieš bandydami dar kartą, atnaujinkite sesijų sąrašą.",
+    "commandFailed": "Vykdymo proceso komanda nepavyko",
+    "invalidReply": "Netinkamas vykdymo proceso atsakymas",
+    "unsafeCommand": "Naudokite /compact, /new, /skill, /models, /agents arba /clear (tik vietiniam rodiniui).",
+    "status": "Ryšys: {{connection}} · Vykdymo procesas: {{runner}}",
+    "presenceStatus": "Vykdymo procesai: {{connection}}",
+    "commandStatus": "Komandos pristatymas: {{status}}",
+    "delivered": "Pristatyta",
+    "expired": "Galiojimas baigėsi"
+  },
   "common": {
+    "sentenceJoiner": ". ",
+    "listJoiner": ", ",
     "cancel": "Atšaukti",
     "done": "Baigti",
     "retry": "Bandyti dar kartą",
@@ -107,9 +131,7 @@
     "scheduled": "Suplanuota",
     "keepEditing": "Tęsti redagavimą",
     "keepRunning": "Tęsti vykdymą",
-    "kiloclaw": "KiloClaw",
     "newSession": "Nauja sesija",
-    "noKiloclawInstances": "Nėra KiloClaw egzempliorių",
     "noModelsAvailable": "Nėra modelių",
     "notFound": "Nerasta.",
     "online": "Prisijungęs",
@@ -189,6 +211,7 @@
     "resendCode": "Siųsti kodą iš naujo",
     "termsPrefix": "Tęsdamas sutinki su mūsų ",
     "terms": "Sąlygomis",
+    "termsInSentence": "Sąlygomis",
     "termsConnector": " ir ",
     "termsSuffix": ".",
     "moreSignInOptions": "Daugiau prisijungimo parinkčių",
@@ -205,6 +228,21 @@
     "pleaseEnterEmail": "Įvesk savo el. pašto adresą.",
     "signInCodeField": "Prisijungimo kodas",
     "or": "arba"
+  },
+  "pendingLink": {
+    "description": "Paskyra su {{email}} jau yra. Prisijunk vienu iš jos būdų, kad pridėtum {{provider}}.",
+    "emailCode": "Atsiųsti man prisijungimo kodą el. paštu",
+    "continueInBrowser": "Tęsti naršyklėje",
+    "startAgain": "Pradėti iš naujo",
+    "expired": "Ši užklausa pridėti {{provider}} nebegalioja.",
+    "noMethods": "Ši paskyra neturi kito prisijungimo būdo, todėl {{provider}} pridėti negalima.",
+    "linked": "{{provider}} pridėtas prie tavo paskyros.",
+    "failedExpired": "{{provider}} nepridėtas, nes užklausa nebegalioja.",
+    "failedWrongAccount": "{{provider}} nepridėtas, nes prisijungei prie kitos paskyros.",
+    "failedAccountAlreadyLinked": "{{provider}} nepridėtas, nes jau susietas su kita paskyra.",
+    "failedProviderAlreadyLinked": "{{provider}} nepridėtas, nes tavo paskyra jau turi kitą {{provider}} prisijungimą.",
+    "failedLinking": "Nepavyko pridėti {{provider}} prie tavo paskyros.",
+    "notAdded": "Esi prisijungęs. {{provider}} nepridėtas prie tavo paskyros."
   },
   "profile": {
     "codeReviewerSubtitle": "Automatinės PR peržiūros",
@@ -225,6 +263,7 @@
     "confirmDeletion": "Patvirtinti ištrynimą",
     "credits": "Kreditai",
     "failedToLoadBalance": "Nepavyko įkelti likučio. Bakstelėkite, kad bandytumėte dar kartą.",
+    "balanceLoadFailed": "Nepavyko įkelti likučio",
     "hideBalance": "Slėpti likutį",
     "showBalance": "Rodyti likutį",
     "balanceHidden": "Likutis paslėptas",
@@ -243,6 +282,8 @@
     "providerTestAccount": "Bandomoji paskyra",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
+    "providerChatgpt": "ChatGPT",
+    "providerClaude": "Claude",
     "providerEnterpriseSso": "Įmonės SSO",
     "passkeysTitle": "Priėjimo raktai",
     "passkeysSubtitle": "Prisijunkite be slaptažodžio",
@@ -265,7 +306,8 @@
     "renamePasskey": "Pervadyti priėjimo raktą",
     "removePasskey": "Pašalinti priėjimo raktą",
     "removePasskeyTitle": "Pašalinti priėjimo raktą?",
-    "removePasskeyMessage": "Daugiau negalėsite prisijungti su šiuo priėjimo raktu."
+    "removePasskeyMessage": "Daugiau negalėsite prisijungti su šiuo priėjimo raktu.",
+    "changelog": "Kas naujo"
   },
   "preferences": {
     "general": "Bendra",
@@ -308,7 +350,6 @@
     "noFilesChangedDescription": "Šioje pakeitimų užklausoje nėra failų pakeitimų.",
     "fileList": {
       "openNavigator": "Atidaryti failų naršyklę",
-      "filesViewed": "Failai · peržiūrėta {{viewed}} iš {{total}}",
       "listed": "(sąraše)",
       "layout": "Išdėstymas",
       "unified": "Bendras",
@@ -321,7 +362,15 @@
       "retryLoadingFiles": "Bandyti įkelti failus dar kartą",
       "filterPlaceholder": "Failo kelias",
       "viewedCount": "peržiūrėta {{viewed}} iš {{total}}",
+      "viewedCount_one": "peržiūrėta {{viewed}} iš {{total}}",
+      "viewedCount_few": "peržiūrėta {{viewed}} iš {{total}}",
+      "viewedCount_many": "peržiūrėta {{viewed}} iš {{total}}",
+      "viewedCount_other": "peržiūrėta {{viewed}} iš {{total}}",
       "viewedOfListed": "peržiūrėta {{viewed}} iš {{total}} sąraše esančių failų",
+      "viewedOfListed_one": "peržiūrėta {{viewed}} iš {{total}} sąraše esančių failų",
+      "viewedOfListed_few": "peržiūrėta {{viewed}} iš {{total}} sąraše esančių failų",
+      "viewedOfListed_many": "peržiūrėta {{viewed}} iš {{total}} sąraše esančių failų",
+      "viewedOfListed_other": "peržiūrėta {{viewed}} iš {{total}} sąraše esančių failų",
       "loadingFiles": "Įkeliama {{loaded}} iš {{total}}…",
       "failedToLoadAllFiles": "Nepavyko įkelti visų failų.",
       "couldNotLoadMoreFiles": "Nepavyko įkelti daugiau failų.",
@@ -704,10 +753,10 @@
     },
     "connect": {
       "checkFailedTitle": "Nepavyko patikrinti GitHub ryšio.",
-      "checkFailedMessage": "Kol duomenys neįkelti, prisijungimo būsena nepasiekiama.",
+      "checkFailedMessage": "Nepavyko pasiekti GitHub. Patikrink ryšį ir bandyk dar kartą.",
       "checkFailedTitleGitLab": "Nepavyko patikrinti GitLab ryšio.",
       "checkFailedTitleBitbucket": "Nepavyko patikrinti Bitbucket ryšio.",
-      "providerCheckFailedMessage": "Ryšio būsena bus prieinama įkėlus duomenis.",
+      "providerCheckFailedMessage": "Nepavyko pasiekti tiekėjo. Patikrink ryšį ir bandyk dar kartą.",
       "reconnectTitle": "Prisijungti prie GitHub iš naujo",
       "reconnectTitleGitLab": "Prisijungti prie GitLab iš naujo",
       "reconnectTitleBitbucket": "Prisijungti prie Bitbucket iš naujo",
@@ -912,23 +961,18 @@
     "previewGenericDescription": "Pranešimai tik informuoja apie įvykį. Norėdami perskaityti žinutę, atidarykite Kilo.",
     "channel": {
       "agentProgress": "Agentų eiga",
-      "chat": "Pokalbių žinutės",
-      "kiloclaw": "KiloClaw veikla",
       "balance": "Įspėjimai apie likutį",
       "security": "Saugos problemos",
       "spend": "Išlaidų įspėjimai",
       "followedSessions": "Sekamos sesijos"
     },
     "category": {
-      "chatMessagesSubtitle": "atsakymai jūsų pokalbiuose",
       "agentAttentionTitle": "Agentui reikia jūsų atsakymo",
       "agentAttentionSubtitle": "klausimai, leidimų ir informacijos prašymai",
       "agentUpdatesTitle": "Agento naujienos",
       "agentUpdatesSubtitle": "agento žinutės užduoties metu",
       "sessionStatusTitle": "Sesijos būsena",
       "sessionStatusSubtitle": "baigta / nepavyko / paruošta valdyti",
-      "kiloclawActivitySubtitle": "egzemplioriaus parengtis ar klaida, suplanuoti veiksmai",
-      "kiloclawActivityUnavailable": "Paleiskite KiloClaw egzempliorių, kad gautumėte KiloClaw veiklą.",
       "balanceAlertsSubtitle": "įspėjimai apie mažą organizacijos likutį",
       "balanceAlertsUnavailable": "Prisijunkite prie organizacijos, kad gautumėte balanso įspėjimus.",
       "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai",
@@ -960,72 +1004,23 @@
   },
   "tabs": {
     "home": "Pradžia",
-    "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, skirtukas, {{position}} iš {{total}}"
   },
   "chat": {
-    "instancePicker": {
-      "switchInstance": "Egzemplioriaus pasirinkimas",
-      "couldNotLoadInstances": "Nepavyko įkelti egzempliorių.",
-      "noInstancesDescription": "Paruošk egzempliorių, kad galėtum pradėti pokalbį.",
-      "setUpKiloclaw": "Paruošti KiloClaw",
-      "currentInstance": "{{title}}, dabartinis"
+    "errors": {
+      "messageTooLong": "Žinutė per ilga. Joje turi būti mažiau nei {{limit}} simbolių."
     },
     "conversation": {
-      "failedToLoad": "Nepavyko įkelti pokalbio.",
-      "notFound": "Pokalbis nerastas.",
       "untitled": "Be pavadinimo",
-      "leaveTitle": "Išeiti iš pokalbio?",
-      "leaveMessage": "Pokalbis bus pašalintas iš tavo sąrašo.",
-      "openHint": "Atidaro pokalbį. Paspausk ir palaikyk, kad pamatytum pervadinimo ir išėjimo parinktis.",
-      "unread": "Neskaitytas",
-      "optionsFor": "Pokalbio „{{title}}“ parinktys",
-      "options": "Pokalbio parinktys",
-      "renameTitle": "Pokalbio pervadinimas",
-      "renamePlaceholder": "Naujas pavadinimas",
-      "couldNotReachBot": "Nepavyko susisiekti su robotu. Bandyk dar kartą.",
-      "messageDeliveryFailed": "Žinutės nepavyko pristatyti robotui.",
-      "couldNotSignIn": "Nepavyko prisijungti prie pokalbio.",
-      "couldNotRefreshMessages": "Nepavyko atnaujinti žinučių.",
-      "couldNotLoadHistory": "Nepavyko įkelti pokalbio istorijos.",
-      "leave": "Išeiti",
-      "untitledConversation": "Pokalbis be pavadinimo",
-      "createFailed": "Nepavyko sukurti pokalbio.",
-      "leaveFailed": "Nepavyko išeiti iš pokalbio."
-    },
-    "reactions": {
-      "common": "Dažnos",
-      "reactWith": "Pridėti reakciją {{reaction}}",
-      "accessibility": "{{emoji}} reakcija, {{displayCount}}"
-    },
-    "composer": {
-      "replyingTo": "Atsakoma į",
-      "cancelReply": "Atšaukti atsakymą",
-      "openInstance": "Atidaryti egzempliorių",
-      "attachFile": "Pridėti failą",
-      "cancelEdit": "Atšaukti redagavimą"
+      "renamePlaceholder": "Naujas pavadinimas"
     },
     "conversationList": {
-      "couldNotLoad": "Nepavyko įkelti pokalbių.",
-      "emptyTitle": "Pokalbių dar nėra",
-      "emptyDescription": "Sukurk pokalbį, kad galėtum bendrauti su savo KiloClaw egzemplioriumi.",
-      "create": "Sukurti pokalbį",
-      "newConversation": "Naujas pokalbis",
-      "openInstanceSettings": "Atidaryti egzemplioriaus nustatymus",
       "today": "Šiandien",
       "yesterday": "Vakar",
-      "thisWeek": "Šią savaitę",
       "older": "Senesni"
     },
     "attachment": {
-      "open": "Atidaryti {{filename}}",
-      "openFailed": "Nepavyko atidaryti priedo. Patikrink ryšį ir bandyk dar kartą.",
       "attachFailed": "Nepavyko pridėti failo.",
-      "limit": "Gali pridėti iki {{displayCount}} failų.",
-      "sizeRejection": "Failo „{{filename}}“ dydis viršija leistiną priedo dydį ({{limit}}).",
-      "unreadable": "Nepavyko perskaityti: {{filename}}.",
-      "pastedImage": "įklijuotas paveikslėlis",
-      "defaultName": "Priedas",
       "classificationDenied": "Vykdomųjų failų pridėti negalima.",
       "classificationEmpty": "Failas tuščias.",
       "classificationTooLarge": "Failo dydis negali viršyti 20 MB.",
@@ -1035,432 +1030,20 @@
       "networkError": "Įvyko tinklo klaida.",
       "uploadFailed": "Nepavyko įkelti.",
       "nothingToPaste": "Nėra ko įklijuoti.",
-      "metadataStripFailed": "Nepavyko pašalinti nuotraukos metaduomenų.",
-      "limit_one": "Gali pridėti iki {{displayCount}} failas.",
-      "limit_other": "Gali pridėti iki {{displayCount}} failų.",
-      "limit_few": "Gali pridėti iki {{displayCount}} failai.",
-      "limit_many": "Gali pridėti iki {{displayCount}} failų."
+      "metadataStripFailed": "Nepavyko pašalinti nuotraukos metaduomenų."
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}. Būsena: {{status}}",
-      "retryUploading": "Bandyti įkelti {{filename}} dar kartą",
-      "remove": "Pašalinti {{filename}}"
-    },
-    "messageBubble": {
-      "deleted": "[ištrinta žinutė]",
-      "yourMessage": "Tavo žinutė",
-      "messageFrom": "Žinutės autorius: {{author}}",
-      "moreActions": "Daugiau veiksmų",
-      "notDelivered": "Nepristatyta",
-      "edited": "(redaguota)",
-      "image": "Paveikslėlis"
+      "accessibility": "{{filename}}. Būsena: {{status}}"
     },
     "messageActions": {
-      "copied": "Nukopijuota",
-      "copyFailed": "Nepavyko nukopijuoti.",
-      "title": "Žinutės veiksmai",
-      "deleteTitle": "Ištrinti žinutę?",
-      "deleteMessage": "Žinutė bus pašalinta iš pokalbio.",
-      "deleteFailed": "Nepavyko ištrinti žinutės.",
-      "removeReactionFailed": "Nepavyko pašalinti reakcijos.",
-      "addReactionFailed": "Nepavyko pridėti reakcijos.",
-      "retrySend": "Siųsti dar kartą",
-      "moreReactions": "Daugiau reakcijų",
-      "edit": "Redaguoti",
-      "sendFailed": "Nepavyko išsiųsti žinutės.",
-      "retrySendFailed": "Nepavyko išsiųsti dar kartą.",
-      "editFailed": "Nepavyko redaguoti žinutės.",
-      "executeFailed": "Nepavyko atlikti veiksmo."
+      "edit": "Redaguoti"
     },
     "attachmentPicker": {
-      "takePhoto": "Fotografuoti",
-      "photoLibrary": "Nuotraukų biblioteka",
-      "files": "Failai",
       "cameraAccessMessage": "Jei nori fotografuoti, nustatymuose leisk naudoti kamerą."
     },
-    "typingIndicator": {
-      "someone": "Kažkas",
-      "typing_one": "{{name}} rašo...",
-      "typing": "{{names}} rašo...",
-      "typing_other": "{{names}} rašo...",
-      "typing_few": "{{names}} rašo...",
-      "typing_many": "{{names}} rašo..."
-    },
     "botStatus": {
-      "offline": "Atsijungęs",
-      "loadingUser": "Įkeliami naudotojo duomenys...",
-      "waitingForStatus": "Laukiama roboto būsenos...",
-      "offlineMessage": "Robotas atsijungęs. Kai jis vėl prisijungs, keitimasis žinutėmis bus tęsiamas."
-    },
-    "errors": {
-      "notAllowed": "Šis veiksmas neleidžiamas.",
-      "messageTooLong": "Žinutė per ilga. Joje turi būti mažiau nei {{limit}} simbolių.",
-      "titleTooLong": "Pavadinimas per ilgas. Jame turi būti mažiau nei {{limit}} simbolių.",
-      "messageEmpty": "Žinutė negali būti tuščia."
+      "offline": "Atsijungęs"
     }
-  },
-  "kiloclaw": {
-    "couldNotLoadInstances": "Nepavyko įkelti KiloClaw egzempliorių.",
-    "billing": {
-      "title": "Atsiskaitymai",
-      "continueMonthToMonth": "Tęsti su mėnesine prenumerata",
-      "plan": "Planas",
-      "finalTermEnds": "Paskutinio laikotarpio pabaiga",
-      "afterFinalTerm": "Po paskutinio laikotarpio",
-      "lessThanOneDay": "Mažiau nei 1 diena",
-      "ends": "Baigiasi",
-      "expires": "Nustoja galioti",
-      "noActivePlan": "Nėra aktyvaus plano",
-      "noActivePlanDescription": "Neturi aktyvios KiloClaw prenumeratos.",
-      "managedByAdmin": "Atsiskaitymus tvarko tavo organizacijos administratorius.",
-      "couldNotLoad": "Nepavyko įkelti atsiskaitymų informacijos.",
-      "manageOnWeb": "Tvarkyti atsiskaitymus svetainėje",
-      "earlybird": "Earlybird",
-      "finalCommitTermEndsOn": "Paskutinis tavo Commit plano laikotarpis baigiasi {{date}}. Tęsk prenumeratą su Standard planu už {{price}}, kitaip prieglobos paslauga bus nutraukta.",
-      "freeTrial": "Nemokamas bandomasis laikotarpis",
-      "hostingEnds": "Prieglobos paslaugos pabaiga",
-      "renews": "Pratęsiama",
-      "standardMonthToMonth": "Standard mėnesinė prenumerata",
-      "standardStartsOn": "Standard planas pradės galioti {{date}} už {{price}}.",
-      "yourStandardMonthlyPrice": "tavo Standard plano mėnesio kaina",
-      "perMonth": "/mėn.",
-      "earlybirdAccessUntil": "Earlybird prieiga galioja iki {{date}}.",
-      "earlybirdEnding": "Iki Earlybird prieigos pabaigos liko {{remaining}}.",
-      "paymentPastDue": "Mokėjimo terminas praleistas. Atnaujink mokėjimo būdą.",
-      "subscriptionCancels": "Prenumerata bus atšaukta {{date}}.",
-      "trialDaysRemaining": "Iki bandomojo laikotarpio pabaigos liko {{remaining}}.",
-      "trialEndingSoon": "Bandomasis laikotarpis netrukus baigsis. Liko {{remaining}}.",
-      "planName": {
-        "standard": "Standard"
-      },
-      "commit": "Commit"
-    },
-    "changelog": {
-      "title": "Kas naujo",
-      "couldNotLoad": "Nepavyko įkelti pakeitimų žurnalo.",
-      "noUpdates": "Dar nėra atnaujinimų",
-      "noUpdatesDescription": "Pakeitimų žurnalo įrašai bus rodomi čia.",
-      "recentUpdates": "Naujausi atnaujinimai",
-      "manageVersion": "Tvarkyti versiją",
-      "redeployRequired": "Reikia diegti iš naujo",
-      "redeploySuggested": "Siūloma diegti iš naujo",
-      "upgradeRequired": "Reikia atnaujinti"
-    },
-    "dashboard": {
-      "title": "Valdymo skydelis",
-      "couldNotLoad": "Nepavyko įkelti valdymo skydelio.",
-      "renameInstance": "Pervadinti egzempliorių",
-      "renamePlaceholder": "Naujas pavadinimas (iki 50 simbolių)",
-      "someDetailsFailed": "Nepavyko įkelti dalies realiojo laiko duomenų.",
-      "destroy": "Sunaikinti",
-      "destroyMessage": "Tavo KiloClaw egzempliorius ir visi jo duomenys bus sunaikinti visam laikui. Šio veiksmo negalima atšaukti.",
-      "destroyTitle": "Sunaikinti egzempliorių",
-      "instance": "Egzempliorius",
-      "couldNotCheckStatus": "Nepavyko patikrinti paslaugos būsenos.",
-      "dangerZone": "PAVOJINGI VEIKSMAI",
-      "destroying": "Naikinama…",
-      "serviceDegraded": "Paslaugos veikimas sutrikęs — bakstelėk ir peržiūrėk būseną",
-      "up": "VEIKIA"
-    },
-    "channels": {
-      "title": "Kanalai",
-      "couldNotLoad": "Nepavyko įkelti kanalų.",
-      "noChannels": "Nėra prieinamų kanalų",
-      "noChannelsDescription": "Kanalų integracijos bus rodomos čia.",
-      "connected": "Prijungta: {{label}}",
-      "disconnectMessage": "Pašalinti {{label}}? Šis kanalas bus atjungtas.",
-      "disconnectTitle": "Atjungti kanalą"
-    },
-    "devicePairing": {
-      "title": "Įrenginių susiejimas",
-      "refreshRequests": "Atnaujinti susiejimo užklausas",
-      "couldNotLoad": "Nepavyko įkelti susiejimo užklausų.",
-      "noPending": "Nėra nepatvirtintų užklausų",
-      "noPendingDescription": "Kanalų ir įrenginių susiejimo užklausos bus rodomos čia.",
-      "channelRequests": "Kanalų užklausos",
-      "deviceRequests": "Įrenginių užklausos",
-      "approveDeviceMessage": "Leisti {{platform}} prisijungti prie tavo egzemplioriaus?",
-      "approveDeviceTitle": "Patvirtinti įrenginį",
-      "approveMessage": "Leisti {{label}} (kodas: {{code}}) prisijungti prie tavo egzemplioriaus?",
-      "approveTitle": "Patvirtinti susiejimo užklausą",
-      "unknownDevice": "Nežinomas įrenginys"
-    },
-    "execPolicy": {
-      "title": "Vykdymo politika",
-      "couldNotLoad": "Nepavyko įkelti vykdymo politikos.",
-      "alwaysAsk": "Visada klausti",
-      "alwaysAskDescription": "Prieš vykdant kiekvieną komandą prašoma patvirtinimo. Saugiausias pasirinkimas.",
-      "neverAsk": "Niekada neklausti",
-      "neverAskDescription": "Komandos vykdomos be patvirtinimo. Greičiau, bet mažiau saugu."
-    },
-    "google": {
-      "title": "Google paskyra",
-      "couldNotLoad": "Nepavyko įkelti Google paskyros būsenos.",
-      "disconnected": "Google paskyra atjungta. Kad pakeitimas įsigaliotų, iš naujo įdiek egzempliorių.",
-      "setupCommand": "Sąrankos komanda",
-      "setupCommandHelp": "Kad prijungtum Google paskyrą, vykdyk šią komandą savo kompiuterio terminale. Kompiuteryje turi būti įdiegtas Docker.",
-      "failedToLoadCommand": "Nepavyko įkelti sąrankos komandos.",
-      "gmailNotifications": "Gmail pranešimai",
-      "disconnect": "Atjungti Google paskyrą",
-      "copied": "Nukopijuota",
-      "copyCommand": "Kopijuoti komandą",
-      "disconnectConfirm": "Atjungti",
-      "disconnectMessage": "Pašalinti tavo Google paskyrą iš šio egzemplioriaus? Gmail pranešimai bus išjungti. Atjungęs paskyrą iš naujo įdiek egzempliorių, kad pakeitimai įsigaliotų.",
-      "disconnectTitle": "Atjungti Google"
-    },
-    "modelList": {
-      "noMatches": "Nėra paiešką atitinkančių modelių",
-      "noModelsDescription": "Modeliai bus rodomi čia, kai bus prieinami.",
-      "noResultsFor": "Pagal „{{query}}“ rezultatų nerasta."
-    },
-    "secrets": {
-      "title": "Slapti duomenys",
-      "couldNotLoad": "Nepavyko įkelti slaptųjų duomenų.",
-      "noSecrets": "Slaptųjų duomenų nėra",
-      "noSecretsDescription": "Čia bus rodomos slaptųjų duomenų integracijos.",
-      "removeMessage": "Pašalinti {{label}}? Šis įrankis nebeturės prieigos prie savo prisijungimo duomenų.",
-      "removeTitle": "Pašalinti slaptuosius duomenis",
-      "saved": "Išsaugota: {{label}}",
-      "hide": "Slėpti {{label}}",
-      "show": "Rodyti {{label}}",
-      "allFieldsRequired": "Norint prijungti {{label}}, būtina užpildyti visus laukus.",
-      "setupGuideFallback": "sąrankos vadovas",
-      "setupGuideA11y": "{{label}} sąrankos vadovas",
-      "setupGuide": "Sąrankos vadovas",
-      "saving": "Išsaugoma…",
-      "removing": "Šalinama…",
-      "updateToken": "Atnaujinti prieigos raktą"
-    },
-    "versionPin": {
-      "title": "Versijos fiksavimas",
-      "couldNotLoad": "Nepavyko įkelti versijos informacijos.",
-      "couldNotLoadMore": "Nepavyko įkelti daugiau versijų.",
-      "loadMore": "Įkelti daugiau versijų",
-      "showingLatest": "Rodoma 100 naujausių versijų.",
-      "availableVersions": "Prieinamos versijos",
-      "noVersions": "Nėra prieinamų versijų",
-      "noVersionsDescription": "Prieinamos OpenClaw versijos bus rodomos čia.",
-      "unpin": "Panaikinti fiksavimą",
-      "unpinMessage": "Grįžti prie naujausios prieinamos versijos?",
-      "unpinTitle": "Panaikinti versijos fiksavimą",
-      "confirmPin": "Patvirtinti fiksavimą",
-      "followingLatest": "Naudojama naujausia",
-      "latest": "naujausia",
-      "pin": "Fiksuoti",
-      "pinnedByAdmin": "Versiją užfiksavo administratorius. Jei nori ją pakeisti, kreipkis į administratorių.",
-      "pinnedTo": "Užfiksuota versija: {{version}}",
-      "reasonOptional": "Priežastis (neprivaloma)",
-      "reasonPlaceholder": "Versijos fiksavimo priežastis",
-      "replaceAdminPin": "Pakeisti administratoriaus užfiksuotą versiją",
-      "replacesAdminPin": "Ši versija pakeis administratoriaus užfiksuotą versiją (dabar {{label}})."
-    },
-    "redeploy": "Diegti iš naujo",
-    "redeployMessage": "Ar tikrai nori iš naujo įdiegti šį egzempliorių?",
-    "redeployTitle": "Iš naujo įdiegti egzempliorių",
-    "controls": {
-      "redeploying": "Diegiama iš naujo…",
-      "restart": "Paleisti iš naujo",
-      "restartOpenClawMessage": "Ar tikrai nori iš naujo paleisti OpenClaw procesą?",
-      "restartOpenClawTitle": "Paleisti OpenClaw iš naujo",
-      "restarting": "Paleidžiama iš naujo…",
-      "start": "Paleisti",
-      "startMessage": "Ar tikrai nori paleisti šį egzempliorių?",
-      "startTitle": "Paleisti egzempliorių",
-      "stop": "Sustabdyti",
-      "stopMessage": "Ar tikrai nori sustabdyti šį egzempliorių?",
-      "stopTitle": "Sustabdyti egzempliorių",
-      "stopping": "Stabdoma…"
-    },
-    "empty": {
-      "finishingSetup": "Baigiama sąranka",
-      "finishingSetupDescription": "Palauk, baigiame kurti tavo paskyrą. Paprastai tai užtrunka tik akimirką.",
-      "getStarted": "Pradėti",
-      "noInstancesDescription": "Sukurk pirmąjį egzempliorių ir pradėk naudoti programavimo agentus."
-    },
-    "instance": {
-      "backToInstances": "Atgal prie egzempliorių",
-      "couldNotLoad": "Nepavyko įkelti egzemplioriaus.",
-      "notFound": "Egzempliorius nerastas",
-      "notFoundDescription": "Šis egzempliorius galėjo būti sunaikintas arba nuoroda nebegalioja."
-    },
-    "list": {
-      "createInstance": "Sukurti egzempliorių",
-      "organizations": "Organizacijos",
-      "accessIssue": {
-        "trialExpired": "Bandomasis laikotarpis baigėsi — užsisakyk prenumeratą, kad galėtum toliau naudoti šį egzempliorių",
-        "subscriptionCanceled": "Prenumerata neaktyvi — užsisakyk ją iš naujo, kad galėtum toliau naudoti šį egzempliorių",
-        "subscriptionPastDue": "Mokėjimo problema — atnaujink mokėjimo duomenis, kad galėtum toliau naudoti šį egzempliorių",
-        "quarantined": "Egzempliorius izoliuotas — reikia specialistų peržiūros",
-        "multipleCurrentConflict": "Reikia peržiūrėti paskyrą",
-        "nonCanonicalEarlybird": "Senąjį planą reikia peržiūrėti"
-      }
-    },
-    "onboarding": {
-      "complete": {
-        "chatWith": "Kalbėtis su {{name}}",
-        "ready": "{{name}} jau gali veikti",
-        "warmedUp": "Viskas paruošta. Gali pasisveikinti, kai tik norėsi."
-      },
-      "flow": {
-        "genericErrorBody": "Šiuo metu nepavyko baigti paruošti tavo egzemplioriaus.",
-        "manualReviewBody": "Prieš kuriant egzempliorių reikia patikrinti tavo paskyros būseną. Tęsk svetainėje kilo.ai.",
-        "manualReviewTitle": "Sąranką turi peržiūrėti specialistai",
-        "openKiloAi": "Atidaryti kilo.ai",
-        "provisioning": "Išteklių paruošimas",
-        "review": "Peržiūra",
-        "identityTitle": "Boto tapatybė",
-        "couldNotLoad": "Nepavyko įkelti pradinės sąrankos būsenos.",
-        "finishingSetup": "Baigiame sąranką — palauk, kol baigsime kurti tavo paskyrą.",
-        "ready": "Paruošta",
-        "settingUp": "Ruošiama…"
-      },
-      "unavailableDescription": "Egzemplioriui sukurti reikia galiojančios KiloClaw prenumeratos. Esami egzemplioriai ir prenumeratos veikia kaip įprasta.",
-      "unavailableTitle": "Naujų KiloClaw egzempliorių sukurti negalima",
-      "identity": {
-        "chooseAvatar": "Pasirinkti avatarą",
-        "namePlaceholder": "Boto vardas",
-        "selectAvatar": "Pasirinkti {{name}} kaip avatarą",
-        "personality": "Asmenybė",
-        "changePersonality": "Keisti asmenybę",
-        "location": "Vieta",
-        "locationPlaceholder": "Miestas arba regionas (neprivaloma)",
-        "useCurrentLocation": "Naudoti dabartinę vietą",
-        "locationDeniedTitle": "Neleista pasiekti vietos duomenų",
-        "locationDeniedMessage": "Nustatymuose leisk pasiekti vietos duomenis, kad galėtum naudoti dabartinę vietą.",
-        "locationValidationFailed": "Nepavyko patvirtinti vietos.",
-        "locationResolveFailed": "Nepavyko nustatyti tavo vietos. Gali ją pakeisti rankiniu būdu.",
-        "locationGetFailed": "Nepavyko gauti tavo vietos duomenų. Įvesk vietą rankiniu būdu.",
-        "nature": {
-          "aiAssistantLabel": "DI asistentas",
-          "aiAssistantVibe": "Paslaugus, sumanus, profesionalus",
-          "digitalCreatureLabel": "Skaitmeninė būtybė",
-          "digitalCreatureVibe": "Savita, gyva, šiek tiek nenuspėjama",
-          "virtualCompanionLabel": "Virtualus draugas",
-          "virtualCompanionVibe": "Šiltas, dėmesingas, nuoširdžiai rūpestingas",
-          "somethingWeirderLabel": "Kas nors keistesnio…",
-          "somethingWeirderVibe": "Apibūdink pats"
-        }
-      },
-      "notifications": {
-        "mockMessage": "Atlikta! Parengiau santrauką, kurios prašei. Gali peržiūrėti, kai tik norėsi.",
-        "settingUp": "Nustatomi pranešimai…",
-        "stayInTheLoop": "Naujienos apie užduotis",
-        "getNotified": "Įjunk pranešimus, kad sužinotum, kai {{name}} baigs užduotį, ir nepraleistum nė vieno atsakymo.",
-        "now": "dabar",
-        "skipForNow": "Kol kas praleisti",
-        "couldNotEnable": "Nepavyko įjungti pranešimų."
-      },
-      "provisioning": {
-        "queryErrorTitle": "Nepavyko patikrinti sąrankos",
-        "queryErrorBody": "Tikrinant {{name}} sąrankos būseną nutrūko ryšys. Sąranka vis dar gali vykti. Bandyk dar kartą arba grįžk netrukus.",
-        "stoppedTitle": "Sąranka sustabdyta",
-        "stoppedBody": "Ruošiant {{name}} egzempliorių, jis netikėtai nustojo veikti.",
-        "stalledTitle": "Sąranka užstrigo",
-        "stalledBody": "Nepavyko baigti ruošti {{name}}. Bandyk dar kartą. Jei problema kartojasi, parašyk adresu {{supportEmail}}.",
-        "timeoutTitle": "Užtrunka ilgiau nei tikėtasi",
-        "timeoutBody": "{{name}} sąranka trunka ilgiau nei įprastai (daugiau nei {{displayMinutes}} min.).",
-        "continueInBackground": "Tęsti fone",
-        "settingUp": "Ruošiama: {{name}}",
-        "connectingToAgent": "Jungiamasi prie agento",
-        "startingSandbox": "Paleidžiama izoliuota aplinka",
-        "backgroundHint": "Paprastai tai užtrunka mažiau nei minutę. Gali uždaryti šį ekraną — sąranka tęsis fone."
-      }
-    },
-    "status": {
-      "cpu": "CPU",
-      "exitCode": "Kodas {{code}}",
-      "gatewayProcess": "ŠLIUZO PROCESAS",
-      "lastExit": "Paskutinis proceso užbaigimas",
-      "memory": "Atmintis",
-      "region": "Regionas",
-      "resources": "IŠTEKLIAI",
-      "restarts": "Paleidimai iš naujo",
-      "state": "Būsena",
-      "uptime": "Veikimo laikas",
-      "crashed": "NULŪŽO",
-      "destroying": "NAIKINAMA",
-      "provisioned": "PARUOŠTA",
-      "restarting": "PALEIDŽIAMA IŠ NAUJO",
-      "running": "VYKDOMA",
-      "shuttingDown": "IŠJUNGIAMA",
-      "starting": "PRADEDAMA",
-      "stopped": "SUSTABDYTA",
-      "stopping": "STABDOMA",
-      "unknown": "NEŽINOMA",
-      "vcpuValue": "{{value}} vCPU"
-    },
-    "modelPicker": {
-      "kiloAuto": "Kilo Auto",
-      "frontierLabel": "Pažangiausi",
-      "frontierDescription": "Didžiausios galimybės. Užklausos nukreipiamos į pažangiausius samprotaujančius modelius.",
-      "balancedDescription": "Geras greičio ir galimybių derinys už mažesnę kainą.",
-      "autoModelA11y": "{{label}} automatinis modelis",
-      "currentModel": "Dabartinis modelis",
-      "browseAllModels": "arba rinkis iš daugiau nei 500 modelių",
-      "browseAllModelsA11y": "Peržiūrėti daugiau nei 500 modelių"
-    },
-    "accessRequired": {
-      "trialExpiredBody": "Jei nori toliau naudoti KiloClaw, naršyklėje atidaryk kilo.ai/claw. Programėlėje prenumeratos užsisakyti negalima.",
-      "subscriptionCanceledTitle": "Užsisakyk prenumeratą svetainėje",
-      "subscriptionCanceledBody": "Jei nori naudoti KiloClaw, naršyklėje atidaryk kilo.ai/claw. Programėlėje prenumeratos užsisakyti negalima.",
-      "subscriptionCanceledCta": "Atidaryti kilo.ai/claw",
-      "subscriptionPastDueTitle": "Mokėjimo duomenų atnaujinimas svetainėje",
-      "subscriptionPastDueBody": "Kilo problema dėl tavo paskutinio mokėjimo. Naršyklėje atidaryk kilo.ai/claw ir atnaujink mokėjimo duomenis. Programėlėje atsiskaitymų tvarkyti negalima.",
-      "quarantinedTitle": "Reikia atkurti egzemplioriaus veikimą",
-      "quarantinedBody": "Tavo KiloClaw egzempliorius izoliuotas, todėl šiuo metu jo naudoti negalima. Jo veikimą turi padėti atkurti mūsų komanda.",
-      "multipleCurrentConflictBody": "Tavo paskyroje radome daugiau nei vieną aktyvią prenumeratą, todėl pristabdėme veikimą, kad nereikėtų mokėti du kartus.",
-      "multipleCurrentConflictCta": "Tęsti svetainėje kilo.ai",
-      "nonCanonicalEarlybirdTitle": "Aptiktas senasis planas",
-      "nonCanonicalEarlybirdBody": "Kad galėtum naudoti ankstyvosios prieigos planą mobiliajame įrenginyje, jį pirmiausia turi peržiūrėti specialistai.",
-      "iosTitle": "KiloClaw nepasiekiamas iOS programėlėje",
-      "iosBody": "Šios paskyros KiloClaw prieiga tvarkoma ne iOS programėlėje.",
-      "iosContact": "Turi klausimų? Parašyk adresu {{supportEmail}}.",
-      "quarantinedCta": "Rašyti mūsų komandai el. paštu",
-      "nonCanonicalEarlybirdCta": "Peržiūrėti savo planą svetainėje kilo.ai"
-    },
-    "instanceCard": {
-      "needsAttention": "Reikia patikrinti {{name}}: {{label}}",
-      "openUnread_one": "Atidaryti {{name}}, {{displayCount}} neskaityta žinutė",
-      "openUnread": "Atidaryti {{name}}, {{displayCount}} neskaitytų žinučių",
-      "openUnread_other": "Atidaryti {{name}}, {{displayCount}} neskaitytų žinučių",
-      "openSettings": "Atidaryti {{name}} nustatymus",
-      "fixOnKiloAi": "Ištaisyti kilo.ai: {{label}}",
-      "openUnread_few": "Atidaryti {{name}}, {{displayCount}} neskaitytos žinutės",
-      "openUnread_many": "Atidaryti {{name}}, {{displayCount}} neskaitytos žinutės"
-    },
-    "settings": {
-      "channelsDescription": "Telegram, Discord, Slack",
-      "devicePairingDescription": "Patvirtinti įrenginių užklausas",
-      "execPolicyDescription": "Saugos nustatymai",
-      "googleDescription": "Gmail, Calendar, Docs",
-      "modelDescription": "DI modelio pasirinkimas",
-      "secretsDescription": "Užšifruoti prisijungimo duomenys",
-      "versionPinDescription": "Užfiksuoti konkrečią versiją"
-    },
-    "avatar": {
-      "arcade": "Žaidimų automatas",
-      "brain": "Smegenys",
-      "creature": "Būtybė",
-      "crystal": "Kristalas",
-      "custom": "Pasirinktinis avataras",
-      "dragon": "Drakonas",
-      "explorer": "Tyrinėtojas",
-      "flame": "Liepsna",
-      "lightning": "Žaibas",
-      "magicWand": "Stebuklinga lazdelė",
-      "moon": "Mėnulis",
-      "operator": "Operatorius",
-      "orbit": "Orbita",
-      "oracle": "Orakulas",
-      "rainbow": "Vaivorykštė",
-      "robot": "Robotas",
-      "satellite": "Palydovas",
-      "sparkles": "Žiburėliai",
-      "strongArm": "Stipri ranka",
-      "talisman": "Talismanas"
-    },
-    "remoteSpawnFilesNotSupported": "Šis egzempliorius negali gauti failų.",
-    "instanceSwitcherTitle": "KiloClaw egzempliorius"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -2158,6 +1741,7 @@
       "actionFailed": "Nepavyko užbaigti šio veiksmo. Bandyk dar kartą.",
       "actionBlocked": "Nepavyko užbaigti šio veiksmo. Iš pradžių reikia išspręsti problemą.",
       "syncNoRepositories": "Sinchronizavimo apimtyje nėra saugyklų. Pasirinkite saugyklas, kurias stebi Saugos agentas, ir sinchronizuokite dar kartą.",
+      "syncNoRepositoriesNoManage": "Sinchronizavimo apimtyje nėra saugyklų. Kad būtų galima sinchronizuoti, organizacijos savininkas, administratorius arba atsiskaitymų administratorius turi prijungti saugyklas.",
       "syncIntegrationInactive": "Saugos agento GitHub ryšys neaktyvus. Iš naujo prijunkite Kilo GitHub App, tada sinchronizuokite dar kartą.",
       "syncMissingPermission": "Kilo GitHub programėlė negali skaityti vulnerability alerts. Suteik šį leidimą GitHub, tada sinchronizuok dar kartą.",
       "configConflict": "Saugos agento nustatymai pakeisti kitoje vietoje. Peržiūrėk naujausius nustatymus ir išsaugok dar kartą."
@@ -2308,7 +1892,7 @@
       "costSpoken": "kaina {{cost}}",
       "costSpokenWithTime": "kaina {{cost}}, {{time}}",
       "pullRequest": "pakeitimų užklausa {{number}}",
-      "spokenJoiner": "ir"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nepavyko atidaryti GitHub",
@@ -2353,11 +1937,12 @@
       "emptyDescription": "Norėdami pradėti, išsiųskite žinutę žemiau esančiame lauke.",
       "scrollToBottom": "Slinkti į apačią",
       "emptyTitle": "Žinučių dar nėra",
+      "emptyReadOnlyTitle": "Šioje sesijoje nėra žinučių",
       "renameAccessibility": "Pervadinti sesiją: {{title}}",
       "cloningSession": "Klonuojama sesija",
       "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos.",
       "cloneFailedRetry": "Nepavyko klonuoti šios sesijos. Bandykite dar kartą.",
-      "notEnoughCredits": "Nepakanka kreditų „Cloud Agent“ paleisti. Papildykite kreditus ir bandykite dar kartą.",
+      "notEnoughCredits": "Nepakanka kreditų šiai užklausai. Papildykite kreditus ir bandykite dar kartą.",
       "previousTaskFinishing": "Ankstesnė užduotis dar nebaigta. Šiek tiek palaukite.",
       "serviceUnavailable": "Paslauga šiuo metu nepasiekiama. Bandykite dar kartą.",
       "connectionTrouble": "Sutriko ryšys. Netrukus bandykite dar kartą.",
@@ -2452,7 +2037,7 @@
       "selectRepositoryToStart": "Norėdami pradėti, pasirinkite saugyklą.",
       "enterPromptToStart": "Norėdami pradėti, pridėkite promptą.",
       "enterPromptOrFileToStart": "Norėdami pradėti, pridėkite promptą arba failą.",
-      "connectProviderToStart": "Norėdami pradėti, prijunkite paslaugų teikėją.",
+      "connectProviderToStart": "Saugyklos gaunamos iš susietos GitHub, GitLab arba Bitbucket paskyros.",
       "promptPlaceholder": "Ką norėtumėte atlikti?",
       "couldNotLoadModels": "Nepavyko įkelti modelių.",
       "prefillRepoAndModelUnavailable": "Pradinės sesijos saugykla ir modelis nebepasiekiami. Pasirinkite kitus žemiau.",
@@ -2499,7 +2084,8 @@
       "selectedProfile": "Pasirinktas profilis",
       "manualOverrides": "Rankiniai nepaisymai",
       "openSettingsToReview": "Norėdami peržiūrėti, atidarykite nustatymus",
-      "profileSelection": "Profilio pasirinkimas"
+      "profileSelection": "Profilio pasirinkimas",
+      "profileLayerAccessibility": "{{label}}: {{detail}}"
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujintas {{displayCount}} failas.",
@@ -2521,6 +2107,23 @@
       "toolList": "rodyti sąrašą",
       "toolPatch": "taisyti",
       "toolTask": "užduotis",
+      "toolWebFetch": "atsisiųsti tinklalapį",
+      "toolWebSearch": "interneto paieška",
+      "toolCodeSearch": "kodo paieška",
+      "toolTodo": "užduočių sąrašas",
+      "toolSkill": "įkelti įgūdį",
+      "toolLsp": "kalbos serveris",
+      "toolBrowser": "naršyklė",
+      "toolNotebook": "užrašų knygelė",
+      "toolBoard": "bendra lenta",
+      "toolQuestion": "užduoti klausimą",
+      "toolSuggest": "pasiūlyti",
+      "toolRecall": "atkurti išsaugotus atsiminimus",
+      "toolRepoClone": "klonuoti repozitoriją",
+      "toolRepoOverview": "repozitorijos apžvalga",
+      "toolSemanticSearch": "semantinė paieška",
+      "toolSendFile": "Išsiųstas failas",
+      "toolSendFileAction": "siųsti failą",
       "readTodos": "Skaityti planą",
       "updateTodos": "Atnaujinti planą",
       "linesBadge": "eil.: {{displayCount}}",
@@ -2627,7 +2230,21 @@
       "thought": "Mintis",
       "showDetails": "Rodyti informaciją",
       "pending": "Laukiama…",
-      "running": "Vykdoma…"
+      "running": "Vykdoma…",
+      "field": {
+        "filePath": "Failo kelias",
+        "path": "Kelias",
+        "offset": "Poslinkis",
+        "limit": "Riba",
+        "pattern": "Šablonas",
+        "include": "Įtraukimas",
+        "patchText": "Pataisos tekstas",
+        "query": "Užklausa",
+        "prompt": "Nurodymas",
+        "header": "Antraštė",
+        "question": "Klausimas",
+        "options": "Parinktys"
+      }
     },
     "messageErrorBoundary": {
       "failedToRender": "Nepavyko parodyti turinio."
@@ -2642,6 +2259,8 @@
       "assistantStopped": "Atsakymo generavimas sustabdytas.",
       "assistantContextOverflow": "Pokalbis per ilgas šiam modeliui.",
       "assistantProviderError": "Teikėjas grąžino klaidą.",
+      "assistantProviderRefused": "Teikėjas atmetė šią užklausą, todėl jos pakartoti nebegalima.",
+      "assistantCreditsRefusal": "Nepakanka kreditų šiai užklausai.",
       "assistantOutputLimit": "Atsakymas pasiekė modelio išvesties limitą.",
       "assistantStructuredOutput": "Atsakymas neatitiko reikalaujamo formato.",
       "assistantFailed": "Nepavyko sugeneruoti atsakymo."
@@ -2674,29 +2293,34 @@
       "preparingEnvironment": "Rengiama aplinka",
       "preparationComplete": "Parengimas baigtas",
       "preparationFailed": "Parengimas nepavyko",
+      "preparationStageFailed": "{{stage}}: nepavyko",
       "setupCommand": "Sąrankos komanda {{index}}",
       "setupCommandOf": "Sąrankos komanda {{index}} iš {{displayCount}}",
       "stepWorkspaceSetup": "Darbo srities sąranka",
       "stepDiskCheck": "Disko tikrinimas",
-      "stepCloning": "Klonuojama saugykla",
-      "stepBranch": "Nustatoma šaka",
+      "stepCloning": "Saugyklos klonavimas",
+      "stepBranch": "Šakos nustatymas",
       "stepDevcontainerSetup": "Konteinerio sąranka",
-      "stepWorkspaceRestore": "Atkuriamas darbo sritis",
-      "stepWorkspaceBackup": "Įrašoma darbo sritis",
-      "stepSandboxProvision": "Ruošiamas smėliadėžės išteklius",
-      "stepSandboxBoot": "Paleidžiama smėliadėžė",
+      "stepWorkspaceRestore": "Darbo srities atkūrimas",
+      "stepWorkspaceBackup": "Darbo srities įrašymas",
+      "stepSandboxProvision": "Smėliadėžės išteklių ruošimas",
+      "stepSandboxBoot": "Smėliadėžės paleidimas",
       "stepSnapshotFallback": "Bandoma dar kartą be momentinės kopijos",
-      "stepKiloServer": "Paleidžiama Kilo",
-      "stepKiloSession": "Rengiama sesija",
+      "stepKiloServer": "Kilo paleidimas",
+      "stepKiloSession": "Sesijos rengimas",
       "stepRestoreIncomplete": "Sesijos atkūrimas neišsamus",
       "stepReady": "Aplinka paruošta",
       "stepFailed": "Nepavyko paruošti aplinkos",
       "stepUnknown": "Aplinkos sąranka",
       "detailCreatingSandbox": "Kuriamas smėliadėžė",
+      "detailStartingSandbox": "Paleidžiama smėliadėžė",
+      "detailCloningRepository": "Klonuojama saugykla",
       "detailUpdatingRepository": "Atnaujinama saugykla",
       "detailCheckingOutBranch": "Perjungiama šaka",
+      "detailSettingUpBranch": "Nustatoma šaka",
       "detailRunningSetupCommands": "Vykdomos sąrankos komandos",
       "detailSavingRepository": "Saugoma saugykla greitesniam paleidimui",
+      "detailStartingKilo": "Paleidžiama Kilo",
       "detailStartingKiloRuntime": "Paleidžiama Kilo vykdyklė",
       "detailPreparingKiloSession": "Rengiama Kilo sesija",
       "detailWaitingForPreviousSandbox": "Laukiama, kol sustos ankstesnė smėliadėžė",
@@ -2712,7 +2336,7 @@
       "detailSetupCommandTimedOut": "Baigėsi sąrankos komandos {{index}} laikas",
       "detailColdRestore": "Šaltis atkūrimas, momentinė kopija pritaikyta, atkurti failai: {{applied}} iš {{total}}",
       "detailProgressPercent": "Atlikta {{percent}}%",
-      "detailRestoreIncompleteReport": "Sesijos atkūrimas neišsamus, neatkurti failai: {{skipped}} iš {{total}} ({{reasons}})",
+      "detailRestoreIncompleteFiles": "Neatkurti failai: {{skipped}} iš {{total}} ({{reasons}})",
       "detailRestoreIncompleteMissing": "Trūksta: {{paths}}",
       "detailRestoreIncompleteMore": "{{listed}} ir dar {{omitted}}",
       "detailReasonPatchFailed": "patch nepavyko pritaikyti",
@@ -2744,6 +2368,10 @@
     "permissionCard": {
       "title": "Reikalingas leidimas",
       "allowQuestion": "Leisti {{permission}}?",
+      "subjectExternalDirectory": "išorinis katalogas",
+      "subjectDoomLoop": "pasikartojantis įrankio kvietimas",
+      "subjectAgentManager": "subagentų valdymas",
+      "subjectSandboxEscalation": "komandos vykdymas už smėliadėžės ribų",
       "appliesTo": "Taikoma:",
       "denyPermission": "Nesuteikti leidimo",
       "deny": "Neleisti",
@@ -2785,7 +2413,7 @@
       "positionHint": "(1 iš {{displayCount}})",
       "movedPastPrompt": "Agentas jau perėjo prie kito veiksmo. Ši kortelė užsidarys, kai sesija bus tęsiama.",
       "waitingForAnswer": "Agentas laukia jūsų atsakymo. Kol neatsakysite į šį klausimą, jūsų žinutės siuntimas agentui bus pristabdytas.",
-      "waitingForPermission": "Agentas laukia leidimo. Kol neatsakysite į šį prašymą, jūsų žinutės siuntimas agentui bus pristabdytas."
+      "waitingForPermission": "Kol neatsakysite į šį prašymą, jūsų žinutės siuntimas agentui bus pristabdytas."
     },
     "childSession": {
       "accessibilityLabel": "Agentas {{agentName}}, užduotis: {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
@@ -2875,10 +2503,6 @@
       "uploadFailedRetry": "Įkelti nepavyko. Bakstelėkite, kad bandytumėte dar kartą.",
       "moveLeft": "Perkelti {{filename}} į kairę",
       "moveRight": "Perkelti {{filename}} į dešinę"
-    },
-    "attachmentPasteHint": {
-      "accessibility": "Įklijuoti paveikslėlį iš iškarpinės",
-      "label": "Įklijuoti aptiktą paveikslėlį"
     },
     "attachmentPicker": {
       "camera": "Fotoaparatas",
@@ -2973,16 +2597,17 @@
     },
     "contextUsage": {
       "windowUnavailable": "Konteksto lango dydis nežinomas",
-      "tapToViewDetails": "Bakstelėkite, kad pamatytumėte konteksto informaciją.",
-      "costSuffix": ", kaina {{cost}}",
-      "tokensWindowUnavailable": "Konteksto žetonų: {{used}}, lango dydis nežinomas",
-      "tokensUsage": "Konteksto žetonų: {{used}} iš {{window}}, panaudota {{percentage}}",
+      "tapToViewDetails": " Bakstelėkite, kad pamatytumėte konteksto informaciją.",
+      "costClause": ", kaina {{cost}}",
+      "loadingCostSpoken": "kaina {{cost}}.",
+      "tokensWindowUnavailable": "Konteksto žetonų: {{used}}, lango dydis nežinomas{{costClause}}.",
+      "tokensUsage": "Konteksto žetonų: {{used}} iš {{window}}, panaudota {{percentage}}{{costClause}}.",
       "title": "Konteksto naudojimas",
       "used": "Panaudota",
       "provider": "Teikėjas",
       "totalCost": "Bendra kaina",
       "usageReflectsLatest": "Naudojimo duomenys atitinka paskutinį baigtą asistento atsakymą.",
-      "usageUnavailable": "Konteksto naudojimas neprieinamas",
+      "usageUnavailable": "Konteksto naudojimas neprieinamas{{costClause}}.",
       "tokenUsage": "Žetonų naudojimas",
       "cacheRate": "Iš talpyklos gauta dalis",
       "modelsCount": "Modeliai ({{displayCount}})",
@@ -3069,7 +2694,6 @@
   },
   "addCredits": {
     "cta": "Papildyti kreditus",
-    "description": "Papildykite kreditus, kad galėtumėte naudotis toliau.",
     "billingPage": "atsiskaitymų puslapis"
   },
   "deviceSessions": {
@@ -3088,7 +2712,8 @@
     "signOutThisDeviceTitle": "Atsijungti šiame įrenginyje?",
     "signOutThisSessionTitle": "Baigti šią sesiją?",
     "signOutThisSessionMessage": "Įrenginys „{{device}}“ bus atjungtas nuo paskyros. Jo prieiga prie API gali galioti dar iki valandos.",
-    "webBrowser": "Žiniatinklio naršyklė"
+    "webBrowser": "Žiniatinklio naršyklė",
+    "unknownDevice": "Nežinomas įrenginys"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Nepavyko atidaryti programų parduotuvės.",
@@ -3213,6 +2838,8 @@
     "retryHint": "Bando iš naujo gauti Kilo Pass būseną.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Šiuo metu Kilo Pass įsigyti negalima.",
+    "purchaseUnavailableTitle": "Šiuo metu nepasiekiama",
+    "purchaseUnavailableEnded": "Jūsų Kilo Pass prenumerata baigėsi.",
     "kiloPassManagement": "Kilo Pass valdymas",
     "kiloPassSetup": "Kilo Pass sąranka",
     "subscriptionHeaderDescription": "Mėnesinė prenumerata, kuri prideda kreditų prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje.",
@@ -3574,9 +3201,9 @@
       "searching": "Paieška žiniatinklyje",
       "thinking": "Mąstoma"
     },
-    "planOf": "iš",
+    "planProgress": "{{done}} iš {{total}}",
     "filesChanged": "pakeisti failai",
-    "finishedIn": "Baigta per",
+    "finishedIn": "Baigta per {{duration}}",
     "noActivityFor": "Nėra veiklos",
     "prOpened": "Atidaryta pull užklausa",
     "permissionWants": "Nori vykdyti",
@@ -3584,7 +3211,7 @@
       "provider": "Sustabdyta: teikėjo klaida",
       "tool": "Sustabdyta: įrankio klaida",
       "cancelled": "Sustabdyta: atšaukta",
-      "other": "SUSTABDYTA"
+      "other": "Sustabdyta"
     }
   },
   "transcriptionModel": {
@@ -3886,7 +3513,7 @@
     "reasoningEffort": {
       "modelFlag": "Šis modelis palaiko mąstymo intensyvumą"
     },
-    "creditsRequired": "Nepakanka kreditų šiai žinutei išsiųsti. Papildykite kreditų ir bandykite dar kartą."
+    "creditsRequired": "Nepakanka kreditų šiai žinutei išsiųsti."
   },
   "settingsTools": {
     "confirmTitle": "Patvirtinti šį pakeitimą?"
@@ -3920,8 +3547,8 @@
     "saved": "Išlaidų įspėjimų nustatymai išsaugoti",
     "loadError": "Nepavyko įkelti išlaidų įspėjimų.",
     "saveError": "Nepavyko išsaugoti išlaidų įspėjimų.",
-    "empty": "Išlaidų įspėjimai išjungti. Įjunk juos, kad įspėtum šios srities atsiskaitymo kontaktus.",
-    "noSpend": "Išlaidų dar neužregistruota",
+    "sendAlerts": "Siųsti įspėjimus",
+    "noSpend": "Kol kas jokių išlaidų",
     "spend24h": "Išlaidos per paskutines 24 valandas",
     "multiplierError": "Įvesk daugiklį, lygų 1 arba didesnį",
     "permissionDenied": "Neturite leidimo valdyti išlaidų įspėjimų.",
@@ -4091,6 +3718,7 @@
       "namePlaceholder": "Mano agentas",
       "promptPlaceholder": "Tu esi...",
       "tools": "Įrankiai",
+      "wholeToolRule": "Šis agentas vienu metu taiko vieną taisyklę visiems įrankiams: {{rule}}. Šie jungikliai yra tik skaitomi.",
       "visibility": "Matomumas",
       "visibilityPrimary": "Pagrindinis — rodomas rinkiklyje",
       "visibilitySubagent": "Subagentas — skambinama tik iš kitų",
@@ -4131,7 +3759,8 @@
       "duplicateName": "Komanda tokiu pavadinimu šiame profilyje jau egzistuoja"
     },
     "repoBindings": {
-      "title": "Numatytieji atpirkimo sandorių profiliai",
+      "title": "Numatytieji saugyklų profiliai",
+      "entryLabel": "Numatytieji profiliai",
       "add": "Pridėti numatytąjį",
       "empty": "Jokių numatytųjų sukonfigūruotų",
       "emptyDescription": "Pridėkite numatytąjį nustatymą, kad profilis būtų automatiškai taikomas pradedant atpirkimo seansus.",
@@ -4340,12 +3969,15 @@
     "snapshotSummaryFailed": "AI santraukos sukurti nepavyko. Struktūruota suvestinė vis dar prieinama.",
     "scheduledContextEnabled": "Suplanuotos suvestinės",
     "scheduledContextSettings": "Suplanuotos suvestinės · {{context}}",
-    "scheduledContextHint": "Įjunkite suplanuotą duomenų fiksavimą ir mokamas AI santraukas tik šiam kontekstui. Atrinktos ištraukos su užmaskuota neskelbtina informacija ir struktūruoti faktai siunčiami jūsų modeliui. Santraukoms naudojama programėlės kalba, išsaugota jums pakeitus suvestinės nustatymus. Pakeitus vien programėlės kalbą, santraukų kalba automatiškai neatnaujinama. Mokesčiai nurašomi iš šio konteksto balanso. Suvestinėms be veiklos AI nenaudojamas.",
+    "scheduledContextHint": "Įjunkite suplanuotą duomenų fiksavimą ir mokamas AI santraukas tik šiam kontekstui. Atrinktos ištraukos su užmaskuota neskelbtina informacija ir struktūruoti faktai siunčiami jūsų modeliui. Santraukoms naudojama programėlės kalba, išsaugota jums pakeitus suvestinės nustatymus. Mokesčiai nurašomi iš šio konteksto balanso. Suvestinėms be veiklos AI nenaudojamas.",
     "snapshotSafeguards": "Kiekvienai suplanuotai suvestinei taikomi vienos santraukos laiko ir išlaidų apribojimai, o ne dienos biudžetas.",
     "snapshotEstimateInputTooLarge": "Šioje suvestinėje per daug įrodymų pasirinktam modeliui.",
-    "quietSnapshot": "Pagal turimus duomenis šiai suvestinei nebuvo atrinkta sesijų veiklos. Į AI modelį nesikreipta, AI santrauka neužsakyta ir mokestis netaikytas.",
+    "quietSnapshot": "Šiai suvestinei nebuvo atrinkta sesijų veiklos. AI santrauka neužsakyta ir mokestis netaikytas.",
     "noEnabledContexts": "Nė viename kontekste neįjungtos suplanuotos suvestinės",
     "sourceBlocker": "Sesijai reikia dėmesio",
     "sourceMetadata": "Užfiksuoti sesijos metaduomenys"
+  },
+  "systemSearch": {
+    "couldNotOpenResult": "Nepavyko atidaryti šio paieškos rezultato"
   }
 }

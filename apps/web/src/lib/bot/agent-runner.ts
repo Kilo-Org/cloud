@@ -10,7 +10,7 @@ import {
   updateBotRequest,
 } from '@/lib/bot/request-logging';
 import { getNextBotCallbackStep, getRemainingBotIterations } from '@/lib/bot/step-budget';
-import { resolveBotModelSlug } from '@/lib/bot/model';
+import { resolveBotRunModel } from '@/lib/bot/model';
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
   type SpawnCloudAgentInput,
@@ -137,7 +137,7 @@ async function buildSystemPrompt(
 }
 
 async function pickSummaryModel(modelSlug: string): Promise<string> {
-  return (await isFreeModel(modelSlug)) ? modelSlug : SUMMARY_MODEL;
+  return isFreeModel(modelSlug) ? modelSlug : SUMMARY_MODEL;
 }
 
 async function summarizePrompt(
@@ -209,7 +209,7 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
     headers,
   });
 
-  const modelSlug = resolveBotModelSlug(params.platformIntegration);
+  const modelSlug = await resolveBotRunModel(params.platformIntegration);
   const owner = ownerFromIntegration(params.platformIntegration);
   const chatPlatform = params.thread.adapter.name;
   const botPlatform = botPlatforms.requireByAdapter(params.thread.adapter);

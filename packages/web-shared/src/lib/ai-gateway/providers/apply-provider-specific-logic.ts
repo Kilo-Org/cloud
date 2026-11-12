@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 import { GEMINI_THOUGHT_TAG_MARKER } from '@kilocode/web-shared/lib/ai-gateway/reasoning-details-transform';
 import {
   isOpenRouterProviderConfig,
@@ -19,6 +20,7 @@ import {
 import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/model-settings';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
+import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import {
   isGatewayUserByokProviderId,
   OpenRouterInferenceProviderIdSchema,
@@ -36,7 +38,7 @@ import {
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import {
   repairChatCompletionsTools,
@@ -66,6 +68,7 @@ import { addMissingToolSchemaEnumTypes } from '@kilocode/web-shared/lib/ai-gatew
 import { removeRecursiveToolSchemaRefs } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-recursive-tool-schema-refs';
 import { removeTopLevelToolSchemaCombinators } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
 import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
+import { removeWhitespaceOnlyMessages } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-whitespace-only-messages';
 import {
   addReflectionReasoningPlaceholders,
   isReflectionModel,
@@ -154,15 +157,22 @@ function applyGeminiReasoningTransform(request: OpenRouterChatCompletionRequest)
 }
 
 /**
- * Claude goes to Anthropic directly only for non-trial enterprise
- * organizations; everyone else is served by the other Claude providers.
+ * Claude goes to Anthropic and OpenAI models go to Amazon Bedrock only for
+ * non-trial enterprise organizations; everyone else is served by the other
+ * providers of the model.
  */
 export function getIgnoredProviders(
   requestedModel: string,
-  isAnthropicProviderAllowed: boolean
+  isNonTrialEnterprise: boolean
 ): string[] {
-  if (!isAnthropicProviderAllowed && isClaudeModel(requestedModel)) {
+  if (isNonTrialEnterprise) {
+    return [];
+  }
+  if (isClaudeModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.anthropic];
+  }
+  if (isOpenAiModel(requestedModel)) {
+    return [OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock']];
   }
   return [];
 }
@@ -184,13 +194,13 @@ export function applyPreferredProvider(
     | OpenRouterChatCompletionRequest
     | GatewayResponsesRequest
     | GatewayMessagesRequest,
-  isAnthropicProviderAllowed: boolean
+  isNonTrialEnterprise: boolean
 ) {
   const preferredProviderOrder = resolvePreferredProviderOrder(
     preferredProviderOrderConfig,
     requestedModel
   );
-  const ignoredProviders = getIgnoredProviders(requestedModel, isAnthropicProviderAllowed);
+  const ignoredProviders = getIgnoredProviders(requestedModel, isNonTrialEnterprise);
   if (preferredProviderOrder.length === 0 && ignoredProviders.length === 0) {
     return;
   }
@@ -313,7 +323,8 @@ export async function applyProviderSpecificLogic(
   organizationId: string | null,
   sessionId: string | null,
   taskId: string | null,
-  isNonTrialEnterprise: boolean
+  isNonTrialEnterprise: boolean,
+  dataRegion: OrganizationDataRegion | null
 ) {
   // A user's own gateway key bills their account, so Kilo's routing preferences
   // do not override what the request and their account ask for, and the
@@ -322,10 +333,7 @@ export async function applyProviderSpecificLogic(
     userByok?.some(byok => isGatewayUserByokProviderId(byok.providerId)) ?? false;
 
   removeModelsFallback(requestedModel, requestToMutate);
-  if (
-    isFreeModelExcludingCustomLlms(requestedModel) ||
-    (userByok !== null && !usesUserGatewayKey)
-  ) {
+  if (isFreeModel(requestedModel) || (userByok !== null && !usesUserGatewayKey)) {
     removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
   }
   applyTrackingIds(requestToMutate, provider, userId, taskId);
@@ -365,6 +373,7 @@ export async function applyProviderSpecificLogic(
 
   if (requestToMutate.kind === 'messages') {
     repairMessagesTools(requestToMutate.body);
+    removeWhitespaceOnlyMessages(requestToMutate.body);
   }
 
   if (requestToMutate.kind === 'responses') {
@@ -418,7 +427,8 @@ export async function applyProviderSpecificLogic(
     await applyVercelSettings(
       requestedModel,
       requestToMutate,
-      usesUserGatewayKey ? null : userByok
+      usesUserGatewayKey ? null : userByok,
+      dataRegion
     );
   }
 

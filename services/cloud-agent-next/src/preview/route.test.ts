@@ -2,10 +2,12 @@ import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
 vi.mock('cloudflare:workers', () => ({ DurableObject: class {} }));
-import { getSandbox } from '@cloudflare/sandbox';
-import { mintPreviewSessionToken, type PreviewClaims } from '../auth.js';
+import {
+  mintPreviewSessionToken,
+  validatePreviewSessionToken,
+  type PreviewClaims,
+} from '../auth.js';
 import type {
   PreviewProviderCoordinates,
   ResolvedPreviewTarget,
@@ -16,7 +18,6 @@ import { PREVIEW_SESSION_MISSING_TEXT } from './container-port-fetch.js';
 import {
   PREVIEW_ENTER_PATH,
   PREVIEW_TICKET_USED_TEXT,
-  defaultFetchUpstream,
   handlePreviewOpen,
   handlePreviewRequest,
   type PreviewRouteDeps,
@@ -25,31 +26,29 @@ import {
 
 const SECRET = 'test-secret';
 const SESSION_ID = 'workspace_11111111-1111-4111-8111-111111111111';
+const WORKTREE_ID = 'worktree_22222222-2222-4222-8222-222222222222';
 const HEX = '11111111111141118111111111111111';
+const WORKTREE_HEX = '22222222222242228222222222222222';
 const PORT = 5173;
 const LABEL = `p${PORT}-${HEX}`;
+const WORKTREE_LABEL = `w${PORT}-${WORKTREE_HEX}`;
 const SUFFIX = 'preview.test';
 const HOST = `${LABEL}.${SUFFIX}`;
+const WORKTREE_HOST = `${WORKTREE_LABEL}.${SUFFIX}`;
 const ORIGIN = `http://${HOST}`;
+const WORKTREE_ORIGIN = `http://${WORKTREE_HOST}`;
 
 const env = { NEXTAUTH_SECRET: SECRET, PREVIEW_HOST_SUFFIX: SUFFIX } as unknown as Env;
 
-const CLOUDFLARE_TARGET: ResolvedPreviewTarget = {
-  status: 'ok',
-  coordinates: {
-    provider: 'cloudflare',
-    allocationName: 'ses-11111111111141118111111111111111',
-    containment: false,
-  },
-};
+const FENCE = {
+  provider: 'cloudflare-containers',
+  logicalSandboxId: 'workspace-container',
+  allocationRef: 'allocation-ref',
+} as const;
 
 const CONTAINERS_TARGET: ResolvedPreviewTarget = {
   status: 'ok',
-  coordinates: {
-    provider: 'cloudflare-containers',
-    logicalSandboxId: 'workspace-container',
-    allocationRef: 'allocation-ref',
-  },
+  coordinates: FENCE,
 };
 
 function entryTicket(overrides: Record<string, unknown> = {}): string {
@@ -68,23 +67,56 @@ function entryTicket(overrides: Record<string, unknown> = {}): string {
   );
 }
 
-function sessionToken(overrides: Partial<PreviewClaims> = {}): string {
+function workspaceEntryTicket(overrides: Record<string, unknown> = {}): string {
+  return entryTicket({
+    cloudAgentSessionId: undefined,
+    worktreeId: WORKTREE_ID,
+    ...overrides,
+  });
+}
+
+function sessionToken(overrides: Record<string, unknown> = {}): string {
   return mintPreviewSessionToken(
     {
       userId: 'user-1',
       cloudAgentSessionId: SESSION_ID,
       port: PORT,
+      ...FENCE,
       ...overrides,
-    },
+    } as unknown as PreviewClaims,
     SECRET
   );
 }
 
-function fixture(input: { target?: ResolvedPreviewTarget; accessError?: unknown } = {}) {
+function workspaceToken(overrides: Record<string, unknown> = {}): string {
+  return mintPreviewSessionToken(
+    {
+      userId: 'user-1',
+      worktreeId: WORKTREE_ID,
+      port: PORT,
+      ...FENCE,
+      ...overrides,
+    } as unknown as PreviewClaims,
+    SECRET
+  );
+}
+
+function fixture(
+  input: {
+    target?: ResolvedPreviewTarget;
+    workspaceTarget?: ResolvedPreviewTarget;
+    accessError?: unknown;
+    workspaceAccessError?: unknown;
+  } = {}
+) {
   const validateAccess = vi.fn(async () => {
     if (input.accessError !== undefined) throw input.accessError;
   });
-  const resolvePreviewTarget = vi.fn(async () => input.target ?? CLOUDFLARE_TARGET);
+  const resolvePreviewTarget = vi.fn(async () => input.target ?? CONTAINERS_TARGET);
+  const resolveWorkspaceTarget = vi.fn(async () => {
+    if (input.workspaceAccessError !== undefined) throw input.workspaceAccessError;
+    return input.workspaceTarget ?? input.target ?? CONTAINERS_TARGET;
+  });
   const stub: PreviewSessionStub = { resolvePreviewTarget };
   const getSessionStub = vi.fn(() => stub);
   const usedNonces = new Set<string>();
@@ -100,6 +132,7 @@ function fixture(input: { target?: ResolvedPreviewTarget; accessError?: unknown 
   const deps: PreviewRouteDeps = {
     validateAccess,
     getSessionStub,
+    resolveWorkspaceTarget,
     consumeTicketNonce,
     fetchUpstream,
   };
@@ -107,6 +140,7 @@ function fixture(input: { target?: ResolvedPreviewTarget; accessError?: unknown 
     deps,
     validateAccess,
     resolvePreviewTarget,
+    resolveWorkspaceTarget,
     getSessionStub,
     consumeTicketNonce,
     fetchUpstream,
@@ -130,6 +164,12 @@ function proxyRequest(
   const headers = new Headers(init.headers);
   if (token !== null) headers.set('Cookie', `${cookieName}=${token}`);
   return new Request(`${ORIGIN}/page?q=1`, { ...init, headers });
+}
+
+function workspaceProxyRequest(token: string | null): Request {
+  const headers = new Headers();
+  if (token !== null) headers.set('Cookie', `${PREVIEW_COOKIE_NAME}=${token}`);
+  return new Request(`${WORKTREE_ORIGIN}/page?q=1`, { headers });
 }
 
 function coordinatesOf(
@@ -159,8 +199,8 @@ describe('preview host dispatch', () => {
 });
 
 describe('preview entry', () => {
-  it('303-redirects to / and mints a host cookie bound to the label', async () => {
-    const { deps, validateAccess } = fixture();
+  it('303-redirects to / and mints a host cookie bound to the label and allocation', async () => {
+    const { deps, validateAccess, resolvePreviewTarget } = fixture();
     const response = await handlePreviewRequest(entryRequest(entryTicket()), env, deps);
     expect(response.status).toBe(303);
     expect(response.headers.get('location')).toBe('/');
@@ -175,6 +215,56 @@ describe('preview entry', () => {
     expect(validateAccess).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user-1', cloudAgentSessionId: SESSION_ID })
     );
+    expect(resolvePreviewTarget).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves a workspace target and binds the cookie to its allocation', async () => {
+    const { deps, validateAccess, resolveWorkspaceTarget } = fixture();
+    const response = await handlePreviewRequest(
+      new Request(`${WORKTREE_ORIGIN}${PREVIEW_ENTER_PATH}?ticket=${workspaceEntryTicket()}`),
+      env,
+      deps
+    );
+    expect(response.status).toBe(303);
+    const cookie = response.headers.get('set-cookie') ?? '';
+    expect(cookie).toContain(`${PREVIEW_COOKIE_NAME}=`);
+    expect(validateAccess).not.toHaveBeenCalled();
+    expect(resolveWorkspaceTarget).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', worktreeId: WORKTREE_ID })
+    );
+
+    const token = cookie.slice(cookie.indexOf('=') + 1, cookie.indexOf(';'));
+    expect(validatePreviewSessionToken(token, SECRET)).toMatchObject({
+      success: true,
+      claims: {
+        worktreeId: WORKTREE_ID,
+        provider: 'cloudflare-containers',
+        logicalSandboxId: 'workspace-container',
+        allocationRef: 'allocation-ref',
+      },
+    });
+  });
+
+  it.each([
+    ['stopped', { status: 'not_running' } as const, 503],
+    ['unsupported_provider', { status: 'unsupported_provider' } as const, 409],
+  ])('does not mint a cookie for a %s target', async (_name, target, status) => {
+    const { deps, consumeTicketNonce } = fixture({ target });
+    const response = await handlePreviewRequest(entryRequest(entryTicket()), env, deps);
+    expect(response.status).toBe(status);
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(consumeTicketNonce).not.toHaveBeenCalled();
+  });
+
+  it('answers 503 when the entry cannot resolve the current target', async () => {
+    const { deps, consumeTicketNonce, resolvePreviewTarget } = fixture();
+    resolvePreviewTarget.mockRejectedValueOnce(new Error('rpc down'));
+    const response = await handlePreviewRequest(entryRequest(entryTicket()), env, deps);
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('1');
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(consumeTicketNonce).not.toHaveBeenCalled();
   });
 
   it('keeps the session cookie for the session lifetime, not the 60 s entry ticket lifetime', async () => {
@@ -538,6 +628,129 @@ describe('preview proxy denials that never reach the resolver or stub', () => {
   });
 });
 
+describe('preview cookie allocation fence', () => {
+  it('proxies a workspace cookie when the current allocation fence matches', async () => {
+    const { deps, resolveWorkspaceTarget, fetchUpstream } = fixture();
+    const response = await handlePreviewRequest(workspaceProxyRequest(workspaceToken()), env, deps);
+    expect(response.status).toBe(200);
+    expect(resolveWorkspaceTarget).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', worktreeId: WORKTREE_ID })
+    );
+    expect(fetchUpstream).toHaveBeenCalledTimes(1);
+    expect(coordinatesOf(fetchUpstream)).toEqual(CONTAINERS_TARGET.coordinates);
+  });
+
+  it.each([
+    ['allocationRef', { allocationRef: 'stale-allocation' }],
+    ['logicalSandboxId', { logicalSandboxId: 'stale-container' }],
+    ['provider', { provider: 'vercel' }],
+  ])(
+    'fails closed when the cookie %s does not match the current target',
+    async (_name, overrides) => {
+      const { deps, fetchUpstream } = fixture();
+      const response = await handlePreviewRequest(proxyRequest(sessionToken(overrides)), env, deps);
+      expect(response.status).toBe(401);
+      await expect(response.text()).resolves.toBe(PREVIEW_SESSION_MISSING_TEXT);
+      expect(fetchUpstream).not.toHaveBeenCalled();
+    }
+  );
+
+  it('fails closed for a workspace cookie minted for a replaced allocation', async () => {
+    const { deps, fetchUpstream } = fixture();
+    const response = await handlePreviewRequest(
+      workspaceProxyRequest(workspaceToken({ allocationRef: 'stale-allocation' })),
+      env,
+      deps
+    );
+    expect(response.status).toBe(401);
+    await expect(response.text()).resolves.toBe(PREVIEW_SESSION_MISSING_TEXT);
+    expect(fetchUpstream).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for a legacy cookie without allocation fence claims', async () => {
+    const { deps, fetchUpstream } = fixture();
+    const legacy = jwt.sign(
+      {
+        type: 'preview_session',
+        userId: 'user-1',
+        cloudAgentSessionId: SESSION_ID,
+        port: PORT,
+      },
+      SECRET,
+      { algorithm: 'HS256', expiresIn: 3600, audience: 'cloud-agent-preview-session' }
+    );
+    const response = await handlePreviewRequest(proxyRequest(legacy), env, deps);
+    expect(response.status).toBe(401);
+    await expect(response.text()).resolves.toBe(PREVIEW_SESSION_MISSING_TEXT);
+    expect(fetchUpstream).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for an expired allocation-bound cookie', async () => {
+    const { deps, fetchUpstream } = fixture();
+    const expired = mintPreviewSessionToken(
+      {
+        userId: 'user-1',
+        cloudAgentSessionId: SESSION_ID,
+        port: PORT,
+        ...FENCE,
+      },
+      SECRET,
+      Math.floor(Date.now() / 1000) - 7200
+    );
+    const response = await handlePreviewRequest(proxyRequest(expired), env, deps);
+    expect(response.status).toBe(401);
+    await expect(response.text()).resolves.toBe(PREVIEW_SESSION_MISSING_TEXT);
+    expect(fetchUpstream).not.toHaveBeenCalled();
+  });
+});
+
+describe('preview workspace resolution errors', () => {
+  const forbidden = new TRPCError({ code: 'FORBIDDEN' });
+  const unavailable = new TRPCError({ code: 'SERVICE_UNAVAILABLE' });
+
+  it('maps a workspace resolution FORBIDDEN to 403 on entry without minting', async () => {
+    const { deps, consumeTicketNonce } = fixture({ workspaceAccessError: forbidden });
+    const response = await handlePreviewRequest(
+      new Request(`${WORKTREE_ORIGIN}${PREVIEW_ENTER_PATH}?ticket=${workspaceEntryTicket()}`),
+      env,
+      deps
+    );
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('Session access denied');
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(consumeTicketNonce).not.toHaveBeenCalled();
+  });
+
+  it('maps a workspace resolution SERVICE_UNAVAILABLE to a retryable 503 on entry', async () => {
+    const { deps, consumeTicketNonce } = fixture({ workspaceAccessError: unavailable });
+    const response = await handlePreviewRequest(
+      new Request(`${WORKTREE_ORIGIN}${PREVIEW_ENTER_PATH}?ticket=${workspaceEntryTicket()}`),
+      env,
+      deps
+    );
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('1');
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(consumeTicketNonce).not.toHaveBeenCalled();
+  });
+
+  it('maps a workspace resolution FORBIDDEN to 403 on proxy without fetching', async () => {
+    const { deps, fetchUpstream } = fixture({ workspaceAccessError: forbidden });
+    const response = await handlePreviewRequest(workspaceProxyRequest(workspaceToken()), env, deps);
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('Session access denied');
+    expect(fetchUpstream).not.toHaveBeenCalled();
+  });
+
+  it('maps a workspace resolution SERVICE_UNAVAILABLE to a retryable 503 on proxy', async () => {
+    const { deps, fetchUpstream } = fixture({ workspaceAccessError: unavailable });
+    const response = await handlePreviewRequest(workspaceProxyRequest(workspaceToken()), env, deps);
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('1');
+    expect(fetchUpstream).not.toHaveBeenCalled();
+  });
+});
+
 describe('preview open hop on the worker host', () => {
   function openRequest(ticket: string | null, base = 'http://localhost:8794'): Request {
     const query = ticket === null ? '' : `?ticket=${encodeURIComponent(ticket)}`;
@@ -556,6 +769,18 @@ describe('preview open hop on the worker host', () => {
     const location = new URL(response.headers.get('location') ?? '');
     expect(location.origin).toBe(`http://${LABEL}.localhost:8794`);
     expect(location.pathname).toBe(PREVIEW_ENTER_PATH);
+    expect(location.searchParams.get('ticket')).toBe(ticket);
+  });
+
+  it('redirects a workspace ticket to its own w label', async () => {
+    const ticket = workspaceEntryTicket();
+    const response = await handlePreviewOpen(openRequest(ticket), {
+      ...env,
+      PREVIEW_HOST_SUFFIX: 'localhost',
+    } as Env);
+    expect(response.status).toBe(303);
+    const location = new URL(response.headers.get('location') ?? '');
+    expect(location.origin).toBe(`http://${WORKTREE_LABEL}.localhost:8794`);
     expect(location.searchParams.get('ticket')).toBe(ticket);
   });
 
@@ -742,7 +967,7 @@ describe('preview Origin policy', () => {
 });
 
 describe('preview upstream forwarding', () => {
-  it('sends the cloudflare marker without a client marker', async () => {
+  it('ignores a client allocation marker and sends the owned allocation', async () => {
     const { deps, fetchUpstream } = fixture();
     await handlePreviewRequest(
       proxyRequest(sessionToken(), {
@@ -753,8 +978,8 @@ describe('preview upstream forwarding', () => {
     );
     const upstream = upstreamRequestOf(fetchUpstream);
     expect(upstream.headers.get('x-kilo-preview-port')).toBe(String(PORT));
-    expect(upstream.headers.get('x-kilo-preview-allocation')).toBeNull();
-    expect(coordinatesOf(fetchUpstream)).toEqual(CLOUDFLARE_TARGET.coordinates);
+    expect(upstream.headers.get('x-kilo-preview-allocation')).toBe('allocation-ref');
+    expect(coordinatesOf(fetchUpstream)).toEqual(CONTAINERS_TARGET.coordinates);
   });
 
   it('adds the allocation marker for a cloudflare-containers target', async () => {
@@ -814,6 +1039,22 @@ describe('preview upstream forwarding', () => {
     expect(response.headers.get('set-cookie')).toBe('a=1; Path=/');
   });
 
+  it.each(['127.0.0.2', '127.255.255.254', '[::ffff:7f00:1]', 'localhost.', 'app.localhost'])(
+    'rewrites a same-port %s redirect to the preview origin through the preview route',
+    async host => {
+      const { deps, fetchUpstream } = fixture();
+      fetchUpstream.mockResolvedValueOnce(
+        new Response(null, {
+          status: 302,
+          headers: { Location: `http://${host}:${PORT}/login` },
+        })
+      );
+      const response = await handlePreviewRequest(proxyRequest(sessionToken()), env, deps);
+      expect(response.status).toBe(302);
+      expect(response.headers.get('location')).toBe(`${ORIGIN}/login`);
+    }
+  );
+
   it('drops the preview cookie the app tries to set', async () => {
     const { deps, fetchUpstream } = fixture();
     fetchUpstream.mockResolvedValueOnce(
@@ -856,83 +1097,5 @@ describe('preview upstream forwarding', () => {
     );
     expect(response.status).toBe(200);
     expect(fetchUpstream).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('default upstream namespace', () => {
-  const namespaces = {
-    Sandbox: { name: 'Sandbox' },
-    SandboxContainment: { name: 'SandboxContainment' },
-    SandboxSmallContainment: { name: 'SandboxSmallContainment' },
-    SandboxCodeReviewContainment: { name: 'SandboxCodeReviewContainment' },
-    SandboxDIND: { name: 'SandboxDIND' },
-  };
-  const namespaceEnv = { ...env, ...namespaces } as unknown as Env;
-  const PLACED_KEY = `sbx-${'a'.repeat(48)}`;
-
-  async function namespaceFor(coordinates: PreviewProviderCoordinates): Promise<unknown> {
-    const sandboxFetch = vi.fn(async () => new Response('ok'));
-    const mocked = vi.mocked(getSandbox);
-    mocked.mockReset();
-    mocked.mockReturnValue({ fetch: sandboxFetch } as unknown as ReturnType<typeof getSandbox>);
-    const response = await defaultFetchUpstream(
-      namespaceEnv,
-      coordinates,
-      new Request(`${ORIGIN}/`)
-    );
-    expect(response.status).toBe(200);
-    expect(sandboxFetch).toHaveBeenCalledTimes(1);
-    const [namespace, sandboxId] = mocked.mock.calls[0] ?? [];
-    expect(sandboxId).toBe(
-      coordinates.provider === 'cloudflare' ? coordinates.allocationName : undefined
-    );
-    return namespace;
-  }
-
-  it('routes a placed contained key through its pinned kind', async () => {
-    await expect(
-      namespaceFor({
-        provider: 'cloudflare',
-        allocationName: PLACED_KEY,
-        containment: true,
-        sandboxKind: 'isolated',
-      })
-    ).resolves.toBe(namespaces.SandboxSmallContainment);
-    await expect(
-      namespaceFor({
-        provider: 'cloudflare',
-        allocationName: PLACED_KEY,
-        containment: true,
-        sandboxKind: 'shared',
-      })
-    ).resolves.toBe(namespaces.SandboxContainment);
-  });
-
-  it('routes a placed key without containment to the standard pool', async () => {
-    await expect(
-      namespaceFor({
-        provider: 'cloudflare',
-        allocationName: PLACED_KEY,
-        containment: false,
-        sandboxKind: 'isolated',
-      })
-    ).resolves.toBe(namespaces.Sandbox);
-  });
-
-  it('keeps routing a legacy prefixed key by its prefix', async () => {
-    await expect(
-      namespaceFor({
-        provider: 'cloudflare',
-        allocationName: 'ses-11111111111141118111111111111111',
-        containment: false,
-      })
-    ).resolves.toBe(namespaces.Sandbox);
-    await expect(
-      namespaceFor({
-        provider: 'cloudflare',
-        allocationName: 'ses-11111111111141118111111111111111',
-        containment: true,
-      })
-    ).resolves.toBe(namespaces.SandboxSmallContainment);
   });
 });

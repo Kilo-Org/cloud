@@ -1,5 +1,11 @@
 export const SENSITIVE_QUERY_PARAMS = new Set(['callbackurl', 'code', 'email', 'state', 'token']);
 export const SENSITIVE_PATHS = new Set(['/auth/verify-magic-link']);
+/**
+ * Query params whose value is itself a path with a query. Sign-in keeps the
+ * page a person was going to in `callbackPath`, so a sensitive param of that
+ * page rides along inside it.
+ */
+const NESTED_PATH_QUERY_PARAMS = new Set(['callbackpath']);
 const SESSION_SHARE_SEGMENT = 's/:share_token';
 const LEGACY_SHARE_SEGMENT = 'share/:share_id';
 const SHARE_PATH_SEGMENT = /(^|\/)(s|share)\/[^/?#\s"']+/g;
@@ -31,12 +37,25 @@ export function sanitizeAnalyticsText(value: string): string {
   return redactSharePaths(value);
 }
 
-function sanitizeSearchParams(searchParams: string): string {
+/** A path with its own query sanitized; the path and fragment are kept. */
+function sanitizeNestedPath(value: string): string {
+  const queryStart = value.indexOf('?');
+  if (queryStart === -1) return value;
+  const fragmentStart = value.indexOf('#', queryStart);
+  const queryEnd = fragmentStart === -1 ? value.length : fragmentStart;
+  const path = value.slice(0, queryStart);
+  const fragment = value.slice(queryEnd);
+  const query = sanitizeSearchParams(value.slice(queryStart + 1, queryEnd), false);
+  return `${path}${query ? `?${query}` : ''}${fragment}`;
+}
+
+function sanitizeSearchParams(searchParams: string, sanitizeNested = true): string {
   const sanitizedParams = new URLSearchParams();
   new URLSearchParams(searchParams).forEach((value, key) => {
-    if (!SENSITIVE_QUERY_PARAMS.has(key.toLowerCase())) {
-      sanitizedParams.append(key, value);
-    }
+    const name = key.toLowerCase();
+    if (SENSITIVE_QUERY_PARAMS.has(name)) return;
+    const nested = sanitizeNested && NESTED_PATH_QUERY_PARAMS.has(name);
+    sanitizedParams.append(key, nested ? sanitizeNestedPath(value) : value);
   });
   return sanitizedParams.toString();
 }

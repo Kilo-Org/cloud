@@ -37,6 +37,8 @@ export type Device = {
   names: readonly string[];
   apply: (config: CellConfig) => void;
   restore: () => void;
+  /** Restart the app process: the recovery when its inspector does not come back. */
+  relaunch?: () => void;
   screenshot: (file: string) => void;
   record: (file: string, seconds: number) => Recording;
   tap?: (xPx: number, yPx: number) => void;
@@ -543,6 +545,21 @@ async function ensureLanguage(ctx: CaptureContext, want: LanguageTarget): Promis
     current => languageMatches(current, want),
     RELOAD_WAIT_MS
   );
+  // The inspector does not survive the reload on every emulator: the app keeps
+  // painting while the page list stays empty until the process restarts. When
+  // the wait ended without the language matching, restart the app — the
+  // recovery the app itself supports — and wait again.
+  if (!languageMatches(dump, want) && ctx.device.relaunch !== undefined) {
+    ctx.log(`design-gate: language did not come back after the reload; relaunching the app`);
+    ctx.probe.disconnect();
+    ctx.device.relaunch();
+    await waitForApp(
+      ctx.probe,
+      ctx.clock,
+      current => languageMatches(current, want),
+      APP_WAIT_MS
+    );
+  }
   await waitForStableLayout(ctx.probe, ctx.clock);
   return { matched: languageMatches(dump, want), reloaded: true };
 }

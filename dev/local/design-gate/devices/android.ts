@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { InfraError, type Device, type Exec, type Spawn } from '../capture';
+import { APP_ID } from '../report';
 import { compactSize, type CellConfig } from '../matrix';
 
 const REMOTE_UI_XML = '/sdcard/design-gate-ui.xml';
@@ -108,6 +109,14 @@ export function createAndroidDevice(options: { exec: Exec; spawn: Spawn; serial:
       setSize(config.compact ? compactSize(densityDpi) : initial.sizeOverride);
       if (config.landscape) setRotation('0', '1');
       else setRotation(initial.accelerometerRotation, initial.userRotation);
+    },
+    // The dev client's inspector does not survive a runtime reload on every
+    // emulator: after a language switch the app keeps painting while the page
+    // list stays empty until the process restarts. Relaunch is the recovery
+    // the app itself supports; the runner waits for readiness afterwards.
+    relaunch: () => {
+      shell('am', 'force-stop', APP_ID);
+      shell('monkey', '-p', APP_ID, '-c', 'android.intent.category.LAUNCHER', '1');
     },
     restore: () => {
       const errors: unknown[] = [];

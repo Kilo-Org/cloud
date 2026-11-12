@@ -174,8 +174,13 @@ repository.
    App installation or GitLab connection.
 2. The session MUST NOT require the requesting member to link a personal GitHub
    or GitLab identity.
-3. A GitHub-triggered action from an organization repository MUST require write
-   access for the triggering GitHub account.
+3. Rule 1 applies to every session mode, including a session that changes code.
+   The system MUST NOT check the requesting member's own permission on the
+   repository or project. A member who can use the integration gets the access
+   of the organization's connection, as in an organization web session.
+4. A GitHub-triggered action from an organization repository MUST require write
+   access for the triggering GitHub account. That account is not necessarily an
+   organization member.
 
 ### Stacked Worktrees
 
@@ -812,6 +817,14 @@ The following use SHOULD and are not enforced today:
      load the `AGENTS.md` or skills of each repository.
 
 ## Changelog
+
+### 2026-11-12 -- Organization repository access
+
+- Sessions from organization chat integrations get repository access from the
+  organization's GitHub or GitLab connection, in every mode. They no longer
+  require a personal provider identity or the member's own repository
+  permission. GitHub-triggered actions still check the triggering account's
+  write access.
 
 ### 2026-11-10 -- Worktree pull requests
 

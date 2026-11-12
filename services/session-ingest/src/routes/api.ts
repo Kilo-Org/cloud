@@ -673,20 +673,6 @@ api.get('/session/:sessionId/diff', async c => {
 });
 
 /**
- * Paginated session-message history for any Kilo session the user owns.
- * Reuses the same `(owner, current organization membership)` check shape as
- * `SessionIngestRPC.findOwnedAccessibleSession` and delegates the bounded
- * read to `SessionIngestDO.readKiloSdkMessages`. Mobile uses the default
- * page size of 50; the existing max of 100 is honored for callers that
- * request more.
- *
- * The id takes `storedSessionIdSchema`: a session created before the
- * canonical `ses_…` shape was issued keeps the id it was created with, and
- * this read is what shows its stored transcript. The access check below, not
- * the id shape, decides who may read it.
- */
-
-/**
  * Deadline for the best-effort session-metadata read on the initial page.
  *
  * The read runs alongside the history read and the page is complete without
@@ -699,6 +685,19 @@ api.get('/session/:sessionId/diff', async c => {
  */
 const SESSION_METADATA_READ_DEADLINE_MS = 2_000;
 
+/**
+ * Paginated session-message history for any Kilo session the user owns.
+ * Reuses the same `(owner, current organization membership)` check shape as
+ * `SessionIngestRPC.findOwnedAccessibleSession` and delegates the bounded
+ * read to `SessionIngestDO.readKiloSdkMessages`. Mobile uses the default
+ * page size of 50; the existing max of 100 is honored for callers that
+ * request more.
+ *
+ * The id takes `storedSessionIdSchema`: a session created before the
+ * canonical `ses_…` shape was issued keeps the id it was created with, and
+ * this read is what shows its stored transcript. The access check below, not
+ * the id shape, decides who may read it.
+ */
 api.get('/session/:sessionId/messages', async c => {
   const rawSessionId = c.req.param('sessionId');
   const parsed = storedSessionIdSchema.safeParse(rawSessionId);

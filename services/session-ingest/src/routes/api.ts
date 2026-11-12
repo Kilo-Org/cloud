@@ -28,6 +28,7 @@ import {
   parentOrganizationMembershipsTable,
   personalOrInheritedOrganizationCondition,
   zodJsonValidator,
+  DEFAULT_DO_RETRY_CONFIG,
   withDORetry,
 } from '@kilocode/worker-utils';
 import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
@@ -684,6 +685,20 @@ api.get('/session/:sessionId/diff', async c => {
  * this read is what shows its stored transcript. The access check below, not
  * the id shape, decides who may read it.
  */
+
+/**
+ * Deadline for the best-effort session-metadata read on the initial page.
+ *
+ * The read runs alongside the history read and the page is complete without
+ * its result, so it may never extend the page. It is a `withDORetry` scope
+ * rather than `withinBudget` because a retry scope also stops the remaining
+ * attempts and aborts the in-flight one; abandoning only our wait would leave
+ * the retry loop running for seconds after the page has already answered.
+ * Comfortably above this read's normal cost and above the history read's own
+ * p95, and far below the budget the control plane allows the page.
+ */
+const SESSION_METADATA_READ_DEADLINE_MS = 2_000;
+
 api.get('/session/:sessionId/messages', async c => {
   const rawSessionId = c.req.param('sessionId');
   const parsed = storedSessionIdSchema.safeParse(rawSessionId);
@@ -767,10 +782,10 @@ api.get('/session/:sessionId/messages', async c => {
   // The initial page also carries the session metadata. That read is
   // best-effort and independent of the history read, so it starts alongside it
   // rather than after it: a second serial Durable Object round trip is pure
-  // added latency on the page the caller is waiting for. The rejection is
-  // absorbed here so a failed snapshot read can never fail the page, and so an
-  // abandoned promise cannot surface as an unhandled rejection when the history
-  // read throws first.
+  // added latency on the page the caller is waiting for. Its own deadline
+  // means a stalled RPC cannot hold the page open, and the rejection is
+  // absorbed here so a failed metadata read can never fail the page — or
+  // surface as an unhandled rejection when the history read throws first.
   const sessionInfoPromise =
     inputParse.data.before === undefined
       ? withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
@@ -780,7 +795,11 @@ api.get('/session/:sessionId/messages', async c => {
               sessionId: inputParse.data.kiloSessionId,
             }),
           stub => stub.readKiloSdkSessionSnapshot(),
-          'SessionIngestDO.readKiloSdkSessionSnapshot'
+          'SessionIngestDO.readKiloSdkSessionSnapshot',
+          {
+            ...DEFAULT_DO_RETRY_CONFIG,
+            scope: { deadlineAt: Date.now() + SESSION_METADATA_READ_DEADLINE_MS },
+          }
         ).catch((error: unknown) => {
           console.warn(
             `Failed to fetch session snapshot for session ${inputParse.data.kiloSessionId}:`,

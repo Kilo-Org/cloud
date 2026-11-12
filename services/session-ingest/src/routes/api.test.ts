@@ -2088,6 +2088,50 @@ describe('api routes', () => {
     expect(readKiloSdkMessages).toHaveBeenCalledWith({ limit: 50, before: undefined });
   });
 
+  it('does not let a stalled session-metadata read hold the page open', async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+      const history = { messages: [], nextCursor: null, omittedItemCount: 0 };
+      vi.mocked(getSessionIngestDO).mockReturnValue({
+        readKiloSdkMessages: vi.fn(async () => history),
+        // The best-effort metadata read never answers.
+        readKiloSdkSessionSnapshot: vi.fn(() => Promise.withResolvers<unknown>().promise),
+      } as never);
+
+      const pending = makeApiApp().fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+          method: 'GET',
+        }),
+        makeTestEnv()
+      );
+      // Flush the request to the metadata deadline, then run past it: the page
+      // must answer with the history and no metadata rather than wait.
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(5_000);
+      const res = await pending;
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        success: true,
+        kiloSessionId: 'ses_12345678901234567890123456',
+        history,
+        sessionMetadata: null,
+      });
+      expect(warn).toHaveBeenCalledWith(
+        'Failed to fetch session snapshot for session ses_12345678901234567890123456:',
+        expect.anything()
+      );
+    } finally {
+      warn.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it('requires a live organization when authorizing message reads', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
@@ -3756,37 +3800,46 @@ describe('api routes', () => {
     });
 
     it('falls back to heartbeat titles when the overlay query outlives its budget', async () => {
-      const connectionStub = {
-        getActiveSessions: vi.fn(async () => [
-          baseHeartbeat('ses_aaaaaaaaaaaaaaaaaaaaaaaaaa', 'Heartbeat A'),
-        ]),
-      };
-      vi.mocked(getUserConnectionDO).mockReturnValue(
-        connectionStub as unknown as ReturnType<typeof getUserConnectionDO>
-      );
-      const { db, fns } = makeDbFakes();
-      vi.mocked(getWorkerDb).mockReturnValue(db);
-      // A Postgres hop that never answers. The overlay is an embellishment on
-      // an answer that is already complete, so the route must return the
-      // heartbeat titles instead of holding the caller open until its own
-      // budget expires — which is what made this route a client timeout.
-      fns.selectResult.mockImplementationOnce(() => Promise.withResolvers<unknown[]>().promise);
+      vi.useFakeTimers();
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const connectionStub = {
+          getActiveSessions: vi.fn(async () => [
+            baseHeartbeat('ses_aaaaaaaaaaaaaaaaaaaaaaaaaa', 'Heartbeat A'),
+          ]),
+        };
+        vi.mocked(getUserConnectionDO).mockReturnValue(
+          connectionStub as unknown as ReturnType<typeof getUserConnectionDO>
+        );
+        const { db, fns } = makeDbFakes();
+        vi.mocked(getWorkerDb).mockReturnValue(db);
+        // A Postgres hop that never answers. The overlay is an embellishment on
+        // an answer that is already complete, so the route must return the
+        // heartbeat titles instead of holding the caller open until its own
+        // budget expires — which is what made this route a client timeout.
+        fns.selectResult.mockImplementationOnce(() => Promise.withResolvers<unknown[]>().promise);
 
-      const app = makeApiApp();
-      const res = await app.fetch(
-        new Request('http://local/sessions/active', { method: 'GET' }),
-        makeTestEnv()
-      );
+        const app = makeApiApp();
+        const pending = app.fetch(
+          new Request('http://local/sessions/active', { method: 'GET' }),
+          makeTestEnv()
+        );
+        // Flush the request to its budget timer, then run past it.
+        await vi.advanceTimersByTimeAsync(0);
+        await vi.advanceTimersByTimeAsync(5_000);
+        const res = await pending;
 
-      expect(res.status).toBe(200);
-      const body = (await res.json()) as { sessions: Array<{ id: string; title: string }> };
-      expect(body.sessions.map(s => s.title)).toEqual(['Heartbeat A']);
-      expect(warn).toHaveBeenCalledWith(
-        'Failed to overlay active-session titles from Postgres (non-fatal)',
-        expect.objectContaining({ error: expect.stringContaining('exceeded its') })
-      );
-      warn.mockRestore();
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { sessions: Array<{ id: string; title: string }> };
+        expect(body.sessions.map(s => s.title)).toEqual(['Heartbeat A']);
+        expect(warn).toHaveBeenCalledWith(
+          'Failed to overlay active-session titles from Postgres (non-fatal)',
+          expect.objectContaining({ error: expect.stringContaining('exceeded its') })
+        );
+      } finally {
+        warn.mockRestore();
+        vi.useRealTimers();
+      }
     });
   });
 

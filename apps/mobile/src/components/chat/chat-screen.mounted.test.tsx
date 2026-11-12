@@ -265,7 +265,7 @@ vi.mock('react-native', () => ({
   Platform: platform,
   Pressable: 'Pressable',
   View: 'View',
-useWindowDimensions: () => ({ width: 1080, height: 2400, scale: 2, fontScale: device.fontScale }),
+  useWindowDimensions: () => ({ width: 1080, height: 2400, scale: 2, fontScale: device.fontScale }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 24, left: 0, right: 0 }),

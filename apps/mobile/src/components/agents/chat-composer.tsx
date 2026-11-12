@@ -403,6 +403,12 @@ export function ChatComposer({
   // cannot mutate the draft while a send is in flight. A second submit can
   // never slip through the brief window where React has not yet committed
   // `isSending=true`.
+  //
+  // A press that arrives while this lock is held is dropped before it reaches
+  // the host, and the press that holds it empties the draft (the host's
+  // `onOptimisticSend`) before the chat sees the words. So one burst sends
+  // once: a second tap finds the lock held, or an empty draft, and never adds
+  // a second question to the chat behind the composer.
   const sendLockRef = useRef<SubmitLock>(createSubmitLock());
   // `settleVoiceInputBeforeSubmit` expects a `{ current: boolean }` ref-like
   // and writes through it during settle. The adapter routes every read and

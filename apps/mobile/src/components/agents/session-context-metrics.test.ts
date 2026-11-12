@@ -1,10 +1,14 @@
+/* eslint-disable max-lines -- one case per pill state: permission controls, the hidden pill and the reading share these render helpers. */
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  expectHiddenReservedBox,
+  classNameOf,
+  expectHiddenPill,
   findAll,
   info,
   PILL_LAYOUT_TOKENS,
+  pillOf,
+  propsOf,
   render,
 } from './session-context-metrics-test-helpers';
 
@@ -27,26 +31,22 @@ describe('SessionContextMetrics', () => {
       autoApproveAvailable: true,
       onPress,
     });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as {
-      accessibilityRole: string;
-      accessibilityLabel: string;
-      onPress: () => void;
-      className: string;
-    };
+    const pill = pillOf(root);
+    expect(pill.type).toBe('Pressable');
+    const props = propsOf(pill);
     expect(props.accessibilityRole).toBe('button');
     expect(props.accessibilityLabel).toContain('Tap to view context details.');
-    expect(props.className).not.toContain('opacity-0');
+    expect(props.className ?? '').not.toContain('opacity-0');
     for (const token of PILL_LAYOUT_TOKENS) {
       expect(props.className).toContain(token);
     }
-    props.onPress();
+    props.onPress?.();
     expect(onPress).toHaveBeenCalledOnce();
   });
 
   // The header control is the only way to the session's permission settings,
   // so it must register a tap while the page is still loading instead of
-  // rendering a dead, invisible reserved box.
+  // rendering a dead, invisible control.
   it('keeps the context control tappable while the session page loads', () => {
     const onPress = vi.fn<() => void>();
     const root = render({
@@ -57,12 +57,9 @@ describe('SessionContextMetrics', () => {
       loading: true,
       onPress,
     });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as {
-      accessibilityRole?: string;
-      onPress?: () => void;
-      className?: string;
-    };
+    const pill = pillOf(root);
+    expect(pill.type).toBe('Pressable');
+    const props = propsOf(pill);
     expect(props.accessibilityRole).toBe('button');
     expect(props.className ?? '').not.toContain('opacity-0');
     props.onPress?.();
@@ -79,12 +76,9 @@ describe('SessionContextMetrics', () => {
       hasMessages: false,
       onPress,
     });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as {
-      accessibilityRole?: string;
-      onPress?: () => void;
-      className?: string;
-    };
+    const pill = pillOf(root);
+    expect(pill.type).toBe('Pressable');
+    const props = propsOf(pill);
     expect(props.accessibilityRole).toBe('button');
     expect(props.className ?? '').not.toContain('opacity-0');
     props.onPress?.();
@@ -93,7 +87,7 @@ describe('SessionContextMetrics', () => {
 
   // Usage and permission controls are both still unknown while a session
   // opens (or after a failed open), but the parent can still open the sheet,
-  // so the control must register a tap instead of a dead reserved box.
+  // so the control must register a tap instead of a dead control.
   it('keeps the context control tappable with no usage and no permission controls', () => {
     const onPress = vi.fn<() => void>();
     const root = render({
@@ -103,13 +97,9 @@ describe('SessionContextMetrics', () => {
       autoApproveAvailable: false,
       onPress,
     });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as {
-      accessibilityRole?: string;
-      accessibilityLabel?: string;
-      onPress?: () => void;
-      className?: string;
-    };
+    const pill = pillOf(root);
+    expect(pill.type).toBe('Pressable');
+    const props = propsOf(pill);
     expect(props.accessibilityRole).toBe('button');
     expect(props.accessibilityLabel).toContain('Tap to view context details.');
     expect(props.className ?? '').not.toContain('opacity-0');
@@ -118,7 +108,7 @@ describe('SessionContextMetrics', () => {
   });
 
   it('does not expose permission controls while the session is loading and no sheet can open', () => {
-    expectHiddenReservedBox(
+    expectHiddenPill(
       render({
         info: undefined,
         totalCostMicrodollars: null,
@@ -129,41 +119,45 @@ describe('SessionContextMetrics', () => {
   });
 
   it('empty session is invisible and a11y-hidden', () => {
-    const root = render({
-      info: undefined,
-      totalCostMicrodollars: null,
-      hasMessages: false,
-    });
-    expectHiddenReservedBox(root);
+    expectHiddenPill(
+      render({
+        info: undefined,
+        totalCostMicrodollars: null,
+        hasMessages: false,
+      })
+    );
   });
 
   it('empty session with a cost stays fully hidden', () => {
-    const root = render({
-      info: undefined,
-      totalCostMicrodollars: 150_000,
-      hasMessages: false,
-    });
-    expectHiddenReservedBox(root);
+    expectHiddenPill(
+      render({
+        info: undefined,
+        totalCostMicrodollars: 150_000,
+        hasMessages: false,
+      })
+    );
   });
 
-  it('loading keeps the reserved invisible box', () => {
-    const root = render({
-      loading: true,
-      hasMessages: true,
-      info: undefined,
-      totalCostMicrodollars: null,
-    });
-    expectHiddenReservedBox(root);
+  it('loading keeps the pill hidden', () => {
+    expectHiddenPill(
+      render({
+        loading: true,
+        hasMessages: true,
+        info: undefined,
+        totalCostMicrodollars: null,
+      })
+    );
   });
 
   it('loading wins over missing messages', () => {
-    const root = render({
-      loading: true,
-      hasMessages: false,
-      info: undefined,
-      totalCostMicrodollars: null,
-    });
-    expectHiddenReservedBox(root);
+    expectHiddenPill(
+      render({
+        loading: true,
+        hasMessages: false,
+        info: undefined,
+        totalCostMicrodollars: null,
+      })
+    );
   });
 
   it('first message with cost but no context info shows a visible, non-pressable pill', () => {
@@ -172,20 +166,19 @@ describe('SessionContextMetrics', () => {
       info: undefined,
       totalCostMicrodollars: 150_000,
     });
-    expect(root.type).toBe('View');
-    const className = (root.props as { className?: string }).className ?? '';
-    expect(className).not.toContain('opacity-0');
-    expect(
-      (root.props as { accessibilityElementsHidden?: boolean }).accessibilityElementsHidden
-    ).toBeUndefined();
-    const texts = findAll(root, el => el.type === 'Text');
+    const pill = pillOf(root);
+    expect(pill.type).toBe('View');
+    const props = propsOf(pill);
+    expect(props.className ?? '').not.toContain('opacity-0');
+    expect(props.accessibilityElementsHidden).toBeUndefined();
+    const texts = findAll(pill, el => el.type === 'Text');
     expect(
       texts.some(el => {
-        const children = (el.props as { children?: unknown }).children;
-        return String(children).includes('$0.15');
+        const children = propsOf(el).children;
+        return typeof children === 'string' && children.includes('$0.15');
       })
     ).toBe(true);
-    expect(root.type).not.toBe('Pressable');
+    expect(pill.type).not.toBe('Pressable');
   });
 
   it('context info with onPress renders the pressable pill', () => {
@@ -196,19 +189,15 @@ describe('SessionContextMetrics', () => {
       totalCostMicrodollars: 150_000,
       onPress,
     });
-    expect(root.type).toBe('Pressable');
-    const props = root.props as {
-      accessibilityRole?: string;
-      accessibilityLabel?: string;
-      className?: string;
-      onPress?: () => void;
-    };
+    const pill = pillOf(root);
+    expect(pill.type).toBe('Pressable');
+    const props = propsOf(pill);
     expect(props.accessibilityRole).toBe('button');
     expect(props.accessibilityLabel).toContain('Tap to view context details.');
     expect(props.className ?? '').not.toContain('opacity-0');
     props.onPress?.();
     expect(onPress).toHaveBeenCalledOnce();
-    const ring = findAll(root, el => el.type === 'ContextUsageRing')[0];
+    const ring = findAll(pill, el => el.type === 'ContextUsageRing')[0];
     expect(ring).toBeDefined();
     if (ring == null) {
       throw new Error('expected ContextUsageRing');
@@ -224,86 +213,74 @@ describe('SessionContextMetrics', () => {
       info: info(),
       totalCostMicrodollars: 150_000,
     });
-    expect(root.type).toBe('View');
-    const className = (root.props as { className?: string }).className ?? '';
-    expect(className).not.toContain('opacity-0');
-    const label = (root.props as { accessibilityLabel?: string }).accessibilityLabel ?? '';
-    expect(label).not.toContain('Tap to view');
+    const pill = pillOf(root);
+    expect(pill.type).toBe('View');
+    const props = propsOf(pill);
+    expect(props.className ?? '').not.toContain('opacity-0');
+    expect(props.accessibilityLabel ?? '').not.toContain('Tap to view');
   });
 
-  // The unknown-context-window slot is measured in
-  // `session-context-metrics-unknown-window.test.ts`.
-
-  // The header row hands the trailing cluster a capped 50% box, but RN's
-  // default flexShrink is 0, so the pill must opt in to shrinking and let its
-  // inner text row compress. Otherwise the pill keeps its natural width and
-  // paints past the row's right edge — off-screen on a narrow phone.
-  it('lets the pill and its text row compress inside a constrained header row', () => {
+  // The header caps the trailing cluster, and RN's flexShrink is 0 by default,
+  // so the pill and its reading must all opt in or they paint off-screen. The
+  // percentage keeps its width and the cost is the part that truncates.
+  it('lets the pill and its reading compress inside a constrained header row', () => {
     const root = render({
       hasMessages: true,
       info: info(),
       totalCostMicrodollars: 150_000,
-      onPress: vi.fn(() => undefined),
+      onPress: vi.fn<() => void>(),
     });
-    const textRow = findAll(
-      root,
-      el =>
-        el.type === 'View' &&
-        ((el.props as { className?: string }).className ?? '').includes('items-baseline')
-    )[0];
-    expect(textRow).toBeDefined();
-    if (textRow == null) {
-      throw new Error('expected the inner text row');
-    }
-    const textRowClassName = (textRow.props as { className?: string }).className ?? '';
-    expect(textRowClassName).toContain('min-w-0');
-    expect(textRowClassName).toContain('shrink');
-    const texts = findAll(root, el => el.type === 'Text');
-    expect(texts.length).toBeGreaterThan(0);
-    for (const text of texts) {
-      // The row shrinks, but the texts inside it keep RN's default
-      // flexShrink: 0 unless they opt in too, so a squeezed row can never
-      // compress them and the second text paints past the pill's right edge.
-      // The cost keeps a 28 dp floor — the width of the marker it replaces —
-      // and still compresses below what the row can hold.
-      const textClassName = (text.props as { className?: string }).className ?? '';
-      expect(textClassName).toContain('shrink');
-      expect(textClassName).toMatch(/min-w-(?:0|8)\b/);
-      expect((text.props as { numberOfLines?: number }).numberOfLines).toBe(1);
-    }
+    expect(classNameOf(root)).toContain('min-w-0');
+    expect(classNameOf(root)).toContain('shrink');
+    const pill = pillOf(root);
+    const runs = findAll(pill, el => propsOf(el).numberOfLines === 1);
+    expect(runs).toHaveLength(2);
+    const [percentage, cost] = runs;
+    expect(classNameOf(percentage ?? root).split(' ')).toContain('shrink-0');
+    const costClasses = classNameOf(cost ?? root).split(' ');
+    expect(costClasses).not.toContain('shrink-0');
+    expect(costClasses).toEqual(expect.arrayContaining(['shrink', 'min-w-0']));
   });
 
-  it('messages with neither info nor cost keep the placeholder beside the track-only ring', () => {
+  // A transcript that reports no usage and no cost paints a bare ring: the pill
+  // hugs what it holds instead of holding a value slot open for a reading that
+  // will never arrive.
+  it('paints only the ring when there is no value to show', () => {
+    const root = render({ hasMessages: true, info: undefined, totalCostMicrodollars: null });
+    const pill = pillOf(root);
+    expect(propsOf(pill).className ?? '').not.toContain('opacity-0');
+    expect(propsOf(pill).accessibilityElementsHidden).toBeUndefined();
+    // Nothing paints beside the ring: a value that has not arrived is not a
+    // value, so no text holds a dash in its place.
+    expect(findAll(pill, el => el.type === 'ContextUsageRing')).toHaveLength(1);
+    expect(findAll(pill, el => el.type === 'Text')).toHaveLength(0);
+  });
+
+  // The pill hugs what it holds: the header's trailing cluster ends with the
+  // Follow control, so a reading that arrives widens the pill instead of moving
+  // that control. The reading itself is two texts with one small gap.
+  it('paints the percentage and the cost as two texts with one gap', () => {
     const root = render({
       hasMessages: true,
-      info: undefined,
-      totalCostMicrodollars: null,
+      info: info(),
+      totalCostMicrodollars: 150_000,
+      onPress: vi.fn<() => void>(),
     });
-    expect(root.type).toBe('View');
-    const className = (root.props as { className?: string }).className ?? '';
-    expect(className).not.toContain('opacity-0');
-    expect(
-      (root.props as { accessibilityElementsHidden?: boolean }).accessibilityElementsHidden
-    ).toBeUndefined();
-    // The placeholder slot's painting is covered in
-    // `session-context-metrics-unknown-window.test.ts`.
-    const ring = findAll(root, el => el.type === 'ContextUsageRing')[0];
-    expect(ring).toBeDefined();
-    if (ring == null) {
-      throw new Error('expected ContextUsageRing');
-    }
-    expect((ring.props as { arcFraction?: number }).arcFraction).toBe(0);
+    const pill = pillOf(root);
+    const row = findAll(pill, el => classNameOf(el).includes('items-baseline'))[0];
+    expect(row).toBeDefined();
+    expect(classNameOf(row ?? root)).toContain('gap-1');
+    const texts = findAll(pill, el => el.type === 'Text');
+    expect(texts.map(el => propsOf(el).children)).toHaveLength(2);
+    expect(propsOf(texts[0] ?? root).children).toBe('16%');
+    expect(String(propsOf(texts[1] ?? root).children)).toContain('$0.15');
   });
 
-  // No usage yet: both value slots stay, dashes while settled, one bar while loading.
-  it('holds the value slots over the bare ring, loading them as one bar', () => {
-    const classOf = (el: React.ReactElement) =>
-      (el.props as { className?: string }).className ?? '';
-    const dashes = (root: React.ReactElement) =>
-      findAll(root, el => (el.props as { children?: unknown }).children === '—');
-    const bars = (root: React.ReactElement) => findAll(root, el => el.type === 'Skeleton');
+  // One silhouette from the first paint: until a value exists the pill paints
+  // its ring and nothing else, so a session that settles without usage never
+  // grows a value slot beside it.
+  it('paints the ring alone until a value exists, while loading and after', () => {
     const onPress = vi.fn<() => void>();
-
     const bare = (loading = false) =>
       render({
         info: undefined,
@@ -312,32 +289,14 @@ describe('SessionContextMetrics', () => {
         loading,
         onPress,
       });
-    const settled = bare();
-    const props = settled.props as { accessibilityLabel?: string };
-    expect(props.accessibilityLabel).toContain('usage unavailable');
-    expect(dashes(settled)).toHaveLength(2);
-    // The settled cost dash holds the label's width.
-    expect(classOf(dashes(settled)[1] ?? settled)).toContain('w-8');
-    expect(bars(settled)).toHaveLength(0);
 
-    const loading = bare(true);
-    expect((loading.props as { accessibilityLabel?: string }).accessibilityLabel).not.toContain(
-      'usage unavailable'
-    );
-    const hiddenRows = findAll(loading, el => classOf(el).includes('opacity-0'));
-    expect(hiddenRows).toHaveLength(1);
-    expect(findAll(hiddenRows[0] ?? loading, el => el.type === 'Text')).toHaveLength(2);
-    const [loadingBar] = bars(loading);
-    if (!loadingBar) {
-      throw new Error('expected the value-row bar');
+    for (const pill of [pillOf(bare(false)), pillOf(bare(true))]) {
+      expect(findAll(pill, el => el.type === 'ContextUsageRing')).toHaveLength(1);
+      expect(
+        findAll(pill, el => el.type === 'Text' && !classNameOf(el).includes('opacity-0'))
+      ).toHaveLength(0);
     }
-    // A box over the row, not a fixed width that fits only the default font scale.
-    expect(classOf(loadingBar)).toContain('w-full');
-    expect(classOf(loadingBar)).toContain('bg-muted-soft');
-    const overlays = findAll(
-      loading,
-      el => (el.props as { style?: { position?: string } }).style?.position === 'absolute'
-    );
-    expect(overlays).toHaveLength(1);
+    expect(propsOf(pillOf(bare(false))).accessibilityLabel).toContain('usage unavailable');
+    expect(propsOf(pillOf(bare(true))).accessibilityLabel ?? '').not.toContain('usage unavailable');
   });
 });

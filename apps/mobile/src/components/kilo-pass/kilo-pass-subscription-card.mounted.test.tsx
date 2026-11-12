@@ -154,7 +154,7 @@ describe('KiloPassSubscriptionCard mounted', () => {
   });
 
   it('an active foreground transition triggers no refetch on either query', async () => {
-    queryState.presentationData = { kind: 'unavailable' };
+    queryState.presentationData = { kind: 'unavailable', statusClass: 'inactive' };
 
     await renderCard();
 
@@ -183,7 +183,7 @@ describe('KiloPassSubscriptionCard mounted', () => {
   });
 
   it('renders the unavailable card with its title, description, and button role', async () => {
-    queryState.presentationData = { kind: 'unavailable' };
+    queryState.presentationData = { kind: 'unavailable', statusClass: 'inactive' };
 
     const renderer = await renderCard();
     const card = renderer.root.findByProps({ accessibilityRole: 'button' });
@@ -195,5 +195,18 @@ describe('KiloPassSubscriptionCard mounted', () => {
     // shared `KILO_PASS_TITLE` and the description from the unavailable kind.
     expect(renderedText).toEqual(['Kilo Pass', 'kiloPass.purchaseUnavailable']);
     expect(card.props.accessibilityLabel).toBe('Kilo Pass. kiloPass.purchaseUnavailable');
+  });
+
+  it('renders the ended copy for a pass the server reports as terminal', async () => {
+    queryState.presentationData = { kind: 'unavailable', statusClass: 'terminal' };
+
+    const renderer = await renderCard();
+    const card = renderer.root.findByProps({ accessibilityRole: 'button' });
+    const renderedText = renderer.root
+      .findAll(node => Object.is(node.type, 'Text'))
+      .map(node => node.props.children);
+
+    expect(renderedText).toEqual(['Kilo Pass', 'kiloPass.purchaseUnavailableEnded']);
+    expect(card.props.accessibilityLabel).toBe('Kilo Pass. kiloPass.purchaseUnavailableEnded');
   });
 });

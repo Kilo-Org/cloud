@@ -22,6 +22,7 @@ import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y
 import { MessageErrorBoundary } from './message-error-boundary';
 import { MessageLongPressProvider } from './message-long-press-context';
 import {
+  isGenericResponseFailure,
   type MessageDeliveryStatement,
   messageFailureLabel,
   selectMessageFailure,
@@ -81,6 +82,14 @@ type MessageBubbleProps = {
   retryAvailable?: boolean;
   /** Copies a failed user message's text back into the composer. */
   onCopyToComposer?: (text: string) => void;
+  /**
+   * Whether this turn's preparation group states its failure. The group names
+   * the stage that failed and the reason, so a generic response-failure
+   * statement here would state the same turn twice; the footer keeps its
+   * actions and drops that statement. A classified failure is still shown.
+   * Defaults to false.
+   */
+  failureStatedByPreparation?: boolean;
   /** Restores a canceled queued message's prompt back into the composer. */
   onRestoreQueued?: (message: StoredMessage) => void;
   /**
@@ -107,6 +116,7 @@ function MessageBubbleImpl({
   onAddCredits,
   retryAvailable,
   onCopyToComposer,
+  failureStatedByPreparation,
   onRestoreQueued,
   condenseToolCalls,
 }: Readonly<MessageBubbleProps>) {
@@ -185,6 +195,13 @@ function MessageBubbleImpl({
   // a re-send passes `retryAvailable: false`: the footer then still states the
   // failure, with no action that could not act.
   const failure = selectMessageFailure({ deliveryState, info: message.info, retryAvailable });
+  // A turn whose preparation failed states that failure in its preparation
+  // group, with the stage and the reason. The generic response-failure
+  // statement would state the same turn again, so only the statement goes: the
+  // actions stay here, because a collapsed group must not be able to hide the
+  // turn's recovery.
+  const statedByPreparation =
+    failureStatedByPreparation === true && failure !== null && isGenericResponseFailure(failure);
   const relevantHandlerWired =
     retryAvailable === false ||
     (failure !== null &&
@@ -193,6 +210,14 @@ function MessageBubbleImpl({
           onCopyToComposer !== undefined ||
           (failure.canAddCredits && onAddCredits !== undefined)
         : onRetryMessage !== undefined || (failure.canAddCredits && onAddCredits !== undefined)));
+  // The actions this row would draw, resolved once: the footer is skipped when
+  // the preparation group states the failure and no action is left, so a blank
+  // padded block never sits above that group.
+  const retryAction = failure?.canRetry === true ? onRetryMessage : undefined;
+  const creditsAction = failure?.canAddCredits === true ? onAddCredits : undefined;
+  const copyAction = failure?.canCopy === true && copyText !== '' ? onCopyToComposer : undefined;
+  const actionRenders =
+    retryAction !== undefined || creditsAction !== undefined || copyAction !== undefined;
   // The footer is the failed turn's status, so it sits in the column that turn
   // occupies rather than the row that carries it: a message that never reached
   // the agent is the user's own row, and its title, detail and action row stay
@@ -207,7 +232,7 @@ function MessageBubbleImpl({
   // interface's own start edge, as the assistant rows around them do.
   const trailingFailure = failure?.side === 'user';
   const failureFooter =
-    failure !== null && relevantHandlerWired ? (
+    failure !== null && relevantHandlerWired && (!statedByPreparation || actionRenders) ? (
       /* The actions close the turn rather than opening the next one: the space
          under them is the gap between turns, so a Retry is never read as part of
          the message that follows it. 24 dp is more than twice the gap between a
@@ -215,42 +240,46 @@ function MessageBubbleImpl({
          actions in its own group. `items-end` is logical, so the status stays
          with the end-aligned bubble in either direction. */
       <View className={cn('gap-2 px-4 pt-1 pb-[24px]', trailingFailure && 'items-end')}>
-        <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
-          {failure.error ? (
-            // Every failure that reports an error carries the same marker; a
-            // message the person stopped reports a neutral status and carries
-            // none. The marker is the state, not copy: the title beside it says
-            // what happened, so it carries no text of its own for a screen
-            // reader.
-            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-              <AlertCircle size={14} color={colors.destructive} />
+        {statedByPreparation ? null : (
+          <>
+            <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
+              {failure.error ? (
+                // Every failure that reports an error carries the same marker; a
+                // message the person stopped reports a neutral status and carries
+                // none. The marker is the state, not copy: the title beside it says
+                // what happened, so it carries no text of its own for a screen
+                // reader.
+                <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                  <AlertCircle size={14} color={colors.destructive} />
+                </View>
+              ) : null}
+              <Text
+                className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
+                accessibilityLabel={messageFailureLabel(failure)}
+              >
+                {failure.title}
+              </Text>
             </View>
-          ) : null}
-          <Text
-            className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
-            accessibilityLabel={messageFailureLabel(failure)}
-          >
-            {failure.title}
-          </Text>
-        </View>
-        {failure.detail !== null ? (
-          <Text
-            className={cn(
-              'text-sm leading-[1.25rem] text-muted-foreground',
-              trailingFailure && 'text-right'
-            )}
-          >
-            {failure.detail}
-          </Text>
-        ) : null}
+            {failure.detail !== null ? (
+              <Text
+                className={cn(
+                  'text-sm leading-[1.25rem] text-muted-foreground',
+                  trailingFailure && 'text-right'
+                )}
+              >
+                {failure.detail}
+              </Text>
+            ) : null}
+          </>
+        )}
         <View className="flex-row gap-2">
-          {failure.canRetry && onRetryMessage ? (
+          {retryAction ? (
             <Button
               variant="outline"
               size="sm"
               className={STATE_ACTION_CLASS}
               onPress={() => {
-                onRetryMessage(message);
+                retryAction(message);
               }}
               accessibilityRole="button"
               accessibilityLabel={t('common.retry')}
@@ -258,7 +287,7 @@ function MessageBubbleImpl({
               <Text>{t('common.retry')}</Text>
             </Button>
           ) : null}
-          {failure.canAddCredits && onAddCredits ? (
+          {creditsAction ? (
             // The failure's one recovery action, so it takes the accent surface
             // the person's own bubble and the enabled send control fill with,
             // in both schemes; the theme's `--primary` is olive in light, which
@@ -269,20 +298,20 @@ function MessageBubbleImpl({
               variant="default"
               size="sm"
               className={cn(STATE_ACTION_CLASS, 'bg-accent-soft')}
-              onPress={onAddCredits}
+              onPress={creditsAction}
               accessibilityRole="button"
               accessibilityLabel={t('addCredits.cta')}
             >
               <Text className="text-accent-soft-foreground">{t('addCredits.cta')}</Text>
             </Button>
           ) : null}
-          {failure.canCopy && onCopyToComposer && copyText !== '' ? (
+          {copyAction ? (
             <Button
               variant="outline"
               size="sm"
               className={STATE_ACTION_CLASS}
               onPress={() => {
-                onCopyToComposer(copyText);
+                copyAction(copyText);
               }}
               accessibilityRole="button"
               accessibilityLabel={t('agentChat.messageBubble.copyToComposer')}

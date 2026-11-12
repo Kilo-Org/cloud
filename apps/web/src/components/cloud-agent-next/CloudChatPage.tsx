@@ -1990,6 +1990,7 @@ export default function CloudChatPage({
                                     (isStreaming || activity.type === 'retrying') &&
                                     !activeSuggestion
                                   }
+                                  isPreparing={cloudStatus?.type === 'preparing'}
                                   placeholder="Ask anything…"
                                   slashCommands={availableCommands}
                                   mode={modeControlValue(composerSettings?.mode ?? null)}

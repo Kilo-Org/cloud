@@ -10,6 +10,7 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   runtime_cli_probe_failed: 'Runtime CLI validation failed',
   runtime_supervisor_missing: 'Runtime supervisor is missing',
   preparation_timeout: 'Environment preparation timed out',
+  preparation_cancelled: 'Environment preparation was stopped',
   workspace_setup_failed: 'Workspace setup failed',
   credential_upgrade_required: SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE,
   repository_access_failed:

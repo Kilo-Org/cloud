@@ -21,6 +21,7 @@ import { useManager } from './CloudAgentProvider';
 import { commandsForPhase, phaseStatus, phaseStatusLabel } from './preparation-phases';
 import {
   phaseDisplayText,
+  preparationFailureText,
   preparationSummaryLine,
   summarizePreparationAttempt,
 } from './preparation-summary';
@@ -118,7 +119,7 @@ function PreparationTimeline({ attempt }: { attempt: PreparationAttempt }) {
       )}
 
       {attempt.safeError && !errorShownOnStep && (
-        <p className="mt-3 text-status-destructive">{attempt.safeError}</p>
+        <p className="mt-3 text-status-destructive">{preparationFailureText(attempt.safeError)}</p>
       )}
     </>
   );
@@ -161,7 +162,11 @@ function PhaseRow({
           className="ml-auto shrink-0 text-foreground-subtle tabular-nums"
         />
       </div>
-      {step.safeError && <p className="ml-7 mt-0.5 text-status-destructive">{step.safeError}</p>}
+      {step.safeError && (
+        <p className="ml-7 mt-0.5 text-status-destructive">
+          {preparationFailureText(step.safeError)}
+        </p>
+      )}
       {children && <div className="ml-7 mt-2">{children}</div>}
     </li>
   );
@@ -201,7 +206,7 @@ function CommandCard({
   step: PreparationStepSnapshot;
   fallbackError?: string;
 }) {
-  const error = step.safeError ?? fallbackError;
+  const error = preparationFailureText(step.safeError ?? fallbackError);
   const output = useStickToBottom<HTMLPreElement>(step.outputTail);
 
   return (

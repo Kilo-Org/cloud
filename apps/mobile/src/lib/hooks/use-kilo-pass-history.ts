@@ -11,7 +11,7 @@ import { useTRPC } from '@/lib/trpc';
  * value so a ledger's first page lands before the page prints; a section that
  * owned it would grow under the first frame and push everything below it.
  */
-export type KiloPassLedgerQuery = {
+type KiloPassLedgerQuery = {
   readonly isPending: boolean;
   readonly isError: boolean;
   readonly isFetchingNextPage: boolean;

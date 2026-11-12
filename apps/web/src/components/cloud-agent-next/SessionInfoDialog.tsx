@@ -32,6 +32,7 @@ import {
   sandboxObservationKey,
   type SandboxObservation,
 } from './sandbox-status';
+import { useSessionSharing } from './hooks/useSessionSharing';
 
 type SessionInfoDialogProps = {
   open: boolean;
@@ -69,6 +70,12 @@ export function SessionInfoDialog({
 }: SessionInfoDialogProps) {
   const [showShareDialog, setShowShareDialog] = useState(false);
   const shareButtonRef = useRef<HTMLButtonElement | null>(null);
+  const sharingDisabledReason = useSessionSharing({
+    kiloSessionId,
+    cloudAgentSessionId: sessionId,
+    organizationId,
+    enabled: open || showShareDialog,
+  });
 
   const trpc = useTRPC();
   const compute = useQuery(
@@ -126,6 +133,7 @@ export function SessionInfoDialog({
   return (
     <>
       <ShareSessionDialog
+        key={kiloSessionId}
         open={showShareDialog}
         onOpenChange={setShowShareDialog}
         onCloseAutoFocus={event => {
@@ -134,6 +142,8 @@ export function SessionInfoDialog({
           shareButtonRef.current.focus();
         }}
         kiloSessionId={kiloSessionId}
+        cloudAgentSessionId={sessionId}
+        organizationId={organizationId}
       />
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
@@ -306,12 +316,23 @@ export function SessionInfoDialog({
             </dl>
             <SessionFailureHistory cloudAgentSessionId={sessionId} />
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col gap-3 sm:flex-col sm:items-end">
+            {sharingDisabledReason && (
+              <p
+                id="session-sharing-unavailable"
+                className="text-muted-foreground text-sm"
+                role="status"
+              >
+                {sharingDisabledReason}
+              </p>
+            )}
             <Button
               ref={shareButtonRef}
               type="button"
               variant="outline"
               onClick={() => setShowShareDialog(true)}
+              disabled={Boolean(sharingDisabledReason)}
+              aria-describedby={sharingDisabledReason ? 'session-sharing-unavailable' : undefined}
               className="min-h-11"
             >
               <Share2 className="h-4 w-4" aria-hidden="true" />

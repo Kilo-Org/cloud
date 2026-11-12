@@ -1,10 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
-import { type UsageRange, usageRangeWindow, type UsageWindow } from './usage-window';
+import {
+  fillDailySeries,
+  type UsageRange,
+  usageRangeWindow,
+  type UsageWindow,
+} from './usage-window';
 
 /** The three metrics the screen charts; the summary covers the rest. */
 export type UsageMetric = 'cost' | 'requests' | 'tokens';
@@ -32,15 +38,61 @@ function scopeFilters(scope: UsageScope, window: UsageWindow) {
 }
 
 /**
+ * The current time, refreshed when the UTC day rolls over and when the app
+ * comes back to the foreground. The analytics window ends "now", so a screen
+ * left mounted overnight would otherwise keep asking for yesterday's last
+ * bucket.
+ */
+function useNow(): Date {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined = undefined;
+
+    const scheduleNextMidnight = () => {
+      const current = new Date();
+      const nextMidnight = new Date(current);
+      nextMidnight.setUTCHours(24, 0, 0, 0);
+      timer = setTimeout(
+        () => {
+          setNow(new Date());
+          scheduleNextMidnight();
+        },
+        nextMidnight.getTime() - current.getTime() + 1_000
+      );
+    };
+
+    scheduleNextMidnight();
+    // A resume can cross the day boundary while the timer was suspended.
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        setNow(new Date());
+      }
+    });
+
+    return () => {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+      subscription.remove();
+    };
+  }, []);
+
+  return now;
+}
+
+/**
  * One request set behind the usage screen: totals, the daily series for the
  * selected metric, and the cost leaders by model and by feature. Every call
  * shares the window and scope, so the screen presents them as one read.
  */
 export function useUsageAnalytics(scope: UsageScope, range: UsageRange, metric: UsageMetric) {
   const trpc = useTRPC();
-  // The window is memoized on the range alone: a window rebuilt on every render
-  // would change the query key and refetch without end.
-  const window = useMemo(() => usageRangeWindow(range), [range]);
+  const now = useNow();
+  // The window is memoized on the range and the moment it was measured: a
+  // window rebuilt on every render would change the query key and refetch
+  // without end, while a window pinned at mount would keep yesterday as its end.
+  const window = useMemo(() => usageRangeWindow(range, now), [range, now]);
   const filters = useMemo(() => scopeFilters(scope, window), [scope, window]);
 
   const summary = useQuery({
@@ -74,9 +126,14 @@ export function useUsageAnalytics(scope: UsageScope, range: UsageRange, metric: 
 
   return {
     summary: summary.data,
-    points: timeseries.data?.timeseries,
+    // The chart, and the sum of the two lists' failures, each report on their
+    // own: a screen whose totals loaded can still say which section failed.
+    points: timeseries.data && fillDailySeries(window, timeseries.data.timeseries),
     models: models.data?.breakdown,
     features: features.data?.breakdown,
+    isSummaryError: summary.isError,
+    isSeriesError: timeseries.isError,
+    isBreakdownError: models.isError || features.isError,
     isLoading: queries.some(query => query.isLoading),
     isFetching: queries.some(query => query.isFetching),
     isError: queries.some(query => query.isError),

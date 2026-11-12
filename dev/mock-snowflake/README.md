@@ -17,14 +17,22 @@ pnpm dev:mock-snowflake
 
 It listens on `https://127.0.0.1:4792` (`MOCK_SNOWFLAKE_PORT` overrides the
 port), generates a self-signed certificate under `fixtures/tls/` on first run,
-and writes `fixtures/snowflake-env.txt`: the `SNOWFLAKE_*` block to append to
-`apps/web/.env.development.local`. It never talks to a real warehouse.
+and writes `fixtures/snowflake-env.txt`. It never talks to a real warehouse.
 
-The web dev process must trust the certificate:
+Point the web app at it by appending that block, plus one trust line for the
+self-signed certificate, to the repo-root `.env.local` (the web dev script
+symlinks it into `apps/web` before starting Next.js):
 
 ```sh
-NODE_EXTRA_CA_CERTS=dev/mock-snowflake/fixtures/tls/cert.pem pnpm dev:start web
+cat dev/mock-snowflake/fixtures/snowflake-env.txt >> .env.local
+printf 'NODE_TLS_REJECT_UNAUTHORIZED=0\n' >> .env.local
+pnpm dev:start app
 ```
+
+Both lines are dev-only and `.env.local` is gitignored. `NODE_EXTRA_CA_CERTS`
+does not work here: Next.js loads `.env.local` after Node has already read that
+variable, so the certificate would stay untrusted. The trust line is read per
+connection, so the file is enough.
 
 Then write fixture rows for a fake account that already signed in once:
 
@@ -39,5 +47,9 @@ organization usage scope can both be exercised.
 ## Checks
 
 `fixtures/` is gitignored, so seeding is safe to repeat: each run replaces that
-account's fixture file. Stop the web app if you want the usage screen to fail
-and exercise its error state; restart the mock and retry to see it recover.
+account's fixture file.
+
+To exercise the usage screen's error state, stop the mock (not the web app —
+that removes the screen) and reload the screen; the totals and the chart each
+report the failure with a Retry. Start the mock again and press Retry to see it
+recover.

@@ -19,7 +19,7 @@ import { isolateLtrBidiText } from '@/lib/bidi';
 
 import { UsageBarChart } from './usage-bar-chart';
 import { UsageBreakdownList } from './usage-breakdown-list';
-import { formatUsageCost } from './usage-format';
+import { formatUsageCost, formatUsageCostPrecise } from './usage-format';
 
 const RANGE_OPTIONS = [
   { value: '7d', labelKey: 'spendAlerts.window7d' },
@@ -82,8 +82,15 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
 
   const summary = usage.summary;
   const empty = summary?.requestCount === 0;
-  const failed = usage.isError && summary === undefined;
+  // No totals at all: the screen has nothing to show but the failure.
+  const failed = usage.isSummaryError && summary === undefined;
   const loading = summary === undefined && !failed;
+  // Totals loaded, but a refresh of them failed: keep the numbers and flag them
+  // instead of presenting stale data as current.
+  const staleTotals = usage.isSummaryError && summary !== undefined;
+  const retryAll = () => {
+    usage.refetch();
+  };
 
   return (
     <View className="gap-6">
@@ -102,9 +109,16 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
       {failed && (
         <QueryError
           variant={usage.isPaused ? 'offline' : 'neutral'}
-          onRetry={() => {
-            usage.refetch();
-          }}
+          onRetry={retryAll}
+          isRetrying={usage.isFetching}
+          placement="top"
+        />
+      )}
+
+      {staleTotals && (
+        <QueryError
+          variant={usage.isPaused ? 'offline' : 'neutral'}
+          onRetry={retryAll}
           isRetrying={usage.isFetching}
           placement="top"
         />
@@ -163,7 +177,9 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
               />
               <StatTile
                 label={t('usage.avgCostPerRequest')}
-                value={isolateLtrBidiText(formatUsageCost(summary.costPerRequest, i18n.language))}
+                value={isolateLtrBidiText(
+                  formatUsageCostPrecise(summary.costPerRequest, i18n.language)
+                )}
               />
             </View>
           </View>
@@ -175,14 +191,36 @@ export function UsageContent({ scope }: Readonly<{ scope: UsageScope }>) {
               onChange={setMetric}
               accessibilityLabel={t('usage.metricPicker')}
             />
-            <UsageBarChart
-              points={usage.points ?? []}
-              accessibilityLabel={t('usage.chartA11y', { metric: metricLabel })}
-            />
+            {usage.isSeriesError ? (
+              <QueryError
+                variant={usage.isPaused ? 'offline' : 'neutral'}
+                onRetry={retryAll}
+                isRetrying={usage.isFetching}
+              />
+            ) : (
+              <UsageBarChart
+                points={usage.points ?? []}
+                accessibilityLabel={t('usage.chartA11y', { metric: metricLabel })}
+              />
+            )}
           </View>
 
-          <UsageBreakdownList title={t('usage.topModels')} entries={usage.models ?? []} />
-          <UsageBreakdownList title={t('usage.topFeatures')} entries={usage.features ?? []} />
+          {usage.isBreakdownError ? (
+            <QueryError
+              variant={usage.isPaused ? 'offline' : 'neutral'}
+              onRetry={retryAll}
+              isRetrying={usage.isFetching}
+            />
+          ) : (
+            <>
+              <UsageBreakdownList title={t('usage.topModels')} entries={usage.models ?? []} />
+              <UsageBreakdownList
+                title={t('usage.topFeatures')}
+                entries={usage.features ?? []}
+                humanize
+              />
+            </>
+          )}
         </>
       )}
     </View>

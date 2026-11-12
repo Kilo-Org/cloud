@@ -16,7 +16,11 @@ type UsageBreakdownEntry = {
 type UsageBreakdownListProps = {
   title: string;
   entries: readonly UsageBreakdownEntry[];
-  /** Cost keys are microdollars, the same unit the summary reports. */
+  /**
+   * Feature and mode keys are slugs that read as words; model keys are ids
+   * (`anthropic/claude-sonnet-4`), and web renders those verbatim.
+   */
+  humanize?: boolean;
 };
 
 /**
@@ -24,7 +28,11 @@ type UsageBreakdownListProps = {
  * cost and its share of the returned rows — the same three facts web's
  * breakdown columns carry.
  */
-export function UsageBreakdownList({ title, entries }: Readonly<UsageBreakdownListProps>) {
+export function UsageBreakdownList({
+  title,
+  entries,
+  humanize = false,
+}: Readonly<UsageBreakdownListProps>) {
   const { i18n } = useTranslation();
   if (entries.length === 0) {
     return null;
@@ -46,7 +54,7 @@ export function UsageBreakdownList({ title, entries }: Readonly<UsageBreakdownLi
             }
           >
             <Text className="min-w-0 shrink text-sm text-foreground" numberOfLines={1}>
-              {humanizeDimension(entry.label)}
+              {humanize ? humanizeDimension(entry.label, i18n.language) : entry.label}
             </Text>
             <View className="shrink-0 flex-row items-center gap-2">
               <Text className="text-sm text-foreground tabular-nums">

@@ -126,7 +126,7 @@ function FlaggedTools({ scan }: { scan: EnkryptToolScanReport }) {
   );
 }
 
-/** Counts overlaps and headers repeated across chunks, so it can exceed the part's length. */
+/** Counts separators between packed segments and headers of split segments, so it can exceed the part's length. */
 function charactersSent(scan: Scan): DetailItem {
   return { label: 'Characters sent', value: formatCount(scan.scanned_characters) };
 }

@@ -240,11 +240,11 @@ async function trackDispatch(key: string, dispatch: Promise<boolean>): Promise<b
 
 // How long a response identity is remembered as having opened its page. Expo
 // can deliver one body tap as two responses that are not concurrent — the JS
-// listener first, then the registered background task after the first
-// dispatch settled — so the in-flight map alone cannot stop the second open.
-// The window stays far shorter than a person re-tapping a notification left in
-// the tray.
-const OPENED_EXTERNAL_TTL_MS = 5 * 60 * 1000;
+// listener first, then the registered background task once the first dispatch
+// settled — and both deliveries land within seconds of each other. The window
+// covers that race and nothing longer, so a person tapping the same,
+// still-present notification again a while later opens the page again.
+const OPENED_EXTERNAL_TTL_MS = 10 * 1000;
 
 // Oldest-first, so a full memory drops the least recently opened page.
 const OPENED_EXTERNAL_MEMORY_SIZE = 32;

@@ -972,6 +972,39 @@ describe('handleNeedsInputNotificationResponse — default action', () => {
     expect(mocks.openExternalUrl).toHaveBeenCalledTimes(1);
   });
 
+  it('opens again when the same notification is tapped after the delivery window', async () => {
+    // The memory covers the delivery race only, so a genuine second tap on the
+    // same notification — the page was closed, the row is still in the tray —
+    // opens it again once the window has passed.
+    const sameTap = {
+      identifier: 'e2e-warm-later',
+      actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+      data: { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
+    } as const;
+
+    await handleNeedsInputNotificationResponse(raiseResponse(sameTap), {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+    await vi.waitFor(() => {
+      expect(mocks.openExternalUrl).toHaveBeenCalledTimes(1);
+    });
+
+    // Fake the clock only: the open resolves through a dynamic import, so the
+    // assertion below still needs real microtasks (and `vi.waitFor` real timers).
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 11_000 });
+    try {
+      await handleNeedsInputNotificationResponse(raiseResponse(sameTap), {
+        runInteraction: mocks.runNeedsInputInteraction,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    await vi.waitFor(() => {
+      expect(mocks.openExternalUrl).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it('opens again for a tap on a different notification', async () => {
     await handleNeedsInputNotificationResponse(
       raiseResponse({

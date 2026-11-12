@@ -1,3 +1,4 @@
+import { CURRENT_CAPABILITY_PREFIX } from '@kilocode/worker-utils/scm-capability-contract';
 import { Hono } from 'hono';
 import { trpcServer } from '@hono/trpc-server';
 import { authMiddleware } from '../../src/middleware/auth.js';
@@ -699,6 +700,65 @@ describe('durable workspace repository authority', () => {
       })
     ).rejects.toThrow();
     expect(await f.policy()).toBeNull();
+  });
+  it('keeps GitLab credential admission available when GitHub policy initialization fails', async () => {
+    const f = await fixture();
+    const gitlabAlias = createControlPlaneCredential(f.sandboxId, 'gitlab');
+    const credential = `${CURRENT_CAPABILITY_PREFIX.gitlab}cached-policy-isolation`;
+    const grant = persistedSessionCredentialGrantSchema.parse({
+      ...f.grant,
+      additionalRepositories: [
+        ...(f.grant.additionalRepositories ?? []),
+        {
+          repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+          scm: {
+            purpose: 'gitlab',
+            alias: gitlabAlias,
+            gitUrl: 'https://gitlab.com/acme/repo.git',
+            capability: {
+              credential,
+              outboundContainerId: f.outboundContainerId,
+              issuedAt: Date.now(),
+              expiresAt: Date.now() + 30 * 60_000,
+            },
+            gitlab: {
+              instanceOrigin: 'https://gitlab.com',
+              instanceHost: 'gitlab.com',
+              projectPath: 'acme/repo',
+              integrationId: 'gitlab-integration',
+              authType: 'oauth',
+              identity: { accountId: 'gitlab-owner', accountLogin: 'owner' },
+              glabIsOAuth2: true,
+            },
+          },
+        },
+      ],
+    });
+    const prepare = vi.fn(async () => {
+      throw new Error('GitHub unavailable');
+    });
+    f.tokens.prepareWorkspaceRepositoryAccess = prepare;
+    await runInDurableObject(f.sandbox, (_instance, state) =>
+      writeScopeGrant(drizzle(state.storage), grant)
+    );
+    await expect(
+      f.sandbox.resolveCredential({
+        credential: gitlabAlias,
+        outboundContainerId: f.outboundContainerId,
+        url: 'https://gitlab.com/acme/repo.git/info/refs?service=git-upload-pack',
+        method: 'GET',
+      })
+    ).resolves.toEqual({ credential });
+    expect(prepare).not.toHaveBeenCalled();
+    await expect(
+      f.sandbox.resolveCredential({
+        credential: f.alias,
+        outboundContainerId: f.outboundContainerId,
+        url: 'https://github.com/acme/a.git/info/refs?service=git-upload-pack',
+        method: 'GET',
+      })
+    ).resolves.toBeNull();
+    expect(prepare).toHaveBeenCalled();
   });
   it('preserves restrictions across stale initialization, credential retirement and eviction', async () => {
     const f = await fixture();

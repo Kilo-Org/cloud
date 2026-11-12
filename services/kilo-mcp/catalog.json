@@ -6228,55 +6228,6 @@
     ],
     "searchBlob": "cloudAgentNext.cancelQueuedMessage Remove a message that is still waiting in a cloud agent session's queue. cloudagentnext cancelqueuedmessage sessionid messageid sessionId messageId"
   },
-  "cloudAgentNext.changeRepositoryAccess": {
-    "path": "cloudAgentNext.changeRepositoryAccess",
-    "kind": "mutation",
-    "summary": "Change the access mode a Cloud Agent session has to a specific repository, such as switching between read-only and write access. Use it to grant, revoke, or update repository permissions for a session while guarding against concurrent edits.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "sessionId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "expectedRevision": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "repositoryId": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991
-        },
-        "mode": {
-          "type": "string",
-          "enum": [
-            "read",
-            "contribute",
-            "remove"
-          ]
-        }
-      },
-      "required": [
-        "sessionId",
-        "expectedRevision",
-        "repositoryId",
-        "mode"
-      ],
-      "additionalProperties": false
-    },
-    "tags": [
-      "cloudagentnext",
-      "changerepositoryaccess",
-      "sessionid",
-      "expectedrevision",
-      "repositoryid",
-      "mode"
-    ],
-    "searchBlob": "cloudAgentNext.changeRepositoryAccess Change the access mode a Cloud Agent session has to a specific repository, such as switching between read-only and write access. Use it to grant, revoke, or update repository permissions for a session while guarding against concurrent edits. cloudagentnext changerepositoryaccess sessionid expectedrevision repositoryid mode sessionId expectedRevision repositoryId mode"
-  },
   "cloudAgentNext.checkEligibility": {
     "path": "cloudAgentNext.checkEligibility",
     "kind": "query",
@@ -18067,80 +18018,6 @@
       "messageid"
     ],
     "searchBlob": "organizations.cloudAgentNext.cancelQueuedMessage Cancel a message that is queued but not yet processed in a cloud agent session. Use to drop a pending message. organizations cloudagentnext cancelqueuedmessage organizationid sessionid messageid organizationId sessionId messageId"
-  },
-  "organizations.cloudAgentNext.changeRepositoryAccess": {
-    "path": "organizations.cloudAgentNext.changeRepositoryAccess",
-    "kind": "mutation",
-    "summary": "Change a cloud agent session's access mode for a repository, such as granting or revoking write access. Use to update repository permissions for a session, with an expected revision to avoid conflicting changes.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "allOf": [
-        {
-          "type": "object",
-          "properties": {
-            "organizationId": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            }
-          },
-          "required": [
-            "organizationId"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "sessionId": {
-              "type": "string",
-              "minLength": 1
-            },
-            "expectedRevision": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 9007199254740991
-            },
-            "repositoryId": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            },
-            "mode": {
-              "type": "string",
-              "enum": [
-                "read",
-                "contribute",
-                "remove"
-              ]
-            },
-            "organizationId": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            }
-          },
-          "required": [
-            "sessionId",
-            "expectedRevision",
-            "repositoryId",
-            "mode",
-            "organizationId"
-          ],
-          "additionalProperties": false
-        }
-      ]
-    },
-    "tags": [
-      "organizations",
-      "cloudagentnext",
-      "changerepositoryaccess",
-      "organizationid",
-      "sessionid",
-      "expectedrevision",
-      "repositoryid",
-      "mode"
-    ],
-    "searchBlob": "organizations.cloudAgentNext.changeRepositoryAccess Change a cloud agent session's access mode for a repository, such as granting or revoking write access. Use to update repository permissions for a session, with an expected revision to avoid conflicting changes. organizations cloudagentnext changerepositoryaccess organizationid sessionid expectedrevision repositoryid mode organizationId sessionId expectedRevision repositoryId mode"
   },
   "organizations.cloudAgentNext.checkEligibility": {
     "path": "organizations.cloudAgentNext.checkEligibility",

@@ -363,6 +363,7 @@ export class GitHubTokenService {
         expiresAt: new Date(result.expiresAt).getTime(),
       };
     } catch (error) {
+      if (error instanceof GitHubRepositoryPermissionsUnavailableError) throw error;
       const parsed = GitHubTokenErrorSchema.safeParse(error);
       const status = parsed.success ? parsed.data.status : undefined;
       const message = parsed.success ? parsed.data.response?.data.message : undefined;

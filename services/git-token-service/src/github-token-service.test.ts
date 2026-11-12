@@ -367,7 +367,7 @@ describe('GitHubTokenService', () => {
     } as unknown as CloudflareEnv);
     await expect(
       service.getTokenForRepositoryIds('123', [101], 'standard', 'read')
-    ).rejects.toThrow();
+    ).rejects.toBeInstanceOf(GitHubRepositoryPermissionsUnavailableError);
   });
 
   it('mints sibling-read credentials using stable repository IDs in the same installation', async () => {

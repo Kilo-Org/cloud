@@ -35,6 +35,30 @@ const policy = {
   repositories: [repository],
 };
 describe('repository access contracts and legacy initialization', () => {
+  it.each(['gitlab', 'bitbucket', 'git'] as const)(
+    'returns an empty policy for a %s grant without contacting GitHub',
+    async type => {
+      const prepare = vi.fn(async () => {
+        throw new Error('GitHub unavailable');
+      });
+      const grant = {
+        scopeId: 'worktree_existing',
+        repository: { type, url: 'https://example.com/acme/repo.git' },
+        scm: { purpose: type === 'git' ? undefined : type },
+      } as SessionCredentialGrant;
+      const expected = { version: 1, scopeId: grant.scopeId, revision: 0, repositories: [] };
+      await expect(
+        repositoryAccessFromTrustedGrant(grant, {
+          prepareWorkspaceRepositoryAccess: prepare,
+        } as unknown as GitTokenService)
+      ).resolves.toEqual(expected);
+      await expect(repositoryAccessFromTrustedGrant(grant, {} as GitTokenService)).resolves.toEqual(
+        expected
+      );
+      expect(prepare).not.toHaveBeenCalled();
+    }
+  );
+
   it('rejects duplicates, unknown versions and corrupt modes while preserving large legacy policies', () => {
     expect(workspaceRepositoryAccessSchema.safeParse(policy).success).toBe(true);
     expect(

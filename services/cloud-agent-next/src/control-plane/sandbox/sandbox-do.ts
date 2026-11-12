@@ -1,5 +1,8 @@
 import { REPOSITORY_ACCESS_PROTOCOL_VERSION } from '@kilocode/worker-utils/workspace-repository-access';
-import { grantScmEntries } from '../../sandbox-control/session-credential-members.js';
+import {
+  grantScmEntries,
+  selectScmEntry,
+} from '../../sandbox-control/session-credential-members.js';
 import {
   repositoryAccessView,
   type RepositoryAccessChange,
@@ -2354,20 +2357,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private scmAdmissionDependencies() {
     return {
       serial: <T>(operation: () => Promise<T>) => this.enqueue(operation),
-      resolve: (request: Omit<Parameters<typeof resolveSessionCredential>[0], 'env'>) =>
-        resolveSessionCredential({ ...request, env: this.env }),
+      resolve: async (request: Omit<Parameters<typeof resolveSessionCredential>[0], 'env'>) => {
+        const entry = selectScmEntry(request.grant, request.credential, new URL(request.url));
+        if (
+          entry?.repository.type === 'github' &&
+          this.env.GIT_TOKEN_SERVICE?.prepareWorkspaceRepositoryAccess
+        )
+          await this.ensureRepositoryAccess(request.grant);
+        return resolveSessionCredential({ ...request, env: this.env });
+      },
       persist: (grant: SessionCredentialGrant) => writeScopeGrant(this.db, grant),
     };
   }
 
   private async readScmAdmissionContext() {
-    for (const grant of listScopeGrants(this.db)) {
-      if (
-        this.env.GIT_TOKEN_SERVICE?.prepareWorkspaceRepositoryAccess &&
-        grantScmEntries(grant).some(entry => entry.repository.type === 'github')
-      )
-        await this.ensureRepositoryAccess(grant);
-    }
     const allocation = await this.readAllocation();
     return {
       sandboxId: this.sandboxId,

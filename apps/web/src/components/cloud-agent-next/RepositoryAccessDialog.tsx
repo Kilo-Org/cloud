@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -41,14 +41,14 @@ export function RepositoryAccessDialog({
   organizationId?: string;
 }) {
   const trpc = useTRPC();
-  const access = useQuery(
-    organizationId
-      ? trpc.organizations.cloudAgentNext.getRepositoryAccess.queryOptions(
-          { sessionId, organizationId },
-          { enabled: open }
-        )
-      : trpc.cloudAgentNext.getRepositoryAccess.queryOptions({ sessionId }, { enabled: open })
-  );
+  const queryClient = useQueryClient();
+  const accessOptions = organizationId
+    ? trpc.organizations.cloudAgentNext.getRepositoryAccess.queryOptions(
+        { sessionId, organizationId },
+        { enabled: open }
+      )
+    : trpc.cloudAgentNext.getRepositoryAccess.queryOptions({ sessionId }, { enabled: open });
+  const access = useQuery(accessOptions);
   const personal = useMutation(trpc.cloudAgentNext.changeRepositoryAccess.mutationOptions());
   const organization = useMutation(
     trpc.organizations.cloudAgentNext.changeRepositoryAccess.mutationOptions()
@@ -73,6 +73,7 @@ export function RepositoryAccessDialog({
       const result = organizationId
         ? await organization.mutateAsync({ ...input, organizationId })
         : await personal.mutateAsync(input);
+      queryClient.setQueryData(accessOptions.queryKey, result.current);
       setFailed(!result.changed);
       setMessage(repositoryAccessResultMessage(result.changed));
       if (result.changed) setDraft(null);

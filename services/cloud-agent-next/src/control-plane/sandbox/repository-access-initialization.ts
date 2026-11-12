@@ -15,7 +15,7 @@ export async function repositoryAccessFromTrustedGrant(
   tokens: GitTokenService
 ): Promise<WorkspaceRepositoryAccess> {
   const entries = grantScmEntries(grant).filter(entry => entry.repository.type === 'github');
-  if (!entries.length || !tokens.prepareWorkspaceRepositoryAccess)
+  if (entries.length && !tokens.prepareWorkspaceRepositoryAccess)
     throw new Error('Repository authorization unavailable');
   const repositories: WorkspaceRepositoryAccess['repositories'] = [];
   for (let offset = 0; offset < entries.length; offset += 4) {

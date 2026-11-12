@@ -2103,6 +2103,8 @@ Only an authenticated workspace owner can change access, subject to current orga
 membership and integration rules. Web control tokens carry the specific `repository-access`
 scope. Runtime, wrapper, alias, and child-management credentials cannot invoke or mint that
 scope. The Worker checks current session ownership before accessing the Sandbox DO.
+Repository grant mutations stay outside the Kilo MCP catalog. An agent cannot use the
+MCP catalog to approve broader repository access for itself; the user changes grants explicitly.
 
 Changes use a revision check. Additions and increases prepare restricted provider credentials
 before committing. Reductions and removals commit immediately. A stale mutation returns the

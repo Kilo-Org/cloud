@@ -3010,7 +3010,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         );
       }
       if (peer?.deleteSessionRepositoryAccess)
-        await peer.deleteSessionRepositoryAccess({ sessionId: this.sessionId });
+        await withDORetry(
+          () => peer,
+          async current => {
+            await current.deleteSessionRepositoryAccess?.({ sessionId: this.sessionId });
+          },
+          'deleteSessionRepositoryAccess'
+        );
       await this.tearDownSession();
     });
   }

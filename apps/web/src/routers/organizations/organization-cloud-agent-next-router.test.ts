@@ -115,6 +115,7 @@ const mockGetPendingInteractions =
 const mockGetMessageResult = jest.fn<CloudAgentNextClient['getMessageResult']>();
 const mockGetEgressAudit =
   jest.fn<(input: CloudAgentClientModule.GetEgressAuditInput) => Promise<unknown>>();
+const mockChangeRepositoryAccess = jest.fn<CloudAgentNextClient['changeRepositoryAccess']>();
 const mockGetSessionMessagesPage = jest.fn<CloudAgentNextClient['getSessionMessagesPage']>();
 const mockCreateWorktreeChat = jest.fn<typeof CreateWorktreeChat>();
 
@@ -145,6 +146,7 @@ const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   getMessageResult: mockGetMessageResult,
   getEgressAudit: mockGetEgressAudit,
   getSessionMessagesPage: mockGetSessionMessagesPage,
+  changeRepositoryAccess: mockChangeRepositoryAccess,
   getPendingInteractions: mockGetPendingInteractions,
   cancelQueuedMessage: mockCancelQueuedMessage,
   getSandboxStatus: mockGetSandboxStatus,
@@ -347,6 +349,11 @@ jest.mock('@kilocode/web-shared/routers/organizations/utils', () => {
 });
 
 let createCaller: (ctx: { user: User; headersList?: Headers }) => {
+  changeRepositoryAccess: (
+    input: Parameters<CloudAgentNextClient['changeRepositoryAccess']>[0] & {
+      organizationId: string;
+    }
+  ) => ReturnType<CloudAgentNextClient['changeRepositoryAccess']>;
   getSessionMessagesPage: (
     input: Parameters<CloudAgentNextClient['getSessionMessagesPage']>[0] & {
       organizationId: string;
@@ -489,6 +496,51 @@ beforeAll(async () => {
 beforeEach(() => {
   mockEnsureOrganizationAccess.mockReset().mockResolvedValue('member');
   mockRequireActiveSubscription.mockReset();
+});
+
+describe('organizationCloudAgentNextRouter.changeRepositoryAccess', () => {
+  const user = { id: 'oauth/repository-access-owner', is_admin: false } as User;
+  const input = {
+    organizationId: ORGANIZATION_ID,
+    sessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    expectedRevision: 0,
+    repositoryId: 101,
+    mode: 'read' as const,
+  };
+  const result = { changed: true, current: { revision: 1, repositories: [] } };
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId
+      .mockReset()
+      .mockResolvedValue({ kiloSessionId: 'ses_owner' });
+    mockChangeRepositoryAccess.mockReset().mockResolvedValue(result);
+  });
+  it('rejects inactive subscriptions before preparing repository credentials', async () => {
+    mockRequireActiveSubscription.mockImplementation(() => {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Subscription inactive' });
+    });
+    await expect(createCaller({ user }).changeRepositoryAccess(input)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    expect(mockChangeRepositoryAccess).not.toHaveBeenCalled();
+  });
+  it('forwards repository changes after checking the subscription and session ownership', async () => {
+    await expect(createCaller({ user }).changeRepositoryAccess(input)).resolves.toEqual(result);
+    expect(mockRequireActiveSubscription).toHaveBeenCalledTimes(1);
+    expect(mockVerifyOrgOwnsSessionV2ByCloudAgentId).toHaveBeenCalledWith(
+      expect.anything(),
+      ORGANIZATION_ID,
+      user.id,
+      input.sessionId
+    );
+    expect(mockChangeRepositoryAccess).toHaveBeenCalledWith({
+      sessionId: input.sessionId,
+      expectedRevision: 0,
+      repositoryId: 101,
+      mode: 'read',
+    });
+  });
 });
 
 describe('organizationCloudAgentNextRouter.getSessionMessagesPage', () => {

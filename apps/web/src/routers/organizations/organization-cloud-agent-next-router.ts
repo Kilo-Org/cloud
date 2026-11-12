@@ -1374,7 +1374,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       });
       return createCloudAgentNextClient(token).getRepositoryAccess({ sessionId: input.sessionId });
     }),
-  changeRepositoryAccess: organizationMemberProcedure
+  changeRepositoryAccess: organizationMemberMutationProcedure
     .input(repositoryAccessChangeSchema.extend({ organizationId: z.string().uuid() }))
     .output(z.object({ changed: z.boolean(), current: repositoryAccessViewSchema }))
     .mutation(async ({ ctx, input }) => {

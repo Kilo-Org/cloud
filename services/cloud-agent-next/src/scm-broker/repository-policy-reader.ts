@@ -66,9 +66,12 @@ export class RepositoryPolicyReader extends WorkerEntrypoint<Env> {
         )
       )
       .limit(2);
-    if (rows.length !== 1) return null;
-    const [row] = rows;
-    return row?.sandboxId ? this.readAt(row.sandboxId, input) : null;
+    for (const row of rows) {
+      if (!row.sandboxId) continue;
+      const policy = await this.readAt(row.sandboxId, input);
+      if (policy) return policy;
+    }
+    return null;
   }
 
   private async readAt(

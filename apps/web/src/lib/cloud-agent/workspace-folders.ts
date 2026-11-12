@@ -39,5 +39,6 @@ export type WorkspaceFolder = {
   kind: WorkspaceFolderKind;
   smartPreset: SmartFolderPreset | null;
   sortMode: WorkspaceFolderSortMode;
+  manualWorktreeOrder: string[];
   worktreeIds: string[];
 };

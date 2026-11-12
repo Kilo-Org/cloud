@@ -199,6 +199,7 @@ describe('workspaceFolders persistence and validation', () => {
       smartPreset: null,
       sortMode: 'manual',
       worktreeIds: [],
+      manualWorktreeOrder: [],
     });
     expect(await callerFor().list({ organizationId: null })).toEqual({
       folders: [first, second, third],
@@ -230,6 +231,7 @@ describe('workspaceFolders persistence and validation', () => {
       smartPreset: 'needs_you',
       sortMode: 'activity',
       worktreeIds: [],
+      manualWorktreeOrder: [],
     });
     expect((await callerFor().list({ organizationId: null })).folders).toEqual([smart]);
 
@@ -291,6 +293,72 @@ describe('workspaceFolders persistence and validation', () => {
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(await readWorktree()).toBeUndefined();
+  });
+
+  it('saves independent smart-folder order without changing workspace folders or positions', async () => {
+    const manual = await createFolder();
+    const smart = await callerFor().create({
+      organizationId: null,
+      name: 'Needs you',
+      color: 'orange',
+      smartPreset: 'needs_you',
+    });
+    const secondId = newWorktreeId();
+    await insertWorktree({ folder_id: manual.id, sidebar_position: 'a1' });
+    await insertWorktree({ worktree_id: secondId, sidebar_position: 'a2' });
+    await insertSession({ cloud_agent_worktree_id: secondId });
+    await callerFor().reorderWorktrees({
+      organizationId: null,
+      folderId: smart.id,
+      worktreeIds: [secondId, WORKTREE_ID],
+    });
+    const listed = (await callerFor().list({ organizationId: null })).folders;
+    expect(listed.find(folder => folder.id === smart.id)?.manualWorktreeOrder).toEqual([
+      secondId,
+      WORKTREE_ID,
+    ]);
+    expect(listed.find(folder => folder.id === manual.id)?.worktreeIds).toEqual([WORKTREE_ID]);
+    expect(await readWorktree()).toMatchObject({ folder_id: manual.id, sidebar_position: 'a1' });
+    expect(await readWorktree(secondId)).toMatchObject({ folder_id: null, sidebar_position: 'a2' });
+  });
+
+  it('rejects duplicate, excessive, foreign, and cross-scope smart-folder ordering', async () => {
+    const smart = await callerFor().create({
+      organizationId: null,
+      name: 'Needs you',
+      color: 'orange',
+      smartPreset: 'needs_you',
+    });
+    const input = { organizationId: null, folderId: smart.id, worktreeIds: [WORKTREE_ID] };
+    await insertWorktree();
+    await expect(
+      callerFor().reorderWorktrees({ ...input, worktreeIds: [WORKTREE_ID, WORKTREE_ID] })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(
+      callerFor().reorderWorktrees({
+        ...input,
+        worktreeIds: Array.from({ length: 201 }, newWorktreeId),
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(callerFor(otherUser).reorderWorktrees(input)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    await expect(
+      callerFor().reorderWorktrees({ ...input, organizationId: ORGANIZATION_ID })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    const foreignId = newWorktreeId();
+    await insertWorktree({ worktree_id: foreignId, kilo_user_id: OTHER_USER_ID });
+    await insertSession({ cloud_agent_worktree_id: foreignId, kilo_user_id: OTHER_USER_ID });
+    await expect(
+      callerFor().reorderWorktrees({ ...input, worktreeIds: [WORKTREE_ID, foreignId] })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(
+      (await readFolders()).find(folder => folder.id === smart.id)?.manual_worktree_order
+    ).toEqual([]);
+    const manual = await createFolder();
+    await expect(
+      callerFor().reorderWorktrees({ ...input, folderId: manual.id })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
   it('writes a fractional sidebar position only when supplied and clears it on null', async () => {

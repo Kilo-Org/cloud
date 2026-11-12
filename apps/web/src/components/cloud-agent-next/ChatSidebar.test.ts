@@ -688,6 +688,7 @@ describe('ChatSidebar row rendering', () => {
           smartPreset: null,
           sortMode: 'manual' as const,
           worktreeIds: [] as string[],
+          manualWorktreeOrder: [],
         },
         {
           id: ids[1],
@@ -697,6 +698,7 @@ describe('ChatSidebar row rendering', () => {
           smartPreset: 'needs_you' as const,
           sortMode: 'activity' as const,
           worktreeIds: [] as string[],
+          manualWorktreeOrder: [],
         },
       ],
       isLoading: false,
@@ -716,6 +718,7 @@ describe('ChatSidebar row rendering', () => {
         async (_orderedWorktreeIds: readonly string[], _folderId: string | null) => true
       ),
       reorderFolders: jest.fn(async () => true),
+      reorderSmartFolderWorktrees: jest.fn(async () => true),
       refresh: jest.fn(async () => undefined),
     } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>;
     const dataTransfer = {
@@ -1403,6 +1406,9 @@ describe('ChatSidebar phase 4 drag ordering', () => {
         async (_orderedWorktreeIds: readonly string[], _folderId: string | null) => true
       ),
       reorderFolders: jest.fn(async () => true),
+      reorderSmartFolderWorktrees: jest.fn(
+        async (_folderId: string, _worktreeIds: readonly string[]) => true
+      ),
       refresh: jest.fn(async () => undefined),
     } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>;
   }
@@ -1484,6 +1490,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
       smartPreset: null,
       sortMode: 'manual',
       worktreeIds: [old.worktreeId],
+      manualWorktreeOrder: [],
     } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>['folders'][number];
     renderSidebar({
       workspaceGroups: [{ ...old, details: { ...old.details!, folderId: folder.id } }],
@@ -1730,6 +1737,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
       smartPreset: null,
       sortMode: 'activity',
       worktreeIds: groups.map(group => group.worktreeId),
+      manualWorktreeOrder: [],
     };
   }
 
@@ -1744,7 +1752,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
   }
 
   it.each(['manual', 'created', 'activity'] as const)(
-    'uses shared %s order for smart folders, not their saved sort mode',
+    'uses the global %s setting for smart folders, not their saved sort mode',
     workspaceOrder => {
       const folders = workspaceFolders();
       const groups = [
@@ -1768,6 +1776,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
           kind: 'smart',
           smartPreset: 'needs_you',
           sortMode: 'created',
+          manualWorktreeOrder: ['worktree_drag_1', 'worktree_drag_0'],
         },
       ];
       renderSidebar({ workspaceGroups: groups, workspaceFolders: folders, workspaceOrder });
@@ -1778,6 +1787,89 @@ describe('ChatSidebar phase 4 drag ordering', () => {
       );
     }
   );
+
+  it.each(['needs_you', 'in_review', 'done'] as const)(
+    'reorders within the %s smart folder without moving or repositioning its workspaces',
+    preset => {
+      const folders = workspaceFolders();
+      const groups = [phase4Group(0, 'a1'), phase4Group(1, 'a2')].map(group => {
+        const session = {
+          ...group.latestSession,
+          sessionStatus: preset === 'needs_you' ? 'question' : 'idle',
+          associatedPr:
+            preset === 'needs_you'
+              ? null
+              : {
+                  url: 'https://github.com/example/repo/pull/1',
+                  number: 1,
+                  state: preset === 'done' ? 'merged' : 'open',
+                  title: null,
+                  headSha: null,
+                  observations: null,
+                  lastSyncedAt: group.latestSession.createdAt,
+                  reviewDecision: null,
+                  reviewDecisionPending: false,
+                  platform: 'github',
+                },
+        };
+        return {
+          ...group,
+          latestSession: session,
+          sessions: [session],
+          details: { ...group.details!, prSession: session },
+        };
+      });
+      const folder: WorkspaceFolder = {
+        ...manualFolder([]),
+        kind: 'smart',
+        smartPreset: preset,
+        manualWorktreeOrder: groups.map(group => group.worktreeId),
+      };
+      folders.folders = [folder];
+      renderSidebar({ workspaceGroups: groups, workspaceFolders: folders });
+      const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
+      const source = rows[0]?.querySelector('button span');
+      if (!source || !rows[1]) throw new Error('Rows missing');
+      dragRows(source, rows[1], 35);
+      expect(folders.reorderSmartFolderWorktrees).toHaveBeenCalledWith(folder.id, [
+        groups[1].worktreeId,
+        groups[0].worktreeId,
+      ]);
+      expect(folders.moveWorktree).not.toHaveBeenCalled();
+      expect(folders.initializeWorktreePositions).not.toHaveBeenCalled();
+    }
+  );
+
+  it('puts an existing positioned workspace on top when it enters a smart folder', () => {
+    const folders = workspaceFolders();
+    const groups = [
+      phase4Group(0, 'a1', { sessionStatus: 'question' }),
+      phase4Group(1, 'z', { sessionStatus: 'idle' }),
+    ];
+    folders.folders = [
+      {
+        ...manualFolder([]),
+        kind: 'smart',
+        smartPreset: 'needs_you',
+        manualWorktreeOrder: [groups[0].worktreeId],
+      },
+    ];
+    renderSidebar({ workspaceGroups: groups, workspaceFolders: folders });
+    const nextSession = { ...groups[1].latestSession, sessionStatus: 'question' };
+    renderSidebar({
+      workspaceGroups: [
+        groups[0],
+        { ...groups[1], latestSession: nextSession, sessions: [nextSession] },
+      ],
+      workspaceFolders: folders,
+    });
+    const section = dom.container.querySelector('[data-folder-id]');
+    expect(
+      [...section!.querySelectorAll('[data-worktree-id]')].map(row =>
+        row.getAttribute('data-worktree-id')
+      )
+    ).toEqual([groups[1].worktreeId, groups[0].worktreeId]);
+  });
 
   it.each([false, true])(
     'explains an empty smart folder when workspace truncation is %s',
@@ -1895,7 +1987,7 @@ describe('ChatSidebar phase 4 drag ordering', () => {
     }
   );
 
-  it('does not reorder automatically grouped rows using their underlying manual folder', () => {
+  it('reorders automatically grouped rows without changing their underlying manual folder', () => {
     const folders = workspaceFolders();
     const groups = [phase4Group(0, 'a1'), phase4Group(1, 'a2')].map(group => ({
       ...group,
@@ -1906,8 +1998,12 @@ describe('ChatSidebar phase 4 drag ordering', () => {
     renderSidebar({ workspaceGroups: fileGroups(groups, folder.id), workspaceFolders: folders });
     const rows = dom.container.querySelectorAll<HTMLElement>('[data-worktree-id]');
     dragRows(rows[0]!, rows[1]!, 35, () => {
-      expect(dom.container.querySelector('[data-worktree-id].border-b-2')).toBeNull();
+      expect(dom.container.querySelector('[data-worktree-id].border-b-2')).not.toBeNull();
     });
+    expect(folders.reorderSmartFolderWorktrees).toHaveBeenCalledWith('needs', [
+      groups[1].worktreeId,
+      groups[0].worktreeId,
+    ]);
     expect(folders.moveWorktree).not.toHaveBeenCalled();
     expect(folders.initializeWorktreePositions).not.toHaveBeenCalled();
   });
@@ -2051,6 +2147,7 @@ describe('ChatSidebar phase 4 drag ordering end placement', () => {
         async (_orderedWorktreeIds: readonly string[], _folderId: string | null) => true
       ),
       reorderFolders: jest.fn(async () => true),
+      reorderSmartFolderWorktrees: jest.fn(async () => true),
       refresh: jest.fn(async () => undefined),
     } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>;
 

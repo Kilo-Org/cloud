@@ -519,6 +519,27 @@ describe('scoped workspace folder moves', () => {
 });
 
 describe('scoped workspace folder listing', () => {
+  it('withholds saved smart-folder workspace order from scoped callers', async () => {
+    const folder = await callerFor().workspaceFolders.create({
+      organizationId: null,
+      name: 'Needs you',
+      color: 'orange',
+      smartPreset: 'needs_you',
+    });
+    const child = await insertWorkspaceSession();
+    await callerFor().workspaceFolders.reorderWorktrees({
+      organizationId: null,
+      folderId: folder.id,
+      worktreeIds: [child.worktreeId],
+    });
+    await expect(
+      callerFor(authorityFor(null)).workspaceFolders.list({ organizationId: null })
+    ).resolves.toEqual({ folders: [{ ...folder, manualWorktreeOrder: [] }] });
+    await expect(callerFor().workspaceFolders.list({ organizationId: null })).resolves.toEqual({
+      folders: [{ ...folder, manualWorktreeOrder: [child.worktreeId] }],
+    });
+  });
+
   it('withholds worktree IDs from a scoped list and keeps them for ordinary callers', async () => {
     const folder = await createFolder();
     const child = await insertWorkspaceSession();
@@ -578,6 +599,13 @@ describe('scoped workspace folder grants', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(
       caller.workspaceFolders.reorder({ organizationId: null, folderIds: [folder.id] })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(
+      caller.workspaceFolders.reorderWorktrees({
+        organizationId: null,
+        folderId: folder.id,
+        worktreeIds: [],
+      })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(await readFolders()).toHaveLength(1);
   });

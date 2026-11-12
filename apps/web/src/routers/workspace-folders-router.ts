@@ -39,6 +39,7 @@ const folderOutputSchema = z.object({
   kind: workspaceFolderKindSchema,
   smartPreset: smartFolderPresetSchema.nullable(),
   sortMode: workspaceFolderSortModeSchema,
+  manualWorktreeOrder: z.array(z.string()),
   worktreeIds: z.array(z.string()),
 });
 
@@ -49,6 +50,7 @@ const folderFields = {
   kind: cloud_agent_workspace_folders.kind,
   smartPreset: cloud_agent_workspace_folders.smart_preset,
   sortMode: cloud_agent_workspace_folders.sort_mode,
+  manualWorktreeOrder: cloud_agent_workspace_folders.manual_worktree_order,
 };
 
 function ownedRootSessions(tx: DrizzleTransaction, scope: SidebarScope, worktreeId: string) {
@@ -253,7 +255,7 @@ export const workspaceFoldersRouter = createTRPCRouter({
             asc(cloud_agent_workspace_folders.id)
           );
         return {
-          folders: rows.map(folder => ({ ...folder, worktreeIds: [] })),
+          folders: rows.map(folder => ({ ...folder, manualWorktreeOrder: [], worktreeIds: [] })),
         };
       }
 
@@ -302,6 +304,7 @@ export const workspaceFoldersRouter = createTRPCRouter({
             kind: row.kind,
             smartPreset: row.smartPreset,
             sortMode: row.sortMode,
+            manualWorktreeOrder: row.manualWorktreeOrder,
             worktreeIds: new Set(),
           };
           folders.set(row.id, folder);
@@ -615,6 +618,42 @@ export const workspaceFoldersRouter = createTRPCRouter({
             eq(cloud_agent_worktrees.worktree_id, worktreeId)
           )
         );
+      return { success: true };
+    }),
+
+  reorderWorktrees: cloudAgentSidebarScopeProcedure
+    .input(
+      folderInputSchema.extend({
+        worktreeIds: z
+          .array(cloudAgentWorktreeIdSchema)
+          .max(200)
+          .refine(ids => new Set(ids).size === ids.length, {
+            message: 'Worktree IDs must be unique',
+          }),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [folder] = await ctx.sidebarDb
+        .select({ kind: cloud_agent_workspace_folders.kind })
+        .from(cloud_agent_workspace_folders)
+        .where(
+          and(
+            ownerScopeCondition(cloud_agent_workspace_folders, ctx.sidebarScope),
+            eq(cloud_agent_workspace_folders.id, input.folderId)
+          )
+        )
+        .for('update');
+      if (!folder) throw new TRPCError({ code: 'NOT_FOUND', message: 'Folder not found' });
+      if (folder.kind !== 'smart') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'A smart folder is required' });
+      }
+      for (const worktreeId of [...input.worktreeIds].sort()) {
+        await lockMovableWorktree(ctx.sidebarDb, ctx.sidebarScope, worktreeId);
+      }
+      await ctx.sidebarDb
+        .update(cloud_agent_workspace_folders)
+        .set({ manual_worktree_order: input.worktreeIds })
+        .where(eq(cloud_agent_workspace_folders.id, input.folderId));
       return { success: true };
     }),
 

@@ -45,6 +45,9 @@ export function useWorkspaceFolders(
     trpc.workspaceFolders.moveSession.mutationOptions()
   );
   const { mutateAsync: reorder } = useMutation(trpc.workspaceFolders.reorder.mutationOptions());
+  const { mutateAsync: reorderWorktrees } = useMutation(
+    trpc.workspaceFolders.reorderWorktrees.mutationOptions()
+  );
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
 
@@ -190,6 +193,20 @@ export function useWorkspaceFolders(
     [organizationId, reorder, run]
   );
 
+  const reorderSmartFolderWorktrees = useCallback(
+    (folderId: string, worktreeIds: readonly string[]) =>
+      run(
+        () =>
+          reorderWorktrees({
+            folderId,
+            worktreeIds: worktreeIds.map(id => cloudAgentWorktreeIdSchema.parse(id)),
+            organizationId: organizationId ?? null,
+          }),
+        'Workspace order saved'
+      ),
+    [organizationId, reorderWorktrees, run]
+  );
+
   /**
    * Manual order treats every unpositioned row as before every positioned row.
    * A drag inside such a container therefore has to initialize all of its rows;
@@ -258,6 +275,7 @@ export function useWorkspaceFolders(
     moveSession,
     initializeWorktreePositions,
     reorderFolders,
+    reorderSmartFolderWorktrees,
     refresh,
   };
 }

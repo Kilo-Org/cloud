@@ -5,10 +5,12 @@ import { AlertCircle, Clock } from '@/components/ui/icons';
 import { type AccessibilityActionEvent, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { AddCreditsRow } from '@/components/add-credits-row';
 import { Bubble } from '@/components/ui/bubble';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { type AddCreditsDestination, addCreditsProps } from '@/lib/credits/add-credits-destination';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { cn } from '@/lib/utils';
@@ -67,11 +69,13 @@ type MessageBubbleProps = {
   /** Retries a failed message. The failure footer renders only when supplied. */
   onRetryMessage?: (message: StoredMessage) => void;
   /**
-   * Opens the credit purchase screen, for a failed turn the account's own
-   * balance caused. Adding credits never needs the session to accept a
-   * re-send, so this action renders even where `retryAvailable` is false.
+   * Where the credit a refused turn needs is bought: the in-app purchase screen
+   * for the person's own balance, or the organization's billing page for a
+   * session the organization pays for. Adding credits never needs the session to
+   * accept a re-send, so this action renders even where `retryAvailable` is
+   * false. A destination the platform may not open renders no action.
    */
-  onAddCredits?: () => void;
+  addCredits?: AddCreditsDestination;
   /**
    * Whether this row's session can accept a re-send now. When false the failure
    * footer keeps its statement and drops the Retry, so a read-only transcript or
@@ -104,7 +108,7 @@ function MessageBubbleImpl({
   onLongPressDetails,
   holdQueuedSlot,
   onRetryMessage,
-  onAddCredits,
+  addCredits,
   retryAvailable,
   onCopyToComposer,
   onRestoreQueued,
@@ -191,8 +195,8 @@ function MessageBubbleImpl({
       (failure.kind === 'delivery'
         ? onRetryMessage !== undefined ||
           onCopyToComposer !== undefined ||
-          (failure.canAddCredits && onAddCredits !== undefined)
-        : onRetryMessage !== undefined || (failure.canAddCredits && onAddCredits !== undefined)));
+          (failure.canAddCredits && addCredits !== undefined)
+        : onRetryMessage !== undefined || (failure.canAddCredits && addCredits !== undefined)));
   // The footer is the failed turn's status, so it sits in the column that turn
   // occupies rather than the row that carries it: a message that never reached
   // the agent is the user's own row, and its title, detail and action row stay
@@ -258,23 +262,15 @@ function MessageBubbleImpl({
               <Text>{t('common.retry')}</Text>
             </Button>
           ) : null}
-          {failure.canAddCredits && onAddCredits ? (
-            // The failure's one recovery action, so it takes the accent surface
+          {failure.canAddCredits && addCredits ? (
+            // The failure's one recovery action, so it keeps the accent surface
             // the person's own bubble and the enabled send control fill with,
             // in both schemes; the theme's `--primary` is olive in light, which
-            // would read as one more secondary action here. The label uses that
-            // surface's own ink, because the primary label ink is white in the
-            // light scheme.
-            <Button
-              variant="default"
-              size="sm"
-              className={cn(STATE_ACTION_CLASS, 'bg-accent-soft')}
-              onPress={onAddCredits}
-              accessibilityRole="button"
-              accessibilityLabel={t('addCredits.cta')}
-            >
-              <Text className="text-accent-soft-foreground">{t('addCredits.cta')}</Text>
-            </Button>
+            // would read as one more secondary action here. The element owns
+            // where the credit is bought — the person's own purchase screen or
+            // the organization's billing page — and hides itself where the
+            // platform may not open the destination.
+            <AddCreditsRow inline emphasis="primary" {...addCreditsProps(addCredits)} />
           ) : null}
           {failure.canCopy && onCopyToComposer && copyText !== '' ? (
             <Button

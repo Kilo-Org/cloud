@@ -38,6 +38,7 @@ import {
 import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
+import { type AddCreditsDestination } from '@/lib/credits/add-credits-destination';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { MessageErrorBoundary } from '@/components/agents/message-error-boundary';
@@ -1382,6 +1383,15 @@ export function SessionDetailContent({
     routerRef.current.push('/(app)/credits' as Href);
   }, []);
 
+  // One destination object for every row: a fresh one per render would
+  // re-create each memoized row's props. A session's credit refusals are
+  // settled on the in-app purchase screen, which is the balance this surface
+  // has always offered.
+  const addCredits = useMemo<AddCreditsDestination>(
+    () => ({ kind: 'inApp', onPress: handleAddCredits }),
+    [handleAddCredits]
+  );
+
   const handleRetryMessage = useCallback(
     (message: StoredMessage) => {
       // Read the live capability at tap time: a stale row could outlive the
@@ -1641,7 +1651,7 @@ export function SessionDetailContent({
           onLongPressDetails={handleOpenDetails}
           holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
           onRetryMessage={retryPrompt !== null ? handleRetryMessage : undefined}
-          onAddCredits={handleAddCredits}
+          addCredits={addCredits}
           retryAvailable={retryAvailable}
           onCopyToComposer={handleCopyToComposer}
           onRestoreQueued={
@@ -1677,7 +1687,7 @@ export function SessionDetailContent({
       heldQueuedIds,
       retryAvailable,
       handleRetryMessage,
-      handleAddCredits,
+      addCredits,
       handleCopyToComposer,
       handleOpenDetails,
       handleRestoreQueued,

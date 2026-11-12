@@ -4,6 +4,7 @@ import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { askedMessageId, asMessages } from '@/lib/chat/turns';
+import { type AddCreditsDestination } from '@/lib/credits/add-credits-destination';
 
 import { MessageBubble } from './message-bubble';
 import { PartDetailSheetHost } from './part-detail-sheet-host';
@@ -182,6 +183,9 @@ const ignoreCopy = (): void => undefined;
 /** The fixture has no purchase screen behind it, so the action stays inert. */
 const ignoreAddCredits = (): void => undefined;
 
+/** The in-app destination the fixture's inert action carries. */
+const FIXTURE_ADD_CREDITS: AddCreditsDestination = { kind: 'inApp', onPress: ignoreAddCredits };
+
 /**
  * The failure the fixture draws: the retryable answer, the terminal one, the
  * one the account's balance refused to send, or the asked question's.
@@ -231,7 +235,7 @@ export function TranscriptStyleFixture({
             key={message.info.id}
             message={message}
             onRetryMessage={retryAvailable ? ignoreRetry : undefined}
-            onAddCredits={ignoreAddCredits}
+            addCredits={FIXTURE_ADD_CREDITS}
             retryAvailable={retryAvailable}
             {...(failedRow !== undefined && message.info.id === failedRow.id
               ? { deliveryState: failedRow.deliveryState, onCopyToComposer: ignoreCopy }

@@ -6,6 +6,7 @@ import type * as React from 'react';
 
 import type * as PartTypes from './part-types';
 import { type MessageDeliveryStatement } from './message-failure-state';
+import { type AddCreditsDestination } from '@/lib/credits/add-credits-destination';
 import {
   assistantMessage,
   findElementByType,
@@ -111,6 +112,9 @@ vi.mock('@/components/ui/text', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
+}));
+vi.mock('@/components/add-credits-row', () => ({
+  AddCreditsRow: 'AddCreditsRow',
 }));
 vi.mock('./chat-markdown-text', () => ({
   ChatMarkdownText: () => null,
@@ -289,7 +293,7 @@ async function renderBubbleWithHandlers(
   props: {
     deliveryState?: MessageDeliveryStatement;
     onRetryMessage?: (m: StoredMessage) => void;
-    onAddCredits?: () => void;
+    addCredits?: AddCreditsDestination;
     retryAvailable?: boolean;
     onCopyToComposer?: (text: string) => void;
     onRestoreQueued?: (m: StoredMessage) => void;
@@ -492,7 +496,7 @@ describe('MessageBubble failure footer', () => {
     const tree = await renderBubbleWithHandlers(userMessage('m-credits'), {
       deliveryState: { status: 'failed', error: '', reason: 'credits' },
       onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
-      onAddCredits,
+      addCredits: { kind: 'inApp', onPress: onAddCredits },
       onCopyToComposer: vi.fn<(text: string) => void>(),
     });
 
@@ -503,13 +507,9 @@ describe('MessageBubble failure footer', () => {
     expect(findText(tree, t => t === 'The agent could not run this message.')).toBe(false);
     // The send never left, so the statement sits in the bubble's own column.
     expect(String(footerOf(tree)?.props.className)).toBe('gap-2 px-4 pt-1 pb-[24px] items-end');
-    const addCredits = findElementByType(
-      tree,
-      'Button',
-      p => p.accessibilityLabel === 'Add credits'
-    );
+    const addCredits = findElementByType(tree, 'AddCreditsRow');
     if (!addCredits) {
-      throw new Error('the footer drew no Add credits button');
+      throw new Error('the footer drew no Add credits action');
     }
     (addCredits.props.onPress as () => void)();
     expect(onAddCredits).toHaveBeenCalledTimes(1);
@@ -633,23 +633,22 @@ describe('MessageBubble failure footer', () => {
         statusCode: 402,
         responseBody: GATEWAY_CREDITS_BODY,
       }),
-      { onRetryMessage: vi.fn<(message: StoredMessage) => void>(), onAddCredits }
+      {
+        onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+        addCredits: { kind: 'inApp', onPress: onAddCredits },
+      }
     );
 
     expect(findText(tree, t => t === 'Response failed')).toBe(true);
     expect(findText(tree, t => t === 'Not enough credits for this request.')).toBe(true);
 
-    const addCredits = findElementByType(
-      tree,
-      'Button',
-      p => p.accessibilityLabel === 'Add credits'
-    );
+    const addCredits = findElementByType(tree, 'AddCreditsRow');
     if (!addCredits) {
-      throw new Error('the footer drew no Add credits button');
+      throw new Error('the footer drew no Add credits action');
     }
     // The row's one recovery action fills with the accent surface the person's
     // own bubble uses, so it reads as that row's primary action.
-    expect(addCredits.props.className).toContain('bg-accent-soft');
+    expect(addCredits.props.emphasis).toBe('primary');
     const press = addCredits.props.onPress as () => void;
     press();
     expect(onAddCredits).toHaveBeenCalledTimes(1);
@@ -670,15 +669,16 @@ describe('MessageBubble failure footer', () => {
         statusCode: 402,
         responseBody: '{"error":{"message":"Upstream request failed"}}',
       }),
-      { onRetryMessage: vi.fn<(message: StoredMessage) => void>(), onAddCredits }
+      {
+        onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+        addCredits: { kind: 'inApp', onPress: onAddCredits },
+      }
     );
 
     expect(
       findText(tree, t => t === 'The provider refused this request and it cannot be retried.')
     ).toBe(true);
-    expect(
-      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Add credits')
-    ).toBeNull();
+    expect(findElementByType(tree, 'AddCreditsRow')).toBeNull();
   });
 
   it('keeps Add credits on a transcript that cannot resend', async () => {
@@ -689,13 +689,11 @@ describe('MessageBubble failure footer', () => {
         statusCode: 402,
         responseBody: GATEWAY_CREDITS_BODY,
       }),
-      { retryAvailable: false, onAddCredits }
+      { retryAvailable: false, addCredits: { kind: 'inApp', onPress: onAddCredits } }
     );
 
     expect(findText(tree, t => t === 'Response failed')).toBe(true);
-    expect(
-      findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Add credits')
-    ).not.toBeNull();
+    expect(findElementByType(tree, 'AddCreditsRow')).not.toBeNull();
   });
 
   it('renders no pressable host for an assistant row with nothing to show', async () => {

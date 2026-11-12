@@ -31,6 +31,7 @@ import { i18n } from '@/i18n';
 import { NEUTRAL_TINT, type Tint, toneColor } from '@/lib/agent-color';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { WEB_BASE_URL } from '@/lib/config';
+import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
@@ -213,10 +214,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               // row of its own would hold nothing but this control.
               trailing={
                 org.balance === 0 ? (
-                  <AddCreditsRow
-                    inline
-                    url={`${WEB_BASE_URL}/organizations/${organizationId}/payment-details`}
-                  />
+                  <AddCreditsRow inline url={organizationBillingUrl(organizationId)} />
                 ) : undefined
               }
               // Always pass the label: a node React Native stops handing a

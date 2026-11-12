@@ -22,7 +22,7 @@ import {
 import type { RemoteMcpStorageArea } from '../../src/shared/remote-mcp-storage';
 import type { RemoteMcpToolRoute } from '../../src/shared/remote-mcp-tools';
 import type { RemoteMcpOAuthProvider } from './remote-mcp-oauth-provider';
-import { createRemoteMcpOAuthProvider } from './remote-mcp-oauth-provider';
+import { AUTH_INCOMPLETE_MESSAGE, createRemoteMcpOAuthProvider } from './remote-mcp-oauth-provider';
 
 type FetchLike = typeof fetch;
 
@@ -61,6 +61,11 @@ const describeConnectFailure = (
 
   if (needsAuth) {
     return { message: NEEDS_CREDENTIALS_MESSAGE, needsAuth };
+  }
+
+  // The interactive sign-in opened but never handed back a code: retrying Connect is the next step.
+  if (error instanceof Error && error.message === AUTH_INCOMPLETE_MESSAGE) {
+    return { message: AUTH_INCOMPLETE_MESSAGE, needsAuth: true };
   }
 
   // A fetch network failure is a TypeError; no HTTP layer answered at all.
@@ -181,7 +186,7 @@ export const connectRemoteMcpServer = async ({
       }
       const code = authProvider.takeAuthorizationCode();
       if (code === undefined) {
-        throw error;
+        throw new Error(AUTH_INCOMPLETE_MESSAGE);
       }
       await transport.finishAuth(code);
       await client.connect(asTransport(makeTransport(server, fetchFn, authProvider)), {

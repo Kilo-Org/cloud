@@ -15,8 +15,12 @@ const mocks = vi.hoisted(() => {
   const finishAuth = vi.fn<(code: string) => Promise<void>>();
   // Captures args passed to new StreamableHTTPClientTransport(url, opts)
   const transportCalls: { opts: TransportOpts; url: URL }[] = [];
+  const launchWebAuthFlow = vi.fn<() => Promise<string | undefined>>(() =>
+    // eslint-disable-next-line promise/prefer-await-to-then
+    Promise.resolve('https://abc.chromiumapp.org/remote-mcp?code=x')
+  );
 
-  return { close, connect, finishAuth, listTools, transportCalls };
+  return { close, connect, finishAuth, launchWebAuthFlow, listTools, transportCalls };
 });
 
 // eslint-disable-next-line vitest/prefer-import-in-mock, jest/no-untyped-mock-factory
@@ -35,8 +39,7 @@ vi.mock('#imports', () => ({
   browser: {
     identity: {
       getRedirectURL: () => 'https://abc.chromiumapp.org/remote-mcp',
-      // eslint-disable-next-line promise/prefer-await-to-then
-      launchWebAuthFlow: () => Promise.resolve('https://abc.chromiumapp.org/remote-mcp?code=x'),
+      launchWebAuthFlow: mocks.launchWebAuthFlow,
     },
   },
 }));
@@ -369,5 +372,27 @@ describe('remote MCP server connection', () => {
     });
 
     expect(result.status).toBe('needs_auth');
+    // An OAuth server that reported unauthorized without handing back a code did not finish signing in.
+    expect(result.lastError).toBe('Sign-in did not complete. Start it again with Connect.');
+  });
+
+  it('says the sign-in did not complete when the browser flow is closed', async () => {
+    const oauthServer = baseServer({ auth: { type: 'oauth' } });
+    mocks.launchWebAuthFlow.mockRejectedValueOnce(new Error('The user did not approve access.'));
+    mocks.connect.mockImplementationOnce(async () => {
+      await lastTransportCall().opts.authProvider?.redirectToAuthorization(
+        new URL('https://auth.example.com/authorize')
+      );
+    });
+    mocks.close.mockResolvedValueOnce();
+
+    const result = await connectRemoteMcpServer({
+      fetch: noopFetch,
+      server: oauthServer,
+      storageArea: { getItem: () => ({ servers: [oauthServer] }), setItem: () => {} },
+    });
+
+    expect(result.status).toBe('needs_auth');
+    expect(result.lastError).toBe('Sign-in did not complete. Start it again with Connect.');
   });
 });

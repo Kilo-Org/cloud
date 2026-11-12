@@ -25,6 +25,7 @@ import { getCreditStorefront } from '@/lib/credits/storefront';
 import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-purchase';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatPrefixedMoney } from '@/lib/format';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { getStoreLegalLinks } from '@/lib/iap/legal-links';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
@@ -38,7 +39,7 @@ import { CreditExpiryNote } from './credit-expiry-note';
 const PACK_SKELETON_ROWS = 4;
 
 /**
- * The height the pack area holds in every state.
+ * The height the pack area holds in every state, at the default font scale.
  *
  * The tallest state carries every surface the area can show at once: the
  * inline purchase error, the store's notice, and one unpriced row per catalog
@@ -47,7 +48,7 @@ const PACK_SKELETON_ROWS = 4;
  * completed one — and the backend catalog still names the packs when the store
  * cannot price them.
  *
- * Every block's height is fixed, which makes the reservation exact:
+ * Every block's height is fixed at the default scale:
  *
  * - a row is 80 dp: its 20 dp paddings, one title line, an 8 dp gap and its
  *   12 dp expiry line. Its title is capped at one line, so a longer pack name
@@ -60,10 +61,16 @@ const PACK_SKELETON_ROWS = 4;
  *   lays out one gap more than it has rows because the notice and the error
  *   are siblings too.
  *
- * The sum is 587.5 dp for the four packs the catalog sells. A state that shows
- * fewer of these surfaces keeps the difference as blank space after its own
- * content, between the pack surface and the copy, so no store answer and no
- * purchase attempt moves the description or the legal links. The row count
+ * The sum is 587.5 dp for the four packs the catalog sells.
+ *
+ * {@link packAreaMinHeight} multiplies the sum by the live font scale, because
+ * `numberOfLines` caps a line count and not a line height: every text line
+ * above grows with the scale. The gaps and paddings do not grow, so the
+ * product over-reserves at a raised scale; over-reserving only adds blank
+ * space, while under-reserving would move the copy. A state that shows fewer
+ * surfaces keeps the difference as blank space after its own content, between
+ * the pack surface and the copy, so no store answer, no purchase attempt and
+ * no font scale moves the description or the legal links. The row count
  * follows the catalog, so a catalog that ever sells more packs widens the
  * reservation instead of pushing the copy down.
  */
@@ -71,11 +78,12 @@ const PACK_ROW_HEIGHT = 80;
 const PACK_CONTENT_GAP = 10.5;
 const STORE_NOTICE_HEIGHT = 180;
 const PURCHASE_ERROR_HEIGHT = 35;
-const packAreaMinHeight = (rows: number): number =>
-  rows * (PACK_ROW_HEIGHT + PACK_CONTENT_GAP) +
-  PACK_CONTENT_GAP +
-  STORE_NOTICE_HEIGHT +
-  PURCHASE_ERROR_HEIGHT;
+const packAreaMinHeight = (rows: number, fontScale: number): number =>
+  (rows * (PACK_ROW_HEIGHT + PACK_CONTENT_GAP) +
+    PACK_CONTENT_GAP +
+    STORE_NOTICE_HEIGHT +
+    PURCHASE_ERROR_HEIGHT) *
+  fontScale;
 
 /**
  * One-off credit packs bought with the store's own purchase sheet.
@@ -88,6 +96,9 @@ const packAreaMinHeight = (rows: number): number =>
 export function CreditPurchaseScreen() {
   const { t, i18n } = useTranslation();
   const storefront = getCreditStorefront();
+  // Every text line the pack area reserves space for grows with the system
+  // font scale, so the reservation does too; see `packAreaMinHeight`.
+  const fontScale = useLiveFontScale();
   const trpc = useTRPC();
   const {
     connected,
@@ -265,7 +276,10 @@ export function CreditPurchaseScreen() {
           <View
             className="gap-3"
             style={{
-              minHeight: packAreaMinHeight(Math.max(PACK_SKELETON_ROWS, products.length)),
+              minHeight: packAreaMinHeight(
+                Math.max(PACK_SKELETON_ROWS, products.length),
+                fontScale
+              ),
             }}
           >
             {/* The purchase error rides inside the reserved area too: it comes

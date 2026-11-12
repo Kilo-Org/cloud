@@ -53,10 +53,20 @@ const statusAnnouncement = vi.hoisted(() => ({ useStatusAnnouncement: vi.fn() })
 
 // ── Mocks ───────────────────────────────────────────────────────────
 
+// The screen sizes its pack-area reservation from the live font scale, so the
+// dimensions read is mutable: the scale test drives it.
+const dimensions = vi.hoisted(() => ({ fontScale: 1 }));
+
 vi.mock('react-native', () => ({
   Platform: mockedPlatform,
   Pressable: 'Pressable',
   View: 'View',
+  useWindowDimensions: () => ({
+    width: 411,
+    height: 914,
+    scale: 1,
+    fontScale: dimensions.fontScale,
+  }),
 }));
 
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
@@ -786,6 +796,11 @@ describe('CreditPurchaseScreen', () => {
     // reservation equals it, and the same value holds in every state, so the
     // copy cannot move.
     const TALLEST_STATE_MIN_HEIGHT = 587;
+    // The purchase error's own sentence. Its two capped lines are the height
+    // the reservation adds for it, so the case that shares it with the notice
+    // must render it.
+    const PURCHASE_ERROR_TEXT = 'The credits on this';
+
     const styleOf = (node: TestRenderer.ReactTestInstance): Record<string, unknown> => {
       const style: unknown = node.props.style;
       return typeof style === 'object' && style !== null && !Array.isArray(style)
@@ -875,6 +890,7 @@ describe('CreditPurchaseScreen', () => {
       packSurfaceInScroller: number;
       reservedHeight: number;
       copyFollowsPackArea: boolean;
+      errorRendered: boolean;
     }[] = [];
     // Sequential, not parallel: every scenario mutates the same owner mock and
     // the same backend fixture, so two mounted screens would race.
@@ -926,6 +942,7 @@ describe('CreditPurchaseScreen', () => {
         packSurfaceInScroller: scroller.findAll(node => scenario.isPackSurface(node)).length,
         reservedHeight: reserved === undefined ? 0 : minHeightOf(reserved),
         copyFollowsPackArea: packAreaIndex !== -1 && copyIndex > packAreaIndex,
+        errorRendered: allText(renderer).includes(PURCHASE_ERROR_TEXT),
       });
       unmount();
       vi.clearAllMocks();
@@ -935,12 +952,54 @@ describe('CreditPurchaseScreen', () => {
     const reservedHeights = new Set(measured.map(result => result.reservedHeight));
     expect(reservedHeights.size, 'one reserved height for every state').toBe(1);
     for (const result of measured) {
+      // The case that shares the notice with a purchase error must render the
+      // error too, or its reserved height would be unverified.
+      expect(result.errorRendered, result.state).toBe(
+        result.state !== 'loading' &&
+          result.state !== 'happy' &&
+          result.state !== 'empty' &&
+          result.state !== 'store unavailable'
+      );
       expect(result.copyInScroller, result.state).toBe(true);
       expect(result.legalInScroller, result.state).toBe(2);
       expect(result.packSurfaceInScroller, result.state).toBeGreaterThan(0);
       expect(result.reservedHeight, result.state).toBeGreaterThanOrEqual(TALLEST_STATE_MIN_HEIGHT);
       expect(result.copyFollowsPackArea, result.state).toBe(true);
     }
+  });
+
+  it('scales the pack area reservation with the system font scale', async () => {
+    // Line caps bound a line count, not a line height: at a raised scale every
+    // reserved text line is taller, so a fixed dp floor would let the copy move
+    // again. The reservation follows the live scale.
+    const minHeightOf = (node: TestRenderer.ReactTestInstance): number => {
+      const style: unknown = node.props.style;
+      if (typeof style !== 'object' || style === null || !('minHeight' in style)) {
+        return 0;
+      }
+      const value = style.minHeight;
+      return typeof value === 'number' ? value : 0;
+    };
+    const reservedHeight = async (): Promise<number> => {
+      const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+      await waitFor(() => packRows(renderer).length === 4);
+      const scroller = renderer.root.findByType(DetailScreenScrollView);
+      const value = scroller
+        .findAll(node => minHeightOf(node) > 0)
+        .map(node => minHeightOf(node))
+        .at(0);
+      unmount();
+      return value ?? 0;
+    };
+
+    dimensions.fontScale = 1;
+    const single = await reservedHeight();
+    dimensions.fontScale = 2;
+    const doubled = await reservedHeight();
+    dimensions.fontScale = 1;
+
+    expect(single).toBe(587.5);
+    expect(doubled).toBe(single * 2);
   });
 
   it('names an expiring balance and says nothing when none expires', async () => {

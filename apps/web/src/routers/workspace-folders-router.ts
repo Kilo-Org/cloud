@@ -14,6 +14,7 @@ import { and, asc, eq, inArray, isNull, max, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { isUniqueViolation } from '@/lib/db-errors';
 import {
+  SMART_FOLDER_WORKTREE_ORDER_LIMIT,
   smartFolderPresetSchema,
   workspaceFolderColorSchema,
   workspaceFolderKindSchema,
@@ -626,7 +627,7 @@ export const workspaceFoldersRouter = createTRPCRouter({
       folderInputSchema.extend({
         worktreeIds: z
           .array(cloudAgentWorktreeIdSchema)
-          .max(200)
+          .max(SMART_FOLDER_WORKTREE_ORDER_LIMIT)
           .refine(ids => new Set(ids).size === ids.length, {
             message: 'Worktree IDs must be unique',
           }),
@@ -647,12 +648,46 @@ export const workspaceFoldersRouter = createTRPCRouter({
       if (folder.kind !== 'smart') {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'A smart folder is required' });
       }
-      for (const worktreeId of [...input.worktreeIds].sort()) {
-        await lockMovableWorktree(ctx.sidebarDb, ctx.sidebarScope, worktreeId);
+      const rows = await ctx.sidebarDb
+        .select({
+          worktreeId: cloud_agent_worktrees.worktree_id,
+          userId: cloud_agent_worktrees.kilo_user_id,
+          organizationId: cloud_agent_worktrees.organization_id,
+          deletionStartedAt: cloud_agent_worktrees.deletion_started_at,
+          deletionCompletedAt: cloud_agent_worktrees.deletion_completed_at,
+          cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
+        })
+        .from(cloud_agent_worktrees)
+        .leftJoin(
+          cli_sessions_v2,
+          and(
+            eq(cli_sessions_v2.cloud_agent_worktree_id, cloud_agent_worktrees.worktree_id),
+            ownerScopeCondition(cli_sessions_v2, ctx.sidebarScope),
+            isNull(cli_sessions_v2.parent_session_id)
+          )
+        )
+        .where(inArray(cloud_agent_worktrees.worktree_id, input.worktreeIds))
+        .orderBy(asc(cloud_agent_worktrees.worktree_id))
+        .for('share', { of: cloud_agent_worktrees });
+      const eligibleIds = new Set<string>();
+      for (const row of rows) {
+        if (
+          row.userId !== ctx.sidebarScope.userId ||
+          row.organizationId !== ctx.sidebarScope.organizationId
+        ) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
+        }
+        if (
+          row.deletionStartedAt === null &&
+          row.deletionCompletedAt === null &&
+          workspaceSessionIdSchema.safeParse(row.cloudAgentSessionId).success
+        ) {
+          eligibleIds.add(row.worktreeId);
+        }
       }
       await ctx.sidebarDb
         .update(cloud_agent_workspace_folders)
-        .set({ manual_worktree_order: input.worktreeIds })
+        .set({ manual_worktree_order: input.worktreeIds.filter(id => eligibleIds.has(id)) })
         .where(eq(cloud_agent_workspace_folders.id, input.folderId));
       return { success: true };
     }),

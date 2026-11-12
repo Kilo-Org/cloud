@@ -5,7 +5,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
-import type { WorkspaceFolderColor } from '@/lib/cloud-agent/workspace-folders';
+import {
+  SMART_FOLDER_WORKTREE_ORDER_LIMIT,
+  type WorkspaceFolderColor,
+} from '@/lib/cloud-agent/workspace-folders';
 import {
   controlPlaneSessionIdSchema,
   getInitializedSmartDoneFoldersStorageKey,
@@ -194,8 +197,14 @@ export function useWorkspaceFolders(
   );
 
   const reorderSmartFolderWorktrees = useCallback(
-    (folderId: string, worktreeIds: readonly string[]) =>
-      run(
+    async (folderId: string, worktreeIds: readonly string[]) => {
+      if (worktreeIds.length > SMART_FOLDER_WORKTREE_ORDER_LIMIT) {
+        toast.error(
+          `Cannot save workspace order for smart folders with more than ${SMART_FOLDER_WORKTREE_ORDER_LIMIT} workspaces.`
+        );
+        return false;
+      }
+      return run(
         () =>
           reorderWorktrees({
             folderId,
@@ -203,7 +212,8 @@ export function useWorkspaceFolders(
             organizationId: organizationId ?? null,
           }),
         'Workspace order saved'
-      ),
+      );
+    },
     [organizationId, reorderWorktrees, run]
   );
 

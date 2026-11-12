@@ -527,6 +527,10 @@ describe('scoped workspace folder listing', () => {
       smartPreset: 'needs_you',
     });
     const child = await insertWorkspaceSession();
+    await db.insert(cloud_agent_worktrees).values({
+      worktree_id: child.worktreeId,
+      kilo_user_id: USER_ID,
+    });
     await callerFor().workspaceFolders.reorderWorktrees({
       organizationId: null,
       folderId: folder.id,

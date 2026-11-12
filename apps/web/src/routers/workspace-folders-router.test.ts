@@ -329,7 +329,11 @@ describe('workspaceFolders persistence and validation', () => {
       color: 'orange',
       smartPreset: 'needs_you',
     });
-    const input = { organizationId: null, folderId: smart.id, worktreeIds: [WORKTREE_ID] };
+    const input = {
+      organizationId: null,
+      folderId: smart.id,
+      worktreeIds: [WORKTREE_ID],
+    } satisfies Parameters<FolderCaller['reorderWorktrees']>[0];
     await insertWorktree();
     await expect(
       callerFor().reorderWorktrees({ ...input, worktreeIds: [WORKTREE_ID, WORKTREE_ID] })
@@ -360,6 +364,89 @@ describe('workspaceFolders persistence and validation', () => {
       callerFor().reorderWorktrees({ ...input, folderId: manual.id })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
+
+  it.each([null, ORGANIZATION_ID])(
+    'saves smart-folder order while skipping deleting, stale, and inaccessible roots in scope %p',
+    async organizationId => {
+      const smart = await callerFor().create({
+        organizationId,
+        name: 'Needs you',
+        color: 'orange',
+        smartPreset: 'needs_you',
+      });
+      const firstId = newWorktreeId();
+      const secondId = newWorktreeId();
+      for (const worktreeId of [firstId, secondId]) {
+        await insertWorktree({ worktree_id: worktreeId, organization_id: organizationId });
+        await insertSession({
+          cloud_agent_worktree_id: worktreeId,
+          organization_id: organizationId,
+        });
+      }
+      await insertSession({ cloud_agent_worktree_id: firstId, organization_id: organizationId });
+      const skipped = [newWorktreeId()];
+      const missingMetadataId = newWorktreeId();
+      await insertSession({
+        cloud_agent_worktree_id: missingMetadataId,
+        organization_id: organizationId,
+      });
+      skipped.push(missingMetadataId);
+      const hidden = [
+        { metadata: { deletion_started_at: INITIAL_TIME }, session: {} },
+        {
+          metadata: { deletion_started_at: INITIAL_TIME, deletion_completed_at: LATER_TIME },
+          session: {},
+        },
+        { metadata: {}, session: { kilo_user_id: OTHER_USER_ID } },
+        {
+          metadata: {},
+          session: { organization_id: organizationId === null ? ORGANIZATION_ID : null },
+        },
+        { metadata: {}, session: { parent_session_id: SESSION_ID } },
+        { metadata: {}, session: { cloud_agent_session_id: 'agent_legacy' } },
+      ] satisfies { metadata: Partial<WorktreeInsert>; session: Partial<NewCliSessionV2> }[];
+      for (const item of hidden) {
+        const worktreeId = newWorktreeId();
+        skipped.push(worktreeId);
+        await insertWorktree({
+          worktree_id: worktreeId,
+          organization_id: organizationId,
+          ...item.metadata,
+        });
+        await insertSession({
+          cloud_agent_worktree_id: worktreeId,
+          organization_id: organizationId,
+          ...item.session,
+        });
+      }
+      const rootlessId = newWorktreeId();
+      await insertWorktree({ worktree_id: rootlessId, organization_id: organizationId });
+      const worktreesBefore = await db
+        .select()
+        .from(cloud_agent_worktrees)
+        .where(eq(cloud_agent_worktrees.kilo_user_id, USER_ID))
+        .orderBy(asc(cloud_agent_worktrees.worktree_id));
+
+      await callerFor().reorderWorktrees({
+        organizationId,
+        folderId: smart.id,
+        worktreeIds: [secondId, ...skipped, rootlessId, firstId],
+      });
+
+      expect((await callerFor().list({ organizationId })).folders).toEqual([
+        { ...smart, manualWorktreeOrder: [secondId, firstId] },
+      ]);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_worktrees)
+          .where(eq(cloud_agent_worktrees.kilo_user_id, USER_ID))
+          .orderBy(asc(cloud_agent_worktrees.worktree_id))
+      ).toEqual(worktreesBefore);
+      await callerFor().reorderWorktrees({ organizationId, folderId: smart.id, worktreeIds: [] });
+      expect((await readFolders(organizationId))[0]?.manual_worktree_order).toEqual([]);
+    }
+  );
 
   it('writes a fractional sidebar position only when supplied and clears it on null', async () => {
     await insertWorktree();

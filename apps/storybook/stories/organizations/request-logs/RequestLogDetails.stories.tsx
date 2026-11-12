@@ -172,6 +172,7 @@ const directByokDetails: RequestLogDetails = {
         ],
       },
       enkrypt_output: null,
+      byok_failover_attempts: [],
     },
   },
 };
@@ -204,6 +205,7 @@ const promotionalModelDetails: RequestLogDetails = {
       },
       enkrypt: null,
       enkrypt_output: null,
+      byok_failover_attempts: [],
     },
   },
 };
@@ -246,6 +248,94 @@ const kiloGatewayDetails: RequestLogDetails = {
       },
       enkrypt: null,
       enkrypt_output: null,
+      byok_failover_attempts: [],
+    },
+  },
+};
+
+const byokFailoverDetails: RequestLogDetails = {
+  request: {
+    ...request,
+    model: 'openai/gpt-5.2',
+    requested_model: 'openai/gpt-5.2',
+    provider: 'openrouter',
+    inference_provider: 'OpenAI',
+    cache_write_tokens: 0,
+    finish_reason: 'stop',
+    api_kind: 'chat_completions',
+  },
+  metadata: {
+    status: 'available',
+    routing: {
+      requested_model: 'openai/gpt-5.2',
+      api_kind: 'chat_completions',
+      owner_type: 'organization',
+      steps: [
+        { step: 'custom-llm', outcome: 'skipped', reason: 'no-match' },
+        { step: 'direct-byok-model', outcome: 'skipped', reason: 'no-match' },
+        { step: 'byok-key', outcome: 'selected', route: 'vercel-byok', provider_id: 'openai' },
+      ],
+      byok_candidates: [
+        {
+          route: 'vercel-byok',
+          provider_id: 'openai',
+          priority: 1,
+          default_rank: 0,
+          route_order: 0,
+          outcome: 'selected',
+        },
+        {
+          route: 'vercel-byok',
+          provider_id: 'azure',
+          priority: 2,
+          default_rank: 1,
+          route_order: 1,
+          outcome: 'unreached',
+        },
+        {
+          route: 'gateway-byok',
+          provider_id: 'openrouter',
+          priority: 3,
+          default_rank: 2,
+          route_order: 2,
+          outcome: 'unreached',
+        },
+      ],
+      result: {
+        kind: 'provider',
+        route: 'vercel-byok',
+        provider_type: 'vercel',
+        byok_provider_ids: ['openai'],
+        payer: 'owner-byok-key',
+        is_free: false,
+      },
+      enkrypt: null,
+      enkrypt_output: null,
+      byok_failover_attempts: [
+        {
+          provider_type: 'vercel',
+          byok_provider_ids: ['openai'],
+          status: 429,
+          error_code: 'insufficient_quota',
+          duration_ms: 412,
+          outcome: 'failed-over',
+        },
+        {
+          provider_type: 'vercel',
+          byok_provider_ids: ['azure'],
+          status: 503,
+          error_code: 'upstream_disconnect',
+          duration_ms: 30_004,
+          outcome: 'failed-over',
+        },
+        {
+          provider_type: 'openrouter',
+          byok_provider_ids: ['openrouter'],
+          status: 200,
+          duration_ms: 1_187,
+          outcome: 'served',
+        },
+      ],
     },
   },
 };
@@ -323,6 +413,7 @@ const enkryptBlockedDetails: RequestLogDetails = {
         ],
       },
       enkrypt_output: null,
+      byok_failover_attempts: [],
     },
   },
 };
@@ -365,6 +456,22 @@ type Story = StoryObj<typeof meta>;
 
 export const DirectByok: Story = {
   args: { row, details: directByokDetails },
+};
+
+export const ByokFailover: Story = {
+  args: {
+    row: {
+      ...row,
+      model: 'openai/gpt-5.2',
+      provider: 'OpenAI',
+      input_tokens: 12_480,
+      output_tokens: 655,
+      cache_hit_tokens: 0,
+      latency_ms: 31_740,
+      generation_time_ms: 4_210,
+    },
+    details: byokFailoverDetails,
+  },
 };
 
 export const PromotionalModel: Story = {

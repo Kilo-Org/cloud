@@ -104,6 +104,7 @@ export function kilo2RuntimeEnvironment(env: Record<string, string>): Record<str
   }
   const runtimeEnv: Record<string, string> = {
     ...env,
+    KILO_USE_RELEASE_CONFIG: '1',
     ...(env.KILO_CONFIG ? { KILO2_CONFIG: env.KILO_CONFIG } : {}),
     KILO_CONFIG_CONTENT: JSON.stringify(config),
     OPENCODE_CONFIG_CONTENT: JSON.stringify(config),

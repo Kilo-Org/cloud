@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/globals';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { getProviderInput } from '@kilocode/web-shared/tests/helpers/get-provider-input.helper';
+import { onlyRoute } from '@kilocode/web-shared/tests/helpers/get-provider-result.helper';
 import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
@@ -143,11 +144,13 @@ describe('getProvider with public custom LLMs', () => {
       ],
       ['acme/country-denied-private-model', user, ORG_ID, 'custom'],
     ] as const) {
-      await expect(
-        getProvider(
-          getProviderInput({ ...providerInput(model, caller, organizationId), countryCode })
+      expect(
+        await onlyRoute(
+          await getProvider(
+            getProviderInput({ ...providerInput(model, caller, organizationId), countryCode })
+          )
         )
-      ).resolves.toMatchObject({ kind: 'provider', provider: { type: providerId } });
+      ).toMatchObject({ provider: { type: providerId } });
     }
   });
 
@@ -163,8 +166,7 @@ describe('getProvider with public custom LLMs', () => {
       )
     );
 
-    expect(result).toMatchObject({
-      kind: 'provider',
+    expect(await onlyRoute(result)).toMatchObject({
       provider: {
         type: 'custom-public',
         apiUrl: 'https://upstream.example.com/v1',
@@ -182,17 +184,20 @@ describe('getProvider with public custom LLMs', () => {
       getProviderInput(providerInput('acme/public-model-free', user, undefined))
     );
 
-    expect(multi).toMatchObject({
+    expect(await onlyRoute(multi)).toMatchObject({
       provider: { supportedChatApis: ['chat_completions', 'responses'] },
     });
-    expect(single).toMatchObject({ provider: { supportedChatApis: ['chat_completions'] } });
+    expect(await onlyRoute(single)).toMatchObject({
+      provider: { supportedChatApis: ['chat_completions'] },
+    });
   });
 
   test('keeps a private custom LLM to its grantees, exempt from policy checks', async () => {
-    await expect(
-      getProvider(getProviderInput(providerInput('acme/private-model-free', user, ORG_ID)))
-    ).resolves.toMatchObject({
-      kind: 'provider',
+    expect(
+      await onlyRoute(
+        await getProvider(getProviderInput(providerInput('acme/private-model-free', user, ORG_ID)))
+      )
+    ).toMatchObject({
       provider: { type: 'custom' },
       bypassAccessCheck: true,
     });
@@ -214,9 +219,11 @@ describe('getProvider with public custom LLMs', () => {
   ])(
     'serves a %s custom LLM with a free id for free to %s',
     async (_visibility, _caller, model, caller, organizationId) => {
-      await expect(
-        getProvider(getProviderInput(providerInput(model, caller, organizationId)))
-      ).resolves.toMatchObject({ kind: 'provider', isFree: true });
+      expect(
+        await onlyRoute(
+          await getProvider(getProviderInput(providerInput(model, caller, organizationId)))
+        )
+      ).toMatchObject({ isFree: true });
     }
   );
 
@@ -226,10 +233,11 @@ describe('getProvider with public custom LLMs', () => {
   ])(
     'does not serve an unpriced %s custom LLM without a free id for free to %s',
     async (_visibility, _caller, model, organizationId) => {
-      await expect(
-        getProvider(getProviderInput(providerInput(model, user, organizationId)))
-      ).resolves.toMatchObject({
-        kind: 'provider',
+      expect(
+        await onlyRoute(
+          await getProvider(getProviderInput(providerInput(model, user, organizationId)))
+        )
+      ).toMatchObject({
         isFree: false,
       });
     }
@@ -250,10 +258,13 @@ describe('getProvider with public custom LLMs', () => {
   });
 
   test('charges for a private custom LLM with pricing, still exempt from policy checks', async () => {
-    await expect(
-      getProvider(getProviderInput(providerInput('acme/priced-private-model', user, ORG_ID)))
-    ).resolves.toMatchObject({
-      kind: 'provider',
+    expect(
+      await onlyRoute(
+        await getProvider(
+          getProviderInput(providerInput('acme/priced-private-model', user, ORG_ID))
+        )
+      )
+    ).toMatchObject({
       provider: { type: 'custom' },
       isFree: false,
       bypassAccessCheck: true,
@@ -261,10 +272,13 @@ describe('getProvider with public custom LLMs', () => {
   });
 
   test('charges a signed-in user for a public custom LLM with pricing', async () => {
-    await expect(
-      getProvider(getProviderInput(providerInput('acme/priced-public-model', user, undefined)))
-    ).resolves.toMatchObject({
-      kind: 'provider',
+    expect(
+      await onlyRoute(
+        await getProvider(
+          getProviderInput(providerInput('acme/priced-public-model', user, undefined))
+        )
+      )
+    ).toMatchObject({
       provider: { type: 'custom-public' },
       isFree: false,
       bypassAccessCheck: false,
@@ -296,8 +310,7 @@ describe('getProvider with public custom LLMs', () => {
         { type: 'function', function: { name: 'read_file', parameters: {} } },
       ],
     });
-    const result = await getProvider(getProviderInput({ ...input, request }));
-    if (result.kind !== 'provider') throw new Error(`Expected a provider, got ${result.kind}`);
+    const result = await onlyRoute(await getProvider(getProviderInput({ ...input, request })));
     jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     await applyProviderSpecificLogic(
       result.provider,

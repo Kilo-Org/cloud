@@ -32,7 +32,7 @@ import {
 import { readChatGptUsageLimit } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
-import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import type { ProviderRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { isValidVercelModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
@@ -43,8 +43,8 @@ import { enforceRequestCostLimit } from '@kilocode/web-shared/lib/ai-gateway/req
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
-type SendUpstreamAttemptInput = {
-  providerContext: GetProviderProviderResult;
+export type SendUpstreamAttemptInput = {
+  providerContext: ProviderRoute;
   requestedModel: string;
   request: GatewayRequest;
   fraudHeaders: FraudDetectionHeaders;
@@ -59,9 +59,11 @@ type SendUpstreamAttemptInput = {
   vercelRequestId?: string | null;
   costLimit?: { maximumMicrodollars: string; availableBalanceMicrodollars: number };
   dataRegion: OrganizationDataRegion | null;
+  /** What remains of `UPSTREAM_DURATION_BUDGET_MS` for this attempt. */
+  upstreamDurationBudgetMs: number;
 };
 
-type SendUpstreamAttemptResult =
+export type SendUpstreamAttemptResult =
   | { type: 'unknown-gateway-model' }
   | { type: 'error'; response: NextResponse }
   | {
@@ -100,6 +102,7 @@ export async function sendUpstreamAttempt({
   vercelRequestId,
   costLimit,
   dataRegion,
+  upstreamDurationBudgetMs,
 }: SendUpstreamAttemptInput): Promise<SendUpstreamAttemptResult> {
   const extraHeaders: Record<string, string> = {};
   await applyProviderSpecificLogic(
@@ -153,6 +156,7 @@ export async function sendUpstreamAttempt({
     signal,
     vercelRequestId,
     reasoningEffort: getReasoningEffort(request),
+    durationBudgetMs: upstreamDurationBudgetMs,
   });
   if (result.type === 'error') return result;
 

@@ -122,37 +122,69 @@ import {
   watchPrQuerySchema,
 } from '@/lib/cloud-agent/watch-pr';
 
-/**
- * Check if an error indicates the session was not found in the cloud-agent DO.
- * This is expected for legacy sessions created before the new DO-based system.
- */
-function sessionTrpcErrorCode(err: unknown): string | undefined {
+type SessionTrpcErrorData = {
+  code?: string;
+  httpStatus?: number;
+  clientError?: { retryable?: unknown };
+};
+
+function sessionTrpcErrorData(err: unknown): SessionTrpcErrorData | undefined {
   if (!(err instanceof TRPCClientError)) return undefined;
-  const data = err.data as { code?: string } | undefined;
-  const shape = err.shape as { data?: { code?: string } } | undefined;
-  return data?.code ?? shape?.data?.code;
+  const data = err.data as SessionTrpcErrorData | undefined;
+  const shapeData = (err.shape as { data?: SessionTrpcErrorData } | undefined)?.data;
+  if (data === undefined && shapeData === undefined) return undefined;
+  return {
+    code: data?.code ?? shapeData?.code,
+    httpStatus: data?.httpStatus ?? shapeData?.httpStatus,
+    clientError: data?.clientError ?? shapeData?.clientError,
+  };
+}
+
+function sessionTrpcErrorCode(err: unknown): string | undefined {
+  return sessionTrpcErrorData(err)?.code;
 }
 
 function isSessionConflictError(err: unknown): boolean {
   return sessionTrpcErrorCode(err) === 'CONFLICT';
 }
 
+/**
+ * Check if an error indicates the session was not found in the cloud-agent DO.
+ * This is expected for legacy sessions created before the new DO-based system.
+ */
 function isSessionNotFoundError(err: unknown): boolean {
-  if (err instanceof TRPCClientError) {
-    const data = err.data as { code?: string; httpStatus?: number } | undefined;
-    const shape = err.shape as { data?: { code?: string; httpStatus?: number } } | undefined;
-    // Check TRPC error code
-    const code = data?.code ?? shape?.data?.code;
-    if (code === 'NOT_FOUND') {
-      return true;
-    }
-    // Also check HTTP status 404
-    const httpStatus = data?.httpStatus ?? shape?.data?.httpStatus;
-    if (httpStatus === 404) {
-      return true;
-    }
-  }
-  return false;
+  const errorData = sessionTrpcErrorData(err);
+  return errorData?.code === 'NOT_FOUND' || errorData?.httpStatus === 404;
+}
+
+const TRANSIENT_TRPC_CODES = new Set(['SERVICE_UNAVAILABLE', 'TIMEOUT']);
+const TRANSIENT_HTTP_STATUSES = new Set([503, 504]);
+const TRANSPORT_ERROR_NAMES = new Set([
+  'HeadersTimeoutError',
+  'BodyTimeoutError',
+  'ConnectTimeoutError',
+  'AbortError',
+  'TimeoutError',
+]);
+
+function isTransportFailure(cause: unknown, depth = 0): boolean {
+  if (typeof cause !== 'object' || cause === null || depth > 3) return false;
+  const { name, message } = cause as { name?: unknown; message?: unknown };
+  if (typeof name === 'string' && TRANSPORT_ERROR_NAMES.has(name)) return true;
+  if (cause instanceof TypeError && message === 'fetch failed') return true;
+  return isTransportFailure((cause as { cause?: unknown }).cause, depth + 1);
+}
+
+/** Worker outages, timeouts, and network failures that a later retry may resolve. */
+function isTransientRuntimeError(err: unknown): boolean {
+  if (!(err instanceof TRPCClientError)) return false;
+  const errorData = sessionTrpcErrorData(err);
+  if (errorData === undefined) return isTransportFailure(err.cause);
+  if (errorData.code && TRANSIENT_TRPC_CODES.has(errorData.code)) return true;
+  if (errorData.httpStatus && TRANSIENT_HTTP_STATUSES.has(errorData.httpStatus)) return true;
+  const retryable = errorData.clientError?.retryable === true;
+  // Internal errors stay defects even when a Worker envelope marks them retryable.
+  return retryable && errorData.code !== undefined && errorData.code !== 'INTERNAL_SERVER_ERROR';
 }
 
 function isParentLookupUnavailableError(err: unknown): boolean {
@@ -2587,6 +2619,16 @@ export const cliSessionsV2Router = createTRPCRouter({
               `Session ${session_id} not found in cloud-agent DO - treating as legacy session`
             );
             // runtimeState stays null
+          } else if (isTransientRuntimeError(error)) {
+            console.error(
+              `Session runtime state temporarily unavailable for session ${session_id}:`,
+              error instanceof Error ? error.message : error
+            );
+            throw new TRPCError({
+              code: 'SERVICE_UNAVAILABLE',
+              message: 'Session runtime state is temporarily unavailable',
+              cause: error,
+            });
           } else {
             console.error(
               `Failed to fetch runtime state for session ${session_id}:`,

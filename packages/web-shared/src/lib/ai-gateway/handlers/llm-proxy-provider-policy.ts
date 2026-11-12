@@ -2,8 +2,9 @@ import type { NextResponse as NextResponseType } from 'next/server';
 import type { User } from '@kilocode/db';
 import {
   getProvider,
-  type GetProviderProviderResult,
+  type ProviderRoute,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import type { FailoverRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/byok-failover';
 import type { AiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 import {
   getManagedGatewayFromUrl,
@@ -85,7 +86,10 @@ type ProviderPolicyInput = {
 type ProviderPolicyResult =
   | {
       ok: true;
-      providerResult: GetProviderProviderResult;
+      /** The first of `getProvider`'s routes, which the policy admits. */
+      route: ProviderRoute;
+      /** `getProvider`'s later routes, each resolving to null when the policy refuses it. */
+      failoverRoutes: readonly FailoverRoute[];
       isNonTrialEnterprise: boolean;
       dataRegion: OrganizationGatewaySettings['dataRegion'];
     }
@@ -163,7 +167,7 @@ export async function resolveProviderAndPolicy(
         (await input.balanceAndSettingsPromise).settings
       )
     : NO_ORGANIZATION_GATEWAY_SETTINGS;
-  const providerResult = await getProvider({
+  const getProviderResult = await getProvider({
     requestedModel: model,
     request,
     user,
@@ -181,33 +185,33 @@ export async function resolveProviderAndPolicy(
     kiloIgnoredProviders: getIgnoredProviders(model, isNonTrialEnterprise),
     onDecision: decision => input.providerMetadataCapture?.captureRoutingDecision(decision),
   });
-  if (providerResult.kind === 'chatgpt-reconnect') {
+  if (getProviderResult.kind === 'chatgpt-reconnect') {
     // The person's enabled ChatGPT connection is terminally dead. Fail readably
     // instead of silently serving the request through another billing path.
-    return reject(chatGptReconnectResponse(providerResult.message));
+    return reject(chatGptReconnectResponse(getProviderResult.message));
   }
-  if (providerResult.kind === 'claude-billing-reconnect') {
+  if (getProviderResult.kind === 'claude-billing-reconnect') {
     // The organization's shared-services Claude link was connected by a person
     // who is gone. Only an owner reconnecting it changes the outcome.
-    return reject(claudeBillingReconnectResponse(providerResult.message, input.organizationId));
+    return reject(claudeBillingReconnectResponse(getProviderResult.message, input.organizationId));
   }
-  if (providerResult.kind === 'claude-billing-unavailable') {
+  if (getProviderResult.kind === 'claude-billing-unavailable') {
     // The owner's Claude billing connection cannot bill. Never serve it on
     // another payer's allowance without telling them.
     return reject(
-      claudeBillingUnavailableResponse(providerResult.message, providerResult.retryable)
+      claudeBillingUnavailableResponse(getProviderResult.message, getProviderResult.retryable)
     );
   }
-  if (providerResult.kind === 'custom-llm-unavailable') {
+  if (getProviderResult.kind === 'custom-llm-unavailable') {
     // Same response as an unknown model id, so callers cannot probe for custom LLMs.
     return reject(unknownModelResponse(model));
   }
-  if (providerResult.kind === 'direct-byok-catalog-only') {
+  if (getProviderResult.kind === 'direct-byok-catalog-only') {
     // Falling through to the managed gateway would fail later with a misleading unknown-model error.
     const message = directByokCatalogOnlyMessage({
       model,
-      providerId: providerResult.providerId,
-      catalogModelId: providerResult.catalogModelId,
+      providerId: getProviderResult.providerId,
+      catalogModelId: getProviderResult.catalogModelId,
     });
     return reject(
       orgAutoRouteTarget
@@ -217,107 +221,107 @@ export async function resolveProviderAndPolicy(
         : directByokCatalogOnlyResponse(message)
     );
   }
-  // A local, so the type guard narrows it rather than `providerResult.provider.type`.
-  const providerType = providerResult.provider.type;
-  if (providerType === 'claude-billing' && !(await isDirectByokProviderAllowed('anthropic'))) {
-    return reject(modelNotAllowedResponse());
-  }
-  if (isManagedGatewayDisabled(organizationGatewaySettings, providerType)) {
-    return reject(managedGatewayDisabledResponse(providerType));
-  }
-  const providerBaseUrl =
-    providerResult.provider.apiUrlOverrides[request.kind] ?? providerResult.provider.apiUrl;
-  const gatewayByDomain = getManagedGatewayFromUrl(providerBaseUrl);
-  if (gatewayByDomain && isManagedGatewayDisabled(organizationGatewaySettings, gatewayByDomain)) {
-    return reject(managedGatewayDisabledResponse(gatewayByDomain));
-  }
-  if (orgAutoRouteTarget) {
-    try {
-      const directByokTarget = await getDirectByokModel(orgAutoRouteTarget);
-      if (directByokTarget.provider && providerResult.provider.type !== 'direct-byok') {
-        return reject(
-          organizationAutoConfigurationResponse(
+  /** Why the policy refuses the route, or null when it may serve the request. */
+  const routeRejection = async (
+    route: ProviderRoute
+  ): Promise<NextResponseType<unknown> | null> => {
+    // A local, so the type guard narrows it rather than `route.provider.type`.
+    const providerType = route.provider.type;
+    if (providerType === 'claude-billing' && !(await isDirectByokProviderAllowed('anthropic'))) {
+      return modelNotAllowedResponse();
+    }
+    if (isManagedGatewayDisabled(organizationGatewaySettings, providerType)) {
+      return managedGatewayDisabledResponse(providerType);
+    }
+    const providerBaseUrl = route.provider.apiUrlOverrides[request.kind] ?? route.provider.apiUrl;
+    const gatewayByDomain = getManagedGatewayFromUrl(providerBaseUrl);
+    if (gatewayByDomain && isManagedGatewayDisabled(organizationGatewaySettings, gatewayByDomain)) {
+      return managedGatewayDisabledResponse(gatewayByDomain);
+    }
+    if (orgAutoRouteTarget) {
+      try {
+        const directByokTarget = await getDirectByokModel(orgAutoRouteTarget);
+        if (directByokTarget.provider && route.provider.type !== 'direct-byok') {
+          return organizationAutoConfigurationResponse(
             `Organization Auto route target '${orgAutoRouteTarget}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`
-          )
+          );
+        }
+      } catch {
+        return organizationAutoConfigurationResponse(
+          'Organization Auto could not validate this route target against the current model catalog.'
         );
       }
-    } catch {
-      return reject(
-        organizationAutoConfigurationResponse(
-          'Organization Auto could not validate this route target against the current model catalog.'
-        )
+    }
+
+    if (!route.provider.supportedChatApis.includes(request.kind)) {
+      return apiKindNotSupportedResponse(
+        request.kind,
+        route.provider.supportedChatApis,
+        route.provider.type === 'direct-byok' ? route.userByok?.[0]?.providerId : undefined
       );
     }
-  }
 
-  if (!providerResult.provider.supportedChatApis.includes(request.kind)) {
-    return reject(
-      apiKindNotSupportedResponse(
-        request.kind,
-        providerResult.provider.supportedChatApis,
-        providerResult.provider.type === 'direct-byok'
-          ? providerResult.userByok?.[0]?.providerId
-          : undefined
-      )
-    );
-  }
+    if (modelResolution.kind === 'direct' && (await isUnavailableModel(model))) {
+      console.warn(`User requested unavailable model ${model}; rejecting.`);
+      return unavailableModelResponse();
+    }
 
-  if (modelResolution.kind === 'direct' && (await isUnavailableModel(model))) {
-    console.warn(`User requested unavailable model ${model}; rejecting.`);
-    return reject(unavailableModelResponse());
-  }
+    // Skip balance/org checks for anonymous users - they can only use free models
+    if (!isAnonymousContext(user)) {
+      const creditsBlocked = paidUsageRejection({
+        user,
+        organizationId: input.organizationId,
+        account: await input.balanceAndSettingsPromise,
+        exempt: route.isFree || !!route.userByok || !!route.skipBalanceCheck,
+      });
+      if (creditsBlocked) return await creditsBlocked();
+    }
 
-  // Skip balance/org checks for anonymous users - they can only use free models
-  if (!isAnonymousContext(user)) {
-    const creditsBlocked = paidUsageRejection({
-      user,
-      organizationId: input.organizationId,
-      account: await input.balanceAndSettingsPromise,
-      exempt:
-        providerResult.isFree || !!providerResult.userByok || !!providerResult.skipBalanceCheck,
-    });
-    if (creditsBlocked) return reject(await creditsBlocked());
-  }
-
-  if (!isAnonymous && !providerResult.bypassAccessCheck) {
+    if (isAnonymous || route.bypassAccessCheck) return null;
     const {
       allowedProviders,
-      effectiveProviderConfig,
       groupModelAllowed,
       groupModelAllowedForInferenceProviderUserByok,
       groupProvidersAllowed,
     } = await getAccessCheck();
 
-    if (providerResult.provider.type === 'direct-byok') {
+    if (route.provider.type === 'direct-byok') {
       // A catalog-mode direct BYOK key is the request's only route, so the policy is checked
       // against the key's provider alone. Routing already skips keys it rejects.
-      const directByokProvider = findDirectByokProvider(
-        providerResult.userByok?.[0]?.providerId ?? ''
-      );
+      const directByokProvider = findDirectByokProvider(route.userByok?.[0]?.providerId ?? '');
       if (
         !directByokProvider ||
         !(await isDirectByokProviderAllowed(getDirectByokPolicyProviderId(directByokProvider)))
       ) {
-        return reject(poolRouted ? efficientPoolBlockedResponse() : modelNotAllowedResponse());
+        return poolRouted ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
       }
-    } else {
-      const modelAllowed = isInferenceProviderUserByok(providerResult.userByok)
-        ? groupModelAllowedForInferenceProviderUserByok
-        : groupModelAllowed;
-      if (!modelAllowed) {
-        return reject(poolRouted ? efficientPoolBlockedResponse() : modelNotAllowedResponse());
-      }
-      if (!groupProvidersAllowed) return reject(modelNotAllowedResponse());
-      if (
-        providerResult.provider.type === 'vercel' &&
-        providerResult.userByok?.some(
-          byok => !isVercelUserByokProviderAllowed(byok.providerId, allowedProviders)
-        )
-      ) {
-        return reject(modelNotAllowedResponse());
-      }
+      return null;
     }
+    const modelAllowed = isInferenceProviderUserByok(route.userByok)
+      ? groupModelAllowedForInferenceProviderUserByok
+      : groupModelAllowed;
+    if (!modelAllowed) {
+      return poolRouted ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
+    }
+    if (!groupProvidersAllowed) return modelNotAllowedResponse();
+    if (
+      route.provider.type === 'vercel' &&
+      route.userByok?.some(
+        byok => !isVercelUserByokProviderAllowed(byok.providerId, allowedProviders)
+      )
+    ) {
+      return modelNotAllowedResponse();
+    }
+    return null;
+  };
 
+  const [resolveFirstRoute, ...resolveFailoverRoutes] = getProviderResult.routes;
+  const route = await resolveFirstRoute();
+  const rejection = await routeRejection(route);
+  if (rejection) return reject(rejection);
+
+  if (!isAnonymous && !route.bypassAccessCheck) {
+    const { effectiveProviderConfig } = await getAccessCheck();
     if (effectiveProviderConfig) {
       request.body.provider = effectiveProviderConfig;
     }
@@ -348,9 +352,31 @@ export async function resolveProviderAndPolicy(
     }
   }
 
+  const failoverRoutes = resolveFailoverRoutes.map(
+    resolveRoute => async (): Promise<ProviderRoute | null> => {
+      let failoverRoute: ProviderRoute;
+      try {
+        failoverRoute = await resolveRoute();
+      } catch (error) {
+        console.error('[byok-failover] Skipping a BYOK key that could not be resolved', {
+          errorType: error instanceof Error ? error.name : 'unknown',
+        });
+        return null;
+      }
+      if (await routeRejection(failoverRoute)) {
+        console.warn('[byok-failover] Skipping a BYOK key the policy refuses', {
+          providerIds: failoverRoute.userByok?.map(byok => byok.providerId) ?? [],
+        });
+        return null;
+      }
+      return failoverRoute;
+    }
+  );
+
   return {
     ok: true,
-    providerResult,
+    route,
+    failoverRoutes,
     isNonTrialEnterprise,
     dataRegion: organizationGatewaySettings.dataRegion,
   };

@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
+import { PINNED_CLIS } from '../../../scripts/runtime-cli-artifact.js';
 import { createMessageId } from '../../../src/shared/message-id.js';
 import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 import { createKiloRuntime } from './kilo-runtime.js';
@@ -31,7 +32,9 @@ suite('real Kilo v2 harness', () => {
     if (process.env.KILO_RUNTIME_HARNESS !== 'kilo2')
       throw new Error('Run this suite with KILO_RUNTIME_HARNESS=kilo2');
     const version = Bun.spawn([binary, '--version']);
-    expect((await new Response(version.stdout).text()).trim()).toBe('kilo2 v0.0.0-v2-77');
+    expect((await new Response(version.stdout).text()).trim()).toBe(
+      PINNED_CLIS.kilo2.reportedVersion
+    );
     expect(await version.exited).toBe(0);
     const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'kilo2-compact-')));
     const directory = path.join(root, 'workspace');
@@ -642,6 +645,15 @@ suite('real Kilo v2 harness', () => {
     await fs.mkdir(directory, { recursive: true });
     await fs.writeFile(path.join(directory, 'AGENTS.md'), 'SYNTHETIC_REPOSITORY_INSTRUCTION');
     const materializer = createRuntimeProfileMaterializer();
+    await fs.mkdir(path.join(directory, '.kilo'), { recursive: true });
+    await fs.writeFile(
+      path.join(directory, '.kilo/kilo.json'),
+      JSON.stringify({ instructions: ['.kilo/repository-instructions.md'] })
+    );
+    await fs.writeFile(
+      path.join(directory, '.kilo/repository-instructions.md'),
+      'SYNTHETIC_RELEASE_REPOSITORY_INSTRUCTION'
+    );
     await materializer.materialize(root, {
       runtimeInstructions: [
         { name: 'disabled-proof', content: 'SYNTHETIC_DISABLED_PROFILE_INSTRUCTION' },
@@ -870,6 +882,7 @@ suite('real Kilo v2 harness', () => {
       );
       expect(events.some(event => event.type === 'command.updated')).toBe(true);
       expect(requests.at(-1)).toContain('SYNTHETIC_REPOSITORY_INSTRUCTION');
+      expect(requests.at(-1)).toContain('SYNTHETIC_RELEASE_REPOSITORY_INSTRUCTION');
       expect(requests.at(-1)).toContain('SYNTHETIC_ENABLED_PROFILE_INSTRUCTION');
       expect(requests.at(-1)).not.toContain('SYNTHETIC_DISABLED_PROFILE_INSTRUCTION');
       expect((await harness.listCommands()).commands).toContainEqual(

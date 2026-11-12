@@ -36,6 +36,7 @@ import {
   getEnkryptBenchmarks,
   publishEnkryptModels,
 } from '@kilocode/web-shared/lib/model-stats/enkrypt';
+import type { ModelStatsLoadClient } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import {
   isFreeNemotronModel,
   NVIDIA_TRIAL_TOS,
@@ -452,10 +453,15 @@ export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse
  */
 export async function getEnhancedOpenRouterModels({
   countryCode,
+  fromDb,
 }: {
   /** The requester's Vercel IP country; custom LLMs denied there are left out.
    * Null lists every custom LLM, for callers that do not serve a request. */
   countryCode: string | null;
+  /** Read client for the model-stats snapshot. Gateway callers run in `sfo1` and
+   * pass `readDb`; omitting it loads through the primary, which the web app needs
+   * because it invalidates the snapshot right after a write. */
+  fromDb?: ModelStatsLoadClient;
 }): Promise<OpenRouterModelsResponse> {
   const rawResponse = await getRawOpenRouterModels();
 
@@ -465,7 +471,7 @@ export async function getEnhancedOpenRouterModels({
   }
 
   const models = await enhancedModelList(rawResponse.data, countryCode);
-  const snapshot = await getEnkryptBenchmarks();
+  const snapshot = await getEnkryptBenchmarks({ fromDb });
   return { data: publishEnkryptModels(models, snapshot) };
 }
 /**

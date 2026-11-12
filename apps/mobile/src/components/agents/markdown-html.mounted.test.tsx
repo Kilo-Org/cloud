@@ -90,9 +90,11 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => undefined },
   useTranslation: () => ({ t: (key: string) => key }),
 }));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalChevronRight: 'DirectionalChevronRight',
+}));
 vi.mock('@/components/ui/icons', () => ({
   ChevronDown: 'ChevronDown',
-  ChevronRight: 'ChevronRight',
 }));
 vi.mock('./markdown-image', () => ({ MarkdownImage: 'MarkdownImage' }));
 vi.mock('./markdown-link-confirm', () => ({
@@ -243,7 +245,7 @@ describe('MarkdownHtml details', () => {
 
     expect(row.props.accessibilityRole).toBe('button');
     expect(row.props.accessibilityState).toEqual({ expanded: false });
-    expect(renderer.root.findAllByType('ChevronRight' as never)).toHaveLength(1);
+    expect(renderer.root.findAllByType('DirectionalChevronRight' as never)).toHaveLength(1);
     expect(allText(renderer)).toContain('More info');
     expect(allText(renderer)).not.toContain('Hidden body');
 

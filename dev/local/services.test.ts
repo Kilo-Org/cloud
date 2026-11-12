@@ -325,6 +325,34 @@ test('starts the session-ingest worker whenever the web app starts', () => {
   assert.equal(worker.port, 8800 + portOffset);
 });
 
+test('registers native session sync as an optional local service with an isolated database target', () => {
+  const worker = getService('cloudflare-session-sync');
+  assert.equal(worker.group, 'session-sync');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/session-sync');
+  assert.equal(worker.port, 8817 + portOffset);
+  assert.deepEqual(worker.dependsOn, ['postgres']);
+  assert.deepEqual(resolveTargets(['cloudflare-session-sync']), [
+    'postgres',
+    'cloudflare-session-sync',
+  ]);
+  assert.ok(resolveTargets(['session-sync']).includes('cloudflare-session-sync'));
+  assert.ok(resolveTargets(['agents']).includes('cloudflare-session-sync'));
+  const originalOffset = portOffset;
+  try {
+    applyPortOffset(4200);
+    const offsetWorker = getService('cloudflare-session-sync');
+    assert.equal(offsetWorker.port, 13017);
+    assert.ok(
+      offsetWorker.command.includes(
+        'CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=postgres://postgres:postgres@localhost:9632/postgres'
+      )
+    );
+  } finally {
+    applyPortOffset(originalOffset);
+  }
+});
+
 test('starts the git-token worker whenever the web app starts', () => {
   // Every code-review read and write resolves the caller's provider credential
   // through git-token-service, so starting the web stack must pull the worker in

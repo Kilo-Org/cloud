@@ -223,7 +223,7 @@ The default development runtime runs **v1**. Select a local test organization
 for v2 before starting the stack. The driver user must have membership in that organization.
 Use the current `PINNED_CLIS.kilo2.version` in
 `services/cloud-agent-next/scripts/runtime-cli-artifact.ts`, not the moving
-`kilo-v2` npm tag. For the verified `0.0.0-v2-85` pin, from the repository root:
+`kilo-v2` npm tag. Run these commands from the repository root:
 
 ```bash
 export E2E_ORG_ID=<organization-uuid>

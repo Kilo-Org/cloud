@@ -1512,16 +1512,44 @@ test('the build job installs the closure its Next build reads', () => {
   assert.equal(build.run, 'pnpm run build', 'the production build is unchanged');
 });
 
-// The plugin files reach one check only: test-scripts runs
-// `test:oxlint-plugins` over them. The web Jest suite, the web build and the
-// cycle check read none of them, so the plugin path has its own filter pair and
-// the shared filter that gates those three names no plugin file. A plugin path
-// back in the shared filter would start four web-test shards, the production
-// build and the cycle check for a change none of them reads.
-const oxlintPluginPath = 'tools/oxlint/anti-slop/rules/no-runtime-typeof.ts';
+// The test-scripts job runs two unrelated input sets: the script chain behind
+// `test:scripts` (scripts, dev tooling, the lint plugins, and the few product
+// files those suites read) and the Postgres and Durable Object regressions. The
+// shared filter that gates the web Jest suite, the web build and the cycle check
+// names neither tree, and an `apps/web/src` change outside the files a suite
+// reads must start no part of this job.
 const webBackendPath = 'apps/web/src/routers/active-sessions-router.ts';
+const scriptSuiteInputs = [
+  'scripts/typecheck-ci.test.mjs',
+  'dev/local/services.ts',
+  'tools/oxlint/anti-slop/rules/no-runtime-typeof.ts',
+  'apps/web/ai-gateway-rewrites.mjs',
+  'apps/web/src/app/api/gateway/route.ts',
+  'apps/ai-gateway/src/app/api/v1/models/route.ts',
+  'apps/web/src/lib/load-env.ts',
+  'apps/web/.env.development.local.example',
+  'apps/mobile/src/lib/design-gate/sampler.ts',
+  'services/auto-routing/.dev.vars.example',
+  'services/container-usage-meter/.dev.vars.example',
+  'services/container-usage-meter/package.json',
+  'services/cloud-agent-next/package.json',
+  'services/session-ingest/wrangler.jsonc',
+  'services/cloud-agent-next/test/e2e/fake-llm-server.ts',
+  '.github/workflows/mobile-native-build.yml',
+  'packages/session-ingest-contracts/src/index.ts',
+  'pnpm-lock.yaml',
+];
+const dataRegressionInputs = [
+  'services/session-ingest/src/index.ts',
+  'services/container-usage-meter/src/postgres.ts',
+  'packages/db/src/schema.ts',
+  'packages/app-shared/src/index.ts',
+  'packages/container-usage/src/index.ts',
+  'packages/organization-entitlement/src/index.ts',
+  'pnpm-lock.yaml',
+];
 
-test('a lint-plugin change runs the plugin suite without the web gates', () => {
+test('test-scripts starts only for the inputs its two step groups read', () => {
   const filtersOf = id => {
     const step = ciJobs.changes.steps.find(candidate => candidate.id === id);
     assert.ok(step, `changes: the ${id} step is missing`);
@@ -1529,61 +1557,143 @@ test('a lint-plugin change runs the plugin suite without the web gates', () => {
   };
   const matches = (patterns, path) => patterns.some(pattern => posix.matchesGlob(path, pattern));
 
-  const backend = filtersOf('filter').kilocode_backend;
+  const scripts = filtersOf('filter_test_scripts').test_scripts;
   assert.deepEqual(
-    filtersOf('filter_retry').kilocode_backend,
-    backend,
-    'the shared retry keeps the filters of the attempt it replaces'
+    filtersOf('filter_test_scripts_retry').test_scripts,
+    scripts,
+    'the script-suite retry keeps the filters of the attempt it replaces'
   );
-  assert.equal(
-    matches(backend, webBackendPath),
-    true,
-    'a backend path still matches the shared filter'
-  );
-  assert.equal(matches(backend, oxlintPluginPath), false, 'the shared filter names no plugin path');
-
-  const plugins = filtersOf('filter_oxlint').oxlint_plugins;
+  const data = filtersOf('filter_test_scripts_db').test_scripts_db;
   assert.deepEqual(
-    filtersOf('filter_oxlint_retry').oxlint_plugins,
-    plugins,
-    'the plugin retry keeps the filters of the attempt it replaces'
+    filtersOf('filter_test_scripts_db_retry').test_scripts_db,
+    data,
+    'the data-regression retry keeps the filters of the attempt it replaces'
   );
-  assert.equal(matches(plugins, oxlintPluginPath), true, 'the plugin pair detects a plugin change');
-  assert.equal(matches(plugins, webBackendPath), false, 'the plugin pair detects nothing else');
-  assert.equal(
-    ciJobs.changes.outputs.oxlint_plugins,
-    '${{ steps.filter_oxlint.outputs.oxlint_plugins || steps.filter_oxlint_retry.outputs.oxlint_plugins }}',
-    'the plugin output falls back to its retry attempt'
+  assert.deepEqual(
+    ciJobs.changes.outputs.test_scripts,
+    '${{ steps.filter_test_scripts.outputs.test_scripts || steps.filter_test_scripts_retry.outputs.test_scripts }}',
+    'the script-suite output falls back to its retry attempt'
+  );
+  assert.deepEqual(
+    ciJobs.changes.outputs.test_scripts_db,
+    '${{ steps.filter_test_scripts_db.outputs.test_scripts_db || steps.filter_test_scripts_db_retry.outputs.test_scripts_db }}',
+    'the data-regression output falls back to its retry attempt'
   );
 
-  assert.match(
-    ciJobs['test-scripts'].if,
-    /needs\.changes\.outputs\.oxlint_plugins == 'true'/,
-    'test-scripts keeps the one check that reads those paths'
+  for (const path of scriptSuiteInputs) {
+    assert.equal(matches(scripts, path), true, `a script-suite input: ${path}`);
+  }
+  for (const path of dataRegressionInputs) {
+    assert.equal(matches(data, path), true, `a data-regression input: ${path}`);
+  }
+  for (const path of [webBackendPath, 'apps/web/src/app/page.tsx', 'apps/web/src/lib/db.ts']) {
+    assert.equal(matches(scripts, path), false, `no script suite reads ${path}`);
+    assert.equal(matches(data, path), false, `no data regression reads ${path}`);
+  }
+  assert.equal(
+    matches(scripts, 'services/session-ingest/src/index.ts'),
+    false,
+    'the script chain reads no session-ingest source'
   );
-  // The root script chain decides what test-scripts runs: a run that starts the
-  // job without the plugin entry would report a plugin-only change unexercised.
+  assert.equal(
+    matches(data, 'dev/local/services.ts'),
+    false,
+    'the data regressions read no dev tooling'
+  );
+
+  const job = ciJobs['test-scripts'];
+  assert.match(job.if, /needs\.changes\.outputs\.test_scripts == 'true'/);
+  assert.match(job.if, /needs\.changes\.outputs\.test_scripts_db == 'true'/);
+  assert.match(job.if, /needs\.changes\.outputs\.data_meter == 'true'/);
+  assert.match(job.if, /needs\.changes\.outputs\.data_session_ingest == 'true'/);
+  assert.doesNotMatch(job.if, /kilocode_backend/, 'the web filter starts no part of this job');
+  // The two detector answers exclude a full selection: such a diff names every
+  // workspace because the detector could not attribute it, not because these
+  // suites read it.
+  for (const service of ['container-usage-meter', 'cloudflare-session-ingest']) {
+    const output = service === 'container-usage-meter' ? 'data_meter' : 'data_session_ingest';
+    assert.match(
+      ciJobs.changes.outputs[output],
+      new RegExp(
+        `steps\\.affected\\.outputs\\.full != 'true' && contains\\(fromJSON\\(steps\\.affected\\.outputs\\.affected\\)\\.packages, '${service}'\\)`
+      ),
+      `${output}: a full selection answers false`
+    );
+  }
+
+  const step = name => {
+    const found = job.steps.find(candidate => candidate.name === name);
+    assert.ok(found, `test-scripts: the ${name} step is missing`);
+    return found;
+  };
+  assert.equal(
+    step('Run script tests').if,
+    "needs.changes.outputs.test_scripts == 'true'",
+    'the script chain reads its own subject'
+  );
+  assert.equal(
+    step('Run container usage Postgres tests').if,
+    "needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_meter == 'true'",
+    'the meter suite reads its filter and the detector answer'
+  );
+  for (const name of [
+    'Run Session Ingest Durable Object regressions',
+    'Run Session Ingest Postgres tests',
+  ]) {
+    assert.equal(
+      step(name).if,
+      "needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_session_ingest == 'true'",
+      `${name}: gated on the data filter and the detector answer`
+    );
+  }
+  // The workspace matrix runs one of these suites under its own condition, and
+  // it must not repeat a run this job already covers, whichever of the two
+  // conditions started it.
+  const heartbeat = ciJobs['workspace-tests'].steps.find(
+    candidate => candidate.name === 'Test native heartbeat attachment compatibility'
+  );
+  assert.equal(
+    heartbeat.if,
+    "matrix.workspace.name == 'cloudflare-session-ingest' && needs.changes.outputs.test_scripts_db != 'true' && needs.changes.outputs.data_session_ingest != 'true'",
+    'the workspace row keeps that suite only when test-scripts skips it'
+  );
+
+  assert.ok(
+    ciJobs.test.needs.includes('test-scripts'),
+    'the required fan-in still publishes this job'
+  );
+
+  // The root script chain decides what that step runs: a suite dropped from it
+  // would report its inputs unexercised on a run that starts the job.
   const rootScripts = JSON.parse(
     readFileSync(new URL('../package.json', import.meta.url), 'utf8')
   ).scripts;
-  assert.match(
-    rootScripts['test:scripts'],
-    /test:oxlint-plugins/,
-    'test-scripts reaches the plugin suite'
-  );
+  for (const suite of [
+    'test:web-rewrites',
+    'test:web-env',
+    'test:dev-local',
+    'test:oxlint-plugins',
+    'test:mobile-artifacts',
+    'test:mobile-sbom',
+    'test:kilo-app-release',
+    'test:kilo-mcp-release',
+  ]) {
+    assert.match(rootScripts['test:scripts'], new RegExp(suite), `test-scripts reaches ${suite}`);
+  }
   assert.match(
     rootScripts['test:oxlint-plugins'],
     /tools\/oxlint\//,
     'the plugin suite runs the plugin tests'
   );
-  for (const job of ['web-test', 'build', 'dependency-cycle-check']) {
-    const condition = ciJobs[job].if;
+
+  for (const webJob of ['web-test', 'build', 'dependency-cycle-check']) {
+    const condition = ciJobs[webJob].if;
     assert.match(
       condition,
       /needs\.changes\.outputs\.kilocode_backend == 'true'/,
-      `${job}: gated on the shared filter alone, which names no plugin path`
+      `${webJob}: gated on the shared filter alone`
     );
-    assert.doesNotMatch(condition, /oxlint_plugins/, `${job}: the plugin output starts no web job`);
+    assert.doesNotMatch(condition, /test_scripts/, `${webJob}: a script input starts no web job`);
   }
 });
 

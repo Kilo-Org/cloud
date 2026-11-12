@@ -20,6 +20,7 @@ type SessionActionsDialogProps = {
   onOpenChange: (open: boolean) => void;
   /** The Kilo session ID (UUID from cli_sessions_v2.session_id) */
   kiloSessionId?: string;
+  cloudAgentSessionId: string;
   sessionTitle?: string;
   repository?: string;
   /** Organization context the dialog renders in; omitted for personal sessions. */
@@ -32,6 +33,7 @@ export function SessionActionsDialog({
   open,
   onOpenChange,
   kiloSessionId,
+  cloudAgentSessionId,
   sessionTitle,
   repository,
   organizationId,
@@ -94,6 +96,9 @@ export function SessionActionsDialog({
             </div>
             <SessionSharePanel
               kiloSessionId={kiloSessionId}
+              cloudAgentSessionId={cloudAgentSessionId}
+              organizationId={organizationId}
+              open={open}
               isSharing={isSharing}
               onSharingChange={setIsSharing}
             />

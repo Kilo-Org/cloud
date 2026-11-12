@@ -499,7 +499,8 @@ function CreditsPageContent() {
                         <TableCell>
                           {/* A pack bought in the app has no Stripe invoice: the
                               store's own record is its receipt. */}
-                          {entry.creditSource === 'apple' || entry.creditSource === 'google_play' ? (
+                          {entry.creditSource === 'apple' ||
+                          entry.creditSource === 'google_play' ? (
                             <span className="type-body text-muted-foreground">
                               {entry.creditSource === 'apple'
                                 ? 'Receipt from the App Store'

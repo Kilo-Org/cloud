@@ -152,6 +152,7 @@ export function BlockedPeopleScreen() {
   } else if (hidden.data.blockedLogins.length === 0 && hidden.data.mutedLogins.length === 0) {
     body = (
       <EmptyState
+        placement="top"
         icon={Ban}
         title={t('profile.blockedPeople.emptyTitle')}
         description={t('profile.blockedPeople.emptyDescription')}

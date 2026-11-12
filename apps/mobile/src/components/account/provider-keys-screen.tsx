@@ -210,6 +210,7 @@ export function ProviderKeysScreen() {
   } else if (keys.data.length === 0) {
     body = (
       <EmptyState
+        placement="top"
         icon={KeyRound}
         title={t('profile.providerKeys.emptyTitle')}
         description={t('profile.providerKeys.emptyDescription')}

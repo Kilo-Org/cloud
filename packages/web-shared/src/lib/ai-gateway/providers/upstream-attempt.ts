@@ -35,6 +35,7 @@ import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/
 import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { isValidVercelModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
@@ -61,7 +62,7 @@ type SendUpstreamAttemptInput = {
 };
 
 type SendUpstreamAttemptResult =
-  | { type: 'invalid-openrouter-model' }
+  | { type: 'unknown-gateway-model' }
   | { type: 'error'; response: NextResponse }
   | {
       type: 'success';
@@ -69,6 +70,18 @@ type SendUpstreamAttemptResult =
       toolsAvailable: string[];
       toolsUsed: string[];
     };
+
+/** Whether the request's gateway lists the model. Other providers are not checked. */
+async function gatewayServesModel(provider: Provider, requestedModel: string) {
+  switch (provider.type) {
+    case 'openrouter':
+      return isValidOpenRouterModelId(requestedModel);
+    case 'vercel':
+      return isValidVercelModelId(requestedModel);
+    default:
+      return true;
+  }
+}
 
 /** Sends one upstream attempt and mutates the request with provider-specific transforms. */
 export async function sendUpstreamAttempt({
@@ -124,12 +137,10 @@ export async function sendUpstreamAttempt({
   }
 
   if (
-    (providerContext.provider.type === 'openrouter' ||
-      providerContext.provider.type === 'vercel') &&
     !isAutoSmallFreeModel(requestedModel) &&
-    !(await isValidOpenRouterModelId(requestedModel))
+    !(await gatewayServesModel(providerContext.provider, requestedModel))
   ) {
-    return { type: 'invalid-openrouter-model' };
+    return { type: 'unknown-gateway-model' };
   }
 
   const result = await upstreamRequest({

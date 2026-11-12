@@ -5,7 +5,11 @@ import {
   USAGE_INGEST_URL,
   USAGE_INGEST_PUBLISH_SECRET,
 } from '@kilocode/web-shared/lib/config.server';
-import type { EnkryptUsageWriteInput, LlmUsageQueueMessage } from '@kilocode/usage-contracts';
+import type {
+  EnkryptUsageWriteInput,
+  ExaUsageRecord,
+  LlmUsageQueueMessage,
+} from '@kilocode/usage-contracts';
 import { enqueueVercelUsage } from '@kilocode/usage-queue/vercel/publisher';
 import { USAGE_VERCEL_QUEUE_ENABLED } from '@kilocode/usage-queue/vercel/config';
 import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
@@ -37,7 +41,7 @@ const RETRY_MAX_DELAY_MS = 2_000;
 export type UsageEnqueueOutcome = { kind: 'accepted' } | { kind: 'unavailable'; reason: string };
 
 /** `usage_kind` labels the publisher logs of a tagged non-LLM usage kind; LLM logs omit it. */
-type PublicationIdentity = { usageId: string; usage_kind?: 'enkrypt_usage' };
+type PublicationIdentity = { usageId: string; usage_kind?: 'enkrypt_usage' | 'exa_usage' };
 
 function reportUnavailable(
   identity: PublicationIdentity,
@@ -161,16 +165,20 @@ export async function enqueueUsage(
 
 const USAGE_INGEST_PATH = '/usage';
 const ENKRYPT_USAGE_INGEST_PATH = '/enkrypt-usage';
+const EXA_USAGE_INGEST_PATH = '/exa-usage';
 
 /**
- * `USAGE_INGEST_URL` is documented as the Worker's `/usage` endpoint, and `/enkrypt-usage` is
- * its sibling on the same Worker. Any other shape cannot be mapped safely, so it counts as no
+ * `USAGE_INGEST_URL` is documented as the Worker's `/usage` endpoint, and each tagged kind's path
+ * is its sibling on the same Worker. Any other shape cannot be mapped safely, so it counts as no
  * publisher at all.
  */
-function enkryptUsageIngestUrl(usageIngestUrl: string | undefined): string | undefined {
+function usageIngestSiblingUrl(
+  usageIngestUrl: string | undefined,
+  siblingPath: string
+): string | undefined {
   const url = usageIngestUrl ? parsePublisherUrl(usageIngestUrl) : null;
   if (!url || url.pathname !== USAGE_INGEST_PATH || url.search || url.hash) return undefined;
-  url.pathname = ENKRYPT_USAGE_INGEST_PATH;
+  url.pathname = siblingPath;
   return url.toString();
 }
 
@@ -184,8 +192,35 @@ export async function enqueueEnkryptUsage(
 ): Promise<UsageEnqueueOutcome> {
   return publishToUsageIngest(
     { usageId: usageWrite.id, usage_kind: 'enkrypt_usage' },
-    enkryptUsageIngestUrl(USAGE_INGEST_URL),
+    usageIngestSiblingUrl(USAGE_INGEST_URL, ENKRYPT_USAGE_INGEST_PATH),
     usageWrite,
+    { retryTransientFailures: true }
+  );
+}
+
+const LOOPBACK_HOSTNAMES: ReadonlySet<string> = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * The Bearer secret must never cross the network in clear text, so plain HTTP is accepted only for
+ * a loopback host, as in local fixtures; any other `http:` URL counts as no publisher.
+ */
+function exaUsageIngestUrl(usageIngestUrl: string | undefined): string | undefined {
+  const url = usageIngestSiblingUrl(usageIngestUrl, EXA_USAGE_INGEST_PATH);
+  if (!url) return undefined;
+  const { protocol, hostname } = new URL(url);
+  return protocol === 'https:' || LOOPBACK_HOSTNAMES.has(hostname) ? url : undefined;
+}
+
+/**
+ * Publishes the bare Exa usage record, with its `id` and `occurredAt` unchanged, to the
+ * usage-ingest `/exa-usage` path, which wraps it in the tagged queue envelope. Like Enkrypt it is
+ * always Cloudflare HTTP with transient retries of the same serialized body.
+ */
+export async function enqueueExaUsage(record: ExaUsageRecord): Promise<UsageEnqueueOutcome> {
+  return publishToUsageIngest(
+    { usageId: record.id, usage_kind: 'exa_usage' },
+    exaUsageIngestUrl(USAGE_INGEST_URL),
+    record,
     { retryTransientFailures: true }
   );
 }
@@ -193,7 +228,7 @@ export async function enqueueEnkryptUsage(
 async function publishToUsageIngest(
   identity: PublicationIdentity,
   ingestUrl: string | undefined,
-  payload: LlmUsageQueueMessage | EnkryptUsageWriteInput,
+  payload: LlmUsageQueueMessage | EnkryptUsageWriteInput | ExaUsageRecord,
   { retryTransientFailures }: { retryTransientFailures: boolean }
 ): Promise<UsageEnqueueOutcome> {
   if (!ingestUrl || !USAGE_INGEST_PUBLISH_SECRET) {

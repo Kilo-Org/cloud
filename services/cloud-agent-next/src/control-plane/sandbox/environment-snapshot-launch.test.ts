@@ -562,10 +562,48 @@ describe('environmentSnapshotDecision', () => {
     });
   });
 
-  it('names the rebuild action after a required snapshot start fails', () => {
+  it('asks for a message retry before a rebuild after a transient provider start failure', () => {
     expect(environmentSnapshotStartBlock({ ...CANDIDATE, buildCommands: 1 }, BUILD_ID)).toEqual({
       reason: 'environment_snapshot_start_failed',
-      detail: 'Environment snapshot is unavailable. Rebuild the environment.',
+      detail:
+        'Sandbox could not start from the environment snapshot. Send the message again to retry. Rebuild the environment only if this failure repeats.',
+      environmentId: REFERENCE.environmentId,
+      buildId: BUILD_ID,
+    });
+  });
+
+  it.each([
+    [
+      'expired',
+      'environment_snapshot_expired',
+      'Environment snapshot is unavailable. Rebuild the environment.',
+    ],
+    [
+      'image_mismatch',
+      'environment_snapshot_incompatible',
+      'Environment snapshot is unavailable. Rebuild the environment.',
+    ],
+    [
+      'provenance',
+      'environment_snapshot_incompatible',
+      'Environment snapshot is unavailable. Rebuild the environment.',
+    ],
+    [
+      'missing',
+      'environment_snapshot_unavailable',
+      'Environment snapshot is unavailable. Rebuild the environment.',
+    ],
+    [
+      'unsupported',
+      'environment_snapshot_incompatible',
+      'Environment snapshot is unavailable. Rebuild the environment.',
+    ],
+  ] as const)('keeps permanent provider failure %s actionable', (failureReason, reason, detail) => {
+    expect(
+      environmentSnapshotStartBlock({ ...CANDIDATE, buildCommands: 1 }, BUILD_ID, failureReason)
+    ).toEqual({
+      reason,
+      detail,
       environmentId: REFERENCE.environmentId,
       buildId: BUILD_ID,
     });

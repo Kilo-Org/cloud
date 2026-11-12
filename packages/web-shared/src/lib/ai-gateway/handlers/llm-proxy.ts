@@ -24,7 +24,7 @@ import {
   paidModelAuthRequiredResponse,
   anonymousFreeModelLimitResponse,
   accountFreeModelLimitResponse,
-  modelDoesNotExistOnOpenRouterResponse,
+  unknownModelResponse,
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
@@ -497,8 +497,8 @@ export async function handleLlmProxyRequest(
           }
         : undefined,
   });
-  if (attempt.type === 'invalid-openrouter-model') {
-    return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+  if (attempt.type === 'unknown-gateway-model') {
+    return unknownModelResponse(effectiveModelIdLowerCased);
   }
   if (attempt.type === 'error') return attempt.response;
 

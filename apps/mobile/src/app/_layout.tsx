@@ -139,6 +139,7 @@ import {
   consumeLastRouteForRepair,
   getLastRouteHydrationVersion,
   isLastRouteHydrated,
+  noteRestoredRouteOpen,
   prepareLastRouteRepair,
   subscribeLastRoute,
 } from '@/lib/last-route';
@@ -1004,6 +1005,9 @@ function RootLayoutNav({
     // cold start's first commit (the base Intent's restored route) cannot
     // overwrite the persisted record before it is read here.
     const recordedHref = consumeLastRouteForRepair(accountUserId ?? null);
+    if (recordedHref === null) {
+      return;
+    }
     if (
       !shouldRepairRestoredRoute({
         recordedHref,
@@ -1035,6 +1039,10 @@ function RootLayoutNav({
     }
     // `navigate` (not `replace`): replacing the stack root leaves the target
     // screen with no back stack, the same reasoning as resolvePendingNavigation.
+    // The mark lets the screen it lands on tell this automatic restore from a
+    // destination the person chose, so a recorded session that no longer
+    // resolves falls back to the start screen instead of a dead end.
+    noteRestoredRouteOpen(recordedHref);
     router.navigate(recordedHref as Href, { withAnchor: true });
   }, [
     decision,

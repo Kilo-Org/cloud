@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { formatComputePrice } from '@/lib/cloud-agent/compute-price';
 import { sandboxComputeInstance } from './sandbox-status';
+import { computeInstanceLabel } from './compute-runs';
 
 export function SandboxComputeRate({ snapshot }: { snapshot: unknown }) {
   const trpc = useTRPC();
@@ -17,7 +18,7 @@ export function SandboxComputeRate({ snapshot }: { snapshot: unknown }) {
     <section className="space-y-2 border-t pt-3 text-xs">
       <h3 className="font-medium">Compute rate</h3>
       <dl className="flex items-baseline justify-between gap-4">
-        <dt className="text-muted-foreground">{instance === 'standard-3' ? 'Medium' : 'Large'}</dt>
+        <dt className="text-muted-foreground">{computeInstanceLabel(instance)}</dt>
         <dd className="text-right tabular-nums">
           {rates.isPending ? 'Loading rate…' : formatComputePrice(rate?.hourlyUsd)}
         </dd>

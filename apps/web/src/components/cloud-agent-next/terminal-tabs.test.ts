@@ -565,6 +565,8 @@ describe('CloudChatPage terminal ownership across navigation', () => {
 
   beforeAll(async () => {
     ({ CloudChatPage } = await import('./CloudChatPage'));
+    const { default: loadable } = await import('next/dist/shared/lib/loadable.shared-runtime');
+    await loadable.preloadAll();
   });
 
   beforeEach(() => {

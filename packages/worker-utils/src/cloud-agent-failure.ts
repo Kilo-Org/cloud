@@ -115,7 +115,7 @@ const WORKSPACE_FAILURE_MESSAGES = {
   setup_command_timeout: 'Setup command timed out',
   setup_command_failed: 'Setup command failed',
   workspace_snapshot_start_failed: 'Workspace snapshot could not be restored',
-  environment_snapshot_required: 'Environment snapshot is required but unavailable',
+  environment_snapshot_required: 'Sandbox could not start from the environment snapshot',
   workspace_setup_unknown: 'Workspace setup failed',
 } as const satisfies Record<WorkspaceFailureSubtype, string>;
 

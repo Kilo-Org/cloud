@@ -86,6 +86,9 @@ type QueryErrorProps = {
   descriptionClassName?: string;
   placement?: 'center' | 'top' | 'static';
   refreshControl?: ScrollViewProps['refreshControl'];
+  /** Forwarded to the inner `EmptyState` → `CenteredState`: the frame the
+   *  state centers in. See `EmptyStateProps.band`. */
+  band?: 'surface' | 'viewport';
 };
 
 export function QueryError({
@@ -103,6 +106,7 @@ export function QueryError({
   descriptionClassName,
   placement = 'center',
   refreshControl,
+  band,
 }: Readonly<QueryErrorProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -129,6 +133,7 @@ export function QueryError({
       className={className}
       placement={placement}
       refreshControl={refreshControl}
+      band={band}
       iconContainerClassName="rounded-full bg-muted p-4"
       iconColor={colors.destructive}
       iconSize={32}

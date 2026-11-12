@@ -7,6 +7,7 @@ import { createContext, memo, useContext } from 'react';
 import { Brain, Loader2 } from 'lucide-react';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { ToolCardShell } from './ToolCardShell';
+import { ToolPartDetailBoundary } from './ToolPartDetail';
 import { ReadToolCard } from './ReadToolCard';
 import { EditToolCard } from './EditToolCard';
 import { WriteToolCard } from './WriteToolCard';
@@ -227,7 +228,14 @@ function StreamingToolPlaceholder({ toolName }: { toolName: string }) {
 
 export function ToolPartRenderer({ part }: { part: Extract<Part, { type: 'tool' }> }) {
   if (!shouldRenderToolPart(part)) return null;
+  return <ToolPartDetailBoundary part={part}>{renderToolPart}</ToolPartDetailBoundary>;
+}
 
+function renderToolPart(part: Extract<Part, { type: 'tool' }>) {
+  return <ToolPartCard part={part} />;
+}
+
+function ToolPartCard({ part }: { part: Extract<Part, { type: 'tool' }> }) {
   if (
     part.state.status === 'error' &&
     !['question', 'suggest', 'chart', 'permission'].includes(part.tool)

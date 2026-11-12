@@ -24,6 +24,7 @@ import type {
   CommandsAvailableData,
 } from '../shared/protocol.js';
 import { logger } from '../logger.js';
+import { projectKilocodeEventForDisplay } from '../shared/tool-display-projection.js';
 import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
 
 /**
@@ -428,6 +429,17 @@ export function createStreamHandler(
             )
               continue;
             const formatted = formatStreamEvent(event, sessionId);
+            // Replay uses the same revisioned preview as history pages, so a
+            // reconnect does not redownload the tool bodies a page omitted.
+            if (
+              filters.toolDisplay === 'preview' &&
+              event.stream_event_type === 'kilocode' &&
+              event.mutation_cursor !== undefined
+            )
+              formatted.data = projectKilocodeEventForDisplay(
+                formatted.data,
+                event.mutation_cursor
+              );
             const message = JSON.stringify(materialized ? { ...formatted, eventId: 0 } : formatted);
             ws.send(message);
             bytesSent += message.length;

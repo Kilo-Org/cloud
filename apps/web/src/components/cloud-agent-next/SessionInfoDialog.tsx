@@ -24,8 +24,14 @@ import type { SessionModelUsage, SessionTokenUsage } from './session-token-usage
 import { formatModelRefName, formatShortModelName } from '@/lib/format-model-name';
 import { skipToken, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { SandboxComputeRate } from './SandboxComputeRate';
-import { sandboxObservationKey, type SandboxObservation } from './sandbox-status';
+import { formatComputePrice } from '@/lib/cloud-agent/compute-price';
+import { SessionComputeRuns } from './SessionComputeRuns';
+import { computeInstanceLabel } from './compute-runs';
+import {
+  sandboxComputeInstance,
+  sandboxObservationKey,
+  type SandboxObservation,
+} from './sandbox-status';
 
 type SessionInfoDialogProps = {
   open: boolean;
@@ -105,6 +111,17 @@ export function SessionInfoDialog({
   const computeData = computeAccessDenied ? undefined : compute.data;
   const computeCostUsd = computeData ? computeData.amountMicrodollars / 1_000_000 : undefined;
   const showCombinedTotal = showTotalCost && computeBillingEnabled && computeCostUsd !== undefined;
+  const sandboxInstance = sandboxComputeInstance(sandbox.data?.snapshot);
+  const idleRates = useQuery(
+    trpc.computeBilling.rates.queryOptions(undefined, {
+      enabled: open && computeData?.runs.length === 0 && sandboxInstance !== null,
+    })
+  );
+  const idleHourlyUsd = idleRates.data?.find(rate => rate.instance === sandboxInstance)?.hourlyUsd;
+  const idleRate =
+    sandboxInstance !== null && idleHourlyUsd != null
+      ? `${computeInstanceLabel(sandboxInstance)} · ${formatComputePrice(idleHourlyUsd)}`
+      : undefined;
 
   return (
     <>
@@ -144,7 +161,7 @@ export function SessionInfoDialog({
                 )}
                 {showCombinedTotal && (
                   <div className="flex items-baseline justify-between gap-4 border-t pt-3 text-sm">
-                    <dt className="text-muted-foreground">Model cost</dt>
+                    <dt className="text-muted-foreground">Model</dt>
                     <dd className="font-mono tabular-nums">
                       {formatSessionTotalCost(totalCostUsd)}
                     </dd>
@@ -179,7 +196,12 @@ export function SessionInfoDialog({
                 {computeBillingEnabled && (
                   <div className="flex items-baseline justify-between gap-4 border-t pt-3 text-sm">
                     <dt className="text-muted-foreground">
-                      {computeData?.scope === 'workspace' ? 'Workspace compute' : 'Compute cost'}
+                      Compute
+                      {computeData?.scope === 'workspace' && (
+                        <span className="mt-0.5 block text-xs">
+                          Shared by all chats in this workspace
+                        </span>
+                      )}
                     </dt>
                     <dd className="font-mono tabular-nums">
                       {computeCostUsd !== undefined
@@ -192,36 +214,20 @@ export function SessionInfoDialog({
                 )}
               </dl>
             )}
-            {computeBillingEnabled && (
-              <div className="space-y-2 text-xs">
-                {computeAccessDenied ? (
-                  <p className="text-muted-foreground">
-                    You do not have access to this session's compute charges.
-                  </p>
-                ) : compute.isError ? (
-                  <p role="alert">
-                    {computeData === undefined
-                      ? 'Compute charges could not load. '
-                      : 'Compute charges could not refresh. Showing the last recorded amount. '}
-                    <button
-                      type="button"
-                      className="underline"
-                      onClick={() => void compute.refetch()}
-                    >
-                      Retry
-                    </button>
-                  </p>
-                ) : (
-                  <p className="text-muted-foreground">
-                    {computeData?.scope === 'workspace'
-                      ? 'Compute is shared by all chats in this workspace. '
-                      : ''}
-                    Recorded compute charges can arrive late. Your own provider bills BYOC compute
-                    separately.
-                  </p>
-                )}
-                {open && <SandboxComputeRate snapshot={sandbox.data?.snapshot} />}
-              </div>
+            {computeBillingEnabled && computeAccessDenied && (
+              <p className="text-muted-foreground text-xs">
+                You do not have access to this session's compute charges.
+              </p>
+            )}
+            {computeBillingEnabled && !computeAccessDenied && compute.isError && (
+              <p className="text-xs" role="alert">
+                {computeData === undefined
+                  ? 'Compute charges could not load. '
+                  : 'Compute charges could not refresh. Showing the last recorded amount. '}
+                <button type="button" className="underline" onClick={() => void compute.refetch()}>
+                  Retry
+                </button>
+              </p>
             )}
             {sessionTokenUsage && (
               <section className="space-y-3" aria-labelledby="session-token-usage-title">
@@ -278,6 +284,9 @@ export function SessionInfoDialog({
                   </details>
                 ))}
               </section>
+            )}
+            {computeBillingEnabled && computeData && (
+              <SessionComputeRuns charges={computeData} idleRate={idleRate} />
             )}
             <dl className="space-y-3 border-t pt-4 text-sm">
               <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-4">

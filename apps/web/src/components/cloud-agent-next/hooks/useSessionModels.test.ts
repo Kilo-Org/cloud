@@ -33,6 +33,58 @@ const emptyRemoteState = {
 } satisfies RemoteModelState;
 
 describe('useSessionModels', () => {
+  it.each([false, true])(
+    'fetches a known selected model catalog only on picker intent=%s',
+    requested => {
+      jest.mocked(useOrganizationModels).mockClear().mockReturnValue({
+        modelOptions: [],
+        isLoadingModels: requested,
+        contextLengthByModelId: new Map(),
+        defaultModel: undefined,
+      });
+      function Picker() {
+        const models = useSessionModels({
+          activeSessionType: 'cloud-agent',
+          remoteModelState: emptyRemoteState,
+          observedModel: null,
+          remoteModelOverride: null,
+          gatewayModelId: gatewayModels[0].id,
+          fetchedSessionData: { organizationId: 'org-owning' },
+          sessionIdFromParams: 'session-1',
+          knownModels: [{ ...gatewayModels[0], mayTrainOnYourPrompts: false }],
+          loadGatewayCatalog: requested,
+        });
+        return createElement('output', null, models.modelOptions[0]?.name);
+      }
+      expect(renderToStaticMarkup(createElement(Picker))).toContain('Claude Sonnet 4');
+      expect(useOrganizationModels).toHaveBeenCalledWith('org-owning', requested);
+    }
+  );
+
+  it('still fetches immediately when the selected model is not known', () => {
+    jest.mocked(useOrganizationModels).mockClear().mockReturnValue({
+      modelOptions: [],
+      isLoadingModels: true,
+      contextLengthByModelId: new Map(),
+      defaultModel: undefined,
+    });
+    function Picker() {
+      useSessionModels({
+        activeSessionType: 'cloud-agent',
+        remoteModelState: emptyRemoteState,
+        observedModel: null,
+        remoteModelOverride: null,
+        gatewayModelId: 'unknown/model',
+        fetchedSessionData: { organizationId: null },
+        sessionIdFromParams: 'session-1',
+        knownModels: [],
+        loadGatewayCatalog: false,
+      });
+      return null;
+    }
+    renderToStaticMarkup(createElement(Picker));
+    expect(useOrganizationModels).toHaveBeenCalledWith(undefined, true);
+  });
   it.each([false, true])('restores the session model with catalog loading=%s', isLoadingModels => {
     jest.mocked(useOrganizationModels).mockReturnValue({
       modelOptions: isLoadingModels ? [] : gatewayModels,

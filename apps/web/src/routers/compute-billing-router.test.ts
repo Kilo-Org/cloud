@@ -15,6 +15,7 @@ import { and, eq } from 'drizzle-orm';
 import { CLOUD_AGENT_CONTAINER_SKUS } from '@kilocode/worker-utils/cloud-agent-compute';
 import { computeBillingRouter, computeChargesInputSchema } from './compute-billing-router';
 import { formatComputePrice } from '@/lib/cloud-agent/compute-price';
+import { containerInstanceForSku } from '@/lib/cloud-agent/compute-billing';
 
 const createCaller = createCallerFactory(computeBillingRouter);
 const range = { startDate: '2026-10-01T00:00:00.000Z', endDate: '2026-11-01T00:00:00.000Z' };
@@ -87,6 +88,60 @@ async function charge(input: {
   });
 }
 
+async function run(input: {
+  skuId: string;
+  userId: string;
+  sessionId: string;
+  startedAt: string;
+  segments: number[];
+  stopped?: boolean;
+  rate?: string;
+}) {
+  const id = crypto.randomUUID();
+  const rate = input.rate ?? '0.01';
+  const seconds = input.segments.reduce((sum, value) => sum + value, 0);
+  const endedAt = new Date(Date.parse(input.startedAt) + seconds * 1000).toISOString();
+  await db.insert(container_usage_interval).values({
+    id,
+    service: 'cloud-agent-next-sandbox-containers-standard3',
+    instance_id: id,
+    start_epoch_ms: Date.parse(input.startedAt),
+    cloud_billing_sku_id: input.skuId,
+    context_fingerprint: 'a'.repeat(64),
+    subject_type: 'user',
+    subject_id: input.userId,
+    actor_type: 'user',
+    actor_id: input.userId,
+    session_id: input.sessionId,
+    started_at: input.startedAt,
+    last_seen_at: endedAt,
+    billing_mode: 'paid',
+    rate_cents_per_unit: rate,
+    ...(input.stopped ? { status: 'closed', stopped_at: endedAt, close_reason: 'exit' } : {}),
+  });
+  for (const [index, segmentSeconds] of input.segments.entries()) {
+    const key = `${id}:${index + 1}`;
+    await db.insert(container_usage_segment).values({
+      interval_id: id,
+      seq: index + 1,
+      idempotency_key: key,
+      reported_seconds: segmentSeconds,
+      usage_seconds: segmentSeconds,
+      received_at: endedAt,
+    });
+    await db.insert(compute_usage_charge).values({
+      usage_source: 'container_usage_segment',
+      usage_source_id: key,
+      cloud_billing_sku_id: input.skuId,
+      user_id: input.userId,
+      quantity: String(segmentSeconds),
+      rate_cents_per_unit: rate,
+      amount_microdollars: Math.round(segmentSeconds * Number(rate) * 10_000),
+      created_at: endedAt,
+    });
+  }
+}
+
 async function session(input: { userId: string; orgId?: string; worktreeId?: string }) {
   const cloudAgentSessionId = `workspace_${crypto.randomUUID()}`;
   await db.insert(cli_sessions_v2).values({
@@ -121,8 +176,8 @@ describe('session compute charges', () => {
     await charge({ skuId, userId: owner.id, sessionId: foreign, seconds: 900 });
     const caller = createCaller({ user: owner });
     const expected = { amountMicrodollars: 60_000, seconds: 600, scope: 'workspace' };
-    expect(await caller.sessionCharges({ cloudAgentSessionId: root })).toEqual(expected);
-    expect(await caller.sessionCharges({ cloudAgentSessionId: sibling })).toEqual(expected);
+    expect(await caller.sessionCharges({ cloudAgentSessionId: root })).toMatchObject(expected);
+    expect(await caller.sessionCharges({ cloudAgentSessionId: sibling })).toMatchObject(expected);
   });
 
   it('returns zero without paid charges and does not combine worktree-less sessions', async () => {
@@ -134,10 +189,12 @@ describe('session compute charges', () => {
       amountMicrodollars: 0,
       seconds: 0,
       scope: 'session',
+      runs: [],
+      earlierRuns: null,
     });
     await charge({ skuId, userId: owner.id, sessionId: first, seconds: 20 });
     await charge({ skuId, userId: owner.id, sessionId: second, seconds: 90 });
-    expect(await caller.sessionCharges({ cloudAgentSessionId: first })).toEqual({
+    expect(await caller.sessionCharges({ cloudAgentSessionId: first })).toMatchObject({
       amountMicrodollars: 2_000,
       seconds: 20,
       scope: 'session',
@@ -160,7 +217,7 @@ describe('session compute charges', () => {
     await charge({ skuId, userId: member.id, sessionId: personal, seconds: 900 });
     const input = { cloudAgentSessionId: own, organizationId: org.id };
     const caller = createCaller({ user: member });
-    expect(await caller.sessionCharges(input)).toEqual({
+    expect(await caller.sessionCharges(input)).toMatchObject({
       amountMicrodollars: 20_000,
       seconds: 200,
       scope: 'workspace',
@@ -188,6 +245,76 @@ describe('session compute charges', () => {
         )
       );
     await expect(caller.sessionCharges(input)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('lists the most recent runs with their duration, rate, and amount, and reconciles earlier runs', async () => {
+    const { owner, outsider, skuId } = await fixture();
+    const worktreeId = `worktree_${crypto.randomUUID()}`;
+    const root = await session({ userId: owner.id, worktreeId });
+    const sibling = await session({ userId: owner.id, worktreeId });
+    const largeSku = `compute-report-large-${crypto.randomUUID()}`;
+    await db
+      .insert(cloud_billing_sku)
+      .values({ id: largeSku, name: 'Large', unit: 'second', rate_cents_per_unit: '0.0333' });
+    const start = Date.parse('2026-11-10T13:00:00.000Z');
+    for (let index = 0; index < 11; index++) {
+      await run({
+        skuId,
+        userId: owner.id,
+        sessionId: index % 2 === 0 ? root : sibling,
+        startedAt: new Date(start + index * 3_600_000).toISOString(),
+        segments: [60, 60 * (index + 1)],
+        stopped: true,
+      });
+    }
+    const latest = new Date(start + 11 * 3_600_000).toISOString();
+    await run({
+      skuId: largeSku,
+      userId: owner.id,
+      sessionId: sibling,
+      startedAt: latest,
+      segments: [600],
+      rate: '0.0333',
+    });
+    await run({ skuId, userId: outsider.id, sessionId: root, startedAt: latest, segments: [999] });
+
+    const charges = await createCaller({ user: owner }).sessionCharges({
+      cloudAgentSessionId: root,
+    });
+    expect(charges.runs).toHaveLength(10);
+    expect(charges.runs[0]).toEqual({
+      startedAt: latest,
+      stoppedAt: null,
+      running: true,
+      instance: null,
+      rateCentsPerSecond: 0.0333,
+      seconds: 600,
+      amountMicrodollars: Math.round(600 * 0.0333 * 10_000),
+    });
+    expect(charges.runs[1]).toMatchObject({
+      startedAt: new Date(start + 10 * 3_600_000).toISOString(),
+      running: false,
+      instance: null,
+      rateCentsPerSecond: 0.01,
+      seconds: 60 + 660,
+      amountMicrodollars: (60 + 660) * 100,
+    });
+    expect(charges.runs[1]?.stoppedAt).not.toBeNull();
+    expect(charges.earlierRuns).toEqual({
+      count: 2,
+      seconds: 60 + 60 + 60 + 120,
+      amountMicrodollars: (60 + 60 + 60 + 120) * 100,
+    });
+    const listed = charges.runs.reduce((sum, item) => sum + item.amountMicrodollars, 0);
+    expect(listed + (charges.earlierRuns?.amountMicrodollars ?? 0)).toBe(
+      charges.amountMicrodollars
+    );
+  });
+
+  it('names only Cloud Agent container SKUs by instance', () => {
+    expect(containerInstanceForSku(CLOUD_AGENT_CONTAINER_SKUS['standard-3'])).toBe('standard-3');
+    expect(containerInstanceForSku(CLOUD_AGENT_CONTAINER_SKUS['standard-4'])).toBe('standard-4');
+    expect(containerInstanceForSku('cloud-agent-standard-2026-07')).toBeNull();
   });
 
   it('rejects nonexistent sessions', async () => {

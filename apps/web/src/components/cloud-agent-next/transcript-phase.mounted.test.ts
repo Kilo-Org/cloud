@@ -77,6 +77,8 @@ class MockResizeObserver {
 
 // The SDK derives the cached page's owner; the mocks own the cached rows directly.
 function mockCachedTranscriptSessionId(): unknown {
+  if ('cachedTranscriptSessionId' in mockAtomValues)
+    return mockAtomValues.cachedTranscriptSessionId;
   if (!mockAtomValues.isRefreshingCachedTranscript) return null;
   const rows = [
     ...((mockAtomValues.staticMessages as { info: { sessionID: string } }[] | undefined) ?? []),
@@ -353,6 +355,8 @@ describe('CloudChatPage route-aware transcript phase', () => {
 
   beforeAll(async () => {
     ({ CloudChatPage } = await import('./CloudChatPage'));
+    const { default: loadable } = await import('next/dist/shared/lib/loadable.shared-runtime');
+    await loadable.preloadAll();
   });
 
   beforeEach(() => {
@@ -587,6 +591,18 @@ describe('CloudChatPage route-aware transcript phase', () => {
 
     expect(mockWorkspaceTabs?.currentChatLoadingLabel).toBeNull();
     expect(mockPlanResumeAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a fresh early page using its route owner, without waiting for metadata or a cache refresh', () => {
+    mockAtomValues.staticMessages = [anchorMessage('msg_early')];
+    mockAtomValues.cachedTranscriptSessionId = mockSessionId;
+    mockAtomValues.isRefreshingCachedTranscript = false;
+    mockAtomValues.isLoading = false;
+    mockAtomValues.canSend = false;
+    render();
+    expect(skeleton()).toBeNull();
+    expect(dom.container.querySelector('[data-message-id="msg_early"]')).not.toBeNull();
+    expect(mockChatInput?.disabled).toBe(true);
   });
 
   it('positions cached messages at the tail before any animation frame or refresh completes', () => {

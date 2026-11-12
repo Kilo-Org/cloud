@@ -117,6 +117,18 @@ export async function shouldRouteToVercel(
     return false;
   }
 
+  if (!(await isVercelRoutingEnabledForModel(requestedModel))) {
+    return false;
+  }
+
+  return await canRouteToVercel(requestedModel, getRoutingProviderConfig);
+}
+
+/**
+ * Whether Kilo's routing config sends the model to Vercel: Vercel routing is on and the model is
+ * not opted out. Vercel must still serve the model.
+ */
+export async function isVercelRoutingEnabledForModel(requestedModel: string) {
   const routingConfig = await getRuntimeGatewayRoutingConfig();
   if (!routingConfig.vercelEnabled) {
     return false;
@@ -127,7 +139,26 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  return await canRouteToVercel(requestedModel, getRoutingProviderConfig);
+  return true;
+}
+
+/** Whether Vercel serves the model, regardless of the request's routing settings. */
+export async function isVercelModel(requestedModel: string) {
+  const [vercelModels, vercelModelId] = await Promise.all([
+    getVercelModelsFromDatabase(),
+    mapModelIdToVercel(requestedModel),
+  ]);
+  return vercelModels.has(vercelModelId);
+}
+
+/**
+ * Whether a request to Vercel may name the model. Like `isValidOpenRouterModelId`, it assumes the
+ * model is valid while Vercel's model list is unavailable, so requests through a user's own Vercel
+ * key keep working during a metadata outage.
+ */
+export async function isValidVercelModelId(requestedModel: string) {
+  const vercelModels = await getVercelModelsFromDatabase();
+  return vercelModels.size === 0 || vercelModels.has(await mapModelIdToVercel(requestedModel));
 }
 
 /**

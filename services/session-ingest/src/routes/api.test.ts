@@ -3754,6 +3754,40 @@ describe('api routes', () => {
       );
       warn.mockRestore();
     });
+
+    it('falls back to heartbeat titles when the overlay query outlives its budget', async () => {
+      const connectionStub = {
+        getActiveSessions: vi.fn(async () => [
+          baseHeartbeat('ses_aaaaaaaaaaaaaaaaaaaaaaaaaa', 'Heartbeat A'),
+        ]),
+      };
+      vi.mocked(getUserConnectionDO).mockReturnValue(
+        connectionStub as unknown as ReturnType<typeof getUserConnectionDO>
+      );
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      // A Postgres hop that never answers. The overlay is an embellishment on
+      // an answer that is already complete, so the route must return the
+      // heartbeat titles instead of holding the caller open until its own
+      // budget expires — which is what made this route a client timeout.
+      fns.selectResult.mockImplementationOnce(() => Promise.withResolvers<unknown[]>().promise);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request('http://local/sessions/active', { method: 'GET' }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { sessions: Array<{ id: string; title: string }> };
+      expect(body.sessions.map(s => s.title)).toEqual(['Heartbeat A']);
+      expect(warn).toHaveBeenCalledWith(
+        'Failed to overlay active-session titles from Postgres (non-fatal)',
+        expect.objectContaining({ error: expect.stringContaining('exceeded its') })
+      );
+      warn.mockRestore();
+    });
   });
 
   it('GET /user/cli returns 426 without Upgrade header', async () => {

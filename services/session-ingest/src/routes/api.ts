@@ -764,6 +764,32 @@ api.get('/session/:sessionId/messages', async c => {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
+  // The initial page also carries the session metadata. That read is
+  // best-effort and independent of the history read, so it starts alongside it
+  // rather than after it: a second serial Durable Object round trip is pure
+  // added latency on the page the caller is waiting for. The rejection is
+  // absorbed here so a failed snapshot read can never fail the page, and so an
+  // abandoned promise cannot surface as an unhandled rejection when the history
+  // read throws first.
+  const sessionInfoPromise =
+    inputParse.data.before === undefined
+      ? withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+          () =>
+            getSessionIngestDO(c.env, {
+              kiloUserId,
+              sessionId: inputParse.data.kiloSessionId,
+            }),
+          stub => stub.readKiloSdkSessionSnapshot(),
+          'SessionIngestDO.readKiloSdkSessionSnapshot'
+        ).catch((error: unknown) => {
+          console.warn(
+            `Failed to fetch session snapshot for session ${inputParse.data.kiloSessionId}:`,
+            error instanceof Error ? error.message : error
+          );
+          return undefined;
+        })
+      : undefined;
+
   const readStartedAt = Date.now();
   let rawHistory: unknown;
   try {
@@ -827,35 +853,17 @@ api.get('/session/:sessionId/messages', async c => {
   // Best-effort: a snapshot read failure must not fail the message page; the
   // live session events still carry goal updates.
   let sessionMetadata: Record<string, unknown> | null = null;
-  if (inputParse.data.before === undefined) {
-    try {
-      const rawSessionInfo = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
-        () =>
-          getSessionIngestDO(c.env, {
-            kiloUserId,
-            sessionId: inputParse.data.kiloSessionId,
-          }),
-        stub => stub.readKiloSdkSessionSnapshot(),
-        'SessionIngestDO.readKiloSdkSessionSnapshot'
-      );
-      if (
-        typeof rawSessionInfo === 'object' &&
-        rawSessionInfo !== null &&
-        (rawSessionInfo as { kind?: unknown }).kind === 'value'
-      ) {
-        const info = (rawSessionInfo as { info?: unknown }).info;
-        if (typeof info === 'object' && info !== null) {
-          const metadata = (info as { metadata?: unknown }).metadata;
-          if (typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)) {
-            sessionMetadata = metadata as Record<string, unknown>;
-          }
-        }
+  const rawSessionInfo = await sessionInfoPromise;
+  if (typeof rawSessionInfo === 'object' && rawSessionInfo !== null) {
+    const info =
+      'kind' in rawSessionInfo && rawSessionInfo.kind === 'value' && 'info' in rawSessionInfo
+        ? rawSessionInfo.info
+        : undefined;
+    if (typeof info === 'object' && info !== null && 'metadata' in info) {
+      const metadata = info.metadata;
+      if (typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)) {
+        sessionMetadata = metadata as Record<string, unknown>;
       }
-    } catch (error) {
-      console.warn(
-        `Failed to fetch session snapshot for session ${inputParse.data.kiloSessionId}:`,
-        error instanceof Error ? error.message : error
-      );
     }
   }
 
@@ -1141,6 +1149,43 @@ api.post('/session/:sessionId/title', async c => {
   return c.json({ title: session.title ?? bodyParse.data.title, applied: true }, 200);
 });
 
+/**
+ * Budget for the best-effort `cli_sessions_v2` title overlay on
+ * `/sessions/active`. The heartbeat answer is already complete without it, so
+ * the overlay may never extend the request: a stalled Postgres hop falls back
+ * to the heartbeat titles instead of spending the caller's budget. Generous
+ * against this route's normal p99, and a small fraction of the budget its
+ * control-plane caller allows.
+ */
+const ACTIVE_SESSION_TITLE_OVERLAY_BUDGET_MS = 1_500;
+
+/**
+ * Resolve with `work` when it settles inside `budgetMs`, otherwise reject with
+ * a budget error. `PromiseLike` rather than `Promise` because the caller passes
+ * a Drizzle query builder, which is thenable but not a platform promise, and
+ * `Promise.resolve` is what normalizes a thenable that forwards its own pending
+ * value onward. `work` keeps its handlers, so an abandoned query that settles
+ * late is consumed instead of surfacing as an unhandled rejection.
+ */
+function withinBudget<T>(work: PromiseLike<T>, budgetMs: number, label: string): Promise<T> {
+  const { promise, resolve, reject } = Promise.withResolvers<T>();
+  const timer = setTimeout(
+    () => reject(new Error(`${label} exceeded its ${budgetMs}ms budget`)),
+    budgetMs
+  );
+  Promise.resolve(work).then(
+    value => {
+      clearTimeout(timer);
+      resolve(value);
+    },
+    error => {
+      clearTimeout(timer);
+      reject(error);
+    }
+  );
+  return promise;
+}
+
 api.get('/sessions/active', async c => {
   const kiloUserId = c.get('user_id');
   const stub = getUserConnectionDO(c.env, { kiloUserId });
@@ -1151,23 +1196,29 @@ api.get('/sessions/active', async c => {
   // only to Postgres) is reflected on the next poll instead of waiting for
   // the CLI's next heartbeat. The overlay is best-effort: a DB failure must
   // not blank the entire Remote section, so we fall back to the heartbeat
-  // titles and return 200.
+  // titles and return 200. It is also bounded: it is an embellishment on an
+  // answer that is already complete, so it may never hold the request open
+  // and spend the caller's budget on a stalled Postgres hop.
   if (sessions.length > 0) {
     const ids = sessions.map(s => s.id);
     try {
       const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
-      const titleRows = await db
-        .select({
-          session_id: cli_sessions_v2.session_id,
-          title: cli_sessions_v2.title,
-        })
-        .from(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-            inArray(cli_sessions_v2.session_id, ids)
-          )
-        );
+      const titleRows = await withinBudget(
+        db
+          .select({
+            session_id: cli_sessions_v2.session_id,
+            title: cli_sessions_v2.title,
+          })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+              inArray(cli_sessions_v2.session_id, ids)
+            )
+          ),
+        ACTIVE_SESSION_TITLE_OVERLAY_BUDGET_MS,
+        'active-session title overlay'
+      );
 
       const titleBySessionId = new Map<string, string>();
       for (const row of titleRows) {

@@ -88,12 +88,6 @@ export const DEVICE_AUTH_CODE_TTL_SECONDS = 600;
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 
-const readFailureBody = async (response: Response): Promise<DeviceAuthFailureBody | undefined> => {
-  const parsed = failureBodySchema.safeParse(await response.json().catch(() => null));
-
-  return parsed.success ? parsed.data : undefined;
-};
-
 const nonEmptyStringSchema = z.string().min(1);
 const storedAuthSchema = z.object({
   token: nonEmptyStringSchema,
@@ -112,6 +106,12 @@ const failureBodySchema = z.object({
 const userResponseSchema = z.object({
   google_user_email: nonEmptyStringSchema.optional(),
 });
+
+const readFailureBody = async (response: Response): Promise<DeviceAuthFailureBody | undefined> => {
+  const parsed = failureBodySchema.safeParse(await response.json().catch(() => null));
+
+  return parsed.success ? parsed.data : undefined;
+};
 
 export const getKiloApiBaseUrl = (): string => {
   const configuredUrl = import.meta.env.VITE_KILO_API_BASE_URL;

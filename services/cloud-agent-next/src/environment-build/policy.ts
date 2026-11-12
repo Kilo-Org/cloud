@@ -6,6 +6,7 @@ import {
   type EnvironmentScope,
 } from './reference.js';
 import { environmentBuildMemberPinSchema } from '../shared/environment-build-protocol.js';
+import { sameVercelAccount } from '../byoc/vercel-snapshot-compatibility.js';
 
 /**
  * Build and snapshot policy (plan "Ownership and data", "Build admission and
@@ -108,11 +109,12 @@ export type SnapshotImageCompatibility = 'current' | 'previous' | 'incompatible'
 
 /**
  * Only snapshots from the same provider, with the same runtime ABI and a
- * downloaded runtime, can serve sessions. For native containers a snapshot from
- * an earlier base image stays usable while its replacement builds: the disk
- * restore does not use the old image and the current runtime is installed over
- * it, so only the base userspace and installed tools differ. Vercel has no such
- * guard, so a different base or an unreadable account is incompatible.
+ * downloaded runtime, can serve sessions. A snapshot from an earlier base image
+ * stays usable while its replacement builds: the current runtime is installed
+ * over the restored disk, so only the base userspace and installed tools
+ * differ. A Vercel snapshot must also come from the same account, and an
+ * unreadable account is incompatible because restoring across accounts is
+ * never safe.
  */
 export function snapshotImageCompatibility(
   published: PublishedSnapshot,
@@ -127,7 +129,9 @@ export function snapshotImageCompatibility(
     return published.provider === 'vercel' ? 'incompatible' : 'current';
   }
   if (published.baseImage === current.baseImage) return 'current';
-  return published.provider === 'vercel' ? 'incompatible' : 'previous';
+  if (published.provider === 'vercel' && !sameVercelAccount(published.baseImage, current.baseImage))
+    return 'incompatible';
+  return 'previous';
 }
 
 export function compatibleWith(

@@ -102,8 +102,9 @@ managed Bitbucket repository access requires an organization. Personal GitHub an
 are supported.
 Native builds require a downloaded runtime-free deployment and a published runtime release. Vercel
 builds use the saved allocation's customer-owned base snapshot and require a published runtime release,
-not native container enrollment. Vercel snapshot compatibility includes the credential, project and
-exact base snapshot, so runtime-only updates do not invalidate it. Missing or incompatible snapshots
+not native container enrollment. A Vercel snapshot is restored only in the same credential, team and
+project. After the base snapshot is rebuilt, a snapshot from the earlier base stays usable, is marked
+stale and admits a replacement build, as for native images. Missing or incompatible snapshots
 fail with a rebuild instruction, never a clean-base fallback. Builds always use the environment's
 saved compute. A session pinned to another provider fails at once with a provider-mismatch reason,
 because a rebuild cannot serve it. Existing all-in-one environment snapshots are incompatible and

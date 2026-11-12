@@ -266,14 +266,15 @@ describe('snapshotEligibility', () => {
     ).toBe(true);
   });
 
-  it('scopes a Vercel snapshot to its provider, credential, team, project, runtime build and base snapshot', () => {
-    const baseImage = vercelSnapshotBaseImage({
+  it('scopes a Vercel snapshot to its provider, credential, team and project', () => {
+    const identity = {
       credentialId: 'credential-1',
       teamId: 'team-1',
       projectId: 'project-1',
       runtimeBuildId: 'runtime-1',
       baseSnapshotId: 'snap-base-1',
-    });
+    };
+    const baseImage = vercelSnapshotBaseImage(identity);
     const vercel: SnapshotCompatibility = {
       provider: 'vercel',
       baseImage,
@@ -292,20 +293,33 @@ describe('snapshotEligibility', () => {
     });
     // A runtime release is not part of a Vercel base identity.
     expect(replacementNeeded(snapshot, 2, NOW, vercel)).toBe(false);
-    // Another provider, account, project or runtime build is incompatible.
+    // A newer base in the same account is used while its replacement builds.
+    const rebuiltBase = {
+      ...vercel,
+      baseImage: vercelSnapshotBaseImage({
+        ...identity,
+        runtimeBuildId: 'runtime-2',
+        baseSnapshotId: 'snap-base-2',
+      }),
+    };
+    expect(snapshotImageCompatibility(snapshot, rebuiltBase)).toBe('previous');
+    expect(snapshotEligibility(snapshot, REFERENCE, NOW, rebuiltBase)).toEqual({
+      eligible: true,
+      stale: true,
+      staleReason: 'image',
+    });
+    expect(replacementNeeded(snapshot, 2, NOW, rebuiltBase)).toBe(true);
+    // Another provider, credential, team or project is incompatible.
     expect(compatibleWith(snapshot, { ...vercel, provider: 'cloudflare-containers' })).toBe(false);
-    expect(
-      compatibleWith(snapshot, {
-        ...vercel,
-        baseImage: vercelSnapshotBaseImage({
-          credentialId: 'credential-2',
-          teamId: 'team-1',
-          projectId: 'project-1',
-          runtimeBuildId: 'runtime-1',
-          baseSnapshotId: 'snap-base-1',
-        }),
-      })
-    ).toBe(false);
+    for (const account of [
+      { credentialId: 'credential-2' },
+      { teamId: 'team-2' },
+      { projectId: 'project-2' },
+    ]) {
+      const other = { ...vercel, baseImage: vercelSnapshotBaseImage({ ...identity, ...account }) };
+      expect(snapshotImageCompatibility(snapshot, other)).toBe('incompatible');
+    }
+    expect(compatibleWith(snapshot, { ...vercel, baseImage: 'not-a-vercel-identity' })).toBe(false);
     expect(compatibleWith(snapshot, { ...vercel, runtimeAbi: 'abi-2' })).toBe(false);
   });
 

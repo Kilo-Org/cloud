@@ -1165,6 +1165,53 @@ describe('environment snapshot resolution', () => {
     expect((await status(harness)).activeBuild).toBeNull();
   });
 
+  it('uses a Vercel snapshot from an earlier base in the same account and admits its replacement', async () => {
+    const harness = await setup();
+    const target = {
+      provider: 'vercel' as const,
+      credentialId: '44444444-4444-4444-8444-444444444444',
+      teamId: 'team-1',
+      projectId: 'project-1',
+      runtimeBuildId: 'runtime-1',
+      baseSnapshotId: 'snap-base',
+      instance: 'vercel-small' as const,
+    };
+    harness.target = { ok: true, target };
+    const { auth } = await readyBuild(harness);
+    await harness.stub.runnerResult(auth, {
+      outcome: 'ready',
+      commit: 'a'.repeat(40),
+      branch: 'main',
+      setupDurationMs: 1,
+    });
+    await drive(harness);
+
+    const otherAccount = { ...target, projectId: 'project-2' };
+    harness.target = { ok: true, target: otherAccount };
+    await expect(
+      harness.stub.resolveSnapshot({
+        reference: sessionReference(harness, 1),
+        actorUserId: 'user-1',
+        provider: 'vercel',
+      })
+    ).resolves.toMatchObject({ snapshot: null, reason: 'incompatible' });
+
+    const rebuiltBase = { ...target, runtimeBuildId: 'runtime-2', baseSnapshotId: 'snap-base-2' };
+    harness.target = { ok: true, target: rebuiltBase };
+    await expect(
+      harness.stub.resolveSnapshot({
+        reference: sessionReference(harness, 1),
+        actorUserId: 'user-1',
+        provider: 'vercel',
+      })
+    ).resolves.toMatchObject({
+      reason: 'eligible',
+      snapshot: { revision: 1, stale: 'image', baseImage: vercelSnapshotBaseImage(target) },
+      currentBaseImage: vercelSnapshotBaseImage(rebuiltBase),
+    });
+    expect((await status(harness)).published).toMatchObject({ revision: 1, stale: 'image' });
+  });
+
   it('keeps status readable and the snapshot current while the target cannot be resolved', async () => {
     const harness = await setup();
     const { auth } = await readyBuild(harness);

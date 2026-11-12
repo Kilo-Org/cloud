@@ -13,6 +13,7 @@ import { createStore, Provider } from 'jotai';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { type Pressable } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
   type AssociatedPrData,
@@ -5045,6 +5046,43 @@ describe('session detail read-only composer', () => {
       expect(
         navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
       ).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('offers a fresh press instead of the old failure once the screen is focused again', async () => {
+    // The wait for the composer is bounded, so a push the navigator applies
+    // later still leaves the failure behind. The person then sees the composer,
+    // and returning here must offer one press: a stale error would carry a Retry
+    // that opens a second composer.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+      routerDropsPush.value = true;
+      const focusEffectsBefore = vi.mocked(useFocusEffect).mock.calls.length;
+
+      await act(async () => {
+        (continueControlOf(view.renderer).props.onPress as () => void)();
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(renderedText(view.renderer.root)).toContain(i18n.t('common.somethingWentWrong'));
+
+      // The navigator applies the push after the wait gave up on it, and the
+      // person comes back: this is the focus event the screen receives.
+      const focusEffects = vi
+        .mocked(useFocusEffect)
+        .mock.calls.slice(0, focusEffectsBefore)
+        .map(([effect]) => effect);
+      await act(async () => {
+        for (const effect of focusEffects) {
+          effect();
+        }
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.somethingWentWrong'));
+      expect(continueControlOf(view.renderer).props.loading).toBe(false);
     } finally {
       vi.useRealTimers();
     }

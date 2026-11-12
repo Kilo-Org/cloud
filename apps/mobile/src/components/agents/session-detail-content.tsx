@@ -2516,12 +2516,18 @@ export function SessionDetailContent({
     void pushContinue(detailsForkCut);
   }, [detailsForkCut, handleCloseDetails, pushContinue]);
 
-  // The composer was the destination: coming back here means the press that
-  // opened it is spent, so the footer offers a fresh one. A failure keeps its
-  // error until the person retries it or leaves.
+  // The composer was the destination: coming back here means the press spent
+  // what the footer was reporting, so the footer offers a fresh one. That
+  // includes a press whose composer arrived after the read-back gave up on it —
+  // the navigator can apply a push later than the wait, and the person then sees
+  // the composer, not this screen. A push the navigator really dropped leaves
+  // the person here, so no focus event follows and its error stays until they
+  // retry it or leave.
   useFocusEffect(
     useCallback(() => {
-      setContinueOpen(current => (current === 'pending' ? 'idle' : current));
+      // Setting the state it already holds is a no-op render, so this is safe
+      // on the mount focus too.
+      setContinueOpen('idle');
     }, [])
   );
 

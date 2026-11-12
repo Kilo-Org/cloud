@@ -172,6 +172,13 @@ const FAILED_PROMPT_MEMORY_MAX_SESSIONS = 20;
 const DENIED_SESSION_MEMORY_MAX_SESSIONS = 20;
 
 /**
+ * Maximum number of sessions whose failed sends wait for a confirmation. A
+ * long-lived manager serves many sessions, so this record is bounded like the
+ * sibling maps; the active session is never evicted.
+ */
+const PENDING_CONFIRMATION_MAX_SESSIONS = 20;
+
+/**
  * Maximum number of retained messages. Once the loaded transcript exceeds this,
  * `trimRetainedHistory` drops the oldest loaded older-page from local storage.
  */
@@ -2688,11 +2695,17 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       config.clearPendingSendConfirmation?.(kiloSessionId, messageId);
       // The record is the only owner of a prompt that may have arrived after
       // this manager replaced the one that sent it, so the text comes from it.
+      // The failure atoms describe the session's latest failure: they are
+      // cleared only when it is this message, never for a different one whose
+      // cause and restored text must stay put.
       const failed = failedPromptBySession.get(kiloSessionId);
-      if (failed?.messageId === messageId) failedPromptBySession.delete(kiloSessionId);
+      const ownsFailure = failed?.messageId === messageId;
+      if (ownsFailure) failedPromptBySession.delete(kiloSessionId);
       if (activeSessionId !== kiloSessionId) continue;
-      store.set(failedPromptAtom, null);
-      store.set(billingFailureAtom, null);
+      if (ownsFailure) {
+        store.set(failedPromptAtom, null);
+        store.set(billingFailureAtom, null);
+      }
       deliveredFailedPromptSequence += 1;
       store.set(deliveredFailedPromptAtom, {
         messageId,
@@ -2949,17 +2962,29 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     kiloSessionId: KiloSessionId,
     expectedGeneration: number
   ): void {
-    const pending = pendingConfirmationBySession.get(kiloSessionId) ?? new Map<string, string>();
-    pendingConfirmationBySession.set(kiloSessionId, pending);
     if (!config.readPendingSendConfirmations) return;
+    // Nothing is stored for this session unless something is read back: one
+    // entry per session ever opened would outlive every one of them.
+    const pending = pendingConfirmationBySession.get(kiloSessionId) ?? new Map<string, string>();
     // Not awaited: the first page arrives on its own schedule, and the
     // transcript subscription settles whatever is pending when it does.
     void config
       .readPendingSendConfirmations(kiloSessionId)
       .then(entries => {
         if (expectedGeneration !== switchGeneration) return;
+        if (entries.length === 0) return;
         for (const entry of entries) {
           pending.set(entry.messageId, entry.text);
+        }
+        pendingConfirmationBySession.delete(kiloSessionId);
+        pendingConfirmationBySession.set(kiloSessionId, pending);
+        if (pendingConfirmationBySession.size > PENDING_CONFIRMATION_MAX_SESSIONS) {
+          for (const key of pendingConfirmationBySession.keys()) {
+            if (key !== kiloSessionId && key !== activeSessionId) {
+              pendingConfirmationBySession.delete(key);
+              break;
+            }
+          }
         }
         settleDeliveredFailedPrompt(kiloSessionId);
       })
@@ -3885,15 +3910,24 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       remoteOptimisticIds.delete(messageId);
       const detail = formatErrorDetail(err);
-      // Only a transport-level answer leaves the outcome unknown: the request
+      // Only a transport-level failure leaves the outcome unknown: the request
       // may have reached the server, so the confirmed row can still arrive and
-      // the text the caller restores must leave again when it does. A classified
-      // refusal (credits, authorization, conflict, service) is the server's own
-      // answer to this send, so no row will ever confirm it.
+      // the text the caller restores must leave again when it does. An answer
+      // that carries a code or an HTTP status is the server's own verdict on
+      // this send, whatever `formatErrorDetail` labels it, so no row will ever
+      // confirm it; so is a failure no transport could have delivered.
+      const shape = errorShapeSchema.safeParse(err);
+      const answeredByServer =
+        shape.success &&
+        (shape.data.data?.code !== undefined ||
+          shape.data.data?.httpStatus !== undefined ||
+          shape.data.shape?.code !== undefined ||
+          shape.data.shape?.data?.httpStatus !== undefined);
       const outcomeUnknown =
-        detail.code === 'connection-failed' ||
-        detail.code === 'connection-lost' ||
-        detail.code === 'generic-error';
+        !answeredByServer &&
+        (detail.code === 'connection-failed' ||
+          detail.code === 'connection-lost' ||
+          detail.code === 'generic-error');
       if (insertedOptimisticRow && kiloSessionId) {
         if (delivered) {
           failedPromptBySession.delete(kiloSessionId);

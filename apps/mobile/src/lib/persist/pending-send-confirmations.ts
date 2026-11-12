@@ -43,9 +43,9 @@ const PENDING_SEND_MAX_SESSIONS = 20;
 
 const PENDING_SEND_KEY_PREFIX = 'pending-send:';
 
-const pendingSendSchema = z.array(
-  z.object({ messageId: z.string().min(1), text: z.string().min(1) })
-);
+// `text` admits an empty string: a send may carry attachments only, and one
+// such entry must not make every other entry in the list unreadable.
+const pendingSendSchema = z.array(z.object({ messageId: z.string().min(1), text: z.string() }));
 
 function pendingSendKey(sessionId: string): string {
   return `${PENDING_SEND_KEY_PREFIX}${sessionId}`;
@@ -160,6 +160,11 @@ export async function persistPendingSendConfirmation(input: {
   text: string;
 }): Promise<void> {
   const { messageId, text } = input;
+  // A send that carried no text restores nothing into the composer, so there is
+  // no duplicate to withdraw later.
+  if (text === '') {
+    return;
+  }
   await writePending({
     ...input,
     update: existing =>

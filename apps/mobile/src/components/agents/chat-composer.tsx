@@ -274,6 +274,12 @@ type ChatComposerProps = {
    * already applied.
    */
   deliveredDraft?: string | null;
+  /**
+   * Called once the composer has consumed `deliveredDraft`. The host clears the
+   * record with it, so the suppression cannot outlive the load it was published
+   * for and take a later draft with the same words.
+   */
+  onDeliveredDraftConsumed?: () => void;
   /** Active session id, used to scope the Android picker launch context. */
   sessionId?: string | null;
   /** Active Remote CLI `suggest` tool request. */
@@ -333,6 +339,7 @@ export function ChatComposer({
   draftKey,
   initialDraft,
   deliveredDraft = null,
+  onDeliveredDraftConsumed,
   sessionId = null,
   suggestion = null,
   onAcceptSuggestion,
@@ -638,12 +645,14 @@ export function ChatComposer({
     initialDraftAppliedRef.current = true;
     // The stored draft is the text of a message the server accepted: applying it
     // would show that message twice, in the transcript and in the input. It is
-    // consumed, not restored — and the durable draft goes with it, so a later
-    // mount cannot bring it back.
+    // consumed, not restored — and the durable draft goes with it. Only the one
+    // load the record was published for is consumed: a draft the reader stored
+    // afterwards may carry the same words and is theirs.
     if (deliveredDraft !== null && initialDraft === deliveredDraft) {
       if (draftKey && userId) {
         void clearStoredDraft(userId, draftKey);
       }
+      onDeliveredDraftConsumed?.();
       return;
     }
     if (initialDraft === '' || textRef.current !== '') {
@@ -654,7 +663,14 @@ export function ChatComposer({
     // its route closed. The host publishes that send's confirmation later, and
     // this draft — loaded, not typed — is what it must withdraw.
     restoredFailedSendRef.current = { text: initialDraft, attachmentIds: [] };
-  }, [initialDraft, deliveredDraft, draftKey, userId, restoreTextIntoInput]);
+  }, [
+    initialDraft,
+    deliveredDraft,
+    draftKey,
+    userId,
+    onDeliveredDraftConsumed,
+    restoreTextIntoInput,
+  ]);
 
   // After Stop, remount the input row once the SDK has restored the composer
   // (Item 14 E2E gate).  The state machine is armed in handleStop and

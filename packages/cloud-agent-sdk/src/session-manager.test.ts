@@ -3670,6 +3670,73 @@ describe('createSessionManager', () => {
       reopened.destroy();
     });
 
+    it("keeps another failure's cause when a different message settles", async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const storage = mockSession.storage;
+      if (!storage) throw new Error('expected session storage');
+
+      // m1 fails with an unknown outcome, so it stays pending.
+      let rejectFirst: (error: Error) => void;
+      mockSession.send.mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectFirst = reject;
+          })
+      );
+      const first = mgr.send({ payload: { type: 'prompt', prompt: 'First', mode: 'code' } });
+      const firstId = storage.getMessageIds()[0]!;
+      rejectFirst!(new Error('ECONNRESET'));
+      await expect(first).resolves.toBe(false);
+
+      // m2 is refused for credits, and that refusal is the session's live cause.
+      mockSession.send.mockRejectedValueOnce(
+        Object.assign(new Error('Insufficient credits'), {
+          data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 },
+        })
+      );
+      await expect(
+        mgr.send({ payload: { type: 'prompt', prompt: 'Second', mode: 'code' } })
+      ).resolves.toBe(false);
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Second');
+
+      // m1's row arrives later: it says nothing about m2's cause, which stays.
+      storage.upsertMessage(
+        stubUserMessage({
+          id: firstId,
+          sessionID: kiloId('ses-1'),
+          time: { created: 2 },
+          agent: 'test-agent',
+          model: { providerID: 'test-provider', modelID: 'test-model' },
+        })
+      );
+
+      expect(atomValue(config.store, mgr.atoms.deliveredFailedPrompt)).toMatchObject({
+        messageId: firstId,
+        text: 'First',
+      });
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Second');
+    });
+
+    it('records no pending confirmation when the server answered with a status', async () => {
+      const persistPendingSendConfirmation = jest.fn();
+      const config = createMockConfig({ persistPendingSendConfirmation });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockRejectedValueOnce(
+        Object.assign(new Error('Rate limited'), {
+          data: { code: 'TOO_MANY_REQUESTS', httpStatus: 429 },
+        })
+      );
+      await expect(
+        mgr.send({ payload: { type: 'prompt', prompt: 'Busy', mode: 'code' } })
+      ).resolves.toBe(false);
+
+      expect(persistPendingSendConfirmation).not.toHaveBeenCalled();
+    });
+
     it('records no pending confirmation for a refusal the server answered', async () => {
       const persistPendingSendConfirmation = jest.fn();
       const config = createMockConfig({ persistPendingSendConfirmation });

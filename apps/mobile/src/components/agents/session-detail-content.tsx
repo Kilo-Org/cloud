@@ -1381,6 +1381,10 @@ export function SessionDetailContent({
   // the record's `sequence` makes this effect run once per delivery.
   const deliveredFailedPrompt = useAtomValue(manager.atoms.deliveredFailedPrompt);
   const appliedDeliveredFailedPromptSequence = useRef(0);
+  // The load each record was published for. The draft suppression lasts only
+  // until the composer consumes that one load, so a draft the reader stores
+  // afterwards with the same words is never taken for the delivered message.
+  const [consumedDeliveredSequence, setConsumedDeliveredSequence] = useState(0);
   useEffect(() => {
     if (deliveredFailedPrompt === null) {
       return;
@@ -1390,6 +1394,15 @@ export function SessionDetailContent({
     }
     appliedDeliveredFailedPromptSequence.current = deliveredFailedPrompt.sequence;
     composerControlRef.current?.withdrawRestoredSend(deliveredFailedPrompt.text);
+  }, [deliveredFailedPrompt, setConsumedDeliveredSequence]);
+  const consumableDeliveredDraft =
+    deliveredFailedPrompt !== null && deliveredFailedPrompt.sequence > consumedDeliveredSequence
+      ? deliveredFailedPrompt.text
+      : null;
+  const consumeDeliveredDraft = useCallback(() => {
+    if (deliveredFailedPrompt !== null) {
+      setConsumedDeliveredSequence(deliveredFailedPrompt.sequence);
+    }
   }, [deliveredFailedPrompt]);
 
   // Where the account settles a turn its balance refused. The action reads no
@@ -2893,7 +2906,8 @@ export function SessionDetailContent({
                 autoSend={autoSend}
                 draftKey={userId ? sessionComposerDraftKey : undefined}
                 initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
-                deliveredDraft={deliveredFailedPrompt?.text ?? null}
+                deliveredDraft={consumableDeliveredDraft}
+                onDeliveredDraftConsumed={consumeDeliveredDraft}
                 sessionId={sessionId}
                 suggestion={activeSuggestion}
                 onAcceptSuggestion={async (requestId, index) => {

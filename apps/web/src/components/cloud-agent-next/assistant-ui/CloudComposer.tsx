@@ -325,22 +325,34 @@ export function CloudComposer({
     appliedWithdrawnSequenceRef.current = withdrawnFailedPrompt.sequence;
     const key = conversationKey ?? DEFAULT_CONVERSATION_KEY;
     const submission = submissionsRef.current.get(key);
-    const restoredText = withdrawnFailedPrompt.text;
-    const showsRestoredText = valueRef.current === restoredText;
+    // The record carries the prompt as it was sent, which is trimmed; the
+    // composer may hold it with trailing whitespace from a paste or an IME.
+    const restoredText = withdrawnFailedPrompt.text.trim();
+    const sameText = (value: string | undefined) =>
+      value !== undefined && value.trim() === restoredText;
+    const showsRestoredText = sameText(valueRef.current);
     const snapshot = composerSnapshotsRef.current.get(key);
-    if (snapshot?.text === restoredText) {
+    const snapshotHoldsRestored = sameText(snapshot?.text);
+    if (snapshotHoldsRestored) {
+      // The snapshot's own previews are revoked by the removal below; deleting
+      // it first would only leak the URLs it held.
       composerSnapshotsRef.current.delete(key);
     }
     if (!showsRestoredText) return;
     writeInputValue('');
-    // The delivered send owns its files now; the restored chips must not stay.
-    if (snapshot?.text === restoredText) {
-      replaceAttachments([]);
+    // The delivered send owns the files it carried, so the chips this restore
+    // put back are removed through the upload hook: that path revokes each
+    // preview and releases its pending key, and it leaves chips the reader
+    // added afterwards alone.
+    if (snapshotHoldsRestored) {
+      for (const attachment of snapshot.attachments) {
+        attachmentUpload.removeAttachment(attachment.id);
+      }
     }
-    if (submission?.text === restoredText) {
+    if (sameText(submission?.text)) {
       submissionsRef.current.delete(key);
     }
-  }, [withdrawnFailedPrompt, conversationKey, writeInputValue, replaceAttachments]);
+  }, [withdrawnFailedPrompt, conversationKey, writeInputValue, attachmentUpload]);
 
   // Resolve the pinned model's display name from the allowed models list, so the
   // locked-read-only toolbar shows the same label as the ModelCombobox. Falls

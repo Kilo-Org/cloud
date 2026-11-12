@@ -158,6 +158,47 @@ describe('pending send confirmations', () => {
     expect(ids.map(entry => entry.messageId)).not.toContain('msg-1');
   });
 
+  it('keeps the other entries readable when a send carried only attachments', async () => {
+    await persistPendingSendConfirmation({
+      owner: OWNER,
+      sessionId: SESSION_ID,
+      messageId: 'msg-text',
+      text: 'hello',
+    });
+    // An attachment-only send carries no text; it is not recorded, and it must
+    // not make the stored list unreadable either.
+    await persistPendingSendConfirmation({
+      owner: OWNER,
+      sessionId: SESSION_ID,
+      messageId: 'msg-files',
+      text: '',
+    });
+
+    await expect(readPendingSendConfirmations(USER_ID, SESSION_ID)).resolves.toEqual([
+      { messageId: 'msg-text', text: 'hello' },
+    ]);
+  });
+
+  it('reads a stored list whose entry carries empty text', async () => {
+    const scope = readCacheScope(USER_ID);
+    kvMock.scopes.set(
+      scope,
+      new Map([
+        [
+          KEY,
+          {
+            v: JSON.stringify([{ messageId: 'msg-files', text: '' }]),
+            updatedAt: 1,
+          },
+        ],
+      ])
+    );
+
+    await expect(readPendingSendConfirmations(USER_ID, SESSION_ID)).resolves.toEqual([
+      { messageId: 'msg-files', text: '' },
+    ]);
+  });
+
   it('never leaks one account pending send to another account', async () => {
     await persistPendingSendConfirmation({
       owner: OWNER,

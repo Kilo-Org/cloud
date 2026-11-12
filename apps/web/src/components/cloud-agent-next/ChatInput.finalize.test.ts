@@ -1509,6 +1509,43 @@ describe('withdrawing a failed prompt the server delivered', () => {
     }
   });
 
+  it('withdraws a restored draft the composer holds with trailing whitespace', async () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    const onSend = jest.fn(async () => false);
+    const render = (
+      initialValue?: string,
+      withdrawnFailedPrompt?: { text: string; sequence: number } | null
+    ) =>
+      act(() =>
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey: 'chat-a',
+            initialValue,
+            withdrawnFailedPrompt,
+            attachmentUploadOptions: { messageUuid: 'withdraw-trimmed' },
+          })
+        )
+      );
+    try {
+      render();
+      act(() => setTextareaValue(dom.container, 'Delivered late\n'));
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+      render('Delivered late\n');
+      expect(dom.container.querySelector('textarea')?.value).toBe('Delivered late\n');
+
+      render('Delivered late\n', { text: 'Delivered late', sequence: 1 });
+      expect(dom.container.querySelector('textarea')?.value).toBe('');
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  });
+
   it('keeps a draft the reader edited after the restore', async () => {
     mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
     const dom = installLinkedomDom();

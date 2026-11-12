@@ -40,15 +40,36 @@ export class KiloGatewayStreamStalledError extends Error {
 /** A non-OK gateway HTTP response. Callers may retry 429/5xx. */
 export class KiloGatewayHttpError extends Error {
   readonly status: number;
-  constructor(status: number) {
+  /** The parsed response body, when the gateway sent one: it carries the reason the user needs. */
+  readonly body: unknown;
+  constructor(status: number, body?: unknown) {
     super(`Failed to fetch gateway chat completion stream: ${String(status)}`);
     this.name = 'KiloGatewayHttpError';
     this.status = status;
+    this.body = body;
   }
 }
 
 const DEFAULT_STALL_TIMEOUT_MS = 45_000;
 const DEFAULT_COMPLETION_TIMEOUT_MS = 90_000;
+
+// A failed response still carries the reason (a rejected key, exhausted credits). Read a bounded amount so a large error page cannot stall the turn.
+const MAX_ERROR_BODY_CHARS = 2000;
+
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- a failed response body is JSON of unknown shape; the caller walks it with its own schema.
+const readErrorBody = async (response: Response): Promise<unknown> => {
+  try {
+    const text = await response.text();
+    const bounded = text.slice(0, MAX_ERROR_BODY_CHARS);
+    if (bounded.trim() === '') {
+      return undefined;
+    }
+    const parsed: unknown = JSON.parse(bounded);
+    return parsed;
+  } catch {
+    return undefined;
+  }
+};
 
 interface StreamingToolCallBuffer {
   arguments: string;
@@ -559,7 +580,7 @@ export const fetchKiloGatewayChatCompletionStream = async ({
       stallPromise,
     ]);
     if (!response.ok) {
-      throw new KiloGatewayHttpError(response.status);
+      throw new KiloGatewayHttpError(response.status, await readErrorBody(response));
     }
     if (response.body === null) {
       throw new Error('Gateway chat completion stream did not include a body.');

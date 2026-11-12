@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- Shared tool panel and per-state mappers for both conversation renderers */
+import { Loader2 } from 'lucide-react';
 import type { JSX, ReactNode } from 'react';
 import { isValidElement } from 'react';
 import type { Components } from 'react-markdown';
@@ -6,12 +7,14 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type {
   AgentConversationEvent,
+  ConversationErrorEvent,
   GroupedConversationItem,
 } from '@/src/shared/agent-conversation';
 import { BROWSER_TOOL_CONTRACT, toKiloBrowserToolName } from '@/src/shared/browser-tool-contract';
 import { getViewportScreenshotDataUrl } from '@/src/shared/agent-tool-output';
 // Explicit .tsx: collapsible-code-block.ts (pure helpers) shadows the default resolution.
 import { CollapsibleCodeBlock } from './collapsible-code-block.tsx';
+import { ErrorNotice } from './error-notice';
 
 // Hoisted so the array reference is stable (react-perf) across renders.
 const remarkPlugins = [remarkGfm];
@@ -74,7 +77,27 @@ const extractCodeChild = (
   return undefined;
 };
 
+// The side panel is a document: an in-place navigation would replace the conversation, so only web and mail links render as links and they always open elsewhere.
+const allowedLinkHrefPattern = /^(?:https?:|mailto:)/iu;
+
+const MarkdownLink: Components['a'] = ({ children, href }) =>
+  href !== undefined && allowedLinkHrefPattern.test(href) ? (
+    <a href={href} rel="noopener noreferrer" target="_blank">
+      {children}
+    </a>
+  ) : (
+    <span>{children}</span>
+  );
+
+// Hoisted so the object reference is stable (react-perf) across renders.
+const thinkingMarkdownComponents: Components = {
+  // eslint-disable-next-line id-length -- react-markdown keys its component map by HTML element name.
+  a: MarkdownLink,
+};
+
 const createAssistantMarkdownComponents = (forceExpanded: boolean): Components => ({
+  // eslint-disable-next-line id-length -- react-markdown keys its component map by HTML element name.
+  a: MarkdownLink,
   pre: ({ children }) => {
     const extracted = extractCodeChild(children);
 
@@ -125,6 +148,9 @@ const formatToolValue = (value: unknown): string => {
   }
 };
 
+const formatToolArguments = (toolArguments: Record<string, unknown>): string | undefined =>
+  Object.keys(toolArguments).length === 0 ? undefined : formatToolValue(toolArguments);
+
 const MessageEvent = ({
   event,
   streamingMessageId,
@@ -171,7 +197,9 @@ const ThinkingEvent = ({
       thinking
     </summary>
     <div className="agent-message-markdown mt-2 text-xs leading-5 text-foreground-muted">
-      <ReactMarkdown remarkPlugins={remarkPlugins}>{event.text}</ReactMarkdown>
+      <ReactMarkdown components={thinkingMarkdownComponents} remarkPlugins={remarkPlugins}>
+        {event.text}
+      </ReactMarkdown>
     </div>
   </details>
 );
@@ -192,7 +220,8 @@ const ToolExchangePanel = ({
   /** Rendered under "Result" or "Error". Omit while the tool still runs. */
   resultText?: string | undefined;
   status: 'completed' | 'failed' | 'running';
-  subtitle: string;
+  /** The tab or server the call acted on. Omit when it says nothing the user needs. */
+  subtitle?: string | undefined;
   title: string;
 }): JSX.Element => {
   const isSuccessful = status !== 'failed';
@@ -223,9 +252,14 @@ const ToolExchangePanel = ({
     <details className={panelClassName}>
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 outline-none transition focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background">
         <span className={titleClassName}>
+          {status === 'running' ? (
+            <Loader2 aria-hidden="true" className="mr-1 inline size-3 animate-spin align-[-2px]" />
+          ) : null}
           {title} {status}
         </span>
-        <span className={tabClassName}>{subtitle}</span>
+        {subtitle === undefined || subtitle === '' ? null : (
+          <span className={tabClassName}>{subtitle}</span>
+        )}
       </summary>
       <div className="mt-2 grid min-w-0 gap-2">
         {argumentsText === undefined ? null : (
@@ -278,20 +312,22 @@ const getToolExchangeResultText = (
 
 const ToolExchangeEvent = ({
   item,
+  tabLabels,
 }: {
   item: Extract<GroupedConversationItem, { readonly type: 'tool-exchange' }>;
+  tabLabels?: ReadonlyMap<number, string> | undefined;
 }): JSX.Element => {
   const { result, toolCall } = item;
 
   if ('source' in toolCall) {
     return (
       <ToolExchangePanel
-        argumentsText={formatToolValue(toolCall.arguments)}
+        argumentsText={formatToolArguments(toolCall.arguments)}
         imageAlt={`Image produced by ${toolCall.name}`}
         imageDataUrl={result?.imageDataUrl}
         resultText={getToolExchangeResultText(result, result?.imageDataUrl !== undefined)}
         status={getToolExchangeStatus(result)}
-        subtitle={toolCall.title ?? ''}
+        subtitle={toolCall.title}
         title={toolCall.name}
       />
     );
@@ -300,7 +336,7 @@ const ToolExchangeEvent = ({
   if ('webMcpOrigin' in toolCall) {
     return (
       <ToolExchangePanel
-        argumentsText={formatToolValue(toolCall.arguments)}
+        argumentsText={formatToolArguments(toolCall.arguments)}
         imageAlt={`Image produced by ${toolCall.name}`}
         resultText={getToolExchangeResultText(result, false)}
         status={getToolExchangeStatus(result)}
@@ -312,15 +348,20 @@ const ToolExchangeEvent = ({
 
   const screenshotDataUrl =
     result?.ok === true ? getViewportScreenshotDataUrl(toolCall.name, result.value) : undefined;
+  const tabLabel =
+    'tabId' in toolCall &&
+    (browserToolTitleByKiloName.has(toolCall.name) || toolCall.name === 'run_workflow')
+      ? tabLabels?.get(toolCall.tabId)
+      : undefined;
 
   return (
     <ToolExchangePanel
-      argumentsText={'arguments' in toolCall ? formatToolValue(toolCall.arguments) : undefined}
+      argumentsText={'arguments' in toolCall ? formatToolArguments(toolCall.arguments) : undefined}
       imageAlt={`Image produced by ${toolCall.name}`}
       imageDataUrl={screenshotDataUrl}
       resultText={getToolExchangeResultText(result, screenshotDataUrl !== undefined)}
       status={getToolExchangeStatus(result)}
-      subtitle={'serverName' in toolCall ? toolCall.serverName : `tab ${toolCall.tabId}`}
+      subtitle={'serverName' in toolCall ? toolCall.serverName : tabLabel}
       title={getToolTitle(toolCall.name)}
     />
   );
@@ -329,7 +370,7 @@ const ToolExchangeEvent = ({
 const StandaloneToolEvent = ({
   event,
 }: {
-  event: Exclude<AgentConversationEvent, { readonly type: 'message' | 'thinking' }>;
+  event: Extract<AgentConversationEvent, { readonly type: 'tool-call' | 'tool-result' }>;
 }): JSX.Element => {
   let title = 'tool error';
   let body = event.type === 'tool-call' ? event.name : event.error;
@@ -360,15 +401,37 @@ const StandaloneToolEvent = ({
   );
 };
 
+const ErrorEvent = ({
+  event,
+  onRetry,
+}: {
+  event: ConversationErrorEvent;
+  onRetry?: (() => void) | undefined;
+}): JSX.Element => (
+  <ErrorNotice
+    action={event.action}
+    detail={event.detail}
+    onRetry={onRetry}
+    retryable={event.retry !== undefined}
+    title={event.title}
+  />
+);
+
 export const AgentConversationItemView = ({
   item,
+  onRetryError,
   streamingMessageId,
+  tabLabels,
 }: {
   item: GroupedConversationItem;
+  /** Retries the failed turn or compaction the error event describes. */
+  onRetryError?: ((event: ConversationErrorEvent) => void) | undefined;
   streamingMessageId?: string | undefined;
+  /** Display label per tab id, for the tab a tool call acted on. */
+  tabLabels?: ReadonlyMap<number, string> | undefined;
 }): JSX.Element => {
   if (item.type === 'tool-exchange') {
-    return <ToolExchangeEvent item={item} />;
+    return <ToolExchangeEvent item={item} tabLabels={tabLabels} />;
   }
 
   const { event } = item;
@@ -379,6 +442,21 @@ export const AgentConversationItemView = ({
 
   if (event.type === 'thinking') {
     return <ThinkingEvent event={event} />;
+  }
+
+  if (event.type === 'error') {
+    return (
+      <ErrorEvent
+        event={event}
+        onRetry={
+          onRetryError === undefined || event.retry === undefined
+            ? undefined
+            : () => {
+                onRetryError(event);
+              }
+        }
+      />
+    );
   }
 
   return <StandaloneToolEvent event={event} />;

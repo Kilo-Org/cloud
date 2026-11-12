@@ -4,7 +4,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { AgentConversationItemView } from './agent-conversation-events';
-import { createToolCall } from '@/src/shared/agent-conversation';
+import { createAssistantMessage, createToolCall } from '@/src/shared/agent-conversation';
 import type {
   AgentConversationEvent,
   GroupedConversationItem,
@@ -28,7 +28,8 @@ type ToolResultEvent = Extract<AgentConversationEvent, { type: 'tool-result' }>;
 describe('workflow tool exchange rendering', () => {
   const renderToolExchange = (
     toolCall: ToolCallEvent,
-    result: ToolResultEvent
+    result: ToolResultEvent,
+    tabLabels?: ReadonlyMap<number, string>
   ): ReturnType<typeof render> => {
     const item: GroupedConversationItem = {
       result,
@@ -36,7 +37,7 @@ describe('workflow tool exchange rendering', () => {
       type: 'tool-exchange',
     };
 
-    return render(<AgentConversationItemView item={item} />);
+    return render(<AgentConversationItemView item={item} tabLabels={tabLabels} />);
   };
 
   it('renders a successful run_workflow with result and pages visited', () => {
@@ -58,11 +59,12 @@ describe('workflow tool exchange rendering', () => {
       },
     };
 
-    const { container } = renderToolExchange(toolCall, result);
+    const { container } = renderToolExchange(toolCall, result, new Map([[7, 'Kilo - Wikipedia']]));
 
     expect(container.textContent).toContain('run_workflow');
     expect(container.textContent).toContain('completed');
-    expect(container.textContent).toContain('tab 7');
+    expect(container.textContent).toContain('Kilo - Wikipedia');
+    expect(container.textContent).not.toContain('tab 7');
     expect(container.textContent).toContain('workflowId');
     expect(container.textContent).toContain('42');
     expect(container.textContent).toContain('2');
@@ -208,11 +210,14 @@ describe('playwright browser tool exchange rendering', () => {
       type: 'tool-exchange',
     };
 
-    const { container } = render(<AgentConversationItemView item={item} />);
+    const { container } = render(
+      <AgentConversationItemView item={item} tabLabels={new Map([[7, 'Example Domain']])} />
+    );
 
     expect(container.textContent).toContain('Navigate to a URL');
     expect(container.textContent).toContain('completed');
-    expect(container.textContent).toContain('tab 7');
+    expect(container.textContent).toContain('Example Domain');
+    expect(container.textContent).not.toContain('tab 7');
     expect(container.textContent).toContain('Arguments');
     expect(container.textContent).toContain('https://example.com');
     expect(container.textContent).toContain('Example Domain');
@@ -405,5 +410,67 @@ describe('agent tool exchange rendering', () => {
     expect(image?.getAttribute('src')).toContain('data:image/png;base64,');
     expect(image?.getAttribute('alt')).toBe('Image produced by browser_screenshot');
     expect(container.textContent).not.toContain('captured');
+  });
+});
+
+describe('assistant markdown links', () => {
+  const renderAssistantText = (text: string): ReturnType<typeof render> =>
+    render(
+      <AgentConversationItemView item={{ event: createAssistantMessage(text), type: 'event' }} />
+    );
+
+  it('opens a web link elsewhere instead of navigating the panel', () => {
+    const { container } = renderAssistantText('[Example](https://example.com/path)');
+
+    const link = container.querySelector('a');
+    expect(link?.getAttribute('href')).toBe('https://example.com/path');
+    expect(link?.getAttribute('target')).toBe('_blank');
+    expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
+  });
+
+  it('keeps a mailto link and refuses any other scheme', () => {
+    const mail = renderAssistantText('[Mail](mailto:help@kilo.ai)');
+    expect(mail.container.querySelector('a')?.getAttribute('href')).toBe('mailto:help@kilo.ai');
+
+    const script = renderAssistantText('[Run](javascript:alert(1))');
+    expect(script.container.querySelector('a')).toBeNull();
+    expect(script.container.textContent).toContain('Run');
+  });
+});
+
+describe('running tool call rendering', () => {
+  it('renders the tool row in a running state while the call is in flight', () => {
+    const toolCall = createToolCall({ arguments: {}, name: 'kilo_browser_snapshot', tabId: 7 });
+
+    const { container } = render(
+      <AgentConversationItemView item={{ toolCall, type: 'tool-exchange' }} />
+    );
+
+    expect(container.querySelector('details')).not.toBeNull();
+    expect(container.textContent).toContain('Page snapshot');
+    expect(container.textContent).toContain('running');
+    // Nothing to report yet, and no empty Arguments block for a call that takes none.
+    expect(container.textContent).not.toContain('Arguments');
+    expect(container.textContent).not.toContain('Result');
+    expect(container.querySelector('svg')).not.toBeNull();
+  });
+
+  it('hides the Arguments block when the call takes no arguments', () => {
+    const toolCall = createToolCall({ arguments: {}, name: 'kilo_browser_snapshot', tabId: 7 });
+    const result = {
+      id: 'tr-1',
+      ok: true,
+      toolCallId: toolCall.id,
+      type: 'tool-result' as const,
+      value: 'Snapshot text',
+    };
+
+    const { container } = render(
+      <AgentConversationItemView item={{ result, toolCall, type: 'tool-exchange' }} />
+    );
+
+    expect(container.textContent).toContain('completed');
+    expect(container.textContent).not.toContain('Arguments');
+    expect(container.textContent).toContain('Snapshot text');
   });
 });

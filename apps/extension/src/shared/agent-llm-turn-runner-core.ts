@@ -2,9 +2,11 @@
 import {
   createAssistantMessage,
   createThinkingBlock,
+  createToolResult,
   createUserMessage,
 } from './agent-conversation';
 import type { AgentConversationEvent } from './agent-conversation';
+import { createTurnErrorEvent } from './agent-turn-error';
 import { runToolCalls } from './agent-tool-results';
 import type { FetchLike } from './auth';
 import { buildGatewayMessagesFromEvents } from './agent-llm-harness';
@@ -31,7 +33,6 @@ interface RunLlmTurnOptions<ToolCall extends ToolCallEvent> {
   readonly appendEvents: (events: AgentConversationEvent[]) => void;
   readonly conversationEvents: AgentConversationEvent[];
   readonly executeToolCall: (toolCall: ToolCall) => Promise<EvalTabResult>;
-  readonly failureMessage: (error: unknown) => string;
   readonly fetch: FetchLike;
   readonly maxToolRounds: number;
   readonly model: string;
@@ -157,7 +158,6 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   appendEvents,
   conversationEvents,
   executeToolCall,
-  failureMessage,
   fetch,
   maxToolRounds,
   model,
@@ -481,19 +481,40 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         return;
       }
 
-      const toolResultEvents: AgentConversationEvent[] = await runToolCalls(
-        toolCallEvents,
-        guardedExecuteToolCall,
-        signal
-      );
+      let executedResultEvents: ToolResultEvent[] = [];
+
+      try {
+        executedResultEvents = await runToolCalls(toolCallEvents, guardedExecuteToolCall, signal);
+      } catch (error) {
+        if (!isAbortError(error)) {
+          throw error;
+        }
+      }
+
+      // Every call needs a result: a stopped turn leaves the rest unanswered, and a provider rejects a replayed call that never got one.
+      const answeredToolCallIds = new Set(executedResultEvents.map(event => event.toolCallId));
+      const toolResultEvents: AgentConversationEvent[] = [
+        ...executedResultEvents,
+        ...toolCallEvents
+          .filter(toolCall => !answeredToolCallIds.has(toolCall.id))
+          .map(toolCall =>
+            createToolResult({
+              error: 'Stopped before this tool ran.',
+              ok: false,
+              toolCallId: toolCall.id,
+            })
+          ),
+      ];
+
+      if (toolResultEvents.length > 0) {
+        appendEvents(toolResultEvents);
+        nextConversationEvents.push(...toolResultEvents);
+      }
 
       if (isSignalAborted(signal)) {
         appendEvents([createAssistantMessage('Stopped.')]);
         return;
       }
-
-      appendEvents(toolResultEvents);
-      nextConversationEvents.push(...toolResultEvents);
 
       if (streakStopMessage !== undefined) {
         appendEvents([createAssistantMessage(streakStopMessage)]);
@@ -505,8 +526,11 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
 
     await continueConversation([...conversationEvents], maxToolRounds);
   } catch (error) {
-    appendEvents([
-      createAssistantMessage(isAbortError(error) ? 'Stopped.' : failureMessage(error)),
-    ]);
+    if (isAbortError(error)) {
+      appendEvents([createAssistantMessage('Stopped.')]);
+      return;
+    }
+
+    appendEvents([createTurnErrorEvent(error)]);
   }
 };

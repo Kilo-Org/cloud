@@ -147,6 +147,8 @@ import {
   cloud_agent_worktrees,
   cloud_agent_pr_watches,
   cloud_agent_pr_watch_activity,
+  cloud_agent_pr_maintenance_attempts,
+  cloud_agent_pr_feedback_dispositions,
   todo_items,
   todo_lists,
   passkey_credentials,
@@ -3176,7 +3178,7 @@ describe('User', () => {
       ).toHaveLength(0);
     });
 
-    it('deletes OAuth-owned PR watch policy and activity without touching another owner', async () => {
+    it('cascades OAuth-owned PR maintenance data without touching another owner', async () => {
       const user = await insertTestUser({ id: `oauth/github|watch-privacy-${randomUUID()}` });
       const otherUser = await insertTestUser();
       const [integration] = await db
@@ -3228,6 +3230,100 @@ describe('User', () => {
       const ownedWatch = watches.find(watch => watch.kilo_user_id === user.id);
       const otherWatch = watches.find(watch => watch.kilo_user_id === otherUser.id);
       if (!ownedWatch || !otherWatch) throw new Error('Missing watch fixtures');
+      const attempts = await db
+        .insert(cloud_agent_pr_maintenance_attempts)
+        .values(
+          watches.map(watch => ({
+            watch_id: watch.id,
+            worktree_id: watch.worktree_id,
+            generation: 1,
+            pending_revision: 1,
+            ordinal: 1,
+            session_id: `ses_${randomUUID()}`,
+            cloud_agent_session_id: `workspace_${randomUUID()}`,
+            creation_operation_key: randomUUID(),
+            message_id: `msg_${randomUUID()}`,
+            input: {
+              version: 1 as const,
+              purpose: 'Private maintenance context',
+              constraints: [],
+              repository: {
+                repositoryId: watch.repository_id,
+                repoUrl: watch.repo_url,
+                prNumber: watch.pr_number,
+                headRef: watch.head_ref,
+                baseRef: watch.base_ref,
+                headSha: watch.head_sha,
+                baseSha: watch.base_sha,
+                parentCommitSha: null,
+              },
+              policy: {
+                version: 2 as const,
+                model: 'kilo/synthetic-maintenance-model',
+                variant: null,
+                profileId: null,
+                environmentId: null,
+                automaticWritesConsent: true as const,
+                historyRewriteConsent: true as const,
+                noHardSpendCapConsent: true as const,
+                branchStrategy: 'rebase' as const,
+                categories: { reviews: true, failedChecks: true, conflicts: true },
+                trustedBotLogins: [],
+                maxAttemptsPerProblem: 2,
+                maxTotalAttempts: 10,
+                batchDelaySeconds: 30,
+                maxBatchWaitSeconds: 120,
+                quietPeriodSeconds: 180,
+              },
+              ordinal: 1,
+              problems: [
+                {
+                  kind: 'conflict' as const,
+                  problemKey: 'private-conflict',
+                  contentFingerprint: 'private-revision',
+                  headSha: watch.head_sha,
+                  baseSha: watch.base_sha,
+                },
+              ],
+              problemAttempts: [],
+              priorDispositions: [],
+              previousResults: [],
+              verificationCommands: [],
+              references: [],
+            },
+            result: {
+              version: 1 as const,
+              summary: 'Private repair result',
+              changedFiles: [],
+              verification: [],
+              publication: { status: 'not_attempted' as const, reason: 'Waiting for input' },
+              problems: [],
+              needsInput: 'Private clarification',
+            },
+          }))
+        )
+        .returning();
+      await db.insert(cloud_agent_pr_feedback_dispositions).values(
+        attempts.map(attempt => ({
+          watch_id: attempt.watch_id,
+          attempt_id: attempt.id,
+          problem_key: 'private-feedback',
+          content_fingerprint: 'private-revision',
+          disposition: 'deferred' as const,
+          reason: 'Private disposition reason',
+          reply_comment_id: `synthetic-comment-${randomUUID()}`,
+          reply_body: 'Private maintenance reply',
+        }))
+      );
+      await db.insert(cli_sessions_v2).values(
+        attempts.map(attempt => ({
+          session_id: attempt.session_id ?? '',
+          kilo_user_id: watches.find(watch => watch.id === attempt.watch_id)?.kilo_user_id ?? '',
+          chat_kind: 'maintenance' as const,
+          maintenance_watch_id: attempt.watch_id,
+          maintenance_attempt_id: attempt.id,
+        }))
+      );
       await db.insert(cloud_agent_pr_watch_activity).values([
         {
           watch_id: ownedWatch.id,
@@ -3267,6 +3363,23 @@ describe('User', () => {
           .from(cloud_agent_pr_watch_activity)
           .where(eq(cloud_agent_pr_watch_activity.watch_id, otherWatch.id))
       ).toHaveLength(1);
+      for (const table of [
+        cloud_agent_pr_maintenance_attempts,
+        cloud_agent_pr_feedback_dispositions,
+      ]) {
+        expect(await db.select().from(table).where(eq(table.watch_id, ownedWatch.id))).toEqual([]);
+        expect(await db.select().from(table).where(eq(table.watch_id, otherWatch.id))).toHaveLength(
+          1
+        );
+      }
+      const ownedChat = await db.query.cli_sessions_v2.findFirst({
+        where: eq(cli_sessions_v2.kilo_user_id, user.id),
+      });
+      expect(ownedChat).toMatchObject({
+        chat_kind: 'maintenance',
+        maintenance_watch_id: null,
+        maintenance_attempt_id: null,
+      });
     });
 
     it('scrubs worktree names without removing deletion fences or another owner’s names', async () => {

@@ -293,6 +293,9 @@ async function queueControlPlaneMessage(
   if (result.type === 'session-not-found') {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
   }
+  if (result.type === 'maintenance-stopped') {
+    throw new TRPCError({ code: 'CONFLICT', message: 'maintenance_attempt_stopped' });
+  }
   if (result.type === 'queue-full') {
     throwAdmissionError(pendingQueueFullAdmissionFailure());
   }

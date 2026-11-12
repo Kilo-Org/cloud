@@ -469,6 +469,7 @@ export type GitTokenService = {
 };
 
 export type Env = {
+  PR_MAINTENANCE_QUEUE?: Cloudflare.Env['PR_MAINTENANCE_QUEUE'];
   AI?: Ai;
   CONTAINER_BILLING_HEARTBEAT_SECONDS?: string;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */

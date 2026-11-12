@@ -96,6 +96,11 @@ export function dbSessionToStoredSession(session: DbSession | DbSessionV2): Stor
     messages: [],
     cloudAgentSessionId: session.cloud_agent_session_id,
     createdOnPlatform: dbSession.created_on_platform ?? null,
+    chatKind: dbSession.chat_kind ?? 'user',
+    maintenanceWatchId: dbSession.maintenance_watch_id ?? null,
+    maintenanceAttemptId: dbSession.maintenance_attempt_id ?? null,
+    isMaintenancePinned:
+      dbSession.chat_kind === 'maintenance' && dbSession.is_maintenance_pinned === true,
     sessionStatus: session.status,
     sessionStatusUpdatedAt: session.status_updated_at?.toISOString() ?? null,
     latestRunFailureKind: session.latest_run_failure_kind ?? null,
@@ -216,6 +221,10 @@ export function mergeWorktreeChatSessions(
     sessionsById.set(cachedSession.sessionId, {
       ...authoritativeSession,
       ...cachedSession,
+      chatKind: authoritativeSession.chatKind,
+      maintenanceWatchId: authoritativeSession.maintenanceWatchId,
+      maintenanceAttemptId: authoritativeSession.maintenanceAttemptId,
+      isMaintenancePinned: authoritativeSession.isMaintenancePinned,
       cloudAgentSessionId,
       status:
         cloudAgentSessionId && !cachedSession.cloudAgentSessionId
@@ -269,7 +278,17 @@ type SidebarSessionActivity = Pick<
   | 'latestRunFailureKind'
   | 'latestRunTerminalAt'
 > &
-  Partial<Pick<StoredSession, 'createdAt' | 'lastActivityAt'>>;
+  Partial<
+    Pick<
+      StoredSession,
+      | 'createdAt'
+      | 'lastActivityAt'
+      | 'chatKind'
+      | 'maintenanceWatchId'
+      | 'maintenanceAttemptId'
+      | 'isMaintenancePinned'
+    >
+  >;
 
 export type SidebarForegroundSessionStatus = {
   sessionId: string;
@@ -697,6 +716,10 @@ export function patchSidebarWorktreeSessionStatus(
             sessionStatus: update.sessionStatus ?? null,
             sessionStatusUpdatedAt: update.sessionStatusUpdatedAt ?? null,
             updatedAt: update.updatedAt,
+            chat_kind: update.chatKind ?? 'user',
+            maintenance_watch_id: update.maintenanceWatchId ?? null,
+            maintenance_attempt_id: update.maintenanceAttemptId ?? null,
+            is_maintenance_pinned: update.isMaintenancePinned ?? false,
             latest_run_status: null,
             latest_run_failure_kind: update.latestRunFailureKind ?? null,
             latest_run_terminal_at: update.latestRunTerminalAt ?? null,
@@ -753,6 +776,10 @@ export function sessionCacheKey(s: {
   latest_run_status?: string | null;
   latest_run_failure_kind?: string | null;
   latest_run_terminal_at?: string | null;
+  chat_kind?: string;
+  maintenance_watch_id?: string | null;
+  maintenance_attempt_id?: string | null;
+  is_maintenance_pinned?: boolean;
   associatedPr?: {
     state: string;
     lastSyncedAt: string;
@@ -761,7 +788,7 @@ export function sessionCacheKey(s: {
     observations?: AssociatedPr['observations'];
   } | null;
 }): string {
-  return `${s.session_id}-${s.updated_at}-${s.last_activity_at ?? ''}-${s.status ?? ''}-${s.status_updated_at ?? ''}-${s.cloud_agent_worktree_id ?? ''}-${s.latest_run_status ?? ''}-${s.latest_run_failure_kind ?? ''}-${s.latest_run_terminal_at ?? ''}-${s.associatedPr?.state ?? ''}-${s.associatedPr?.lastSyncedAt ?? ''}-${s.associatedPr?.reviewDecision ?? ''}-${s.associatedPr?.reviewDecisionPending ?? false}-${JSON.stringify(s.associatedPr?.observations ?? null)}`;
+  return `${s.session_id}-${s.updated_at}-${s.last_activity_at ?? ''}-${s.status ?? ''}-${s.status_updated_at ?? ''}-${s.cloud_agent_worktree_id ?? ''}-${s.latest_run_status ?? ''}-${s.latest_run_failure_kind ?? ''}-${s.latest_run_terminal_at ?? ''}-${s.chat_kind ?? ''}-${s.maintenance_watch_id ?? ''}-${s.maintenance_attempt_id ?? ''}-${s.is_maintenance_pinned ?? false}-${s.associatedPr?.state ?? ''}-${s.associatedPr?.lastSyncedAt ?? ''}-${s.associatedPr?.reviewDecision ?? ''}-${s.associatedPr?.reviewDecisionPending ?? false}-${JSON.stringify(s.associatedPr?.observations ?? null)}`;
 }
 
 /**
@@ -800,6 +827,9 @@ export function eventRowToDbSession(
     title: row.title,
     cloud_agent_session_id: null,
     cloud_agent_worktree_id: row.worktreeId,
+    chat_kind: row.chatKind,
+    maintenance_watch_id: row.maintenanceWatchId,
+    maintenance_attempt_id: row.maintenanceAttemptId,
     created_on_platform: row.createdOnPlatform,
     organization_id: row.organizationId,
     git_url: row.gitUrl,
@@ -885,6 +915,16 @@ function mergeSidebarDbSession(
     cloud_agent_session_id: existing.cloud_agent_session_id ?? next.cloud_agent_session_id,
     cloud_agent_worktree_id:
       next.cloud_agent_worktree_id ?? existing.cloud_agent_worktree_id ?? null,
+    chat_kind: next.chat_kind ?? existing.chat_kind,
+    maintenance_watch_id:
+      next.maintenance_watch_id === undefined
+        ? existing.maintenance_watch_id
+        : next.maintenance_watch_id,
+    maintenance_attempt_id:
+      next.maintenance_attempt_id === undefined
+        ? existing.maintenance_attempt_id
+        : next.maintenance_attempt_id,
+    is_maintenance_pinned: next.is_maintenance_pinned ?? existing.is_maintenance_pinned,
   };
   if ('associatedPr' in existing) return { ...merged, associatedPr: existing.associatedPr };
   return merged;
@@ -1372,6 +1412,10 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
       messages: [],
       cloudAgentSessionId: row.cloud_agent_session_id,
       createdOnPlatform: row.created_on_platform,
+      chatKind: row.chat_kind ?? 'user',
+      maintenanceWatchId: row.maintenance_watch_id ?? null,
+      maintenanceAttemptId: row.maintenance_attempt_id ?? null,
+      isMaintenancePinned: row.chat_kind === 'maintenance' && row.is_maintenance_pinned === true,
       sessionStatus: row.status,
       sessionStatusUpdatedAt: row.status_updated_at,
       latestRunFailureKind: row.latest_run_failure_kind,
@@ -1394,6 +1438,11 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
       last_activity_at: session.last_activity_at?.toISOString() ?? null,
       version: session.version,
       created_on_platform: session.created_on_platform ?? 'unknown',
+      chat_kind: session.chat_kind ?? 'user',
+      maintenance_watch_id: session.maintenance_watch_id ?? null,
+      maintenance_attempt_id: session.maintenance_attempt_id ?? null,
+      is_maintenance_pinned:
+        session.chat_kind === 'maintenance' && session.is_maintenance_pinned === true,
       organization_id: session.organization_id,
       git_url: session.git_url,
       git_branch: session.git_branch,
@@ -1470,6 +1519,17 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
               cloud_agent_worktree_id:
                 session.cloud_agent_worktree_id ?? existing.cloud_agent_worktree_id ?? null,
               associatedPr: existing.associatedPr ?? session.associatedPr,
+              chat_kind: session.chat_kind ?? existing.chat_kind,
+              maintenance_watch_id:
+                session.maintenance_watch_id === undefined
+                  ? existing.maintenance_watch_id
+                  : session.maintenance_watch_id,
+              maintenance_attempt_id:
+                session.maintenance_attempt_id === undefined
+                  ? existing.maintenance_attempt_id
+                  : session.maintenance_attempt_id,
+              is_maintenance_pinned:
+                session.is_maintenance_pinned ?? existing.is_maintenance_pinned,
               ...getSidebarRunOutcomeAfterStatus(
                 existing,
                 session.status,
@@ -1656,6 +1716,11 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
             defaultTitle: worktree.defaultTitle,
             sessions: worktree.sessions.map(session => ({
               ...session,
+              chatKind: session.chat_kind,
+              maintenanceWatchId: session.maintenance_watch_id,
+              maintenanceAttemptId: session.maintenance_attempt_id,
+              isMaintenancePinned:
+                session.chat_kind === 'maintenance' && session.is_maintenance_pinned,
               latestRunFailureKind: session.latest_run_failure_kind,
               latestRunTerminalAt: session.latest_run_terminal_at,
             })),

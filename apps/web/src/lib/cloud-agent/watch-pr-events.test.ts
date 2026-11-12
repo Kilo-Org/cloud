@@ -151,7 +151,7 @@ describe('watch PR payload normalization', () => {
       pull_request: { number: 42, head: { sha: newer } },
       comment: {
         id: 9,
-        body: 'x'.repeat(10000),
+        body: 'x'.repeat(20000),
         updated_at: earlier,
         commit_id: head,
         user: { id: 99 },
@@ -160,21 +160,21 @@ describe('watch PR payload normalization', () => {
     });
     expect(event?.kind).toBe('feedback');
     if (event?.kind !== 'feedback') throw new Error('missing feedback');
-    expect(event.body).toHaveLength(4000);
+    expect(event.body).toHaveLength(12000);
     expect(event).not.toHaveProperty('author_association');
     expect(projection(project(watch(), event)).pending[0]?.reason).toBe(
       'reviewer_verification_required'
     );
   });
 
-  it('keeps astral feedback bodies within the 4000 UTF-16-unit evidence limit', () => {
+  it('keeps astral feedback bodies within the 12000 UTF-16-unit evidence limit', () => {
     const event = normalizeWatchPrEvent('pull_request_review_comment', {
       ...envelope,
       action: 'edited',
       pull_request: { number: 42, head: { sha: newer } },
       comment: {
         id: 9,
-        body: '😀'.repeat(3000),
+        body: '😀'.repeat(7000),
         updated_at: earlier,
         commit_id: head,
         user: { id: 99 },
@@ -182,10 +182,10 @@ describe('watch PR payload normalization', () => {
     });
     expect(event?.kind).toBe('feedback');
     if (event?.kind !== 'feedback') throw new Error('missing feedback');
-    expect(event.body).toHaveLength(4000);
+    expect(event.body).toHaveLength(12000);
     expect(
       watchPrProjectionSchema.parse(project(watch(), event).projection).evidence[0]?.body
-    ).toHaveLength(4000);
+    ).toHaveLength(12000);
   });
 
   it('strips NUL characters and lone surrogates from stored feedback bodies', () => {
@@ -223,7 +223,7 @@ describe('watch PR payload normalization', () => {
     expect(event).toMatchObject({ kind: 'feedback', updatedAt: null, state: 'changes_requested' });
   });
 
-  it('normalizes checks with empty PR associations without URLs or unbounded output', () => {
+  it('normalizes checks with empty PR associations and bounded diagnostic metadata', () => {
     expect(
       normalizeWatchPrEvent('check_run', {
         ...envelope,
@@ -245,6 +245,8 @@ describe('watch PR payload normalization', () => {
     ).toEqual({
       ...identity,
       kind: 'check',
+      name: 'tests',
+      detailsUrl: 'https://untrusted.test',
       prNumbers: [],
       key: `check:7:run:10:tests:${head}`,
       objectId: '10',
@@ -357,7 +359,7 @@ describe('watch PR observation projection', () => {
   });
 
   it('passing, pending and unknown checks produce no actionable observation', () => {
-    for (const conclusion of ['success', 'neutral', 'skipped', 'cancelled', 'unknown', null]) {
+    for (const conclusion of ['success', 'neutral', 'skipped', 'unknown', null]) {
       expect(projection(project(watch(), check({ conclusion }))).pending).toEqual([]);
     }
     expect(
@@ -544,14 +546,18 @@ describe('watch PR observation projection', () => {
   });
 
   it.each([false, true])(
-    'retains ambiguity for same-time feedback deletion (delete first: %s)',
+    'keeps irreversible deletion for same-time feedback in either order (delete first: %s)',
     deleteFirst => {
       const active = feedback({ updatedAt: later });
       const removed = feedback({ action: 'deleted', updatedAt: later });
       const first = project(watch(), deleteFirst ? removed : active);
-      const uncertain = project(first, deleteFirst ? active : removed);
-      expect(projection(uncertain)).toMatchObject({ ambiguous: true, needsAttention: true });
-      expect(projection(uncertain).evidence).toEqual(projection(first).evidence);
+      const deleted = project(first, deleteFirst ? active : removed);
+      expect(projection(deleted)).toMatchObject({
+        ambiguous: false,
+        needsAttention: false,
+        pending: [],
+      });
+      expect(projection(deleted).evidence[0]).toMatchObject({ removed: true });
     }
   );
 
@@ -756,9 +762,14 @@ describe('watch PR observation projection', () => {
     }
   );
 
-  it('suppresses self feedback by immutable actor ID, not association', () => {
+  it('keeps reviewer bot feedback and suppresses only marked maintenance replies', () => {
     const current = watch();
-    expect(projectWatchPrEvent(current, feedback(), 1, ['99'])).toBe(current);
+    expect(projectWatchPrEvent(current, feedback(), 1, ['99'])).not.toBe(current);
+    expect(
+      projectWatchPrEvent(current, feedback({ body: 'Done <!-- kilo-pr-maintenance -->' }), 1, [
+        '99',
+      ])
+    ).toBe(current);
   });
 
   it('empty changes-requested reviews need human attention, not a fabricated fix', () => {

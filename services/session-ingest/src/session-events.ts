@@ -12,6 +12,9 @@ export type SessionEventDbRow = {
   updated_at: string | Date;
   title: string | null;
   created_on_platform: string | null;
+  chat_kind?: 'user' | 'maintenance';
+  maintenance_watch_id?: string | null;
+  maintenance_attempt_id?: string | null;
   organization_id: string | null;
   git_url: string | null;
   git_branch: string | null;
@@ -37,6 +40,13 @@ export function mapSessionEventRow(row: SessionEventDbRow): SessionEventV2Row {
     updatedAt: toIsoString(row.updated_at),
     title: row.title,
     createdOnPlatform: row.created_on_platform,
+    ...(row.chat_kind === undefined ? {} : { chatKind: row.chat_kind }),
+    ...(row.maintenance_watch_id === undefined
+      ? {}
+      : { maintenanceWatchId: row.maintenance_watch_id }),
+    ...(row.maintenance_attempt_id === undefined
+      ? {}
+      : { maintenanceAttemptId: row.maintenance_attempt_id }),
     organizationId: row.organization_id,
     gitUrl: row.git_url,
     gitBranch: row.git_branch,

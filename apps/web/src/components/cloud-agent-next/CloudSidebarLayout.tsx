@@ -33,6 +33,7 @@ import {
   deriveForegroundSessionStatus,
   groupSidebarWorkspaces,
   mergeWorktreeChatSessions,
+  SIDEBAR_RECONCILE_DELAY_MS,
   useSidebarSessions,
   type SidebarWorktreeDetails,
 } from './hooks/useSidebarSessions';
@@ -518,6 +519,10 @@ function CloudSidebarLayoutContent({
         : skipToken
     ),
     staleTime: 5000,
+    refetchInterval: query =>
+      query.state.data?.cliSessions.some(session => session.is_maintenance_pinned)
+        ? SIDEBAR_RECONCILE_DELAY_MS
+        : false,
   });
   const worktreeChats = useMemo(() => {
     if (!selectedWorktreeId) return [];

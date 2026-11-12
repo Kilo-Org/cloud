@@ -205,6 +205,7 @@ type SiblingAgentSelection = {
 };
 
 type SiblingCreateOptions = {
+  chat?: SessionMetadata['chat'];
   fingerprint: string;
   requestedKiloSessionId: string | undefined;
   /** Server-only deterministic destination for callback-created chats. */
@@ -427,7 +428,7 @@ function workspaceIdentityConflict(): TRPCError {
  * organization, placement) is derived from the workspace's roots; the caller
  * cannot override any of it.
  */
-async function loadWorkspaceSource(
+export async function loadWorkspaceSource(
   db: WorkerDb,
   ctx: TRPCContext,
   workspaceId: CloudAgentWorktreeId,
@@ -695,7 +696,7 @@ function allowsSubagentSessionsForWorktree(source: WorktreeSource): boolean {
   );
 }
 
-function sourceWorktreeBranchName(source: WorktreeSource): string {
+export function sourceWorktreeBranchName(source: WorktreeSource): string {
   return (
     source.workspace.branchName ??
     source.repository.upstreamBranch ??
@@ -709,7 +710,8 @@ function buildRegistrationInput(
   progress: OperationProgress,
   runtimeAuthorization: WorktreeRuntimeAuthorization,
   agentOverride?: SiblingAgentSelection,
-  continuation?: boolean
+  continuation?: boolean,
+  chat?: SessionMetadata['chat']
 ): Parameters<ReturnType<typeof getSandboxSessionStub>['registerSessionFromMetadata']>[0] {
   const repository = { ...source.repository };
   if ('token' in repository) delete repository.token;
@@ -740,6 +742,7 @@ function buildRegistrationInput(
     allowSubagentSessions:
       allowsSubagentSessionsForWorktree(source) && runtimeAuthorization !== undefined,
     identity: { ...source.metadata.identity, sessionId: progress.cloudAgentSessionId },
+    ...(chat ? { chat } : {}),
     auth: {
       ...source.metadata.auth,
       kiloSessionId: progress.kiloSessionId,
@@ -749,7 +752,11 @@ function buildRegistrationInput(
     repository,
     ...(source.metadata.profile ? { profile: source.metadata.profile } : {}),
     ...(source.metadata.environment ? { environment: source.metadata.environment } : {}),
-    ...(source.metadata.finalization ? { finalization: source.metadata.finalization } : {}),
+    ...(chat?.kind === 'maintenance'
+      ? { finalization: { autoCommit: false } }
+      : source.metadata.finalization
+        ? { finalization: source.metadata.finalization }
+        : {}),
     workspace,
     ...(continuation ? { continuation: true as const } : {}),
     lifecycle: { version: now, timestamp: now },
@@ -781,7 +788,8 @@ async function assertDestinationRuntimeAuthorizationActive(
 function assertRegisteredMetadata(
   rawMetadata: unknown,
   source: WorktreeSource,
-  progress: OperationProgress
+  progress: OperationProgress,
+  chat?: SessionMetadata['chat']
 ): void {
   const parsed = CurrentSessionMetadataSchema.safeParse(rawMetadata);
   if (!parsed.success) throw operationConflict();
@@ -794,6 +802,8 @@ function assertRegisteredMetadata(
     metadata.identity.orgId !== source.metadata.identity.orgId ||
     metadata.identity.createdOnPlatform !== source.metadata.identity.createdOnPlatform ||
     metadata.auth.kiloSessionId !== progress.kiloSessionId ||
+    JSON.stringify(metadata.chat ?? { kind: 'user' }) !==
+      JSON.stringify(chat ?? { kind: 'user' }) ||
     !workspace ||
     workspace.worktreeId !== source.worktreeId ||
     workspace.workspacePath !== source.workspace.workspacePath ||
@@ -855,7 +865,7 @@ async function createOwnershipRow(
   source: WorktreeSource,
   ctx: TRPCContext,
   progress: OperationProgress,
-  options: Pick<SiblingCreateOptions, 'clone' | 'title'>
+  options: Pick<SiblingCreateOptions, 'clone' | 'title' | 'chat'>
 ): Promise<void> {
   const startedAt = Date.now();
   const diagnostic = {
@@ -880,6 +890,18 @@ async function createOwnershipRow(
       },
       organizationId: source.ownership.organizationId ?? undefined,
       createdOnPlatform: source.ownership.createdOnPlatform,
+      ...(options.chat
+        ? {
+            chat:
+              options.chat.kind === 'maintenance'
+                ? {
+                    kind: 'maintenance' as const,
+                    watchId: options.chat.watchId,
+                    attemptId: options.chat.attemptId,
+                  }
+                : options.chat,
+          }
+        : {}),
       profileId: source.ownership.profileId ?? undefined,
       title: options.title ?? `New session - ${new Date().toISOString()}`,
       gitUrl: source.ownership.gitUrl ?? canonicalRepositoryUrl(source.repository),
@@ -1034,7 +1056,7 @@ async function registerWorktreeSession(
   source: WorktreeSource,
   ctx: TRPCContext,
   progress: OperationProgress,
-  options?: Pick<SiblingCreateOptions, 'agent' | 'initialTurn' | 'continuation' | 'clone'>,
+  options?: Pick<SiblingCreateOptions, 'agent' | 'initialTurn' | 'continuation' | 'clone' | 'chat'>,
   preissuedRuntimeAuthorization?: WorktreeRuntimeAuthorization
 ): Promise<void> {
   const startedAt = Date.now();
@@ -1068,7 +1090,7 @@ async function registerWorktreeSession(
         if (registrationAttempted) {
           const existing = await stub.getMetadata();
           if (existing) {
-            assertRegisteredMetadata(existing, source, progress);
+            assertRegisteredMetadata(existing, source, progress, options?.chat);
             await assertDestinationRuntimeAuthorizationActive(
               ctx,
               progress.cloudAgentSessionId,
@@ -1097,7 +1119,8 @@ async function registerWorktreeSession(
             progress,
             runtimeAuthorization,
             options?.agent,
-            options?.continuation
+            options?.continuation,
+            options?.chat
           ),
           initialCommands,
         });
@@ -1341,7 +1364,7 @@ async function reconcileWorktreeCreate(
   });
   if (existingMetadata) {
     try {
-      assertRegisteredMetadata(existingMetadata, source, progress);
+      assertRegisteredMetadata(existingMetadata, source, progress, options.chat);
     } catch (error) {
       logControlDiagnostic(
         'worktree_chat_result',

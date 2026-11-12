@@ -32,6 +32,11 @@ const mockCompleteSharedGitHubInstallationDelivery = jest.fn();
 const mockReleaseSharedGitHubInstallationDelivery = jest.fn();
 const mockMaterializeGitHubInstallationIdentity = jest.fn();
 const mockObserveWatchPrWebhook = jest.fn();
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  logExceptInTest: jest.fn(),
+  warnExceptInTest: jest.fn(),
+  errorExceptInTest: jest.fn(),
+}));
 const mockObservePrWebhook = jest.fn();
 
 jest.mock('@/lib/cloud-agent/watch-pr-webhook', () => ({
@@ -418,22 +423,30 @@ describe('handleGitHubWebhook', () => {
     expect(mockObserveWatchPrWebhook).toHaveBeenCalledWith(expect.objectContaining({ payload }));
   });
 
-  it('continues legacy handling when durable watch projection fails', async () => {
-    mockObserveWatchPrWebhook.mockRejectedValueOnce(new Error('projection database unavailable'));
-    const response = await handleGitHubWebhook(
-      signedGitHubRequest('pull_request', pullRequestPayload()),
-      'lite'
-    );
-    expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalled();
-    expect(mockLogWebhookEvent).toHaveBeenCalled();
-    expect(captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({
-        tags: expect.objectContaining({ source: 'github_lite_watch_pr_observation' }),
-      })
-    );
-  });
+  it.each(['standard', 'lite'] as const)(
+    'returns a retryable failure when durable watch projection fails for the %s app',
+    async appType => {
+      mockObserveWatchPrWebhook.mockRejectedValueOnce(new Error('projection database unavailable'));
+      const response = await handleGitHubWebhook(
+        signedGitHubRequest('pull_request', pullRequestPayload()),
+        appType
+      );
+      expect(response.status).toBe(503);
+      expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+      expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+      expect(captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            source:
+              appType === 'lite'
+                ? 'github_lite_watch_pr_observation'
+                : 'github_watch_pr_observation',
+          }),
+        })
+      );
+    }
+  );
 
   it('does not admit watch events before signature validation', async () => {
     mockVerifyGitHubWebhookSignature.mockReturnValue('invalid');

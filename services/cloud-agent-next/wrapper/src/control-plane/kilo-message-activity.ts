@@ -18,6 +18,7 @@ function messageActivity(sessionId: string, info: unknown): ActivityMessage | un
     sessionId,
     id: info.id,
     role: info.role,
+    ...(typeof info.parentID === 'string' ? { parentMessageId: info.parentID } : {}),
     ...(time && typeof time.created === 'number'
       ? {
           time: {

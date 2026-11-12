@@ -2,12 +2,14 @@ import 'server-only';
 
 import { Octokit } from '@octokit/rest';
 import { TRPCError } from '@trpc/server';
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, notInArray, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import {
   agent_environment_profiles,
   cli_sessions_v2,
   cloud_agent_pr_watch_activity,
+  cloud_agent_pr_maintenance_attempts,
+  cloud_agent_environments,
   cloud_agent_pr_watches,
   cloud_agent_worktrees,
   platform_integrations,
@@ -15,6 +17,10 @@ import {
   type CloudAgentPrWatch,
 } from '@kilocode/db/schema';
 import { watchPrPolicySchema } from '@kilocode/db/schema-types';
+import {
+  hasWatchPrAutomaticWriteConsent,
+  isLiveWatchPrAttempt,
+} from '@kilocode/db/cloud-agent-pr-maintenance';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
@@ -34,8 +40,38 @@ import {
 } from './watch-pr-events';
 import { replayWatchPrCiEvents } from './watch-pr-ci-inbox';
 import { readWorkspacePullRequest } from '@/lib/session-associated-pr';
+import { validateMaintenanceSettings } from './watch-pr-maintenance-authorization';
+import { assessAndScheduleWatchPr, stopWatchPrAttempts } from './watch-pr-maintenance';
+import { maintenanceWorkspace } from './watch-pr-maintenance-client';
+import { maintenanceHistoryEntry } from './watch-pr-maintenance-history';
+import { deriveWatchPrObservationExecutionStatus } from './watch-pr-observation';
+import {
+  expiredLegacyWatchCondition,
+  isLegacyWatchExpired,
+  unexpiredWatchConsentCondition,
+  watchPrConsentExpiry,
+} from './watch-pr-legacy-expiry';
 
 type WatchContext = Parameters<typeof ensureOrganizationAccess>[0];
+
+async function validateMaintenanceOptionSettings(
+  profileId: string | null,
+  environmentId: string | null
+) {
+  const profile = profileId
+    ? await db.query.agent_environment_profiles.findFirst({
+        where: eq(agent_environment_profiles.id, profileId),
+        columns: { id: true, name: true },
+      })
+    : null;
+  const environment = environmentId
+    ? await db.query.cloud_agent_environments.findFirst({
+        where: eq(cloud_agent_environments.id, environmentId),
+        columns: { id: true, name: true },
+      })
+    : null;
+  return { profile: profile ?? null, environment: environment ?? null };
+}
 
 export const watchPrQuerySchema = z.object({
   sessionId: z.string().min(1),
@@ -48,32 +84,52 @@ export const watchPrQuerySchema = z.object({
 export const watchPrEnableSchema = watchPrQuerySchema.extend({
   integrationId: z.string().uuid(),
   policy: watchPrPolicySchema,
-  expiresAt: z.string().datetime(),
+  expiresAt: z.string().datetime().optional(),
 });
 export const watchPrMutationSchema = z.object({
   watchId: z.string().uuid(),
   generation: z.number().int().positive(),
 });
 
-export const WATCH_PR_REPAIR_UNAVAILABLE_REASON =
-  'Automatic repairs are unavailable until worktree reservation and non-bypassable, revocable publication enforcement exist.';
-
 export function serializeWatchPr(watch: CloudAgentPrWatch) {
+  const automatic = hasWatchPrAutomaticWriteConsent(watchPrPolicySchema.parse(watch.policy));
+  const iso = (value: string | null) => (value ? new Date(value).toISOString() : null);
   return {
     ...watch,
+    execution_status: watch.status === 'watching' ? watch.execution_status : 'watching',
     policy: watchPrPolicySchema.parse(watch.policy),
     projection: watchPrProjectionSchema.parse(watch.projection),
-    expires_at: new Date(watch.expires_at).toISOString(),
+    expires_at: iso(watch.expires_at),
+    pending_since: iso(watch.pending_since),
+    next_run_at: iso(watch.next_run_at),
+    last_assessed_at: iso(watch.last_assessed_at),
+    finished_at: iso(watch.finished_at),
     last_event_at: watch.last_event_at ? new Date(watch.last_event_at).toISOString() : null,
     created_at: new Date(watch.created_at).toISOString(),
     updated_at: new Date(watch.updated_at).toISOString(),
-    mode: 'observation_only' as const,
-    automaticRepairsAvailable: false as const,
-    automaticRepairsUnavailableReason: WATCH_PR_REPAIR_UNAVAILABLE_REASON,
-    observationCoverage: 'future_events_only' as const,
+    mode: automatic ? ('automatic_maintenance' as const) : ('observation_only' as const),
+    automaticRepairsAvailable: automatic,
+    automaticRepairsUnavailableReason: automatic
+      ? null
+      : 'Enable automatic maintenance with explicit write consent',
+    observationCoverage: automatic
+      ? ('existing_and_future' as const)
+      : ('future_events_only' as const),
     hardSpendCapAvailable: false as const,
     manualRecheckAvailable: watch.status !== 'finished',
-    manualRecheckCoverage: 'pr_identity_and_lifecycle_only' as const,
+    manualRecheckCoverage: automatic
+      ? ('current_pr_state' as const)
+      : ('pr_identity_and_lifecycle_only' as const),
+    rateLimitRetryAt: ['rate_limited', 'throttled', 'low_budget'].includes(
+      watch.lifecycle_reason ?? ''
+    )
+      ? iso(watch.next_run_at)
+      : null,
+    rateLimitReason: ['rate_limited', 'throttled', 'low_budget'].includes(
+      watch.lifecycle_reason ?? ''
+    )
+      ? watch.lifecycle_reason
+      : null,
   };
 }
 
@@ -427,6 +483,17 @@ export async function getPrWatchOptions(
     if (!(error instanceof TRPCError) || error.code !== 'BAD_REQUEST') throw error;
     unavailableReason = error.message;
   }
+  const workspace =
+    unavailableReason === null
+      ? await maintenanceWorkspace({
+          userId: ctx.user.id,
+          organizationId: session.organization_id ?? undefined,
+          worktreeId: session.cloud_agent_worktree_id ?? '',
+        })
+      : null;
+  const executionSettings = workspace
+    ? await validateMaintenanceOptionSettings(workspace.profileId, workspace.environmentId)
+    : { profile: null, environment: null };
   return {
     enabled: true,
     canEnable: unavailableReason === null,
@@ -434,28 +501,25 @@ export async function getPrWatchOptions(
     integrationOptions,
     defaultIntegrationId:
       integrationOptions.length === 1 ? (integrationOptions[0]?.integrationId ?? null) : null,
-    defaults: { model: null, profileId: session.profile_id ?? null },
-    mode: 'observation_only' as const,
-    automaticRepairsAvailable: false as const,
-    automaticRepairsUnavailableReason: WATCH_PR_REPAIR_UNAVAILABLE_REASON,
-    observationCoverage: 'future_events_only' as const,
+    organizationId: session.organization_id,
+    defaults: {
+      model: workspace?.model ?? null,
+      variant: workspace?.variant ?? null,
+      profileId: workspace ? workspace.profileId : (session.profile_id ?? null),
+      environmentId: workspace?.environmentId ?? null,
+    },
+    executionSettings,
+    mode: 'automatic_maintenance' as const,
+    automaticRepairsAvailable: true as const,
+    automaticRepairsUnavailableReason: null,
+    observationCoverage: 'existing_and_future' as const,
     hardSpendCapAvailable: false as const,
-    manualRecheckCoverage: 'pr_identity_and_lifecycle_only' as const,
+    manualRecheckCoverage: 'current_pr_state' as const,
   };
 }
 
-export function assertWatchPrExpiry(expiresAt: string, now = Date.now()) {
-  const expiry = new Date(expiresAt).getTime();
-  if (!Number.isFinite(expiry) || expiry <= now || expiry > now + 24 * 60 * 60 * 1000) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Watch expiry must be in the next 24 hours',
-    });
-  }
-}
-
 export async function enableWatchPr(ctx: WatchContext, input: z.infer<typeof watchPrEnableSchema>) {
-  assertWatchPrExpiry(input.expiresAt);
+  const expiresAt = watchPrConsentExpiry(input.policy, input.expiresAt);
   const session = await ownedWatchSource(ctx, input.sessionId);
   assertExpectedPr(session, input);
   const { source, integration, appType, pr } = await verifySource(
@@ -464,8 +528,29 @@ export async function enableWatchPr(ctx: WatchContext, input: z.infer<typeof wat
     input.integrationId,
     input.policy.profileId
   );
+  if (hasWatchPrAutomaticWriteConsent(input.policy)) {
+    await validateMaintenanceSettings({
+      userId: ctx.user.id,
+      organizationId: session.organization_id,
+      repoUrl: source.repo.url,
+      policy: input.policy,
+    });
+    const workspace = await maintenanceWorkspace({
+      userId: ctx.user.id,
+      organizationId: session.organization_id ?? undefined,
+      worktreeId: source.worktreeId,
+    });
+    if (
+      workspace.profileId !== input.policy.profileId ||
+      workspace.environmentId !== input.policy.environmentId
+    ) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Maintenance must use the current workspace profile and environment',
+      });
+    }
+  }
   const watch = await db.transaction(async tx => {
-    assertWatchPrExpiry(input.expiresAt);
     const [currentWorktree] = await tx
       .select()
       .from(cloud_agent_worktrees)
@@ -490,7 +575,10 @@ export async function enableWatchPr(ctx: WatchContext, input: z.infer<typeof wat
       .update(cloud_agent_pr_watches)
       .set({
         status: 'finished',
-        lifecycle_reason: sql`CASE WHEN ${cloud_agent_pr_watches.expires_at} <= now() THEN 'expired' ELSE 'source_worktree_deleted' END`,
+        execution_status: 'watching',
+        lifecycle_reason: sql`CASE WHEN ${expiredLegacyWatchCondition} THEN 'expired' ELSE 'source_worktree_deleted' END`,
+        finished_at: new Date().toISOString(),
+        next_run_at: null,
         generation: sql`${cloud_agent_pr_watches.generation} + 1`,
         projection: sql`jsonb_set(jsonb_set(${cloud_agent_pr_watches.projection}, '{pending}', '[]'::jsonb), '{needsAttention}', 'false'::jsonb)`,
         updated_at: new Date().toISOString(),
@@ -499,8 +587,7 @@ export async function enableWatchPr(ctx: WatchContext, input: z.infer<typeof wat
         and(
           eq(cloud_agent_pr_watches.repository_id, String(pr.base.repo.id)),
           eq(cloud_agent_pr_watches.pr_number, pr.number),
-          sql`${cloud_agent_pr_watches.status} != 'finished' AND (
-            ${cloud_agent_pr_watches.expires_at} <= now() OR (
+          sql`${cloud_agent_pr_watches.status} != 'finished' AND (${expiredLegacyWatchCondition} OR (
               ${cloud_agent_pr_watches.kilo_user_id} = ${ctx.user.id}
               AND ${cloud_agent_pr_watches.organization_id} IS NOT DISTINCT FROM ${session.organization_id}
               AND NOT EXISTS (
@@ -510,8 +597,7 @@ export async function enableWatchPr(ctx: WatchContext, input: z.infer<typeof wat
                   AND ${cloud_agent_worktrees.organization_id} IS NOT DISTINCT FROM ${cloud_agent_pr_watches.organization_id}
                   AND ${cloud_agent_worktrees.deletion_started_at} IS NULL
               )
-            )
-          )`
+           ))`
         )
       )
       .returning();
@@ -543,7 +629,7 @@ export async function enableWatchPr(ctx: WatchContext, input: z.infer<typeof wat
         base_sha: pr.base.sha,
         policy: input.policy,
         projection: emptyWatchPrProjection(pr.updated_at),
-        expires_at: input.expiresAt,
+        expires_at: expiresAt,
       })
       .onConflictDoNothing()
       .returning();
@@ -556,11 +642,15 @@ export async function enableWatchPr(ctx: WatchContext, input: z.infer<typeof wat
       watch_id: created.id,
       generation: created.generation,
       kind: 'enabled',
-      reason: 'observation_only',
+      reason: hasWatchPrAutomaticWriteConsent(input.policy)
+        ? 'automatic_maintenance'
+        : 'observation_only',
     });
     return created;
   });
-  return serializeWatchPr(watch);
+  return serializeWatchPr(
+    hasWatchPrAutomaticWriteConsent(watch.policy) ? await assessAndScheduleWatchPr(watch) : watch
+  );
 }
 
 async function settleUnavailableWatch(watch: CloudAgentPrWatch) {
@@ -568,19 +658,21 @@ async function settleUnavailableWatch(watch: CloudAgentPrWatch) {
   const worktree = await db.query.cloud_agent_worktrees.findFirst({
     where: eq(cloud_agent_worktrees.worktree_id, watch.worktree_id),
   });
-  const reason =
-    new Date(watch.expires_at).getTime() <= Date.now()
-      ? 'expired'
-      : !worktree || worktree.deletion_started_at
-        ? 'source_worktree_deleted'
-        : null;
+  const reason = isLegacyWatchExpired(watch)
+    ? 'expired'
+    : !worktree || worktree.deletion_started_at
+      ? 'source_worktree_deleted'
+      : null;
   if (!reason) return watch;
   return db.transaction(async tx => {
     const [updated] = await tx
       .update(cloud_agent_pr_watches)
       .set({
         status: 'finished',
+        execution_status: 'watching',
         lifecycle_reason: reason,
+        finished_at: new Date().toISOString(),
+        next_run_at: null,
         generation: watch.generation + 1,
         projection: sql`jsonb_set(jsonb_set(${cloud_agent_pr_watches.projection}, '{pending}', '[]'::jsonb), '{needsAttention}', 'false'::jsonb)`,
         updated_at: new Date().toISOString(),
@@ -650,15 +742,81 @@ export async function getWatchPr(ctx: WatchContext, input: z.infer<typeof watchP
   }
   const settled = await settleUnavailableWatch(watch);
   const activity = await db
-    .select()
+    .select({
+      id: cloud_agent_pr_watch_activity.id,
+      watch_id: cloud_agent_pr_watch_activity.watch_id,
+      generation: cloud_agent_pr_watch_activity.generation,
+      kind: cloud_agent_pr_watch_activity.kind,
+      reason: cloud_agent_pr_watch_activity.reason,
+      created_at: cloud_agent_pr_watch_activity.created_at,
+    })
     .from(cloud_agent_pr_watch_activity)
-    .where(eq(cloud_agent_pr_watch_activity.watch_id, watch.id))
+    .where(
+      and(
+        eq(cloud_agent_pr_watch_activity.watch_id, watch.id),
+        notInArray(cloud_agent_pr_watch_activity.kind, ['reply', 'job_log', 'assessment_retry'])
+      )
+    )
     .orderBy(desc(cloud_agent_pr_watch_activity.created_at))
     .limit(50);
+  const attempts = await db.query.cloud_agent_pr_maintenance_attempts.findMany({
+    where: eq(cloud_agent_pr_maintenance_attempts.watch_id, watch.id),
+    orderBy: desc(cloud_agent_pr_maintenance_attempts.ordinal),
+    limit: 10,
+  });
+  const attemptSessionIds = attempts.flatMap(attempt =>
+    attempt.session_id ? [attempt.session_id] : []
+  );
+  const sessionCosts = attemptSessionIds.length
+    ? await db.query.cli_sessions_v2.findMany({
+        where: and(
+          eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+          inArray(cli_sessions_v2.session_id, attemptSessionIds)
+        ),
+        columns: { session_id: true, total_cost_microdollars: true },
+      })
+    : [];
+  const costs = new Map(sessionCosts.map(session => [session.session_id, session]));
+  const history = attempts.map(attempt =>
+    maintenanceHistoryEntry(
+      attempt,
+      attempt.session_id ? (costs.get(attempt.session_id) ?? null) : null
+    )
+  );
+  const active = attempts.find(attempt => isLiveWatchPrAttempt(attempt.status));
+  const { projection, ...summary } = serializeWatchPr(settled);
   return {
-    ...serializeWatchPr(settled),
+    ...summary,
+    observation: {
+      needsAttention: projection.needsAttention,
+      ambiguous: projection.ambiguous,
+      truncated: projection.truncated,
+      pendingCount: projection.pending.length,
+    },
+    execution_status:
+      settled.status !== 'watching'
+        ? 'watching'
+        : active?.status === 'needs_input'
+          ? 'needs_input'
+          : active
+            ? 'fixing'
+            : deriveWatchPrObservationExecutionStatus(settled),
+    history,
+    activeChat: active
+      ? {
+          attemptId: active.id,
+          sessionId: active.session_id,
+          cloudAgentSessionId: active.cloud_agent_session_id,
+          status: active.status,
+          chatAvailable: active.session_id !== null && costs.has(active.session_id),
+        }
+      : null,
     activity: activity.map(item => ({
-      ...item,
+      id: item.id,
+      watch_id: item.watch_id,
+      generation: item.generation,
+      kind: item.kind,
+      reason: item.reason,
       created_at: new Date(item.created_at).toISOString(),
     })),
   };
@@ -702,14 +860,17 @@ export async function changeWatchPr(
     canonicalRepoUrl = verified.source.repo.url;
   }
   const status = action === 'stop' ? 'finished' : action === 'pause' ? 'paused' : 'watching';
-  return db.transaction(async tx => {
+  const changed = await db.transaction(async tx => {
     const [updated] = await tx
       .update(cloud_agent_pr_watches)
       .set({
         status,
+        execution_status: 'watching',
         ...(canonicalRepoUrl ? { repo_url: canonicalRepoUrl } : {}),
         lifecycle_reason: action === 'resume' ? null : `user_${action}`,
         generation: watch.generation + 1,
+        next_run_at: action === 'resume' ? new Date().toISOString() : null,
+        finished_at: action === 'stop' ? new Date().toISOString() : null,
         ...(action === 'stop'
           ? {
               projection: sql`jsonb_set(jsonb_set(${cloud_agent_pr_watches.projection}, '{pending}', '[]'::jsonb), '{needsAttention}', 'false'::jsonb)`,
@@ -723,7 +884,7 @@ export async function changeWatchPr(
           eq(cloud_agent_pr_watches.kilo_user_id, ctx.user.id),
           eq(cloud_agent_pr_watches.generation, input.generation),
           eq(cloud_agent_pr_watches.status, watch.status),
-          sql`${cloud_agent_pr_watches.expires_at} > now()`
+          unexpiredWatchConsentCondition
         )
       )
       .returning();
@@ -735,8 +896,14 @@ export async function changeWatchPr(
       kind: action,
       reason: updated.lifecycle_reason,
     });
-    return serializeWatchPr(updated);
+    return updated;
   });
+  if (action !== 'resume') await stopWatchPrAttempts(changed);
+  return serializeWatchPr(
+    action === 'resume' && hasWatchPrAutomaticWriteConsent(changed.policy)
+      ? await assessAndScheduleWatchPr(changed, 'recheck')
+      : changed
+  );
 }
 
 export async function recheckWatchPr(
@@ -751,6 +918,8 @@ export async function recheckWatchPr(
       code: 'PRECONDITION_FAILED',
       message: 'Finished watches cannot be rechecked',
     });
+  if (hasWatchPrAutomaticWriteConsent(watch.policy))
+    return serializeWatchPr(await assessAndScheduleWatchPr(watch, 'recheck'));
   const session = await ownedWatchSourceFor(ctx, watch);
   if (
     session.cloud_agent_worktree_id !== watch.worktree_id ||
@@ -768,7 +937,7 @@ export async function recheckWatchPr(
           eq(cloud_agent_pr_watches.id, watch.id),
           eq(cloud_agent_pr_watches.kilo_user_id, ctx.user.id),
           eq(cloud_agent_pr_watches.generation, input.generation),
-          sql`${cloud_agent_pr_watches.expires_at} > now()`
+          unexpiredWatchConsentCondition
         )
       )
       .for('update');

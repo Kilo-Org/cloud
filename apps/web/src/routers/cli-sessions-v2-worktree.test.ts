@@ -6,6 +6,9 @@ import {
   cloud_agent_sessions,
   cloud_agent_session_runs,
   cloud_agent_worktrees,
+  cloud_agent_pr_watches,
+  cloud_agent_pr_maintenance_attempts,
+  platform_integrations,
   github_branch_pull_requests,
   organization_memberships,
   organizations,
@@ -15,6 +18,10 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
+import {
+  watchPrMaintenanceInputSchema,
+  watchPrMaintenancePolicySchema,
+} from '@kilocode/db/cloud-agent-pr-maintenance';
 import { TRPCClientError } from '@trpc/client';
 import type * as TrpcServerModule from '@trpc/server';
 import { and, eq, inArray, isNotNull, or } from 'drizzle-orm';
@@ -148,6 +155,9 @@ const ownershipRow = {
   cloud_agent_session_scope_id: null,
   cloud_agent_worktree_id: WORKTREE_ID,
   created_on_platform: 'cloud-agent-web',
+  chat_kind: 'user',
+  maintenance_watch_id: null,
+  maintenance_attempt_id: null,
   git_url: null,
   git_branch: null,
   platform: null,
@@ -825,6 +835,141 @@ describe('cliSessionsV2 latest run outcomes', () => {
 });
 
 describe('cliSessionsV2 worktreeDetails and persistent names', () => {
+  it('derives the maintenance pin from a live attempt, not the chat origin', async () => {
+    const policy = watchPrMaintenancePolicySchema.parse({
+      version: 2,
+      automaticWritesConsent: true,
+      historyRewriteConsent: true,
+      noHardSpendCapConsent: true,
+      model: 'test/model',
+      profileId: null,
+      environmentId: null,
+      categories: { reviews: true, failedChecks: true, conflicts: true },
+    });
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '101',
+      })
+      .returning();
+    if (!integration) throw new Error('Missing integration');
+    const [watch] = await db
+      .insert(cloud_agent_pr_watches)
+      .values({
+        kilo_user_id: user.id,
+        integration_id: integration.id,
+        installation_id: '101',
+        github_app_type: 'standard',
+        repository_id: crypto.randomUUID(),
+        repo_url: GIT_URL,
+        pr_number: 42,
+        source_session_id: SESSION_ID,
+        source_cloud_agent_session_id: WORKSPACE_ID,
+        worktree_id: WORKTREE_ID,
+        head_ref: BRANCH,
+        base_ref: 'main',
+        head_sha: 'a'.repeat(40),
+        base_sha: 'b'.repeat(40),
+        policy,
+        projection: {},
+      })
+      .returning();
+    if (!watch) throw new Error('Missing watch');
+    try {
+      const input = watchPrMaintenanceInputSchema.parse({
+        version: 1,
+        purpose: 'Fix merge conflicts',
+        constraints: [],
+        repository: {
+          repositoryId: watch.repository_id,
+          repoUrl: GIT_URL,
+          prNumber: 42,
+          headRef: BRANCH,
+          baseRef: 'main',
+          headSha: watch.head_sha,
+          baseSha: watch.base_sha,
+          parentCommitSha: null,
+        },
+        policy,
+        ordinal: 1,
+        problems: [
+          {
+            kind: 'conflict',
+            problemKey: 'conflict',
+            contentFingerprint: 'conflict-v1',
+            headSha: watch.head_sha,
+            baseSha: watch.base_sha,
+          },
+        ],
+        problemAttempts: [],
+        priorDispositions: [],
+        previousResults: [],
+        verificationCommands: [],
+        references: [],
+      });
+      const [attempt] = await db
+        .insert(cloud_agent_pr_maintenance_attempts)
+        .values({
+          watch_id: watch.id,
+          worktree_id: WORKTREE_ID,
+          generation: 1,
+          pending_revision: 0,
+          ordinal: 1,
+          creation_operation_key: crypto.randomUUID(),
+          message_id: `msg_${crypto.randomUUID()}`,
+          session_id: SESSION_ID,
+          cloud_agent_session_id: WORKSPACE_ID,
+          status: 'needs_input',
+          input,
+        })
+        .returning();
+      if (!attempt) throw new Error('Missing attempt');
+      await db
+        .update(cli_sessions_v2)
+        .set({
+          chat_kind: 'maintenance',
+          maintenance_watch_id: watch.id,
+          maintenance_attempt_id: attempt.id,
+          created_on_platform: 'cli',
+        })
+        .where(eq(cli_sessions_v2.session_id, SESSION_ID));
+      const caller = createCaller({ user });
+      expect(
+        (await caller.list({ organizationId: null, worktreeId: WORKTREE_ID })).cliSessions[0]
+      ).toMatchObject({ chat_kind: 'maintenance', is_maintenance_pinned: true });
+      expect(
+        (await caller.worktreeDetails({ worktreeIds: [WORKTREE_ID], organizationId: null }))
+          .worktrees[WORKTREE_ID].sessions[0]
+      ).toMatchObject({ chat_kind: 'maintenance', is_maintenance_pinned: true });
+      expect(await caller.get({ session_id: SESSION_ID })).toMatchObject({
+        chat_kind: 'maintenance',
+        is_maintenance_pinned: true,
+      });
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_session_id: null })
+        .where(eq(cli_sessions_v2.session_id, SESSION_ID));
+      expect(await caller.getWithRuntimeState({ session_id: SESSION_ID })).toMatchObject({
+        chat_kind: 'maintenance',
+        maintenance_watch_id: watch.id,
+        maintenance_attempt_id: attempt.id,
+        is_maintenance_pinned: true,
+      });
+      await db
+        .update(cloud_agent_pr_maintenance_attempts)
+        .set({ status: 'completed', finished_at: LATER_TIME })
+        .where(eq(cloud_agent_pr_maintenance_attempts.id, attempt.id));
+      expect(
+        (await caller.list({ organizationId: null, worktreeId: WORKTREE_ID })).cliSessions[0]
+      ).toMatchObject({ chat_kind: 'maintenance', is_maintenance_pinned: false });
+    } finally {
+      await db.delete(cloud_agent_pr_watches).where(eq(cloud_agent_pr_watches.id, watch.id));
+      await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
+    }
+  });
   it('returns defaults for existing worktrees without metadata and omits unknown or foreign groups', async () => {
     const foreignId = newWorktreeId();
     await insertSession({ kilo_user_id: OTHER_USER_ID, cloud_agent_worktree_id: foreignId });
@@ -851,6 +996,10 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
               sessionId: SESSION_ID,
               sessionStatus: null,
               sessionStatusUpdatedAt: null,
+              chat_kind: 'user',
+              maintenance_watch_id: null,
+              maintenance_attempt_id: null,
+              is_maintenance_pinned: false,
               latest_run_status: null,
               latest_run_failure_kind: null,
               latest_run_terminal_at: null,
@@ -890,6 +1039,10 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
           sessionId: SESSION_ID,
           sessionStatus: null,
           sessionStatusUpdatedAt: null,
+          chat_kind: 'user',
+          maintenance_watch_id: null,
+          maintenance_attempt_id: null,
+          is_maintenance_pinned: false,
           latest_run_status: null,
           latest_run_failure_kind: null,
           latest_run_terminal_at: null,
@@ -899,6 +1052,10 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
           sessionId: sibling.session_id,
           sessionStatus: 'busy',
           sessionStatusUpdatedAt: '2026-04-29T01:16:12.945Z',
+          chat_kind: 'user',
+          maintenance_watch_id: null,
+          maintenance_attempt_id: null,
+          is_maintenance_pinned: false,
           latest_run_status: null,
           latest_run_failure_kind: null,
           latest_run_terminal_at: null,
@@ -911,6 +1068,10 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
         sessionId: otherWorktreeSession.session_id,
         sessionStatus: 'retry',
         sessionStatusUpdatedAt: null,
+        chat_kind: 'user',
+        maintenance_watch_id: null,
+        maintenance_attempt_id: null,
+        is_maintenance_pinned: false,
         latest_run_status: null,
         latest_run_failure_kind: null,
         latest_run_terminal_at: null,
@@ -970,6 +1131,10 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
       sessionId: SESSION_ID,
       sessionStatus: 'question',
       sessionStatusUpdatedAt: '2020-01-01T00:00:00.000Z',
+      chat_kind: 'user',
+      maintenance_watch_id: null,
+      maintenance_attempt_id: null,
+      is_maintenance_pinned: false,
       latest_run_status: null,
       latest_run_failure_kind: null,
       latest_run_terminal_at: null,
@@ -1263,6 +1428,10 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
             sessionId: SESSION_ID,
             sessionStatus: null,
             sessionStatusUpdatedAt: null,
+            chat_kind: 'user',
+            maintenance_watch_id: null,
+            maintenance_attempt_id: null,
+            is_maintenance_pinned: false,
             latest_run_status: null,
             latest_run_failure_kind: null,
             latest_run_terminal_at: null,
@@ -1532,6 +1701,10 @@ describe('cliSessionsV2 worktree PR projection', () => {
         'parent_session_id',
         'organization_id',
         'created_on_platform',
+        'chat_kind',
+        'maintenance_watch_id',
+        'maintenance_attempt_id',
+        'is_maintenance_pinned',
         'git_url',
         'git_branch',
         'status',

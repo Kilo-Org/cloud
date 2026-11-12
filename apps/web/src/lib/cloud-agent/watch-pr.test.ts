@@ -10,7 +10,6 @@ import {
   GitHubRuntimeAuthorizationError,
 } from '@/lib/integrations/github/runtime-authorization';
 import {
-  assertWatchPrExpiry,
   assertWatchPrSource,
   changeWatchPr,
   enableWatchPr,
@@ -23,16 +22,19 @@ import {
 } from './watch-pr';
 import { emptyWatchPrProjection } from './watch-pr-events';
 import { replayWatchPrCiEvents } from './watch-pr-ci-inbox';
+import { isLegacyWatchExpired, watchPrConsentExpiry } from './watch-pr-legacy-expiry';
 import { readWorkspacePullRequest } from '@/lib/session-associated-pr';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     query: {
-      cli_sessions_v2: { findFirst: jest.fn() },
+      cli_sessions_v2: { findFirst: jest.fn(), findMany: jest.fn(async () => []) },
       cloud_agent_pr_watches: { findFirst: jest.fn() },
       cloud_agent_worktrees: { findFirst: jest.fn() },
       platform_integrations: { findFirst: jest.fn(), findMany: jest.fn() },
       agent_environment_profiles: { findFirst: jest.fn() },
+      cloud_agent_environments: { findFirst: jest.fn() },
+      cloud_agent_pr_maintenance_attempts: { findMany: jest.fn(async () => []) },
     },
     transaction: jest.fn(),
     select: jest.fn(),
@@ -55,6 +57,16 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
 }));
 jest.mock('./watch-pr-ci-inbox', () => ({
   replayWatchPrCiEvents: jest.fn(async (_tx, _watch, next) => next),
+}));
+jest.mock('./watch-pr-maintenance', () => ({
+  assessAndScheduleWatchPr: jest.fn(async watch => watch),
+  stopWatchPrAttempts: jest.fn(async () => undefined),
+}));
+jest.mock('./watch-pr-maintenance-authorization', () => ({
+  validateMaintenanceSettings: jest.fn(),
+}));
+jest.mock('./watch-pr-maintenance-client', () => ({
+  maintenanceWorkspace: jest.fn(async () => ({ profileId: null, environmentId: null })),
 }));
 
 const ctx = { user: { id: 'oauth/github|watch-owner' } } as Parameters<typeof enableWatchPr>[0];
@@ -195,6 +207,24 @@ describe('watch consent and source boundaries', () => {
       hardSpendCapAvailable: false,
     });
   });
+  it('normalizes maintenance scheduling timestamps and nullable compatibility expiry', () => {
+    expect(
+      serializeWatchPr({
+        ...watch,
+        expires_at: null,
+        pending_since: '2026-10-14 01:16:12.945+00',
+        next_run_at: '2026-10-14 01:17:12.945+00',
+        last_assessed_at: '2026-10-14 01:15:12.945+00',
+        finished_at: null,
+      })
+    ).toMatchObject({
+      expires_at: null,
+      pending_since: '2026-10-14T01:16:12.945Z',
+      next_run_at: '2026-10-14T01:17:12.945Z',
+      last_assessed_at: '2026-10-14T01:15:12.945Z',
+      finished_at: null,
+    });
+  });
   it.each([
     { cloud_agent_worktree_id: null },
     { cloud_agent_session_id: 'agent_legacy' },
@@ -223,11 +253,15 @@ describe('watch consent and source boundaries', () => {
   ])('rejects missing or excessive consent %j', override => {
     expect(watchPrPolicySchema.safeParse({ ...policy, ...override }).success).toBe(false);
   });
-  it('requires future bounded expiry', () => {
-    const now = Date.now();
-    expect(() => assertWatchPrExpiry(new Date(now).toISOString(), now)).toThrow();
-    expect(() => assertWatchPrExpiry(new Date(now + 86400001).toISOString(), now)).toThrow();
-    expect(() => assertWatchPrExpiry(new Date(now + 3600000).toISOString(), now)).not.toThrow();
+  it('preserves bounded legacy consent without upgrading it', () => {
+    expect(watchPrEnableSchema.safeParse({ ...input, expiresAt: undefined }).success).toBe(true);
+    expect(() => watchPrConsentExpiry(policy)).toThrow('expire within the next 24 hours');
+    expect(watchPrConsentExpiry(policy, input.expiresAt)).toBe(input.expiresAt);
+    expect(isLegacyWatchExpired({ ...watch, expires_at: '2020-01-01T00:00:00Z' })).toBe(true);
+    expect(serializeWatchPr({ ...watch, expires_at: null })).toMatchObject({
+      expires_at: null,
+      mode: 'observation_only',
+    });
   });
 });
 
@@ -1024,6 +1058,45 @@ describe('watch lifecycle authorization', () => {
       activity: [],
     });
     expect(prGet).not.toHaveBeenCalled();
+  });
+  it('returns compact observation/activity state and clears stale no-live execution labels', async () => {
+    jest
+      .mocked(db.query.cloud_agent_pr_watches.findFirst)
+      .mockResolvedValue({ ...watch, execution_status: 'fixing' });
+    const where = jest.fn().mockReturnValue({
+      orderBy: () => ({
+        limit: () =>
+          Promise.resolve([
+            {
+              id: 'activity-1',
+              watch_id: watch.id,
+              generation: 1,
+              kind: 'repair_completed',
+              reason: null,
+              data: { privateLog: 'PRIVATE_LOG' },
+              created_at: watch.created_at,
+            },
+          ]),
+      }),
+    });
+    jest.mocked(db.select).mockReturnValue({ from: () => ({ where }) } as never);
+    const result = await getWatchPr(ctx, queryInput);
+    expect(result).toMatchObject({
+      execution_status: 'watching',
+      observation: { pendingCount: 0 },
+      history: [],
+    });
+    expect(result).not.toHaveProperty('projection');
+    expect(result).not.toHaveProperty('attempts');
+    expect(result?.activity).toHaveLength(1);
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_LOG');
+    expect(new PgDialect().sqlToQuery(where.mock.calls[0][0]).params).toEqual([
+      watch.id,
+      'reply',
+      'job_log',
+      'assessment_retry',
+    ]);
+    expect(jest.mocked(db.select).mock.calls[0][0]).not.toHaveProperty('data');
   });
 });
 

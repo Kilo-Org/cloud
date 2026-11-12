@@ -2,6 +2,7 @@ import 'server-only';
 
 import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
+import { prMaintenanceFeedbackCommentSchema as maintenanceCommentSchema } from './pr-maintenance-feedback';
 import {
   generateGitHubInstallationToken,
   toGitHubRateLimitError,
@@ -19,6 +20,12 @@ import {
   type PrObservationEvent,
   type PrObservations,
 } from './pr-observations';
+import {
+  claimPrMaintenanceCall,
+  PrMaintenanceDeferredError,
+  recordPrMaintenanceApiCall,
+  type PrMaintenanceScope,
+} from './pr-refresh-budget';
 
 const REQUEST_TIMEOUT_MS = 10_000;
 const PAGE_SIZE = 100;
@@ -51,6 +58,7 @@ export type FetchPullRequestObservationsInput = {
   existing: unknown;
   /** Shared deadline for every GitHub request this refresh makes. */
   signal?: AbortSignal;
+  maintenanceReason?: 'enable' | 'recheck';
 };
 
 export type ReviewDecision = 'approved' | 'changes_requested' | 'review_required' | null;
@@ -59,6 +67,22 @@ export type FetchPullRequestObservationsResult = {
   observations: PrObservations;
   reviewDecision: ReviewDecision;
   reviewDecisionFetched: boolean;
+  maintenance?: PrMaintenanceSnapshot;
+  maintenanceCheckDetails?: Array<{ id: string; detailsUrl: string | null; name: string }>;
+  maintenanceCheckRuns?: CheckRunLike[];
+};
+
+export type PrMaintenanceFeedback = z.infer<typeof maintenanceCommentSchema> & {
+  source: 'review_comment' | 'review' | 'conversation_comment';
+  threadId: string | null;
+  resolved: boolean;
+  rootId?: string | null;
+};
+export type PrMaintenanceSnapshot = {
+  feedback: PrMaintenanceFeedback[];
+  files: string[];
+  filesComplete: boolean;
+  complete: boolean;
 };
 
 type CheckRunLike = {
@@ -71,6 +95,8 @@ type CheckRunLike = {
   conclusion?: string | null;
   started_at?: string | null;
   completed_at?: string | null;
+  details_url?: string | null;
+  check_suite?: { id: number | string } | null;
 };
 
 type CommitStatusLike = {
@@ -91,33 +117,38 @@ type ReviewThreadRecord = {
   state: 'unresolved' | 'resolved';
 };
 
-type ReviewThreadPage = {
-  reviewDecision: string | null;
-  reviewThreads: {
-    nodes: Array<{
-      id: string;
-      isResolved: boolean;
-      comments: { nodes: Array<{ fullDatabaseId: string | null }> };
-    }>;
-    pageInfo: {
-      hasNextPage: boolean;
-      endCursor: string | null;
-    };
-  };
-};
-
 const id = z
   .union([z.string().max(20).regex(/^\d+$/), z.number().int().nonnegative()])
   .transform(String);
-const reviewThreadPageSchema: z.ZodType<ReviewThreadPage> = z.object({
+const reviewThreadPageSchema = z.object({
   reviewDecision: z.string().nullable(),
+  comments: z
+    .object({
+      nodes: z.array(maintenanceCommentSchema),
+      pageInfo: z.object({ hasPreviousPage: z.boolean() }),
+    })
+    .optional(),
+  reviews: z
+    .object({
+      nodes: z.array(maintenanceCommentSchema),
+      pageInfo: z.object({ hasPreviousPage: z.boolean() }),
+    })
+    .optional(),
+  files: z
+    .object({
+      nodes: z.array(z.object({ path: z.string(), changeType: z.string().optional() })),
+      pageInfo: z.object({ hasNextPage: z.boolean() }),
+    })
+    .nullable()
+    .optional(),
   reviewThreads: z.object({
     nodes: z.array(
       z.object({
         id: z.string().min(1).max(512),
         isResolved: z.boolean(),
         comments: z.object({
-          nodes: z.array(z.object({ fullDatabaseId: id.nullable() })),
+          nodes: z.array(z.object({ fullDatabaseId: id.nullable() }).passthrough()),
+          pageInfo: z.object({ hasNextPage: z.boolean() }).optional(),
         }),
       })
     ),
@@ -127,8 +158,12 @@ const reviewThreadPageSchema: z.ZodType<ReviewThreadPage> = z.object({
     }),
   }),
 });
+type ReviewThreadPage = z.infer<typeof reviewThreadPageSchema>;
 
 const reviewDataSchema = z.object({
+  rateLimit: z
+    .object({ cost: z.number(), limit: z.number(), remaining: z.number(), resetAt: z.string() })
+    .optional(),
   repository: z
     .object({
       pullRequest: reviewThreadPageSchema.nullable(),
@@ -142,17 +177,110 @@ const graphQlResponseSchema = z.object({
 });
 
 const REVIEW_THREADS_QUERY = /* GraphQL */ `
-  query PrObservationReviewThreads($owner: String!, $name: String!, $number: Int!, $after: String) {
+  query PrObservationReviewThreads(
+    $owner: String!
+    $name: String!
+    $number: Int!
+    $after: String
+    $includePrFeedback: Boolean!
+    $includeThreadFeedback: Boolean!
+    $threadCommentLimit: Int!
+  ) {
+    rateLimit {
+      cost
+      limit
+      remaining
+      resetAt
+    }
     repository(owner: $owner, name: $name) {
       pullRequest(number: $number) {
         reviewDecision
+        comments(last: 100) @include(if: $includePrFeedback) {
+          nodes {
+            fullDatabaseId
+            body
+            authorAssociation
+            author {
+              login
+              __typename
+              ... on User {
+                databaseId
+              }
+              ... on Bot {
+                databaseId
+              }
+            }
+            updatedAt
+            url
+          }
+          pageInfo {
+            hasPreviousPage
+          }
+        }
+        reviews(last: 100) @include(if: $includePrFeedback) {
+          nodes {
+            fullDatabaseId
+            body
+            authorAssociation
+            author {
+              login
+              __typename
+              ... on User {
+                databaseId
+              }
+              ... on Bot {
+                databaseId
+              }
+            }
+            updatedAt
+            url
+            state
+            commit {
+              oid
+            }
+          }
+          pageInfo {
+            hasPreviousPage
+          }
+        }
+        files(first: 100) @include(if: $includePrFeedback) {
+          nodes {
+            path
+            changeType
+          }
+          pageInfo {
+            hasNextPage
+          }
+        }
         reviewThreads(first: 100, after: $after) {
           nodes {
             id
             isResolved
-            comments(first: 1) {
+            comments(first: $threadCommentLimit) {
               nodes {
                 fullDatabaseId
+                ... @include(if: $includeThreadFeedback) {
+                  body
+                  authorAssociation
+                  author {
+                    login
+                    __typename
+                    ... on User {
+                      databaseId
+                    }
+                    ... on Bot {
+                      databaseId
+                    }
+                  }
+                  updatedAt
+                  url
+                  commit {
+                    oid
+                  }
+                }
+              }
+              pageInfo @include(if: $includeThreadFeedback) {
+                hasNextPage
               }
             }
           }
@@ -177,7 +305,18 @@ function linkHasNext(headers: unknown): boolean | null {
   return /rel="?next"?/i.test(link);
 }
 
-type RateLimitState = { error: GitHubRateLimitError | null };
+type RateLimitState = {
+  error: GitHubRateLimitError | null;
+  scope?: PrMaintenanceScope;
+  reason?: string;
+};
+
+async function beforeRequest(state: RateLimitState) {
+  if (state.error) throw state.error;
+  if (!state.scope) return;
+  const budget = await claimPrMaintenanceCall(state.scope);
+  if (!budget.allowed) throw new PrMaintenanceDeferredError(budget.reason, budget.retryAt);
+}
 
 /**
  * Record a rate limit for this invocation, keeping the latest deadline so the
@@ -193,7 +332,7 @@ function recordRateLimit(state: RateLimitState, error: unknown): GitHubRateLimit
   return rateError;
 }
 
-function isRateLimitGraphQlError(entry: unknown): boolean {
+export function isRateLimitGraphQlError(entry: unknown): boolean {
   if (!isRecord(entry)) return false;
   const codes: unknown[] = [entry.type];
   if (isRecord(entry.extensions)) codes.push(entry.extensions.code);
@@ -222,15 +361,29 @@ async function collectRestPages<T>(
   const items: T[] = [];
   for (let page = 1; page <= MAX_PAGES; page += 1) {
     // A sibling leg saw a rate limit: stop before starting another request.
-    if (state.error) throw state.error;
+    await beforeRequest(state);
     let response: { data: T[]; headers: unknown };
     try {
+      if (state.scope)
+        await recordPrMaintenanceApiCall({
+          ...state.scope,
+          endpoint: 'pr_refresh',
+          reason: state.reason ?? 'refresh',
+        });
       response = await fetchPage(page);
     } catch (error) {
       const rateError = recordRateLimit(state, error);
       throw rateError ?? error;
     }
     items.push(...response.data);
+    if (state.scope)
+      await recordPrMaintenanceApiCall({
+        ...state.scope,
+        endpoint: 'pr_refresh',
+        reason: state.reason ?? 'refresh',
+        headers: response.headers,
+        calls: 0,
+      });
     const hasNext = linkHasNext(response.headers) ?? response.data.length >= PAGE_SIZE;
     if (!hasNext) return { items, truncated: false };
     if (page === MAX_PAGES) return { items, truncated: true };
@@ -245,16 +398,24 @@ function normalizeReviewDecision(value: string | null): ReviewDecision {
   return null;
 }
 
+type ReviewQueryParams = { owner: string; repo: string; number: number; maintenance: boolean };
+
 async function fetchReviewPage(
   octokit: Octokit,
-  params: { owner: string; repo: string; number: number },
+  params: ReviewQueryParams,
   after: string | null,
   state: RateLimitState
 ): Promise<ReviewThreadPage> {
-  if (state.error) throw state.error;
+  await beforeRequest(state);
 
   let response: { data: unknown; headers: unknown };
   try {
+    if (state.scope)
+      await recordPrMaintenanceApiCall({
+        ...state.scope,
+        endpoint: 'pr_refresh',
+        reason: state.reason ?? 'refresh',
+      });
     response = await octokit.request('POST /graphql', {
       query: REVIEW_THREADS_QUERY,
       variables: {
@@ -262,6 +423,9 @@ async function fetchReviewPage(
         name: params.repo,
         number: params.number,
         after,
+        includePrFeedback: params.maintenance && after === null,
+        includeThreadFeedback: params.maintenance,
+        threadCommentLimit: params.maintenance ? 10 : 1,
       },
     });
   } catch (error) {
@@ -285,6 +449,16 @@ async function fetchReviewPage(
   }
 
   const parsed = reviewDataSchema.safeParse(body.data.data);
+  if (state.scope)
+    await recordPrMaintenanceApiCall({
+      ...state.scope,
+      endpoint: 'pr_refresh',
+      reason: state.reason ?? 'refresh',
+      headers: response.headers,
+      calls: 0,
+      graphqlCost: parsed.success ? parsed.data.rateLimit?.cost : undefined,
+      graphqlBudget: parsed.success ? parsed.data.rateLimit : undefined,
+    });
   const pullRequest = parsed.success ? parsed.data.repository?.pullRequest : null;
   if (!pullRequest) {
     throw new Error('GitHub did not return pull request review data');
@@ -294,38 +468,113 @@ async function fetchReviewPage(
 
 async function readReviews(
   octokit: Octokit,
-  params: { owner: string; repo: string; number: number },
+  params: ReviewQueryParams,
   state: RateLimitState
-): Promise<{ reviewDecision: ReviewDecision; threads: ReviewThreadRecord[]; truncated: boolean }> {
+): Promise<{
+  reviewDecision: ReviewDecision;
+  threads: ReviewThreadRecord[];
+  truncated: boolean;
+  maintenance: PrMaintenanceSnapshot;
+}> {
   let after: string | null = null;
   let reviewDecision: ReviewDecision = null;
   const threads: ReviewThreadRecord[] = [];
+  const maintenance: PrMaintenanceSnapshot = {
+    feedback: [],
+    files: [],
+    filesComplete: false,
+    complete: true,
+  };
 
   for (let pageIndex = 1; pageIndex <= MAX_PAGES; pageIndex += 1) {
     const page = await fetchReviewPage(octokit, params, after, state);
     if (pageIndex === 1) reviewDecision = normalizeReviewDecision(page.reviewDecision);
+    if (pageIndex === 1) {
+      maintenance.files = page.files?.nodes.map(file => file.path) ?? [];
+      maintenance.filesComplete = Boolean(
+        page.files &&
+        !page.files.pageInfo.hasNextPage &&
+        !page.files.nodes.some(file => file.changeType === 'RENAMED')
+      );
+      maintenance.complete = Boolean(
+        page.comments &&
+        page.reviews &&
+        !page.comments.pageInfo.hasPreviousPage &&
+        !page.reviews.pageInfo.hasPreviousPage
+      );
+      for (const comment of page.comments?.nodes ?? [])
+        maintenance.feedback.push({
+          ...comment,
+          source: 'conversation_comment',
+          threadId: null,
+          resolved: false,
+        });
+      for (const review of page.reviews?.nodes ?? [])
+        maintenance.feedback.push({ ...review, source: 'review', threadId: null, resolved: false });
+    }
     for (const node of page.reviewThreads.nodes) {
       if (threads.length >= PR_OBSERVATION_LIMIT) {
-        return { reviewDecision, threads, truncated: true };
+        return {
+          reviewDecision,
+          threads,
+          truncated: true,
+          maintenance: { ...maintenance, complete: false },
+        };
       }
       threads.push({
         rootId: node.comments.nodes[0]?.fullDatabaseId ?? null,
         threadId: node.id,
         state: node.isResolved ? 'resolved' : 'unresolved',
       });
+      if (
+        !node.comments.pageInfo ||
+        node.comments.pageInfo.hasNextPage ||
+        !node.comments.nodes.length
+      ) {
+        maintenance.complete = false;
+        continue;
+      }
+      for (const comment of node.comments.nodes) {
+        const parsed = maintenanceCommentSchema.safeParse(comment);
+        if (parsed.success)
+          maintenance.feedback.push({
+            ...parsed.data,
+            source: 'review_comment',
+            threadId: node.id,
+            resolved: node.isResolved,
+            rootId: node.comments.nodes[0]?.fullDatabaseId ?? null,
+          });
+        else maintenance.complete = false;
+      }
     }
     if (!page.reviewThreads.pageInfo.hasNextPage) {
-      return { reviewDecision, threads, truncated: false };
+      return { reviewDecision, threads, truncated: false, maintenance };
     }
     if (threads.length >= PR_OBSERVATION_LIMIT) {
-      return { reviewDecision, threads, truncated: true };
+      return {
+        reviewDecision,
+        threads,
+        truncated: true,
+        maintenance: { ...maintenance, complete: false },
+      };
     }
     const endCursor = page.reviewThreads.pageInfo.endCursor;
     if (!endCursor) throw new Error('GitHub did not return a review thread cursor');
-    if (pageIndex === MAX_PAGES) return { reviewDecision, threads, truncated: true };
+    if (pageIndex === MAX_PAGES)
+      return {
+        reviewDecision,
+        threads,
+        truncated: true,
+        maintenance: { ...maintenance, complete: false },
+      };
     after = endCursor;
   }
-  return { reviewDecision, threads, truncated: true };
+  return {
+    reviewDecision,
+    threads,
+    truncated: true,
+    maintenance: { ...maintenance, complete: false },
+  };
 }
 
 type CheckEvent = Extract<PrObservationEvent, { kind: 'check' }>;
@@ -405,7 +654,15 @@ function seedMergeability(
 export async function fetchPullRequestObservations(
   input: FetchPullRequestObservationsInput
 ): Promise<FetchPullRequestObservationsResult> {
-  const rateLimitState: RateLimitState = { error: null };
+  const rateLimitState: RateLimitState = {
+    error: null,
+    ...(input.maintenanceReason
+      ? {
+          scope: { appType: input.appType, installationId: input.installationId },
+          reason: input.maintenanceReason,
+        }
+      : {}),
+  };
   const signal = input.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS);
 
   let token: Awaited<ReturnType<typeof generateGitHubInstallationToken>>;
@@ -475,12 +732,20 @@ export async function fetchPullRequestObservations(
       });
       return { data: response.data.statuses, headers: response.headers };
     }),
-    readReviews(octokit, { owner, repo, number }, rateLimitState),
+    readReviews(
+      octokit,
+      { owner, repo, number, maintenance: Boolean(input.maintenanceReason) },
+      rateLimitState
+    ),
   ]);
 
   // A rate limit is an operational signal for the whole refresh, not partial
   // data. Propagate it before building or persisting any fresh observations.
   if (rateLimitState.error) throw rateLimitState.error;
+  for (const result of [checkRunsResult, statusesResult, reviewsResult]) {
+    if (result.status === 'rejected' && result.reason instanceof PrMaintenanceDeferredError)
+      throw result.reason;
+  }
 
   const checkRunsPage = checkRunsResult.status === 'fulfilled' ? checkRunsResult.value : null;
   const statusesPage = statusesResult.status === 'fulfilled' ? statusesResult.value : null;
@@ -551,5 +816,12 @@ export async function fetchPullRequestObservations(
     observations: prObservationsSchema.parse(working),
     reviewDecision: reviews?.reviewDecision ?? null,
     reviewDecisionFetched: reviewsResult.status === 'fulfilled',
+    maintenance: reviews?.maintenance,
+    maintenanceCheckDetails: checkRunsPage?.items.flatMap(run =>
+      run.id != null
+        ? [{ id: String(run.id), detailsUrl: run.details_url ?? null, name: run.name ?? 'Check' }]
+        : []
+    ),
+    maintenanceCheckRuns: checkRunsPage?.items,
   };
 }

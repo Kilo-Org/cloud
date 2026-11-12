@@ -346,6 +346,464 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 worker RPC surface', () => {
+  it('preserves published repair state through cold answers and unstructured discussion without trusting later dirty work', async () => {
+    const { stub, peer, sessionId, sessionMetadata, sandboxSelection } =
+      await setupGeneratedTitleSession();
+    const attemptId = crypto.randomUUID();
+    sessionMetadata.chat = {
+      kind: 'maintenance',
+      watchId: crypto.randomUUID(),
+      attemptId,
+      publication: {
+        repoUrl: 'https://github.com/acme/widgets',
+        headRef: 'kilo/test-branch',
+        baseRef: 'main',
+        observedHeadSha: 'a'.repeat(40),
+        baseSha: 'b'.repeat(40),
+      },
+    };
+    const first = messageId();
+    peer.prepareView = peer.view('ready');
+    await stub.createSessionWithInitialAdmission({
+      metadata: sessionMetadata,
+      sandboxSelection,
+      message: promptPayload(first),
+    });
+    const publication = {
+      status: 'published' as const,
+      source: 'git' as const,
+      repoUrl: 'https://github.com/acme/widgets',
+      headRef: 'kilo/test-branch',
+      observedHeadSha: 'a'.repeat(40),
+      pushedHeadSha: 'c'.repeat(40),
+      remoteHeadSha: 'c'.repeat(40),
+      baseSha: 'b'.repeat(40),
+      exactLease: `refs/heads/kilo/test-branch:${'a'.repeat(40)}`,
+      pushExitCode: 0 as const,
+      verifiedAt: new Date().toISOString(),
+    };
+    const workspace = {
+      status: 'observed' as const,
+      source: 'git' as const,
+      headSha: publication.pushedHeadSha,
+      remoteHeadSha: publication.remoteHeadSha,
+      dirty: false,
+      verifiedAt: new Date().toISOString(),
+    };
+    const result = {
+      version: 1 as const,
+      summary: 'Published the repair.',
+      changedFiles: ['repair.txt'],
+      verification: [],
+      publication,
+      problems: [],
+      needsInput: 'Choose the next action.',
+    };
+    await stub.onOutcome({
+      sessionId,
+      status: 'completed',
+      lastMessageId: first,
+      maintenance: { attemptId, messageId: first, publication, result, workspace },
+    });
+    await stub.onRoute({ state: 'lost', attemptId: peer.attemptId, reason: 'sandbox_stopped' });
+    await evictAllDurableObjects();
+    await runInDurableObject(stub, instance => {
+      instance.sandboxPeerFor = () => peer;
+    });
+    const answer = messageId();
+    await stub.send(promptPayload(answer, 'Keep the published repair.'));
+    await stub.onOutcome({
+      sessionId,
+      status: 'completed',
+      lastMessageId: answer,
+      maintenance: {
+        attemptId,
+        messageId: answer,
+        publication: { status: 'not_attempted', reason: 'No new push.' },
+        result: { ...result, needsInput: null },
+        workspace: { ...workspace, verifiedAt: new Date().toISOString() },
+      },
+    });
+    expect(await stub.getMaintenanceStatus(first)).toMatchObject({
+      result: { needsInput: null },
+      publication,
+      resultMessageId: answer,
+      publicationMessageId: first,
+    });
+    const discussion = messageId();
+    await stub.send(promptPayload(discussion, 'Explain the fix.'));
+    await stub.onOutcome({
+      sessionId,
+      status: 'completed',
+      lastMessageId: discussion,
+      maintenance: {
+        attemptId,
+        messageId: discussion,
+        publication: { status: 'not_attempted', reason: 'Discussion only.' },
+        result: null,
+        workspace: { ...workspace, verifiedAt: new Date().toISOString() },
+      },
+    });
+    await evictAllDurableObjects();
+    expect(await stub.getMaintenanceStatus(first)).toMatchObject({
+      result: { summary: result.summary },
+      resultMessageId: answer,
+      publicationMessageId: first,
+      publication,
+    });
+    await runInDurableObject(stub, instance => {
+      instance.sandboxPeerFor = () => peer;
+    });
+    const newWork = messageId();
+    await stub.send(promptPayload(newWork, 'Make another change.'));
+    await stub.onOutcome({
+      sessionId,
+      status: 'completed',
+      lastMessageId: newWork,
+      maintenance: {
+        attemptId,
+        messageId: newWork,
+        publication: { status: 'not_attempted', reason: 'Not published.' },
+        result: null,
+        workspace: { ...workspace, dirty: true, verifiedAt: new Date().toISOString() },
+      },
+    });
+    expect(await stub.getMaintenanceStatus(first)).toMatchObject({
+      result: { summary: result.summary },
+      publication: { status: 'unknown' },
+      lastPublished: { messageId: first, publication },
+    });
+  });
+  it('persists Stop before registration and rejects the original slow creation after eviction', async () => {
+    const { stub, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();
+    const identity = {
+      watchId: crypto.randomUUID(),
+      attemptId: crypto.randomUUID(),
+      messageId: messageId(),
+    };
+    sessionMetadata.chat = {
+      kind: 'maintenance',
+      watchId: identity.watchId,
+      attemptId: identity.attemptId,
+      publication: {
+        repoUrl: 'https://github.com/acme/widgets',
+        headRef: 'kilo/test-branch',
+        baseRef: 'main',
+        observedHeadSha: 'a'.repeat(40),
+        baseSha: 'b'.repeat(40),
+      },
+    };
+    expect(await stub.stopMaintenanceBeforeRegistration(identity)).toEqual({ stopped: true });
+    await evictAllDurableObjects();
+    expect(
+      await stub.registerSessionFromMetadata({ metadata: sessionMetadata, sandboxSelection })
+    ).toMatchObject({ success: false, error: 'maintenance_attempt_stopped' });
+    expect(await stub.getMetadata()).toBeNull();
+    expect(await stub.getMessageResult(identity.messageId)).toEqual({ type: 'session-not-found' });
+  });
+
+  it('refuses the initial maintenance message when Stop follows registration but precedes send', async () => {
+    const { stub, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();
+    const identity = {
+      watchId: crypto.randomUUID(),
+      attemptId: crypto.randomUUID(),
+      messageId: messageId(),
+    };
+    sessionMetadata.chat = {
+      kind: 'maintenance',
+      watchId: identity.watchId,
+      attemptId: identity.attemptId,
+      publication: {
+        repoUrl: 'https://github.com/acme/widgets',
+        headRef: 'kilo/test-branch',
+        baseRef: 'main',
+        observedHeadSha: 'a'.repeat(40),
+        baseSha: 'b'.repeat(40),
+      },
+    };
+    expect(
+      await stub.registerSessionFromMetadata({ metadata: sessionMetadata, sandboxSelection })
+    ).toMatchObject({ success: true });
+    await stub.stopMaintenanceBeforeRegistration(identity);
+    expect(await stub.send(promptPayload(identity.messageId))).toEqual({
+      type: 'maintenance-stopped',
+    });
+    expect(await stub.getMessageResult(identity.messageId)).toEqual({ type: 'message-not-found' });
+  });
+
+  it('settles a maintenance outcome even when its evidence write fails', async () => {
+    const { stub, peer, sessionId, sessionMetadata, sandboxSelection } =
+      await setupGeneratedTitleSession();
+    const attemptId = crypto.randomUUID();
+    sessionMetadata.chat = {
+      kind: 'maintenance',
+      watchId: crypto.randomUUID(),
+      attemptId,
+      publication: {
+        repoUrl: 'https://github.com/acme/widgets',
+        headRef: 'kilo/test-branch',
+        baseRef: 'main',
+        observedHeadSha: 'a'.repeat(40),
+        baseSha: 'b'.repeat(40),
+      },
+    };
+    const first = messageId();
+    peer.prepareView = peer.view('ready');
+    await stub.createSessionWithInitialAdmission({
+      metadata: sessionMetadata,
+      sandboxSelection,
+      message: promptPayload(first),
+    });
+    await runInDurableObject(stub, async (instance, state) => {
+      const put = state.storage.put.bind(state.storage);
+      const storageWrite = vi.spyOn(state.storage, 'put').mockImplementation((...args) => {
+        const [key] = args;
+        if (
+          typeof key === 'object' &&
+          Object.keys(key).some(name => name.startsWith('pr-maintenance/outcome/'))
+        )
+          return Promise.reject(new RangeError('Synthetic evidence storage limit'));
+        return put(...args);
+      });
+      try {
+        await expect(
+          instance.onOutcome({
+            sessionId,
+            status: 'completed',
+            lastMessageId: first,
+            maintenance: {
+              attemptId,
+              messageId: first,
+              result: null,
+              publication: { status: 'not_attempted', reason: 'No push.' },
+            },
+          })
+        ).resolves.toBeUndefined();
+        expect(storageWrite).toHaveBeenCalled();
+        expect(await instance.getMessageResult(first)).toMatchObject({
+          type: 'found',
+          result: { status: 'completed' },
+        });
+      } finally {
+        storageWrite.mockRestore();
+      }
+    });
+  });
+
+  it('fences Stop that arrives after registration precheck but before authorization finishes', async () => {
+    const { stub, sessionMetadata, sandboxSelection } = await setupGeneratedTitleSession();
+    const identity = {
+      watchId: crypto.randomUUID(),
+      attemptId: crypto.randomUUID(),
+      messageId: messageId(),
+    };
+    sessionMetadata.chat = {
+      kind: 'maintenance',
+      watchId: identity.watchId,
+      attemptId: identity.attemptId,
+      publication: {
+        repoUrl: 'https://github.com/acme/widgets',
+        headRef: 'kilo/test-branch',
+        baseRef: 'main',
+        observedHeadSha: 'a'.repeat(40),
+        baseSha: 'b'.repeat(40),
+      },
+    };
+    await runInDurableObject(stub, async instance => {
+      const entered = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      Object.assign(instance, {
+        unsealAuthorization: async () => {
+          entered.resolve();
+          await release.promise;
+          return { type: 'ok', authorization: undefined };
+        },
+      });
+      const registration = instance.registerSessionFromMetadata({
+        metadata: sessionMetadata,
+        sandboxSelection,
+      });
+      await entered.promise;
+      expect(await instance.stopMaintenanceBeforeRegistration(identity)).toEqual({ stopped: true });
+      release.resolve();
+      expect(await registration).toMatchObject({
+        success: false,
+        error: 'maintenance_attempt_stopped',
+      });
+      expect(await instance.getMetadata()).toBeNull();
+    });
+  });
+  it('keeps maintenance questions through sandbox stop and eviction; answers continue the same chat without auto-commit', async () => {
+    const { stub, peer, sessionId, kiloId, sessionMetadata, sandboxSelection } =
+      await setupGeneratedTitleSession();
+    sessionMetadata.chat = {
+      kind: 'maintenance',
+      watchId: crypto.randomUUID(),
+      attemptId: crypto.randomUUID(),
+      publication: {
+        repoUrl: 'https://github.com/acme/widgets',
+        headRef: 'kilo/test-branch',
+        baseRef: 'main',
+        observedHeadSha: 'a'.repeat(40),
+        baseSha: 'b'.repeat(40),
+      },
+    };
+    const first = messageId();
+    peer.prepareView = peer.view('ready');
+    await stub.createSessionWithInitialAdmission({
+      metadata: sessionMetadata,
+      sandboxSelection,
+      message: { ...promptPayload(first), finalization: { autoCommit: true } },
+    });
+    await stub.onEvents({
+      events: [
+        {
+          type: 'question.asked',
+          properties: { id: 'maintenance-question', sessionID: kiloId, questions: [] },
+        },
+      ],
+    });
+    await stub.onRoute({ state: 'lost', attemptId: peer.attemptId, reason: 'sandbox_stopped' });
+    expect(await stub.getMaintenanceStatus(first)).toMatchObject({
+      waitingForInput: true,
+      stoppedAt: null,
+      message: { status: 'failed', failureCode: 'sandbox_stopped' },
+    });
+    await evictAllDurableObjects();
+    expect(await stub.getMaintenanceStatus(first)).toMatchObject({
+      waitingForInput: true,
+      stoppedAt: null,
+    });
+    await runInDurableObject(stub, instance => {
+      instance.sandboxPeerFor = () => peer;
+    });
+    await stub.answer({
+      sessionId,
+      reply: {
+        action: 'answer',
+        questionId: 'maintenance-question',
+        answers: [['Use the smaller change.']],
+      },
+    });
+    const resumed = await stub.getMaintenanceStatus(first);
+    expect(resumed?.waitingForInput).toBe(false);
+    expect(resumed?.latestMessage?.cloudAgentSessionId).toBe(sessionId);
+    expect(resumed?.latestMessage?.messageId).not.toBe(first);
+    expect(peer.deliverCalls.at(-1)?.messages.at(-1)?.finalization?.autoCommit).toBe(false);
+    expect((await stub.getMetadata())?.chat).toEqual(sessionMetadata.chat);
+  });
+
+  it('durably records maintenance Stop while a question has no active message', async () => {
+    const { stub, peer, sessionId, kiloId, sessionMetadata, sandboxSelection } =
+      await setupGeneratedTitleSession();
+    sessionMetadata.chat = {
+      kind: 'maintenance',
+      watchId: crypto.randomUUID(),
+      attemptId: crypto.randomUUID(),
+      publication: {
+        repoUrl: 'https://github.com/acme/widgets',
+        headRef: 'kilo/test-branch',
+        baseRef: 'main',
+        observedHeadSha: 'a'.repeat(40),
+        baseSha: 'b'.repeat(40),
+      },
+    };
+    const first = messageId();
+    peer.prepareView = peer.view('ready');
+    await stub.createSessionWithInitialAdmission({
+      metadata: sessionMetadata,
+      sandboxSelection,
+      message: promptPayload(first),
+    });
+    await stub.onEvents({
+      events: [
+        {
+          type: 'question.asked',
+          properties: { id: 'maintenance-question', sessionID: kiloId, questions: [] },
+        },
+      ],
+    });
+    await stub.onOutcome({
+      sessionId,
+      status: 'failed',
+      reason: 'sandbox_stopped',
+      lastMessageId: first,
+    });
+    expect(await stub.stop()).toEqual({ interrupted: false });
+    await evictAllDurableObjects();
+    expect(await stub.getMaintenanceStatus(first)).toMatchObject({
+      stoppedAt: expect.any(Number),
+      waitingForInput: false,
+    });
+  });
+
+  it('retains wrapper Git evidence by exact message and never applies it to a continuation', async () => {
+    const { stub, peer, sessionId, sessionMetadata, sandboxSelection } =
+      await setupGeneratedTitleSession();
+    const attemptId = crypto.randomUUID();
+    sessionMetadata.chat = {
+      kind: 'maintenance',
+      watchId: crypto.randomUUID(),
+      attemptId,
+      publication: {
+        repoUrl: 'https://github.com/acme/widgets',
+        headRef: 'kilo/test-branch',
+        baseRef: 'main',
+        observedHeadSha: 'a'.repeat(40),
+        baseSha: 'b'.repeat(40),
+      },
+    };
+    const first = messageId();
+    peer.prepareView = peer.view('ready');
+    await stub.createSessionWithInitialAdmission({
+      metadata: sessionMetadata,
+      sandboxSelection,
+      message: promptPayload(first),
+    });
+    const publication = {
+      status: 'published' as const,
+      source: 'git' as const,
+      repoUrl: 'https://github.com/acme/widgets',
+      headRef: 'kilo/test-branch',
+      observedHeadSha: 'a'.repeat(40),
+      pushedHeadSha: 'c'.repeat(40),
+      remoteHeadSha: 'c'.repeat(40),
+      baseSha: 'b'.repeat(40),
+      exactLease: `refs/heads/kilo/test-branch:${'a'.repeat(40)}`,
+      pushExitCode: 0 as const,
+      verifiedAt: new Date().toISOString(),
+    };
+    await stub.onEvents({
+      events: [
+        {
+          type: 'wrapper.maintenance.publication',
+          properties: { attemptId, messageId: first, publication, result: null },
+        },
+      ],
+    });
+    expect(await stub.getMessageResult(first)).toMatchObject({
+      type: 'found',
+      result: { status: 'running', maintenance: { publication } },
+    });
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: first });
+    expect(await stub.getMessageResult(first)).toMatchObject({
+      type: 'found',
+      result: { maintenance: { attemptId, messageId: first, publication } },
+    });
+    const continuation = messageId();
+    await stub.send({ ...promptPayload(continuation), finalization: { autoCommit: true } });
+    expect(await stub.getMaintenanceStatus(first)).toMatchObject({
+      latestMessage: { messageId: continuation, status: 'running' },
+      result: null,
+      publication: { status: 'unknown' },
+    });
+    await evictAllDurableObjects();
+    expect(await stub.getMessageResult(first)).toMatchObject({
+      type: 'found',
+      result: { maintenance: { publication } },
+    });
+  });
+
   it('publishes background status for preparation, input waits, answers, completion, and failure without a chat socket', async () => {
     const { stub, peer, sessionId, kiloId, sessionMetadata, sandboxSelection } =
       await setupGeneratedTitleSession();

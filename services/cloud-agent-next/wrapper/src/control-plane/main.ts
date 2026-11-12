@@ -302,9 +302,12 @@ export function createControlPlaneFrameDispatcher(
         void deps.turns.current?.answer(frame.sessionId, frame.reply);
         return;
       case 'session.release':
-        deps.turns.current?.release(frame.sessionId);
-        deps.preparation.current?.release(frame.sessionId);
-        void deps.terminals.current?.forgetSession(frame.sessionId);
+        void Promise.resolve(deps.turns.current?.release(frame.sessionId))
+          .then(() => {
+            deps.preparation.current?.release(frame.sessionId);
+            return deps.terminals.current?.forgetSession(frame.sessionId);
+          })
+          .catch(() => deps.log('control-plane session release cleanup failed'));
         return;
       case 'worktree.snapshot':
       case 'worktree.summary':
@@ -614,7 +617,7 @@ export async function runControlPlaneWrapper(
     log: logToFile,
     stop: async () => {
       nativeStatus.stop();
-      turnsRef.current?.shutdown();
+      await turnsRef.current?.shutdown();
       terminalsRef.current?.shutdown();
       await runtimes.shutdown();
       closeControlWorkload(workload);

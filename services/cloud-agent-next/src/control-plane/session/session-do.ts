@@ -5,6 +5,20 @@ import {
 } from '../sandbox/workspace-snapshot.js';
 import { readCustomerBillingFailure } from '../../persistence/customer-billing-failure.js';
 import { DurableObject } from 'cloudflare:workers';
+import { notifyMaintenanceCompletion } from './maintenance-notification.js';
+import {
+  maintenanceMessage,
+  MAINTENANCE_STOPPED_AT_KEY,
+  MAINTENANCE_STOP_TOMBSTONE_KEY,
+  maintenanceStopIdentitySchema,
+  maintenanceRegistrationStopped,
+  maintenanceInitialMessageStopped,
+  readMaintenanceOutcome,
+  readMaintenanceAttemptResult,
+  readMaintenanceStop,
+  retainMaintenanceOutcome,
+  retainMaintenancePublicationEvent,
+} from './maintenance-state.js';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
 import {
@@ -489,6 +503,7 @@ export type CloudAgentChildSessionPage = {
 export type ControlPlaneSendResult =
   | { type: 'ok' }
   | { type: 'session-not-found' }
+  | { type: 'maintenance-stopped' }
   | { type: 'queue-full' };
 
 /**
@@ -1283,6 +1298,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const parsed = controlPlaneSessionCreateInputSchema.safeParse(input);
     if (!parsed.success) return createFailure('BAD_REQUEST', 'Invalid session create input');
     const { metadata, message, sandboxSelection, runtimeAuthorizationSeal } = parsed.data;
+    if (await maintenanceRegistrationStopped(this.ctx.storage, metadata))
+      return createFailure('BAD_REQUEST', 'maintenance_attempt_stopped');
 
     if (this.metadata !== null && this.registration !== null) {
       if (!this.matchesExistingRegistration(metadata, message.messageId, sandboxSelection)) {
@@ -1296,6 +1313,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // cannot refuse it; if it somehow did, fail as a transport error the
       // caller retries rather than inventing a create failure code.
       if (sent.type === 'queue-full') throw new Error('Pending message queue is full');
+      if (sent.type === 'maintenance-stopped')
+        return createFailure('BAD_REQUEST', 'maintenance_attempt_stopped');
       return sent.type === 'session-not-found'
         ? createFailure('NOT_FOUND', 'Session not found')
         : this.admissionAck(message.messageId);
@@ -1323,7 +1342,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const sealed = await this.unsealAuthorization(runtimeAuthorizationSeal, validated.data);
     if (sealed.type === 'failure') return sealed.failure;
 
-    await this.enqueue(async () => {
+    const registered = await this.enqueue(async () => {
+      if (await maintenanceRegistrationStopped(this.ctx.storage, validated.data)) return false;
       if (validated.data.clone === undefined) markHistoryHydrated(this.ctx.storage);
       await this.ctx.storage.put(REGISTRATION_KEY, registration);
       this.registration = registration;
@@ -1333,13 +1353,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         await this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, sealed.authorization);
         this.runtimeAuthorization = sealed.authorization;
       }
+      return true;
     });
+    if (!registered) return createFailure('BAD_REQUEST', 'maintenance_attempt_stopped');
 
     const sent = await this.send(message);
     // A fresh session has an empty queue, so the bound cannot refuse its first
     // message; a refusal is a transport error the caller retries, not a create
     // failure code.
     if (sent.type === 'queue-full') throw new Error('Pending message queue is full');
+    if (sent.type === 'maintenance-stopped')
+      return createFailure('BAD_REQUEST', 'maintenance_attempt_stopped');
     if (sent.type === 'session-not-found') {
       return createFailure('INTERNAL', 'Session registration failed');
     }
@@ -1357,6 +1381,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const parsed = controlPlaneSessionRegisterInputSchema.safeParse(input);
     if (!parsed.success) return createFailure('BAD_REQUEST', 'Invalid session register input');
     const { metadata, sandboxSelection, runtimeAuthorizationSeal, initialCommands } = parsed.data;
+    if (await maintenanceRegistrationStopped(this.ctx.storage, metadata))
+      return createFailure('BAD_REQUEST', 'maintenance_attempt_stopped');
     // N3: a repeated register (for example a `withDORetry` replay carrying the
     // seal) must not touch the seal again. Match the stored intent and replay
     // success before unsealing; a different intent is rejected.
@@ -1385,7 +1411,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     const sealed = await this.unsealAuthorization(runtimeAuthorizationSeal, metadata);
     if (sealed.type === 'failure') return sealed.failure;
-    await this.enqueue(async () => {
+    const registered = await this.enqueue(async () => {
+      if (await maintenanceRegistrationStopped(this.ctx.storage, metadata)) return false;
       // Finish seeding before metadata can make a registration retry return success.
       if (initialCommands !== undefined) await this.cacheAvailableCommands(initialCommands);
       if (metadata.clone === undefined) markHistoryHydrated(this.ctx.storage);
@@ -1397,7 +1424,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         await this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, sealed.authorization);
         this.runtimeAuthorization = sealed.authorization;
       }
+      return true;
     });
+    if (!registered) return createFailure('BAD_REQUEST', 'maintenance_attempt_stopped');
     return { success: true };
   }
 
@@ -1916,6 +1945,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       (existing.identity.orgId ?? null) === (metadata.identity.orgId ?? null) &&
       (existing.allowSubagentSessions ?? false) === (metadata.allowSubagentSessions ?? false) &&
       existing.parentCloudAgentSessionId === metadata.parentCloudAgentSessionId &&
+      JSON.stringify(existing.chat ?? { kind: 'user' }) ===
+        JSON.stringify(metadata.chat ?? { kind: 'user' }) &&
       sameRepository(existing.repository, metadata.repository) &&
       sameSandboxProviderBinding(
         getSandboxProviderBinding(existing),
@@ -1988,7 +2019,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // persist a queued row against wiped storage.
       if (this.registration === null) return { type: 'session-not-found' };
       const admitted = await this.admitMessage(await this.withSessionCallbackContext(parsed));
-      return admitted === 'queue-full' ? { type: 'queue-full' } : { type: 'ok' };
+      return { type: admitted };
     });
   }
 
@@ -2012,7 +2043,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * reports `queueMessage`'s refusal of a new message over the queued bound; the
    * reducer owns the count and `admitMessage` does not re-derive it.
    */
-  private async admitMessage(parsed: ControlPlanePromptPayload): Promise<'ok' | 'queue-full'> {
+  private async admitMessage(
+    parsed: ControlPlanePromptPayload
+  ): Promise<'ok' | 'queue-full' | 'maintenance-stopped'> {
+    if (
+      this.metadata !== null &&
+      (await maintenanceInitialMessageStopped(this.ctx.storage, this.metadata, parsed.messageId))
+    ) {
+      return 'maintenance-stopped';
+    }
+    parsed = maintenanceMessage(this.metadata, parsed);
     const now = Date.now();
     let reduction = queueMessage(this.messages, parsed, now);
     if (reduction.rejected === 'queue-full') return 'queue-full';
@@ -2031,6 +2071,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (reduction.rejected === 'queue-full') return 'queue-full';
     }
     if (reduction.changed.length > 0) {
+      if (
+        this.metadata?.chat?.kind === 'maintenance' &&
+        !this.messages.some(message => message.state === 'accepted')
+      ) {
+        await this.clearPendingInteractions();
+      }
       this.messages = reduction.messages;
       await this.persistMessages(reduction.changed);
       for (const message of reduction.changed) this.emitQueued(message);
@@ -2056,6 +2102,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     if (this.registration === null) return { interrupted: false };
     return this.enqueue(async () => {
+      if (this.metadata?.chat?.kind === 'maintenance') {
+        await this.ctx.storage.put(MAINTENANCE_STOPPED_AT_KEY, Date.now());
+        await this.clearPendingInteractions();
+      }
       const open = openMessages(this.messages).map(m => m.messageId);
       // A user cancel: mark the interruption so the next idle schedules a
       // capture that shows the cancelled worktree state.
@@ -2202,6 +2252,31 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
+  async stopMaintenanceBeforeRegistration(input: {
+    watchId: string;
+    attemptId: string;
+    messageId: string;
+  }): Promise<{ stopped: boolean }> {
+    await this.initialized;
+    const identity = maintenanceStopIdentitySchema.parse(input);
+    const stopped = await this.enqueue(async () => {
+      if (
+        this.metadata !== null &&
+        (this.metadata.chat?.kind !== 'maintenance' ||
+          this.metadata.chat.watchId !== identity.watchId ||
+          this.metadata.chat.attemptId !== identity.attemptId)
+      )
+        return false;
+      await this.ctx.storage.put({
+        [MAINTENANCE_STOP_TOMBSTONE_KEY]: identity,
+        [MAINTENANCE_STOPPED_AT_KEY]: Date.now(),
+      });
+      return true;
+    });
+    if (stopped && this.registration !== null) await this.stop();
+    return { stopped };
+  }
+
   async cancelQueuedMessage(messageId: string): Promise<{ dropped: boolean }> {
     await this.initialized;
     if (this.registration === null) return { dropped: false };
@@ -2246,7 +2321,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       );
       if (intent === null) return 'not_connected';
       const admitted = await this.admitMessage(intent);
-      if (admitted === 'queue-full') return 'not_connected';
+      if (admitted !== 'ok') return 'not_connected';
       await this.resolvePendingInteraction(parsed.reply);
       return 'sent';
     });
@@ -2544,6 +2619,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           // Spec §10 "Finalization running".
           this.emitCloudStatus({ type: 'finalizing' });
         }
+        if (
+          await retainMaintenancePublicationEvent(
+            this.ctx.storage,
+            this.metadata,
+            this.messages,
+            event
+          )
+        ) {
+          if (receiptKey !== undefined) this.ctx.storage.kv.put(receiptKey, index + 1);
+          continue;
+        }
         if (SETUP_EVENT_TYPES.has(event.type)) {
           const setupEvent = controlPlaneSetupEventSchema.safeParse(event);
           if (setupEvent.success) this.recordSetupEvent(setupEvent.data);
@@ -2598,6 +2684,23 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         parsed.reason,
         Date.now()
       );
+      if (this.messages.some(message => message.messageId === parsed.lastMessageId)) {
+        try {
+          await retainMaintenanceOutcome(
+            this.ctx.storage,
+            this.metadata,
+            parsed.lastMessageId,
+            parsed.maintenance,
+            this.messages
+          );
+        } catch {
+          logger
+            .withFields({ sessionId: this.sessionId, messageId: parsed.lastMessageId })
+            .warn(
+              'Maintenance outcome retention failed; settling the message without retained evidence'
+            );
+        }
+      }
       await this.applySettlement(
         reduction,
         {
@@ -2616,6 +2719,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // An outcome is a terminal event: capture on it. Interruption is set only
       // by an explicit user cancel (`stop`).
       this.worktreeChanges.onOutcome({ ...parsed });
+      if (parsed.status === 'completed' && this.metadata?.chat?.kind === 'maintenance') {
+        this.ctx.waitUntil(
+          notifyMaintenanceCompletion({
+            storage: this.ctx.storage,
+            metadata: this.metadata,
+            messages: this.messages,
+            notifications: this.env.NOTIFICATIONS,
+          })
+        );
+      }
     });
   }
 
@@ -3061,6 +3174,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (this.registration === null) return { type: 'session-not-found' };
     const message = this.messages.find(item => item.messageId === messageId);
     if (message === undefined) return { type: 'message-not-found' };
+    const maintenance =
+      this.metadata?.chat?.kind === 'maintenance'
+        ? await readMaintenanceOutcome(this.ctx.storage, messageId)
+        : null;
     const result: SafeMessageResultResponse = {
       messageId: message.messageId,
       status:
@@ -3072,11 +3189,51 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               ? 'interrupted'
               : message.state,
       createdAt: message.createdAt,
+      ...(maintenance ? { maintenance } : {}),
+      ...(this.metadata?.chat?.kind === 'maintenance' && message.reason !== null
+        ? { failureCode: message.reason }
+        : {}),
       ...(message.acceptedAt === null ? {} : { acceptedAt: message.acceptedAt }),
       ...(message.settledAt === null ? {} : { terminalAt: message.settledAt }),
       cloudAgentSessionId: this.sessionId,
     };
     return { type: 'found', result };
+  }
+
+  async getMaintenanceStatus(messageId: string) {
+    await this.initialized;
+    if (this.metadata?.chat?.kind !== 'maintenance') {
+      if (this.metadata !== null) return null;
+      const identity = maintenanceStopIdentitySchema.safeParse(
+        await this.ctx.storage.get(MAINTENANCE_STOP_TOMBSTONE_KEY)
+      );
+      if (!identity.success || identity.data.messageId !== messageId) return null;
+      return {
+        message: null,
+        latestMessage: null,
+        waitingForInput: false,
+        stoppedAt: await readMaintenanceStop(this.ctx.storage),
+        result: null,
+        publication: null,
+        resultMessageId: null,
+        publicationMessageId: null,
+        lastPublished: null,
+        workspace: null,
+      };
+    }
+    const exact = await this.getMessageResult(messageId);
+    const latestId = this.messages.at(-1)?.messageId;
+    const latest = latestId === undefined ? null : await this.getMessageResult(latestId);
+    const attempt = await readMaintenanceAttemptResult(this.ctx.storage, this.messages);
+    return {
+      message: exact.type === 'found' ? exact.result : null,
+      latestMessage: latest?.type === 'found' ? latest.result : null,
+      waitingForInput:
+        (this.pendingInteractions?.questions.length ?? 0) > 0 ||
+        (this.pendingInteractions?.permissions.length ?? 0) > 0,
+      stoppedAt: await readMaintenanceStop(this.ctx.storage),
+      ...attempt,
+    };
   }
 
   /**
@@ -4605,7 +4762,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       );
       // A replaced attempt retires its questions and permissions with its
       // runtime: a stale interaction id must not be answerable on the new one.
-      await this.clearPendingInteractions();
+      if (this.metadata?.chat?.kind !== 'maintenance') await this.clearPendingInteractions();
     }
     await this.ctx.storage.put(ROUTE_KEY, view);
     this.route = view;

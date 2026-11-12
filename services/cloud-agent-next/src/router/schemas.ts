@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { maintenanceOutcomeSchema } from '../shared/pr-maintenance.js';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
   getSandboxAllocation,
@@ -1429,6 +1430,8 @@ export const GetMessageResultOutput = z
     cloudAgentSessionId: sessionIdSchema,
     messageId: MessageIdSchema,
     status: z.enum(['queued', 'running', 'completed', 'failed', 'interrupted']),
+    failureCode: z.string().max(4096).optional(),
+    maintenance: maintenanceOutcomeSchema.optional(),
     createdAt: z.number(),
     queuedAt: z.number().optional(),
     acceptedAt: z.number().optional(),

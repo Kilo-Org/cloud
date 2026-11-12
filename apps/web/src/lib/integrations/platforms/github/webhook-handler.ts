@@ -203,6 +203,10 @@ export async function handleGitHubWebhook(
           ...(deliveryAction ? { action: deliveryAction } : {}),
         },
       });
+      return NextResponse.json(
+        { error: 'PR observation could not be saved. Retry this delivery.' },
+        { status: 503 }
+      );
     }
 
     const logWebhook = async (

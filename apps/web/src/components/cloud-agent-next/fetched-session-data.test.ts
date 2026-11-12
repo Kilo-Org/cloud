@@ -36,4 +36,22 @@ describe('toFetchedSessionData environment', () => {
 
     expect(result.environmentId).toBeNull();
   });
+
+  it('preserves explicit maintenance metadata independently of runtime state', () => {
+    const result = toFetchedSessionData(kiloSessionId, {
+      ...session,
+      runtimeState: null,
+      chat_kind: 'maintenance',
+      maintenance_watch_id: '11111111-1111-4111-8111-111111111111',
+      maintenance_attempt_id: '22222222-2222-4222-8222-222222222222',
+      is_maintenance_pinned: true,
+    });
+    expect(result.chatKind).toBe('maintenance');
+    expect(result.maintenanceWatchId).toBe('11111111-1111-4111-8111-111111111111');
+    expect(result.maintenanceAttemptId).toBe('22222222-2222-4222-8222-222222222222');
+    expect(result.isMaintenancePinned).toBe(true);
+    expect(toFetchedSessionData(kiloSessionId, { ...session, runtimeState: null }).chatKind).toBe(
+      'user'
+    );
+  });
 });

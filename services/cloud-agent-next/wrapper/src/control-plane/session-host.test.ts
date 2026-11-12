@@ -251,7 +251,7 @@ async function hostFixture(
       preparing = value;
     },
     async dispose() {
-      host.turns.shutdown();
+      await host.turns.shutdown();
       terminals.shutdown();
       await host.runtimes.shutdown();
       await server.stop(true);

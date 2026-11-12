@@ -9,6 +9,9 @@ export const WORKSPACE_CONFIGURATION_VERSION = '1';
 export const RUNTIME_INSTRUCTIONS_HEADER = 'x-kilo-runtime-instructions';
 export const RUNTIME_INSTRUCTIONS_VERSION = '1';
 
+export const PR_MAINTENANCE_HEADER = 'x-kilo-pr-maintenance';
+export const PR_MAINTENANCE_VERSION = '1';
+
 export const KILO_CLI_VERSION_HEADER = 'x-kilo-cli-version';
 export const WRAPPER_VERSION_HEADER = 'x-kilo-wrapper-version';
 

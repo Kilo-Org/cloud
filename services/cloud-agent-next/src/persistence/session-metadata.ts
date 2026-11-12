@@ -1,4 +1,5 @@
 import { environmentReferenceSchema } from '../environment-build/reference.js';
+import { sessionChatSchema } from '../shared/pr-maintenance.js';
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
@@ -478,6 +479,7 @@ export const CurrentSessionMetadataSchema = z
     allowSubagentSessions: z.boolean().optional(),
     parentCloudAgentSessionId: z.string().min(1).optional(),
     identity: MetadataIdentitySchema,
+    chat: sessionChatSchema.optional(),
     auth: MetadataAuthSchema,
     repository: MetadataRepositorySchema.optional(),
     clone: MetadataCloneSchema.optional(),

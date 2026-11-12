@@ -30,6 +30,7 @@ import {
   CONTROL_PLANE_PROTOCOL_VERSION,
   type ControlPlaneRouteSpec,
   type ControlPlaneRouteView,
+  type ControlPlaneWrapperFrame,
 } from '../../src/shared/control-plane-protocol.js';
 import type { createSandboxNotificationDispatcher } from '../../src/control-plane/sandbox/notifications.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
@@ -300,6 +301,7 @@ async function connectAndHello(
   options: {
     workspaceConfiguration?: boolean;
     runtimeInstructions?: boolean;
+    prMaintenance?: boolean;
     runtimeHarness?: string;
   } = {}
 ): Promise<{ wrapper: FakeWrapper; credential: string; allocationId: string }> {
@@ -1348,6 +1350,95 @@ describe('SandboxControlV2 routes and forwarding', () => {
         ]);
         wrapper.send({ type: 'session.ready', sessionId: SESSION });
         await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+      } finally {
+        wrapper.close();
+      }
+    }
+  );
+
+  const MAINTENANCE: NonNullable<ControlPlaneRouteSpec['maintenance']> = {
+    kind: 'maintenance',
+    watchId: '33333333-3333-4333-8333-333333333333',
+    attemptId: '44444444-4444-4444-8444-444444444444',
+    publication: {
+      repoUrl: 'https://github.com/acme/widgets',
+      headRef: 'feature/repair',
+      baseRef: 'main',
+      observedHeadSha: 'a'.repeat(40),
+      baseSha: 'b'.repeat(40),
+    },
+  };
+
+  function maintenancePrepareInput(sessionId: string) {
+    const input = prepareInput(sessionId);
+    return { ...input, spec: { ...input.spec, maintenance: MAINTENANCE } };
+  }
+
+  it.each([false, true])(
+    'sends maintenance rules to a wrapper that advertises PR maintenance (workspace configuration: %s)',
+    async workspaceConfiguration => {
+      const provider = createFakeProvider();
+      const { stub } = await setup(provider);
+      await stub.prepare(maintenancePrepareInput(SESSION));
+      const { wrapper } = await connectAndHello(provider, 'wr_1', {
+        workspaceConfiguration,
+        prMaintenance: true,
+      });
+      try {
+        const frame = await wrapper.next();
+        expect(frame?.type).toBe(workspaceConfiguration ? 'session.attach' : 'session.prepare');
+        if (frame?.type !== 'session.attach' && frame?.type !== 'session.prepare') {
+          throw new Error('expected a preparation frame');
+        }
+        expect(frame.spec.maintenance).toEqual(MAINTENANCE);
+      } finally {
+        wrapper.close();
+      }
+    }
+  );
+
+  it.each([false, true])(
+    'fails without sending maintenance rules to a pre-deploy wrapper (workspace configuration: %s)',
+    async workspaceConfiguration => {
+      const provider = createFakeProvider();
+      const { stub, peer } = await setup(provider);
+      await stub.prepare(maintenancePrepareInput(SESSION));
+
+      const stages: unknown[] = [];
+      const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+        const bounded = fields as unknown as Record<string, unknown>;
+        if (bounded.diagnosticEvent === 'route_failed') stages.push(bounded.stage);
+        return logger;
+      });
+      const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      let wrapper: FakeWrapper;
+      try {
+        ({ wrapper } = await connectAndHello(provider, 'wr_old', { workspaceConfiguration }));
+        await waitFor(() =>
+          expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+            expect.objectContaining({ state: 'failed', reason: 'workspace_setup_failed' })
+          )
+        );
+      } finally {
+        withFields.mockRestore();
+        info.mockRestore();
+        warn.mockRestore();
+      }
+
+      try {
+        expect(stages).toContain('wrapper_maintenance_unsupported');
+        const frames: ControlPlaneWrapperFrame[] = [];
+        for (let frame = await wrapper.next(250); frame !== null; frame = await wrapper.next(250)) {
+          frames.push(frame);
+        }
+        expect(frames.map(frame => frame.type)).not.toContain('session.prepare');
+        expect(frames.map(frame => frame.type)).not.toContain('session.attach');
+        expect(JSON.stringify(frames)).not.toContain('maintenance');
+        expect(await readRouteRow(stub, SESSION)).toMatchObject({
+          state: 'failed',
+          reason: 'workspace_setup_failed',
+        });
       } finally {
         wrapper.close();
       }

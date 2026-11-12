@@ -541,7 +541,7 @@ describe('turn manager submission', () => {
     );
     expect(outcomeFrames(h.frames)).toEqual([]);
     expect(h.manager.hasPendingWork()).toBe(true);
-    h.manager.shutdown();
+    await h.manager.shutdown();
   });
 
   it('bounds attachment delivery and fences late materialization without calling it native inactivity', async () => {
@@ -950,7 +950,7 @@ describe('turn manager submission', () => {
     const catalog = Promise.withResolvers<Awaited<ReturnType<Harness['listCommands']>>>();
     h.client(routeSpec()).client.listCommands = () => catalog.promise;
     const published = h.manager.publishCommands(SESSION_ID);
-    h.manager.release(SESSION_ID);
+    await h.manager.release(SESSION_ID);
     catalog.resolve({ commands: [{ name: 'latest', hints: [] }], dropped: 0, overLimit: false });
     await published;
     expect(eventFrames(h.frames)).toEqual([]);
@@ -1403,7 +1403,7 @@ describe('turn resubmission', () => {
       h.manager.submit(SESSION_ID, promptPayload('m1'));
       await settle();
       h.retireClient(spec);
-      h.manager[action](SESSION_ID);
+      await h.manager[action](SESSION_ID);
       if (action === 'release') h.registerRoute(spec);
       h.manager.submit(SESSION_ID, promptPayload('m2'));
       await settle();
@@ -1779,7 +1779,7 @@ describe('turn resubmission', () => {
     h.manager.observeKiloEvent(
       kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
     );
-    h.manager.release(SESSION_ID);
+    await h.manager.release(SESSION_ID);
     h.registerRoute(routeSpec());
     h.frames.length = 0;
     h.manager.observeKiloEvent(childEvent);
@@ -2426,7 +2426,7 @@ describe('harness completion without a native drain', () => {
     await settle();
     expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
     expect(h.client(routeSpec()).drains).toEqual([]);
-    h.manager.shutdown();
+    await h.manager.shutdown();
   });
 
   it('does not let a reconciled close complete a newer prompt', async () => {
@@ -2447,7 +2447,7 @@ describe('harness completion without a native drain', () => {
     h.manager.observeKiloEvent(completedKiloTurn());
     await settle();
     expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm2' }]);
-    h.manager.shutdown();
+    await h.manager.shutdown();
   });
 });
 
@@ -3502,7 +3502,7 @@ describe('automatic permissions', () => {
     h.manager.observeKiloEvent(
       kiloEvent('permission.asked', { sessionID: KILO_SESSION, id: 'p1' })
     );
-    h.manager.release(SESSION_ID);
+    await h.manager.release(SESSION_ID);
     rejectReply?.(new Error('reply unavailable'));
     await settle();
     expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);
@@ -4010,7 +4010,7 @@ describe('GitHub review publication recovery', () => {
     h.manager.observeKiloEvent(completedKiloTurn());
     await settle();
     const recovery = h.client(spec).prompts[1];
-    h.manager.release(SESSION_ID);
+    await h.manager.release(SESSION_ID);
     expect(recovery.signal?.aborted).toBe(true);
     expect(
       h.timeouts.filter(timeout => timeout.ms === 15_000).every(timeout => timeout.cancelled)
@@ -4258,7 +4258,7 @@ describe('turn route identity', () => {
       rewriting.resolve();
       drained.resolve(true);
       await rewrite;
-      h.manager.shutdown();
+      await h.manager.shutdown();
     }
   });
 
@@ -4413,7 +4413,7 @@ describe('native session outcome transitions', () => {
         { status: 'completed', lastMessageId: 'm2' },
       ]);
       expect(h.manager.hasPendingWork()).toBe(false);
-      h.manager.shutdown();
+      await h.manager.shutdown();
     }
   );
 
@@ -4456,7 +4456,7 @@ describe('native session outcome transitions', () => {
           })
         );
       }
-      h.manager.shutdown();
+      await h.manager.shutdown();
     }
   );
 
@@ -4492,8 +4492,8 @@ describe('native session outcome transitions', () => {
       await settle();
       expect(signal).toBeDefined();
       if (action === 'stop') h.manager.abort(SESSION_ID);
-      if (action === 'release') h.manager.release(SESSION_ID);
-      if (action === 'shutdown') h.manager.shutdown();
+      if (action === 'release') await h.manager.release(SESSION_ID);
+      if (action === 'shutdown') await h.manager.shutdown();
       if (action === 'timeout') {
         h.timeouts
           .find(timer => !timer.cancelled && timer.ms === DEFAULT_CONDENSE_TIMEOUT_MS)
@@ -4504,7 +4504,7 @@ describe('native session outcome transitions', () => {
       expect(signal?.aborted).toBe(true);
       expect(h.manager.hasPendingWork()).toBe(false);
       expect(outcomeFrames(h.frames)).toHaveLength(1);
-      h.manager.shutdown();
+      await h.manager.shutdown();
     }
   );
 
@@ -4537,7 +4537,7 @@ describe('native session outcome transitions', () => {
     await settle();
     expect(commits).toBe(0);
     expect(outcomeFrames(h.frames)).toHaveLength(1);
-    h.manager.shutdown();
+    await h.manager.shutdown();
   });
 
   it('projects a no_progress failure with the parsed outcomeReason', async () => {
@@ -4920,11 +4920,11 @@ describe('completion ownership and transport bounds', () => {
       const token = h.client(routeSpec()).drains[0].token;
       if (action === 'release') {
         expect(h.manager.routeSpec(SESSION_ID)).toEqual(routeSpec());
-        h.manager.release(SESSION_ID);
+        await h.manager.release(SESSION_ID);
         expect(h.manager.routeSpec(SESSION_ID)).toBeUndefined();
         expect(h.manager.hasActiveTurnInDirectory(DIRECTORY)).toBe(false);
       }
-      if (action === 'shutdown') h.manager.shutdown();
+      if (action === 'shutdown') await h.manager.shutdown();
       if (action === 'deadline')
         h.manager.onNativeDeadline(
           runningState,

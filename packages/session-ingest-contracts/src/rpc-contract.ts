@@ -204,6 +204,12 @@ export const createSessionForCloudAgentSchema = z.object({
     .optional(),
   organizationId: z.string().optional(),
   createdOnPlatform: z.string().min(1),
+  chat: z
+    .discriminatedUnion('kind', [
+      z.object({ kind: z.literal('user') }).strict(),
+      z.object({ kind: z.literal('maintenance'), watchId: z.uuid(), attemptId: z.uuid() }).strict(),
+    ])
+    .optional(),
   title: z.string().optional(),
   // Compatibility: old Cloud Agent workers omit gitUrl; remove after all deployed workers send it.
   gitUrl: z.string().optional(),

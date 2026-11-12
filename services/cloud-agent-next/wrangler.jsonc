@@ -34,7 +34,7 @@
   },
   "logpush": true,
   "triggers": {
-    "crons": ["17 2 * * *", "*/5 * * * *"],
+    "crons": ["17 2 * * *", "*/5 * * * *", "* * * * *"],
   },
   "routes": [
     {
@@ -310,6 +310,7 @@
    */
   "queues": {
     "producers": [
+      { "binding": "PR_MAINTENANCE_QUEUE", "queue": "cloud-agent-next-pr-maintenance" },
       {
         "binding": "CALLBACK_QUEUE",
         "queue": "cloud-agent-next-callback-queue",
@@ -320,6 +321,13 @@
       },
     ],
     "consumers": [
+      {
+        "queue": "cloud-agent-next-pr-maintenance",
+        "max_batch_size": 1,
+        "max_batch_timeout": 1,
+        "max_retries": 4,
+        "retry_delay": 30,
+      },
       {
         "queue": "cloud-agent-next-callback-queue",
         "max_batch_size": 5,
@@ -344,7 +352,7 @@
       // origin host from the first route, which would hide the preview Host.
       "routes": [],
       "triggers": {
-        "crons": ["17 2 * * *", "*/5 * * * *"],
+        "crons": ["17 2 * * *", "*/5 * * * *", "* * * * *"],
       },
       "hyperdrive": [
         {
@@ -461,6 +469,7 @@
       },
       "queues": {
         "producers": [
+          { "binding": "PR_MAINTENANCE_QUEUE", "queue": "cloud-agent-next-pr-maintenance-dev" },
           {
             "binding": "CALLBACK_QUEUE",
             "queue": "cloud-agent-next-callback-queue-dev",
@@ -471,6 +480,13 @@
           },
         ],
         "consumers": [
+          {
+            "queue": "cloud-agent-next-pr-maintenance-dev",
+            "max_batch_size": 1,
+            "max_batch_timeout": 1,
+            "max_retries": 4,
+            "retry_delay": 30,
+          },
           {
             "queue": "cloud-agent-next-callback-queue-dev",
             "max_batch_size": 5,

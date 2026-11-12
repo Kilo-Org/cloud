@@ -1,0 +1,5 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": { "types": ["@types/node"] },
+  "include": ["../../../worker-configuration.d.ts", "../pr-maintenance-local.ts", "./*.ts"]
+}

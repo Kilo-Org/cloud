@@ -35,6 +35,11 @@ import { CHAT_TAB_ID, fileTabId, terminalTabId } from './workspace-tabs';
 import type { FileWorkspaceTab, TerminalWorkspaceTab, WorkspaceTabId } from './workspace-tabs';
 import type { StoredSession } from './types';
 import type { TerminalStatus } from './useCloudAgentTerminal';
+import { MaintenanceBadge } from './MaintenanceBadge';
+import {
+  getVisibleMaintenanceChatSessions,
+  isMaintenanceChatPinned,
+} from './maintenance-chat-presentation';
 
 type TerminalStatusSummary = {
   status: TerminalStatus;
@@ -146,12 +151,10 @@ export function CloudAgentWorkspaceTabs({
   const groupedSessionsById = new Map(
     groupedChatSessions.map(session => [session.sessionId, session])
   );
-  const visibleChatSessions =
-    openChatSessionIds === undefined
-      ? groupedChatSessions
-      : openChatSessionIds
-          .map(sessionId => groupedSessionsById.get(sessionId))
-          .filter(session => session !== undefined);
+  const visibleChatSessions = getVisibleMaintenanceChatSessions(
+    groupedChatSessions,
+    openChatSessionIds
+  );
   const openSessionIds = new Set(visibleChatSessions.map(session => session.sessionId));
   const closedChatSessions = (
     closedChatSessionIds ?? groupedChatSessions.map(session => session.sessionId)
@@ -405,6 +408,9 @@ export function CloudAgentWorkspaceTabs({
                       ) : (
                         <span className="min-w-0 max-w-36 truncate">{session.prompt}</span>
                       )}
+                      {session.chatKind === 'maintenance' && (
+                        <MaintenanceBadge pinned={isMaintenanceChatPinned(session)} />
+                      )}
                     </TooltipTrigger>
                   </TabsTrigger>
                   <TooltipContent className="max-w-[min(24rem,calc(100vw-2rem))] wrap-anywhere">
@@ -445,7 +451,7 @@ export function CloudAgentWorkspaceTabs({
                   />
                 ) : null}
 
-                {onCloseChat && (
+                {onCloseChat && !isMaintenanceChatPinned(session) && (
                   <Button
                     type="button"
                     size="sm"
@@ -673,6 +679,7 @@ export function CloudAgentWorkspaceTabs({
                           </span>
                           <span className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
                             <span>Closed tab</span>
+                            {session.chatKind === 'maintenance' && <MaintenanceBadge />}
                             <TimeAgo timestamp={session.updatedAt} />
                             {isDeleting ? (
                               <LoaderCircle

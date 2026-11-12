@@ -51,6 +51,12 @@ import {
   permissionCategoryFromProperties,
 } from '../../../src/shared/kilo-event-properties.js';
 import { isInteractiveSessionOrigin } from '../../../src/shared/control-plane-permission.js';
+import { createMaintenanceExecution, type MaintenanceExecution } from './maintenance-execution.js';
+import { createMaintenanceGit } from './maintenance-git.js';
+import {
+  MAINTENANCE_PUBLICATION_EVENT,
+  type MaintenanceOutcome,
+} from '../../../src/shared/pr-maintenance.js';
 
 const PROMPT_DELIVERY_TIMEOUT_MS = 120_000;
 const SYNTHETIC_KILO_EVENTS = new Set(['server.connected', 'server.heartbeat']);
@@ -164,6 +170,9 @@ export type Turn = {
   submitting: Promise<void>;
   publication?: ReturnType<typeof createReviewPublication>;
   gateResult?: 'pass' | 'fail';
+  maintenance?: MaintenanceExecution;
+  maintenanceFinishing?: Promise<void>;
+  maintenanceOutcome?: MaintenanceOutcome;
 };
 
 type TurnRoute = {
@@ -174,6 +183,7 @@ type TurnRoute = {
   roots: RouteRoot[];
   runtimeKey: string;
   createdOnPlatform?: string;
+  maintenance?: ControlPlaneRouteSpec['maintenance'];
   githubReviewTarget?: ControlPlaneRouteSpec['githubReviewTarget'];
   secretEnvKeys?: readonly string[];
   automaticPermissions: Set<string>;
@@ -399,6 +409,35 @@ export function createTurnManager(deps: TurnManagerDeps) {
     reason?: string,
     facts?: Pick<ControlPlaneOutcome, 'assistantReason' | 'providerOwnership'>
   ): void {
+    const maintenance = turn.maintenance;
+    const maintenanceChat = turn.route.maintenance;
+    if (
+      maintenance !== undefined &&
+      maintenanceChat !== undefined &&
+      turn.maintenanceOutcome === undefined
+    ) {
+      if (turn.maintenanceFinishing) return;
+      const messageId = lastReceivedMessageId(turn);
+      turn.maintenanceFinishing = (async () => {
+        if (status !== 'completed') await abortKilo(turn.route);
+        try {
+          turn.maintenanceOutcome = await maintenance.finish(messageId);
+        } catch {
+          emitWarning(
+            turn.route.sessionId,
+            'Maintenance rebase cleanup failed. Inspect the checkout before continuing.'
+          );
+          turn.maintenanceOutcome = {
+            attemptId: maintenanceChat.attemptId,
+            messageId,
+            publication: { status: 'unknown', reason: 'maintenance_terminal_cleanup_failed' },
+            result: null,
+          };
+        }
+        if (turns.get(turn.route.sessionId) === turn) sendOutcome(turn, status, reason, facts);
+      })();
+      return;
+    }
     // Name the last prompt the wrapper RECEIVED. For a failure that settles a
     // queued-but-unsent prompt too, so it cannot sit accepted until the
     // backstop; for `completed` this is safe because completion requires every
@@ -415,6 +454,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         ? {}
         : { providerOwnership: facts.providerOwnership }),
       lastMessageId,
+      ...(turn.maintenanceOutcome ? { maintenance: turn.maintenanceOutcome } : {}),
       ...(status === 'completed' && turn.gateResult !== undefined
         ? { gateResult: turn.gateResult }
         : {}),
@@ -541,6 +581,24 @@ export function createTurnManager(deps: TurnManagerDeps) {
         nativeFailure: error => onKiloError(turn, { error }),
       });
     turns.set(route.sessionId, turn);
+    if (route.maintenance) {
+      const runtime = deps.runtimes.get(route.runtimeKey);
+      const root = route.roots.find(
+        root =>
+          root.repoFullName !== undefined &&
+          `https://github.com/${root.repoFullName}`.toLowerCase() ===
+            route.maintenance?.publication.repoUrl
+      );
+      turn.maintenance = createMaintenanceExecution({
+        chat: route.maintenance,
+        directory: root?.directory ?? route.directory,
+        env: runtime?.env,
+        onPublication: outcome =>
+          emitEvents(route.sessionId, [
+            { type: MAINTENANCE_PUBLICATION_EVENT, properties: { ...outcome } },
+          ]),
+      });
+    }
     if (memoryHeldRuntimes.has(route.runtimeKey)) emitWarning(route.sessionId, MEMORY_HOLD_WARNING);
     if (route.createdOnPlatform === 'code-review') {
       turn.publication = createReviewPublication({
@@ -692,6 +750,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
     try {
       if (pending.payload.turn.type === 'prompt') {
         if (message === undefined) throw new Error('Prompt attachments were not materialized');
+        const prompt = turn.maintenance
+          ? await turn.maintenance.prompt(pending.payload.messageId, message.prompt ?? '')
+          : message.prompt;
+        if (!isCurrent()) return;
         // Now handed to Kilo. The mark lives on the prompt, so a resubmission of
         // the same messageId cannot outrun the receipt count.
         markDispatched(turn, pending);
@@ -704,7 +766,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
           ...(pending.payload.agent.variant === undefined
             ? {}
             : { variant: pending.payload.agent.variant }),
-          ...(message.prompt === undefined ? {} : { prompt: message.prompt }),
+          ...(prompt === undefined ? {} : { prompt }),
           ...(message.parts === undefined ? {} : { parts: message.parts }),
           ...(pending.payload.context === undefined ? {} : { context: pending.payload.context }),
           ...(model === undefined ? {} : { model }),
@@ -781,9 +843,11 @@ export function createTurnManager(deps: TurnManagerDeps) {
       return;
     }
     const turn = turns.get(sessionId) ?? createTurn(route);
-    // A delivery retry (spec §12) repeats the same messageId; it must not
-    // double-count or be dispatched again.
     if (turn.prompts.some(entry => entry.payload.messageId === payload.messageId)) return;
+    if (turn.maintenanceFinishing) {
+      void turn.maintenanceFinishing.then(() => acceptPrompt(sessionId, payload));
+      return;
+    }
     // The session drain is level-triggered and would wait for this new work.
     // Stop the old finalization instead, so the new prompt drives its own turn.
     turn.completion?.invalidate();
@@ -971,6 +1035,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
     client: Harness,
     signal: AbortSignal
   ): Promise<void> {
+    if (turn.route.maintenance) return;
     if (!turn.prompts.some(entry => entry.payload.finalization?.autoCommit)) return;
     if (queueState(turn.route) === 'queue') return;
     const runtime = deps.runtimes.get(turn.route.runtimeKey);
@@ -1214,6 +1279,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
       return;
     if (event) turn.publication?.observe(event.type);
     for (const item of activity) turn.publication?.observeActivity(item);
+    for (const item of activity) turn.maintenance?.observe(item);
     for (const item of activity)
       if (item.type === 'message' && item.message.role === 'assistant')
         turn.assistantMessageId = item.message.id;
@@ -1260,6 +1326,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
     eventSessionId: string | undefined,
     event: KiloFeedEvent
   ): boolean {
+    if (event.type === MAINTENANCE_PUBLICATION_EVENT) return false;
     if (route.createdOnPlatform === 'code-review') {
       if (event.type === 'question.asked' && typeof event.properties.id === 'string') {
         if (!route.automaticQuestions.has(event.properties.id)) {
@@ -1558,6 +1625,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         roots: routeRoots(spec),
         runtimeKey: runtimeKey(spec),
         createdOnPlatform: spec.createdOnPlatform,
+        maintenance: spec.maintenance,
         githubReviewTarget: spec.githubReviewTarget,
         ...(spec.secretEnvKeys === undefined ? {} : { secretEnvKeys: spec.secretEnvKeys }),
         automaticPermissions: existing?.automaticPermissions ?? new Set(),
@@ -1568,9 +1636,29 @@ export function createTurnManager(deps: TurnManagerDeps) {
       turnByKiloSession.set(spec.kiloSessionId, spec.sessionId);
     },
 
-    release(sessionId: string): void {
+    async release(sessionId: string): Promise<void> {
       interruptedFinalizations.get(sessionId)?.abort.abort(new Error('session released'));
       const route = routes.get(sessionId);
+      const turn = turns.get(sessionId);
+      if (turn?.maintenance) {
+        await abortKilo(turn.route)
+          .then(() => turn.maintenance?.cleanup())
+          .catch(() => emitWarning(sessionId, 'Maintenance rebase cleanup failed.'));
+      } else if (route?.maintenance) {
+        const root = route.roots.find(
+          root =>
+            root.repoFullName !== undefined &&
+            `https://github.com/${root.repoFullName}`.toLowerCase() ===
+              route.maintenance?.publication.repoUrl
+        );
+        await createMaintenanceGit({
+          directory: root?.directory ?? route.directory,
+          env: deps.runtimes.get(route.runtimeKey)?.env,
+        })
+          .abortOwnedRebase(route.maintenance.attemptId)
+          .catch(() => emitWarning(sessionId, 'Maintenance rebase cleanup failed.'));
+      }
+      if (routes.get(sessionId) !== route) return;
       if (route !== undefined) {
         turnByKiloSession.delete(route.kiloSessionId);
         for (const [child, root] of childRoots) {
@@ -1804,7 +1892,13 @@ export function createTurnManager(deps: TurnManagerDeps) {
 
     tick,
 
-    shutdown(): void {
+    async shutdown(): Promise<void> {
+      for (const turn of turns.values()) {
+        if (turn.maintenance)
+          await abortKilo(turn.route)
+            .then(() => turn.maintenance?.cleanup())
+            .catch(() => emitWarning(turn.route.sessionId, 'Maintenance rebase cleanup failed.'));
+      }
       for (const entry of interruptedFinalizations.values()) {
         entry.abort.abort(new Error('wrapper shutting down'));
       }

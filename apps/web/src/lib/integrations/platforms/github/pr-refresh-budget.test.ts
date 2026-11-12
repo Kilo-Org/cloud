@@ -1,4 +1,5 @@
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({ logExceptInTest: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { eval: jest.fn() },
 }));
@@ -8,6 +9,10 @@ import { redisClient } from '@kilocode/web-shared/lib/redis';
 import {
   claimPrRefresh,
   deferPrRefresh,
+  claimPrMaintenanceCall,
+  claimPrConflictBatch,
+  completePrMaintenanceWrite,
+  recordPrMaintenanceApiCall,
   type ClaimPrRefreshDenied,
   type ClaimPrRefreshInput,
 } from './pr-refresh-budget';
@@ -41,8 +46,30 @@ function liveEntry(key: string, now: number): RedisEntry | undefined {
   return entry;
 }
 
-function fakeEval(_script: string, keys: string[], args: unknown[]): Promise<unknown> {
+function fakeEval(script: string, keys: string[], args: unknown[]): Promise<unknown> {
   const now = Number(args[0]);
+  if (keys.length === 3) {
+    for (let index = 0; index < 2; index++) {
+      const entry = liveEntry(keys[index], now);
+      if (entry) return Promise.resolve([0, index + 1, Number(entry.value)]);
+    }
+    if (args[1] === '1') {
+      const prior = liveEntry(keys[2], now);
+      if (prior) return Promise.resolve([0, 3, Number(prior.value)]);
+      store.set(keys[2], { value: String(now + 30_000), expiresAt: now + 30_000 });
+      return Promise.resolve([1, 0, now + 30_000]);
+    }
+    return Promise.resolve([1, 0, 0]);
+  }
+  if (script.includes('== tonumber(ARGV[1])')) {
+    const entry = liveEntry(keys[0], Number(args[1]));
+    if (Number(entry?.value) === Number(args[0]))
+      store.set(keys[0], {
+        value: String(Number(args[1]) + 1000),
+        expiresAt: Number(args[1]) + 1000,
+      });
+    return Promise.resolve(1);
+  }
 
   if (keys.length === 2) {
     const [cooldownKey, attemptKey] = keys;
@@ -86,6 +113,93 @@ beforeEach(() => {
   jest.clearAllMocks();
   store = new Map();
   evalMock.mockImplementation(fakeEval);
+});
+
+describe('installation maintenance budget', () => {
+  const scope = { appType: 'standard' as const, installationId: 'installation-1' };
+  it('admits one installation conflict batch across concurrent watch dispatches', async () => {
+    const claims = await Promise.all(Array.from({ length: 20 }, () => claimPrConflictBatch(scope)));
+    expect(claims.filter(claim => claim.allowed)).toHaveLength(1);
+    expect(claims.filter(claim => !claim.allowed)).toHaveLength(19);
+    expect(await claimPrConflictBatch({ ...scope, appType: 'lite' })).toEqual({ allowed: true });
+  });
+  it('shares refresh cooldown across all maintenance endpoints and stops before API calls', async () => {
+    const retryAt = new Date(T0 + 120_000);
+    await deferPrRefresh({ ...scope, resetAt: retryAt });
+    expect(await claimPrMaintenanceCall(scope)).toEqual({
+      allowed: false,
+      reason: 'rate_limited',
+      retryAt,
+    });
+    expect(await claimPrMaintenanceCall({ ...scope, write: true })).toEqual({
+      allowed: false,
+      reason: 'rate_limited',
+      retryAt,
+    });
+    expect(await claimPrMaintenanceCall({ ...scope, appType: 'lite' })).toEqual({ allowed: true });
+  });
+  it('defers low-priority requests below twenty percent without blocking unrelated installations', async () => {
+    await recordPrMaintenanceApiCall({
+      ...scope,
+      endpoint: 'conflict',
+      reason: 'base_overlap',
+      headers: {
+        'x-ratelimit-limit': '5000',
+        'x-ratelimit-remaining': '999',
+        'x-ratelimit-reset': String((T0 + 60_000) / 1000),
+      },
+    });
+    expect(await claimPrMaintenanceCall(scope)).toEqual({
+      allowed: false,
+      reason: 'low_budget',
+      retryAt: new Date(T0 + 60_000),
+    });
+    expect(await claimPrMaintenanceCall({ ...scope, installationId: 'other' })).toEqual({
+      allowed: true,
+    });
+  });
+  it('uses actual GraphQL cost/budget and preserves the reset deadline', async () => {
+    await recordPrMaintenanceApiCall({
+      ...scope,
+      endpoint: 'conflict',
+      reason: 'base_overlap',
+      graphqlCost: 2,
+      graphqlBudget: { limit: 5000, remaining: 10, resetAt: new Date(T0 + 90_000).toISOString() },
+    });
+    expect(await claimPrMaintenanceCall(scope)).toMatchObject({
+      allowed: false,
+      reason: 'low_budget',
+      retryAt: new Date(T0 + 90_000),
+    });
+  });
+  it('serializes in-flight writes and delays the next write until one second after completion', async () => {
+    const first = await claimPrMaintenanceCall({ ...scope, write: true });
+    expect(first).toEqual({ allowed: true, writeLease: T0 + 30_000 });
+    jest.setSystemTime(T0 + 2500);
+    expect(await claimPrMaintenanceCall({ ...scope, write: true })).toMatchObject({
+      allowed: false,
+      reason: 'write_pacing',
+    });
+    await completePrMaintenanceWrite({ ...scope, writeLease: T0 + 30_000 });
+    jest.setSystemTime(T0 + 3499);
+    expect(await claimPrMaintenanceCall({ ...scope, write: true })).toEqual({
+      allowed: false,
+      reason: 'write_pacing',
+      retryAt: new Date(T0 + 3500),
+    });
+    jest.setSystemTime(T0 + 3500);
+    expect(await claimPrMaintenanceCall({ ...scope, write: true })).toMatchObject({
+      allowed: true,
+    });
+  });
+  it('fails closed when the installation budget store is unavailable', async () => {
+    evalMock.mockRejectedValue(new Error('unavailable'));
+    expect(await claimPrMaintenanceCall(scope)).toEqual({
+      allowed: false,
+      reason: 'unavailable',
+      retryAt: new Date(T0 + 60_000),
+    });
+  });
 });
 
 afterEach(() => {

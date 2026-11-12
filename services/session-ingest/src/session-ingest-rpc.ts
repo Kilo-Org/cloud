@@ -237,6 +237,9 @@ function destinationIdentityConflicts(
     | 'cloud_agent_session_scope_id'
     | 'cloud_agent_worktree_id'
     | 'organization_id'
+    | 'chat_kind'
+    | 'maintenance_watch_id'
+    | 'maintenance_attempt_id'
   >,
   parsed: CreateSessionForCloudAgentParams
 ): boolean {
@@ -246,6 +249,11 @@ function destinationIdentityConflicts(
     (existing.cloud_agent_session_scope_id !== null &&
       existing.cloud_agent_session_scope_id !== parsed.cloudAgentSessionId) ||
     existing.organization_id !== (parsed.organizationId ?? null) ||
+    (existing.chat_kind ?? 'user') !== (parsed.chat?.kind ?? 'user') ||
+    (existing.maintenance_watch_id ?? null) !==
+      (parsed.chat?.kind === 'maintenance' ? parsed.chat.watchId : null) ||
+    (existing.maintenance_attempt_id ?? null) !==
+      (parsed.chat?.kind === 'maintenance' ? parsed.chat.attemptId : null) ||
     (existing.cloud_agent_worktree_id ?? null) !== (parsed.cloudAgentWorktreeId ?? null)
   );
 }
@@ -506,6 +514,10 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
           organization_id: parsed.organizationId ?? null,
           profile_id: parsed.profileId ?? null,
           created_on_platform: parsed.createdOnPlatform,
+          chat_kind: parsed.chat?.kind ?? 'user',
+          maintenance_watch_id: parsed.chat?.kind === 'maintenance' ? parsed.chat.watchId : null,
+          maintenance_attempt_id:
+            parsed.chat?.kind === 'maintenance' ? parsed.chat.attemptId : null,
           ...(parsed.title !== undefined ? { title: parsed.title } : {}),
           ...(inputGitUrl !== undefined ? { git_url: inputGitUrl } : {}),
           version: 0,
@@ -574,6 +586,9 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         cloud_agent_session_scope_id: cli_sessions_v2.cloud_agent_session_scope_id,
         cloud_agent_worktree_id: cli_sessions_v2.cloud_agent_worktree_id,
         organization_id: cli_sessions_v2.organization_id,
+        chat_kind: cli_sessions_v2.chat_kind,
+        maintenance_watch_id: cli_sessions_v2.maintenance_watch_id,
+        maintenance_attempt_id: cli_sessions_v2.maintenance_attempt_id,
       })
       .from(cli_sessions_v2)
       .where(

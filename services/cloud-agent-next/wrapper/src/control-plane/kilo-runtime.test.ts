@@ -740,8 +740,8 @@ describe('createKiloRuntime', () => {
       expect(spawner.processes[0].stopped).toBe(0);
       attachment.resolve({ prompt: 'hello' });
       finalization.resolve({ success: true });
-      turns.release('workspace_b');
-      turns.shutdown();
+      await turns.release('workspace_b');
+      await turns.shutdown();
       await runtime.shutdown();
     }
   );
@@ -810,7 +810,7 @@ describe('createKiloRuntime', () => {
       expect(spawner.processes[0].stopped).toBe(0);
       expect(spawner.spawnCount()).toBe(1);
       expect(frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
-      turns.shutdown();
+      await turns.shutdown();
       await runtime.shutdown();
     }
   );
@@ -1850,7 +1850,7 @@ describe('Kilo observation recovery', () => {
         await Bun.sleep(1);
       },
       async dispose() {
-        turns.shutdown();
+        await turns.shutdown();
         await created.runtime.shutdown();
       },
     };

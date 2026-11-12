@@ -209,6 +209,7 @@ semantics.
 | `main` and container `image` paths rebased (`../src/index.ts`, `../Dockerfile*`) | The rendered config lives one directory deeper, in `.wrangler/`. |
 | Report-queue producer and consumer removed | The e2e Worker must not produce or consume the production report queue. |
 | Callback-queue producer and consumer renamed to `cloud-agent-next-callback-queue-e2e-test` | The e2e Worker can never consume production callback messages. |
+| PR-maintenance queue producer and consumers removed, and the `* * * * *` PR-maintenance recovery cron removed | A queue has one consumer, so the e2e Worker must not take the production PR-maintenance consumer or call production dispatch every minute. Without `PR_MAINTENANCE_QUEUE`, a schedule request to the e2e Worker fails with 503 (`scheduleMaintenance` throws `maintenance_queue_unavailable`). |
 | Only the native `SandboxContainers` container kept | Native Cloudflare Containers is the only runtime; the E2E Worker exercises the same provider as production. |
 | Runtime migrations preserve E2E history | `v15` removes the old runtime; `v15-e2e` creates the retained runtime namespaces. |
 | `NEXTAUTH_SECRET` Secrets Store binding added | Verifies the ticket and API token, and seals runtime authorization. |

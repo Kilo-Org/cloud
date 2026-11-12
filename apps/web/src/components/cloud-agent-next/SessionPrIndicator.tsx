@@ -1,42 +1,26 @@
 'use client';
 
-import { useCallback } from 'react';
-
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 import { PrBadge, PrBadgeSkeleton } from './PrBadge';
 import { PrHoverCardContent } from './PrHoverCardContent';
 import type { StoredSession } from './types';
 
 type SessionPrIndicatorProps = {
-  session: Pick<StoredSession, 'sessionId' | 'branch' | 'associatedPr' | 'repository'>;
+  session: Pick<
+    StoredSession,
+    'sessionId' | 'branch' | 'associatedPr' | 'repository' | 'worktreeId'
+  >;
 };
 
-/**
- * Right-aligned PR indicator for a single session row in the sidebar.
- *
- * Tri-state behavior driven by `session.associatedPr`:
- *   - `undefined` + the session has a `branch` → render a fixed-width skeleton
- *     so the column does not jitter while the list query is in flight.
- *   - `null` → render nothing (no stored link, or a stored link GitHub has not
- *     verified).
- *   - `AssociatedPr` → render the badge wrapped in a hover card; clicking the
- *     badge opens the PR on GitHub and `stopPropagation` prevents the row's
- *     own click handler from selecting the session. Only a GitHub-verified link
- *     reaches this branch; a verified link whose cache row has not synced
- *     renders as a pending partial (state `unknown`) with a Refresh action.
- */
 export function SessionPrIndicator({ session }: SessionPrIndicatorProps) {
-  const handleBadgeClick = useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      event.stopPropagation();
-      const url = session.associatedPr?.url;
-      if (!url) return;
-      window.open(url, '_blank', 'noopener,noreferrer');
-    },
-    [session.associatedPr]
-  );
-
   if (session.associatedPr === undefined) {
     if (!session.branch) return null;
     return <PrBadgeSkeleton />;
@@ -49,23 +33,26 @@ export function SessionPrIndicator({ session }: SessionPrIndicatorProps) {
   const pr = session.associatedPr;
 
   return (
-    <HoverCard openDelay={120} closeDelay={80}>
-      <HoverCardTrigger asChild>
-        <PrBadge pr={pr} onClick={handleBadgeClick} />
-      </HoverCardTrigger>
-      <HoverCardContent
-        align="end"
-        side="left"
-        collisionPadding={8}
-        className="w-72 max-w-[var(--radix-hover-card-content-available-width)]"
-        onClick={event => event.stopPropagation()}
-      >
-        <PrHoverCardContent
-          pr={pr}
-          sessionId={session.sessionId}
-          gitBranch={session.branch ?? null}
-        />
-      </HoverCardContent>
-    </HoverCard>
+    <span className="inline-flex shrink-0" onClick={event => event.stopPropagation()}>
+      <Dialog>
+        <DialogTrigger asChild>
+          <PrBadge pr={pr} title="Open pull request status and maintenance" />
+        </DialogTrigger>
+        <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Pull request status</DialogTitle>
+            <DialogDescription>
+              Cached GitHub evidence and automatic maintenance for this workspace.
+            </DialogDescription>
+          </DialogHeader>
+          <PrHoverCardContent
+            pr={pr}
+            sessionId={session.sessionId}
+            gitBranch={session.branch ?? null}
+            worktreeId={session.worktreeId}
+          />
+        </DialogContent>
+      </Dialog>
+    </span>
   );
 }

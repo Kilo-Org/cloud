@@ -6,6 +6,7 @@ import type {
 } from '@kilocode/cloud-agent-sdk';
 import type { RootRouter } from '@/routers/root-router';
 import { normalizeAlias } from './session-config';
+import type { MaintenanceSessionMetadata } from './store/db-session-atoms';
 
 // The fields read here, so the server's unserialized result fits as well.
 type SessionWithRuntimeState = Pick<
@@ -19,7 +20,8 @@ type SessionWithRuntimeState = Pick<
   | 'runtimeState'
   | 'associatedPr'
   | 'total_cost_microdollars'
->;
+> &
+  MaintenanceSessionMetadata;
 
 /** The SDK's view of `cliSessionsV2.getWithRuntimeState`, for the browser and the server. */
 export function toFetchedSessionData(
@@ -48,5 +50,10 @@ export function toFetchedSessionData(
     runtimeAgents: rs?.runtimeAgents,
     associatedPr: session.associatedPr,
     totalCostMicrodollars: session.total_cost_microdollars,
+    chatKind: session.chat_kind ?? 'user',
+    maintenanceWatchId: session.maintenance_watch_id ?? null,
+    maintenanceAttemptId: session.maintenance_attempt_id ?? null,
+    isMaintenancePinned:
+      session.chat_kind === 'maintenance' && session.is_maintenance_pinned === true,
   };
 }

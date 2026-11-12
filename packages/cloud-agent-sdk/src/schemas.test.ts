@@ -427,6 +427,21 @@ describe('session worktree event schemas', () => {
     expect(parsed.worktreeId).toBe(worktreeId);
   });
 
+  it('preserves explicit maintenance metadata without deriving an attempt pin', () => {
+    const metadata = {
+      chatKind: 'maintenance',
+      maintenanceWatchId: 'watch-example',
+      maintenanceAttemptId: 'attempt-example',
+    };
+    const parsed = sessionEventV2RowSchema.parse({
+      ...session,
+      ...metadata,
+      isMaintenancePinned: true,
+    });
+    expect(parsed).toEqual({ ...session, ...metadata });
+    expect(sessionEventV2RowSchema.parse(session).chatKind).toBeUndefined();
+  });
+
   it.each(['session.created', 'session.updated'] as const)(
     'retains worktree IDs in %s payloads',
     type => {

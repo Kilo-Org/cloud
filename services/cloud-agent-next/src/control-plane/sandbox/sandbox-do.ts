@@ -2,6 +2,8 @@ import { assertContainerAccountAvailable } from '../../container-account-admissi
 import { billingFailureFromAdmission } from '../../billing-failure.js';
 import {
   parseRuntimeHarness,
+  PR_MAINTENANCE_HEADER,
+  PR_MAINTENANCE_VERSION,
   RUNTIME_HARNESS_HEADER,
   RUNTIME_HARNESSES,
   RUNTIME_INSTRUCTIONS_HEADER,
@@ -511,6 +513,7 @@ const wrapperSocketAttachmentSchema = z.object({
   worktreeGit: z.literal(true).optional(),
   workspaceConfiguration: z.literal(true).optional(),
   runtimeInstructions: z.literal(true).optional(),
+  prMaintenance: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
   runtimeHarness: z.enum(RUNTIME_HARNESSES).optional(),
   kiloCliVersion: SandboxRuntimeVersionSchema.optional(),
@@ -529,6 +532,7 @@ function runtimeHarnessField(runtimeHarness: RuntimeHarness | undefined) {
 type PrepareFrameMaterializationStage =
   | 'wrapper_redaction_unsupported'
   | 'wrapper_skills_sh_unsupported'
+  | 'wrapper_maintenance_unsupported'
   | 'frame_materialization_failed';
 
 class PrepareFrameMaterializationError extends Error {
@@ -2759,6 +2763,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(request.headers.get(RUNTIME_INSTRUCTIONS_HEADER) === RUNTIME_INSTRUCTIONS_VERSION
           ? { runtimeInstructions: true as const }
           : {}),
+        ...(request.headers.get(PR_MAINTENANCE_HEADER) === PR_MAINTENANCE_VERSION
+          ? { prMaintenance: true as const }
+          : {}),
         ...runtimeHarnessField(parseRuntimeHarness(request.headers.get(RUNTIME_HARNESS_HEADER))),
         ...(observedRuntime.kiloCliVersion === null
           ? {}
@@ -3632,6 +3639,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(spec.branchMode === undefined ? {} : { branchMode: spec.branchMode }),
       ...(spec.baseBranch === undefined ? {} : { baseBranch: spec.baseBranch }),
       ...(spec.baseSha === undefined ? {} : { baseSha: spec.baseSha }),
+      ...(spec.maintenance === undefined ? {} : { maintenance: spec.maintenance }),
       ...(spec.worktreeRecovery === undefined ? {} : { worktreeRecovery: spec.worktreeRecovery }),
       ...(spec.runtimeSkills === undefined ? {} : { runtimeSkills: spec.runtimeSkills }),
       ...(spec.runtimeInstructions === undefined
@@ -4585,6 +4593,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       throw new PrepareFrameMaterializationError('wrapper_skills_sh_unsupported');
     }
     const attachment = this.readAttachment(socket);
+    // Maintenance rules cannot be stripped, so a wrapper that would drop the field fails the attempt.
+    if (route.spec.maintenance !== undefined && attachment?.prMaintenance !== true) {
+      throw new PrepareFrameMaterializationError('wrapper_maintenance_unsupported');
+    }
     const snapshotFrame = workspaceSnapshotFrame(this.db, route, attachment);
     const wireSpec: ControlPlaneRouteSpec = {
       ...runtimeSpecForContract(
@@ -6735,6 +6747,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(frame.worktreeGit ? { worktreeGit: true } : {}),
         ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
         ...(attachment?.runtimeInstructions ? { runtimeInstructions: true } : {}),
+        ...(attachment?.prMaintenance ? { prMaintenance: true } : {}),
         ...runtimeHarnessField(attachment?.runtimeHarness),
       });
       logControlDiagnostic('workspace_snapshot_capability', {

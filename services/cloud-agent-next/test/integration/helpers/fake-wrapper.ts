@@ -1,4 +1,6 @@
 import {
+  PR_MAINTENANCE_HEADER,
+  PR_MAINTENANCE_VERSION,
   RUNTIME_HARNESS_HEADER,
   RUNTIME_INSTRUCTIONS_HEADER,
   RUNTIME_INSTRUCTIONS_VERSION,
@@ -25,6 +27,7 @@ export type FakeWrapperConnectInput = {
   runtimeContract?: 'legacy' | 'worktree';
   workspaceConfiguration?: boolean;
   runtimeInstructions?: boolean;
+  prMaintenance?: boolean;
   /** Raw `x-kilo-runtime-harness` value, so a test can also send an unknown one. */
   runtimeHarness?: string;
   kiloCliVersion?: string;
@@ -106,6 +109,7 @@ export class FakeWrapper {
         ...(input.runtimeInstructions
           ? { [RUNTIME_INSTRUCTIONS_HEADER]: RUNTIME_INSTRUCTIONS_VERSION }
           : {}),
+        ...(input.prMaintenance ? { [PR_MAINTENANCE_HEADER]: PR_MAINTENANCE_VERSION } : {}),
         ...(input.runtimeHarness === undefined
           ? {}
           : { [RUNTIME_HARNESS_HEADER]: input.runtimeHarness }),

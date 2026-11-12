@@ -93,6 +93,13 @@ import { z } from 'zod';
 import { isOrgInList } from './sandbox-id.js';
 import { registerVercelScmBrokerRoute } from './scm-broker/vercel-route.js';
 import { isAllowedStreamWebSocketOrigin, isAllowedWebSocketOrigin } from './ws-origin.js';
+import { registerMaintenanceRoutes } from './pr-maintenance/routes.js';
+import {
+  consumeMaintenanceQueue,
+  dispatchDueMaintenance,
+  PR_MAINTENANCE_QUEUES,
+  PR_MAINTENANCE_RECOVERY_CRON,
+} from './pr-maintenance/scheduling.js';
 
 const app = new Hono<HonoContext>();
 
@@ -283,6 +290,7 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
 });
 
 registerVercelScmBrokerRoute(app);
+registerMaintenanceRoutes(app);
 
 app.get('/health', (c: Context<HonoContext>) => {
   return c.json({
@@ -989,6 +997,7 @@ export default {
     return app.fetch(request, env, ctx);
   },
   async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
+    if (PR_MAINTENANCE_QUEUES.has(batch.queue)) return consumeMaintenanceQueue(batch, env);
     if (batch.queue.startsWith('cloud-agent-next-callback-queue')) {
       const consumer = createCallbackQueueConsumer(env);
       return consumer(batch as MessageBatch<CallbackJob>);
@@ -1000,6 +1009,10 @@ export default {
     logger.warn(`Received message from unexpected queue: ${batch.queue}`);
   },
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    if (controller.cron === PR_MAINTENANCE_RECOVERY_CRON) {
+      await dispatchDueMaintenance(env);
+      return;
+    }
     if (controller.cron === REPORT_RETENTION_CRON) {
       await removeExpiredCloudAgentReportData(env);
       return;

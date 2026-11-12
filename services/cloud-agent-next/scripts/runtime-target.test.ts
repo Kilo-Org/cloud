@@ -7,6 +7,10 @@ import {
   buildE2eWorkerConfig,
   buildLocalE2eWorkerConfig,
 } from '../test/e2e/deploy/render-e2e-worker-config.mjs';
+import {
+  PR_MAINTENANCE_QUEUES,
+  PR_MAINTENANCE_RECOVERY_CRON,
+} from '../src/pr-maintenance/scheduling.js';
 
 const startup = { mode: 'downloaded', image: 'runtime-free' } as const;
 const release = {
@@ -207,6 +211,35 @@ it('keeps verified downloaded runtime selection in deployed E2E configuration', 
     binding: 'RUNTIME_RELEASE_BUCKET',
     bucket_name: release.bucket,
   });
+});
+
+it('keeps the deployed E2E Worker off the production PR-maintenance queue and cron', () => {
+  const source = parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
+  expect(source.queues.producers).toContainEqual(
+    expect.objectContaining({ binding: 'PR_MAINTENANCE_QUEUE' })
+  );
+  expect(source.triggers.crons).toContain(PR_MAINTENANCE_RECOVERY_CRON);
+
+  const output = buildE2eWorkerConfig(
+    renderRuntimeTarget({ config: source, environment: 'production', startup, release }),
+    {
+      workerUrl: 'https://e2e.example.test',
+      kiloOpenRouterBase: 'https://fake.example.test/api/openrouter',
+    }
+  );
+  const producers: Array<{ binding: string; queue: string }> = output.queues.producers;
+  const consumers: Array<{ queue: string }> = output.queues.consumers;
+  expect(producers.map(producer => producer.binding)).not.toContain('PR_MAINTENANCE_QUEUE');
+  for (const { queue } of [...producers, ...consumers]) {
+    expect(PR_MAINTENANCE_QUEUES.has(queue)).toBe(false);
+  }
+  expect(consumers.map(consumer => consumer.queue)).toContain(
+    'cloud-agent-next-callback-queue-e2e-test'
+  );
+  expect(output.triggers.crons).not.toContain(PR_MAINTENANCE_RECOVERY_CRON);
+  expect(output.triggers.crons).toEqual(
+    source.triggers.crons.filter((cron: string) => cron !== PR_MAINTENANCE_RECOVERY_CRON)
+  );
 });
 
 it('rebases only the runtime-free base for local HTTP E2E startup', () => {

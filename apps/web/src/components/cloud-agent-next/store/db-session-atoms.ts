@@ -16,6 +16,7 @@
  */
 
 import { atom } from 'jotai';
+import type { CloudAgentChatKind } from '@kilocode/db/cloud-agent-pr-maintenance';
 import type { AssociatedPr } from '../utils/github-pr-link';
 import { extractRepoFromGitUrl } from '../utils/git-utils';
 
@@ -27,7 +28,14 @@ export { extractRepoFromGitUrl };
  * API session type - matches the shape returned by cli-sessions-router.list (V1)
  * Dates are returned as strings from the tRPC API
  */
-type ApiSession = {
+export type MaintenanceSessionMetadata = {
+  chat_kind?: CloudAgentChatKind;
+  maintenance_watch_id?: string | null;
+  maintenance_attempt_id?: string | null;
+  is_maintenance_pinned?: boolean;
+};
+
+type ApiSession = MaintenanceSessionMetadata & {
   latest_run_status?: 'queued' | 'accepted' | 'completed' | 'failed' | 'interrupted' | null;
   latest_run_failure_kind?: 'failed' | 'system_interrupted' | null;
   latest_run_terminal_at?: string | null;
@@ -54,7 +62,7 @@ type ApiSession = {
 /**
  * Database session type - with Date objects for convenient manipulation
  */
-export type DbSession = {
+export type DbSession = MaintenanceSessionMetadata & {
   latest_run_status?: ApiSession['latest_run_status'];
   latest_run_failure_kind?: ApiSession['latest_run_failure_kind'];
   latest_run_terminal_at?: ApiSession['latest_run_terminal_at'];
@@ -81,7 +89,7 @@ export type DbSession = {
  * Database session type for V2 - with Date objects
  * V2 sidebar sessions include git/platform/org/parent/status fields from cli_sessions_v2.
  */
-export type DbSessionV2 = {
+export type DbSessionV2 = MaintenanceSessionMetadata & {
   latest_run_status?: ApiSession['latest_run_status'];
   latest_run_failure_kind?: ApiSession['latest_run_failure_kind'];
   latest_run_terminal_at?: ApiSession['latest_run_terminal_at'];
@@ -133,7 +141,7 @@ export function apiSessionToDbSession(apiSession: ApiSession): DbSession | DbSes
  * V2 sessions don't have blob URLs, git_url, organization_id, or created_on_platform.
  * These fields are optional to support both V1 and V2 sessions.
  */
-export type DbSessionDetails = {
+export type DbSessionDetails = MaintenanceSessionMetadata & {
   session_id: string;
   title: string | null;
   cloud_agent_session_id: string | null;

@@ -101,6 +101,7 @@ import {
 import { filterLiveSidebarSessions } from './live-sidebar-sessions';
 import type { ActiveSession } from './hooks/useActiveSessions';
 import { sidebarUpdatedSince } from './hooks/sidebar-queries';
+import { MaintenanceBadge } from './MaintenanceBadge';
 
 type ChatSidebarProps = {
   sessions: StoredSession[];
@@ -281,6 +282,9 @@ const SessionRow = memo(function SessionRow({
             <span className="line-clamp-1 min-w-0 flex-1 leading-snug" title={session.prompt}>
               {session.prompt}
             </span>
+            {session.chatKind === 'maintenance' && (
+              <MaintenanceBadge pinned={session.isMaintenancePinned} />
+            )}
             <SessionPrIndicator session={session} />
             <span className="group/session-actions relative flex h-5 w-8 shrink-0 items-center justify-center">
               {isDeleting ? (

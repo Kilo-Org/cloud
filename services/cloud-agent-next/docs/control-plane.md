@@ -809,6 +809,11 @@ keep environment snapshots and existing history/worktree recovery.
   WebSocket upgrade. The Sandbox DO retains this capability in the socket attachment across
   hibernation and omits `runtimeInstructions` from both `session.prepare` and `session.attach` for
   older wrappers, whose strict schemas reject the field. Stored workspace instructions are unchanged.
+- A wrapper that runs PR maintenance chats advertises `x-kilo-pr-maintenance: 1` on the WebSocket
+  upgrade, retained in the socket attachment the same way. A route whose spec carries `maintenance`
+  is never sent to a wrapper without it: the attempt fails `workspace_setup_failed` (diagnostic stage
+  `wrapper_maintenance_unsupported`) instead of waiting for the preparation deadline. The field is not
+  stripped, because the wrapper would then run the chat without its maintenance rules.
 - Profile instruction cleanup removes only files tracked in `$HOME/.kilocode/profile-instructions.json`.
   Invalid entries are skipped individually without losing ownership of valid entries. Restored HOMEs
   from wrappers predating this manifest retain untracked rules, including stale profile rules: their

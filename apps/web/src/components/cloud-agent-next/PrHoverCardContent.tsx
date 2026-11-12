@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useTRPC } from '@/lib/trpc/utils';
 
 import { PrStateBadge } from './PrStateBadge';
+import { PrMaintenance } from './PrMaintenance';
 import {
   normalizePrBadgeState,
   truncatePrTitle,
@@ -21,6 +22,7 @@ type PrHoverCardContentProps = {
   pr: AssociatedPr;
   sessionId: string;
   gitBranch: string | null;
+  worktreeId?: string | null;
 };
 
 /**
@@ -71,7 +73,12 @@ function isWithinRefreshThrottle(lastSyncedAt: string): boolean {
   return Date.now() - parsed < REFRESH_THROTTLE_MS;
 }
 
-export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardContentProps) {
+export function PrHoverCardContent({
+  pr,
+  sessionId,
+  gitBranch,
+  worktreeId,
+}: PrHoverCardContentProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const state = normalizePrBadgeState(pr.state);
@@ -112,7 +119,7 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
   }, [isPending, refresh, sessionId]);
 
   return (
-    <div className="flex flex-col gap-3 text-sm">
+    <div className="flex min-w-0 flex-col gap-3 text-sm">
       <div className="flex items-start gap-2">
         <PrStateBadge state={state} />
         <span className="text-muted-foreground text-xs leading-5">PR #{pr.number}</span>
@@ -204,11 +211,13 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
             )}
           </>
         )}
-        {pr.reviewDecision && (
+        {(pr.platform === 'github' || pr.reviewDecision) && (
           <>
             <span className="text-muted-foreground">Review</span>
-            <span className={REVIEW_DECISION_CLASSES[pr.reviewDecision]}>
-              {REVIEW_DECISION_LABELS[pr.reviewDecision]}
+            <span
+              className={pr.reviewDecision ? REVIEW_DECISION_CLASSES[pr.reviewDecision] : undefined}
+            >
+              {pr.reviewDecision ? REVIEW_DECISION_LABELS[pr.reviewDecision] : 'Unknown'}
             </span>
           </>
         )}
@@ -239,6 +248,8 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
           Partial observations; some evidence is missing.
         </p>
       )}
+
+      {worktreeId && pr.platform === 'github' && <PrMaintenance pr={pr} sessionId={sessionId} />}
 
       <div className="border-border/60 flex items-center gap-2 border-t pt-3">
         {pr.platform === 'github' &&

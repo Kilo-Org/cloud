@@ -10,6 +10,7 @@ import { removeUserClaudeBillingGrants } from '@kilocode/web-shared/lib/ai-gatew
 import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { clearOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { deleteUserClaudeProfiles } from '@/lib/claude-billing/delete';
+import { deleteWatchPrRecords } from '@/lib/cloud-agent/watch-pr-cleanup';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
 import { lockGitHubIdentityWrites } from '@kilocode/db/github-identity';
@@ -1385,7 +1386,7 @@ export async function anonymizeCloudUserData(
     .delete(cloud_agent_workspace_folders)
     .where(eq(cloud_agent_workspace_folders.kilo_user_id, userId));
   await tx.delete(todo_lists).where(eq(todo_lists.kilo_user_id, userId));
-  await tx.delete(cloud_agent_pr_watches).where(eq(cloud_agent_pr_watches.kilo_user_id, userId));
+  await deleteWatchPrRecords(tx, eq(cloud_agent_pr_watches.kilo_user_id, userId));
   await tx
     .update(cloud_agent_worktrees)
     .set({ name: null, folder_id: null })

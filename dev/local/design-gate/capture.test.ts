@@ -648,6 +648,99 @@ test('a language reload the inspector never returns from relaunches the app', as
   assert.equal(state.language, 'en');
 });
 
+test('a reload that leaves no debugger at all still relaunches and measures the cell', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const base = fakeProbe(state);
+  // The reload takes the inspector with it: nothing is listed, so the readiness
+  // wait ends by throwing instead of returning a stale dump. That is the outage
+  // the relaunch exists for, and it must not end the run.
+  let detached = false;
+  const dead = () => new InfraError('No Metro debugger page for Pixel (0 pages listed)');
+  const probe: ProbeClient = {
+    ...base,
+    setLanguage: async (preference, resolved) => {
+      state.languageCalls.push(`${preference}/${resolved}`);
+      if (resolved === 'ar') {
+        detached = true;
+        return;
+      }
+      state.language = resolved;
+    },
+    ready: async () => {
+      if (detached) throw dead();
+      return true;
+    },
+    dump: async () => {
+      if (detached) throw dead();
+      return base.dump();
+    },
+  };
+  const device: Device = {
+    ...fakeDevice(calls, state),
+    relaunch: () => {
+      calls.push('relaunch');
+      detached = false;
+      state.language = 'ar';
+    },
+  };
+  const ctx = context(device, probe);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'standard'), HOME);
+  assert.equal(calls.filter(call => call === 'relaunch').length, 1);
+  assert.deepEqual(
+    outcome.cells.map(cell => [cell.id, cell.screens.map(screen => screen.target)]),
+    [
+      ['base', ['home']],
+      ['dark', ['home']],
+      ['compact', ['home']],
+      ['rtl', ['home']],
+    ]
+  );
+  assert.deepEqual(outcome.skipped, []);
+  assert.equal(state.language, 'en');
+});
+
+test('a relaunch the device cannot perform skips the cell instead of aborting the run', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const base = fakeProbe(state);
+  const probe: ProbeClient = {
+    ...base,
+    setLanguage: async (preference, resolved) => {
+      state.languageCalls.push(`${preference}/${resolved}`);
+      if (resolved === 'ar') return;
+      state.language = resolved;
+    },
+  };
+  const device: Device = {
+    ...fakeDevice(calls, state),
+    relaunch: () => {
+      calls.push('relaunch');
+      throw new Error('adb: device offline');
+    },
+  };
+  const outcome = await runMatrix(context(device, probe), matrixCells('android', 'standard'), HOME);
+  // The cell that needed the restart is named as unmeasured; the three cells
+  // that did not are still graded, and the run reports the gap instead of
+  // dying on one adb error.
+  assert.deepEqual(outcome.skipped, [
+    {
+      cell: 'rtl',
+      target: 'home',
+      reason: 'InfraError: Relaunch failed: Error: adb: device offline',
+    },
+  ]);
+  assert.deepEqual(
+    outcome.cells.map(cell => [cell.id, cell.screens.length]),
+    [
+      ['base', 1],
+      ['dark', 1],
+      ['compact', 1],
+    ]
+  );
+  assert.equal(calls.filter(call => call === 'relaunch').length, 1);
+});
+
 test('runMatrix records a target the probe cannot read instead of reporting a pass', async () => {
   const calls: string[] = [];
   const state = probeState();

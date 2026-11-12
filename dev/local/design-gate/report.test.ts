@@ -98,6 +98,18 @@ test('renderReport lists the summary table and one line per finding', () => {
     ),
     /No findings\./
   );
+  // A target nothing read must be visible in the report, not only in a lower
+  // screen count: the run is inconclusive and this is where a reader looks.
+  const skippedReport = renderReport(
+    { platform: 'android', device: 'd', matrix: 'standard', startedAt: 'S', finishedAt: 'F' },
+    [{ id: 'rtl', config: dark, screens: [] }],
+    [],
+    fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-skipped-')),
+    [{ cell: 'rtl', target: 'sessions', reason: 'InfraError: no Metro debugger page' }]
+  );
+  assert.ok(skippedReport.includes('## Unmeasured targets'));
+  assert.ok(skippedReport.includes('- rtl · sessions: InfraError: no Metro debugger page'));
+  assert.ok(skippedReport.includes('The run is inconclusive; these targets were not read.'));
 });
 
 test('screenBoxes scales dp to px and numbers findings globally', () => {

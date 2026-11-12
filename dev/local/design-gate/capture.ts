@@ -561,30 +561,58 @@ async function ensureLanguage(ctx: CaptureContext, want: LanguageTarget): Promis
     ctx.log(`design-gate: setLanguage did not answer (${String(error)}); waiting for reload`);
   }
   ctx.probe.disconnect();
-  const dump = await waitForApp(
-    ctx.probe,
-    ctx.clock,
-    current => languageMatches(current, want),
-    RELOAD_WAIT_MS
-  );
-  // The inspector does not survive the reload on every emulator: the app keeps
-  // painting while the page list stays empty until the process restarts. When
-  // the wait ended without the language matching, restart the app — the
-  // recovery the app itself supports — and wait again.
-  let settledDump = dump;
-  if (!languageMatches(dump, want) && ctx.device.relaunch !== undefined) {
-    ctx.log(`design-gate: language did not come back after the reload; relaunching the app`);
-    ctx.probe.disconnect();
-    ctx.device.relaunch();
-    settledDump = await waitForApp(
+  // The reload takes the app away for a few seconds, and it ends two ways
+  // without the new language: the old target answers and still reports the old
+  // one, or nothing answers at all because the inspector went with the reload
+  // and the page list is empty. Both are the same outage, and both are what the
+  // relaunch recovers, so a timed-out wait falls through to it.
+  let unreachable: InfraError | undefined;
+  let dump: ProbeDump | undefined;
+  try {
+    dump = await waitForApp(
       ctx.probe,
       ctx.clock,
       current => languageMatches(current, want),
-      APP_WAIT_MS
+      RELOAD_WAIT_MS
     );
+  } catch (error) {
+    if (!(error instanceof InfraError)) throw error;
+    unreachable = error;
+    ctx.log(`design-gate: the reloaded app did not answer (${String(error)})`);
+  }
+  let settledDump = dump;
+  if (settledDump === undefined || !languageMatches(settledDump, want)) {
+    // The inspector does not survive the reload on every emulator: the app keeps
+    // painting while the page list stays empty until the process restarts.
+    // Restart the app — the recovery the app itself supports — and wait again.
+    if (ctx.device.relaunch === undefined) {
+      if (unreachable !== undefined) throw unreachable;
+    } else {
+      ctx.log(`design-gate: relaunching the app to get its inspector back`);
+      ctx.probe.disconnect();
+      // A device that cannot start the app leaves the cell unmeasured, not the
+      // whole run failed: adb reports it as a plain error, so it is raised as an
+      // InfraError that the cell records as a skip.
+      try {
+        ctx.device.relaunch();
+      } catch (error) {
+        throw error instanceof InfraError
+          ? error
+          : new InfraError(`Relaunch failed: ${String(error)}`);
+      }
+      settledDump = await waitForApp(
+        ctx.probe,
+        ctx.clock,
+        current => languageMatches(current, want),
+        APP_WAIT_MS
+      );
+    }
   }
   await waitForStableLayout(ctx.probe, ctx.clock);
-  return { matched: languageMatches(settledDump, want), reloaded: true };
+  return {
+    matched: settledDump !== undefined && languageMatches(settledDump, want),
+    reloaded: true,
+  };
 }
 
 export function layoutSignature(dump: ProbeDump): string {
@@ -701,6 +729,24 @@ export async function runMatrix(
   const unregisterCleanup = ctx.registerCleanup?.(async () => {
     await restoreState();
   });
+  // A cell whose language cannot be reached leaves every target of that cell
+  // unmeasured: record them as skipped and keep the other cells, so one probe
+  // failure ends the run inconclusive instead of aborting it.
+  const switchCellLanguage = async (
+    cellId: string,
+    want: LanguageTarget
+  ): Promise<LanguageOutcome | undefined> => {
+    try {
+      return await ensureLanguage(ctx, want);
+    } catch (error) {
+      if (!(error instanceof InfraError)) throw error;
+      const reason = String(error);
+      ctx.log(`design-gate: cell ${cellId} language failed: ${reason}`);
+      for (const target of targets)
+        outcome.skipped.push({ cell: cellId, target: target.id, reason });
+      return undefined;
+    }
+  };
   try {
     for (const config of cells) {
       ctx.log(`design-gate: cell ${config.id}`);
@@ -713,7 +759,8 @@ export async function runMatrix(
       const language: LanguageTarget = config.rtl
         ? { preference: RTL_LANGUAGE, resolved: RTL_LANGUAGE, rtl: true }
         : ltrLanguage;
-      const cellLanguage = await ensureLanguage(ctx, language);
+      const cellLanguage = await switchCellLanguage(config.id, language);
+      if (cellLanguage === undefined) continue;
       await ctx.clock.sleep(CONFIG_SETTLE_MS);
       const run: CellRun = { id: config.id, config, screens: [] };
       outcome.cells.push(run);

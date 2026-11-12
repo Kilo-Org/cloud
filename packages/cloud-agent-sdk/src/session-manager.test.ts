@@ -13,6 +13,7 @@ import {
   createCloudAgentSession,
   REMOTE_SESSION_EXIT_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_NOT_SUPPORTED,
+  REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED,
 } from './session';
 import type {
   CloudAgentSession,
@@ -174,6 +175,7 @@ jest.mock('./session', () => ({
   REMOTE_SESSION_EXIT_NOT_SUPPORTED: 'Remote session exit is not supported for the current session',
   REMOTE_SESSION_CREATION_NOT_SUPPORTED:
     'Remote session creation is not supported for the current session',
+  REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED: 'This session is still loading. Try again in a moment.',
   createCloudAgentSession: jest.fn(
     (sessionConfig: {
       kiloSessionId: string;
@@ -8603,6 +8605,57 @@ describe('createSessionManager', () => {
         REMOTE_SESSION_CREATION_NOT_SUPPORTED
       );
       expect(mockSession.createRemoteSession).not.toHaveBeenCalled();
+    });
+
+    it('rejects before traffic until the active session scope is available', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSession.createRemoteSession.mockClear();
+      // The active session's own row has not landed yet.
+      config.store.set(mgr.atoms.fetchedSessionData, {
+        ...defaultFetchedSession,
+        kiloSessionId: kiloId('ses-2'),
+        organizationId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      });
+
+      await expect(mgr.createRemoteSession()).rejects.toThrow(
+        REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED
+      );
+      expect(mockSession.createRemoteSession).not.toHaveBeenCalled();
+    });
+
+    it('rejects before traffic while the active session has no row yet', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSession.createRemoteSession.mockClear();
+      config.store.set(mgr.atoms.fetchedSessionData, null);
+
+      await expect(mgr.createRemoteSession()).rejects.toThrow(
+        REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED
+      );
+      expect(mockSession.createRemoteSession).not.toHaveBeenCalled();
+    });
+
+    it('uses the organization the caller supplies, whether or not a row has landed', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const orgId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      config.store.set(mgr.atoms.fetchedSessionData, null);
+
+      await mgr.createRemoteSession({ orgId });
+
+      expect(mockSession.createRemoteSession).toHaveBeenCalledWith(
+        expect.objectContaining({ orgId })
+      );
     });
 
     it('rejects before traffic with a stable error when the transport lacks createSession capability', async () => {

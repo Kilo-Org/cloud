@@ -6,8 +6,7 @@ import { byok_api_keys } from '@kilocode/db/schema';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import { and, eq, isNull } from 'drizzle-orm';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
-import { getUserFromSession } from '@kilocode/web-shared/lib/user/server';
-import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { claude_billing_connections } from '@kilocode/db/schema';
 import {
   activateClaudeBillingGrant,
@@ -67,9 +66,18 @@ async function mayComplete(owner: ClaudeBillingOwner, userId: string): Promise<b
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const pending = await consumeClaudeBillingPending();
-  const session = await getUserFromSession();
-
-  if (!pending || !session || pending.kiloUserId !== session.id) {
+  // The standard authorized session, so a blocked account or a revoked web
+  // session cannot complete a link: the person is reported before the code is
+  // exchanged and before the connection row, the grant, or the stored key change.
+  const { user, authorizationRefused } = await getUserFromAuth({ adminOnly: false });
+  if (authorizationRefused) {
+    return outcomeRedirect(
+      validateReturnPath(pending?.returnPath ?? '/byok') ?? '/byok',
+      pending?.owner ?? { kind: 'personal' },
+      'forbidden'
+    );
+  }
+  if (!pending || !user || pending.kiloUserId !== user.id) {
     return outcomeRedirect('/byok', { kind: 'personal' }, 'failed');
   }
   const { owner } = pending;
@@ -79,12 +87,11 @@ export async function GET(request: NextRequest) {
   if (params.get('state') !== pending.state) {
     return outcomeRedirect(returnPath, owner, 'failed');
   }
-  const user = await findUserById(session.id);
-  if (!(await isClaudePlatformOAuthEnabled(user?.google_user_email))) {
+  if (!(await isClaudePlatformOAuthEnabled(user.google_user_email))) {
     return outcomeRedirect(returnPath, owner, 'forbidden');
   }
   // Membership and role can change while the person is on Claude's approval page.
-  if (!(await mayComplete(owner, session.id))) {
+  if (!(await mayComplete(owner, user.id))) {
     return outcomeRedirect(returnPath, owner, 'forbidden');
   }
   const error = params.get('error');
@@ -117,7 +124,7 @@ export async function GET(request: NextRequest) {
           last_refusal_code: null,
           last_refusal_at: null,
           // The person who linked it last; a shared-services link is gated on them.
-          created_by: session.id,
+          created_by: user.id,
         })
         .where(
           and(
@@ -127,7 +134,7 @@ export async function GET(request: NextRequest) {
         )
         .returning({ id: claude_billing_connections.id });
       if (!saved) throw new Error('Claude connection disappeared during approval');
-      await activateClaudeBillingGrant(owner, saved.id, session.id, tx);
+      await activateClaudeBillingGrant(owner, saved.id, user.id, tx);
       // A personal link replaces the person's stored Anthropic API key: they no
       // longer share one, and Kilo never uses a dormant key it did not need. An
       // organization key stays, because it still serves that organization's

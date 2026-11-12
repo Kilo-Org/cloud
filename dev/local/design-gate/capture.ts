@@ -213,8 +213,10 @@ export async function waitForApp(
   let lastError: unknown;
   for (;;) {
     try {
-      if (await probe.ready()) {
-        last = await probe.dump();
+      // A probe that has just lost its page waits for it; this wait's own
+      // budget caps that, so an absent app still fails within the declared time.
+      if (await probe.ready(Math.max(0, deadline - clock.now()))) {
+        last = await probe.dump(Math.max(0, deadline - clock.now()));
         if (accept(last)) return last;
       }
     } catch (error) {

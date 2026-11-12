@@ -20,6 +20,8 @@ export const DEFAULT_WORKSPACE_ORDER: WorkspaceOrder = 'manual';
 /** The sidebar workspace list accepts at most this many search characters. */
 export const WORKSPACE_LIST_SEARCH_MAX_LENGTH = 256;
 
+export const SMART_FOLDER_WORKTREE_ORDER_LIMIT = 200;
+
 export function defaultWorkspaceOrder(): WorkspaceOrder {
   return DEFAULT_WORKSPACE_ORDER;
 }
@@ -39,5 +41,6 @@ export type WorkspaceFolder = {
   kind: WorkspaceFolderKind;
   smartPreset: SmartFolderPreset | null;
   sortMode: WorkspaceFolderSortMode;
+  manualWorktreeOrder: string[];
   worktreeIds: string[];
 };

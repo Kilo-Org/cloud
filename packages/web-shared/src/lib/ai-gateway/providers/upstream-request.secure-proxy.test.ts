@@ -2,7 +2,7 @@ import { SecureProxyRequestBodySchema } from '@kilocode/ai-gateway-secure-proxy-
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { buildDirectProvider } from './build-direct-provider';
-import { upstreamRequest } from './upstream-request';
+import { UPSTREAM_DURATION_BUDGET_MS, upstreamRequest } from './upstream-request';
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -77,6 +77,7 @@ async function sendThroughSecureProxy(
     extraHeaders,
     provider,
     reasoningEffort: null,
+    durationBudgetMs: UPSTREAM_DURATION_BUDGET_MS,
   });
 
   expect(result.type).toBe('success');

@@ -82,6 +82,7 @@ import {
   getPositionBetween,
   groupWorkspaceGroupsByDestination,
   isValidPositionKey,
+  sortSmartFolderGroups,
   sortWorkspaceGroups,
   type SidebarWorkspaceGroup,
   type SidebarWorkspaceRow,
@@ -421,6 +422,7 @@ function WorktreeGroupMenuItems({
         : stackedSource.source?.basePushed === false
           ? `Push \`${sourceBranch}\` first; it will be pushed after the next successful turn, or enable auto-commit`
           : undefined;
+  const manualFolders = folderControls?.folders.filter(folder => folder.kind === 'manual') ?? [];
 
   return (
     <>
@@ -456,7 +458,7 @@ function WorktreeGroupMenuItems({
           Rename worktree
         </DropdownMenuItem>
       )}
-      {folderControls && (
+      {folderControls && (manualFolders.length > 0 || folderControls.folderId !== null) && (
         <DropdownMenuSub>
           <DropdownMenuSubTrigger disabled={folderControls.disabled} className="gap-2">
             <FolderInput className="text-muted-foreground size-4" />
@@ -468,7 +470,7 @@ function WorktreeGroupMenuItems({
               onValueChange={value => folderControls.onMove(value === 'ungrouped' ? null : value)}
             >
               <DropdownMenuRadioItem value="ungrouped">Ungrouped</DropdownMenuRadioItem>
-              {folderControls.folders.map(folder => (
+              {manualFolders.map(folder => (
                 <DropdownMenuRadioItem key={folder.id} value={folder.id}>
                   <span
                     aria-hidden="true"
@@ -1262,14 +1264,18 @@ export function ChatSidebar({
     () =>
       (workspaceFolders?.folders ?? []).map(folder => {
         if (folder.kind === 'smart' && folder.smartPreset) {
-          const groups = workspaceDestinations.smart.get(folder.smartPreset) ?? [];
+          const groups = sortSmartFolderGroups(
+            workspaceDestinations.smart.get(folder.smartPreset) ?? [],
+            workspaceOrder,
+            folder.manualWorktreeOrder
+          );
           return { folder, groups };
         }
         // Regular folders preserve the user's global workspace order.
         const groups = workspaceDestinations.manual.get(folder.id) ?? [];
         return { folder, groups };
       }),
-    [workspaceDestinations, workspaceFolders?.folders]
+    [workspaceDestinations, workspaceFolders?.folders, workspaceOrder]
   );
   const phase4Ungrouped = useMemo(() => {
     if (searchQuery.trim()) return workspaceDestinations.unfiled;
@@ -1323,11 +1329,11 @@ export function ChatSidebar({
       if (phase4Ungrouped.some(group => group.root.worktreeId === worktreeId)) {
         return { folderId: null, groups: workspaceDestinations.unfiled };
       }
-      const section = phase4FolderSections.find(
-        ({ folder, groups }) =>
-          folder.kind === 'manual' && groups.some(group => group.root.worktreeId === worktreeId)
+      const section = phase4FolderSections.find(({ groups }) =>
+        groups.some(group => group.root.worktreeId === worktreeId)
       );
-      if (section) return { folderId: section.folder.id, groups: section.groups };
+      if (section)
+        return { folderId: section.folder.id, groups: section.groups, folder: section.folder };
       return undefined;
     },
     [
@@ -1390,7 +1396,12 @@ export function ChatSidebar({
         (previous !== null && next !== null && previous >= next);
       event.preventDefault();
       event.stopPropagation();
-      if (needsRebalance) {
+      if (reorderContainer.folder?.kind === 'smart') {
+        void workspaceFolders?.reorderSmartFolderWorktrees(
+          reorderContainer.folder.id,
+          desired.map(group => group.root.worktreeId)
+        );
+      } else if (needsRebalance) {
         void workspaceFolders?.initializeWorktreePositions(
           desired.map(group => group.root.worktreeId),
           folderId

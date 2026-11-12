@@ -243,9 +243,30 @@ describe('validateStreamTicket', () => {
         type: 'stream_ticket',
         userId: 'user-1',
         cloudAgentSessionId: 'session-1',
+        exp: expect.any(Number),
       },
     });
   });
+
+  it.each(['cloud-agent-stream', 'cloud-agent-terminal'])(
+    'requires an expiry claim on a ticket for the %s audience',
+    audience => {
+      const ticket = jwt.sign(
+        {
+          type: 'stream_ticket',
+          userId: 'user-1',
+          cloudAgentSessionId: 'session-1',
+        },
+        secret,
+        { algorithm: 'HS256', noTimestamp: true, audience }
+      );
+
+      expect(validateStreamTicket(ticket, secret, audience)).toEqual({
+        success: false,
+        error: 'Invalid ticket payload',
+      });
+    }
+  );
 
   it('rejects a stream ticket presented with the terminal audience', () => {
     const ticket = jwt.sign(
@@ -342,28 +363,13 @@ describe('validateWrapperDispatchTicket', () => {
     });
   });
 
-  it('accepts a legacy raw Kilo JWT so wrapper processes bound before ticket support shipped keep working', async () => {
-    const legacyToken = jwt.sign({ version: 3, kiloUserId: 'user-1' }, secret, {
+  it('rejects a plain Kilo user JWT', async () => {
+    const userToken = jwt.sign({ version: 3, kiloUserId: 'user-1' }, secret, {
       algorithm: 'HS256',
       expiresIn: '1 minute',
     });
 
-    await expect(validateWrapperDispatchTicket(`Bearer ${legacyToken}`, secret)).resolves.toEqual({
-      success: true,
-      claims: { type: 'legacy_kilo_token', userId: 'user-1' },
-    });
-  });
-
-  it('rejects an audience-scoped Kilo JWT on the legacy path', async () => {
-    const audienceScopedToken = jwt.sign({ version: 3, kiloUserId: 'user-1' }, secret, {
-      algorithm: 'HS256',
-      expiresIn: '1 minute',
-      audience: 'git-token-service',
-    });
-
-    await expect(
-      validateWrapperDispatchTicket(`Bearer ${audienceScopedToken}`, secret)
-    ).resolves.toEqual({
+    await expect(validateWrapperDispatchTicket(`Bearer ${userToken}`, secret)).resolves.toEqual({
       success: false,
       error: 'Invalid ticket type',
     });
@@ -373,12 +379,13 @@ describe('validateWrapperDispatchTicket', () => {
     ['the Cloud Agent Next REST audience', 'cloud-agent-next'],
     ['an array containing the REST audience', ['other-service', 'cloud-agent-next']],
     ['a different resource audience', 'kilo-gateway'],
+    ['a service audience', 'git-token-service'],
     ['an explicit null audience', null],
     ['an explicit empty audience', ''],
     ['a malformed empty audience list', []],
     ['a malformed null audience list', [null]],
     ['a malformed audience object', { audience: 'cloud-agent-next' }],
-  ])('rejects a legacy Kilo JWT with %s', async (_description, aud) => {
+  ])('rejects a Kilo user JWT with %s', async (_description, aud) => {
     const token = jwt.sign({ version: 3, kiloUserId: 'user-1', aud }, secret, {
       algorithm: 'HS256',
       expiresIn: '1 minute',
@@ -418,16 +425,16 @@ describe('validateWrapperDispatchTicket', () => {
     });
   });
 
-  it('accepts a legacy Kilo JWT carrying deviceSessionId claim', async () => {
-    const legacyToken = jwt.sign(
+  it('rejects a Kilo user JWT that carries additional session claims', async () => {
+    const userToken = jwt.sign(
       { version: 3, kiloUserId: 'user-1', deviceSessionId: 'session-xyz-999' },
       secret,
       { algorithm: 'HS256', expiresIn: '1 minute' }
     );
 
-    await expect(validateWrapperDispatchTicket(`Bearer ${legacyToken}`, secret)).resolves.toEqual({
-      success: true,
-      claims: { type: 'legacy_kilo_token', userId: 'user-1' },
+    await expect(validateWrapperDispatchTicket(`Bearer ${userToken}`, secret)).resolves.toEqual({
+      success: false,
+      error: 'Invalid ticket type',
     });
   });
 });

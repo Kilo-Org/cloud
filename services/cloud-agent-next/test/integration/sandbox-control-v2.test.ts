@@ -2534,6 +2534,7 @@ describe('SandboxControlV2 allocation egress policy', () => {
     'media.githubusercontent.com',
     'objects.githubusercontent.com',
     'raw.githubusercontent.com',
+    'session-sync.kiloapps.io',
     'uploads.github.com',
     'worker.example.com',
   ];

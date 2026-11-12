@@ -93,6 +93,28 @@ export function sortWorkspaceGroups(
   return [...groups].sort((a, b) => compareRoots(a.root, b.root, order));
 }
 
+/** New smart-folder members precede the last explicitly saved order. */
+export function sortSmartFolderGroups(
+  groups: readonly SidebarWorkspaceGroup[],
+  order: WorkspaceOrder,
+  manualWorktreeOrder: readonly string[]
+): SidebarWorkspaceGroup[] {
+  if (order !== 'manual') return sortWorkspaceGroups(groups, order);
+  const positions = new Map(manualWorktreeOrder.map((id, index) => [id, index]));
+  return [...groups].sort((a, b) => {
+    const aPosition = positions.get(a.root.worktreeId);
+    const bPosition = positions.get(b.root.worktreeId);
+    if (aPosition !== undefined && bPosition !== undefined) return aPosition - bPosition;
+    if (aPosition !== undefined) return 1;
+    if (bPosition !== undefined) return -1;
+    const entryTime = (group: SidebarWorkspaceGroup) =>
+      Math.max(
+        ...[group.root, ...group.layers].map(row => time(row.statusUpdatedAt ?? row.lastActivityAt))
+      );
+    return entryTime(b) - entryTime(a) || compareRoots(a.root, b.root, 'created');
+  });
+}
+
 function groupNeedsYou(group: SidebarWorkspaceGroup): boolean {
   return [group.root, ...group.layers].some(
     row =>

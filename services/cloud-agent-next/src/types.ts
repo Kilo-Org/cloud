@@ -486,6 +486,7 @@ export type Env = {
   E2E_CALLBACK_SINK?: DurableObjectNamespace<E2eCallbackSink>;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
+  SESSION_SYNC?: Fetcher;
   /** Record-only container lifecycle usage meter. */
   CONTAINER_USAGE_METER: ContainerUsageRpcMethods;
   /** Shared secret for internal service-to-service authentication */

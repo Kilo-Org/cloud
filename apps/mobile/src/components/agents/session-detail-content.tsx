@@ -5,14 +5,19 @@ import {
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
+import {
+  type Href,
+  useFocusEffect,
+  useIsFocused,
+  useNavigationContainerRef,
+  useRouter,
+} from 'expo-router';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { Platform, type TextInstance, View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -38,6 +43,7 @@ import {
 import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
+import { addCreditsDestinationFor } from '@/lib/credits/add-credits-destination';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { MessageErrorBoundary } from '@/components/agents/message-error-boundary';
@@ -183,6 +189,7 @@ import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { type ContextDisplayScope } from '@/components/context-control';
+import { KeyboardFollowPane } from '@/components/keyboard-follow-pane';
 import { ScreenHeader } from '@/components/screen-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { BlurBar } from '@/components/ui/blur-bar';
@@ -298,6 +305,12 @@ export function SessionDetailContent({
   const manager = useSessionManager();
   const { t } = useTranslation();
   const router = useRouter();
+  // The root container this screen's `setParams` lands on, read at the moment
+  // of the call rather than through state: `setParams` asserts the container is
+  // mounted and throws "Attempted to navigate before mounting the Root Layout
+  // component" otherwise (KILO-APP-6VA). The debounced publish below is the one
+  // call that can outlive the container.
+  const navigationRef = useNavigationContainerRef();
   const { openNewSessionHref } = useNewSessionNavigator();
   const { confirm, dialog } = useConfirmDialog();
   // The router behind the failure row's one navigation. Read through a ref so a
@@ -476,13 +489,20 @@ export function SessionDetailContent({
       return undefined;
     }
     const timer = setTimeout(() => {
+      // The container can go away between this effect and its timer: an
+      // activity recreate, or the bootstrap-error surface that renders no
+      // `Slot`. Dropping the publish costs one resume position; writing it
+      // would throw out of the timer and take the app to the fatal screen.
+      if (!navigationRef.isReady()) {
+        return;
+      }
       publishedAnchorRef.current = anchor;
       router.setParams({ at: anchor });
     }, ANCHOR_PUBLISH_DEBOUNCE_MS);
     return () => {
       clearTimeout(timer);
     };
-  }, [anchor, router]);
+  }, [anchor, navigationRef, router]);
 
   // A send takes the transcript position over: the sent message and its reply
   // must be on screen, even when a `?at=` resume left the transcript parked on
@@ -576,7 +596,14 @@ export function SessionDetailContent({
     },
   });
 
-  const organizationId = fetchedData?.organizationId ?? undefined;
+  // `fetchSession` is the only source of the session's own row, so the recorded
+  // profile id, the title, the cost and the loading flag all apply only once the
+  // row names the session on screen.
+  const sessionDataLoaded = fetchedData?.kiloSessionId === sessionId;
+  // The organization scope follows the session on screen. Until that session's
+  // own row is available the scope is unresolved: the org-scoped reads wait for
+  // it, and the create, restart, Continue and fork actions stay unavailable.
+  const organizationId = sessionDataLoaded ? (fetchedData.organizationId ?? undefined) : undefined;
 
   // The session's active-profile chip: the profile this session runs on. It
   // resolves from the session's own recorded `profileId`, so an explicit
@@ -591,12 +618,10 @@ export function SessionDetailContent({
     effectiveDefaultId,
     isLoading: isSessionProfileLoading,
     isError: isSessionProfileError,
-  } = useEffectiveAgentProfile(organizationId);
-  // `fetchSession` is the only source of the session's own profile id, and the
-  // atom can still hold the previous session's row. Until the CURRENT session's
-  // read resolves, the chip stays hidden rather than briefly naming the context
-  // default for a session that recorded a different profile.
-  const sessionDataLoaded = fetchedData?.kiloSessionId === sessionId;
+  } = useEffectiveAgentProfile(organizationId, null, { enabled: sessionDataLoaded });
+  // Until the current session's read resolves, the chip stays hidden rather than
+  // briefly naming the context default for a session that recorded a different
+  // profile.
   const recordedSessionProfileId = sessionDataLoaded ? (fetchedData.profileId ?? null) : null;
   const activeSessionProfileId = sessionDataLoaded
     ? (recordedSessionProfileId ?? effectiveDefaultId)
@@ -638,13 +663,26 @@ export function SessionDetailContent({
   useCliSessionPresence(presenceSessionId);
 
   const { saveModel: savePersistedModel } = usePersistedAgentModel();
-  const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
+  const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId, {
+    enabled: sessionDataLoaded,
+  });
   const { defaultExpanded: reasoningDefaultExpanded } = useReasoningPreference();
   const { hideThinking, hasLoaded: hideThinkingLoaded } = useHideThinkingPreference();
   const { keepScreenOn, hasLoaded: keepScreenOnLoaded } = useKeepScreenOnPreference();
   const { condenseToolCalls } = useCondenseToolCallsPreference();
-  const { models: gatewayModels, isLoading: gatewayModelsLoading } =
-    useAvailableModels(organizationId);
+  const { models: catalogModels, isLoading: gatewayCatalogLoading } = useAvailableModels(
+    organizationId,
+    'member',
+    { enabled: sessionDataLoaded }
+  );
+  // The picker lists models only once the session's scope is resolved. Until
+  // then it holds its loading state, so it never presents a model list for a
+  // scope the screen has not settled.
+  const gatewayModels = useMemo(
+    () => (sessionDataLoaded ? catalogModels : []),
+    [catalogModels, sessionDataLoaded]
+  );
+  const gatewayModelsLoading = gatewayCatalogLoading || !sessionDataLoaded;
   const sessionModels = useSessionModelOptions({
     activeSessionType,
     remoteModelState,
@@ -726,7 +764,8 @@ export function SessionDetailContent({
   );
   const { profileAgents: effectiveProfileAgents } = useEffectiveProfileCustomModes(
     organizationId,
-    activeSessionProfileId
+    activeSessionProfileId,
+    { enabled: sessionDataLoaded }
   );
   const roleView = useMemo(
     () =>
@@ -1432,6 +1471,19 @@ export function SessionDetailContent({
     routerRef.current.push('/(app)/credits' as Href);
   }, []);
 
+  // One destination object for every row: a fresh one per render would
+  // re-create each memoized row's props. The session records the balance that
+  // pays for it, so an organization's session is settled on that organization's
+  // billing page and a personal one on the in-app purchase screen. Until the
+  // CURRENT session's metadata is the loaded one, that record is unknown, so the
+  // row offers no action rather than reading "no organization" from a load that
+  // has not answered yet — the fallback would be the personal balance.
+  const addCredits = useMemo(
+    () =>
+      sessionDataLoaded ? addCreditsDestinationFor(organizationId, handleAddCredits) : undefined,
+    [handleAddCredits, organizationId, sessionDataLoaded]
+  );
+
   const handleRetryMessage = useCallback(
     (message: StoredMessage) => {
       // Read the live capability at tap time: a stale row could outlive the
@@ -1691,7 +1743,7 @@ export function SessionDetailContent({
           onLongPressDetails={handleOpenDetails}
           holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
           onRetryMessage={retryPrompt !== null ? handleRetryMessage : undefined}
-          onAddCredits={handleAddCredits}
+          addCredits={addCredits}
           retryAvailable={retryAvailable}
           onCopyToComposer={handleCopyToComposer}
           failureStatedByPreparation={preparationFailureTriggers.has(item.message.info.id)}
@@ -1729,7 +1781,7 @@ export function SessionDetailContent({
       retryAvailable,
       preparationFailureTriggers,
       handleRetryMessage,
-      handleAddCredits,
+      addCredits,
       handleCopyToComposer,
       handleOpenDetails,
       handleRestoreQueued,
@@ -2190,6 +2242,13 @@ export function SessionDetailContent({
   // either answered or stated. The writable composer keeps the reserve (see
   // `isSessionChromePending`): a composer above skeleton rows would hold a
   // send the open cannot answer yet.
+  //
+  // Continue opens a new session in this session's organization, so its control
+  // waits for the session's own row the same way the scoped reads do. Until
+  // that row names this open, the live control states that with its busy mark
+  // instead of giving way to the reserve: the reserve is a shape, and a press
+  // on it was the defect this footer had.
+  const isReadOnlyFooterPending = isSessionChromePending || !sessionDataLoaded;
   const isComposerVisible =
     !hasBlockingInteraction && !isReadOnlySession && !isSessionChromePending;
   const isReadOnlyContinueVisible = isReadOnlySession && !hasBlockingInteraction;
@@ -2204,8 +2263,14 @@ export function SessionDetailContent({
   const isPendingComposer =
     isWritableResolved ||
     (fetchedData?.kiloSessionId === sessionId && fetchedData.cloudAgentSessionId !== null);
+  // The reserve never shares the slot with a live control: a settled composer
+  // already holds it, and the hold only owns the slot when nothing else does.
   const isReadOnlyFooterPlaceholderVisible =
-    isSessionChromePending && !hasBlockingInteraction && !isPendingComposer && !isReadOnlySession;
+    isReadOnlyFooterPending &&
+    !hasBlockingInteraction &&
+    !isPendingComposer &&
+    !isComposerVisible &&
+    !isReadOnlyContinueVisible;
   const isComposerSkeletonVisible =
     isSessionChromePending && !hasBlockingInteraction && isPendingComposer;
   // Structural locks only. The live send capability is passed separately so a
@@ -2375,6 +2440,11 @@ export function SessionDetailContent({
   );
 
   const handleCreateSession = useCallback(async () => {
+    // Start creates a session in the displayed session's organization, so it
+    // requires that session's own row to supply the scope first.
+    if (!sessionDataLoaded) {
+      return false;
+    }
     // The orchestrator surfaces exactly one actionable toast on failure and
     // calls `router.replace` to the new session route on success — the
     // route-keyed `AgentSessionProvider` creates a fresh manager for the new
@@ -2394,9 +2464,14 @@ export function SessionDetailContent({
       },
     });
     return result.success;
-  }, [manager, sessionRouter, organizationId]);
+  }, [manager, sessionRouter, organizationId, sessionDataLoaded]);
 
   const handleRestartSession = useCallback(async () => {
+    // Restart opens a replacement session in the same organization, so it waits
+    // for the same resolved scope Start does.
+    if (!sessionDataLoaded) {
+      return false;
+    }
     const result = await restartAgentSession({
       create: manager.createRemoteSession.bind(manager),
       exit: manager.exitRemoteSession.bind(manager),
@@ -2407,7 +2482,7 @@ export function SessionDetailContent({
       },
     });
     return result.success;
-  }, [manager, sessionRouter, organizationId]);
+  }, [manager, sessionRouter, organizationId, sessionDataLoaded]);
 
   const handleExitSession = useCallback(
     async (
@@ -2459,6 +2534,14 @@ export function SessionDetailContent({
 
   const pushContinue = useCallback(
     async (cut: ForkCut | null) => {
+      // Continue and fork open a new session in this session's organization, so
+      // both need the scope resolved before they open a destination. The live
+      // control is busy until then, so this guard only answers a press that
+      // raced the last state change.
+      if (!sessionDataLoaded) {
+        setContinueOpen('idle');
+        return;
+      }
       const outcome = await openNewSessionHref(
         buildContinueHref({
           organizationId,
@@ -2466,9 +2549,9 @@ export function SessionDetailContent({
           cloneSourceTitle: rename.title,
           cloneUpToMessageId: cut?.cloneUpToMessageId,
           forkPrefillText: cut?.forkPrefillText,
-          forkSourceIsCloudAgent: Boolean(fetchedData?.cloudAgentSessionId),
+          forkSourceIsCloudAgent: Boolean(fetchedData.cloudAgentSessionId),
           prefill: buildContinuePrefillParams({
-            gitUrl: fetchedData?.gitUrl,
+            gitUrl: fetchedData.gitUrl,
             mode: currentMode,
             model: currentModel,
             variant: currentVariant,
@@ -2496,6 +2579,7 @@ export function SessionDetailContent({
       currentMode,
       currentModel,
       currentVariant,
+      sessionDataLoaded,
     ]
   );
 
@@ -2636,13 +2720,12 @@ export function SessionDetailContent({
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
           <VisibleSessionPublisher sessionId={sessionId} />
 
-          {/* The trailing bottom-chrome spacer below reserves the navigation-bar
-              inset outside this view. The native lift measures the keyboard
-              against this view's own bottom edge, so that inset is never
-              counted twice — the correction the app-aware padding needed. */}
-          <KeyboardAvoidingView className="flex-1" behavior="padding">
-            {renderKeyboardBody()}
-          </KeyboardAvoidingView>
+          {/* The transcript and composer keep their layout while the keyboard
+              moves: the pane translates them with the keyboard on the UI
+              thread, so the list is not resized frame by frame and does not
+              re-pin its tail from those layout events. The trailing spacer
+              below still reserves the navigation-bar inset. */}
+          <KeyboardFollowPane>{renderKeyboardBody()}</KeyboardFollowPane>
 
           {isComposerVisible ? (
             <BlurBar className="border-t-0">
@@ -2710,7 +2793,9 @@ export function SessionDetailContent({
                 ? t('agentChat.session.cancelQueuedUpgradeRequired')
                 : null
             }
-            onForkFromHere={detailsForkCut ? handleForkFromHere : undefined}
+            onForkFromHere={
+              detailsForkCut !== null && sessionDataLoaded ? handleForkFromHere : undefined
+            }
           />
 
           {childSessionSheet.sheet ? (
@@ -2927,7 +3012,7 @@ export function SessionDetailContent({
                   variant="default"
                   size="action"
                   className="bg-primary dark:bg-selection"
-                  loading={continueOpen === 'pending'}
+                  loading={continueOpen === 'pending' || isReadOnlyFooterPending}
                   accessibilityLabel={t('agentChat.session.continueInNewSession')}
                   onPress={handleContinueInNewSession}
                 >

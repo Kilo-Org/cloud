@@ -70,7 +70,7 @@ const EnkryptUsageListInputSchema = OrganizationIdInputSchema.extend({
   guardrail: z.enum(['input', 'output']).optional(),
 });
 
-export type RequestLogMetadata =
+type RequestLogMetadata =
   | { status: 'available'; routing: RequestLogRoutingDetails }
   | { status: 'not-found' | 'not-configured' | 'unreadable' };
 

@@ -104,7 +104,7 @@ does not require this credential.
 - `NEXTAUTH_URL` - Base URL for NextAuth.js; used across many auth-related files. [SERVER]
 - `NEXTAUTH_SECRET` - Secret key for NextAuth.js session encryption and five-minute, audience-bound user assertions verified by internal Workers such as user data export. `[SECRET]`
 - `SESSION_SYNC_SECRET` - Signs short-lived grants for the native session sync service. Keep it separate from user credentials and `NEXTAUTH_SECRET`. `[SECRET]`
-- `PAGES_AUTH_SECRET` - What the Pages deployment at `pages.kiloapps.io` presents when it trades a sign-in code, or a Pages-audience token minted at `/api/auth/resource-token`, at `/api/pages-auth/exchange`. At least 32 characters. While it is unset, the `pages` audience cannot sign anyone in. `[SECRET]`
+- `PAGES_AUTH_SECRET` - What the Pages deployment at `pages.kiloapps.io` presents when it trades a sign-in code, or a Pages-audience token minted at `/api/auth/resource-token`, at `/api/pages-auth/exchange`. The exchange answers with the person's account id, name and organizations, plus their primary email address when a sign-in method verified it. At least 32 characters. While it is unset, the `pages` audience cannot sign anyone in. `[SECRET]`
 - `PAGES_DEV_AUTH_SECRET` - The same for `pages-dev.kiloapps.io`, for both the code and the token trade. Keep it different from `PAGES_AUTH_SECRET`. `[SECRET]`
 - `DEBUG_SHOW_DEV_UI` - Enables dev-only UI elements (debug panels, admin buttons); checked in `packages/web-shared/src/lib/constants.ts` and `apps/web/src/app/(app)/profile/page.tsx`. [SERVER]
 - `TRPC_TIMING_LOGGING` - Enables tRPC timing logs in development; checked in `packages/web-shared/src/lib/trpc/init.ts`. [SERVER]
@@ -548,7 +548,7 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `R2_API_REQUEST_LOG_BUCKET_NAME` - R2 bucket for `api_request_log` request and response bodies. [SERVER]
 - `R2_API_REQUEST_LOG_ACCESS_KEY_ID` - R2 access key ID used only for the `api_request_log` bucket; uses the `R2_ACCOUNT_ID` account. `[SECRET]`
 - `R2_API_REQUEST_LOG_SECRET_ACCESS_KEY` - R2 secret access key paired with `R2_API_REQUEST_LOG_ACCESS_KEY_ID`. `[SECRET]`
-- `R2_AI_PROVIDER_METADATA_BUCKET_NAME` - Optional R2 bucket for AI provider metadata; `<microdollar_usage id>.json` contains the version-1 gateway routing decision, optional `vercel: { metadata }`, and optional `enkrypt` (the organization's input guardrail settings and scan steps, without prompt text). [SERVER]
+- `R2_AI_PROVIDER_METADATA_BUCKET_NAME` - Optional R2 bucket for AI provider metadata; `<microdollar_usage id>.json` contains the version-1 gateway routing decision, optional `vercel: { metadata }`, and optional `enkrypt` (the organization's input guardrail settings and scan steps, without prompt text), and optional `byok_failover_attempts` (each upstream attempt's BYOK provider, status, error code, and duration when a failing BYOK key failed over to the next). [SERVER]
 - `R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID` - Dedicated R2 access key ID for the AI provider metadata bucket; uses the `R2_ACCOUNT_ID` account. `[SECRET]`
 - `R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY` - R2 secret access key paired with `R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID`. `[SECRET]`
 

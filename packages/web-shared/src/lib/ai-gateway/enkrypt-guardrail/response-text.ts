@@ -118,14 +118,14 @@ const KNOWN_CHAT_MESSAGE_FIELDS = new Set([
   'annotations',
 ]);
 
+const BASE64_DATA_URL = /^data:[^,]*;base64,/i;
+
 /**
  * Adds the strings of a value the gateway does not know, each under its path, so text streamed in
  * pieces across deltas, such as an audio transcript, joins in order like `content`. Type tags are
  * not model output, and base64 data URLs, such as generated images or audio, are not text, so
  * neither is scanned.
  */
-const BASE64_DATA_URL = /^data:[^,]*;base64,/i;
-
 function addUnknownStrings(groups: TextGroups, path: string, value: unknown) {
   if (typeof value === 'string') {
     if (!BASE64_DATA_URL.test(value)) groups.add(path, value);

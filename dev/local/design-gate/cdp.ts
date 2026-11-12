@@ -59,8 +59,9 @@ export function parseSamples(json: string): {
 }
 
 export type ProbeClient = {
-  ready: () => Promise<boolean>;
-  dump: () => Promise<ProbeDump>;
+  /** The optional budgetMs caps the wait for a missing app page by the caller's own budget. */
+  ready: (budgetMs?: number) => Promise<boolean>;
+  dump: (budgetMs?: number) => Promise<ProbeDump>;
   setLanguage: (preference: string, resolved: string) => Promise<void>;
   resolvedLanguage: () => Promise<string>;
   openLink: (url: string) => Promise<void>;
@@ -79,16 +80,38 @@ export type ProbeClientOptions = {
   createSocket?: (url: string) => CdpSocket;
   timeoutMs?: number;
   sleep?: (ms: number) => Promise<unknown>;
+  /**
+   * How long one probe call waits for the app's debugger page when none is
+   * listed. The app drops its page whenever it reloads — a matrix language
+   * switch restarts the runtime — and the page appears again a moment later, so
+   * a run that has just reloaded waits here instead of reporting an
+   * infrastructure failure. One call owns one window: the reconnect attempts
+   * inside it share the window, and a caller that declares its own budget with
+   * ready(budgetMs) or dump(budgetMs) shortens it.
+   */
+  pageWaitMs?: number;
+  now?: () => number;
 };
 
 const EVALUATE_TIMEOUT_MS = 15_000;
 const LIST_TIMEOUT_MS = 10_000;
 const RETRIES = 3;
 const RETRY_DELAY_MS = 2_000;
+const PAGE_POLL_MS = 500;
 const PROBE = 'globalThis.__kiloDesignGate';
 
 export class ProbeScriptError extends Error {
   override name = 'ProbeScriptError';
+}
+
+/**
+ * Metro listed no debugger page for the app. The page window is the whole wait
+ * for it, so a spent window ends the retry chain instead of paying the retry
+ * backoff again.
+ */
+class MissingPageError extends InfraError {
+  // The run log keeps reporting an infrastructure failure, as it did before the
+  // wait existed; only the retry decision reads this class.
 }
 
 function record(value: unknown): Record<string, unknown> | undefined {
@@ -269,15 +292,22 @@ export async function evaluate(
 
 export function createProbeClient(options: ProbeClientOptions): ProbeClient {
   const timeoutMs = options.timeoutMs ?? EVALUATE_TIMEOUT_MS;
+  const pageWaitMs = options.pageWaitMs ?? 0;
   const sleep = options.sleep ?? delay;
+  const now = options.now ?? Date.now;
   let session: CdpSession | undefined;
 
-  const connect = async (): Promise<CdpSession> => {
+  const connect = async (pageDeadline: number): Promise<CdpSession> => {
     if (session?.isOpen()) return session;
-    const pages = await listPages(options.metro, options.fetch);
-    const page = selectPage(pages, options.names);
+    let pages = await listPages(options.metro, options.fetch);
+    let page = selectPage(pages, options.names);
+    while (page?.webSocketDebuggerUrl === undefined && now() < pageDeadline) {
+      await sleep(PAGE_POLL_MS);
+      pages = await listPages(options.metro, options.fetch);
+      page = selectPage(pages, options.names);
+    }
     if (page?.webSocketDebuggerUrl === undefined) {
-      throw new InfraError(
+      throw new MissingPageError(
         `No Metro debugger page for ${options.names.join(' / ')} at ${options.metro} (${pages.length} pages listed)`
       );
     }
@@ -290,16 +320,23 @@ export function createProbeClient(options: ProbeClientOptions): ProbeClient {
     session = undefined;
   };
 
-  const call = async (expression: string): Promise<unknown> => {
+  const call = async (expression: string, budgetMs?: number): Promise<unknown> => {
+    // One page window for the whole retry chain, so the reconnect attempts do
+    // not multiply the reload budget, and a caller's own budget shortens it. A
+    // spent window ends the chain: the deadline is fixed, so another attempt
+    // cannot find the page in time and only adds the retry backoff.
+    const waitMs = budgetMs === undefined ? pageWaitMs : Math.min(pageWaitMs, budgetMs);
+    const pageDeadline = now() + waitMs;
     let lastError: unknown;
     for (let attempt = 0; attempt <= RETRIES; attempt++) {
       if (attempt > 0) await sleep(RETRY_DELAY_MS);
       try {
-        return await evaluate(await connect(), expression, timeoutMs);
+        return await evaluate(await connect(pageDeadline), expression, timeoutMs);
       } catch (error) {
         if (error instanceof ProbeScriptError) throw error;
         lastError = error;
         disconnect();
+        if (error instanceof MissingPageError && now() >= pageDeadline) break;
       }
     }
     if (lastError instanceof InfraError) throw lastError;
@@ -317,9 +354,10 @@ export function createProbeClient(options: ProbeClientOptions): ProbeClient {
   };
 
   return {
-    ready: async () => (await call(`${PROBE}?.ready() === true`)) === true,
-    dump: async () => {
-      const json = await call(`${PROBE}.dump()`);
+    ready: async (budgetMs?: number) =>
+      (await call(`${PROBE}?.ready() === true`, budgetMs)) === true,
+    dump: async (budgetMs?: number) => {
+      const json = await call(`${PROBE}.dump()`, budgetMs);
       if (typeof json !== 'string')
         throw new InfraError('Design gate probe dump() did not return a string');
       // Every read of the probe passes here, so the settle loop, the capture

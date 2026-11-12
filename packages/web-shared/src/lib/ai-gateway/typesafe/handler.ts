@@ -50,7 +50,8 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { systemOneRequestCostBound } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
-import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
+import { normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
+import { bouncerPayerKey } from '@kilocode/web-shared/lib/bouncer/request';
 import {
   bareIpLiteral,
   bouncerDecideTier,
@@ -193,6 +194,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
   // in, so its usage row uses a payer-safe IP that drops shared Kilo infrastructure.
   const bouncerIp = bareIpLiteral(ipAddress);
   const bouncerRequestId = randomUUID();
+  const payerAccountId = bouncerPayerKey(user.id, organizationId, payer);
 
   // The one decide for this request, awaited just before the upstream call within its 500 ms
   // budget. Only an enforced verdict rejects; every other outcome sends the request.
@@ -201,7 +203,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     ip: bouncerIp,
     ja4: normalizeJa4(usageBase.context.fraudHeaders.http_x_vercel_ja4_digest),
     account: {
-      accountId: bouncerAccountId(user.id, organizationId),
+      accountId: payerAccountId,
       userId: user.id,
       tier: bouncerDecideTier(organizationId, plan, balance),
       payer,
@@ -250,7 +252,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     bouncer: {
       requestId: bouncerRequestId,
       occurredAt: new Date(startedAtMs),
-      accountId: bouncerAccountId(user.id, organizationId),
+      accountId: payerAccountId,
       clientIp: payerSharingIp(bouncerIp, feature),
       clientAttributed: usageBase.clientAttributed,
       requestedLogprobs: false,

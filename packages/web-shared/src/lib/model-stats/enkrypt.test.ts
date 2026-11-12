@@ -7,6 +7,7 @@ import {
 } from '@kilocode/db/schema-types';
 import { ModelStatsBenchmarksSchema, type ModelStats } from '@kilocode/db/schema';
 import type * as Enkrypt from './enkrypt';
+import type * as Drizzle from '@kilocode/web-shared/lib/drizzle';
 import type { ModelStatsCacheEntry } from './model-stats-cache';
 import { fingerprintEnkryptScore } from './enkrypt-fingerprint';
 
@@ -16,7 +17,13 @@ const mockOrderBy = jest.fn<Promise<ModelStatsCacheEntry[]>, []>();
 const mockSelect = jest.fn(() => ({
   from: () => ({ leftJoin: () => ({ orderBy: mockOrderBy }), orderBy: mockOrderBy }),
 }));
-const mockReplicaSelect = jest.fn();
+const mockReplicaOrderBy = jest.fn<Promise<ModelStatsCacheEntry[]>, []>();
+const mockReplicaSelect = jest.fn(() => ({
+  from: () => ({
+    leftJoin: () => ({ orderBy: mockReplicaOrderBy }),
+    orderBy: mockReplicaOrderBy,
+  }),
+}));
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get ENKRYPT_PUBLICATION_ENABLED() {
@@ -95,6 +102,7 @@ beforeEach(async () => {
   jest.resetModules();
   jest.clearAllMocks();
   mockOrderBy.mockReset().mockResolvedValue([row()]);
+  mockReplicaOrderBy.mockReset().mockResolvedValue([row()]);
   mockPublicationEnabled = true;
   mockSyncEnabled = false;
   jest.useFakeTimers();
@@ -320,6 +328,23 @@ describe('publishEnkryptModels', () => {
 });
 
 describe('getEnkryptBenchmarks', () => {
+  it('loads through the read client its caller passes', async () => {
+    const { readDb } = jest.requireMock<typeof Drizzle>('@kilocode/web-shared/lib/drizzle');
+
+    const replica = await getEnkryptBenchmarks({ fromDb: readDb });
+    expect(replica?.entries).toHaveLength(1);
+    expect(mockReplicaSelect).toHaveBeenCalledTimes(1);
+    expect(mockSelect).not.toHaveBeenCalled();
+
+    const primary = await getEnkryptBenchmarks();
+    expect(primary).not.toBe(replica);
+    expect(mockSelect).toHaveBeenCalledTimes(1);
+    expect(mockReplicaSelect).toHaveBeenCalledTimes(1);
+
+    expect(await getEnkryptBenchmarks({ fromDb: readDb })).toBe(replica);
+    expect(mockReplicaSelect).toHaveBeenCalledTimes(1);
+  });
+
   it.each([true, false])(
     'does not query when publication is disabled and sync is %s',
     async enabled => {

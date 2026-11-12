@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { after } from 'next/server';
 import {
+  enkryptCreditsToMicrodollars,
   recordEnkryptUsage,
   type EnkryptGuardrailCall,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
@@ -9,7 +10,6 @@ import {
   scanRequest,
   type EnkryptGuardrailScan,
   type EnkryptGuardrailScanResult,
-  type EnkryptScanPart,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import {
   joinSegments,
@@ -19,19 +19,20 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
 import {
   ENKRYPT_VERDICT_CACHE_TTL_SECONDS,
+  mostSevereVerdict,
   verdictCacheKey,
-  type EnkryptCachedScanResult,
   type EnkryptGuardrailRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/verdict-cache';
 import { scanUnits } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/scan-chunks';
 import { ENKRYPT_MAX_CONCURRENT_CALLS } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-limiter';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import type {
+  EnkryptScanPart,
   EnkryptScanReport,
   EnkryptToolScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import type { EnkryptDetectRequestDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
-import { combinedVerdict, startEnkryptInputGuardrail } from './input-guardrail';
+import { recordEnkryptUsageRecords, startEnkryptInputGuardrail } from './input-guardrail';
 
 jest.mock('next/server', () => ({
   ...jest.requireActual<Record<string, unknown>>('next/server'),
@@ -1361,11 +1362,45 @@ describe('startEnkryptInputGuardrail with many tool definitions', () => {
   });
 });
 
-describe('combinedVerdict', () => {
-  function result(verdict: EnkryptGuardrailScanResult['verdict']): EnkryptCachedScanResult {
-    return { verdict, usageRecords: [], report: null, cacheEntries: [] };
-  }
+describe('recordEnkryptUsageRecords', () => {
+  const usageRecord = { ...call(), addedLatencyMs: 120 };
+  const loggedFields = {
+    organization_id: scan.organizationId,
+    kilo_user_id: scan.kiloUserId,
+    session_id: scan.sessionId,
+    api_kind: scan.apiKind,
+    decision: 'allowed',
+    credits_cost: 3,
+    charged_microdollars: enkryptCreditsToMicrodollars(3),
+    added_latency_ms: 120,
+    error: 'write failed',
+  };
 
+  it('logs and drops a record whose write fails', async () => {
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockedRecordUsage.mockRejectedValueOnce(new Error('write failed'));
+
+    await recordEnkryptUsageRecords([usageRecord, usageRecord]);
+
+    expect(mockedRecordUsage).toHaveBeenCalledTimes(2);
+    expect(errorLog.mock.calls).toEqual([
+      ['[enkrypt-guardrail] usage record write failed; record dropped', loggedFields],
+    ]);
+  });
+
+  it('logs the given fields first', async () => {
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockedRecordUsage.mockRejectedValueOnce(new Error('write failed'));
+
+    await recordEnkryptUsageRecords([usageRecord], { guardrail: 'output' });
+
+    const [[, fields]] = errorLog.mock.calls;
+    expect(fields).toEqual({ guardrail: 'output', ...loggedFields });
+    expect(Object.keys(fields as object)[0]).toBe('guardrail');
+  });
+});
+
+describe('mostSevereVerdict', () => {
   const block = { action: 'block', message: 'blocked' } as const;
   const unavailable = { action: 'unavailable', reason: 'transient' } as const;
   const allow = { action: 'allow' } as const;
@@ -1380,6 +1415,6 @@ describe('combinedVerdict', () => {
       ['a block over an allow', [block, allow], block],
     ]
   )('acts on %s', (_name, verdicts, expected) => {
-    expect(combinedVerdict(verdicts.map(result))).toEqual(expected);
+    expect(mostSevereVerdict(verdicts)).toEqual(expected);
   });
 });

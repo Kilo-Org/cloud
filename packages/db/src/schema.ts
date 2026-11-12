@@ -6605,6 +6605,10 @@ export const cloud_agent_workspace_folders = pgTable(
     kind: text().$type<'manual' | 'smart'>().notNull().default('manual'),
     smart_preset: text().$type<'needs_you' | 'in_review' | 'done'>(),
     sort_mode: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
+    manual_worktree_order: text()
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

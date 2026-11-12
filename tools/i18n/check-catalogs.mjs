@@ -238,6 +238,10 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // from localized placeholders, with no translatable words.
   'agentBriefing.atLeast',
   'agentBriefing.window',
+  // The organization plan's own tier names. They are product names, so every
+  // catalog keeps them as the billing pages and the invoices spell them.
+  'organization.hub.planTeams',
+  'organization.hub.planEnterprise',
 ]);
 
 /**

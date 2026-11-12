@@ -3319,9 +3319,58 @@ export const ModelSchema = z.object({
     .catch(undefined),
 });
 
-export type GatewayModel = z.infer<typeof ModelSchema>;
+/**
+ * The fields Vercel AI Gateway's model list adds to describe a model, which Kilo needs to list
+ * models that only Vercel serves. OpenRouter's list lacks them or uses other shapes, so its models
+ * parse with `ModelSchema` alone.
+ */
+export const VercelModelSchema = ModelSchema.extend({
+  description: z.string().optional().catch(undefined),
+  /** Seconds since the epoch: when Vercel added the model, often a shared backfill date. */
+  created: z.number().optional().catch(undefined),
+  /** Seconds since the epoch. */
+  released: z.number().optional().catch(undefined),
+  context_window: z.number().optional().catch(undefined),
+  max_tokens: z.number().optional().catch(undefined),
+  modalities: z
+    .object({ input: z.array(z.string()), output: z.array(z.string()) })
+    .optional()
+    .catch(undefined),
+  supported_parameters: z.array(z.string()).optional().catch(undefined),
+  pricing: z
+    .object({
+      input: z.string(),
+      output: z.string(),
+      input_cache_read: z.string().optional().catch(undefined),
+      input_cache_write: z.string().optional().catch(undefined),
+    })
+    .optional()
+    .catch(undefined),
+  /** Milliseconds since the epoch. */
+  deprecated_at: z
+    .number()
+    .int()
+    .min(0)
+    .max(Date.UTC(9999, 11, 31))
+    .optional()
+    .catch(undefined),
+  reasoning_options: z
+    .array(
+      z.object({
+        type: z.string(),
+        values: z.array(z.string()).optional().catch(undefined),
+      })
+    )
+    .optional()
+    .catch(undefined),
+});
+
+/** A gateway model list entry. The Vercel-only fields are never set on OpenRouter models. */
+export type GatewayModel = z.infer<typeof VercelModelSchema>;
 
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
+
+export const VercelModelsSchema = z.object({ data: z.array(VercelModelSchema) });
 
 export const EndpointPricingSchema = z.object({
   prompt: z.string(),

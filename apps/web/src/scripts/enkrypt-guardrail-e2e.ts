@@ -66,7 +66,7 @@ function memoryStore(): EnkryptVerdictCacheStore {
     },
     async set(key, value, options) {
       if (options.nx && values.has(key)) return null;
-      values.set(key, value);
+      values.set(key, typeof value === 'string' ? value : JSON.stringify(value));
       return 'OK';
     },
   };

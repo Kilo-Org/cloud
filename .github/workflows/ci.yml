@@ -42,11 +42,21 @@ jobs:
       session_sync: ${{ steps.filter_session_sync.outputs.session_sync || steps.filter_session_sync_retry.outputs.session_sync }}
       # Every input the ci-wiring job reads, also its own pair.
       wiring: ${{ steps.filter_wiring.outputs.wiring || steps.filter_wiring_retry.outputs.wiring }}
-      # The oxlint plugins. test-scripts reaches their own suite through
-      # test:oxlint-plugins; the web Jest suite, the web build and the cycle
-      # check read no plugin file, so this output stays out of the shared
-      # filter that gates them.
-      oxlint_plugins: ${{ steps.filter_oxlint.outputs.oxlint_plugins || steps.filter_oxlint_retry.outputs.oxlint_plugins }}
+      # The two input sets of the test-scripts job, each its own pair. The
+      # script chain reads no web source, the web Jest suite, the web build and
+      # the cycle check read no script input, and the Postgres and Durable
+      # Object regressions read neither tree, so each subject gates its own
+      # step instead of sharing one filter.
+      test_scripts: ${{ steps.filter_test_scripts.outputs.test_scripts || steps.filter_test_scripts_retry.outputs.test_scripts }}
+      test_scripts_db: ${{ steps.filter_test_scripts_db.outputs.test_scripts_db || steps.filter_test_scripts_db_retry.outputs.test_scripts_db }}
+      # The detector's answer for the two services whose suites this job runs.
+      # It covers what the two filters above cannot name: a workspace in the
+      # dependency closure of `@kilocode/db` or `@kilocode/worker-utils`, and
+      # data a suite reads as a file. A full selection is excluded, because it
+      # means the detector could not attribute the change rather than that these
+      # suites read it.
+      data_meter: ${{ steps.affected.outputs.full != 'true' && contains(fromJSON(steps.affected.outputs.affected).packages, 'container-usage-meter') }}
+      data_session_ingest: ${{ steps.affected.outputs.full != 'true' && contains(fromJSON(steps.affected.outputs.affected).packages, 'cloudflare-session-ingest') }}
       # The dependency inputs the detector parses with a dependency
       # (DEPENDENCY_INPUTS in scripts/affected-workspaces.mjs). Gates the
       # root install below; its own pair.
@@ -381,26 +391,125 @@ jobs:
               - '.gitignore'
               - '.nvmrc'
               - '.npmrc'
-      # The lint plugins are their own subject: only test-scripts reads them,
-      # through test:oxlint-plugins, so the shared filter above no longer lists
-      # them and the web-test, build and dependency-cycle-check jobs stop
-      # starting for a plugin-only diff.
-      - name: Detect oxlint plugin changes
-        id: filter_oxlint
+      # The script chain behind `pnpm run test:scripts`. Every entry below comes
+      # from what a suite in that chain imports or reads: scripts/** for the
+      # web-env, mobile-artifacts, mobile-sbom, kilo-app-release and
+      # kilo-mcp-release suites; dev/** for dev-local; tools/oxlint/** for the
+      # plugin suite. The rewrites suite also enumerates the route directories
+      # of both apps, the dev-local suites read the mobile design-gate sources,
+      # the web env example, the auto-routing and meter dev-vars examples, the
+      # fake LLM used by the tunnel tests, the native build workflow, the web
+      # load-env module and three workspace packages. None of this is web source
+      # outside those paths, so a web-only diff no longer starts the chain. Add
+      # an entry here when a suite starts reading a new path: a missing entry
+      # stops its suite silently on the change it protects.
+      - name: Detect script-suite changes
+        id: filter_test_scripts
         continue-on-error: true
         uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         with:
           filters: |
-            oxlint_plugins:
+            test_scripts:
+              - 'scripts/**'
+              - 'dev/**'
               - 'tools/oxlint/**'
-      - name: Detect oxlint plugin changes (retry)
-        id: filter_oxlint_retry
-        if: steps.filter_oxlint.outcome == 'failure'
+              - 'apps/web/ai-gateway-rewrites*.mjs'
+              - 'apps/web/src/app/**/route.ts'
+              - 'apps/ai-gateway/src/app/**/route.ts'
+              - 'apps/web/src/lib/load-env.ts'
+              - 'apps/web/.env.development.local.example'
+              - 'apps/mobile/src/lib/design-gate/**'
+              - 'services/*/package.json'
+              - 'services/*/wrangler.jsonc'
+              - 'services/auto-routing/.dev.vars.example'
+              - 'services/container-usage-meter/.dev.vars.example'
+              - 'services/cloud-agent-next/test/e2e/**'
+              - '.github/workflows/mobile-native-build.yml'
+              - 'packages/db/**'
+              - 'packages/worker-utils/**'
+              - 'packages/session-ingest-contracts/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'patches/**'
+      - name: Detect script-suite changes (retry)
+        id: filter_test_scripts_retry
+        if: steps.filter_test_scripts.outcome == 'failure'
         uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         with:
           filters: |
-            oxlint_plugins:
+            test_scripts:
+              - 'scripts/**'
+              - 'dev/**'
               - 'tools/oxlint/**'
+              - 'apps/web/ai-gateway-rewrites*.mjs'
+              - 'apps/web/src/app/**/route.ts'
+              - 'apps/ai-gateway/src/app/**/route.ts'
+              - 'apps/web/src/lib/load-env.ts'
+              - 'apps/web/.env.development.local.example'
+              - 'apps/mobile/src/lib/design-gate/**'
+              - 'services/*/package.json'
+              - 'services/*/wrangler.jsonc'
+              - 'services/auto-routing/.dev.vars.example'
+              - 'services/container-usage-meter/.dev.vars.example'
+              - 'services/cloud-agent-next/test/e2e/**'
+              - '.github/workflows/mobile-native-build.yml'
+              - 'packages/db/**'
+              - 'packages/worker-utils/**'
+              - 'packages/session-ingest-contracts/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'patches/**'
+      # The Postgres and Durable Object regressions of the same job: the meter
+      # suite and the two session-ingest suites read the trees below, and each
+      # workspace named here is one the two packages declare or import. A
+      # workspace further down that closure, and a file a suite reads as data,
+      # are covered by the detector answers this job's gate also reads. These
+      # suites read no script input, so they get their own subject and the chain
+      # above does not run for a service-only change.
+      - name: Detect data-regression changes
+        id: filter_test_scripts_db
+        continue-on-error: true
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            test_scripts_db:
+              - 'services/session-ingest/**'
+              - 'services/container-usage-meter/**'
+              - 'packages/db/**'
+              - 'packages/encryption/**'
+              - 'packages/app-shared/**'
+              - 'packages/notifications/**'
+              - 'packages/worker-utils/**'
+              - 'packages/session-ingest-contracts/**'
+              - 'packages/container-usage/**'
+              - 'packages/organization-entitlement/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'patches/**'
+      - name: Detect data-regression changes (retry)
+        id: filter_test_scripts_db_retry
+        if: steps.filter_test_scripts_db.outcome == 'failure'
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            test_scripts_db:
+              - 'services/session-ingest/**'
+              - 'services/container-usage-meter/**'
+              - 'packages/db/**'
+              - 'packages/encryption/**'
+              - 'packages/app-shared/**'
+              - 'packages/notifications/**'
+              - 'packages/worker-utils/**'
+              - 'packages/session-ingest-contracts/**'
+              - 'packages/container-usage/**'
+              - 'packages/organization-entitlement/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'patches/**'
       # A pull request and a main push both check only the workspaces their own
       # diff can affect: the pull request the branch's base, the push the commit
       # main moved from. The merge queue passes no base, so it still checks
@@ -439,6 +548,10 @@ jobs:
             ] | unique end' <<< "$affected")
           {
             echo "affected=$(jq -c . <<< "$affected")"
+            # The two service outputs below read this flag: a selection that
+            # could not attribute the change names every workspace, and these
+            # suites read none of them for such a diff.
+            echo "full=$(jq -r .full <<< "$affected")"
             echo "typecheck_groups=$(jq -c .typecheck_groups <<< "$groups")"
             echo "typecheck_groups_non_trpc=$typecheck_groups_non_trpc"
             echo "lint_groups=$(jq -c .lint_groups <<< "$groups")"
@@ -515,11 +628,11 @@ jobs:
       # files concurrently, so the step pays one start-up and one parse of the
       # YAML they share. The job is off the critical path, and the required
       # `test` job needs it, so a broken admission still blocks the merge.
-      # sbom.yml is only reached by a PR that changes the workflow or its test,
-      # and that path set does not trip the kilocode_backend filter that gates
-      # test-scripts, so its wiring check runs here. This list is the only place
-      # that suite runs: the `test:mobile-sbom` script that test-scripts reaches
-      # must not name it, or one run executes the file in two jobs.
+      # sbom.yml is reached by a PR that changes it or its test. The test also
+      # trips the script chain's filter, but that chain names it nowhere, and
+      # this list is the only place the suite runs: the `test:mobile-sbom`
+      # script that test-scripts reaches must not name it, or one run executes
+      # the file in two jobs.
       - name: Test workflow wiring
         run: >-
           node --test
@@ -537,10 +650,11 @@ jobs:
           scripts/meta-janitor-approve.test.mjs
           scripts/mobile-sbom-workflow.test.mjs
 
-      # The same gap for the release workflow: a PR that changes it or its test
-      # does not trip the backend filter either, so its wiring checks run here
-      # and a workflow change cannot drop a release gate unnoticed. This step is
-      # the only place the suite runs, for the same reason as the list above.
+      # The same split for the release workflow: a PR that changes it alone
+      # trips no product filter, and its test runs in no other job, so its
+      # wiring checks run here and a workflow change cannot drop a release gate
+      # unnoticed. This step is the only place the suite runs, for the same
+      # reason as the list above.
       - name: Test release workflow wiring
         run: node --test scripts/kilo-app-release-workflow.test.mjs
 
@@ -965,9 +1079,13 @@ jobs:
 
   test-scripts:
     needs: changes
-    # test:scripts is the only job that runs the plugin suite, so a plugin-only
-    # change starts it through oxlint_plugins while the web gates stay skipped.
-    if: needs.changes.outputs.kilocode_backend == 'true' || needs.changes.outputs.oxlint_plugins == 'true' || contains(fromJSON(needs.changes.outputs.affected).packages, 'container-usage-meter')
+    # Two filters gate this job, and each step below reads the subject it needs,
+    # so a run that only one of them starts skips the other's steps. The two
+    # detector answers cover what a filter cannot name: a workspace in the
+    # closure of the packages these suites import, and data a suite reads as a
+    # file. A web-source diff matches no filter and no service, and the required
+    # `test` job passes this skipped job.
+    if: needs.changes.outputs.test_scripts == 'true' || needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_meter == 'true' || needs.changes.outputs.data_session_ingest == 'true'
     # The Postgres regressions ran on the large runner in the job this one
     # replaces. The builder cleanup test drives two claims against the same
     # rows, so keep the runner it was written for.
@@ -1036,18 +1154,26 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run script tests
+        if: needs.changes.outputs.test_scripts == 'true'
         run: pnpm run test:scripts
 
       - name: Run container usage Postgres tests
+        if: needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_meter == 'true'
         # The meter suite connects to POSTGRES_URL directly. Avoid the Jest worker
         # suffix that computeDatabaseUrl adds whenever NODE_ENV=test.
         run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter container-usage-meter test:postgres
 
       - name: Run Session Ingest Durable Object regressions
+        if: needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_session_ingest == 'true'
         run: pnpm --filter cloudflare-session-ingest run test:integration
 
       - name: Run Session Ingest Postgres tests
-        run: NODE_ENV=development pnpm --filter cloudflare-session-ingest test:postgres
+        if: needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_session_ingest == 'true'
+        # Copies of shared tables and the worktree regressions read the migrated
+        # schema, and this step runs alone when only the detector selects this
+        # service, so it applies the migrations instead of relying on the meter
+        # step above.
+        run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloudflare-session-ingest test:postgres
 
   # In its own job, madge runs beside the script tests instead of before them.
   dependency-cycle-check:
@@ -1590,10 +1716,11 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ steps.plugins.outputs.key }}
 
       # test-scripts runs the whole test/integration set through
-      # `test:integration` when the kilocode_backend filter matches, so this
-      # file would run in two jobs of one run. Keep the step for the selection
-      # that misses that filter, a dependency or test-only change that still
-      # selects this row, where it is the only place the file runs.
+      # `test:integration` when either the data filter or the detector selects
+      # this service, so this file would run in two jobs of one run. Keep the
+      # step for the selection that misses both, a dependency or test-only
+      # change that still selects this row, where it is the only place the file
+      # runs.
       - name: Test native heartbeat attachment compatibility
-        if: matrix.workspace.name == 'cloudflare-session-ingest' && needs.changes.outputs.kilocode_backend != 'true'
+        if: matrix.workspace.name == 'cloudflare-session-ingest' && needs.changes.outputs.test_scripts_db != 'true' && needs.changes.outputs.data_session_ingest != 'true'
         run: pnpm --filter cloudflare-session-ingest run test:integration test/integration/user-connection-attachment.test.ts

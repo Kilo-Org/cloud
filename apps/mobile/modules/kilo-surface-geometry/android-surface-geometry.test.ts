@@ -70,6 +70,7 @@ const LAYOUT = functionBody(SOURCE, 'onGlobalLayout');
 const ATTACH = functionBody(SOURCE, 'onViewAttachedToWindow');
 const DETACH = functionBody(SOURCE, 'onViewDetachedFromWindow');
 const REFRESH_FRAME = functionBody(SOURCE, 'refreshDisplayFrame');
+const STOP = functionBody(SOURCE, 'stop');
 const SIGNAL = functionBody(SOURCE, 'signalChanged');
 const COMPARE = functionBody(SOURCE, 'sameAs');
 
@@ -132,6 +133,15 @@ describe('the surface-geometry pre-draw observer', () => {
       /private var chain = arrayOfNulls<View>\(0\)/
     );
     expect(MEASURE, 'the path buffer grows by doubling').toMatch(/chain = chain\.copyOf\(/);
+    expect(MEASURE, 'the tail past the collected path is released').toMatch(
+      /releaseChain\(depth\)/
+    );
+    for (const [name, body] of [
+      ['detach', DETACH],
+      ['stop', STOP],
+    ] as const) {
+      expect(body, `${name} releases the collected path`).toMatch(/releaseChain\(0\)/);
+    }
   });
 
   it('compares the six values and builds the emit map only on a change', () => {

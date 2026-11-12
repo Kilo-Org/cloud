@@ -246,6 +246,9 @@ private class SurfaceGeometryObserver(
     attached = false
     dirty = true
     detachTree()
+    // A detached window's ancestors must not stay reachable through the path
+    // buffer, and the measurement below returns before it collects a new path.
+    releaseChain(0)
     snapshot()
   }
 
@@ -377,6 +380,16 @@ private class SurfaceGeometryObserver(
     frameFresh = true
   }
 
+  /**
+   * Drops the path from `beyond` to the end of the buffer. The path holds strong
+   * references to the ancestors, and the root itself is only weakly held, so a
+   * stale tail would keep a window's view tree alive: the tail is cleared after
+   * every collection, and the whole buffer on detach and on stop.
+   */
+  private fun releaseChain(beyond: Int) {
+    for (index in beyond until chain.size) chain[index] = null
+  }
+
   fun snapshot(): Map<String, Any> {
     val root = root.get()
     if (stopped || root == null) {
@@ -462,6 +475,7 @@ private class SurfaceGeometryObserver(
       depth += 1
       ancestor = ancestor.parent as? View
     }
+    releaseChain(depth)
     // `chain[0 until depth]` was just written, so the reads below cannot be null.
     localToScreen(chain[depth - 1]!!, ancestorMatrix)
     var alpha = 1f
@@ -528,6 +542,7 @@ private class SurfaceGeometryObserver(
     stopped = true
     attached = false
     detachTree()
+    releaseChain(0)
     root.get()?.removeOnAttachStateChangeListener(this)
     root.clear()
     onStop(this)

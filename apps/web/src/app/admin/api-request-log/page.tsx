@@ -108,9 +108,9 @@ export default function ApiRequestLogPage() {
           title="Download API Request Log"
           description="Requests and responses logged for the opt-ins below, kept for 30 days."
           downloadPath="/admin/api/api-request-log/download"
-          idLabel="Log ID"
-          idPlaceholder="Enter numeric log ID"
-          idInputMode="numeric"
+          idLabel="Log IDs"
+          idPlaceholder="e.g. 123, 456"
+          idDescription="Enter one log ID or multiple IDs separated by commas."
           showErrorsOnly
           preflight={preflight}
         />

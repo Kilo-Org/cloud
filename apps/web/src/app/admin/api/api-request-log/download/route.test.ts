@@ -778,6 +778,193 @@ describe('GET /admin/api/api-request-log/download', () => {
     }
   );
 
+  it.each(['plain', 'whitespace and duplicates'])(
+    'exports only the selected bigint IDs with %s and audits the full normalized selection',
+    async format => {
+      const selectedIds = ['1', '9007199254740993', '9223372036854775807'];
+      const missingId = '9223372036854775806';
+      const unselectedId = '9007199254740992';
+      await db.insert(api_request_log).values(
+        [...selectedIds, unselectedId].map(id => {
+          const request_r2_key = `2026-08-01/selected-${id}/request.json`;
+          fakeR2.objects.set(`${BUCKET}/${request_r2_key}`, JSON.stringify({ id }));
+          return { ...baseRow, id: BigInt(id), request_r2_key };
+        })
+      );
+      const ids = [...selectedIds, missingId];
+      const id =
+        format === 'plain' ? ids.join(',') : ` \t${ids.join(' ,\n ')} , ${selectedIds[1]} \r`;
+      const params = new URLSearchParams({ id });
+      const send = jest.spyOn(fakeR2, 'send');
+
+      const response = await GET(
+        new NextRequest(`http://localhost:3000/admin/api/api-request-log/download?${params}`)
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Content-Disposition')).toBe(
+        'attachment; filename="api-request-log_all-users_any-start_any-end_ids-4.zip"'
+      );
+      expect(mockedRecordAdminAction).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          target: null,
+          metadata: expect.objectContaining({
+            logId: null,
+            logIds: ids,
+            matchingRows: selectedIds.length,
+            hasUserFilter: false,
+          }),
+        })
+      );
+      const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
+      expect(Object.keys(entries)).toEqual(
+        selectedIds.map(id => expect.stringContaining(`_${id}_request.json`))
+      );
+      for (const id of selectedIds) {
+        expect(JSON.parse(readEntry(entries, `_${id}_request.json`))).toEqual({ id });
+      }
+      expect(send).toHaveBeenCalledTimes(selectedIds.length);
+    }
+  );
+
+  it('retains single-ID audit and filename compatibility after trimming and deduplication', async () => {
+    const request_r2_key = '2026-08-01/duplicate-id/request.json';
+    fakeR2.objects.set(`${BUCKET}/${request_r2_key}`, '{"selected":true}');
+    const [row] = await db
+      .insert(api_request_log)
+      .values({ ...baseRow, request_r2_key })
+      .returning({ id: api_request_log.id });
+
+    const response = await GET(createRequest({ id: ` ${row.id} , ${row.id} ` }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Disposition')).toContain(`_id-${row.id}.zip`);
+    expect(mockedRecordAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        metadata: expect.objectContaining({ logId: String(row.id), matchingRows: 1 }),
+      })
+    );
+    expect(mockedRecordAdminAction.mock.calls[0][1].metadata).not.toHaveProperty('logIds');
+    const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
+    expect(Object.keys(entries)).toEqual([expect.stringContaining(`_${row.id}_request.json`)]);
+    expect(JSON.parse(readEntry(entries, `_${row.id}_request.json`))).toEqual({ selected: true });
+  });
+
+  it('keeps the ID selection on every batch and excludes interleaved unselected rows', async () => {
+    const rows = await db
+      .insert(api_request_log)
+      .values(
+        Array.from({ length: BATCH_SIZE + 2 }, (_, index) => {
+          const request_r2_key = `2026-08-01/selected-page-${index}/request.json`;
+          fakeR2.objects.set(`${BUCKET}/${request_r2_key}`, JSON.stringify({ index }));
+          return { ...baseRow, request_r2_key };
+        })
+      )
+      .returning({ id: api_request_log.id });
+    const selected = rows.filter((_, index) => index % 2 === 0);
+    const send = jest.spyOn(fakeR2, 'send');
+
+    const response = await GET(
+      createRequest({
+        id: selected
+          .toReversed()
+          .map(row => String(row.id))
+          .join(','),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
+    expect(Object.keys(entries)).toEqual(
+      selected.map(row => expect.stringContaining(`_${row.id}_request.json`))
+    );
+    expect(send).toHaveBeenCalledTimes(selected.length);
+    expect(mockedRecordAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        metadata: expect.objectContaining({ matchingRows: selected.length }),
+      })
+    );
+  });
+
+  it('intersects selected IDs with user, organization, model, session, time and error filters', async () => {
+    const organizationId = 'selection-test-organization';
+    const sessionId = 'selection-test-session';
+    const outsideUserId = `${TEST_USER_ID}-outside`;
+    const matchingRow = {
+      ...baseRow,
+      organization_id: organizationId,
+      session_id: sessionId,
+      status_code: 500,
+    };
+    const rows = await db
+      .insert(api_request_log)
+      .values(
+        [
+          matchingRow,
+          { ...matchingRow, status_code: 200, error: { synthetic_error: true } },
+          { ...matchingRow, kilo_user_id: outsideUserId },
+          { ...matchingRow, organization_id: 'outside-organization' },
+          { ...matchingRow, model: 'outside-model' },
+          { ...matchingRow, session_id: 'outside-session' },
+          { ...matchingRow, created_at: '2026-08-01T11:59:59.999Z' },
+          { ...matchingRow, created_at: '2026-08-01T12:31:00.000Z' },
+          { ...matchingRow, status_code: 200 },
+          matchingRow,
+        ].map((row, index) => {
+          const request_r2_key = `2026-08-01/selection-filters-${index}/request.json`;
+          fakeR2.objects.set(`${BUCKET}/${request_r2_key}`, JSON.stringify({ index }));
+          return { ...row, request_r2_key };
+        })
+      )
+      .returning({ id: api_request_log.id });
+
+    try {
+      const response = await GET(
+        createRequest({
+          id: rows
+            .slice(0, -1)
+            .map(row => String(row.id))
+            .join(','),
+          organizationId,
+          sessionId,
+          startTime: '12:00',
+          endTime: '12:30',
+          errorsOnly: 'true',
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Content-Disposition')).toContain('_errors-only_ids-9.zip');
+      const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
+      expect(Object.keys(entries)).toHaveLength(3);
+      for (const [index, row] of rows.slice(0, 2).entries()) {
+        expect(JSON.parse(readEntry(entries, `_${row.id}_request.json`))).toEqual({ index });
+      }
+      expect(JSON.parse(readEntry(entries, `_${rows[1].id}_error.json`))).toEqual({
+        synthetic_error: true,
+      });
+      expect(mockedRecordAdminAction).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ metadata: expect.objectContaining({ matchingRows: 2 }) })
+      );
+    } finally {
+      await db.delete(api_request_log).where(eq(api_request_log.kilo_user_id, outsideUserId));
+    }
+  });
+
+  it('returns 404 without auditing when none of the selected IDs match', async () => {
+    await db.insert(api_request_log).values(baseRow);
+
+    const response = await GET(createRequest({ id: '9223372036854775806,9223372036854775807' }));
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'No records found for the given criteria' });
+    expect(mockedRecordAdminAction).not.toHaveBeenCalled();
+  });
+
   it.each<Record<string, string>>([
     { userId: 'another-user' },
     { organizationId: 'another-organization' },
@@ -872,10 +1059,28 @@ describe('GET /admin/api/api-request-log/download', () => {
     '1.5',
     '1e3',
     'abc',
-    ' 1 ',
     '01',
     '9223372036854775808',
     '100000000000000000000',
+    ' ',
+    ',',
+    ',1',
+    '1,',
+    '1, ,2',
+    '1,,2',
+    '1,0',
+    '1,-1',
+    '1,+2',
+    '1,02',
+    '1,2.5',
+    '1,2e3',
+    '1,0x10',
+    '1,2_000',
+    '1,abc',
+    '1,2 3',
+    '1,9223372036854775808',
+    '1,100000000000000000000',
+    '1,１',
   ])('rejects invalid log ID %j', async id => {
     const response = await GET(createRequest({ id }));
 
@@ -1103,6 +1308,35 @@ describe('GET /admin/api/api-request-log/download', () => {
       expect(exportedIds(entries)).toHaveLength(rows.length);
       expect(entries[INCOMPLETE_NOTICE_NAME]).toBeUndefined();
     });
+
+    it.each([0, 2])(
+      'counts only the %i selected rows remaining after the time budget is reached',
+      async remainingSelected => {
+        const rows = await insertRows(ROUTE_BATCH_SIZE + 8);
+        const selected = [
+          ...rows.slice(0, ROUTE_BATCH_SIZE),
+          ...rows.slice(ROUTE_BATCH_SIZE + 3, ROUTE_BATCH_SIZE + 3 + remainingSelected),
+        ];
+        exceedBudgetDuringFirstBatch();
+
+        const response = await GET(
+          createRequest({ id: selected.map(row => String(row.id)).join(',') })
+        );
+
+        expect(response.status).toBe(200);
+        const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
+        expect(exportedIds(entries)).toEqual(
+          selected.slice(0, ROUTE_BATCH_SIZE).map(row => String(row.id))
+        );
+        if (remainingSelected === 0) {
+          expect(entries[INCOMPLETE_NOTICE_NAME]).toBeUndefined();
+        } else {
+          expect(strFromU8(entries[INCOMPLETE_NOTICE_NAME])).toContain(
+            `It contains ${ROUTE_BATCH_SIZE} matching records. ${remainingSelected} more matching records were not exported.`
+          );
+        }
+      }
+    );
   });
 
   it('skips missing R2 objects and records R2 read failures without aborting the export', async () => {

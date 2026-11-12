@@ -64,6 +64,7 @@ describe.skipIf(!databaseUrl)(
     ) => Promise<Response>;
     const upstreamRequests: Request[] = [];
     let upstreamStatus = 200;
+    let subjectId = '8080';
     const env = () => ({ GIT_TOKEN_SERVICE: service });
     const metadata = {
       id: 42,
@@ -98,6 +99,31 @@ describe.skipIf(!databaseUrl)(
       });
       const configuration = {
         HYPERDRIVE: { connectionString: databaseUrl },
+        REPOSITORY_POLICY: {
+          repositoryAccessProtocolVersion: async () => 2,
+          readWorkspaceRepositoryPolicy: async () => ({
+            sandboxId: 'sandbox_test',
+            access: {
+              version: 1,
+              scopeId: 'worktree_test',
+              revision: 0,
+              repositories: [
+                {
+                  repositoryId: 42,
+                  nodeId: 'R_repo',
+                  owner: 'acme',
+                  name: 'repo',
+                  mode: 'contribute',
+                  source: 'environment',
+                  approvedBy: userId,
+                  approvedAt: 1,
+                  integrationId,
+                  identity: { source: 'user', providerSubjectId: '8080', appType: 'standard' },
+                },
+              ],
+            },
+          }),
+        },
         GITHUB_APP_SLUG: 'kiloconnect',
         GITHUB_APP_CLIENT_ID: 'synthetic-client',
         GITHUB_APP_CLIENT_SECRET: 'synthetic-secret',
@@ -123,6 +149,7 @@ describe.skipIf(!databaseUrl)(
       mocks.logger.withFields.mockReturnValue(mocks.logger);
       upstreamRequests.length = 0;
       upstreamStatus = 200;
+      subjectId = '8080';
       mocks.installation.mockResolvedValue({
         success: true,
         installationId: '123',
@@ -136,12 +163,20 @@ describe.skipIf(!databaseUrl)(
         'fetch',
         vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
           const request = input instanceof Request ? input : new Request(input, init);
+          if (new URL(request.url).pathname === '/user')
+            return Response.json({ id: Number(subjectId) });
+          if (new URL(request.url).pathname === '/user/installations/123/repositories')
+            return Response.json({ total_count: 1, repositories: [{ id: 42 }] });
           if (request.url === 'https://api.github.com/repos/acme/repo')
             return Response.json(metadata);
           if (new URL(request.url).pathname.endsWith('/token/scoped'))
             return Response.json({
               token: scopedToken,
-              installation: { repository_selection: 'selected' },
+              installation: {
+                id: 123,
+                repository_selection: 'selected',
+                permissions: JSON.parse(await request.text()).permissions,
+              },
             });
           if (request.url === 'https://api.github.com/repos/acme/other')
             return new Response(null, { status: 404 });
@@ -317,6 +352,7 @@ describe.skipIf(!databaseUrl)(
 
     it('denies a changed account for a user-source capability', async () => {
       const capability = await issue();
+      subjectId = '9090';
       await database.db
         .update(user_github_app_tokens)
         .set({
@@ -330,7 +366,7 @@ describe.skipIf(!databaseUrl)(
       expect(upstreamRequests).toHaveLength(0);
     });
 
-    it('denies legacy installation uploads at redemption and the task outbound boundary', async () => {
+    it('denies legacy attachment uploads outside the workspace repository policy', async () => {
       const capability = await issue(false);
       await database.db
         .update(user_github_app_tokens)
@@ -347,7 +383,8 @@ describe.skipIf(!databaseUrl)(
         requestMethod: 'POST',
         requestUrl: 'https://uploads.github.com/user-attachments/assets?repository_id=42',
       });
-      expect(redemption).toEqual({ success: false, reason: 'invalid_task_scope' });
+      expect(redemption.success).toBe(false);
+      expect(redemption).not.toHaveProperty('authorization');
       expect(
         (
           await proxyRequest(

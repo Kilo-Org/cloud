@@ -271,9 +271,7 @@ export function CreditPurchaseScreen() {
                 packLabel,
                 storePrice,
                 stateLabel,
-                storePrice === null && stateLabel === null
-                  ? t('credits.priceUnavailable')
-                  : null,
+                storePrice === null && stateLabel === null ? t('credits.priceUnavailable') : null,
                 expiryMessage,
               ]
                 .filter(Boolean)

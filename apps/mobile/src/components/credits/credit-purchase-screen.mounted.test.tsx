@@ -781,9 +781,7 @@ describe('CreditPurchaseScreen', () => {
       `Add ${packAmount('$500.00')} of credits`,
       'Price unavailable',
     ]);
-    expect(labelOf(rows[3])).toContain(
-      'Credits purchased through the App Store do not expire.'
-    );
+    expect(labelOf(rows[3])).toContain('Credits purchased through the App Store do not expire.');
     // One fixed-height state line, one gap, on every row: the store answering
     // or dropping changes the copy in place, never a row's height.
     const stateLines = rows.map(row =>

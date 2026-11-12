@@ -11,7 +11,7 @@ import {
   type SessionLiveFailureKind,
   type SessionLivePlan,
   type SessionLiveStep,
-} from '@kilocode/session-ingest-contracts';
+} from '@kilocode/session-ingest-contracts/session-live-summary';
 
 import { LIVE_ACTIVITY_RELEVANCE, type SessionLiveActivityContentState } from './push-data';
 import {

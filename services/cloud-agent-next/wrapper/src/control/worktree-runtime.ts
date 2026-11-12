@@ -190,6 +190,7 @@ export function buildWorktreeKiloEnvironment(
     GH_NO_EXTENSION_UPDATE_NOTIFIER: '1',
     GH_STACK_NO_UPDATE_NOTIFIER: '1',
     KILO_DISABLE_CODEBASE_INDEXING: 'vscode-no-workspace',
+    KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'false',
     KILO_DEBUG_SESSION_INGEST: '1',
     ...kiloServerEnvForOrigin(runtimeConfig?.createdOnPlatform),
     KILOCODE_TOKEN: kilo.token,

@@ -197,6 +197,7 @@ vi.mock('@/components/ui/icons', () => ({
   Lock: 'Lock',
   LogOut: 'LogOut',
   MessageSquare: 'MessageSquare',
+  Plus: 'Plus',
   ShieldCheck: 'ShieldCheck',
   SlidersHorizontal: 'SlidersHorizontal',
   Smartphone: 'Smartphone',

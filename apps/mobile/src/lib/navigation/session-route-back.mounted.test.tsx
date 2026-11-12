@@ -97,4 +97,17 @@ describe('useSessionRouteBack', () => {
     expect(backPress.listeners.size).toBe(0);
     expect(backPress.press()).toBe(false);
   });
+
+  it('never answers a press a surface above it consumed first', () => {
+    // A sheet, an overlay or a picker in front of the session registers its own
+    // listener later, so React Native asks it first. That screen owns the press,
+    // and this route must not navigate out from under it: the fallback is for a
+    // press the session itself owns.
+    const renderer = mount();
+    backPress.addEventListener('hardwareBackPress', () => true);
+
+    expect(backPress.press()).toBe(true);
+    expect(routerState.dismissTo).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
 });

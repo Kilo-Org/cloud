@@ -30,7 +30,10 @@ import {
   resolveGatewayCaller,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { findSupportedFimModel } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
-import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  emitApiMetricsForResponse,
+  emitGatewayApiMetrics,
+} from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   bareIpLiteral,
   bouncerDecideTier,
@@ -245,26 +248,23 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.status_code = proxyRes.status;
 
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: false,
-      isStreaming: false,
-      userByok: !!userByokEntry,
-      provider: editProvider,
-      requestedModel: requestBody.model,
-      resolvedModel: requestBody.model,
-      toolsAvailable: [],
-      toolsUsed: [],
-      ttfbMs,
-      statusCode: proxyRes.status,
-    },
-    proxyRes.clone(),
-    requestStartedAt
-  );
+  const metricsParams = {
+    kiloUserId: user.id,
+    organizationId,
+    isAnonymous: false,
+    isStreaming: false,
+    userByok: !!userByokEntry,
+    provider: editProvider,
+    requestedModel: requestBody.model,
+    resolvedModel: requestBody.model,
+    toolsAvailable: [],
+    toolsUsed: [],
+    ttfbMs,
+    statusCode: proxyRes.status,
+  };
 
   if (!proxyRes.body) {
+    emitGatewayApiMetrics({ ...metricsParams, completeRequestMs: ttfbMs });
     return NextResponse.json(
       {
         error: 'No body returned from upstream',
@@ -286,7 +286,8 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   const clonedResponse = proxyRes.clone();
 
-  countAndStoreEditUsage(clonedResponse, usageContext, requestSpan);
+  const accounting = countAndStoreEditUsage(clonedResponse, usageContext, requestSpan);
+  emitApiMetricsForResponse(metricsParams, accounting.statsPromise, requestStartedAt);
 
   return upstreamErrorResponse ?? wrapInSafeNextResponse(proxyRes);
 }

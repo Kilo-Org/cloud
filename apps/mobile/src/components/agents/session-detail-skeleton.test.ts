@@ -90,8 +90,8 @@ describe('SessionReadOnlyFooterPlaceholder', () => {
 
 // The composer's own row, in points. This app's rem is 14 pt, so a scale step
 // like `h-11` paints 38.5 pt and leaves the slot short of the composer that
-// replaces it — the slot moved the transcript when it resolved. The controls
-// keep ChatComposerInputRow's CONTROL_HIT_TARGET: 48 on Android, 44 on iOS.
+// replaces it — the slot moved the transcript when it resolved. Both trailing
+// controls stand on the voice toggle's 48 pt target box on either platform.
 describe('SessionComposerSkeleton', () => {
   function skeletonBars(platformOs: 'android' | 'ios', fontScale = 1): string[] {
     platform.os = platformOs;
@@ -122,16 +122,13 @@ describe('SessionComposerSkeleton', () => {
   }
 
   it('stands the row on the composer field and both controls', () => {
-    for (const [platformOs, control] of [
-      ['android', 'h-[48px] w-[48px]'],
-      ['ios', 'h-[44px] w-[44px]'],
-    ] as const) {
+    for (const platformOs of ['android', 'ios'] as const) {
       const bars = skeletonBars(platformOs);
       expect(bars).toHaveLength(3);
       const [field = [], voice = [], send = []] = bars.map(className => className.split(/\s+/));
       expect(field).toEqual(expect.arrayContaining(['h-full', 'w-full', 'rounded-[20px]']));
       for (const trailing of [voice, send]) {
-        expect(trailing).toEqual(expect.arrayContaining(control.split(' ')));
+        expect(trailing).toEqual(expect.arrayContaining(['h-[48px]', 'w-[48px]']));
         expect(trailing).toContain('ms-3');
         expect(trailing).toContain('rounded-full');
       }

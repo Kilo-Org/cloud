@@ -1,4 +1,4 @@
-import { ENKRYPT_USAGE_WRITE_PATH, type UsageRecordRequest } from '@kilocode/usage-contracts';
+import { ENKRYPT_USAGE_WRITE_PATH, type LlmUsageQueueMessage } from '@kilocode/usage-contracts';
 import {
   recordLlmUsage,
   recordEnkryptUsage,
@@ -122,7 +122,7 @@ function recordQueuedUsage(
 }
 
 /** LLM logs keep their existing fields; only tagged messages add `usage_kind`. */
-function usageIdentity(parsed: QueuedUsage, llmFields: (usage: UsageRecordRequest) => object) {
+function usageIdentity(parsed: QueuedUsage, llmFields: (usage: LlmUsageQueueMessage) => object) {
   if (parsed.kind === 'llm') return llmFields(parsed.usage);
   if (parsed.kind === 'enkrypt_usage') {
     return { usage_id: parsed.record.id, usage_kind: 'enkrypt_usage' };

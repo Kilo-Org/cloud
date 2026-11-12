@@ -45,12 +45,12 @@ export default defineProject({
       'src/lib/analytics/**/*.test.ts',
       'src/lib/auth/**/*.test.ts',
       'src/lib/chat/**/*.test.ts',
+      'src/lib/design-gate/**/*.test.ts',
       'src/lib/auth/**/*.test.tsx',
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',
       'src/lib/artifacts/**/*.test.ts',
       'src/lib/glanceable/**/*.test.ts',
-      'src/lib/kiloclaw/**/*.test.ts',
       'src/glanceable-ios/**/*.test.ts',
       'src/glanceable-android/**/*.test.ts',
       'src/lib/font-scale/**/*.test.ts',
@@ -81,9 +81,6 @@ export default defineProject({
       'src/components/**/*.test.ts',
       'src/components/agents/**/!(*.mounted).test.tsx',
       'src/components/pr-review/**/!(*.mounted).test.tsx',
-      // `!(*.mounted)` keeps `*.mounted.test.tsx` in the mounted project only:
-      // this directory holds both kinds, and a file in both projects runs twice.
-      'src/components/kiloclaw/**/!(*.mounted).test.tsx',
       'src/lib/telemetry/**/*.test.ts',
       'src/lib/tour/**/*.test.ts',
       'modules/kilo-surface-geometry/*.test.ts',

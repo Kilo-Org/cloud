@@ -122,7 +122,7 @@ type ChatSidebarProps = {
   workspaceOrder?: WorkspaceOrder;
   workspaceRowsTruncated?: boolean;
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
-  onDeleteWorktree?: (worktreeId: string) => void;
+  onDeleteWorktree?: (worktreeId: string, name: string) => void;
   deletingWorktreeIds?: readonly string[];
   isDeletionInProgress?: boolean;
   isInSheet?: boolean;
@@ -400,7 +400,7 @@ function WorktreeGroupRow({
   onOpenWorktree: (group: SidebarWorktreeGroup) => void;
   onCreateWorktreeChat?: (sourceKiloSessionId: string) => void;
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
-  onDeleteWorktree?: (worktreeId: string) => void;
+  onDeleteWorktree?: (worktreeId: string, name: string) => void;
   onNewStackedWorkspace?: (
     group: SidebarWorktreeGroup,
     source?: { branch: string; repository: string } | null
@@ -759,7 +759,7 @@ function WorktreeGroupRow({
                         <DropdownMenuItem
                           variant="destructive"
                           disabled={isDeletionInProgress}
-                          onSelect={() => onDeleteWorktree(group.worktreeId)}
+                          onSelect={() => onDeleteWorktree(group.worktreeId, worktreeLabel)}
                         >
                           <Trash2 className="h-4 w-4" />
                           Delete worktree
@@ -1110,10 +1110,8 @@ export function ChatSidebar({
           );
           return { folder, groups };
         }
-        const groups = sortWorkspaceGroups(
-          workspaceDestinations.manual.get(folder.id) ?? [],
-          folder.sortMode
-        );
+        // Regular folders preserve the user's global workspace order.
+        const groups = workspaceDestinations.manual.get(folder.id) ?? [];
         return { folder, groups };
       }),
     [workspaceDestinations, workspaceFolders?.folders]
@@ -1164,17 +1162,27 @@ export function ChatSidebar({
     placement: 'before' | 'after';
   } | null>(null);
 
-  const workspaceGroupsInContainer = useCallback(
-    (folderId: string | null): SidebarWorkspaceGroup[] => {
-      if (folderId === null) return workspaceDestinations.unfiled;
-      const folder = workspaceFolders?.folders.find(candidate => candidate.id === folderId);
-      if (!folder) return workspaceDestinations.unfiled;
-      if (folder.kind === 'smart' && folder.smartPreset) {
-        return workspaceDestinations.smart.get(folder.smartPreset) ?? [];
+  const getReorderContainer = useCallback(
+    (worktreeId: string) => {
+      if (!hasWorkspaceGroups || !canEditFolders || workspaceOrder !== 'manual') return undefined;
+      if (phase4Ungrouped.some(group => group.root.worktreeId === worktreeId)) {
+        return { folderId: null, groups: workspaceDestinations.unfiled };
       }
-      return workspaceDestinations.manual.get(folder.id) ?? [];
+      const section = phase4FolderSections.find(
+        ({ folder, groups }) =>
+          folder.kind === 'manual' && groups.some(group => group.root.worktreeId === worktreeId)
+      );
+      if (section) return { folderId: section.folder.id, groups: section.groups };
+      return undefined;
     },
-    [workspaceDestinations, workspaceFolders?.folders]
+    [
+      canEditFolders,
+      hasWorkspaceGroups,
+      phase4FolderSections,
+      phase4Ungrouped,
+      workspaceDestinations.unfiled,
+      workspaceOrder,
+    ]
   );
 
   const rowDropPlacement = useCallback((event: DragEvent<HTMLDivElement>): 'before' | 'after' => {
@@ -1184,52 +1192,35 @@ export function ChatSidebar({
 
   const rowDragOver = useCallback(
     (event: DragEvent<HTMLDivElement>, worktreeId: string) => {
-      if (!hasWorkspaceGroups || dragItem?.type !== 'worktree' || dragItem.id === worktreeId) {
+      const container = getReorderContainer(worktreeId);
+      if (
+        dragItem?.type !== 'worktree' ||
+        dragItem.id === worktreeId ||
+        !container?.groups.some(group => group.root.worktreeId === dragItem.id)
+      ) {
+        setRowDropTarget(null);
         return;
       }
-      const dragged = orderedWorkspaceGroups.find(group => group.root.worktreeId === dragItem.id);
-      const target = orderedWorkspaceGroups.find(group => group.root.worktreeId === worktreeId);
-      if (!dragged || !target) return;
-      const targetFolderId = target.root.folderId ?? null;
-      const draggedFolderId = dragged.root.folderId ?? null;
-      if (targetFolderId !== draggedFolderId) return;
-      const folder = targetFolderId
-        ? workspaceFolders?.folders.find(candidate => candidate.id === targetFolderId)
-        : undefined;
-      if (folder?.kind === 'smart') return;
       event.preventDefault();
       event.stopPropagation();
       event.dataTransfer.dropEffect = 'move';
+      setDropTarget(null);
       setRowDropTarget({ worktreeId, placement: rowDropPlacement(event) });
     },
-    [
-      dragItem,
-      orderedWorkspaceGroups,
-      rowDropPlacement,
-      workspaceFolders?.folders,
-      hasWorkspaceGroups,
-    ]
+    [dragItem, getReorderContainer, rowDropPlacement]
   );
 
   const rowDrop = useCallback(
     (event: DragEvent<HTMLDivElement>, worktreeId: string) => {
-      if (!hasWorkspaceGroups || dragItem?.type !== 'worktree') {
-        setRowDropTarget(null);
-        return;
-      }
-      const draggedId = dragItem.id;
-      const target = orderedWorkspaceGroups.find(group => group.root.worktreeId === worktreeId);
-      const placement = rowDropPlacement(event);
       setRowDropTarget(null);
-      if (!target || draggedId === worktreeId) return;
-      const folderId = target.root.folderId ?? null;
-      const folder = folderId
-        ? workspaceFolders?.folders.find(candidate => candidate.id === folderId)
-        : undefined;
-      if (folder?.kind === 'smart') return;
-      const dragged = orderedWorkspaceGroups.find(group => group.root.worktreeId === draggedId);
-      if (!dragged) return;
-      const container = workspaceGroupsInContainer(folderId).filter(
+      if (dragItem?.type !== 'worktree' || dragItem.id === worktreeId) return;
+      const draggedId = dragItem.id;
+      const reorderContainer = getReorderContainer(worktreeId);
+      const dragged = reorderContainer?.groups.find(group => group.root.worktreeId === draggedId);
+      if (!reorderContainer || !dragged) return;
+      const { folderId } = reorderContainer;
+      const placement = rowDropPlacement(event);
+      const container = reorderContainer.groups.filter(
         group => group.root.worktreeId !== draggedId
       );
       const targetIndex = container.findIndex(group => group.root.worktreeId === worktreeId);
@@ -1259,14 +1250,7 @@ export function ChatSidebar({
       setDragItem(null);
       setDropTarget(null);
     },
-    [
-      dragItem,
-      orderedWorkspaceGroups,
-      rowDropPlacement,
-      workspaceFolders,
-      workspaceGroupsInContainer,
-      hasWorkspaceGroups,
-    ]
+    [dragItem, getReorderContainer, rowDropPlacement, workspaceFolders]
   );
 
   const clearDrag = useCallback(() => {
@@ -1317,6 +1301,7 @@ export function ChatSidebar({
   };
 
   const dragOver = (event: DragEvent<HTMLElement>, target: WorkspaceFolderDropTarget) => {
+    setRowDropTarget(null);
     if (
       !canEditFolders ||
       !getWorkspaceFolderDropAction(
@@ -1410,7 +1395,9 @@ export function ChatSidebar({
           }
         : undefined;
     const dropPlacement =
-      rowDropTarget?.worktreeId === group.worktreeId ? rowDropTarget.placement : null;
+      rowDropTarget?.worktreeId === group.worktreeId && getReorderContainer(group.worktreeId)
+        ? rowDropTarget.placement
+        : null;
     const renderRow = (member: SidebarWorktreeGroup, slots?: StackBaseRowSlots) => (
       <WorktreeGroupRow
         {...slots}
@@ -1746,8 +1733,10 @@ export function ChatSidebar({
                       });
                     }}
                     onMove={direction => moveFolder(folder.id, direction)}
-                    onSortModeChange={sortMode =>
-                      void workspaceFolders.setFolderSortMode(folder.id, sortMode)
+                    onSortModeChange={
+                      folder.kind === 'smart'
+                        ? sortMode => void workspaceFolders.setFolderSortMode(folder.id, sortMode)
+                        : undefined
                     }
                     onDragStart={event => startDrag(event, { type: 'folder', id: folder.id })}
                     onDragEnd={clearDrag}

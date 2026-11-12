@@ -32,7 +32,7 @@ import { NEUTRAL_TINT, type Tint, toneColor } from '@/lib/agent-color';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatMoney, formatNumber } from '@/lib/format';
+import { formatNumber, formatPrefixedMoney } from '@/lib/format';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
@@ -148,7 +148,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   let lowBalanceSubtitle: string | undefined = undefined;
   if (minimumBalance != null) {
     lowBalanceSubtitle = t('organization.hub.lowBalanceBelow', {
-      amount: formatMoney(minimumBalance, i18n.language),
+      amount: isolateLtrBidiText(formatPrefixedMoney(minimumBalance, i18n.language)),
     });
   } else if (orgWithMembers.data != null) {
     lowBalanceSubtitle = t('common.off');
@@ -169,6 +169,10 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   const lowBalanceAccessibilityLabel = lowBalanceRetry
     ? `${t('organization.lowBalanceAlert.title')}. ${lowBalanceDetail}. ${lowBalanceRetry}`
     : `${t('organization.lowBalanceAlert.title')}. ${lowBalanceDetail}`;
+
+  // One string for the painted balance and its spoken label, in the shape the
+  // Profile credits card paints the same balance.
+  const balanceAmount = formatPrefixedMoney(fromMicrodollars(org.balance), i18n.language);
 
   return (
     <View className="flex-1 bg-background">
@@ -200,12 +204,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           {showMoney && (
             <KvRow
               label={t('organization.hub.balance')}
-              value={
-                hideOrgBalance
-                  ? HIDDEN_BALANCE
-                  : formatMoney(fromMicrodollars(org.balance), i18n.language)
-              }
+              value={hideOrgBalance ? HIDDEN_BALANCE : balanceAmount}
               valueFace="numeric"
+              // The amount's symbol and sign are neutral to the paragraph's
+              // direction, so the run carries its own left-to-right order.
+              valueDirection="ltr"
               // An empty balance offers the top-up on the amount's own line: a
               // row of its own would hold nothing but this control.
               trailing={
@@ -220,11 +223,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               // label keeps its previous native value on Android, so a
               // masked row that reveals its amount would still announce
               // "Balance hidden" (the credits card's own note).
-              valueAccessibilityLabel={
-                hideOrgBalance
-                  ? t('profile.balanceHidden')
-                  : formatMoney(fromMicrodollars(org.balance), i18n.language)
-              }
+              valueAccessibilityLabel={hideOrgBalance ? t('profile.balanceHidden') : balanceAmount}
             />
           )}
           <KvRow

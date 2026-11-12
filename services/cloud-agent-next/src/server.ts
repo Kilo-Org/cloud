@@ -90,6 +90,7 @@ import { getVercelRuntimeIdentity } from './byoc/vercel-runtime-identity.js';
 import { z } from 'zod';
 import { isOrgInList } from './sandbox-id.js';
 import { registerVercelScmBrokerRoute } from './scm-broker/vercel-route.js';
+import { isAllowedStreamWebSocketOrigin, isAllowedWebSocketOrigin } from './ws-origin.js';
 
 const app = new Hono<HonoContext>();
 
@@ -114,15 +115,6 @@ function snapshotBuildOwnerKey(input: z.infer<typeof SnapshotBuildOwnerSchema>):
 
 function snapshotBuildOwnerId(input: z.infer<typeof SnapshotBuildOwnerSchema>): string {
   return input.organizationId !== undefined ? input.organizationId : input.userId;
-}
-
-function isAllowedWebSocketOrigin(env: Env, origin: string | undefined): boolean {
-  const allowedOrigins = (env.WS_ALLOWED_ORIGINS || '')
-    .split(',')
-    .map(value => value.trim())
-    .filter(Boolean);
-  const isRealOrigin = origin !== undefined && origin !== 'null';
-  return allowedOrigins.length === 0 || !isRealOrigin || allowedOrigins.includes(origin);
 }
 
 function createTerminalForwardRequest(
@@ -170,7 +162,7 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
     return new Response('Invalid ptyId parameter', { status: 400 });
   }
 
-  if (!isAllowedWebSocketOrigin(env, request.headers.get('Origin') ?? undefined)) {
+  if (!isAllowedWebSocketOrigin(env, request.headers.get('Origin'))) {
     logger.withFields({ cloudAgentSessionId, ptyId }).warn('/terminal: Origin not allowed');
     return new Response('Origin not allowed', { status: 403 });
   }
@@ -752,6 +744,11 @@ app.get('/stream', async (c: Context<HonoContext>) => {
     return c.text('Missing cloudAgentSessionId parameter', 400);
   }
 
+  if (!isAllowedStreamWebSocketOrigin(c.env, c.req.header('Origin'))) {
+    logger.withFields({ cloudAgentSessionId }).warn('/stream: Origin not allowed');
+    return c.text('Origin not allowed', 403);
+  }
+
   const ticket = url.searchParams.get('ticket');
   if (!ticket) {
     logger.withFields({ cloudAgentSessionId }).warn('/stream: Missing ticket');
@@ -828,6 +825,9 @@ app.get('/terminal', async (c: Context<HonoContext>) => {
   return handleTerminalWebSocket(c.req.raw, c.env);
 });
 
+/** Concurrent revocation closes per wave. */
+const ORG_STREAM_CLOSE_CONCURRENCY = 8;
+
 app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
   const unauthorized = requireInternalApi(c);
   if (unauthorized) return unauthorized;
@@ -859,10 +859,35 @@ app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
       )
     );
 
-  for (const row of rows) {
+  // The caller bounds this request, and a close that has a route to retire can
+  // refresh the provider policy or stop its sandbox. Matching closes therefore
+  // run in waves of eight, so the sessions of one wave share the caller's
+  // budget and the request keeps a bounded number of concurrent DO calls.
+  const sessionIds = rows.flatMap(row => {
     const sessionId = row.cloudAgentSessionId;
-    if (!sessionId || !isControlSession(sessionId)) continue;
-    await getSandboxSessionStub(c.env, userId, sessionId).closeOrgStreams(organizationId);
+    return sessionId && isControlSession(sessionId) ? [sessionId] : [];
+  });
+  for (let index = 0; index < sessionIds.length; index += ORG_STREAM_CLOSE_CONCURRENCY) {
+    await Promise.all(
+      sessionIds.slice(index, index + ORG_STREAM_CLOSE_CONCURRENCY).map(async sessionId => {
+        try {
+          await getSandboxSessionStub(c.env, userId, sessionId).closeOrgStreams(organizationId);
+        } catch (error) {
+          // One session's failed close (an unreachable Durable Object, or a
+          // release that could not finish) must not stop the others. Every
+          // later grant is issued only on a current membership, so authority
+          // ends at the next issuance: until then the session keeps the grant
+          // it already holds.
+          logger
+            .withFields({
+              cloudAgentSessionId: sessionId,
+              userId,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            .error('/internal/streams/close: session close failed');
+        }
+      })
+    );
   }
 
   return c.body(null, 204);

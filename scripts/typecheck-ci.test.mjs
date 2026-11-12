@@ -301,9 +301,6 @@ test('every workflow install job restores a pnpm dependency cache', () => {
 // whenever the runner fleet's apt egress degrades, and the runner images
 // already ship the Chromium system libraries. A browser build that the
 // version-keyed cache does not satisfy is downloaded, never apt-installed.
-// chromatic.yml is disabled in the repository's Actions settings, so its jobs
-// run nowhere; it is left as it is until the workflow is re-enabled.
-const disabledWorkflows = new Set(['chromatic.yml']);
 
 test('every Chromium install skips apt and restores the browser cache first', () => {
   const directory = new URL('../.github/workflows/', import.meta.url);
@@ -313,7 +310,6 @@ test('every Chromium install skips apt and restores the browser cache first', ()
   for (const file of readdirSync(directory)
     .filter(name => /\.ya?ml$/.test(name))
     .sort()) {
-    if (disabledWorkflows.has(file)) continue;
     const workflow = load(readFileSync(new URL(file, directory), 'utf8'));
     for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
       const steps = (job.steps ?? []).filter(step => step !== null && typeof step === 'object');
@@ -341,11 +337,12 @@ test('every Chromium install skips apt and restores the browser cache first', ()
   assert.deepEqual(
     installs,
     [
+      'chromatic.yml:playwright',
       'ci.yml:mobile-diagram-host',
       'extension-ci.yml:e2e-chrome-shard',
       'setup-smoke.yml:setup-smoke',
     ],
-    'every Chromium install in a live workflow is covered'
+    'every Chromium install in a workflow is covered'
   );
 });
 
@@ -870,22 +867,26 @@ test('kilo-app CI installs the closure the declaration action needs', () => {
   }
 });
 
-// Both harness SDK producers run the same action and no other step that reads
-// a workspace, so both install the same closure. The package has no workspace
-// dependency; the root project supplies the `tsgo` binary the action's key
-// script runs, so it stays in the filter.
+// Every job that produces the harness SDK runs only steps that read this
+// package or the root project, so all of them install the same closure. The
+// package has no workspace dependency; the root project supplies the `tsgo`
+// binary the action's key script runs, so it stays in the filter.
 const harnessProducerInstall =
   "pnpm install --frozen-lockfile --filter '@kilocode/harness-sdk...' --filter kilocode-monorepo";
 
-test('both harness SDK producers install the harness SDK closure', () => {
-  for (const file of ['kilo-app-ci.yml', 'mobile-native-build.yml']) {
-    const install = workflows[file].jobs[harnessProducer].steps.find(
+test('every harness SDK producer installs the harness SDK closure', () => {
+  for (const [file, job] of [
+    ['kilo-app-ci.yml', harnessProducer],
+    ['mobile-native-build.yml', harnessProducer],
+    ['ci.yml', 'harness-sdk'],
+  ]) {
+    const install = workflows[file].jobs[job].steps.find(
       step => step.name === 'Install dependencies'
     );
     assert.equal(
       install.run,
       harnessProducerInstall,
-      `${file}'s ${harnessProducer} installs the harness SDK closure, not the whole workspace`
+      `${file}'s ${job} installs the harness SDK closure, not the whole workspace`
     );
   }
 });
@@ -1628,6 +1629,40 @@ test('the Chrome e2e shards start only for the inputs their bundle reads', () =>
   assert.equal(jobs['e2e-chrome'].if, '${{ !cancelled() }}');
 });
 
+// The extension declares @kilocode/trpc and @kilocode/cloud-agent-sdk and no
+// other workspace package, so the extension's closure is what links its
+// Firefox build and its unit suite. `verify` also builds the tRPC declarations,
+// whose program resolves apps/web and web-shared sources through its path
+// aliases; apps/web declares no @kilocode/trpc, so both filters are needed
+// there and neither implies the other. A step that starts reading another
+// workspace widens its job's filter; it does not restore the full install.
+const extensionVerifyInstall =
+  "pnpm install --frozen-lockfile --filter 'kilo-extension...' --filter 'web...' --filter kilocode-monorepo";
+
+test('the extension verify job installs the closure its steps read', () => {
+  const verify = workflows['extension-ci.yml'].jobs.verify;
+  const installs = verify.steps.filter(step => /^pnpm\b.*\binstall\b/.test(step.run ?? ''));
+  assert.deepEqual(
+    installs.map(step => step.run),
+    [extensionVerifyInstall],
+    'one install links the extension closure, the web closure and the root project'
+  );
+});
+
+// A shard's duration belongs to the Playwright suite, and the workspace install
+// stays under a tenth of it, so a closure install cannot save a tenth of the
+// job. The measured decision leaves this install whole, so only a measurement
+// under this test changes it.
+test('the Chrome e2e shards keep the workspace install and both shards', () => {
+  const job = workflows['extension-ci.yml'].jobs['e2e-chrome-shard'];
+  assert.equal(
+    job.steps.find(step => step.name === 'Install dependencies').run,
+    'pnpm install --frozen-lockfile',
+    'a shard installs the workspace, because the suite sets its duration'
+  );
+  assert.deepEqual(job.strategy.matrix.shard, [1, 2], 'both shards still run');
+});
+
 // The account database job runs the root `drizzle` script, which executes
 // drizzle-kit inside packages/db, and one session-sync suite whose workspace
 // imports are @kilocode/db and @kilocode/worker-utils, both declared by the
@@ -1680,24 +1715,25 @@ test('the ci-wiring job installs its closure in one pass', () => {
 });
 
 // The measured per-job install share of wall time keeps a narrowing above one
-// tenth of the job it saves: the mobile-test shards, `mobile-lint` and
-// `check-unused` clear that bar, and `mobile-typecheck`'s sample run does not,
-// so it keeps the whole workspace for now. When a measurement moves a job over
-// the bar, name it here; a step that starts importing another workspace widens
-// its job's filter, and no job restores the full install to hide an undeclared
-// import. Dependency postinstalls stay enabled across these jobs.
+// tenth of the job it saves: `mobile-typecheck`'s install step is the only step
+// the narrowing changes, and on the project's CI runs it costs well over a tenth
+// of that job, so the job installs the app closure too. When a measurement moves
+// a job below the bar, name it here; a step that starts importing another
+// workspace widens its job's filter, and no job restores the full install to
+// hide an undeclared import. Dependency postinstalls stay enabled across these
+// jobs.
 const appClosureInstall =
   "pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo";
 
 test('the kilo-app CI consumers install the app closure', () => {
-  // The producer jobs install their own build closure, and `mobile-typecheck`
-  // keeps the whole workspace until its measured saving clears the bar; every
-  // other install in this workflow is the app's.
+  // The producer jobs install their own build closure; every other install in
+  // this workflow is the app's, including the typecheck job's: its only program
+  // resolves the app's sources and its workspace dependencies' declarations,
+  // and the two built trees it reads arrive as artifacts.
   const consumerJobs = Object.entries(kiloAppJobs)
     .filter(
       ([name, job]) =>
         !name.startsWith('prepare') &&
-        name !== 'mobile-typecheck' &&
         (job.steps ?? []).some(step => /^pnpm install --frozen-lockfile\b/.test(step.run ?? ''))
     )
     .map(([name]) => name);
@@ -1711,7 +1747,7 @@ test('the kilo-app CI consumers install the app closure', () => {
   }
   assert.deepEqual(
     consumerJobs,
-    ['mobile-lint', 'check-unused', 'mobile-test'],
+    ['mobile-typecheck', 'mobile-lint', 'check-unused', 'mobile-test'],
     'the app closure covers the measured consumer installs and leaves the others alone'
   );
 });
@@ -1761,9 +1797,11 @@ test('the extension matrix row defers to extension CI outside the merge queue', 
 });
 
 // A selection document from scripts/affected-workspaces.mjs, as the root script
-// reads it.
+// reads it. `base_valid` is true for a normal run: the detector read the base and
+// attributed the change.
 const selection = (overrides = {}) => ({
   base: 'base',
+  base_valid: true,
   full: false,
   reasons: [],
   full_checks: [],
@@ -1784,6 +1822,7 @@ function runTypecheck(
     buildExit = 0,
     checkExit = 0,
     built = '',
+    event = '',
     affected = selection(),
     selectionExit = 0,
   } = {}
@@ -1856,6 +1895,7 @@ if (name === 'git') {
       env: {
         ...process.env,
         PATH: `${bin}:${process.env.PATH}`,
+        GITHUB_EVENT_NAME: event,
         KILO_TYPECHECK_TRPC_BUILT: built,
         EXTENSION_TYPECHECK: extension.scripts.typecheck,
         CHANGES: changes,
@@ -2127,6 +2167,84 @@ test('the web group stays out of a selection that names neither program', t => {
   });
   assert.equal(result.status, 0);
   assert.deepEqual(result.commands, []);
+});
+
+// extension-ci.yml has no merge-queue trigger, so the trpc row is the
+// extension's only gate on a queue entry: the leg must stay there.
+test('the trpc group typechecks the extension for a merge queue entry', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    group: 'trpc',
+    event: 'merge_group',
+    affected: selection({ full: true, dirs: ['apps/extension', 'apps/web'] }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.commands, [trpcBuild, 'pnpm --filter kilo-extension run typecheck']);
+});
+
+// extension-ci.yml runs `verify`, which typechecks the extension, whenever its
+// own selection reaches apps/extension, and that selection is this document's
+// `dirs` list. Repeating the compile in the ci.yml row pays for one program
+// twice on the same event.
+test('the trpc group leaves the extension compile to extension CI', t => {
+  for (const event of ['pull_request', 'push']) {
+    const result = runTypecheck(t, {
+      root: true,
+      group: 'trpc',
+      event,
+      built: '1',
+      affected: selection({ full: true, dirs: ['apps/extension', 'apps/web'] }),
+    });
+    assert.equal(result.status, 0);
+    assert.deepEqual(result.commands, [], `${event}: the row runs no extension check`);
+  }
+});
+
+// A full check that selects no workspace reaches the extension in no other
+// workflow, so the leg is what typechecks it.
+test('the trpc group keeps the extension when extension CI selects nothing', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    group: 'trpc',
+    event: 'pull_request',
+    built: '1',
+    affected: selection({ full_checks: ['typecheck'], dirs: [] }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.commands, ['pnpm --filter kilo-extension run typecheck']);
+});
+
+// Only the two events extension-ci.yml runs on may hand the compile over. A
+// local invocation carries no event name, and the row keeps the leg there.
+test('the trpc group typechecks the extension when the event is unknown', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    group: 'trpc',
+    built: '1',
+    affected: selection({ full: true, dirs: ['apps/extension'] }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.commands, ['pnpm --filter kilo-extension run typecheck']);
+});
+
+// A base the checkout cannot read selects every workspace without attributing
+// the change, and extension-ci.yml resolves its own fallback base for that
+// event, so the document cannot answer for it.
+test('the trpc group keeps the extension when the detector read no base', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    group: 'trpc',
+    event: 'push',
+    built: '1',
+    affected: selection({
+      base: '0000000000000000000000000000000000000000',
+      base_valid: false,
+      full: true,
+      dirs: ['apps/extension', 'apps/web'],
+    }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.commands, ['pnpm --filter kilo-extension run typecheck']);
 });
 // `pnpm-workspace.yaml` lists workspaces that sit inside another workspace
 // (services/cloud-agent-next/wrapper is one). Both the full and the affected

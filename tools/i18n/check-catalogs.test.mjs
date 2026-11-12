@@ -58,10 +58,9 @@ function runChecker(
     copyFileSync(new URL(`./${name}`, import.meta.url), join(toolDir, name));
   }
   mkdirSync(join(root, 'tools/lib'), { recursive: true });
-  copyFileSync(
-    new URL('../lib/source-files.mjs', import.meta.url),
-    join(root, 'tools/lib/source-files.mjs')
-  );
+  for (const name of ['catalogs.mjs', 'source-files.mjs']) {
+    copyFileSync(new URL(`../lib/${name}`, import.meta.url), join(root, 'tools/lib', name));
+  }
   const result = spawnSync(process.execPath, [join(toolDir, 'check-catalogs.mjs')], {
     cwd: root,
     encoding: 'utf8',

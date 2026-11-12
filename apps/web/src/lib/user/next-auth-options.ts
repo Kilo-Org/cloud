@@ -3,9 +3,11 @@ import { JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
 import { cookies, headers } from 'next/headers';
 
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from '@/lib/user';
 import { createOrUpdateUser, findAndSyncExistingUser } from '@/lib/user';
 import { readWatchwoodSignupAssessment } from '@/lib/auth/watchwood';
+import { getTrustedSignupClientIp } from '@/lib/auth/trusted-signup-ip';
 import type { NextAuthOptions, Account, User as NextUser, Profile } from 'next-auth';
 import NextAuth from 'next-auth';
 import type { GoogleProfile } from 'next-auth/providers/google';
@@ -132,7 +134,6 @@ export type TurnstileJwtPayload = {
    */
   guid: UUID;
   ip: string;
-  watchwoodIp?: string;
   iat: number;
   exp: number;
 };
@@ -1297,7 +1298,7 @@ export const authOptions: NextAuthOptions = {
         // Check if this is an existing user with a different primary email
         const existingUser = await findAndSyncExistingUser(accountInfo);
 
-        if (existingUser?.blocked_reason) {
+        if (existingUser && isBlockedAccount(existingUser)) {
           return redirectUrlForCode('BLOCKED');
         }
 
@@ -1406,10 +1407,10 @@ export const authOptions: NextAuthOptions = {
             return redirectUrlForCode('INVALID_VERIFICATION');
           }
 
-          const currentIP = requestHeaders.get('x-forwarded-for');
-          if (verifiedToken.ip !== currentIP) {
+          const currentIP = getTrustedSignupClientIp(requestHeaders);
+          if (!currentIP || verifiedToken.ip !== currentIP) {
             sentryLogger('turnstile-auth')(
-              `SECURITY: IP mismatch - JWT: ${verifiedToken.ip}, Current: ${currentIP}`,
+              `SECURITY: IP mismatch - JWT: ${verifiedToken.ip}, Current: ${currentIP ?? 'unresolved'}`,
               accountInfo
             );
             return redirectUrlForCode('IP_MISMATCH');
@@ -1510,7 +1511,7 @@ export const authOptions: NextAuthOptions = {
           );
         }
 
-        if (result.user.blocked_reason) {
+        if (isBlockedAccount(result.user)) {
           return redirectUrlForCode(`BLOCKED`);
         }
 

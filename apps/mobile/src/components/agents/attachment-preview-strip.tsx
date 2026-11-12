@@ -385,10 +385,11 @@ const AttachmentChip = memo(function AttachmentChip({
         <View
           className={cn(
             'h-full w-full flex-row items-center gap-2',
-            // Row 3.3: the Retry control sits in the bottom-LEFT corner, so
-            // the retryable chip's file content shifts right of its badge
-            // instead of being hidden underneath it.
-            description.showRetry ? 'pl-10 pr-2' : 'px-2'
+            // Row 3.3: the Retry control sits in the bottom-start corner, so
+            // the retryable chip's file content shifts start-ward of its badge
+            // instead of being hidden underneath it. A chip without Retry keeps
+            // the symmetric `px-2` row inset.
+            description.showRetry ? 'ps-10 pe-2' : 'px-2'
           )}
         >
           {isErrored ? (
@@ -396,8 +397,16 @@ const AttachmentChip = memo(function AttachmentChip({
           ) : (
             <FileIcon size={14} color={colors.mutedForeground} />
           )}
-          <View className="min-w-0 flex-1">
-            <Text numberOfLines={1} className="text-xs text-foreground">
+          {/* The text column reserves the Remove badge's own width (`pe-8`) so
+              both lines ellipsize before the absolutely positioned badge. The
+              reserve rides here, not on the row, because the row's opposite
+              insets stay equal; the badge box itself is unchanged. Removing it
+              puts the filename back under the control. */}
+          <View className={cn('min-w-0 flex-1', description.showRemove && 'pe-8')}>
+            {/* The filename loses its middle, so the name's start and the file
+                type both stay readable. A tail ellipsis drops the extension
+                and leaves similar names of one type indistinguishable. */}
+            <Text className="text-xs text-foreground" numberOfLines={1} ellipsizeMode="middle">
               {description.filename}
             </Text>
             <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
@@ -513,8 +522,10 @@ const AttachmentChip = memo(function AttachmentChip({
             // height in both shapes — the 46 dp document chip and the 64 dp
             // image thumbnail — instead of pinning to a corner. `box-none`
             // leaves the chip body's tap target whole; only the badge itself
-            // takes a touch. Its end inset matches the content's own `px-2`
-            // start inset, so the badge clears the surface's rounded corner.
+            // takes a touch. Its `pe-2` end inset matches the content's own
+            // `ps-2` inner inset, so the badge clears the surface's rounded
+            // corner, and the text column reserves the badge's width
+            // (`pe-8`) so no filename runs underneath it.
             <View
               className="absolute inset-0 items-end justify-center pe-2"
               pointerEvents="box-none"

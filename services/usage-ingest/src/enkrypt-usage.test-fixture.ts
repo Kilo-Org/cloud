@@ -11,6 +11,8 @@ export const enkryptRecord: EnkryptUsageWrite = {
   creditsCost: 7,
   addedLatencyMs: 212,
   guardrail: 'input',
+  scannedCharacters: 2_400,
+  totalCharacters: 10_000,
 };
 
 export const enkryptMessage: EnkryptUsageQueueMessage = {

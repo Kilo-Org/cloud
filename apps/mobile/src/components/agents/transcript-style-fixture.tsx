@@ -74,30 +74,6 @@ const turns = asMessages({
 type AssistantFailure = NonNullable<Extract<StoredMessage['info'], { role: 'assistant' }>['error']>;
 
 /**
- * The gateway's answer to a paid request from an account that cannot pay it:
- * status 402 with its named credit block in the body
- * (`usageLimitExceededResponse` in packages/web-shared). This is the failure
- * the row states as the credits copy beside Add credits.
- */
-const CREDITS_REFUSAL: AssistantFailure = {
-  name: 'APIError',
-  data: {
-    message: 'Add credits to continue, or switch to a free model',
-    statusCode: 402,
-    isRetryable: false,
-    responseBody: JSON.stringify({
-      error: {
-        title: 'Paid Model - Credits Required',
-        message: 'Add credits to continue, or switch to a free model',
-        balance: 0,
-        buyCreditsUrl: 'https://app.kilo.ai/profile',
-      },
-      error_type: 'usage_limit_exceeded',
-    }),
-  },
-};
-
-/**
  * The turn the provider refused: a contentless assistant row carrying the
  * gateway's verdict for the failure. A retryable one (the default) is what the
  * transcript shows after a transient upstream failure, and its row draws the
@@ -138,7 +114,6 @@ function failedAnswerWith(error: AssistantFailure): StoredMessage {
 
 const retryableMessages = [...turns, failedAnswer(true)];
 const terminalMessages = [...turns, failedAnswer(false)];
-const creditsMessages = [...turns, failedAnswerWith(CREDITS_REFUSAL)];
 
 /**
  * The question whose answer failed, drawn the way the chat screen draws it: the
@@ -160,6 +135,25 @@ const executionFailureMessages = asMessages({
 const EXECUTION_FAILURE = { status: 'failed', error: '', reason: 'execution' } as const;
 
 /**
+ * The question whose send the account's balance refused, drawn the way the chat
+ * screen draws it: the asked question is the row that carries the statement, and
+ * it holds the same delivery state the chat hands it — the credits cause, Add
+ * credits, and Copy to composer, with no Retry. A runtime reload restores the
+ * chat from its stored records, so this state cannot be opened by a link
+ * afterwards; the fixture is how the design gate measures it in each cell.
+ */
+const creditsDeliveryMessages = asMessages({
+  sessionId: SESSION,
+  asked: 'And what time is it in Lisbon?',
+  askedImages: [],
+  answering: [],
+  waiting: [],
+  turns: [...transcriptTurns],
+});
+
+const CREDITS_DELIVERY_FAILURE = { status: 'failed', error: '', reason: 'credits' } as const;
+
+/**
  * The message the transport gave up on after several attempts. It never
  * reached the agent, so the failure belongs to the message's own column rather
  * than the response's; the SDK stores it on a queued row of the transcript.
@@ -175,6 +169,7 @@ const askedId = askedMessageId(SESSION);
 /** The transcript row a failed delivery rides on, and the copy the row states. */
 const failedRowByFailure = {
   execution: { id: askedId, deliveryState: EXECUTION_FAILURE },
+  creditsDelivery: { id: askedId, deliveryState: CREDITS_DELIVERY_FAILURE },
   undelivered: { id: 'hello-there', deliveryState: UNDELIVERED_FAILURE },
 } as const;
 
@@ -189,14 +184,14 @@ const ignoreAddCredits = (): void => undefined;
 
 /**
  * The failure the fixture draws: the retryable answer, the terminal one, the
- * one the account's balance caused, or the asked question's.
+ * one the account's balance refused to send, or the asked question's.
  */
-type FixtureFailure = 'retryable' | 'terminal' | 'credits' | 'execution' | 'undelivered';
+type FixtureFailure = 'retryable' | 'terminal' | 'creditsDelivery' | 'execution' | 'undelivered';
 
 const MESSAGES_BY_FAILURE = {
   retryable: retryableMessages,
   terminal: terminalMessages,
-  credits: creditsMessages,
+  creditsDelivery: creditsDeliveryMessages,
   execution: executionFailureMessages,
   undelivered: turns,
 } satisfies Record<FixtureFailure, readonly StoredMessage[]>;
@@ -208,7 +203,9 @@ export function TranscriptStyleFixture({
   const { t } = useTranslation();
   const messages = MESSAGES_BY_FAILURE[failure];
   const failedRow =
-    failure === 'execution' || failure === 'undelivered' ? failedRowByFailure[failure] : undefined;
+    failure === 'execution' || failure === 'creditsDelivery' || failure === 'undelivered'
+      ? failedRowByFailure[failure]
+      : undefined;
 
   return (
     <View className="flex-1 bg-background">

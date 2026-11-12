@@ -120,7 +120,7 @@ function isAllowedProviderRoute(
 }
 
 const ORGANIZATION_MODEL_CATALOG_PATH =
-  /^\/api\/(?:openrouter|gateway)\/organizations\/[A-Za-z0-9._-]+\/models$/;
+  /^\/api\/(?:openrouter|gateway)\/(?:api\/)?organizations\/[A-Za-z0-9._-]+\/models$/;
 
 /**
  * The attestation plane that authenticates the upstream endpoint, which is not
@@ -143,7 +143,9 @@ function logicalProviderPath(pathname: string, organizationId: string | undefine
     pathname.startsWith(`${value}/`)
   );
   if (!prefix) return null;
-  const path = pathname.slice(prefix.length);
+  // Kilo v1 appends /api/organizations/<org> to its configured provider base.
+  // Normalize that catalog alias before applying the same session-org allowlist.
+  const path = pathname.slice(prefix.length).replace(/^\/api\/organizations\//, '/organizations/');
   if (path.startsWith('/v1/') && prefix !== '/api/gateway') return null;
   return isAllowedProviderRoute('GET', path, organizationId) ||
     isAllowedProviderRoute('POST', path, organizationId)

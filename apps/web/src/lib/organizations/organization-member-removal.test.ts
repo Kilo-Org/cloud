@@ -32,6 +32,12 @@ import {
 import { removeUserFromOrganization } from './organization-member-removal';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
 import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';
+import { isClaudeOperatorConfigured } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/operator', () => ({
+  getClaudeOperatorToken: jest.fn(async () => 'member-removal-operator-token'),
+  isClaudeOperatorConfigured: jest.fn(() => false),
+}));
 
 jest.mock('@/lib/session-ingest-client', () => ({
   invalidateOrganizationSessionAccess: jest.fn().mockResolvedValue(undefined),
@@ -53,6 +59,7 @@ describe('removeUserFromOrganization', () => {
   beforeEach(() => {
     jest.mocked(invalidateOrganizationSessionAccess).mockClear();
     jest.mocked(closeCloudAgentOrgStreams).mockClear();
+    jest.mocked(isClaudeOperatorConfigured).mockReturnValue(false);
   });
 
   afterEach(async () => {
@@ -117,6 +124,42 @@ describe('removeUserFromOrganization', () => {
       { member: false, status: 'connected', id: 'ocon_shared' },
       { member: true, status: 'removed', id: null },
     ]);
+  });
+
+  test('retires an unreferenced member Claude profile after the removal transaction commits', async () => {
+    jest.mocked(isClaudeOperatorConfigured).mockReturnValue(true);
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ type: 'user_profile_deleted' }), { status: 200 })
+      );
+    try {
+      const owner = await insertTestUser();
+      const member = await insertTestUser();
+      const organization = await createOrganization('Claude member retire', owner.id);
+      await addUserToOrganization(organization.id, member.id, 'member');
+      await db.insert(claude_billing_connections).values({
+        kilo_user_id: member.id,
+        organization_id: organization.id,
+        user_profile_id: `uprof_retire_${member.id}`,
+        connection_id: 'ocon_retire',
+        status: 'connected',
+        connected_at: new Date().toISOString(),
+        created_by: member.id,
+      });
+
+      await removeUserFromOrganization(organization.id, member.id, owner.id);
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(String(fetchSpy.mock.calls[0]?.[0])).toContain(`uprof_retire_${member.id}`);
+      const remaining = await db
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.organization_id, organization.id));
+      expect(remaining).toEqual([]);
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 
   test('should remove user from organization', async () => {

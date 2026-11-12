@@ -27,7 +27,7 @@ import { WorktreeReviewMessageCard } from '../WorktreeReviewMessageCard';
 import { PreparationRow } from '../PreparationRow';
 import { CommitCard } from '../CommitCard';
 import { MessageErrorBoundary } from '../MessageErrorBoundary';
-import { CloudMessageParts } from './CloudMessageParts';
+import { CloudMessagePartByIndex, CloudMessageParts } from './CloudMessageParts';
 import {
   useCloudMessagePresentation,
   useCloudPresentationActions,
@@ -41,13 +41,11 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
   const parts = presentation.parts.map(part => part.source);
   const isUser = first.info.role === 'user';
   const text = isUser ? getUserTextContent(parts) : getAssistantTextContent(parts);
-  const compaction =
-    isUser && parts.length > 0 && parts.every(isCompactionPart)
-      ? parts.find(isCompactionPart)
-      : undefined;
+  const compaction = parts.find(isCompactionPart);
   const error = first.info.role === 'assistant' ? first.info.error : undefined;
   const showError = !presentation.isStreaming && error != null;
   const interrupted = error != null && isAssistantInterruptError(error);
+  const errorMessage = error != null && !interrupted ? getAssistantErrorMessage(error) : undefined;
   const statusClass = interrupted ? 'text-muted-foreground' : 'text-destructive';
   const review = isUser ? parseWorktreeReviewMessage(text) : null;
   const callback = isUser ? parseChildSessionCallbackPrompt(text) : null;
@@ -62,7 +60,7 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
     <MessageErrorBoundary>
       {visible && (
         <MessagePrimitive.Root
-          data-message-id={compaction && !child ? undefined : presentation.id}
+          data-message-id={presentation.id}
           data-message-role={first.info.role}
           className={
             child
@@ -77,7 +75,33 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
           {presentation.messageIds.slice(1).map(id => (
             <span key={id} data-message-id={id} aria-hidden="true" />
           ))}
-          {child ? (
+          {compaction ? (
+            <>
+              <CompactionSeparator
+                compactionPart={compaction}
+                timestamp={presentation.displayTimestamp}
+                status={
+                  interrupted
+                    ? 'interrupted'
+                    : error != null
+                      ? 'failed'
+                      : first.info.role === 'assistant' && first.info.time.completed === undefined
+                        ? presentation.isStreaming
+                          ? 'running'
+                          : 'interrupted'
+                        : 'completed'
+                }
+              />
+              {errorMessage && errorMessage !== 'Context compaction failed' && (
+                <p className="text-destructive text-sm">{errorMessage}</p>
+              )}
+              {(isUser ? parts : getVisibleAssistantParts(parts)).map((part, index) =>
+                isCompactionPart(part) ? null : (
+                  <CloudMessagePartByIndex key={part.id} index={index} />
+                )
+              )}
+            </>
+          ) : child ? (
             <>
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <Badge variant="outline" className="text-xs">
@@ -91,11 +115,6 @@ export function CloudMessage({ child = false }: { child?: boolean }) {
                 <CloudMessageParts />
               </div>
             </>
-          ) : compaction ? (
-            <CompactionSeparator
-              compactionPart={compaction}
-              timestamp={presentation.displayTimestamp}
-            />
           ) : isUser ? (
             <>
               <div

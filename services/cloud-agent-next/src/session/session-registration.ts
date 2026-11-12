@@ -1003,7 +1003,6 @@ async function allocateNewSession(
     assertEnvironmentSupportsSandbox({
       environment: input.environment,
       allocation: sandboxAllocation,
-      contained: true,
     });
   } catch (error) {
     // A saved allocation resolved after admission can still fail here; the ledger
@@ -2294,7 +2293,6 @@ export async function createSessionWithLedger(
   assertEnvironmentSupportsSandbox({
     environment: input.environment,
     allocation: requestedSandboxAllocation(input),
-    contained: true,
   });
   const initialWorktreeEnabled = isEligibleFirstWorktreeSession(input, ctx);
   const initialEffectiveInput = effectiveSessionRegistrationInput(input, initialWorktreeEnabled, 2);

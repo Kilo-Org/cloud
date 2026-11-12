@@ -1,5 +1,6 @@
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
+import { ORGANIZATION_PARENT_ACCESS_ROLES } from '@kilocode/app-shared/organizations';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import { captureMessage } from '@sentry/nextjs';
@@ -36,7 +37,7 @@ export async function enforceOrganizationCreationLimit(
     .where(
       and(
         eq(organization_memberships.kilo_user_id, userId),
-        inArray(organization_memberships.role, ['owner', 'admin', 'billing_manager'])
+        inArray(organization_memberships.role, ORGANIZATION_PARENT_ACCESS_ROLES)
       )
     );
   const existingOrganizations = await tx

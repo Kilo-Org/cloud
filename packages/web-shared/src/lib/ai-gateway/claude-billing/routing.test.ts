@@ -19,7 +19,7 @@ import type { ClaudeBillingConnectionRow } from '@kilocode/db/schema';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getGrantedClaudeBillingConnection } from './store';
 import { getClaudeOperatorToken, isClaudeOperatorConfigured } from './operator';
-import { checkClaudeBilling } from './routing';
+import { buildClaudeBillingProvider, checkClaudeBilling } from './routing';
 import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
@@ -87,6 +87,65 @@ function sharedOwner() {
 }
 
 describe('Claude customer-billed routing', () => {
+  it.each(['anthropic/claude-fable-5.2', '~anthropic/claude-fable-latest'])(
+    'drops mismatched thinking blocks for %s',
+    async model => {
+      const provider = buildClaudeBillingProvider(
+        'operator-token',
+        'claude-fable-5-2',
+        { kind: 'personal', kiloUserId: 'user' },
+        'uprof_test'
+      );
+      const gatewayRequest: GatewayRequest = {
+        kind: 'messages',
+        body: {
+          model,
+          max_tokens: 2_048,
+          messages: [{ role: 'user', content: 'hello' }],
+          thinking: { type: 'adaptive', display: 'summarized' },
+        },
+      };
+      const headers: Record<string, string> = {
+        'anthropic-beta': 'fine-grained-tool-streaming-2025-05-14',
+        'x-anthropic-beta': 'fine-grained-tool-streaming-2025-05-14',
+      };
+
+      const context = {
+        provider,
+        model,
+        request: gatewayRequest,
+        extraHeaders: headers,
+        originalHeaders: {} as never,
+        userByok: null,
+        kilo_user_id: 'user',
+        organization_id: null,
+        session_id: null,
+      };
+      await provider.transformRequest(context);
+
+      expect(context.model).toBe(model);
+      expect(gatewayRequest.body).toMatchObject({
+        model: 'claude-fable-5-2',
+        thinking: {
+          type: 'adaptive',
+          display: 'summarized',
+          block_binding: { prefix_mismatch_behavior: 'drop_block' },
+        },
+        billing_policy: { type: 'billing_policy', bill_to: 'user_profile' },
+      });
+      for (const header of ['anthropic-beta', 'x-anthropic-beta']) {
+        expect(headers[header].split(',')).toEqual(
+          expect.arrayContaining([
+            'fine-grained-tool-streaming-2025-05-14',
+            'oauth-2025-04-20',
+            'user-profiles-billing-2026-10-01',
+            'thinking-binding-controls-2026-08-01',
+          ])
+        );
+      }
+    }
+  );
+
   it.each(['messages', 'chat_completions'] as const)(
     'bills the profile over %s without a Kilo charge',
     async kind => {
@@ -215,6 +274,82 @@ describe('Claude customer-billed routing', () => {
       })
     ).toMatchObject({ kind: 'unavailable' });
     expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+  });
+
+  function sharedOnly() {
+    jest
+      .mocked(getGrantedClaudeBillingConnection)
+      .mockImplementation(async owner => (owner.kind === 'shared_services' ? SHARED_ROW : null));
+  }
+
+  it.each([
+    [
+      'a soft-deleted account',
+      {
+        id: 'connector',
+        google_user_email: 'deleted+c@deleted.invalid',
+        blocked_reason: 'soft-deleted at 2026-01-01T00:00:00.000Z',
+      },
+    ],
+    [
+      'an account being deleted',
+      {
+        id: 'connector',
+        google_user_email: 'connector@kilocode.ai',
+        blocked_reason: 'deletion-in-progress at 2026-01-01T00:00:00.000Z',
+      },
+    ],
+    ['an account with no email', { id: 'connector', google_user_email: '', blocked_reason: null }],
+    ['a missing account', undefined],
+  ])('requires a reconnect for the shared connection when the connector is %s', async (_, user) => {
+    sharedOnly();
+    jest.mocked(findUserById).mockResolvedValue(user as never);
+
+    const result = await checkClaudeBilling({
+      ...input(),
+      requesterEmail: 'code-review-bot@kilocode.local',
+      organizationId: SHARED_ORG_ID,
+      botId: 'reviewer',
+    });
+
+    expect(result).toEqual({
+      kind: 'reconnect',
+      message: expect.stringContaining('is no longer available'),
+    });
+    expect(getGrantedClaudeBillingConnection).toHaveBeenCalledTimes(1);
+    expect(isClaudePlatformOAuthEnabled).not.toHaveBeenCalled();
+    expect(getClaudeOperatorToken).not.toHaveBeenCalled();
+  });
+
+  it('keeps the requester fallback when the row records no connector', async () => {
+    jest
+      .mocked(getGrantedClaudeBillingConnection)
+      .mockImplementation(async owner =>
+        owner.kind === 'shared_services' ? { ...SHARED_ROW, created_by: null as never } : null
+      );
+
+    expect(
+      await checkClaudeBilling({
+        ...input(),
+        organizationId: SHARED_ORG_ID,
+        botId: 'reviewer',
+      })
+    ).toMatchObject({ kind: 'provider' });
+    expect(findUserById).not.toHaveBeenCalled();
+    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith('requester@kilocode.ai');
+  });
+
+  it('serves a personal connection even when the recorded connector is gone', async () => {
+    jest.mocked(findUserById).mockResolvedValue({
+      id: 'connector',
+      blocked_reason: 'soft-deleted at 2026-01-01',
+    } as never);
+    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(row);
+
+    const result = await checkClaudeBilling(input());
+
+    expect(result?.kind).toBe('provider');
+    expect(findUserById).not.toHaveBeenCalled();
   });
 
   it('falls back to the caller connection when the organization has no shared one', async () => {

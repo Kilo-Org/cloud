@@ -3,6 +3,30 @@ import { runtimeHarness, kilo2RuntimeEnvironment } from './runtime-harness.js';
 import { readKilo2Sse } from './kilo2-event-feed.js';
 
 describe('runtime harness selection', () => {
+  it('passes the disk-backed profile to v2 without putting templates in the environment', () => {
+    const result = kilo2RuntimeEnvironment({
+      HOME: '/shared',
+      KILO_CONFIG: '/shared/.config/kilo/profile.json',
+      KILO_CONFIG_CONTENT: '{}',
+    });
+    expect(result.KILO2_CONFIG).toBe('/shared/.config/kilo/profile.json');
+    expect(JSON.parse(result.KILO_CONFIG_CONTENT).commands).toBeUndefined();
+  });
+
+  it.each([
+    { skills: ['/extra'] },
+    { skills: { paths: ['/extra'], urls: ['https://example.com/skills'] } },
+  ])('adds profile skills to configured v2 discovery sources', ({ skills }) => {
+    const env = { HOME: '/shared', KILO_CONFIG_CONTENT: JSON.stringify({ skills }) };
+    const result = kilo2RuntimeEnvironment(env);
+    expect(JSON.parse(result.KILO_CONFIG_CONTENT).skills).toEqual([
+      '/extra',
+      ...(Array.isArray(skills) ? [] : ['https://example.com/skills']),
+      '/shared/.kilocode/skills',
+    ]);
+    expect(kilo2RuntimeEnvironment(result)).toEqual(result);
+    expect(JSON.parse(env.KILO_CONFIG_CONTENT).skills).toEqual(skills);
+  });
   it('exposes legacy rule files to V2 once without replacing repository instruction configuration', () => {
     const original = {
       HOME: '/workspace-shared-home',
@@ -85,6 +109,26 @@ describe('runtime harness selection', () => {
       });
     }
   );
+
+  it('preserves the projected organization through the v2 config adapter', () => {
+    const result = kilo2RuntimeEnvironment({
+      KILOCODE_ORGANIZATION_ID: 'org-session',
+      KILO_CONFIG_CONTENT: JSON.stringify({
+        provider: {
+          kilo: {
+            options: {
+              baseURL: 'https://worker.example/api/openrouter',
+              kilocodeOrganizationId: 'org-session',
+            },
+          },
+        },
+      }),
+    });
+    expect(result.KILOCODE_ORGANIZATION_ID).toBe('org-session');
+    expect(
+      JSON.parse(result.KILO_CONFIG_CONTENT).provider.kilo.options.kilocodeOrganizationId
+    ).toBe('org-session');
+  });
 
   it('keeps heartbeat comments and frames split across transport chunks', async () => {
     const chunks = [': heart', 'beat\n\nda', 'ta: {"type":"server.connected"}\n\n'];

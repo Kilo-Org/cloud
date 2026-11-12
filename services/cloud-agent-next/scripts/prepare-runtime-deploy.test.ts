@@ -28,7 +28,7 @@ async function checkout(config: string, recipe?: string, mode = 'downloaded') {
   await fs.writeFile(
     path.join(root, 'runtime-targets.json'),
     JSON.stringify({
-      default: { mode, image: 'all-in-one' },
+      default: { mode, image: 'runtime-free' },
       targets: {},
     })
   );
@@ -70,7 +70,7 @@ const config = () =>
     containers: [
       {
         class_name: 'SandboxContainers',
-        images: { app: { dockerfile: './Dockerfile.containers' } },
+        images: { 'runtime-free': { dockerfile: './Dockerfile.containers.runtime-free' } },
       },
     ],
   });
@@ -134,12 +134,20 @@ describe('exact-SHA handoff wait', () => {
     await rejection;
   });
 });
-it('accepts JSONC comments and trailing commas without runtime storage in preinstalled mode', async () => {
+it('accepts JSONC comments and trailing commas but rejects preinstalled configuration', async () => {
   const f = await checkout(
     config().slice(0, -1) + ', // supported JSONC\n}',
     undefined,
     'preinstalled'
   );
-  await expect(main(['production', f.sha], f.root)).resolves.toBeUndefined();
+  await expect(main(['production', f.sha], f.root)).rejects.toMatchObject({
+    issues: [
+      expect.objectContaining({
+        code: 'invalid_value',
+        path: ['default', 'mode'],
+        values: ['downloaded'],
+      }),
+    ],
+  });
   expect(lookup).not.toHaveBeenCalled();
 });

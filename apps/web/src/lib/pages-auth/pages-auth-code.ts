@@ -22,23 +22,27 @@ const CODE_PURPOSE = 'pages-auth';
 export const PAGES_AUTH_STATE_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
 
 /**
- * What a code stands for: this person, signing in to this deployment, in the
- * sign-in this `state` names.
+ * What a code stands for: this person, signing in to the deployment this
+ * `audience` names, in the sign-in this `state` names.
  */
 export type PagesAuthGrant = {
   userId: string;
-  origin: string;
+  audience: string;
   state: string;
 };
 
 function parsePagesAuthGrant(payload: Record<string, unknown>): PagesAuthGrant | null {
   if (payload.purpose !== CODE_PURPOSE) return null;
   if (typeof payload.userId !== 'string' || payload.userId.length === 0) return null;
-  if (typeof payload.origin !== 'string' || payload.origin.length === 0) return null;
+  if (typeof payload.audience !== 'string' || payload.audience.length === 0) return null;
   if (typeof payload.state !== 'string' || !PAGES_AUTH_STATE_PATTERN.test(payload.state)) {
     return null;
   }
-  return { userId: payload.userId, origin: payload.origin, state: payload.state };
+  return {
+    userId: payload.userId,
+    audience: payload.audience,
+    state: payload.state,
+  };
 }
 
 /**

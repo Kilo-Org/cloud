@@ -12,13 +12,12 @@ import {
   PRODUCTION_HOSTS,
   URL_SCHEMES,
 } from '@/lib/url-contract';
-import { ENV_KEYS } from './env-keys';
+import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './env-keys';
 
 describe('assertUrlScheme', () => {
   const productionCases: { key: keyof typeof URL_SCHEMES; value: string }[] = [
     { key: 'apiBaseUrl', value: 'https://api.kilo.ai' },
     { key: 'webBaseUrl', value: 'https://app.kilo.ai' },
-    { key: 'kiloChatUrl', value: 'https://chat.kilo.ai' },
     { key: 'notificationsUrl', value: 'https://notifications.kilo.ai' },
     { key: 'cloudAgentWsUrl', value: 'wss://cloud-agent.kilo.ai' },
     { key: 'sessionIngestWsUrl', value: 'wss://session-ingest.kilo.ai' },
@@ -244,26 +243,23 @@ describe('app.config.ts config boundary (text contract)', () => {
   });
 });
 
-// The build-time loop resolves each URL_SCHEMES key through ENV_KEYS
-// (`process.env[ENV_KEYS[key]]`), so the optional latency ingest URL has to
-// resolve there too: otherwise its scheme and production-host check is
-// silently skipped and a bad override throws at launch in config.ts instead.
-// env-keys.js defines that entry non-enumerably, so the lookup finds the name
-// while the required-presence check (`Object.values(ENV_KEYS)`) stays
-// required-only.
+// The build-time URL contract in app.config.ts resolves each URL_SCHEMES key
+// through the required and optional maps together, so a URL key's name lives in
+// exactly one of them: a URL key that only OPTIONAL_ENV_KEYS names still gets
+// its scheme and production-host check. The required-presence check
+// (`Object.values(ENV_KEYS)`) stays required-only.
 describe('URL key → environment variable resolution', () => {
-  it('resolves every URL key through ENV_KEYS, optional keys included', () => {
+  it('names every URL key in the required or optional map', () => {
+    const urlEnvNames: Record<string, string | undefined> = {
+      ...ENV_KEYS,
+      ...OPTIONAL_ENV_KEYS,
+    };
     for (const key of Object.keys(URL_SCHEMES)) {
-      const envVar = ENV_KEYS[key as keyof typeof ENV_KEYS];
-      expect(envVar, `${key} must resolve to an env var name`).toBeTruthy();
+      expect(urlEnvNames[key], `${key} must resolve to an env var name`).toBeTruthy();
     }
   });
 
   it('keeps the optional URL key out of the required-presence values', () => {
     expect(Object.values(ENV_KEYS)).not.toContain('LATENCY_INGEST_URL');
-  });
-
-  it('keeps app.config.ts resolving URL values through ENV_KEYS', () => {
-    expect(configCodeSource).toMatch(/process\.env\[ENV_KEYS\[/);
   });
 });

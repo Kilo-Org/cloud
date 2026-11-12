@@ -53,9 +53,15 @@ unavailable signing secret returns 503, so ordinary bounded-backoff reconnect re
 
 ## 3. Topology and identities
 
-- One Session DO per `sessionId` (`workspace_*`). One Sandbox DO per `sandboxId`. One sandbox
-  serves one workspace: it hosts the sibling chats and worktrees of that workspace and of no other.
-  Legacy shared keys (`usr-`, `org-`, `bot-`, `ubt-`) only decode; nothing creates them.
+- One Session DO per `sessionId` (`workspace_*`). One Sandbox DO per `sandboxId`.
+- Sandbox ownership has exactly two supported forms: **one standalone session without a workspace
+  per sandbox**, or **one workspace per sandbox, containing any number of sessions**. Sessions in
+  the same workspace share its sandbox and runtime. Independent workspaces and standalone sessions
+  never share a sandbox. The `workspace_*` session ID prefix does not imply workspace membership.
+- All new functionality targets this exclusive ownership model. It does not need to support
+  sandboxes shared across independent workspaces or standalone sessions. Legacy shared keys
+  (`usr-`, `org-`, `bot-`, `ubt-`) only decode; nothing creates them. Retained legacy shared-sandbox
+  decoding and cleanup are compatibility-only, not a supported topology to extend.
 - A **route** is one session on one sandbox: `sessionId`, worktree directory, `kiloSessionId`.
   New allocations with a compatible wrapper share one Kilo runtime per directory.
   Existing allocations retain their original `runtimeIsolation` and HOME keys until normal replacement.
@@ -210,24 +216,22 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
 ### Startup modes
 
 The Sandbox DO selects the first process of a sandbox. The provider runs it and does not interpret it.
-The mode says where the runtime (Kilo and the supervisor) comes from: the image or a download.
+New allocations download their runtime (Kilo and the supervisor) onto a runtime-free base image.
 
 - **Contract.** `launch(ref, { command, env }, options)` takes the command as an argv; a script is
   `['/bin/sh', '-c', script]`. Native uses it as the start entrypoint, and as the exec on a
-  `sleep infinity` main process. Vercel runs it without a login shell. The Sandbox SDK runs it
-  with `startProcess`. A provider never chooses a Kilo version, reads a release descriptor or owns
+  `sleep infinity` main process. Vercel runs it without a login shell.
+  A provider never chooses a Kilo version, reads a release descriptor or owns
   a deadline other than `deadlineAt`.
-- **`preinstalled`.** `preinstalled-startup.ts` supplies `['/bin/sh', CONTROL_SUPERVISOR_PATH]`.
-  The image holds Kilo and the supervisor. There is no download and no grant.
 - **`downloaded`.** `downloaded-startup.ts` reads the release descriptor, confirms both payload
   objects, mints an artifact grant and renders the bootstrap (`runtime-bootstrap.ts`). The bootstrap
   installs the CLI and control payloads under `/opt/kilo-cloud`, points the stable paths at them,
   removes the grant and execs the same supervisor argv. The native PID 1 check, the `pgrep` probe
-  and the SDK process scan stay unchanged.
+  stay unchanged.
 - **Selection.** `startup-selection.ts` reads the mode and the native image from Worker
-  configuration once per create attempt. Absent configuration means `preinstalled`. Mode and image
-  are independent, but the runtime-free image requires `downloaded`. Native and BYOC Vercel pins
-  support `downloaded`; SDK pins keep `preinstalled`. Vercel executes the trusted installer as root
+  configuration once per create attempt. Only `downloaded` and `runtime-free` are accepted;
+  omitted mode/image values select those defaults, but a release descriptor is required.
+  Retired SDK pins cannot create compute. Vercel executes the trusted installer as root
   against the customer snapshot. Its base digest excludes the downloaded CLI and wrapper release.
   Any invalid pair, a `downloaded` pin without a descriptor, or a missing descriptor or payload object fails
   `invalid_configuration` before provider work. An R2 read error is a transient create error.
@@ -520,6 +524,35 @@ These keep their current owners and evidence; the rewrite ports them, it does no
   obtain a runtime authorization fence. Physical replacement retires scope material through the
   allocation hooks and rebinds preparing routes before sending credentials to the new wrapper,
   without resetting attempt deadlines or starting a sandbox merely to obtain credentials.
+- Organization membership gates every organization-attributed grant. Preparation, the wrapper
+  rebind after a restart and a warm renewal all issue through the same path, which reads the session
+  owner's current membership of the grant's organization first. That membership is the direct
+  membership row that session creation also requires, not the wider read predicate: an inherited
+  parent-organization role keeps the session readable but does not authorize a grant. Grant
+  authority therefore stays no wider than the authority to start the session. None of the three
+  paths sends a grant or a `session.credentials` frame to a non-member. A read that answers "not a
+  member" is proof: preparation and the rebind fail the attempt with `workspace_setup_failed` stage
+  `organization_access_revoked` and do not retry it, and a warm renewal retires the route at the
+  Sandbox DO on the path that proved the loss, so the route, its grant and the wrapper path go and
+  the wrapper receives `session.release` instead of the route continuing on the grant it already
+  holds. An unreadable membership denies the grant on every path, because a failed read is not
+  evidence that the grant is still allowed. One unreadable read is a single observation, so an
+  issuance reads again inside the grant issuance bound; only an exhausted read denies. A renewal
+  then keeps the five-minute retry, and a preparation or rebind fails the attempt with
+  `workspace_setup_failed` stage `organization_membership_unavailable`, so the deny is
+  distinguishable from a grant-mint fault. Personal sources carry no organization and skip the
+  read.
+- Organization access revocation (`POST /internal/streams/close`, sent when a member is removed)
+  releases each of that member's matching sessions at the Sandbox DO in addition to closing their
+  client sockets: the route row, its organization-attributed grant and the wrapper path go, and the
+  wrapper receives `session.release`, ending organization-scoped execution instead of letting it
+  run to grant expiry. One session's failed close does not skip the remaining sessions of the same
+  member, and matching closes run in waves of eight. A slow release for one session therefore does
+  not spend the caller's budget before the other sessions of its wave start. A later grant renewal
+  that proves the loss retires that session's route from the Sandbox DO itself, so the same end does
+  not depend on the close call. A session that holds no route at that sandbox owns nothing there:
+  its release changes no policy, keeps the shared rules of the other sessions and sends no wrapper
+  frame.
 - Worktree deletion commits the authoritative ingest content removal before runtime cleanup, then
   attempts every journaled runtime location. Missing runtime history or an unconfirmed provider
   stop returns the logical deletion as successful with `cleanup: 'pending'`, retains the deletion
@@ -626,12 +659,11 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
 - **Runtime selection.** Environment builders always use the `runtime-free` image and downloaded
   startup. Snapshot enrollment controls builder access independently of session startup selection.
   Builds are unsupported without a downloaded runtime-free deployment and a published runtime release.
-  Existing all-in-one snapshots are incompatible and trigger replacement builds. Sessions keep their
-  selected image; an `app` session starts from its image instead of a split-image snapshot.
+  Existing all-in-one snapshots are incompatible and trigger replacement builds. Already-running
+  allocations retain their recorded startup identity until replacement.
   Downloaded startup uses the current runtime installer and its named builder or supervisor target,
-  including on snapshot restore. The installed control bundle includes the builder. A preinstalled
-  launch rejects snapshots captured with downloaded aliases; a downloaded launch can install a
-  newer compatible runtime over a snapshot. The artifact read grant travels in the installer
+  including on snapshot restore. The installed control bundle includes the builder. A downloaded
+  launch can install a newer compatible runtime over a snapshot. The artifact read grant travels in the installer
   command and expires at the startup deadline. A restored session supplies a new command and its
   own credentials. Native snapshot retention of start configuration still needs deployed validation.
 
@@ -697,6 +729,20 @@ keep environment snapshots and existing history/worktree recovery.
   env, secrets and MCP configuration from the route before accepting work.
   Existing native sessions are reused; missing native sessions use history-only recovery.
   New chats and later siblings share that runtime and directory without resetting files.
+
+  On a shared-workspace Kilo v2 runtime start without a workspace snapshot, the wrapper also preloads
+  the five most recently updated root chats from that workspace's ownership ledger. Their native
+  histories import in parallel with the requested chat before preparation reports ready; existing
+  native sessions are reused. Preloading runs once per live runtime, never restores transcript file
+  patches, and never attaches routes or starts turns for those chats. Owner, organization, workspace
+  membership, and a non-deleting workspace are checked on discovery and sibling history reads.
+  The discovery authorization covers its exact chat IDs for at most ten seconds on that wrapper
+  socket and route attempt; later reads recheck the ledger, so revocation can lag by at most that window.
+  Preloading has a ten-second best-effort budget; an import gets one retry, and a failed or timed-out
+  preload does not fail the requested chat. Other chats still restore on demand. Kilo v1 chats
+  always restore on demand, so history-only warmup cannot suppress their saved file patches.
+  Cancelling a caller stops its wait immediately, but its import lock remains until the underlying
+  harness open settles. A queued requested open keeps its own inputs and cancellation deadline.
 - **Diagnostics and retention.** Existing diagnostics report workspace, requesting session,
   allocation, capture time, selected source and skip/fallback reason. They never log handles,
   credentials or file contents. Replacing a descriptor makes the previous artifact unselectable;
@@ -1056,13 +1102,12 @@ alone is non-zero and restarts. If the loop gives up, the Sandbox DO `starting` 
 timer stops the sandbox.
 
 On the native Cloudflare Containers runtime the container main process is the startup command:
-`start()` is issued with it as the entrypoint. In `preinstalled` mode that is
-`['/bin/sh', supervisor-path]`. In `downloaded` mode it is the bootstrap, which execs the same argv
+`start()` is issued with the downloaded bootstrap as the entrypoint, which execs
+`['/bin/sh', supervisor-path]`
 after install. PID 1 identity (`/proc/1/cmdline`) is the issuance confirmation when it is either
 argv, bounded by the wrapper readiness deadline. PID 1 identity is not wrapper readiness: the
 wrapper socket and the Sandbox DO `starting` timer stay the readiness owner, and no provider poll or
-wrapper-child probe is added for that path. Sandbox SDK runs the preinstalled startup command
-against a living PID 1. Vercel runs either startup command against a living PID 1; downloaded startup
+wrapper-child probe is added for that path. Vercel runs the bootstrap against a living PID 1; downloaded startup
 installs verified artifacts before it executes the supervisor.
 
 A native attempt that already issued the main process does not start another supervisor when that
@@ -1204,10 +1249,9 @@ Worker forwards an admitted report to the Sandbox DO as `startup-failed`.
 - CI publishes runtime payloads create-only by content hash, and the descriptor last. The deploy
   reads an immutable handoff for the exact commit, and verifies the base image digest and both
   payloads before it deploys a `downloaded` target.
-- The catalog defaults all targets to `downloaded` runtime-free with no `interactiveOrgIds`
-  restriction, including organization and personal sessions. SDK pins remain preinstalled.
-  Optional cohorts can restrict a future target. Roll back by image or by mode; a full mode rollback
-  changes the default to preinstalled/all-in-one, not merely removes a production override.
+- All targets use `downloaded` runtime-free, including organization and personal sessions.
+  Preinstalled images and startup cohorts are not supported. Rollback selects a previously verified
+  runtime release and compatible base image rather than switching startup modes.
 - The runtime-free image change relies on B1 (#7914), which is already merged: a running container
   captures under the image that it started with, including after DO reconstruction.
 - `runtime-targets.json` owns mode and image. Deployment renders Worker vars and the native image
@@ -1956,8 +2000,8 @@ counts.
     local run does not prove hosted DNS/TLS/providers, the native Containers path, or no-wake.
 24. **Downloaded runtime start and restore.** A fresh `downloaded` start runs the selected CLI and
     wrapper. A snapshot captured with runtime A, restored with runtime B, runs only B: A never
-    reaches `hello`. User files and configuration stay. Absent configuration keeps `preinstalled`
-    unchanged.
+    reaches `hello`. User files and configuration stay. Missing release configuration fails before
+    provider creation rather than falling back to a baked runtime.
 25. **Downloaded runtime startup failure.** An unauthorized download or a failed CLI probe fails
     queued work promptly with `runtime_<code>`, before the first-connect timer. If the bootstrap
     exits before the first PID 1 check of a repository start and the provider failure wins, one

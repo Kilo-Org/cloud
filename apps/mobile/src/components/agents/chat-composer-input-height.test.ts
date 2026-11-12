@@ -68,8 +68,8 @@ describe('resolveComposerTextContentWidth', () => {
 
 describe('composer chrome budgets', () => {
   it('keeps the starter-row reserve out of the new-session prompt budget', () => {
-    // The chat composer budget still carries the reserve: 120 + STARTER_ROW_HEIGHT = 232.
-    expect(COMPOSER_CHROME_HEIGHT - STARTER_ROW_HEIGHT).toBe(120);
+    // The chat composer budget still carries the reserve: 124 + STARTER_ROW_HEIGHT = 236.
+    expect(COMPOSER_CHROME_HEIGHT - STARTER_ROW_HEIGHT).toBe(124);
     // The new-session prompt budget carries no reserve, so the keyboard-open cap
     // can reach the input's absolute max instead of flooring at its minimum.
     expect(NEW_SESSION_PROMPT_CHROME_HEIGHT).toBe(176);

@@ -16,6 +16,7 @@ import {
   buildAgentPayload,
   initialAgentFormState,
   PERMISSION_TOOLS,
+  readWholeToolAction,
   validateAgentForm,
 } from '@/components/profiles/profile-agents-model';
 import { SheetHeader } from '@/components/sheet-header';
@@ -110,6 +111,9 @@ export function AgentFormSheet({
     initial.disabledTools
   );
   const [error, setError] = useState<AgentFormError | null>(null);
+  // A whole-agent rule applies to every tool at once, so the per-tool switches
+  // below cannot express a change to it; they render the loaded state instead.
+  const wholeToolAction = readWholeToolAction(agent?.config.permission);
   const { models } = useAvailableModels(organizationId);
   const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
     'slug' | 'name' | 'description'
@@ -345,7 +349,7 @@ export function AgentFormSheet({
                   </Text>
                   <Switch
                     value={enabled}
-                    disabled={isSaving}
+                    disabled={isSaving || wholeToolAction !== undefined}
                     accessibilityLabel={tool}
                     onValueChange={next => {
                       setDisabledTools(current =>
@@ -357,6 +361,11 @@ export function AgentFormSheet({
               );
             })}
           </View>
+          {wholeToolAction !== undefined ? (
+            <Text className="text-sm text-muted-foreground">
+              {t('profiles.agents.wholeToolRule', { rule: wholeToolAction })}
+            </Text>
+          ) : null}
         </View>
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />

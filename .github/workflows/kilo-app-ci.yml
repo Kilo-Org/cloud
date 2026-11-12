@@ -9,10 +9,9 @@ name: kilo-app CI
 # manual run of main stand on the tip of main and reuse that commit's push run
 # as well, but only a run that passed and whose shard job proves the suite
 # executed. The release calls the suite through `workflow_call` for any reuse it
-# cannot prove: no run for the commit, a run that ended without a pass
-# (including one the cancel-in-progress group above cancels when a later push
-# lands on main), a run still in flight, and a run for a commit that touched no
-# app path and so skipped the suite.
+# cannot prove: no run for the commit, a run that ended without a pass (a
+# cancelled run carries no verdict about its commit), a run still in flight, and
+# a run for a commit that touched no app path and so skipped the suite.
 #
 # Check names must stay unique across workflows: the `main-tests` ruleset
 # matches a required context by name and app, so two workflows publishing the
@@ -34,9 +33,14 @@ on:
   merge_group:
   workflow_call:
 
+# Cancel in-progress runs when a new commit is pushed to the same PR. A main
+# push must reach a conclusion instead: the release reuses that conclusion for
+# the commit, and a cancelled run leaves it running the suite again. GitHub
+# still drops a run that is only pending when a third run enters the group, and
+# such a run never started, so it costs no work.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -100,7 +104,7 @@ jobs:
             exit 0
           fi
           if git diff --name-only "$base" HEAD \
-            | grep -Eq '^apps/mobile/|^packages/trpc/|^apps/web/src/routers/|^packages/web-shared/src/routers/|^packages/app-shared/|^packages/kilo-chat/|^packages/kilo-chat-hooks/|^packages/event-service/|^packages/notifications/|^packages/cloud-agent-sdk/|^pnpm-lock\.yaml$|^\.github/workflows/kilo-app-ci\.yml$|^\.github/workflows/ci\.yml$|^scripts/stacked-ci\.test\.mjs$'; then
+            | grep -Eq '^apps/mobile/|^packages/trpc/|^apps/web/src/routers/|^packages/web-shared/src/routers/|^packages/app-shared/|^packages/event-service/|^packages/notifications/|^packages/cloud-agent-sdk/|^pnpm-lock\.yaml$|^\.github/workflows/kilo-app-ci\.yml$|^\.github/workflows/ci\.yml$|^scripts/stacked-ci\.test\.mjs$'; then
             echo "mobile=true" >> "$GITHUB_OUTPUT"
           # The app also reads every workspace it depends on, directly or
           # through a relative import, and its tests may read other
@@ -236,8 +240,13 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
+      # Only the workspaces the app depends on and the root one are installed:
+      # `tsgo` resolves the app's sources and the declarations of its workspace
+      # dependencies, and the two trees it needs from the builders arrive as
+      # artifacts below. Widen the filter when a step here imports a workspace
+      # outside the closure.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo
 
       - name: Download the tRPC declarations
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8

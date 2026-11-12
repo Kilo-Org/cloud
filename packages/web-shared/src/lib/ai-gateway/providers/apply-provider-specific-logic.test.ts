@@ -982,13 +982,13 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
 describe('applyProviderSpecificLogic thinking block binding', () => {
   const model = 'anthropic/claude-opus-5.5';
 
-  async function apply(provider: Provider) {
-    const request = makeMessagesRequest(model);
+  async function apply(provider: Provider, requestedModel = model) {
+    const request = makeMessagesRequest(requestedModel);
     request.body.thinking = { type: 'adaptive' };
     const extraHeaders: Record<string, string> = {};
     await applyProviderSpecificLogic(
       provider,
-      model,
+      requestedModel,
       request,
       extraHeaders,
       null,
@@ -1004,10 +1004,12 @@ describe('applyProviderSpecificLogic thinking block binding', () => {
   }
 
   it.each([
-    { name: 'Vercel', provider: VERCEL_AI_GATEWAY },
-    { name: 'OpenRouter', provider: OPENROUTER },
-  ])('drops mismatched thinking blocks on $name', async ({ provider }) => {
-    const { thinking, extraHeaders } = await apply(provider);
+    { name: 'Vercel', provider: VERCEL_AI_GATEWAY, model },
+    { name: 'OpenRouter', provider: OPENROUTER, model },
+    { name: 'Vercel', provider: VERCEL_AI_GATEWAY, model: 'anthropic/claude-opus-latest' },
+    { name: 'OpenRouter', provider: OPENROUTER, model: 'anthropic/claude-opus-latest' },
+  ])('drops mismatched thinking blocks on $name for $model', async ({ provider, model }) => {
+    const { thinking, extraHeaders } = await apply(provider, model);
 
     expect(thinking).toEqual({
       type: 'adaptive',

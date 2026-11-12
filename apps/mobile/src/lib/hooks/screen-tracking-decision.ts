@@ -2,8 +2,6 @@
  * Pure decision for settled-leaf screen tracking: whether PostHog should
  * capture a `$screen` event for the current route. No React, no side effects —
  * the hook owns the settle timer, the readiness subscription, and the capture.
- * The gates are the `input` fields below plus three route rules: no
- * redirect-only route, no KiloClaw surface, no duplicate within a generation.
  */
 
 /** How long segments must stay unchanged before a route counts as settled. */
@@ -44,7 +42,6 @@ export type ScreenTrackingDecision =
         | 'bootstrap-not-settled'
         | 'no-screen'
         | 'redirect-only'
-        | 'kiloclaw-excluded'
         | 'duplicate';
     };
 
@@ -68,9 +65,6 @@ export function decideScreenTracking(input: ScreenTrackingInput): ScreenTracking
   }
   if (REDIRECT_ONLY_SCREENS.has(screenName)) {
     return { capture: false, screenName, reason: 'redirect-only' };
-  }
-  if (input.segments.some(segment => segment.includes('kiloclaw'))) {
-    return { capture: false, screenName, reason: 'kiloclaw-excluded' };
   }
   if (
     input.lastCaptured !== null &&

@@ -5,10 +5,7 @@ import { z } from 'zod';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getUserFromSession } from '@kilocode/web-shared/lib/user/server';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
-import {
-  getClaudeBillingConnectionIncludingRemoved,
-  type ClaudeBillingOwner,
-} from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
+import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { ensureClaudeBillingProfile } from '@/lib/claude-billing/profile';
 import { saveClaudeBillingPending } from '@/lib/claude-billing/pending';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
@@ -78,9 +75,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const userProfileId = await ensureClaudeBillingProfile(owner, session.id);
-    const connection = await getClaudeBillingConnectionIncludingRemoved(owner);
-    if (!connection) return outcomeRedirect(returnPath, owner, 'failed');
+    const { userProfileId, connectionVersion } = await ensureClaudeBillingProfile(
+      owner,
+      session.id
+    );
     const state = randomBytes(32).toString('base64url');
     const codeVerifier = randomBytes(64).toString('base64url');
     const authorizeUrl = await pushClaudeAuthorizationRequest({
@@ -96,7 +94,7 @@ export async function GET(request: NextRequest) {
       state,
       codeVerifier,
       userProfileId,
-      connectionVersion: connection.updated_at,
+      connectionVersion,
     });
     return NextResponse.redirect(authorizeUrl);
   } catch (error) {

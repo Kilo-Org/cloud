@@ -636,6 +636,22 @@ describe('device-sessions', () => {
       }
     });
 
+    test('refresh returns USER_BLOCKED when the block timestamp is set', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+
+      await db
+        .update(kilocode_users)
+        .set({ blocked_reason: null, blocked_at: new Date().toISOString() })
+        .where(eq(kilocode_users.id, testUserId));
+
+      const result = await rotateRefreshToken(refreshToken);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toBe('USER_BLOCKED');
+      }
+    });
+
     test('unblock and retry: blocked refresh does not consume token, retry succeeds after unblock', async () => {
       const sessionId = await createDeviceSession({ userId: testUserId });
       const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);

@@ -1,4 +1,4 @@
-FROM docker.io/library/debian:trixie-slim
+FROM --platform=linux/amd64 docker.io/library/debian:trixie-slim
 
 ARG NODE_VERSION="24.22.1"
 ARG BUN_VERSION="1.4.4"

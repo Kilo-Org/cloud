@@ -1,11 +1,11 @@
-/* eslint-disable max-lines -- The login screen keeps its device-auth branches, keyboard padding, and language picker together. */
+/* eslint-disable max-lines -- The login screen keeps its device-auth branches, keyboard inset, and language picker together. */
 import * as Clipboard from 'expo-clipboard';
 import { type Href, useRouter } from 'expo-router';
 import { Globe } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View } from 'react-native';
-import { useKeyboardState } from 'react-native-keyboard-controller';
+import { Pressable, View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
@@ -13,10 +13,13 @@ import logo from '@/../assets/images/logo.png';
 import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
 import { CenteredState } from '@/components/centered-state';
 import { IdleAuth } from '@/components/login/idle-auth';
-import { errorMessage, resolveKeyboardBottomPadding } from '@/components/login-screen-state';
+import {
+  errorMessage,
+  resolveBottomChromePadding,
+  resolveFieldActionReserve,
+} from '@/components/login-screen-state';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
@@ -31,6 +34,7 @@ import {
   takePendingLinkOutcome,
 } from '@/lib/auth/pending-link-state';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   clearPersistedLoginDrafts,
@@ -63,6 +67,14 @@ export function LoginScreen() {
   const colors = useThemeColors();
   const insets = useScreenInsets();
   const { t } = useTranslation();
+  const fontScale = useLiveFontScale();
+  // The space the keyboard reveal keeps below a focused field is the height of
+  // what the form renders under that field, reported by the form itself: a
+  // refusal that wraps in a long catalog is measured instead of assumed. The
+  // action-and-gaps floor covers the first frame, before anything reported a
+  // height, and the provider rows above the field never count.
+  const [belowFieldHeight, setBelowFieldHeight] = useState(0);
+  const fieldActionReserve = resolveFieldActionReserve({ fontScale, belowFieldHeight });
   const [persistFailed, setPersistFailed] = useState(false);
   const [authFormBusy, setAuthFormBusy] = useState(false);
   const [draft, setDraft] = useState<{
@@ -184,11 +196,9 @@ export function LoginScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- persistToken is stable except for signIn identity; only re-run on a newly approved token
   }, [status, token]);
 
-  // The `KeyboardProvider` at the root measures the keyboard once in native
-  // code, so this screen reads the height instead of listening to React Native's
-  // keyboard events. The provider also clears the height when the app leaves the
-  // foreground, which the listener pair used to do itself.
-  const keyboardHeight = useKeyboardState(state => state.height);
+  // The keyboard is reserved by the scroll view below: `KeyboardAwareScrollView`
+  // owns the IME inset and scrolls the focused field into view, so this screen
+  // neither reads the height nor pads for it.
 
   if (status === 'approved') {
     if (persistFailed) {
@@ -220,14 +230,9 @@ export function LoginScreen() {
   }
 
   // One padded wrapper for both platforms: the bottom inset is reserved at
-  // rest, and while the IME is up the provider's keyboard height is reserved
-  // instead (see `resolveKeyboardBottomPadding`). The ScrollView's centered form
-  // then re-centres in the space that stays above the keyboard, so "Continue" is
-  // never left under the keyboard, the navigation bar, or the home indicator.
-  const bottomPadding = resolveKeyboardBottomPadding({
-    keyboardHeight,
-    bottomInset: insets.bottom,
-  });
+  // rest, and the scroll view reserves the keyboard itself. The scroll content
+  // then stays clear of the navigation bar, the home indicator, and the IME.
+  const bottomPadding = resolveBottomChromePadding({ bottomInset: insets.bottom });
   // The Globe stays enabled on idle, denied, expired, and error (those render
   // an interactive IdleAuth form); it is disabled while a device-auth flow
   // (pending/approved) or a busy auth action owns the screen.
@@ -250,16 +255,24 @@ export function LoginScreen() {
   // indicator below instead of a wholesale swap to the spinner.
   const startInFlight = status === 'pending' && !code;
   const showTerminalError = status === 'denied' || status === 'expired' || status === 'error';
-  const showIdleForm = status === 'idle' ? draft !== null : showTerminalError || startInFlight;
+  // The idle form paints on the first frame, before the stored draft resolves.
+  // A shorter placeholder instead of the form would grow the centered column
+  // into its place and lift the logo and the heading off the position they had
+  // already painted; painting the form reserves that space by construction.
+  const showIdleForm = status === 'idle' || showTerminalError || startInFlight;
+  // The form reads its seed once, so a stored address or SSO recovery reaches
+  // it through one remount when the restore lands. The module draft keeps the
+  // value a person already typed, so that remount cannot replace it.
+  const restoredDraft = draft !== null && (draft.email !== '' || draft.ssoRecovery !== null);
 
   return (
     // One wrapper owns the vertical space on both platforms: it paints the
-    // screen background and reserves the bottom padding resolved above, so the
-    // ScrollView's centered form stays above the keyboard, the navigation bar,
-    // and the home indicator.
+    // screen background and reserves the bottom chrome resolved above, so the
+    // centered form stays clear of the navigation bar and the home indicator.
+    // The keyboard inset belongs to the scroll view inside it.
     <View
       className="flex-1 bg-background"
-      // eslint-disable-next-line react-native/no-inline-styles -- dynamic keyboard and safe-area padding
+      // eslint-disable-next-line react-native/no-inline-styles -- dynamic chrome and safe-area padding
       style={{
         paddingBottom: bottomPadding,
         paddingLeft: insets.left,
@@ -284,10 +297,18 @@ export function LoginScreen() {
           <Globe size={22} color={colors.foreground} />
         </Pressable>
       </View>
-      <ScrollView
+      <KeyboardAwareScrollView
         className="flex-1 bg-background"
         contentContainerClassName="flex-grow items-center justify-center gap-6 px-6 py-8"
         keyboardShouldPersistTaps="handled"
+        // The space the form keeps below the focused field while the keyboard is
+        // up: its own measured height, floored at the primary action plus the
+        // form gaps at the current text scale. Nothing below the field — a
+        // refusal that wraps, the action, the remaining controls — can then end
+        // on the keyboard edge. Layout mode grows the scroll length by the IME
+        // height, which is what lets that position sit on the keyboard's top.
+        bottomOffset={fieldActionReserve}
+        mode="layout"
       >
         <View className="w-full max-w-sm items-center gap-2">
           <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel={t('login.logo')} />
@@ -314,20 +335,14 @@ export function LoginScreen() {
             </Text>
           )}
 
-          {status === 'idle' && draft === null && (
-            <>
-              {/* Form-sized placeholder until the SecureStore draft restore finishes. */}
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-11 w-full" />
-            </>
-          )}
-
           {showIdleForm && (
             <IdleAuth
+              key={restoredDraft ? 'restored-draft' : 'blank-draft'}
               start={start}
               initialEmail={draft?.email ?? ''}
               initialSsoRecovery={draft?.ssoRecovery ?? null}
               onBusyChange={setAuthFormBusy}
+              onBelowFieldHeightChange={setBelowFieldHeight}
               onSignInStart={clearError}
               pendingLink={pendingLink}
               pendingLinkRefused={
@@ -407,7 +422,7 @@ export function LoginScreen() {
             </View>
           )}
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }

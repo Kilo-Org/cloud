@@ -7,7 +7,7 @@
   "name": "cloud-agent-next",
   "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "main": "src/index.ts",
-  "compatibility_date": "2026-06-03",
+  "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "preview_urls": false,
   "rules": [
@@ -71,7 +71,10 @@
     "CLI_TIMEOUT_SECONDS": "900",
     "REAPER_INTERVAL_MS": "300000",
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
-    "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai",
+    // The web origins that open /stream and /terminal. The staging web target
+    // reaches this Worker too, because cloud-agent-next has no staging
+    // deployment of its own.
+    "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai,https://staging-app.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
     "TOOL_CGROUP_RESERVE_MB": "2048",
     "TOOL_CGROUP_CPU_WEIGHT": "50",
@@ -187,9 +190,8 @@
       "scheduling_policy": "durable_object",
       "observability": { "enabled": true },
       "images": {
-        "app": {
-          "dockerfile": "./Dockerfile.containers",
-          "build_vars": { "KILOCODE_CLI_VERSION": "7.8.17" },
+        "runtime-free": {
+          "dockerfile": "./Dockerfile.containers.runtime-free",
         },
       },
     },
@@ -426,9 +428,8 @@
           "scheduling_policy": "durable_object",
           "observability": { "enabled": true },
           "images": {
-            "app": {
-              "dockerfile": "./Dockerfile.containers",
-              "build_vars": { "KILOCODE_CLI_VERSION": "7.8.17" },
+            "runtime-free": {
+              "dockerfile": "./Dockerfile.containers.runtime-free",
             },
           },
         },

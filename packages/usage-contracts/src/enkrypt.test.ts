@@ -180,6 +180,23 @@ describe('EnkryptUsageWriteSchema', () => {
     expect(EnkryptUsageWriteSchema.safeParse(writeWith({ detectorsFired })).success).toBe(false);
   });
 
+  test('accepts the scanned and total characters', () => {
+    const write = writeWith({ scannedCharacters: 2_400, totalCharacters: 10_000 });
+    expect(EnkryptUsageWriteSchema.parse(write)).toStrictEqual(write);
+  });
+
+  test('accepts a write without sizes from an older sender', () => {
+    const parsed = EnkryptUsageWriteSchema.parse(validWrite());
+    expect(parsed).not.toHaveProperty('scannedCharacters');
+    expect(parsed).not.toHaveProperty('totalCharacters');
+  });
+
+  test.each(['scannedCharacters', 'totalCharacters'])('rejects an invalid %s', field => {
+    for (const value of [-1, 1.5, 2 ** 31, null, '10']) {
+      expect(EnkryptUsageWriteSchema.safeParse(writeWith({ [field]: value })).success).toBe(false);
+    }
+  });
+
   test.each(['both', 'Input', null])('rejects the guardrail %j', guardrail => {
     expect(EnkryptUsageWriteSchema.safeParse(writeWith({ guardrail })).success).toBe(false);
   });

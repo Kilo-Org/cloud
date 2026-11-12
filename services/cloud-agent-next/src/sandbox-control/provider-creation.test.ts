@@ -1,4 +1,4 @@
-import { preinstalledStartup } from './preinstalled-startup.js';
+import { supervisorStartup } from '../../test/fixtures/supervisor-startup.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ContainerCapacityUnavailableError } from '../container-concurrency.js';
 import { containerLimitError } from '../container-limit-test-helpers.js';
@@ -107,12 +107,12 @@ describe('native egress policy forwarding', () => {
       const created = await provider.create({ ...intent, intentId: 'egress-attempt' });
       if ('unresolved' in created) throw new Error('Expected provider reference');
       await provider.launch(created.providerRef, {
-        command: preinstalledStartup(),
+        command: supervisorStartup(),
         env: {
           SANDBOX_CONTROL_URL: 'wss://agent.example.com',
         },
       });
-      await provider.launch(created.providerRef, { command: preinstalledStartup(), env: {} });
+      await provider.launch(created.providerRef, { command: supervisorStartup(), env: {} });
       for (const [input] of launchWrapper.mock.calls) {
         if (egressAllowlist === undefined) expect(input).not.toHaveProperty('egressAllowlist');
         else expect(input.egressAllowlist).toEqual(egressAllowlist);
@@ -142,7 +142,7 @@ describe('native image forwarding', () => {
 
       await provider.launch(
         created.providerRef,
-        { command: preinstalledStartup(), env: {} },
+        { command: supervisorStartup(), env: {} },
         { nativeImage }
       );
 
@@ -165,7 +165,7 @@ describe('native image forwarding', () => {
     const created = await provider.create({ ...intent, intentId: 'image-attempt' });
     if ('unresolved' in created) throw new Error('Expected provider reference');
 
-    await provider.launch(created.providerRef, { command: preinstalledStartup(), env: {} });
+    await provider.launch(created.providerRef, { command: supervisorStartup(), env: {} });
 
     expect(launchWrapper.mock.calls[0]?.[0]).not.toHaveProperty('nativeImage');
   });
@@ -473,9 +473,9 @@ describe('Vercel runtime metadata', () => {
           expect.objectContaining({ snapshotId: config.snapshotId })
         );
       }
-      expect(
-        await provider.launch(providerRef, { command: preinstalledStartup(), env: {} })
-      ).toEqual({ startSource: 'image' });
+      expect(await provider.launch(providerRef, { command: supervisorStartup(), env: {} })).toEqual(
+        { startSource: 'image' }
+      );
       expect(restClient.executeCommand).toHaveBeenCalledOnce();
       expect(await provider.observe(providerRef, intent)).toEqual({ status: 'active' });
       expect(await provider.stop(providerRef, intent)).toBe('terminal');

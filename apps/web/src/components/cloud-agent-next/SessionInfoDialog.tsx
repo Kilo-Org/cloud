@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ChevronDown, Share2 } from 'lucide-react';
 import { ShareSessionDialog } from './ShareSessionDialog';
-import { SessionFailureHistory } from './SessionFailureHistory';
+import { isTerminalAccessError, SessionFailureHistory } from './SessionFailureHistory';
 import {
   formatSessionCost,
   formatSessionTotalCost,
@@ -22,13 +22,19 @@ import {
 } from './session-cost-breakdown';
 import type { SessionModelUsage, SessionTokenUsage } from './session-token-usage';
 import { formatModelRefName, formatShortModelName } from '@/lib/format-model-name';
-import { SessionComputeRate } from './SessionComputeRate';
+import { skipToken, useQuery } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
+import { SandboxComputeRate } from './SandboxComputeRate';
+import { sandboxObservationKey, type SandboxObservation } from './sandbox-status';
 
 type SessionInfoDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCloseAutoFocus?: ComponentProps<typeof DialogContent>['onCloseAutoFocus'];
   sessionId: string;
+  organizationId?: string;
+  sandboxScopeId: string;
+  computeBillingEnabled: boolean;
   /** The Kilo session ID (UUID from cliSessions.session_id) */
   kiloSessionId?: string;
   model: string;
@@ -44,6 +50,9 @@ export function SessionInfoDialog({
   onOpenChange,
   onCloseAutoFocus,
   sessionId,
+  organizationId,
+  sandboxScopeId,
+  computeBillingEnabled,
   model,
   modelDisplayName,
   sessionCostBreakdown,
@@ -54,6 +63,25 @@ export function SessionInfoDialog({
 }: SessionInfoDialogProps) {
   const [showShareDialog, setShowShareDialog] = useState(false);
   const shareButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const trpc = useTRPC();
+  const compute = useQuery(
+    trpc.computeBilling.sessionCharges.queryOptions(
+      { cloudAgentSessionId: sessionId, organizationId },
+      {
+        enabled: query =>
+          open && computeBillingEnabled && !isTerminalAccessError(query.state.error),
+        refetchInterval: query =>
+          open && !isTerminalAccessError(query.state.error) ? 15_000 : false,
+        retry: (failureCount, error) => failureCount < 2 && !isTerminalAccessError(error),
+      }
+    )
+  );
+  const sandbox = useQuery<SandboxObservation>({
+    queryKey: sandboxObservationKey(sandboxScopeId, organizationId),
+    queryFn: skipToken,
+    gcTime: 0,
+  });
 
   const totalCostUsd = sessionCostBreakdown?.totalCostUsd ?? 0;
   const rootCostUsd = sessionCostBreakdown?.rootCostUsd ?? 0;
@@ -73,6 +101,10 @@ export function SessionInfoDialog({
   const showCostBreakdown =
     isRenderableSessionCost(totalCostUsd) &&
     (isRenderableSessionCost(rootCostUsd) || showSubagentCost || showOlderActivityCost);
+  const computeAccessDenied = isTerminalAccessError(compute.error);
+  const computeData = computeAccessDenied ? undefined : compute.data;
+  const computeCostUsd = computeData ? computeData.amountMicrodollars / 1_000_000 : undefined;
+  const showCombinedTotal = showTotalCost && computeBillingEnabled && computeCostUsd !== undefined;
 
   return (
     <>
@@ -93,18 +125,31 @@ export function SessionInfoDialog({
         >
           <DialogHeader className="pr-6 text-left">
             <DialogTitle>Session Information</DialogTitle>
-            <DialogDescription>Recorded model cost in USD and token usage.</DialogDescription>
+            <DialogDescription>Recorded costs in USD and model token usage.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {open && <SessionComputeRate />}
-            {showTotalCost && (
+            {(showTotalCost || computeBillingEnabled) && (
               <dl className="bg-muted/30 grid gap-2 rounded-lg border p-4">
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                  <dt className="text-sm font-medium">Total cost</dt>
-                  <dd className="font-mono text-2xl font-semibold tracking-tight tabular-nums">
-                    {formatSessionTotalCost(totalCostUsd)}
-                  </dd>
-                </div>
+                {showTotalCost && (
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <dt className="text-sm font-medium">
+                      {showCombinedTotal ? 'Total cost' : 'Model cost'}
+                    </dt>
+                    <dd className="font-mono text-2xl font-semibold tracking-tight tabular-nums">
+                      {formatSessionTotalCost(
+                        totalCostUsd + (showCombinedTotal ? (computeCostUsd ?? 0) : 0)
+                      )}
+                    </dd>
+                  </div>
+                )}
+                {showCombinedTotal && (
+                  <div className="flex items-baseline justify-between gap-4 border-t pt-3 text-sm">
+                    <dt className="text-muted-foreground">Model cost</dt>
+                    <dd className="font-mono tabular-nums">
+                      {formatSessionTotalCost(totalCostUsd)}
+                    </dd>
+                  </div>
+                )}
                 {showCostBreakdown && (
                   <>
                     <div className="mt-1 flex items-baseline justify-between gap-4 border-t pt-3 text-sm">
@@ -131,7 +176,52 @@ export function SessionInfoDialog({
                     )}
                   </>
                 )}
+                {computeBillingEnabled && (
+                  <div className="flex items-baseline justify-between gap-4 border-t pt-3 text-sm">
+                    <dt className="text-muted-foreground">
+                      {computeData?.scope === 'workspace' ? 'Workspace compute' : 'Compute cost'}
+                    </dt>
+                    <dd className="font-mono tabular-nums">
+                      {computeCostUsd !== undefined
+                        ? formatSessionTotalCost(computeCostUsd)
+                        : compute.isError
+                          ? 'Unavailable'
+                          : 'Loading…'}
+                    </dd>
+                  </div>
+                )}
               </dl>
+            )}
+            {computeBillingEnabled && (
+              <div className="space-y-2 text-xs">
+                {computeAccessDenied ? (
+                  <p className="text-muted-foreground">
+                    You do not have access to this session's compute charges.
+                  </p>
+                ) : compute.isError ? (
+                  <p role="alert">
+                    {computeData === undefined
+                      ? 'Compute charges could not load. '
+                      : 'Compute charges could not refresh. Showing the last recorded amount. '}
+                    <button
+                      type="button"
+                      className="underline"
+                      onClick={() => void compute.refetch()}
+                    >
+                      Retry
+                    </button>
+                  </p>
+                ) : (
+                  <p className="text-muted-foreground">
+                    {computeData?.scope === 'workspace'
+                      ? 'Compute is shared by all chats in this workspace. '
+                      : ''}
+                    Recorded compute charges can arrive late. Your own provider bills BYOC compute
+                    separately.
+                  </p>
+                )}
+                {open && <SandboxComputeRate snapshot={sandbox.data?.snapshot} />}
+              </div>
             )}
             {sessionTokenUsage && (
               <section className="space-y-3" aria-labelledby="session-token-usage-title">

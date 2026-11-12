@@ -11,6 +11,7 @@ import {
   scopeGrants as scopeGrantsTable,
 } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import { readScopeGrant } from '../../src/control-plane/sandbox/scope-grants.js';
+import { workerOrganizationMembershipReader } from '../../src/control-plane/sandbox/organization-membership.js';
 import {
   failExpiredRoutes,
   onRouteFailed,
@@ -28,6 +29,7 @@ import type {
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
   type ControlPlaneRouteSpec,
+  type ControlPlaneRouteView,
 } from '../../src/shared/control-plane-protocol.js';
 import type { createSandboxNotificationDispatcher } from '../../src/control-plane/sandbox/notifications.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
@@ -35,7 +37,7 @@ import { logger } from '../../src/logger.js';
 import { encryptWithPublicKey } from '../../src/utils/encryption.js';
 import {
   createFakeCredentialBroker,
-  installFakeCredentialEnv,
+  installFakeSandboxEnv,
   type FakeCredentialBroker,
 } from './helpers/fake-credentials.js';
 import { createRuntimeProxyMintingPeer, FakeSessionPeer } from './helpers/fake-session-peer.js';
@@ -212,6 +214,19 @@ function readRouteRow(stub: DurableObjectStub<SandboxControlV2>, sessionId: stri
   });
 }
 
+/** The stored grant's expiry, so a test can prove no re-issue replaced it. */
+function grantExpiry(stub: DurableObjectStub<SandboxControlV2>, sessionId: string) {
+  return runInDurableObject(stub, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
+    const id = rows[0]?.grant;
+    if (id === null || id === undefined) throw new Error('route has no grant');
+    return readScopeGrant(db, id)?.expiresAt ?? null;
+  });
+}
+
+/** Grant scopes with a pending renewal retry. */
+
 async function setAllocationField(
   stub: DurableObjectStub<SandboxControlV2>,
   patch: Partial<{ last_activity_at: number; last_frame_at: number; create_deadline_at: number }>
@@ -269,7 +284,7 @@ async function setup(
   const stub = sandboxNamespace.getByName(SANDBOX_ID);
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
-    installFakeCredentialEnv(instance.env, broker);
+    installFakeSandboxEnv(instance, broker);
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
@@ -862,7 +877,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
     const stub = sandboxNamespace.getByName(SANDBOX_ID);
     await runInDurableObject(stub, async instance => {
       await instance.getAllocationState();
-      installFakeCredentialEnv(instance.env, broker, { AGENT_ENV_VARS_PRIVATE_KEY: privateKey });
+      installFakeSandboxEnv(instance, broker, { AGENT_ENV_VARS_PRIVATE_KEY: privateKey });
       Object.assign(instance, {
         createProviderAdapter: () => provider.adapter,
         provider: provider.adapter,
@@ -1403,6 +1418,195 @@ describe('SandboxControlV2 routes and forwarding', () => {
     );
     expect((await wrapper.next())?.type).toBe('session.credentials');
     expect((await wrapper.next())?.type).toBe('session.prompt');
+  });
+
+  it('retires a ready route when its owner is not a current member', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    // The route is ready with a grant that is due, and the membership answer
+    // changes.
+    await runInDurableObject(stub, instance => {
+      instance.organizationMembershipFor = async () => false;
+    });
+    await patchGrant(stub, SESSION, grant => ({
+      ...grant,
+      expiresAt: Date.now() + TIMERS.credentialGrantReissueBelowMs / 2,
+    }));
+
+    // The sandbox reads the membership itself: the prompt is answered
+    // not_ready, the route releases, and the stored route is removed.
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'not_ready'
+    );
+    expect((await wrapper.next())?.type).toBe('session.release');
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+
+    // A released route stays released for a later prompt.
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m2')] })).toBe(
+      'not_ready'
+    );
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+    wrapper.close();
+  });
+
+  it('retries a renewal whose organization membership read failed', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    let reads = 0;
+    await runInDurableObject(stub, instance => {
+      instance.organizationMembershipFor = async () => {
+        reads += 1;
+        throw new Error('membership read unavailable');
+      };
+    });
+    await patchGrant(stub, SESSION, grant => ({
+      ...grant,
+      expiresAt: Date.now() + TIMERS.credentialGrantReissueBelowMs / 2,
+    }));
+
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    // The issuance reads the membership once more, so a single unanswered read
+    // keeps the grant in place.
+    expect(reads).toBe(TIMERS.organizationMembershipReadAttempts);
+    // A membership read that does not answer keeps the route ready on its
+    // grant, and the next send asks for a new grant.
+    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'ready' });
+    const before = await grantExpiry(stub, SESSION);
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m2')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    expect(reads).toBe(2 * TIMERS.organizationMembershipReadAttempts);
+    expect(await grantExpiry(stub, SESSION)).toBe(before);
+    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'ready' });
+    wrapper.close();
+  });
+
+  it('requires a current membership to prepare an organization route', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await runInDurableObject(stub, instance => {
+      instance.organizationMembershipFor = async () => false;
+    });
+
+    const view = await stub.prepare(prepareInput(SESSION));
+    expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    // Without a grant the preparation fails and no sandbox starts.
+    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'failed' });
+    expect(provider.launchEnvs).toHaveLength(0);
+  });
+
+  it('recovers a preparation whose first membership read failed', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    let reads = 0;
+    await runInDurableObject(stub, instance => {
+      instance.organizationMembershipFor = async () => {
+        reads += 1;
+        if (reads === 1) throw new Error('membership read unavailable');
+        return true;
+      };
+    });
+
+    // The issuance reads again, and the preparation proceeds.
+    expect((await stub.prepare(prepareInput(SESSION))).state).not.toBe('failed');
+    expect(reads).toBe(2);
+    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'preparing' });
+  });
+
+  it('reports an unavailable membership read when its reader throws', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    // This worker binds no Hyperdrive, so the production default reader throws.
+    // An unanswered membership read ends the issuance with its own denial.
+    let reads = 0;
+    await runInDurableObject(stub, instance => {
+      const production = workerOrganizationMembershipReader(instance.env);
+      instance.organizationMembershipFor = async (userId, organizationId) => {
+        reads += 1;
+        return production(userId, organizationId);
+      };
+    });
+
+    const stages: unknown[] = [];
+    const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+      const bounded = fields as unknown as Record<string, unknown>;
+      if (bounded.diagnosticEvent === 'route_failed') stages.push(bounded.stage);
+      return logger;
+    });
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const error = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    let view: ControlPlaneRouteView;
+    try {
+      view = await stub.prepare(prepareInput(SESSION));
+    } finally {
+      withFields.mockRestore();
+      info.mockRestore();
+      warn.mockRestore();
+      error.mockRestore();
+    }
+
+    expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    // The denial names its own cause after the issuance exhausts its reads.
+    expect(stages).toEqual(['organization_membership_unavailable']);
+    expect(reads).toBe(TIMERS.organizationMembershipReadAttempts);
+    expect(await readRouteRow(stub, SESSION)).toMatchObject({ state: 'failed' });
+    expect(provider.launchEnvs).toHaveLength(0);
+  });
+
+  it('keeps personal routes independent of organization membership', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    let reads = 0;
+    await runInDurableObject(stub, instance => {
+      instance.organizationMembershipFor = async () => {
+        reads += 1;
+        return false;
+      };
+    });
+    const personal = {
+      spec: routeSpec(SESSION),
+      credentials: {
+        userId: 'user_123',
+        kiloSessionId: kiloSessionIdFor(SESSION),
+        kiloToken: NATIVE_KILO_TOKEN,
+        repository: { type: 'github' as const, repo: 'acme/widgets' },
+        scopeId: SESSION,
+      },
+    };
+
+    expect((await stub.prepare(personal)).state).not.toBe('failed');
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+    await patchGrant(stub, SESSION, grant => ({
+      ...grant,
+      expiresAt: Date.now() + TIMERS.credentialGrantReissueBelowMs / 2,
+    }));
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.credentials');
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+    expect(reads).toBe(0);
+    wrapper.close();
   });
 
   it('replays the workspace configuration when the wrapper is replaced', async () => {

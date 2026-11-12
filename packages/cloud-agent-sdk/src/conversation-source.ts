@@ -27,7 +27,6 @@ function remember<V>(map: Map<string, V>, key: string, value: V) {
 
 export type ConversationSource = { version: 'v1' } | { version: 'v2' };
 
-/** Select the native reader at the SDK boundary. Renderers receive display events. */
 function positionFromPartId(messageId: string, partId: string): number | undefined {
   const prefix = `${messageId}_`;
   if (!partId.startsWith(prefix)) return undefined;
@@ -186,6 +185,7 @@ export function createConversationSourceReader() {
         remember(layouts, message.info.id, layout);
       }
     },
+    /** Select the native reader at the SDK boundary. Renderers receive display events. */
     read(raw: CloudAgentEvent): { source: ConversationSource; events: NormalizedEvent[] } {
       const envelope = z.object({ type: z.string(), properties: z.unknown() }).safeParse(raw.data);
       if (

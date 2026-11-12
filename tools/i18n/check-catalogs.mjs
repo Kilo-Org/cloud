@@ -17,6 +17,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { countPlaceholderBases, flattenCatalog, pluralParts } from '../lib/catalogs.mjs';
 import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -174,9 +175,6 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'profile.providerChatgpt',
   'profile.providerClaude',
   'consent.kilo',
-  'common.kiloclaw',
-  'tabs.kiloclawWrapped',
-  'kiloclaw.status.vcpuValue',
   'securityAgent.findingDetails.cve',
   'securityAgent.findingDetails.ghsa',
   'securityAgent.findingDetails.sourceDependabot',
@@ -266,9 +264,6 @@ function supportedLanguages() {
 function parseCatalog(file, label) {
   const text = readFileSync(file, 'utf8');
   const seen = [];
-  JSON.parse(text, function reviver(key, value) {
-    return value;
-  });
   // Walk the raw text: a duplicate key inside one object survives only here.
   const stack = [new Set()];
   const tokens = text.matchAll(/"((?:[^"\\]|\\.)*)"\s*:|[{}]/g);
@@ -290,18 +285,6 @@ function parseCatalog(file, label) {
     fail(`${label}: duplicate key "${key}"`);
   }
   return JSON.parse(text);
-}
-
-function flatten(value, prefix = '', out = new Map()) {
-  for (const [key, child] of Object.entries(value)) {
-    const path = prefix ? `${prefix}.${key}` : key;
-    if (child && typeof child === 'object' && !Array.isArray(child)) {
-      flatten(child, path, out);
-    } else {
-      out.set(path, String(child));
-    }
-  }
-  return out;
 }
 
 /**
@@ -468,6 +451,12 @@ const LOCALE_SEPARATED_KEYS = new Set([
   // alone separates ("ja", "zh-Hans", "zh-Hant"). "th" ends no sentence with a
   // mark, so it keeps the space the hint needs to stay a separate sentence.
   'agentChat.contextUsage.tapToViewDetails',
+  // The sentence and list joiners are the catalog's own statement about how it
+  // closes a sentence and separates two items, so both carry their own edges: a
+  // space after the mark nearly everywhere, none where the mark alone separates
+  // ("ja", "zh-Hans", "zh-Hant").
+  'common.sentenceJoiner',
+  'common.listJoiner',
 ]);
 
 /**
@@ -649,10 +638,8 @@ function wording(value, language = 'en') {
     .replace(/[.!:。！：]+$/u, '');
 }
 
-const PLURAL_SUFFIX_RE = /_(zero|one|two|few|many|other)$/;
-
 function pluralBaseKey(key) {
-  return key.replace(/_(?:zero|one|two|few|many|other)$/, '');
+  return pluralParts(key)?.base ?? key;
 }
 
 /**
@@ -682,15 +669,6 @@ function familyVisibleCounts(english, base) {
     }
   }
   return names;
-}
-
-/** Split a dotted key into its family base and plural category, if any. */
-function pluralParts(key) {
-  const match = PLURAL_SUFFIX_RE.exec(key);
-  if (!match) {
-    return null;
-  }
-  return { base: key.slice(0, -match[0].length), category: match[1] };
 }
 
 /**
@@ -763,7 +741,7 @@ for (const catalog of CATALOGS) {
     }
   }
 
-  const english = flatten(parseCatalog(join(catalog.dir, 'en.json'), `${catalog.name}/en`));
+  const english = flattenCatalog(parseCatalog(join(catalog.dir, 'en.json'), `${catalog.name}/en`));
   const englishFamilies = new Set(
     [...english.keys()]
       .map(pluralParts)
@@ -774,11 +752,7 @@ for (const catalog of CATALOGS) {
   // only by count, so English ships a flat key (or a family). A language whose
   // nouns do change with the count may declare a family for that base; see the
   // locale loop below.
-  const englishCountedBases = new Set(
-    [...english]
-      .filter(([key, value]) => /{{\s*count\s*}}/.test(value))
-      .map(([key]) => pluralBaseKey(key))
-  );
+  const englishCountedBases = countPlaceholderBases(english);
   const englishValues = new Set(english.values());
   // Keys whose English text is identical. Short strings only: a long sentence
   // repeated verbatim is rare, and a 60-character cap keeps the groups to the
@@ -855,7 +829,7 @@ for (const catalog of CATALOGS) {
       continue;
     }
     const label = `${catalog.name}/${tag}`;
-    const translated = flatten(parseCatalog(join(catalog.dir, `${tag}.json`), label));
+    const translated = flattenCatalog(parseCatalog(join(catalog.dir, `${tag}.json`), label));
     localeValues.set(tag, translated);
     checkAgentEditorCopy(translated, english, label);
     checkPullRequestTerm(translated, label);

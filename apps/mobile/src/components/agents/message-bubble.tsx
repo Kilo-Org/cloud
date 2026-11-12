@@ -1,10 +1,6 @@
 /* eslint-disable max-lines -- the transcript element-tree suite asserts this component's unrendered tree, so splitting the failure footer behind a component boundary would hide every assertion's target */
 import { memo, useCallback, useMemo } from 'react';
-import {
-  type MessageDeliveryState,
-  type Part,
-  type StoredMessage,
-} from '@kilocode/cloud-agent-sdk';
+import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { AlertCircle, Clock } from '@/components/ui/icons';
 import { type AccessibilityActionEvent, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -25,8 +21,12 @@ import { FilePartRenderer } from './file-part-renderer';
 import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
 import { MessageErrorBoundary } from './message-error-boundary';
 import { MessageLongPressProvider } from './message-long-press-context';
-import { messageFailureLabel, selectMessageFailure } from './message-failure-state';
-import { partRendersContent } from './message-visibility';
+import {
+  type MessageDeliveryStatement,
+  messageFailureLabel,
+  selectMessageFailure,
+} from './message-failure-state';
+import { partRendersContent, userBubbleRendersContent } from './message-visibility';
 import { PartRenderer } from './part-renderer';
 import { firstHumanText, humanTextParts, isFilePart } from './part-types';
 import { groupMessageParts } from './session-tool-run';
@@ -51,8 +51,11 @@ type MessageBubbleProps = {
   modelOptions?: SessionModelOption[];
   defaultReasoningExpanded?: boolean;
   onOpenChildSession?: OpenChildSession;
-  /** Per-user-message delivery state. v1 surfaces only a "Queued" badge. */
-  deliveryState?: MessageDeliveryState;
+  /**
+   * What the turn's delivery did, as the SDK recorded it or as the chat states
+   * it (`MessageDeliveryStatement`). v1 surfaces only a "Queued" badge.
+   */
+  deliveryState?: MessageDeliveryStatement;
   /** Opens the message-details sheet; long-press never triggers the copy ActionSheet. */
   onLongPressDetails?: (message: StoredMessage) => void;
   /**
@@ -125,6 +128,14 @@ function MessageBubbleImpl({
     onLongPressDetails?.(message);
   }, [message, onLongPressDetails]);
 
+  // The parts this row draws, and the single list both branches below gate on.
+  // A row can arrive with nothing visible: the transcript keeps a message item
+  // while a live turn streams its parts in, and a confirmed user row stays until
+  // its parts land. Drawing the long-press wrapper around that empty row left an
+  // empty interactive strip (its own py-1, plus an invisible focus stop) in the
+  // transcript, so the wrapper is rendered only when there is something in it.
+  const visibleParts = useMemo(() => parts.filter(part => partRendersContent(part)), [parts]);
+
   // The bubble is memo-wrapped, but the transcript still re-renders its rows
   // while a message streams. Memoize the derived text on the parts identity so
   // the filter/map/join and the first-human-part scan run once per part list
@@ -158,23 +169,29 @@ function MessageBubbleImpl({
   if (parts.length === 1 && firstPart?.type === 'compaction') {
     return (
       <View className="px-4">
-        <CompactionSeparator />
+        <CompactionSeparator
+          info={message.info}
+          isStreaming={isLastAssistantMessage && isSessionStreaming}
+        />
       </View>
     );
   }
 
   // Failed-row footer. Renders when the relevant handler is wired
   // (mobile-w2b wires onRetryMessage/onCopyToComposer); a delivery row needs
-  // Retry or Copy, an assistant row needs Retry or, when the account's balance
-  // caused the failure, Add credits. A caller that already knows the session
-  // cannot accept a re-send passes `retryAvailable: false`: the footer then
-  // still states the failure, with no action that could not act.
+  // Retry, Copy, or — for the send the balance refused — Add credits, and an
+  // assistant row needs Retry or, when the account's balance caused the
+  // failure, Add credits. A caller that already knows the session cannot accept
+  // a re-send passes `retryAvailable: false`: the footer then still states the
+  // failure, with no action that could not act.
   const failure = selectMessageFailure({ deliveryState, info: message.info, retryAvailable });
   const relevantHandlerWired =
     retryAvailable === false ||
     (failure !== null &&
       (failure.kind === 'delivery'
-        ? onRetryMessage !== undefined || onCopyToComposer !== undefined
+        ? onRetryMessage !== undefined ||
+          onCopyToComposer !== undefined ||
+          (failure.canAddCredits && onAddCredits !== undefined)
         : onRetryMessage !== undefined || (failure.canAddCredits && onAddCredits !== undefined)));
   // The footer is the failed turn's status, so it sits in the column that turn
   // occupies rather than the row that carries it: a message that never reached
@@ -284,79 +301,92 @@ function MessageBubbleImpl({
     const fileParts = parts.filter(part => isFilePart(part));
     const isQueued = deliveryState?.status === 'queued';
     const hasBadgeSlot = isQueued || holdQueuedSlot;
+    // The wrapper carries the row's padding and its long-press surface, so it
+    // is drawn only when the row draws content or holds a control. The bubble's
+    // own predicate answers for the bubble: a row whose parts render nothing —
+    // or whose only part is the server's synthetic context wrapper — draws no
+    // bubble, and must not leave the empty strip around it.
+    const drawsBubble = userBubbleRendersContent(parts);
+    const drawsControls = hasBadgeSlot === true || onRestoreQueued !== undefined;
 
     return (
       <View>
-        <Pressable onLongPress={handleLongPress} accessible={a11y.accessible} className="px-4 py-1">
-          <View className="items-end gap-1">
-            {message.parts.some(partRendersContent) ? (
-              <Bubble side="user">
-                <InMessageBubbleContext.Provider value>
-                  {userTextContent ? (
-                    <ChatMarkdownText value={userTextContent} variant="user" selectable={false} />
+        {drawsBubble || drawsControls ? (
+          <Pressable
+            onLongPress={handleLongPress}
+            accessible={a11y.accessible}
+            className="px-4 py-1"
+          >
+            <View className="items-end gap-1">
+              {drawsBubble ? (
+                <Bubble side="user">
+                  <InMessageBubbleContext.Provider value>
+                    {userTextContent ? (
+                      <ChatMarkdownText value={userTextContent} variant="user" selectable={false} />
+                    ) : null}
+                    {fileParts.map(part => (
+                      <FilePartRenderer
+                        key={part.id}
+                        part={part}
+                        onLongPress={onLongPressDetails ? handleLongPress : undefined}
+                      />
+                    ))}
+                  </InMessageBubbleContext.Provider>
+                </Bubble>
+              ) : null}
+              {hasBadgeSlot || onRestoreQueued ? (
+                <View className="flex-row items-center gap-2 self-end pr-1">
+                  {hasBadgeSlot ? (
+                    <View
+                      accessibilityRole={isQueued ? 'text' : undefined}
+                      accessibilityLabel={
+                        isQueued ? t('agentChat.messageBubble.queuedAccessibility') : undefined
+                      }
+                      accessible={isQueued}
+                      {...(!isQueued
+                        ? {
+                            accessibilityElementsHidden: true as const,
+                            importantForAccessibility: 'no-hide-descendants' as const,
+                          }
+                        : {})}
+                      pointerEvents={isQueued ? 'auto' : 'none'}
+                      className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
+                    >
+                      <Clock size={12} color={colors.mutedForeground} />
+                      <Text className="text-xs text-muted-foreground">{t('common.queued')}</Text>
+                    </View>
                   ) : null}
-                  {fileParts.map(part => (
-                    <FilePartRenderer
-                      key={part.id}
-                      part={part}
-                      onLongPress={onLongPressDetails ? handleLongPress : undefined}
-                    />
-                  ))}
-                </InMessageBubbleContext.Provider>
-              </Bubble>
+                  {!isQueued && onRestoreQueued ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={QUEUED_CONTROL_MIN_HEIGHT}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('agentChat.messageBubble.restoreQueuedAccessibility')}
+                      onPress={() => {
+                        onRestoreQueued(message);
+                      }}
+                    >
+                      <Text>{t('agentChat.messageBubble.restoreQueued')}</Text>
+                    </Button>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+            {a11y.accessibilityActions.length > 0 ? (
+              <View
+                accessible
+                accessibilityRole={a11y.accessibilityRole}
+                accessibilityLabel={a11y.accessibilityLabel}
+                accessibilityHint={a11y.accessibilityHint}
+                accessibilityActions={a11y.accessibilityActions}
+                onAccessibilityAction={handleAccessibilityAction}
+                className="absolute inset-0 opacity-0"
+                pointerEvents="none"
+              />
             ) : null}
-            {hasBadgeSlot || onRestoreQueued ? (
-              <View className="flex-row items-center gap-2 self-end pr-1">
-                {hasBadgeSlot ? (
-                  <View
-                    accessibilityRole={isQueued ? 'text' : undefined}
-                    accessibilityLabel={
-                      isQueued ? t('agentChat.messageBubble.queuedAccessibility') : undefined
-                    }
-                    accessible={isQueued}
-                    {...(!isQueued
-                      ? {
-                          accessibilityElementsHidden: true as const,
-                          importantForAccessibility: 'no-hide-descendants' as const,
-                        }
-                      : {})}
-                    pointerEvents={isQueued ? 'auto' : 'none'}
-                    className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
-                  >
-                    <Clock size={12} color={colors.mutedForeground} />
-                    <Text className="text-xs text-muted-foreground">{t('common.queued')}</Text>
-                  </View>
-                ) : null}
-                {!isQueued && onRestoreQueued ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={QUEUED_CONTROL_MIN_HEIGHT}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('agentChat.messageBubble.restoreQueuedAccessibility')}
-                    onPress={() => {
-                      onRestoreQueued(message);
-                    }}
-                  >
-                    <Text>{t('agentChat.messageBubble.restoreQueued')}</Text>
-                  </Button>
-                ) : null}
-              </View>
-            ) : null}
-          </View>
-          {a11y.accessibilityActions.length > 0 ? (
-            <View
-              accessible
-              accessibilityRole={a11y.accessibilityRole}
-              accessibilityLabel={a11y.accessibilityLabel}
-              accessibilityHint={a11y.accessibilityHint}
-              accessibilityActions={a11y.accessibilityActions}
-              onAccessibilityAction={handleAccessibilityAction}
-              className="absolute inset-0 opacity-0"
-              pointerEvents="none"
-            />
-          ) : null}
-        </Pressable>
+          </Pressable>
+        ) : null}
         {failureFooter}
       </View>
     );
@@ -366,11 +396,14 @@ function MessageBubbleImpl({
   // Row-rhythm contract: py-1 on each of two adjacent wrappers sums to the
   // same value as the gap-2 between parts of one message and the user
   // wrapper's py-1 — every adjacent transcript row pair sits one gap apart.
+  // The wrapper is drawn only for a row that draws a part, so an assistant row
+  // still waiting for its first part leaves no padded strip in the transcript.
   const isStreaming = isLastAssistantMessage && isSessionStreaming;
   const renderPart = (part: (typeof message.parts)[number]) => (
     <PartRenderer
       key={part.id}
       part={part}
+      messageInfo={message.info}
       isStreaming={isStreaming}
       getChildMessages={getChildMessages}
       defaultReasoningExpanded={defaultReasoningExpanded}
@@ -381,13 +414,13 @@ function MessageBubbleImpl({
 
   return (
     <View>
-      {parts.some(part => partRendersContent(part)) ? (
+      {visibleParts.length > 0 ? (
         <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
           <InMessageBubbleContext.Provider value>
             <MessageLongPressProvider message={message} onLongPressDetails={onLongPressDetails}>
               <View className="gap-2">
                 {condenseToolCalls
-                  ? groupMessageParts(parts, { condense: true }).map(group =>
+                  ? groupMessageParts(visibleParts, { condense: true }).map(group =>
                       group.kind === 'tool-run' ? (
                         <MessageErrorBoundary key={group.parts[0]?.id}>
                           <CondensedToolRunRow parts={group.parts} />
@@ -396,7 +429,7 @@ function MessageBubbleImpl({
                         group.parts.map(renderPart)
                       )
                     )
-                  : parts.map(part => renderPart(part))}
+                  : visibleParts.map(part => renderPart(part))}
               </View>
             </MessageLongPressProvider>
           </InMessageBubbleContext.Provider>

@@ -1,7 +1,11 @@
 import * as z from 'zod';
-import { ENKRYPT_DETECTOR_IDS, EnkryptPiiEntitySchema } from '@kilocode/db/schema-types';
+import {
+  ENKRYPT_DETECTOR_IDS,
+  EnkryptPiiEntitySchema,
+  type EnkryptDetectorId,
+} from '@kilocode/db/schema-types';
 import type { EnkryptDetectRequestDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
-import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import type { EnkryptGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 
 const DetectorIdSchema = z.enum(ENKRYPT_DETECTOR_IDS);
 
@@ -26,9 +30,13 @@ const GuardrailSettingsSchema = z.object({
   detectors: z.array(DetectorSettingsSchema),
 });
 
-/** One Enkrypt scan of the request: the blocking detectors' or the log-only detectors'. */
+/**
+ * One Enkrypt scan: of the blocking detectors or the log-only detectors, over the request's tool
+ * definitions, its system prompt, its conversation, or the model's response.
+ */
 export const EnkryptScanReportSchema = z.object({
   scan: z.enum(['blocking', 'log_only']),
+  part: z.enum(['tools', 'system', 'conversation', 'response']),
   detectors_enabled: z.array(DetectorIdSchema),
   detectors_blocking: z.array(DetectorIdSchema),
   verdict_cache: z.enum(['off', 'miss', 'hit', 'error']),
@@ -36,6 +44,9 @@ export const EnkryptScanReportSchema = z.object({
   total_segments: z.number(),
   cached_characters: z.number(),
   cached_segments: z.number(),
+  /** Attachments, such as images, sent to Enkrypt only as an omission marker. */
+  omitted_attachments: z.number(),
+  /** Includes the overlap of already-scanned text and omission markers. */
   scanned_characters: z.number(),
   decision: z.enum(['allowed', 'blocked', 'error_fail_closed', 'error_logged', 'client_aborted']),
   error: z.string().nullable(),
@@ -101,7 +112,7 @@ export type EnkryptOutputGuardrailReport = z.infer<typeof EnkryptOutputGuardrail
 
 function detectorSettings(
   detectors: EnkryptDetectRequestDetectors,
-  blocking: readonly string[]
+  blocking: readonly EnkryptDetectorId[]
 ): DetectorSettings[] {
   return ENKRYPT_DETECTOR_IDS.flatMap((detector): DetectorSettings[] => {
     if (!detectors[detector]) return [];
@@ -127,7 +138,7 @@ function detectorSettings(
 }
 
 export function guardrailSettings(
-  config: EnkryptInputGuardrailConfig
+  config: EnkryptGuardrailConfig
 ): z.infer<typeof GuardrailSettingsSchema> {
   return {
     status: config.status,

@@ -82,10 +82,19 @@ before(async () => {
   if (!process.env.RUNTIME_INSTALLER_TEST_IMAGE) {
     const build = spawnSync(
       'docker',
-      ['build', '--platform', 'linux/amd64', '-t', image, '-f', 'Dockerfile.containers', '.'],
+      [
+        'build',
+        '--platform',
+        'linux/amd64',
+        '-t',
+        image,
+        '-f',
+        'Dockerfile.containers.runtime-free',
+        '.',
+      ],
       { cwd: serviceRoot, stdio: 'inherit' }
     );
-    assert.equal(build.status, 0, 'Dockerfile.containers build');
+    assert.equal(build.status, 0, 'Dockerfile.containers.runtime-free build');
   }
   await new Promise<void>(resolve => server.listen(0, '0.0.0.0', resolve));
   const address = server.address();

@@ -257,6 +257,10 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  getBuiltinAgents: baseProcedure
+    .output(BuiltinAgentSettingsInputSchema)
+    .query(({ ctx }) => getBuiltinAgentSettings(db, ctx.user.id)),
+
   setBuiltinAgents: baseProcedure
     .input(z.object({ agents: BuiltinAgentSettingsInputSchema }))
     .output(z.object({ success: z.boolean(), agents: BuiltinAgentSettingsInputSchema }))

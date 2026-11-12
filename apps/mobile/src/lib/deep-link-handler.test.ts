@@ -135,6 +135,28 @@ describe('redirectSystemPath', () => {
     });
   });
 
+  describe('removed mobile destinations', () => {
+    it.each([
+      'https://app.kilo.ai/claw',
+      'https://app.kilo.ai/claw/?at=message',
+      'kiloapp://claw',
+      'kiloapp:///claw',
+      'kiloapp://app.kilo.ai/claw',
+      'kiloapp:///kiloclaw/settings',
+      'kiloapp:///chat/sandbox-1/conversation-1',
+      'kiloapp:///onboarding',
+      'kiloapp:///(app)/(tabs)/(1_kiloclaw)/chat/instance-picker',
+      'kiloapp:///%28app%29/%28tabs%29/%281_kiloclaw%29',
+      '/(app)/(tabs)/(1_kiloclaw)',
+      '/chat/sandbox-1/instance-picker',
+    ])('opens the shell cold and leaves the current screen warm for %s', path => {
+      expect(redirectSystemPath({ path, initial: true })).toBe('/');
+      expect(redirectSystemPath({ path, initial: false })).toBeNull();
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(mocks.navigate).not.toHaveBeenCalled();
+    });
+  });
+
   describe('a link that names no screen', () => {
     // Resolving one of these replaces the visible route and unmounts the screen
     // beneath it, so the unsaved state of that screen (an open form) is lost
@@ -148,8 +170,9 @@ describe('redirectSystemPath', () => {
       'kiloapp://',
       'kiloapp:///definitely-not-a-route',
       'kiloapp:///dev/unknown-fixture',
-      'kiloapp://agent-chat/not-a-session',
-      'kiloapp:///(app)/agent-chat/not-a-session',
+      // A session-family capture the store cannot address names no session.
+      'kiloapp://agent-chat/ses:1',
+      'kiloapp:///(app)/agent-chat/ses:1',
     ])('ignores %s without navigate or stash', path => {
       for (const initial of [true, false]) {
         expect(redirectSystemPath({ path, initial })).toBeNull();
@@ -161,16 +184,33 @@ describe('redirectSystemPath', () => {
 
   describe('session destination', () => {
     it.each([
-      'https://app.kilo.ai/cloud/sessions/not-a-session',
-      'kiloapp:///cloud/sessions/not-a-session',
-      // An id shape seen in the wild: a UUID can never be a session id.
-      'https://app.kilo.ai/cloud/sessions/00000000-0000-0000-0000-000000000000',
-      'https://app.kilo.ai/cloud/sessions/ses_short',
-    ])('ignores %s, which the session route cannot open', path => {
+      // A capture the store's id rule refuses addresses no session: the route
+      // could never read one, so the link opens nothing and the visible screen
+      // keeps its state.
+      'https://app.kilo.ai/cloud/sessions/ses:1',
+      'kiloapp:///cloud/sessions/ses:1',
+    ])('ignores %s, which the session route cannot address', path => {
       for (const initial of [true, false]) {
         expect(redirectSystemPath({ path, initial })).toBeNull();
         expect(getPendingDeepLink()).toBeNull();
         expect(mocks.navigate).not.toHaveBeenCalled();
+      }
+    });
+
+    it.each([
+      // Every id the session store can hold names a session the route can
+      // address, including ones minted before the canonical shape and a ses_
+      // id whose length drifted from it. The route's denial is the answer for
+      // an id that does not resolve.
+      ['an id minted before the canonical shape', 'xmw2l780h18'],
+      ['a ses_ id longer than the canonical shape', 'ses_01J9FRESH000000000000000001'],
+    ])('stashes %s for the session route', (_name, sessionId) => {
+      for (const initial of [true, false]) {
+        _resetDeepLinkLaunchForTests();
+        expect(
+          redirectSystemPath({ path: `kiloapp:///cloud/sessions/${sessionId}`, initial })
+        ).toBeNull();
+        expect(getPendingDeepLink()).toBe(`/(app)/agent-chat/${sessionId}`);
       }
     });
 

@@ -2333,8 +2333,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         if (event.type === 'commands.available') {
           await handleCommandsAvailable(event.properties, {
             setAvailableCommands: async commands => {
-              this.availableCommands = commands;
               await this.ctx.storage.put(AVAILABLE_COMMANDS_KEY, commands);
+              this.availableCommands = commands;
+              this.emitSynthetic('commands.available', commands, 'commands-available');
             },
             logger: {
               info: message => logger.withFields({ sessionId: this.sessionId }).info(message),
@@ -2902,9 +2903,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /**
    * C1c: closes the browser sockets of this session — the event stream and the
-   * browser side of each bridged terminal — and returns how many it closed.
-   * Reads the organization from the same persisted session metadata and only
-   * closes on a match.
+   * browser side of each bridged terminal — releases its route at the Sandbox DO,
+   * and returns how many sockets it closed. Reads the organization from the same
+   * persisted session metadata and only acts on a match. The release retires the
+   * route and its organization-attributed grant, removes the wrapper path and
+   * ends the running turn, so organization-scoped execution stops instead of
+   * continuing on a grant that outlives the membership.
    */
   async closeOrgStreams(organizationId: string): Promise<number> {
     await this.initialized;
@@ -2916,6 +2920,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       closed++;
     }
     closed += this.terminals.closeBrowserSockets(1000, 'session access revoked');
+    const peer = this.sandboxPeer();
+    if (peer !== null) {
+      // No route (an unregistered or already released sandbox) makes this a
+      // no-op. A failed release stays visible to the caller, which reports the
+      // failed revocation close instead of assuming the route is gone.
+      await withDORetry(
+        () => this.sandboxPeer() ?? peer,
+        current => current.release({ sessionId: this.sessionId }),
+        'closeOrgStreams.release'
+      );
+    }
     return closed;
   }
 

@@ -100,7 +100,7 @@ describe('Kilo v2 release in the handoff', () => {
           {
             class_name: 'SandboxContainers',
             scheduling_policy: 'durable_object',
-            images: { app: { dockerfile: './Dockerfile.containers' } },
+            images: { 'runtime-free': { dockerfile: './Dockerfile.containers.runtime-free' } },
           },
         ],
       },
@@ -172,23 +172,23 @@ describe('deployment preparation', () => {
         class_name: 'SandboxContainers',
         scheduling_policy: 'durable_object',
         images: {
-          app: {
-            dockerfile: './Dockerfile.containers',
+          'runtime-free': {
+            dockerfile: './Dockerfile.containers.runtime-free',
           },
         },
       },
     ],
   });
-  it('rejects mixed all-in-one image fields before base verification', async () => {
+  it('rejects mixed image fields before base verification', async () => {
     const f = await fixture();
     await publishRuntimeHandoff({ ...f, descriptor: f.packaged.descriptor });
     const changed = config();
-    Object.assign(changed.containers[0].images.app, { image: f.base.image });
+    Object.assign(changed.containers[0].images['runtime-free'], { image: f.base.image });
     let verified = false;
     await expect(
       prepareRuntimeDeployment({
         config: changed,
-        startup: { mode: 'downloaded', image: 'all-in-one' },
+        startup: { mode: 'downloaded', image: 'runtime-free' },
         environment: 'production',
         sourceSha: f.sourceSha,
         bucket: 'runtime-test',
@@ -202,29 +202,30 @@ describe('deployment preparation', () => {
     ).rejects.toThrow('configuration drift');
     expect(verified).toBe(false);
   });
-  it('preinstalled does not touch unavailable publication storage', async () => {
+  it('rejects preinstalled before touching publication storage', async () => {
     const f = await fixture();
     let reads = 0;
-    const result = await prepareRuntimeDeployment({
-      config: config(),
-      startup: { mode: 'preinstalled', image: 'all-in-one' },
-      environment: 'production',
-      sourceSha: f.sourceSha,
-      bucket: 'runtime-test',
-      accountId: 'c'.repeat(32),
-      baseInputId: f.base.inputId,
-      store: {
-        ...f.store,
-        getBytes: async () => {
-          reads++;
-          throw new Error('storage unavailable');
+    await expect(
+      prepareRuntimeDeployment({
+        config: config(),
+        startup: { mode: 'preinstalled', image: 'all-in-one' } as never,
+        environment: 'production',
+        sourceSha: f.sourceSha,
+        bucket: 'runtime-test',
+        accountId: 'c'.repeat(32),
+        baseInputId: f.base.inputId,
+        store: {
+          ...f.store,
+          getBytes: async () => {
+            reads++;
+            throw new Error('storage unavailable');
+          },
         },
-      },
-      verifyBase: () => {
-        throw new Error('must not verify base');
-      },
-    });
-    expect(result?.vars?.RUNTIME_STARTUP_MODE).toBe('preinstalled');
+        verifyBase: () => {
+          throw new Error('must not verify base');
+        },
+      })
+    ).rejects.toThrow();
     expect(reads).toBe(0);
   });
   it('renders the verified digest and descriptor only after verification', async () => {
@@ -236,7 +237,6 @@ describe('deployment preparation', () => {
       startup: {
         mode: 'downloaded',
         image: 'runtime-free',
-        interactiveOrgIds: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
       },
       environment: 'production',
       sourceSha: f.sourceSha,
@@ -250,16 +250,16 @@ describe('deployment preparation', () => {
       },
     });
     expect(order).toEqual(['verified']);
-    expect(result?.containers?.[0].images?.app).toEqual({ dockerfile: './Dockerfile.containers' });
+    expect(result?.containers?.[0].images?.app).toBeUndefined();
     expect(result?.containers?.[0].images?.['runtime-free']).toEqual({ image: f.base.image });
-    expect(result?.vars?.RUNTIME_INTERACTIVE_ORG_IDS).toBe('9d278969-5453-4ae3-a51f-a8d2274a7b56');
+    expect(result?.vars?.RUNTIME_INTERACTIVE_ORG_IDS).toBeUndefined();
     expect(result?.vars?.RUNTIME_RELEASE_DESCRIPTOR).toBe(f.published.descriptor.sha256);
   });
   it('configuration drift prevents base verification and deployment', async () => {
     const f = await fixture();
     await publishRuntimeHandoff({ ...f, descriptor: f.packaged.descriptor });
     const changed = config();
-    changed.containers[0].images.app.dockerfile = './untrusted';
+    changed.containers[0].images['runtime-free'].dockerfile = './untrusted';
     let verified = false;
     await expect(
       prepareRuntimeDeployment({
@@ -287,7 +287,7 @@ describe('deployment preparation', () => {
       prepareRuntimeDeployment({
         config: changed,
         environment: 'production',
-        startup: { mode: 'downloaded', image: 'all-in-one' },
+        startup: { mode: 'downloaded', image: 'runtime-free' },
         sourceSha: f.sourceSha,
         bucket: 'runtime-test',
         accountId: 'c'.repeat(32),

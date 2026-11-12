@@ -5,7 +5,7 @@ import {
   type CloudAgentSyncAuthorization,
 } from '@kilocode/worker-utils/cloud-agent-session-sync';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
-import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { getPgDb } from './db/pg.js';
 import { getSandboxSessionStub } from './sandbox-session/session-stub.js';
@@ -59,17 +59,14 @@ export class SessionSyncAuthorization extends WorkerEntrypoint<Env> {
     if (sessionID !== undefined && !roots.includes(sessionID)) {
       const db = getPgDb(this.env);
       // Stored lineage comes from runtime events, so it cannot claim another user's session.
-      const [foreign] = await db
-        .select({ sessionId: cli_sessions_v2.session_id })
+      // Any user can add a row for a known ID, so a session is foreign only without the caller's row.
+      const [owner] = await db
+        .select({ userId: cli_sessions_v2.kilo_user_id })
         .from(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.session_id, sessionID),
-            ne(cli_sessions_v2.kilo_user_id, claims.userId)
-          )
-        )
+        .where(eq(cli_sessions_v2.session_id, sessionID))
+        .orderBy(desc(eq(cli_sessions_v2.kilo_user_id, claims.userId)))
         .limit(1);
-      if (foreign) return null;
+      if (owner && owner.userId !== claims.userId) return null;
       const rows = await db
         .select({
           sessionId: cli_sessions_v2.cloud_agent_session_id,

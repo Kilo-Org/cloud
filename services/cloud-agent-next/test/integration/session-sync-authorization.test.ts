@@ -15,13 +15,13 @@ vi.mock('../../src/db/pg.js', () => ({ getPgDb }));
 
 type Statement = { sql: string; params: unknown[] };
 
-/** Answers the foreign-owner lookup first, then the owned-root lookup. */
-function postgres(input: { foreign?: boolean; roots?: [string, string][] }) {
+/** Answers the caller-first owner lookup, then the owned-root lookup. */
+function postgres(input: { owner?: string; roots?: [string, string][] }) {
   const statements: Statement[] = [];
   getPgDb.mockReturnValue(
     drizzle(async (sql, params) => {
       statements.push({ sql, params });
-      if (statements.length === 1) return { rows: input.foreign ? [['ses_foreign']] : [] };
+      if (statements.length === 1) return { rows: input.owner ? [[input.owner]] : [] };
       return { rows: input.roots ?? [] };
     })
   );
@@ -155,10 +155,26 @@ describe('Session Sync descendant authorization', () => {
 
   it('rejects a session that another user owns before it reads runtime lineage', async () => {
     const f = await fixture();
-    postgres({ foreign: true, roots: [[memberCloudSessionId, f.kiloSessionId]] });
+    postgres({ owner: 'synthetic-other-owner', roots: [[memberCloudSessionId, f.kiloSessionId]] });
     const calls = await spyDescendant(f, true);
     expect(await f.service.authorizeUpload({ handle: f.handle, sessionID: childId })).toBeNull();
     expect(calls).toEqual([]);
+  });
+
+  it('keeps authorizing an owned session when another user adds a row for its ID', async () => {
+    const f = await fixture();
+    // The lookup orders the caller's row first, so the database returns it before the foreign row.
+    const statements = postgres({
+      owner: f.userId,
+      roots: [[memberCloudSessionId, f.kiloSessionId]],
+    });
+    const calls = await spyDescendant(f, true);
+    expect(await f.service.authorizeUpload({ handle: f.handle, sessionID: childId })).toEqual({
+      userID: f.userId,
+      expiresAt: expect.any(Number),
+    });
+    expect(statements[0].sql).toMatch(/order by .*"kilo_user_id" = \$2.* desc/i);
+    expect(calls).toEqual([[f.kiloSessionId, childId]]);
   });
 
   it('asks the uploader to retry while descendant lineage is not stored yet', async () => {

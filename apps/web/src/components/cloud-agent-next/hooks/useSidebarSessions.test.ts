@@ -259,6 +259,7 @@ describe('mergeSidebarFolderSessions', () => {
         kind: 'manual',
         smartPreset: null,
         sortMode: 'manual',
+        manualWorktreeOrder: [],
         worktreeIds: folder.flatMap(session => (session.worktreeId ? [session.worktreeId] : [])),
       },
     ]);

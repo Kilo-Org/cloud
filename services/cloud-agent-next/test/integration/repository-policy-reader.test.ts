@@ -9,7 +9,7 @@ vi.mock('../../src/db/pg.js', () => ({
     selectDistinct: () => ({
       from: () => ({
         innerJoin: () => ({
-          where: () => ({ limit: async () => ledger.rows }),
+          where: async () => ledger.rows,
         }),
       }),
     }),
@@ -34,7 +34,11 @@ const policy = {
 
 describe('repository policy compatibility ledger lookup', () => {
   beforeEach(() => {
-    ledger.rows = [{ sandboxId: 'sbx__retired' }, { sandboxId: 'sbx__current' }];
+    ledger.rows = [
+      { sandboxId: 'sbx__retired' },
+      { sandboxId: 'sbx__retired_again' },
+      { sandboxId: 'sbx__current' },
+    ];
   });
   function reader(read: ReturnType<typeof vi.fn>) {
     const getByName = vi.fn((_sandboxId: string) => ({ readWorkspaceRepositoryPolicy: read }));
@@ -43,18 +47,26 @@ describe('repository policy compatibility ledger lookup', () => {
     } as unknown as ConstructorParameters<typeof RepositoryPolicyReader>[1]);
     return { service, getByName };
   }
-  it('asks the next canonical owner when the old ledger location rejects the binding', async () => {
-    const read = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(policy);
+  it('asks the next canonical owner after multiple old ledger locations reject the binding', async () => {
+    const read = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(policy);
     const { service, getByName } = reader(read);
     await expect(service.readWorkspaceRepositoryPolicy(lookup)).resolves.toEqual(policy);
-    expect(getByName.mock.calls.map(([id]) => id)).toEqual(['sbx__retired', 'sbx__current']);
-    expect(read).toHaveBeenCalledTimes(2);
-    expect(read).toHaveBeenNthCalledWith(2, lookup);
+    expect(getByName.mock.calls.map(([id]) => id)).toEqual([
+      'sbx__retired',
+      'sbx__retired_again',
+      'sbx__current',
+    ]);
+    expect(read).toHaveBeenCalledTimes(3);
+    expect(read).toHaveBeenNthCalledWith(3, lookup);
   });
-  it('fails closed when neither canonical owner accepts the binding', async () => {
+  it('fails closed when no canonical owner accepts the binding', async () => {
     const read = vi.fn().mockResolvedValue(null);
     const { service } = reader(read);
     await expect(service.readWorkspaceRepositoryPolicy(lookup)).resolves.toBeNull();
-    expect(read).toHaveBeenCalledTimes(2);
+    expect(read).toHaveBeenCalledTimes(3);
   });
 });

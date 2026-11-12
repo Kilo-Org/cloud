@@ -64,8 +64,7 @@ export class RepositoryPolicyReader extends WorkerEntrypoint<Env> {
               ]
             : [])
         )
-      )
-      .limit(2);
+      );
     for (const row of rows) {
       if (!row.sandboxId) continue;
       const policy = await this.readAt(row.sandboxId, input);

@@ -2154,6 +2154,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return route.grant;
     });
     await this.requireOrganizationMembership(grant);
+    if (!grantScmEntries(grant).some(entry => entry.repository.type === 'github'))
+      throw new Error('operation_not_supported');
     const access = await this.ensureRepositoryAccess(grant);
     const current = access.repositories.find(repo => repo.repositoryId === input.repositoryId);
     if (access.revision !== input.expectedRevision)

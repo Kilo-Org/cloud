@@ -499,6 +499,39 @@ describe('durable workspace repository authority', () => {
     expect(await f.identity()).toEqual(before);
     expect((await f.policy())?.repositories.map(repo => repo.repositoryId)).toEqual([101, 202]);
   });
+  it('rejects GitHub access changes when the persisted grant has no GitHub credential', async () => {
+    const f = await fixture();
+    const grant = persistedSessionCredentialGrantSchema.parse({
+      ...f.grant,
+      repository: { type: 'git', url: 'https://example.test/acme/repo.git' },
+      scm: undefined,
+      additionalRepositories: undefined,
+    });
+    await runInDurableObject(f.sandbox, (_instance, state) => {
+      const db = drizzle(state.storage);
+      writeScopeGrant(db, grant);
+    });
+    await expect(
+      f.sandbox.getRepositoryAccess({ ownerId: OWNER, sessionId: SESSION })
+    ).resolves.toEqual({ revision: 0, repositories: [] });
+    const denial = await runInDurableObject(f.sandbox, async instance => {
+      try {
+        await instance.changeRepositoryAccess({
+          ownerId: OWNER,
+          sessionId: SESSION,
+          expectedRevision: 0,
+          repositoryId: 303,
+          mode: 'read',
+        });
+        return 'allowed';
+      } catch (error) {
+        return error instanceof Error ? error.message : 'unknown';
+      }
+    });
+    expect(denial).toBe('operation_not_supported');
+    expect(f.tokens.prepareWorkspaceRepositoryAccess).not.toHaveBeenCalled();
+    expect(await f.policy()).toMatchObject({ revision: 0, repositories: [] });
+  });
   it('uses real trusted route/token validation and changes the next canonical broker decision', async () => {
     const f = await fixture();
     const api = await caller(f);

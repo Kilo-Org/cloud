@@ -1562,13 +1562,19 @@ describe('session detail header right cluster', () => {
     expect(slot[0]?.props.className).toContain('shrink');
 
     // ...and the cluster inside it shrinks into that cap, so it can never paint
-    // past the slot edge. It holds the Follow control and the context pill and
-    // nothing else: the PR badge now shares the goal row instead.
+    // past the slot edge. It holds the context pill and the Follow control and
+    // nothing else: the PR badge now shares the goal row instead. The pill
+    // leads and the Follow control ends the row, so a reading that arrives
+    // widens the pill into the header's free space instead of moving the
+    // control beside it.
     const cluster = slot[0]?.children[0] as ReactTestInstance | undefined;
     expect(cluster?.props.className).toContain('min-w-0');
     expect(cluster?.props.className).toContain('shrink');
     expect(cluster?.findAllByType(SessionContextMetrics)).toHaveLength(1);
     expect(cluster?.children).toHaveLength(2);
+    const [leading] = cluster?.children ?? [];
+    expect(typeof leading).toBe('object');
+    expect((leading as ReactTestInstance | undefined)?.type).toBe(SessionContextMetrics);
 
     // The pill is the flexible part of the cluster: it shrinks into the cap
     // with it, so the cluster can never paint past the slot edge.
@@ -1584,18 +1590,26 @@ describe('session detail header right cluster', () => {
     if (priced.info.role !== 'assistant') {
       throw new Error('expected an assistant message');
     }
-    priced.info = { ...priced.info, sessionID: ROOT_ID, cost: 1234.56 };
+    priced.info = { ...priced.info, sessionID: ROOT_ID, cost: 123_456.78 };
     const { renderer } = await mountDetails([priced]);
-    const expected = formatSessionCostBadge(1234.56 * 1_000_000);
-    expect(expected).not.toBeNull();
+    const expected = formatSessionCostBadge(123_456.78 * 1_000_000);
+    if (expected === null) {
+      throw new Error('expected a formatted cost badge');
+    }
     const metrics = renderer.root.findByProps({ testID: 'session-context-metrics' });
-    const cost = metrics.find(
+    // The cost is its own value text, so it truncates on its own one line inside
+    // the capped pill instead of pushing the percentage beside it.
+    const [cost] = metrics.findAll(
       node =>
         Object.is(node.type, 'Text') &&
-        node.children.some(child => typeof child === 'string' && child === expected)
+        node.children.some(child => typeof child === 'string' && child.includes(expected))
     );
+    if (cost === undefined) {
+      throw new Error('expected the cost text');
+    }
     expect(cost.props.numberOfLines).toBe(1);
     expect(cost.props.className).toContain('shrink');
+    expect(cost.props.className).toContain('min-w-0');
   });
 });
 
@@ -4787,8 +4801,8 @@ describe('session detail read-only composer', () => {
   });
 
   // The transcript paints a skeleton until its rows stop measuring. The chrome
-  // around it reads the same fact: a live continue footer, or a pill settled on
-  // a bare ring, beside a loading body is the screen showing two states at once.
+  // around it reads the same fact: a live continue footer beside a loading body
+  // is the screen showing two states at once.
   it('keeps the footer and the pill in their loading shapes until the rows are painted', async () => {
     openSettledReport.value = false;
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
@@ -4801,10 +4815,11 @@ describe('session detail read-only composer', () => {
           node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
       )
     ).toHaveLength(0);
-    // The pill holds the row its values will take, instead of shrinking to a
-    // ring with no slot.
+    // The pill paints its ring alone in every unresolved state, and the box
+    // around it holds the row its values will take, so nothing shrinks when the
+    // values arrive.
     const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
-    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(1);
+    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
 
     // The list then reports its rows painted, and the footer takes the
     // placeholder's place in the same slot.

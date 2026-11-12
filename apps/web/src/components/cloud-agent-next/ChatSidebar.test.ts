@@ -824,7 +824,17 @@ describe('ChatSidebar row rendering', () => {
         workspaceGroups,
         workspaceFolders: { ...workspaceFolders, folders: [smartFolder] },
       });
-      expect(destinations()).toEqual(['Ungrouped']);
+      expect(destinations()).toEqual([]);
+      expect(row.textContent).not.toContain('Move to folder');
+      expect(dom.container.querySelector(`[data-folder-id="${smartFolder.id}"]`)).not.toBeNull();
+
+      renderSidebar({
+        sessions,
+        workspaceGroups,
+        workspaceFolders: { ...workspaceFolders, folders: [] },
+      });
+      expect(destinations()).toEqual([]);
+      expect(row.textContent).not.toContain('Move to folder');
     }
   );
 
@@ -1496,6 +1506,27 @@ describe('ChatSidebar phase 4 drag ordering', () => {
       refresh: jest.fn(async () => undefined),
     } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>;
   }
+
+  it('keeps Ungrouped available for a filed workspace while manual folders are unavailable', () => {
+    const group = phase4Group(0, null);
+    if (!group.details) throw new Error('Workspace details missing');
+    renderSidebar({
+      workspaceGroups: [
+        {
+          ...group,
+          details: { ...group.details, folderId: '11111111-1111-4111-8111-111111111111' },
+        },
+      ],
+      workspaceFolders: workspaceFolders(),
+    });
+
+    const row = dom.container.querySelector(`[data-worktree-id="${group.worktreeId}"]`);
+    if (!row) throw new Error('Workspace row missing');
+    expect(row.textContent).toContain('Move to folder');
+    expect(
+      Array.from(row.querySelectorAll('[role="menuitemradio"]'), item => item.textContent)
+    ).toEqual(['Ungrouped']);
+  });
 
   function dragRows(
     source: Element,

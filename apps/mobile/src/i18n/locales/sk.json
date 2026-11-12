@@ -1892,7 +1892,7 @@
       "costSpoken": "cena {{cost}}",
       "costSpokenWithTime": "cena {{cost}}, {{time}}",
       "pullRequest": "žiadosť o zlúčenie {{number}}",
-      "spokenJoiner": "a"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub sa nepodarilo otvoriť",

@@ -1857,7 +1857,7 @@
       "costSpoken": "custo de {{cost}}",
       "costSpokenWithTime": "custo de {{cost}}, {{time}}",
       "pullRequest": "PR {{number}}",
-      "spokenJoiner": "e"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Não foi possível abrir o GitHub",

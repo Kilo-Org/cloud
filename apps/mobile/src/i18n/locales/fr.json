@@ -2272,7 +2272,7 @@
       "costSpoken": "coût de {{cost}}",
       "costSpokenWithTime": "coût : {{cost}}, {{time}}",
       "pullRequest": "demande de fusion {{number}}",
-      "spokenJoiner": "et"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenMessage": "Impossible de lancer la configuration de l'application GitHub. Réessayez.",

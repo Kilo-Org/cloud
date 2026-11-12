@@ -1810,7 +1810,7 @@
       "costSpoken": "разход {{cost}}",
       "costSpokenWithTime": "разход {{cost}}, {{time}}",
       "pullRequest": "заявка за обединяване {{number}}",
-      "spokenJoiner": "и"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Неуспешно отваряне на GitHub",

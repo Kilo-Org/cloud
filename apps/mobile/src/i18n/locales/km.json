@@ -1810,7 +1810,7 @@
       "costSpoken": "ចំណាយ {{cost}}",
       "costSpokenWithTime": "ចំណាយ {{cost}}, {{time}}",
       "pullRequest": "សំណើបញ្ចូលកូដ {{number}}",
-      "spokenJoiner": "និង"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "មិនអាចបើក GitHub បាន",

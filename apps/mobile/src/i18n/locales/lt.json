@@ -1892,7 +1892,7 @@
       "costSpoken": "kaina {{cost}}",
       "costSpokenWithTime": "kaina {{cost}}, {{time}}",
       "pullRequest": "pakeitimų užklausa {{number}}",
-      "spokenJoiner": "ir"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nepavyko atidaryti GitHub",

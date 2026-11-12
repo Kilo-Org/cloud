@@ -1851,7 +1851,7 @@
       "costSpoken": "cost de {{cost}}",
       "costSpokenWithTime": "costul este {{cost}}, {{time}}",
       "pullRequest": "PR {{number}}",
-      "spokenJoiner": "și"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nu s-a putut deschide GitHub",

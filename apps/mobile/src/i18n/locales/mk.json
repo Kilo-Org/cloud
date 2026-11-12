@@ -1810,7 +1810,7 @@
       "costSpoken": "трошок {{cost}}",
       "costSpokenWithTime": "трошок {{cost}}, {{time}}",
       "pullRequest": "барање за спојување {{number}}",
-      "spokenJoiner": "и"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не можеше да се отвори GitHub",

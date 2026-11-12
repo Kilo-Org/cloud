@@ -1810,7 +1810,7 @@
       "costSpoken": "تێچوون: {{cost}}",
       "costSpokenWithTime": "تێچووی {{cost}}، {{time}}",
       "pullRequest": "داواکاری ڕاکێشانی {{number}}",
-      "spokenJoiner": "و"
+      "spokenJoiner": "،"
     },
     "githubInstall": {
       "couldNotOpenTitle": "نەتوانرا GitHub بکرێتەوە",

@@ -1268,7 +1268,7 @@
       "costSpoken": "maliyet: {{cost}}",
       "costSpokenWithTime": "maliyet {{cost}}, {{time}}",
       "pullRequest": "{{number}} numaralı çekme isteği",
-      "spokenJoiner": "ve"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenMessage": "GitHub uygulamasının kurulumu başlatılamadı. Lütfen tekrar dene.",

@@ -1810,7 +1810,7 @@
       "costSpoken": "kostnad {{cost}}",
       "costSpokenWithTime": "kostnad {{cost}}, {{time}}",
       "pullRequest": "PR {{number}}",
-      "spokenJoiner": "och"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunde inte öppna GitHub",

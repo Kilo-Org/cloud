@@ -1810,7 +1810,7 @@
       "costSpoken": "kulu {{cost}}",
       "costSpokenWithTime": "kulu {{cost}}, {{time}}",
       "pullRequest": "tõmbetaotlus {{number}}",
-      "spokenJoiner": "ja"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubi ei õnnestunud avada",

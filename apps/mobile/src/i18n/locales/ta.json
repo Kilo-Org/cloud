@@ -1810,7 +1810,7 @@
       "costSpoken": "செலவு {{cost}}",
       "costSpokenWithTime": "செலவு {{cost}}, {{time}}",
       "pullRequest": "இணைப்புக் கோரிக்கை {{number}}",
-      "spokenJoiner": "மற்றும்"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ஐத் திறக்க முடியவில்லை",

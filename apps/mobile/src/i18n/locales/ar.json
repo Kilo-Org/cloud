@@ -1340,7 +1340,7 @@
       "costSpoken": "التكلفة {{cost}}",
       "costSpokenWithTime": "التكلفة {{cost}}، {{time}}",
       "pullRequest": "طلب سحب {{number}}",
-      "spokenJoiner": "و"
+      "spokenJoiner": "،"
     },
     "githubInstall": {
       "couldNotOpenMessage": "تعذّر بدء إعداد تطبيق GitHub. حاول مرة أخرى.",

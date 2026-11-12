@@ -1810,7 +1810,7 @@
       "costSpoken": "költség: {{cost}}",
       "costSpokenWithTime": "költség: {{cost}}, {{time}}",
       "pullRequest": "{{number}}. módosítási kérelem",
-      "spokenJoiner": "és"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nem sikerült megnyitni a GitHubot",

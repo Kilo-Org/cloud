@@ -1268,7 +1268,7 @@
       "costSpoken": "chi phí {{cost}}",
       "costSpokenWithTime": "chi phí {{cost}}, {{time}}",
       "pullRequest": "PR {{number}}",
-      "spokenJoiner": "và"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenMessage": "Chúng tôi không thể bắt đầu thiết lập ứng dụng GitHub. Vui lòng thử lại.",

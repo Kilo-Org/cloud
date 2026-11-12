@@ -1810,7 +1810,7 @@
       "costSpoken": "gharama {{cost}}",
       "costSpokenWithTime": "gharama {{cost}}, {{time}}",
       "pullRequest": "ombi la kuunganisha {{number}}",
-      "spokenJoiner": "na"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Imeshindikana kufungua GitHub",

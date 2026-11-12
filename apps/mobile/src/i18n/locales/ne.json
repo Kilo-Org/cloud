@@ -1810,7 +1810,7 @@
       "costSpoken": "लागत {{cost}}",
       "costSpokenWithTime": "लागत {{cost}}, {{time}}",
       "pullRequest": "पुल रिक्वेस्ट {{number}}",
-      "spokenJoiner": "र"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub खोल्न सकिएन",

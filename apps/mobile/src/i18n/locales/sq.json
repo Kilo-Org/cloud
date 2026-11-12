@@ -1810,7 +1810,7 @@
       "costSpoken": "kostoja {{cost}}",
       "costSpokenWithTime": "kostoja {{cost}}, {{time}}",
       "pullRequest": "kërkesa për bashkim {{number}}",
-      "spokenJoiner": "dhe"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nuk u hap GitHub",

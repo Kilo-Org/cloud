@@ -1810,7 +1810,7 @@
       "costSpoken": "kharashka {{cost}}",
       "costSpokenWithTime": "qiimaha {{cost}}, {{time}}",
       "pullRequest": "codsiga isku-darka {{number}}",
-      "spokenJoiner": "iyo"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Lama furi karin GitHub",

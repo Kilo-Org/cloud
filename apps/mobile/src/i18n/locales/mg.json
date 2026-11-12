@@ -1810,7 +1810,7 @@
       "costSpoken": "sarany {{cost}}",
       "costSpokenWithTime": "sarany {{cost}}, {{time}}",
       "pullRequest": "fangatahana fampiraisana {{number}}",
-      "spokenJoiner": "sy"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "Tsy afaka nanokatra ny GitHub",

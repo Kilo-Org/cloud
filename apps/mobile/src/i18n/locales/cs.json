@@ -1892,7 +1892,7 @@
       "costSpoken": "náklady {{cost}}",
       "costSpokenWithTime": "náklady {{cost}}, {{time}}",
       "pullRequest": "PR {{number}}",
-      "spokenJoiner": "a"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub se nepodařilo otevřít",

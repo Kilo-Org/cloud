@@ -1851,7 +1851,7 @@
       "costSpoken": "trošak {{cost}}",
       "costSpokenWithTime": "cena {{cost}}, {{time}}",
       "pullRequest": "zahtev za spajanje {{number}}",
-      "spokenJoiner": "i"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub se ne može otvoriti",

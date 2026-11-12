@@ -1268,7 +1268,7 @@
       "costSpoken": "kosten {{cost}}",
       "costSpokenWithTime": "kosten {{cost}}, {{time}}",
       "pullRequest": "PR {{number}}",
-      "spokenJoiner": "en"
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenMessage": "We konden de installatie van de GitHub-app niet starten. Probeer het opnieuw.",

@@ -196,6 +196,7 @@ vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   FileText: 'FileText',
   Pencil: 'Pencil',
+  Plug: 'Plug',
   Receipt: 'Receipt',
   Users: 'Users',
   Wallet: 'Wallet',

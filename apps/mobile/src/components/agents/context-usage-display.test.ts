@@ -301,13 +301,21 @@ describe('getPillSlotSizers', () => {
     // The cost sizer holds both badge shapes: the four-decimal one below half a
     // cent is the wider of the two, so it is the reserve.
     expect(sizers.cost).toBe(formatSessionCostBadge(4_999));
+  });
+
+  // A badge the pill actually paints fits the width its slot reserved, in both
+  // of the shapes the formatter produces: four decimals below half a cent and
+  // two at or above it.
+  it('holds a painted badge in both of its shapes', () => {
+    const { cost } = getPillSlotSizers();
     for (const painted of [
-      formatSessionCostBadge(4_999),
+      formatSessionCostBadge(500),
       formatSessionCostBadge(20_000),
-      formatSessionCostBadge(12_340_000),
+      formatSessionCostBadge(150_000),
+      formatSessionCostBadge(980_000),
     ]) {
       expect(painted).not.toBeNull();
-      expect((painted ?? '').length).toBeLessThanOrEqual(sizers.cost.length);
+      expect((painted ?? '').length).toBeLessThanOrEqual(cost.length);
     }
   });
 

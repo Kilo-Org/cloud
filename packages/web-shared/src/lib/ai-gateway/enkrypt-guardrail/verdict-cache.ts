@@ -2,14 +2,19 @@ import { createHash } from 'node:crypto';
 import * as z from 'zod';
 import { ENKRYPT_DETECTOR_IDS } from '@kilocode/db/schema-types';
 import {
+  coverageReport,
+  detectorsReport,
   guardrailBlockMessage,
   scanRequest,
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
   type EnkryptGuardrailScanResult,
   type EnkryptGuardrailVerdict,
+  type EnkryptScanContext,
   type EnkryptScanCoverage,
   scanKind,
+  scanLogFields,
+  totalCredits,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import {
   joinSegments,
@@ -30,12 +35,10 @@ import {
   type EnkryptGuardrailReport,
   type EnkryptInputPartScanReport,
   type EnkryptScanReport,
+  type EnkryptSegmentsPart,
   type EnkryptToolScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
-
-/** When false, every request is scanned in full. */
-export const ENKRYPT_VERDICT_CACHE_ENABLED = true;
 
 /**
  * Bump when key derivation or the meaning of a cached verdict changes, for example how detector
@@ -67,7 +70,7 @@ export type EnkryptVerdictCacheStore = {
   ): Promise<unknown>;
 };
 
-export type EnkryptGuardrailRequest = Omit<EnkryptGuardrailScan, 'text' | 'coverage'> & {
+export type EnkryptGuardrailRequest = EnkryptScanContext & {
   parts: RequestScanParts;
 };
 
@@ -134,13 +137,12 @@ function cachedVerdict(
   config: ReadyConfig
 ): EnkryptVerdictCacheEntry['verdict'] | null {
   if (value === 'allow') return 'allow';
-  let parsed: unknown = value;
-  if (typeof value === 'string') {
-    try {
-      parsed = JSON.parse(value);
-    } catch {
-      return null;
-    }
+  if (typeof value !== 'string') return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return null;
   }
   const blocked = cachedBlockVerdictSchema.safeParse(parsed);
   return blocked.success &&
@@ -151,74 +153,77 @@ function cachedVerdict(
 
 type CachedVerdict = EnkryptVerdictCacheEntry['verdict'];
 
+/** The verdict cache of a request, when it is used: with a store and a ready configuration. */
+type VerdictCache = { store: EnkryptVerdictCacheStore; config: ReadyConfig };
+
 /** A unit and its verdict cache key, or null when the cache is not used. */
 type KeyedUnit = ScanUnit & { key: string | null };
 
-/** The cached verdict of each unit, or `off` when the cache is not used or there is nothing to look up. */
-type Lookup = { status: 'off' | 'error' } | { status: 'done'; verdicts: (CachedVerdict | null)[] };
+/** A unit and its cached verdict, or null for none. */
+type LookedUpUnit = KeyedUnit & { verdict: CachedVerdict | null };
 
+function keyedUnits(
+  request: EnkryptScanContext,
+  part: RequestPart,
+  segments: RequestSegment[],
+  cache: VerdictCache | null
+): KeyedUnit[] {
+  return scanUnits(segments).map(unit => ({
+    ...unit,
+    key: cache ? verdictCacheKey(request, cache.config, part, unit.text) : null,
+  }));
+}
+
+/**
+ * The cached verdicts of `units`, by key, looked up in one call, and the cache status: `off` when
+ * the cache is not used or there is nothing to look up. A failed lookup finds no verdict, so every
+ * unit is scanned.
+ */
 async function lookup(
   organizationId: string,
   units: KeyedUnit[],
-  config: EnkryptGuardrailConfig,
-  store: EnkryptVerdictCacheStore | null
-): Promise<Lookup> {
+  cache: VerdictCache | null
+): Promise<{ status: EnkryptScanCoverage['cache']; verdicts: Map<string, CachedVerdict> }> {
+  const verdicts = new Map<string, CachedVerdict>();
   const keys = units.flatMap(unit => (unit.key ? [unit.key] : []));
-  if (!store || config.status !== 'ready' || keys.length === 0) return { status: 'off' };
+  if (!cache || keys.length === 0) return { status: 'off', verdicts };
   try {
-    const values = await store.mget(keys);
-    return {
-      status: 'done',
-      verdicts: keys.map((_, index) => cachedVerdict(values[index], config)),
-    };
+    const values = await cache.store.mget(keys);
+    keys.forEach((key, index) => {
+      const verdict = cachedVerdict(values[index], cache.config);
+      if (verdict) verdicts.set(key, verdict);
+    });
+    return { status: verdicts.size > 0 ? 'hit' : 'miss', verdicts };
   } catch (error) {
     warnExceptInTest('[enkrypt-guardrail] verdict cache lookup failed; scanning in full', {
       organization_id: organizationId,
       error: error instanceof Error ? error.message : String(error),
     });
-    return { status: 'error' };
+    return { status: 'error', verdicts };
   }
 }
 
-function keyedUnits(
-  request: Omit<EnkryptGuardrailRequest, 'parts'>,
-  part: RequestPart,
-  segments: RequestSegment[],
-  store: EnkryptVerdictCacheStore | null
-): KeyedUnit[] {
-  const { config } = request;
-  return scanUnits(segments).map(unit => ({
+function withVerdicts(units: KeyedUnit[], verdicts: Map<string, CachedVerdict>): LookedUpUnit[] {
+  return units.map(unit => ({
     ...unit,
-    key:
-      store && config.status === 'ready' ? verdictCacheKey(request, config, part, unit.text) : null,
+    verdict: unit.key === null ? null : (verdicts.get(unit.key) ?? null),
   }));
 }
 
-function verdictsOf(result: Lookup, count: number): (CachedVerdict | null)[] {
-  return result.status === 'done' ? result.verdicts : Array<null>(count).fill(null);
-}
-
-function cacheStatus(result: Lookup): EnkryptScanCoverage['cache'] {
-  if (result.status !== 'done') return result.status;
-  return result.verdicts.some(verdict => verdict !== null) ? 'hit' : 'miss';
-}
-
-/** The first cached block among `verdicts`, if any. */
-function cachedBlock(
-  verdicts: (CachedVerdict | null)[]
-): Exclude<CachedVerdict, 'allow'> | undefined {
-  return verdicts.find(
-    (verdict): verdict is Exclude<CachedVerdict, 'allow'> => verdict !== null && verdict !== 'allow'
-  );
+/** The first cached block among `units`, if any. */
+function cachedBlock(units: LookedUpUnit[]): Exclude<CachedVerdict, 'allow'> | undefined {
+  for (const { verdict } of units) {
+    if (verdict !== null && verdict !== 'allow') return verdict;
+  }
+  return undefined;
 }
 
 /** The segments whose units all have a cached verdict, and their length joined as in the part. */
 function cachedCoverage(
   rendered: string[],
-  units: KeyedUnit[],
-  verdicts: (CachedVerdict | null)[]
+  units: LookedUpUnit[]
 ): Pick<EnkryptScanCoverage, 'cachedCharacters' | 'cachedSegments'> {
-  const uncached = new Set(units.filter((_, index) => !verdicts[index]).map(unit => unit.segment));
+  const uncached = new Set(units.filter(unit => !unit.verdict).map(unit => unit.segment));
   const cached = rendered.filter((_, index) => !uncached.has(index));
   return { cachedCharacters: joinSegments(cached).length, cachedSegments: cached.length };
 }
@@ -227,12 +232,12 @@ function cachedCoverage(
  * The units without a cached verdict, each once, packed into Enkrypt calls. A unit that appears
  * more than once, such as a repeated message, is scanned once.
  */
-function uncachedCalls(units: KeyedUnit[], verdicts: (CachedVerdict | null)[]): KeyedUnit[][] {
+function uncachedCalls(units: LookedUpUnit[]): KeyedUnit[][] {
   const seen = new Set<string>();
   return packUnits(
-    units.filter((unit, index) => {
+    units.filter(unit => {
       const id = unit.key ?? unit.text;
-      if (verdicts[index] || seen.has(id)) return false;
+      if (unit.verdict || seen.has(id)) return false;
       seen.add(id);
       return true;
     })
@@ -281,11 +286,11 @@ function cacheableVerdict(
 function callCacheEntries(
   calls: KeyedUnit[][],
   results: EnkryptGuardrailScanResult[],
-  config: EnkryptGuardrailConfig
+  cache: VerdictCache | null
 ): EnkryptVerdictCacheEntry[] {
-  if (config.status !== 'ready') return [];
+  if (!cache) return [];
   return calls.flatMap((call, index): EnkryptVerdictCacheEntry[] => {
-    const verdict = cacheableVerdict(required(results[index]), config);
+    const verdict = cacheableVerdict(required(results[index]), cache.config);
     if (verdict === 'allow') {
       return call.flatMap(({ key }) => (key ? [{ key, verdict }] : []));
     }
@@ -306,15 +311,19 @@ function bySeverity<T extends { decision: EnkryptScanReport['decision'] }>(a: T,
   return DECISION_SEVERITY.indexOf(a.decision) - DECISION_SEVERITY.indexOf(b.decision);
 }
 
-function sum(values: number[]): number {
-  return values.reduce((total, value) => total + value, 0);
+function mostSevereDecision(
+  decisions: EnkryptScanReport['decision'][]
+): EnkryptScanReport['decision'] {
+  return DECISION_SEVERITY.find(each => decisions.includes(each)) ?? 'allowed';
 }
 
-function totalCredits(reports: { credits_cost: number | null }[]): number | null {
-  const credits = reports.flatMap(report =>
-    report.credits_cost === null ? [] : [report.credits_cost]
-  );
-  return credits.length === 0 ? null : sum(credits);
+/** The error of the most severe report that failed. */
+function mostSevereError(reports: EnkryptScanReport[]): EnkryptScanReport['error'] {
+  return reports.toSorted(bySeverity).find(report => report.error !== null)?.error ?? null;
+}
+
+function sum(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0);
 }
 
 /**
@@ -322,44 +331,36 @@ function totalCredits(reports: { credits_cost: number | null }[]): number | null
  * unavailable when any chunk's scan is, so a chunk that fails never lets the part through.
  */
 function combineChunks(results: EnkryptGuardrailScanResult[]): EnkryptGuardrailScanResult {
+  const first = required(results[0]);
+  if (results.length === 1) return first;
   const reports = results.map(result => result.report);
-  const [first] = reports;
-  if (!first || reports.length === 1) return required(results[0]);
-  const bySeverest = [...reports].sort(bySeverity);
   return {
     verdict: mostSevereVerdict(results.map(result => result.verdict)),
     usageRecords: results.flatMap(result => result.usageRecords),
     report: {
-      ...first,
+      ...first.report,
       scanned_characters: sum(reports.map(report => report.scanned_characters)),
-      decision: required(bySeverest[0]).decision,
-      error: bySeverest.find(report => report.error !== null)?.error ?? null,
+      decision: mostSevereDecision(reports.map(report => report.decision)),
+      error: mostSevereError(reports),
       detectors_fired: ENKRYPT_DETECTOR_IDS.filter(id =>
         reports.some(report => report.detectors_fired.includes(id))
       ),
       attempts: sum(reports.map(report => report.attempts)),
-      credits_cost: totalCredits(reports),
+      credits_cost: totalCredits(reports.map(report => report.credits_cost)),
       latency_ms: Math.max(...reports.map(report => report.latency_ms)),
     },
   };
 }
 
-function logFields(request: Omit<EnkryptGuardrailRequest, 'parts'>) {
-  return {
-    organization_id: request.organizationId,
-    session_id: request.sessionId,
-    client_request_id: request.clientRequestId,
-    api_kind: request.apiKind,
-  };
-}
-
 /**
  * A part's verdict cache lookup, done before any of the request's scans start: the Enkrypt calls it
- * still needs, and how to turn their results, in the same order, into the part's result.
+ * still needs, and how to turn their results into the part's result.
  */
 type PartPlan = {
   scans: EnkryptGuardrailScan[];
-  finish(results: EnkryptGuardrailScanResult[]): EnkryptCachedScanResult;
+  finish(
+    resultOf: (scan: EnkryptGuardrailScan) => EnkryptGuardrailScanResult
+  ): EnkryptCachedScanResult;
 };
 
 /**
@@ -367,7 +368,7 @@ type PartPlan = {
  * still reports the part, without an Enkrypt call.
  */
 function callScans(
-  request: Omit<EnkryptGuardrailRequest, 'parts'>,
+  request: EnkryptScanContext,
   coverage: EnkryptScanCoverage,
   calls: KeyedUnit[][]
 ): EnkryptGuardrailScan[] {
@@ -387,38 +388,29 @@ function callScans(
  * never cached; see `isCacheableAllow` for log-only scans.
  */
 async function planSegmentsPart(
-  part: 'system' | 'conversation',
+  part: EnkryptSegmentsPart,
   segments: RequestSegment[],
-  request: Omit<EnkryptGuardrailRequest, 'parts'>,
-  store: EnkryptVerdictCacheStore | null
+  request: EnkryptScanContext,
+  cache: VerdictCache | null
 ): Promise<PartPlan> {
-  const { config } = request;
   const rendered = segments.map(renderSegment);
-  const units = keyedUnits(request, part, segments, store);
-  const looked = await lookup(request.organizationId, units, config, store);
-  const verdicts = verdictsOf(looked, units.length);
+  const keyed = keyedUnits(request, part, segments, cache);
+  const { status, verdicts } = await lookup(request.organizationId, keyed, cache);
+  const units = withVerdicts(keyed, verdicts);
   const coverage: EnkryptScanCoverage = {
     part,
-    cache: cacheStatus(looked),
+    cache: status,
     totalCharacters: joinSegments(rendered).length,
     totalSegments: segments.length,
-    ...cachedCoverage(rendered, units, verdicts),
+    ...cachedCoverage(rendered, units),
     omittedAttachments: segments.filter(segment => segment.body === null).length,
   };
-  const block = cachedBlock(verdicts);
-  if (block && config.status === 'ready') {
+  const block = cachedBlock(units);
+  if (block && cache) {
     const { detectors } = block;
     const report: EnkryptInputPartScanReport = {
-      scan: 'blocking',
+      ...coverageReport(cache.config, coverage),
       part,
-      detectors_enabled: ENKRYPT_DETECTOR_IDS.filter(id => config.detectors[id] !== undefined),
-      detectors_blocking: config.blockingDetectors,
-      verdict_cache: 'hit',
-      total_characters: coverage.totalCharacters,
-      total_segments: coverage.totalSegments,
-      cached_characters: coverage.cachedCharacters,
-      cached_segments: coverage.cachedSegments,
-      omitted_attachments: coverage.omittedAttachments,
       scanned_characters: 0,
       decision: 'blocked',
       error: null,
@@ -428,7 +420,7 @@ async function planSegmentsPart(
       latency_ms: 0,
       chunks: 0,
     };
-    console.debug('[enkrypt-guardrail] decision', { ...logFields(request), ...report });
+    console.debug('[enkrypt-guardrail] decision', { ...scanLogFields(request), ...report });
     return {
       scans: [],
       finish: () => ({
@@ -439,15 +431,17 @@ async function planSegmentsPart(
       }),
     };
   }
-  const calls = uncachedCalls(units, verdicts);
+  const calls = uncachedCalls(units);
+  const scans = callScans(request, coverage, calls);
   return {
-    scans: callScans(request, coverage, calls),
-    finish(results) {
+    scans,
+    finish(resultOf) {
+      const results = scans.map(resultOf);
       const result = combineChunks(results);
       return {
         ...result,
         report: { ...result.report, part, chunks: calls.length },
-        cacheEntries: callCacheEntries(calls, results, config),
+        cacheEntries: callCacheEntries(calls, results, cache),
       };
     },
   };
@@ -502,7 +496,6 @@ function flaggedTool({
 }
 
 function toolsReport(
-  kind: EnkryptToolScanReport['scan'],
   config: EnkryptGuardrailConfig,
   cache: EnkryptToolScanReport['verdict_cache'],
   outcomes: ToolOutcome[]
@@ -512,19 +505,10 @@ function toolsReport(
     outcome.kind === 'scanned' ? [outcome.result.report] : []
   );
   const flagged = outcomes.flatMap(each => flaggedTool(each) ?? []).sort(bySeverity);
-  const decisions = [
-    ...reports.map(report => report.decision),
-    ...flagged.map(each => each.decision),
-  ];
-  const decision = DECISION_SEVERITY.find(each => decisions.includes(each)) ?? 'allowed';
   return {
-    scan: kind,
+    scan: scanKind(config),
     part: 'tools',
-    detectors_enabled:
-      config.status === 'ready'
-        ? ENKRYPT_DETECTOR_IDS.filter(id => config.detectors[id] !== undefined)
-        : [],
-    detectors_blocking: config.status === 'ready' ? config.blockingDetectors : [],
+    ...detectorsReport(config),
     verdict_cache: cache,
     tools_total: outcomes.length,
     tools_cached: cached.length,
@@ -535,13 +519,16 @@ function toolsReport(
       sum(cached.map(each => each.characters)) +
       sum(reports.map(report => report.cached_characters)),
     scanned_characters: sum(reports.map(report => report.scanned_characters)),
-    decision,
-    error: [...reports].sort(bySeverity).find(report => report.error !== null)?.error ?? null,
+    decision: mostSevereDecision([
+      ...reports.map(report => report.decision),
+      ...flagged.map(each => each.decision),
+    ]),
+    error: mostSevereError(reports),
     detectors_fired: ENKRYPT_DETECTOR_IDS.filter(id =>
       flagged.some(each => each.detectors_fired.includes(id))
     ),
     attempts: sum(reports.map(report => report.attempts)),
-    credits_cost: totalCredits(reports),
+    credits_cost: totalCredits(reports.map(report => report.credits_cost)),
     latency_ms: reports.reduce((latest, report) => Math.max(latest, report.latency_ms), 0),
     flagged_tools: flagged.slice(0, MAX_REPORTED_FLAGGED_TOOLS).map(each => ({
       kind: each.kind,
@@ -553,9 +540,10 @@ function toolsReport(
 }
 
 /** A tool's cached verdict, or the calls that scan its uncached segments. */
-type ToolPlan =
+type ToolPlan = { tool: RequestToolDefinition; characters: number } & (
   | { verdict: CachedVerdict }
-  | { calls: KeyedUnit[][]; scans: EnkryptGuardrailScan[] };
+  | { calls: KeyedUnit[][]; scans: EnkryptGuardrailScan[] }
+);
 
 /**
  * Plans the tool definitions and response formats. Each segment of each is cached on its own, as
@@ -568,56 +556,64 @@ type ToolPlan =
  */
 async function planTools(
   tools: RequestToolDefinition[],
-  request: Omit<EnkryptGuardrailRequest, 'parts'>,
-  store: EnkryptVerdictCacheStore | null
+  request: EnkryptScanContext,
+  cache: VerdictCache | null
 ): Promise<PartPlan> {
   const { config } = request;
-  const texts = tools.map(tool => joinSegments(tool.segments.map(renderSegment)));
-  const toolUnits = tools.map(tool => keyedUnits(request, 'tools', tool.segments, store));
-  const looked = await lookup(request.organizationId, toolUnits.flat(), config, store);
-  const allVerdicts = verdictsOf(looked, toolUnits.flat().length);
-  const cache = cacheStatus(looked);
-  let offset = 0;
-  const plans = toolUnits.map((units, index): ToolPlan => {
-    const verdicts = allVerdicts.slice(offset, (offset += units.length));
-    const block = cachedBlock(verdicts);
-    if (block) return { verdict: block };
-    if (verdicts.every(verdict => verdict === 'allow')) return { verdict: 'allow' };
-    const calls = uncachedCalls(units, verdicts);
+  const toolUnits = tools.map(tool => ({
+    tool,
+    rendered: tool.segments.map(renderSegment),
+    units: keyedUnits(request, 'tools', tool.segments, cache),
+  }));
+  const { status, verdicts } = await lookup(
+    request.organizationId,
+    toolUnits.flatMap(each => each.units),
+    cache
+  );
+  const plans = toolUnits.map(({ tool, rendered, units: keyed }): ToolPlan => {
+    const characters = joinSegments(rendered).length;
+    const units = withVerdicts(keyed, verdicts);
+    const block = cachedBlock(units);
+    if (block) return { tool, characters, verdict: block };
+    if (units.every(unit => unit.verdict === 'allow')) {
+      return { tool, characters, verdict: 'allow' };
+    }
+    const calls = uncachedCalls(units);
     const coverage: EnkryptScanCoverage = {
       part: 'tools',
-      cache,
-      totalCharacters: texts[index]?.length ?? 0,
-      totalSegments: required(tools[index]).segments.length,
-      ...cachedCoverage(required(tools[index]).segments.map(renderSegment), units, verdicts),
+      cache: status,
+      totalCharacters: characters,
+      totalSegments: tool.segments.length,
+      ...cachedCoverage(rendered, units),
       omittedAttachments: 0,
     };
-    return { calls, scans: callScans(request, coverage, calls) };
+    return { tool, characters, calls, scans: callScans(request, coverage, calls) };
   });
   return {
     scans: plans.flatMap(plan => ('scans' in plan ? plan.scans : [])),
-    finish(results) {
-      let scanned = 0;
-      const outcomes = tools.map((tool, index): ToolOutcome => {
-        const characters = texts[index]?.length ?? 0;
-        const plan = required(plans[index]);
+    finish(resultOf) {
+      const outcomes = plans.map((plan): ToolOutcome => {
+        const { tool, characters } = plan;
         if ('verdict' in plan) {
           return { tool, characters, outcome: { kind: 'cached', verdict: plan.verdict } };
         }
-        const callResults = results.slice(scanned, (scanned += plan.scans.length));
+        const results = plan.scans.map(resultOf);
         return {
           tool,
           characters,
           outcome: {
             kind: 'scanned',
-            result: combineChunks(callResults),
-            cacheEntries: callCacheEntries(plan.calls, callResults, config),
+            result: combineChunks(results),
+            cacheEntries: callCacheEntries(plan.calls, results, cache),
           },
         };
       });
-      const report = toolsReport(scanKind(config), config, cache, outcomes);
+      const report = toolsReport(config, status, outcomes);
       if (report.tools_cached > 0) {
-        console.debug('[enkrypt-guardrail] tool definitions', { ...logFields(request), ...report });
+        console.debug('[enkrypt-guardrail] tool definitions', {
+          ...scanLogFields(request),
+          ...report,
+        });
       }
       return {
         verdict: mostSevereVerdict(
@@ -663,19 +659,20 @@ export async function scanRequestWithVerdictCache(
     ...deps,
     deadline: deps.deadline ?? AbortSignal.timeout(deps.timeoutMs),
   };
+  const { config } = request;
+  const cache = store && config.status === 'ready' ? { store, config } : null;
   const plans = await Promise.all([
-    ...(parts.tools.length > 0 ? [planTools(parts.tools, request, store)] : []),
-    ...(parts.system.length > 0 ? [planSegmentsPart('system', parts.system, request, store)] : []),
-    planSegmentsPart('conversation', parts.conversation, request, store),
+    ...(parts.tools.length > 0 ? [planTools(parts.tools, request, cache)] : []),
+    ...(parts.system.length > 0 ? [planSegmentsPart('system', parts.system, request, cache)] : []),
+    planSegmentsPart('conversation', parts.conversation, request, cache),
   ]);
-  const started = new Map<EnkryptGuardrailScan, Promise<EnkryptGuardrailScanResult>>();
   const byLength = plans.flatMap(plan => plan.scans).sort((a, b) => b.text.length - a.text.length);
-  for (const scan of byLength) started.set(scan, scanRequest(scan, scanDeps));
-  return Promise.all(
-    plans.map(async plan =>
-      plan.finish(await Promise.all(plan.scans.map(scan => required(started.get(scan)))))
+  const results = new Map(
+    await Promise.all(
+      byLength.map(async scan => [scan, await scanRequest(scan, scanDeps)] as const)
     )
   );
+  return plans.map(plan => plan.finish(scan => required(results.get(scan))));
 }
 
 export async function rememberRequestVerdict(

@@ -3,9 +3,9 @@ import {
   createEnkryptCallLimiter,
   ENKRYPT_MAX_CONCURRENT_CALLS,
   type EnkryptCallLimiter,
-  type EnkryptCallPriority,
   type EnkryptCallSlot,
 } from './call-limiter';
+import type { EnkryptScanKind } from './report';
 
 const signal = new AbortController().signal;
 
@@ -18,7 +18,7 @@ function track(
   limiter: EnkryptCallLimiter,
   granted: string[],
   label: string,
-  priority: EnkryptCallPriority,
+  priority: EnkryptScanKind,
   acquireSignal: AbortSignal = signal
 ): Promise<EnkryptCallSlot | null> {
   return limiter.acquire(priority, acquireSignal).then(slot => {

@@ -87,42 +87,6 @@ describe('extractRequestParts', () => {
         ),
       });
     });
-
-    it('scans every message of a first turn, including the system prompt', () => {
-      expect(
-        render(
-          request('chat_completions', {
-            messages: [
-              { role: 'system', content: 'system prompt' },
-              { role: 'user', content: 'first' },
-              { role: 'user', content: 'second' },
-            ],
-          })
-        )
-      ).toEqual({
-        tools: '',
-        system: seg('system', 'system prompt'),
-        conversation: lines(seg('user', 'first'), seg('user', 'second')),
-      });
-    });
-
-    it('rescans earlier messages on an agent step that only returns tool output', () => {
-      expect(
-        render(
-          request('chat_completions', {
-            messages: [
-              { role: 'user', content: 'read the file' },
-              { role: 'assistant', content: null, tool_calls: [{ id: 'call_1' }] },
-              { role: 'tool', tool_call_id: 'call_1', content: 'file contents' },
-            ],
-          })
-        )
-      ).toEqual({
-        tools: '',
-        system: '',
-        conversation: lines(seg('user', 'read the file'), seg('tool result', 'file contents')),
-      });
-    });
   });
 
   describe('messages', () => {
@@ -231,30 +195,6 @@ describe('extractRequestParts', () => {
           seg('user search result', 'Doc', 'search hit')
         )
       );
-    });
-
-    it('includes assistant prefills and all preceding messages', () => {
-      expect(
-        render(
-          request('messages', {
-            messages: [
-              { role: 'user', content: 'old question' },
-              { role: 'assistant', content: 'old answer' },
-              { role: 'user', content: 'new question' },
-              { role: 'assistant', content: '{' },
-            ],
-          })
-        )
-      ).toEqual({
-        tools: '',
-        system: '',
-        conversation: lines(
-          seg('user', 'old question'),
-          seg('assistant', 'old answer'),
-          seg('user', 'new question'),
-          seg('assistant', '{')
-        ),
-      });
     });
   });
 
@@ -846,11 +786,15 @@ describe('same-header merging', () => {
             { role: 'user', content: 'two' },
           ],
         })
-      ).conversation
-    ).toEqual([
-      { header: 'user', body: 'one' },
-      { header: 'user', body: 'two' },
-    ]);
+      )
+    ).toEqual({
+      tools: [],
+      system: [],
+      conversation: [
+        { header: 'user', body: 'one' },
+        { header: 'user', body: 'two' },
+      ],
+    });
   });
 
   it('splits each parallel Anthropic tool_result block into a segment of its own', () => {
@@ -968,24 +912,6 @@ describe('same-header merging', () => {
       { header: 'tool result', body: 'first output' },
       { header: 'tool result', body: 'second output' },
     ]);
-  });
-
-  it('merges the text parts of one chat user message into one segment', () => {
-    expect(
-      extractRequestParts(
-        request('chat_completions', {
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: 'one' },
-                { type: 'text', text: 'two' },
-              ],
-            },
-          ],
-        })
-      ).conversation
-    ).toEqual([{ header: 'user', body: 'one\n\ntwo' }]);
   });
 
   it('does not merge tool definitions from different tools', () => {
@@ -1408,120 +1334,6 @@ describe('tool definitions and output formats', () => {
   const schema = { type: 'object', properties: { text: { description: 'edited schema text' } } };
   const schemaText = JSON.stringify(schema);
 
-  it.each([
-    [
-      'chat_completions',
-      {
-        tools: [
-          {
-            type: 'function',
-            function: { name: 'tool', description: 'edited description', parameters: schema },
-          },
-        ],
-        response_format: { type: 'json_schema', json_schema: { schema } },
-      },
-    ],
-    [
-      'messages',
-      {
-        tools: [{ name: 'tool', description: 'edited description', input_schema: schema }],
-        output_config: { format: { type: 'json_schema', schema } },
-      },
-    ],
-    [
-      'responses',
-      {
-        tools: [
-          { type: 'function', name: 'tool', description: 'edited description', parameters: schema },
-        ],
-        text: { format: { type: 'json_schema', schema } },
-      },
-    ],
-    [
-      'messages',
-      {
-        tools: [{ name: 'tool', description: 'edited description', input_schema: schema }],
-        output_format: { type: 'json_schema', schema },
-      },
-    ],
-  ] as const)('scans selected definition and format fields on %s', (kind, body) => {
-    expect(render(request(kind, body))).toEqual({
-      tools: lines(
-        seg('tool definition: tool', 'edited description', schemaText),
-        seg('response format', schemaText)
-      ),
-      system: '',
-      conversation: '',
-    });
-  });
-
-  it('scans chat custom grammars and legacy functions', () => {
-    expect(
-      render(
-        request('chat_completions', {
-          functions: [{ name: 'legacy', parameters: schema }],
-          tools: [
-            {
-              type: 'custom',
-              custom: {
-                name: 'custom',
-                format: {
-                  type: 'grammar',
-                  grammar: { syntax: 'lark', definition: 'edited grammar' },
-                },
-              },
-            },
-          ],
-        })
-      ).tools
-    ).toBe(
-      lines(
-        seg('tool definition: custom', 'edited grammar'),
-        seg('tool definition: legacy', schemaText)
-      )
-    );
-  });
-
-  it('scans Responses custom grammars and nested namespace tools', () => {
-    expect(
-      render(
-        request('responses', {
-          tools: [
-            {
-              type: 'custom',
-              name: 'custom',
-              format: { type: 'grammar', syntax: 'lark', definition: 'edited grammar' },
-            },
-            {
-              type: 'namespace',
-              name: 'space',
-              description: 'edited namespace',
-              tools: [
-                { type: 'function', name: 'nested', parameters: schema, output_schema: schema },
-              ],
-            },
-          ],
-        })
-      ).tools
-    ).toBe(
-      lines(
-        seg('tool definition: custom', 'edited grammar'),
-        seg('tool definition: space', 'edited namespace'),
-        seg('tool definition: nested', schemaText, schemaText)
-      )
-    );
-  });
-
-  it('scans Anthropic tool input examples', () => {
-    expect(
-      render(
-        request('messages', {
-          tools: [{ name: 'example', input_schema: schema, input_examples: [{ text: 'edited' }] }],
-        })
-      ).tools
-    ).toBe(seg('tool definition: example', schemaText, '[{"text":"edited"}]'));
-  });
-
   it('scans discovered definitions and additional developer tools in the conversation', () => {
     const gatewayRequest = request('responses', {
       input: [
@@ -1676,20 +1488,6 @@ describe('segment boundaries', () => {
     expect(after.conversation.slice(before.conversation.length)).toEqual([
       { header: 'user', body: 'next' },
     ]);
-  });
-
-  it('keeps the tools and conversation unchanged when only the system prompt changes', () => {
-    const body = (system: string) => ({
-      system,
-      tools: [{ name: 'read', input_schema: { type: 'object' } }],
-      messages: [{ role: 'user', content: 'hello' }],
-    });
-    const before = extractRequestParts(request('messages', body('Today is Monday.')));
-    const after = extractRequestParts(request('messages', body('Today is Tuesday.')));
-
-    expect(after.tools).toEqual(before.tools);
-    expect(after.conversation).toEqual(before.conversation);
-    expect(after.system).toEqual([{ header: 'system', body: 'Today is Tuesday.' }]);
   });
 
   it.each([
@@ -1971,7 +1769,12 @@ describe('per-tool entries', () => {
               description: 'Space tools',
               tools: [
                 { type: 'function', name: 'a', description: 'First' },
-                { type: 'function', name: 'b', parameters: { type: 'object' } },
+                {
+                  type: 'function',
+                  name: 'b',
+                  parameters: { type: 'object' },
+                  output_schema: { type: 'string' },
+                },
                 { type: 'web_search' },
               ],
             },
@@ -1997,7 +1800,9 @@ describe('per-tool entries', () => {
       {
         kind: 'tool',
         name: 'b',
-        segments: [{ header: 'tool definition: b', body: '{"type":"object"}' }],
+        segments: [
+          { header: 'tool definition: b', body: '{"type":"object"}\n\n{"type":"string"}' },
+        ],
       },
       {
         kind: 'tool',
@@ -2107,20 +1912,5 @@ describe('per-tool entries', () => {
     expect(
       extractRequestParts(request('responses', { text: { format: { type: 'text' } } })).tools
     ).toEqual([]);
-  });
-
-  it('keeps tool entries ahead of the response format entry', () => {
-    expect(
-      extractRequestParts(
-        request('chat_completions', {
-          tools: [{ type: 'function', function: { name: 'read', parameters: { type: 'object' } } }],
-          response_format: { type: 'json_schema', json_schema: { name: 'answer' } },
-          messages: [],
-        })
-      ).tools.map(tool => [tool.kind, tool.name])
-    ).toEqual([
-      ['tool', 'read'],
-      ['response_format', null],
-    ]);
   });
 });

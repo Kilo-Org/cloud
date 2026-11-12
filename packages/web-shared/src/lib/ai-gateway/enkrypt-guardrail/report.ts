@@ -40,9 +40,34 @@ const ScanDecisionSchema = z.enum([
 
 const VerdictCacheSchema = z.enum(['off', 'miss', 'hit', 'error']);
 
+/**
+ * A `log_only` scan has no detector that can block, so the request does not wait for it and its
+ * failures are only logged: the request is never rejected because of it.
+ */
+export const EnkryptScanKindSchema = z.enum(['blocking', 'log_only']);
+
+export type EnkryptScanKind = z.infer<typeof EnkryptScanKindSchema>;
+
+/**
+ * What a scan covers: one of the request's tool definitions or response formats, its system
+ * prompt, its conversation, or the model's response.
+ */
+export const EnkryptScanPartSchema = z.enum(['tools', 'system', 'conversation', 'response']);
+
+export type EnkryptScanPart = z.infer<typeof EnkryptScanPartSchema>;
+
+const SegmentsPartSchema = EnkryptScanPartSchema.extract(['system', 'conversation']);
+
+/** A part whose segments are packed into chunks: the system prompt or the conversation. */
+export type EnkryptSegmentsPart = z.infer<typeof SegmentsPartSchema>;
+
+const UnavailableReasonSchema = z.enum(['transient', 'timeout', 'failed']);
+
+export type EnkryptUnavailableReason = z.infer<typeof UnavailableReasonSchema>;
+
 /** Fields shared by a single scan and the aggregate of a request's tool definition scans. */
 const scanOutcomeShape = {
-  scan: z.enum(['blocking', 'log_only']),
+  scan: EnkryptScanKindSchema,
   detectors_enabled: z.array(DetectorIdSchema),
   detectors_blocking: z.array(DetectorIdSchema),
   verdict_cache: VerdictCacheSchema,
@@ -68,9 +93,9 @@ const scanOutcomeShape = {
  * tool definitions, its system prompt, its conversation, or the model's response, or one chunk of
  * them.
  */
-export const EnkryptScanReportSchema = z.object({
+const EnkryptScanReportSchema = z.object({
   ...scanOutcomeShape,
-  part: z.enum(['tools', 'system', 'conversation', 'response']),
+  part: EnkryptScanPartSchema,
   total_segments: z.number(),
   cached_segments: z.number(),
   /** Attachments, such as images, sent to Enkrypt only as an omission marker. */
@@ -99,7 +124,7 @@ export type EnkryptFlaggedTool = z.infer<typeof FlaggedToolSchema>;
  * one segment. The decision and error are those of the most severe tool. Characters, calls, and
  * credits are summed; the latency runs until the last tool's scan finished.
  */
-export const EnkryptToolScanReportSchema = z.object({
+const EnkryptToolScanReportSchema = z.object({
   ...scanOutcomeShape,
   part: z.literal('tools'),
   tools_total: z.number(),
@@ -119,7 +144,10 @@ export type EnkryptToolScanReport = z.infer<typeof EnkryptToolScanReportSchema>;
 
 const VerdictCacheWriteSchema = z.enum(['written', 'failed', 'skipped']);
 
-/** The verdict cache write of a scan: for tool definitions, `failed` if any write failed, else `written` if any was written. */
+/**
+ * The verdict cache writes of a scan, one per cached segment or slice: `failed` if any write failed,
+ * else `written` if any was written, else `skipped`.
+ */
 const verdictCacheWriteShape = { verdict_cache_write: VerdictCacheWriteSchema };
 
 /**
@@ -130,20 +158,20 @@ const verdictCacheWriteShape = { verdict_cache_write: VerdictCacheWriteSchema };
  * Characters, calls, and credits are summed; the latency runs until the last chunk's scan finished.
  */
 const EnkryptSegmentsScanReportSchema = EnkryptScanReportSchema.extend({
-  part: z.enum(['system', 'conversation']),
+  part: SegmentsPartSchema,
   /** Chunks the uncached segments were packed into, so 0 when the cache covered all of them. */
   chunks: z.number(),
 });
 
 /** A scan of the input guardrail: the aggregate of the tool definitions, the system prompt, or the conversation. */
-export const EnkryptInputScanReportSchema = z.union([
+const EnkryptInputScanReportSchema = z.union([
   EnkryptToolScanReportSchema.extend(verdictCacheWriteShape),
   EnkryptSegmentsScanReportSchema.extend(verdictCacheWriteShape),
 ]);
 
 export type EnkryptInputScanReport = z.infer<typeof EnkryptInputScanReportSchema>;
 
-export type EnkryptSegmentsScanReport = z.infer<typeof EnkryptSegmentsScanReportSchema>;
+type EnkryptSegmentsScanReport = z.infer<typeof EnkryptSegmentsScanReportSchema>;
 
 /** An input guardrail scan before its verdict cache write is known. */
 export type EnkryptInputPartScanReport = EnkryptToolScanReport | EnkryptSegmentsScanReport;
@@ -157,13 +185,20 @@ export const EnkryptGuardrailReportSchema = z.object({
   settings: GuardrailSettingsSchema.nullable(),
   /** The verdict the request acted on; `skip` when no blocking detector gated it. */
   verdict: z.enum(['skip', 'allow', 'block', 'unavailable']),
-  unavailable_reason: z.enum(['transient', 'timeout', 'failed']).nullable(),
+  unavailable_reason: UnavailableReasonSchema.nullable(),
   /** How long the request waited for the verdict, or null when it never waited. */
   added_latency_ms: z.number().nullable(),
   scans: z.array(EnkryptInputScanReportSchema),
 });
 
 export type EnkryptGuardrailReport = z.infer<typeof EnkryptGuardrailReportSchema>;
+
+/** A scan of the output guardrail, which scans the whole response. */
+const EnkryptOutputScanReportSchema = EnkryptScanReportSchema.extend({
+  part: z.literal('response'),
+});
+
+export type EnkryptOutputScanReport = z.infer<typeof EnkryptOutputScanReportSchema>;
 
 /**
  * What the output guardrail did for one response. Holds settings, sizes, timings, and outcomes
@@ -186,10 +221,10 @@ export const EnkryptOutputGuardrailReportSchema = z.object({
     .nullable(),
   /** The verdict the response acted on; `skip` when no blocking detector gated it. */
   verdict: z.enum(['skip', 'allow', 'block', 'unavailable']),
-  unavailable_reason: z.enum(['transient', 'timeout', 'failed']).nullable(),
+  unavailable_reason: UnavailableReasonSchema.nullable(),
   /** How long the held-back response waited for the verdict after the upstream response ended. */
   added_latency_ms: z.number().nullable(),
-  scans: z.array(EnkryptScanReportSchema),
+  scans: z.array(EnkryptOutputScanReportSchema),
 });
 
 export type EnkryptOutputGuardrailReport = z.infer<typeof EnkryptOutputGuardrailReportSchema>;

@@ -6,9 +6,11 @@ import {
 
 /**
  * Reads AI provider metadata objects (see `KiloRoutingDecisionRecordSchema`) for display. Older
- * objects lack fields added later, so every part is optional and an unreadable entry drops only
- * itself. Unknown keys are stripped, which keeps provider response IDs and client session IDs off
- * the page; this includes the gateway's `vercel` metadata object.
+ * objects lack fields added later, so a missing or unreadable top-level field reads as null, an
+ * unreadable step or BYOK candidate drops only itself, and an Enkrypt report that does not match
+ * the current report shape is dropped whole. Unknown keys are stripped, which keeps provider
+ * response IDs and client session IDs off the page; this includes the gateway's `vercel` metadata
+ * object.
  */
 function lenientArray<T extends z.ZodType>(item: T) {
   return z
@@ -69,26 +71,17 @@ const RoutingResultSchema = z.object({
 export type RequestLogRoutingResult = z.infer<typeof RoutingResultSchema>;
 
 const AiProviderMetadataRecordSchema = z.object({
-  requested_model: optionalString,
-  api_kind: optionalString,
-  owner_type: optionalString,
+  requested_model: z.string().nullable().catch(null),
+  api_kind: z.string().nullable().catch(null),
+  owner_type: z.string().nullable().catch(null),
   steps: lenientArray(RoutingStepSchema),
   byok_candidates: lenientArray(ByokCandidateSchema),
-  result: RoutingResultSchema.nullable().catch(null).default(null),
-  enkrypt: EnkryptGuardrailReportSchema.optional().catch(undefined),
-  enkrypt_output: EnkryptOutputGuardrailReportSchema.optional().catch(undefined),
+  result: RoutingResultSchema.nullable().catch(null),
+  enkrypt: EnkryptGuardrailReportSchema.nullable().catch(null),
+  enkrypt_output: EnkryptOutputGuardrailReportSchema.nullable().catch(null),
 });
 
-export type RequestLogRoutingDetails = {
-  requested_model: string | null;
-  api_kind: string | null;
-  owner_type: string | null;
-  steps: RequestLogRoutingStep[];
-  byok_candidates: RequestLogByokCandidate[];
-  result: RequestLogRoutingResult | null;
-  enkrypt: z.infer<typeof EnkryptGuardrailReportSchema> | null;
-  enkrypt_output: z.infer<typeof EnkryptOutputGuardrailReportSchema> | null;
-};
+export type RequestLogRoutingDetails = z.infer<typeof AiProviderMetadataRecordSchema>;
 
 export type RequestLogNotSentReason =
   | 'enkrypt-block'
@@ -128,16 +121,5 @@ export function parseRoutingDetails(body: string): RequestLogRoutingDetails | nu
     return null;
   }
   const parsed = AiProviderMetadataRecordSchema.safeParse(json);
-  if (!parsed.success) return null;
-  const record = parsed.data;
-  return {
-    requested_model: record.requested_model ?? null,
-    api_kind: record.api_kind ?? null,
-    owner_type: record.owner_type ?? null,
-    steps: record.steps,
-    byok_candidates: record.byok_candidates,
-    result: record.result,
-    enkrypt: record.enkrypt ?? null,
-    enkrypt_output: record.enkrypt_output ?? null,
-  };
+  return parsed.success ? parsed.data : null;
 }

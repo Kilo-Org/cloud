@@ -32,6 +32,11 @@ function compareByOpenRouterModelId(a: VercelModelIdOverride, b: VercelModelIdOv
       : 0;
 }
 
+/** Free and paid models share a canonical ID, so they are indexed apart and never paired. */
+function canonicalIndexKey(canonicalId: string, modelId: string) {
+  return `${isFreeVariant(modelId) ? 'free' : 'paid'}:${canonicalId}`;
+}
+
 function indexIdsByCanonicalId(
   entry: unknown,
   providerId: string,
@@ -45,12 +50,9 @@ function indexIdsByCanonicalId(
 
   for (const model of Object.values(provider.data.models)) {
     if (!model.canonical_model_id) continue;
-    if (isFreeVariant(model.id)) continue;
     if (!availableModelIds.has(model.id)) continue;
-    index.set(
-      model.canonical_model_id,
-      preferredModelId(index.get(model.canonical_model_id), model.id)
-    );
+    const key = canonicalIndexKey(model.canonical_model_id, model.id);
+    index.set(key, preferredModelId(index.get(key), model.id));
   }
   return index;
 }
@@ -84,8 +86,8 @@ export function buildVercelModelIdOverrides(params: {
   const legacyOpenRouterModelIds = new Set(Object.keys(LEGACY_OPENROUTER_MODEL_ID_OVERRIDES));
 
   const generatedOverrides: VercelModelIdOverride[] = [];
-  for (const [canonicalId, openrouterModelId] of openrouterByCanonicalId) {
-    const vercelModelId = vercelByCanonicalId.get(canonicalId);
+  for (const [indexKey, openrouterModelId] of openrouterByCanonicalId) {
+    const vercelModelId = vercelByCanonicalId.get(indexKey);
     if (!vercelModelId) continue;
     if (openrouterModelId === vercelModelId) continue;
     if (mapResolvedModelIdToVercelWithoutOverrides(openrouterModelId) === vercelModelId) continue;

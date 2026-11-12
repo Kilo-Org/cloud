@@ -163,6 +163,28 @@ describe('findVercelOnlyModels', () => {
     expect(ids(models)).not.toContain('openai/gpt-5-fast');
   });
 
+  it('treats a Vercel free model a free override points to as covered', () => {
+    const models = findVercelOnlyModels({
+      openRouterModelIds: ['reflection/beam:free'],
+      vercelMetadata,
+      overrides: new Map([['reflection/beam:free', 'reflection/beam-free']]),
+    });
+
+    expect(ids(models)).not.toContain('reflection/beam-free');
+    expect(ids(models)).not.toContain('reflection/beam:free');
+  });
+
+  it('lists a Vercel free model under its free override id when OpenRouter dropped that id', () => {
+    const models = findVercelOnlyModels({
+      openRouterModelIds: [],
+      vercelMetadata,
+      overrides: new Map([['reflection/beam:free', 'reflection/beam-free']]),
+    });
+
+    expect(ids(models)).toContain('reflection/beam:free');
+    expect(ids(models)).not.toContain('reflection/beam-free');
+  });
+
   it('skips ids with uppercase letters, which the proxy cannot route', () => {
     const models = findVercelOnlyModels({
       openRouterModelIds: [],

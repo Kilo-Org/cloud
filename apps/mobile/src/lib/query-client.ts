@@ -201,12 +201,8 @@ function queryKeyInput(queryKey: unknown): QueryKeyInput | undefined {
  * Drops a permission-denied query from the cache so the next persister save
  * omits it. An org-scoped query is cleared by its org prefix (procedure path +
  * `input.organizationId`), which also covers every sibling variant of that
- * procedure for the same org; a non-org query is cleared by its exact key.
- *
- * A query something still observes cannot be removed: its screen would rebuild
- * it on the next render and refetch straight into the same denial. It keeps its
- * place in the cache and loses its payload instead, so no denied row keeps
- * rendering and the next save still omits it.
+ * procedure for the same org; a non-org query is cleared by its exact key. An
+ * observed query keeps its slot: its screen would rebuild and refetch it.
  */
 function dropPermissionDeniedQuery(
   queryClient: QueryClient,

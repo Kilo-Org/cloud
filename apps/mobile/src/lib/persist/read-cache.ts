@@ -221,8 +221,8 @@ const ALLOWED_PROCEDURES: readonly AllowedProcedure[] = [
   },
 ];
 
-/** The allowlist entry that admits this query key, or undefined. */
-function admittedProcedure(queryKey: unknown): AllowedProcedure | undefined {
+/** The allowlist entry for this query path, or undefined. */
+function allowedProcedureFor(queryKey: unknown): AllowedProcedure | undefined {
   if (!Array.isArray(queryKey) || queryKey.length < 2) {
     return undefined;
   }
@@ -233,8 +233,16 @@ function admittedProcedure(queryKey: unknown): AllowedProcedure | undefined {
     return undefined;
   }
   const path = segments.join('.');
-  const allowed = ALLOWED_PROCEDURES.find(procedure => procedure.path === path);
-  return allowed?.isAllowedInput(queryKey[1]) ? allowed : undefined;
+  return ALLOWED_PROCEDURES.find(procedure => procedure.path === path);
+}
+
+/** The allowlist entry that admits this query key and its input, or undefined. */
+function admittedProcedure(queryKey: unknown): AllowedProcedure | undefined {
+  const allowed = allowedProcedureFor(queryKey);
+  if (!allowed || !Array.isArray(queryKey)) {
+    return undefined;
+  }
+  return allowed.isAllowedInput(queryKey[1]) ? allowed : undefined;
 }
 
 /**
@@ -247,34 +255,60 @@ export function isReadCacheAllowedKey(queryKey: unknown): boolean {
 }
 
 /**
- * True when a snapshot of this query may enter — or leave — the persisted
- * cache: an allowlisted key whose payload the entry accepts, and, for an
- * allowlisted infinite query, the first page only. The tRPC adapter strips
- * `cursor`/`direction` from infinite-query keys, so every loaded page shares
- * the same key and only the loaded data can prove the snapshot is the first
- * page.
+ * True when the payload holds no more than the first page. The tRPC adapter
+ * strips `cursor`/`direction` from infinite-query keys, so every loaded page
+ * shares the same key and only the loaded data can prove the snapshot is the
+ * first page.
  */
-function isPersistableSnapshot(
+function holdsFirstPageOnly(queryKey: unknown, data: unknown): boolean {
+  // The allowlist guarantees an array key with a meta segment.
+  const meta = (queryKey as readonly unknown[])[1] as { type?: unknown } | null | undefined;
+  if (meta?.type !== 'infinite') {
+    return true;
+  }
+  const page = data as { pageParams?: unknown[] } | undefined;
+  return (page?.pageParams?.length ?? 1) <= 1;
+}
+
+/** True when the snapshot passes the entry's payload rule and holds the first page only. */
+function snapshotAllowed(
+  lookup: (queryKey: unknown) => AllowedProcedure | undefined,
   queryKey: unknown,
   state: { status: string; data: unknown }
 ): boolean {
   if (state.status !== 'success') {
     return false;
   }
-  const allowed = admittedProcedure(queryKey);
-  if (!allowed) {
-    return false;
-  }
-  if (allowed.isAllowedPayload && !allowed.isAllowedPayload(state.data)) {
-    return false;
-  }
-  // The allowlist guarantees an array key with a meta segment.
-  const meta = (queryKey as readonly unknown[])[1] as { type?: unknown } | null | undefined;
-  if (meta?.type !== 'infinite') {
-    return true;
-  }
-  const data = state.data as { pageParams?: unknown[] } | undefined;
-  return (data?.pageParams?.length ?? 1) <= 1;
+  const allowed = lookup(queryKey);
+  return (
+    allowed !== undefined &&
+    (allowed.isAllowedPayload === undefined || allowed.isAllowedPayload(state.data)) &&
+    holdsFirstPageOnly(queryKey, state.data)
+  );
+}
+
+/**
+ * True when a snapshot of this query may enter the persisted cache: an
+ * allowlisted key whose input and payload the entry accepts, holding the first
+ * page only.
+ */
+function isPersistableSnapshot(
+  queryKey: unknown,
+  state: { status: string; data: unknown }
+): boolean {
+  return snapshotAllowed(admittedProcedure, queryKey, state);
+}
+
+/**
+ * True when a stored snapshot may hydrate. The restore checks the query path
+ * and the payload rule; the input shape was validated when the entry was
+ * written, and serialization drops `undefined` fields.
+ */
+function isRestorableSnapshot(
+  queryKey: unknown,
+  state: { status: string; data: unknown }
+): boolean {
+  return snapshotAllowed(allowedProcedureFor, queryKey, state);
 }
 
 /** Persist only successful queries whose snapshot this build restores. */
@@ -352,13 +386,13 @@ let coldStartGeneration = 0;
 let coldStartRestoredScope: string | null = null;
 
 /**
- * Drops restored queries this build would not persist. A blob written by an
- * earlier build can hold an entry the current rule never restores, and a cold
+ * Drops restored queries this build would not restore. A blob written by an
+ * earlier build can hold an entry the current rule never hydrates, and a cold
  * start must not paint it once and fetch it after.
  */
 function withoutUnrestorableQueries(persisted: PersistedClient): PersistedClient {
   const { queries } = persisted.clientState;
-  const restorable = queries.filter(query => isPersistableSnapshot(query.queryKey, query.state));
+  const restorable = queries.filter(query => isRestorableSnapshot(query.queryKey, query.state));
   if (restorable.length === queries.length) {
     return persisted;
   }

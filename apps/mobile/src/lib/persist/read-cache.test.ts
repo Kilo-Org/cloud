@@ -1,6 +1,12 @@
 /* eslint-disable max-lines -- cohesive unit suite for the read-cache allowlist, budget, fences, takeover, mismatch, and cleanup contract */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV factories settle without await because they resolve immediately */
-import { hashKey, type Query, QueryClient } from '@tanstack/react-query';
+import {
+  type DehydratedState,
+  hashKey,
+  type Query,
+  QueryClient,
+  type QueryKey,
+} from '@tanstack/react-query';
 import { type PersistedClient } from '@tanstack/react-query-persist-client';
 import * as SecureStore from 'expo-secure-store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -98,6 +104,46 @@ function makeAuthoritativeQueryClient(userId: string): QueryClient {
   const queryClient = new QueryClient();
   queryClient.setQueryData(GET_ME_QUERY_KEY, { id: userId });
   return queryClient;
+}
+
+/** One dehydrated query in a persisted blob fixture. */
+type PersistedEntry = DehydratedState['queries'][number];
+
+/** A successful dehydrated query state for a persisted blob fixture. */
+function successState(data: unknown) {
+  return {
+    data,
+    dataUpdateCount: 0,
+    dataUpdatedAt: Date.now(),
+    error: null,
+    errorUpdateCount: 0,
+    errorUpdatedAt: 0,
+    fetchFailureCount: 0,
+    fetchFailureReason: null,
+    fetchMeta: null,
+    isInvalidated: false,
+    status: 'success' as const,
+    fetchStatus: 'idle' as const,
+  };
+}
+
+/** One dehydrated query in a persisted blob fixture. */
+function persistedEntry(queryKey: QueryKey, data: unknown): PersistedEntry {
+  return {
+    queryHash: hashKey(queryKey),
+    queryKey,
+    dehydratedAt: Date.now(),
+    state: successState(data),
+  };
+}
+
+/** A stored blob, serialized the way the persister writes it. */
+function storedBlob(queries: readonly PersistedEntry[]): string {
+  return JSON.stringify({
+    timestamp: Date.now(),
+    buster: '',
+    clientState: { mutations: [], queries },
+  });
 }
 
 beforeEach(() => {
@@ -721,43 +767,16 @@ describe('cold-start restore and takeover', () => {
     ];
     const personalKey = briefingKey('personal-report');
     const organizationKey = briefingKey('organization-report');
-    const successState = (data: unknown) => ({
-      data,
-      dataUpdateCount: 0,
-      dataUpdatedAt: Date.now(),
-      error: null,
-      errorUpdateCount: 0,
-      errorUpdatedAt: 0,
-      fetchFailureCount: 0,
-      fetchFailureReason: null,
-      fetchMeta: null,
-      isInvalidated: false,
-      status: 'success' as const,
-      fetchStatus: 'idle' as const,
-    });
-    const entry = (queryKey: readonly unknown[], data: unknown) => ({
-      queryHash: hashKey(queryKey),
-      queryKey,
-      dehydratedAt: Date.now(),
-      state: successState(data),
-    });
     scopes.set(
       readCacheScope('u1'),
       new Map([
         [
           'read-cache',
-          JSON.stringify({
-            timestamp: Date.now(),
-            buster: '',
-            clientState: {
-              mutations: [],
-              queries: [
-                entry(GET_ME_QUERY_KEY, { id: 'u1' }),
-                entry(personalKey, { context: { organizationId: null } }),
-                entry(organizationKey, { context: { organizationId: 'org-1' } }),
-              ],
-            },
-          }),
+          storedBlob([
+            persistedEntry(GET_ME_QUERY_KEY, { id: 'u1' }),
+            persistedEntry(personalKey, { context: { organizationId: null } }),
+            persistedEntry(organizationKey, { context: { organizationId: 'org-1' } }),
+          ]),
         ],
       ])
     );
@@ -767,6 +786,53 @@ describe('cold-start restore and takeover', () => {
 
     expect(queryClient.getQueryData(personalKey)).toEqual({ context: { organizationId: null } });
     expect(queryClient.getQueryData(organizationKey)).toBeUndefined();
+  });
+
+  it('hydrates a stored session-list snapshot from its path and payload', async () => {
+    const { scopes } = createFakeKv();
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    const writtenKey = [
+      ['cliSessionsV2', 'list'],
+      {
+        type: 'infinite',
+        input: {
+          limit: 30,
+          orderBy: 'updated_at',
+          includeChildren: false,
+          createdOnPlatform: undefined,
+          gitUrl: undefined,
+          organizationId: null,
+        },
+      },
+    ];
+    // Serialization drops the two `undefined` fields, so the restored key has
+    // four input fields instead of the six the persister wrote.
+    const restoredKey = [
+      ['cliSessionsV2', 'list'],
+      {
+        type: 'infinite',
+        input: { limit: 30, orderBy: 'updated_at', includeChildren: false, organizationId: null },
+      },
+    ];
+    scopes.set(
+      readCacheScope('u1'),
+      new Map([
+        [
+          'read-cache',
+          storedBlob([
+            persistedEntry(writtenKey, { pages: [{ cliSessions: [] }], pageParams: [undefined] }),
+          ]),
+        ],
+      ])
+    );
+    const queryClient = new QueryClient();
+
+    await restorePersistedCacheOnColdStart(queryClient);
+
+    expect(queryClient.getQueryData(restoredKey)).toEqual({
+      pages: [{ cliSessions: [] }],
+      pageParams: [null],
+    });
   });
 
   it('retries a rejected identity-hint read and still hydrates the cache', async () => {

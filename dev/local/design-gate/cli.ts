@@ -54,6 +54,10 @@ import { uiautomatorToProbeDump } from './uiautomator';
 
 const DEFAULT_METRO = 'http://127.0.0.1:8081';
 const DEFAULT_MOTION_SECONDS = 3;
+// A language switch restarts the app runtime, so Metro lists no debugger page
+// for a moment. A probe call that has just reloaded the app waits this long for
+// the page before it reports an infrastructure failure.
+const APP_RELOAD_PAGE_WAIT_MS = 45_000;
 
 type Common = { platform?: Platform; device?: string; metro: string; out?: string };
 
@@ -682,10 +686,10 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
     const device = openDevice(args, deps);
     if (args.command === 'motion') {
       const probe = createProbeClient({
-      metro: args.metro,
-      names: device.names,
-      pageWaitMs: APP_RELOAD_PAGE_WAIT_MS,
-    });
+        metro: args.metro,
+        names: device.names,
+        pageWaitMs: APP_RELOAD_PAGE_WAIT_MS,
+      });
       await waitForApp(probe, deps.clock);
       const result = await runMotion(
         {
@@ -753,10 +757,10 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
         {
           device,
           probe: createProbeClient({
-      metro: args.metro,
-      names: device.names,
-      pageWaitMs: APP_RELOAD_PAGE_WAIT_MS,
-    }),
+            metro: args.metro,
+            names: device.names,
+            pageWaitMs: APP_RELOAD_PAGE_WAIT_MS,
+          }),
           clock: deps.clock,
           out,
           readImage: png => readRgba(png, deps.exec),

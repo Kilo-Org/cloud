@@ -17,7 +17,6 @@ import { openExternalUrl } from '@/lib/external-link';
 import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
 import { useTRPC } from '@/lib/trpc';
 import {
-  KILO_PASS_TITLE,
   type PurchasePresentationKind,
   type PurchaseStatusClass,
 } from '@kilocode/app-shared/commerce';
@@ -147,12 +146,14 @@ function KiloPassUnavailableScreen({ presentation }: PresentationProps) {
 
   return (
     <KiloPassFrame>
-      <CenteredState>
+      {/* The frame's header already names the pass, so the body opens with what
+          the pass is, then where it is managed. It centres its copy in the space
+          it owns instead of measuring that space, which would move it on open. */}
+      <View className="flex-1 justify-center">
         <View className="items-center gap-3 px-6">
           <Text className="text-center text-sm leading-[1.25rem] text-muted-foreground">
             {t('kiloPass.subscriptionHeaderDescription')}
           </Text>
-          <Text className="text-center font-semibold text-foreground">{KILO_PASS_TITLE}</Text>
           <Text className="text-center text-sm text-muted-foreground">
             {t('kiloPass.managedOnWeb')}
           </Text>
@@ -176,7 +177,7 @@ function KiloPassUnavailableScreen({ presentation }: PresentationProps) {
             </Button>
           ) : null}
         </View>
-      </CenteredState>
+      </View>
     </KiloPassFrame>
   );
 }

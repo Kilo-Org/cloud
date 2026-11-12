@@ -570,7 +570,14 @@ export function SessionDetailContent({
     },
   });
 
-  const organizationId = fetchedData?.organizationId ?? undefined;
+  // `fetchSession` is the only source of the session's own row, so the recorded
+  // profile id, the title, the cost and the loading flag all apply only once the
+  // row names the session on screen.
+  const sessionDataLoaded = fetchedData?.kiloSessionId === sessionId;
+  // The organization scope follows the session on screen. Until that session's
+  // own row is available the scope is unresolved: the org-scoped reads wait for
+  // it, and the create, restart, Continue and fork actions stay unavailable.
+  const organizationId = sessionDataLoaded ? (fetchedData.organizationId ?? undefined) : undefined;
 
   // The session's active-profile chip: the profile this session runs on. It
   // resolves from the session's own recorded `profileId`, so an explicit
@@ -585,12 +592,10 @@ export function SessionDetailContent({
     effectiveDefaultId,
     isLoading: isSessionProfileLoading,
     isError: isSessionProfileError,
-  } = useEffectiveAgentProfile(organizationId);
-  // `fetchSession` is the only source of the session's own profile id, and the
-  // atom can still hold the previous session's row. Until the CURRENT session's
-  // read resolves, the chip stays hidden rather than briefly naming the context
-  // default for a session that recorded a different profile.
-  const sessionDataLoaded = fetchedData?.kiloSessionId === sessionId;
+  } = useEffectiveAgentProfile(organizationId, null, { enabled: sessionDataLoaded });
+  // Until the current session's read resolves, the chip stays hidden rather than
+  // briefly naming the context default for a session that recorded a different
+  // profile.
   const recordedSessionProfileId = sessionDataLoaded ? (fetchedData.profileId ?? null) : null;
   const activeSessionProfileId = sessionDataLoaded
     ? (recordedSessionProfileId ?? effectiveDefaultId)
@@ -632,13 +637,26 @@ export function SessionDetailContent({
   useCliSessionPresence(presenceSessionId);
 
   const { saveModel: savePersistedModel } = usePersistedAgentModel();
-  const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
+  const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId, {
+    enabled: sessionDataLoaded,
+  });
   const { defaultExpanded: reasoningDefaultExpanded } = useReasoningPreference();
   const { hideThinking, hasLoaded: hideThinkingLoaded } = useHideThinkingPreference();
   const { keepScreenOn, hasLoaded: keepScreenOnLoaded } = useKeepScreenOnPreference();
   const { condenseToolCalls } = useCondenseToolCallsPreference();
-  const { models: gatewayModels, isLoading: gatewayModelsLoading } =
-    useAvailableModels(organizationId);
+  const { models: catalogModels, isLoading: gatewayCatalogLoading } = useAvailableModels(
+    organizationId,
+    'member',
+    { enabled: sessionDataLoaded }
+  );
+  // The picker lists models only once the session's scope is resolved. Until
+  // then it holds its loading state, so it never presents a model list for a
+  // scope the screen has not settled.
+  const gatewayModels = useMemo(
+    () => (sessionDataLoaded ? catalogModels : []),
+    [catalogModels, sessionDataLoaded]
+  );
+  const gatewayModelsLoading = gatewayCatalogLoading || !sessionDataLoaded;
   const sessionModels = useSessionModelOptions({
     activeSessionType,
     remoteModelState,
@@ -720,7 +738,8 @@ export function SessionDetailContent({
   );
   const { profileAgents: effectiveProfileAgents } = useEffectiveProfileCustomModes(
     organizationId,
-    activeSessionProfileId
+    activeSessionProfileId,
+    { enabled: sessionDataLoaded }
   );
   const roleView = useMemo(
     () =>
@@ -2175,10 +2194,15 @@ export function SessionDetailContent({
   // the transcript is painted, not merely once the open resolves: a read-only
   // footer above rows that are still skeletons is the same two states at once,
   // so the reserve holds for that window too (see `isSessionChromePending`).
+  // Continue opens a new session in this session's organization, so its control
+  // waits for the session's own row the same way the scoped reads do. Until that
+  // row names this open, the read-only slot keeps the reserve it already holds
+  // rather than painting a control that cannot act.
+  const isReadOnlyFooterPending = isSessionChromePending || !sessionDataLoaded;
   const isComposerVisible =
     !hasBlockingInteraction && !isReadOnlySession && !isSessionChromePending;
   const isReadOnlyContinueVisible =
-    isReadOnlySession && !hasBlockingInteraction && !isSessionChromePending;
+    isReadOnlySession && !hasBlockingInteraction && !isReadOnlyFooterPending;
   // The pending slot holds the shape its session will end in. The kind is only
   // set once the transport answers, but the metadata read lands before that and
   // names a cloud-agent session, which is writable by construction; the id
@@ -2190,8 +2214,10 @@ export function SessionDetailContent({
   const isPendingComposer =
     isWritableResolved ||
     (fetchedData?.kiloSessionId === sessionId && fetchedData.cloudAgentSessionId !== null);
+  // The reserve never shares the slot with a live control: a settled composer
+  // already holds it, and the hold only owns the slot when nothing else does.
   const isReadOnlyFooterPlaceholderVisible =
-    isSessionChromePending && !hasBlockingInteraction && !isPendingComposer;
+    isReadOnlyFooterPending && !hasBlockingInteraction && !isPendingComposer && !isComposerVisible;
   const isComposerSkeletonVisible =
     isSessionChromePending && !hasBlockingInteraction && isPendingComposer;
   // Structural locks only. The live send capability is passed separately so a
@@ -2361,6 +2387,11 @@ export function SessionDetailContent({
   );
 
   const handleCreateSession = useCallback(async () => {
+    // Start creates a session in the displayed session's organization, so it
+    // requires that session's own row to supply the scope first.
+    if (!sessionDataLoaded) {
+      return false;
+    }
     // The orchestrator surfaces exactly one actionable toast on failure and
     // calls `router.replace` to the new session route on success — the
     // route-keyed `AgentSessionProvider` creates a fresh manager for the new
@@ -2380,9 +2411,14 @@ export function SessionDetailContent({
       },
     });
     return result.success;
-  }, [manager, sessionRouter, organizationId]);
+  }, [manager, sessionRouter, organizationId, sessionDataLoaded]);
 
   const handleRestartSession = useCallback(async () => {
+    // Restart opens a replacement session in the same organization, so it waits
+    // for the same resolved scope Start does.
+    if (!sessionDataLoaded) {
+      return false;
+    }
     const result = await restartAgentSession({
       create: manager.createRemoteSession.bind(manager),
       exit: manager.exitRemoteSession.bind(manager),
@@ -2393,7 +2429,7 @@ export function SessionDetailContent({
       },
     });
     return result.success;
-  }, [manager, sessionRouter, organizationId]);
+  }, [manager, sessionRouter, organizationId, sessionDataLoaded]);
 
   const handleExitSession = useCallback(
     async (
@@ -2440,6 +2476,11 @@ export function SessionDetailContent({
 
   const pushContinue = useCallback(
     (cut: ForkCut | null) => {
+      // Continue and fork open a new session in this session's organization, so
+      // both need the scope resolved before they open a destination.
+      if (!sessionDataLoaded) {
+        return;
+      }
       openNewSessionHref(
         buildContinueHref({
           organizationId,
@@ -2447,9 +2488,9 @@ export function SessionDetailContent({
           cloneSourceTitle: rename.title,
           cloneUpToMessageId: cut?.cloneUpToMessageId,
           forkPrefillText: cut?.forkPrefillText,
-          forkSourceIsCloudAgent: Boolean(fetchedData?.cloudAgentSessionId),
+          forkSourceIsCloudAgent: Boolean(fetchedData.cloudAgentSessionId),
           prefill: buildContinuePrefillParams({
-            gitUrl: fetchedData?.gitUrl,
+            gitUrl: fetchedData.gitUrl,
             mode: currentMode,
             model: currentModel,
             variant: currentVariant,
@@ -2467,6 +2508,7 @@ export function SessionDetailContent({
       currentMode,
       currentModel,
       currentVariant,
+      sessionDataLoaded,
     ]
   );
 
@@ -2660,7 +2702,9 @@ export function SessionDetailContent({
                 ? t('agentChat.session.cancelQueuedUpgradeRequired')
                 : null
             }
-            onForkFromHere={detailsForkCut ? handleForkFromHere : undefined}
+            onForkFromHere={
+              detailsForkCut !== null && sessionDataLoaded ? handleForkFromHere : undefined
+            }
           />
 
           {childSessionSheet.sheet ? (

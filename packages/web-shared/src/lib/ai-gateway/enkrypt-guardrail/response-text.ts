@@ -68,16 +68,23 @@ const NOT_MODEL_WRITTEN_FIELDS = new Set([
 ]);
 
 /**
+ * Fields never scanned: those the model did not write, signatures and encrypted content under any
+ * name, such as `reasoning_signature`, and reasoning summaries, which restate the raw reasoning and
+ * are not fed back to the model.
+ */
+function isScannedField(key: string): boolean {
+  return !NOT_MODEL_WRITTEN_FIELDS.has(key) && !/summary|signature|encrypted/i.test(key);
+}
+
+/**
  * Output types the gateway does not know yet, such as new tool calls, are scanned as JSON so that
  * they are checked rather than skipped.
  */
 function unknownOutputText(value: Record<string, unknown>): Text {
-  return jsonText(
-    Object.fromEntries(Object.entries(value).filter(([key]) => !NOT_MODEL_WRITTEN_FIELDS.has(key)))
-  );
+  return jsonText(Object.fromEntries(Object.entries(value).filter(([key]) => isScannedField(key))));
 }
 
-const chatMessageSchema = z.object({
+const chatMessageSchema = z.looseObject({
   content: z
     .union([z.string(), z.array(z.object({ type: z.string(), text, refusal: text }))])
     .nullish(),
@@ -98,6 +105,36 @@ const chatMessageSchema = z.object({
 });
 
 type ChatMessage = z.infer<typeof chatMessageSchema>;
+
+/**
+ * Message fields read above, and those that are not model output: the role, and annotations, such
+ * as citations of web search results.
+ */
+const KNOWN_CHAT_MESSAGE_FIELDS = new Set([
+  ...Object.keys(chatMessageSchema.shape),
+  'role',
+  'annotations',
+]);
+
+/**
+ * Adds the strings of a value the gateway does not know, each under its path, so text streamed in
+ * pieces across deltas, such as an audio transcript, joins in order like `content`. Type tags are
+ * not model output, and base64 data URLs, such as generated images or audio, are not text, so
+ * neither is scanned.
+ */
+const BASE64_DATA_URL = /^data:[^,]*;base64,/i;
+
+function addUnknownStrings(groups: TextGroups, path: string, value: unknown) {
+  if (typeof value === 'string') {
+    if (!BASE64_DATA_URL.test(value)) groups.add(path, value);
+  } else if (Array.isArray(value)) {
+    value.forEach((item, index) => addUnknownStrings(groups, `${path}.${index}`, item));
+  } else if (value !== null && typeof value === 'object') {
+    for (const [key, item] of Object.entries(value)) {
+      if (key !== 'type' && isScannedField(key)) addUnknownStrings(groups, `${path}.${key}`, item);
+    }
+  }
+}
 
 const chatCompletionSchema = z.object({
   choices: z.array(
@@ -145,6 +182,12 @@ function addChatMessage(groups: TextGroups, choice: string, message: ChatMessage
     groups.add(`${tool}:name`, call.function?.name ?? call.custom?.name);
     groups.add(`${tool}:arguments`, call.function?.arguments ?? call.custom?.input);
   });
+  // Fields the gateway does not know yet, such as an audio transcript, still reach the client.
+  for (const [key, value] of Object.entries(message)) {
+    if (!KNOWN_CHAT_MESSAGE_FIELDS.has(key) && isScannedField(key)) {
+      addUnknownStrings(groups, `${choice}:extra:${key}`, value);
+    }
+  }
 }
 
 const addChatCompletion: AddJson = (groups, json) => {

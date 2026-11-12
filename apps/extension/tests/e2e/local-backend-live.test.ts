@@ -238,8 +238,11 @@ const signInWithLocalDeviceAuth = async ({
   await authPage.goto(
     `${authOrigin}/users/sign_in?fakeUser=${encodeURIComponent(localUserEmail)}&callbackPath=${encodeURIComponent(callbackPath)}`
   );
-  await authPage.getByRole('button', { name: 'Authorize' }).click({ timeout: 60_000 });
-  await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 30_000 });
+  // The post-login redirect can swallow the Authorize click; retry until the panel logs in.
+  await expect(async () => {
+    await authPage.getByRole('button', { name: 'Authorize' }).click({ timeout: 10_000 });
+    await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 10_000 });
+  }).toPass({ timeout: 90_000 });
   await authPage.close();
 };
 
@@ -257,6 +260,10 @@ const selectFrontierModel = async (sidePanel: Page): Promise<void> => {
     await sidePanel.getByLabel('Thinking effort').selectOption('medium');
   }
 };
+
+// Scope conversation-tab locators to the strip; the mode switch has a selected tab too.
+const conversationTabs = (sidePanel: Page) =>
+  sidePanel.getByRole('tablist', { name: 'Conversation tabs' });
 
 const sampleConversation = (page: Page, durationMs: number): Promise<ConversationSample[]> =>
   page.evaluate(async duration => {
@@ -414,7 +421,7 @@ test('live local backend keeps frontier conversations stable across modes, reloa
     await expectSelectedModelId(sidePanel, frontierModel);
     await sidePanel.getByLabel(/Danger mode/u).click();
     await sidePanel.getByRole('button', { name: /^Safe/u }).click();
-    await sidePanel.getByRole('tab').nth(0).click();
+    await conversationTabs(sidePanel).getByRole('tab').first().click();
     await expect(sidePanel.getByLabel(/Danger mode/u)).toBeVisible();
     await waitForStoredConversationSnapshot(
       sidePanel,
@@ -569,7 +576,7 @@ test('live local backend runs parallel frontier conversations without switching 
       .toBe(true);
 
     // The second request stays on its own tab (the running first request never steals focus).
-    await expect(sidePanel.getByRole('tab', { selected: true })).toContainText(
+    await expect(conversationTabs(sidePanel).getByRole('tab', { selected: true })).toContainText(
       'LOCAL_PARALLEL_SECOND'
     );
 
@@ -591,7 +598,7 @@ test('live local backend runs parallel frontier conversations without switching 
 
     // The second conversation runs to completion on its own tab.
     await sidePanel.getByRole('tab', { name: /LOCAL_PARALLEL_SECOND/u }).click();
-    await expect(sidePanel.getByRole('tab', { selected: true })).toContainText(
+    await expect(conversationTabs(sidePanel).getByRole('tab', { selected: true })).toContainText(
       'LOCAL_PARALLEL_SECOND'
     );
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
@@ -902,7 +909,9 @@ test('live local backend dangerous mode eval can update the selected page', asyn
         'LOCAL_DANGEROUS_EVAL: use eval to run exactly this JavaScript in the selected page, then reply briefly with the resulting value: document.body.dataset.kiloLiveEval = "done"; return document.body.dataset.kiloLiveEval;'
       );
     await sidePanel.getByLabel('Message agent').press('Enter');
-    await expect(sidePanel.getByText('eval completed')).toBeVisible({ timeout: 120_000 });
+    await expect(sidePanel.getByText('Evaluate JavaScript completed')).toBeVisible({
+      timeout: 120_000,
+    });
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
       timeout: 120_000,
     });

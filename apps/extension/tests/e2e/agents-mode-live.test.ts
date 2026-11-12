@@ -72,8 +72,11 @@ const signInWithLocalDeviceAuth = async ({
   await authPage.goto(
     `${authOrigin}/users/sign_in?fakeUser=${encodeURIComponent(localUserEmail)}&callbackPath=${encodeURIComponent(callbackPath)}`
   );
-  await authPage.getByRole('button', { name: 'Authorize' }).click({ timeout: 60_000 });
-  await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 30_000 });
+  // The post-login redirect can swallow the Authorize click; retry until the panel logs in.
+  await expect(async () => {
+    await authPage.getByRole('button', { name: 'Authorize' }).click({ timeout: 10_000 });
+    await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 10_000 });
+  }).toPass({ timeout: 90_000 });
   await authPage.close();
 };
 

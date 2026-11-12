@@ -3,6 +3,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { CLOUD_AGENT_METADATA_STALE_TIME } from '@/lib/cloud-agent/constants';
 
 export type CloudAgentSettingsRepositoryRow = {
   repositoryFullName: string;
@@ -40,7 +41,10 @@ export function useBuiltinAgentSettings() {
   const trpc = useTRPC();
 
   return useQuery(
-    trpc.cloudAgentSettings.getBuiltinAgents.queryOptions(undefined, { staleTime: 30_000 })
+    trpc.cloudAgentSettings.getBuiltinAgents.queryOptions(undefined, {
+      staleTime: CLOUD_AGENT_METADATA_STALE_TIME,
+      gcTime: CLOUD_AGENT_METADATA_STALE_TIME,
+    })
   );
 }
 

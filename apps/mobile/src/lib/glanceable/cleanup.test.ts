@@ -5,6 +5,7 @@ import {
   buildOpaqueScopeKey,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
 import {
@@ -361,7 +362,10 @@ describe('cleanup', () => {
   it('republishes a restored record only for the signed-in scope', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-27T01:00:00.000Z'));
-    const store = new Map<string, string>();
+    const store = new Map<string, string>([
+      // The class upgrade has run, so an absent identity hint is absent.
+      [WIDGET_STORE_CLASS_MARKER.key, WIDGET_STORE_CLASS_MARKER.value],
+    ]);
     const secureStore = {
       setItemAsync: async (key: string, value: string) => {
         store.set(key, value);

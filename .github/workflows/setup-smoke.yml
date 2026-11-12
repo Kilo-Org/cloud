@@ -53,6 +53,11 @@ jobs:
         with:
           lfs: true
 
+      # The only package-manager provisioner in this job: the action installs the
+      # version pinned by package.json's packageManager field and exports
+      # PNPM_HOME, which both the tmux shells and the shim below read. Do not add a
+      # second activation (Corepack), because it downloads the same version again
+      # and nothing here needs it.
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
@@ -66,11 +71,6 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version-file: '.nvmrc'
-
-      - name: Enable Corepack
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.1.2 --activate
 
       - name: Expose pnpm to tmux shells
         run: |

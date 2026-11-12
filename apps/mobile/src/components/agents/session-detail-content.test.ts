@@ -58,7 +58,10 @@ import {
   isSessionGoalCollapsed,
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
-import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import {
+  CONTINUE_SCOPE_WAIT_MS,
+  SessionDetailContent,
+} from '@/components/agents/session-detail-content';
 import { AGENT_SESSION_NAV_GUARD_MS } from '@/components/agents/agent-session-nav-guard';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-rename-state';
@@ -1641,8 +1644,9 @@ describe('session detail organization scope', () => {
 
     // The read-only footer's Continue is the same class of action: it needs the
     // session's own row for the destination's organization. The window before
-    // that row arrives paints the live control busy, not the inert reserve: the
-    // reserve swallowed the press the footer exists for.
+    // that row arrives paints the live control, not the inert reserve, and a
+    // press in that window is held rather than dropped: the reserve swallowed
+    // the press the footer exists for.
     await act(async () => {
       view.store.set(view.manager.atoms.activeSessionType, 'read-only');
       await Promise.resolve();
@@ -1651,9 +1655,16 @@ describe('session detail organization scope', () => {
       view.renderer.root.findAll(node => Object.is(node.type, 'SessionReadOnlyFooterPlaceholder'))
     ).toHaveLength(0);
     const heldContinue = continueControlOf(view.renderer);
-    expect(heldContinue.props.loading).toBe(true);
+    expect(heldContinue.props.loading).toBe(false);
     await act(async () => {
       (heldContinue.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    // The press is answered in place, so a second tap cannot open a second
+    // composer, and nothing is opened before the row lands.
+    expect(continueControlOf(view.renderer).props.loading).toBe(true);
+    await act(async () => {
+      (continueControlOf(view.renderer).props.onPress as () => void)();
       await Promise.resolve();
     });
     expect(
@@ -1668,6 +1679,17 @@ describe('session detail organization scope', () => {
     const detailsSheet = detailsSheetNode(view.renderer);
     expect(detailsSheet.props.visible).toBe(true);
     expect(detailsSheet.props.onForkFromHere).toBeUndefined();
+
+    // The row lands: the held press opens the composer seeded from this
+    // session, and only once.
+    await act(async () => {
+      metadata.resolve(undefined);
+      await Promise.resolve();
+    });
+    await waitFor(
+      () => navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new')).length === 1
+    );
+    expect(navigationRoutes.at(-1)).toContain(`cloneFromKiloSessionId=${ROOT_ID}`);
   });
 
   it('offers the fork entry once the session row resolves', async () => {
@@ -5509,6 +5531,58 @@ describe('session detail read-only composer', () => {
 
       expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.somethingWentWrong'));
       expect(continueControlOf(view.renderer).props.loading).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('states the failure when the row a held press waits for never arrives', async () => {
+    // A press before the session's own row resolves is held, not dropped. The
+    // wait is bounded: a row that never lands must end in the stated failure
+    // with a Retry, never in a footer that stays busy for good.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const metadata = Promise.withResolvers<undefined>();
+      const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], {
+        metadataReady: metadata.promise,
+        cachedRows: [childMessage(ROOT_ID, 'shown row')],
+      });
+      await act(async () => {
+        view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+        await Promise.resolve();
+      });
+
+      await act(async () => {
+        (continueControlOf(view.renderer).props.onPress as () => void)();
+        await Promise.resolve();
+      });
+      expect(continueControlOf(view.renderer).props.loading).toBe(true);
+      expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.somethingWentWrong'));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CONTINUE_SCOPE_WAIT_MS);
+      });
+      expect(renderedText(view.renderer.root)).toContain(i18n.t('common.somethingWentWrong'));
+      expect(continueControlOf(view.renderer).props.loading).toBe(false);
+      expect(
+        navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+      ).toHaveLength(0);
+
+      // The row finally lands and the same footer retries: the press opens the
+      // composer it was always meant to open. (No `waitFor` here: it polls on
+      // the timers this test fakes.)
+      await act(async () => {
+        metadata.resolve(undefined);
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(view.store.get(view.manager.atoms.fetchedSessionData)?.kiloSessionId).toBe(ROOT_ID);
+      await act(async () => {
+        (continueControlOf(view.renderer).props.onPress as () => void)();
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(
+        navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+      ).toHaveLength(1);
     } finally {
       vi.useRealTimers();
     }

@@ -74,3 +74,57 @@ export async function awaitComposerTop(input: {
   }
   return false;
 }
+
+/**
+ * What one press of a composer entry point produced.
+ *
+ * `opened` — the navigator accepted the push and the composer is the route the
+ * person now sees. `ignored` — the single-push guard answered this press, so
+ * the press that owns the window is still the one landing. `failed` — the push
+ * was dispatched and the composer never appeared: the navigator dropped it, or
+ * the call raised. Only a caller that shows state of its own acts on this.
+ */
+export type NewSessionOpenOutcome = 'opened' | 'ignored' | 'failed';
+
+/** Resolve after `ms`, for the composer re-checks `awaitComposerTop` runs. */
+export function delayMs(ms: number): Promise<undefined> {
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  setTimeout(() => {
+    resolve(undefined);
+  }, ms);
+  return promise;
+}
+
+/**
+ * Press an entry point that opens the composer, then read back whether the
+ * composer arrived. A press the guard answered does not read anything back: it
+ * belongs to the press that owns the window.
+ *
+ * `push` is the guarded push the screen already owns (`router.push` through
+ * `useNewSessionNavigator`), and `readState` is that screen's navigator state.
+ */
+export async function openComposerWithOutcome(input: {
+  /** Claim the single-push window. `false` means this press is not the first. */
+  claim: () => boolean;
+  /** Dispatch the navigation. */
+  push: () => void;
+  /** The `(app)` stack state the navigator holds right now. */
+  readState: () => AgentStackState | undefined;
+  sleep?: (ms: number) => Promise<void>;
+  delaysMs?: readonly number[];
+}): Promise<NewSessionOpenOutcome> {
+  if (!input.claim()) {
+    return 'ignored';
+  }
+  try {
+    input.push();
+  } catch {
+    return 'failed';
+  }
+  const opened = await awaitComposerTop({
+    readState: input.readState,
+    sleep: input.sleep ?? delayMs,
+    delaysMs: input.delaysMs,
+  });
+  return opened ? 'opened' : 'failed';
+}

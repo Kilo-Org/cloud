@@ -61,7 +61,7 @@ export function useStartTodo(): StartTodoControls {
 
   const review = useCallback(
     (todo: StartableTodo, list: StartDefaults) => {
-      void openNewSessionHref(todoNewSessionHref(todo, list));
+      openNewSessionHref(todoNewSessionHref(todo, list));
     },
     [openNewSessionHref]
   );

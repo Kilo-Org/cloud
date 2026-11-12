@@ -4,6 +4,7 @@ import {
   awaitComposerTop,
   composerOnTop,
   isComposerRouteName,
+  openComposerWithOutcome,
 } from './new-session-navigation-outcome';
 
 function stack(...names: string[]) {
@@ -84,5 +85,67 @@ describe('awaitComposerTop', () => {
     });
     expect(opened).toBe(false);
     expect(delays).toEqual([250, 650]);
+  });
+});
+
+describe('openComposerWithOutcome', () => {
+  const neverSettles = () => Promise.resolve();
+
+  it('reports the composer once the navigator shows it on top', async () => {
+    const pushes: string[] = [];
+    let state = stack('(tabs)', 'agent-chat/[session-id]');
+    const outcome = await openComposerWithOutcome({
+      claim: () => true,
+      push: () => {
+        pushes.push('new');
+        state = stack('(tabs)', 'agent-chat/[session-id]', 'agent-chat/new');
+      },
+      readState: () => state,
+      sleep: neverSettles,
+    });
+
+    expect(outcome).toBe('opened');
+    expect(pushes).toEqual(['new']);
+  });
+
+  it('does not push when the single-push guard answers the press', async () => {
+    // The press that owns the guard window is still landing; a second tap is
+    // the same press and must not open a second composer.
+    let pushes = 0;
+    const outcome = await openComposerWithOutcome({
+      claim: () => false,
+      push: () => {
+        pushes += 1;
+      },
+      readState: () => stack('(tabs)', 'agent-chat/[session-id]'),
+      sleep: neverSettles,
+    });
+
+    expect(outcome).toBe('ignored');
+    expect(pushes).toBe(0);
+  });
+
+  it('reports a dropped push as failed', async () => {
+    const outcome = await openComposerWithOutcome({
+      claim: () => true,
+      push: () => undefined,
+      readState: () => stack('(tabs)', 'agent-chat/[session-id]'),
+      sleep: neverSettles,
+    });
+
+    expect(outcome).toBe('failed');
+  });
+
+  it('reports a push that throws as failed', async () => {
+    const outcome = await openComposerWithOutcome({
+      claim: () => true,
+      push: () => {
+        throw new Error('navigator not ready');
+      },
+      readState: () => stack('(tabs)', 'agent-chat/[session-id]'),
+      sleep: neverSettles,
+    });
+
+    expect(outcome).toBe('failed');
   });
 });

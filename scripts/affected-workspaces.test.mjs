@@ -471,6 +471,15 @@ test('a test-only change keeps the full selection for a workspace without tests'
   assert.deepEqual(result.packages, ['consumer', 'host', 'host-part']);
 });
 
+test('a test file beside a source file in the same workspace keeps the fan-out', () => {
+  // One non-test file in the workspace is enough: its exports can change, so the
+  // readers stay selected.
+  assert.deepEqual(
+    select(['packages/db/src/schema.test.ts', 'packages/db/src/schema.ts']).packages,
+    ['@kilocode/db', '@kilocode/trpc', 'kilo-app', 'web']
+  );
+});
+
 test('a test-only workspace that reads a changed workspace still selects its readers', () => {
   // The workspace entered the selection through its test file and also reads a
   // changed workspace, so its own sources carry that change to its readers.

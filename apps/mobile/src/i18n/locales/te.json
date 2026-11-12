@@ -2709,6 +2709,8 @@
     "retryHint": "Kilo Pass స్థితిని మళ్లీ పొందడానికి ప్రయత్నిస్తుంది.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Kilo Pass కొనుగోలు ప్రస్తుతం అందుబాటులో లేదు.",
+    "purchaseUnavailableTitle": "ప్రస్తుతం అందుబాటులో లేదు",
+    "purchaseUnavailableEnded": "మీ Kilo Pass ముగిసింది.",
     "kiloPassManagement": "Kilo Pass నిర్వహణ",
     "kiloPassSetup": "Kilo Pass సెటప్",
     "subscriptionHeaderDescription": "Kilo Appలో AI కోడింగ్ సెషన్‌లను నడపడానికి మీ Kilo బ్యాలెన్స్‌కు క్రెడిట్‌లను జోడించే నెలవారీ చందా.",

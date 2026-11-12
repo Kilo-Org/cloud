@@ -2709,6 +2709,8 @@
     "retryHint": "Wuxuu mar kale isku dayaa inuu soo dejiyo xaaladda Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Iibsashada Kilo Pass hadda lama heli karo.",
+    "purchaseUnavailableTitle": "Hadda lama heli karo",
+    "purchaseUnavailableEnded": "Kilo Pass-kaaga wuu dhammaaday.",
     "kiloPassManagement": "Maamulka Kilo Pass",
     "kiloPassSetup": "Dejinta Kilo Pass",
     "subscriptionHeaderDescription": "Isdiiwaangelin bil ah oo ku darsa credits dheelitirkaaga Kilo si loogu shaqeeyo kalfadhiyada codeynta AI ee app-ka Kilo.",

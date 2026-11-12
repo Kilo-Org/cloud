@@ -2815,6 +2815,8 @@
     "retryHint": "Znovu načte stav Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. Akce: {{actionLabel}}",
     "purchaseUnavailable": "Kilo Pass nyní nelze zakoupit.",
+    "purchaseUnavailableTitle": "Nyní nedostupné",
+    "purchaseUnavailableEnded": "Váš Kilo Pass skončil.",
     "kiloPassManagement": "Správa Kilo Pass",
     "kiloPassSetup": "Nastavení Kilo Pass",
     "subscriptionHeaderDescription": "Měsíční předplatné, které přidává kredity do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo.",

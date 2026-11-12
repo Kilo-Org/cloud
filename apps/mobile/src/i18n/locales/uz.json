@@ -2709,6 +2709,8 @@
     "retryHint": "Kilo Pass holatini qayta yuklashga urinadi.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Hozir Kilo Passni xarid qilib bo'lmaydi.",
+    "purchaseUnavailableTitle": "Hozir mavjud emas",
+    "purchaseUnavailableEnded": "Kilo Passingiz muddati tugadi.",
     "kiloPassManagement": "Kilo Pass boshqaruvi",
     "kiloPassSetup": "Kilo Passni sozlash",
     "subscriptionHeaderDescription": "Kilo App ilovasida sun'iy intellekt yordamida kod yozish uchun Kilo balansingizga kreditlar qo'shadigan oylik obuna.",

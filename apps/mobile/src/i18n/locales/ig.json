@@ -2709,6 +2709,8 @@
     "retryHint": "Na-anwale ịnweta ọnọdụ Kilo Pass ọzọ.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "Enweghị ike ịzụta Kilo Pass ugbu a.",
+    "purchaseUnavailableTitle": "Adịghị ugbu a",
+    "purchaseUnavailableEnded": "Kilo Pass gị agwụla.",
     "kiloPassManagement": "Njikwa Kilo Pass",
     "kiloPassSetup": "Nhazi Kilo Pass",
     "subscriptionHeaderDescription": "Ndenye aha kwa ọnwa na-agbakwunye kredit na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App.",

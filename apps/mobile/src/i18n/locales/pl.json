@@ -2227,6 +2227,8 @@
     "retryHint": "Ponownie sprawdza stan Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. Działanie: {{actionLabel}}",
     "purchaseUnavailable": "Zakup Kilo Pass nie jest teraz dostępny.",
+    "purchaseUnavailableTitle": "Teraz niedostępne",
+    "purchaseUnavailableEnded": "Twój Kilo Pass wygasł.",
     "kiloPassManagement": "Zarządzanie Kilo Pass",
     "kiloPassSetup": "Konfiguracja Kilo Pass",
     "subscriptionHeaderDescription": "Miesięczna subskrypcja, która dodaje kredyty do Twojego salda Kilo za prowadzenie sesji kodowania AI w aplikacji Kilo.",

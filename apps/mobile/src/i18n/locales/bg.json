@@ -2709,6 +2709,8 @@
     "retryHint": "Повтаря зареждането на състоянието на Kilo Pass.",
     "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "purchaseUnavailable": "В момента не можеш да закупиш Kilo Pass.",
+    "purchaseUnavailableTitle": "В момента не е налично",
+    "purchaseUnavailableEnded": "Твоят Kilo Pass приключи.",
     "kiloPassManagement": "Управление на Kilo Pass",
     "kiloPassSetup": "Настройка на Kilo Pass",
     "subscriptionHeaderDescription": "Месечен абонамент, който добавя кредити към вашия Kilo баланс за стартиране на AI сесии за кодиране в приложението Kilo.",

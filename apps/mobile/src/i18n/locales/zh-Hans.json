@@ -2167,6 +2167,8 @@
     "retryHint": "重新获取 Kilo Pass 状态。",
     "cardAccessibility": "{{title}}。{{description}}。{{actionLabel}}",
     "purchaseUnavailable": "目前无法购买 Kilo Pass。",
+    "purchaseUnavailableTitle": "目前不可用",
+    "purchaseUnavailableEnded": "您的 Kilo Pass 已结束。",
     "kiloPassManagement": "Kilo Pass 管理",
     "kiloPassSetup": "Kilo Pass 设置",
     "subscriptionHeaderDescription": "一项月度订阅，为你的 Kilo 余额添加积分，用于在 Kilo App 中运行 AI 编程会话。",

@@ -2709,6 +2709,8 @@
     "retryHint": "Kilo Pass को स्थिति फेरि लोड गर्ने प्रयास गर्छ।",
     "cardAccessibility": "{{title}}। {{description}}। {{actionLabel}}",
     "purchaseUnavailable": "Kilo Pass खरिद अहिले उपलब्ध छैन।",
+    "purchaseUnavailableTitle": "अहिले उपलब्ध छैन",
+    "purchaseUnavailableEnded": "तपाईंको Kilo Pass समाप्त भएको छ।",
     "kiloPassManagement": "Kilo Pass व्यवस्थापन",
     "kiloPassSetup": "Kilo Pass सेटअप",
     "subscriptionHeaderDescription": "यो मासिक सदस्यताले Kilo App मा AI कोडिङ सत्रहरू चलाउन तपाईंको Kilo मौज्दातमा क्रेडिट थप्छ।",

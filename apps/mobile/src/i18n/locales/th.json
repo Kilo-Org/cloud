@@ -2709,6 +2709,8 @@
     "retryHint": "ลองโหลดสถานะ Kilo Pass อีกครั้ง",
     "cardAccessibility": "{{title}} {{description}} {{actionLabel}}",
     "purchaseUnavailable": "ขณะนี้ไม่สามารถซื้อ Kilo Pass ได้",
+    "purchaseUnavailableTitle": "ขณะนี้ไม่พร้อมใช้งาน",
+    "purchaseUnavailableEnded": "Kilo Pass ของคุณสิ้นสุดแล้ว",
     "kiloPassManagement": "การจัดการ Kilo Pass",
     "kiloPassSetup": "การตั้งค่า Kilo Pass",
     "subscriptionHeaderDescription": "การสมัครสมาชิกรายเดือนที่เพิ่มเครดิตให้กับยอดคงเหลือ Kilo ของคุณสำหรับการรันเซสชันการเขียนโค้ด AI ใน Kilo App.",

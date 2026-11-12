@@ -1,5 +1,6 @@
 import {
   type GatedSecureStore,
+  LOCK_READABLE_METADATA_KEYS,
   readGatedValueForUpdate,
   upgradeGatedValue,
   widgetSecureStore,
@@ -7,13 +8,12 @@ import {
 } from '@/lib/auth/secure-store-gated';
 
 /**
- * The SecureStore items of the Home widget, the glanceable mirror and the
- * followed session cards, and the one-time upgrade to the class they are
- * written with.
+ * The SecureStore items of the Home widget, the glanceable mirror, the followed
+ * session cards, and the two identity hints the glanceable fences compare.
  *
- * These items are not credentials: they carry counts, statuses, timestamps and
- * an opaque scope key. A push and a background task mirror and read them while
- * the phone is locked, so the widget store writes them
+ * None of them is a credential: they carry counts, statuses, timestamps, an
+ * opaque scope key and two account ids. A push and a background task mirror,
+ * read and fence them while the phone is locked, so the widget store writes them
  * `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`, and an install that stored them under
  * the expo-secure-store default (`WHEN_UNLOCKED`) is upgraded by
  * `migrateWidgetStoreAccessibility` the first time the app runs unlocked.
@@ -31,6 +31,10 @@ const WIDGET_STORE_KEYS = [
   GLANCEABLE_SNAPSHOT_KEY,
   GLANCEABLE_LEGACY_SCOPE_KEY,
   SESSION_CARD_SCOPE_KEY,
+  // The two identity hints are written by `lib/auth/account-metadata-write` with
+  // this store's class; the upgrade owns that class for every item, so it
+  // upgrades them too.
+  ...LOCK_READABLE_METADATA_KEYS,
 ] as const;
 
 // SecureStore cannot report the class an existing item was written with, so the

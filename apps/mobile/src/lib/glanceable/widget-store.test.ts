@@ -20,6 +20,7 @@ import {
   rememberHomeWidgetSnapshot,
 } from '@/lib/glanceable/home-widget-data';
 import { setProtectedDataAvailable } from '@/lib/protected-data';
+import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   setBreadcrumbSink,
   setTelemetrySink,
@@ -200,6 +201,20 @@ describe('migrateWidgetStoreAccessibility', () => {
 
     expect(setItem.mock.calls.map(([key]) => key)).toEqual([
       HOME_WIDGET_DATA_KEY,
+      'widget-store-accessibility',
+    ]);
+  });
+
+  it('upgrades the identity hints the locked fences read', async () => {
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    store.set(ORGANIZATION_STORAGE_KEY, 'org-9');
+    const { setItem, gated } = inspectableStore();
+
+    await migrateWidgetStoreAccessibility(() => gated);
+
+    expect(setItem.mock.calls.map(([key]) => key)).toEqual([
+      ACTIVE_USER_ID_KEY,
+      ORGANIZATION_STORAGE_KEY,
       'widget-store-accessibility',
     ]);
   });

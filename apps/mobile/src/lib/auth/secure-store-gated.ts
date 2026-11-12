@@ -1,5 +1,6 @@
 import { type StoredValueRead } from '@/lib/auth/secure-store-value';
 import { isProtectedDataAvailable } from '@/lib/protected-data';
+import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
 /**
@@ -42,9 +43,22 @@ import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 /** The `expo-secure-store` options these calls build; only a write carries one. */
 type GatedStoreOptions = { keychainAccessible?: number };
 
-/** The SecureStore surface a caller supplies; the native module satisfies it. */
-export type GatedSecureStore = {
+/**
+ * The two account ids the glanceable fences compare, and the only account
+ * metadata written with the widget class: a push must resolve the account it
+ * acts for with the screen locked. Neither is a credential.
+ * `lib/auth/account-metadata-write` writes them with {@link widgetStoreOptions},
+ * and `lib/glanceable/widget-store` upgrades an existing install's pair once.
+ */
+export const LOCK_READABLE_METADATA_KEYS = [ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY] as const;
+
+/** The read half of a store; a caller that only reads can supply exactly that. */
+export type GatedReadStore = {
   getItemAsync(key: string, options?: GatedStoreOptions): Promise<string | null>;
+};
+
+/** The SecureStore surface a caller supplies; the native module satisfies it. */
+export type GatedSecureStore = GatedReadStore & {
   setItemAsync(key: string, value: string, options?: GatedStoreOptions): Promise<void>;
 };
 
@@ -78,10 +92,32 @@ export function withWidgetAccessibility(store: NativeWidgetStore): GatedSecureSt
   };
 }
 
+// Test-only override so a suite can exercise the real resolver without
+// expo-modules-core; the wrapper and the option stay the production ones.
+let nativeForTests: NativeWidgetStore | null = null;
+
+function nativeWidgetStore(): NativeWidgetStore {
+  if (nativeForTests !== null) {
+    return nativeForTests;
+  }
+  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- headless-safe lazy native load: the pure suites that import this module must not load expo-modules-core
+  return require('expo-secure-store') as NativeWidgetStore;
+}
+
+export function _setWidgetNativeStoreForTests(next: NativeWidgetStore | null): void {
+  nativeForTests = next;
+}
+
+/** The class the widget store writes, for the callers that reach the keychain
+ *  through `lib/auth/secure-store-value` instead of the widget store — the two
+ *  identity hints in `lib/auth/account-metadata-write`. */
+export function widgetStoreOptions(): GatedStoreOptions {
+  return { keychainAccessible: nativeWidgetStore().AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY };
+}
+
 /** The widget and glanceable scope store, as the app resolves it for real. */
 export function widgetSecureStore(): GatedSecureStore {
-  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- headless-safe lazy native load: the pure suites that import this module must not load expo-modules-core
-  return withWidgetAccessibility(require('expo-secure-store') as NativeWidgetStore);
+  return withWidgetAccessibility(nativeWidgetStore());
 }
 
 // One queue per key, shared by every writer and by the class upgrade. A publish
@@ -130,7 +166,7 @@ async function setGatedValue(
  * surface — a `null` answered while the keychain is closed.
  */
 export async function readGatedValueForUpdate(
-  resolveStore: () => GatedSecureStore,
+  resolveStore: () => GatedReadStore,
   key: string
 ): Promise<StoredValueRead> {
   try {

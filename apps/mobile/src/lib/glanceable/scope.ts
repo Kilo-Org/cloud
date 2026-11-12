@@ -1,17 +1,21 @@
-import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
+import {
+  type GatedReadStore,
+  readGatedValueForUpdate,
+  widgetSecureStore,
+} from '@/lib/auth/secure-store-gated';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
+import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 /**
  * Scope reads shared by the push handler (`@/lib/notifications`) and the
  * glanceable front-approval orchestrator: the selected organization id and the
  * active-user id, both from SecureStore, and the signed-in scope they form.
  *
- * They read through `readStoredValueSafe` in `lib/auth/secure-store-value`, the
- * one SecureStore entry point: `expo-secure-store` is available on iOS and
- * Android alike, so neither platform lacks the capability and no per-platform
- * storage branch is kept — a single implementation serves both. A failed read
- * is reported and reads as an absent hint instead of rejecting into the
- * background push handler.
+ * The two hints are written with the widget store's class
+ * (`lib/auth/account-metadata-write`), so they are read through the widget store
+ * as well: a push or a background refresh must resolve the account it acts for
+ * with the screen locked, which the default `WHEN_UNLOCKED` class refuses. Only
+ * the read is shared — no token and no other account item is reachable here.
  *
  * They live here rather than beside either call site so both paths resolve the
  * same scope the glanceable snapshot is fenced on; a copy per caller would let
@@ -22,19 +26,27 @@ import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
  * push handler that cannot read a hint drops the push either way.
  * {@link readSignedInScope} keeps them apart, because a snapshot fence must not
  * read a keychain that is merely locked as a different account.
- *
- * Nothing here loads a native module when the file is imported: the keychain
- * entry point is required inside the read. The glanceable mirror imports this
- * module from pure suites that inject their own store, and those suites must not
- * pull the `expo-secure-store` graph in behind it.
  */
 
+/**
+ * One identity hint. `null` covers an absent value and a keychain that could not
+ * answer, which is the answer both push paths act on the same way.
+ */
 async function readHint(key: string): Promise<string | null> {
-  // Dynamic on purpose: a static import would pull `expo-secure-store` into every
-  // suite that imports the glanceable mirror, and those run without a native
-  // runtime. The specifier is fixed; only the load is deferred.
-  const { readStoredValueSafe } = await import('@/lib/auth/secure-store-value');
-  return readStoredValueSafe(key);
+  const read = await readGatedValueForUpdate(readStore, key);
+  return read.status === 'value' ? read.value : null;
+}
+
+// The store the hints are read through. A pure suite injects its own: the widget
+// store loads the native module lazily, which those suites cannot import.
+let storeForTests: GatedReadStore | null = null;
+
+function readStore(): GatedReadStore {
+  return storeForTests ?? widgetSecureStore();
+}
+
+export function _setScopeStoreForTests(next: GatedReadStore | null): void {
+  storeForTests = next;
 }
 
 /**
@@ -61,16 +73,15 @@ export async function getActiveUserId(): Promise<string | null> {
  * already holds one — the glanceable mirror's injectable store — passes it in
  * instead of loading a second entry point beside it.
  */
-export type ScopeKeychain = Readonly<{
-  getItemAsync: (key: string) => Promise<string | null>;
-}>;
+export type ScopeKeychain = GatedReadStore;
 
 /**
  * The signed-in scope as the snapshot fence needs it. Three outcomes, not two:
  * `absent` is a device with no account signed in, `unavailable` is a read that
- * did not complete (a locked keychain, a failed read). Only `known` can confirm
- * that a persisted record belongs to the account holding the device, and an
- * incomplete read is never a mismatch either.
+ * did not complete (a keychain that has not been unlocked since boot, a failed
+ * read). Only `known` can confirm that a persisted record belongs to the
+ * account holding the device, and an incomplete read is never a mismatch
+ * either.
  */
 export type SignedInScope =
   | { readonly status: 'known'; readonly userId: string; readonly organizationId: string | null }
@@ -78,17 +89,25 @@ export type SignedInScope =
   | { readonly status: 'unavailable' };
 
 /**
- * Read both identity hints and report which of the three outcomes they are. A
- * failed read is reported at warning level and reads as `unavailable`, so a
- * caller fence never treats an unreadable keychain as a different account.
+ * Read both identity hints and report which of the three outcomes they are.
+ *
+ * The user id decides which: a `null` it cannot vouch for — the keychain is
+ * closed, or the read failed — is `unavailable`, never `absent`, so a locked
+ * device is not read as a signed-out one. Once it answers with an id, an absent
+ * organization id is the personal scope, which the read can then trust because
+ * the item that proves the device is readable already answered.
  */
 export async function readSignedInScope(keychain: ScopeKeychain): Promise<SignedInScope> {
+  const userId = await readGatedValueForUpdate(() => keychain, ACTIVE_USER_ID_KEY);
+  if (userId.status === 'unreadable') {
+    return { status: 'unavailable' };
+  }
+  if (userId.value === null) {
+    return { status: 'absent' };
+  }
   try {
-    const [userId, organizationId] = await Promise.all([
-      keychain.getItemAsync(ACTIVE_USER_ID_KEY),
-      keychain.getItemAsync(ORGANIZATION_STORAGE_KEY),
-    ]);
-    return userId === null ? { status: 'absent' } : { status: 'known', userId, organizationId };
+    const organizationId = await keychain.getItemAsync(ORGANIZATION_STORAGE_KEY);
+    return { status: 'known', userId: userId.value, organizationId };
   } catch (error) {
     reportSecureStoreFailure('read', error);
     return { status: 'unavailable' };

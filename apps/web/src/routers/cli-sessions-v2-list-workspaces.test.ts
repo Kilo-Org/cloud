@@ -341,6 +341,50 @@ describe('cliSessionsV2 listWorkspaces', () => {
     }
   );
 
+  it.each(['manual', 'created', 'activity'] as const)(
+    'reports truncation when an old Done match falls beyond the first page in %s order',
+    async sortMode => {
+      const oldMerged = worktreeId();
+      await insertPr(oldMerged, 'ses_old_done_match', 'merged', {
+        created_at: '2020-01-01T00:00:00.000Z',
+        last_activity_at: '2020-01-01T00:00:00.000Z',
+      });
+      await db.insert(cloud_agent_workspace_folders).values({
+        kilo_user_id: USER_ID,
+        name: 'Done',
+        position: 0,
+        kind: 'smart',
+        smart_preset: 'done',
+      });
+      await db
+        .insert(cli_sessions_v2)
+        .values(
+          Array.from({ length: 201 }, (_value, index) =>
+            makeSession(`ses_newer_workspace_${index}`, worktreeId())
+          )
+        );
+
+      const first = await sessionCaller().listWorkspaces({
+        organizationId: null,
+        sortMode,
+        limit: 200,
+      });
+      expect(first.workspaces).toHaveLength(200);
+      expect(first.workspaces.some(workspace => workspace.worktreeId === oldMerged)).toBe(false);
+      expect(first.truncated).toBe(true);
+      expect(first.nextCursor).toBe(200);
+
+      const searched = await sessionCaller().listWorkspaces({
+        organizationId: null,
+        sortMode,
+        search: 'Stacked pull request',
+      });
+      expect(searched.workspaces.map(workspace => workspace.worktreeId)).toEqual([oldMerged]);
+      expect(searched.workspaces[0]?.pr?.state).toBe('merged');
+      expect(searched.truncated).toBe(false);
+    }
+  );
+
   it('projects the verified PR stack and base fields', async () => {
     const worktree = worktreeId();
     await insertPr(worktree, 'ses_300000000000000000000001', 'open', { pr_number: 42 });

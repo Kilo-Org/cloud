@@ -1779,22 +1779,33 @@ describe('ChatSidebar phase 4 drag ordering', () => {
     }
   );
 
-  it('explains automatic matching instead of drops in an empty smart folder', () => {
-    const folders = workspaceFolders();
-    folders.folders = [
-      {
-        ...manualFolder([]),
-        name: 'Done',
-        kind: 'smart',
-        smartPreset: 'done',
-      },
-    ];
-    renderSidebar({ workspaceGroups: [], workspaceFolders: folders });
-    const section = dom.container.querySelector('[aria-label="Folder Done"]');
-    expect(section?.textContent).toContain('Workspaces appear here automatically.');
-    expect(section?.textContent).not.toContain('Drop workspaces here');
-    expect(section?.textContent).not.toContain('Sort workspaces');
-  });
+  it.each([false, true])(
+    'explains an empty smart folder when workspace truncation is %s',
+    workspaceRowsTruncated => {
+      const folders = workspaceFolders();
+      folders.folders = [
+        {
+          ...manualFolder([]),
+          name: 'Done',
+          kind: 'smart',
+          smartPreset: 'done',
+        },
+      ];
+      renderSidebar({ workspaceGroups: [], workspaceFolders: folders, workspaceRowsTruncated });
+      const section = dom.container.querySelector('[aria-label="Folder Done"]');
+      expect(section?.textContent).toContain(
+        workspaceRowsTruncated
+          ? 'Workspace list limited to 200. Use search to find matching workspaces.'
+          : 'No matching workspaces. Workspaces appear here automatically.'
+      );
+      if (workspaceRowsTruncated) {
+        expect(section?.textContent).not.toContain('No matching workspaces');
+        expect(section?.textContent).not.toContain('Workspaces appear here automatically.');
+      }
+      expect(section?.textContent).not.toContain('Drop workspaces here');
+      expect(section?.textContent).not.toContain('Sort workspaces');
+    }
+  );
 
   it('renders saved manual folder positions after a drag, refetch and remount', () => {
     const folders = workspaceFolders();

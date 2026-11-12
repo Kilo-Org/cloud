@@ -1721,6 +1721,7 @@ export function ChatSidebar({
                     }
                     visibleCount={groups.length}
                     totalCount={folder.kind === 'smart' ? groups.length : folder.worktreeIds.length}
+                    workspaceRowsTruncated={workspaceRowsTruncated}
                     onEdit={() => setFolderEditor(folder)}
                     onDelete={() => {
                       void workspaceFolders.deleteFolder(folder.id).then(deleted => {

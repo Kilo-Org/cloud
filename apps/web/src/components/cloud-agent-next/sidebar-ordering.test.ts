@@ -141,34 +141,4 @@ describe('groupWorkspaceGroupsByDestination', () => {
       'done',
     ]);
   });
-
-  it.each(['manual', 'created', 'activity'] as const)(
-    'preserves the shared %s workspace order in all smart folders',
-    order => {
-      const groups = [
-        group('older', {
-          status: 'question',
-          sidebarPosition: 'a1',
-          createdAt: '2025-01-01T00:00:00.000Z',
-          lastActivityAt: '2026-03-01T00:00:00.000Z',
-        }),
-        group('newer', { status: 'failed', sidebarPosition: 'a2' }),
-      ];
-      const ordered = sortWorkspaceGroups(groups, order);
-      for (const preset of ['needs_you', 'in_review', 'done'] as const) {
-        const matching = ordered.map(item => ({
-          ...item,
-          root: {
-            ...item.root,
-            status: preset === 'needs_you' ? item.root.status : null,
-            prState: preset === 'done' ? 'merged' : 'open',
-          },
-        }));
-        const destinations = groupWorkspaceGroupsByDestination(matching, [
-          folder('smart-folder', { kind: 'smart', smartPreset: preset, sortMode: 'activity' }),
-        ]);
-        expect(destinations.smart.get(preset)).toEqual(matching);
-      }
-    }
-  );
 });

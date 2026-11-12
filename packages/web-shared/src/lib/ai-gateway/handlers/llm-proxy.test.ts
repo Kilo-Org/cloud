@@ -5658,14 +5658,18 @@ describe('Enkrypt output guardrail', () => {
     enkryptAnswers(piiDetected);
     const body = upstreamBody('chat_completions', true);
     const encoded = new TextEncoder().encode(body);
-    let upstream: ReadableStreamDefaultController<Uint8Array> | undefined;
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
       response: new Response(
         new ReadableStream<Uint8Array>({
           start(controller) {
-            upstream = controller;
             controller.enqueue(encoded.slice(0, 10));
+            // The gateway reads the head of a streaming body before it answers, so the rest
+            // arrives from a later task rather than after the caller already holds a response.
+            setImmediate(() => {
+              controller.enqueue(encoded.slice(10));
+              controller.close();
+            });
           },
         }),
         { headers: { 'content-type': 'text/event-stream' } }
@@ -5684,8 +5688,6 @@ describe('Enkrypt output guardrail', () => {
 
     expect(response.status).toBe(200);
     expect(enkryptCallsAtRewrite).toBe(0);
-    upstream?.enqueue(encoded.slice(10));
-    upstream?.close();
     expect(await response.text()).toBe(body);
     await runAfterTasks();
     expect(enkryptRequestBodies()).toEqual([
@@ -8096,5 +8098,103 @@ describe('BYOK failover', () => {
 
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
     expect(failovers[0]).not.toHaveBeenCalled();
+  });
+});
+
+describe('empty upstream stream retry', () => {
+  const ENVELOPE = 'data: {"choices":[],"id":"gen-empty","provider":"Novita"}\n\ndata: [DONE]\n\n';
+  const CONTENT =
+    'data: {"choices":[{"index":0,"delta":{"content":"hi"}}],"id":"gen-full"}\n\ndata: [DONE]\n\n';
+  let env: jest.ReplaceProperty<NodeJS.ProcessEnv>;
+
+  function streamingResponse(body: string) {
+    return new Response(body, { headers: { 'content-type': 'text/event-stream' } });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedGetProvider.mockResolvedValue(
+      providerResult({ provider, userByok: null, isFree: false, bypassAccessCheck: false })
+    );
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
+    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
+    setUserAuth();
+  });
+
+  afterEach(() => {
+    env?.restore();
+  });
+
+  function setRetryModels(value: string) {
+    env = jest.replaceProperty(process, 'env', {
+      ...process.env,
+      GATEWAY_EMPTY_STREAM_RETRY_MODELS: value,
+    });
+  }
+
+  function sendStreamed(headers?: HeadersInit) {
+    return handleLlmProxyRequest(
+      makeRequest({ ...makeBody(), stream: true }, headers, '/chat/completions')
+    );
+  }
+
+  it('retries once and serves the content of an envelope-only answer', async () => {
+    setRetryModels('openai/gpt-4o');
+    mockedUpstreamRequest
+      .mockResolvedValueOnce({ type: 'success', response: streamingResponse(ENVELOPE) })
+      .mockResolvedValueOnce({ type: 'success', response: streamingResponse(CONTENT) });
+
+    const response = await sendStreamed();
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(CONTENT);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(2);
+    const firstBody = mockedUpstreamRequest.mock.calls[0]?.[0].body as { model?: string };
+    const retriedBody = mockedUpstreamRequest.mock.calls[1]?.[0].body as { model?: string };
+    expect(retriedBody.model).toBe(firstBody.model);
+    expect(retriedBody).not.toBe(firstBody);
+  });
+
+  it('forwards an envelope-only answer without a retry when the model is not listed', async () => {
+    setRetryModels('');
+    mockedUpstreamRequest.mockImplementation(async () => ({
+      type: 'success',
+      response: streamingResponse(ENVELOPE),
+    }));
+
+    const response = await sendStreamed();
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(ENVELOPE);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards the first envelope-only answer when the retry is envelope-only too', async () => {
+    setRetryModels('openai/gpt-4o');
+    mockedUpstreamRequest.mockImplementation(async () => ({
+      type: 'success',
+      response: streamingResponse(ENVELOPE),
+    }));
+
+    const response = await sendStreamed();
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(ENVELOPE);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it('serves a content-bearing answer on the first attempt', async () => {
+    setRetryModels('openai/gpt-4o');
+    mockedUpstreamRequest.mockImplementation(async () => ({
+      type: 'success',
+      response: streamingResponse(CONTENT),
+    }));
+
+    const response = await sendStreamed();
+
+    expect(await response.text()).toBe(CONTENT);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 });

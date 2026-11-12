@@ -7,6 +7,13 @@ import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/
 import { BRIEFING_SETTLEMENT_HEADER } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { sendUpstreamAttemptWithByokFailover } from '@kilocode/web-shared/lib/ai-gateway/providers/byok-failover';
+import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
+import { UPSTREAM_DURATION_BUDGET_MS } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import {
+  getEmptyStreamRetryModels,
+  isEmptyStreamRetryEnabled,
+  maybeRetryEmptyUpstreamStream,
+} from '@kilocode/web-shared/lib/ai-gateway/empty-stream-retry';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -99,6 +106,12 @@ function llmProxyPath(url: URL): LlmProxyPath | null {
       return null;
   }
 }
+
+/**
+ * A retry needs enough of the shared upstream budget left to finish a whole generation, so it is
+ * skipped rather than aborted immediately near the route's deadline.
+ */
+const MIN_EMPTY_STREAM_RETRY_BUDGET_MS = 30_000;
 
 /**
  * Signed-in callers count per account, anonymous callers per IP. Uses the
@@ -395,6 +408,23 @@ export async function handleLlmProxyRequest(
   if (!providerPolicy.ok) return providerPolicy.response;
   const { route, failoverRoutes, isNonTrialEnterprise, dataRegion } = providerPolicy;
 
+  const emptyStreamRetryEnabled =
+    isEmptyStreamRetryEnabled({
+      costLimited: requestCostLimit !== null,
+      kind: requestBodyParsed.kind,
+      model: effectiveModelIdLowerCased,
+      models: getEmptyStreamRetryModels(),
+      streaming: requestBodyParsed.body.stream === true,
+      userByok: route.userByok !== null,
+    }) &&
+    UPSTREAM_DURATION_BUDGET_MS - (performance.now() - requestStartedAt) >=
+      MIN_EMPTY_STREAM_RETRY_BUDGET_MS;
+  // Provider transforms mutate the request they send, so a retry needs a copy taken before them.
+  // The copy is only made for a request the retry can use.
+  const requestForEmptyStreamRetry = emptyStreamRetryEnabled
+    ? structuredClone(requestBodyParsed)
+    : null;
+
   console.debug(`Routing request to ${route.provider.type}`, {
     byokProviderIds: route.userByok?.map(byok => byok.providerId) ?? null,
   });
@@ -511,11 +541,43 @@ export async function handleLlmProxyRequest(
   }
   if (attempt.type === 'error') return attempt.response;
   usageContext.provider = providerContext.provider.type;
+  // The peek and the retry both finish before the response clone that usage accounting reads, so
+  // the accounted answer is the one the client receives.
+  const { attempt: answered, request: retriedRequest } = await maybeRetryEmptyUpstreamStream({
+    attempt,
+    enabled: requestForEmptyStreamRetry !== null,
+    kind: requestBodyParsed.kind,
+    model: effectiveModelIdLowerCased,
+    providerType: providerContext.provider.type,
+    requestForRetry: requestForEmptyStreamRetry,
+    vercelRequestId: headers.vercelRequestId,
+    retry: retryRequest =>
+      sendUpstreamAttempt({
+        providerContext,
+        request: retryRequest,
+        requestedModel: effectiveModelIdLowerCased,
+        fraudHeaders,
+        userId: user.id,
+        organizationId: organizationId ?? null,
+        sessionId: headers.sessionId,
+        taskId: headers.taskId,
+        isNonTrialEnterprise,
+        search: url.search,
+        method: request.method,
+        signal: request.signal,
+        vercelRequestId: headers.vercelRequestId,
+        dataRegion,
+        upstreamDurationBudgetMs: Math.floor(
+          UPSTREAM_DURATION_BUDGET_MS - (performance.now() - requestStartedAt)
+        ),
+      }),
+  });
 
   const { settings: organizationSettings } = await balanceAndSettingsPromise;
+  const answeredRequest = retriedRequest ?? sentRequest;
   return await respondToUpstream({
-    upstream: attempt,
-    request: sentRequest,
+    upstream: answered,
+    request: answeredRequest,
     model: effectiveModelIdLowerCased,
     requestedModel: requestedModelLowerCased,
     providerResult: providerContext,
@@ -525,7 +587,7 @@ export async function handleLlmProxyRequest(
     upstreamSpan: openrouterRequestSpan,
     requestStartedAt,
     briefingSettlementToken: request.headers.get(BRIEFING_SETTLEMENT_HEADER),
-    logging: { ...requestLogging, request: sentRequest },
+    logging: { ...requestLogging, request: answeredRequest },
     enkryptOutputScan:
       organizationId && !isAnonymousContext(user)
         ? resolveEnkryptOutputScan(

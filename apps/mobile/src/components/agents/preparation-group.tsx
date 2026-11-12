@@ -12,9 +12,7 @@ import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-import { MonoScrollBlock } from './mono-scroll-block';
 import {
-  preparationDetailText,
   preparationErrorText,
   preparationStepLabel,
   splitFailureSentence,
@@ -26,6 +24,7 @@ import {
   incompleteRestoreText,
   preparationGroupExpandedByDefault,
 } from './preparation-group-state';
+import { hasStepDetails, PreparationStepDetails } from './preparation-step-details';
 
 /** Reaches the 44 dp touch floor on a header and a child row without growing either. */
 const ROW_TOUCH_SLOP = { top: 5, bottom: 5 } as const;
@@ -90,7 +89,15 @@ export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
               {copy.detail}
             </Text>
           ) : null}
-          {copy.namedStep === undefined ? null : <PreparationStepDetails step={copy.namedStep} />}
+          {/* A failed group's header names the failed stage, so that stage's
+              last progress line would contradict it. Running and completed
+              groups keep their progress lines. */}
+          {copy.namedStep === undefined ? null : (
+            <PreparationStepDetails
+              step={copy.namedStep}
+              showProgress={attempt.status !== 'failed'}
+            />
+          )}
           {steps.map(step => (
             <PreparationStepRow
               key={step.id}
@@ -222,13 +229,7 @@ function PreparationStepRow({
   useEffect(() => {
     setExpanded(step.status !== 'completed');
   }, [step.id, step.status]);
-  const hasDetails = [
-    step.command,
-    step.latestDetail,
-    step.outputTail,
-    step.safeError,
-    step.exitCode,
-  ].some(value => value !== undefined && value !== '');
+  const hasDetails = hasStepDetails(step, true);
   const label =
     step.kind === 'setup_command' && phaseKey === START_COMMANDS_STEP_KEY
       ? (step.command ?? preparationStepLabel(step, t))
@@ -274,71 +275,6 @@ function PreparationStepRow({
         </Text>
       </Pressable>
       {expanded && hasDetails ? <PreparationStepDetails step={step} divided /> : null}
-    </View>
-  );
-}
-
-/**
- * A step's own evidence: the command, the progress line, the failure, the exit
- * code and the tail. A row shows it under its header when expanded, and a group
- * whose header already names the step shows it on its own, so naming a step in
- * the header never hides what that step recorded.
- */
-function PreparationStepDetails({
-  step,
-  divided = false,
-}: {
-  step: PreparationStepSnapshot;
-  divided?: boolean;
-}) {
-  const { t } = useTranslation();
-  const hasDetails = [
-    step.command,
-    step.latestDetail,
-    step.outputTail,
-    step.safeError,
-    step.exitCode,
-  ].some(value => value !== undefined && value !== '');
-  if (!hasDetails) {
-    return null;
-  }
-  return (
-    <View className={divided ? 'gap-2 border-t border-border px-3 py-2' : 'gap-2'}>
-      {step.command ? (
-        <Text selectable className="rounded bg-secondary p-2 font-mono text-xs">
-          {step.command}
-        </Text>
-      ) : null}
-      {step.latestDetail ? (
-        <Text className="text-sm text-muted-foreground">
-          {preparationDetailText(step.latestDetail, t)}
-        </Text>
-      ) : null}
-      {step.safeError ? (
-        <Text selectable className="text-sm text-muted-foreground">
-          {preparationErrorText(step.safeError, t)}
-        </Text>
-      ) : null}
-      {step.exitCode !== undefined ? (
-        <Text className="text-xs text-muted-foreground">
-          {t('agentChat.preparation.exitCode', { code: step.exitCode })}
-        </Text>
-      ) : null}
-      {step.outputTail ? (
-        <>
-          {step.outputTruncated ? (
-            <Text className="text-xs text-muted-foreground">
-              {t('agentChat.preparation.earlierOutputOmitted')}
-            </Text>
-          ) : null}
-          <MonoScrollBlock
-            content={step.outputTail}
-            containerClassName="rounded bg-secondary p-2"
-            textClassName="text-foreground"
-            inTranscript
-          />
-        </>
-      ) : null}
     </View>
   );
 }

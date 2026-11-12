@@ -454,7 +454,7 @@ needs one. At-least-once delivery and operator replay can add further attempts.
 Under sustained failure, polling eventually slows to **5–10 minutes** between
 eligible attempts, so recovery can still wait that long plus scheduling/backlog.
 For a new event receiving only recognized admission rejections, the 20 requested
-delays sum to 63m 31s–127m 02s; for only other handled failures, 68m 28s–136m 56s.
+delays sum to 63m 31s–127m 04s; for only other handled failures, 68m 28s–136m 56s.
 These are conditional scheduled-delay sums, **not DLQ timing guarantees**, minimum
 recovery windows, or retention requirements. Processing, implicit 60-second
 retries, mixed histories, consumed attempts, scheduling and retention affect the

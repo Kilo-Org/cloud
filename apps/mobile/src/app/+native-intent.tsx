@@ -130,6 +130,9 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     if (/(?:^|\/)dev\/transcript-execution-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/transcript-execution-failure-fixture';
     }
+    if (/(?:^|\/)dev\/transcript-preparation-failure-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/transcript-preparation-failure-fixture';
+    }
     if (/(?:^|\/)dev\/transcript-undelivered-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/transcript-undelivered-fixture';
     }

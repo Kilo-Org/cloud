@@ -1172,7 +1172,7 @@ export function SessionDetailContent({
   // transport, the next build restores the normal streaming behavior.
   const dropUnrenderableUserRows = activeSessionType === 'read-only';
 
-  const baseTranscript = useMemo(() => {
+  const { transcript: baseTranscript, preparationFailureTriggers } = useMemo(() => {
     // A superseded submission's preparation goes with its row: dropping only
     // the row would leave `mergeSessionTranscript` re-emitting the attempt at
     // the end (its trigger id is no longer in the message list).
@@ -1182,10 +1182,22 @@ export function SessionDetailContent({
         : preparationAttempts.filter(
             attempt => !supersededMessageIds.has(attempt.triggerMessageId)
           );
-    return mergeSessionTranscript(displayedMessages, attempts, {
-      deliveryStates: pendingMessages,
-      dropUnrenderableUserRows,
-    });
+    // A failed attempt states its own failure in the group it renders, with the
+    // stage and the reason. The question that triggered it must not repeat the
+    // generic response failure on top of that statement.
+    const failed = new Set<string>();
+    for (const attempt of attempts) {
+      if (attempt.status === 'failed') {
+        failed.add(attempt.triggerMessageId);
+      }
+    }
+    return {
+      transcript: mergeSessionTranscript(displayedMessages, attempts, {
+        deliveryStates: pendingMessages,
+        dropUnrenderableUserRows,
+      }),
+      preparationFailureTriggers: failed,
+    };
   }, [
     displayedMessages,
     preparationAttempts,
@@ -1644,6 +1656,7 @@ export function SessionDetailContent({
           onAddCredits={handleAddCredits}
           retryAvailable={retryAvailable}
           onCopyToComposer={handleCopyToComposer}
+          failureStatedByPreparation={preparationFailureTriggers.has(item.message.info.id)}
           onRestoreQueued={
             canceledQueuedMessages.has(item.message.info.id) ? handleRestoreQueued : undefined
           }
@@ -1676,6 +1689,7 @@ export function SessionDetailContent({
       pendingMessages,
       heldQueuedIds,
       retryAvailable,
+      preparationFailureTriggers,
       handleRetryMessage,
       handleAddCredits,
       handleCopyToComposer,

@@ -50,6 +50,20 @@ export const MAX_HEARTBEAT_GIT_URL_LENGTH = 2048;
 export const MAX_HEARTBEAT_GIT_BRANCH_LENGTH = 256;
 // A parent identifier is another session id, so it shares that bound.
 export const MAX_HEARTBEAT_PARENT_SESSION_ID_LENGTH = 256;
+// An ISO-8601 timestamp at millisecond precision is 24 characters; keep room
+// for a producer that sends a longer zone offset.
+export const MAX_HEARTBEAT_SCHEDULED_AT_LENGTH = 64;
+
+/**
+ * A metadata string of at most `max` characters; a longer value is shortened
+ * to the limit, and a cut never leaves a lone high surrogate.
+ */
+const boundedMetadata = (max: number) =>
+  z
+    .string()
+    .transform(value =>
+      value.length > max ? value.slice(0, max).replace(/[\uD800-\uDBFF]$/, '') : value
+    );
 
 // Reads the advertised session count from a frame independently of the full
 // heartbeat contract, so a frame outside the limits above is reported with its
@@ -95,18 +109,25 @@ export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
     sessions: z
       .array(
         z.object({
+          // Identity fields keep a hard limit: a cut id would name a different
+          // session, and a cut status could read as another known status.
           id: z.string().max(MAX_HEARTBEAT_SESSION_ID_LENGTH),
           status: z.string().max(MAX_HEARTBEAT_STATUS_LENGTH),
           // Wake time for a `scheduled` session (ISO-8601). Sent beside `status`;
           // absent for every other status and on legacy CLIs that predate
           // scheduling. A producer that serializes the absent field as an explicit
-          // null, or a value that is not a time at all, reads as absent: rejecting
-          // the value would fail `CLIOutboundMessageSchema` and drop the whole
-          // heartbeat, so the session would never reach `sessions.list`.
-          scheduledAt: z.string().optional().catch(undefined),
-          title: z.string().max(MAX_HEARTBEAT_TITLE_LENGTH),
-          gitUrl: z.string().max(MAX_HEARTBEAT_GIT_URL_LENGTH).optional(),
-          gitBranch: z.string().max(MAX_HEARTBEAT_GIT_BRANCH_LENGTH).optional(),
+          // null, a value that is not a time at all, or a value longer than a
+          // timestamp is treated as absent, so the field stays optional in the
+          // parsed row.
+          scheduledAt: z
+            .string()
+            .max(MAX_HEARTBEAT_SCHEDULED_AT_LENGTH)
+            .optional()
+            .catch(undefined),
+          // Display metadata is shortened to its limit.
+          title: boundedMetadata(MAX_HEARTBEAT_TITLE_LENGTH),
+          gitUrl: boundedMetadata(MAX_HEARTBEAT_GIT_URL_LENGTH).optional(),
+          gitBranch: boundedMetadata(MAX_HEARTBEAT_GIT_BRANCH_LENGTH).optional(),
           parentSessionId: z.string().max(MAX_HEARTBEAT_PARENT_SESSION_ID_LENGTH).optional(),
           // Platform the session is running on (e.g. "darwin", "linux", "vscode").
           // Optional for backward compatibility with legacy CLIs.

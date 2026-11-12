@@ -6101,7 +6101,7 @@ describe('UserConnectionDO', () => {
       expect(data.sessions).toHaveLength(MAX_HEARTBEAT_SESSIONS);
     });
 
-    it('refuses a heartbeat over the session count limit before any per-session work', async () => {
+    it('refuses a heartbeat over the session limit before any per-session work', async () => {
       const { doInstance, mockCtx, ctx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -6130,9 +6130,10 @@ describe('UserConnectionDO', () => {
       expect(cliWs.deserializeAttachment()).toMatchObject({ sessions: [] });
     });
 
-    it('refuses a heartbeat whose session string exceeds its limit', async () => {
+    it('shortens an over-limit title and relays the shortened value', async () => {
       const { doInstance, mockCtx, ctx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
       const sessions = [
         makeSession('ses_title_too_long', 'busy', 't'.repeat(MAX_HEARTBEAT_TITLE_LENGTH + 1)),
@@ -6144,16 +6145,17 @@ describe('UserConnectionDO', () => {
       );
       await flushAsync();
 
-      expect(warn).toHaveBeenCalledWith('CLI message parse failed', {
-        role: 'cli',
-        connectionId: 'cli-1',
-        byteCount: expect.any(Number),
-        sessionCount: 1,
-        issues: [{ path: ['sessions', 0, 'title'], code: 'too_big' }],
-      });
-      expect(JSON.stringify(warn.mock.calls)).not.toContain('t'.repeat(64));
-      expect(ctx.storage.store.size).toBe(0);
-      expect(doInstance.getActiveSessions()).toEqual([]);
+      expect(warn).not.toHaveBeenCalledWith('CLI message parse failed', expect.anything());
+      expect(allSent(cliWs)).toEqual([{ type: 'heartbeat_ack' }]);
+      const active = doInstance.getActiveSessions();
+      expect(active).toHaveLength(1);
+      expect(active[0]?.title).toHaveLength(MAX_HEARTBEAT_TITLE_LENGTH);
+      const heartbeatEvent = allSent(webWs).find(message => message.event === 'sessions.heartbeat');
+      expect(JSON.stringify(heartbeatEvent)).toContain('t'.repeat(MAX_HEARTBEAT_TITLE_LENGTH));
+      expect(JSON.stringify(heartbeatEvent)).not.toContain(
+        't'.repeat(MAX_HEARTBEAT_TITLE_LENGTH + 1)
+      );
+      expect(ctx.storage.store.size).toBeGreaterThan(0);
     });
 
     it('webSocketError triggers webSocketClose', async () => {

@@ -10,6 +10,7 @@ import {
   MAX_HEARTBEAT_PARENT_SESSION_ID_LENGTH,
   MAX_HEARTBEAT_SESSION_ID_LENGTH,
   MAX_HEARTBEAT_SESSIONS,
+  MAX_HEARTBEAT_SCHEDULED_AT_LENGTH,
   MAX_HEARTBEAT_STATUS_LENGTH,
   MAX_HEARTBEAT_TITLE_LENGTH,
   heartbeatSessionCount,
@@ -1039,6 +1040,13 @@ describe('CLIOutboundMessageSchema heartbeat session bounds', () => {
     return { type: 'heartbeat', sessions };
   }
 
+  /** Parsed heartbeat rows; fails the test when the frame is refused. */
+  function parsedRows(sessions: unknown[]) {
+    const parsed = CLIOutboundMessageSchema.parse(heartbeat(sessions));
+    if (parsed.type !== 'heartbeat') throw new Error('expected a heartbeat frame');
+    return parsed.sessions;
+  }
+
   function rows(count: number) {
     return Array.from({ length: count }, (_, index) =>
       row({ id: `ses_${String(index).padStart(26, '0')}` })
@@ -1051,7 +1059,7 @@ describe('CLIOutboundMessageSchema heartbeat session bounds', () => {
     ).toBe(true);
   });
 
-  it('refuses a heartbeat one session over the count limit', () => {
+  it('refuses a heartbeat one session over the session limit', () => {
     const result = CLIOutboundMessageSchema.safeParse(heartbeat(rows(MAX_HEARTBEAT_SESSIONS + 1)));
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -1076,9 +1084,6 @@ describe('CLIOutboundMessageSchema heartbeat session bounds', () => {
   it.each([
     ['id', MAX_HEARTBEAT_SESSION_ID_LENGTH],
     ['status', MAX_HEARTBEAT_STATUS_LENGTH],
-    ['title', MAX_HEARTBEAT_TITLE_LENGTH],
-    ['gitUrl', MAX_HEARTBEAT_GIT_URL_LENGTH],
-    ['gitBranch', MAX_HEARTBEAT_GIT_BRANCH_LENGTH],
     ['parentSessionId', MAX_HEARTBEAT_PARENT_SESSION_ID_LENGTH],
   ])('refuses a session whose %s is one character over its limit', (field, limit) => {
     const result = CLIOutboundMessageSchema.safeParse(
@@ -1092,7 +1097,35 @@ describe('CLIOutboundMessageSchema heartbeat session bounds', () => {
     }
   });
 
-  it('reports the advertised count of a heartbeat the contract refuses', () => {
+  it.each([
+    ['title', MAX_HEARTBEAT_TITLE_LENGTH],
+    ['gitUrl', MAX_HEARTBEAT_GIT_URL_LENGTH],
+    ['gitBranch', MAX_HEARTBEAT_GIT_BRANCH_LENGTH],
+  ])('shortens %s to its limit', (field, limit) => {
+    const [session] = parsedRows([row({ [field]: 'x'.repeat(limit + 1) })]);
+    expect(session?.[field as 'title']).toHaveLength(limit);
+  });
+
+  it('shortens an over-limit title without leaving a lone surrogate', () => {
+    // The limit falls between the two halves of the last code point.
+    const title = `${'a'.repeat(MAX_HEARTBEAT_TITLE_LENGTH - 1)}😀`;
+    const [session] = parsedRows([row({ title })]);
+    expect(session?.title).toBe('a'.repeat(MAX_HEARTBEAT_TITLE_LENGTH - 1));
+  });
+
+  it('treats an over-limit wake time as absent', () => {
+    const [session] = parsedRows([
+      row({
+        status: 'scheduled',
+        scheduledAt: 'z'.repeat(MAX_HEARTBEAT_SCHEDULED_AT_LENGTH + 1),
+      }),
+    ]);
+    // The over-limit value is not carried into the parsed row.
+    expect(session?.scheduledAt).toBeUndefined();
+    expect(JSON.stringify(session)).not.toContain('zzzz');
+  });
+
+  it('reports the advertised count of a heartbeat over the session limit', () => {
     expect(heartbeatSessionCount(heartbeat(rows(MAX_HEARTBEAT_SESSIONS + 1)))).toBe(
       MAX_HEARTBEAT_SESSIONS + 1
     );

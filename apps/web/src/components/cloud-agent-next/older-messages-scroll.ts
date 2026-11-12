@@ -42,6 +42,10 @@ type PrependScrollPosition = {
   anchor: { element: Element; top: number; key: ScrollAnchorKey; value: string } | null;
 };
 
+function getPartScrollAnchorElement(marker: Element): Element | undefined {
+  return marker.closest('[data-scroll-anchor-group]') ?? marker.nextElementSibling ?? undefined;
+}
+
 export function capturePrependScrollPosition(el: HTMLElement): PrependScrollPosition {
   const viewport = el.getBoundingClientRect();
   let anchor: PrependScrollPosition['anchor'] = null;
@@ -50,7 +54,7 @@ export function capturePrependScrollPosition(el: HTMLElement): PrependScrollPosi
     for (const marker of el.querySelectorAll<HTMLElement>(`[${key}]`)) {
       const value = marker.getAttribute(key);
       if (!value) continue;
-      const element = key === 'data-scroll-anchor' ? marker.nextElementSibling : marker;
+      const element = key === 'data-scroll-anchor' ? getPartScrollAnchorElement(marker) : marker;
       if (!element || element.hasAttribute('hidden')) continue;
       const rect = element.getBoundingClientRect();
       if (rect.height > 0 && rect.bottom > viewport.top && rect.top < viewport.bottom) {
@@ -73,7 +77,9 @@ export function restoreScrollAfterPrepend(el: HTMLElement, previous: PrependScro
     // Regrouping can retain the old message id on a zero-height span inside the new row.
     element =
       anchor.key === 'data-scroll-anchor'
-        ? (marker?.nextElementSibling ?? undefined)
+        ? marker
+          ? getPartScrollAnchorElement(marker)
+          : undefined
         : (marker?.closest('[data-message-role]') ?? marker);
   }
   if (anchor && element && el.contains(element)) {

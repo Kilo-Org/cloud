@@ -122,6 +122,7 @@ export function CloudMessageParts({ collapseTools = false }: { collapseTools?: b
     return (
       <div key={key} className="py-1">
         <AgentWorkGroup
+          scrollAnchorIds={segment.parts.map(part => part.id)}
           summary={summarizeAgentWork(segment.parts, working)}
           working={working}
           activity={

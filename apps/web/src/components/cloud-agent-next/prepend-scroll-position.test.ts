@@ -9,6 +9,9 @@ function scrollingTranscript() {
     messageId: 'msg_visible',
     regrouped: false,
     partAnchors: false,
+    collapsedGroup: false,
+    groupPartIds: ['part_first', 'part_visible'],
+    mergedHeight: 0,
     scrollHeight: 1000,
     viewportTop: 100,
   };
@@ -29,13 +32,28 @@ function scrollingTranscript() {
     },
   };
   let currentRow = row;
+  const groupHeader = {
+    hasAttribute: () => false,
+    getBoundingClientRect: () => {
+      const top = layout.viewportTop + layout.rowTop + layout.mergedHeight - element.scrollTop;
+      return { top, bottom: top + 44, height: 44 };
+    },
+  };
+  let currentHeader = groupHeader;
   const partMarker = {
     dataset: { scrollAnchor: 'part_visible' },
     getAttribute: (key: string) => (key === 'data-scroll-anchor' ? 'part_visible' : null),
     get nextElementSibling() {
       return currentRow;
     },
+    closest: () => null,
   };
+  const groupMarkers = () =>
+    layout.groupPartIds.map(id => ({
+      getAttribute: (key: string) => (key === 'data-scroll-anchor' ? id : null),
+      nextElementSibling: null,
+      closest: () => currentHeader,
+    }));
   const groupedMessageMarker = {
     ...marker,
     getAttribute: (key: string) => (key === 'data-message-id' ? 'msg_visible' : null),
@@ -51,18 +69,25 @@ function scrollingTranscript() {
       !layout.rowPresent
         ? []
         : selector === '[data-scroll-anchor]'
-          ? layout.partAnchors
-            ? [partMarker]
-            : []
+          ? layout.collapsedGroup
+            ? groupMarkers()
+            : layout.partAnchors
+              ? [partMarker]
+              : []
           : [marker, currentRow, ...(layout.regrouped ? [groupedMessageMarker] : [])],
-    contains: (child: unknown) => layout.rowPresent && child === currentRow,
+    contains: (child: unknown) =>
+      layout.rowPresent && (child === currentRow || child === currentHeader),
   };
   return {
     element: element as unknown as HTMLElement,
     layout,
     row,
+    get groupHeader() {
+      return currentHeader;
+    },
     replaceRow: () => {
       currentRow = { ...row };
+      currentHeader = { ...groupHeader };
     },
   };
 }
@@ -156,7 +181,7 @@ describe('prepend scroll position', () => {
     }
   );
 
-  it('follows the retained message marker when a collapsed assistant group gets a new root id', () => {
+  it('follows the retained message marker when a regrouped row has no internal offset', () => {
     const { element, layout, replaceRow } = scrollingTranscript();
     const position = capturePrependScrollPosition(element);
     replaceRow();
@@ -169,6 +194,34 @@ describe('prepend scroll position', () => {
     restoreScrollAfterPrepend(element, position);
     expect(element.scrollTop).toBe(360);
   });
+
+  it.each([false, true])(
+    'keeps a collapsed header fixed when merged content precedes it (browser anchoring: %s)',
+    browserAnchored => {
+      const transcript = scrollingTranscript();
+      const { element, layout, replaceRow } = transcript;
+      layout.collapsedGroup = true;
+      const top = transcript.groupHeader.getBoundingClientRect().top;
+      const position = capturePrependScrollPosition(element);
+      expect(position.anchor).toMatchObject({
+        element: transcript.groupHeader,
+        key: 'data-scroll-anchor',
+        value: 'part_first',
+      });
+      replaceRow();
+      layout.messageId = 'msg_older';
+      layout.regrouped = true;
+      layout.groupPartIds.unshift('part_older');
+      layout.rowTop += 300;
+      layout.mergedHeight = 180;
+      layout.scrollHeight += 660;
+      if (browserAnchored) element.scrollTop += 480;
+      restoreScrollAfterPrepend(element, position);
+      restoreScrollAfterPrepend(element, position);
+      expect(element.scrollTop).toBe(540);
+      expect(transcript.groupHeader.getBoundingClientRect().top).toBe(top);
+    }
+  );
 
   it('measures the row relative to the viewport when the viewport itself moves', () => {
     const { element, layout } = scrollingTranscript();

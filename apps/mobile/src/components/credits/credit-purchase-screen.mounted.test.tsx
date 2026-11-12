@@ -18,6 +18,7 @@ import {
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
 import { act, type TestRenderer } from '@/test/renderer';
+import { compiledLengthDp } from '@/test/native-dimensions';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { CreditPurchaseScreen } from './credit-purchase-screen';
 
@@ -1272,14 +1273,42 @@ describe('CreditPurchaseScreen', () => {
 
     const amountHeight = measured[0]?.amount ?? 0;
     const captionHeight = measured[0]?.caption ?? 0;
-    // Both slots are text line boxes: the amount's own line, and the two lines
-    // the caption's sentence wraps to in this card's width.
-    expect(amountHeight).toBeGreaterThan(0);
-    expect(captionHeight).toBeGreaterThan(0);
+    // Each floor is the text's own line box at the default scale, so the
+    // reservation matches the painted lines: one `text-2xl` line for the
+    // amount, and the sentence's two `text-xs` lines for the caption. The
+    // compiled `lineHeight` is a multiplier, so the box is the font size times
+    // that leading.
+    const amountLine =
+      (await compiledLengthDp('text-2xl', 'fontSize')) *
+      (await compiledLengthDp('text-2xl', 'lineHeight'));
+    const captionLine =
+      (await compiledLengthDp('text-xs', 'fontSize')) *
+      (await compiledLengthDp('text-xs', 'lineHeight'));
+    expect(amountHeight).toBeCloseTo(amountLine, 0);
+    expect(captionHeight).toBeGreaterThanOrEqual(2 * captionLine);
     for (const result of measured) {
       expect(result.amount, result.state).toBe(amountHeight);
       expect(result.caption, result.state).toBe(captionHeight);
     }
+    // A raised scale fits fewer characters per line, so the caption needs more
+    // lines than it does at the default scale. The floor must count those
+    // lines, not just scale the two lines' height, or the caption outgrows it
+    // and the copy below moves.
+    dimensions.fontScale = 1.5;
+    const raised = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(raised.renderer).includes('No expiring credits.'));
+    const raisedCard = raised.renderer.root.findAll(
+      node => (node.props as { testID?: string }).testID === 'credit-purchase-screen'
+    )[0];
+    if (!raisedCard) {
+      throw new Error('expected the screen at the raised scale');
+    }
+    expect(heightOf(slotOf(raisedCard, 'credit-expiry-slot'))).toBeGreaterThanOrEqual(
+      3 * captionLine * 1.5
+    );
+    expect(heightOf(slotOf(raisedCard, 'credit-balance-slot'))).toBeCloseTo(amountLine * 1.5, 0);
+    raised.unmount();
+    dimensions.fontScale = 1;
     // The caption slot paints one caption in every state; the slot's own
     // subtree carries the copy, so the assertion cannot pass through the rest
     // of the screen. The failed balance line sits in the amount slot, above

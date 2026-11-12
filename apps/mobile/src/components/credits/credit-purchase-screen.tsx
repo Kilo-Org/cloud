@@ -85,6 +85,17 @@ const BALANCE_AMOUNT_LINE_HEIGHT = 28.2;
 const EXPIRY_LINE_HEIGHT = 14.1;
 const EXPIRY_CAPTION_LINES = 2;
 
+/**
+ * The caption's floor at a font scale. The card's width does not change, so a
+ * raised scale fits fewer characters per line: the sentence's line count grows
+ * with the scale, and the floor counts those lines before it multiplies each
+ * one's height. Reserving only the scaled height of two lines would let the
+ * caption outgrow the floor and move the copy below.
+ */
+function expiryCaptionFloor(fontScale: number): number {
+  return Math.ceil(EXPIRY_CAPTION_LINES * fontScale) * EXPIRY_LINE_HEIGHT * fontScale;
+}
+
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
 
@@ -269,12 +280,12 @@ export function CreditPurchaseScreen() {
   };
 
   const renderExpirySlot = () => {
-    // Every state paints one caption inside the same two-line slot: the
-    // sentence, the "no expiring credits" line the Profile credits card also
-    // shows, "expiry unavailable" when the read fails, or the skeleton. The
-    // slot is two lines because that is what the sentence wraps to in this
-    // card's width, and it is laid out from its bottom, so the card's bottom
-    // padding stays its `py-4` in every state and the copy below never moves.
+    // Every state paints one caption inside the same floor: the sentence, the
+    // "no expiring credits" line the Profile credits card also shows, "expiry
+    // unavailable" when the read fails, or the skeleton. The floor counts the
+    // lines the sentence wraps to in this card's width, and the caption
+    // centres inside it, so the card's padding stays its `py-4` at both edges
+    // and the copy below never moves.
     if (creditBlocksQuery.isError) {
       return (
         <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
@@ -333,7 +344,7 @@ export function CreditPurchaseScreen() {
                 sentence grows the floor instead of truncating. */}
             <View
               className="mt-1 justify-center"
-              style={{ minHeight: EXPIRY_CAPTION_LINES * EXPIRY_LINE_HEIGHT * fontScale }}
+              style={{ minHeight: expiryCaptionFloor(fontScale) }}
               testID="credit-expiry-slot"
             >
               {renderExpirySlot()}

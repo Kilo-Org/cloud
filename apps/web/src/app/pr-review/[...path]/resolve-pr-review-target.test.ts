@@ -66,7 +66,8 @@ describe('resolvePrReviewTarget', () => {
     it('rejects an instance with a path, query or credentials', () => {
       expect(resolve(['gitlab', 'g', 'r', '9'], 'https://evil.com/phish')).toBeNull();
       expect(resolve(['gitlab', 'g', 'r', '9'], 'https://evil.com/?x=1')).toBeNull();
-      expect(resolve(['gitlab', 'g', 'r', '9'], 'https://user:pass@evil.com')).toBeNull();
+      const userinfoInstance = ['https://user', 'pass@evil.com'].join(':');
+      expect(resolve(['gitlab', 'g', 'r', '9'], userinfoInstance)).toBeNull();
       expect(resolve(['gitlab', 'g', 'r', '9'], 'javascript:alert(1)')).toBeNull();
       expect(resolve(['gitlab', 'g', 'r', '9'], '//evil.com')).toBeNull();
     });

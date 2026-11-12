@@ -731,8 +731,14 @@ are not a complete recovery mechanism. Exact recovery limits are documented in
 3. If the environment dies, the next prompt MUST recover in the same chat. The
    user MUST NOT be forced to start a new session.
 4. Recovery MUST preserve each worktree chat, its transcript, and its grouping.
-   Uncommitted files are not guaranteed to survive replacement of the shared
-   physical environment.
+   Uncommitted tracked and untracked text changes in the saved worktree snapshot
+   are restored best-effort into a replacement environment. Binary, oversized,
+   truncated, ignored, or over-budget files MAY be omitted, and a partial
+   recovery MUST NOT block the next turn.
+5. A route MUST adopt the recovery saved for a later preparation, so a restart
+   restores the newest saved snapshot rather than the one captured when the route
+   was first prepared. An attempt that already received its preparation frame is
+   not re-prepared for a newer snapshot; the next attempt gets it.
 
 ### Continuity
 

@@ -231,9 +231,9 @@ describe('initPostHog gate', () => {
     expect(hoisted.client.setPersonPropertiesForFlags).toHaveBeenCalledTimes(1);
   });
 
-  it('evaluates flags in a development build without capturing', async () => {
-    // A disabled client would answer every flag with its default, leaving a
-    // flag-gated surface impossible to exercise in development.
+  it('starts no client in a development build without a dev host', async () => {
+    // A dev build must not contact the production project: without an explicit
+    // dev host every flag falls back to its default.
     hoisted.controller.allowsOptional.mockReturnValue(true);
     vi.stubGlobal('__DEV__', true);
     try {
@@ -241,14 +241,33 @@ describe('initPostHog gate', () => {
       initPostHog();
 
       const posthogModule = await import('posthog-react-native');
+      expect(posthogModule.default).not.toHaveBeenCalled();
+    } finally {
+      vi.stubGlobal('__DEV__', false);
+    }
+  });
+
+  it('evaluates flags against a dev host without capturing', async () => {
+    // The explicit dev host is the only way a development build evaluates
+    // flags; capture stays closed because dev builds never capture.
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    vi.stubGlobal('__DEV__', true);
+    process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST = 'http://10.0.2.2:8123';
+    try {
+      const initPostHog = await loadInitPostHog();
+      initPostHog();
+
+      const posthogModule = await import('posthog-react-native');
       expect(posthogModule.default).toHaveBeenCalledTimes(1);
       expect(hoisted.holder.options).toMatchObject({
+        host: 'http://10.0.2.2:8123',
         defaultOptIn: false,
         captureAppLifecycleEvents: false,
         sendFeatureFlagEvent: false,
       });
-      expect(hoisted.holder.options?.disabled).toBeUndefined();
+      expect(hoisted.client.setPersonPropertiesForFlags).not.toHaveBeenCalled();
     } finally {
+      delete process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST;
       vi.stubGlobal('__DEV__', false);
     }
   });
@@ -354,6 +373,8 @@ describe('captureEvent privacy and gates', () => {
   it('warns in development and names every dropped key', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     vi.stubGlobal('__DEV__', true);
+    // A dev client only exists against an explicit dev host.
+    process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST = 'http://127.0.0.1:8123';
     try {
       const { initPostHog, captureEvent } = await loadModule();
       initPostHog();
@@ -367,6 +388,7 @@ describe('captureEvent privacy and gates', () => {
         'Analytics sample-event: redacted prohibited properties repo_name, session_id'
       );
     } finally {
+      delete process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST;
       vi.stubGlobal('__DEV__', false);
       warn.mockRestore();
     }
@@ -595,6 +617,42 @@ describe('initPostHog constructor options', () => {
     initPostHog();
 
     expect(hoisted.holder.options?.disableGeoip).toBe(true);
+  });
+});
+
+describe('livePostHogClient', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.holder.options = undefined;
+    hoisted.controller.allowsMandatory.mockReturnValue(true);
+    hoisted.controller.allowsOptional.mockReturnValue(true);
+    hoisted.controller.currentGeneration.mockReturnValue(0);
+  });
+
+  it('reports what the client was built for, null when none runs', async () => {
+    const { initPostHog, identifyUser, discardPostHog, livePostHogClient } = await loadModule();
+    expect(livePostHogClient()).toBeNull();
+
+    initPostHog();
+    expect(livePostHogClient()).toEqual({
+      generation: 0,
+      captureAllowed: true,
+      identifiedEmail: undefined,
+    });
+
+    identifyUser('test@test.com');
+    expect(livePostHogClient()?.identifiedEmail).toBe('test@test.com');
+
+    await discardPostHog();
+    expect(livePostHogClient()).toBeNull();
+  });
+
+  it('reports the capture level the client was built with', async () => {
+    hoisted.controller.allowsOptional.mockReturnValue(false);
+    const { initPostHog, livePostHogClient } = await loadModule();
+    initPostHog();
+
+    expect(livePostHogClient()?.captureAllowed).toBe(false);
   });
 });
 

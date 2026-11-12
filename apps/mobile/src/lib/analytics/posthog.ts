@@ -87,6 +87,12 @@ let client: PostHog | null = null;
 /** Generation that created the client. Stale events from a prior account
  *  are dropped — they must not transmit under the new identity. */
 let clientGeneration: number | null = null;
+/** Capture level the live client was built with. A caller that wants a
+ *  different level needs a new client; the same level does not. */
+let clientCaptureAllowed = false;
+/** Account email the live client was identified with, undefined until
+ *  `identifyUser` runs. */
+let clientIdentifiedEmail: string | undefined = undefined;
 
 /** Test-only fetch wrapper (slice P3-AH-16a). Applied to the current client on
  *  registration and to any client created later by `initPostHog`. */
@@ -181,6 +187,42 @@ function deviceFormFactor(): 'phone' | 'tablet' | 'desktop' | 'tv' | 'unknown' {
   return 'unknown';
 }
 
+/** The production PostHog API host. Release builds only ever talk to it. */
+const POSTHOG_HOST = 'https://us.i.posthog.com';
+
+/**
+ * Whether this build and this account's consent allow any capture. A
+ * development build never captures, even when it evaluates flags against a dev
+ * host.
+ */
+export function isCaptureAllowed(): boolean {
+  return allowsOptional() && !__DEV__;
+}
+
+/** What the live client was built for. `null` when no client is running. */
+export type LivePostHogClient = Readonly<{
+  /** Controller generation the client was built for; another generation is another account. */
+  generation: number;
+  captureAllowed: boolean;
+  identifiedEmail: string | undefined;
+}>;
+
+/**
+ * The live client's build parameters, or null when no client is running. A
+ * caller that finds the same generation and capture level can reuse this client
+ * instead of rebuilding it and dropping its queue.
+ */
+export function livePostHogClient(): LivePostHogClient | null {
+  if (!client || clientGeneration === null) {
+    return null;
+  }
+  return {
+    generation: clientGeneration,
+    captureAllowed: clientCaptureAllowed,
+    identifiedEmail: clientIdentifiedEmail,
+  };
+}
+
 /**
  * Allowed person properties and event super properties (hard). Custom fields:
  * `platform`, `device_form_factor`, `app_version`, `app_build`. SDK stock
@@ -201,18 +243,25 @@ export function initPostHog(): void {
   if (client) {
     return;
   }
+  // A development build must not contact the production project: it evaluates
+  // flags only against an explicit dev host (`EXPO_PUBLIC_POSTHOG_DEV_HOST`,
+  // e.g. a local PostHog mock), and never captures. Without the host it starts
+  // nothing, so every flag falls back to its default — the same outcome as the
+  // web, whose dev builds have no project to ask. Expo inlines `EXPO_PUBLIC_*`
+  // values into the bundle, so this is read through `process.env`.
+  // oxlint-disable-next-line no-undefined -- an absent dev host is the guard
+  const host = __DEV__ ? process.env.EXPO_PUBLIC_POSTHOG_DEV_HOST : POSTHOG_HOST;
+  if (!host) {
+    return;
+  }
   // The SDK drops every capture while it is opted out, so `defaultOptIn: false`
   // is the flags-only mode: nothing is enqueued, and the switches below keep the
   // SDK from registering the traffic it would otherwise send on its own. With
   // consent, each switch equals the SDK default, so the consented client is
   // unchanged.
-  //
-  // Dev builds never capture, but they do evaluate flags: a `disabled` client
-  // would answer every flag with its default, so a flag-gated surface could
-  // never be exercised in development or measured by the design gate.
-  const captureAllowed = allowsOptional() && !__DEV__;
+  const captureAllowed = isCaptureAllowed();
   client = new PostHog(POSTHOG_API_KEY, {
-    host: 'https://us.i.posthog.com',
+    host,
     disableGeoip: true,
     defaultOptIn: captureAllowed,
     captureAppLifecycleEvents: captureAllowed,
@@ -227,6 +276,8 @@ export function initPostHog(): void {
     customStorage: posthogCustomStorage,
   });
   clientGeneration = currentGeneration();
+  clientCaptureAllowed = captureAllowed;
+  clientIdentifiedEmail = undefined;
   notifyPostHogReady();
   // Super property on every event so dashboards can filter mobile vs web
   // without relying on $lib.
@@ -307,6 +358,7 @@ export function identifyUser(email: string): void {
   // allowed-field list above this function governs person properties, and a
   // flags-only client writes no person properties at all.
   client.identify(email, allowsOptional() ? appVersionProperties() : undefined);
+  clientIdentifiedEmail = email;
   // Pull the freshly-identified user's flags so gated UI resolves promptly.
   client.reloadFeatureFlags();
 }
@@ -377,6 +429,8 @@ export async function discardPostHog(): Promise<void> {
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- see comment above: guards against a client that violates its own type's contract
     if (typeof c?.setPersistedProperty !== 'function') {
       client = null;
+      clientCaptureAllowed = false;
+      clientIdentifiedEmail = undefined;
       notifyPostHogReady();
       return;
     }
@@ -393,6 +447,8 @@ export async function discardPostHog(): Promise<void> {
     // Ready listeners persist — they must observe both the false transition
     // now and a true transition from a later initPostHog.
     client = null;
+    clientCaptureAllowed = false;
+    clientIdentifiedEmail = undefined;
     notifyPostHogReady();
 
     try {

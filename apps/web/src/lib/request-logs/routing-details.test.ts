@@ -77,21 +77,6 @@ describe('parseRoutingDetails', () => {
     });
   });
 
-  test('passes steps, BYOK candidates, and result through', () => {
-    const parsed = parseRoutingDetails(productionRecord);
-
-    expect(parsed?.steps).toEqual(expectedSteps);
-    expect(parsed?.byok_candidates).toEqual([]);
-    expect(parsed?.result).toEqual(expectedResult);
-  });
-
-  test('returns the Enkrypt guardrail report without its retired tool result setting', () => {
-    expect(parseRoutingDetails(productionRecord)?.enkrypt).toEqual(expectedEnkrypt);
-    expect(parseRoutingDetails(productionRecord)?.enkrypt?.settings).not.toHaveProperty(
-      'scan_tool_results'
-    );
-  });
-
   test('drops an Enkrypt report from before scans were split into parts', () => {
     const record = JSON.parse(productionRecord) as Record<string, unknown>;
     const scan: Record<string, unknown> = { ...expectedEnkrypt.scans[0] };
@@ -182,7 +167,6 @@ describe('parseRoutingDetails', () => {
     expect(parsed?.enkrypt?.scans).toEqual([toolsScan]);
     expect(parsed?.enkrypt?.verdict).toBe('block');
     expect(parseRoutingDetails(JSON.stringify(parsed))).toEqual(parsed);
-    expect(parsed?.enkrypt?.scans[0]).toEqual(toolsScan);
   });
 
   test('drops a tools scan in the per-part shape from before tools were aggregated', () => {

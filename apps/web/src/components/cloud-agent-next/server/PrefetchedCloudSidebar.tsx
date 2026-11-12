@@ -11,7 +11,7 @@ import {
   sidebarListInput,
   sidebarWorkspaceListInput,
   workspaceFoldersQueryKey,
-  worktreeDetailsBatches,
+  sidebarWorktreeDetailsBatches,
 } from '../hooks/sidebar-queries';
 import { DEFAULT_SIDEBAR_PREFERENCES } from '../sidebar-preferences';
 import type { SidebarPreferences } from '../sidebar-preferences';
@@ -68,7 +68,7 @@ async function prefetchSidebar(
     gitUrl: projectFilter.length > 0 ? projectFilter : undefined,
   };
   const foldersOptions = trpc.workspaceFolders.list.queryOptions({ organizationId });
-  const [list] = await Promise.all([
+  const [list, , workspaceList] = await Promise.all([
     queryClient.query(
       trpc.cliSessionsV2.list.queryOptions(sidebarListInput({ updatedSince, ...filters }))
     ),
@@ -76,24 +76,28 @@ async function prefetchSidebar(
       ...foldersOptions,
       queryKey: workspaceFoldersQueryKey(foldersOptions.queryKey, userId),
     }),
-    queryClient.prefetchInfiniteQuery(
-      trpc.cliSessionsV2.listWorkspaces.infiniteQueryOptions(sidebarWorkspaceListInput(filters), {
-        getNextPageParam: lastPage => lastPage.nextCursor ?? undefined,
-      })
-    ),
+    queryClient
+      .fetchInfiniteQuery(
+        trpc.cliSessionsV2.listWorkspaces.infiniteQueryOptions(sidebarWorkspaceListInput(filters), {
+          getNextPageParam: lastPage => lastPage.nextCursor ?? undefined,
+        })
+      )
+      .catch(() => undefined),
     queryClient.query(trpc.cloudAgentSettings.getWorkspaceOrder.queryOptions()),
   ]);
   const limit = pLimit(4);
   const sessions = list?.cliSessions ?? [];
   await Promise.all(
-    worktreeDetailsBatches(sessions.map(session => session.cloud_agent_worktree_id)).map(
-      worktreeIds =>
-        limit(() => {
-          if (Date.now() >= deadlineAt) return;
-          return queryClient
-            .query(trpc.cliSessionsV2.worktreeDetails.queryOptions({ worktreeIds, organizationId }))
-            .catch(() => undefined);
-        })
+    sidebarWorktreeDetailsBatches(
+      sessions.map(session => session.cloud_agent_worktree_id),
+      workspaceList?.pages.flatMap(page => page.workspaces) ?? []
+    ).map(worktreeIds =>
+      limit(() => {
+        if (Date.now() >= deadlineAt) return;
+        return queryClient
+          .query(trpc.cliSessionsV2.worktreeDetails.queryOptions({ worktreeIds, organizationId }))
+          .catch(() => undefined);
+      })
     )
   );
 }

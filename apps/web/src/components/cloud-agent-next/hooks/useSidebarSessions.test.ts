@@ -1805,6 +1805,25 @@ describe('useSidebarSessions live update helpers', () => {
       expect(failed.worktrees.worktree_shared.sessions[0].latest_run_failure_kind).toBe('failed');
     });
 
+    it('adds a created chat to only its owning cached worktree without a refetch', () => {
+      const update = {
+        worktreeId: 'worktree_shared',
+        sessionId: 'ses_created',
+        sessionStatus: 'idle',
+        sessionStatusUpdatedAt: '2026-01-03T12:02:00.000Z',
+        updatedAt: '2026-01-03T12:02:00.000Z',
+      };
+      const patched = patchSidebarWorktreeSessionStatus(initial, update);
+      expect(patched.worktrees.worktree_shared.sessions.map(row => row.sessionId)).toEqual([
+        'ses_hidden',
+        'ses_created',
+      ]);
+      expect(patchSidebarWorktreeSessionStatus(patched, update)).toBe(patched);
+      expect(
+        patchSidebarWorktreeSessionStatus(initial, { ...update, worktreeId: 'elsewhere' })
+      ).toBe(initial);
+    });
+
     it('does not poll unloaded, empty, or CLI-only worktree batches', () => {
       expect(getSidebarWorktreeRefetchInterval(undefined)).toBe(false);
       expect(getSidebarWorktreeRefetchInterval(undefined, true)).toBe(false);

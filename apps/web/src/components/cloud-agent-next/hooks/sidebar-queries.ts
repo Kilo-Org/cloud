@@ -86,6 +86,13 @@ export function workspaceFoldersQueryKey(baseKey: TRPCQueryKey, userId: string):
 }
 
 /** Worktree ids in sorted batches, one details query per batch. */
+export function sidebarWorktreeDetailsBatches(
+  sessionWorktreeIds: Iterable<string | null | undefined>,
+  workspaces: readonly { worktreeId: string | null }[]
+): CloudAgentWorktreeId[][] {
+  return worktreeDetailsBatches([...sessionWorktreeIds, ...workspaces.map(row => row.worktreeId)]);
+}
+
 export function worktreeDetailsBatches(
   worktreeIds: Iterable<string | null | undefined>
 ): CloudAgentWorktreeId[][] {

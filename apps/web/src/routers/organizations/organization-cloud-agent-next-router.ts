@@ -65,6 +65,8 @@ import {
   baseGetEgressAuditNextOutputSchema,
   baseGetSessionMessagesPageNextSchema,
   baseGetSessionMessagesPageNextOutputSchema,
+  baseGetSessionToolPartDetailNextSchema,
+  baseGetSessionToolPartDetailNextOutputSchema,
   baseGetSandboxStatusNextSchema,
   baseGetSandboxStatusNextOutputSchema,
   baseGetPendingInteractionsNextSchema,
@@ -240,6 +242,10 @@ const ListChildSessionsInput = baseListChildSessionsNextSchema.extend({
 });
 
 const GetSessionMessagesPageInput = baseGetSessionMessagesPageNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const GetSessionToolPartDetailInput = baseGetSessionToolPartDetailNextSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -1330,6 +1336,31 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         kiloSessionId: input.kiloSessionId,
         cursor: input.cursor,
         limit: input.limit,
+        toolDisplay: input.toolDisplay,
+      });
+    }),
+
+  /** Complete stored details for an expanded tool preview; authorized on every read. */
+  getSessionToolPartDetail: organizationMemberProcedure
+    .input(GetSessionToolPartDetailInput)
+    .output(baseGetSessionToolPartDetailNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return createCloudAgentNextClient(authToken).getSessionToolPartDetail({
+        sessionId: input.sessionId,
+        kiloSessionId: input.kiloSessionId,
+        messageId: input.messageId,
+        partId: input.partId,
+        callId: input.callId,
       });
     }),
 

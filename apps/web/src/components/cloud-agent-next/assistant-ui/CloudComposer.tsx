@@ -111,6 +111,7 @@ type CloudComposerProps = {
   pinnedModelOption?: ModelOption;
   /** Whether models are loading */
   isLoadingModels?: boolean;
+  onModelPickerIntent?: () => void;
   /** Callback when mode changes */
   onModeChange?: (mode: AgentMode) => void;
   /** Callback when model changes */
@@ -170,6 +171,7 @@ export function CloudComposer({
   modelOptions = [],
   pinnedModelOption,
   isLoadingModels = false,
+  onModelPickerIntent,
   onModeChange,
   onModelChange,
   variant,
@@ -850,6 +852,7 @@ export function CloudComposer({
                 pinnedModelOption={pinnedModelOption}
                 onModelChange={onModelChange}
                 isLoadingModels={isLoadingModels}
+                onModelPickerIntent={onModelPickerIntent}
                 variant={variant}
                 availableVariants={availableVariants}
                 onVariantChange={onVariantChange}
@@ -894,6 +897,7 @@ export function CloudComposer({
                   </Tooltip>
                 ) : (
                   <ModelCombobox
+                    onLoadModels={onModelPickerIntent}
                     models={modelOptions}
                     pinnedModel={pinnedModelOption}
                     value={model}

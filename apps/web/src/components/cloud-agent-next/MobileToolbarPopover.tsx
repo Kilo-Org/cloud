@@ -22,6 +22,7 @@ type MobileToolbarPopoverProps = {
   pinnedModelOption?: ModelOption;
   onModelChange?: (model: string) => void;
   isLoadingModels?: boolean;
+  onModelPickerIntent?: () => void;
   variant?: string;
   availableVariants?: string[];
   onVariantChange?: (variant: string) => void;
@@ -44,6 +45,7 @@ export function MobileToolbarPopover({
   pinnedModelOption,
   onModelChange,
   isLoadingModels,
+  onModelPickerIntent,
   variant,
   availableVariants = [],
   onVariantChange,
@@ -67,13 +69,25 @@ export function MobileToolbarPopover({
   }
 
   return (
-    <Popover open={disabled ? false : open} onOpenChange={disabled ? undefined : setOpen}>
+    <Popover
+      open={disabled ? false : open}
+      onOpenChange={
+        disabled
+          ? undefined
+          : value => {
+              if (value) onModelPickerIntent?.();
+              setOpen(value);
+            }
+      }
+    >
       <PopoverTrigger asChild>
         <Button
           type="button"
           variant="outline"
           size="sm"
           disabled={disabled}
+          onPointerEnter={onModelPickerIntent}
+          onFocus={onModelPickerIntent}
           className={cn('h-9 min-w-0 justify-between gap-1.5', className)}
         >
           <span className="truncate">{displayName}</span>
@@ -105,6 +119,7 @@ export function MobileToolbarPopover({
               </div>
             ) : (
               <ModelCombobox
+                onLoadModels={onModelPickerIntent}
                 models={modelOptions}
                 pinnedModel={pinnedModelOption}
                 value={model}

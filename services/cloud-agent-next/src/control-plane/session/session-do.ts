@@ -241,6 +241,13 @@ import {
   type SessionMessagesPage,
 } from './history.js';
 import {
+  readToolPartDetail,
+  toolPartDetailInputSchema,
+  type ToolPartDetail,
+  type ToolPartDetailInput,
+} from './tool-detail.js';
+import type { ToolDisplayMode } from '../../shared/tool-display-projection.js';
+import {
   HISTORY_HYDRATION_WAIT_MS,
   hydrateSessionHistory,
   markHistoryHydrated,
@@ -511,6 +518,17 @@ export type ControlPlaneSessionSnapshot =
       totalCostMicrodollars: number;
       title?: string;
     };
+
+type FoundSessionSummary = Omit<
+  Extract<ControlPlaneSessionSnapshot, { type: 'found' }>,
+  'messages'
+>;
+
+export type ControlPlaneSessionMetadataSummary = {
+  metadata: SessionMetadata | null;
+  snapshot: { type: 'session-not-found' } | FoundSessionSummary;
+  currentMessage: { messageId: string; state: 'accepted' | 'queued' } | null;
+};
 
 /**
  * Session DO -> Sandbox DO (spec §10). Resolved from the production
@@ -2567,10 +2585,41 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   async getSession(): Promise<ControlPlaneSessionSnapshot> {
     await this.initialized;
     if (this.registration === null) return { type: 'session-not-found' };
+    return {
+      ...this.readSessionSummary(),
+      messages: this.messages.map(message => ({
+        messageId: message.messageId,
+        state: message.state,
+        createdAt: message.createdAt,
+        acceptedAt: message.acceptedAt,
+        settledAt: message.settledAt,
+        reason: message.reason,
+      })),
+    };
+  }
+
+  /** Management reads need queue identity, not the entire admitted-message history. */
+  async getSessionMetadataSummary(): Promise<ControlPlaneSessionMetadataSummary> {
+    await this.initialized;
+    const message =
+      this.messages.find(message => message.state === 'accepted') ??
+      this.messages.find(message => message.state === 'queued');
+    return {
+      metadata: this.metadata,
+      snapshot:
+        this.registration === null ? { type: 'session-not-found' } : this.readSessionSummary(),
+      currentMessage:
+        message && (message.state === 'accepted' || message.state === 'queued')
+          ? { messageId: message.messageId, state: message.state }
+          : null,
+    };
+  }
+
+  private readSessionSummary(): FoundSessionSummary {
+    const registration = this.registration;
+    if (!registration) throw new Error('Session not registered');
     this.partText.flush();
-    const native = this.eventQueries.findByEntityId(
-      `session/${this.registration.spec.kiloSessionId}`
-    );
+    const native = this.eventQueries.findByEntityId(`session/${registration.spec.kiloSessionId}`);
     const info = z
       .object({ title: z.string().optional() })
       .safeParse(
@@ -2580,19 +2629,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       type: 'found',
       sessionId: this.sessionId,
       route: this.route,
-      messages: this.messages.map(message => ({
-        messageId: message.messageId,
-        state: message.state,
-        createdAt: message.createdAt,
-        acceptedAt: message.acceptedAt,
-        settledAt: message.settledAt,
-        reason: message.reason,
-      })),
       latestEventId: this.eventQueries.getLatestEventId(),
       updateCursor: this.eventQueries.getUpdateCursor(),
       totalCostMicrodollars: this.eventQueries.getTotalCostMicrodollars(
         this.sessionId,
-        this.registration.spec.kiloSessionId
+        registration.spec.kiloSessionId
       ),
       ...(info.success && info.data.title !== undefined ? { title: info.data.title } : {}),
     };
@@ -2604,6 +2645,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       limit?: number;
       kiloSessionId?: string;
       expectedRootKiloSessionId?: string;
+      toolDisplay?: ToolDisplayMode;
     } = {}
   ): Promise<SessionMessagesPage | null> {
     await this.initialized;
@@ -2629,23 +2671,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       }
     }
     const isRoot = kiloSessionId === rootKiloSessionId;
-    const storedLineage = isRoot
-      ? undefined
-      : readStoredHistoryLineage(this.db, rootKiloSessionId, kiloSessionId);
-    const lineage =
-      isRoot || storedLineage !== undefined
-        ? storedLineage
-        : await withTimeout(
-            readOwnedHistoryLineage({
-              env: this.env,
-              userId: registration.credentials.userId,
-              sessionId: this.sessionId,
-              rootKiloSessionId,
-              kiloSessionId,
-            }),
-            5000,
-            'Session history lineage lookup timed out'
-          );
+    const lineage = await this.readHistoryLineage(registration, kiloSessionId);
     if ((!isRoot && lineage == null) || this.registration !== registration) return null;
     await this.ensureClientHistory(kiloSessionId);
     if (this.registration !== registration) return null;
@@ -2663,6 +2689,65 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       omittedItemCount:
         readHistoryHydration(this.ctx.storage, isRoot ? undefined : kiloSessionId)
           ?.omittedItemCount ?? 0,
+    });
+  }
+
+  /** Returns a descendant's lineage under the registered root; the root has none. */
+  private async readHistoryLineage(
+    registration: ControlPlaneSessionRegistration,
+    kiloSessionId: string
+  ) {
+    const rootKiloSessionId = registration.spec.kiloSessionId;
+    if (kiloSessionId === rootKiloSessionId) return undefined;
+    // `null` is a stored denial; only an unknown lineage needs the owned lookup.
+    const stored = readStoredHistoryLineage(this.db, rootKiloSessionId, kiloSessionId);
+    if (stored !== undefined) return stored;
+    return await withTimeout(
+      readOwnedHistoryLineage({
+        env: this.env,
+        userId: registration.credentials.userId,
+        sessionId: this.sessionId,
+        rootKiloSessionId,
+        kiloSessionId,
+      }),
+      5000,
+      'Session history lineage lookup timed out'
+    );
+  }
+
+  /**
+   * Reads one complete stored tool call for an expanded preview. Uses the same
+   * root and lineage authorization as history pages and never wakes compute.
+   */
+  async getSessionToolPartDetail(input: ToolPartDetailInput): Promise<ToolPartDetail | null> {
+    await this.initialized;
+    const parsed = toolPartDetailInputSchema.parse(input);
+    const registration = this.registration;
+    const rootKiloSessionId = registration?.spec.kiloSessionId;
+    if (
+      registration === null ||
+      rootKiloSessionId === undefined ||
+      (parsed.expectedRootKiloSessionId !== undefined &&
+        parsed.expectedRootKiloSessionId !== rootKiloSessionId)
+    )
+      return null;
+    const kiloSessionId = parsed.kiloSessionId ?? rootKiloSessionId;
+    const lineage = await this.readHistoryLineage(registration, kiloSessionId);
+    if (
+      (kiloSessionId !== rootKiloSessionId && lineage == null) ||
+      this.registration !== registration
+    )
+      return null;
+    await this.ensureClientHistory(kiloSessionId);
+    if (this.registration !== registration) return null;
+    this.partText.flush();
+    return readToolPartDetail({
+      queries: this.eventQueries,
+      sessionId: this.sessionId,
+      kiloSessionId,
+      messageId: parsed.messageId,
+      partId: parsed.partId,
+      ...(parsed.callId === undefined ? {} : { callId: parsed.callId }),
     });
   }
 

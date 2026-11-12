@@ -39,7 +39,7 @@ import {
   getOrganizationProviderPrivacy,
   inferenceProvidersNotAllowedResponse,
   managedGatewayDisabledResponse,
-  modelDoesNotExistOnOpenRouterResponse,
+  unknownModelResponse,
   modelNotAllowedResponse,
   organizationAutoConfigurationResponse,
   unavailableModelResponse,
@@ -204,7 +204,7 @@ export async function resolveProviderAndPolicy(
   }
   if (getProviderResult.kind === 'custom-llm-unavailable') {
     // Same response as an unknown model id, so callers cannot probe for custom LLMs.
-    return reject(modelDoesNotExistOnOpenRouterResponse(model));
+    return reject(unknownModelResponse(model));
   }
   if (getProviderResult.kind === 'direct-byok-catalog-only') {
     // Falling through to the managed gateway would fail later with a misleading unknown-model error.

@@ -9,6 +9,10 @@ import {
   cloudSessionMessagesPageInputSchema,
   cloudSessionMessagesPageWireSchema,
 } from '@kilocode/cloud-agent-sdk/schemas';
+import {
+  cloudToolPartDetailInputSchema,
+  cloudToolPartDetailWireSchema,
+} from '@kilocode/cloud-agent-sdk/tool-part-detail';
 import { SandboxStatusSessionIdSchema } from '../../../../services/cloud-agent-next/src/shared/sandbox-status';
 import { SESSION_ID_RE } from '../../../../services/cloud-agent-next/src/shared/protocol';
 import { GetEgressAuditInputSchema } from '@kilocode/worker-utils/egress-audit';
@@ -813,6 +817,8 @@ export const baseGetEgressAuditNextSchema = GetEgressAuditInputSchema.extend({
 }).strict();
 export const baseGetSessionMessagesPageNextSchema = cloudSessionMessagesPageInputSchema;
 export const baseGetSessionMessagesPageNextOutputSchema = cloudSessionMessagesPageWireSchema;
+export const baseGetSessionToolPartDetailNextSchema = cloudToolPartDetailInputSchema;
+export const baseGetSessionToolPartDetailNextOutputSchema = cloudToolPartDetailWireSchema;
 
 export const baseGetSandboxStatusNextSchema = z
   .object({

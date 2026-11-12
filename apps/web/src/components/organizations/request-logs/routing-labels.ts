@@ -9,18 +9,18 @@ import type {
 
 export type StepTone = 'selected' | 'skipped' | 'rejected' | 'deferred' | 'info';
 
-export type DescribedStep = {
+type DescribedStep = {
   title: string;
   detail: string;
   tone: StepTone;
 };
 
-export type DescribedResult = {
+type DescribedResult = {
   title: string;
   paidBy: string | null;
 };
 
-export type DescribedUnsentResult = {
+type DescribedUnsentResult = {
   title: string;
   detail: string | null;
 };
@@ -30,7 +30,7 @@ const GATEWAY_NAMES: Record<string, string> = {
   vercel: 'Vercel AI Gateway',
 };
 
-export const BYOK_SKIP_REASON_LABELS: Record<string, string> = {
+const BYOK_SKIP_REASON_LABELS: Record<string, string> = {
   'unsupported-api-kind': 'Does not support this API',
   disabled: 'Key disabled',
   'not-catalog-mode': 'Key uses provider model IDs',
@@ -39,7 +39,7 @@ export const BYOK_SKIP_REASON_LABELS: Record<string, string> = {
   'ignored-by-request': 'Provider ignored by the request',
 };
 
-export const BYOK_OUTCOME_LABELS: Record<string, string> = {
+const BYOK_OUTCOME_LABELS: Record<string, string> = {
   selected: 'Selected',
   skipped: 'Skipped',
   unreached: 'Not reached',

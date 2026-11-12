@@ -42,9 +42,9 @@ type Stored<Detectors> =
   | { status: 'invalid' }
   | { status: 'found'; detectors: Detectors };
 
-export type StoredEnkryptDetectors = Stored<EnkryptInputDetectors>;
+type StoredEnkryptDetectors = Stored<EnkryptInputDetectors>;
 
-export type StoredEnkryptOutputDetectors = Stored<EnkryptOutputDetectors>;
+type StoredEnkryptOutputDetectors = Stored<EnkryptOutputDetectors>;
 
 /** The dotted paths of a schema failure, for a log that never carries the invalid value. */
 function issuePaths(error: z.ZodError): string[] {

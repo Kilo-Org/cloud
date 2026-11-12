@@ -4,7 +4,6 @@ import type { EnkryptOutputDetectors, OrganizationSettings } from '@kilocode/db/
 import {
   ENKRYPT_DETECT_URL,
   ENKRYPT_MAX_SCAN_CHARACTERS,
-  RESPONSE_TOO_LARGE_MESSAGE,
   type EnkryptGuardrailVerdict,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import { createEmptyEnkryptOutputDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
@@ -20,6 +19,7 @@ import {
   MAX_HELD_OUTPUT_BYTES,
   OUTPUT_KEEP_ALIVE_INTERVAL_MS,
   resolveEnkryptOutputScan,
+  RESPONSE_TOO_LARGE_MESSAGE,
   type EnkryptOutputScan,
 } from './output-guardrail';
 
@@ -387,6 +387,14 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+describe('RESPONSE_TOO_LARGE_MESSAGE', () => {
+  it('says that a response is withheld above 100,000 characters', () => {
+    expect(RESPONSE_TOO_LARGE_MESSAGE).toBe(
+      "Your organization's Enkrypt AI guardrail cannot scan more than 100,000 characters of model output at once, so this response was withheld. Ask for a shorter response, for example by lowering the maximum output tokens, then retry."
+    );
+  });
+});
+
 describe('resolveEnkryptOutputScan', () => {
   it('returns null without an output guardrail', () => {
     expect(
@@ -747,6 +755,35 @@ describe('guardEnkryptOutput', () => {
         expect(verdict).toEqual({ action: 'block', message: BLOCK_MESSAGE });
         expect(response.headers.get('content-type')).toBe('text/event-stream');
         expect(response.headers.get('x-should-retry')).toBe('false');
+      }
+    );
+
+    it.each(FORMATS)(
+      'rejects a chat_completions %s response with blocked output in a content part type the gateway does not know',
+      async format => {
+        const fetchSpy = mockEnkrypt(({ text }) =>
+          text.includes(SECRET) ? detectPii() : allowAll()
+        );
+        const part = { type: 'output_audio', id: 'audio_1', transcript: MODEL_OUTPUT };
+        const body =
+          format === 'json'
+            ? JSON.stringify({ choices: [{ index: 0, message: { content: [part] } }] })
+            : sse([
+                { data: { choices: [{ index: 0, delta: { content: [part] } }] } },
+                { data: '[DONE]' },
+              ]);
+
+        const { client, release, onReject } = await guard(
+          upstreamResponse(body, format),
+          outputScan(blockingPii),
+          'chat_completions',
+          format === 'sse'
+        );
+
+        expect(await client.text()).not.toContain(SECRET);
+        expect(release).not.toHaveBeenCalled();
+        expect(rejection(onReject).verdict).toEqual({ action: 'block', message: BLOCK_MESSAGE });
+        expect(detectRequests(fetchSpy).map(({ text }) => text)).toEqual([MODEL_OUTPUT]);
       }
     );
   });

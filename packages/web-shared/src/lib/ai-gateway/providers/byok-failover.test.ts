@@ -353,7 +353,7 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
         stop_reason: 'no-keys-left',
       },
     ]);
-    if (result.attempt.type === 'invalid-openrouter-model') throw new Error('Expected a response');
+    if (result.attempt.type === 'unknown-gateway-model') throw new Error('Expected a response');
     expect(result.attempt.response.bodyUsed).toBe(false);
     expect(await result.attempt.response.json()).toEqual(lastBody);
   });
@@ -378,7 +378,7 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
       error_code: 'upstream_disconnect',
       outcome: 'failed',
     });
-    if (result.attempt.type === 'invalid-openrouter-model') throw new Error('Expected a response');
+    if (result.attempt.type === 'unknown-gateway-model') throw new Error('Expected a response');
     expect(await result.attempt.response.json()).toEqual({
       error: 'unreachable',
       error_type: 'upstream_disconnect',
@@ -387,7 +387,7 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
 
   it('records a final model OpenRouter does not list as a failed 404', async () => {
     answerAfter(100, upstreamJsonFailure(500, { error: { code: 'server_error' } }));
-    answerAfter(5, { type: 'invalid-openrouter-model' });
+    answerAfter(5, { type: 'unknown-gateway-model' });
     const [failover, third] = failoverTo(
       route('failover-key', 'openrouter', 'openrouter'),
       route('third-key', 'anthropic')
@@ -487,7 +487,7 @@ describe('sendUpstreamAttemptWithByokFailover attempts', () => {
     expect(failoverRoutes[0]).toHaveBeenCalledTimes(1);
     expect(failoverRoutes[1]).toHaveBeenCalledTimes(1);
     expect(mockedSendUpstreamAttempt).toHaveBeenCalledTimes(1);
-    if (result.attempt.type === 'invalid-openrouter-model') throw new Error('Expected a response');
+    if (result.attempt.type === 'unknown-gateway-model') throw new Error('Expected a response');
     expect(await result.attempt.response.json()).toEqual({
       error: { code: 'insufficient_quota' },
     });

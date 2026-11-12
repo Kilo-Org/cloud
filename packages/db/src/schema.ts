@@ -7527,7 +7527,6 @@ export const byok_api_keys = pgTable(
       onDelete: 'cascade',
     }),
     provider_id: text().notNull(),
-    encrypted_api_key: jsonb().$type<EncryptedData>(),
     encrypted_api_key_envelope: jsonb().$type<BYOKApiKeyEnvelope>(),
     management_source: text().$type<BYOKManagementSource>().notNull().default('user'),
     is_enabled: boolean().default(true).notNull(),

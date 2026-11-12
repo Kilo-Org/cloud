@@ -25,11 +25,11 @@ type ByokFailoverResult = {
 };
 
 function attemptStatus(attempt: SendUpstreamAttemptResult): number {
-  return attempt.type === 'invalid-openrouter-model' ? 404 : attempt.response.status;
+  return attempt.type === 'unknown-gateway-model' ? 404 : attempt.response.status;
 }
 
 function failedResponse(attempt: SendUpstreamAttemptResult): Response | null {
-  if (attempt.type === 'invalid-openrouter-model' || attempt.response.ok) return null;
+  if (attempt.type === 'unknown-gateway-model' || attempt.response.ok) return null;
   return attempt.response;
 }
 
@@ -143,7 +143,7 @@ export async function sendUpstreamAttemptWithByokFailover(
   let attemptDurationMs = Math.round(performance.now() - attemptStartedAt);
   let stopReason: ByokFailoverAttempt['stop_reason'];
   for (;;) {
-    if (attempt.type === 'invalid-openrouter-model') {
+    if (attempt.type === 'unknown-gateway-model') {
       stopReason = 'model-unavailable';
       break;
     }
@@ -205,7 +205,7 @@ export async function sendUpstreamAttemptWithByokFailover(
     // The client still reads the failure, so the code comes from a copy.
     errorCode: failed ? readErrorCode(failed.clone()) : Promise.resolve(undefined),
     duration_ms: attemptDurationMs,
-    ...(failed || attempt.type === 'invalid-openrouter-model'
+    ...(failed || attempt.type === 'unknown-gateway-model'
       ? { outcome: 'failed' as const, stop_reason: stopReason ?? 'no-keys-left' }
       : { outcome: 'served' as const }),
   });

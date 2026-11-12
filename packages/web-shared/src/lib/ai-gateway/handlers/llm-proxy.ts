@@ -6,7 +6,7 @@ import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/de
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { BRIEFING_SETTLEMENT_HEADER } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
-import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
+import { sendUpstreamAttemptWithByokFailover } from '@kilocode/web-shared/lib/ai-gateway/providers/byok-failover';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
@@ -393,26 +393,26 @@ export async function handleLlmProxyRequest(
     organizationGroupPolicyPromise,
   });
   if (!providerPolicy.ok) return providerPolicy.response;
-  const { providerResult, isNonTrialEnterprise, dataRegion } = providerPolicy;
+  const { route, failoverRoutes, isNonTrialEnterprise, dataRegion } = providerPolicy;
 
-  console.debug(`Routing request to ${providerResult.provider.type}`, {
-    byokProviderIds: providerResult.userByok?.map(byok => byok.providerId) ?? null,
+  console.debug(`Routing request to ${route.provider.type}`, {
+    byokProviderIds: route.userByok?.map(byok => byok.providerId) ?? null,
   });
 
   const promptInfo = extractPromptInfo(requestBodyParsed);
   const usageContext: MicrodollarUsageContext = {
     ...usageBase.context,
     api_kind: requestBodyParsed.kind,
-    provider: providerResult.provider.type,
+    provider: route.provider.type,
     requested_model: effectiveModelIdLowerCased,
-    is_free: providerResult.isFree,
+    is_free: route.isFree,
     custom_llm_pricing: customLlm?.definition.pricing ?? null,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
     reasoning_setting: extractReasoningSetting(requestBodyParsed.body),
     isStreaming: requestBodyParsed.body.stream === true,
-    user_byok: !!providerResult.userByok,
+    user_byok: !!route.userByok,
     has_tools: (requestBodyParsed.body.tools?.length ?? 0) > 0,
     feature,
     auto_model: autoModel,
@@ -466,7 +466,7 @@ export async function handleLlmProxyRequest(
     await logUnrewrittenResponse({
       response: guardrailRejection.clone(),
       model: effectiveModelIdLowerCased,
-      providerId: providerResult.provider.type,
+      providerId: route.provider.type,
       logging: requestLogging,
       error: { guardrail_rejection: guardrailVerdict.action },
     });
@@ -474,48 +474,58 @@ export async function handleLlmProxyRequest(
   }
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
 
-  const attempt = await sendUpstreamAttempt({
-    providerContext: providerResult,
-    request: requestBodyParsed,
-    requestedModel: effectiveModelIdLowerCased,
-    fraudHeaders,
-    userId: user.id,
-    organizationId: organizationId ?? null,
-    sessionId: headers.sessionId,
-    taskId: headers.taskId,
-    isNonTrialEnterprise,
-    search: url.search,
-    method: request.method,
-    signal: request.signal,
-    vercelRequestId: headers.vercelRequestId,
-    dataRegion,
-    costLimit:
-      requestCostLimit !== null && requestCostBalance
-        ? {
-            maximumMicrodollars: requestCostLimit,
-            availableBalanceMicrodollars: Math.floor(requestCostBalance.balance * 1_000_000),
-          }
-        : undefined,
-  });
+  const {
+    attempt,
+    providerContext,
+    request: sentRequest,
+    failoverAttempts,
+  } = await sendUpstreamAttemptWithByokFailover(
+    {
+      providerContext: route,
+      request: requestBodyParsed,
+      requestedModel: effectiveModelIdLowerCased,
+      fraudHeaders,
+      userId: user.id,
+      organizationId: organizationId ?? null,
+      sessionId: headers.sessionId,
+      taskId: headers.taskId,
+      isNonTrialEnterprise,
+      search: url.search,
+      method: request.method,
+      signal: request.signal,
+      vercelRequestId: headers.vercelRequestId,
+      dataRegion,
+      costLimit:
+        requestCostLimit !== null && requestCostBalance
+          ? {
+              maximumMicrodollars: requestCostLimit,
+              availableBalanceMicrodollars: Math.floor(requestCostBalance.balance * 1_000_000),
+            }
+          : undefined,
+    },
+    failoverRoutes
+  );
+  if (failoverAttempts) providerMetadataCapture?.captureByokFailoverAttempts(failoverAttempts);
   if (attempt.type === 'unknown-gateway-model') {
     return unknownModelResponse(effectiveModelIdLowerCased);
   }
   if (attempt.type === 'error') return attempt.response;
+  usageContext.provider = providerContext.provider.type;
 
   const { settings: organizationSettings } = await balanceAndSettingsPromise;
   return await respondToUpstream({
     upstream: attempt,
-    request: requestBodyParsed,
+    request: sentRequest,
     model: effectiveModelIdLowerCased,
     requestedModel: requestedModelLowerCased,
-    providerResult,
+    providerResult: providerContext,
     user,
     organizationId,
     usageContext,
     upstreamSpan: openrouterRequestSpan,
     requestStartedAt,
     briefingSettlementToken: request.headers.get(BRIEFING_SETTLEMENT_HEADER),
-    logging: requestLogging,
+    logging: { ...requestLogging, request: sentRequest },
     enkryptOutputScan:
       organizationId && !isAnonymousContext(user)
         ? resolveEnkryptOutputScan(

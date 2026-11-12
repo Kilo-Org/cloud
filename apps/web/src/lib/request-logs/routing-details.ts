@@ -70,6 +70,18 @@ const RoutingResultSchema = z.object({
 
 export type RequestLogRoutingResult = z.infer<typeof RoutingResultSchema>;
 
+const ByokFailoverAttemptSchema = z.object({
+  provider_type: optionalString,
+  byok_provider_ids: z.array(z.string()).catch([]),
+  status: optionalNumber,
+  error_code: optionalString,
+  duration_ms: optionalNumber,
+  outcome: z.string(),
+  stop_reason: optionalString,
+});
+
+export type RequestLogByokFailoverAttempt = z.infer<typeof ByokFailoverAttemptSchema>;
+
 const AiProviderMetadataRecordSchema = z.object({
   requested_model: z.string().nullable().catch(null),
   api_kind: z.string().nullable().catch(null),
@@ -79,6 +91,7 @@ const AiProviderMetadataRecordSchema = z.object({
   result: RoutingResultSchema.nullable().catch(null),
   enkrypt: EnkryptGuardrailReportSchema.nullable().catch(null),
   enkrypt_output: EnkryptOutputGuardrailReportSchema.nullable().catch(null),
+  byok_failover_attempts: lenientArray(ByokFailoverAttemptSchema),
 });
 
 export type RequestLogRoutingDetails = z.infer<typeof AiProviderMetadataRecordSchema>;

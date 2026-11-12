@@ -36,12 +36,17 @@ import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight'
 import {
   getProvider,
   type GetProviderProviderResult,
+  type ProviderRoute,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   KiloRoutingDecisionRecordSchema,
   type ProviderRoutingDecision,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
-import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import {
+  UPSTREAM_DURATION_BUDGET_MS,
+  upstreamRequest,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
   getOpenRouterModelsFromDatabase,
   getVercelModelsFromDatabase,
@@ -402,6 +407,10 @@ const provider = {
   transformRequest: jest.fn(),
 } satisfies Provider;
 
+function providerResult(route: ProviderRoute): GetProviderProviderResult {
+  return { kind: 'provider', routes: [async () => route] };
+}
+
 function makeRequest(
   body: unknown,
   headers?: HeadersInit,
@@ -520,13 +529,14 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
       settings: undefined,
       plan: undefined,
     });
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider,
-      userByok: null,
-      isFree: false,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
@@ -561,13 +571,14 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
   });
 
   it('serves a free model to a client that sends the anonymous sentinel', async () => {
-    mockedGetProvider.mockResolvedValueOnce({
-      kind: 'provider',
-      provider,
-      userByok: null,
-      isFree: true,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValueOnce(
+      providerResult({
+        provider,
+        userByok: null,
+        isFree: true,
+        bypassAccessCheck: false,
+      })
+    );
     setSignedTokenAuth('anonymous', {
       user: {
         id: 'user-123',
@@ -677,13 +688,14 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
       botId: 'bot-123',
       tokenSource: 'gateway-token',
     });
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider,
-      userByok: [{ decryptedAPIKey: 'byok-key', providerId: 'openai' }],
-      isFree: false,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider,
+        userByok: [{ decryptedAPIKey: 'byok-key', providerId: 'openai' }],
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
@@ -828,14 +840,15 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
       settings: undefined,
       plan: undefined,
     });
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider,
-      userByok: null,
-      isFree: false,
-      bypassAccessCheck: false,
-      skipBalanceCheck: true,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+        skipBalanceCheck: true,
+      })
+    );
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
@@ -887,13 +900,14 @@ describe('POST /api/v1/chat/completions request handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setUserAuth();
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider,
-      userByok: null,
-      isFree: false,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
     mockedGetOpenRouterModels.mockResolvedValue(new Set(['poolside/laguna-s-2.1:free']));
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedIsFreeModelRateLimited.mockResolvedValue(false);
@@ -1001,13 +1015,12 @@ describe('POST /api/v1/chat/completions request handling', () => {
     };
     mockedGetProvider.mockImplementation(async ({ onDecision }) => {
       onDecision?.(decision);
-      return {
-        kind: 'provider',
+      return providerResult({
         provider,
         userByok: null,
         isFree: false,
         bypassAccessCheck: false,
-      };
+      });
     });
     const { handleLlmProxyRequest } = await import('./llm-proxy');
 
@@ -1078,13 +1091,12 @@ describe('POST /api/v1/chat/completions request handling', () => {
     };
     mockedGetProvider.mockImplementation(async ({ onDecision }) => {
       onDecision?.(decision);
-      return {
-        kind: 'provider',
+      return providerResult({
         provider: { ...provider, type: 'vercel' },
         userByok: null,
         isFree: false,
         bypassAccessCheck: false,
-      };
+      });
     });
     mockedAccountForMicrodollarUsage.mockImplementation((_response, usageContext) => {
       const capture = usageContext.providerMetadataCapture;
@@ -1171,13 +1183,12 @@ describe('POST /api/v1/chat/completions request handling', () => {
     };
     mockedGetProvider.mockImplementation(async ({ onDecision }) => {
       onDecision?.(decision);
-      return {
-        kind: 'provider',
+      return providerResult({
         provider: { ...provider, supportedChatApis: ['responses'] },
         userByok: null,
         isFree: false,
         bypassAccessCheck: false,
-      };
+      });
     });
     const { handleLlmProxyRequest } = await import('./llm-proxy');
 
@@ -1274,13 +1285,14 @@ describe('POST /api/v1/chat/completions request handling', () => {
   });
 
   it('asks bouncer to decide for an anonymous caller with the client IP', async () => {
-    mockedGetProvider.mockResolvedValueOnce({
-      kind: 'provider',
-      provider,
-      userByok: null,
-      isFree: true,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValueOnce(
+      providerResult({
+        provider,
+        userByok: null,
+        isFree: true,
+        bypassAccessCheck: false,
+      })
+    );
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
       authFailedResponse: new Response('unauthorized', { status: 401 }),
@@ -1541,13 +1553,14 @@ describe('POST /api/v1/chat/completions request handling', () => {
 
   it('passes provider response transforms to the response rewriter', async () => {
     const responseTransforms = ReasoningDetailsTransform.GeminiThought;
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider: { ...provider, responseTransforms },
-      userByok: null,
-      isFree: false,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider: { ...provider, responseTransforms },
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
     const { handleLlmProxyRequest } = await import('./llm-proxy');
 
     const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
@@ -1630,13 +1643,12 @@ describe('POST /api/v1/chat/completions request handling', () => {
       mockedGetProvider.mockImplementationOnce(async input => {
         routingProvider = await input.getRoutingProviderConfig?.();
         kiloIgnoredProviders = input.kiloIgnoredProviders;
-        return {
-          kind: 'provider',
+        return providerResult({
           provider,
           userByok: null,
           isFree: false,
           bypassAccessCheck: false,
-        };
+        });
       });
       const { handleLlmProxyRequest } = await import('./llm-proxy');
       const response = await handleLlmProxyRequest(makeRequest(makeBody(model)) as never);
@@ -1847,13 +1859,14 @@ describe('POST /api/v1/chat/completions request handling', () => {
       'rejects a request routed through a disabled %s gateway',
       async (_gateway, selectedProvider, settings, gatewayName) => {
         setOrganization(settings, { gateway_settings: ['org-1'] });
-        mockedGetProvider.mockResolvedValue({
-          kind: 'provider',
-          provider: selectedProvider,
-          userByok: null,
-          isFree: false,
-          bypassAccessCheck: false,
-        });
+        mockedGetProvider.mockResolvedValue(
+          providerResult({
+            provider: selectedProvider,
+            userByok: null,
+            isFree: false,
+            bypassAccessCheck: false,
+          })
+        );
 
         const { handleLlmProxyRequest } = await import('./llm-proxy');
         const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
@@ -1908,13 +1921,14 @@ describe('POST /api/v1/chat/completions request handling', () => {
       'rejects a %s provider targeting the disabled gateway at %s',
       async (type, apiUrl, settings, gatewayName) => {
         setOrganization(settings, { gateway_settings: ['org-1'] });
-        mockedGetProvider.mockResolvedValue({
-          kind: 'provider',
-          provider: { ...provider, type, apiUrl },
-          userByok: null,
-          isFree: false,
-          bypassAccessCheck: true,
-        });
+        mockedGetProvider.mockResolvedValue(
+          providerResult({
+            provider: { ...provider, type, apiUrl },
+            userByok: null,
+            isFree: false,
+            bypassAccessCheck: true,
+          })
+        );
 
         const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
 
@@ -1935,13 +1949,14 @@ describe('POST /api/v1/chat/completions request handling', () => {
       'checks the effective upstream URL for %s with overrides %j',
       async (apiUrl, apiUrlOverrides, expectedStatus) => {
         setOrganization({ disable_openrouter: true }, { gateway_settings: ['org-1'] });
-        mockedGetProvider.mockResolvedValue({
-          kind: 'provider',
-          provider: { ...provider, type: 'custom', apiUrl, apiUrlOverrides },
-          userByok: null,
-          isFree: false,
-          bypassAccessCheck: true,
-        });
+        mockedGetProvider.mockResolvedValue(
+          providerResult({
+            provider: { ...provider, type: 'custom', apiUrl, apiUrlOverrides },
+            userByok: null,
+            isFree: false,
+            bypassAccessCheck: true,
+          })
+        );
 
         const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
 
@@ -1968,13 +1983,14 @@ describe('POST /api/v1/chat/completions request handling', () => {
       'allows a custom provider at %s with settings %j and feature organizations %j',
       async (apiUrl, settings, organizationIds) => {
         setOrganization(settings, { gateway_settings: [...organizationIds] });
-        mockedGetProvider.mockResolvedValue({
-          kind: 'provider',
-          provider: { ...provider, type: 'custom', apiUrl },
-          userByok: null,
-          isFree: false,
-          bypassAccessCheck: true,
-        });
+        mockedGetProvider.mockResolvedValue(
+          providerResult({
+            provider: { ...provider, type: 'custom', apiUrl },
+            userByok: null,
+            isFree: false,
+            bypassAccessCheck: true,
+          })
+        );
 
         const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
 
@@ -1985,13 +2001,14 @@ describe('POST /api/v1/chat/completions request handling', () => {
 
     it('rejects a BYOK route through a disabled Vercel AI Gateway', async () => {
       setOrganization({ disable_vercel_ai_gateway: true }, { gateway_settings: ['org-1'] });
-      mockedGetProvider.mockResolvedValue({
-        kind: 'provider',
-        provider: vercelProvider,
-        userByok: [{ decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' }],
-        isFree: false,
-        bypassAccessCheck: false,
-      });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider: vercelProvider,
+          userByok: [{ decryptedAPIKey: 'sk-anthropic', providerId: 'anthropic' }],
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
 
       const { handleLlmProxyRequest } = await import('./llm-proxy');
       const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
@@ -2020,13 +2037,14 @@ describe('POST /api/v1/chat/completions request handling', () => {
 
     it('pins Vercel AI Gateway requests to the data region', async () => {
       setOrganization({ data_region: 'jp' }, { gateway_settings: ['org-1'] });
-      mockedGetProvider.mockResolvedValue({
-        kind: 'provider',
-        provider: vercelProvider,
-        userByok: null,
-        isFree: false,
-        bypassAccessCheck: false,
-      });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider: vercelProvider,
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
 
       const { handleLlmProxyRequest } = await import('./llm-proxy');
       const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
@@ -2059,10 +2077,7 @@ describe('POST /api/v1/chat/completions request handling', () => {
       | 'an OpenRouter key'
       | 'a Vercel AI Gateway key'
       | 'no BYOK key';
-    const byokRoutes: Record<
-      ByokRoute,
-      Pick<GetProviderProviderResult, 'provider' | 'userByok'>
-    > = {
+    const byokRoutes: Record<ByokRoute, Pick<ProviderRoute, 'provider' | 'userByok'>> = {
       'a catalog-mode direct BYOK key': {
         provider: { ...provider, type: 'direct-byok' },
         userByok: [{ decryptedAPIKey: 'key', providerId: 'zai-coding' }],
@@ -2101,12 +2116,13 @@ describe('POST /api/v1/chat/completions request handling', () => {
         plan: 'enterprise',
       });
       mockedGetEffectiveModelDecision.mockResolvedValue(decision);
-      mockedGetProvider.mockResolvedValue({
-        kind: 'provider',
-        ...byokRoutes[route],
-        isFree: false,
-        bypassAccessCheck: false,
-      });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          ...byokRoutes[route],
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
       const { handleLlmProxyRequest } = await import('./llm-proxy');
       return handleLlmProxyRequest(makeRequest(makeBody('moonshotai/kimi-k2.6')) as never);
     }
@@ -2247,13 +2263,14 @@ describe('POST /api/v1/chat/completions request handling', () => {
     async providerType => {
       mockedIsValidOpenRouterModelId.mockResolvedValue(false);
       mockedGetVercelModels.mockResolvedValue(new Set(['vendor/other-model']));
-      mockedGetProvider.mockResolvedValue({
-        kind: 'provider',
-        provider: { ...provider, type: providerType },
-        userByok: null,
-        isFree: false,
-        bypassAccessCheck: false,
-      });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider: { ...provider, type: providerType },
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: false,
+        })
+      );
 
       const { handleLlmProxyRequest } = await import('./llm-proxy');
       const response = await handleLlmProxyRequest(
@@ -2355,13 +2372,14 @@ describe('POST /api/v1/chat/completions request handling', () => {
         authFailedResponse: null,
         organizationId: undefined,
       });
-      mockedGetProvider.mockResolvedValue({
-        kind: 'provider',
-        provider,
-        userByok: null,
-        isFree: true,
-        bypassAccessCheck: false,
-      });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider,
+          userByok: null,
+          isFree: true,
+          bypassAccessCheck: false,
+        })
+      );
       mockedIsFreeModelRateLimited.mockResolvedValue(true);
 
       const { handleLlmProxyRequest } = await import('./llm-proxy');
@@ -2439,13 +2457,14 @@ describe('POST /api/v1/chat/completions request handling', () => {
   });
 
   it('serves free models under the free-model rate limit', async () => {
-    mockedGetProvider.mockResolvedValueOnce({
-      kind: 'provider',
-      provider,
-      userByok: null,
-      isFree: true,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValueOnce(
+      providerResult({
+        provider,
+        userByok: null,
+        isFree: true,
+        bypassAccessCheck: false,
+      })
+    );
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
       authFailedResponse: new Response('unauthorized', { status: 401 }),
@@ -2599,13 +2618,14 @@ describe.each([
     setUserAuth();
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider,
-      userByok: null,
-      isFree: false,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
@@ -2636,13 +2656,12 @@ describe.each([
   it('does not introduce a provider object when privacy is absent', async () => {
     mockedGetProvider.mockImplementationOnce(async ({ request }) => {
       expect(request.body).not.toHaveProperty('provider');
-      return {
-        kind: 'provider',
+      return providerResult({
         provider,
         userByok: null,
         isFree: false,
         bypassAccessCheck: false,
-      };
+      });
     });
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
@@ -2743,13 +2762,12 @@ describe.each([
       mockedGetProvider.mockImplementationOnce(async ({ request, getRoutingProviderConfig }) => {
         expect(request.body.provider).toEqual({ only: ['azure'], ...expectedPrivacy });
         expect(await getRoutingProviderConfig?.()).toEqual(expectedPrivacy);
-        return {
-          kind: 'provider',
+        return providerResult({
           provider,
           userByok: null,
           isFree: false,
           bypassAccessCheck: false,
-        };
+        });
       });
       const { handleLlmProxyRequest } = await import('./llm-proxy');
       const response = await handleLlmProxyRequest(
@@ -2788,13 +2806,12 @@ describe.each([
     });
     mockedGetProvider.mockImplementationOnce(async ({ getRoutingProviderConfig }) => {
       expect(await getRoutingProviderConfig?.()).toEqual({ only: ['openai'], ...privacy });
-      return {
-        kind: 'provider',
+      return providerResult({
         provider,
         userByok: null,
         isFree: false,
         bypassAccessCheck: false,
-      };
+      });
     });
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
@@ -2824,13 +2841,14 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedCreateDirectByokReferenceResolver.mockResolvedValue(async modelId => modelId);
     setUserAuth();
 
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider,
-      userByok: null,
-      isFree: false,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
@@ -3127,13 +3145,14 @@ describe('kilo-auto/efficient classifier billing', () => {
   });
 
   it('names the BYOK key when it cannot serve the API kind', async () => {
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider: { ...provider, type: 'direct-byok', supportedChatApis: ['responses'] },
-      userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
-      isFree: false,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider: { ...provider, type: 'direct-byok', supportedChatApis: ['responses'] },
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
@@ -3238,13 +3257,14 @@ describe('kilo-auto/efficient classifier billing', () => {
       settings: {},
       plan: 'enterprise',
     });
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider: { ...provider, type: 'direct-byok' },
-      userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
-      isFree: false,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider: { ...provider, type: 'direct-byok' },
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
@@ -3399,13 +3419,14 @@ describe('kilo-auto/efficient classifier billing', () => {
   it('bills classifier cost even when the final inference is BYOK', async () => {
     // The classifier runs on Kilo's OpenRouter credential regardless of the
     // final provider, so its cost is owed even when the user is BYOK.
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider,
-      userByok: [{ decryptedAPIKey: 'byok-key', providerId: 'openai' }],
-      isFree: false,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider,
+        userByok: [{ decryptedAPIKey: 'byok-key', providerId: 'openai' }],
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: {
         model: 'anthropic/claude-haiku-4',
@@ -3455,13 +3476,14 @@ describe('kilo-auto/efficient classifier billing', () => {
   it('bills the classifier even when the provider does not support the request API', async () => {
     // Exit-safe billing: the classifier already spent on Kilo's credential, so
     // the row must persist even though the request is rejected before upstream.
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider: { ...provider, supportedChatApis: ['responses'] },
-      userByok: null,
-      isFree: false,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider: { ...provider, supportedChatApis: ['responses'] },
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: {
         model: 'anthropic/claude-haiku-4',
@@ -3720,13 +3742,14 @@ describe('auto-routing shadow classifier', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setUserAuth();
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider,
-      userByok: null,
-      isFree: false,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
@@ -3805,13 +3828,14 @@ describe('custom routers and signed auto decisions', () => {
     jest.clearAllMocks();
     mockDecisionSecret = 'test-decision-secret';
     setUserAuth();
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider,
-      userByok: null,
-      isFree: false,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
     mockedGetDirectByokModel.mockResolvedValue({ provider: null, model: null });
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
@@ -4133,13 +4157,14 @@ describe('custom LLM requests', () => {
     setUserAuth();
     mockedFindCustomLlm.mockResolvedValue(null);
     jest.mocked(isCustomLlm).mockResolvedValue(false);
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider: customProvider,
-      userByok: null,
-      isFree: true,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider: customProvider,
+        userByok: null,
+        isFree: true,
+        bypassAccessCheck: false,
+      })
+    );
     mockedUpstreamRequest.mockResolvedValue({
       type: 'success',
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'custom', choices: [] }),
@@ -4247,13 +4272,14 @@ describe('custom LLM requests', () => {
   }
 
   function resolveCustomProvider(isFree: boolean, bypassAccessCheck: boolean) {
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider: customProvider,
-      userByok: null,
-      isFree,
-      bypassAccessCheck,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider: customProvider,
+        userByok: null,
+        isFree,
+        bypassAccessCheck,
+      })
+    );
   }
 
   it('blocks a user without balance from a private custom LLM with pricing', async () => {
@@ -4498,13 +4524,14 @@ describe('briefing gateway accounting receipts', () => {
       settings: undefined,
       plan: undefined,
     });
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider,
-      userByok: null,
-      isFree: false,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedIsFreeModelRateLimited.mockResolvedValue(false);
@@ -4657,13 +4684,14 @@ describe('briefing gateway accounting receipts', () => {
         authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
         organizationId: undefined,
       });
-      mockedGetProvider.mockResolvedValueOnce({
-        kind: 'provider',
-        provider,
-        userByok: null,
-        isFree: true,
-        bypassAccessCheck: false,
-      });
+      mockedGetProvider.mockResolvedValueOnce(
+        providerResult({
+          provider,
+          userByok: null,
+          isFree: true,
+          bypassAccessCheck: false,
+        })
+      );
     }
     if (variant === 'auto routing') {
       body.model = 'kilo-auto/efficient';
@@ -4886,13 +4914,14 @@ describe('Enkrypt output guardrail', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider,
-      userByok: null,
-      isFree: false,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     respondUpstream('chat_completions', false);
@@ -5048,14 +5077,15 @@ describe('Enkrypt output guardrail', () => {
     async balance => {
       setOrganization(outputGuardrailSettings('block'), balance);
       mockedIsAutoTopUpInFlight.mockResolvedValue(false);
-      mockedGetProvider.mockResolvedValue({
-        kind: 'provider',
-        provider,
-        userByok: null,
-        isFree: false,
-        bypassAccessCheck: false,
-        skipBalanceCheck: true,
-      });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider,
+          userByok: null,
+          isFree: false,
+          bypassAccessCheck: false,
+          skipBalanceCheck: true,
+        })
+      );
       enkryptAnswers(nothingDetected);
 
       const response = await sendRequest('chat_completions', false);
@@ -5096,13 +5126,14 @@ describe('Enkrypt output guardrail', () => {
       setUp: () => {
         setOrganization(outputGuardrailSettings('block'));
         setAnonymousAuth();
-        mockedGetProvider.mockResolvedValue({
-          kind: 'provider',
-          provider,
-          userByok: null,
-          isFree: true,
-          bypassAccessCheck: false,
-        });
+        mockedGetProvider.mockResolvedValue(
+          providerResult({
+            provider,
+            userByok: null,
+            isFree: true,
+            bypassAccessCheck: false,
+          })
+        );
       },
       model: 'test/free-model:free',
     },
@@ -5433,13 +5464,12 @@ describe('Enkrypt output guardrail', () => {
       enkryptAnswers(piiDetected);
       mockedGetProvider.mockImplementation(async ({ onDecision }) => {
         onDecision?.(decision);
-        return {
-          kind: 'provider',
+        return providerResult({
           provider,
           userByok: null,
           isFree: false,
           bypassAccessCheck: false,
-        };
+        });
       });
 
       let text: string;
@@ -5684,13 +5714,14 @@ describe('Enkrypt input guardrail', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider,
-      userByok: null,
-      isFree: false,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      })
+    );
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedIsValidOpenRouterModelId.mockResolvedValue(true);
     mockedUpstreamRequest.mockResolvedValue({
@@ -5775,14 +5806,16 @@ describe('Enkrypt input guardrail', () => {
         balance
       );
       mockedIsAutoTopUpInFlight.mockResolvedValue(false);
-      mockedGetProvider.mockResolvedValue({
-        kind: 'provider',
-        provider,
-        userByok: route === 'byok' ? [{ decryptedAPIKey: 'byok-key', providerId: 'openai' }] : null,
-        isFree: route === 'free',
-        bypassAccessCheck: false,
-        skipBalanceCheck: route === 'skipBalanceCheck',
-      });
+      mockedGetProvider.mockResolvedValue(
+        providerResult({
+          provider,
+          userByok:
+            route === 'byok' ? [{ decryptedAPIKey: 'byok-key', providerId: 'openai' }] : null,
+          isFree: route === 'free',
+          bypassAccessCheck: false,
+          skipBalanceCheck: route === 'skipBalanceCheck',
+        })
+      );
       enkryptAnswers({ summary: { injection_attack: 0, pii: 0 } });
 
       const response = await handleLlmProxyRequest(
@@ -5825,13 +5858,14 @@ describe('Enkrypt input guardrail', () => {
       { enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } } },
       0.000001
     );
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider,
-      userByok: null,
-      isFree: true,
-      bypassAccessCheck: false,
-    });
+    mockedGetProvider.mockResolvedValue(
+      providerResult({
+        provider,
+        userByok: null,
+        isFree: true,
+        bypassAccessCheck: false,
+      })
+    );
     mockedIsFreeModelRateLimited.mockResolvedValue(false);
     enkryptAnswers({ summary: { injection_attack: 0, pii: 0 } });
 
@@ -6004,13 +6038,12 @@ describe('Enkrypt input guardrail', () => {
           is_free: false,
         },
       });
-      return {
-        kind: 'provider',
+      return providerResult({
         provider,
         userByok: null,
         isFree: false,
         bypassAccessCheck: false,
-      };
+      });
     });
     setOrganization({
       enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
@@ -7560,5 +7593,508 @@ describe('Enkrypt input guardrail', () => {
         expect(send).not.toHaveBeenCalled();
       }
     );
+  });
+});
+
+describe('BYOK failover', () => {
+  function byokProvider(apiKey: string, overrides: Partial<Provider> = {}): Provider {
+    return { ...provider, apiKey, transformRequest: jest.fn(async () => {}), ...overrides };
+  }
+
+  function byokRoute(providerId: UserByokProviderId, routeProvider: Provider): ProviderRoute {
+    return {
+      provider: routeProvider,
+      userByok: [{ decryptedAPIKey: routeProvider.apiKey, providerId }],
+      isFree: false,
+      bypassAccessCheck: false,
+    };
+  }
+
+  /** A result taking the request with `primary` and listing `later` as its failover routes. */
+  function withFailover(primary: ProviderRoute, ...later: ProviderRoute[]) {
+    const failovers = later.map(route => jest.fn(async () => route));
+    const result: GetProviderProviderResult = {
+      kind: 'provider',
+      routes: [async () => primary, ...failovers],
+    };
+    return { result, failovers };
+  }
+
+  function upstreamWithStatus(status: number) {
+    return {
+      type: 'success' as const,
+      response: upstreamJsonResponse(
+        status < 400
+          ? { id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }
+          : { error: { message: `upstream failed with ${status}` } },
+        status
+      ),
+    };
+  }
+
+  function sentApiKeys() {
+    return mockedUpstreamRequest.mock.calls.map(([args]) => args.provider.apiKey);
+  }
+
+  function sentBodies() {
+    return mockedUpstreamRequest.mock.calls.map(([args]) => args.body);
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setUserAuth();
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
+    mockedIsFreeModelRateLimited.mockResolvedValue(false);
+    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockReturnValue(usageAccountingResult());
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    for (const method of ['warn', 'error'] as const) {
+      const logger = console[method];
+      if (jest.isMockFunction(logger)) logger.mockRestore();
+    }
+  });
+
+  it.each([401, 429, 500])(
+    'serves the request with the next BYOK key when the first key answers %s',
+    async status => {
+      const primaryProvider = byokProvider('primary-byok-key', {
+        transformRequest: jest.fn(async ({ request }) => {
+          request.body.model = 'primary-upstream-model';
+        }),
+      });
+      const failoverProvider = byokProvider('failover-byok-key', { type: 'direct-byok' });
+      const failoverRoute = byokRoute('zai-coding', failoverProvider);
+      const { result, failovers } = withFailover(
+        byokRoute('openai', primaryProvider),
+        failoverRoute
+      );
+      mockedGetProvider.mockResolvedValue(result);
+      mockedUpstreamRequest
+        .mockResolvedValueOnce(upstreamWithStatus(status))
+        .mockResolvedValueOnce(upstreamWithStatus(200));
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+      expect(response.status).toBe(200);
+      expect(failovers[0]).toHaveBeenCalledTimes(1);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(2);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].durationBudgetMs).toBe(
+        UPSTREAM_DURATION_BUDGET_MS
+      );
+      expect(sentApiKeys()).toEqual(['primary-byok-key', 'failover-byok-key']);
+      expect(mockedUpstreamRequest.mock.calls[1]?.[0].provider).toBe(failoverProvider);
+      const [firstBody, secondBody] = sentBodies();
+      expect(firstBody).toMatchObject({ model: 'primary-upstream-model' });
+      expect(secondBody).toMatchObject({
+        model: 'openai/gpt-4o',
+        messages: [{ role: 'user', content: 'hello' }],
+      });
+      expect(secondBody).not.toBe(firstBody);
+      expect(failoverProvider.transformRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: failoverProvider,
+          userByok: failoverRoute.userByok,
+        })
+      );
+      expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledTimes(1);
+      expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ provider: 'direct-byok', user_byok: true, status_code: 200 }),
+        expect.anything(),
+        failoverProvider
+      );
+    }
+  );
+
+  it('returns the last failure when every BYOK key fails, never falling back to Kilo', async () => {
+    const { result, failovers } = withFailover(
+      byokRoute('openai', byokProvider('primary-byok-key')),
+      byokRoute('anthropic', byokProvider('second-byok-key')),
+      byokRoute('openrouter', byokProvider('third-byok-key'))
+    );
+    mockedGetProvider.mockResolvedValue(result);
+    mockedUpstreamRequest
+      .mockResolvedValueOnce(upstreamWithStatus(500))
+      .mockResolvedValueOnce(upstreamWithStatus(429))
+      .mockResolvedValueOnce(upstreamWithStatus(502));
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(502);
+    expect(failovers[0]).toHaveBeenCalledTimes(1);
+    expect(failovers[1]).toHaveBeenCalledTimes(1);
+    expect(mockedGetProvider).toHaveBeenCalledTimes(1);
+    expect(sentApiKeys()).toEqual(['primary-byok-key', 'second-byok-key', 'third-byok-key']);
+    expect(sentApiKeys()).not.toContain(provider.apiKey);
+    for (const body of sentBodies()) expect(body).toMatchObject({ model: 'openai/gpt-4o' });
+  });
+
+  it('fails over when the upstream request itself fails', async () => {
+    const { result } = withFailover(
+      byokRoute('openai', byokProvider('primary-byok-key')),
+      byokRoute('anthropic', byokProvider('failover-byok-key'))
+    );
+    mockedGetProvider.mockResolvedValue(result);
+    mockedUpstreamRequest
+      .mockResolvedValueOnce({
+        type: 'error',
+        response: NextResponse.json({ error: 'upstream unreachable' }, { status: 503 }),
+      })
+      .mockResolvedValueOnce(upstreamWithStatus(200));
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(200);
+    expect(sentApiKeys()).toEqual(['primary-byok-key', 'failover-byok-key']);
+  });
+
+  it('returns the last upstream request failure when it is the final attempt', async () => {
+    const { result } = withFailover(
+      byokRoute('openai', byokProvider('primary-byok-key')),
+      byokRoute('anthropic', byokProvider('failover-byok-key'))
+    );
+    mockedGetProvider.mockResolvedValue(result);
+    mockedUpstreamRequest.mockResolvedValueOnce(upstreamWithStatus(500)).mockResolvedValueOnce({
+      type: 'error',
+      response: NextResponse.json({ error: 'upstream unreachable' }, { status: 503 }),
+    });
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'upstream unreachable' });
+    expect(sentApiKeys()).toEqual(['primary-byok-key', 'failover-byok-key']);
+  });
+
+  it('never resolves a failover key when the first key succeeds', async () => {
+    const primaryProvider = byokProvider('primary-byok-key');
+    const { result, failovers } = withFailover(
+      byokRoute('openai', primaryProvider),
+      byokRoute('anthropic', byokProvider('failover-byok-key'))
+    );
+    mockedGetProvider.mockResolvedValue(result);
+    mockedUpstreamRequest.mockResolvedValueOnce(upstreamWithStatus(200));
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(200);
+    expect(failovers[0]).not.toHaveBeenCalled();
+    expect(sentApiKeys()).toEqual(['primary-byok-key']);
+    expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      primaryProvider
+    );
+  });
+
+  it.each([
+    {
+      name: 'a ChatGPT subscription',
+      result: providerResult({
+        provider: byokProvider('chatgpt-token', { type: 'openai-chatgpt' }),
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+        skipBalanceCheck: true,
+      }),
+    },
+    {
+      name: 'Kilo',
+      result: providerResult({
+        provider,
+        userByok: null,
+        isFree: false,
+        bypassAccessCheck: false,
+      }),
+    },
+    {
+      name: 'a BYOK key without later keys',
+      result: providerResult(byokRoute('openai', byokProvider('primary-byok-key'))),
+    },
+    {
+      name: 'a BYOK key whose later keys all fail to resolve',
+      result: {
+        kind: 'provider',
+        routes: [
+          async () => byokRoute('openai', byokProvider('primary-byok-key')),
+          async () => {
+            throw new Error('cannot decrypt');
+          },
+        ],
+      },
+    },
+  ] satisfies { name: string; result: GetProviderProviderResult }[])(
+    'sends one attempt for $name when it fails',
+    async ({ result }) => {
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      mockedGetProvider.mockResolvedValue(result);
+      mockedUpstreamRequest.mockResolvedValueOnce(upstreamWithStatus(500));
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+      expect(response.status).toBe(500);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('skips a failover key the policy refuses and uses the next one', async () => {
+    const { result, failovers } = withFailover(
+      byokRoute('openai', byokProvider('primary-byok-key')),
+      byokRoute('anthropic', byokProvider('refused-byok-key', { supportedChatApis: ['messages'] })),
+      byokRoute('openrouter', byokProvider('next-byok-key'))
+    );
+    mockedGetProvider.mockResolvedValue(result);
+    mockedUpstreamRequest
+      .mockResolvedValueOnce(upstreamWithStatus(500))
+      .mockResolvedValueOnce(upstreamWithStatus(200));
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(200);
+    expect(failovers[0]).toHaveBeenCalledTimes(1);
+    expect(failovers[1]).toHaveBeenCalledTimes(1);
+    expect(sentApiKeys()).toEqual(['primary-byok-key', 'next-byok-key']);
+    expect(console.warn).toHaveBeenCalledWith(
+      '[byok-failover] Skipping a BYOK key the policy refuses',
+      { providerIds: ['anthropic'] }
+    );
+  });
+
+  it('skips a failover key that cannot be resolved and uses the next one', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const unresolvable = jest.fn(async (): Promise<ProviderRoute> => {
+      throw new TypeError('cannot decrypt');
+    });
+    const next = jest.fn(async () => byokRoute('openrouter', byokProvider('next-byok-key')));
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      routes: [
+        async () => byokRoute('openai', byokProvider('primary-byok-key')),
+        unresolvable,
+        next,
+      ],
+    });
+    mockedUpstreamRequest
+      .mockResolvedValueOnce(upstreamWithStatus(500))
+      .mockResolvedValueOnce(upstreamWithStatus(200));
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(200);
+    expect(unresolvable).toHaveBeenCalledTimes(1);
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(sentApiKeys()).toEqual(['primary-byok-key', 'next-byok-key']);
+    expect(consoleError).toHaveBeenCalledWith(
+      '[byok-failover] Skipping a BYOK key that could not be resolved',
+      { errorType: 'TypeError' }
+    );
+    expect(JSON.stringify(consoleError.mock.calls)).not.toMatch(/byok-key/);
+  });
+
+  it('returns the failure when no failover key is left after skipping', async () => {
+    const { result, failovers } = withFailover(
+      byokRoute('openai', byokProvider('primary-byok-key')),
+      byokRoute('anthropic', byokProvider('refused-byok-key', { supportedChatApis: ['messages'] }))
+    );
+    mockedGetProvider.mockResolvedValue(result);
+    mockedUpstreamRequest.mockResolvedValueOnce(upstreamWithStatus(500));
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(500);
+    expect(failovers[0]).toHaveBeenCalledTimes(1);
+    expect(sentApiKeys()).toEqual(['primary-byok-key']);
+  });
+
+  it('does not fail over for a model OpenRouter does not list', async () => {
+    const { result, failovers } = withFailover(
+      byokRoute('openai', byokProvider('primary-byok-key')),
+      byokRoute('anthropic', byokProvider('failover-byok-key'))
+    );
+    mockedGetProvider.mockResolvedValue(result);
+    mockedIsValidOpenRouterModelId.mockResolvedValue(false);
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(404);
+    expect(failovers[0]).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  describe('provider metadata archive', () => {
+    const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
+      '@kilocode/web-shared/lib/r2/create-client'
+    );
+    const decision: ProviderRoutingDecision = {
+      requested_model: 'openai/gpt-4o',
+      api_kind: 'chat_completions',
+      owner_type: 'user',
+      steps: [
+        { step: 'byok-key', outcome: 'selected', route: 'direct-byok', provider_id: 'openai' },
+      ],
+      byok_candidates: [],
+      result: {
+        kind: 'provider',
+        route: 'direct-byok',
+        provider_type: 'direct-byok',
+        byok_provider_ids: ['openai'],
+        payer: 'owner-byok-key',
+        is_free: false,
+      },
+    };
+
+    async function archivedRecord(result: GetProviderProviderResult) {
+      fakeR2.objects.clear();
+      const env = jest.replaceProperty(process, 'env', {
+        ...process.env,
+        R2_ACCOUNT_ID: 'test-metadata-account',
+        R2_AI_PROVIDER_METADATA_BUCKET_NAME: 'test-provider-metadata',
+        R2_AI_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
+        R2_AI_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
+      });
+      mockedGetProvider.mockImplementation(async ({ onDecision }) => {
+        onDecision?.(decision);
+        return result;
+      });
+
+      let response: Response;
+      let body: unknown;
+      try {
+        response = await handleLlmProxyRequest(makeRequest(makeBody()));
+        body = await response.json();
+        await Promise.all(
+          jest
+            .mocked(after)
+            .mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
+        );
+      } finally {
+        env.restore();
+      }
+
+      const objects = [...fakeR2.objects.values()];
+      expect(objects).toHaveLength(1);
+      const raw = objects[0] ?? '';
+      return {
+        response,
+        body,
+        raw,
+        record: KiloRoutingDecisionRecordSchema.parse(JSON.parse(raw)),
+      };
+    }
+
+    it('archives every attempt of a failover with its status and error code', async () => {
+      const { result } = withFailover(
+        byokRoute('openai', byokProvider('primary-byok-key')),
+        byokRoute('anthropic', byokProvider('failover-byok-key', { type: 'vercel' }))
+      );
+      mockedUpstreamRequest
+        .mockResolvedValueOnce({
+          type: 'success',
+          response: upstreamJsonResponse(
+            {
+              error: {
+                message: 'You exceeded your current quota, please check your plan.',
+                type: 'insufficient_quota',
+                code: 'insufficient_quota',
+              },
+            },
+            429
+          ),
+        })
+        .mockResolvedValueOnce(upstreamWithStatus(200));
+
+      const { response, raw, record } = await archivedRecord(result);
+
+      expect(response.status).toBe(200);
+      expect(record).toMatchObject(decision);
+      expect(record.byok_failover_attempts).toEqual([
+        {
+          provider_type: 'openrouter',
+          byok_provider_ids: ['openai'],
+          status: 429,
+          error_code: 'insufficient_quota',
+          duration_ms: expect.any(Number),
+          outcome: 'failed-over',
+        },
+        {
+          provider_type: 'vercel',
+          byok_provider_ids: ['anthropic'],
+          status: 200,
+          duration_ms: expect.any(Number),
+          outcome: 'served',
+        },
+      ]);
+      expect(raw).not.toMatch(/exceeded your current quota|primary-byok-key|failover-byok-key/);
+    });
+
+    it('archives a final failure while the client still receives its body', async () => {
+      const { result } = withFailover(
+        byokRoute('openai', byokProvider('primary-byok-key')),
+        byokRoute('anthropic', byokProvider('failover-byok-key'))
+      );
+      mockedUpstreamRequest.mockResolvedValueOnce(upstreamWithStatus(500)).mockResolvedValueOnce({
+        type: 'error',
+        response: NextResponse.json(
+          { error: 'upstream unreachable', error_type: 'upstream_disconnect' },
+          { status: 503 }
+        ),
+      });
+
+      const { response, body, record } = await archivedRecord(result);
+
+      expect(response.status).toBe(503);
+      expect(body).toEqual({ error: 'upstream unreachable', error_type: 'upstream_disconnect' });
+      expect(record.byok_failover_attempts).toEqual([
+        expect.objectContaining({ status: 500, outcome: 'failed-over' }),
+        expect.objectContaining({
+          byok_provider_ids: ['anthropic'],
+          status: 503,
+          error_code: 'upstream_disconnect',
+          outcome: 'failed',
+          stop_reason: 'no-keys-left',
+        }),
+      ]);
+      expect(record.byok_failover_attempts?.[0]).not.toHaveProperty('error_code');
+    });
+
+    it('archives no attempts when the first key serves the request', async () => {
+      const { result, failovers } = withFailover(
+        byokRoute('openai', byokProvider('primary-byok-key')),
+        byokRoute('anthropic', byokProvider('failover-byok-key'))
+      );
+      mockedUpstreamRequest.mockResolvedValueOnce(upstreamWithStatus(200));
+
+      const { response, raw, record } = await archivedRecord(result);
+
+      expect(response.status).toBe(200);
+      expect(failovers[0]).not.toHaveBeenCalled();
+      expect(record).toMatchObject(decision);
+      expect(JSON.parse(raw)).not.toHaveProperty('byok_failover_attempts');
+    });
+  });
+
+  it('does not fail over once the client has disconnected', async () => {
+    const controller = new AbortController();
+    const { result, failovers } = withFailover(
+      byokRoute('openai', byokProvider('primary-byok-key')),
+      byokRoute('anthropic', byokProvider('failover-byok-key'))
+    );
+    mockedGetProvider.mockResolvedValue(result);
+    mockedUpstreamRequest.mockImplementationOnce(async () => {
+      controller.abort();
+      return upstreamWithStatus(500);
+    });
+
+    await handleLlmProxyRequest(
+      new NextRequest(makeRequest(makeBody()), { signal: controller.signal })
+    );
+
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    expect(failovers[0]).not.toHaveBeenCalled();
   });
 });

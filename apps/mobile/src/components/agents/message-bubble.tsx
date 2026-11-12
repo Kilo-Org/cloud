@@ -23,6 +23,7 @@ import { MessageErrorBoundary } from './message-error-boundary';
 import { MessageLongPressProvider } from './message-long-press-context';
 import {
   type MessageDeliveryStatement,
+  isGenericResponseFailure,
   messageFailureLabel,
   selectMessageFailure,
 } from './message-failure-state';
@@ -81,6 +82,14 @@ type MessageBubbleProps = {
   retryAvailable?: boolean;
   /** Copies a failed user message's text back into the composer. */
   onCopyToComposer?: (text: string) => void;
+  /**
+   * Whether this turn's preparation group states its failure. The group names
+   * the stage that failed and the reason, so a generic response-failure
+   * statement here would state the same turn twice; the footer keeps its
+   * actions and drops that statement. A classified failure is still shown.
+   * Defaults to false.
+   */
+  failureStatedByPreparation?: boolean;
   /** Restores a canceled queued message's prompt back into the composer. */
   onRestoreQueued?: (message: StoredMessage) => void;
   /**
@@ -107,6 +116,7 @@ function MessageBubbleImpl({
   onAddCredits,
   retryAvailable,
   onCopyToComposer,
+  failureStatedByPreparation,
   onRestoreQueued,
   condenseToolCalls,
 }: Readonly<MessageBubbleProps>) {
@@ -185,6 +195,13 @@ function MessageBubbleImpl({
   // a re-send passes `retryAvailable: false`: the footer then still states the
   // failure, with no action that could not act.
   const failure = selectMessageFailure({ deliveryState, info: message.info, retryAvailable });
+  // A turn whose preparation failed states that failure in its preparation
+  // group, with the stage and the reason. The generic response-failure
+  // statement would state the same turn again, so only the statement goes: the
+  // actions stay here, because a collapsed group must not be able to hide the
+  // turn's recovery.
+  const statedByPreparation =
+    failureStatedByPreparation === true && failure !== null && isGenericResponseFailure(failure);
   const relevantHandlerWired =
     retryAvailable === false ||
     (failure !== null &&
@@ -215,34 +232,38 @@ function MessageBubbleImpl({
          actions in its own group. `items-end` is logical, so the status stays
          with the end-aligned bubble in either direction. */
       <View className={cn('gap-2 px-4 pt-1 pb-[24px]', trailingFailure && 'items-end')}>
-        <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
-          {failure.error ? (
-            // Every failure that reports an error carries the same marker; a
-            // message the person stopped reports a neutral status and carries
-            // none. The marker is the state, not copy: the title beside it says
-            // what happened, so it carries no text of its own for a screen
-            // reader.
-            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-              <AlertCircle size={14} color={colors.destructive} />
+        {statedByPreparation ? null : (
+          <>
+            <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
+              {failure.error ? (
+                // Every failure that reports an error carries the same marker; a
+                // message the person stopped reports a neutral status and carries
+                // none. The marker is the state, not copy: the title beside it says
+                // what happened, so it carries no text of its own for a screen
+                // reader.
+                <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                  <AlertCircle size={14} color={colors.destructive} />
+                </View>
+              ) : null}
+              <Text
+                className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
+                accessibilityLabel={messageFailureLabel(failure)}
+              >
+                {failure.title}
+              </Text>
             </View>
-          ) : null}
-          <Text
-            className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
-            accessibilityLabel={messageFailureLabel(failure)}
-          >
-            {failure.title}
-          </Text>
-        </View>
-        {failure.detail !== null ? (
-          <Text
-            className={cn(
-              'text-sm leading-[1.25rem] text-muted-foreground',
-              trailingFailure && 'text-right'
-            )}
-          >
-            {failure.detail}
-          </Text>
-        ) : null}
+            {failure.detail !== null ? (
+              <Text
+                className={cn(
+                  'text-sm leading-[1.25rem] text-muted-foreground',
+                  trailingFailure && 'text-right'
+                )}
+              >
+                {failure.detail}
+              </Text>
+            ) : null}
+          </>
+        )}
         <View className="flex-row gap-2">
           {failure.canRetry && onRetryMessage ? (
             <Button

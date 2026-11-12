@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- The failure selector and the every-catalog label check share one subject. */
 import { describe, expect, it } from 'vitest';
 
-import { type MessageInfo } from '@kilocode/cloud-agent-sdk';
+import { type MessageDeliveryState, type MessageInfo } from '@kilocode/cloud-agent-sdk';
 
 import { CATALOG_LOADERS } from '@/i18n/catalogs';
 import { i18n } from '@/i18n';
@@ -9,6 +9,7 @@ import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 
 import {
   composeFailureLabel,
+  isGenericResponseFailure,
   messageFailureLabel,
   NON_RETRYABLE_ASSISTANT_ERRORS,
   selectMessageFailure,
@@ -393,6 +394,53 @@ describe('selectMessageFailure', () => {
         selectMessageFailure({ info: assistantInfo('APIError'), retryAvailable: true })?.canRetry
       ).toBe(true);
     });
+  });
+});
+
+/**
+ * A failed preparation states its own cause in the group it renders, so the
+ * question's row keeps only its actions where its statement would repeat the
+ * same failed turn. Only the statement with no cause of its own is that
+ * generic; every classified cause stays readable in the row.
+ */
+describe('isGenericResponseFailure', () => {
+  const failureFor = (input: {
+    deliveryState?: Extract<MessageDeliveryState, { status: 'failed' }>;
+    info?: MessageInfo;
+  }) =>
+    selectMessageFailure({
+      info: input.info ?? userInfo(),
+      ...(input.deliveryState === undefined ? {} : { deliveryState: input.deliveryState }),
+    });
+
+  it('reads a failed run and an unclassified assistant error as generic', () => {
+    const execution = failureFor({
+      deliveryState: { status: 'failed', error: '', reason: 'execution' },
+    });
+    expect(execution).not.toBeNull();
+    expect(execution && isGenericResponseFailure(execution)).toBe(true);
+
+    const unknown = failureFor({ info: assistantInfo('UnknownError') });
+    expect(unknown).not.toBeNull();
+    expect(unknown && isGenericResponseFailure(unknown)).toBe(true);
+  });
+
+  it('keeps every classified cause, and every failure of the send itself', () => {
+    const cases: (MessageInfo | Extract<MessageDeliveryState, { status: 'failed' }>)[] = [
+      { status: 'failed', error: '', reason: 'credits' },
+      { status: 'failed', error: 'RAW_TRANSPORT_TEXT', reason: 'exhausted' },
+      { status: 'failed', error: '', reason: 'interrupted' },
+      assistantInfo('ProviderAuthError'),
+      assistantInfo('ContextOverflowError'),
+      assistantInfo('APIError'),
+    ];
+
+    for (const entry of cases) {
+      const failure =
+        'status' in entry ? failureFor({ deliveryState: entry }) : failureFor({ info: entry });
+      expect(failure, JSON.stringify(entry)).not.toBeNull();
+      expect(failure && isGenericResponseFailure(failure), JSON.stringify(entry)).toBe(false);
+    }
   });
 });
 

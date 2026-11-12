@@ -5059,7 +5059,7 @@ describe('session detail duplicate failure state', () => {
     expect(labels).toContain(i18n.t('agentChat.messageBubble.copyToComposer'));
   });
 
-  it('shows the failure line and a usable composer once environment setup gives up', async () => {
+  it('states a failed preparation once: the group names the failed stage and the row keeps its actions', async () => {
     goalMountOptions.resolvedType = 'cloud-agent';
     sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
     const question = 'please refactor';
@@ -5092,15 +5092,28 @@ describe('session detail duplicate failure state', () => {
       status: 'failed',
       startedAt: 0,
       completedAt: 1,
-      safeError: 'sandbox_create_failed',
+      safeError: 'invalid_configuration',
       revision: 2,
-      steps: [],
+      steps: [
+        {
+          id: 'step-sandbox',
+          key: 'sandbox_provision',
+          kind: 'phase',
+          label: 'sandbox provision',
+          status: 'failed',
+          startedAt: 0,
+          completedAt: 1,
+          revision: 1,
+          latestDetail: 'Creating sandbox',
+          safeError: 'invalid_configuration',
+        },
+      ],
     };
     act(() => {
       view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, true);
       view.store.set<CloudStatus | null, [CloudStatus | null], unknown>(
         view.manager.atoms.cloudStatus,
-        { type: 'error', message: 'sandbox_create_failed' }
+        { type: 'error', message: 'invalid_configuration' }
       );
       view.store.set<readonly PreparationAttempt[], [readonly PreparationAttempt[]], unknown>(
         view.manager.atoms.preparationAttempts,
@@ -5122,11 +5135,22 @@ describe('session detail duplicate failure state', () => {
     });
 
     const text = renderedText(view.renderer.root);
-    expect(text).toContain(i18n.t('agentChat.messageFailure.assistantTitle'));
-    expect(text).toContain(i18n.t('agentChat.messageFailure.deliveryExecution'));
+    // The failed attempt is what the group renders; its own copy (the failed
+    // stage and the reason) is covered by the group's suite.
+    const group = view.renderer.root.find(node => Object.is(node.type, 'PreparationGroup'));
+    expect(group.props.attempt).toMatchObject({
+      id: 'attempt-1',
+      triggerMessageId: USER_ID,
+      status: 'failed',
+    });
+    // The generic response-failure statement above it is gone, so the same
+    // failed turn is not read as two competing errors.
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.assistantTitle'));
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.deliveryExecution'));
     expect(placeholder()).toBe(i18n.t('common.message'));
     expect(composerProps(view).sendDisabled).toBe(false);
     expect(composerProps(view).sendDisabledReason).toBeNull();
+    // The turn keeps the recovery PR 9887 gave it.
     const labels = view.renderer.root
       .findAll(node => Object.is(node.type, 'Button'))
       .map(node => node.props.accessibilityLabel);

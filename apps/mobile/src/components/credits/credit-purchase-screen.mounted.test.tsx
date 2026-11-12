@@ -873,8 +873,8 @@ describe('CreditPurchaseScreen', () => {
 
     expect(allText(renderer)).toContain('Completing purchase');
     const rows = packRows(renderer);
-    // The in-flight row swaps its store price for the state in the trailing
-    // slot, so it keeps its single trailing line and no row moves.
+    // The in-flight row keeps its store price and its state, and the state takes
+    // the note line, so the row keeps its height and the price stays announced.
     const busyRow = rows.find(
       row =>
         (row.props as { accessibilityState?: { busy?: boolean } }).accessibilityState?.busy === true
@@ -898,7 +898,7 @@ describe('CreditPurchaseScreen', () => {
     expect(
       (busyRow?.props as { accessibilityLabel?: string } | undefined)?.accessibilityLabel
     ).toBe(
-      `Add ${packAmount('$10.00')} of credits, Completing purchase, Credits purchased through the App Store do not expire.`
+      `Add ${packAmount('$10.00')} of credits, $10.99, Completing purchase, Credits purchased through the App Store do not expire.`
     );
     expect(
       rows.every(

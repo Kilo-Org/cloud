@@ -261,11 +261,16 @@ export function CreditPurchaseScreen() {
               // The row is one accessible element: the explicit label replaces
               // its children, so the charge and the disabled reason must be in
               // the label itself (the canonical Kilo Pass row does the same).
-              // The state is never dropped from the label, also when the card
-              // above is its only visible statement.
+              // The price the row still shows stays in the label while a
+              // purchase is open, and the state is never dropped, also when the
+              // card above is its only visible statement.
               const rowAccessibilityLabel = [
                 packLabel,
-                completingLabel ?? statusLabel ?? storePrice ?? t('credits.priceUnavailable'),
+                storePrice,
+                completingLabel ?? statusLabel,
+                storePrice === null && completingLabel === null && statusLabel === null
+                  ? t('credits.priceUnavailable')
+                  : null,
                 expiryMessage,
               ]
                 .filter(Boolean)

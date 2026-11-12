@@ -105,21 +105,31 @@ type PillCostSlot = 'label' | 'loading' | 'unreported';
 
 /**
  * The widest reading each value slot has to hold: the percentage at `100` and a
- * four-figure cost badge, both read through the formatters the painted values
- * use so the slot holds at every font scale and in every locale.
+ * cost badge in its widest form, both read through the formatters the painted
+ * values use so the slot holds at every font scale and in every locale.
  *
  * The pill lays each slot out at this width and paints the reading over it.
  * A slot therefore never collapses for a value that has not arrived, and a
  * reading that arrives fills the slot it already showed instead of resizing the
  * pill — and the title and trailing control beside it — after the screen
  * settled.
+ *
+ * A badge has two shapes: four decimals below half a cent and two at or above
+ * it, so the sizer is the wider of the two rather than a guess at one of them.
+ * The four-decimal shape carries one more digit and is the wider of the two at
+ * the same type size.
  */
-const COST_SLOT_SIZER_MICRODOLLARS = 12_340_000;
+const COST_SLOT_SIZER_TWO_DECIMALS_MICRODOLLARS = 12_340_000;
+const COST_SLOT_SIZER_FOUR_DECIMALS_MICRODOLLARS = 4_999;
 
 export function getPillSlotSizers() {
+  const twoDecimals =
+    formatSessionCostBadge(COST_SLOT_SIZER_TWO_DECIMALS_MICRODOLLARS) ?? '$0.00';
+  const fourDecimals =
+    formatSessionCostBadge(COST_SLOT_SIZER_FOUR_DECIMALS_MICRODOLLARS) ?? '$0.0000';
   return {
     percentage: formatPercent(100, i18n.language),
-    cost: formatSessionCostBadge(COST_SLOT_SIZER_MICRODOLLARS) ?? '$0.00',
+    cost: fourDecimals.length >= twoDecimals.length ? fourDecimals : twoDecimals,
   };
 }
 

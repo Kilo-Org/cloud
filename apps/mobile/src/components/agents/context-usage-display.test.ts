@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { formatPercent } from '@/lib/format';
+
+import { formatSessionCostBadge } from './session-list-helpers';
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
@@ -296,9 +298,13 @@ describe('getPillSlotSizers', () => {
   it('sizes both slots from the widest reading each one paints', () => {
     const sizers = getPillSlotSizers();
     expect(sizers.percentage).toBe(formatPercent(100, i18n.language));
-    // A settled cost badge, in the same format the painted cost uses.
-    expect(sizers.cost).toMatch(/^\$\d+\.\d{2}$/u);
-    expect(sizers.cost.length).toBeGreaterThanOrEqual('$0.15'.length);
+    // The cost sizer is a badge in its widest shape: four decimals carry one
+    // more digit than two, so the four-decimal shape holds both.
+    expect(sizers.cost).toBe(formatSessionCostBadge(4_999));
+    for (const painted of [formatSessionCostBadge(20_000), formatSessionCostBadge(1_234_567)]) {
+      expect(painted).not.toBeNull();
+      expect((painted ?? '').length).toBeLessThanOrEqual(sizers.cost.length);
+    }
   });
 
   it('never returns an empty sizer', () => {

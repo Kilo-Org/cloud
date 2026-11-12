@@ -4159,20 +4159,31 @@ describe('SessionIngestDO integration', () => {
         expect(readStoredTotal(state)).toBeCloseTo(expected.total ?? 0, 10);
         expect(readStoredTotal(state)).toBeCloseTo(20 * 0.02 + 20 * 0.01 + 0.5 + 0.05, 10);
 
-        // The read's projection hands the isolate a body only for a row without a stored
-        // contribution.
-        const projected = [
-          ...state.storage.sql.exec<{ item_id: string; legacy_item_data: string | null }>(
-            'SELECT item_id, CASE WHEN cost_usd IS NULL THEN item_data END AS legacy_item_data ' +
-              'FROM ingest_items WHERE item_id IN (?, ?) ORDER BY item_id',
+        // A batch step reads a body's size, never the body: a row with a stored contribution
+        // reports none, and a pre-column row reports the size of the body it would need.
+        const sized = [
+          ...state.storage.sql.exec<{ item_id: string; body_bytes: number }>(
+            'SELECT item_id, CASE WHEN cost_usd IS NULL THEN length(CAST(item_data AS BLOB)) ' +
+              'ELSE 0 END AS body_bytes FROM ingest_items WHERE item_id IN (?, ?) ' +
+              'ORDER BY item_id',
             'message/b0',
             'message/b39'
           ),
         ];
-        expect(projected.map(row => [row.item_id, row.legacy_item_data !== null])).toEqual([
+        expect(sized.map(row => [row.item_id, row.body_bytes > 0])).toEqual([
           ['message/b0', true],
           ['message/b39', false],
         ]);
+
+        // The body read returns the stored body of a pre-column row, which parses to that
+        // row's contribution.
+        const [body] = [
+          ...state.storage.sql.exec<{ item_data: string }>(
+            'SELECT item_data FROM ingest_items WHERE item_id = ?',
+            'message/b0'
+          ),
+        ];
+        expect(JSON.parse(body.item_data).cost).toBeCloseTo(0.02, 10);
       });
 
       await stub.clear();

@@ -1,48 +1,48 @@
-import { and, asc, eq, gt, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 
 import { ingestItems } from '../db/sqlite-schema';
-import { storedMessageCostUsd } from './session-metrics';
+import { clampAssistantCostUsd, storedMessageCostUsd } from './session-metrics';
 
 /**
- * Bounded read of a session's stored running cost: at most this many message rows, and this
- * many pre-column bodies, per batch. The seed sums the same contributions a full recomputation
- * over stored rows would, one batch at a time, so a long transcript costs the ingest request a
- * bounded amount of Durable Object time and memory instead of one read of every stored body.
+ * Bounded read of a session's stored running cost: at most this many message rows per batch,
+ * and at most this many bytes of pre-column bodies per batch. The seed sums the same
+ * contributions a recomputation over the stored rows yields, one batch at a time, so a long
+ * transcript costs the ingest request a bounded amount of Durable Object time and memory.
  */
 export const RUNNING_COST_SEED_BATCH_ROWS = 16;
 export const RUNNING_COST_SEED_BATCH_BYTES = 4 * 1024 * 1024;
 
-const encoder = new TextEncoder();
+type SeedRow = { id: number; cost_usd: number | null; body_bytes: number };
 
 /**
- * The read needs `cost_usd` for every row and the body only for a row without a stored
- * contribution: the projection returns the body for a NULL `cost_usd` row and null otherwise,
- * so the isolate never receives a body the total does not read.
+ * A batch step reads each row's stored contribution and the size of the body a row without one
+ * would need; the body itself arrives in a second read that the byte ceiling sizes. A stored
+ * contribution carries no body, so its size reads as zero.
  */
-function seedColumns() {
+function seedPageColumns() {
   return {
     id: ingestItems.id,
     cost_usd: ingestItems.cost_usd,
-    legacy_item_data: sql<string | null>`CASE
-      WHEN ${ingestItems.cost_usd} IS NULL THEN ${ingestItems.item_data}
+    body_bytes: sql<number>`CASE
+      WHEN ${ingestItems.cost_usd} IS NULL
+        THEN length(CAST(${ingestItems.item_data} AS BLOB))
+      ELSE 0
     END`,
   };
 }
 
 /**
- * The session's assistant cost summed over its stored inline message rows, read in row-id order
- * in bounded batches. The total equals a single-pass recomputation of the same rows: every row
- * is summed exactly once and in the same order. A batch that already holds a body ends before
- * a body that would exceed its byte ceiling, and the next batch resumes after the last row it
- * summed.
+ * The session's assistant cost summed over its inline message rows, read in row-id order in
+ * bounded batches. Every row is summed exactly once and in the same order, so the total equals
+ * a single-pass recomputation of the stored rows.
  */
 export function readStoredRunningAssistantCostUsd(db: DrizzleSqliteDODatabase): number {
   let total = 0;
   let cursor: number | null = null;
   for (;;) {
-    const batch = db
-      .select(seedColumns())
+    const page = db
+      .select(seedPageColumns())
       .from(ingestItems)
       .where(
         and(
@@ -54,28 +54,48 @@ export function readStoredRunningAssistantCostUsd(db: DrizzleSqliteDODatabase): 
       .orderBy(asc(ingestItems.id))
       .limit(RUNNING_COST_SEED_BATCH_ROWS)
       .all();
-    if (batch.length === 0) break;
+    if (page.length === 0) break;
 
-    let summed = 0;
-    let summedBytes = 0;
-    for (const row of batch) {
-      const body = row.legacy_item_data;
-      const bodyBytes = body === null ? 0 : encoder.encode(body).byteLength;
-      // One oversized body still arrives in a batch of its own; a later body waits for the
-      // next batch, which starts after the last row this one summed.
-      if (summed > 0 && summedBytes + bodyBytes > RUNNING_COST_SEED_BATCH_BYTES) break;
-      total += storedMessageCostUsd({
-        cost_usd: row.cost_usd,
-        legacy_item_data: body,
-        item_data_r2_key: null,
-      });
-      summedBytes += bodyBytes;
-      summed += 1;
+    const batch: SeedRow[] = [];
+    let batchBodyBytes = 0;
+    for (const row of page) {
+      // The first row of a batch is always summed, so a body above the ceiling still belongs to
+      // a batch of its own and the cursor always moves forward.
+      if (
+        batch.length > 0 &&
+        row.cost_usd === null &&
+        batchBodyBytes + row.body_bytes > RUNNING_COST_SEED_BATCH_BYTES
+      ) {
+        break;
+      }
+      if (row.cost_usd === null) batchBodyBytes += row.body_bytes;
+      batch.push(row);
       cursor = row.id;
+    }
+
+    const bodies = new Map<number, string>();
+    const bodyIds = batch.filter(row => row.cost_usd === null).map(row => row.id);
+    if (bodyIds.length > 0) {
+      const rows = db
+        .select({ id: ingestItems.id, item_data: ingestItems.item_data })
+        .from(ingestItems)
+        .where(inArray(ingestItems.id, bodyIds))
+        .all();
+      for (const row of rows) bodies.set(row.id, row.item_data);
+    }
+
+    for (const row of batch) {
+      total += clampAssistantCostUsd(
+        storedMessageCostUsd({
+          cost_usd: row.cost_usd,
+          legacy_item_data: row.cost_usd === null ? (bodies.get(row.id) ?? null) : null,
+          item_data_r2_key: null,
+        })
+      );
     }
     // A short batch with every row summed is the last page. A short batch the byte ceiling cut
     // ends is not: its remaining rows follow the cursor in the next batch.
-    if (summed === batch.length && batch.length < RUNNING_COST_SEED_BATCH_ROWS) break;
+    if (batch.length === page.length && page.length < RUNNING_COST_SEED_BATCH_ROWS) break;
   }
   return Math.max(0, total);
 }

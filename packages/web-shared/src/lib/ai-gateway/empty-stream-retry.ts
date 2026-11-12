@@ -11,9 +11,10 @@ import { z } from 'zod';
 
 /**
  * A streaming chat completions answer that carries no content is a usable failure: the client
- * received a 200 and no delta, so it re-sends the same prompt. This module names that class in the
- * log for every stream, and, for the models listed in `GATEWAY_EMPTY_STREAM_RETRY_MODELS`, repeats
- * the upstream request once with the provider that produced the empty answer demoted.
+ * received a 200 and no delta, so it re-sends the same prompt. For the models listed in
+ * `GATEWAY_EMPTY_STREAM_RETRY_MODELS`, this module names that class in the log and repeats the
+ * upstream request once with the provider that produced the empty answer demoted. Unlisted models
+ * are neither peeked nor logged.
  */
 
 export const EMPTY_STREAM_RETRY_MODELS_ENV = 'GATEWAY_EMPTY_STREAM_RETRY_MODELS';

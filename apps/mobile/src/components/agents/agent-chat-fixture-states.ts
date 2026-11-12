@@ -7,7 +7,7 @@ export const PENDING_BASH_ASK: StandalonePermission = {
   requestId: 'per_designGateBash',
   permission: 'bash',
   patterns: ['pnpm test'],
-  metadata: {},
+  metadata: { command: 'pnpm test' },
   always: [],
 };
 

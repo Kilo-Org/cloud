@@ -12,6 +12,7 @@ import { approvalKeySchema } from '@kilocode/app-shared/approval-key';
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
   buildSessionLiveActivityContentState,
+  isFinishedSessionCardStatus,
   type PushData,
   sessionCardStaleAtSeconds,
   sessionLiveActivityRelevance,
@@ -253,7 +254,7 @@ export function planSessionCardSend(params: {
     statusSinceFallback: previous?.statusKind === statusKind ? previous.statusSince : updatedAt,
     previous,
   });
-  if (content.statusKind === 'idle' || content.statusKind === 'failed') {
+  if (isFinishedSessionCardStatus(content.statusKind)) {
     return {
       content,
       send: {

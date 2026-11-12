@@ -1,10 +1,10 @@
 import { type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { useEffect } from 'react';
 import { View } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { KeyboardFollowPane } from '@/components/keyboard-follow-pane';
 import { ScreenHeader } from '@/components/screen-header';
 
 import { ChatComposer } from './chat-composer';
@@ -152,7 +152,7 @@ export function PartDetailTransitionFixture({
       <OpenInitialPart partId={initialPartId} />
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('common.chat')} />
-        <KeyboardAvoidingView className="flex-1" behavior="padding">
+        <KeyboardFollowPane>
           <SessionMessageList
             sessionId={SESSION}
             items={shownMessages.map(message => ({ type: 'message' as const, message }))}
@@ -178,7 +178,7 @@ export function PartDetailTransitionFixture({
             modelLocked
             attachmentsEnabled={false}
           />
-        </KeyboardAvoidingView>
+        </KeyboardFollowPane>
         <View style={{ height: bottom }} />
       </View>
     </PartDetailSheetHost>

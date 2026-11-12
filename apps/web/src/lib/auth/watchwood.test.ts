@@ -25,7 +25,7 @@ jest.mock('next/headers', () => ({
   })),
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  NEXTAUTH_SECRET: '[REDACTED by s1-secret-redact]',
+  NEXTAUTH_SECRET: 'watchwood-unit-test-signing-key',
   NEXTAUTH_URL: 'https://example.test',
 }));
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
@@ -36,7 +36,7 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
   },
 }));
 
-const secret = '[REDACTED by s1-secret-redact]';
+const secret = 'watchwood-unit-test-signing-key';
 const sessionCookie = 'watchwood_signup_session';
 const guid = '4829b420-d43c-4f31-893d-f5042cf274cf';
 const otherGuid = '0f4d7b9a-2c1e-4a55-9d1b-6a1f6f0c3a10';

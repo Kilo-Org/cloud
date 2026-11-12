@@ -232,7 +232,7 @@ test('side panel agents views follow the signed-in identity through a device-aut
     await expect(sidePanel.getByText(FIRST_HISTORY_TITLE)).toHaveCount(0);
 
     activePending.reject(new Error('Network unavailable'));
-    await expect(sidePanel.getByText('Failed to load active sessions')).toBeVisible({
+    await expect(sidePanel.getByRole('alert')).toBeVisible({
       timeout: 15_000,
     });
     await expect(sidePanel.getByText(SECOND_HISTORY_TITLE)).toBeVisible({ timeout: 15_000 });

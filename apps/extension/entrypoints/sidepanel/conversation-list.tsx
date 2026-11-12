@@ -388,7 +388,7 @@ export const ConversationList = ({
   const virtualItems = virtualizer.getVirtualItems();
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="relative flex min-h-0 flex-1 flex-col">
       <section
         aria-label="Agent conversation"
         className="agent-conversation-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-4"
@@ -421,10 +421,16 @@ export const ConversationList = ({
         </div>
       </section>
       {showJumpButton ? (
-        <div className="flex shrink-0 justify-end border-t border-border bg-surface-raised px-3 py-2">
+        /*
+         * Overlaid, not a layout row: at small panel heights the fixed chrome
+         * (composer, footer) already squeezes the pane, so a bar would push the
+         * control under the composer and make it unclickable. Overlaying keeps
+         * the pane's height and still shows the label.
+         */
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-end px-3 pb-2">
           <button
             aria-label="Jump to latest"
-            className="flex h-8 items-center gap-1.5 rounded-full border border-border bg-surface-overlay px-3 type-label text-foreground-on-secondary outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
+            className="pointer-events-auto flex h-8 items-center gap-1.5 rounded-full border border-border bg-surface-overlay px-3 type-label text-foreground-on-secondary shadow-lg shadow-black/50 outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
             onClick={jumpToLatest}
             type="button"
           >

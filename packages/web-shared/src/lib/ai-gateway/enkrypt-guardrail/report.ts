@@ -49,8 +49,8 @@ const scanOutcomeShape = {
   total_characters: z.number(),
   cached_characters: z.number(),
   /**
-   * Includes the overlaps of already-scanned text ahead of the uncached suffix and of each chunk,
-   * and omission markers, so it can exceed `total_characters`.
+   * Includes the separators between packed segments and the headers of split segments, so it can
+   * exceed `total_characters`.
    */
   scanned_characters: z.number(),
   decision: ScanDecisionSchema,
@@ -121,14 +121,14 @@ const verdictCacheWriteShape = { verdict_cache_write: VerdictCacheWriteSchema };
 
 /**
  * The scan of a request's system prompt or conversation by the blocking or the log-only detectors.
- * Text longer than one Enkrypt call can take is split into chunks, each scanned on its own and
- * overlapping the one before it. The decision is that of the most severe chunk, and the error that
- * of the most severe chunk that failed. Characters, calls, and credits are summed; the latency runs
- * until the last chunk's scan finished.
+ * Each segment has its verdict cached on its own; `cached_segments` counts those the cache covered
+ * whole. The uncached ones are packed into chunks of at most one Enkrypt call each. The decision is
+ * that of the most severe chunk, and the error that of the most severe chunk that failed.
+ * Characters, calls, and credits are summed; the latency runs until the last chunk's scan finished.
  */
 const EnkryptSegmentsScanReportSchema = EnkryptScanReportSchema.extend({
   part: z.enum(['system', 'conversation']),
-  /** Chunks the uncached text was split into, so 0 when the cache covered all of it. */
+  /** Chunks the uncached segments were packed into, so 0 when the cache covered all of them. */
   chunks: z.number(),
 });
 

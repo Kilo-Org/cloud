@@ -45,11 +45,10 @@ export type RequestToolDefinition = {
 };
 
 /**
- * A request in three parts, each scanned and cached on its own. `tools` holds tool definitions and
- * response formats, which rarely change within a session; each is cached as a whole, so adding,
- * removing, or changing one tool rescans only that tool. `system` is the system prompt, which
- * clients rebuild more often, for example with the date or workspace state, and is cached as a
- * whole. `conversation` is the message history, which grows request by request.
+ * A request in three parts, each scanned on its own, with the verdict of every segment cached on
+ * its own. `tools` holds tool definitions and response formats, which rarely change within a
+ * session; each is scanned by its own calls, so a detection is reported for its tool. `system` is
+ * the system prompt. `conversation` is the message history, which grows request by request.
  */
 export type RequestScanParts = {
   tools: RequestToolDefinition[];
@@ -777,8 +776,7 @@ export function renderSegment({ header, body }: RequestSegment): string {
 /**
  * Pieces of one item are segments of their own; consecutive pieces with the same header, such as
  * two text parts of one message, are merged. Items are never merged, so each tool call and tool
- * result, including parallel ones, is a segment of its own: segment boundaries are where the
- * verdict cache can resume and where a long scan is preferably split.
+ * result, including parallel ones, is a segment of its own, with its verdict cached on its own.
  */
 function itemSegments(pieces: Item): RequestSegment[] {
   const groups: { header: string; texts: string[] | null }[] = [];

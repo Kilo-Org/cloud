@@ -51,8 +51,8 @@ export const EnkryptUsageWriteSchema = z.strictObject({
    */
   detectorsFired: z.array(z.enum(ENKRYPT_DETECTOR_IDS)).nonempty().optional(),
   /**
-   * UTF-16 code units this call sent to Enkrypt: the part no cached verdict covers, plus an overlap
-   * of already-scanned text. Optional so writes from a gateway deployed before it stay valid.
+   * UTF-16 code units this call sent to Enkrypt: segments no cached verdict covers, packed into one
+   * call. Optional so writes from a gateway deployed before it stay valid.
    */
   scannedCharacters: z.int32().nonnegative().optional(),
   /**

@@ -33,6 +33,14 @@ export type UniversalLinkRoute = {
    * `[^/]+`, and the runtime matcher already compares segments.
    */
   readonly excludeDeeperAasaPaths?: boolean;
+  /**
+   * Android `pathPattern` override for this row. `pathPattern` is a full
+   * regular expression and the table compile of `*` is `.*`, which crosses
+   * `/` — so a row that must match exactly one segment states its own pattern
+   * here (`[^/]+`). Every row without an override keeps the compile it shipped
+   * with.
+   */
+  readonly androidPathPattern?: string;
 };
 
 export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
@@ -84,13 +92,15 @@ export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
   // one segment — every deeper `/organizations/<id>/…` page (SSO, guardrails,
   // request logs, …) is web-only, so those links stay in the browser. The two
   // literal pages under the same shape are not ids either: the create form
-  // must open where the account is asked. On Android `*` is `[^/]+`; on iOS
-  // `*` crosses `/`, hence `excludeDeeperAasaPaths`.
+  // must open where the account is asked. On iOS `*` crosses `/`, hence
+  // `excludeDeeperAasaPaths`; on Android the explicit `[^/]+` override keeps
+  // the filter to one segment without touching any other row's pattern.
   {
     webPath: '/organizations/*',
     appPath: '/(app)/(tabs)/(3_profile)/organization/<1>',
     exclusions: ['new', 'create'],
     excludeDeeperAasaPaths: true,
+    androidPathPattern: '/organizations/[^/]+',
   },
   // Provider rows BEFORE the GitHub row: `/pr-review/gitlab/x/123` has the
   // same segment count as a GitHub PR path, and the literal platform segment
@@ -399,19 +409,20 @@ function patternWithFinalWildcardReplaced(pattern: string, value: string): strin
 
 /**
  * Compile the table to Android `pathPattern` strings.
- * `pathPattern` is matched as a full regular expression. A `*` segment becomes
- * `[^/]+` — non-empty, and it never crosses `/`, so a one-segment row stays
- * exactly one segment (the table's documented meaning; `.*` would swallow
- * every deeper path). A trailing `**` becomes `.*` because the tail is
- * multi-segment by design. Android cannot express exclusions — the runtime
- * matcher (`webPathToAppPath` / `resolveIncomingUrl`) is the exclusion
- * enforcement.
+ * Each `*` or trailing `**` segment becomes `.*` (Android's pattern crosses
+ * `/`, so the multi-segment tail needs no special form) — the compile every
+ * shipped row uses. A row that must match exactly one segment states an
+ * explicit `androidPathPattern` instead, so narrowing it changes no other
+ * row's filter. Android cannot express exclusions — the runtime matcher
+ * (`webPathToAppPath` / `resolveIncomingUrl`) is the exclusion enforcement.
  */
 export function androidPathPatterns(): string[] {
-  return UNIVERSAL_LINK_ROUTES.map(route =>
-    route.webPath
-      .split('/')
-      .map(seg => (seg === '*' ? '[^/]+' : seg === '**' ? '.*' : seg))
-      .join('/')
+  return UNIVERSAL_LINK_ROUTES.map(
+    route =>
+      route.androidPathPattern ??
+      route.webPath
+        .split('/')
+        .map(seg => (seg === '*' || seg === '**' ? '.*' : seg))
+        .join('/')
   );
 }

@@ -446,33 +446,44 @@ describe('androidPathPatterns', () => {
       '/profile',
       '/profile/preferences',
       '/cloud/sessions',
-      '/cloud/sessions/[^/]+',
+      '/cloud/sessions/.*',
       '/security-agent',
       '/security-agent/findings',
       '/code-reviews',
-      '/code-reviews/[^/]+',
-      '/organizations/[^/]+/security-agent',
-      '/organizations/[^/]+/security-agent/findings',
-      '/organizations/[^/]+/code-reviews',
-      '/organizations/[^/]+/code-reviews/[^/]+',
-      '/organizations/[^/]+/overview',
+      '/code-reviews/.*',
+      '/organizations/.*/security-agent',
+      '/organizations/.*/security-agent/findings',
+      '/organizations/.*/code-reviews',
+      '/organizations/.*/code-reviews/.*',
+      '/organizations/.*/overview',
+      // The only row that departs from the `.*` compile: it must match one
+      // segment, or the Android filter swallows every web-only org page.
       '/organizations/[^/]+',
       '/pr-review/gitlab/.*',
       '/pr-review/bitbucket/.*',
-      '/pr-review/[^/]+/[^/]+/[^/]+',
+      '/pr-review/.*/.*/.*',
     ]);
   });
 
-  it('keeps a one-segment row to exactly one segment', () => {
-    // `.*` would cross `/` and associate every deeper web page; `[^/]+` cannot.
+  it('departs from the `.*` compile on the bare organization row only', () => {
+    // Every other row keeps the pattern it shipped with; a global `[^/]+`
+    // would strangle rows that legitimately cross segments (GitLab project
+    // paths, session ids) and stop links that open the app today.
+    const overrides = UNIVERSAL_LINK_ROUTES.filter(route => route.androidPathPattern != null);
+    expect(overrides.map(route => route.webPath)).toEqual(['/organizations/*']);
+
     const patterns = androidPathPatterns();
     expect(patterns).not.toContain('/organizations/.*');
     expect(patterns).toContain('/organizations/[^/]+');
-    // Only the `**` tail rows may cross `/`.
-    const crossing = patterns.filter(
-      (pattern, index) =>
-        pattern.includes('.*') && !UNIVERSAL_LINK_ROUTES[index]?.webPath.endsWith('/**')
-    );
-    expect(crossing).toEqual([]);
+    for (const [index, route] of UNIVERSAL_LINK_ROUTES.entries()) {
+      if (route.androidPathPattern != null) {
+        continue;
+      }
+      const legacy = route.webPath
+        .split('/')
+        .map(seg => (seg === '*' || seg === '**' ? '.*' : seg))
+        .join('/');
+      expect(patterns[index]).toBe(legacy);
+    }
   });
 });

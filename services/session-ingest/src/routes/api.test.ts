@@ -1332,27 +1332,30 @@ describe('api routes', () => {
     it.each([
       ['malformed JSON', '{"data":[{"type":"message","data":{"id":"msg_1"}},broken'],
       ['unterminated object', '{"data":['],
-    ] as const)('answers a buffered legacy body the format cannot parse with a client error', async (_name, body) => {
-      const { app, ingest } = prepareIngestRoute();
-      const env = makeTestEnv();
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    ] as const)(
+      'answers a buffered legacy body the format cannot parse with a client error',
+      async (_name, body) => {
+        const { app, ingest } = prepareIngestRoute();
+        const env = makeTestEnv();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-      const response = await app.fetch(ingestRequest(body), env);
+        const response = await app.fetch(ingestRequest(body), env);
 
-      expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({ success: false, error: 'malformed_json' });
-      expect(ingest).not.toHaveBeenCalled();
-      expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
-      expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
-      expect(warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          event: 'direct_ingest_parse_reject',
-          reason: 'gate_percent',
-          declaredBytes: new TextEncoder().encode(body).byteLength,
-        })
-      );
-      warn.mockRestore();
-    });
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ success: false, error: 'malformed_json' });
+        expect(ingest).not.toHaveBeenCalled();
+        expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
+        expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
+        expect(warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            event: 'direct_ingest_parse_reject',
+            reason: 'gate_percent',
+            declaredBytes: new TextEncoder().encode(body).byteLength,
+          })
+        );
+        warn.mockRestore();
+      }
+    );
 
     it.each([
       ['declared over cap', '4194305'],

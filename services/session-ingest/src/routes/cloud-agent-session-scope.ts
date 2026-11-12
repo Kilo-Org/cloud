@@ -629,58 +629,65 @@ cloudAgentSessionScopeApi.get('/session/:sessionId/export', async c => {
   });
 });
 
-cloudAgentSessionScopeApi.post('/session/:sessionId/title', bodyLimit({ maxSize: 1024 }), async c => {
-  const assertion = getScopeAssertion(c);
-  if (assertion.kind !== 'v2') {
-    return c.json({ success: false, error: 'Cloud Agent session scope protocol v2 required' }, 400);
+cloudAgentSessionScopeApi.post(
+  '/session/:sessionId/title',
+  bodyLimit({ maxSize: 1024 }),
+  async c => {
+    const assertion = getScopeAssertion(c);
+    if (assertion.kind !== 'v2') {
+      return c.json(
+        { success: false, error: 'Cloud Agent session scope protocol v2 required' },
+        400
+      );
+    }
+
+    const sessionId = containedKiloSessionIdSchema.safeParse(c.req.param('sessionId'));
+    if (!sessionId.success) {
+      return c.json({ success: false, error: 'Invalid sessionId' }, 400);
+    }
+
+    const bodyParse = reportSessionTitleSchema.safeParse(await c.req.json().catch(() => null));
+    if (!bodyParse.success) {
+      return c.json({ success: false, error: 'Invalid body', issues: bodyParse.error.issues }, 400);
+    }
+
+    const kiloUserId = c.get('user_id');
+    const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
+    const resolution = await resolveScopedChildSession(db, {
+      kiloUserId,
+      sessionId: sessionId.data,
+      scope: assertion.data,
+    });
+    if (resolution.kind !== 'ok') {
+      return c.json({ success: false, error: 'session_not_found' }, 404);
+    }
+
+    const scope = scopedSessionCondition(kiloUserId, assertion.data, resolution.rootScopeId);
+
+    const result = await applyReportedSessionTitle(db, {
+      sessionId: sessionId.data,
+      kiloUserId,
+      input: bodyParse.data,
+      scope,
+    });
+    if (result.kind === 'not_found') {
+      return c.json({ success: false, error: 'session_not_found' }, 404);
+    }
+    if (result.kind === 'refused') {
+      return c.json({ applied: false }, 200);
+    }
+
+    const session = mapSessionEventRow(result.row);
+    notifyUserSessionEvent(
+      c.env,
+      kiloUserId,
+      {
+        type: 'session.updated',
+        data: { source: 'v2', session, changedAt: session.updatedAt },
+      },
+      getOptionalExecutionContext(c)
+    );
+
+    return c.json({ title: session.title ?? bodyParse.data.title, applied: true }, 200);
   }
-
-  const sessionId = containedKiloSessionIdSchema.safeParse(c.req.param('sessionId'));
-  if (!sessionId.success) {
-    return c.json({ success: false, error: 'Invalid sessionId' }, 400);
-  }
-
-  const bodyParse = reportSessionTitleSchema.safeParse(await c.req.json().catch(() => null));
-  if (!bodyParse.success) {
-    return c.json({ success: false, error: 'Invalid body', issues: bodyParse.error.issues }, 400);
-  }
-
-  const kiloUserId = c.get('user_id');
-  const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
-  const resolution = await resolveScopedChildSession(db, {
-    kiloUserId,
-    sessionId: sessionId.data,
-    scope: assertion.data,
-  });
-  if (resolution.kind !== 'ok') {
-    return c.json({ success: false, error: 'session_not_found' }, 404);
-  }
-
-  const scope = scopedSessionCondition(kiloUserId, assertion.data, resolution.rootScopeId);
-
-  const result = await applyReportedSessionTitle(db, {
-    sessionId: sessionId.data,
-    kiloUserId,
-    input: bodyParse.data,
-    scope,
-  });
-  if (result.kind === 'not_found') {
-    return c.json({ success: false, error: 'session_not_found' }, 404);
-  }
-  if (result.kind === 'refused') {
-    return c.json({ applied: false }, 200);
-  }
-
-  const session = mapSessionEventRow(result.row);
-  notifyUserSessionEvent(
-    c.env,
-    kiloUserId,
-    {
-      type: 'session.updated',
-      data: { source: 'v2', session, changedAt: session.updatedAt },
-    },
-    getOptionalExecutionContext(c)
-  );
-
-  return c.json({ title: session.title ?? bodyParse.data.title, applied: true }, 200);
-});
+);

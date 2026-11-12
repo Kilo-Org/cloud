@@ -618,11 +618,14 @@ export async function queue(
       msg.ack();
     } catch (err) {
       if (err instanceof MalformedIngestPayloadError) {
-        console.error('Staged ingest object is not parseable JSON; object removed and message acknowledged', {
-          r2Key: msg.body.r2Key,
-          sessionId: msg.body.sessionId,
-          error: err.message,
-        });
+        console.error(
+          'Staged ingest object is not parseable JSON; object removed and message acknowledged',
+          {
+            r2Key: msg.body.r2Key,
+            sessionId: msg.body.sessionId,
+            error: err.message,
+          }
+        );
         await deleteStagedObject(env, msg.body.r2Key);
         msg.ack();
         continue;

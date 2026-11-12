@@ -9,38 +9,32 @@ const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, sc
 
 type CardContent = {
   kind: string;
-  state?: { title: string; description: string; action: string; actionLabel: string };
+  title?: string;
+  description?: string;
+  accessibilityLabel?: string;
 };
 
 const cardState = vi.hoisted(() => {
   const card: CardContent = {
     kind: 'card',
-    state: {
-      title: 'Kilo Pass',
-      description: 'Monthly credits with bonus progress.',
-      action: 'open-web',
-      actionLabel: 'Subscribe',
-    },
+    title: 'Kilo Pass',
+    description: 'Active',
+    accessibilityLabel: 'Kilo Pass. Active',
   };
   return { content: card };
 });
 
 const CARD_CONTENT: CardContent = {
   kind: 'card',
-  state: {
-    title: 'Kilo Pass',
-    description: 'Monthly credits with bonus progress.',
-    action: 'open-web',
-    actionLabel: 'Subscribe',
-  },
+  title: 'Kilo Pass',
+  description: 'Active',
+  accessibilityLabel: 'Kilo Pass. Active',
 };
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     kiloPass: {
-      getPurchasePresentation: {
-        queryOptions: () => ({ queryKey: ['kiloPass', 'presentation'] as const }),
-      },
+      getState: { queryOptions: () => ({ queryKey: ['kiloPass', 'getState'] as const }) },
     },
   }),
 }));
@@ -49,12 +43,8 @@ vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({ data: undefined, isError: false, isPending: true, refetch: vi.fn() }),
 }));
 
-vi.mock('@/lib/kilo-pass/subscription-card-state', () => ({
-  getKiloPassSubscriptionCardContentState: () => cardState.content,
-  getKiloPassSubscriptionCardAccessibility: (state: { title: string }) => ({
-    accessibilityLabel: state.title,
-    accessibilityHint: undefined,
-  }),
+vi.mock('@/lib/kilo-pass/state', () => ({
+  getKiloPassCardContentState: () => cardState.content,
 }));
 
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
@@ -66,9 +56,6 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/kilo-pass/kilo-pass-icon', () => ({ KiloPassIcon: 'KiloPassIcon' }));
 vi.mock('react-native', () => ({
-  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
-  Linking: { openURL: vi.fn() },
-  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   View: 'View',
   useWindowDimensions: () => windowDims,
@@ -105,12 +92,10 @@ describe('KiloPassSubscriptionCard mounted layout', () => {
     const root = renderCard();
     const cards = root.findAllByProps({ accessibilityRole: 'button' });
     expect(cards).toHaveLength(1);
-    expect(cards[0]?.props.accessibilityLabel).toBe('Kilo Pass');
+    expect(cards[0]?.props.accessibilityLabel).toBe('Kilo Pass. Active');
 
     const tileRow = root.find(node => Object.is(node.type, 'KiloPassIcon')).parent?.parent;
-    expect(
-      tileRow?.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children)
-    ).toEqual(['Subscribe']);
+    expect(tileRow?.findAll(node => Object.is(node.type, 'Text'))).toHaveLength(0);
     expect(
       root.findAll(node => Object.is(node.type, 'Text') && node.props.children === 'Kilo Pass')
     ).toHaveLength(1);

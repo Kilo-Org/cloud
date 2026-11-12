@@ -1,7 +1,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { selectionHaptic } from '@/lib/haptics';
 import { type ReactNode } from 'react';
-import { Linking, Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { Pressable, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 
@@ -10,12 +10,9 @@ import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { rowTint } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getKiloPassCardContentState } from '@/lib/kilo-pass/state';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useTRPC } from '@/lib/trpc';
-import {
-  getKiloPassSubscriptionCardAccessibility,
-  getKiloPassSubscriptionCardContentState,
-} from '@/lib/kilo-pass/subscription-card-state';
 
 export function KiloPassSubscriptionCard({
   hideLoadingSkeleton = false,
@@ -40,41 +37,23 @@ export function KiloPassSubscriptionCard({
   // 160 dp, e1 round, 2026-09-21). Stacking hands the text the card's full
   // width, the same presentation ConfigureRow takes on these screens.
   const narrow = isNarrowLayout(width);
-  const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-  const storefront = Platform.OS === 'ios' ? 'app_store' : 'play';
-  const presentationQuery = useQuery(
-    trpc.kiloPass.getPurchasePresentation.queryOptions({
-      platform,
-      storefront,
-      product: 'kilo_pass',
-    })
-  );
-  const contentState = getKiloPassSubscriptionCardContentState({
-    presentation: presentationQuery.data,
-    presentationIsError: presentationQuery.isError,
-    presentationIsPending: presentationQuery.isPending,
+  const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
+  const contentState = getKiloPassCardContentState({
+    subscription: stateQuery.data?.subscription,
+    isError: stateQuery.isError,
+    isPending: stateQuery.isPending,
   });
 
   const handlePress = () => {
     if (contentState.kind !== 'card') {
       return;
     }
-
-    const cardState = contentState.state;
-
     selectionHaptic();
-    if (cardState.action === 'open-web') {
-      const webUrl = presentationQuery.data?.webUrl;
-      if (webUrl) {
-        void Linking.openURL(webUrl);
-      }
-      return;
-    }
     router.push('/(app)/kilo-pass' as Href);
   };
   const handleRetryPress = () => {
     selectionHaptic();
-    void presentationQuery.refetch();
+    void stateQuery.refetch();
   };
 
   // The card body's one row: icon tile + text block + an optional trailing
@@ -162,28 +141,16 @@ export function KiloPassSubscriptionCard({
 
       {contentState.kind === 'card' ? (
         <Pressable
-          accessibilityHint={
-            getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityHint
-          }
-          accessibilityLabel={
-            getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityLabel
-          }
+          accessibilityLabel={contentState.accessibilityLabel}
           accessibilityRole="button"
           className="rounded-lg border border-border bg-card p-3 active:opacity-80"
           onPress={handlePress}
         >
           {cardBody(
             <>
-              <Text className="font-semibold">{contentState.state.title}</Text>
-              <Text className="text-xs text-muted-foreground">
-                {contentState.state.description}
-              </Text>
-            </>,
-            contentState.state.actionLabel ? (
-              <Text className="shrink-0 text-xs font-medium text-primary">
-                {contentState.state.actionLabel}
-              </Text>
-            ) : undefined
+              <Text className="font-semibold">{contentState.title}</Text>
+              <Text className="text-xs text-muted-foreground">{contentState.description}</Text>
+            </>
           )}
         </Pressable>
       ) : null}

@@ -4,38 +4,58 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 
 import { KiloPassSubscriptionScreen } from './kilo-pass-subscription-screen';
+import { type KiloPassSubscription } from '@/lib/kilo-pass/state';
 
-const mockedPlatform = vi.hoisted(() => ({ OS: 'ios' as string }));
 const mockRouter = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
 const mockClearance = vi.hoisted(() => ({ windowTop: 0 }));
 const mocks = vi.hoisted(() => ({
-  presentation: {
-    isPending: false,
+  state: {
+    data: undefined as unknown,
     isError: false,
-    data: null as { kind: string; statusClass: string; webUrl: string | null } | null,
+    isPending: false,
     refetch: vi.fn(),
   },
 }));
 
 vi.mock('expo-router', () => ({ useRouter: () => mockRouter }));
-vi.mock('react-native', () => ({ Platform: mockedPlatform, View: 'View' }));
-vi.mock('@tanstack/react-query', () => ({ useQuery: () => mocks.presentation }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' }, View: 'View' }));
+vi.mock('@tanstack/react-query', () => ({ useQuery: () => mocks.state }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'DetailScreenScrollView' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({ Crown: 'Crown' }));
+vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/lib/a11y/tap-target', () => ({ STATE_ACTION_CLASS: 'min-h-[48px]' }));
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/form-sheet', () => ({
   useSheetHeaderTopClearance: () => mockClearance.windowTop,
 }));
 vi.mock('@/lib/trpc', () => ({
-  useTRPC: () => ({ kiloPass: { getPurchasePresentation: { queryOptions: () => ({}) } } }),
+  useTRPC: () => ({ kiloPass: { getState: { queryOptions: () => ({}) } } }),
 }));
+
+function subscription(overrides: Partial<KiloPassSubscription> = {}): KiloPassSubscription {
+  return {
+    tier: 'tier_49',
+    cadence: 'monthly',
+    status: 'active',
+    cancelAtPeriodEnd: false,
+    resumesAt: null,
+    nextBillingAt: '2026-12-05T12:00:00.000Z',
+    refillAt: '2026-12-05T12:00:00.000Z',
+    currentPeriodBaseCreditsUsd: 49,
+    currentPeriodUsageUsd: 12.5,
+    currentPeriodBonus: {
+      status: 'available',
+      kind: null,
+      actualAmountUsd: null,
+      projectedAmountUsd: 9.8,
+    },
+    ...overrides,
+  };
+}
 
 async function renderScreen(): Promise<TestRenderer.ReactTestRenderer> {
   const holder: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
@@ -76,106 +96,80 @@ function nodesOfType(
 
 describe('KiloPassSubscriptionScreen', () => {
   beforeEach(() => {
-    mockedPlatform.OS = 'ios';
     mockClearance.windowTop = 0;
-    mocks.presentation.isPending = false;
-    mocks.presentation.isError = false;
-    mocks.presentation.data = null;
-    mocks.presentation.refetch.mockClear();
+    mocks.state.isPending = false;
+    mocks.state.isError = false;
+    mocks.state.data = { subscription: null, isEligibleForFirstMonthPromo: true };
+    mocks.state.refetch.mockClear();
     mockRouter.replace.mockClear();
     mockRouter.push.mockClear();
   });
 
-  it('unavailable: renders the shared empty state with a title and one way out', async () => {
-    mocks.presentation.data = { kind: 'unavailable', statusClass: 'inactive', webUrl: null };
+  it('shows the loading skeleton while the pass query is pending', async () => {
+    mocks.state.isPending = true;
+    const renderer = await renderScreen();
+    expect(nodesOfType(renderer, 'Skeleton').length).toBeGreaterThan(0);
+    expect(nodesOfType(renderer, 'EmptyState')).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('tells an account without a pass that the app does not offer one', async () => {
     const renderer = await renderScreen();
     const emptyState = nodesOfType(renderer, 'EmptyState');
     expect(emptyState).toHaveLength(1);
-    expect(emptyState[0]?.props.title).toBe('Not available right now');
-    // The plain kind has nothing the title does not say, so it carries no
-    // description that would restate it.
-    expect(emptyState[0]?.props.description).toBeUndefined();
-    // The state is a finished surface, not the raw centered text it used to be.
-    expect(nodesOfType(renderer, 'CenteredState')).toHaveLength(0);
-    expect(nodesOfType(renderer, 'DetailScreenScrollView')).toHaveLength(0);
-    const action = emptyState[0]?.props.action as {
-      props: {
-        accessibilityLabel: string;
-        className: string;
-        children: { type: unknown; props: { children: unknown } };
-        onPress: () => void;
-      };
-    };
-    expect(action.props.accessibilityLabel).toBe('Buy credits');
-    // Pressable is a View, so the label must be a Text element; a bare string
-    // child would paint nothing on either platform.
-    expect(String(action.props.children.type)).toBe('Text');
-    expect(action.props.children.props.children).toBe('Buy credits');
-    expect(action.props.className.split(' ')).toContain('min-h-[48px]');
-    act(() => {
-      action.props.onPress();
-    });
-    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/credits');
+    expect(emptyState[0]?.props.title).toBe("Kilo Pass isn't available in the app.");
+    // A finished message with no action: the app sells nothing here.
+    expect(emptyState[0]?.props.action).toBeUndefined();
     renderer.unmount();
   });
 
-  it('unavailable: a lapsed pass states that the pass ended', async () => {
-    mocks.presentation.data = { kind: 'unavailable', statusClass: 'terminal', webUrl: null };
-    const renderer = await renderScreen();
-    const emptyState = nodesOfType(renderer, 'EmptyState')[0];
-    expect(emptyState?.props.title).toBe('Not available right now');
-    expect(emptyState?.props.description).toBe('Your Kilo Pass has ended.');
-    renderer.unmount();
-  });
-
-  it('clears the window top inset when the modal surface reaches the window top', async () => {
-    mockClearance.windowTop = 51.8;
-    mocks.presentation.data = { kind: 'unavailable', statusClass: 'inactive', webUrl: null };
-    const renderer = await renderScreen();
-    const padded = nodesOfType(renderer, 'View').filter(
-      node => (node.props.style as { paddingTop?: number } | undefined)?.paddingTop === 51.8
-    );
-    expect(padded).toHaveLength(1);
-    renderer.unmount();
-    mockClearance.windowTop = 0;
-  });
-
-  it('leaves the header to the presented sheet when the surface sits below the window top', async () => {
-    mocks.presentation.data = { kind: 'unavailable', statusClass: 'inactive', webUrl: null };
-    const renderer = await renderScreen();
-    const padded = nodesOfType(renderer, 'View').filter(node => node.props.style !== undefined);
-    expect(padded).toHaveLength(0);
-    renderer.unmount();
-  });
-
-  it('web_management: keeps the web copy and Manage, and renders no empty state', async () => {
-    mockedPlatform.OS = 'android';
-    mocks.presentation.data = {
-      kind: 'web_management',
-      statusClass: 'healthy',
-      webUrl: 'https://example.com/subscriptions/kilo-pass',
+  it('states that a lapsed pass ended', async () => {
+    mocks.state.data = {
+      subscription: subscription({ status: 'canceled' }),
+      isEligibleForFirstMonthPromo: false,
     };
     const renderer = await renderScreen();
-    expect(nodesOfType(renderer, 'EmptyState')).toHaveLength(0);
-    expect(nodesOfType(renderer, 'CenteredState')).toHaveLength(1);
-    expect(allText(renderer)).toContain('This Kilo Pass is managed on web');
-    expect(allText(renderer)).toContain('Manage');
-    const button = nodesOfType(renderer, 'Button').find(
-      node => node.props.accessibilityLabel === 'Manage'
-    );
-    if (!button) {
-      throw new Error('Manage action missing');
-    }
-    // The label must be a Text element, not a bare string: Pressable is a
-    // View, and a View draws no text, so a bare string leaves a blank button.
-    const label = button.find(node => String(node.type) === 'Text');
-    expect(label.children).toEqual(['Manage']);
-    // The lone centered CTA carries the 48dp Android target.
-    expect((button.props.className as string).split(' ')).toContain('min-h-[48px]');
+    const emptyState = nodesOfType(renderer, 'EmptyState');
+    expect(emptyState).toHaveLength(1);
+    expect(emptyState[0]?.props.title).toBe('Your Kilo Pass has ended.');
     renderer.unmount();
   });
 
-  it('presentation error: Retry refetches the presentation once', async () => {
+  it('prints the pass details the web console shows, with no manage action', async () => {
+    mocks.state.data = { subscription: subscription(), isEligibleForFirstMonthPromo: false };
+    const renderer = await renderScreen();
+
+    expect(allText(renderer)).toContain('Pro · Monthly');
+    expect(allText(renderer)).toContain('Active');
+
+    const rows = nodesOfType(renderer, 'KvRow');
+    expect(rows.map(row => [row.props.label, row.props.value])).toEqual([
+      ['Renews', 'Dec 5, 2026'],
+      ["This month's usage", '$12.50 / $58.80'],
+      ['Available free bonus', '$9.80'],
+    ]);
+    expect(rows.at(-1)?.props.last).toBe(true);
+
+    // No button exists on the details surface: managing, cancelling, and
+    // buying a pass are web-only.
+    expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('prints a scheduled cancellation as active until the paid-through date', async () => {
+    mocks.state.data = {
+      subscription: subscription({ cancelAtPeriodEnd: true }),
+      isEligibleForFirstMonthPromo: false,
+    };
+    const renderer = await renderScreen();
+    expect(allText(renderer)).toContain('Canceling');
+    const rows = nodesOfType(renderer, 'KvRow');
+    expect(rows[0]?.props.label).toBe('Active until');
+    renderer.unmount();
+  });
+
+  it('keeps a failed pass query retryable', async () => {
+    mocks.state.isError = true;
     const renderer = await renderScreen();
     expect(allText(renderer)).toContain("Couldn't load Kilo Pass.");
     expect(allText(renderer)).toContain('Kilo Pass could not be loaded. Try again.');
@@ -183,16 +177,25 @@ describe('KiloPassSubscriptionScreen', () => {
     act(() => {
       (retry.props.onPress as () => void)();
     });
-    expect(mocks.presentation.refetch).toHaveBeenCalledTimes(1);
+    expect(mocks.state.refetch).toHaveBeenCalledTimes(1);
     renderer.unmount();
   });
 
-  it('keeps a cached presentation after a refetch failure', async () => {
-    mocks.presentation.data = { kind: 'web_management', statusClass: 'healthy', webUrl: null };
-    mocks.presentation.isError = true;
+  it('hands the window top to the modal surface when it reaches the window top', async () => {
+    mockClearance.windowTop = 51.8;
     const renderer = await renderScreen();
-    expect(allText(renderer)).toContain('This Kilo Pass is managed on web');
-    expect(allText(renderer)).not.toContain("Couldn't load Kilo Pass.");
+    const header = nodesOfType(renderer, 'ScreenHeader')[0];
+    expect(header?.props.safeAreaTop).toBe(false);
+    expect(String(header?.props.className)).toContain('pt-2');
+    renderer.unmount();
+    mockClearance.windowTop = 0;
+  });
+
+  it('keeps the header inset when the sheet presents below the window top', async () => {
+    const renderer = await renderScreen();
+    const header = nodesOfType(renderer, 'ScreenHeader')[0];
+    expect(header?.props.safeAreaTop).toBe(true);
+    expect(header?.props.className).toBeUndefined();
     renderer.unmount();
   });
 });

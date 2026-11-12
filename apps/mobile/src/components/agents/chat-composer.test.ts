@@ -599,6 +599,22 @@ describe('ChatComposer draft restore', () => {
     });
   });
 
+  it('does not apply a stored draft whose message the server confirmed', async () => {
+    const render = await mount(
+      makeProps({
+        draftKey: 'agent-composer:sess-1',
+        initialDraft: 'Delivered late',
+        deliveredDraft: 'Delivered late',
+      })
+    );
+
+    // The transcript renders the delivered message; applying the stored draft
+    // would show it twice, so nothing is sent and the input stays empty.
+    requireInputRowOnSubmit(render)();
+    await settle();
+    expect(onSendMock).not.toHaveBeenCalled();
+  });
+
   it('keeps text typed before the draft settles instead of restoring over it', async () => {
     const pending = await mount(
       makeProps({ draftKey: 'agent-composer:sess-1', initialDraft: undefined })

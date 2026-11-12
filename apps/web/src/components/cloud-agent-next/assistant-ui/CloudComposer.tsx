@@ -125,6 +125,15 @@ type CloudComposerProps = {
   showToolbar?: boolean;
   /** Restore a failed prompt only when this composer owns the submitted draft. */
   initialValue?: string;
+  /**
+   * A failed send the server accepted after all. The composer restored the text
+   * from `initialValue`/its own failed submission; the confirmed message is now
+   * in the transcript, so that restored text must leave the input — otherwise it
+   * sits in two places and the next Send posts it twice. An edit the reader made
+   * after the restore keeps the text as their next message. `sequence` counts
+   * deliveries so one record is applied once.
+   */
+  withdrawnFailedPrompt?: { text: string; sequence: number } | null;
   /** Custom modes exposed by the session's profile stack (shown in picker) */
   customModeOptions?: ModeOption<AgentMode>[];
   /** When true, the model picker is rendered read-only (e.g. agent has a model override). */
@@ -168,6 +177,7 @@ export function CloudComposer({
   availableVariants = [],
   showToolbar = false,
   initialValue,
+  withdrawnFailedPrompt,
   attachmentUploadOptions,
   attachmentsEnabled = true,
   customModeOptions,
@@ -302,6 +312,35 @@ export function CloudComposer({
     writeInputValue(initialValue);
     textareaRef.current?.focus();
   }, [initialValue, conversationKey, writeInputValue]);
+
+  // The send turned out to be delivered: withdraw the text this composer put
+  // back for it. Only the untouched restore goes — a draft the reader typed
+  // after the restore is the next message — and the conversation-scoped
+  // snapshot of that failed send goes with it, so switching chats cannot bring
+  // the duplicate back.
+  const appliedWithdrawnSequenceRef = useRef(0);
+  useEffect(() => {
+    if (withdrawnFailedPrompt === null || withdrawnFailedPrompt === undefined) return;
+    if (withdrawnFailedPrompt.sequence <= appliedWithdrawnSequenceRef.current) return;
+    appliedWithdrawnSequenceRef.current = withdrawnFailedPrompt.sequence;
+    const key = conversationKey ?? DEFAULT_CONVERSATION_KEY;
+    const submission = submissionsRef.current.get(key);
+    const restoredText = withdrawnFailedPrompt.text;
+    const showsRestoredText = valueRef.current === restoredText;
+    const snapshot = composerSnapshotsRef.current.get(key);
+    if (snapshot?.text === restoredText) {
+      composerSnapshotsRef.current.delete(key);
+    }
+    if (!showsRestoredText) return;
+    writeInputValue('');
+    // The delivered send owns its files now; the restored chips must not stay.
+    if (snapshot?.text === restoredText) {
+      replaceAttachments([]);
+    }
+    if (submission?.text === restoredText) {
+      submissionsRef.current.delete(key);
+    }
+  }, [withdrawnFailedPrompt, conversationKey, writeInputValue, replaceAttachments]);
 
   // Resolve the pinned model's display name from the allowed models list, so the
   // locked-read-only toolbar shows the same label as the ModelCombobox. Falls

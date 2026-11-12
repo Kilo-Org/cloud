@@ -1464,6 +1464,90 @@ it.each(['chat-b', 'new'])(
   }
 );
 
+describe('withdrawing a failed prompt the server delivered', () => {
+  it('clears the restored draft once the confirmed message arrives', async () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    const onSend = jest.fn(async () => false);
+    const render = (
+      conversationKey: string,
+      initialValue?: string,
+      withdrawnFailedPrompt?: { text: string; sequence: number } | null
+    ) =>
+      act(() =>
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey,
+            initialValue,
+            withdrawnFailedPrompt,
+            attachmentUploadOptions: { messageUuid: 'withdraw' },
+          })
+        )
+      );
+    try {
+      render('chat-a');
+      act(() => setTextareaValue(dom.container, 'Delivered late'));
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+      // The transport failed, so the composer put the text back.
+      render('chat-a', 'Delivered late');
+      expect(dom.container.querySelector('textarea')?.value).toBe('Delivered late');
+
+      // The transcript then showed the message the server had accepted: the
+      // restored text is the same message, so it leaves the input.
+      render('chat-a', 'Delivered late', { text: 'Delivered late', sequence: 1 });
+      expect(dom.container.querySelector('textarea')?.value).toBe('');
+      // A repeated record for the same delivery changes nothing.
+      render('chat-a', 'Delivered late', { text: 'Delivered late', sequence: 1 });
+      expect(dom.container.querySelector('textarea')?.value).toBe('');
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  });
+
+  it('keeps a draft the reader edited after the restore', async () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    const onSend = jest.fn(async () => false);
+    const render = (
+      conversationKey: string,
+      initialValue?: string,
+      withdrawnFailedPrompt?: { text: string; sequence: number } | null
+    ) =>
+      act(() =>
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey,
+            initialValue,
+            withdrawnFailedPrompt,
+            attachmentUploadOptions: { messageUuid: 'withdraw-edited' },
+          })
+        )
+      );
+    try {
+      render('chat-a');
+      act(() => setTextareaValue(dom.container, 'Restored prompt'));
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+      render('chat-a', 'Restored prompt');
+      // The next message, typed over the restore, is not the delivered one.
+      act(() => setTextareaValue(dom.container, 'Next message'));
+      render('chat-a', 'Restored prompt', { text: 'Restored prompt', sequence: 1 });
+      expect(dom.container.querySelector('textarea')?.value).toBe('Next message');
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  });
+});
+
 it('retains submission ownership while another conversation stores its draft', async () => {
   mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
   let settle: (accepted: boolean) => void = () => {

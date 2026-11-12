@@ -36,25 +36,27 @@ import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-comman
 import { cloudAgentId, kiloId } from '@kilocode/cloud-agent-sdk/test-helpers';
 
 /**
- * The two places a refused send can leave its text, rendered by the real session
- * screen against one fixed transcript:
- *
- * - `undelivered`: the transcript keeps the message as an undelivered bubble with
- *   Retry, and the composer is empty.
- * - `restored`: the transport refused the message, so the bubble is gone and the
- *   text sits in the composer with the cause stated above it.
+ * The agent chat screen — transcript and composer — against one fixed
+ * transcript, for a design-gate cell. The transcript keeps a refused message as
+ * an undelivered bubble with Retry and leaves the composer empty.
  *
  * Nothing here talks to a transport. Every atom holds one still layout and every
- * method is inert, so a design-gate cell can bracket the screen and compare two
- * revisions of it without a live session behind it.
+ * method is inert, so a cell can bracket the screen and compare two revisions of
+ * it without a live session that keeps moving behind it.
+ *
+ * The sibling state — the same text restored in the composer, with the cause
+ * stated above it — is not reproduced here: the screen reads its draft from the
+ * durable store under the signed-in account, so a fixture cannot seed it without
+ * writing into that account's drafts. That state is proven by device captures
+ * and the component suites instead.
  */
-export type AgentChatFixtureVariant = 'undelivered' | 'restored';
+export type AgentChatFixtureVariant = 'undelivered';
 
 export const AGENT_CHAT_FIXTURE_SESSION_ID: KiloSessionId = kiloId(
   'ses_designGateAgentChatFixture0001'
 );
 
-/** The prompt both variants are about, so the two screens differ only in where it lives. */
+/** The prompt the refused message carries. */
 export const AGENT_CHAT_FIXTURE_PROMPT = 'Deploy the fix to staging';
 
 /** The assistant turn before the prompt, so the transcript has a finished burst. */
@@ -153,13 +155,6 @@ const sessionConfig: SessionConfig = {
   runtimeAgents: [],
 };
 
-const creditsCause: SessionStatusIndicator = {
-  type: 'error',
-  message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
-  timestamp: 0,
-  code: 'insufficient-credits',
-};
-
 const undeliveredEntry: MessageDeliveryState = {
   status: 'failed',
   error: 'The message could not be delivered',
@@ -178,7 +173,6 @@ type FixtureModelSelection = { model: { providerID: string; modelID: string }; v
 const noRemoteOverride: RemoteModelOverride | null = null;
 const noObservedModel: FixtureModelSelection | null = null;
 const noCloudOverride: CloudAgentModelOverride | null = null;
-const noIndicator: SessionStatusIndicator | null = null;
 const noOlderMessagesError: OlderMessagesError | null = null;
 type FixtureDeliveredPrompt = { messageId: string; text: string; sequence: number };
 const noDelivered: FixtureDeliveredPrompt | null = null;
@@ -205,12 +199,9 @@ function fixed<T>(value: T) {
  * The session manager the real screen mounts against, typed as the product's own
  * interface so a member the screen starts reading is caught here, not on device.
  */
-export function createAgentChatFixtureManager(variant: AgentChatFixtureVariant): SessionManager {
-  const restored = variant === 'restored';
-  const messages: StoredMessage[] = restored ? [opening, answer] : [opening, answer, refused];
-  const pending = new Map<string, MessageDeliveryState>(
-    restored ? [] : [[refused.info.id, undeliveredEntry]]
-  );
+export function createAgentChatFixtureManager(): SessionManager {
+  const messages: StoredMessage[] = [opening, answer, refused];
+  const pending = new Map<string, MessageDeliveryState>([[refused.info.id, undeliveredEntry]]);
   const idle = async (): Promise<void> => undefined;
   return {
     switchSession: async () => undefined,
@@ -264,7 +255,7 @@ export function createAgentChatFixtureManager(variant: AgentChatFixtureVariant):
       cloudAgentModelOverride: fixed(noCloudOverride),
       canSend: fixed(true),
       canInterrupt: fixed(false),
-      statusIndicator: fixed(restored ? creditsCause : noIndicator),
+      statusIndicator: fixed<SessionStatusIndicator | null>(null),
       error: fixed<string | null>(null),
       question: fixed<QuestionState | null>(null),
       sessionInfo: fixed<SessionInfo | null>({ id: AGENT_CHAT_FIXTURE_SESSION_ID }),

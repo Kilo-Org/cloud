@@ -3,6 +3,7 @@ import { handleManagedScmOutbound } from '../sandbox-outbound.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { EgressAuditRequestSchema } from '../shared/egress-audit.js';
 import { isAllowedEgressUrl, nativeEgressAllowlistSchema } from './egress-policy.js';
+import { CLOUD_AGENT_SESSION_SYNC_ORIGIN } from '@kilocode/worker-utils/cloud-agent-session-sync';
 
 export type ContainersOutboundProps = {
   containerId: string;
@@ -71,6 +72,15 @@ export class ContainersOutbound extends WorkerEntrypoint<Cloudflare.Env, Contain
       const headers = new Headers(request.headers);
       if (policy.data !== undefined) headers.set('Host', url.host);
       request = new Request(request, { headers, redirect: 'manual' });
+    }
+    if (url.origin === CLOUD_AGENT_SESSION_SYNC_ORIGIN) {
+      if (!this.env.SESSION_SYNC) {
+        return Response.json(
+          { error: { code: 'auth_unavailable', retryable: true } },
+          { status: 503 }
+        );
+      }
+      return this.env.SESSION_SYNC.fetch(request);
     }
     return handleManagedScmOutbound(request, this.env, { containerId });
   }

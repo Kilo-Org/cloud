@@ -106,6 +106,7 @@
    * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
    */
   "services": [
+    { "binding": "SESSION_SYNC", "service": "session-sync" },
     {
       "binding": "SESSION_INGEST",
       "service": "session-ingest",
@@ -375,6 +376,7 @@
         "VERCEL_SANDBOX_EXTEND_DURATION_MS": "600000",
       },
       "services": [
+        { "binding": "SESSION_SYNC", "service": "session-sync-local" },
         {
           "binding": "SESSION_INGEST",
           "service": "session-ingest",

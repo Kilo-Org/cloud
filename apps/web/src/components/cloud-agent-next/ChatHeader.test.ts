@@ -23,6 +23,9 @@ jest.mock('@tanstack/react-query', () => ({
 }));
 jest.mock('@/lib/trpc/utils', () => ({
   useTRPC: () => ({
+    cloudAgentNext: {
+      getSessionMessagesPage: { queryOptions: () => ({ queryKey: ['session-messages'] }) },
+    },
     computeBilling: {
       sessionCharges: { queryOptions: () => ({ queryKey: ['compute-session-charges'] }) },
       rates: { queryOptions: () => ({ queryKey: ['compute-rates'] }) },

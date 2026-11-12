@@ -18,6 +18,7 @@ export type StartupSelection = { mode: 'downloaded'; image: 'runtime-free'; desc
 export type StartupRouteIdentity = {
   orgId?: string;
   billingOrigin?: string;
+  createdOnPlatform?: string;
 };
 
 export type StartupCohortContext = {
@@ -114,7 +115,11 @@ export function newSandboxHarness(
   const orgIds = configuredOrgIds(env.RUNTIME_KILO2_ORG_IDS);
   return orgIds !== undefined &&
     inOrgScope(provider, cohort, orgIds) &&
-    cohort?.preparingRoutes?.every(route => route.billingOrigin === 'cloud-agent-web')
+    cohort?.preparingRoutes?.every(
+      route =>
+        route.billingOrigin === 'cloud-agent-web' ||
+        (route.billingOrigin === 'cloud-agent' && route.createdOnPlatform === 'cloud-agent-web')
+    )
     ? 'kilo2'
     : 'kilo';
 }

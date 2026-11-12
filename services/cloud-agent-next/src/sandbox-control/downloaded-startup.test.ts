@@ -500,6 +500,25 @@ describe('runtime harness selection', () => {
       })
     ).toBe('kilo');
   });
+  it('selects v2 for the normalized billing origin of an actual web session', () => {
+    const route = {
+      ...webRoute,
+      billingOrigin: 'cloud-agent',
+      createdOnPlatform: 'cloud-agent-web',
+    };
+    expect(
+      newSandboxHarness(kilo2Env, 'cloudflare-containers', {
+        ...webCohort,
+        preparingRoutes: [route],
+      })
+    ).toBe('kilo2');
+    expect(
+      newSandboxHarness(kilo2Env, 'cloudflare-containers', {
+        ...webCohort,
+        preparingRoutes: [{ ...route, createdOnPlatform: 'slack' }],
+      })
+    ).toBe('kilo');
+  });
   it.each(['code-review', 'desktop', 'agent-manager', 'slack', 'unknown', '', undefined])(
     'keeps v1 for a listed organization when the origin is %s',
     billingOrigin => {

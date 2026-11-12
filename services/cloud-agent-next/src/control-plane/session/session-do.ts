@@ -1720,6 +1720,15 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     };
   }
 
+  async hasSessionSyncDescendant(
+    rootKiloSessionId: string,
+    kiloSessionId: string
+  ): Promise<boolean> {
+    await this.initialized;
+    if (this.registration?.spec.kiloSessionId !== rootKiloSessionId) return false;
+    return readStoredHistoryLineage(this.db, rootKiloSessionId, kiloSessionId) != null;
+  }
+
   /** C1c model preflight: renew and return the backing runtime token. */
   async getRuntimeToken(): Promise<string | null> {
     const metadata = await this.getMetadata();

@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
-import { ChevronRight, ListTodo } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { ListTodo } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -81,7 +82,7 @@ export function SessionTasksRow({ summary }: Readonly<SessionTasksIndicatorProps
       >
         {summary.current.content}
       </Text>
-      <ChevronRight size={16} color={colors.mutedForeground} />
+      <DirectionalChevronRight size={16} color={colors.mutedForeground} />
     </Pressable>
   );
 }

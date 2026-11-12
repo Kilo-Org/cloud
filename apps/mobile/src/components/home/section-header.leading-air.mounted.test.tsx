@@ -3,8 +3,10 @@ import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  SECTION_ACTION_FLOAT_CLASS,
   SECTION_ACTION_FRAME_DP,
   SECTION_ACTION_HIT_SLOP_DP,
+  SECTION_HEADER_LEADING_ROW_PADDING_CLASS,
   SECTION_HEADER_ROW_PADDING_CLASS,
   tapTargetReachDp,
   textActionTargetClass,
@@ -97,6 +99,34 @@ describe('SectionHeader leading air', () => {
     // RN drops touches outside the parent row, so the slop must fit its padding.
     expect(header.row).toContain(SECTION_HEADER_ROW_PADDING_CLASS);
     expect(SECTION_HEADER_ROW_PADDING_CLASS).toBe(`py-[${String(SECTION_ACTION_HIT_SLOP_DP)}px]`);
+  });
+
+  // Field defect (Home): the first header's label air left a 23 dp hole between
+  // the brand row and "Live now" (design-gate `leading-gap`).
+  it('starts the first header with its label line and keeps the action reach in the row', () => {
+    const header = mountHeader(
+      createElement(SectionHeader, {
+        label: 'Live now',
+        actionLabel: 'See all',
+        onActionPress: () => undefined,
+        reserveLabelAir: true,
+        leading: true,
+      })
+    );
+
+    expect(header.labelBoxes).toBe(0);
+    expect(header.row).toContain(SECTION_HEADER_LEADING_ROW_PADDING_CLASS);
+    expect(header.action?.classes).toEqual(
+      expect.arrayContaining([FRAME_CLASS, SECTION_ACTION_FLOAT_CLASS, 'items-center'])
+    );
+    // The floating box overhangs the 14 dp line by half the difference, and
+    // the row's padding holds that overhang plus the slop on both sides: the
+    // viewport above the row and the cards below it take those touches.
+    const overhang = (SECTION_ACTION_FRAME_DP - 14) / 2;
+    expect(SECTION_ACTION_FLOAT_CLASS).toBe(`-my-[${String(overhang)}px]`);
+    expect(SECTION_HEADER_LEADING_ROW_PADDING_CLASS).toBe(
+      `py-[${String(overhang + SECTION_ACTION_HIT_SLOP_DP)}px]`
+    );
   });
 
   it('leaves a header that does not reserve the air on the full action frame', () => {

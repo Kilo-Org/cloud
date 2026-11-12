@@ -4,7 +4,9 @@ import { I18nManager, Pressable, View } from 'react-native';
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
 import {
   SECTION_ACTION_BOX_CLASS,
+  SECTION_ACTION_FLOAT_CLASS,
   SECTION_ACTION_HIT_SLOP,
+  SECTION_HEADER_LEADING_ROW_PADDING_CLASS,
   SECTION_HEADER_ROW_PADDING_CLASS,
   textActionTargetClass,
 } from '@/lib/a11y/tap-target';
@@ -49,6 +51,14 @@ type SectionHeaderProps = {
    * (home-header-section-gap). Home passes this for its sections.
    */
   reserveLabelAir?: boolean;
+  /**
+   * Marks the first section on the screen, right under the title. With
+   * `reserveLabelAir` there is no block above it to keep a gap to, so the
+   * label drops its air box and starts at the row's top padding, and the
+   * action floats over the label line. Without it, the air box left a hole
+   * between the screen title and the first label (design-gate `leading-gap`).
+   */
+  leading?: boolean;
 };
 
 export function SectionHeader({
@@ -58,12 +68,15 @@ export function SectionHeader({
   actionHidden = false,
   notice,
   reserveLabelAir = false,
+  leading = false,
 }: Readonly<SectionHeaderProps>) {
   const hasAction = Boolean(actionLabel && onActionPress) && !(actionHidden && notice);
+  const labelAir = reserveLabelAir && !leading;
+  const floatAction = reserveLabelAir && leading;
   // With a notice the label keeps its own width, so the notice takes all the
   // free space on the line instead of an equal share of it.
   const labelText = (
-    <Text variant="eyebrow" className={cn('max-w-full', !reserveLabelAir && !notice && 'grow')}>
+    <Text variant="eyebrow" className={cn('max-w-full', !labelAir && !notice && 'grow')}>
       {label}
     </Text>
   );
@@ -83,12 +96,14 @@ export function SectionHeader({
     <View
       className={cn(
         'flex-row flex-wrap items-end justify-end gap-2 px-4',
-        reserveLabelAir ? SECTION_HEADER_ROW_PADDING_CLASS : 'py-2'
+        labelAir && SECTION_HEADER_ROW_PADDING_CLASS,
+        floatAction && SECTION_HEADER_LEADING_ROW_PADDING_CLASS,
+        !reserveLabelAir && 'py-2'
       )}
     >
       {/* With a notice the label keeps its own width, so the notice takes all
           the free space on the line instead of an equal share of it. */}
-      {reserveLabelAir ? (
+      {labelAir ? (
         <View className={cn('flex-col justify-end', !notice && 'grow', LABEL_AIR_CLASS)}>
           {labelText}
         </View>
@@ -137,7 +152,11 @@ export function SectionHeader({
           hitSlop={reserveLabelAir ? SECTION_ACTION_HIT_SLOP : undefined}
           className={cn(
             reserveLabelAir ? SECTION_ACTION_BOX_CLASS : textActionTargetClass(),
-            'max-w-full shrink-0 flex-row items-end justify-center active:opacity-70',
+            // A floating box overhangs the label line evenly, so its copy sits
+            // on the box's centre, which is the label line.
+            floatAction && SECTION_ACTION_FLOAT_CLASS,
+            'max-w-full shrink-0 flex-row justify-center active:opacity-70',
+            floatAction ? 'items-center' : 'items-end',
             actionHidden && 'opacity-0'
           )}
         >

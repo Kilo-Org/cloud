@@ -552,9 +552,6 @@ describe('ensurePaymentMethodStored', () => {
     expect(result?.http_x_vercel_ja4_digest).toBe(headers.http_x_vercel_ja4_digest);
   });
 
-  // This test verifies that when directly calling ensurePaymentMethodStored with a payment method
-  // that already exists in the database but is soft-deleted, it will restore the payment method
-  // and update its data with the latest information from Stripe
   test('should restore a soft-deleted payment method when directly storing the same payment method', async () => {
     const existingPaymentMethod = {
       ...createTestPaymentMethod(testUser.id),
@@ -684,8 +681,6 @@ describe('ensurePaymentMethodStored', () => {
 
     await ensurePaymentMethodStored(testUser.id, mockStripePaymentMethod);
 
-    // For the updated payment method, we need to modify the same object
-    // since we're simulating an update to the same payment method ID
     if (mockStripePaymentMethod.card) {
       mockStripePaymentMethod.card.last4 = '2222';
       mockStripePaymentMethod.card.brand = 'amex';
@@ -718,7 +713,6 @@ describe('ensurePaymentMethodStored', () => {
     const result = await ensurePaymentMethodStored(userB.id, userB_card);
 
     expect(result).not.toBeNull();
-    // Should still be false because we check withDeleted: true
     expect(result?.eligible_for_free_credits).toBe(false);
   });
 
@@ -2866,7 +2860,6 @@ describe('isCardFingerprintEligibleForFreeCredits', () => {
   test('should return true when fingerprint exists only for the same user', async () => {
     const fingerprint = `test_fingerprint_same_user_${Date.now()}`;
 
-    // Create payment method for the same user
     const paymentMethod = {
       ...createTestPaymentMethod(testUser.id),
       stripe_fingerprint: fingerprint,
@@ -2880,7 +2873,6 @@ describe('isCardFingerprintEligibleForFreeCredits', () => {
   test('should return false when fingerprint exists for a different user', async () => {
     const fingerprint = `test_fingerprint_different_user_${Date.now()}`;
 
-    // Create payment method for a different user
     const paymentMethod = {
       ...createTestPaymentMethod(anotherUser.id),
       stripe_fingerprint: fingerprint,
@@ -2894,7 +2886,6 @@ describe('isCardFingerprintEligibleForFreeCredits', () => {
   test('should return false when fingerprint exists for different user even if soft-deleted', async () => {
     const fingerprint = `test_fingerprint_soft_deleted_${Date.now()}`;
 
-    // Create soft-deleted payment method for a different user
     const paymentMethod = {
       ...createTestPaymentMethod(anotherUser.id),
       stripe_fingerprint: fingerprint,
@@ -2906,8 +2897,6 @@ describe('isCardFingerprintEligibleForFreeCredits', () => {
     expect(result).toBe(false);
   });
 });
-
-// === handleSuccessfulChargeWithPayment tests ===
 
 describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', () => {
   const makeCharge = (params: { id: string; amount: number; customer: string }) =>
@@ -3235,7 +3224,6 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     const paymentIntent = {
       ...makePaymentIntent({
         id: piId,
-        // Unknown charge type - no stripe-checkout-topup
         metadata: {
           kiloUserId: user.id,
           type: 'something-else',
@@ -3263,7 +3251,6 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     expect(warningLogs).not.toContain('receipt-sensitive');
     expect(warningLogs).not.toContain('sensitive-metadata');
 
-    // Should NOT create a credit transaction
     const creditTx = await db.query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, chId),
     });
@@ -3294,7 +3281,6 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
 
     await handleSuccessfulChargeWithPayment(charge, paymentIntent);
 
-    // For user top-ups, handleSuccessfulChargeWithPayment passes config.stripe_payment_id = charge.id
     const creditTx = await db.query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, chargeId),
     });
@@ -3307,7 +3293,6 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     expect(creditTx?.is_free).toBe(false);
     expect(creditTx?.description).toBe('Top-up via stripe');
 
-    // Verify user aggregate balance fields updated
     const updatedUser = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });

@@ -1,5 +1,5 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-import 'server-only'; // This file imports the database and can therefore only be used on the server side.
+import 'server-only';
 import Stripe from 'stripe';
 import { client, invalidateStripePaymentMethodCache } from '@kilocode/web-shared/lib/stripe-client';
 import {
@@ -691,7 +691,6 @@ export async function detachAllPaymentMethods(user: User) {
   // Stripe again instead of serving the answer cached before the removal.
   invalidateStripePaymentMethodCache(user.stripe_customer_id);
 
-  // Also clear auto-top-up settings
   await db
     .update(kilocode_users)
     .set({
@@ -744,7 +743,6 @@ export async function ensurePaymentMethodStored(
     return updateResult[0];
   }
 
-  // Check if fingerprint exists for other users
   const eligible_for_free_credits = await isCardFingerprintEligibleForFreeCredits(
     paymentMethod.card?.fingerprint,
     kiloUserId
@@ -759,7 +757,7 @@ export async function ensurePaymentMethodStored(
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     deleted_at: null,
-    organization_id: organizationId ?? null, // Allow organization_id to be optional
+    organization_id: organizationId ?? null,
   };
 
   try {
@@ -850,7 +848,6 @@ async function handleAutoTopUpSetup(
     `Processing auto-topup-setup for user ${user.id} from payment intent ${paymentIntent.id}`
   );
 
-  // Save the payment method for future auto-top-ups
   const paymentMethodId =
     typeof paymentIntent.payment_method === 'string'
       ? paymentIntent.payment_method
@@ -892,7 +889,6 @@ async function handleAutoTopUpSetup(
       targetWhere: sql`${auto_top_up_configs.owned_by_user_id} IS NOT NULL`,
     });
 
-  // Enable auto-top-up for the user
   await db
     .update(kilocode_users)
     .set({
@@ -900,7 +896,6 @@ async function handleAutoTopUpSetup(
     })
     .where(eq(kilocode_users.id, user.id));
 
-  // Credit the initial payment to the user's balance
   const setupTopUpOk = await processTopUp(user, creditAmountInCents, config, {
     serviceFeeCents: emailAmounts.serviceFeeCents,
     grossPaidCents: emailAmounts.grossPaidCents,
@@ -1014,7 +1009,6 @@ export async function handleSuccessfulChargeWithPayment(
   const organizationId = paymentIntent.metadata.organizationId;
   const kiloUserId = paymentIntent.metadata.kiloUserId;
 
-  // process organization top-ups if its an org toup first as the flow is much less complex
   if (organizationId) {
     if (!kiloUserId) {
       sentryLogger('stripe', 'warning')('Org top-up missing kiloUserId in PaymentIntent metadata', {
@@ -1059,7 +1053,6 @@ export async function handleSuccessfulChargeWithPayment(
       await handleOrgAutoTopUpSetup(organizationId, kiloUserId, paymentIntent, config);
     }
 
-    // Save payment method for organization (for future auto-top-ups)
     const paymentMethodId =
       typeof paymentIntent.payment_method === 'string'
         ? paymentIntent.payment_method
@@ -1084,8 +1077,6 @@ export async function handleSuccessfulChargeWithPayment(
     return;
   }
 
-  // If this charge did not originate from our stripe-checkout-powered top-up flow,
-  // check if it's an auto-topup-setup.
   if (!paymentIntent || paymentIntent.metadata.type !== 'stripe-checkout-topup') {
     // Auto-topup-setup is the initial $15 charge when user enables auto-top-up
     const isAutoTopUpSetup = paymentIntent?.metadata?.type === 'auto-topup-setup';
@@ -1099,9 +1090,6 @@ export async function handleSuccessfulChargeWithPayment(
       'invoice' in charge && typeof charge.invoice === 'string' ? charge.invoice : null;
 
     if (invoiceId) {
-      // This charge is from an invoice payment. Auto-top-ups are handled by
-      // `invoice.payment_succeeded` which has direct access to invoice metadata.
-      // Skip processing here to avoid duplicate credit application.
       logExceptInTest(
         `Skipping invoice-based charge ${charge.id} in charge.succeeded - will be handled by invoice.payment_succeeded`
       );
@@ -1124,7 +1112,6 @@ export async function handleSuccessfulChargeWithPayment(
     } else if (isKiloclawEarlybird) {
       await recordKiloclawEarlybirdPurchase(user, charge);
     } else {
-      // Unknown charge type - log warning but don't process
       warnExceptInTest(
         'Unknown charge type (not stripe-checkout-topup, not auto-topup-setup). Ignoring.',
         getSafeStripeChargeLogContext(charge, paymentIntent)
@@ -1191,7 +1178,7 @@ export async function getStripeInvoices(
 
   if (dateThreshold) {
     listParams.created = {
-      gte: Math.floor(dateThreshold.getTime() / 1000), // Convert to Unix timestamp
+      gte: Math.floor(dateThreshold.getTime() / 1000),
     };
   }
 
@@ -1203,7 +1190,6 @@ export async function getStripeInvoices(
 
 function mapStripeInvoicesToUnified(invoices: Stripe.Invoice[]): UnifiedInvoice[] {
   return invoices.map(invoice => {
-    // Classify as 'seats' if any line item has seats metadata or a known paid seat price ID
     const isSeatInvoice =
       invoice.lines?.data?.some(line => {
         const hasSeatsMetadata =
@@ -1249,7 +1235,7 @@ export async function getStripeInvoicesPage(
 
   if (dateThreshold) {
     listParams.created = {
-      gte: Math.floor(dateThreshold.getTime() / 1000), // Convert to Unix timestamp
+      gte: Math.floor(dateThreshold.getTime() / 1000),
     };
   }
 
@@ -1369,7 +1355,6 @@ async function syncStripeDisputeCaseFromWebhook(params: {
 export async function processStripePaymentEventHook(event: Stripe.Event) {
   switch (event.type) {
     case 'checkout.session.completed':
-      // no handling necessary now that we removed the hold
       break;
 
     // charge.succeeded is for one-time payments, like top-ups
@@ -1499,7 +1484,6 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
-      // Handle auto-topup (user or organization)
       const isUserAutoTopup = invoice.metadata?.type === 'auto-topup';
       const isOrgAutoTopup = invoice.metadata?.type === 'org-auto-topup';
 
@@ -1832,7 +1816,6 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       break;
     }
 
-    // invoice.payment_succeeded is for subscriptions
     case 'customer.subscription.created': {
       const createdSubType = event.data.object.metadata?.type;
       if (createdSubType === 'kilo-pass-org') {
@@ -1861,7 +1844,6 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
-      // Only dispatch to seat handler for recognized seat subscription types
       if (
         createdSubType === 'seats' ||
         createdSubType === 'stripe-checkout-seats' ||
@@ -1941,7 +1923,6 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
     case 'subscription_schedule.updated': {
       const schedule = event.data.object;
 
-      // Try KiloClaw schedule handling first
       await handleKiloClawScheduleEvent({
         eventId: event.id,
         schedule,
@@ -2735,7 +2716,6 @@ export async function handleUpdateSeatCount(
           proration_behavior: isIncreasingSeats ? 'always_invoice' : 'none',
           payment_behavior: isIncreasingSeats ? 'allow_incomplete' : undefined,
           ...(isIncreasingSeats ? { proration_date: prepared.prorationDate } : {}),
-          // Only modify the paid seat item; free-seat items remain untouched.
           items: [
             {
               id: paidSeatItem.id,
@@ -2799,10 +2779,8 @@ export async function handleUpdateSeatCount(
     }
   }
 
-  // If the invoice is open or draft, attempt to pay it to trigger PaymentIntent creation
   if (invoiceObj && (invoiceObj.status === 'open' || invoiceObj.status === 'draft')) {
     try {
-      // Finalize if draft
       if (invoiceObj.status === 'draft') {
         invoiceObj = await client.invoices.finalizeInvoice(invoiceObj.id);
       }
@@ -2822,7 +2800,6 @@ export async function handleUpdateSeatCount(
         });
       }
 
-      // Attempt to pay the invoice - this will create a PaymentIntent and attempt charge
       const paidInvoice = (await client.invoices.pay(invoiceObj.id, {
         expand: ['payment_intent'],
       })) as Stripe.Invoice & { payment_intent?: Stripe.PaymentIntent | string | null };
@@ -2840,7 +2817,6 @@ export async function handleUpdateSeatCount(
       // We need to list recent invoices for the subscription and find the one
       // with a payment_intent in requires_action status.
 
-      // List recent invoices for this subscription to find one with requires_action
       const recentInvoices = await client.invoices.list({
         subscription: subscriptionStripeId,
         limit: 5,
@@ -2851,7 +2827,6 @@ export async function handleUpdateSeatCount(
         payment_intent?: Stripe.PaymentIntent | string | null;
       };
 
-      // Find an invoice with a payment_intent that requires action
       for (const inv of recentInvoices.data) {
         const invWithPi = inv as InvoiceWithPaymentIntent;
         const pi = invWithPi.payment_intent;
@@ -2861,7 +2836,6 @@ export async function handleUpdateSeatCount(
         }
       }
 
-      // If still not found, try listing PaymentIntents directly for the customer
       if (!paymentIntent) {
         // subscription.customer can be a string ID, expanded Customer object, or DeletedCustomer.
         // Extract the customer ID string regardless of the shape.
@@ -2895,7 +2869,6 @@ export async function handleUpdateSeatCount(
   }
 
   if (paymentIntent && paymentIntent.status === 'requires_action') {
-    // 3DS authentication is required - return the client secret for frontend handling
     return {
       success: false,
       message:
@@ -2909,7 +2882,6 @@ export async function handleUpdateSeatCount(
     paymentIntent &&
     (paymentIntent.status === 'requires_payment_method' || paymentIntent.status === 'canceled')
   ) {
-    // Payment failed for another reason
     throw new Error('Payment failed. Please update your payment method and try again.');
   }
 

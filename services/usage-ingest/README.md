@@ -216,13 +216,14 @@ producer flag off and let the consumer drain.
 `usage_record_completion` is a persistence event for lasting
 diagnosis and log-derived counts/latency. `entrypoint` is `gateway`,
 `writer_endpoint`, or `unknown`; `writer_caller` is `queue`, `queue_vercel`,
-`region_handoff`, or `unknown`. These finite fields separate concurrent paths:
+`ingress_direct`, `region_handoff`, or `unknown`. These finite fields separate concurrent paths:
 
 | Persistence path | `entrypoint` | `writer_caller` |
 |---|---|---|
 | Frankfurt gateway direct write or SFO local fallback | `gateway` | `unknown` |
 | Queue consumer through HTTP writer | `writer_endpoint` | `queue` |
 | Staging Vercel queue consumer through HTTP writer | `writer_endpoint` | `queue_vercel` |
+| Ingress Worker direct write ahead of its queue | `writer_endpoint` | `ingress_direct` |
 | SFO gateway handoff through HTTP writer | `writer_endpoint` | `region_handoff` |
 | HTTP writer without a classified caller, including classifier/grader writes | `writer_endpoint` | `unknown` |
 | Unclassified local caller | `unknown` | `unknown` |
@@ -230,8 +231,9 @@ diagnosis and log-derived counts/latency. `entrypoint` is `gateway`,
 The Queue consumer explicitly opts into `x-usage-write-source: queue`; the SFO
 handoff client sets `region_handoff`. Other shared-client users, including the
 classifier and benchmark grader, omit the marker. After internal API authentication,
-the writer route accepts only `queue`, `queue_vercel`, or `region_handoff`; missing
-or other values map to `unknown` without logging the raw header. This is caller-supplied diagnostic
+the writer route accepts only `queue`, `queue_vercel`, `ingress_direct`, or
+`region_handoff`; missing or other values map to `unknown` without logging the raw
+header. This is caller-supplied diagnostic
 context, not an authorization or accounting input. Older clients remain compatible.
 See the [Vercel queue prototype runbook](../../packages/usage-queue/README.md) for
 the isolated staging transport and its `queue_vercel` caller label.
@@ -484,10 +486,33 @@ can take the only slot. The total limit is unchanged. Like the shared limit, thi
 is a per-runtime counter, not a connection reservation, and it makes no
 fleet-wide fairness claim.
 
+The same guard also admits `ingress_direct`, the ingress Worker's direct write ahead
+of its queue, as writer class `direct`. A direct
+call never waits and never joins the FIFO. It is decided immediately against the
+shared limit, the pool checks, and its own ceiling of `max(1, limit - 3)` direct
+calls, currently **5 of 8** per runtime instance. When any of those refuses it, the
+call gets the same HTTP 429 body with reason `queue_limit` (or the pool reason),
+so the shared writer client's strict rejection schema is unchanged, and the Worker
+sends the event to its queue instead. Because it never queues, a direct call cannot
+overtake or displace a waiting queue caller.
+
+The `direct` and `non_llm` ceilings are caps inside the one shared limit, not
+reservations in either direction. Neither class is guaranteed a slot, and LLM queue
+writes can still use all 8. With today's pool of 10, direct calls cannot occupy the
+last three slots of an instance and `non_llm` calls cannot occupy more than two.
+If both classes are at their ceilings at the same time (5 + 2), LLM queue writes
+still have at least one of the instance's eight. With smaller pools the
+`max(1, …)` floors can remove that headroom: a pool maximum of 3 gives a shared
+limit of 1 and a ceiling of 1 for each class, so either can take the only slot.
+These are per-instance counters. They do not reserve connections, and they do not
+guarantee queue slots across the fleet, because each instance counts only its own
+calls and other traffic can still fill the pool.
+
 `usage_writer_admission` diagnostics sample admitted decisions at 1% and warn on
 all rejected decisions. Fields contain only the bounded caller/outcome/reason,
-`writer_class` (`queue` or `non_llm`), active count/limit, `active_non_llm` and
-`non_llm_limit`, pool gauges/max, and sample rate; diagnostic failures cannot
+`writer_class` (`queue`, `non_llm` or `direct`), active count/limit,
+`active_non_llm`, `non_llm_limit`, `active_direct` and `direct_limit`, pool
+gauges/max, and sample rate; diagnostic failures cannot
 change admission or persistence results.
 
 The source policy remains finite: initial delivery plus up to **20 retries**

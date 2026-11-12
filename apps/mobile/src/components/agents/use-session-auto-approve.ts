@@ -20,11 +20,12 @@ type SessionAutoApproveInput = {
 
 type SessionAutoApproveResult = {
   /**
-   * The request id whose permission card must not render, or null when the
-   * card should show: the toggle is off, the session cannot receive asks, or
-   * the reply failed in a retryable way (a thrown error or a `'retryable'`
-   * outcome). A `'terminal'` outcome keeps the card hidden instead of showing
-   * it, because the ask no longer exists and the reply already told the user.
+   * The request id whose permission card must not render, or null. Null means
+   * no permission ask is waiting, or the card should show: the toggle is off,
+   * the session cannot receive asks, or the reply failed in a retryable way (a
+   * thrown error or a `'retryable'` outcome). A `'terminal'` outcome keeps the
+   * card hidden instead of showing it, because the ask no longer exists and
+   * the reply already told the user.
    */
   suppressedRequestId: string | null;
 };

@@ -3998,5 +3998,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nepodařilo se otevřít tento výsledek hledání"
+  },
+  "usage": {
+    "title": "Využití",
+    "orgTitle": "Využití organizace",
+    "entrySubtitle": "Náklady, požadavky a tokeny",
+    "rangePicker": "Časové období",
+    "range90d": "90 dní",
+    "metricPicker": "Metrika grafu",
+    "chartA11y": "{{metric}} za den",
+    "avgCostPerRequest": "Prům. náklady / pož.",
+    "topModels": "Nejpoužívanější modely",
+    "topFeatures": "Nejpoužívanější funkce",
+    "emptyTitle": "V tomto období žádné využití",
+    "orgSelfNotice": "Vidíte své vlastní využití v této organizaci.",
+    "viewDetails": "Zobrazit podrobnosti o využití"
   }
 }

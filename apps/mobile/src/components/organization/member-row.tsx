@@ -9,6 +9,7 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { MenuSheet, type MenuSheetOption } from '@/components/ui/menu-sheet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { isolateLtrBidiText } from '@/lib/bidi';
 import { formatMoney } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type ActiveOrgMember, type OrgRole } from '@/lib/hooks/use-organization-queries';
@@ -19,6 +20,8 @@ type MemberRowProps = {
   /** Caller is owner and this isn't their own row. */
   canManage: boolean;
   enableUsageLimits: boolean;
+  /** Organization is a sales demo, so spend may be paired with its limit. */
+  isSalesDemo: boolean;
   organizationId: string;
   /** Suppress bottom divider on the last row of a group. */
   last?: boolean;
@@ -41,6 +44,7 @@ export function MemberRow({
   member,
   canManage,
   enableUsageLimits,
+  isSalesDemo,
   organizationId,
   last,
 }: Readonly<MemberRowProps>) {
@@ -118,6 +122,29 @@ export function MemberRow({
     });
   }
 
+  // Today's spend against the member's own daily limit, on the same terms as
+  // web's member card (`DailyUsageLimitDisplay`): the server strips
+  // `currentDailyUsageUsd` for a caller whose role may not read other members'
+  // usage, and web only pairs the two amounts for a sales-demo organization.
+  // Every other case keeps the limit line alone, which every role may see.
+  const currentDailyUsageUsd =
+    'currentDailyUsageUsd' in member ? member.currentDailyUsageUsd : null;
+  // A money amount's symbol is neutral to the paragraph's direction, so each
+  // run keeps its own left-to-right order inside the pair.
+  const dailyLimit = member.dailyUsageLimitUsd;
+  const limitText =
+    dailyLimit == null ? null : isolateLtrBidiText(formatMoney(dailyLimit, i18n.language));
+  const spendText =
+    isSalesDemo && currentDailyUsageUsd != null
+      ? isolateLtrBidiText(formatMoney(currentDailyUsageUsd, i18n.language))
+      : null;
+  // Web pairs the two amounts only when both exist and the organization is a
+  // sales demo; every other case keeps the limit line alone.
+  const pairLine = limitText != null && spendText != null ? `${spendText} / ${limitText}` : null;
+  const spendLine =
+    pairLine ??
+    (limitText == null ? null : t('organization.members.limitPerDay', { amount: limitText }));
+
   function actionFor(index: number): (() => void) | null {
     const label = actionOptions[index]?.label;
     if (label === t('organization.members.changeRole')) {
@@ -164,13 +191,7 @@ export function MemberRow({
             {roleLabel(member.role)}
           </Text>
         </View>
-        {member.dailyUsageLimitUsd != null && (
-          <Text className="text-xs text-muted-foreground">
-            {t('organization.members.limitPerDay', {
-              amount: formatMoney(member.dailyUsageLimitUsd, i18n.language),
-            })}
-          </Text>
-        )}
+        {spendLine !== null && <Text className="text-xs text-muted-foreground">{spendLine}</Text>}
       </View>
     </View>
   );

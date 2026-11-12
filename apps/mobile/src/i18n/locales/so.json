@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Natiijadan raadinta lama furi karin"
+  },
+  "usage": {
+    "title": "Isticmaalka",
+    "orgTitle": "Isticmaalka ururka",
+    "entrySubtitle": "Kharashka, codsiyada iyo halbeegyada",
+    "rangePicker": "Muddada waqtiga",
+    "range90d": "90 maalmood",
+    "metricPicker": "Cabbirka shaxda",
+    "chartA11y": "{{metric}} maalintii",
+    "avgCostPerRequest": "Celceliska kharashka / codsi",
+    "topModels": "Moodeellada ugu badan",
+    "topFeatures": "Astaamaha ugu badan",
+    "emptyTitle": "Isticmaal kuma jiro muddadan",
+    "orgSelfNotice": "Waxaad arkaysaa isticmaalkaaga gaarka ah ee ururkan.",
+    "viewDetails": "Eeg faahfaahinta isticmaalka"
   }
 }

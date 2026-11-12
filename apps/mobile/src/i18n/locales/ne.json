@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "यो खोज परिणाम खोल्न सकिएन"
+  },
+  "usage": {
+    "title": "प्रयोग",
+    "orgTitle": "संगठनको प्रयोग",
+    "entrySubtitle": "खर्च, अनुरोधहरू र टोकनहरू",
+    "rangePicker": "समय अवधि",
+    "range90d": "90 दिन",
+    "metricPicker": "चार्ट मेट्रिक",
+    "chartA11y": "प्रति दिन {{metric}}",
+    "avgCostPerRequest": "औसत लागत / अनुरोध",
+    "topModels": "शीर्ष मोडेलहरू",
+    "topFeatures": "शीर्ष सुविधाहरू",
+    "emptyTitle": "यस अवधिमा कुनै प्रयोग छैन",
+    "orgSelfNotice": "तपाईं यस संगठनमा आफ्नै प्रयोग हेर्दै हुनुहुन्छ।",
+    "viewDetails": "प्रयोग विवरण हेर्नुहोस्"
   }
 }

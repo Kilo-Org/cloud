@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 import { i18n } from '@/i18n';
+import { isolateLtrBidiText } from '@/lib/bidi';
+import { formatMoney } from '@/lib/format';
 import { MemberRow } from './member-row';
 
 type Mounted = RenderWithProvidersResult;
@@ -60,7 +62,14 @@ const mounted: Mounted[] = [];
 async function renderRow(overrides: Partial<Parameters<typeof MemberRow>[0]> = {}) {
   mocks.menuProps.length = 0;
   const view = await renderWithProviders(
-    <MemberRow member={member} canManage enableUsageLimits organizationId="org-1" {...overrides} />
+    <MemberRow
+      member={member}
+      canManage
+      enableUsageLimits
+      isSalesDemo={false}
+      organizationId="org-1"
+      {...overrides}
+    />
   );
   mounted.push(view);
   return view.renderer;
@@ -273,5 +282,59 @@ describe('MemberRow menu', () => {
     expect(mocks.push).not.toHaveBeenCalled();
     expect(mocks.updateMember.mutate).not.toHaveBeenCalled();
     expect(mocks.removeMember.mutate).not.toHaveBeenCalled();
+  });
+});
+
+describe('MemberRow daily spend', () => {
+  // The same fields web's `DailyUsageLimitDisplay` pairs, and only in the
+  // states it pairs them in.
+  const spendMember = {
+    ...member,
+    dailyUsageLimitUsd: 10,
+    currentDailyUsageUsd: 2.4,
+  } as unknown as Parameters<typeof MemberRow>[0]['member'];
+
+  const texts = (renderer: Awaited<ReturnType<typeof renderRow>>) =>
+    renderer.root.findAllByType('Text').map(node => node.props.children as unknown);
+
+  const pair = `${isolateLtrBidiText(formatMoney(2.4, i18n.language))} / ${isolateLtrBidiText(
+    formatMoney(10, i18n.language)
+  )}`;
+  const limitOnly = i18n.t('organization.members.limitPerDay', {
+    amount: isolateLtrBidiText(formatMoney(10, i18n.language)),
+  });
+
+  it('pairs spend with the limit for a sales-demo organization', async () => {
+    const renderer = await renderRow({ member: spendMember, isSalesDemo: true });
+    expect(texts(renderer)).toContain(pair);
+    expect(texts(renderer)).not.toContain(limitOnly);
+  });
+
+  it('keeps the limit alone for an organization web does not pair', async () => {
+    const renderer = await renderRow({ member: spendMember, isSalesDemo: false });
+    expect(texts(renderer)).toContain(limitOnly);
+    expect(texts(renderer)).not.toContain(pair);
+  });
+
+  it('keeps the limit alone when the server withholds the spend', async () => {
+    const stripped = { ...member, dailyUsageLimitUsd: 10 } as unknown as Parameters<
+      typeof MemberRow
+    >[0]['member'];
+    const renderer = await renderRow({ member: stripped, isSalesDemo: true });
+    expect(texts(renderer)).toContain(limitOnly);
+    expect(texts(renderer)).not.toContain(pair);
+  });
+
+  it('shows no spend line for a member without a daily limit', async () => {
+    const unlimited = { ...member, currentDailyUsageUsd: 2.4 } as unknown as Parameters<
+      typeof MemberRow
+    >[0]['member'];
+    const renderer = await renderRow({ member: unlimited, isSalesDemo: true });
+    expect(texts(renderer)).not.toContain(pair);
+    expect(
+      texts(renderer).some(
+        value => typeof value === 'string' && value.includes(formatMoney(10, i18n.language))
+      )
+    ).toBe(false);
   });
 });

@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Dit zoekresultaat kon niet worden geopend"
+  },
+  "usage": {
+    "title": "Gebruik",
+    "orgTitle": "Organisatiegebruik",
+    "entrySubtitle": "Kosten, verzoeken en tokens",
+    "rangePicker": "Periode",
+    "range90d": "90 dagen",
+    "metricPicker": "Grafiekwaarde",
+    "chartA11y": "{{metric}} per dag",
+    "avgCostPerRequest": "Gem. kosten / verzoek",
+    "topModels": "Topmodellen",
+    "topFeatures": "Topfuncties",
+    "emptyTitle": "Geen gebruik in deze periode",
+    "orgSelfNotice": "Je ziet je eigen gebruik in deze organisatie.",
+    "viewDetails": "Gebruiksdetails bekijken"
   }
 }

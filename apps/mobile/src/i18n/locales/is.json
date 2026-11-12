@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ekki tókst að opna þessa leitarniðurstöðu"
+  },
+  "usage": {
+    "title": "Notkun",
+    "orgTitle": "Notkun fyrirtækis",
+    "entrySubtitle": "Útgjöld, beiðnir og tókar",
+    "rangePicker": "Tímabil",
+    "range90d": "90 dagar",
+    "metricPicker": "Mæligildi grafs",
+    "chartA11y": "{{metric}} á dag",
+    "avgCostPerRequest": "Meðalkostn. / beiðni",
+    "topModels": "Mest notuðu líkön",
+    "topFeatures": "Mest notaðir eiginleikar",
+    "emptyTitle": "Engin notkun á þessu tímabili",
+    "orgSelfNotice": "Þú sérð þína eigin notkun í þessu fyrirtæki.",
+    "viewDetails": "Skoða upplýsingar um notkun"
   }
 }

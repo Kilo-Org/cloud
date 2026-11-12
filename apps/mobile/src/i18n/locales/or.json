@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ଏହି ଖୋଜା ଫଳାଫଳ ଖୋଲିହେଲା ନାହିଁ"
+  },
+  "usage": {
+    "title": "ବ୍ୟବହାର",
+    "orgTitle": "ସଂସ୍ଥାର ବ୍ୟବହାର",
+    "entrySubtitle": "ଖର୍ଚ୍ଚ, ଅନୁରୋଧ ଓ ଟୋକନ୍",
+    "rangePicker": "ସମୟ ପରିସର",
+    "range90d": "90 ଦିନ",
+    "metricPicker": "ଚାର୍ଟ ମେଟ୍ରିକ୍",
+    "chartA11y": "ପ୍ରତି ଦିନ {{metric}}",
+    "avgCostPerRequest": "ହାରାହାରି ଖର୍ଚ୍ଚ / ଅନୁରୋଧ",
+    "topModels": "ଶୀର୍ଷ ମଡେଲ୍",
+    "topFeatures": "ଶୀର୍ଷ ଫିଚର୍",
+    "emptyTitle": "ଏହି ଅବଧିରେ କୌଣସି ବ୍ୟବହାର ନାହିଁ",
+    "orgSelfNotice": "ଆପଣ ଏହି ସଂସ୍ଥାରେ ନିଜର ବ୍ୟବହାର ଦେଖୁଛନ୍ତି।",
+    "viewDetails": "ବ୍ୟବହାର ବିବରଣୀ ଦେଖନ୍ତୁ"
   }
 }

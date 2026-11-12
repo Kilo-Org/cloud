@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "ఈ శోధన ఫలితాన్ని తెరవలేకపోయాము"
+  },
+  "usage": {
+    "title": "వినియోగం",
+    "orgTitle": "సంస్థ వినియోగం",
+    "entrySubtitle": "ఖర్చు, అభ్యర్థనలు, టోకెన్లు",
+    "rangePicker": "కాల వ్యవధి",
+    "range90d": "90 రోజులు",
+    "metricPicker": "చార్ట్ కొలమానం",
+    "chartA11y": "రోజుకు {{metric}}",
+    "avgCostPerRequest": "సగటు ఖర్చు / అభ్యర్థన",
+    "topModels": "అగ్ర మోడల్‌లు",
+    "topFeatures": "అగ్ర ఫీచర్‌లు",
+    "emptyTitle": "ఈ వ్యవధిలో వినియోగం లేదు",
+    "orgSelfNotice": "మీరు ఈ సంస్థలో మీ స్వంత వినియోగాన్ని చూస్తున్నారు.",
+    "viewDetails": "వినియోగ వివరాలను చూడండి"
   }
 }

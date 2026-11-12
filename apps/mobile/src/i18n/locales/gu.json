@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "આ શોધ પરિણામ ખોલી શકાયું નહીં"
+  },
+  "usage": {
+    "title": "વપરાશ",
+    "orgTitle": "સંસ્થાનો વપરાશ",
+    "entrySubtitle": "ખર્ચ, વિનંતીઓ અને ટોકન",
+    "rangePicker": "સમય શ્રેણી",
+    "range90d": "90 દિવસ",
+    "metricPicker": "ચાર્ટ મેટ્રિક",
+    "chartA11y": "દિવસ દીઠ {{metric}}",
+    "avgCostPerRequest": "સરેરાશ ખર્ચ / વિનંતી",
+    "topModels": "ટોચના મોડેલ",
+    "topFeatures": "ટોચની સુવિધાઓ",
+    "emptyTitle": "આ સમયગાળામાં કોઈ વપરાશ નથી",
+    "orgSelfNotice": "તમે આ સંસ્થામાં તમારો પોતાનો વપરાશ જોઈ રહ્યા છો.",
+    "viewDetails": "વપરાશની વિગતો જુઓ"
   }
 }

@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Kunne ikke åpne dette søkeresultatet"
+  },
+  "usage": {
+    "title": "Forbruk",
+    "orgTitle": "Organisasjonens forbruk",
+    "entrySubtitle": "Kostnader, forespørsler og tokener",
+    "rangePicker": "Tidsperiode",
+    "range90d": "90 dager",
+    "metricPicker": "Måltall i diagram",
+    "chartA11y": "{{metric}} per dag",
+    "avgCostPerRequest": "Snittkostnad / forespørsel",
+    "topModels": "Mest brukte modeller",
+    "topFeatures": "Mest brukte funksjoner",
+    "emptyTitle": "Ikke noe forbruk i denne perioden",
+    "orgSelfNotice": "Du ser ditt eget forbruk i denne organisasjonen.",
+    "viewDetails": "Vis forbruksdetaljer"
   }
 }

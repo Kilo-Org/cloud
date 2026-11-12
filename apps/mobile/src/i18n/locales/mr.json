@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "हा शोध परिणाम उघडता आले नाही"
+  },
+  "usage": {
+    "title": "वापर",
+    "orgTitle": "संस्थेचा वापर",
+    "entrySubtitle": "खर्च, विनंत्या आणि टोकन",
+    "rangePicker": "कालावधी",
+    "range90d": "90 दिवस",
+    "metricPicker": "चार्ट मेट्रिक",
+    "chartA11y": "प्रतिदिन {{metric}}",
+    "avgCostPerRequest": "सरासरी खर्च / विनंती",
+    "topModels": "आघाडीची मॉडेल",
+    "topFeatures": "आघाडीची वैशिष्ट्ये",
+    "emptyTitle": "या कालावधीत कोणताही वापर नाही",
+    "orgSelfNotice": "तुम्ही या संस्थेतील तुमचा स्वतःचा वापर पाहत आहात.",
+    "viewDetails": "वापराचे तपशील पहा"
   }
 }

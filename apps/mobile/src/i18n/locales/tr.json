@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu arama sonucu açılamadı"
+  },
+  "usage": {
+    "title": "Kullanım",
+    "orgTitle": "Organizasyon kullanımı",
+    "entrySubtitle": "Harcama, istekler ve tokenlar",
+    "rangePicker": "Zaman aralığı",
+    "range90d": "90 gün",
+    "metricPicker": "Grafik ölçütü",
+    "chartA11y": "Günlük {{metric}}",
+    "avgCostPerRequest": "Ort. maliyet / istek",
+    "topModels": "En çok kullanılan modeller",
+    "topFeatures": "En çok kullanılan özellikler",
+    "emptyTitle": "Bu dönemde kullanım yok",
+    "orgSelfNotice": "Bu organizasyondaki kendi kullanımınızı görüyorsunuz.",
+    "viewDetails": "Kullanım ayrıntılarını görüntüle"
   }
 }

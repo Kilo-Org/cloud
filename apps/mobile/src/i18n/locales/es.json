@@ -3933,5 +3933,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "No se pudo abrir este resultado de búsqueda"
+  },
+  "usage": {
+    "title": "Uso",
+    "orgTitle": "Uso de la organización",
+    "entrySubtitle": "Gasto, solicitudes y tokens",
+    "rangePicker": "Periodo",
+    "range90d": "90 días",
+    "metricPicker": "Métrica del gráfico",
+    "chartA11y": "{{metric}} por día",
+    "avgCostPerRequest": "Coste medio / solicitud",
+    "topModels": "Modelos más usados",
+    "topFeatures": "Funciones más usadas",
+    "emptyTitle": "Sin uso en este periodo",
+    "orgSelfNotice": "Estás viendo tu propio uso en esta organización.",
+    "viewDetails": "Ver detalles de uso"
   }
 }

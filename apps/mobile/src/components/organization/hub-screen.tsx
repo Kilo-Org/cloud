@@ -303,7 +303,12 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           />
         </Animated.View>
 
-        <OrgUsageStats organizationId={organizationId} />
+        <OrgUsageStats
+          organizationId={organizationId}
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/organization/usage' as Href);
+          }}
+        />
 
         <View className="rounded-lg bg-secondary px-3">
           <ConfigureRow

@@ -4128,5 +4128,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Ni lwyddwyd i agor canlyniad chwilio hwn"
+  },
+  "usage": {
+    "title": "Defnydd",
+    "orgTitle": "Defnydd y sefydliad",
+    "entrySubtitle": "Gwariant, ceisiadau a thocynnau",
+    "rangePicker": "Cyfnod amser",
+    "range90d": "90 diwrnod",
+    "metricPicker": "Mesur y siart",
+    "chartA11y": "{{metric}} y dydd",
+    "avgCostPerRequest": "Cost gyfartalog / cais",
+    "topModels": "Prif fodelau",
+    "topFeatures": "Prif nodweddion",
+    "emptyTitle": "Dim defnydd yn y cyfnod hwn",
+    "orgSelfNotice": "Rydych chi'n gweld eich defnydd eich hun yn y sefydliad hwn.",
+    "viewDetails": "Gweld manylion defnydd"
   }
 }

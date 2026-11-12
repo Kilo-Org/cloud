@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "باز کردن این نتیجه جست‌وجو ممکن نشد"
+  },
+  "usage": {
+    "title": "مصرف",
+    "orgTitle": "مصرف سازمان",
+    "entrySubtitle": "هزینه، درخواست‌ها و توکن‌ها",
+    "rangePicker": "بازه زمانی",
+    "range90d": "۹۰ روز",
+    "metricPicker": "معیار نمودار",
+    "chartA11y": "{{metric}} در روز",
+    "avgCostPerRequest": "میانگین هزینه / درخواست",
+    "topModels": "مدل‌های پرکاربرد",
+    "topFeatures": "قابلیت‌های پرکاربرد",
+    "emptyTitle": "مصرفی در این بازه ثبت نشده است",
+    "orgSelfNotice": "شما مصرف خودتان در این سازمان را می‌بینید.",
+    "viewDetails": "مشاهده جزئیات مصرف"
   }
 }

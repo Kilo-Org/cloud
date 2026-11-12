@@ -3998,5 +3998,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Не атрымалася адкрыць гэты вынік пошуку"
+  },
+  "usage": {
+    "title": "Выкарыстанне",
+    "orgTitle": "Выкарыстанне арганізацыі",
+    "entrySubtitle": "Выдаткі, запыты і токены",
+    "rangePicker": "Перыяд",
+    "range90d": "90 дзён",
+    "metricPicker": "Паказчык графіка",
+    "chartA11y": "{{metric}} за дзень",
+    "avgCostPerRequest": "Сяр. кошт / запыт",
+    "topModels": "Топ мадэляў",
+    "topFeatures": "Топ функцый",
+    "emptyTitle": "Няма выкарыстання за гэты перыяд",
+    "orgSelfNotice": "Вы бачыце ўласнае выкарыстанне ў гэтай арганізацыі.",
+    "viewDetails": "Падрабязнасці выкарыстання"
   }
 }

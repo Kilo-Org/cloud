@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu'aa barbaachuu kana banuun hin danda'amne"
+  },
+  "usage": {
+    "title": "Itti fayyadama",
+    "orgTitle": "Itti fayyadama dhaabbataa",
+    "entrySubtitle": "Baasii, gaaffiiwwan fi tookanoota",
+    "rangePicker": "Hangii yeroo",
+    "range90d": "Guyyaa 90",
+    "metricPicker": "Safartuu chaartii",
+    "chartA11y": "{{metric}} guyyaatti",
+    "avgCostPerRequest": "Baasii giddugaleessaa / gaaffii",
+    "topModels": "Moodeelota olaanoo",
+    "topFeatures": "Amaloota olaanoo",
+    "emptyTitle": "Yeroo kana keessa itti fayyadamni hin jiru",
+    "orgSelfNotice": "Itti fayyadama kee dhaabbata kana keessatti argaa jirta.",
+    "viewDetails": "Bal'ina itti fayyadamaa ilaali"
   }
 }

@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "یہ تلاش کا نتیجہ کھولا نہیں جا سکا"
+  },
+  "usage": {
+    "title": "استعمال",
+    "orgTitle": "تنظیم کا استعمال",
+    "entrySubtitle": "خرچ، درخواستیں اور ٹوکن",
+    "rangePicker": "وقت کی مدت",
+    "range90d": "90 دن",
+    "metricPicker": "چارٹ میٹرک",
+    "chartA11y": "{{metric}} فی دن",
+    "avgCostPerRequest": "اوسط لاگت / درخواست",
+    "topModels": "سرفہرست ماڈلز",
+    "topFeatures": "سرفہرست فیچرز",
+    "emptyTitle": "اس مدت میں کوئی استعمال نہیں",
+    "orgSelfNotice": "آپ اس تنظیم میں اپنا استعمال دیکھ رہے ہیں۔",
+    "viewDetails": "استعمال کی تفصیلات دیکھیں"
   }
 }

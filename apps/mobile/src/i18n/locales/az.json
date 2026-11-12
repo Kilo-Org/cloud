@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Bu axtarış nəticəsi açılmadı"
+  },
+  "usage": {
+    "title": "İstifadə",
+    "orgTitle": "Təşkilatın istifadəsi",
+    "entrySubtitle": "Xərc, sorğular və tokenlər",
+    "rangePicker": "Zaman aralığı",
+    "range90d": "90 gün",
+    "metricPicker": "Qrafik göstəricisi",
+    "chartA11y": "Gün üzrə {{metric}}",
+    "avgCostPerRequest": "Orta xərc / sorğu",
+    "topModels": "Əsas modellər",
+    "topFeatures": "Əsas funksiyalar",
+    "emptyTitle": "Bu dövrdə istifadə yoxdur",
+    "orgSelfNotice": "Bu təşkilatda öz istifadənizi görürsünüz.",
+    "viewDetails": "İstifadə təfərrüatlarına baxın"
   }
 }

@@ -3933,5 +3933,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Neizdevās atvērt šo meklēšanas rezultātu"
+  },
+  "usage": {
+    "title": "Lietojums",
+    "orgTitle": "Organizācijas lietojums",
+    "entrySubtitle": "Tēriņi, pieprasījumi un tokeni",
+    "rangePicker": "Laika periods",
+    "range90d": "90 dienas",
+    "metricPicker": "Diagrammas rādītājs",
+    "chartA11y": "{{metric}} dienā",
+    "avgCostPerRequest": "Vid. izmaksas / piepr.",
+    "topModels": "Populārākie modeļi",
+    "topFeatures": "Populārākās funkcijas",
+    "emptyTitle": "Šajā periodā nav lietojuma",
+    "orgSelfNotice": "Jūs redzat savu lietojumu šajā organizācijā.",
+    "viewDetails": "Skatīt lietojuma informāciju"
   }
 }

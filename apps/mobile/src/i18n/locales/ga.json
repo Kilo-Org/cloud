@@ -4063,5 +4063,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Níorbh fhéidir an toradh cuardaigh seo a oscailt"
+  },
+  "usage": {
+    "title": "Úsáid",
+    "orgTitle": "Úsáid na heagraíochta",
+    "entrySubtitle": "Caiteachas, iarratais agus comharthaí",
+    "rangePicker": "Raon ama",
+    "range90d": "90 lá",
+    "metricPicker": "Méadrach na cairte",
+    "chartA11y": "{{metric}} in aghaidh an lae",
+    "avgCostPerRequest": "Meánchostas / iarratas",
+    "topModels": "Samhlacha is mó úsáid",
+    "topFeatures": "Gnéithe is mó úsáid",
+    "emptyTitle": "Níl aon úsáid sa tréimhse seo",
+    "orgSelfNotice": "Tá d'úsáid féin san eagraíocht seo á feiceáil agat.",
+    "viewDetails": "Féach ar shonraí úsáide"
   }
 }

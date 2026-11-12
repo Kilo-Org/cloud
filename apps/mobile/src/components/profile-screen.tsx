@@ -10,6 +10,7 @@ import {
   GitMerge,
   GitPullRequest,
   KeyRound,
+  LineChart,
   Lock,
   LogOut,
   MessageSquare,
@@ -233,6 +234,22 @@ export function ProfileScreen() {
       >
         {/* Credits */}
         <CreditsCard orgs={orgs} enabled={isAuthenticated} />
+
+        {/* Usage: one row on the balance's own section, because spend and
+            remaining credits are the two halves of the same question. */}
+        <View className="mt-3">
+          <ConfigureRow
+            icon={LineChart}
+            title={t('usage.title')}
+            subtitle={t('usage.entrySubtitle')}
+            hue="sage"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/usage' as Href);
+            }}
+          />
+        </View>
 
         {/* Code Reviewer */}
         <View className="mt-6 gap-3">

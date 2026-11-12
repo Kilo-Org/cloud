@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Hindi mabuksan ang resulta ng paghahanap na ito"
+  },
+  "usage": {
+    "title": "Paggamit",
+    "orgTitle": "Paggamit ng organisasyon",
+    "entrySubtitle": "Gastos, mga kahilingan, at mga token",
+    "rangePicker": "Saklaw ng panahon",
+    "range90d": "90 araw",
+    "metricPicker": "Sukatan ng chart",
+    "chartA11y": "{{metric}} bawat araw",
+    "avgCostPerRequest": "Avg na gastos / kahilingan",
+    "topModels": "Nangungunang mga model",
+    "topFeatures": "Nangungunang mga feature",
+    "emptyTitle": "Walang paggamit sa panahong ito",
+    "orgSelfNotice": "Nakikita mo ang sarili mong paggamit sa organisasyong ito.",
+    "viewDetails": "Tingnan ang detalye ng paggamit"
   }
 }

@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Kon nie hierdie soektogresultaat oopmaak nie"
+  },
+  "usage": {
+    "title": "Gebruik",
+    "orgTitle": "Organisasiegebruik",
+    "entrySubtitle": "Besteding, versoeke en tekens",
+    "rangePicker": "Tydperk",
+    "range90d": "90 dae",
+    "metricPicker": "Grafiekmaatstaf",
+    "chartA11y": "{{metric}} per dag",
+    "avgCostPerRequest": "Gem. koste / versoek",
+    "topModels": "Topmodelle",
+    "topFeatures": "Topfunksies",
+    "emptyTitle": "Geen gebruik in hierdie tydperk nie",
+    "orgSelfNotice": "Jy sien jou eie gebruik in hierdie organisasie.",
+    "viewDetails": "Bekyk gebruiksbesonderhede"
   }
 }

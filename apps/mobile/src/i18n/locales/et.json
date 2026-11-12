@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Otsingutulemust ei õnnestunud avada"
+  },
+  "usage": {
+    "title": "Kasutus",
+    "orgTitle": "Organisatsiooni kasutus",
+    "entrySubtitle": "Kulu, päringud ja tokenid",
+    "rangePicker": "Ajavahemik",
+    "range90d": "90 päeva",
+    "metricPicker": "Graafiku näitaja",
+    "chartA11y": "{{metric}} päevas",
+    "avgCostPerRequest": "Keskm. kulu / päring",
+    "topModels": "Enimkasutatud mudelid",
+    "topFeatures": "Enimkasutatud funktsioonid",
+    "emptyTitle": "Sel perioodil kasutust pole",
+    "orgSelfNotice": "Näed oma kasutust selles organisatsioonis.",
+    "viewDetails": "Vaata kasutuse üksikasju"
   }
 }

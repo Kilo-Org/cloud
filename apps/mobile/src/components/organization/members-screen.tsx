@@ -97,6 +97,9 @@ export function OrganizationMembersScreen() {
   const isLoading = orgWithMembers.isLoading;
   const isError = orgWithMembers.isError && !orgWithMembers.data;
   const enableUsageLimits = orgWithMembers.data?.settings.enable_usage_limits !== false;
+  // Web's member card only pairs spend with the limit for a sales-demo
+  // organization, so the row takes the same flag rather than deciding itself.
+  const isSalesDemo = orgWithMembers.data?.settings.is_sales_demo === true;
   const canInvite = isMoneyRole(role);
   const isOwner = role === 'owner';
 
@@ -153,6 +156,7 @@ export function OrganizationMembersScreen() {
               member={item.member}
               canManage={isOwner && item.member.id !== currentUserId}
               enableUsageLimits={enableUsageLimits}
+              isSalesDemo={isSalesDemo}
               organizationId={organizationId}
               last={item.last}
             />

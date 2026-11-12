@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "මෙම සෙවුම් ප්‍රතිඵලය විවෘත කිරීමට නොහැකි විය"
+  },
+  "usage": {
+    "title": "භාවිතය",
+    "orgTitle": "සංවිධාන භාවිතය",
+    "entrySubtitle": "වියදම, ඉල්ලීම් සහ ටෝකන",
+    "rangePicker": "කාල පරාසය",
+    "range90d": "දින 90",
+    "metricPicker": "ප්‍රස්ථාර මිනුම",
+    "chartA11y": "දිනකට {{metric}}",
+    "avgCostPerRequest": "සාමාන්‍ය පිරිවැය / ඉල්ලීම",
+    "topModels": "ප්‍රමුඛ ආකෘති",
+    "topFeatures": "ප්‍රමුඛ විශේෂාංග",
+    "emptyTitle": "මෙම කාලය තුළ භාවිතයක් නැත",
+    "orgSelfNotice": "ඔබ දකින්නේ මෙම සංවිධානයේ ඔබගේම භාවිතයයි.",
+    "viewDetails": "භාවිත විස්තර බලන්න"
   }
 }

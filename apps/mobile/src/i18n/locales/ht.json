@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Pa t ka louvri rezilta rechèch sa a"
+  },
+  "usage": {
+    "title": "Itilizasyon",
+    "orgTitle": "Itilizasyon òganizasyon",
+    "entrySubtitle": "Depans, demann ak jeton",
+    "rangePicker": "Peryòd tan",
+    "range90d": "90 jou",
+    "metricPicker": "Mezi grafik la",
+    "chartA11y": "{{metric}} pa jou",
+    "avgCostPerRequest": "Pri mwayen / demann",
+    "topModels": "Modèl ki pi itilize",
+    "topFeatures": "Fonksyon ki pi itilize",
+    "emptyTitle": "Pa gen itilizasyon nan peryòd sa a",
+    "orgSelfNotice": "W ap wè pwòp itilizasyon pa w nan òganizasyon sa a.",
+    "viewDetails": "Wè detay itilizasyon"
   }
 }

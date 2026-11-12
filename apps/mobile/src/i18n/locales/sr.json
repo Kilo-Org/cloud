@@ -3933,5 +3933,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Nije moguće otvoriti ovaj rezultat pretrage"
+  },
+  "usage": {
+    "title": "Korišćenje",
+    "orgTitle": "Korišćenje organizacije",
+    "entrySubtitle": "Troškovi, zahtevi i tokeni",
+    "rangePicker": "Vremenski opseg",
+    "range90d": "90 dana",
+    "metricPicker": "Metrika grafikona",
+    "chartA11y": "{{metric}} po danu",
+    "avgCostPerRequest": "Pros. trošak / zahtev",
+    "topModels": "Najčešći modeli",
+    "topFeatures": "Najčešće funkcije",
+    "emptyTitle": "Nema korišćenja u ovom periodu",
+    "orgSelfNotice": "Vidite sopstveno korišćenje u ovoj organizaciji.",
+    "viewDetails": "Prikaži detalje korišćenja"
   }
 }

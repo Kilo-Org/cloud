@@ -3868,5 +3868,20 @@
   },
   "systemSearch": {
     "couldNotOpenResult": "Tidak dapat membuka hasil pencarian ini"
+  },
+  "usage": {
+    "title": "Penggunaan",
+    "orgTitle": "Penggunaan organisasi",
+    "entrySubtitle": "Pengeluaran, permintaan, dan token",
+    "rangePicker": "Rentang waktu",
+    "range90d": "90 hari",
+    "metricPicker": "Metrik grafik",
+    "chartA11y": "{{metric}} per hari",
+    "avgCostPerRequest": "Biaya rata-rata / permintaan",
+    "topModels": "Model teratas",
+    "topFeatures": "Fitur teratas",
+    "emptyTitle": "Tidak ada penggunaan pada periode ini",
+    "orgSelfNotice": "Anda melihat penggunaan Anda sendiri di organisasi ini.",
+    "viewDetails": "Lihat detail penggunaan"
   }
 }

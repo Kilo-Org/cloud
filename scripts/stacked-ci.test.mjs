@@ -304,10 +304,17 @@ for (const [name, files, expected] of [
   ],
   [
     'a lint plugin with an app path',
-    ['tools/oxlint/anti-slop/index.ts', 'apps/mobile/src/app/index.tsx'],
+    ['tools/oxlint/anti-slop/index.ts', 'apps/mobile/vitest.config.ts'],
     { mobile: 'true', lint_only: 'false' },
   ],
-  ['an app path alone', ['apps/mobile/src/app/index.tsx'], { mobile: 'true', lint_only: 'false' }],
+  ['an app path alone', ['apps/mobile/vitest.config.ts'], { mobile: 'true', lint_only: 'false' }],
+  // The plugin branch writes `mobile=true` before the workspace selection runs,
+  // so a plugin change that carries no app path still runs the app's lint.
+  [
+    'a lint plugin with an unrelated path',
+    ['tools/oxlint/anti-slop/index.ts', 'README.md'],
+    { mobile: 'true', lint_only: 'false' },
+  ],
   ['this workflow alone', [mobilePath], { mobile: 'true', lint_only: 'false' }],
   ['an unrelated path alone', ['README.md'], { mobile: 'false', lint_only: 'false' }],
   ['no changed path', [], { mobile: 'false', lint_only: 'false' }],

@@ -271,7 +271,7 @@ Only local development and tests use the forwarded-header fallback.
 Turnstile verification signs a separate trusted-IP claim for Watchwood; existing authentication fields retain their behavior.
 Watchwood skips older proofs without that claim instead of changing authentication admission.
 Tokens remain transient; signed, HttpOnly cookies carry the signup identity and assessment through authentication redirects.
-The optional SDK device cookie stays disabled.
+The SDK sets a first-party `watchwood_device_id` cookie and sends that device identifier with signup evidence; OpenAI treats the device identifier as a strong token-farming signal.
 
 The browser allows at most two seconds for shadow submission.
 After the mount request reports collection disabled, submission skips Watchwood without another request.
@@ -283,10 +283,11 @@ Missing tokens, blocked scripts, invalid responses, unavailable services, and hi
 Redis budgets limit assessments per verified Turnstile context and client IP; exhausted budgets reduce coverage, not signup admission.
 Each budget increment sets its expiry atomically.
 
-Logs named `[auth] Watchwood signup attempt` describe assessment coverage, failures, scores, and latency.
+Logs named `[auth] Watchwood signup attempt` describe assessment coverage, failures, scores, risk reasons, upstream HTTP statuses, and latency.
 Logs named `[auth] Watchwood signup shadow` correlate new-account attempts with existing signup outcomes through `operationId`.
-Both events carry `shadow: true` and `enforced: false`.
+Both events carry `shadow: true`, `enforced: false`, and any risk reasons the upstream response supplied.
 The risk score ranges from zero to one; it is not a probability.
+Risk reasons and sub-reasons are optional upstream labels; unexpected shapes are omitted rather than failing the assessment.
 Do not interpret a missing assessment as a low score.
 Observe coverage, conversion, latency, and confirmed abuse before proposing enforcement.
 To disable collection, set `WATCHWOOD_SHADOW_ENABLED` to `false` and redeploy.

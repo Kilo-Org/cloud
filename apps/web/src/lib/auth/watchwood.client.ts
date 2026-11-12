@@ -16,9 +16,9 @@ const contextSchema = z.discriminatedUnion('enabled', [
   }),
 ]);
 const sdkSchema = z.object({
-  initialize: z.custom<(options: { org_id: string; safety_identifier: string }) => unknown>(
-    value => typeof value === 'function'
-  ),
+  initialize: z.custom<
+    (options: { org_id: string; safety_identifier: string; use_device_cookie: boolean }) => unknown
+  >(value => typeof value === 'function'),
   getToken: z.custom<() => unknown>(value => typeof value === 'function'),
 });
 const tokenSchema = z.object({
@@ -88,7 +88,7 @@ async function performWatchwoodSignup(signal: AbortSignal, submit: boolean): Pro
   const sdk = await loadSdk(signal);
   signal.throwIfAborted();
   if (!sdk) return;
-  await sdk.initialize({ org_id, safety_identifier });
+  await sdk.initialize({ org_id, safety_identifier, use_device_cookie: true });
   signal.throwIfAborted();
   if (!submit) return;
 

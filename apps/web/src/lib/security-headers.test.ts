@@ -20,6 +20,8 @@ describe('security headers', () => {
     expect(policy).toContain('https://js.stripe.com');
     expect(policy).toContain('https://*.js.stripe.com');
     expect(policy).toContain('https://api.stripe.com');
+    expect(policy).toContain('https://api.openai.com/v1/watchwood/');
+    expect(policy).toContain('https://watchwood.openai.com/v1/watchwood/');
     expect(policy).toContain('https://hooks.stripe.com');
     expect(policy).toContain('https://login.kilo.ai');
     expect(policy).toContain('https://login-test.kilo.ai');

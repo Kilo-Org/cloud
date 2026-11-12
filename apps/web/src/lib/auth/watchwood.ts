@@ -23,6 +23,7 @@ return count
 `;
 const identitySchema = z.object({ safetyIdentifier: z.uuid() });
 const turnstileSchema = z.object({ guid: z.uuid(), ip: z.string() });
+const riskReasonsSchema = z.array(z.string().trim().min(1).max(64)).max(10);
 const assessmentBase = z.object({
   safetyIdentifier: z.uuid().optional(),
   latencyMs: z.number().finite().nonnegative(),
@@ -32,6 +33,8 @@ const assessmentSchema = z.discriminatedUnion('status', [
   assessmentBase.extend({
     status: z.literal('assessed'),
     riskScore: z.number().finite().min(0).max(1),
+    riskReasons: riskReasonsSchema.optional(),
+    riskSubReasons: riskReasonsSchema.optional(),
   }),
   assessmentBase.extend({
     status: z.enum([
@@ -43,8 +46,14 @@ const assessmentSchema = z.discriminatedUnion('status', [
       'invalid_response',
       'upstream_error',
     ]),
+    upstreamStatus: z.number().int().nonnegative().optional(),
   }),
 ]);
+const upstreamSchema = z.object({
+  risk_score: z.number().finite().min(0).max(1),
+  risk_reasons: riskReasonsSchema.optional().catch(undefined),
+  risk_sub_reasons: riskReasonsSchema.optional().catch(undefined),
+});
 const assessmentCookieSchema = z.object({ assessment: assessmentSchema, turnstileGuid: z.uuid() });
 const submissionSchema = z.object({
   token: z.string().max(8192).default(''),
@@ -139,7 +148,13 @@ function safeAssessment(assessment: WatchwoodSignupAssessment) {
     safetyIdentifier: assessment.safetyIdentifier,
     latencyMs: assessment.latencyMs,
     assessedAt: assessment.assessedAt,
-    ...(assessment.status === 'assessed' ? { riskScore: assessment.riskScore } : {}),
+    ...(assessment.status === 'assessed'
+      ? {
+          riskScore: assessment.riskScore,
+          ...(assessment.riskReasons ? { riskReasons: assessment.riskReasons } : {}),
+          ...(assessment.riskSubReasons ? { riskSubReasons: assessment.riskSubReasons } : {}),
+        }
+      : {}),
   };
 }
 
@@ -259,6 +274,9 @@ export async function assessWatchwoodSignup(request: NextRequest): Promise<NextR
   let turnstileGuid: string | undefined;
   let status: WatchwoodSignupAssessment['status'] = 'invalid_context';
   let riskScore: number | undefined;
+  let riskReasons: string[] | undefined;
+  let riskSubReasons: string[] | undefined;
+  let upstreamStatus: number | undefined;
   try {
     const session = identitySchema.safeParse(
       verify(request.cookies.get(SESSION_COOKIE)?.value, SESSION_COOKIE)
@@ -310,15 +328,18 @@ export async function assessWatchwoodSignup(request: NextRequest): Promise<NextR
         if (!upstream.ok) {
           void upstream.body?.cancel().catch(() => undefined);
           status = 'upstream_error';
+          upstreamStatus = upstream.status;
           return result;
         }
         status = 'invalid_response';
-        const parsed = z
-          .object({ risk_score: z.number().finite().min(0).max(1) })
-          .safeParse(await readBoundedJson(upstream.body, controller.signal));
+        const parsed = upstreamSchema.safeParse(
+          await readBoundedJson(upstream.body, controller.signal)
+        );
         if (parsed.success) {
           status = 'assessed';
           riskScore = parsed.data.risk_score;
+          riskReasons = parsed.data.risk_reasons;
+          riskSubReasons = parsed.data.risk_sub_reasons;
         }
         return result;
       }
@@ -330,12 +351,25 @@ export async function assessWatchwoodSignup(request: NextRequest): Promise<NextR
     const base = { safetyIdentifier, latencyMs: Date.now() - startedAt, assessedAt: Date.now() };
     const assessment: WatchwoodSignupAssessment =
       status === 'assessed' && riskScore !== undefined
-        ? { ...base, status: 'assessed', riskScore }
-        : { ...base, status: status === 'assessed' ? 'invalid_response' : status };
+        ? {
+            ...base,
+            status: 'assessed',
+            riskScore,
+            ...(riskReasons ? { riskReasons } : {}),
+            ...(riskSubReasons ? { riskSubReasons } : {}),
+          }
+        : status === 'upstream_error'
+          ? {
+              ...base,
+              status: 'upstream_error',
+              ...(upstreamStatus !== undefined ? { upstreamStatus } : {}),
+            }
+          : { ...base, status: status === 'assessed' ? 'invalid_response' : status };
     console.info('[auth] Watchwood signup attempt', {
       shadow: true,
       enforced: false,
       ...safeAssessment(assessment),
+      ...(upstreamStatus !== undefined ? { upstreamStatus } : {}),
     });
     if (safetyIdentifier && turnstileGuid) {
       try {

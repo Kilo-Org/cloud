@@ -100,6 +100,7 @@ export function buildContentSecurityPolicy({
     'https://us-assets.i.posthog.com',
     'https://api.stripe.com',
     'https://api.openai.com/v1/watchwood/',
+    'https://watchwood.openai.com/v1/watchwood/',
     'https://r.stripe.com',
     'https://m.stripe.com',
     'https://checkout.stripe.com',

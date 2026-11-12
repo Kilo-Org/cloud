@@ -4,13 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import { AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { RootRouter } from '@/routers/root-router';
@@ -24,6 +17,7 @@ import {
   formatMicrodollarsAsUsd,
   formatRequestTime,
 } from './format';
+import { RequestSheetFrame } from './RequestSheetFrame';
 import { RoutingDecisionFlow } from './RoutingDecisionFlow';
 import { gatewayName } from './routing-labels';
 
@@ -155,19 +149,18 @@ export function RequestLogDetailsSheet({
   });
 
   return (
-    <Sheet open={row !== null} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full gap-0 overflow-y-auto p-0 sm:max-w-2xl">
-        {row && (
-          <>
-            <SheetHeader className="border-b p-6 pr-12">
-              <SheetTitle className="font-mono text-base break-all">
-                {row.model ?? 'Request'}
-              </SheetTitle>
-              <SheetDescription>
-                {formatRequestTime(row.created_at)} · {userLabel(row.user)}
-              </SheetDescription>
-            </SheetHeader>
-            <div className="flex flex-col gap-8 p-6">
+    <RequestSheetFrame
+      onOpenChange={onOpenChange}
+      content={
+        row && {
+          title: row.model ?? 'Request',
+          description: (
+            <>
+              {formatRequestTime(row.created_at)} · {userLabel(row.user)}
+            </>
+          ),
+          body: (
+            <>
               <RequestSummary row={row} details={detailsQuery.data} />
               {detailsQuery.isPending && <DetailsSkeleton />}
               {detailsQuery.error && (
@@ -179,10 +172,10 @@ export function RequestLogDetailsSheet({
                 </Alert>
               )}
               {detailsQuery.data && <RoutingSections metadata={detailsQuery.data.metadata} />}
-            </div>
-          </>
-        )}
-      </SheetContent>
-    </Sheet>
+            </>
+          ),
+        }
+      }
+    />
   );
 }

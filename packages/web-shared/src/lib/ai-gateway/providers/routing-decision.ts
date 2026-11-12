@@ -115,7 +115,7 @@ const RoutingDecisionStepSchema = z.union([
   z.object({
     step: z.literal('claude-billing'),
     outcome: z.literal('rejected'),
-    reason: z.literal('unavailable'),
+    reason: z.enum(['unavailable', 'reconnect']),
   }),
   z.object({
     step: z.literal('claude-billing'),
@@ -189,6 +189,7 @@ const RoutingDecisionResultSchema = z.discriminatedUnion('kind', [
     kind: z.enum([
       'chatgpt-reconnect',
       'claude-billing-unavailable',
+      'claude-billing-reconnect',
       'custom-llm-unavailable',
       'direct-byok-catalog-only',
     ]),

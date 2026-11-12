@@ -82,7 +82,6 @@ import {
   getPositionBetween,
   groupWorkspaceGroupsByDestination,
   isValidPositionKey,
-  sortSmartFolderGroups,
   sortWorkspaceGroups,
   type SidebarWorkspaceGroup,
   type SidebarWorkspaceRow,
@@ -122,7 +121,7 @@ type ChatSidebarProps = {
   workspaceOrder?: WorkspaceOrder;
   workspaceRowsTruncated?: boolean;
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
-  onDeleteWorktree?: (worktreeId: string) => void;
+  onDeleteWorktree?: (worktreeId: string, name: string) => void;
   deletingWorktreeIds?: readonly string[];
   isDeletionInProgress?: boolean;
   isInSheet?: boolean;
@@ -400,7 +399,7 @@ function WorktreeGroupRow({
   onOpenWorktree: (group: SidebarWorktreeGroup) => void;
   onCreateWorktreeChat?: (sourceKiloSessionId: string) => void;
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
-  onDeleteWorktree?: (worktreeId: string) => void;
+  onDeleteWorktree?: (worktreeId: string, name: string) => void;
   onNewStackedWorkspace?: (
     group: SidebarWorktreeGroup,
     source?: { branch: string; repository: string } | null
@@ -759,7 +758,7 @@ function WorktreeGroupRow({
                         <DropdownMenuItem
                           variant="destructive"
                           disabled={isDeletionInProgress}
-                          onSelect={() => onDeleteWorktree(group.worktreeId)}
+                          onSelect={() => onDeleteWorktree(group.worktreeId, worktreeLabel)}
                         >
                           <Trash2 className="h-4 w-4" />
                           Delete worktree
@@ -1103,11 +1102,7 @@ export function ChatSidebar({
     () =>
       (workspaceFolders?.folders ?? []).map(folder => {
         if (folder.kind === 'smart' && folder.smartPreset) {
-          const groups = sortSmartFolderGroups(
-            workspaceDestinations.smart.get(folder.smartPreset) ?? [],
-            folder.smartPreset,
-            folder.sortMode
-          );
+          const groups = workspaceDestinations.smart.get(folder.smartPreset) ?? [];
           return { folder, groups };
         }
         // Regular folders preserve the user's global workspace order.
@@ -1726,6 +1721,7 @@ export function ChatSidebar({
                     }
                     visibleCount={groups.length}
                     totalCount={folder.kind === 'smart' ? groups.length : folder.worktreeIds.length}
+                    workspaceRowsTruncated={workspaceRowsTruncated}
                     onEdit={() => setFolderEditor(folder)}
                     onDelete={() => {
                       void workspaceFolders.deleteFolder(folder.id).then(deleted => {
@@ -1733,11 +1729,6 @@ export function ChatSidebar({
                       });
                     }}
                     onMove={direction => moveFolder(folder.id, direction)}
-                    onSortModeChange={
-                      folder.kind === 'smart'
-                        ? sortMode => void workspaceFolders.setFolderSortMode(folder.id, sortMode)
-                        : undefined
-                    }
                     onDragStart={event => startDrag(event, { type: 'folder', id: folder.id })}
                     onDragEnd={clearDrag}
                     onDragOver={event => dragOver(event, folderTarget(event, folder.id))}

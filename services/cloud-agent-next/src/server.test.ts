@@ -324,6 +324,53 @@ describe('server /stream', () => {
   });
 });
 
+describe('server /stream origin policy', () => {
+  const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+  function streamRequest(origin?: string): Request {
+    const headers: Record<string, string> = { Upgrade: 'websocket' };
+    if (origin !== undefined) headers.Origin = origin;
+    return new Request(`http://worker.test/stream?cloudAgentSessionId=${sessionId}`, { headers });
+  }
+
+  it('refuses an origin outside the allowlist before ticket validation', async () => {
+    const env = createEnv();
+    env.WS_ALLOWED_ORIGINS = 'https://app.example.com';
+
+    const response = await fetchWorker(streamRequest('https://evil.example.com'), env);
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('Origin not allowed');
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(loggerWithFieldsMock).toHaveBeenCalledWith({ cloudAgentSessionId: sessionId });
+  });
+
+  it.each([
+    ['an allowlisted origin', 'https://app.example.com'],
+    ['no Origin header', undefined],
+    ['the null serialization', 'null'],
+    ['a Chrome extension origin', 'chrome-extension://abcdefghijklmnopabcdefghijklmnop'],
+    ['a Firefox extension origin', 'moz-extension://6b0a1c2e-7c4d-4f2a-9a53-2f5f83f0b1c9'],
+  ])('passes %s through to ticket validation', async (_label, origin) => {
+    const env = createEnv();
+    env.WS_ALLOWED_ORIGINS = 'https://app.example.com';
+
+    const response = await fetchWorker(streamRequest(origin), env);
+
+    expect(response.status).toBe(401);
+    await expect(response.text()).resolves.toBe('Missing ticket');
+  });
+
+  it('keeps the permissive default when the allowlist is unset', async () => {
+    const env = createEnv();
+
+    const response = await fetchWorker(streamRequest('https://evil.example.com'), env);
+
+    expect(response.status).toBe(401);
+    await expect(response.text()).resolves.toBe('Missing ticket');
+  });
+});
+
 describe('server background reporting', () => {
   it('routes report queue batches to the Cloud Agent report consumer', async () => {
     const env = createEnv();
@@ -689,6 +736,26 @@ describe('server /terminal', () => {
     expect(response.status).toBe(403);
     await expect(response.text()).resolves.toBe('Origin not allowed');
     expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+  it('keeps extension origins out of the terminal origin policy', async () => {
+    const env = createEnv();
+    env.WS_ALLOWED_ORIGINS = 'https://app.example.com';
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/terminal?cloudAgentSessionId=workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&ptyId=pty_123&ticket=ticket',
+        {
+          headers: {
+            Upgrade: 'websocket',
+            Origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop',
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('Origin not allowed');
   });
   it('rejects agent_ sessions before resolving the control-plane Durable Object', async () => {
     const sessionId = 'agent_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';

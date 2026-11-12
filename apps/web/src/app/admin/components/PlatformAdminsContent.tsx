@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -65,6 +66,7 @@ export function PlatformAdminsContent() {
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [permissionTarget, setPermissionTarget] = useState<PlatformAdminUser | null>(null);
   const [permissionValues, setPermissionValues] = useState<PermissionValues | null>(null);
+  const [superadminAcknowledged, setSuperadminAcknowledged] = useState(false);
   // The dialog is controlled and has no DialogTrigger, so Radix has no trigger
   // ref to restore focus to on close and would leave focus on <body>. We track
   // the element that opened the dialog (the clicked Grant/Revoke button) and
@@ -193,10 +195,15 @@ export function PlatformAdminsContent() {
       canManageCredits: user.can_manage_credits,
       canExportApiRequestLogs: user.can_export_api_request_logs,
     });
+    setSuperadminAcknowledged(false);
   }
+
+  const requiresSuperadminConfirmation =
+    permissionTarget?.is_super_admin === false && permissionValues?.isSuperadmin === true;
 
   function savePermissions() {
     if (!permissionTarget || !permissionValues) return;
+    if (requiresSuperadminConfirmation && !superadminAcknowledged) return;
 
     const permissions = {
       ...(permissionValues.isSuperadmin !== permissionTarget.is_super_admin && {
@@ -286,7 +293,7 @@ export function PlatformAdminsContent() {
                       </TableCell>
                       <TableCell>
                         <div className="flex min-w-40 flex-wrap gap-1.5">
-                          {admin.is_super_admin && <Badge variant="secondary">Superadmin</Badge>}
+                          {admin.is_super_admin && <Badge variant="warning">Superadmin</Badge>}
                           {admin.can_view_sessions && (
                             <Badge variant="secondary">Session viewer</Badge>
                           )}
@@ -340,7 +347,7 @@ export function PlatformAdminsContent() {
               : rosterError || permissions.isError
                 ? 'Could not determine your permissions. Reload to try again.'
                 : canManageAdmins
-                  ? 'Search registered kilocode.ai or anaconda.com users who are not already admins. New admins receive no subordinate permissions.'
+                  ? 'Search registered kilocode.ai or anaconda.com users who are not already admins. New admins receive Base admin access and no subordinate permissions.'
                   : 'Superadmin access is required to grant platform admin access or manage permissions.'}
           </CardDescription>
         </CardHeader>
@@ -473,8 +480,9 @@ export function PlatformAdminsContent() {
                 <>
                   Are you sure you want to grant platform admin access to{' '}
                   <span className="font-medium">{confirmAction.user.google_user_email}</span>? This
-                  grants no superadmin, session-viewer, credit-manager, or API request log exporter
-                  permissions. Their current credentials will be rotated.
+                  grants Base admin access to the admin console and no superadmin, session-viewer,
+                  credit-manager, or API request log exporter permissions. Their current credentials
+                  will be rotated.
                 </>
               ) : confirmAction ? (
                 <>
@@ -514,6 +522,7 @@ export function PlatformAdminsContent() {
           if (!open && !setPermissionsMutation.isPending) {
             setPermissionTarget(null);
             setPermissionValues(null);
+            setSuperadminAcknowledged(false);
           }
         }}
       >
@@ -538,30 +547,22 @@ export function PlatformAdminsContent() {
             <div className="flex flex-col gap-5 py-2">
               <div className="flex min-h-11 items-center justify-between gap-4">
                 <div className="flex flex-col gap-1">
-                  <Label htmlFor="permission-superadmin">Superadmin</Label>
-                  <p id="permission-superadmin-help" className="text-muted-foreground text-sm">
-                    Can manage platform admins and subordinate permissions.
+                  <Label htmlFor="permission-base-admin">Base admin</Label>
+                  <p id="permission-base-admin-help" className="text-muted-foreground text-sm">
+                    Platform admin access to the admin console. Required for every admin; remove it
+                    with Revoke admin access.
                   </p>
-                  {permissionTarget.id === currentUserId && (
-                    <p className="text-muted-foreground text-xs">
-                      Another superadmin must change this permission.
-                    </p>
-                  )}
                 </div>
                 <Label
-                  htmlFor="permission-superadmin"
-                  className="flex size-11 shrink-0 cursor-pointer items-center justify-center"
+                  htmlFor="permission-base-admin"
+                  className="flex size-11 shrink-0 cursor-default items-center justify-center"
                 >
                   <Switch
-                    id="permission-superadmin"
-                    aria-describedby="permission-superadmin-help"
-                    checked={permissionValues.isSuperadmin}
-                    disabled={
-                      setPermissionsMutation.isPending || permissionTarget.id === currentUserId
-                    }
-                    onCheckedChange={isSuperadmin =>
-                      setPermissionValues(values => values && { ...values, isSuperadmin })
-                    }
+                    id="permission-base-admin"
+                    aria-describedby="permission-base-admin-help"
+                    aria-disabled="true"
+                    checked
+                    disabled
                   />
                 </Label>
               </div>
@@ -642,6 +643,70 @@ export function PlatformAdminsContent() {
                   />
                 </Label>
               </div>
+
+              <div className="border-status-warning-border border-t pt-5">
+                <div className="border-status-warning-border bg-status-warning-surface flex flex-col gap-4 rounded-lg border p-4">
+                  <div className="flex min-h-11 items-start justify-between gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Label htmlFor="permission-superadmin">Superadmin</Label>
+                        <Badge variant="warning">Super user</Badge>
+                      </div>
+                      <p id="permission-superadmin-help" className="text-muted-foreground text-sm">
+                        SUPER USER credential: can grant and revoke admin access and every
+                        permission above. Grant only to the small set of people who administer
+                        admins. Most admins should NOT have this.
+                      </p>
+                      {permissionTarget.id === currentUserId && (
+                        <p className="text-muted-foreground text-xs">
+                          Another superadmin must change this permission.
+                        </p>
+                      )}
+                    </div>
+                    <Label
+                      htmlFor="permission-superadmin"
+                      className="mt-0.5 flex size-11 shrink-0 cursor-pointer items-center justify-center"
+                    >
+                      <Switch
+                        id="permission-superadmin"
+                        aria-describedby="permission-superadmin-help"
+                        checked={permissionValues.isSuperadmin}
+                        disabled={
+                          setPermissionsMutation.isPending || permissionTarget.id === currentUserId
+                        }
+                        onCheckedChange={isSuperadmin => {
+                          setSuperadminAcknowledged(false);
+                          setPermissionValues(values => values && { ...values, isSuperadmin });
+                        }}
+                      />
+                    </Label>
+                  </div>
+
+                  {requiresSuperadminConfirmation && (
+                    <div className="border-status-warning-border flex items-start gap-3 border-t pt-4">
+                      <Checkbox
+                        id="permission-superadmin-confirm"
+                        aria-describedby="permission-superadmin-confirm-help"
+                        className="mt-0.5"
+                        checked={superadminAcknowledged}
+                        onCheckedChange={setSuperadminAcknowledged}
+                        onClick={event => setSuperadminAcknowledged(event.currentTarget.checked)}
+                      />
+                      <div className="flex flex-col gap-1">
+                        <Label htmlFor="permission-superadmin-confirm">
+                          I understand this grants super user access
+                        </Label>
+                        <p
+                          id="permission-superadmin-confirm-help"
+                          className="text-muted-foreground text-sm"
+                        >
+                          This person can grant and revoke admin access and every permission.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -661,7 +726,13 @@ export function PlatformAdminsContent() {
                 Keep editing
               </Button>
             </DialogClose>
-            <Button onClick={savePermissions} disabled={setPermissionsMutation.isPending}>
+            <Button
+              onClick={savePermissions}
+              disabled={
+                setPermissionsMutation.isPending ||
+                (requiresSuperadminConfirmation && !superadminAcknowledged)
+              }
+            >
               {setPermissionsMutation.isPending ? 'Saving...' : 'Save permissions'}
             </Button>
           </DialogFooter>

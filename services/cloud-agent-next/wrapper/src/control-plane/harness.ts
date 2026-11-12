@@ -107,6 +107,8 @@ export type Harness = {
     signal?: AbortSignal;
   }): Promise<boolean>;
   interrupt(input: HarnessSession): Promise<boolean>;
+  /** Full-tree HTTP/marker completion proof, supported only by the Kilo v2 harness. */
+  drainSession?: (input: HarnessSession & { token?: string }) => Promise<boolean>;
   observe(input: HarnessObservationInput): Promise<SessionObservation[]>;
   release(input: HarnessSession & { deadlineMs: number; signal: AbortSignal }): Promise<{
     ok: boolean;

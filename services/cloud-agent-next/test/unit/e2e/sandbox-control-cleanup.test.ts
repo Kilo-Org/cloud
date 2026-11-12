@@ -6,6 +6,7 @@ import {
   computeExclusiveLayout,
   inspectControlPlaneHistory,
   inspectControlPlaneWorkspaceFile,
+  killOwnedControlPlanePrimary,
   stopOwnedControlPlaneSandbox,
   type ControlPlaneKiloRuntime,
   type DockerCommandExecutor,
@@ -249,6 +250,51 @@ describe('stopOwnedControlPlaneSandbox best-effort cleanup', () => {
   });
 });
 
+describe('killOwnedControlPlanePrimary fault injection', () => {
+  const exclusiveExec = (operation: Record<string, unknown>) =>
+    operation.action === 'discover' ? validDiscovery : { ok: true, exclusive: true };
+
+  it('kills the proven primary and keeps its proxy', async () => {
+    const killedIds: string[] = [];
+    const executeDocker = createExecutor({
+      containers: [ownedPrimary, ownedProxy],
+      exec: exclusiveExec,
+      onKill: containerId => killedIds.push(containerId),
+    });
+
+    await expect(
+      killOwnedControlPlanePrimary(ownedPrimary, KILO_SESSION_ID, executeDocker)
+    ).resolves.toEqual([ownedPrimary.name]);
+    expect(killedIds).toEqual([ownedPrimary.id]);
+  });
+
+  it('kills nothing when exclusive ownership fails', async () => {
+    const kill = vi.fn();
+    const executeDocker = createExecutor({
+      containers: [ownedPrimary, ownedProxy],
+      exec: operation =>
+        operation.action === 'discover' ? validDiscovery : { ok: true, exclusive: false },
+      onKill: kill,
+    });
+
+    await expect(
+      killOwnedControlPlanePrimary(ownedPrimary, KILO_SESSION_ID, executeDocker)
+    ).rejects.toThrow('Refusing cleanup of a sandbox with other worktrees');
+    expect(kill).not.toHaveBeenCalled();
+  });
+
+  it('returns [] without killing when the primary is already gone', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const kill = vi.fn();
+    const executeDocker = createExecutor({ containers: [ownedProxy], onKill: kill });
+
+    await expect(
+      killOwnedControlPlanePrimary(ownedPrimary, KILO_SESSION_ID, executeDocker)
+    ).resolves.toEqual([]);
+    expect(kill).not.toHaveBeenCalled();
+  });
+});
+
 describe('stopOwnedSandboxFamily coordinator wrapper', () => {
   it('propagates a running-container ownership failure when the family never goes away', async () => {
     const kill = vi.fn();
@@ -415,6 +461,20 @@ describe('computeExclusiveLayout directory guard', () => {
         exclusiveLayoutInput({ directory: '/workspace/user/sessions/workspace_1' })
       ).exclusive
     ).toBe(true);
+  });
+
+  it('accepts the isolated workspace layout only while it is the only directory', () => {
+    expect(
+      computeExclusiveLayout(exclusiveLayoutInput({ directory: '/workspace/app' })).exclusive
+    ).toBe(true);
+    expect(
+      computeExclusiveLayout(
+        exclusiveLayoutInput({ directory: '/workspace/app', siblings: ['app', 'other'] })
+      ).exclusive
+    ).toBe(false);
+    expect(
+      computeExclusiveLayout(exclusiveLayoutInput({ directory: '/workspace/other' })).exclusive
+    ).toBe(false);
   });
 
   it('accepts a scenario-owned sibling directory listed in allowedDirectories', () => {

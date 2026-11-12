@@ -15,6 +15,7 @@ import { CLOUD_AGENT_CONTAINER_SKUS } from '@kilocode/worker-utils/cloud-agent-c
 type Database = typeof defaultDb;
 export const COMPUTE_CHARGE_PAGE_SIZE = 100;
 export const COMPUTE_CHARGE_MAX_PAGE = 20;
+export const SESSION_COMPUTE_RUN_LIMIT = 10;
 
 export async function readComputeRates(database: Database) {
   const rows = await database
@@ -79,39 +80,98 @@ export async function readSessionComputeCharges(
           : eq(cli_sessions_v2.cloud_agent_worktree_id, session.worktreeId)
       )
     );
-  const [total] = await database
+  const interval = container_usage_interval;
+  const charge = compute_usage_charge;
+  const chargedRuns = database
     .select({
-      amountMicrodollars: sql<number>`coalesce(sum(${compute_usage_charge.amount_microdollars}), 0)::double precision`,
-      seconds: sql<number>`coalesce(sum(${compute_usage_charge.quantity}), 0)::double precision`,
+      id: interval.id,
+      startedAt: interval.started_at,
+      stoppedAt: interval.stopped_at,
+      status: interval.status,
+      skuId: interval.cloud_billing_sku_id,
+      rateCentsPerSecond:
+        sql<number>`coalesce(${interval.rate_cents_per_unit}, max(${charge.rate_cents_per_unit}))::double precision`.as(
+          'rate_cents_per_second'
+        ),
+      seconds: sql<number>`sum(${charge.quantity})::double precision`.as('seconds'),
+      amountMicrodollars: sql<number>`sum(${charge.amount_microdollars})::double precision`.as(
+        'amount_microdollars'
+      ),
     })
-    .from(container_usage_interval)
+    .from(interval)
+    .innerJoin(container_usage_segment, eq(container_usage_segment.interval_id, interval.id))
     .innerJoin(
-      container_usage_segment,
-      eq(container_usage_segment.interval_id, container_usage_interval.id)
-    )
-    .innerJoin(
-      compute_usage_charge,
+      charge,
       and(
-        eq(compute_usage_charge.usage_source, 'container_usage_segment'),
-        eq(compute_usage_charge.usage_source_id, container_usage_segment.idempotency_key)
+        eq(charge.usage_source, 'container_usage_segment'),
+        eq(charge.usage_source_id, container_usage_segment.idempotency_key)
       )
     )
     .where(
       and(
-        inArray(container_usage_interval.session_id, sessions),
+        inArray(interval.session_id, sessions),
         input.organizationId === null
-          ? eq(compute_usage_charge.user_id, input.userId)
+          ? eq(charge.user_id, input.userId)
           : and(
-              eq(compute_usage_charge.organization_id, input.organizationId),
+              eq(charge.organization_id, input.organizationId),
               eq(computeChargeMemberId, input.userId)
             )
       )
-    );
+    )
+    .groupBy(interval.id)
+    .as('charged_runs');
+
+  // One snapshot keeps the listed runs and the earlier-runs remainder reconciled with the total.
+  const { total, runs } = await database.transaction(
+    async tx => {
+      const [total] = await tx
+        .select({
+          amountMicrodollars: sql<number>`coalesce(sum(${chargedRuns.amountMicrodollars}), 0)::double precision`,
+          seconds: sql<number>`coalesce(sum(${chargedRuns.seconds}), 0)::double precision`,
+          runCount: sql<number>`count(*)::integer`,
+        })
+        .from(chargedRuns);
+      const runs = await tx
+        .select()
+        .from(chargedRuns)
+        .orderBy(desc(chargedRuns.startedAt), desc(chargedRuns.id))
+        .limit(SESSION_COMPUTE_RUN_LIMIT);
+      return { total, runs };
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' }
+  );
+
+  const totalAmount = total?.amountMicrodollars ?? 0;
+  const totalSeconds = total?.seconds ?? 0;
+  const earlierCount = (total?.runCount ?? 0) - runs.length;
   return {
-    amountMicrodollars: total?.amountMicrodollars ?? 0,
-    seconds: total?.seconds ?? 0,
+    amountMicrodollars: totalAmount,
+    seconds: totalSeconds,
     scope: session.worktreeId === null ? ('session' as const) : ('workspace' as const),
+    runs: runs.map(run => ({
+      startedAt: new Date(run.startedAt).toISOString(),
+      stoppedAt: run.stoppedAt === null ? null : new Date(run.stoppedAt).toISOString(),
+      running: run.status === 'open',
+      instance: containerInstanceForSku(run.skuId),
+      rateCentsPerSecond: run.rateCentsPerSecond,
+      seconds: run.seconds,
+      amountMicrodollars: run.amountMicrodollars,
+    })),
+    earlierRuns:
+      earlierCount > 0
+        ? {
+            count: earlierCount,
+            seconds: totalSeconds - runs.reduce((sum, run) => sum + run.seconds, 0),
+            amountMicrodollars:
+              totalAmount - runs.reduce((sum, run) => sum + run.amountMicrodollars, 0),
+          }
+        : null,
   };
+}
+
+export function containerInstanceForSku(skuId: string) {
+  const entry = Object.entries(CLOUD_AGENT_CONTAINER_SKUS).find(([, id]) => id === skuId);
+  return entry ? (entry[0] as keyof typeof CLOUD_AGENT_CONTAINER_SKUS) : null;
 }
 
 export async function readComputeCharges(

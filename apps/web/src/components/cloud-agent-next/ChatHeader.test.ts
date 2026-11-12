@@ -3,16 +3,16 @@ import React, { type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { SessionCostBreakdown } from './session-cost-breakdown';
 import type { SessionModelUsage, SessionTokenUsage } from './session-token-usage';
+import type { SessionComputeCharges } from './SessionComputeRuns';
 
 jest.mock('./ShareSessionDialog', () => ({ ShareSessionDialog: () => null }));
 jest.mock('./SessionFailureHistory', () => ({
   ...jest.requireActual('./SessionFailureHistory'),
   SessionFailureHistory: () => null,
 }));
-jest.mock('./SandboxComputeRate', () => ({ SandboxComputeRate: () => null }));
 
 let mockCompute: {
-  data?: { amountMicrodollars: number; seconds: number; scope: 'workspace' | 'session' };
+  data?: SessionComputeCharges;
   isError: boolean;
   error?: { data: { code: string } };
 } = { isError: false };
@@ -25,6 +25,7 @@ jest.mock('@/lib/trpc/utils', () => ({
   useTRPC: () => ({
     computeBilling: {
       sessionCharges: { queryOptions: () => ({ queryKey: ['compute-session-charges'] }) },
+      rates: { queryOptions: () => ({ queryKey: ['compute-rates'] }) },
     },
   }),
 }));
@@ -82,6 +83,33 @@ const tokenUsage: SessionTokenUsage = {
   cacheWrite: 6_789,
 };
 
+const workspaceCompute: SessionComputeCharges = {
+  amountMicrodollars: 660_000,
+  seconds: 1860,
+  scope: 'workspace',
+  runs: [
+    {
+      startedAt: '2026-11-10T14:40:00.000Z',
+      stoppedAt: null,
+      running: true,
+      instance: 'standard-4',
+      rateCentsPerSecond: 0.0333,
+      seconds: 1200,
+      amountMicrodollars: 399_600,
+    },
+    {
+      startedAt: '2026-11-10T13:00:00.000Z',
+      stoppedAt: '2026-11-10T13:10:00.000Z',
+      running: false,
+      instance: 'standard-4',
+      rateCentsPerSecond: 0.0333,
+      seconds: 600,
+      amountMicrodollars: 199_800,
+    },
+  ],
+  earlierRuns: { count: 1, seconds: 60, amountMicrodollars: 60_600 },
+};
+
 describe('SessionInfoDialog compute costs', () => {
   afterEach(() => {
     mockCompute = { isError: false };
@@ -95,20 +123,29 @@ describe('SessionInfoDialog compute costs', () => {
   };
   const render = () => renderSessionInfo(modelCost, undefined, false, undefined, true);
 
-  it('includes recorded workspace compute in the total and explains the shared scope', () => {
-    mockCompute = {
-      data: { amountMicrodollars: 660_000, seconds: 3600, scope: 'workspace' },
-      isError: false,
-    };
+  it('includes recorded workspace compute in the total and notes the shared scope', () => {
+    mockCompute = { data: workspaceCompute, isError: false };
     const markup = render();
     expect(markup).toContain('Total cost');
     expect(markup).toContain('$1.91');
-    expect(markup).toContain('Model cost');
+    expect(markup).toMatch(/>Model<\/dt>/);
     expect(markup).toContain('$1.25');
-    expect(markup).toContain('Workspace compute');
+    expect(markup).toContain('Shared by all chats in this workspace');
     expect(markup).toContain('$0.66');
-    expect(markup).toContain('Compute is shared by all chats in this workspace.');
-    expect(markup).toContain('Recorded compute charges can arrive late.');
+    expect(markup).not.toContain('arrive late');
+    expect(markup).not.toContain('BYOC');
+    expect(markup).not.toContain('Compute rate');
+  });
+
+  it('lists each sandbox run as duration times hourly rate, with earlier runs combined', () => {
+    mockCompute = { data: workspaceCompute, isError: false };
+    const markup = render();
+    expect(markup).toMatch(/>3 runs<\/span>/);
+    expect(markup).toMatch(
+      / – now<\/span><span[^>]*>20 min × \$1\.20\/hr<\/span><span[^>]*>\$0\.40</
+    );
+    expect(markup).toMatch(/>10 min × \$1\.20\/hr<\/span><span[^>]*>\$0\.20</);
+    expect(markup).toMatch(/>1 earlier run<\/span><span[^>]*>1 min<\/span><span[^>]*>\$0\.06</);
   });
 
   it('does not label an incomplete model-only amount as the total while compute loads', () => {
@@ -131,7 +168,7 @@ describe('SessionInfoDialog compute costs', () => {
 
   it('keeps the last recorded amount and total when a refresh fails', () => {
     mockCompute = {
-      data: { amountMicrodollars: 660_000, seconds: 3600, scope: 'workspace' },
+      data: workspaceCompute,
       isError: true,
     };
     const markup = render();
@@ -149,7 +186,7 @@ describe('SessionInfoDialog compute costs', () => {
     'does not offer a retry or cached charges for %s',
     code => {
       mockCompute = {
-        data: { amountMicrodollars: 660_000, seconds: 3600, scope: 'workspace' },
+        data: workspaceCompute,
         isError: true,
         error: { data: { code } },
       };
@@ -163,12 +200,17 @@ describe('SessionInfoDialog compute costs', () => {
   );
 
   it('includes a loaded zero compute charge without inventing usage', () => {
-    mockCompute = { data: { amountMicrodollars: 0, seconds: 0, scope: 'session' }, isError: false };
+    mockCompute = {
+      data: { amountMicrodollars: 0, seconds: 0, scope: 'session', runs: [], earlierRuns: null },
+      isError: false,
+    };
     const markup = render();
     expect(markup).toContain('Total cost');
-    expect(markup).toContain('Compute cost');
+    expect(markup).toMatch(/>Compute<\/dt>/);
+    expect(markup).toContain('No usage yet');
     expect(markup).toContain('$0.00');
-    expect(markup).not.toContain('Compute is shared');
+    expect(markup).not.toContain('Shared by all chats');
+    expect(markup).not.toContain('<details');
   });
 });
 
@@ -189,7 +231,7 @@ describe('SessionInfoDialog session costs', () => {
     expect(markup).toContain('$0.35');
     expect(markup).toContain('Older activity');
     expect(markup).toContain('$0.23');
-    expect(markup).not.toContain('Workspace compute');
+    expect(markup).not.toContain('Compute');
     expect(markup).not.toContain('Token Usage');
   });
 

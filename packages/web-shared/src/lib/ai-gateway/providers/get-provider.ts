@@ -145,6 +145,12 @@ export type GetProviderResult =
    * other way would spend a different payer's allowance without telling them.
    */
   | { kind: 'claude-billing-unavailable'; message: string; retryable?: boolean }
+  /**
+   * The organization's shared-services Claude connection was linked by a person
+   * who is gone. Only an organization owner reconnecting it changes the
+   * outcome, so the request fails readably instead of on another billing path.
+   */
+  | { kind: 'claude-billing-reconnect'; message: string }
   /** The id is a custom LLM the caller may not use, or its stored credentials are unusable. */
   | { kind: 'custom-llm-unavailable' }
   | DirectByokCatalogOnlyResult;
@@ -464,6 +470,10 @@ async function selectProvider(
     organizationId,
     botId,
   });
+  if (claudeBilling?.kind === 'reconnect') {
+    decision.step({ step: 'claude-billing', outcome: 'rejected', reason: 'reconnect' });
+    return { kind: 'claude-billing-reconnect', message: claudeBilling.message };
+  }
   if (claudeBilling?.kind === 'unavailable') {
     decision.step({ step: 'claude-billing', outcome: 'rejected', reason: 'unavailable' });
     return {

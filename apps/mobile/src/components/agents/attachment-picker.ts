@@ -6,6 +6,7 @@ import { Alert, Linking } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 
 import { i18n } from '@/i18n';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { AGENT_ATTACHMENT_EXTENSION_REGEX } from '@/lib/agent-attachments/constants';
 import { mimeForExtension, normalizeAttachmentExtension } from '@/lib/agent-attachments/validate';
 import { IMAGE_PICKER_OPTIONS, launchImagePicker } from '@/lib/agent-attachments/image-picker';
@@ -127,13 +128,34 @@ async function pickAgentLibraryImages(
   return candidates;
 }
 
+/**
+ * The system picker's result, or `null` when the app never got one. A rejected
+ * launch or a failed copy into the app cache leaves the user where they were
+ * with nothing attached, so it announces the retryable copy: a tap that
+ * produced no file is never silent, and the same tap can start again.
+ */
+async function launchDocumentPicker(): Promise<DocumentPicker.DocumentPickerResult | null> {
+  try {
+    return await DocumentPicker.getDocumentAsync({
+      copyToCacheDirectory: true,
+      multiple: true,
+      type: '*/*',
+    });
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: {
+        'error.subsystem': 'agent-attachments',
+        'error.operation': 'pick-agent-documents',
+      },
+    });
+    announcingToast.error(i18n.t('agentChat.attachmentPreview.openFailedRetry'));
+    return null;
+  }
+}
+
 async function pickAgentDocuments(): Promise<AgentAttachmentCandidate[]> {
-  const result = await DocumentPicker.getDocumentAsync({
-    copyToCacheDirectory: true,
-    multiple: true,
-    type: '*/*',
-  });
-  if (result.canceled) {
+  const result = await launchDocumentPicker();
+  if (result === null || result.canceled) {
     return [];
   }
   const candidates = result.assets.map(normalizeDocumentAsset);

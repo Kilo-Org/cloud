@@ -4,7 +4,13 @@ import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { EmptyFilesView, HunkHeaderRow, PaginationRow } from './pr-diff-hunk-rows';
+import { type ExpandSeparatorItem } from '@/lib/pr-review/diff/pr-diff-list-items';
+import {
+  EmptyFilesView,
+  ExpandSeparatorRow,
+  HunkHeaderRow,
+  PaginationRow,
+} from './pr-diff-hunk-rows';
 import { TabStateMessage } from './pr-diff-tab-state-message';
 
 vi.mock('react-native', () => ({
@@ -140,5 +146,67 @@ describe('PaginationRow', () => {
     } finally {
       await i18n.changeLanguage('en');
     }
+  });
+});
+
+describe('ExpandSeparatorRow announcement', () => {
+  // The press loads a 20-line window and the loader clamps it to the gap's own
+  // end, so a short known gap reveals fewer lines than the default window. The
+  // accessible name must carry the revealed count, not the requested one.
+  function renderRow(
+    state: ExpandSeparatorItem['state'],
+    startLine: number,
+    endLine: number
+  ): { label: string; text: string } {
+    const item: ExpandSeparatorItem = {
+      kind: 'expand-separator',
+      key: `gap:a.ts:${startLine}`,
+      filePath: 'a.ts',
+      ref: { owner: 'sample', repo: 'review-copy', number: 1, ref: 'head' },
+      context: { gapIndex: -1, startLine, endLine },
+      state,
+    };
+    const renderer = mountNode(
+      createElement(ExpandSeparatorRow, { item, onLoad: () => undefined })
+    );
+    const [expand] = renderer.root.findAll(node => node.props.accessibilityRole === 'button');
+    const [text] = renderer.root.findAll(node => String(node.type) === 'Text');
+    if (expand === undefined || text === undefined) {
+      throw new Error('expected the expand control and its text');
+    }
+    return { label: String(expand.props.accessibilityLabel), text: String(text.props.children) };
+  }
+
+  it('names the five lines a short known gap reveals', () => {
+    expect(renderRow('idle', 1, 5)).toEqual({
+      text: 'Expand 5 lines (1–5)',
+      label: 'Expand 5 lines of context',
+    });
+  });
+
+  it('keys the announced plural category on the revealed count', async () => {
+    await i18n.changeLanguage('fr');
+    try {
+      expect(renderRow('idle', 1, 1)).toEqual({
+        text: 'Afficher 1 ligne (1–1)',
+        label: 'Afficher 1 ligne de contexte',
+      });
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
+  it('announces the visible message once the row has loaded part of the gap', () => {
+    expect(renderRow('partial', 6, 8)).toEqual({
+      text: 'Expand more 3 lines (6–8)',
+      label: 'Expand more 3 lines (6–8)',
+    });
+  });
+
+  it('keeps the count-free message when the gap has no known end', () => {
+    expect(renderRow('idle', 12, Number.POSITIVE_INFINITY)).toEqual({
+      text: 'Expand context',
+      label: 'Expand context',
+    });
   });
 });

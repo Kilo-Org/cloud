@@ -1,5 +1,4 @@
 import { shellQuote } from '../kilo/utils.js';
-import { KILO_CLI_VERSION } from './kilo-cli-version.js';
 import { RUNTIME_DISTRIBUTION } from './runtime-distribution.js';
 
 /**
@@ -49,7 +48,7 @@ export type PinnedAgentTool = PinnedToolBase &
       }
   );
 
-export type ToolchainTool = 'bun' | 'rg' | 'gh' | 'glab' | 'pnpm' | 'kilo';
+export type ToolchainTool = 'bun' | 'rg' | 'gh' | 'glab' | 'pnpm';
 
 /** Each key is the command the tool installs, which is also its version-check command. */
 export const RUNTIME_TOOLCHAIN = {
@@ -108,17 +107,6 @@ export const RUNTIME_TOOLCHAIN = {
     sha256: 'ea206e35474bf87be9564a85ca70ed1c8ebdc45da55aafb0a3bf09d1ba69b179',
     installedPath: 'pnpm/pnpm',
     installedSha256: ['5e9119e6f4f18dace3795169e9b3672231ab3662505862dc3026571303a8ef32'],
-  },
-  // Its install script copies the platform binary to `bin/.kilo`; without it
-  // `kilo` cannot start. The linux-x64 and linux-x64-baseline variants publish the
-  // same bytes, so one digest covers the selection the script makes.
-  kilo: {
-    kind: 'npm',
-    version: KILO_CLI_VERSION,
-    url: `https://registry.npmjs.org/@kilocode/cli/-/cli-${KILO_CLI_VERSION}.tgz`,
-    sha256: '6f5739bd5e61317743f6a42ccbf9735a4785e9bb1fa10fea7283eabffca7db40',
-    installedPath: '@kilocode/cli/bin/.kilo',
-    installedSha256: ['d252701f7cfdcffa77003670b2d127963a967fb25ebd09546685e1bd659edbfa'],
   },
 } as const satisfies Record<ToolchainTool, PinnedAgentTool>;
 
@@ -182,23 +170,6 @@ export function installPinnedArchiveScript(tool: ToolchainTool): string {
       : `tar -xzf ${archivePath} -C "$work/extract"`,
     `sudo install -m 0755 "$work/extract/${pin.member}" ${shellQuote(pin.installPath)}`,
     `check_sha256 ${shellQuote(pin.installPath)} ${quotedDigests(pin)}`,
-  ]);
-}
-
-/**
- * Downloads one pinned npm tarball, checks its digest, installs it globally from
- * that file (its install scripts run, because both packages need them to place
- * their binary), and checks the bytes the install left behind.
- */
-export function installPinnedNpmPackageScript(tool: ToolchainTool): string {
-  const pin = RUNTIME_TOOLCHAIN[tool];
-  if (pin.kind !== 'npm') throw new Error(`${tool} is not installed from an npm tarball`);
-  return scriptBlock([
-    SHA256_GUARD,
-    `fetch_verified ${shellQuote(pin.url)} ${shellQuote(pin.sha256)} "$work/package.tgz"`,
-    'sudo npm install -g --loglevel=error "$work/package.tgz"',
-    'npm_root=$(sudo npm root -g)',
-    `check_sha256 "$npm_root/${pin.installedPath}" ${quotedDigests(pin)}`,
   ]);
 }
 

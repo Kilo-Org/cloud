@@ -30,6 +30,7 @@ import {
   allowedInferenceProviders,
   apiKindNotSupportedResponse,
   chatGptReconnectResponse,
+  claudeBillingReconnectResponse,
   claudeBillingUnavailableResponse,
   dataCollectionRequiredResponse,
   directByokCatalogOnlyMessage,
@@ -188,6 +189,11 @@ export async function resolveProviderAndPolicy(
     // The person's enabled ChatGPT connection is terminally dead. Fail readably
     // instead of silently serving the request through another billing path.
     return reject(chatGptReconnectResponse(getProviderResult.message));
+  }
+  if (getProviderResult.kind === 'claude-billing-reconnect') {
+    // The organization's shared-services Claude link was connected by a person
+    // who is gone. Only an owner reconnecting it changes the outcome.
+    return reject(claudeBillingReconnectResponse(getProviderResult.message, input.organizationId));
   }
   if (getProviderResult.kind === 'claude-billing-unavailable') {
     // The owner's Claude billing connection cannot bill. Never serve it on

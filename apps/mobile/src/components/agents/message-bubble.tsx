@@ -22,11 +22,12 @@ import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y
 import { MessageErrorBoundary } from './message-error-boundary';
 import { MessageLongPressProvider } from './message-long-press-context';
 import {
+  isGenericResponseFailure,
   type MessageDeliveryStatement,
   messageFailureLabel,
   selectMessageFailure,
 } from './message-failure-state';
-import { partRendersContent } from './message-visibility';
+import { partRendersContent, userBubbleRendersContent } from './message-visibility';
 import { PartRenderer } from './part-renderer';
 import { firstHumanText, humanTextParts, isFilePart } from './part-types';
 import { groupMessageParts } from './session-tool-run';
@@ -81,6 +82,14 @@ type MessageBubbleProps = {
   retryAvailable?: boolean;
   /** Copies a failed user message's text back into the composer. */
   onCopyToComposer?: (text: string) => void;
+  /**
+   * Whether this turn's preparation group states its failure. The group names
+   * the stage that failed and the reason, so a generic response-failure
+   * statement here would state the same turn twice; the footer keeps its
+   * actions and drops that statement. A classified failure is still shown.
+   * Defaults to false.
+   */
+  failureStatedByPreparation?: boolean;
   /** Restores a canceled queued message's prompt back into the composer. */
   onRestoreQueued?: (message: StoredMessage) => void;
   /**
@@ -107,6 +116,7 @@ function MessageBubbleImpl({
   onAddCredits,
   retryAvailable,
   onCopyToComposer,
+  failureStatedByPreparation,
   onRestoreQueued,
   condenseToolCalls,
 }: Readonly<MessageBubbleProps>) {
@@ -127,6 +137,14 @@ function MessageBubbleImpl({
   const handleLongPress = useCallback(() => {
     onLongPressDetails?.(message);
   }, [message, onLongPressDetails]);
+
+  // The parts this row draws, and the single list both branches below gate on.
+  // A row can arrive with nothing visible: the transcript keeps a message item
+  // while a live turn streams its parts in, and a confirmed user row stays until
+  // its parts land. Drawing the long-press wrapper around that empty row left an
+  // empty interactive strip (its own py-1, plus an invisible focus stop) in the
+  // transcript, so the wrapper is rendered only when there is something in it.
+  const visibleParts = useMemo(() => parts.filter(part => partRendersContent(part)), [parts]);
 
   // The bubble is memo-wrapped, but the transcript still re-renders its rows
   // while a message streams. Memoize the derived text on the parts identity so
@@ -156,9 +174,9 @@ function MessageBubbleImpl({
     }
   };
 
-  // Compaction-only message renders as a separator
-  const firstPart = parts[0];
-  if (parts.length === 1 && firstPart?.type === 'compaction') {
+  // Compaction-only message renders as a separator, excluding hidden display parts.
+  const firstPart = visibleParts[0];
+  if (visibleParts.length === 1 && firstPart?.type === 'compaction') {
     return (
       <View className="px-4">
         <CompactionSeparator
@@ -177,6 +195,13 @@ function MessageBubbleImpl({
   // a re-send passes `retryAvailable: false`: the footer then still states the
   // failure, with no action that could not act.
   const failure = selectMessageFailure({ deliveryState, info: message.info, retryAvailable });
+  // A turn whose preparation failed states that failure in its preparation
+  // group, with the stage and the reason. The generic response-failure
+  // statement would state the same turn again, so only the statement goes: the
+  // actions stay here, because a collapsed group must not be able to hide the
+  // turn's recovery.
+  const statedByPreparation =
+    failureStatedByPreparation === true && failure !== null && isGenericResponseFailure(failure);
   const relevantHandlerWired =
     retryAvailable === false ||
     (failure !== null &&
@@ -185,6 +210,14 @@ function MessageBubbleImpl({
           onCopyToComposer !== undefined ||
           (failure.canAddCredits && onAddCredits !== undefined)
         : onRetryMessage !== undefined || (failure.canAddCredits && onAddCredits !== undefined)));
+  // The actions this row would draw, resolved once: the footer is skipped when
+  // the preparation group states the failure and no action is left, so a blank
+  // padded block never sits above that group.
+  const retryAction = failure?.canRetry === true ? onRetryMessage : undefined;
+  const creditsAction = failure?.canAddCredits === true ? onAddCredits : undefined;
+  const copyAction = failure?.canCopy === true && copyText !== '' ? onCopyToComposer : undefined;
+  const actionRenders =
+    retryAction !== undefined || creditsAction !== undefined || copyAction !== undefined;
   // The footer is the failed turn's status, so it sits in the column that turn
   // occupies rather than the row that carries it: a message that never reached
   // the agent is the user's own row, and its title, detail and action row stay
@@ -199,7 +232,7 @@ function MessageBubbleImpl({
   // interface's own start edge, as the assistant rows around them do.
   const trailingFailure = failure?.side === 'user';
   const failureFooter =
-    failure !== null && relevantHandlerWired ? (
+    failure !== null && relevantHandlerWired && (!statedByPreparation || actionRenders) ? (
       /* The actions close the turn rather than opening the next one: the space
          under them is the gap between turns, so a Retry is never read as part of
          the message that follows it. 24 dp is more than twice the gap between a
@@ -207,42 +240,46 @@ function MessageBubbleImpl({
          actions in its own group. `items-end` is logical, so the status stays
          with the end-aligned bubble in either direction. */
       <View className={cn('gap-2 px-4 pt-1 pb-[24px]', trailingFailure && 'items-end')}>
-        <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
-          {failure.error ? (
-            // Every failure that reports an error carries the same marker; a
-            // message the person stopped reports a neutral status and carries
-            // none. The marker is the state, not copy: the title beside it says
-            // what happened, so it carries no text of its own for a screen
-            // reader.
-            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-              <AlertCircle size={14} color={colors.destructive} />
+        {statedByPreparation ? null : (
+          <>
+            <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
+              {failure.error ? (
+                // Every failure that reports an error carries the same marker; a
+                // message the person stopped reports a neutral status and carries
+                // none. The marker is the state, not copy: the title beside it says
+                // what happened, so it carries no text of its own for a screen
+                // reader.
+                <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                  <AlertCircle size={14} color={colors.destructive} />
+                </View>
+              ) : null}
+              <Text
+                className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
+                accessibilityLabel={messageFailureLabel(failure)}
+              >
+                {failure.title}
+              </Text>
             </View>
-          ) : null}
-          <Text
-            className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
-            accessibilityLabel={messageFailureLabel(failure)}
-          >
-            {failure.title}
-          </Text>
-        </View>
-        {failure.detail !== null ? (
-          <Text
-            className={cn(
-              'text-sm leading-[1.25rem] text-muted-foreground',
-              trailingFailure && 'text-right'
-            )}
-          >
-            {failure.detail}
-          </Text>
-        ) : null}
+            {failure.detail !== null ? (
+              <Text
+                className={cn(
+                  'text-sm leading-[1.25rem] text-muted-foreground',
+                  trailingFailure && 'text-right'
+                )}
+              >
+                {failure.detail}
+              </Text>
+            ) : null}
+          </>
+        )}
         <View className="flex-row gap-2">
-          {failure.canRetry && onRetryMessage ? (
+          {retryAction ? (
             <Button
               variant="outline"
               size="sm"
               className={STATE_ACTION_CLASS}
               onPress={() => {
-                onRetryMessage(message);
+                retryAction(message);
               }}
               accessibilityRole="button"
               accessibilityLabel={t('common.retry')}
@@ -250,7 +287,7 @@ function MessageBubbleImpl({
               <Text>{t('common.retry')}</Text>
             </Button>
           ) : null}
-          {failure.canAddCredits && onAddCredits ? (
+          {creditsAction ? (
             // The failure's one recovery action, so it takes the accent surface
             // the person's own bubble and the enabled send control fill with,
             // in both schemes; the theme's `--primary` is olive in light, which
@@ -261,20 +298,20 @@ function MessageBubbleImpl({
               variant="default"
               size="sm"
               className={cn(STATE_ACTION_CLASS, 'bg-accent-soft')}
-              onPress={onAddCredits}
+              onPress={creditsAction}
               accessibilityRole="button"
               accessibilityLabel={t('addCredits.cta')}
             >
               <Text className="text-accent-soft-foreground">{t('addCredits.cta')}</Text>
             </Button>
           ) : null}
-          {failure.canCopy && onCopyToComposer && copyText !== '' ? (
+          {copyAction ? (
             <Button
               variant="outline"
               size="sm"
               className={STATE_ACTION_CLASS}
               onPress={() => {
-                onCopyToComposer(copyText);
+                copyAction(copyText);
               }}
               accessibilityRole="button"
               accessibilityLabel={t('agentChat.messageBubble.copyToComposer')}
@@ -293,79 +330,92 @@ function MessageBubbleImpl({
     const fileParts = parts.filter(part => isFilePart(part));
     const isQueued = deliveryState?.status === 'queued';
     const hasBadgeSlot = isQueued || holdQueuedSlot;
+    // The wrapper carries the row's padding and its long-press surface, so it
+    // is drawn only when the row draws content or holds a control. The bubble's
+    // own predicate answers for the bubble: a row whose parts render nothing —
+    // or whose only part is the server's synthetic context wrapper — draws no
+    // bubble, and must not leave the empty strip around it.
+    const drawsBubble = userBubbleRendersContent(parts);
+    const drawsControls = hasBadgeSlot === true || onRestoreQueued !== undefined;
 
     return (
       <View>
-        <Pressable onLongPress={handleLongPress} accessible={a11y.accessible} className="px-4 py-1">
-          <View className="items-end gap-1">
-            {message.parts.some(partRendersContent) ? (
-              <Bubble side="user">
-                <InMessageBubbleContext.Provider value>
-                  {userTextContent ? (
-                    <ChatMarkdownText value={userTextContent} variant="user" selectable={false} />
+        {drawsBubble || drawsControls ? (
+          <Pressable
+            onLongPress={handleLongPress}
+            accessible={a11y.accessible}
+            className="px-4 py-1"
+          >
+            <View className="items-end gap-1">
+              {drawsBubble ? (
+                <Bubble side="user">
+                  <InMessageBubbleContext.Provider value>
+                    {userTextContent ? (
+                      <ChatMarkdownText value={userTextContent} variant="user" selectable={false} />
+                    ) : null}
+                    {fileParts.map(part => (
+                      <FilePartRenderer
+                        key={part.id}
+                        part={part}
+                        onLongPress={onLongPressDetails ? handleLongPress : undefined}
+                      />
+                    ))}
+                  </InMessageBubbleContext.Provider>
+                </Bubble>
+              ) : null}
+              {hasBadgeSlot || onRestoreQueued ? (
+                <View className="flex-row items-center gap-2 self-end pr-1">
+                  {hasBadgeSlot ? (
+                    <View
+                      accessibilityRole={isQueued ? 'text' : undefined}
+                      accessibilityLabel={
+                        isQueued ? t('agentChat.messageBubble.queuedAccessibility') : undefined
+                      }
+                      accessible={isQueued}
+                      {...(!isQueued
+                        ? {
+                            accessibilityElementsHidden: true as const,
+                            importantForAccessibility: 'no-hide-descendants' as const,
+                          }
+                        : {})}
+                      pointerEvents={isQueued ? 'auto' : 'none'}
+                      className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
+                    >
+                      <Clock size={12} color={colors.mutedForeground} />
+                      <Text className="text-xs text-muted-foreground">{t('common.queued')}</Text>
+                    </View>
                   ) : null}
-                  {fileParts.map(part => (
-                    <FilePartRenderer
-                      key={part.id}
-                      part={part}
-                      onLongPress={onLongPressDetails ? handleLongPress : undefined}
-                    />
-                  ))}
-                </InMessageBubbleContext.Provider>
-              </Bubble>
+                  {!isQueued && onRestoreQueued ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={QUEUED_CONTROL_MIN_HEIGHT}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('agentChat.messageBubble.restoreQueuedAccessibility')}
+                      onPress={() => {
+                        onRestoreQueued(message);
+                      }}
+                    >
+                      <Text>{t('agentChat.messageBubble.restoreQueued')}</Text>
+                    </Button>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+            {a11y.accessibilityActions.length > 0 ? (
+              <View
+                accessible
+                accessibilityRole={a11y.accessibilityRole}
+                accessibilityLabel={a11y.accessibilityLabel}
+                accessibilityHint={a11y.accessibilityHint}
+                accessibilityActions={a11y.accessibilityActions}
+                onAccessibilityAction={handleAccessibilityAction}
+                className="absolute inset-0 opacity-0"
+                pointerEvents="none"
+              />
             ) : null}
-            {hasBadgeSlot || onRestoreQueued ? (
-              <View className="flex-row items-center gap-2 self-end pr-1">
-                {hasBadgeSlot ? (
-                  <View
-                    accessibilityRole={isQueued ? 'text' : undefined}
-                    accessibilityLabel={
-                      isQueued ? t('agentChat.messageBubble.queuedAccessibility') : undefined
-                    }
-                    accessible={isQueued}
-                    {...(!isQueued
-                      ? {
-                          accessibilityElementsHidden: true as const,
-                          importantForAccessibility: 'no-hide-descendants' as const,
-                        }
-                      : {})}
-                    pointerEvents={isQueued ? 'auto' : 'none'}
-                    className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
-                  >
-                    <Clock size={12} color={colors.mutedForeground} />
-                    <Text className="text-xs text-muted-foreground">{t('common.queued')}</Text>
-                  </View>
-                ) : null}
-                {!isQueued && onRestoreQueued ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={QUEUED_CONTROL_MIN_HEIGHT}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('agentChat.messageBubble.restoreQueuedAccessibility')}
-                    onPress={() => {
-                      onRestoreQueued(message);
-                    }}
-                  >
-                    <Text>{t('agentChat.messageBubble.restoreQueued')}</Text>
-                  </Button>
-                ) : null}
-              </View>
-            ) : null}
-          </View>
-          {a11y.accessibilityActions.length > 0 ? (
-            <View
-              accessible
-              accessibilityRole={a11y.accessibilityRole}
-              accessibilityLabel={a11y.accessibilityLabel}
-              accessibilityHint={a11y.accessibilityHint}
-              accessibilityActions={a11y.accessibilityActions}
-              onAccessibilityAction={handleAccessibilityAction}
-              className="absolute inset-0 opacity-0"
-              pointerEvents="none"
-            />
-          ) : null}
-        </Pressable>
+          </Pressable>
+        ) : null}
         {failureFooter}
       </View>
     );
@@ -375,6 +425,8 @@ function MessageBubbleImpl({
   // Row-rhythm contract: py-1 on each of two adjacent wrappers sums to the
   // same value as the gap-2 between parts of one message and the user
   // wrapper's py-1 — every adjacent transcript row pair sits one gap apart.
+  // The wrapper is drawn only for a row that draws a part, so an assistant row
+  // still waiting for its first part leaves no padded strip in the transcript.
   const isStreaming = isLastAssistantMessage && isSessionStreaming;
   const renderPart = (part: (typeof message.parts)[number]) => (
     <PartRenderer
@@ -391,13 +443,13 @@ function MessageBubbleImpl({
 
   return (
     <View>
-      {parts.some(part => partRendersContent(part)) ? (
+      {visibleParts.length > 0 ? (
         <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
           <InMessageBubbleContext.Provider value>
             <MessageLongPressProvider message={message} onLongPressDetails={onLongPressDetails}>
               <View className="gap-2">
                 {condenseToolCalls
-                  ? groupMessageParts(parts, { condense: true }).map(group =>
+                  ? groupMessageParts(visibleParts, { condense: true }).map(group =>
                       group.kind === 'tool-run' ? (
                         <MessageErrorBoundary key={group.parts[0]?.id}>
                           <CondensedToolRunRow parts={group.parts} />
@@ -406,7 +458,7 @@ function MessageBubbleImpl({
                         group.parts.map(renderPart)
                       )
                     )
-                  : parts.map(part => renderPart(part))}
+                  : visibleParts.map(part => renderPart(part))}
               </View>
             </MessageLongPressProvider>
           </InMessageBubbleContext.Provider>

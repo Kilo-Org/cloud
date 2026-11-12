@@ -40,7 +40,15 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { lineIndex, parseProblems, parseSourceFile, walk } from '../lib/ast.mjs';
+import {
+  isTranslateCallee,
+  lineIndex,
+  parseProblems,
+  parseSourceFile,
+  unwrap,
+  walk,
+} from '../lib/ast.mjs';
+import { countPlaceholderBases, flattenCatalog, pluralParts } from '../lib/catalogs.mjs';
 import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -108,14 +116,6 @@ export const NO_AGREEMENT = new Map([
     'counts of a total, not a count of the noun: "Files · {{viewed}} of {{total}} viewed"',
   ],
   [
-    'prReview.fileNavigator.viewedCount',
-    'counts of a total, not a count of the noun: "{{viewed}} of {{total}} viewed"',
-  ],
-  [
-    'prReview.fileNavigator.viewedOfListed',
-    'counts of a total, not a count of the noun: "{{viewed}} of {{total}} viewed of listed files"',
-  ],
-  [
     'prReview.fileNavigator.loadingFiles',
     'progress read-out: "Loading {{loaded}} of {{total}}…" has no inflected word',
   ],
@@ -154,44 +154,6 @@ export const NO_AGREEMENT = new Map([
   ],
   ['profiles.counts.mcp', 'initialism, not agreement: "{{count}} MCP" names no inflected word'],
 ]);
-
-/**
- * Whether `callee` is the audit's `t`: a bare `t`, or the initialised i18n
- * instance's `i18n.t`. A method of any other object is a different function
- * that happens to be named `t`, so its arguments say nothing about a message.
- */
-function isTranslateCallee(callee) {
-  if (callee.type === 'Identifier') {
-    return callee.name === 't';
-  }
-  if (callee.type !== 'MemberExpression' || callee.computed) {
-    return false;
-  }
-  return (
-    callee.property.type === 'Identifier' &&
-    callee.property.name === 't' &&
-    callee.object.type === 'Identifier' &&
-    callee.object.name === 'i18n'
-  );
-}
-
-/** The node a TypeScript-only wrapper holds, so `{ … } satisfies X` reads as an object. */
-const TS_WRAPPERS = new Set([
-  'TSAsExpression',
-  'TSSatisfiesExpression',
-  'TSTypeAssertion',
-  'TSNonNullExpression',
-  'TSInstantiationExpression',
-  'ParenthesizedExpression',
-]);
-
-function unwrap(node) {
-  let current = node;
-  while (TS_WRAPPERS.has(current.type)) {
-    current = current.expression;
-  }
-  return current;
-}
 
 /**
  * The property names written in key position on the options object.
@@ -422,29 +384,14 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
   ],
 ]);
 
-/** Flatten a catalog to dotted keys, the same shape check-catalogs.mjs uses. */
-function flatten(value, prefix = '', out = new Map()) {
-  for (const [key, child] of Object.entries(value)) {
-    const path = prefix ? `${prefix}.${key}` : key;
-    if (child && typeof child === 'object' && !Array.isArray(child)) {
-      flatten(child, path, out);
-    } else {
-      out.set(path, String(child));
-    }
-  }
-  return out;
-}
-
 /** The English catalog, flattened. */
 export function readEnglishCatalog(localesDir = LOCALES_DIR) {
-  return flatten(JSON.parse(readFileSync(join(localesDir, 'en.json'), 'utf8')));
+  return flattenCatalog(JSON.parse(readFileSync(join(localesDir, 'en.json'), 'utf8')));
 }
-
-const PLURAL_SUFFIX_RE = /_(?:zero|one|two|few|many|other)$/;
 
 /** The base key of a plural family, or null when the key is not a category. */
 export function pluralFamilyBase(key) {
-  return PLURAL_SUFFIX_RE.test(key) ? key.replace(PLURAL_SUFFIX_RE, '') : null;
+  return pluralParts(key)?.base ?? null;
 }
 
 /** Every plural family English declares, as its base key. */
@@ -460,9 +407,6 @@ function hasFamily(english, key) {
   return english.has(`${key}_one`) && english.has(`${key}_other`);
 }
 
-/** The variable i18next selects a plural category from, and the number itself. */
-const COUNT_PLACEHOLDER = /{{\s*count\s*}}/;
-
 /**
  * The families every locale owes the categories its own plural rules require.
  *
@@ -472,15 +416,10 @@ const COUNT_PLACEHOLDER = /{{\s*count\s*}}/;
  * one string and renders it at every count, so it owes no categories until it
  * declares a member itself. A family built from `{{displayCount}}` or
  * `{{itemCount}}` carries the caller's formatted number instead and gets no such
- * fallback. `check-catalogs.mjs` splits the same way in its `englishCountedBases`,
- * so both gates stay in step while they read the same placeholder.
+ * fallback.
  */
 function familiesOwedByEveryLocale(english) {
-  const numeralFamilies = new Set(
-    [...english]
-      .filter(([, value]) => COUNT_PLACEHOLDER.test(value))
-      .map(([key]) => pluralFamilyBase(key) ?? key)
-  );
+  const numeralFamilies = countPlaceholderBases(english);
   return new Set(
     englishPluralFamilies(english).filter(
       family => hasFamily(english, family) && !numeralFamilies.has(family)
@@ -575,7 +514,9 @@ function run() {
       let catalog;
       let categories;
       try {
-        catalog = flatten(JSON.parse(readFileSync(join(LOCALES_DIR, `${tag}.json`), 'utf8')));
+        catalog = flattenCatalog(
+          JSON.parse(readFileSync(join(LOCALES_DIR, `${tag}.json`), 'utf8'))
+        );
         categories = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

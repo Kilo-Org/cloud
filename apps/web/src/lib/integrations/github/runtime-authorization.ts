@@ -11,6 +11,7 @@ import {
   platform_integrations,
 } from '@kilocode/db/schema';
 import { organizationWorkflowGitHubConnectionSql } from '@kilocode/db';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { and, eq, isNull, notExists, or } from 'drizzle-orm';
 
 export type GitHubRuntimeAuthorizationRejectionReason =
@@ -63,6 +64,7 @@ type RuntimeAssociation = {
   } | null;
   organizationDeletedAt: string | null;
   userRecordId: string | null;
+  userBlockedAt: string | null;
   userBlockedReason: string | null;
 };
 
@@ -88,14 +90,22 @@ export function getGitHubRuntimeAssociationRejectionReason(
 ): GitHubRuntimeAuthorizationRejectionReason | null {
   if (!association) return 'missing_association';
 
-  const { integration, installation, organizationDeletedAt, userRecordId, userBlockedReason } =
-    association;
+  const {
+    integration,
+    installation,
+    organizationDeletedAt,
+    userRecordId,
+    userBlockedAt,
+    userBlockedReason,
+  } = association;
   const hasUserOwner = integration.owned_by_user_id !== null;
   const hasOrganizationOwner = integration.owned_by_organization_id !== null;
   if (hasUserOwner === hasOrganizationOwner) return 'malformed_owner';
   if (hasUserOwner) {
     if (userRecordId !== integration.owned_by_user_id) return 'missing_personal_owner';
-    if (userBlockedReason !== null) return 'blocked_personal_owner';
+    if (isBlockedAccount({ blocked_at: userBlockedAt, blocked_reason: userBlockedReason })) {
+      return 'blocked_personal_owner';
+    }
   } else if (organizationDeletedAt !== null) {
     return 'deleted_organization';
   }
@@ -155,6 +165,7 @@ export async function assertGitHubInstallationRuntimeAuthorized(
       installation: github_app_installations,
       organizationDeletedAt: organizations.deleted_at,
       userRecordId: kilocode_users.id,
+      userBlockedAt: kilocode_users.blocked_at,
       userBlockedReason: kilocode_users.blocked_reason,
     })
     .from(platform_integrations)

@@ -1325,7 +1325,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     const parsed = controlPlaneSessionRegisterInputSchema.safeParse(input);
     if (!parsed.success) return createFailure('BAD_REQUEST', 'Invalid session register input');
-    const { metadata, sandboxSelection, runtimeAuthorizationSeal } = parsed.data;
+    const { metadata, sandboxSelection, runtimeAuthorizationSeal, initialCommands } = parsed.data;
     // N3: a repeated register (for example a `withDORetry` replay carrying the
     // seal) must not touch the seal again. Match the stored intent and replay
     // success before unsealing; a different intent is rejected.
@@ -1355,6 +1355,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const sealed = await this.unsealAuthorization(runtimeAuthorizationSeal, metadata);
     if (sealed.type === 'failure') return sealed.failure;
     await this.enqueue(async () => {
+      // Finish seeding before metadata can make a registration retry return success.
+      if (initialCommands !== undefined) await this.cacheAvailableCommands(initialCommands);
       if (metadata.clone === undefined) markHistoryHydrated(this.ctx.storage);
       await this.ctx.storage.put(REGISTRATION_KEY, registration);
       this.registration = registration;
@@ -1372,6 +1374,25 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   async getMetadata(): Promise<SessionMetadata | null> {
     await this.initialized;
     return this.metadata;
+  }
+
+  async getAvailableCommands(): Promise<CommandsAvailableData> {
+    await this.initialized;
+    return this.availableCommands;
+  }
+
+  private async cacheAvailableCommands(data: unknown): Promise<void> {
+    await handleCommandsAvailable(data, {
+      setAvailableCommands: async commands => {
+        await this.ctx.storage.put(AVAILABLE_COMMANDS_KEY, commands);
+        this.availableCommands = commands;
+        this.emitSynthetic('commands.available', commands, 'commands-available');
+      },
+      logger: {
+        info: message => logger.withFields({ sessionId: this.sessionId }).info(message),
+        warn: message => logger.withFields({ sessionId: this.sessionId }).warn(message),
+      },
+    });
   }
 
   async assertCloudAgentManagementAuthority(authority: unknown): Promise<void> {
@@ -2331,17 +2352,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       for (const [index, event] of parsed.events.entries()) {
         if (index < nextEvent) continue;
         if (event.type === 'commands.available') {
-          await handleCommandsAvailable(event.properties, {
-            setAvailableCommands: async commands => {
-              await this.ctx.storage.put(AVAILABLE_COMMANDS_KEY, commands);
-              this.availableCommands = commands;
-              this.emitSynthetic('commands.available', commands, 'commands-available');
-            },
-            logger: {
-              info: message => logger.withFields({ sessionId: this.sessionId }).info(message),
-              warn: message => logger.withFields({ sessionId: this.sessionId }).warn(message),
-            },
-          });
+          await this.cacheAvailableCommands(event.properties);
           continue;
         }
         if (event.type === CONTROL_PLANE_WRAPPER_FINALIZING_EVENT) {

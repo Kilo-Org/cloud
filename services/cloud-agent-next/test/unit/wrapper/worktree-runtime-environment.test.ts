@@ -38,7 +38,7 @@ describe('cloud runtime feature configuration', () => {
     }
   });
 
-  it('disables background subagents, indexing and snapshots despite profile or inherited overrides', () => {
+  it('disables v1 background subagents, indexing and snapshots despite profile or inherited overrides', () => {
     const overrides = {
       KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'true',
       KILO_DISABLE_CODEBASE_INDEXING: '',

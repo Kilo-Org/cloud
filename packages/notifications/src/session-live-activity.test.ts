@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
+import { buildHomeWidgetDetails, HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
 
 import { LIVE_ACTIVITY_RELEVANCE, sessionLiveActivityContentStateSchema } from './push-data';
 import {
@@ -46,6 +46,34 @@ describe('sessionLiveActivityTitle', () => {
     expect(sessionLiveActivityTitle('report\u202Efdp.exe')).toBe('reportfdp.exe');
     expect(sessionLiveActivityTitle('\u2066Deploy\u2069\u200B fix')).toBe('Deploy fix');
     expect(sessionLiveActivityTitle('Fix\u2028the login bug')).toBe('Fix the login bug');
+  });
+
+  it('cleans a stored title the same way the Home widget does', () => {
+    // The invisible operators draw nothing, so neither surface shows them.
+    const stored = 'Deploy\u2061\u2062\u2063\u2064 the fix';
+    expect(sessionLiveActivityTitle(stored)).toBe('Deploy the fix');
+    expect(
+      buildHomeWidgetDetails([{ status: 'permission', title: stored }]).waitingAgents[0]?.title
+    ).toBe('Deploy the fix');
+    // They also must not charge the title cap, or the cut hides text that draws.
+    const capped = `${'a'.repeat(HOME_WIDGET_TITLE_LIMIT - 6)}\u2061\u2062\u2063\u2064bcdef`;
+    const visible = `${'a'.repeat(HOME_WIDGET_TITLE_LIMIT - 6)}bcdef`;
+    expect(sessionLiveActivityTitle(capped)).toBe(visible);
+    expect(
+      buildHomeWidgetDetails([{ status: 'permission', title: capped }]).waitingAgents[0]?.title
+    ).toBe(visible);
+  });
+
+  it('keeps a long title that starts with the backend placeholder', () => {
+    // The placeholder rule matches the whole stored title, so a user title that
+    // merely begins with the same words stays a title after the shared cut.
+    const placeholder = 'New session - 2026-09-22T01:09:45.623Z';
+    expect(sessionLiveActivityTitle(placeholder)).toBeNull();
+    expect(sessionLiveActivityTitle(`${placeholder} about the deploy`)).toBe(
+      `${placeholder} about the deploy`
+    );
+    const long = `${placeholder} ${'x'.repeat(HOME_WIDGET_TITLE_LIMIT)}`;
+    expect(sessionLiveActivityTitle(long)).toBe(long.slice(0, HOME_WIDGET_TITLE_LIMIT));
   });
 });
 
@@ -286,6 +314,34 @@ describe('buildSessionLiveActivityContentState', () => {
         options
       )
     ).toMatchObject({ statusKind: 'running', scheduledAt: null });
+  });
+
+  it('reads a stored time like the Home widget, even where Date.parse cannot', () => {
+    const stored = '2026-03-16 15:21:40.957+00';
+    const buildCard = () =>
+      buildSessionLiveActivityContentState(
+        { id: 'ses_time', status: 'running', statusUpdatedAt: stored },
+        options
+      );
+    expect(
+      buildHomeWidgetDetails([{ status: 'scheduled', title: 'Wake', scheduledAt: stored }])
+        .scheduledAgents[0]?.scheduledAt
+    ).toBe('2026-03-16T15:21:40.957Z');
+    expect(buildCard().statusSince).toBe('2026-03-16T15:21:40.957Z');
+    // A device runtime that cannot read the space-separated form still shows the
+    // stored time, because the shared reader rebuilds it before parsing.
+    const nativeParse = Date.parse;
+    const parse = vi
+      .spyOn(Date, 'parse')
+      .mockImplementation(value =>
+        /^\d{4}-\d{2}-\d{2} /.test(String(value)) ? Number.NaN : nativeParse(value)
+      );
+    try {
+      expect(buildCard().statusSince).toBe('2026-03-16T15:21:40.957Z');
+      expect(buildCard().statusSince).not.toBe(options.statusSinceFallback);
+    } finally {
+      parse.mockRestore();
+    }
   });
 });
 

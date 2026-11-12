@@ -26,7 +26,7 @@ function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | un
 /**
  * The label for a model id: its localized Auto-model name, or `fallbackName`
  * (the catalogue's own name) for every model the catalogue does not name.
- * KiloClaw stores the same ids with a `kilocode/` prefix, so look those up too.
+ * Provider-prefixed ids resolve to the same catalog labels.
  */
 export function autoModelLabel(id: string, fallbackName: string): string {
   const key =

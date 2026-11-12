@@ -113,7 +113,6 @@ function catalogModel(
         supportedChatApis,
         responseTransforms: null,
       }),
-      transformRequest() {},
       models: async () => [],
     },
     model: { id: 'kimi-k2.6', name: 'Kimi K2.6', context_length: 1, max_completion_tokens: 1 },

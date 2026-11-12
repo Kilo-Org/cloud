@@ -1,5 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-import { describeResult, describeStep, gatewayName } from './routing-labels';
+import { describeResult, describeStep, describeUnsentResult, gatewayName } from './routing-labels';
 
 describe('describeStep', () => {
   test('shows the key that served over another API as selected', () => {
@@ -109,6 +109,51 @@ describe('describeResult', () => {
         is_free: isFree,
       })
     ).toEqual({ title: "Sent to the promotional model's provider", paidBy });
+  });
+});
+
+describe('describeUnsentResult', () => {
+  const kiloResult = {
+    kind: 'provider',
+    route: 'kilo',
+    provider_type: 'openrouter',
+    byok_provider_ids: [],
+    payer: 'kilo',
+    is_free: false,
+  };
+
+  test.each([
+    ['enkrypt-block', 'Not sent: blocked by the Enkrypt input guardrail'],
+    ['enkrypt-unavailable', 'Not sent: the Enkrypt input guardrail was unavailable'],
+    ['rejected-before-guardrail', 'Not sent: rejected before the Enkrypt input guardrail verdict'],
+  ] as const)('names %s as the reason and the provider Kilo selected', (reason, title) => {
+    expect(describeUnsentResult(kiloResult, reason)).toEqual({
+      title,
+      detail: 'Would have been sent to OpenRouter.',
+    });
+  });
+
+  test('names the direct BYOK provider that would have served', () => {
+    expect(
+      describeUnsentResult(
+        {
+          kind: 'provider',
+          route: 'direct-byok',
+          provider_type: 'direct-byok',
+          byok_provider_ids: ['bedrock-byok'],
+          payer: 'owner-byok-key',
+          is_free: false,
+        },
+        'enkrypt-block'
+      ).detail
+    ).toBe('Would have been sent to Amazon Bedrock (direct).');
+  });
+
+  test('omits the detail when the provider was not recorded', () => {
+    expect(describeUnsentResult({ kind: 'provider' }, 'enkrypt-block')).toEqual({
+      title: 'Not sent: blocked by the Enkrypt input guardrail',
+      detail: null,
+    });
   });
 });
 

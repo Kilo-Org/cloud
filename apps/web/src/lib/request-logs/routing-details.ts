@@ -104,6 +104,35 @@ export type RequestLogRoutingDetails = {
   byok_failover_attempts: RequestLogByokFailoverAttempt[];
 };
 
+export type RequestLogNotSentReason =
+  | 'enkrypt-block'
+  | 'enkrypt-unavailable'
+  | 'rejected-before-guardrail';
+
+/**
+ * Why the request was not sent to the selected provider, or null when it was sent or the record
+ * cannot tell. The gateway awaits the input guardrail's verdict just before the upstream request
+ * and rejects on a block or unavailable verdict, so a request that never waited for the verdict
+ * (`added_latency_ms` is null) was rejected earlier. Records without the guardrail carry no such
+ * signal.
+ */
+export function requestNotSentReason(
+  routing: Pick<RequestLogRoutingDetails, 'enkrypt'>
+): RequestLogNotSentReason | null {
+  const { enkrypt } = routing;
+  if (!enkrypt) return null;
+  if (enkrypt.added_latency_ms === null) return 'rejected-before-guardrail';
+  switch (enkrypt.verdict) {
+    case 'block':
+      return 'enkrypt-block';
+    case 'unavailable':
+      return 'enkrypt-unavailable';
+    case 'allow':
+    case 'skip':
+      return null;
+  }
+}
+
 /** Returns null when the object is not JSON or not an object. */
 export function parseRoutingDetails(body: string): RequestLogRoutingDetails | null {
   let json: unknown;

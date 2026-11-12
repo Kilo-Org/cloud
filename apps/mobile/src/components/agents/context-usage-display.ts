@@ -150,9 +150,8 @@ export function getHeaderPillContent({
     };
   }
   // A transcript without usage. The pill keeps the track-only ring and, when
-  // this screen already knows it, the session's cost; it never paints a dash
-  // standing in for a value that has not arrived. Only the dash above, for
-  // usage without a context window, is a real value.
+  // this screen already knows it, the session's cost; no branch of this selector
+  // paints a dash standing in for a value.
   return {
     primary: null,
     secondary: costText,

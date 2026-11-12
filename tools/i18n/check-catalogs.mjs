@@ -14,9 +14,17 @@
  * Usage: node tools/i18n/check-catalogs.mjs
  */
 import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  isTranslateCallee,
+  lineIndex,
+  parseProblems,
+  parseSourceFile,
+  unwrap,
+  walk,
+} from '../lib/ast.mjs';
 import { countPlaceholderBases, flattenCatalog, pluralParts } from '../lib/catalogs.mjs';
 import { isTestArtifact, sourceFiles } from '../lib/source-files.mjs';
 
@@ -541,6 +549,10 @@ function holdsLabel(values, run) {
  * - `referenced`: every string literal in the source. A key named in a lookup
  *   table and passed to t() through a variable is used, so the dead-key check
  *   reads this wider set and never asks anyone to delete a live key.
+ *
+ * Both come from the syntax tree (tools/lib/ast.mjs), so text that only looks
+ * like a call — in a comment, in a string, in a type annotation — moves no key,
+ * and an apostrophe in prose cannot throw the quote pairing out of step.
  */
 function scanSource() {
   const called = new Set();
@@ -548,21 +560,36 @@ function scanSource() {
   for (const dir of SOURCE_DIRS) {
     for (const file of sourceFiles(dir, isTestArtifact)) {
       const text = readFileSync(file, 'utf8');
-      for (const match of text.matchAll(/\b(?:i18n\.)?t\(\s*'([^']+)'/g)) {
-        called.add(match[1]);
+      const { program, errors } = parseSourceFile(file, text);
+      // A file the parser refused has an empty tree, so its keys would leave
+      // both sets without a word. `check:i18n` runs oxlint first, so this
+      // normally reports nothing.
+      const path = relativePath(ROOT, file).split(sep).join('/');
+      for (const problem of parseProblems(path, errors, lineIndex(text))) {
+        fail(problem);
       }
-      // `*`, not `+`: an empty '' must consume both quotes, or the scan pairs
-      // its closing quote with the next string's opening quote and desyncs.
-      for (const match of text.matchAll(/'([^'\\\n]*)'|"([^"\\\n]*)"/g)) {
-        const literal = match[1] ?? match[2];
-        if (literal !== '') {
-          referenced.add(literal);
+      walk(program, node => {
+        if (node.type === 'Literal' && typeof node.value === 'string') {
+          if (node.value !== '') {
+            referenced.add(node.value);
+          }
+          return;
         }
-      }
-      // A template-literal key would make the both-ways check unsound.
-      if (/\b(?:i18n\.)?t\(\s*`/.test(text)) {
-        fail(`${file}: t() called with a template literal; the key check cannot see it`);
-      }
+        if (node.type !== 'CallExpression' || !isTranslateCallee(node.callee)) {
+          return;
+        }
+        const [first] = node.arguments;
+        if (first === undefined) {
+          return;
+        }
+        // A template-literal key would make the both-ways check unsound.
+        const key = unwrap(first);
+        if (key.type === 'TemplateLiteral') {
+          fail(`${file}: t() called with a template literal; the key check cannot see it`);
+        } else if (key.type === 'Literal' && typeof key.value === 'string' && key.value !== '') {
+          called.add(key.value);
+        }
+      });
     }
   }
   return { called, referenced };

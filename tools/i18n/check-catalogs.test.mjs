@@ -1,9 +1,21 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
+
+// The checker parses with oxc through the shared scanner, so a fixture links the
+// repository's dependency tree at its own root.
+const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
 
 const ENGLISH = {
   agents: {
@@ -58,9 +70,12 @@ function runChecker(
     copyFileSync(new URL(`./${name}`, import.meta.url), join(toolDir, name));
   }
   mkdirSync(join(root, 'tools/lib'), { recursive: true });
-  for (const name of ['catalogs.mjs', 'source-files.mjs']) {
+  for (const name of ['ast.mjs', 'catalogs.mjs', 'source-files.mjs']) {
     copyFileSync(new URL(`../lib/${name}`, import.meta.url), join(root, 'tools/lib', name));
   }
+  // The shared scanner parses with oxc, a root dependency: resolve it the way
+  // the repository does, from the fixture's own root.
+  symlinkSync(join(REPO, 'node_modules'), join(root, 'node_modules'), 'dir');
   const result = spawnSync(process.execPath, [join(toolDir, 'check-catalogs.mjs')], {
     cwd: root,
     encoding: 'utf8',
@@ -143,6 +158,46 @@ test('rejects unused English plural siblings', context => {
     result.stderr,
     /mobile: en\.json defines "agents\.liveCount_other", which no source file uses/
   );
+});
+
+test('ignores a call written in a comment or a string', context => {
+  const source = [
+    "t('agents.title');",
+    "t('agents.liveCount', { count: 2 });",
+    "// t('agents.commentedOut') named the key before this screen moved",
+    `const note = "t('agents.quotedInText') is not a call";`,
+    'void note;',
+  ].join('\n');
+  const result = runChecker(context, { source });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('does not count a key named only in a comment as a use', context => {
+  const english = { agents: { title: 'Agents', retired: 'Retired agents' } };
+  const translated = { agents: { title: 'Localized agents', retired: 'Localized retirees' } };
+  const result = runChecker(context, {
+    english,
+    translated,
+    source: "t('agents.title');\n// 'agents.retired' left with the old screen",
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile: en\.json defines "agents\.retired", which no source file uses/
+  );
+});
+
+test('still rejects a template-literal key', context => {
+  const source = [
+    "t('agents.title');",
+    "t('agents.liveCount', { count: 2 });",
+    'const page = 1;',
+    't(`agents.page${page}`);',
+  ].join('\n');
+  const result = runChecker(context, { source });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /t\(\) called with a template literal; the key check cannot see it/);
 });
 
 test('ignores a mounted-harness helper while a source file still reports its keys', context => {

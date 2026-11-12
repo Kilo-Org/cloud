@@ -1007,7 +1007,7 @@ describe('User', () => {
         enforced: true,
         code: 'signup_rate_limited',
         flags: [],
-        methods: [],
+        retryAfterMs: 1000,
       });
 
       const result = await createOrUpdateUser(

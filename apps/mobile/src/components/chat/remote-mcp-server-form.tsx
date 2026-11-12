@@ -99,6 +99,8 @@ export function RemoteMcpServerForm({
    */
   const [tokenFieldKey, setTokenFieldKey] = useState(0);
   const tokenDefault = useRef(initialToken);
+  /** Whether the field still holds the value the server was saved with. */
+  const tokenFromSaved = useRef(initialToken !== '');
   /**
    * Whether the token field was cleared because the URL left the saved
    * endpoint. The field then shows why it is empty, rather than leaving a greyed
@@ -140,23 +142,36 @@ export function RemoteMcpServerForm({
 
   /**
    * Points the token field at the endpoint the URL text now names. While the URL
-   * still names the saved endpoint the saved value stands; any other endpoint
-   * starts with an empty field, and the required-token rule holds Save until a
-   * value is entered for it. Returning the URL to the saved endpoint restores
-   * the saved value, so an abandoned retarget leaves nothing to retype.
+   * still names the saved endpoint the saved value stands; a URL that names
+   * another endpoint starts from an empty field, so the saved value is never
+   * offered for a different host, and the required-token rule holds Save until
+   * a value is entered for it. A value the person typed is their own and stays
+   * through later URL edits, and returning the URL to the saved endpoint puts
+   * the saved value back, so an abandoned retarget leaves nothing to retype.
    */
   const retargetToken = useCallback(
     (nextUrl: string) => {
       if (server === undefined) {
         return;
       }
-      const next = sameRemoteMcpEndpoint(initialUrl, nextUrl) ? initialToken : '';
-      if (next === token.current) {
+      if (sameRemoteMcpEndpoint(initialUrl, nextUrl)) {
+        if (token.current === initialToken) {
+          return;
+        }
+        token.current = initialToken;
+        tokenDefault.current = initialToken;
+        tokenFromSaved.current = true;
+        setTokenRetargeted(false);
+        setTokenFieldKey(key => key + 1);
         return;
       }
-      token.current = next;
-      tokenDefault.current = next;
-      setTokenRetargeted(next === '' && initialToken !== '');
+      if (!tokenFromSaved.current) {
+        return;
+      }
+      token.current = '';
+      tokenDefault.current = '';
+      tokenFromSaved.current = false;
+      setTokenRetargeted(initialToken !== '');
       setTokenFieldKey(key => key + 1);
     },
     [server, initialUrl, initialToken]
@@ -252,6 +267,7 @@ export function RemoteMcpServerForm({
           secureTextEntry
           onChangeText={value => {
             token.current = value;
+            tokenFromSaved.current = false;
             if (value.trim() !== '') {
               setTokenRetargeted(false);
             }

@@ -105,6 +105,15 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+/** A server saved with a bearer value, so an endpoint case names only its edit. */
+const savedBearer = {
+  id: 'remote',
+  name: 'Remote',
+  url: 'https://remote.example/mcp',
+  auth: { type: 'bearer', token: 'secret' },
+  enabled: true,
+} as const;
+
 describe('the remote MCP server form', () => {
   it('gates Save until the name and the URL are there', async () => {
     await mount({ onSave });
@@ -228,17 +237,23 @@ describe('the remote MCP server form', () => {
     expect(dirty.at(-1)).toBe(false);
   });
 
+  it('keeps a value the person typed through a later URL edit', async () => {
+    await mount({ server: savedBearer, onSave });
+
+    await type(1, 'https://one.example/mcp');
+    await type(2, 'entered');
+    await type(1, 'https://two.example/mcp');
+
+    expect(saveButton().disabled).toBe(false);
+
+    await pressSave();
+
+    expect(saved[0]?.url).toBe('https://two.example/mcp');
+    expect(saved[0]?.auth).toEqual({ type: 'bearer', token: 'entered' });
+  });
+
   it('asks for the token again when the URL names another endpoint', async () => {
-    await mount({
-      server: {
-        id: 'remote',
-        name: 'Remote',
-        url: 'https://remote.example/mcp',
-        auth: { type: 'bearer', token: 'secret' },
-        enabled: true,
-      },
-      onSave,
-    });
+    await mount({ server: savedBearer, onSave });
 
     expect(fields()[2]?.defaultValue).toBe('secret');
     expect(saveButton().disabled).toBe(false);
@@ -263,16 +278,7 @@ describe('the remote MCP server form', () => {
   });
 
   it('restores the saved token when the URL returns to the saved endpoint', async () => {
-    await mount({
-      server: {
-        id: 'remote',
-        name: 'Remote',
-        url: 'https://remote.example/mcp',
-        auth: { type: 'bearer', token: 'secret' },
-        enabled: true,
-      },
-      onSave,
-    });
+    await mount({ server: savedBearer, onSave });
 
     await type(1, 'https://elsewhere.example/mcp');
     expect(fields()[2]?.defaultValue).toBe('');

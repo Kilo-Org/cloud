@@ -49,7 +49,6 @@ import {
   resolveSendSelection,
   type CustomModeOption,
 } from './session-config';
-import { useCombinedProfiles, useProfiles, useProfile } from '@/hooks/useCloudAgentProfiles';
 import { useCloudAgentEnvironment } from '@/hooks/useCloudAgentEnvironments';
 import {
   formatSessionTotalCost,
@@ -62,6 +61,7 @@ import { useCachedTranscriptPage } from './use-cached-transcript-page';
 import { LocalChatFailure } from './local-sessions/LocalChatFailure';
 import { localSessionSourceId } from './local-sessions/local-session';
 import { useLocalChatView } from './local-sessions/use-local-chat-view';
+import { useLocalComposer } from './local-sessions/use-local-composer';
 import { TranscriptStatusSlot } from './TranscriptStatusSlot';
 import { ComposerContextLine } from './ComposerContextLine';
 import { CurrentTaskList } from './CurrentTaskList';
@@ -410,9 +410,12 @@ export default function CloudChatPage({
   );
 
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
-  // A local chat shows the settings it copied from its source until its own load.
+  const { composer: localComposer, updateComposer: updateLocalComposer } = useLocalComposer(
+    manager,
+    localSession
+  );
   const composerSettings =
-    sessionConfig ?? localSession?.composer ?? cachedPage?.sessionConfig ?? null;
+    localComposer ?? sessionConfig ?? localSession?.composer ?? cachedPage?.sessionConfig ?? null;
 
   const [attachmentMessageUuid] = useState(() => uuidv4());
   const [terminalStatuses, setTerminalStatuses] = useState<
@@ -716,6 +719,7 @@ export default function CloudChatPage({
         mode: composerSettings.mode,
         model: sessionModels.selectedValue ?? composerSettings.model,
         variant: sessionModels.selectedVariant ?? null,
+        runtimeAgents: composerSettings.runtimeAgents,
       }
     : null;
   const handleCreateWorktreeChat = useCallback(() => {
@@ -1223,53 +1227,19 @@ export default function CloudChatPage({
     [activeWorkspaceTabId, changesViewOpen, fileScope]
   );
 
-  const { data: combinedProfilesData } = useCombinedProfiles({
-    organizationId: organizationId ?? '',
-    enabled: !!organizationId,
-  });
-  const { data: personalProfiles } = useProfiles({
-    organizationId: undefined,
-    enabled: !organizationId,
-  });
-  const effectiveAgentProfileId = organizationId
-    ? (combinedProfilesData?.effectiveDefaultId ?? null)
-    : (personalProfiles?.find(p => p.isDefault)?.id ?? null);
-  const effectiveAgentProfileOrg =
-    effectiveAgentProfileId && organizationId
-      ? combinedProfilesData?.orgProfiles.some(p => p.id === effectiveAgentProfileId)
-        ? organizationId
-        : undefined
-      : undefined;
-  const { data: selectedProfileDetails } = useProfile(effectiveAgentProfileId ?? '', {
-    organizationId: effectiveAgentProfileOrg,
-    enabled: !!effectiveAgentProfileId,
-  });
-  // Only surface profile agents the session can still run. `runtimeAgents` is
-  // frozen at session creation, but the current visible profile may have
-  // gained an agent since; the worker's `validateModeAgainstRuntimeAgents`
-  // accepts only built-in slugs or slugs in that frozen list, so a newer
-  // profile agent would be offered here and then rejected on send.
-  const runtimeAgentSlugs = new Set((sessionConfig?.runtimeAgents ?? []).map(a => a.slug));
-  const visibleProfileAgents = (selectedProfileDetails?.agents ?? [])
-    .filter(a => !a.config.disable && !a.config.hidden && a.config.mode !== 'subagent')
-    .filter(a => runtimeAgentSlugs.has(a.slug));
-
-  const runtimeCustomOptions: CustomModeOption[] = (sessionConfig?.runtimeAgents ?? []).map(a => ({
-    value: a.slug,
-    label: a.name,
-    description: '',
-  }));
-  const profileCustomOptions: CustomModeOption[] = visibleProfileAgents.map(a => ({
-    value: a.slug,
-    label: a.name,
-    description: a.config.description ?? '',
-  }));
+  const runtimeCustomOptions: CustomModeOption[] = (composerSettings?.runtimeAgents ?? []).map(
+    a => ({
+      value: a.slug,
+      label: a.name,
+      description: '',
+    })
+  );
   const combinedCustomOptions = filterSessionCustomModeOptions(
     ensureSelectedCustomOption(
-      dedupeCustomModeOptions([...runtimeCustomOptions, ...profileCustomOptions]),
-      sessionConfig?.mode ?? ''
+      dedupeCustomModeOptions(runtimeCustomOptions),
+      composerSettings?.mode ?? ''
     ),
-    sessionConfig?.runtimeAgents
+    composerSettings?.runtimeAgents
   );
   const customModeOptions: CustomModeOption[] | undefined =
     combinedCustomOptions.length > 0 ? combinedCustomOptions : undefined;
@@ -1278,14 +1248,15 @@ export default function CloudChatPage({
   // reflect + lock that value. The agent's `variant` is only meaningful when
   // it also pins a model (variants are model-specific, validated at write
   // time in AgentConfigSchema), so we surface it alongside the locked model.
-  const selectedRuntimeAgent = sessionConfig?.runtimeAgents?.find(
-    a => a.slug === sessionConfig?.mode
+  const selectedRuntimeAgent = composerSettings?.runtimeAgents?.find(
+    a => a.slug === composerSettings?.mode
   );
   const agentModelOverride = selectedRuntimeAgent?.model?.trim() || undefined;
   const agentVariantOverride = agentModelOverride
     ? selectedRuntimeAgent?.variant?.trim() || undefined
     : undefined;
-  const modelPickerLocked = activeSessionType === 'cloud-agent' && !!agentModelOverride;
+  const modelPickerLocked =
+    (activeSessionType === 'cloud-agent' || localComposer !== null) && !!agentModelOverride;
   const displayModel = modelPickerLocked ? agentModelOverride : sessionModels.selectedValue;
   const lockTooltip = modelPickerLocked
     ? `Locked by agent "${selectedRuntimeAgent?.name}"`
@@ -1295,9 +1266,13 @@ export default function CloudChatPage({
 
   const handleModeChange = useCallback(
     (mode: AgentMode) => {
+      if (localComposer) {
+        updateLocalComposer({ ...localComposer, mode });
+        return;
+      }
       if (sessionConfig) setSessionConfig({ ...sessionConfig, mode });
     },
-    [sessionConfig, setSessionConfig]
+    [localComposer, sessionConfig, setSessionConfig, updateLocalComposer]
   );
 
   const handleModelChange = useCallback(
@@ -1309,7 +1284,7 @@ export default function CloudChatPage({
         );
         return;
       }
-      if (!sessionConfig) return;
+      if (!sessionConfig && !localComposer) return;
 
       const newModelVariants =
         modelOptions.find(candidate => candidate.id === model)?.variants ?? [];
@@ -1317,21 +1292,32 @@ export default function CloudChatPage({
         sessionModels.selectedVariant && newModelVariants.includes(sessionModels.selectedVariant)
           ? sessionModels.selectedVariant
           : newModelVariants[0];
+      if (localComposer) {
+        updateLocalComposer({ ...localComposer, model, variant: validVariant ?? null });
+        return;
+      }
+      if (!sessionConfig) return;
       manager.setCloudAgentModelOverride({ model, variant: validVariant });
       setSessionConfig({ ...sessionConfig, model, variant: validVariant });
     },
     [
       activeSessionType,
+      localComposer,
       manager,
       modelOptions,
       sessionConfig,
       sessionModels.selectedVariant,
       setSessionConfig,
+      updateLocalComposer,
     ]
   );
 
   const handleVariantChange = useCallback(
     (variant: string) => {
+      if (localComposer) {
+        updateLocalComposer({ ...localComposer, variant });
+        return;
+      }
       if (activeSessionType === 'remote') {
         const option = modelOptions.find(candidate => candidate.id === sessionModels.selectedValue);
         manager.setRemoteModelOverride(createRemoteModelOverride(option, variant));
@@ -1343,10 +1329,12 @@ export default function CloudChatPage({
     },
     [
       activeSessionType,
+      localComposer,
       manager,
       modelOptions,
       sessionConfig,
       sessionModels.selectedValue,
+      updateLocalComposer,
       setSessionConfig,
     ]
   );
@@ -1459,7 +1447,8 @@ export default function CloudChatPage({
   const composerInputRef = useSessionComposerFocus(
     composerFocusRequest,
     sessionIdFromParams,
-    isCurrentSession && !isLoading && transcriptPhase !== 'opening',
+    transcriptPhase === 'local' ||
+      (isCurrentSession && !isLoading && transcriptPhase !== 'opening'),
     isReadOnly || Boolean(activeQuestion || activePermission) || !chatTabActive || changesViewOpen,
     composerTextareaDisabled
   );
@@ -1996,6 +1985,7 @@ export default function CloudChatPage({
                                         : undefined
                                   }
                                   textareaDisabled={composerTextareaDisabled}
+                                  toolbarDisabled={localComposer ? isReadOnly : undefined}
                                   isStreaming={
                                     (isStreaming || activity.type === 'retrying') &&
                                     !activeSuggestion

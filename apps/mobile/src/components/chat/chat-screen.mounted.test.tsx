@@ -306,7 +306,7 @@ function isHandler(value: unknown): value is (...args: unknown[]) => unknown {
 }
 
 /** The props each state surface on screen was drawn with. */
-type StateProps = { title?: unknown; description?: unknown; action?: unknown; band?: unknown };
+type StateProps = { title?: unknown; description?: unknown; action?: unknown };
 
 const emptyStatesOf = (tree: ReactTestRenderer): StateProps[] =>
   tree.root.findAll(node => (node.type as string) === 'EmptyState').map(node => node.props);
@@ -380,13 +380,12 @@ describe('the chat transcript while it opens', () => {
     expect(messagesOf(tree)).toEqual([]);
     /* Nothing failed, so the chat takes a first message. */
     expect(count(tree, 'ChatComposer')).toBe(1);
-    /* The state centers in the transcript area it fills, not in the whole
-       window: the pending paint and the measured placement then agree from the
-       first frame, so the state does not move when a measurement lands. The
-       state centers through its own scroller, so the band reaches that scroller
-       and no second one wraps it. */
+    /* The state centers in the transcript area its own scroller shows, so the
+       pending paint and the measured placement agree from the first frame and
+       the state does not move when a measurement lands. The state centers
+       through its own scroller, so no second one wraps it. */
     const [empty] = emptyStatesOf(tree);
-    expect(empty?.band).toBe('viewport');
+    expect(empty?.description).toBeDefined();
     expect(count(tree, 'CenteredState')).toBe(0);
   });
 

@@ -14,10 +14,14 @@ import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations
 import { type ActiveOrgMember, type OrgRole } from '@/lib/hooks/use-organization-queries';
 import { cn, firstNonEmpty } from '@/lib/utils';
 
+import { assignableMemberRoles } from './organization-role-options';
+
 type MemberRowProps = {
   member: ActiveOrgMember;
-  /** Caller is owner and this isn't their own row. */
+  /** Caller may act on this row: management role, not their own, owner rows owner-only. */
   canManage: boolean;
+  /** Caller's own organization role; it decides which roles the menu offers. */
+  callerRole: OrgRole | undefined;
   enableUsageLimits: boolean;
   organizationId: string;
   /** Suppress bottom divider on the last row of a group. */
@@ -35,11 +39,10 @@ export function roleLabel(role: OrgRole): string {
   return i18n.t(ROLE_LABEL_KEYS[role]);
 }
 
-const ROLE_OPTIONS: OrgRole[] = ['owner', 'admin', 'member', 'billing_manager'];
-
 export function MemberRow({
   member,
   canManage,
+  callerRole,
   enableUsageLimits,
   organizationId,
   last,
@@ -78,7 +81,8 @@ export function MemberRow({
     return true;
   }
 
-  const roleOptions: MenuSheetOption[] = ROLE_OPTIONS.map(role => ({
+  const assignableRoles = assignableMemberRoles(callerRole);
+  const roleOptions: MenuSheetOption[] = assignableRoles.map(role => ({
     label: roleLabel(role),
     selected: role === member.role,
   }));
@@ -225,7 +229,7 @@ export function MemberRow({
         onDismiss={runPendingAction}
         onRequestDismiss={markMenuDismissedItself}
         onSelect={index => {
-          const role = ROLE_OPTIONS[index];
+          const role = assignableRoles[index];
           if (role) {
             chooseAction(() => {
               onSelectRole(role);

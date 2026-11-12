@@ -147,6 +147,7 @@ import {
   SessionSkeletonMessages,
 } from '@/components/agents/session-detail-skeleton';
 import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
+import { PULL_FEEDBACK_MIN_BEAT_MS } from '@/components/agents/use-pull-refresh';
 import {
   SESSION_SLOW_LOAD_MS,
   useSessionSlowLoadPhase,
@@ -184,6 +185,7 @@ import { ToolRunSheetHost } from '@/components/agents/tool-run-sheet-host';
 import {
   buildTerminalErrorCopyText,
   resolveSessionTerminalError,
+  type SessionTerminalError,
   statusIndicatorDuplicatesMessageFailure,
 } from '@/components/agents/session-terminal-error';
 import { performCopy } from '@/components/agents/use-message-copy';
@@ -1973,6 +1975,99 @@ export function SessionDetailContent({
       }),
     [error, statusIndicator, messages.length, connectionLost]
   );
+  // Acknowledging a terminal error's Retry. The reopen clears `errorAtom` and
+  // sets the loading flag before its first await, so the card that carries the
+  // action is unmounted by the same tap: without this, a failure that answers
+  // as fast as the transport can ask leaves the screen as it was and the tap
+  // reads as lost. The card keeps the failure it states, with its action busy,
+  // until the reopen's outcome owns the body again — content landed, the
+  // reopened failure is on screen, or the shared transport leg came back.
+  //
+  // The acknowledgment is also bounded by the slow-load threshold, the same
+  // window the slow card's Retry uses: a reopen that never reports an outcome
+  // must not leave the action disabled behind a spinner.
+  const [terminalRetry, setTerminalRetry] = useState<{
+    sessionId: string;
+    error: SessionTerminalError;
+    tappedAt: number;
+  } | null>(null);
+  const terminalRetryPending = terminalRetry?.sessionId === sessionId;
+  useEffect(() => {
+    if (!terminalRetryPending) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setTerminalRetry(null);
+    }, SESSION_SLOW_LOAD_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [terminalRetryPending]);
+  useEffect(() => {
+    if (!terminalRetryPending) {
+      return undefined;
+    }
+    // The reopen's outcome owns the body again once content landed, the
+    // reopened failure is on screen, or — on the session branch — the open
+    // finished without a failure to show, which is a session that really is
+    // empty. That last case has to release: without it a successful retry on an
+    // empty session would keep the stale failure card up for the whole window.
+    const settled =
+      messages.length > 0 ||
+      (terminalRetry.error.retryWith === 'connection'
+        ? terminalError === null
+        : !isLoading && (terminalError !== null || fetchedData?.kiloSessionId === sessionId));
+    if (!settled) {
+      return undefined;
+    }
+    // The outcome is already on screen, but a refused reopen settles in well
+    // under a second: releasing at once makes the busy state a flash the reader
+    // misses, and the tap reads as lost again — the same device-defect
+    // reasoning the list's pull feedback uses. Hold the acknowledged state
+    // through that beat, then swap.
+    const beat = Math.max(0, PULL_FEEDBACK_MIN_BEAT_MS - (Date.now() - terminalRetry.tappedAt));
+    if (beat === 0) {
+      setTerminalRetry(null);
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setTerminalRetry(null);
+    }, beat);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [
+    terminalRetryPending,
+    terminalRetry,
+    terminalError,
+    isLoading,
+    messages.length,
+    fetchedData,
+    sessionId,
+  ]);
+  const shownTerminalError =
+    terminalRetryPending && messages.length === 0
+      ? (terminalError ?? terminalRetry.error)
+      : terminalError;
+  const handleTerminalRetry = (failure: SessionTerminalError): void => {
+    if (terminalRetryPending) {
+      return;
+    }
+    setTerminalRetry({ sessionId, error: failure, tappedAt: Date.now() });
+    if (failure.retryWith === 'connection') {
+      retrySessionConnection();
+      return;
+    }
+    void (async () => {
+      try {
+        await manager.switchSession(sessionId);
+      } catch {
+        // A reopen that rejects without clearing the failure never settles on
+        // its own: hand the action back instead of leaving it busy.
+        setTerminalRetry(current => (current?.sessionId === sessionId ? null : current));
+      }
+    })();
+  };
   // A failed last row states its own failure and carries the action. The fixed
   // footer's error line must not state the same failure a second time (explorer
   // finding: the same failure stated three times), so a status error the row
@@ -3185,37 +3280,30 @@ export function SessionDetailContent({
   }
 
   function renderContent() {
-    if (terminalError) {
+    if (shownTerminalError) {
       const copyText = buildTerminalErrorCopyText({
         sessionId,
-        title: terminalError.title,
-        message: terminalError.message,
-        detail: terminalError.detail,
+        title: shownTerminalError.title,
+        message: shownTerminalError.message,
+        detail: shownTerminalError.detail,
       });
       return (
         <CenteredState>
           <View className="items-center gap-3 px-6">
             <QueryError
-              variant={terminalError.variant}
+              variant={shownTerminalError.variant}
               placement="top"
               className="px-0 pt-0"
-              title={terminalError.title}
-              message={terminalError.message}
+              title={shownTerminalError.title}
+              message={shownTerminalError.message}
               onRetry={
-                terminalError.retryable
+                shownTerminalError.retryable
                   ? () => {
-                      // A spent reconnect budget on the shared transport leg is
-                      // only cleared by resetting that leg; reopening the
-                      // session over the same dead socket would return here.
-                      if (terminalError.retryWith === 'connection') {
-                        retrySessionConnection();
-                        return;
-                      }
-                      void manager.switchSession(sessionId);
+                      handleTerminalRetry(shownTerminalError);
                     }
                   : undefined
               }
-              isRetrying={isLoading}
+              isRetrying={terminalRetryPending}
             />
             <View className="flex-row gap-3">
               <Button

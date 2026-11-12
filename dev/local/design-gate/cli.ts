@@ -59,6 +59,15 @@ const DEFAULT_MOTION_SECONDS = 3;
 // the page before it reports an infrastructure failure.
 const APP_RELOAD_PAGE_WAIT_MS = 45_000;
 
+/**
+ * The port the device reaches Metro on: the emulator's reverse tunnel forwards
+ * it, and the dev client's deep link names it. A Metro URL without an explicit
+ * port falls back to the default, which is where `--metro` points by default.
+ */
+export function metroPort(metro: string): number {
+  return Number(new URL(metro).port) || Number(new URL(DEFAULT_METRO).port);
+}
+
 type Common = { platform?: Platform; device?: string; metro: string; out?: string };
 
 const SCAN_SOURCES = ['probe', 'uiautomator', 'agent-device'] as const;
@@ -434,6 +443,7 @@ function openDevice(args: CliArgs, deps: CliDeps): Device {
       exec: deps.exec,
       spawn: deps.spawn,
       serial: resolveSerial(deps.exec, args.device),
+      metroPort: metroPort(args.metro),
     });
   }
   return createIosDevice({
@@ -441,6 +451,19 @@ function openDevice(args: CliArgs, deps: CliDeps): Device {
     spawn: deps.spawn,
     simulator: resolveSimulator(deps.exec, args.device),
   });
+}
+
+/**
+ * Why a run is inconclusive, or undefined when every target was measured. A
+ * target the probe could not read was never graded, and exit 0 has to mean the
+ * whole matrix was read, so a skip makes the run inconclusive rather than a
+ * pass, with or without a prepared comparison.
+ */
+export function inconclusiveReason(outcome: RunOutcome): string | undefined {
+  if (outcome.skipped.length === 0) return undefined;
+  return `${outcome.skipped.length} target(s) could not be read: ${outcome.skipped
+    .map(entry => `${entry.cell}/${entry.target}`)
+    .join(', ')}`;
 }
 
 export const SCAN_SETTLE_READS = 3;
@@ -612,6 +635,9 @@ async function scanOutcome(
       },
     ],
     findings,
+    // A scan measures the screen in front of it and nothing else: no target of
+    // a manifest matrix is left unread, so nothing is skipped.
+    skipped: [],
     ...(settled &&
     alignment.status === 'bracketed' &&
     !(alignment.pixels === 'uniform' && alignment.expectedText)
@@ -735,6 +761,7 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
     };
     let outcome: RunOutcome;
     let unmeasured = false;
+    let inconclusive: string | undefined;
     if (args.command === 'run') {
       const targetsJson =
         args.targets === undefined ? undefined : fs.readFileSync(args.targets, 'utf8');
@@ -779,6 +806,7 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
         return 2;
       }
       outcome = result;
+      inconclusive = inconclusiveReason(result);
       if (preparation !== undefined && args.revision !== undefined) {
         validatePreparedSource(preparation, args.revision, process.cwd());
         await verifyRuntimeSource(preparation, args.revision, args.metro, device.names);
@@ -799,6 +827,10 @@ export async function main(argv: readonly string[], deps: CliDeps = defaultDeps)
     deps.log(
       `design-gate: ${counts.errors} errors, ${counts.warnings} warnings across ${outcome.cells.length} cells`
     );
+    if (inconclusive !== undefined) {
+      deps.log(`design-gate: capture is inconclusive (${inconclusive}); exit 2`);
+      return 2;
+    }
     if (unmeasured) {
       deps.log(
         'design-gate: capture is inconclusive (unsettled screen, alignment or possible blank frame); exit 2'

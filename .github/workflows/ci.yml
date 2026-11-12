@@ -49,6 +49,14 @@ jobs:
       # step instead of sharing one filter.
       test_scripts: ${{ steps.filter_test_scripts.outputs.test_scripts || steps.filter_test_scripts_retry.outputs.test_scripts }}
       test_scripts_db: ${{ steps.filter_test_scripts_db.outputs.test_scripts_db || steps.filter_test_scripts_db_retry.outputs.test_scripts_db }}
+      # The detector's answer for the two services whose suites this job runs.
+      # It covers what the two filters above cannot name: a workspace in the
+      # dependency closure of `@kilocode/db` or `@kilocode/worker-utils`, and
+      # data a suite reads as a file. A full selection is excluded, because it
+      # means the detector could not attribute the change rather than that these
+      # suites read it.
+      data_meter: ${{ steps.affected.outputs.full != 'true' && contains(fromJSON(steps.affected.outputs.affected).packages, 'container-usage-meter') }}
+      data_session_ingest: ${{ steps.affected.outputs.full != 'true' && contains(fromJSON(steps.affected.outputs.affected).packages, 'cloudflare-session-ingest') }}
       # The dependency inputs the detector parses with a dependency
       # (DEPENDENCY_INPUTS in scripts/affected-workspaces.mjs). Gates the
       # root install below; its own pair.
@@ -411,8 +419,8 @@ jobs:
               - 'apps/web/src/lib/load-env.ts'
               - 'apps/web/.env.development.local.example'
               - 'apps/mobile/src/lib/design-gate/**'
-              - 'services/auto-routing/package.json'
-              - 'services/auto-routing/wrangler.jsonc'
+              - 'services/*/package.json'
+              - 'services/*/wrangler.jsonc'
               - 'services/auto-routing/.dev.vars.example'
               - 'services/container-usage-meter/.dev.vars.example'
               - 'services/cloud-agent-next/test/e2e/**'
@@ -440,8 +448,8 @@ jobs:
               - 'apps/web/src/lib/load-env.ts'
               - 'apps/web/.env.development.local.example'
               - 'apps/mobile/src/lib/design-gate/**'
-              - 'services/auto-routing/package.json'
-              - 'services/auto-routing/wrangler.jsonc'
+              - 'services/*/package.json'
+              - 'services/*/wrangler.jsonc'
               - 'services/auto-routing/.dev.vars.example'
               - 'services/container-usage-meter/.dev.vars.example'
               - 'services/cloud-agent-next/test/e2e/**'
@@ -455,9 +463,11 @@ jobs:
               - 'patches/**'
       # The Postgres and Durable Object regressions of the same job: the meter
       # suite and the two session-ingest suites read the trees below, and each
-      # workspace named here is one the two packages declare or import. They
-      # read no script input, so they get their own subject and the chain above
-      # does not run for a service-only change.
+      # workspace named here is one the two packages declare or import. A
+      # workspace further down that closure, and a file a suite reads as data,
+      # are covered by the detector answers this job's gate also reads. These
+      # suites read no script input, so they get their own subject and the chain
+      # above does not run for a service-only change.
       - name: Detect data-regression changes
         id: filter_test_scripts_db
         continue-on-error: true
@@ -538,6 +548,10 @@ jobs:
             ] | unique end' <<< "$affected")
           {
             echo "affected=$(jq -c . <<< "$affected")"
+            # The two service outputs below read this flag: a selection that
+            # could not attribute the change names every workspace, and these
+            # suites read none of them for such a diff.
+            echo "full=$(jq -r .full <<< "$affected")"
             echo "typecheck_groups=$(jq -c .typecheck_groups <<< "$groups")"
             echo "typecheck_groups_non_trpc=$typecheck_groups_non_trpc"
             echo "lint_groups=$(jq -c .lint_groups <<< "$groups")"
@@ -1065,15 +1079,13 @@ jobs:
 
   test-scripts:
     needs: changes
-    # Two subjects gate this job: the script chain's own inputs, and the
-    # Postgres and Durable Object regressions' inputs. Each step below reads the
-    # subject it needs, so a run that only one of them starts skips the other's
-    # steps. A web-source diff matches neither, and the required `test` job
-    # passes this skipped job. The gate names no detector answer: a change that
-    # widens the selection, such as a workflow edit, reads nothing these suites
-    # cover, so it must not start them. The meter step alone still follows the
-    # detector, for the package selection a dependency-driven answer reports.
-    if: needs.changes.outputs.test_scripts == 'true' || needs.changes.outputs.test_scripts_db == 'true'
+    # Two filters gate this job, and each step below reads the subject it needs,
+    # so a run that only one of them starts skips the other's steps. The two
+    # detector answers cover what a filter cannot name: a workspace in the
+    # closure of the packages these suites import, and data a suite reads as a
+    # file. A web-source diff matches no filter and no service, and the required
+    # `test` job passes this skipped job.
+    if: needs.changes.outputs.test_scripts == 'true' || needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_meter == 'true' || needs.changes.outputs.data_session_ingest == 'true'
     # The Postgres regressions ran on the large runner in the job this one
     # replaces. The builder cleanup test drives two claims against the same
     # rows, so keep the runner it was written for.
@@ -1146,17 +1158,17 @@ jobs:
         run: pnpm run test:scripts
 
       - name: Run container usage Postgres tests
-        if: needs.changes.outputs.test_scripts_db == 'true' || contains(fromJSON(needs.changes.outputs.affected).packages, 'container-usage-meter')
+        if: needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_meter == 'true'
         # The meter suite connects to POSTGRES_URL directly. Avoid the Jest worker
         # suffix that computeDatabaseUrl adds whenever NODE_ENV=test.
         run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter container-usage-meter test:postgres
 
       - name: Run Session Ingest Durable Object regressions
-        if: needs.changes.outputs.test_scripts_db == 'true'
+        if: needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_session_ingest == 'true'
         run: pnpm --filter cloudflare-session-ingest run test:integration
 
       - name: Run Session Ingest Postgres tests
-        if: needs.changes.outputs.test_scripts_db == 'true'
+        if: needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_session_ingest == 'true'
         run: NODE_ENV=development pnpm --filter cloudflare-session-ingest test:postgres
 
   # In its own job, madge runs beside the script tests instead of before them.
@@ -1700,10 +1712,11 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ steps.plugins.outputs.key }}
 
       # test-scripts runs the whole test/integration set through
-      # `test:integration` when the data-regression filter matches, so this
-      # file would run in two jobs of one run. Keep the step for the selection
-      # that misses that filter, a dependency or test-only change that still
-      # selects this row, where it is the only place the file runs.
+      # `test:integration` when either the data filter or the detector selects
+      # this service, so this file would run in two jobs of one run. Keep the
+      # step for the selection that misses both, a dependency or test-only
+      # change that still selects this row, where it is the only place the file
+      # runs.
       - name: Test native heartbeat attachment compatibility
-        if: matrix.workspace.name == 'cloudflare-session-ingest' && needs.changes.outputs.test_scripts_db != 'true'
+        if: matrix.workspace.name == 'cloudflare-session-ingest' && needs.changes.outputs.test_scripts_db != 'true' && needs.changes.outputs.data_session_ingest != 'true'
         run: pnpm --filter cloudflare-session-ingest run test:integration test/integration/user-connection-attachment.test.ts

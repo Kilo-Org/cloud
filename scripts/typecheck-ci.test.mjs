@@ -1531,6 +1531,9 @@ const scriptSuiteInputs = [
   'apps/mobile/src/lib/design-gate/sampler.ts',
   'services/auto-routing/.dev.vars.example',
   'services/container-usage-meter/.dev.vars.example',
+  'services/container-usage-meter/package.json',
+  'services/cloud-agent-next/package.json',
+  'services/session-ingest/wrangler.jsonc',
   'services/cloud-agent-next/test/e2e/fake-llm-server.ts',
   '.github/workflows/mobile-native-build.yml',
   'packages/session-ingest-contracts/src/index.ts',
@@ -1601,12 +1604,22 @@ test('test-scripts starts only for the inputs its two step groups read', () => {
   const job = ciJobs['test-scripts'];
   assert.match(job.if, /needs\.changes\.outputs\.test_scripts == 'true'/);
   assert.match(job.if, /needs\.changes\.outputs\.test_scripts_db == 'true'/);
+  assert.match(job.if, /needs\.changes\.outputs\.data_meter == 'true'/);
+  assert.match(job.if, /needs\.changes\.outputs\.data_session_ingest == 'true'/);
   assert.doesNotMatch(job.if, /kilocode_backend/, 'the web filter starts no part of this job');
-  assert.doesNotMatch(
-    job.if,
-    /affected/,
-    'a widened selection starts no part of this job: its inputs did not change'
-  );
+  // The two detector answers exclude a full selection: such a diff names every
+  // workspace because the detector could not attribute it, not because these
+  // suites read it.
+  for (const service of ['container-usage-meter', 'cloudflare-session-ingest']) {
+    const output = service === 'container-usage-meter' ? 'data_meter' : 'data_session_ingest';
+    assert.match(
+      ciJobs.changes.outputs[output],
+      new RegExp(
+        `steps\\.affected\\.outputs\\.full != 'true' && contains\\(fromJSON\\(steps\\.affected\\.outputs\\.affected\\)\\.packages, '${service}'\\)`
+      ),
+      `${output}: a full selection answers false`
+    );
+  }
 
   const step = name => {
     const found = job.steps.find(candidate => candidate.name === name);
@@ -1618,10 +1631,10 @@ test('test-scripts starts only for the inputs its two step groups read', () => {
     "needs.changes.outputs.test_scripts == 'true'",
     'the script chain reads its own subject'
   );
-  assert.match(
+  assert.equal(
     step('Run container usage Postgres tests').if,
-    /needs\.changes\.outputs\.test_scripts_db == 'true' \|\| contains\(fromJSON\(needs\.changes\.outputs\.affected\)\.packages, 'container-usage-meter'\)/,
-    'the meter suite also follows the affected detector'
+    "needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_meter == 'true'",
+    'the meter suite reads its filter and the detector answer'
   );
   for (const name of [
     'Run Session Ingest Durable Object regressions',
@@ -1629,18 +1642,19 @@ test('test-scripts starts only for the inputs its two step groups read', () => {
   ]) {
     assert.equal(
       step(name).if,
-      "needs.changes.outputs.test_scripts_db == 'true'",
-      `${name}: gated on the data-regression subject`
+      "needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_session_ingest == 'true'",
+      `${name}: gated on the data filter and the detector answer`
     );
   }
   // The workspace matrix runs one of these suites under its own condition, and
-  // it must not repeat a run this job already covers.
+  // it must not repeat a run this job already covers, whichever of the two
+  // conditions started it.
   const heartbeat = ciJobs['workspace-tests'].steps.find(
     candidate => candidate.name === 'Test native heartbeat attachment compatibility'
   );
-  assert.match(
+  assert.equal(
     heartbeat.if,
-    /needs\.changes\.outputs\.test_scripts_db != 'true'/,
+    "matrix.workspace.name == 'cloudflare-session-ingest' && needs.changes.outputs.test_scripts_db != 'true' && needs.changes.outputs.data_session_ingest != 'true'",
     'the workspace row keeps that suite only when test-scripts skips it'
   );
 

@@ -1,8 +1,8 @@
-import type { inferRouterOutputs, MobileRouter } from '@kilocode/trpc/mobile';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import type { CreditPurchaseEntry } from '@/lib/credits/credit-history';
+import { type CreditPurchaseEntry } from '@/lib/credits/credit-history';
 import { hasRetentionBudget, withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';

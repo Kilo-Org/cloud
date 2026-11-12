@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCreditHistoryItems,
   type CreditDeduction,
-  type CreditPurchaseEntry,
   creditGrantKind,
   creditPurchaseChannel,
+  type CreditPurchaseEntry,
 } from './credit-history';
 
 function purchase(overrides: Partial<CreditPurchaseEntry>): CreditPurchaseEntry {

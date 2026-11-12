@@ -1,4 +1,4 @@
-import type { inferRouterOutputs, MobileRouter } from '@kilocode/trpc/mobile';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
@@ -17,6 +17,9 @@ export type CreditDeduction = RouterOutputs['user']['getCreditBlocks']['deductio
 export type CreditPurchaseChannel = 'card' | 'app_store' | 'google_play' | 'other';
 
 export function creditPurchaseChannel(creditSource: string | null): CreditPurchaseChannel {
+  // A legacy top-up recorded before the column existed has no channel, and it
+  // is still a card purchase: the receipt lookup decides whether a receipt
+  // exists at all.
   switch (creditSource) {
     case 'apple': {
       return 'app_store';
@@ -25,9 +28,6 @@ export function creditPurchaseChannel(creditSource: string | null): CreditPurcha
       return 'google_play';
     }
     case 'stripe':
-    // A legacy top-up recorded before the column existed has no channel, and
-    // it is still a card purchase: the receipt lookup decides whether a
-    // receipt exists at all.
     case null: {
       return 'card';
     }

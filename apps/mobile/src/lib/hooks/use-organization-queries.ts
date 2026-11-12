@@ -189,8 +189,6 @@ export function useOrgCreditTransactionsPage(organizationId: string | null) {
   return { query, entries, hasMore };
 }
 
-type OrgInvoice = RouterOutputs['organizations']['invoicesPage']['entries'][number];
-
 /**
  * Build the invoices infinite-query options. Kept as a pure builder so the
  * retention bound, the fixed `period: 'year'` input, and the cursor

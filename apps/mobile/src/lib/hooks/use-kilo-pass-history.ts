@@ -1,7 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import type { KiloPassBillingEntry, KiloPassCreditEntry } from '@/lib/kilo-pass/management';
+import { type KiloPassBillingEntry, type KiloPassCreditEntry } from '@/lib/kilo-pass/management';
 import { hasRetentionBudget, withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';

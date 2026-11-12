@@ -12,7 +12,7 @@ import {
   useKiloPassBillingHistory,
   useKiloPassCreditHistory,
 } from '@/lib/hooks/use-kilo-pass-history';
-import type { KiloPassBillingEntry, KiloPassCreditEntry } from '@/lib/kilo-pass/management';
+import { type KiloPassBillingEntry, type KiloPassCreditEntry } from '@/lib/kilo-pass/management';
 import { firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 function HistorySection({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
@@ -103,7 +103,7 @@ export function KiloPassCreditHistorySection() {
   const { query, entries, hasMore } = useKiloPassCreditHistory(true);
   const firstPageFailed = query.isError && entries.length === 0;
 
-  let body: ReactNode;
+  let body: ReactNode = null;
   if (query.isPending) {
     body = (
       <SectionPending>
@@ -160,7 +160,7 @@ export function KiloPassBillingHistorySection() {
   const { query, entries, hasMore } = useKiloPassBillingHistory(true);
   const firstPageFailed = query.isError && entries.length === 0;
 
-  let body: ReactNode;
+  let body: ReactNode = null;
   if (query.isPending) {
     body = (
       <SectionPending>

@@ -1,4 +1,4 @@
-import type { inferRouterOutputs, MobileRouter } from '@kilocode/trpc/mobile';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
 import { WEB_BASE_URL } from '@/lib/config';
 import { ENDED_STATUSES } from '@/lib/kilo-pass/state';
@@ -49,6 +49,11 @@ export function selectKiloPassManagementAction(subscription: {
 /** Whether the pass was sold by a store rather than by kilo.ai's own checkout. */
 export function isStoreManagedPass(subscription: { paymentProvider: string }): boolean {
   return subscription.paymentProvider !== 'stripe';
+}
+
+/** Which store sold a store-managed pass. Only meaningful when one did. */
+export function isAppStorePass(subscription: { paymentProvider: string }): boolean {
+  return subscription.paymentProvider === 'app_store';
 }
 
 const APP_STORE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';

@@ -10,9 +10,9 @@ import { isolateLtrBidiText } from '@/lib/bidi';
 import {
   type CreditDeduction,
   type CreditGrantKind,
-  type CreditPurchaseEntry,
   creditGrantKind,
   creditPurchaseChannel,
+  type CreditPurchaseEntry,
 } from '@/lib/credits/credit-history';
 import { formatDate, formatPrefixedMoney } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -22,6 +22,12 @@ const DEDUCTION_LABEL_KEYS = {
   deduction: 'credits.history.kind.deduction',
   adjustment: 'credits.history.kind.adjustment',
   balance_neutral: 'credits.history.kind.balanceNeutral',
+} satisfies Record<string, string>;
+
+/** The note a store-sold pack carries instead of a receipt action. */
+const STORE_RECEIPT_KEYS = {
+  app_store: 'credits.history.appStoreReceipt',
+  google_play: 'credits.history.googlePlayReceipt',
 } satisfies Record<string, string>;
 
 /** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
@@ -38,11 +44,11 @@ function deductionTypeLabel(kind: CreditDeduction['kind']): string {
  * The grant line's type, following the web credits page: the recorded channel
  * decides, and only a grant with none falls back to its free flag.
  */
-const GRANT_LABEL_KEYS: Record<CreditGrantKind, string> = {
+const GRANT_LABEL_KEYS = {
   purchase: 'credits.history.kind.purchase',
   pass: 'kiloPass.title',
   grant: 'credits.history.kind.grant',
-};
+} satisfies Record<CreditGrantKind, string>;
 
 function grantTypeLabel(grant: { credit_source: string | null; is_free: boolean }): string {
   return i18n.t(
@@ -84,12 +90,8 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
   const channel = creditPurchaseChannel(entry.creditSource);
   const description = firstNonEmpty(entry.description, t('credits.history.purchaseFallback'));
 
-  const storeReceiptNote =
-    channel === 'app_store'
-      ? t('credits.history.appStoreReceipt')
-      : channel === 'google_play'
-        ? t('credits.history.googlePlayReceipt')
-        : null;
+  const storeReceiptKey = lookup(STORE_RECEIPT_KEYS, channel);
+  const storeReceiptNote = storeReceiptKey ? t(storeReceiptKey) : null;
   const expiryLabel = entry.expiryDate
     ? t('organization.creditActivity.expiresUtc', {
         date: formatDate(parseTimestamp(entry.expiryDate), i18n.language, { timeZone: 'UTC' }),
@@ -128,11 +130,12 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
         <Text className="text-xs text-muted-foreground">
           {formatDate(parseTimestamp(entry.date), i18n.language)}
         </Text>
-        {storeReceiptNote != null ? (
+        {storeReceiptNote != null && (
           <Text className="text-xs text-muted-foreground">{storeReceiptNote}</Text>
-        ) : expiryLabel != null ? (
+        )}
+        {storeReceiptNote == null && expiryLabel != null && (
           <Text className="text-xs text-muted-foreground">{expiryLabel}</Text>
-        ) : null}
+        )}
       </View>
     </View>
   );

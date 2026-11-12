@@ -7,8 +7,8 @@ import { CenteredState } from '@/components/centered-state';
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
 import {
-  KiloPassCreditHistorySection,
   KiloPassBillingHistorySection,
+  KiloPassCreditHistorySection,
 } from '@/components/kilo-pass/kilo-pass-history-sections';
 import { KiloPassManagementSections } from '@/components/kilo-pass/kilo-pass-management';
 import { ScreenHeader } from '@/components/screen-header';

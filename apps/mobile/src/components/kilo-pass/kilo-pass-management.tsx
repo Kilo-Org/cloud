@@ -11,9 +11,10 @@ import { canOpenExternalBilling } from '@/lib/credits/external-billing-link';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatDate } from '@/lib/format';
 import {
+  isAppStorePass,
   isStoreManagedPass,
-  kiloPassWebUrl,
   type KiloPassSubscriptionState,
+  kiloPassWebUrl,
   selectKiloPassManagementAction,
   storeSubscriptionsUrl,
 } from '@/lib/kilo-pass/management';
@@ -97,8 +98,7 @@ export function KiloPassManagementSections({
   );
 
   if (storeManaged) {
-    const storeName =
-      subscription.paymentProvider === 'app_store' ? t('common.appStore') : t('common.googlePlay');
+    const storeName = isAppStorePass(subscription) ? t('common.appStore') : t('common.googlePlay');
     const manageLabel = t('kiloPass.manage.manageInStore', { store: storeName });
     return (
       <View className="gap-3">
@@ -164,7 +164,7 @@ export function KiloPassManagementSections({
         <Button
           variant="outline"
           loading={cancelSubscription.isPending}
-          onPress={() =>
+          onPress={() => {
             confirm({
               title: t('kiloPass.manage.cancel'),
               message: t('kiloPass.manage.cancelDescription'),
@@ -172,8 +172,8 @@ export function KiloPassManagementSections({
               onConfirm: () => {
                 cancelSubscription.mutate();
               },
-            })
-          }
+            });
+          }}
         >
           <Text className="text-destructive">{t('kiloPass.manage.cancel')}</Text>
         </Button>

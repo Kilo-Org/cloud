@@ -76,7 +76,7 @@ export function NewSessionCloudEnvironmentRow({
   }
 
   const body = (
-    <View className={cn(CARD_CLASS, opensPicker && !disabled && 'active:opacity-70')}>
+    <>
       <View className="min-w-0 flex-1 gap-1">
         <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
           {label}
@@ -86,26 +86,30 @@ export function NewSessionCloudEnvironmentRow({
         </Text>
       </View>
       {opensPicker ? <ChevronDown size={18} color={colors.mutedForeground} /> : null}
-    </View>
+    </>
   );
 
   return (
     <View className="mt-5">
       <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('agentChat.newSession.environment')}
+        {t('agentChat.newSession.cloudEnvironment')}
       </Text>
+      {/* The card's own chrome lives on the Pressable, exactly as the profile
+          row below does. An unstyled Pressable around a styled card is
+          flattened away by the native view hierarchy, and the row then paints
+          but never receives a touch: the press handlers never fire. */}
       {opensPicker ? (
         <Pressable
           onPress={onOpen}
           disabled={disabled}
           accessibilityRole="button"
           accessibilityLabel={t('agentChat.environment.environmentAccessibility', { label })}
-          className={disabled ? 'opacity-60' : undefined}
+          className={cn(CARD_CLASS, disabled ? 'opacity-60' : 'active:opacity-70')}
         >
           {body}
         </Pressable>
       ) : (
-        body
+        <View className={CARD_CLASS}>{body}</View>
       )}
       {selection.status === 'unknown' ? (
         <Pressable

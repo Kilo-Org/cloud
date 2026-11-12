@@ -36,6 +36,13 @@ import { cn } from '@/lib/utils';
 import { useCreditNativeIap } from './credit-native-iap-owner';
 import { CreditExpiryNote } from './credit-expiry-note';
 
+/**
+ * The room the scroller keeps at its end for the floating purchase error. It is
+ * the card's own height at three capped lines plus its margins, reserved in
+ * every state so the copy can scroll above the card without the layout moving.
+ */
+const PURCHASE_ERROR_CLEARANCE = 100;
+
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
 
@@ -243,6 +250,10 @@ export function CreditPurchaseScreen() {
           className="-mx-1 flex-1"
           contentContainerClassName="gap-3 px-1"
           showsVerticalScrollIndicator={false}
+          // The error overlay floats over the bottom of this area, so this adds
+          // the room that lets the description and the links scroll clear of
+          // it. It is a constant height, so it cannot move the copy.
+          contentContainerStyle={{ paddingBottom: PURCHASE_ERROR_CLEARANCE }}
         >
           {/* The card holds both of its data slots in every state: the amount (a
               skeleton, the value, or the failed read's own retry target) and
@@ -447,25 +458,22 @@ export function CreditPurchaseScreen() {
             </Pressable>
           </View>
         </DetailScreenScrollView>
-        {/* The purchase error is an overlay, not a block in the flow: it comes
-            and goes with a purchase attempt, and the four pack states are the
-            ones whose heights the slot holds. Floating it keeps its
-            announcement and leaves the layout untouched.
-
-            It hangs from the top of the scroll area, just under the header, so
-            it never covers the description and the legal links at the end of
-            the content — those are what the slot protects. It takes the same
-            side insets the scroller uses, so it stays inside the safe band in
-            landscape, and it carries the gutter itself because the container
-            owns the screen's padding. */}
-        <View
-          className="pointer-events-none absolute inset-x-0 top-0 px-5 pt-2"
-          style={sideInsetStyle}
-        >
-          <AccessibleStatus
-            message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
-            className="rounded-xl border border-destructive bg-card px-4 py-3 text-sm"
-          />
+        {/* The purchase error floats above the bottom of the scroll area. It
+            is not one of the four pack states, so it takes no layout height,
+            and the live region stays the announcement channel the store sheet
+            leaves available. Two wrappers keep the pieces apart: the outer one
+            adds the safe-area side insets to the gutter, and the inner one
+            carries the gutter itself, because an inline padding on one node
+            replaces its className padding. The scroller keeps a trailing
+            clearance so the last content can scroll clear of the card. */}
+        <View className="pointer-events-none absolute inset-x-0 bottom-0" style={sideInsetStyle}>
+          <View className="px-5 pb-4">
+            <AccessibleStatus
+              message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
+              className="rounded-xl border border-destructive bg-card px-4 py-3 text-sm"
+              numberOfLines={3}
+            />
+          </View>
         </View>
       </View>
     </View>

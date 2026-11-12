@@ -782,26 +782,37 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
-  it('floats the purchase error above the pack area without covering the copy', async () => {
+  it('floats the purchase error clear of the copy without taking layout height', async () => {
     // The error is not one of the four pack states, so it must not take layout
-    // height and must not sit over the description and the legal links that the
-    // slot protects.
+    // height. It floats at the bottom of the scroll area, and the scroller keeps
+    // a constant trailing clearance so the copy can scroll above it — the error
+    // can never cover content that has been scrolled to its end.
     owner.errorMessageKey = 'credits.purchaseOwnedByAnotherAccount';
 
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => renderer.root.findAllByType(AccessibleStatus).length > 0);
 
     const scroller = renderer.root.findByType(DetailScreenScrollView);
-    const [status] = renderer.root.findAllByType(AccessibleStatus);
-    expect(status).toBeDefined();
-    const inScroller = scroller.findAllByType(AccessibleStatus);
-    expect(inScroller).toHaveLength(0);
+    expect(scroller.findAllByType(AccessibleStatus)).toHaveLength(0);
 
-    // It is anchored to the top of the scroll area, not its end: the copy lives
-    // at the end, so a top anchor can never cover it.
-    const wrapper = status?.parent;
-    expect(String(wrapper?.props.className)).toContain('top-0');
-    expect(String(wrapper?.props.className)).not.toContain('bottom-');
+    // The clearance is the scroller's constant, present whether or not the
+    // error shows, so the copy's place does not depend on the error.
+    const containerStyle: unknown = scroller.props.contentContainerStyle;
+    expect(
+      typeof containerStyle === 'object' &&
+        containerStyle !== null &&
+        'paddingBottom' in containerStyle &&
+        typeof containerStyle.paddingBottom === 'number' &&
+        containerStyle.paddingBottom > 0
+    ).toBe(true);
+
+    const [status] = renderer.root.findAllByType(AccessibleStatus);
+    const inner = status?.parent;
+    const outer = inner?.parent;
+    // The insets and the gutter sit on separate wrappers: an inline padding on
+    // one node would replace its className padding.
+    expect(String(inner?.props.className)).toContain('px-5');
+    expect(String(outer?.props.className)).toContain('bottom-0');
     unmount();
   });
 

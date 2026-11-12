@@ -23,6 +23,7 @@ import {
   type LiveSessions,
 } from '@/components/home/live-session-state';
 import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
+import { LiveSessionsCardFailure } from '@/components/home/home-sessions-failure-card';
 import { SectionHeader } from '@/components/home/section-header';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 
@@ -46,6 +47,10 @@ export function AgentSessionsSection({
   const failureLabel = t('home.couldNotLoadActiveSessions');
   const notice = useLiveSessionHeaderNotice(context, sessions, failureLabel);
   const showBriefing = briefing?.visible === true;
+  // A whole-surface failure draws inside the card frame, in the height the
+  // frame already reserved while the query was pending, so the sections below
+  // the card do not move when the load fails after the first paint.
+  const failureInCard = content === 'error';
   const briefingCard = briefing?.card ?? null;
   // Open the Agents tab, with the status filter a count row names. Same tab
   // switch and stack reset as `See all`, so a pushed history screen cannot hide
@@ -63,6 +68,30 @@ export function AgentSessionsSection({
     },
     [router]
   );
+  // The card's one drawn body. A failure takes the slot instead of a block
+  // above it, so the frame keeps the height it reserved while pending.
+  const cardBody = (): ReactNode => {
+    if (failureInCard) {
+      return (
+        <LiveSessionsCardFailure
+          context={context}
+          sessions={sessions}
+          failureLabel={failureLabel}
+        />
+      );
+    }
+    if (content === 'pending') {
+      return <GlanceableActiveCardSkeleton embedded />;
+    }
+    return (
+      <GlanceableActiveCard
+        sessions={sessions.activeSessions}
+        onPressSession={handleRowPress}
+        onPressStatus={openAgentsIndex}
+        embedded
+      />
+    );
+  };
 
   return (
     <View>
@@ -89,6 +118,7 @@ export function AgentSessionsSection({
           sessions={sessions}
           failureLabel={failureLabel}
           inlineNotices={false}
+          bodyHidden={failureInCard}
         />
         {/* One card, not a row per session. The skeleton shares the loaded
             card's minimum frame; scaled text can grow the loaded content. */}
@@ -96,25 +126,15 @@ export function AgentSessionsSection({
           {(briefingCard !== null ||
             content === 'pending' ||
             content === 'empty' ||
-            content === 'rows') && (
+            content === 'rows' ||
+            failureInCard) && (
             <Animated.View
               entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
             >
               <AdaptiveHomeCardFrame
-                live={
-                  content === 'pending' ? (
-                    <GlanceableActiveCardSkeleton embedded />
-                  ) : (
-                    <GlanceableActiveCard
-                      sessions={sessions.activeSessions}
-                      onPressSession={handleRowPress}
-                      onPressStatus={openAgentsIndex}
-                      embedded
-                    />
-                  )
-                }
+                live={cardBody()}
                 briefing={briefingCard ?? undefined}
-                showBriefing={showBriefing}
+                showBriefing={showBriefing && !failureInCard}
               />
             </Animated.View>
           )}

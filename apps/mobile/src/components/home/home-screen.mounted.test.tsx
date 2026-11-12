@@ -634,6 +634,27 @@ describe('Home live presentation', () => {
     await updateSocketRows([]);
   });
 
+  it('draws the whole-surface failure inside the card frame, in the height it reserved', async () => {
+    state.live.terminalError = failure;
+    await renderHome();
+    const message = "Couldn't load active sessions";
+    const frame = cardFrame();
+    // The frame stays mounted in this state: it holds the height the pending
+    // skeleton reserved, so a failure that lands after the first paint cannot
+    // move the sections below the card.
+    expect(frame).toBeDefined();
+    const insideFrame = (node: TestRenderer.ReactTestInstance) =>
+      frame?.findAll(candidate => candidate === node).length === 1;
+    const failureText = nodes('Text').find(node => node.children.includes(message));
+    expect(failureText).toBeDefined();
+    expect(insideFrame(failureText as TestRenderer.ReactTestInstance)).toBe(true);
+    expect(insideFrame(action('Retry'))).toBe(true);
+    // One message, one recovery action: the block that used to stand above the
+    // card is gone, so the card column holds no second copy of the failure.
+    expect(text().split(message)).toHaveLength(2);
+    expect(nodes('AlertCircle')).toHaveLength(1);
+  });
+
   it('waits for the live coordinator without requesting or waiting for stored history', async () => {
     const storedKey = [['cliSessionsV2', 'list']];
     const history = Promise.withResolvers<undefined>();

@@ -86,6 +86,12 @@ type QueryErrorProps = {
   descriptionClassName?: string;
   placement?: 'center' | 'top' | 'static';
   refreshControl?: ScrollViewProps['refreshControl'];
+  /**
+   * False when another mounted node already announces this message, so the
+   * description is drawn without a second announcement. Home's card frame
+   * announces the whole-surface failure through the section that owns it.
+   */
+  announceDescription?: boolean;
 };
 
 export function QueryError({
@@ -103,6 +109,7 @@ export function QueryError({
   descriptionClassName,
   placement = 'center',
   refreshControl,
+  announceDescription = true,
 }: Readonly<QueryErrorProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -110,21 +117,25 @@ export function QueryError({
   const titleText = title ?? meta.title;
   const descriptionText = message ?? meta.description;
   const retryText = retryLabel ?? t('common.retry');
+  const descriptionClasses =
+    descriptionClassName === undefined
+      ? 'text-center text-sm'
+      : `text-center text-sm ${descriptionClassName}`;
 
   return (
     <EmptyState
       icon={VARIANT_ICONS[variant]}
       title={titleText}
       description={
-        <AccessibleStatus
-          message={descriptionText}
-          tone="status"
-          className={
-            descriptionClassName === undefined
-              ? 'text-center text-sm'
-              : `text-center text-sm ${descriptionClassName}`
-          }
-        />
+        announceDescription ? (
+          <AccessibleStatus
+            message={descriptionText}
+            tone="status"
+            className={descriptionClasses}
+          />
+        ) : (
+          <Text className={`text-muted-foreground ${descriptionClasses}`}>{descriptionText}</Text>
+        )
       }
       className={className}
       placement={placement}

@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type ScrollViewProps, View } from 'react-native';
 
@@ -12,6 +12,7 @@ import {
   type LiveSessions,
 } from '@/components/home/live-session-state';
 import { QueryError, type QueryErrorVariant } from '@/components/query-error';
+import { cardFailure, useLiveSessionsRetry } from '@/components/home/home-sessions-failure-card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -19,7 +20,6 @@ import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
-import { createSubmitLock } from '@/lib/submit-lock';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
 
@@ -51,9 +51,17 @@ export function LiveSessionFeedback({
   refresh,
   inlineNotices = true,
   compact: compactSpacing = false,
+  bodyHidden = false,
 }: LiveSessionProps & {
   failureLabel: string;
   centered?: boolean;
+  /**
+   * True when the surface draws the whole-surface failure somewhere else, as
+   * Home does inside its card frame. The announcements stay here, so a state
+   * change never remounts the announcer and never speaks the same message
+   * twice.
+   */
+  bodyHidden?: boolean;
   refreshControl?: ScrollViewProps['refreshControl'];
   refresh?: LiveSessionRefreshState;
   /**
@@ -74,33 +82,25 @@ export function LiveSessionFeedback({
   useEffect(() => {
     wasConnected.current ||= isConnected;
   }, [isConnected]);
-  const retryLock = useMemo(createSubmitLock, []);
-  const [retrying, setRetrying] = useState(false);
+  const { retrying, retry: handleRetry } = useLiveSessionsRetry(context, sessions);
   const handleRefreshRetry = () => {
     refresh?.onRetry();
-  };
-  const handleRetry = () => {
-    if (!retryLock.acquire()) {
-      return;
-    }
-    setRetrying(true);
-    void (async () => {
-      try {
-        await (context.isError ? context.refetch() : sessions.refetch());
-      } finally {
-        retryLock.release();
-        setRetrying(false);
-      }
-    })();
   };
   const content = liveSessionContent(context, sessions);
   // One message speaks while the refresh-status line owns the rows-state
   // failure: the line announces its own copy instead of a second label.
   const statusLineOwnsFailure = content === 'rows' && refresh && (refresh.busy || refresh.failed);
+  // A failure drawn in the card frame is announced here: this component stays
+  // mounted across the whole surface's states, so the message speaks once even
+  // though the card's own body comes and goes.
+  const cardMessage = bodyHidden
+    ? (cardFailure({ t, context, sessions, failureLabel })?.message ?? null)
+    : null;
   useStatusAnnouncement(
-    context.isReady && sessions.terminalError?.kind === 'retryable' && !statusLineOwnsFailure
-      ? failureLabel
-      : null
+    cardMessage ??
+      (context.isReady && sessions.terminalError?.kind === 'retryable' && !statusLineOwnsFailure
+        ? failureLabel
+        : null)
   );
   const denied = context.isReady && sessions.terminalError?.kind === 'non-retryable';
   const unavailable = !context.isResolving && !context.isReady && !context.isError;
@@ -201,6 +201,11 @@ export function LiveSessionFeedback({
     if (compact && !inlineNotices) {
       failure = null;
     }
+  }
+  if (bodyHidden) {
+    // The surface draws this failure in its card frame instead; only the
+    // announcements belong here, so the column never paints a second block.
+    failure = null;
   }
   let connectionLabel: string | null = null;
   if (context.isReady && !isConnected && internet !== 'offline') {

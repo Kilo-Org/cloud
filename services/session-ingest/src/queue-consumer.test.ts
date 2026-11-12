@@ -56,12 +56,7 @@ import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getUserConnectionDO } from './dos/UserConnectionDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { notifyUserSessionEvent } from './session-events';
-import {
-  QUEUE_MAX_RETRIES,
-  QUEUE_RETRY_DELAY_SECONDS,
-  createItemExtractor,
-  queue,
-} from './queue-consumer';
+import { QUEUE_RETRY_DELAY_SECONDS, createItemExtractor, queue } from './queue-consumer';
 import { computeSessionMetadataUpdates } from './ingest/metadata';
 import { INGEST_CHUNK_MAX_BYTES } from './util/ingest-limits';
 
@@ -1026,7 +1021,7 @@ describe('queue', () => {
     expect(deleteObject).not.toHaveBeenCalled();
   });
 
-  it('removes the object after the last attempt', async () => {
+  it('keeps the staged object when the last attempt fails so a dead-lettered message can be replayed', async () => {
     const ingest = vi.fn(async () => {
       throw new Error('Durable Object is overloaded.');
     });
@@ -1064,7 +1059,9 @@ describe('queue', () => {
               ingestVersion: 1,
               ingestedAt: 1,
             },
-            attempts: QUEUE_MAX_RETRIES + 1,
+            // Past the consumer's configured retry cap: the delivery that
+            // dead-letters the message.
+            attempts: 4,
             ack,
             retry,
           },
@@ -1074,7 +1071,7 @@ describe('queue', () => {
       { waitUntil: vi.fn() } as unknown as ExecutionContext
     );
 
-    expect(deleteObject).toHaveBeenCalledWith('staging/last_attempt');
+    expect(deleteObject).not.toHaveBeenCalled();
     expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
     expect(ack).not.toHaveBeenCalled();
     error.mockRestore();

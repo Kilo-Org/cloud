@@ -32,8 +32,6 @@ export interface IngestQueueMessage {
 }
 
 export const QUEUE_RETRY_DELAY_SECONDS = 5 * 60;
-// The session-ingest-processing consumer's `max_retries` in wrangler.jsonc.
-export const QUEUE_MAX_RETRIES = 3;
 
 export class MalformedIngestPayloadError extends Error {
   constructor(
@@ -631,17 +629,17 @@ export async function queue(
         continue;
       }
 
-      const isLastAttempt = msg.attempts >= QUEUE_MAX_RETRIES + 1;
+      // A transient failure keeps the staged object. The queue records only the
+      // key, and the client already handed the payload off, so the staged bytes
+      // are the whole message for an operator replaying a dead-letter record.
+      // The staging bucket's lifecycle policy bounds how long an abandoned
+      // object stays.
       console.error('Queue message processing failed, will retry', {
         r2Key: msg.body.r2Key,
         sessionId: msg.body.sessionId,
         attempts: msg.attempts,
-        isLastAttempt,
         error: err instanceof Error ? err.message : String(err),
       });
-      if (isLastAttempt) {
-        await deleteStagedObject(env, msg.body.r2Key);
-      }
       msg.retry({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
     }
   }

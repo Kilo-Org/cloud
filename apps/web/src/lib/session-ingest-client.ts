@@ -117,10 +117,10 @@ function redactedRouteForLog(requestUrl: string): string {
  * `CONTROL_PLANE_UPSTREAM_BUDGET_MS` (strictly under the mobile app's 15s
  * `CONTROL_PLANE_DEADLINE_MS`) instead of holding the calling control-plane
  * procedure open until the client deadline fires or the gateway answers 504.
- * The timeout keeps the module's existing failure shape: every call site
- * already propagates a transport failure to its router, which maps it to an
- * `INTERNAL_SERVER_ERROR` the mobile client renders as its existing retryable
- * state — never a new non-retryable one.
+ * Call sites propagate the timeout to their router, and
+ * `sessionIngestTrpcError` maps it to `SERVICE_UNAVAILABLE`: a stalled
+ * upstream is retryable on the client, never reported as a defect here. Other
+ * transport failures keep `INTERNAL_SERVER_ERROR`.
  *
  * On a budget expiry exactly one allow-listed line is emitted. It carries the
  * redacted route, the elapsed time and a fixed outcome — never the
@@ -144,6 +144,28 @@ async function fetchSessionIngest(requestUrl: string, init: RequestInit = {}): P
     }
     throw error;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Failure mapping
+// ---------------------------------------------------------------------------
+
+/**
+ * The tRPC error one session-ingest call failure becomes.
+ *
+ * A budget expiry is an upstream that did not answer in time, not a fault in
+ * this control plane, so it must stay retryable: `SERVICE_UNAVAILABLE`. Every
+ * other failure keeps the `INTERNAL_SERVER_ERROR` contract the routers already
+ * publish for an unexpected worker answer. `cause` is preserved so the
+ * original timeout stays attributable in logs and Sentry.
+ */
+export function sessionIngestTrpcError(message: string, cause: unknown): TRPCError {
+  return new TRPCError({
+    code:
+      cause instanceof ServiceFetchTimeoutError ? 'SERVICE_UNAVAILABLE' : 'INTERNAL_SERVER_ERROR',
+    message,
+    cause,
+  });
 }
 
 // ---------------------------------------------------------------------------

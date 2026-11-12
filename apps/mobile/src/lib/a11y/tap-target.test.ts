@@ -53,7 +53,8 @@ import {
   tapTargetReachDp,
   textActionTargetClass,
   TOUCH_TARGET_DP,
-  VOICE_INPUT_LG_HIT_SLOP_DP,
+  UNDER_COPY_ACTION_BOX_CLASS,
+  UNDER_COPY_ACTION_HIT_SLOP,
 } from './tap-target';
 
 // `inlineLinkHitSlop` resolves the sentence's ends through the interface
@@ -140,6 +141,29 @@ describe('shared tap-target geometry', () => {
     expect(await compiledDp(android, 'minWidth')).toBeGreaterThanOrEqual(ICON_TARGET_DP);
 
     platform.OS = 'ios';
+  });
+
+  it('cancels the action box slack under the copy it sits below', async () => {
+    // The regression this guards: the box centres one label line, so a tile
+    // that pads its edges evenly showed a wider gap under its action than above
+    // its copy. The margin removes that slack from the layout, so the tile pads
+    // the same on both edges while the box stays above the audit floor and
+    // never reaches the message above it.
+    const height = await compiledDp(UNDER_COPY_ACTION_BOX_CLASS, 'minHeight');
+    expect(height).toBe(32);
+    expect(height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    // A short label in another language keeps the audit floor on both axes.
+    expect(await compiledDp(UNDER_COPY_ACTION_BOX_CLASS, 'minWidth')).toBe(48);
+    const margin = await compiledDp(UNDER_COPY_ACTION_BOX_CLASS, 'marginBlock');
+    expect(margin).toBe(-7);
+    // What is left is the label line itself, so the box adds no room of its own
+    // above the copy or below the label.
+    expect(Math.abs(height - 2 * Math.abs(margin) - INLINE_LINK_SENTENCE_LINE_DP)).toBeLessThan(1);
+    // The slop carries the reach the shortened box gives up on its own node.
+    expect(tapTargetReachDp(height - 0.2, UNDER_COPY_ACTION_HIT_SLOP.top)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
+    expect(UNDER_COPY_ACTION_HIT_SLOP.top).toBe(UNDER_COPY_ACTION_HIT_SLOP.bottom);
   });
 
   it('renders a state surface action on the Android 48dp minimum', async () => {
@@ -423,10 +447,10 @@ describe('composer input row control separation', () => {
   it('leaves positive clearance between two adjacent controls tap areas', () => {
     // The regression this guards: the send/stop control carried no gap, so it
     // rendered flush against the microphone and the two tap areas overlapped.
+    // The voice toggle renders its whole target as its own box, so the row's
+    // slop is the only one the gap has to carry.
     expect(composerControlClearanceDp()).toBeGreaterThan(0);
-    expect(COMPOSER_CONTROL_GAP_DP).toBeGreaterThan(
-      VOICE_INPUT_LG_HIT_SLOP_DP + COMPOSER_CONTROL_HIT_SLOP_DP
-    );
+    expect(COMPOSER_CONTROL_GAP_DP).toBeGreaterThan(COMPOSER_CONTROL_HIT_SLOP_DP);
   });
 
   it('zeroes the slop on the side the nearer control sits on', () => {
@@ -449,12 +473,13 @@ describe('composer input row control separation', () => {
     }
   });
 
-  it('gaps the voice toggle from the send control below the two facing slops', () => {
+  it('gaps the voice toggle from the send control below the send control slop', () => {
     // `ms-1` is 0.25rem at NativeWind's 14pt rem: 3.5dp, narrower than the
-    // two facing slops, which is why both controls zero their facing side.
+    // send control's slop, which is why it zeroes the side that faces the
+    // toggle.
     expect(COMPOSER_VOICE_SEND_GAP_CLASS).toBe('ms-1');
     const voiceSendGapDp = Number(COMPOSER_VOICE_SEND_GAP_CLASS.slice('ms-'.length)) * 0.25 * 14;
     expect(voiceSendGapDp).toBe(3.5);
-    expect(voiceSendGapDp).toBeLessThan(VOICE_INPUT_LG_HIT_SLOP_DP + COMPOSER_CONTROL_HIT_SLOP_DP);
+    expect(voiceSendGapDp).toBeLessThan(COMPOSER_CONTROL_HIT_SLOP_DP);
   });
 });

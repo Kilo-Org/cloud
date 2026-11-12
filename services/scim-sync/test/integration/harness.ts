@@ -211,6 +211,9 @@ export async function readState(target: DurableObjectStub<ScimSyncDO>): Promise<
   failures: number;
   failure: { eventId: string; attempts: number } | null;
   parked: string[];
+  /** The class and the reason each parked event was recorded with. */
+  parkedClasses: Record<string, string>;
+  parkedReasons: Record<string, string>;
 }> {
   return runInDurableObject(target, (_instance, state) => {
     const db = drizzle(state.storage);
@@ -218,15 +221,14 @@ export async function readState(target: DurableObjectStub<ScimSyncDO>): Promise<
     for (const row of db.select().from(syncState).all()) rows[row.key] = row.value;
     const failureRows = db.select().from(eventFailures).all();
     const held = failureRows[0];
+    const parkedRows = db.select().from(parkedEvents).all();
     return {
       rows,
       failures: failureRows.length,
       failure: held === undefined ? null : { eventId: held.event_id, attempts: held.attempts },
-      parked: db
-        .select()
-        .from(parkedEvents)
-        .all()
-        .map(row => row.event_id),
+      parked: parkedRows.map(row => row.event_id),
+      parkedClasses: Object.fromEntries(parkedRows.map(row => [row.event_id, row.class])),
+      parkedReasons: Object.fromEntries(parkedRows.map(row => [row.event_id, row.error])),
     };
   });
 }
@@ -301,15 +303,43 @@ export function activationWithNonListDomains(id: string): unknown {
   return { ...event, data: { ...event.data, domains: { domain: 'acme.test' } } };
 }
 
-export function groupEvent(id: string, event = 'dsync.group.created'): unknown {
+/**
+ * An activation whose body the shared request contract rejects, so the
+ * dispatcher parks it without an HTTP call and the app binds no organization
+ * for the directory.
+ */
+export function activationWithRejectedBody(id: string): unknown {
+  const event = directoryEvent(id) as { data: Record<string, unknown> };
+  return {
+    ...event,
+    data: {
+      ...event.data,
+      domains: Array.from({ length: 51 }, (_unused, i) => ({
+        object: 'organization_domain',
+        id: `od_${i}`,
+        domain: `d${i}.acme.test`,
+      })),
+    },
+  };
+}
+
+export function groupEvent(
+  id: string,
+  event = 'dsync.group.created',
+  overrides: {
+    /** The directory the group belongs to, for tests that need two of them. */
+    directoryId?: string;
+    groupId?: string;
+  } = {}
+): unknown {
   return {
     id,
     event,
     created_at: '2026-01-01T00:00:00.000Z',
     data: {
-      id: 'dir_grp_01',
+      id: overrides.groupId ?? 'dir_grp_01',
       idp_id: 'idp_grp_01',
-      directory_id: 'directory_01',
+      directory_id: overrides.directoryId ?? 'directory_01',
       organization_id: null,
       name: 'Engineering',
       created_at: '2026-01-01T00:00:00.000Z',

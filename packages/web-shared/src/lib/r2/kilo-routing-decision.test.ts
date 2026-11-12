@@ -2,6 +2,7 @@ import { after } from 'next/server';
 import { PutObjectCommand, S3ServiceException } from '@aws-sdk/client-s3';
 import {
   KiloRoutingDecisionRecordSchema,
+  type ByokFailoverAttempt,
   type ProviderRoutingDecision,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-decision';
 import type {
@@ -207,6 +208,7 @@ test('adds the Enkrypt guardrail report read at upload time', async () => {
         credits_cost: 3,
         latency_ms: 400,
         verdict_cache_write: 'skipped',
+        chunks: 1,
       },
     ],
   };
@@ -327,6 +329,101 @@ test('omits the Enkrypt entry when no guardrail applied', async () => {
   await runScheduledUpload();
 
   expect(archivedRecord()).not.toHaveProperty('enkrypt');
+});
+
+test('adds the BYOK failover attempts', async () => {
+  const attempts: ByokFailoverAttempt[] = [
+    {
+      provider_type: 'vercel',
+      byok_provider_ids: ['openai'],
+      status: 429,
+      error_code: 'insufficient_quota',
+      duration_ms: 412,
+      outcome: 'failed-over',
+    },
+    {
+      provider_type: 'openrouter',
+      byok_provider_ids: ['openrouter'],
+      status: 200,
+      duration_ms: 903,
+      outcome: 'served',
+    },
+  ];
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureRoutingDecision(decision);
+  capture?.captureByokFailoverAttempts(Promise.resolve(attempts));
+
+  await runScheduledUpload();
+
+  expect(archivedRecord()).toEqual({
+    schema_version: 1,
+    usage_id: USAGE_ID,
+    created_at: expect.any(String),
+    ...decision,
+    byok_failover_attempts: attempts,
+  });
+});
+
+test('awaits the BYOK failover attempts at upload time', async () => {
+  const attempts = Promise.withResolvers<ByokFailoverAttempt[]>();
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureRoutingDecision(decision);
+  capture?.captureByokFailoverAttempts(attempts.promise);
+  expect(fakeR2.send).not.toHaveBeenCalled();
+
+  const upload = runScheduledUpload();
+  await Promise.resolve();
+  expect(fakeR2.send).not.toHaveBeenCalled();
+  attempts.resolve([
+    {
+      provider_type: 'vercel',
+      byok_provider_ids: ['openai'],
+      status: 429,
+      error_code: 'rate_limit_error',
+      duration_ms: 120,
+      outcome: 'failed-over',
+    },
+  ]);
+  await upload;
+
+  expect(archivedRecord().byok_failover_attempts).toEqual([
+    expect.objectContaining({ status: 429, error_code: 'rate_limit_error' }),
+  ]);
+});
+
+test('archives without the BYOK failover attempts when they fail to resolve', async () => {
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureRoutingDecision(decision);
+  capture?.captureByokFailoverAttempts(Promise.reject(new Error('upstream error text')));
+
+  await runScheduledUpload();
+
+  expect(archivedRecord()).toEqual({
+    schema_version: 1,
+    usage_id: USAGE_ID,
+    created_at: expect.any(String),
+    ...decision,
+  });
+  expect(errorExceptInTest).toHaveBeenCalledWith(
+    '[kilo-routing-decision] BYOK failover attempts failed; archived without it',
+    { usageId: USAGE_ID, errorType: 'Error' }
+  );
+  expect(JSON.stringify(jest.mocked(errorExceptInTest).mock.calls)).not.toMatch(
+    /upstream error text/
+  );
+});
+
+test.each([
+  { name: 'none were captured', attempts: undefined },
+  { name: 'an empty list was captured', attempts: Promise.resolve([]) },
+])('omits the BYOK failover attempts when $name', async ({ attempts }) => {
+  const capture = createAiProviderMetadataCapture(USAGE_ID);
+  capture?.captureRoutingDecision(decision);
+  if (attempts) capture?.captureByokFailoverAttempts(attempts);
+
+  await runScheduledUpload();
+
+  expect(archivedRecord()).not.toHaveProperty('byok_failover_attempts');
 });
 
 test('does not register an archive from metadata or parser settlement without routing', async () => {

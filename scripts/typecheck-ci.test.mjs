@@ -1487,16 +1487,69 @@ test('the web-test shards install the closure their Jest suite reads', () => {
   assert.equal(run.run, 'pnpm --filter web test --shard=${{ matrix.shard }}/4');
 });
 
-// The plugin files reach one check only: test-scripts runs
-// `test:oxlint-plugins` over them. The web Jest suite, the web build and the
-// cycle check read none of them, so the plugin path has its own filter pair and
-// the shared filter that gates those three names no plugin file. A plugin path
-// back in the shared filter would start four web-test shards, the production
-// build and the cycle check for a change none of them reads.
-const oxlintPluginPath = 'tools/oxlint/anti-slop/rules/no-runtime-typeof.ts';
-const webBackendPath = 'apps/web/src/routers/active-sessions-router.ts';
+// The build job runs one Next production build, and that build's type check
+// reads the app's tsconfig include: the app sources and tests, the web-shared
+// sources, the ai-gateway sources one web test imports, and the sources of a
+// billing service two web tests import inside apps/web. A clean install of the
+// app and ai-gateway closures alone fails that check, because a project outside
+// the install scope gets no node_modules to resolve its own imports from. The
+// service imports @kilocode/organization-entitlement, so its dependents are
+// selected along with the two closures. The install step is the only step the
+// narrowing changes, and a measured job run puts the saving above a tenth of
+// the job's wall time.
+const buildInstall =
+  "pnpm install --frozen-lockfile --filter 'web...' --filter 'ai-gateway...' --filter '...@kilocode/organization-entitlement' --filter kilocode-monorepo";
 
-test('a lint-plugin change runs the plugin suite without the web gates', () => {
+test('the build job installs the closure its Next build reads', () => {
+  const job = ciJobs['build'];
+  const installs = job.steps.filter(step => /^pnpm\b.*\binstall\b/.test(step.run ?? ''));
+  assert.deepEqual(
+    installs.map(step => step.run),
+    [buildInstall],
+    'one install links the build closure and the root project'
+  );
+  const build = job.steps.find(step => step.name === 'Build application');
+  assert.equal(build.run, 'pnpm run build', 'the production build is unchanged');
+});
+
+// The test-scripts job runs two unrelated input sets: the script chain behind
+// `test:scripts` (scripts, dev tooling, the lint plugins, and the few product
+// files those suites read) and the Postgres and Durable Object regressions. The
+// shared filter that gates the web Jest suite, the web build and the cycle check
+// names neither tree, and an `apps/web/src` change outside the files a suite
+// reads must start no part of this job.
+const webBackendPath = 'apps/web/src/routers/active-sessions-router.ts';
+const scriptSuiteInputs = [
+  'scripts/typecheck-ci.test.mjs',
+  'dev/local/services.ts',
+  'tools/oxlint/anti-slop/rules/no-runtime-typeof.ts',
+  'apps/web/ai-gateway-rewrites.mjs',
+  'apps/web/src/app/api/gateway/route.ts',
+  'apps/ai-gateway/src/app/api/v1/models/route.ts',
+  'apps/web/src/lib/load-env.ts',
+  'apps/web/.env.development.local.example',
+  'apps/mobile/src/lib/design-gate/sampler.ts',
+  'services/auto-routing/.dev.vars.example',
+  'services/container-usage-meter/.dev.vars.example',
+  'services/container-usage-meter/package.json',
+  'services/cloud-agent-next/package.json',
+  'services/session-ingest/wrangler.jsonc',
+  'services/cloud-agent-next/test/e2e/fake-llm-server.ts',
+  '.github/workflows/mobile-native-build.yml',
+  'packages/session-ingest-contracts/src/index.ts',
+  'pnpm-lock.yaml',
+];
+const dataRegressionInputs = [
+  'services/session-ingest/src/index.ts',
+  'services/container-usage-meter/src/postgres.ts',
+  'packages/db/src/schema.ts',
+  'packages/app-shared/src/index.ts',
+  'packages/container-usage/src/index.ts',
+  'packages/organization-entitlement/src/index.ts',
+  'pnpm-lock.yaml',
+];
+
+test('test-scripts starts only for the inputs its two step groups read', () => {
   const filtersOf = id => {
     const step = ciJobs.changes.steps.find(candidate => candidate.id === id);
     assert.ok(step, `changes: the ${id} step is missing`);
@@ -1504,61 +1557,151 @@ test('a lint-plugin change runs the plugin suite without the web gates', () => {
   };
   const matches = (patterns, path) => patterns.some(pattern => posix.matchesGlob(path, pattern));
 
-  const backend = filtersOf('filter').kilocode_backend;
+  const scripts = filtersOf('filter_test_scripts').test_scripts;
   assert.deepEqual(
-    filtersOf('filter_retry').kilocode_backend,
-    backend,
-    'the shared retry keeps the filters of the attempt it replaces'
+    filtersOf('filter_test_scripts_retry').test_scripts,
+    scripts,
+    'the script-suite retry keeps the filters of the attempt it replaces'
   );
-  assert.equal(
-    matches(backend, webBackendPath),
-    true,
-    'a backend path still matches the shared filter'
-  );
-  assert.equal(matches(backend, oxlintPluginPath), false, 'the shared filter names no plugin path');
-
-  const plugins = filtersOf('filter_oxlint').oxlint_plugins;
+  const data = filtersOf('filter_test_scripts_db').test_scripts_db;
   assert.deepEqual(
-    filtersOf('filter_oxlint_retry').oxlint_plugins,
-    plugins,
-    'the plugin retry keeps the filters of the attempt it replaces'
+    filtersOf('filter_test_scripts_db_retry').test_scripts_db,
+    data,
+    'the data-regression retry keeps the filters of the attempt it replaces'
   );
-  assert.equal(matches(plugins, oxlintPluginPath), true, 'the plugin pair detects a plugin change');
-  assert.equal(matches(plugins, webBackendPath), false, 'the plugin pair detects nothing else');
-  assert.equal(
-    ciJobs.changes.outputs.oxlint_plugins,
-    '${{ steps.filter_oxlint.outputs.oxlint_plugins || steps.filter_oxlint_retry.outputs.oxlint_plugins }}',
-    'the plugin output falls back to its retry attempt'
+  assert.deepEqual(
+    ciJobs.changes.outputs.test_scripts,
+    '${{ steps.filter_test_scripts.outputs.test_scripts || steps.filter_test_scripts_retry.outputs.test_scripts }}',
+    'the script-suite output falls back to its retry attempt'
+  );
+  assert.deepEqual(
+    ciJobs.changes.outputs.test_scripts_db,
+    '${{ steps.filter_test_scripts_db.outputs.test_scripts_db || steps.filter_test_scripts_db_retry.outputs.test_scripts_db }}',
+    'the data-regression output falls back to its retry attempt'
   );
 
-  assert.match(
-    ciJobs['test-scripts'].if,
-    /needs\.changes\.outputs\.oxlint_plugins == 'true'/,
-    'test-scripts keeps the one check that reads those paths'
+  for (const path of scriptSuiteInputs) {
+    assert.equal(matches(scripts, path), true, `a script-suite input: ${path}`);
+  }
+  for (const path of dataRegressionInputs) {
+    assert.equal(matches(data, path), true, `a data-regression input: ${path}`);
+  }
+  for (const path of [webBackendPath, 'apps/web/src/app/page.tsx', 'apps/web/src/lib/db.ts']) {
+    assert.equal(matches(scripts, path), false, `no script suite reads ${path}`);
+    assert.equal(matches(data, path), false, `no data regression reads ${path}`);
+  }
+  assert.equal(
+    matches(scripts, 'services/session-ingest/src/index.ts'),
+    false,
+    'the script chain reads no session-ingest source'
   );
-  // The root script chain decides what test-scripts runs: a run that starts the
-  // job without the plugin entry would report a plugin-only change unexercised.
+  assert.equal(
+    matches(data, 'dev/local/services.ts'),
+    false,
+    'the data regressions read no dev tooling'
+  );
+
+  const job = ciJobs['test-scripts'];
+  assert.match(job.if, /needs\.changes\.outputs\.test_scripts == 'true'/);
+  assert.match(job.if, /needs\.changes\.outputs\.test_scripts_db == 'true'/);
+  assert.match(job.if, /needs\.changes\.outputs\.data_meter == 'true'/);
+  assert.match(job.if, /needs\.changes\.outputs\.data_session_ingest == 'true'/);
+  assert.doesNotMatch(job.if, /kilocode_backend/, 'the web filter starts no part of this job');
+  // The two detector answers exclude a full selection: such a diff names every
+  // workspace because the detector could not attribute it, not because these
+  // suites read it.
+  for (const service of ['container-usage-meter', 'cloudflare-session-ingest']) {
+    const output = service === 'container-usage-meter' ? 'data_meter' : 'data_session_ingest';
+    assert.match(
+      ciJobs.changes.outputs[output],
+      new RegExp(
+        `steps\\.affected\\.outputs\\.full != 'true' && contains\\(fromJSON\\(steps\\.affected\\.outputs\\.affected\\)\\.packages, '${service}'\\)`
+      ),
+      `${output}: a full selection answers false`
+    );
+  }
+
+  const step = name => {
+    const found = job.steps.find(candidate => candidate.name === name);
+    assert.ok(found, `test-scripts: the ${name} step is missing`);
+    return found;
+  };
+  assert.equal(
+    step('Run script tests').if,
+    "needs.changes.outputs.test_scripts == 'true'",
+    'the script chain reads its own subject'
+  );
+  assert.equal(
+    step('Run container usage Postgres tests').if,
+    "needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_meter == 'true'",
+    'the meter suite reads its filter and the detector answer'
+  );
+  for (const name of [
+    'Run Session Ingest Durable Object regressions',
+    'Run Session Ingest Postgres tests',
+  ]) {
+    assert.equal(
+      step(name).if,
+      "needs.changes.outputs.test_scripts_db == 'true' || needs.changes.outputs.data_session_ingest == 'true'",
+      `${name}: gated on the data filter and the detector answer`
+    );
+  }
+  // The suite copies shared tables and reads the worktree rows, so it needs the
+  // migrated schema. This step also runs when the detector alone selects the
+  // service, a run in which the meter step above never applies the migrations.
+  assert.equal(
+    step('Run Session Ingest Postgres tests').run,
+    'NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloudflare-session-ingest test:postgres',
+    'the session ingest suite migrates its own schema'
+  );
+  // The workspace matrix runs one of these suites under its own condition, and
+  // it must not repeat a run this job already covers, whichever of the two
+  // conditions started it.
+  const heartbeat = ciJobs['workspace-tests'].steps.find(
+    candidate => candidate.name === 'Test native heartbeat attachment compatibility'
+  );
+  assert.equal(
+    heartbeat.if,
+    "matrix.workspace.name == 'cloudflare-session-ingest' && needs.changes.outputs.test_scripts_db != 'true' && needs.changes.outputs.data_session_ingest != 'true'",
+    'the workspace row keeps that suite only when test-scripts skips it'
+  );
+
+  assert.ok(
+    ciJobs.test.needs.includes('test-scripts'),
+    'the required fan-in still publishes this job'
+  );
+
+  // The root script chain decides what that step runs: a suite dropped from it
+  // would report its inputs unexercised on a run that starts the job.
   const rootScripts = JSON.parse(
     readFileSync(new URL('../package.json', import.meta.url), 'utf8')
   ).scripts;
-  assert.match(
-    rootScripts['test:scripts'],
-    /test:oxlint-plugins/,
-    'test-scripts reaches the plugin suite'
-  );
+  for (const suite of [
+    'test:web-rewrites',
+    'test:web-env',
+    'test:dev-local',
+    'test:oxlint-plugins',
+    'test:mobile-artifacts',
+    'test:mobile-sbom',
+    'test:kilo-app-release',
+    'test:kilo-mcp-release',
+  ]) {
+    assert.match(rootScripts['test:scripts'], new RegExp(suite), `test-scripts reaches ${suite}`);
+  }
   assert.match(
     rootScripts['test:oxlint-plugins'],
     /tools\/oxlint\//,
     'the plugin suite runs the plugin tests'
   );
-  for (const job of ['web-test', 'build', 'dependency-cycle-check']) {
-    const condition = ciJobs[job].if;
+
+  for (const webJob of ['web-test', 'build', 'dependency-cycle-check']) {
+    const condition = ciJobs[webJob].if;
     assert.match(
       condition,
       /needs\.changes\.outputs\.kilocode_backend == 'true'/,
-      `${job}: gated on the shared filter alone, which names no plugin path`
+      `${webJob}: gated on the shared filter alone`
     );
-    assert.doesNotMatch(condition, /oxlint_plugins/, `${job}: the plugin output starts no web job`);
+    assert.doesNotMatch(condition, /test_scripts/, `${webJob}: a script input starts no web job`);
   }
 });
 
@@ -1797,9 +1940,11 @@ test('the extension matrix row defers to extension CI outside the merge queue', 
 });
 
 // A selection document from scripts/affected-workspaces.mjs, as the root script
-// reads it.
+// reads it. `base_valid` is true for a normal run: the detector read the base and
+// attributed the change.
 const selection = (overrides = {}) => ({
   base: 'base',
+  base_valid: true,
   full: false,
   reasons: [],
   full_checks: [],
@@ -1820,6 +1965,7 @@ function runTypecheck(
     buildExit = 0,
     checkExit = 0,
     built = '',
+    event = '',
     affected = selection(),
     selectionExit = 0,
   } = {}
@@ -1892,6 +2038,7 @@ if (name === 'git') {
       env: {
         ...process.env,
         PATH: `${bin}:${process.env.PATH}`,
+        GITHUB_EVENT_NAME: event,
         KILO_TYPECHECK_TRPC_BUILT: built,
         EXTENSION_TYPECHECK: extension.scripts.typecheck,
         CHANGES: changes,
@@ -2163,6 +2310,84 @@ test('the web group stays out of a selection that names neither program', t => {
   });
   assert.equal(result.status, 0);
   assert.deepEqual(result.commands, []);
+});
+
+// extension-ci.yml has no merge-queue trigger, so the trpc row is the
+// extension's only gate on a queue entry: the leg must stay there.
+test('the trpc group typechecks the extension for a merge queue entry', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    group: 'trpc',
+    event: 'merge_group',
+    affected: selection({ full: true, dirs: ['apps/extension', 'apps/web'] }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.commands, [trpcBuild, 'pnpm --filter kilo-extension run typecheck']);
+});
+
+// extension-ci.yml runs `verify`, which typechecks the extension, whenever its
+// own selection reaches apps/extension, and that selection is this document's
+// `dirs` list. Repeating the compile in the ci.yml row pays for one program
+// twice on the same event.
+test('the trpc group leaves the extension compile to extension CI', t => {
+  for (const event of ['pull_request', 'push']) {
+    const result = runTypecheck(t, {
+      root: true,
+      group: 'trpc',
+      event,
+      built: '1',
+      affected: selection({ full: true, dirs: ['apps/extension', 'apps/web'] }),
+    });
+    assert.equal(result.status, 0);
+    assert.deepEqual(result.commands, [], `${event}: the row runs no extension check`);
+  }
+});
+
+// A full check that selects no workspace reaches the extension in no other
+// workflow, so the leg is what typechecks it.
+test('the trpc group keeps the extension when extension CI selects nothing', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    group: 'trpc',
+    event: 'pull_request',
+    built: '1',
+    affected: selection({ full_checks: ['typecheck'], dirs: [] }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.commands, ['pnpm --filter kilo-extension run typecheck']);
+});
+
+// Only the two events extension-ci.yml runs on may hand the compile over. A
+// local invocation carries no event name, and the row keeps the leg there.
+test('the trpc group typechecks the extension when the event is unknown', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    group: 'trpc',
+    built: '1',
+    affected: selection({ full: true, dirs: ['apps/extension'] }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.commands, ['pnpm --filter kilo-extension run typecheck']);
+});
+
+// A base the checkout cannot read selects every workspace without attributing
+// the change, and extension-ci.yml resolves its own fallback base for that
+// event, so the document cannot answer for it.
+test('the trpc group keeps the extension when the detector read no base', t => {
+  const result = runTypecheck(t, {
+    root: true,
+    group: 'trpc',
+    event: 'push',
+    built: '1',
+    affected: selection({
+      base: '0000000000000000000000000000000000000000',
+      base_valid: false,
+      full: true,
+      dirs: ['apps/extension', 'apps/web'],
+    }),
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.commands, ['pnpm --filter kilo-extension run typecheck']);
 });
 // `pnpm-workspace.yaml` lists workspaces that sit inside another workspace
 // (services/cloud-agent-next/wrapper is one). Both the full and the affected

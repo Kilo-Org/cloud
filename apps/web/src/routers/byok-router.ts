@@ -61,7 +61,15 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { encryptByokForStorage } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { GatewayAuthenticationError, type GatewayProviderOptions } from '@ai-sdk/gateway';
-import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import {
+  getVercelModelIdOverrides,
+  mapModelIdToVercel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { findVercelOnlyModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
+import {
+  getVendorNamesByModelPrefix,
+  getVercelOnlyModelName,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
@@ -254,21 +262,38 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
     result[providerId].push(model.name + ' (' + model.id + ')');
   };
 
-  for (const openRouterModel of Object.values(openRouterModelMetadata)) {
-    if (isAutoSmallFreeModel(openRouterModel.id)) continue;
-    for (const providerId of await getModelGatewayUserByokProviders(openRouterModel.id)) {
-      addSupportedModel(providerId, openRouterModel);
+  const addGatewayModel = async (model: { id: string; name: string }) => {
+    for (const providerId of await getModelGatewayUserByokProviders(model.id)) {
+      addSupportedModel(providerId, model);
     }
-    const vercelModel = vercelModelMetadata[await mapModelIdToVercel(openRouterModel.id)];
-    if (!vercelModel) continue;
-    if (vercelModel.type !== 'language') continue;
+    const vercelModel = vercelModelMetadata[await mapModelIdToVercel(model.id)];
+    if (vercelModel?.type !== 'language') return;
     for (const endpoint of vercelModel.endpoints) {
       const providerId = getVercelUserByokProviderIdForEndpoint(
         endpoint.provider_name ?? endpoint.tag
       );
       if (!providerId) continue;
-      addSupportedModel(providerId, openRouterModel);
+      addSupportedModel(providerId, model);
     }
+  };
+
+  const openRouterModels = Object.values(openRouterModelMetadata);
+  for (const openRouterModel of openRouterModels) {
+    if (isAutoSmallFreeModel(openRouterModel.id)) continue;
+    await addGatewayModel(openRouterModel);
+  }
+
+  const vendorNames = getVendorNamesByModelPrefix(openRouterModels);
+  const vercelOnlyModels = findVercelOnlyModels({
+    openRouterModelIds: Object.keys(openRouterModelMetadata),
+    vercelMetadata: vercelModelMetadata,
+    overrides: await getVercelModelIdOverrides(),
+  });
+  for (const vercelOnlyModel of vercelOnlyModels) {
+    await addGatewayModel({
+      id: vercelOnlyModel.id,
+      name: getVercelOnlyModelName(vercelOnlyModel, vendorNames),
+    });
   }
 
   for (const provider of DIRECT_BYOK_PROVIDERS) {

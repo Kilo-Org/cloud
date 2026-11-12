@@ -570,6 +570,30 @@ test('the release workflow gates the build on the upload cap and lands the chang
   validate(readWorkflow());
 });
 
+// The preflight reads the EAS CLI and the evaluated Expo config only. `eas-cli`
+// is the app's development dependency, and `app.config.ts` with
+// scripts/assert-expo-config.mjs resolves app-local modules, so the app closure
+// carries every input of the job. The job runs on the default runner, and a
+// measured run of it puts the install saving above a tenth of its wall time.
+const preflightInstall =
+  "pnpm install --frozen-lockfile --filter 'kilo-app...' --filter kilocode-monorepo";
+
+test('the release preflight installs the app closure', () => {
+  const job = readWorkflow().jobs.preflight;
+  const installs = job.steps.filter(item => /^pnpm\b.*\binstall\b/.test(item.run ?? ''));
+  assert.deepEqual(
+    installs.map(item => item.run),
+    [preflightInstall],
+    'one install links the app closure and the root project'
+  );
+  const assertion = job.steps.find(item => item.name === 'Assert production config contract');
+  assert.match(
+    assertion.run,
+    /pnpm assert:config/,
+    'the config assertion the closure must carry still runs'
+  );
+});
+
 test('release retries preserve shipped sections on a bump branch without a PR', () => {
   const work = mkdtempSync(join(tmpdir(), 'kilo-app-bump-'));
   const repo = join(work, 'repo');

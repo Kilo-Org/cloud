@@ -46,6 +46,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/components/ui/bubble', () => ({ Bubble: 'Bubble' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+// The Add credits element pulls `@/lib/external-link` → `expo-web-browser`, which
+// the pure project cannot load; this harness reads the bubble's own element tree.
+vi.mock('@/components/add-credits-row', () => ({ AddCreditsRow: 'AddCreditsRow' }));
 vi.mock('./chat-markdown-text', () => ({ ChatMarkdownText: 'ChatMarkdownText' }));
 vi.mock('./compaction-separator', () => ({ CompactionSeparator: 'CompactionSeparator' }));
 vi.mock('./file-part-renderer', () => ({ FilePartRenderer: 'FilePartRenderer' }));

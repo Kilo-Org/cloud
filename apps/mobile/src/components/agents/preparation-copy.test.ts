@@ -55,23 +55,33 @@ describe('preparationStepLabel', () => {
     ).toEqual([
       'Workspace setup',
       'Disk check',
-      'Cloning repository',
-      'Setting up branch',
+      'Repository clone',
+      'Branch setup',
       'Dev container setup',
       'Running setup commands',
       'Running setup commands',
       'Running commands',
-      'Restoring workspace',
-      'Saving workspace',
-      'Provisioning sandbox',
-      'Starting sandbox',
+      'Workspace restore',
+      'Workspace save',
+      'Sandbox provisioning',
+      'Sandbox start',
       'Retrying without a snapshot',
-      'Starting Kilo',
-      'Preparing session',
+      'Kilo start',
+      'Session preparation',
       'Session restore incomplete',
       'Environment ready',
       'Environment setup failed',
     ]);
+  });
+
+  it('names the stage as a noun, so a failed group reads as a failed step', () => {
+    // The header composes this label after its own failure wording; a stage
+    // named as a running process would claim the step is still in progress.
+    expect(
+      t('agentChat.preparation.preparationStageFailed', {
+        stage: preparationStepLabel(step('sandbox_provision'), t),
+      })
+    ).toBe('Sandbox provisioning failed');
   });
 
   it('never shows a phase key the app does not know', () => {
@@ -85,7 +95,7 @@ describe('preparationStepLabel', () => {
 
   it('reads the label from the active catalog, not the server label', async () => {
     await i18n.changeLanguage('ja');
-    expect(preparationStepLabel(step('sandbox_provision'), t)).not.toBe('Provisioning sandbox');
+    expect(preparationStepLabel(step('sandbox_provision'), t)).not.toBe('Sandbox provisioning');
     expect(preparationStepLabel(step('sandbox_provision'), t)).toBe(
       i18n.getFixedT('ja')('agentChat.preparation.stepSandboxProvision')
     );
@@ -101,6 +111,14 @@ describe('preparationDetailText', () => {
     expect(preparationDetailText('Warm workspace reused', t)).toBe('Warm workspace reused');
     expect(preparationDetailText('Importing session...', t)).toBe('Importing session');
     expect(preparationDetailText('Running build commands', t)).toBe('Running setup commands');
+  });
+
+  it('reads every phase whose row is now a noun as the activity it is doing', () => {
+    // The row name is the stage ("Sandbox start"); the line under it says what
+    // the stage is doing, so the two never read as the same label repeated.
+    expect(preparationDetailText('Starting sandbox', t)).toBe('Starting sandbox');
+    expect(preparationDetailText('Setting up branch', t)).toBe('Setting up branch');
+    expect(preparationDetailText('Starting Kilo', t)).toBe('Starting Kilo');
   });
 
   it('reads a clone retry and git progress with localized numbers', async () => {

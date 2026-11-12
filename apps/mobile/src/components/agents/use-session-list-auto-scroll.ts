@@ -15,6 +15,7 @@ import {
   shouldRetrySessionAutoScroll,
   shouldScheduleSessionAutoScroll,
 } from '@/components/agents/use-session-auto-scroll-state';
+import { useSessionTailRepin } from '@/components/agents/use-session-tail-repin';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 
 type UseSessionListAutoScrollParams = {
@@ -139,6 +140,15 @@ export function useSessionListAutoScroll<ItemT>({
       autoScrollResetTimeoutRef.current = null;
     }, 150);
   }, [clearAutoScrollResetTimeout]);
+
+  const tailRepin = useSessionTailRepin(
+    () =>
+      shouldRetrySessionAutoScroll({
+        isUserScrolling: isUserScrollingRef.current,
+        shouldAutoScroll: shouldAutoScrollRef.current,
+      }),
+    scrollToLatestMessage
+  );
 
   // Animated scroll for the user-initiated "scroll to bottom" button.
   // Intentionally does NOT set `isAutoScrollingRef`: that flag suppresses
@@ -399,10 +409,10 @@ export function useSessionListAutoScroll<ItemT>({
           didContentHeightChange,
         })
       ) {
-        scrollToLatestMessage();
+        tailRepin.push(null);
       }
     },
-    [scrollToLatestMessage, updateScrollableFromSizes]
+    [tailRepin, updateScrollableFromSizes]
   );
 
   const handleListLayout = useCallback(
@@ -426,7 +436,7 @@ export function useSessionListAutoScroll<ItemT>({
           didViewportHeightChange,
         })
       ) {
-        scrollToLatestMessage();
+        tailRepin.push(null);
         return;
       }
       if (
@@ -439,7 +449,7 @@ export function useSessionListAutoScroll<ItemT>({
         scheduleScrollToLatestMessage();
       }
     },
-    [scheduleScrollToLatestMessage, scrollToLatestMessage, updateScrollableFromSizes]
+    [scheduleScrollToLatestMessage, tailRepin, updateScrollableFromSizes]
   );
 
   return {

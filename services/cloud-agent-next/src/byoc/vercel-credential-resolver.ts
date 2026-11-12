@@ -34,20 +34,32 @@ const EnvelopeSchema = z.object({
   }),
 });
 
-const SetupStepSchema = z.enum([
-  'validating_access',
-  'create_builder',
-  'install_system_dependencies',
-  'install_node_dependencies',
-  'upload_runtime_artifacts',
-  'verify_runtime_artifacts',
-  'snapshot_builder',
-  'create_validator',
-  'launch_validator_wrapper',
-  'verify_validator_call_home',
-  'stop_validator',
-  'confirm_terminal',
-]);
+const RETIRED_SETUP_STEPS = ['upload_runtime_artifacts', 'verify_runtime_artifacts'] as const;
+
+/**
+ * Rows written before the downloaded-runtime split can still name a removed
+ * setup step. Resume them at the current install step instead of rejecting the
+ * row; the removed installer must not run again.
+ */
+const SetupStepSchema = z
+  .enum([
+    'validating_access',
+    'create_builder',
+    'install_system_dependencies',
+    'install_node_dependencies',
+    'snapshot_builder',
+    'create_validator',
+    'launch_validator_wrapper',
+    'verify_validator_call_home',
+    'stop_validator',
+    'confirm_terminal',
+    ...RETIRED_SETUP_STEPS,
+  ])
+  .transform((step): VercelComputeSetupStep =>
+    step === 'upload_runtime_artifacts' || step === 'verify_runtime_artifacts'
+      ? 'install_node_dependencies'
+      : step
+  );
 
 const CredentialOwnerSchema = byocVercelOwnerSchema;
 

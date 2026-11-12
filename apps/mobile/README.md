@@ -472,12 +472,19 @@ The Expo plugin disables Horizon and Fire OS through `modules.horizon` and
 builds. Rebuild the native development client after changing `expo-iap`; a Metro
 reload alone does not update its native billing implementation.
 
-Kilo Pass has no native purchase, restore, or store-management flow in the app.
-The Profile card and `/kilo-pass` route render the backend
-`kiloPass.getPurchasePresentation` result:
+Kilo Pass has no native purchase, restore, store-management, or external-link
+flow in the app. The Profile card and the `/kilo-pass` route both read
+`kiloPass.getState`:
 
-- `unavailable` shows the unavailable presentation without purchase controls.
-- `web_management` shows Manage, which opens the returned `webUrl`.
+- No pass shows that Kilo Pass is not available in the app.
+- An active pass shows its tier and billing cadence, its status, the renewal or
+  paid-through date, the current period's usage against the available credits,
+  and the bonus credits for the period. A scheduled cancellation shows the
+  paid-through date; a paused pass shows its resume date.
+- A pass whose provider status ended shows the ended message.
+- A failed read offers one retry.
+
+No control on either surface buys, cancels, resumes, or manages a pass.
 
 Kilo Pass store verification, provider notifications, and expiry reconciliation
 remain on the backend for existing store subscriptions.

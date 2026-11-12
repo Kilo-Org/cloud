@@ -189,6 +189,7 @@ export function createControlPlaneSessionHost(options: {
     | 'onDeadline'
     | 'onActivityChange'
     | 'onMemoryHold'
+    | 'onFeedInterrupted'
   >;
   turn: Omit<TurnManagerDeps, 'runtimes' | 'timers'>;
   isPreparing(): boolean;
@@ -199,6 +200,7 @@ export function createControlPlaneSessionHost(options: {
     onEvent: event => turns?.observeKiloEvent(event),
     onHarnessActivity: event => turns?.observeActivity(event),
     onActivityChange: key => turns?.refreshActivity(key),
+    onFeedInterrupted: (id, key) => turns?.onFeedInterrupted(id, key),
     onDeadline: (identity, reason, retry, key, stopped) =>
       turns?.onNativeDeadline(identity, reason, retry, key, stopped),
     onRestart: info => turns?.onRuntimeRestart(info),

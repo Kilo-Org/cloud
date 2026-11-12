@@ -29,6 +29,7 @@ import {
 import { readProfileBundle } from '../../session-profile.js';
 import type { CloudAgentSessionState } from '../../persistence/types.js';
 import type {
+  ControlPlaneSessionMetadataSummary,
   ControlPlaneSessionSnapshot,
   SandboxSessionV2,
 } from '../../control-plane/session/session-do.js';
@@ -406,69 +407,68 @@ export function createSessionManagementHandlers() {
           // returns a fresh stub per retry attempt.
           const getStub = () => getSandboxSessionStub(env, userId, sessionId);
 
-          // Fetch metadata with retry
-          const metadata = await withDORetry<
+          const summaryRead = withDORetry<
             DurableObjectStub<SandboxSessionV2>,
-            CloudAgentSessionState | null
-          >(getStub, s => s.getMetadata(), 'getMetadata');
-
-          if (!metadata) {
-            logger.info('Session not found');
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: 'Session not found',
-            });
-          }
-
-          const {
-            currentWork,
-            latestEventId,
-            routeReady,
-            title,
-            totalCostMicrodollars,
-            updateCursor,
-          } = await (async (): Promise<{
-            currentWork: {
-              messageId: string;
-              status: 'pending' | 'running';
-              health: 'healthy' | 'stale';
-            } | null;
-            latestEventId: number | null;
-            routeReady: boolean | undefined;
-            title?: string;
-            totalCostMicrodollars?: number;
-            updateCursor?: number;
-          }> => {
-            const snapshot = await withDORetry<
-              DurableObjectStub<SandboxSessionV2>,
-              ControlPlaneSessionSnapshot
-            >(
-              () => getSandboxSessionStub(env, userId, sessionId),
-              s => s.getSession(),
-              'getSession'
-            );
-            if (snapshot.type !== 'found') {
-              return { currentWork: null, latestEventId: null, routeReady: undefined };
+            ControlPlaneSessionMetadataSummary
+          >(getStub, s => s.getSessionMetadataSummary(), 'getSessionMetadataSummary').then(
+            result => {
+              if (!result.metadata)
+                throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+              return { ...result, metadata: result.metadata };
             }
-            const accepted = snapshot.messages.find(message => message.state === 'accepted');
-            const queued = snapshot.messages.find(message => message.state === 'queued');
-            return {
-              currentWork: accepted
-                ? { messageId: accepted.messageId, status: 'running', health: 'healthy' }
-                : queued
-                  ? { messageId: queued.messageId, status: 'pending', health: 'healthy' }
-                  : null,
-              latestEventId: snapshot.latestEventId,
-              // Route readiness is the control-plane owner of "can this
-              // session own a terminal": a terminal requires a ready route.
-              routeReady: snapshot.route?.state === 'ready',
-              title: snapshot.title,
-              totalCostMicrodollars: snapshot.totalCostMicrodollars,
-              updateCursor: snapshot.updateCursor,
-            };
-          })();
-
-          const sessionMetadata = metadata;
+          );
+          const [
+            { metadata: sessionMetadata, snapshot, currentMessage },
+            auxiliaryMetadata,
+            worktreeOwnership,
+          ] = await Promise.all([
+            summaryRead,
+            (async () => {
+              try {
+                return await getSessionAuxiliaryMetadata(getPgDb(env), {
+                  userId,
+                  cloudAgentSessionId: sessionId,
+                  kiloSessionId: sessionAccess.kiloSessionId,
+                  organizationId: sessionAccess.organizationId,
+                });
+              } catch (error) {
+                logger
+                  .withFields({
+                    sessionId,
+                    errorName: error instanceof Error ? error.name : 'unknown',
+                  })
+                  .warn('Failed to fetch optional auxiliary metadata for getSession');
+                return null;
+              }
+            })(),
+            summaryRead.then(({ metadata }) =>
+              metadata.workspace?.worktreeId
+                ? findWorktreeOwnership(
+                    getPgDb(env),
+                    userId,
+                    sessionAccess.kiloSessionId,
+                    sessionId
+                  )
+                : null
+            ),
+          ]);
+          const found = snapshot.type === 'found' ? snapshot : null;
+          const currentWork =
+            found && currentMessage
+              ? {
+                  messageId: currentMessage.messageId,
+                  status:
+                    currentMessage.state === 'accepted'
+                      ? ('running' as const)
+                      : ('pending' as const),
+                  health: 'healthy' as const,
+                }
+              : null;
+          const latestEventId = found?.latestEventId ?? null;
+          const routeReady = found ? found.route?.state === 'ready' : undefined;
+          const title = found?.title;
+          const totalCostMicrodollars = found?.totalCostMicrodollars;
+          const updateCursor = found?.updateCursor;
           const metadataProfile = readProfileBundle(sessionMetadata);
 
           const sandboxId =
@@ -480,31 +480,8 @@ export function createSessionManagementHandlers() {
           logger.setTags({ sandboxId, orgId: sessionMetadata.identity.orgId ?? '(personal)' });
           logger.info('Session metadata retrieved successfully');
 
-          let auxiliaryMetadata: Awaited<ReturnType<typeof getSessionAuxiliaryMetadata>> = null;
-          try {
-            auxiliaryMetadata = await getSessionAuxiliaryMetadata(getPgDb(env), {
-              userId,
-              cloudAgentSessionId: sessionId,
-              kiloSessionId: sessionAccess.kiloSessionId,
-              organizationId: sessionAccess.organizationId,
-            });
-          } catch (error) {
-            logger
-              .withFields({ sessionId, errorName: error instanceof Error ? error.name : 'unknown' })
-              .warn('Failed to fetch optional auxiliary metadata for getSession');
-          }
-
           // Worktree ownership lives on the external ownership row, not in DO metadata.
           const worktreeId = sessionMetadata.workspace?.worktreeId;
-          let worktreeOwnership: WorktreeOwnership | null = null;
-          if (worktreeId) {
-            worktreeOwnership = await findWorktreeOwnership(
-              getPgDb(env),
-              userId,
-              sessionAccess.kiloSessionId,
-              sessionId
-            );
-          }
 
           // Sanitize and return safe fields only (no tokens/secrets)
           const repositoryFields = publicRepositoryFields(sessionMetadata);

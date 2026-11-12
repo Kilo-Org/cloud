@@ -1,4 +1,5 @@
 import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { isCompactionSummaryPart } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
 
 import {
   hasNonWhitespaceText,
@@ -39,6 +40,10 @@ export function partRendersContent(part: Part): boolean {
 }
 
 function computePartRendersContent(part: Part): boolean {
+  // Mobile keeps compaction as a separator rather than displaying the saved summary inline.
+  if (isCompactionSummaryPart(part)) {
+    return false;
+  }
   if (isTextPart(part)) {
     // Snapshot-init progress shows only in the fixed WorkingIndicator row, and
     // TextPartRenderer renders nothing for blank text. Whitespace-only text is

@@ -20,6 +20,8 @@ import {
   type CloudStatus,
   createSessionManager,
   createUserWebConnection,
+  type DeliveredFailedPrompt,
+  type FetchedSessionData,
   type KiloSessionId,
   type MessageDeliveryState,
   type PreparationAttempt,
@@ -41,6 +43,7 @@ import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { getTaskToolSessionId } from '@/components/agents/child-session-card-state';
 import { SessionManagerContext } from '@/components/agents/session-manager-context';
 import { MessageBubble } from '@/components/agents/message-bubble';
+import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
 import { assistantMessage, userMessage } from '@/components/agents/message-bubble-test-utils';
 import {
   exitRemoteSessionWithFeedback,
@@ -70,6 +73,10 @@ import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import type * as SessionTranscript from '@/components/agents/session-transcript';
 import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
+import type * as UseEffectiveAgentProfileModule from '@/components/agents/use-effective-agent-profile';
+import type * as UseEffectiveProfileCustomModesModule from '@/components/agents/use-effective-profile-custom-modes';
+import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
+import { restartAgentSession } from '@/components/agents/restart-agent-session';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import {
   SEND_REASON_MAX_FONT_SCALE,
@@ -147,6 +154,14 @@ const profileRowsState = vi.hoisted(() => {
   };
 });
 const routerSetParams = vi.hoisted(() => vi.fn());
+// The root container ref, which is one module-level singleton in expo-router.
+// A test flips `ready` to model the container going away (an activity recreate)
+// between arming the publish and its timer firing.
+const navigationContainer = vi.hoisted(() => ({
+  ready: true,
+  addListener: () => () => undefined,
+  isReady: () => navigationContainer.ready,
+}));
 const handoffAdvertiserCalls = vi.hoisted(() => ({
   props: [] as { anchorMessageId?: string | null }[],
 }));
@@ -211,7 +226,7 @@ vi.mock('@/lib/app-unlock-context', () => ({
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
-  useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
+  useNavigationContainerRef: () => navigationContainer,
   usePreventRemove: vi.fn(),
   useNavigation: () => ({
     getState: () => ({
@@ -523,12 +538,65 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 vi.mock('@/lib/last-opened-session', () => ({
   recordLastOpenedSession: vi.fn(),
 }));
+// The organization each org-scoped read on the screen is asked for. The screen
+// derives that scope from the session row, so the recorded arguments are the
+// assertion surface for it.
+const scopeReads = vi.hoisted(() => ({
+  models: [] as { organizationId: string | undefined; enabled: boolean | undefined }[],
+  /** What the mocked catalog read reports; a model here must not reach the picker. */
+  catalogModels: [] as unknown[],
+  preferences: [] as { organizationId: string | undefined; enabled: boolean | undefined }[],
+  profiles: [] as { organizationId: string | undefined; enabled: boolean | undefined }[],
+  modes: [] as { organizationId: string | undefined; enabled: boolean | undefined }[],
+}));
 vi.mock('@/lib/hooks/use-available-models', () => ({
-  useAvailableModels: () => ({ models: [], isLoading: false }),
+  useAvailableModels: (
+    organizationId: string | undefined,
+    _audience: unknown,
+    options?: { enabled?: boolean }
+  ) => {
+    scopeReads.models.push({ organizationId, enabled: options?.enabled });
+    return { models: scopeReads.catalogModels, isLoading: false };
+  },
 }));
 vi.mock('@/lib/hooks/use-model-preferences', () => ({
-  useModelPreferences: () => ({ setLastSelected: vi.fn() }),
+  useModelPreferences: (organizationId: string | undefined, options?: { enabled?: boolean }) => {
+    scopeReads.preferences.push({ organizationId, enabled: options?.enabled });
+    return { setLastSelected: vi.fn() };
+  },
 }));
+// Keep the real profile hook (the chip tests below assert its behavior) and
+// record the scope it is asked for.
+vi.mock('@/components/agents/use-effective-agent-profile', async importOriginal => {
+  const actual = await importOriginal<typeof UseEffectiveAgentProfileModule>();
+  return {
+    ...actual,
+    useEffectiveAgentProfile: (
+      organizationId?: string,
+      overrideProfileId?: string | null,
+      options?: { enabled?: boolean }
+    ) => {
+      scopeReads.profiles.push({ organizationId, enabled: options?.enabled });
+      return actual.useEffectiveAgentProfile(organizationId, overrideProfileId, options);
+    },
+  };
+});
+// Keep the real custom-mode read (its own suite asserts the resolution rules)
+// and record the scope it is asked for, like the profile hook above.
+vi.mock('@/components/agents/use-effective-profile-custom-modes', async importOriginal => {
+  const actual = await importOriginal<typeof UseEffectiveProfileCustomModesModule>();
+  return {
+    ...actual,
+    useEffectiveProfileCustomModes: (
+      organizationId?: string,
+      profileId?: string | null,
+      options?: { enabled?: boolean }
+    ) => {
+      scopeReads.modes.push({ organizationId, enabled: options?.enabled });
+      return actual.useEffectiveProfileCustomModes(organizationId, profileId, options);
+    },
+  };
+});
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
   usePersistedAgentModel: () => ({ saveModel: vi.fn() }),
 }));
@@ -844,6 +912,8 @@ function transcriptKeys(renderer: ReactTestRenderer): string[] {
 
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+  routerSetParams.mockClear();
+  navigationContainer.ready = true;
   profileRowsState.personal = [];
   profileRowsState.combined = { orgProfiles: [], personalProfiles: [], effectiveDefaultId: null };
   profileRowsState.agentsById = {};
@@ -868,6 +938,13 @@ beforeEach(() => {
   connectionHealth.isConnected = true;
   connectionHealth.reconnectExhausted = false;
   connectionHealth.retryConnection.mockClear();
+  scopeReads.models.length = 0;
+  scopeReads.preferences.length = 0;
+  scopeReads.profiles.length = 0;
+  scopeReads.modes.length = 0;
+  scopeReads.catalogModels = [];
+  vi.mocked(createAndNavigateAgentSession).mockReset();
+  vi.mocked(restartAgentSession).mockReset();
 });
 
 type MountDetailsOptions = {
@@ -884,6 +961,12 @@ type MountDetailsOptions = {
   sessionOrganizationId?: string;
   /** The profile id the session row recorded, as `fetchSession` reports it. */
   sessionProfileId?: string | null;
+  /**
+   * Keep one mounted screen across `switchRoot`, the way the route's screen
+   * instance receives a new `sessionId` prop. The default remounts, as the
+   * route-keyed provider does.
+   */
+  keepInstanceOnSwitch?: boolean;
 };
 
 async function mountDetails(
@@ -1009,7 +1092,7 @@ async function mountDetails(
         Provider,
         { store },
         createElement(SessionDetailContent, {
-          key: id,
+          ...(options.keepInstanceOnSwitch ? {} : { key: id }),
           sessionId: id,
           displayScope,
           ...(cachedTitle === undefined ? {} : { cachedTitle }),
@@ -1340,6 +1423,262 @@ describe('session detail active-profile indicator', () => {
   });
 });
 
+/**
+ * The props the screen hands one transcript row's bubble. The list is stubbed,
+ * so read the element the stub renders: the bubble itself is a memo component,
+ * which a rendered-tree lookup does not resolve to the imported symbol.
+ */
+function messageBubbleProps(
+  renderer: ReactTestRenderer,
+  messageId: string
+): { onLongPressDetails: (message: StoredMessage) => void } {
+  const list = renderer.root.findAllByType(SessionMessageList)[0];
+  if (!list) {
+    throw new Error('the transcript list was expected to paint');
+  }
+  const props = list.props as {
+    items: readonly SessionTranscriptItem[];
+    renderItem: (args: { item: SessionTranscriptItem }) => ReactElement<{ children: ReactNode }>;
+  };
+  const item = props.items.find(
+    candidate => candidate.type === 'message' && candidate.message.info.id === messageId
+  );
+  if (!item) {
+    throw new Error(`no transcript row for ${messageId}`);
+  }
+  const rendered = props.renderItem({ item });
+  const children = rendered.props.children;
+  const bubble = (Array.isArray(children) ? children : [children]).find(
+    (child: ReactNode): child is ReactElement =>
+      isValidElement(child) && child.type === MessageBubble
+  );
+  if (!bubble) {
+    throw new Error(`no bubble for ${messageId}`);
+  }
+  return bubble.props as { onLongPressDetails: (message: StoredMessage) => void };
+}
+
+function detailsSheetNode(renderer: ReactTestRenderer) {
+  const [sheet] = renderer.root.findAll(node => Object.is(node.type, 'MessageDetailsSheet'));
+  if (!sheet) {
+    throw new Error('the message details sheet was expected to mount');
+  }
+  return sheet;
+}
+
+describe('session detail organization scope', () => {
+  it('uses the displayed session organization once its row resolves', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    // One mounted screen, as the route keeps it: only the `sessionId` prop
+    // changes when another session opens.
+    const view = await mountDetails([], {
+      sessionOrganizationId: 'org-a',
+      keepInstanceOnSwitch: true,
+    });
+    await waitFor(
+      () => view.store.get(view.manager.atoms.fetchedSessionData)?.kiloSessionId === ROOT_ID
+    );
+    expect(scopeReads.models.at(-1)).toEqual({ organizationId: 'org-a', enabled: true });
+    expect(scopeReads.preferences.at(-1)).toEqual({ organizationId: 'org-a', enabled: true });
+    expect(scopeReads.profiles.at(-1)).toEqual({ organizationId: 'org-a', enabled: true });
+    expect(scopeReads.modes.at(-1)).toEqual({ organizationId: 'org-a', enabled: true });
+
+    const counts = {
+      models: scopeReads.models.length,
+      preferences: scopeReads.preferences.length,
+      profiles: scopeReads.profiles.length,
+      modes: scopeReads.modes.length,
+    };
+    // The manager's read for the new session has not answered yet.
+    vi.spyOn(view.manager, 'switchSession').mockImplementation(
+      () =>
+        new Promise<void>(() => {
+          // Never settles: the manager's read for the new session stays pending,
+          // which is the window this test describes.
+        })
+    );
+    await view.switchRoot(NEXT_ROOT_ID);
+    expect(view.store.get(view.manager.atoms.fetchedSessionData)?.kiloSessionId).toBe(ROOT_ID);
+
+    const afterSwitch = {
+      models: scopeReads.models.slice(counts.models),
+      preferences: scopeReads.preferences.slice(counts.preferences),
+      profiles: scopeReads.profiles.slice(counts.profiles),
+      modes: scopeReads.modes.slice(counts.modes),
+    };
+    // No org-scoped read runs for a scope the screen has not settled.
+    for (const reads of Object.values(afterSwitch)) {
+      expect(reads.length).toBeGreaterThan(0);
+      expect(reads.every(read => read.organizationId === undefined)).toBe(true);
+      expect(reads.at(-1)?.enabled).toBe(false);
+    }
+    // Start, Restart, Continue and fork are unavailable in this window.
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+    // The Continue control is the read-only session's one action; it stays
+    // unrendered while the scope is unresolved.
+    expect(
+      view.renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Button') &&
+          node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+      )
+    ).toHaveLength(0);
+    expect(createAndNavigateAgentSession).not.toHaveBeenCalled();
+    expect(restartAgentSession).not.toHaveBeenCalled();
+
+    // The new session's row lands: its organization scopes every read and action
+    // from here on.
+    const staleRow = view.store.get(view.manager.atoms.fetchedSessionData);
+    if (!staleRow) {
+      throw new Error('the stale session row was expected');
+    }
+    await act(async () => {
+      view.store.set<FetchedSessionData | null, [FetchedSessionData | null], unknown>(
+        view.manager.atoms.fetchedSessionData,
+        {
+          ...staleRow,
+          kiloSessionId: NEXT_ROOT_ID,
+          organizationId: 'org-b',
+        }
+      );
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.canSend, true);
+      await Promise.resolve();
+    });
+
+    expect(scopeReads.models.at(-1)).toEqual({ organizationId: 'org-b', enabled: true });
+    expect(scopeReads.preferences.at(-1)).toEqual({ organizationId: 'org-b', enabled: true });
+    expect(scopeReads.profiles.at(-1)).toEqual({ organizationId: 'org-b', enabled: true });
+    expect(scopeReads.modes.at(-1)).toEqual({ organizationId: 'org-b', enabled: true });
+
+    vi.mocked(createAndNavigateAgentSession).mockResolvedValue({
+      success: true,
+      sessionId: NEXT_ROOT_ID,
+    });
+    vi.mocked(restartAgentSession).mockResolvedValue({ success: true, sessionId: NEXT_ROOT_ID });
+    const [composer] = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'));
+    if (!composer) {
+      throw new Error('the composer was expected for the resolved session');
+    }
+    await act(async () => {
+      await (composer.props.onCreateSession as () => Promise<boolean>)();
+      await (composer.props.onRestartSession as () => Promise<boolean>)();
+      await Promise.resolve();
+    });
+    expect(createAndNavigateAgentSession).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'org-b' })
+    );
+    expect(restartAgentSession).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'org-b' })
+    );
+  });
+
+  it('holds the reads and the actions while the session row has not arrived', async () => {
+    // A cached transcript paints while the metadata read is still in flight, so
+    // the composer is on screen before the session's own row arrives.
+    const metadata = Promise.withResolvers<undefined>();
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const cachedRow = cachedRows[0];
+    if (!cachedRow) {
+      throw new Error('the cached row fixture was expected');
+    }
+    scopeReads.catalogModels = [
+      {
+        id: 'deepseek/deepseek-v4.1-flash',
+        name: 'DeepSeek V4.1 Flash',
+        variants: [],
+        isPreferred: false,
+        showGatewayMetadata: true,
+      },
+    ];
+    const view = await mountDetails(cachedRows, {
+      metadataReady: metadata.promise,
+      cachedRows,
+    });
+    expect(view.store.get(view.manager.atoms.fetchedSessionData)).toBeNull();
+
+    // Held: no organization-scoped read has run, and the held catalog is not
+    // presented even though the read reports cached models.
+    expect(scopeReads.models.at(-1)).toEqual({ organizationId: undefined, enabled: false });
+    expect(scopeReads.modes.at(-1)).toEqual({ organizationId: undefined, enabled: false });
+    const [composer] = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'));
+    if (!composer) {
+      throw new Error('the composer was expected for a cached transcript');
+    }
+    expect(composer.props.modelOptions).toEqual([]);
+    // The bottom slot holds one block: the live composer never shares it with
+    // the read-only reserve.
+    expect(
+      view.renderer.root.findAll(node => Object.is(node.type, 'SessionReadOnlyFooterPlaceholder'))
+    ).toHaveLength(0);
+
+    // Start and Restart do nothing while the scope is unresolved.
+    await act(async () => {
+      await (composer.props.onCreateSession as () => Promise<boolean>)();
+      await (composer.props.onRestartSession as () => Promise<boolean>)();
+      await Promise.resolve();
+    });
+    expect(createAndNavigateAgentSession).not.toHaveBeenCalled();
+    expect(restartAgentSession).not.toHaveBeenCalled();
+
+    // The read-only footer's Continue is the same class of action: the same
+    // window paints that footer, so it keeps its reserve instead of offering a
+    // Continue that cannot open a destination.
+    await act(async () => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      await Promise.resolve();
+    });
+    expect(
+      view.renderer.root.findAll(node => Object.is(node.type, 'SessionReadOnlyFooterPlaceholder'))
+    ).toHaveLength(1);
+    expect(
+      view.renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Button') &&
+          node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+      )
+    ).toHaveLength(0);
+    expect(
+      navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+    ).toHaveLength(0);
+
+    // Fork from a message's details is the same held destination, so the sheet
+    // offers no fork entry in this window.
+    act(() => {
+      messageBubbleProps(view.renderer, cachedRow.info.id).onLongPressDetails(cachedRow);
+    });
+    const detailsSheet = detailsSheetNode(view.renderer);
+    expect(detailsSheet.props.visible).toBe(true);
+    expect(detailsSheet.props.onForkFromHere).toBeUndefined();
+  });
+
+  it('offers the fork entry once the session row resolves', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const row = childMessage(ROOT_ID, 'resolved row');
+    const view = await mountDetails([row], { sessionOrganizationId: 'org-a' });
+    await waitFor(
+      () => view.store.get(view.manager.atoms.fetchedSessionData)?.kiloSessionId === ROOT_ID
+    );
+
+    act(() => {
+      messageBubbleProps(view.renderer, row.info.id).onLongPressDetails(row);
+    });
+    const detailsSheet = detailsSheetNode(view.renderer);
+    const fork = detailsSheet.props.onForkFromHere;
+    expect(typeof fork).toBe('function');
+
+    act(() => {
+      (fork as () => void)();
+    });
+    const destination = navigationRoutes.at(-1) ?? '';
+    expect(destination.startsWith('/(app)/agent-chat/new?organizationId=org-a')).toBe(true);
+    expect(destination).toContain(`cloneUpToMessageId=${row.info.id}`);
+  });
+});
+
 function roleProfileRow(id: string, name: string, isDefault: boolean) {
   return {
     id,
@@ -1566,13 +1905,19 @@ describe('session detail header right cluster', () => {
     expect(slot[0]?.props.className).toContain('shrink');
 
     // ...and the cluster inside it shrinks into that cap, so it can never paint
-    // past the slot edge. It holds the Follow control and the context pill and
-    // nothing else: the PR badge now shares the goal row instead.
+    // past the slot edge. It holds the context pill and the Follow control and
+    // nothing else: the PR badge now shares the goal row instead. The pill
+    // leads and the Follow control ends the row, so a reading that arrives
+    // widens the pill into the header's free space instead of moving the
+    // control beside it.
     const cluster = slot[0]?.children[0] as ReactTestInstance | undefined;
     expect(cluster?.props.className).toContain('min-w-0');
     expect(cluster?.props.className).toContain('shrink');
     expect(cluster?.findAllByType(SessionContextMetrics)).toHaveLength(1);
     expect(cluster?.children).toHaveLength(2);
+    const [leading] = cluster?.children ?? [];
+    expect(typeof leading).toBe('object');
+    expect((leading as ReactTestInstance | undefined)?.type).toBe(SessionContextMetrics);
 
     // The pill is the flexible part of the cluster: it shrinks into the cap
     // with it, so the cluster can never paint past the slot edge.
@@ -1588,18 +1933,26 @@ describe('session detail header right cluster', () => {
     if (priced.info.role !== 'assistant') {
       throw new Error('expected an assistant message');
     }
-    priced.info = { ...priced.info, sessionID: ROOT_ID, cost: 1234.56 };
+    priced.info = { ...priced.info, sessionID: ROOT_ID, cost: 123_456.78 };
     const { renderer } = await mountDetails([priced]);
-    const expected = formatSessionCostBadge(1234.56 * 1_000_000);
-    expect(expected).not.toBeNull();
+    const expected = formatSessionCostBadge(123_456.78 * 1_000_000);
+    if (expected === null) {
+      throw new Error('expected a formatted cost badge');
+    }
     const metrics = renderer.root.findByProps({ testID: 'session-context-metrics' });
-    const cost = metrics.find(
+    // The cost is its own value text, so it truncates on its own one line inside
+    // the capped pill instead of pushing the percentage beside it.
+    const [cost] = metrics.findAll(
       node =>
         Object.is(node.type, 'Text') &&
-        node.children.some(child => typeof child === 'string' && child === expected)
+        node.children.some(child => typeof child === 'string' && child.includes(expected))
     );
+    if (cost === undefined) {
+      throw new Error('expected the cost text');
+    }
     expect(cost.props.numberOfLines).toBe(1);
     expect(cost.props.className).toContain('shrink');
+    expect(cost.props.className).toContain('min-w-0');
   });
 });
 
@@ -3899,6 +4252,67 @@ describe('hide thinking preference', () => {
     expect(bubbleAfter.getChildMessages).toBe(bubbleBefore.getChildMessages);
   });
 
+  // The row's Add credits settles the balance the session records. Until the
+  // current session's metadata is the loaded one, that record is unknown: the
+  // cached transcript still paints, so reading no organization there would send
+  // an organization's refusal to the person's own purchase screen.
+  it('withholds Add credits until the session metadata is the loaded one', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const row: StoredMessage = {
+      info: { ...userMessage('msg_1761000000002_credits').info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'msg_1761000000002_credits-text',
+          sessionID: ROOT_ID,
+          messageID: 'msg_1761000000002_credits',
+          text: 'a refused question',
+        }),
+      ],
+    };
+    const view = await mountDetails([row], {
+      metadataReady: metadata.promise,
+      cachedRows: [row],
+      sessionOrganizationId: 'org-a',
+    });
+
+    const creditsOf = () => {
+      const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+      if (!list) {
+        throw new Error('No transcript list');
+      }
+      const props = list.props as {
+        items: readonly SessionTranscriptItem[];
+        renderItem: (args: { item: SessionTranscriptItem }) => ReactElement<{
+          children: ReactNode;
+        }>;
+      };
+      const item = props.items.find(
+        candidate => candidate.type === 'message' && candidate.message.info.id === row.info.id
+      );
+      if (!item) {
+        throw new Error('No transcript item for the question');
+      }
+      const bubble = (props.renderItem({ item }).props as { children: ReactNode[] }).children.find(
+        (child): child is ReactElement => isValidElement(child) && child.type === MessageBubble
+      );
+      if (!bubble) {
+        throw new Error('No bubble for the question');
+      }
+      return (bubble.props as { addCredits?: { kind: string; url?: string } }).addCredits;
+    };
+
+    expect(creditsOf()).toBeUndefined();
+
+    await act(async () => {
+      metadata.resolve(undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => creditsOf() !== undefined);
+
+    expect(creditsOf()).toEqual({ kind: 'organization', url: organizationBillingUrl('org-a') });
+  });
+
   it('renders no empty padded row for a reasoning-only child message', async () => {
     const view = await openRunningChildSheet(true);
     await view.respond(RUNNING_CHILD, [childReasoningMessage(RUNNING_CHILD)]);
@@ -3986,6 +4400,49 @@ describe('session detail composer after a failed turn', () => {
     const node = view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer'));
     expect(node.props.disabled).toBe(false);
     expect(node.props.sendDisabled).toBe(true);
+  });
+
+  it('withdraws the restored draft when the SDK reports the failed send was delivered', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(candidate =>
+      Object.is(candidate.type, 'ChatComposer')
+    );
+    const control = {
+      setText: vi.fn(),
+      hasContent: vi.fn(() => true),
+      restoreAttachments: vi.fn(),
+      withdrawRestoredSend: vi.fn(),
+    };
+    act(() => {
+      (composer.props.controlRef as { current: typeof control | null }).current = control;
+    });
+
+    act(() => {
+      view.store.set<DeliveredFailedPrompt | null, [DeliveredFailedPrompt | null], unknown>(
+        view.manager.atoms.deliveredFailedPrompt,
+        {
+          messageId: 'msg-delivered',
+          text: 'Delivered late',
+          sequence: 1,
+        }
+      );
+    });
+    expect(control.withdrawRestoredSend).toHaveBeenCalledExactlyOnceWith('Delivered late');
+
+    // A re-render of the same record changes nothing: one delivery, one
+    // withdrawal.
+    act(() => {
+      view.store.set<DeliveredFailedPrompt | null, [DeliveredFailedPrompt | null], unknown>(
+        view.manager.atoms.deliveredFailedPrompt,
+        {
+          messageId: 'msg-delivered',
+          text: 'Delivered late',
+          sequence: 1,
+        }
+      );
+    });
+    expect(control.withdrawRestoredSend).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the composer sendable after a non-retryable turn failure', async () => {
@@ -4469,6 +4926,33 @@ describe('SessionDetailContent live position', () => {
     });
     expect(routerSetParams).toHaveBeenCalledWith({ at: 'msg-77' });
   });
+
+  it('drops the publish when the container is gone before the debounce fires', async () => {
+    routerSetParams.mockClear();
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    act(() => {
+      (list.props as ComponentProps<typeof SessionMessageList>).onAnchorChange?.('msg-77');
+    });
+
+    // The container leaves before the timer fires — an activity recreate, or
+    // the bootstrap-error surface that renders no `Slot`. `setParams` asserts
+    // the container is mounted and throws out of this callback otherwise; the
+    // resume position is simply dropped.
+    navigationContainer.ready = false;
+
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 600);
+      });
+    });
+
+    expect(routerSetParams).not.toHaveBeenCalled();
+  });
 });
 
 // A resume link delivered onto a screen that already shows the session arrives
@@ -4791,8 +5275,8 @@ describe('session detail read-only composer', () => {
   });
 
   // The transcript paints a skeleton until its rows stop measuring. The chrome
-  // around it reads the same fact: a live continue footer, or a pill settled on
-  // a bare ring, beside a loading body is the screen showing two states at once.
+  // around it reads the same fact: a live continue footer beside a loading body
+  // is the screen showing two states at once.
   it('keeps the footer and the pill in their loading shapes until the rows are painted', async () => {
     openSettledReport.value = false;
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
@@ -4805,10 +5289,11 @@ describe('session detail read-only composer', () => {
           node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
       )
     ).toHaveLength(0);
-    // The pill holds the row its values will take, instead of shrinking to a
-    // ring with no slot.
+    // The pill paints its ring alone in every unresolved state, and the box
+    // around it holds the row its values will take, so nothing shrinks when the
+    // values arrive.
     const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
-    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(1);
+    expect(metrics.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
 
     // The list then reports its rows painted, and the footer takes the
     // placeholder's place in the same slot.
@@ -5063,7 +5548,7 @@ describe('session detail duplicate failure state', () => {
     expect(labels).toContain(i18n.t('agentChat.messageBubble.copyToComposer'));
   });
 
-  it('shows the failure line and a usable composer once environment setup gives up', async () => {
+  it('states a failed preparation once: the group names the failed stage and the row keeps its actions', async () => {
     goalMountOptions.resolvedType = 'cloud-agent';
     sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
     const question = 'please refactor';
@@ -5096,15 +5581,28 @@ describe('session detail duplicate failure state', () => {
       status: 'failed',
       startedAt: 0,
       completedAt: 1,
-      safeError: 'sandbox_create_failed',
+      safeError: 'invalid_configuration',
       revision: 2,
-      steps: [],
+      steps: [
+        {
+          id: 'step-sandbox',
+          key: 'sandbox_provision',
+          kind: 'phase',
+          label: 'sandbox provision',
+          status: 'failed',
+          startedAt: 0,
+          completedAt: 1,
+          revision: 1,
+          latestDetail: 'Creating sandbox',
+          safeError: 'invalid_configuration',
+        },
+      ],
     };
     act(() => {
       view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, true);
       view.store.set<CloudStatus | null, [CloudStatus | null], unknown>(
         view.manager.atoms.cloudStatus,
-        { type: 'error', message: 'sandbox_create_failed' }
+        { type: 'error', message: 'invalid_configuration' }
       );
       view.store.set<readonly PreparationAttempt[], [readonly PreparationAttempt[]], unknown>(
         view.manager.atoms.preparationAttempts,
@@ -5126,11 +5624,22 @@ describe('session detail duplicate failure state', () => {
     });
 
     const text = renderedText(view.renderer.root);
-    expect(text).toContain(i18n.t('agentChat.messageFailure.assistantTitle'));
-    expect(text).toContain(i18n.t('agentChat.messageFailure.deliveryExecution'));
+    // The failed attempt is what the group renders; its own copy (the failed
+    // stage and the reason) is covered by the group's suite.
+    const group = view.renderer.root.find(node => Object.is(node.type, 'PreparationGroup'));
+    expect(group.props.attempt).toMatchObject({
+      id: 'attempt-1',
+      triggerMessageId: USER_ID,
+      status: 'failed',
+    });
+    // The generic response-failure statement above it is gone, so the same
+    // failed turn is not read as two competing errors.
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.assistantTitle'));
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.deliveryExecution'));
     expect(placeholder()).toBe(i18n.t('common.message'));
     expect(composerProps(view).sendDisabled).toBe(false);
     expect(composerProps(view).sendDisabledReason).toBeNull();
+    // The turn keeps the recovery PR 9887 gave it.
     const labels = view.renderer.root
       .findAll(node => Object.is(node.type, 'Button'))
       .map(node => node.props.accessibilityLabel);

@@ -445,6 +445,30 @@ describe('canRouteToVercel', () => {
   });
 });
 
+describe('isValidVercelModelId', () => {
+  async function loadIsValidVercelModelId(vercelModelIds: string[]) {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+      getVercelModelsFromDatabase: jest.fn(async () => new Set(vercelModelIds)),
+    }));
+    return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
+      .isValidVercelModelId;
+  }
+
+  it('accepts a model whose Vercel id is listed and rejects one that is not', async () => {
+    const isValidVercelModelId = await loadIsValidVercelModelId(['alibaba/qwen3.5-flash']);
+
+    await expect(isValidVercelModelId('qwen/qwen3.5-flash')).resolves.toBe(true);
+    await expect(isValidVercelModelId('vendor/unknown-model')).resolves.toBe(false);
+  });
+
+  it("assumes a model is valid while Vercel's model list is unavailable", async () => {
+    const isValidVercelModelId = await loadIsValidVercelModelId([]);
+
+    await expect(isValidVercelModelId('vendor/unknown-model')).resolves.toBe(true);
+  });
+});
+
 describe('applyVercelSettings BYOK pinning', () => {
   function byokRequest(ignore: string[]): GatewayRequest {
     return {

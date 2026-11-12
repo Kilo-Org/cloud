@@ -6,21 +6,21 @@ import {
   securityLifecycleEventSchema,
 } from './notification-events';
 import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
-import { pushDataSchema, cloudAgentSessionCategorySchema } from './push-data';
+import { pushDataSchema, cloudAgentSessionCategorySchema, nonEmptyStringSchema } from './push-data';
 import { refineSpendAlertScope } from './spend-alert-scope';
 
 // ── sendPushForConversation ─────────────────────────────────────────
 
 export const sendPushForConversationInputSchema = z.object({
-  conversationId: z.string().min(1),
-  sandboxId: z.string().min(1),
-  senderUserId: z.union([z.string().min(1), z.null()]),
-  recipientUserIds: z.array(z.string().min(1)).min(1),
+  conversationId: nonEmptyStringSchema,
+  sandboxId: nonEmptyStringSchema,
+  senderUserId: z.union([nonEmptyStringSchema, z.null()]),
+  recipientUserIds: z.array(nonEmptyStringSchema).min(1),
   title: z.string().max(200),
   bodyPreview: z.string().max(200),
-  messageId: z.string().min(1),
+  messageId: nonEmptyStringSchema,
   // Old producers omit these; remove the optionals when every producer sends keys.
-  i18nKey: z.string().min(1).optional(),
+  i18nKey: nonEmptyStringSchema.optional(),
   i18nParams: z.record(z.string(), z.string()).optional(),
 });
 export type SendPushForConversationInput = z.infer<typeof sendPushForConversationInputSchema>;
@@ -54,7 +54,7 @@ export type SendPushForConversationOutput = z.infer<typeof sendPushForConversati
 
 // ── badge HTTP routes ───────────────────────────────────────────────
 
-export const badgeBucketSchema = z.string().min(1);
+export const badgeBucketSchema = nonEmptyStringSchema;
 export type BadgeBucket = z.infer<typeof badgeBucketSchema>;
 
 export const badgeCountRowSchema = z.object({
@@ -79,7 +79,7 @@ export const markBadgeReadResponseSchema = z.object({
 export type MarkBadgeReadResponse = z.infer<typeof markBadgeReadResponseSchema>;
 
 export const clearBadgeBucketForUserInputSchema = z.object({
-  userId: z.string().min(1),
+  userId: nonEmptyStringSchema,
   badgeBucket: badgeBucketSchema,
 });
 export type ClearBadgeBucketForUserInput = z.infer<typeof clearBadgeBucketForUserInputSchema>;
@@ -90,8 +90,8 @@ export type ClearBadgeBucketForUserOutput = z.infer<typeof clearBadgeBucketForUs
 // ── sendInstanceLifecycleNotification ───────────────────────────────
 
 export const sendInstanceLifecycleNotificationInputSchema = z.object({
-  userId: z.string().min(1),
-  sandboxId: z.string().min(1),
+  userId: nonEmptyStringSchema,
+  sandboxId: nonEmptyStringSchema,
   event: instanceLifecycleEventSchema,
   instanceName: z.string().nullable(),
   errorMessage: z.string().optional(),
@@ -119,9 +119,9 @@ export type SendInstanceLifecycleNotificationResult = z.infer<
 // ── sendScheduledActionNotice ─────────────────────────────────────────
 
 export const sendScheduledActionNoticeInputSchema = z.object({
-  userId: z.string().min(1),
-  instanceId: z.string().min(1),
-  sandboxId: z.string().min(1),
+  userId: nonEmptyStringSchema,
+  instanceId: nonEmptyStringSchema,
+  sandboxId: nonEmptyStringSchema,
   event: scheduledActionEventSchema,
   instanceName: z.string().nullable(),
   scheduledAt: z.string(),
@@ -144,9 +144,9 @@ export const cloudAgentSessionPushStatusSchema = z.enum(['completed', 'failed', 
 export type CloudAgentSessionPushStatus = z.infer<typeof cloudAgentSessionPushStatusSchema>;
 
 export const sendCloudAgentSessionNotificationInputSchema = z.object({
-  userId: z.string().min(1),
-  cliSessionId: z.string().min(1),
-  executionId: z.string().min(1),
+  userId: nonEmptyStringSchema,
+  cliSessionId: nonEmptyStringSchema,
+  executionId: nonEmptyStringSchema,
   status: cloudAgentSessionPushStatusSchema,
   body: z.string(),
   suppressIfViewingSession: z.boolean().optional(),
@@ -155,9 +155,9 @@ export const sendCloudAgentSessionNotificationInputSchema = z.object({
   // Needs-input raise detail: which answer the waiting agent wants, and the PR
   // that can be opened from the notification. Absent on status pushes.
   attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
-  prUrl: z.string().min(1).optional(),
+  prUrl: nonEmptyStringSchema.optional(),
   // Old producers omit these; remove the optionals when every producer sends keys.
-  i18nKey: z.string().min(1).optional(),
+  i18nKey: nonEmptyStringSchema.optional(),
   i18nParams: z.record(z.string(), z.string()).optional(),
 });
 export type SendCloudAgentSessionNotificationParams = z.infer<
@@ -174,8 +174,8 @@ export type SendCloudAgentSessionNotificationResult = z.infer<
 
 // Aggregate refreshes carry identity only; the server reads current status and scope.
 export const refreshGlanceableSessionsInputSchema = z.object({
-  userId: z.string().min(1),
-  cliSessionIds: z.array(z.string().min(1)).min(1),
+  userId: nonEmptyStringSchema,
+  cliSessionIds: z.array(nonEmptyStringSchema).min(1),
   /**
    * The subset of `cliSessionIds` whose change moved a session into or out of
    * the `permission` status. `needsApproval` gates the Approve control on the
@@ -186,7 +186,7 @@ export const refreshGlanceableSessionsInputSchema = z.object({
    * several organizations, and exempting all of them would wake devices that
    * had no approval change.
    */
-  approvalChangedSessionIds: z.array(z.string().min(1)).optional(),
+  approvalChangedSessionIds: z.array(nonEmptyStringSchema).optional(),
   /**
    * Sessions in `cliSessionIds` whose refresh must not happen unless a session
    * card follows them. The ingest service refreshes the card content after it
@@ -195,7 +195,7 @@ export const refreshGlanceableSessionsInputSchema = z.object({
    * indexed read and skips this call when none of the named sessions is
    * followed. Omitting the field keeps the previous behavior.
    */
-  cardFollowSessionIds: z.array(z.string().min(1)).optional(),
+  cardFollowSessionIds: z.array(nonEmptyStringSchema).optional(),
 });
 export type RefreshGlanceableSessionsParams = z.infer<typeof refreshGlanceableSessionsInputSchema>;
 
@@ -208,16 +208,16 @@ export type RefreshGlanceableSessionsParams = z.infer<typeof refreshGlanceableSe
 // the next agent-session transition to drive a delivery pass.
 
 export const glanceableScopeRefreshRequestSchema = z.object({
-  userId: z.string().min(1),
-  organizationId: z.string().min(1).nullable(),
+  userId: nonEmptyStringSchema,
+  organizationId: nonEmptyStringSchema.nullable(),
 });
 export type GlanceableScopeRefreshRequest = z.infer<typeof glanceableScopeRefreshRequestSchema>;
 
 // ── sendSessionReadyNotification ────────────────────────────────────
 
 export const sendSessionReadyNotificationInputSchema = z.object({
-  userId: z.string().min(1),
-  cliSessionId: z.string().min(1),
+  userId: nonEmptyStringSchema,
+  cliSessionId: nonEmptyStringSchema,
   title: z.string().optional(),
 });
 export type SendSessionReadyNotificationParams = z.infer<
@@ -238,10 +238,10 @@ export type SendSessionReadyNotificationResult = z.infer<
 // RPC so the existing completed/failed/interrupted enum stays unchanged.
 
 export const sendAgentSessionNotificationInputSchema = z.object({
-  userId: z.string().min(1),
-  cliSessionId: z.string().min(1),
-  notificationId: z.string().min(1).max(64),
-  message: z.string().min(1).max(500),
+  userId: nonEmptyStringSchema,
+  cliSessionId: nonEmptyStringSchema,
+  notificationId: nonEmptyStringSchema.max(64),
+  message: nonEmptyStringSchema.max(500),
 });
 export type SendAgentSessionNotificationParams = z.infer<
   typeof sendAgentSessionNotificationInputSchema
@@ -276,9 +276,9 @@ export const agentBriefingDispatchWindowSchema = z.object({
 });
 
 export const dispatchPushInputSchema = z.object({
-  userId: z.string().min(1),
-  presenceContext: z.string().min(1).nullable(),
-  idempotencyKey: z.string().min(1),
+  userId: nonEmptyStringSchema,
+  presenceContext: nonEmptyStringSchema.nullable(),
+  idempotencyKey: nonEmptyStringSchema,
   agentBriefing: agentBriefingDispatchWindowSchema.optional(),
   badge: z
     .object({
@@ -293,7 +293,7 @@ export const dispatchPushInputSchema = z.object({
     sound: z.union([z.literal('default'), z.null()]).optional(),
     priority: z.enum(['default', 'high']).optional(),
     // Old producers omit these; remove the optionals when every producer sends keys.
-    i18nKey: z.string().min(1).optional(),
+    i18nKey: nonEmptyStringSchema.optional(),
     i18nParams: z.record(z.string(), z.string()).optional(),
   }),
   // Optional per-call rate limit (sliding window). When set, the DO checks
@@ -302,7 +302,7 @@ export const dispatchPushInputSchema = z.object({
   // records its idempotency key with that outcome so replays dedup.
   rateLimit: z
     .object({
-      key: z.string().min(1),
+      key: nonEmptyStringSchema,
       limit: z.number().int().positive(),
       windowSeconds: z.number().int().positive(),
     })
@@ -327,9 +327,9 @@ export type DispatchPushOutcome = z.infer<typeof dispatchPushOutcomeSchema>;
 
 export const internalDispatchLowBalanceRequestSchema = z.object({
   kind: z.literal('low_balance'),
-  recipientUserIds: z.array(z.string().min(1)).min(1),
-  organizationId: z.string().min(1),
-  organizationName: z.string().min(1),
+  recipientUserIds: z.array(nonEmptyStringSchema).min(1),
+  organizationId: nonEmptyStringSchema,
+  organizationName: nonEmptyStringSchema,
   minimumBalanceUsd: z.number().nonnegative(),
 });
 export type InternalDispatchLowBalanceRequest = z.infer<
@@ -350,14 +350,14 @@ export type InternalDispatchLowBalanceRequest = z.infer<
 export const internalDispatchSpendAlertRequestSchema = z
   .object({
     kind: z.literal('spend_alert'),
-    recipientUserIds: z.array(z.string().min(1)).min(1),
+    recipientUserIds: z.array(nonEmptyStringSchema).min(1),
     scope: z.enum(['personal', 'organization']),
-    organizationId: z.string().min(1).optional(),
+    organizationId: nonEmptyStringSchema.optional(),
     alertKind: z.enum(['threshold', 'anomaly']),
-    scopeName: z.string().min(1),
+    scopeName: nonEmptyStringSchema,
     amountUsd: z.number().nonnegative(),
     thresholdUsd: z.number().nonnegative(),
-    dedupeKey: z.string().min(1),
+    dedupeKey: nonEmptyStringSchema,
   })
   .superRefine(refineSpendAlertScope);
 export type InternalDispatchSpendAlertRequest = z.infer<
@@ -366,15 +366,15 @@ export type InternalDispatchSpendAlertRequest = z.infer<
 
 export const internalDispatchSecurityFindingRequestSchema = z.object({
   kind: z.literal('security_finding'),
-  recipientUserId: z.string().min(1),
-  notificationId: z.string().min(1),
-  findingId: z.string().min(1),
-  scope: z.string().min(1),
+  recipientUserId: nonEmptyStringSchema,
+  notificationId: nonEmptyStringSchema,
+  findingId: nonEmptyStringSchema,
+  scope: nonEmptyStringSchema,
   notificationKind: z.enum(['new_finding', 'sla_warning', 'sla_breach']),
-  severity: z.string().min(1),
-  repoFullName: z.string().min(1),
-  title: z.string().min(1),
-  ghsaId: z.string().min(1).nullable().optional(),
+  severity: nonEmptyStringSchema,
+  repoFullName: nonEmptyStringSchema,
+  title: nonEmptyStringSchema,
+  ghsaId: nonEmptyStringSchema.nullable().optional(),
 });
 export type InternalDispatchSecurityFindingRequest = z.infer<
   typeof internalDispatchSecurityFindingRequestSchema
@@ -387,11 +387,11 @@ export type InternalDispatchSecurityFindingRequest = z.infer<
 export const internalDispatchSecurityLifecycleRequestSchema = z.object({
   kind: z.literal('security_lifecycle'),
   event: securityLifecycleEventSchema,
-  findingId: z.string().min(1),
-  scope: z.string().min(1),
-  remediationId: z.string().min(1).optional(),
-  prUrl: z.string().min(1).optional(),
-  recipientUserIds: z.array(z.string().min(1)).min(1),
+  findingId: nonEmptyStringSchema,
+  scope: nonEmptyStringSchema,
+  remediationId: nonEmptyStringSchema.optional(),
+  prUrl: nonEmptyStringSchema.optional(),
+  recipientUserIds: z.array(nonEmptyStringSchema).min(1),
 });
 export type InternalDispatchSecurityLifecycleRequest = z.infer<
   typeof internalDispatchSecurityLifecycleRequestSchema
@@ -399,7 +399,7 @@ export type InternalDispatchSecurityLifecycleRequest = z.infer<
 
 export const internalDispatchAgentBriefingRequestSchema = agentBriefingDispatchWindowSchema.extend({
   kind: z.literal('agent_briefing'),
-  userId: z.string().min(1),
+  userId: nonEmptyStringSchema,
 });
 export type InternalDispatchAgentBriefingRequest = z.infer<
   typeof internalDispatchAgentBriefingRequestSchema

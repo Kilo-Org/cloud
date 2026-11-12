@@ -14,7 +14,8 @@ import {
 } from './auth.js';
 import { validateKiloToken } from './validate-kilo-token.js';
 import { consumeStreamTicketNonce } from './persistence/StreamTicketNonceDO.js';
-import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
+import { createNotFoundHandler } from '@kilocode/worker-utils';
+import { createWorkerErrorHandler } from './error-handler.js';
 import { createCallbackQueueConsumer } from './callbacks/index.js';
 import type { CallbackJob } from './callbacks/index.js';
 import {
@@ -90,6 +91,7 @@ import { getVercelRuntimeIdentity } from './byoc/vercel-runtime-identity.js';
 import { z } from 'zod';
 import { isOrgInList } from './sandbox-id.js';
 import { registerVercelScmBrokerRoute } from './scm-broker/vercel-route.js';
+import { isAllowedStreamWebSocketOrigin, isAllowedWebSocketOrigin } from './ws-origin.js';
 
 const app = new Hono<HonoContext>();
 
@@ -114,15 +116,6 @@ function snapshotBuildOwnerKey(input: z.infer<typeof SnapshotBuildOwnerSchema>):
 
 function snapshotBuildOwnerId(input: z.infer<typeof SnapshotBuildOwnerSchema>): string {
   return input.organizationId !== undefined ? input.organizationId : input.userId;
-}
-
-function isAllowedWebSocketOrigin(env: Env, origin: string | undefined): boolean {
-  const allowedOrigins = (env.WS_ALLOWED_ORIGINS || '')
-    .split(',')
-    .map(value => value.trim())
-    .filter(Boolean);
-  const isRealOrigin = origin !== undefined && origin !== 'null';
-  return allowedOrigins.length === 0 || !isRealOrigin || allowedOrigins.includes(origin);
 }
 
 function createTerminalForwardRequest(
@@ -170,7 +163,7 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
     return new Response('Invalid ptyId parameter', { status: 400 });
   }
 
-  if (!isAllowedWebSocketOrigin(env, request.headers.get('Origin') ?? undefined)) {
+  if (!isAllowedWebSocketOrigin(env, request.headers.get('Origin'))) {
     logger.withFields({ cloudAgentSessionId, ptyId }).warn('/terminal: Origin not allowed');
     return new Response('Origin not allowed', { status: 403 });
   }
@@ -237,11 +230,7 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
     logger.withFields({ cloudAgentSessionId, userId }).warn('/terminal: Missing ticket nonce');
     return new Response('Missing ticket nonce', { status: 401 });
   }
-  const consumed = await consumeStreamTicketNonce(
-    env,
-    nonce,
-    (ticketResult.payload as unknown as { exp: number }).exp * 1000
-  );
+  const consumed = await consumeStreamTicketNonce(env, nonce, ticketResult.payload.exp * 1000);
   if (!consumed) {
     logger.withFields({ cloudAgentSessionId, userId }).warn('/terminal: Ticket nonce already used');
     return new Response('Ticket nonce already used', { status: 401 });
@@ -350,7 +339,7 @@ app.get('/internal/byoc/vercel-runtime-identity', async (c: Context<HonoContext>
   if (unauthorized) return unauthorized;
 
   try {
-    return c.json(await getVercelRuntimeIdentity(c.env), 200, { 'Cache-Control': 'no-store' });
+    return c.json(await getVercelRuntimeIdentity(), 200, { 'Cache-Control': 'no-store' });
   } catch {
     return c.text('Vercel runtime identity could not be resolved', 502);
   }
@@ -752,6 +741,11 @@ app.get('/stream', async (c: Context<HonoContext>) => {
     return c.text('Missing cloudAgentSessionId parameter', 400);
   }
 
+  if (!isAllowedStreamWebSocketOrigin(c.env, c.req.header('Origin'))) {
+    logger.withFields({ cloudAgentSessionId }).warn('/stream: Origin not allowed');
+    return c.text('Origin not allowed', 403);
+  }
+
   const ticket = url.searchParams.get('ticket');
   if (!ticket) {
     logger.withFields({ cloudAgentSessionId }).warn('/stream: Missing ticket');
@@ -809,11 +803,7 @@ app.get('/stream', async (c: Context<HonoContext>) => {
     logger.withFields({ cloudAgentSessionId, userId }).warn('/stream: Missing ticket nonce');
     return c.text('Missing ticket nonce', 401);
   }
-  const consumed = await consumeStreamTicketNonce(
-    c.env,
-    nonce,
-    (ticketResult.payload as unknown as { exp: number }).exp * 1000
-  );
+  const consumed = await consumeStreamTicketNonce(c.env, nonce, ticketResult.payload.exp * 1000);
   if (!consumed) {
     logger.withFields({ cloudAgentSessionId, userId }).warn('/stream: Ticket nonce already used');
     return c.text('Ticket nonce already used', 401);
@@ -952,7 +942,7 @@ app.use(
 );
 
 app.notFound(createNotFoundHandler());
-app.onError(createErrorHandler(logger, { includeMessage: false }));
+app.onError(createWorkerErrorHandler(logger));
 
 export const REPORT_RETENTION_CRON = '17 2 * * *';
 export const OUTCOME_AGGREGATE_CRON = '*/5 * * * *';

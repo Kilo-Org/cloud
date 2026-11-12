@@ -108,7 +108,14 @@ Keyboard avoidance is `react-native-keyboard-controller`, wrapped in one `Keyboa
 conversation, manual-review and PR-discussion surfaces; the Agents list and the stored history render
 `@/components/agents/owned-keyboard-lift` instead, which pads by the keyboard their own search field raised and
 writes that pad on every render (the library container drops its animated style when `enabled` turns false, and
-the property it last applied stays on the native view). `useKeyboardState` is the app's one keyboard-height read.
+the property it last applied stays on the native view). The pad never takes more room than the body can spare:
+it is clamped so a minimum viewport survives (`MIN_BODY_VIEWPORT` in `@/lib/body-viewport`, the same floor
+`TabScreenScrollView` applies to its frame), because a keyboard height belongs to the window it was measured in
+and a rotation replaces that window with a much shorter one — an unclamped pad then fills the body and the list
+renders nothing, with no rows, skeleton, empty state or error. The clamp measures the body frame and keys that
+measurement to `useWindowDimensions().height`: the layout pass that reports a new frame runs after the first
+render a rotation produces, so a frame measured in the previous window is released for that render instead of
+being trusted. `useKeyboardState` is the app's one keyboard-height read.
 The conversation list follows the newest message when its viewport shrinks; it must not add a second keyboard inset.
 A surface whose content
 pads the platform's bottom inset itself passes `keyboardVerticalOffset={keyboardInsetOffset(bottom)}`
@@ -201,6 +208,7 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 - Keep related items closer together than unrelated groups, and use the same gap for the same relation everywhere.
 - Plan long text: a label that can grow truncates with an ellipsis or wraps by design. When secondary text cannot fit, drop it before you squeeze the primary text.
 - Never shift layout when state changes. Reserve the space for spinners, status lines, errors, and copy that comes and goes, or replace content in place.
+- Never grow a row or a section header to a control's touch size. Keep the row one line tall and reach 44pt with `hitSlop` on a shared compact box from `@/lib/a11y/tap-target` (`LINE_ACTION_BOX_CLASS`, `SECTION_ACTION_BOX_CLASS`). A taller box leaves empty space above its text, and at the top of a screen that space reads as a hole under the title.
 - Do not repeat what the screen already shows: no "Enabled" beside a switch, no product name beside its logo, no description that restates the title.
 - Change only the visual properties the task names. A color fix does not change dimensions.
 
@@ -260,6 +268,7 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - Pass one `--link` per changed screen and per state it can show: loading, empty, error, and long text. Open a hard-to-reach state through a fixture link (see Fixtures).
 - The standard matrix covers the default size, dark mode, a compact screen, and right-to-left on Android, and the default size, dark mode, and right-to-left on iOS. It keeps font scale and display density at their defaults.
 - After a link opens, the gate keeps measuring for 2.5 s, so content that arrives late and moves the screen is a `layout-shift` error.
+- A scrolling screen must start with what it shows. Empty space above the first painted content, beyond the scroll content's top padding and one section break (24 dp), is a `leading-gap` error: a first block pushed down by a margin, or a box that holds its content at its bottom.
 - Shift measurements use transform-free layout frames. Navigation transforms remain visible in screenshots and motion recordings without hiding real content shifts.
 - The sampler retains the newest layouts that fit its weight budget, up to a maximum count. A truncation flag in the timeline and motion artifacts marks incomplete capture.
 - Fix every `error` finding, then run the gate again until it exits 0. Fix each `warning`, or give a one-line reason in the pull request.

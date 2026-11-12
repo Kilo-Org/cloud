@@ -4,6 +4,7 @@ import { type LauncherSurfaceTargets } from '@/lib/launcher-surfaces';
 import {
   buildLauncherSurfacesPayload,
   createLauncherSurfacesPublisher,
+  noteLauncherSurfacesCleared,
 } from '@/lib/launcher-surfaces-publish';
 
 const translate = (key: string): string => `t:${key}`;
@@ -103,6 +104,21 @@ describe('createLauncherSurfacesPublisher', () => {
 
     // The native side dropped the surface, so the same targets must be written
     // again rather than suppressed by the pre-clear memo.
+    publisher.apply(targets(), translate);
+    expect(publish).toHaveBeenCalledTimes(2);
+  });
+
+  it('writes again after a clear recorded outside the publisher', () => {
+    const publish = vi.fn<(payload: unknown) => void>();
+    const publisher = createLauncherSurfacesPublisher(publish, vi.fn<() => void>());
+
+    publisher.apply(targets(), translate);
+    expect(publish).toHaveBeenCalledOnce();
+
+    // A boundary clear runs outside any publisher. The derivation that follows
+    // it writes the list again instead of being treated as a repeat.
+    noteLauncherSurfacesCleared();
+
     publisher.apply(targets(), translate);
     expect(publish).toHaveBeenCalledTimes(2);
   });

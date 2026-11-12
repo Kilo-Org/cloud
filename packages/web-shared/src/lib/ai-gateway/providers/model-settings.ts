@@ -12,7 +12,18 @@ import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { isMinimaxModel } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
 import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
-import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getOpenRouterModelsMetadataFromDatabase,
+  getVercelModelsMetadataFromDatabase,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getVercelModelIdOverrides,
+  mapResolvedModelIdToVercel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import {
+  findVercelOnlyModels,
+  fromVercelReasoningOptions,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import {
   effortOptions,
   getFallbackReasoningOptions,
@@ -44,12 +55,46 @@ export async function getOpenRouterReasoningOptions(
   return effortOptions(...ReasoningEffortSchema.options.filter(effort => efforts.has(effort)));
 }
 
+/**
+ * Vercel's reasoning options for a model the catalog lists because only Vercel AI Gateway serves
+ * it. Undefined for models OpenRouter lists, including those without reasoning metadata.
+ */
+async function getVercelOnlyReasoningOptions(
+  model: string
+): Promise<ReasoningOption[] | undefined> {
+  const openRouterModels = await getOpenRouterModelsMetadataFromDatabase();
+  const openRouterModelIds = Object.keys(openRouterModels);
+  if (
+    // Without OpenRouter's models, every Vercel model would look Vercel-only.
+    openRouterModelIds.length === 0 ||
+    (openRouterModels[model] ?? openRouterModels[normalizeModelId(model)])
+  ) {
+    return undefined;
+  }
+  const [vercelModels, overrides] = await Promise.all([
+    getVercelModelsMetadataFromDatabase(),
+    getVercelModelIdOverrides(),
+  ]);
+  const vercelModel = vercelModels[mapResolvedModelIdToVercel(model, overrides)];
+  const [vercelOnlyModel] = vercelModel
+    ? findVercelOnlyModels({
+        openRouterModelIds,
+        vercelMetadata: { [vercelModel.id]: vercelModel },
+        overrides,
+      })
+    : [];
+  return vercelOnlyModel?.id === model
+    ? fromVercelReasoningOptions(vercelOnlyModel.storedModel.reasoning_options)
+    : undefined;
+}
+
 export async function getModelReasoningOptions(
   model: string,
   allowFallback: boolean
 ): Promise<ReasoningOption[] | undefined> {
   return (
     (await getOpenRouterReasoningOptions(model)) ??
+    (await getVercelOnlyReasoningOptions(model)) ??
     (allowFallback ? getFallbackReasoningOptions(model) : undefined)
   );
 }

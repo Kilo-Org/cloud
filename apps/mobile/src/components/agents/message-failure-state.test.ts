@@ -9,6 +9,9 @@ import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 
 import {
   composeFailureLabel,
+  CREDITS_DELIVERY_REASON,
+  isGenericResponseFailure,
+  type MessageDeliveryStatement,
   messageFailureLabel,
   NON_RETRYABLE_ASSISTANT_ERRORS,
   selectMessageFailure,
@@ -393,6 +396,50 @@ describe('selectMessageFailure', () => {
         selectMessageFailure({ info: assistantInfo('APIError'), retryAvailable: true })?.canRetry
       ).toBe(true);
     });
+  });
+});
+
+/**
+ * A failed preparation states its own cause in the group it renders, so the
+ * question's row keeps only its actions where its statement would repeat the
+ * same failed turn. Only the statement with no cause of its own is that
+ * generic; every classified cause stays readable in the row.
+ */
+describe('isGenericResponseFailure', () => {
+  const failureFor = (input: { deliveryState?: MessageDeliveryStatement; info?: MessageInfo }) =>
+    selectMessageFailure({
+      info: input.info ?? userInfo(),
+      ...(input.deliveryState === undefined ? {} : { deliveryState: input.deliveryState }),
+    });
+
+  it('reads a failed run and an unclassified assistant error as generic', () => {
+    const execution = failureFor({
+      deliveryState: { status: 'failed', error: '', reason: 'execution' },
+    });
+    expect(execution).not.toBeNull();
+    expect(execution && isGenericResponseFailure(execution)).toBe(true);
+
+    const unknown = failureFor({ info: assistantInfo('UnknownError') });
+    expect(unknown).not.toBeNull();
+    expect(unknown && isGenericResponseFailure(unknown)).toBe(true);
+  });
+
+  it('keeps every classified cause, and every failure of the send itself', () => {
+    const cases: (MessageInfo | MessageDeliveryStatement)[] = [
+      { status: 'failed', error: '', reason: CREDITS_DELIVERY_REASON },
+      { status: 'failed', error: 'RAW_TRANSPORT_TEXT', reason: 'exhausted' },
+      { status: 'failed', error: '', reason: 'interrupted' },
+      assistantInfo('ProviderAuthError'),
+      assistantInfo('ContextOverflowError'),
+      assistantInfo('APIError'),
+    ];
+
+    for (const entry of cases) {
+      const failure =
+        'status' in entry ? failureFor({ deliveryState: entry }) : failureFor({ info: entry });
+      expect(failure, JSON.stringify(entry)).not.toBeNull();
+      expect(failure && isGenericResponseFailure(failure), JSON.stringify(entry)).toBe(false);
+    }
   });
 });
 

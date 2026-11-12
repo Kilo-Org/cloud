@@ -7,6 +7,7 @@ import {
 } from './session-row-accessibility-label';
 
 import { i18n } from '@/i18n';
+import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import type * as ReactI18next from 'react-i18next';
 
 vi.mock('react-i18next', async importOriginal => {
@@ -563,9 +564,11 @@ describe('sessionRowAccessibilityLabel', () => {
 });
 
 /**
- * The fragments after the second are clauses, not list items: a locale whose
- * cost sentence starts with a verb needs a separator other than its list
- * conjunction, while two plain labels keep the conjunction.
+ * The fragments after the second are clauses, not list items: a relative time,
+ * a cost sentence, an origin phrase. Every locale states the pause before the
+ * last one, because a list conjunction between a label and a clause speaks as a
+ * second item ("AURORA-FATURAMENTO e há 40 minutos"). Two plain labels keep the
+ * locale conjunction.
  */
 describe('spokenJoiner', () => {
   afterEach(async () => {
@@ -589,5 +592,108 @@ describe('spokenJoiner', () => {
     expect(
       sessionRowAccessibilityLabel({ title: 'Lokale Sitzung', needsInput: false, badge: 'CLI' })
     ).toBe('Lokale Sitzung und CLI');
+  });
+
+  it('pauses before the time instead of joining it with a conjunction in Portuguese', async () => {
+    await i18n.changeLanguage('pt');
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'Conciliação de setembro',
+        needsInput: false,
+        badge: 'AURORA-FATURAMENTO',
+        meta: 'há 40 minutos',
+      })
+    ).toBe('Conciliação de setembro, AURORA-FATURAMENTO, há 40 minutos');
+  });
+
+  it('pauses before the origin phrase that follows a Portuguese cost clause', async () => {
+    await i18n.changeLanguage('pt');
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'Conciliação de setembro',
+        needsInput: false,
+        badge: 'AURORA-FATURAMENTO',
+        meta: 'custo de 2 cêntimos, há 1 hora',
+        platform: 'cloud-agent',
+      })
+    ).toBe(
+      'Conciliação de setembro, AURORA-FATURAMENTO, custo de 2 cêntimos, há 1 hora, de CLOUD AGENT'
+    );
+  });
+
+  it('keeps the Portuguese conjunction between two plain labels', async () => {
+    await i18n.changeLanguage('pt');
+    expect(
+      sessionRowAccessibilityLabel({ title: 'Correção de login', needsInput: false, badge: 'CLI' })
+    ).toBe('Correção de login e CLI');
+  });
+
+  it('pauses in Brazilian Portuguese too', async () => {
+    await i18n.changeLanguage('pt-BR');
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'Conciliação de setembro',
+        needsInput: false,
+        badge: 'AURORA-FATURAMENTO',
+        meta: '40 minutos atrás',
+      })
+    ).toBe('Conciliação de setembro, AURORA-FATURAMENTO, 40 minutos atrás');
+  });
+
+  it('binds a mark outside the Western comma set to the word before it', async () => {
+    // The Ethiopic comma is punctuation the previous hand-listed set missed, so
+    // the label kept the formatter's space in front of it (`CLI ፣`).
+    await i18n.changeLanguage('am');
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'ርዕስ',
+        needsInput: false,
+        badge: 'CLI',
+        meta: 'ከ40 ደቂቃ በፊት',
+      })
+    ).toBe('ርዕስ፣ CLI፣ ከ40 ደቂቃ በፊት');
+  });
+
+  it('keeps the Arabic word space after the pause mark before the origin', async () => {
+    // The Arabic list formatter spells its conjunction as a prefix (`" و"`),
+    // so its separator carries no trailing space. A pause mark is not that
+    // prefix: the label must still separate it from the next word, or it reads
+    // `…أشهر،من …` as one run-on token.
+    await i18n.changeLanguage('ar');
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'الجلسة الأولى',
+        needsInput: false,
+        badge: 'CLOUD AGENT',
+        meta: 'التكلفة 18 سنتًا، قبل 3 أشهر',
+        platform: 'cloud-agent',
+      })
+    ).toBe('الجلسة الأولى وCLOUD AGENT والتكلفة 18 سنتًا، قبل 3 أشهر، من CLOUD AGENT');
+  });
+
+  it('leaves a script that writes no space after its pause mark unchanged', async () => {
+    // Japanese `、` binds the next clause directly; adding a space would put
+    // one where the script never writes it.
+    await i18n.changeLanguage('ja');
+    expect(
+      sessionRowAccessibilityLabel({
+        title: 'セッション',
+        needsInput: false,
+        badge: 'CLI',
+        meta: '40分前',
+        platform: 'cloud-agent',
+      })
+    ).toBe('セッション、CLI、40分前、CLOUD AGENTから');
+  });
+
+  it('states a pause, never a bare conjunction, in every catalog', async () => {
+    const bare: string[] = [];
+    for (const tag of SUPPORTED_LANGUAGES) {
+      await i18n.changeLanguage(tag); // eslint-disable-line no-await-in-loop -- one catalog at a time mirrors the runtime switch
+      if (!/\p{P}/u.test(i18n.t('agents.sessionRow.spokenJoiner'))) {
+        bare.push(tag);
+      }
+    }
+    expect(bare).toEqual([]);
   });
 });

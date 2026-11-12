@@ -5,10 +5,12 @@ import { AlertCircle, Clock } from '@/components/ui/icons';
 import { type AccessibilityActionEvent, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { AddCreditsRow } from '@/components/add-credits-row';
 import { Bubble } from '@/components/ui/bubble';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { type AddCreditsDestination, addCreditsProps } from '@/lib/credits/add-credits-destination';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { cn } from '@/lib/utils';
@@ -22,6 +24,7 @@ import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y
 import { MessageErrorBoundary } from './message-error-boundary';
 import { MessageLongPressProvider } from './message-long-press-context';
 import {
+  isGenericResponseFailure,
   type MessageDeliveryStatement,
   messageFailureLabel,
   selectMessageFailure,
@@ -67,11 +70,13 @@ type MessageBubbleProps = {
   /** Retries a failed message. The failure footer renders only when supplied. */
   onRetryMessage?: (message: StoredMessage) => void;
   /**
-   * Opens the credit purchase screen, for a failed turn the account's own
-   * balance caused. Adding credits never needs the session to accept a
-   * re-send, so this action renders even where `retryAvailable` is false.
+   * Where the credit a refused turn needs is bought: the in-app purchase screen
+   * for the person's own balance, or the organization's billing page for a
+   * session the organization pays for. Adding credits never needs the session to
+   * accept a re-send, so this action renders even where `retryAvailable` is
+   * false. A destination the platform may not open renders no action.
    */
-  onAddCredits?: () => void;
+  addCredits?: AddCreditsDestination;
   /**
    * Whether this row's session can accept a re-send now. When false the failure
    * footer keeps its statement and drops the Retry, so a read-only transcript or
@@ -81,6 +86,14 @@ type MessageBubbleProps = {
   retryAvailable?: boolean;
   /** Copies a failed user message's text back into the composer. */
   onCopyToComposer?: (text: string) => void;
+  /**
+   * Whether this turn's preparation group states its failure. The group names
+   * the stage that failed and the reason, so a generic response-failure
+   * statement here would state the same turn twice; the footer keeps its
+   * actions and drops that statement. A classified failure is still shown.
+   * Defaults to false.
+   */
+  failureStatedByPreparation?: boolean;
   /** Restores a canceled queued message's prompt back into the composer. */
   onRestoreQueued?: (message: StoredMessage) => void;
   /**
@@ -104,9 +117,10 @@ function MessageBubbleImpl({
   onLongPressDetails,
   holdQueuedSlot,
   onRetryMessage,
-  onAddCredits,
+  addCredits,
   retryAvailable,
   onCopyToComposer,
+  failureStatedByPreparation,
   onRestoreQueued,
   condenseToolCalls,
 }: Readonly<MessageBubbleProps>) {
@@ -164,9 +178,9 @@ function MessageBubbleImpl({
     }
   };
 
-  // Compaction-only message renders as a separator
-  const firstPart = parts[0];
-  if (parts.length === 1 && firstPart?.type === 'compaction') {
+  // Compaction-only message renders as a separator, excluding hidden display parts.
+  const firstPart = visibleParts[0];
+  if (visibleParts.length === 1 && firstPart?.type === 'compaction') {
     return (
       <View className="px-4">
         <CompactionSeparator
@@ -185,14 +199,29 @@ function MessageBubbleImpl({
   // a re-send passes `retryAvailable: false`: the footer then still states the
   // failure, with no action that could not act.
   const failure = selectMessageFailure({ deliveryState, info: message.info, retryAvailable });
+  // A turn whose preparation failed states that failure in its preparation
+  // group, with the stage and the reason. The generic response-failure
+  // statement would state the same turn again, so only the statement goes: the
+  // actions stay here, because a collapsed group must not be able to hide the
+  // turn's recovery.
+  const statedByPreparation =
+    failureStatedByPreparation === true && failure !== null && isGenericResponseFailure(failure);
   const relevantHandlerWired =
     retryAvailable === false ||
     (failure !== null &&
       (failure.kind === 'delivery'
         ? onRetryMessage !== undefined ||
           onCopyToComposer !== undefined ||
-          (failure.canAddCredits && onAddCredits !== undefined)
-        : onRetryMessage !== undefined || (failure.canAddCredits && onAddCredits !== undefined)));
+          (failure.canAddCredits && addCredits !== undefined)
+        : onRetryMessage !== undefined || (failure.canAddCredits && addCredits !== undefined)));
+  // The actions this row would draw, resolved once: the footer is skipped when
+  // the preparation group states the failure and no action is left, so a blank
+  // padded block never sits above that group.
+  const retryAction = failure?.canRetry === true ? onRetryMessage : undefined;
+  const creditsAction = failure?.canAddCredits === true ? addCredits : undefined;
+  const copyAction = failure?.canCopy === true && copyText !== '' ? onCopyToComposer : undefined;
+  const actionRenders =
+    retryAction !== undefined || creditsAction !== undefined || copyAction !== undefined;
   // The footer is the failed turn's status, so it sits in the column that turn
   // occupies rather than the row that carries it: a message that never reached
   // the agent is the user's own row, and its title, detail and action row stay
@@ -207,7 +236,7 @@ function MessageBubbleImpl({
   // interface's own start edge, as the assistant rows around them do.
   const trailingFailure = failure?.side === 'user';
   const failureFooter =
-    failure !== null && relevantHandlerWired ? (
+    failure !== null && relevantHandlerWired && (!statedByPreparation || actionRenders) ? (
       /* The actions close the turn rather than opening the next one: the space
          under them is the gap between turns, so a Retry is never read as part of
          the message that follows it. 24 dp is more than twice the gap between a
@@ -215,42 +244,46 @@ function MessageBubbleImpl({
          actions in its own group. `items-end` is logical, so the status stays
          with the end-aligned bubble in either direction. */
       <View className={cn('gap-2 px-4 pt-1 pb-[24px]', trailingFailure && 'items-end')}>
-        <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
-          {failure.error ? (
-            // Every failure that reports an error carries the same marker; a
-            // message the person stopped reports a neutral status and carries
-            // none. The marker is the state, not copy: the title beside it says
-            // what happened, so it carries no text of its own for a screen
-            // reader.
-            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-              <AlertCircle size={14} color={colors.destructive} />
+        {statedByPreparation ? null : (
+          <>
+            <View className={cn('flex-row items-center gap-1.5', trailingFailure && 'justify-end')}>
+              {failure.error ? (
+                // Every failure that reports an error carries the same marker; a
+                // message the person stopped reports a neutral status and carries
+                // none. The marker is the state, not copy: the title beside it says
+                // what happened, so it carries no text of its own for a screen
+                // reader.
+                <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                  <AlertCircle size={14} color={colors.destructive} />
+                </View>
+              ) : null}
+              <Text
+                className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
+                accessibilityLabel={messageFailureLabel(failure)}
+              >
+                {failure.title}
+              </Text>
             </View>
-          ) : null}
-          <Text
-            className={cn('text-sm text-destructive', trailingFailure && 'text-right')}
-            accessibilityLabel={messageFailureLabel(failure)}
-          >
-            {failure.title}
-          </Text>
-        </View>
-        {failure.detail !== null ? (
-          <Text
-            className={cn(
-              'text-sm leading-[1.25rem] text-muted-foreground',
-              trailingFailure && 'text-right'
-            )}
-          >
-            {failure.detail}
-          </Text>
-        ) : null}
+            {failure.detail !== null ? (
+              <Text
+                className={cn(
+                  'text-sm leading-[1.25rem] text-muted-foreground',
+                  trailingFailure && 'text-right'
+                )}
+              >
+                {failure.detail}
+              </Text>
+            ) : null}
+          </>
+        )}
         <View className="flex-row gap-2">
-          {failure.canRetry && onRetryMessage ? (
+          {retryAction ? (
             <Button
               variant="outline"
               size="sm"
               className={STATE_ACTION_CLASS}
               onPress={() => {
-                onRetryMessage(message);
+                retryAction(message);
               }}
               accessibilityRole="button"
               accessibilityLabel={t('common.retry')}
@@ -258,31 +291,23 @@ function MessageBubbleImpl({
               <Text>{t('common.retry')}</Text>
             </Button>
           ) : null}
-          {failure.canAddCredits && onAddCredits ? (
-            // The failure's one recovery action, so it takes the accent surface
+          {creditsAction ? (
+            // The failure's one recovery action, so it keeps the accent surface
             // the person's own bubble and the enabled send control fill with,
             // in both schemes; the theme's `--primary` is olive in light, which
-            // would read as one more secondary action here. The label uses that
-            // surface's own ink, because the primary label ink is white in the
-            // light scheme.
-            <Button
-              variant="default"
-              size="sm"
-              className={cn(STATE_ACTION_CLASS, 'bg-accent-soft')}
-              onPress={onAddCredits}
-              accessibilityRole="button"
-              accessibilityLabel={t('addCredits.cta')}
-            >
-              <Text className="text-accent-soft-foreground">{t('addCredits.cta')}</Text>
-            </Button>
+            // would read as one more secondary action here. The element owns
+            // where the credit is bought — the person's own purchase screen or
+            // the organization's billing page — and hides itself where the
+            // platform may not open the destination.
+            <AddCreditsRow inline emphasis="primary" {...addCreditsProps(creditsAction)} />
           ) : null}
-          {failure.canCopy && onCopyToComposer && copyText !== '' ? (
+          {copyAction ? (
             <Button
               variant="outline"
               size="sm"
               className={STATE_ACTION_CLASS}
               onPress={() => {
-                onCopyToComposer(copyText);
+                copyAction(copyText);
               }}
               accessibilityRole="button"
               accessibilityLabel={t('agentChat.messageBubble.copyToComposer')}

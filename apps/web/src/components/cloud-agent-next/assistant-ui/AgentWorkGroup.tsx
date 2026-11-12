@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ChevronDown, LoaderCircle } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
@@ -8,16 +8,27 @@ export function AgentWorkGroup({
   summary,
   working = false,
   activity,
+  scrollAnchorIds,
   children,
 }: {
   summary: string;
   working?: boolean;
   activity?: string;
+  scrollAnchorIds?: readonly string[];
   children: ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <Collapsible className="border-muted bg-muted/30 rounded-md border">
-      <CollapsibleTrigger className="group hover:bg-muted/40 focus-visible:ring-ring flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none">
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="border-muted bg-muted/30 rounded-md border"
+    >
+      <CollapsibleTrigger
+        data-scroll-anchor-group
+        className="group hover:bg-muted/40 focus-visible:ring-ring flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+      >
+        {!open && scrollAnchorIds?.map(id => <span key={id} hidden data-scroll-anchor={id} />)}
         {working && (
           <LoaderCircle
             className="text-muted-foreground size-4 shrink-0 animate-spin motion-reduce:animate-none"
@@ -37,14 +48,16 @@ export function AgentWorkGroup({
           aria-hidden
         />
       </CollapsibleTrigger>
-      <CollapsibleContent
-        role="region"
-        aria-label={summary}
-        tabIndex={0}
-        className="border-muted focus-visible:ring-ring max-h-[min(24rem,50vh)] space-y-2 overflow-y-auto overscroll-y-contain border-t px-3 py-2 focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
-      >
-        {children}
-      </CollapsibleContent>
+      {open && (
+        <CollapsibleContent
+          role="region"
+          aria-label={summary}
+          tabIndex={0}
+          className="border-muted focus-visible:ring-ring max-h-[min(24rem,50vh)] space-y-2 overflow-y-auto overscroll-y-contain border-t px-3 py-2 focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
+        >
+          {children}
+        </CollapsibleContent>
+      )}
     </Collapsible>
   );
 }

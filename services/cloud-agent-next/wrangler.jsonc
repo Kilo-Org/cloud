@@ -10,16 +10,7 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "preview_urls": false,
-  "rules": [
-    { "type": "Text", "globs": ["**/*.sql"], "fallthrough": true },
-    {
-      "type": "Data",
-      "globs": [
-        "**/wrapper/dist/control-plane-wrapper.js?binary",
-        "**/wrapper/control-plane-supervisor.sh?binary",
-      ],
-    },
-  ],
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "workers_dev": true,
   "dev": {
     "port": 8794,
@@ -71,7 +62,10 @@
     "CLI_TIMEOUT_SECONDS": "900",
     "REAPER_INTERVAL_MS": "300000",
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
-    "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai",
+    // The web origins that open /stream and /terminal. The staging web target
+    // reaches this Worker too, because cloud-agent-next has no staging
+    // deployment of its own.
+    "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai,https://staging-app.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
     "TOOL_CGROUP_RESERVE_MB": "2048",
     "TOOL_CGROUP_CPU_WEIGHT": "50",
@@ -112,6 +106,7 @@
    * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
    */
   "services": [
+    { "binding": "SESSION_SYNC", "service": "session-sync" },
     {
       "binding": "SESSION_INGEST",
       "service": "session-ingest",
@@ -381,6 +376,7 @@
         "VERCEL_SANDBOX_EXTEND_DURATION_MS": "600000",
       },
       "services": [
+        { "binding": "SESSION_SYNC", "service": "session-sync-local" },
         {
           "binding": "SESSION_INGEST",
           "service": "session-ingest",

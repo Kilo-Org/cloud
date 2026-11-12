@@ -30,7 +30,7 @@ import { isMoneyRole, type OrgRole, useOrgBoundary } from '@/lib/hooks/use-organ
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { cn } from '@/lib/utils';
-import { useRouteIsStackRoot } from '@/lib/navigation/route-focus';
+import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 
 // The design gate's collector builds each node's `owners` list from the
 // rendered component's ancestor chain, so a component that carries this name
@@ -42,7 +42,8 @@ const PresentedContent = ({ children }: { children?: ReactNode }) => children;
 
 export function InviteMemberSheet() {
   const popOnce = usePopOnce();
-  const isStackRoot = useRouteIsStackRoot();
+  // The sheet header takes its top clearance from the one shared rule.
+  const modalTopInset = useFormSheetHeaderTopInset();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { organizationId, role: myRole, org, isResolving } = useOrgBoundary();
@@ -176,8 +177,8 @@ export function InviteMemberSheet() {
         // its header clears the status bar itself; a sheet pushed over another
         // screen settles an inset lower and reserves nothing. The native
         // full-detent Android layout is a stack root, and the base-route runs
-        // measure exactly that case (shared rule at the route-focus helper).
-        topInset={isStackRoot ? 'android-window-top' : 'bottom-form-sheet'}
+        // measure exactly that case (shared rule at `useFormSheetHeaderTopInset`).
+        topInset={modalTopInset}
         surfaceClassName="bg-card border-t border-border"
       />
       <SheetScrollView

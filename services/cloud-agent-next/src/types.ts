@@ -486,6 +486,7 @@ export type Env = {
   E2E_CALLBACK_SINK?: DurableObjectNamespace<E2eCallbackSink>;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
+  SESSION_SYNC?: Fetcher;
   /** Record-only container lifecycle usage meter. */
   CONTAINER_USAGE_METER: ContainerUsageRpcMethods;
   /** Shared secret for internal service-to-service authentication */
@@ -518,7 +519,7 @@ export type Env = {
   GITHUB_LITE_APP_BOT_USER_ID?: string;
   /** Shared secret for JWT token validation */
   NEXTAUTH_SECRET: SecretBinding;
-  /** Comma-separated list of allowed Origins for /stream WebSocket connections */
+  /** Comma-separated allowed Origins for the /stream and /terminal WebSocket connections */
   WS_ALLOWED_ORIGINS?: string;
   /** Backend base URL (used for balance checks before session spin-up) */
   KILOCODE_BACKEND_BASE_URL?: string;

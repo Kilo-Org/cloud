@@ -20,7 +20,6 @@ import { AdvancedConfigPanel } from '@/components/agents/advanced-config-panel';
 import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
 import { type NewSessionConfigureFormProps } from '@/components/agents/new-session-configure-form-props';
 import { NewSessionProfileRow } from '@/components/agents/new-session-environment-row';
-import { NewSessionPlanRefusal } from '@/components/agents/new-session-plan-refusal';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NEW_SESSION_PROMPT_DEFAULT_LINES } from '@/components/agents/chat-composer-input-height';
 import {
@@ -31,6 +30,7 @@ import { NewSessionRepositorySection } from '@/components/agents/new-session-rep
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { NewSessionRemoteSpawnFailure } from '@/components/agents/new-session-remote-spawn-failure';
+import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
@@ -319,7 +319,9 @@ export function NewSessionConfigureForm({
         {/* The plan refusal is known before the press, so it sits in the scroll
             content under the composer rather than in the pinned footer: it
             never takes height from the fields, the launch folder included. */}
-        {planRefusal !== null ? <NewSessionPlanRefusal message={planRefusal} /> : null}
+        {planRefusal !== null ? (
+          <OrganizationPlanRefusal message={planRefusal} className="mt-5" />
+        ) : null}
         {accountSection}
         <NewSessionRunTarget
           showRunOnSelector={showRunOnSelector}

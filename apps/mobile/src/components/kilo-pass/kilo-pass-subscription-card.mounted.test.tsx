@@ -31,23 +31,24 @@ const appState = vi.hoisted(() => {
 
 const haptics = vi.hoisted(() => ({ selectionAsync: vi.fn() }));
 
-// The presentation query has a stable result shape independent of renders.
+const routerPush = vi.hoisted(() => vi.fn());
+
+// The pass query has a stable result shape independent of renders.
 const queryState = vi.hoisted(() => ({
-  presentation: vi.fn(),
-  presentationData: undefined as unknown,
-  presentationIsError: false,
-  presentationIsPending: false,
+  refetch: vi.fn(),
+  data: undefined as unknown,
+  isError: false,
+  isPending: false,
 }));
 
 const trpc = vi.hoisted(() => ({
   kiloPass: {
-    getPurchasePresentation: { queryOptions: () => ({ __name: 'presentation' }) },
+    getState: { queryOptions: () => ({ queryKey: ['kiloPass', 'getState'] as const }) },
   },
 }));
 
 vi.mock('react-native', () => ({
   AppState: { addEventListener: appState.addEventListener },
-  Linking: { openURL: vi.fn() },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
@@ -58,7 +59,7 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: routerPush }),
 }));
 
 vi.mock('expo-haptics', () => ({ selectionAsync: haptics.selectionAsync }));
@@ -79,20 +80,45 @@ vi.mock('@/i18n', () => ({
 
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/kilo-pass/kilo-pass-icon', () => ({ KiloPassIcon: 'KiloPassIcon' }));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalChevronRight: 'DirectionalChevronRight',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ primary: '#000000' }),
 }));
 
+vi.mock('@/lib/kilo-pass/state', () => ({
+  getKiloPassCardContentState: () => {
+    if (queryState.isPending) {
+      return { kind: 'loading' };
+    }
+    if (queryState.isError) {
+      return {
+        kind: 'error',
+        title: 'kiloPass.unavailable',
+        description: 'kiloPass.tryAgainFromProfile',
+        actionLabel: 'common.retry',
+      };
+    }
+    return {
+      kind: 'card',
+      title: 'Kilo Pass',
+      description: 'kiloPass.notAvailableInApp',
+      accessibilityLabel: 'Kilo Pass. kiloPass.notAvailableInApp',
+    };
+  },
+}));
+
 vi.mock('@/lib/trpc', () => ({ useTRPC: () => trpc }));
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({
-    data: queryState.presentationData,
-    isError: queryState.presentationIsError,
-    isPending: queryState.presentationIsPending,
-    refetch: queryState.presentation,
+    data: queryState.data,
+    isError: queryState.isError,
+    isPending: queryState.isPending,
+    refetch: queryState.refetch,
   }),
 }));
 
@@ -125,10 +151,11 @@ describe('KiloPassSubscriptionCard mounted', () => {
     vi.stubGlobal('__DEV__', false);
     appState.listeners.clear();
     haptics.selectionAsync.mockClear();
-    queryState.presentation.mockClear();
-    queryState.presentationData = undefined;
-    queryState.presentationIsError = false;
-    queryState.presentationIsPending = false;
+    routerPush.mockClear();
+    queryState.refetch.mockClear();
+    queryState.data = { subscription: null, isEligibleForFirstMonthPromo: true };
+    queryState.isError = false;
+    queryState.isPending = false;
   });
 
   afterEach(() => {
@@ -142,8 +169,8 @@ describe('KiloPassSubscriptionCard mounted', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows the subscription loading state while the presentation is pending', async () => {
-    queryState.presentationIsPending = true;
+  it('shows the subscription loading state while the pass query is pending', async () => {
+    queryState.isPending = true;
 
     const renderer = await renderCard();
     const loadingCard = renderer.root.findByProps({
@@ -153,9 +180,7 @@ describe('KiloPassSubscriptionCard mounted', () => {
     expect(loadingCard.props.accessibilityState).toEqual({ busy: true });
   });
 
-  it('an active foreground transition triggers no refetch on either query', async () => {
-    queryState.presentationData = { kind: 'unavailable' };
-
+  it('an active foreground transition triggers no refetch', async () => {
     await renderCard();
 
     act(() => {
@@ -164,11 +189,11 @@ describe('KiloPassSubscriptionCard mounted', () => {
     });
     await flush();
 
-    expect(queryState.presentation).not.toHaveBeenCalled();
+    expect(queryState.refetch).not.toHaveBeenCalled();
   });
 
   it('renders the error state and keeps Retry reachable', async () => {
-    queryState.presentationIsError = true;
+    queryState.isError = true;
 
     const renderer = await renderCard();
     const retry = renderer.root.findByProps({ accessibilityHint: 'kiloPass.retryHint' });
@@ -179,21 +204,24 @@ describe('KiloPassSubscriptionCard mounted', () => {
     });
 
     expect(haptics.selectionAsync).toHaveBeenCalledTimes(1);
-    expect(queryState.presentation).toHaveBeenCalledTimes(1);
+    expect(queryState.refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('renders the unavailable card with its title, description, and button role', async () => {
-    queryState.presentationData = { kind: 'unavailable' };
-
+  it('renders the no-pass card and opens the pass screen on press', async () => {
     const renderer = await renderCard();
     const card = renderer.root.findByProps({ accessibilityRole: 'button' });
     const renderedText = renderer.root
       .findAll(node => Object.is(node.type, 'Text'))
       .map(node => node.props.children);
 
-    // The tests run with i18n mocked to echo keys; the title comes from the
-    // shared `KILO_PASS_TITLE` and the description from the unavailable kind.
-    expect(renderedText).toEqual(['Kilo Pass', 'kiloPass.purchaseUnavailable']);
-    expect(card.props.accessibilityLabel).toBe('Kilo Pass. kiloPass.purchaseUnavailable');
+    expect(renderedText).toEqual(['Kilo Pass', 'kiloPass.notAvailableInApp']);
+    expect(card.props.accessibilityLabel).toBe('Kilo Pass. kiloPass.notAvailableInApp');
+
+    act(() => {
+      (card.props.onPress as () => void)();
+    });
+
+    expect(haptics.selectionAsync).toHaveBeenCalledTimes(1);
+    expect(routerPush).toHaveBeenCalledWith('/(app)/kilo-pass');
   });
 });

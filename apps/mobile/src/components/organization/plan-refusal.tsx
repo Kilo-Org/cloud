@@ -48,7 +48,11 @@ export function OrganizationPlanRefusal({
       <View className="pt-0.5">
         <AlertCircle size={ALERT_ICON_SIZE} color={colors.destructive} />
       </View>
-      <View className="min-w-0 shrink gap-1">
+      {/* The message takes the row's remaining width instead of shrinking to
+          its longest line: a short sentence would otherwise leave the free
+          space on one side only, and a right-to-left layout puts that space on
+          the opposite edge from a left-to-right one. */}
+      <View className="min-w-0 flex-1 gap-1">
         <AccessibleStatus message={message} tone="error" className="text-sm" />
         {action ? (
           <Pressable

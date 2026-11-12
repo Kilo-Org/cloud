@@ -1300,7 +1300,9 @@ describe('AttachmentPreviewStrip — control hit targets', () => {
   /** Resolved dp of one side's inset class, `px-*` counting for both sides. */
   function sideDp(className: unknown, side: 'start' | 'end'): number {
     const text = String(className);
-    const logical = new RegExp(`(?:^|\\s)${side === 'start' ? 'ps' : 'pe'}-(\\d+(?:\\.\\d+)?)(?=\\s|$)`);
+    const logical = new RegExp(
+      `(?:^|\\s)${side === 'start' ? 'ps' : 'pe'}-(\\d+(?:\\.\\d+)?)(?=\\s|$)`
+    );
     const match = logical.exec(text) ?? /(?:^|\s)px-(\d+(?:\.\d+)?)(?=\s|$)/.exec(text);
     return match ? Number(match[1]) * DP_PER_SPACING_UNIT : 0;
   }

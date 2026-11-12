@@ -225,6 +225,24 @@ export const CHIP_HIT_SLOP = {
 } as const;
 
 /**
+ * The frame the credits screen's failed-balance retry renders: the amount's
+ * own line box, so the card keeps its height in every state of the read and
+ * the copy below the card never moves. Its 44pt touch minimum comes from the
+ * hit slop, not from a taller box (`hitSlop` widens the touch region, not the
+ * rect — the trap `attachment-preview-strip.tsx` documents), and the gate's own
+ * rule accepts a node at the audit floor.
+ */
+export const BALANCE_RETRY_FRAME_DP = 28;
+export const BALANCE_RETRY_FRAME_CLASS = 'h-8';
+export const BALANCE_RETRY_HIT_SLOP_DP = 8;
+export const BALANCE_RETRY_HIT_SLOP = {
+  top: BALANCE_RETRY_HIT_SLOP_DP,
+  bottom: BALANCE_RETRY_HIT_SLOP_DP,
+  left: BALANCE_RETRY_HIT_SLOP_DP,
+  right: BALANCE_RETRY_HIT_SLOP_DP,
+} as const;
+
+/**
  * The box a text-only action renders so its own node carries the platform's
  * minimum touch target: `DESIGN.md:364`'s 44pt on iOS and
  * {@link ICON_TARGET_DP}'s 48dp on Android. The agents history link is one such

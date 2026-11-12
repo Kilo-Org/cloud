@@ -8,7 +8,15 @@ import '@/i18n';
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { type BackendStoreCreditProduct } from '@/lib/credits/store-products';
-import { LEGAL_LINK_BOX_CLASS, LEGAL_LINK_ROW_CLASS } from '@/lib/a11y/tap-target';
+import {
+  BALANCE_RETRY_FRAME_DP,
+  BALANCE_RETRY_HIT_SLOP,
+  BALANCE_RETRY_HIT_SLOP_DP,
+  LEGAL_LINK_BOX_CLASS,
+  LEGAL_LINK_ROW_CLASS,
+  tapTargetReachDp,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { CreditPurchaseScreen } from './credit-purchase-screen';
@@ -44,8 +52,12 @@ const creditBlocks = vi.hoisted(() => ({
   state: 'ok' as 'ok' | 'pending' | 'error',
 }));
 
-/** What one of the card's two reads answers in the current state. */
-const answerRead = (state: 'ok' | 'pending' | 'error', answer: unknown): Promise<unknown> => {
+/**
+ * What one of the card's two reads answers in the current state. A function
+ * declaration, not a `vi.hoisted` const: the query factories hoist above the
+ * module body, and a function declaration is initialized with it.
+ */
+function answerRead(state: 'ok' | 'pending' | 'error', answer: unknown): Promise<unknown> {
   if (state === 'error') {
     return Promise.reject(new Error('read failed'));
   }
@@ -55,7 +67,7 @@ const answerRead = (state: 'ok' | 'pending' | 'error', answer: unknown): Promise
     return new Promise(() => undefined);
   }
   return Promise.resolve(answer);
-};
+}
 
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 
@@ -164,15 +176,13 @@ vi.mock('@/lib/trpc', () => ({
       getContextBalance: {
         queryOptions: () => ({
           queryKey: ['user', 'getContextBalance', {}],
-          queryFn: () =>
-            answerRead(balance.state, { balance: balance.balance, isDepleted: false }),
+          queryFn: () => answerRead(balance.state, { balance: balance.balance, isDepleted: false }),
         }),
       },
       getCreditBlocks: {
         queryOptions: () => ({
           queryKey: ['user', 'getCreditBlocks', {}],
-          queryFn: () =>
-            answerRead(creditBlocks.state, { creditBlocks: creditBlocks.entries }),
+          queryFn: () => answerRead(creditBlocks.state, { creditBlocks: creditBlocks.entries }),
         }),
       },
     },
@@ -992,7 +1002,11 @@ describe('CreditPurchaseScreen', () => {
           renderer.root.findAll(() => true).some(node => surfaceOf(node) === scenario.expected)
       );
       const scroller = renderer.root.findByType(DetailScreenScrollView);
-      const slot = scroller.findAll(node => minHeightOf(node) > 0);
+      // The reserve is the pack area's slot. The balance card carries two
+      // smaller reserves of its own, so they are excluded by their testIDs.
+      const slot = scroller.findAll(
+        node => minHeightOf(node) > 0 && !/^credit-(balance|expiry)-slot$/.test(testIDOf(node))
+      );
       const surfaces = renderer.root
         .findAll(node => surfaceOf(node) !== undefined)
         .map(node => surfaceOf(node))
@@ -1154,15 +1168,44 @@ describe('CreditPurchaseScreen', () => {
     // late, so it paints one height in every state: a skeleton, the value, the
     // failed read's retry target, and a caption in all three cases. Otherwise a
     // settling read would move the packs and the copy below them.
-    const slotHeight = (scope: TestRenderer.ReactTestInstance, testID: string): number => {
+    /** The card's data-slot Views, found by the testID the screen sets. */
+    const slotOf = (scope: TestRenderer.ReactTestInstance, testID: string) => {
       const [slot] = scope.findAll(node => (node.props as { testID?: string }).testID === testID);
-      const style: unknown = slot?.props.style;
-      const height =
-        typeof style === 'object' && style !== null && 'height' in style ? style.height : 0;
-      return typeof height === 'number' ? height : 0;
+      return slot;
+    };
+    const heightOf = (slot: TestRenderer.ReactTestInstance | undefined): number => {
+      const minHeight: unknown = slot?.props.style;
+      const value =
+        typeof minHeight === 'object' && minHeight !== null && 'minHeight' in minHeight
+          ? (minHeight as { minHeight: unknown }).minHeight
+          : 0;
+      return typeof value === 'number' ? value : 0;
+    };
+    const textOf = (slot: TestRenderer.ReactTestInstance | undefined): string => {
+      if (!slot) {
+        return '';
+      }
+      const texts: string[] = [];
+      const walk = (instance: TestRenderer.ReactTestInstance): void => {
+        for (const child of instance.children) {
+          if (typeof child === 'string') {
+            texts.push(child);
+          } else if (typeof child === 'number') {
+            texts.push(String(child));
+          } else {
+            walk(child);
+          }
+        }
+      };
+      walk(slot);
+      return texts.join(' ');
     };
     const cases: { state: string; expected: string; prepare: () => void }[] = [
-      { state: 'reads pending', expected: 'Credits are a one-time purchase', prepare: () => undefined },
+      {
+        state: 'reads pending',
+        expected: 'Credits are a one-time purchase',
+        prepare: () => undefined,
+      },
       {
         state: 'nothing expires',
         expected: 'No expiring credits.',
@@ -1200,7 +1243,8 @@ describe('CreditPurchaseScreen', () => {
       },
     ];
 
-    const measured: { state: string; amount: number; caption: number; captionText: string }[] = [];
+    const measured: { state: string; amount: number; caption: number; captionSlotText: string }[] =
+      [];
     /* eslint-disable no-await-in-loop -- each scenario mutates the shared read state */
     for (const scenario of cases) {
       balance.state = 'pending';
@@ -1217,9 +1261,9 @@ describe('CreditPurchaseScreen', () => {
       }
       measured.push({
         state: scenario.state,
-        amount: slotHeight(card, 'credit-balance-slot'),
-        caption: slotHeight(card, 'credit-expiry-slot'),
-        captionText: allText(renderer),
+        amount: heightOf(slotOf(card, 'credit-balance-slot')),
+        caption: heightOf(slotOf(card, 'credit-expiry-slot')),
+        captionSlotText: textOf(slotOf(card, 'credit-expiry-slot')),
       });
       unmount();
       vi.clearAllMocks();
@@ -1236,11 +1280,39 @@ describe('CreditPurchaseScreen', () => {
       expect(result.amount, result.state).toBe(amountHeight);
       expect(result.caption, result.state).toBe(captionHeight);
     }
-    const captions = measured.map(result => result.captionText);
+    // The caption slot paints one caption in every state; the slot's own
+    // subtree carries the copy, so the assertion cannot pass through the rest
+    // of the screen. The failed balance line sits in the amount slot, above
+    // this one, so it is not part of the caption's states.
+    const captions = measured.map(result => result.captionSlotText);
     expect(captions.some(text => text.includes('No expiring credits.'))).toBe(true);
     expect(captions.some(text => text.includes('in credits expires'))).toBe(true);
     expect(captions.some(text => text.includes('Credit expiry unavailable.'))).toBe(true);
-    expect(captions.some(text => text.includes('Failed to load balance. Tap to retry.'))).toBe(true);
+    // The skeleton paints no text, so the pending state's slot reads as empty.
+    expect(captions[0]).toBe('');
+    // Every state paints the caption line inside the same two-line floor, and
+    // the amount keeps one line: both are the text's own box, so the card's
+    // padding stays balanced.
+    expect(captions.filter(text => text.length > 0)).toHaveLength(cases.length - 1);
+
+    // The failed read's retry keeps the amount's own line box and reaches the
+    // 44 dp touch minimum from its hit slop, so it adds no height to the card.
+    balance.state = 'error';
+    creditBlocks.state = 'ok';
+    creditBlocks.entries = [];
+    const failed = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(failed.renderer).includes('Failed to load balance. Tap to retry.'));
+    const [retry] = failed.renderer.root.findAll(
+      node => (node.props as { accessibilityRole?: string }).accessibilityRole === 'button'
+    );
+    if (!retry) {
+      throw new Error('expected the balance retry target');
+    }
+    const slop = (retry.props as { hitSlop?: Record<string, number> }).hitSlop;
+    const reach = tapTargetReachDp(BALANCE_RETRY_FRAME_DP, BALANCE_RETRY_HIT_SLOP_DP);
+    expect(slop).toEqual(BALANCE_RETRY_HIT_SLOP);
+    expect(reach).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    failed.unmount();
   });
 
   it('identity failure: shows its own retryable card instead of an empty pack area', async () => {

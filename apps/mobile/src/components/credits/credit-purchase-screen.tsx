@@ -12,7 +12,12 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { LEGAL_LINK_BOX_CLASS, LEGAL_LINK_ROW_CLASS } from '@/lib/a11y/tap-target';
+import {
+  BALANCE_RETRY_FRAME_CLASS,
+  BALANCE_RETRY_HIT_SLOP,
+  LEGAL_LINK_BOX_CLASS,
+  LEGAL_LINK_ROW_CLASS,
+} from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { WEB_BASE_URL } from '@/lib/config';
 import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
@@ -57,32 +62,28 @@ const purchaseErrorClearance = (fontScale: number, bottomInset: number): number 
   8;
 
 /**
- * The balance card's two data slots, at the default font scale.
+ * The balance card's data slots, at the default font scale.
  *
  * The card is the one block above the pack area whose content arrives late, so
  * it holds one height in every state of its two reads and the copy below never
- * moves. The amount keeps its own `text-2xl` line box — a skeleton, the value
- * and the failed read's retry all sit inside it — and the expiry caption keeps
- * the two `text-xs` lines its sentence wraps to in this card's width.
+ * moves. Two measured line boxes decide that height, and both are the text's
+ * own box rather than extra space, so the card's bottom padding stays its
+ * `py-4` and matches the top:
  *
- * Both reservations are the text's line box itself, not extra space on top of
- * it, so the card's bottom padding stays its `py-4` and matches the top. The
- * caption is laid out from the slot's bottom, so a one-line caption sits where
- * the second line would end and leaves no band under the amount.
+ * - The amount's `text-2xl` line box: the value, the skeleton and the failed
+ *   read's retry target are all one line of it.
+ * - The expiry caption's `text-xs` lines: the caption paints in every state,
+ *   so the only shape it can grow is the sentence's wrap, and the sentence
+ *   wraps to two lines at this card's width in the catalog's measured styles.
  *
- * The text scales with the system font size, so the reservations do too; only
- * the two lines' text is multiplied, the spacing stays fixed, as in the rows.
+ * The reservation is a floor, not a cap: a catalog value that wraps one line
+ * more grows the card by one line, which is the price of never truncating a
+ * localized sentence. The line boxes scale with the system font size; the
+ * spacing between them stays fixed, as in the rows.
  */
 const BALANCE_AMOUNT_LINE_HEIGHT = 28.2;
-const EXPIRY_CAPTION_LINES = 2;
 const EXPIRY_LINE_HEIGHT = 14.1;
-
-/**
- * Per-side `hitSlop` of the failed balance read's retry target: its box is one
- * amount line high, so the slop lifts the 28 dp box to the 44 dp touch target
- * without adding height that would move the copy below the card.
- */
-const BALANCE_RETRY_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+const EXPIRY_CAPTION_LINES = 2;
 
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
@@ -240,7 +241,7 @@ export function CreditPurchaseScreen() {
         <Pressable
           accessibilityLabel={t('profile.failedToLoadBalance')}
           accessibilityRole="button"
-          className="h-8 justify-center active:opacity-70"
+          className={cn(BALANCE_RETRY_FRAME_CLASS, 'justify-center active:opacity-70')}
           hitSlop={BALANCE_RETRY_HIT_SLOP}
           onPress={() => {
             void refetchBalance();
@@ -267,7 +268,7 @@ export function CreditPurchaseScreen() {
     );
   };
 
-const renderExpirySlot = () => {
+  const renderExpirySlot = () => {
     // Every state paints one caption inside the same two-line slot: the
     // sentence, the "no expiring credits" line the Profile credits card also
     // shows, "expiry unavailable" when the read fails, or the skeleton. The
@@ -276,9 +277,7 @@ const renderExpirySlot = () => {
     // padding stays its `py-4` in every state and the copy below never moves.
     if (creditBlocksQuery.isError) {
       return (
-        <Text className="text-xs text-muted-foreground" numberOfLines={EXPIRY_CAPTION_LINES}>
-          {t('credits.expiryUnavailable')}
-        </Text>
+        <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
       );
     }
     if (creditBlocksQuery.isPending) {
@@ -289,7 +288,6 @@ const renderExpirySlot = () => {
         creditBlocks={creditBlocksQuery.data.creditBlocks}
         hiddenAmount={hideBalanceAmount ? HIDDEN_BALANCE : undefined}
         emptyMessage={t('credits.noExpiringCredits')}
-        numberOfLines={EXPIRY_CAPTION_LINES}
       />
     );
   };
@@ -322,19 +320,20 @@ const renderExpirySlot = () => {
                 below the value, never between the label and the value. */}
             <View
               className="mt-1 justify-center"
-              style={{ height: BALANCE_AMOUNT_LINE_HEIGHT * fontScale }}
+              style={{ minHeight: BALANCE_AMOUNT_LINE_HEIGHT * fontScale }}
               testID="credit-balance-slot"
             >
               {renderBalanceValue()}
             </View>
-            {/* The caption is centred in its two-line slot: a one-line
+            {/* The caption is centred in its two-line floor: a one-line
                 caption splits the line it does not use above and below, so the
                 card's bottom edge keeps the same distance from the text as its
-                top edge does. Anchoring it to either end of the slot would put
-                the whole unused line on the other side and read as a band. */}
+                top edge does. Anchoring it to either end would put the whole
+                unused line on one side and read as a band. A longer locale's
+                sentence grows the floor instead of truncating. */}
             <View
               className="mt-1 justify-center"
-              style={{ height: EXPIRY_CAPTION_LINES * EXPIRY_LINE_HEIGHT * fontScale }}
+              style={{ minHeight: EXPIRY_CAPTION_LINES * EXPIRY_LINE_HEIGHT * fontScale }}
               testID="credit-expiry-slot"
             >
               {renderExpirySlot()}

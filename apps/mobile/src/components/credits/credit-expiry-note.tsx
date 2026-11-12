@@ -11,12 +11,6 @@ type CreditExpiryNoteProps = {
   creditBlocks: Parameters<typeof getNextCreditExpiry>[0];
   hiddenAmount?: string;
   emptyMessage?: string;
-  /**
-   * Cap on the lines the caption may paint. A caller that reserves the
-   * caption's height passes the count it reserved, so a longer catalog value
-   * truncates instead of growing the slot.
-   */
-  numberOfLines?: number;
 };
 
 /**
@@ -45,20 +39,17 @@ export function CreditExpiryNote({
   creditBlocks,
   hiddenAmount,
   emptyMessage,
-  numberOfLines,
 }: Readonly<CreditExpiryNoteProps>) {
   const { t, i18n } = useTranslation();
   const nextExpiry = getNextCreditExpiry(creditBlocks);
   if (!nextExpiry) {
     return emptyMessage ? (
-      <Text className="text-xs text-muted-foreground" numberOfLines={numberOfLines}>
-        {emptyMessage}
-      </Text>
+      <Text className="text-xs text-muted-foreground">{emptyMessage}</Text>
     ) : null;
   }
 
   return (
-    <Text className="text-xs text-muted-foreground" numberOfLines={numberOfLines}>
+    <Text className="text-xs text-muted-foreground">
       {keepZoneWithDate(
         t('credits.nextExpiry', {
           amount:

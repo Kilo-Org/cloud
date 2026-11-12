@@ -4028,9 +4028,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
     // Inheritance from the active session (Decision 6). Explicit caller fields
     // win when provided (e.g. tests); otherwise store-derived values apply. Only
-    // the active session's own row supplies an organization.
+    // the active session's own row supplies an organization, and a caller that
+    // names its own organization needs no row.
     const fetched = store.get(fetchedSessionDataAtom);
-    if (fetched && fetched.kiloSessionId !== activeSessionId) {
+    const scopeSupplied = input?.orgId !== undefined;
+    if (!scopeSupplied && fetched?.kiloSessionId !== activeSessionId) {
       throw new Error(REMOTE_SESSION_CREATION_SCOPE_UNRESOLVED);
     }
     const selection = store.get(remoteModelOverrideAtom)?.selection ?? store.get(observedModelAtom);

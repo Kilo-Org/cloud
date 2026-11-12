@@ -644,13 +644,18 @@ export function SessionDetailContent({
   const { hideThinking, hasLoaded: hideThinkingLoaded } = useHideThinkingPreference();
   const { keepScreenOn, hasLoaded: keepScreenOnLoaded } = useKeepScreenOnPreference();
   const { condenseToolCalls } = useCondenseToolCallsPreference();
-  const { models: gatewayModels, isLoading: gatewayCatalogLoading } = useAvailableModels(
+  const { models: catalogModels, isLoading: gatewayCatalogLoading } = useAvailableModels(
     organizationId,
     'member',
     { enabled: sessionDataLoaded }
   );
-  // A held catalog read is not an empty catalog: keep the picker in its loading
-  // state for the unresolved window, the way a read in flight reports itself.
+  // The picker lists models only once the session's scope is resolved. Until
+  // then it holds its loading state, so it never presents a model list for a
+  // scope the screen has not settled.
+  const gatewayModels = useMemo(
+    () => (sessionDataLoaded ? catalogModels : []),
+    [catalogModels, sessionDataLoaded]
+  );
   const gatewayModelsLoading = gatewayCatalogLoading || !sessionDataLoaded;
   const sessionModels = useSessionModelOptions({
     activeSessionType,

@@ -529,6 +529,8 @@ vi.mock('@/lib/last-opened-session', () => ({
 // assertion surface for it.
 const scopeReads = vi.hoisted(() => ({
   models: [] as { organizationId: string | undefined; enabled: boolean | undefined }[],
+  /** What the mocked catalog read reports; a model here must not reach the picker. */
+  catalogModels: [] as unknown[],
   preferences: [] as { organizationId: string | undefined; enabled: boolean | undefined }[],
   profiles: [] as { organizationId: string | undefined; enabled: boolean | undefined }[],
   modes: [] as { organizationId: string | undefined; enabled: boolean | undefined }[],
@@ -540,7 +542,7 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
     options?: { enabled?: boolean }
   ) => {
     scopeReads.models.push({ organizationId, enabled: options?.enabled });
-    return { models: [], isLoading: false };
+    return { models: scopeReads.catalogModels, isLoading: false };
   },
 }));
 vi.mock('@/lib/hooks/use-model-preferences', () => ({
@@ -924,6 +926,7 @@ beforeEach(() => {
   scopeReads.preferences.length = 0;
   scopeReads.profiles.length = 0;
   scopeReads.modes.length = 0;
+  scopeReads.catalogModels = [];
   vi.mocked(createAndNavigateAgentSession).mockReset();
   vi.mocked(restartAgentSession).mockReset();
 });
@@ -1512,6 +1515,68 @@ describe('session detail organization scope', () => {
     expect(restartAgentSession).toHaveBeenCalledWith(
       expect.objectContaining({ organizationId: 'org-b' })
     );
+  });
+
+  it('holds the reads and the actions while the session row has not arrived', async () => {
+    // A cached transcript paints while the metadata read is still in flight, so
+    // the composer is on screen before the session's own row arrives.
+    const metadata = Promise.withResolvers<undefined>();
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    scopeReads.catalogModels = [
+      {
+        id: 'deepseek/deepseek-v4.1-flash',
+        name: 'DeepSeek V4.1 Flash',
+        variants: [],
+        isPreferred: false,
+        showGatewayMetadata: true,
+      },
+    ];
+    const view = await mountDetails(cachedRows, {
+      metadataReady: metadata.promise,
+      cachedRows,
+    });
+    expect(view.store.get(view.manager.atoms.fetchedSessionData)).toBeNull();
+
+    // Held: no organization-scoped read has run, and the held catalog is not
+    // presented even though the read reports cached models.
+    expect(scopeReads.models.at(-1)).toEqual({ organizationId: undefined, enabled: false });
+    expect(scopeReads.modes.at(-1)).toEqual({ organizationId: undefined, enabled: false });
+    const [composer] = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'));
+    if (!composer) {
+      throw new Error('the composer was expected for a cached transcript');
+    }
+    expect(composer.props.modelOptions).toEqual([]);
+
+    // Start and Restart do nothing while the scope is unresolved.
+    await act(async () => {
+      await (composer.props.onCreateSession as () => Promise<boolean>)();
+      await (composer.props.onRestartSession as () => Promise<boolean>)();
+      await Promise.resolve();
+    });
+    expect(createAndNavigateAgentSession).not.toHaveBeenCalled();
+    expect(restartAgentSession).not.toHaveBeenCalled();
+
+    // The read-only footer's Continue is likewise unavailable: the same window
+    // paints it for a read-only transcript, and pressing it opens nothing.
+    await act(async () => {
+      view.store.set(view.manager.atoms.activeSessionType, 'read-only');
+      await Promise.resolve();
+    });
+    const continueRoute = navigationRoutes.lastIndexOf('session-detail');
+    const [continueControl] = view.renderer.root.findAll(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    if (continueControl) {
+      act(() => {
+        (continueControl.props.onPress as () => void)();
+      });
+    }
+    expect(navigationRoutes.lastIndexOf('session-detail')).toBe(continueRoute);
+    expect(
+      navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+    ).toHaveLength(0);
   });
 });
 

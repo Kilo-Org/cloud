@@ -77,7 +77,9 @@ export function useEffectiveProfileCustomModes(
     enabled && Boolean(targetProfileId) && ownershipResolved
   );
 
-  const profileAgents = visibleProfileAgents(agentsQuery.data ?? []);
+  // A held caller sees no profile agents until its scope resolves, matching the
+  // context read it also holds.
+  const profileAgents = enabled ? visibleProfileAgents(agentsQuery.data ?? []) : [];
   const customOptions = dedupeCustomModeOptions(customModeOptionsFromProfileAgents(profileAgents));
   // True once the profile's agent list is known: the context lookup answered
   // and the selected profile (if any) loaded. A failed read is not settled.

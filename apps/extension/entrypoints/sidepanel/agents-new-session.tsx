@@ -28,6 +28,7 @@ import {
 import type { CreateRemoteSessionInput } from '@kilocode/cloud-agent-sdk';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import { getKiloApiBaseUrl, loadStoredAuth } from '@/src/shared/auth';
+import { getDefaultGatewayModelId } from '@/src/shared/default-gateway-model';
 import { fetchModelPreferences } from '@/src/shared/model-preferences-client';
 import { isGatewayModelId } from '@/src/shared/model-picker-rows';
 import {
@@ -166,31 +167,38 @@ export const buildCreateRemoteSessionInput = ({
  * reason is a dead end — most often no GitHub integration, so a cloud session
  * can never get a repository.
  */
+export type SubmitBlocker =
+  | 'connect-github'
+  | 'no-repos'
+  | 'repos-unavailable'
+  | 'pick-repo'
+  | 'no-models';
+
 export const submitBlockedReason = ({
   hasModels,
   integrationInstalled,
   isCloudTarget,
-  isLoading,
-  isPromptValid,
+  isModelsLoading,
   repoCount,
+  repoStatus,
   selectedRepo,
 }: {
   hasModels: boolean;
   integrationInstalled: boolean;
   isCloudTarget: boolean;
-  /** Repositories or models still in flight; an empty list means nothing yet. */
-  isLoading: boolean;
-  isPromptValid: boolean;
+  isModelsLoading: boolean;
   repoCount: number;
+  repoStatus: 'loading' | 'error' | 'ready';
   selectedRepo: string;
-}): 'connect-github' | 'no-repos' | 'pick-repo' | 'no-models' | null => {
-  if (!isPromptValid || !isCloudTarget) {
-    // The textarea already reports a short prompt; a CLI target needs nothing else.
+}): SubmitBlocker | null => {
+  if (!isCloudTarget) {
     return null;
   }
-  if (isLoading) {
-    // Naming a blocker mid-load would name the wrong one.
+  if (repoStatus === 'loading' || isModelsLoading) {
     return null;
+  }
+  if (repoStatus === 'error') {
+    return 'repos-unavailable';
   }
   if (!integrationInstalled) {
     return 'connect-github';
@@ -332,6 +340,7 @@ export const AgentsNewSession = ({
   const [repoSearch, setRepoSearch] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const repoDropdownRef = useRef<HTMLDivElement>(null);
+  const repoButtonRef = useRef<HTMLButtonElement>(null);
 
   const isCloudTarget = runTarget === 'cloud';
   const selectedInstance = useMemo(
@@ -361,6 +370,27 @@ export const AgentsNewSession = ({
   }, []);
 
   useEffect(() => {
+    if (!repoDropdownOpen) {
+      return;
+    }
+    const handler = (evt: KeyboardEvent): void => {
+      if (evt.key !== 'Escape') {
+        return;
+      }
+      // The open popover owns Escape; closing the whole form would lose the draft.
+      evt.preventDefault();
+      evt.stopPropagation();
+      setRepoDropdownOpen(false);
+      setRepoSearch('');
+      repoButtonRef.current?.focus();
+    };
+    document.addEventListener('keydown', handler, true);
+    return () => {
+      document.removeEventListener('keydown', handler, true);
+    };
+  }, [repoDropdownOpen]);
+
+  useEffect(() => {
     if (isModelUserSelected || modelOptions.length === 0) {
       return;
     }
@@ -378,8 +408,8 @@ export const AgentsNewSession = ({
       }
     }
 
-    // Fallback: first model in loaded list (index 0)
-    setSelectedModel(modelOptions[0]?.id ?? '');
+    // Fallback: the shared Auto/recommended default, never the catalogue's first row.
+    setSelectedModel(getDefaultGatewayModelId(modelOptions) ?? '');
     setSelectedVariant('');
   }, [modelOptions, lastSelected, isModelUserSelected]);
 
@@ -437,9 +467,9 @@ export const AgentsNewSession = ({
     hasModels: modelOptions.length > 0,
     integrationInstalled,
     isCloudTarget,
-    isLoading: isRepoLoading || isModelsLoading,
-    isPromptValid,
+    isModelsLoading,
     repoCount: repos.length,
+    repoStatus,
     selectedRepo,
   });
 
@@ -622,6 +652,29 @@ export const AgentsNewSession = ({
     [isFormValid, handleSubmit]
   );
 
+  /* Escape leaves the form exactly like the Back arrow. A dialog or a native
+     select closes itself first, and the repository popover stops the event in
+     the capture phase. */
+  useEffect(() => {
+    const handler = (evt: KeyboardEvent): void => {
+      if (evt.key !== 'Escape' || evt.defaultPrevented) {
+        return;
+      }
+      const { target } = evt;
+      if (target instanceof Element && target.closest('[role="dialog"]') !== null) {
+        return;
+      }
+      if (target instanceof HTMLSelectElement) {
+        return;
+      }
+      onCancel();
+    };
+    document.addEventListener('keydown', handler);
+    return () => {
+      document.removeEventListener('keydown', handler);
+    };
+  }, [onCancel]);
+
   if (isAuthLoading) {
     return (
       <div className="flex flex-1 items-center justify-center px-4 py-6">
@@ -698,6 +751,22 @@ export const AgentsNewSession = ({
           {prompt.length > 0 && prompt.length < PROMPT_MIN_LENGTH ? (
             <p className="mt-1 type-label text-foreground-muted">
               Enter at least {PROMPT_MIN_LENGTH} characters
+            </p>
+          ) : null}
+          {prompt.length >= PROMPT_MAX_LENGTH * 0.9 ? (
+            <p
+              aria-live="polite"
+              className={`mt-1 type-label ${
+                prompt.length >= PROMPT_MAX_LENGTH
+                  ? 'text-status-yellow-300'
+                  : 'text-foreground-muted'
+              }`}
+            >
+              {prompt.length.toLocaleString('en-US')} / {PROMPT_MAX_LENGTH.toLocaleString('en-US')}{' '}
+              characters
+              {prompt.length >= PROMPT_MAX_LENGTH
+                ? ' · limit reached, extra text is dropped'
+                : null}
             </p>
           ) : null}
         </div>
@@ -792,6 +861,7 @@ export const AgentsNewSession = ({
           {isCloudTarget ? (
             <div ref={repoDropdownRef} className="relative">
               <button
+                ref={repoButtonRef}
                 aria-label="Select repository"
                 className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface-overlay px-2 type-label transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={isSubmitting || repoStatus === 'loading'}
@@ -985,6 +1055,9 @@ export const AgentsNewSession = ({
               </>
             ) : null}
             {blockedReason === 'no-repos' ? 'No repositories available on this account.' : null}
+            {blockedReason === 'repos-unavailable'
+              ? 'Repositories did not load. Open the repository picker and retry.'
+              : null}
             {blockedReason === 'no-models' ? 'No models available. Retry above.' : null}
             {blockedReason === 'pick-repo' ? 'Choose a repository to start.' : null}
           </p>

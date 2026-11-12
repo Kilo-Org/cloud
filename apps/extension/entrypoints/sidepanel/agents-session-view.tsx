@@ -16,6 +16,7 @@ import { AgentsMessageList } from './agents-message-list';
 import { AgentsComposer } from './agents-composer';
 import { AgentsBlockingCards } from './agents-blocking-cards';
 import { ContextDonut } from './context-donut';
+import { ErrorNotice } from './error-notice';
 import { ModelPicker } from './model-picker';
 import { useGatewayModels } from './use-gateway-models';
 import {
@@ -28,6 +29,10 @@ import {
 
 const CREDITS_KEYWORDS =
   /(?:insufficient\s*credits|add\s*(?:at\s*least\s*)?\$\d|payment\s*required)/i;
+
+/* Same grace the session list's Offline pill uses: a reconnect blip must not
+   flash a connection error over a perfectly healthy transcript. */
+const LIVE_CONNECTION_GRACE_MS = 5000;
 
 /*
  * Same query key and fetcher as the new-session form's own stored-auth query,
@@ -67,7 +72,7 @@ export const AgentsSessionView = ({
   /** Prompt to auto-send once the session accepts messages (CLI spawn flow). */
   initialPrompt?: string | undefined;
 }): JSX.Element => {
-  const { manager, organizationId, trpcClient } = useExtensionAgents();
+  const { manager, organizationId, store, trpcClient, userWebConnection } = useExtensionAgents();
   const { atoms } = manager;
   const messages = useAtomValue(atoms.messagesList);
   const isLoading = useAtomValue(atoms.isLoading);
@@ -92,10 +97,17 @@ export const AgentsSessionView = ({
   const remoteModelOverride = useAtomValue(atoms.remoteModelOverride);
   const observedModel = useAtomValue(atoms.observedModel);
   const cloudAgentModelOverride = useAtomValue(atoms.cloudAgentModelOverride);
+  const activity = useAtomValue(atoms.activity);
+  const agentStatus = useAtomValue(atoms.agentStatus);
 
   const [retryingPrompt, setRetryingPrompt] = useState(false);
   const [retryingSwitch, setRetryingSwitch] = useState(false);
   const [retrySucceeded, setRetrySucceeded] = useState(false);
+  /* A retry that re-dialed into the same failure must say so instead of
+     offering the identical Retry again. */
+  const [retryFailed, setRetryFailed] = useState(false);
+  const [liveConnected, setLiveConnected] = useState(() => userWebConnection.isConnected());
+  const [showLiveConnectionLost, setShowLiveConnectionLost] = useState(false);
   /*
    * A sent prompt reaches the agent before `isStreaming` flips. Without this
    * the composer just goes dead and the transcript shows nothing happening.
@@ -106,6 +118,32 @@ export const AgentsSessionView = ({
   useEffect(() => {
     setRetrySucceeded(false);
   }, [failedPrompt]);
+
+  useEffect(() => {
+    setLiveConnected(userWebConnection.isConnected());
+    return userWebConnection.onConnectionChange(setLiveConnected);
+  }, [userWebConnection]);
+
+  useEffect(() => {
+    if (liveConnected) {
+      setShowLiveConnectionLost(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setShowLiveConnectionLost(true);
+    }, LIVE_CONNECTION_GRACE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [liveConnected]);
+
+  const errorMessage =
+    error ?? (statusIndicator?.type === 'error' ? statusIndicator.message : null);
+
+  // A fresh failure is new information: the previous retry verdict no longer applies.
+  useEffect(() => {
+    setRetryFailed(false);
+  }, [errorMessage]);
 
   // Single session lifecycle: clear error + switch on setup, destroy on cleanup.
   // On id change cleanup runs first (destroy old), then setup reconnects fresh.
@@ -230,11 +268,12 @@ export const AgentsSessionView = ({
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- branded ID from untyped hook input
         await manager.switchSession(kiloSessionId as KiloSessionId);
+        setRetryFailed(store.get(manager.atoms.error) !== null);
       } finally {
         setRetryingSwitch(false);
       }
     })();
-  }, [kiloSessionId, manager]);
+  }, [kiloSessionId, manager, store]);
 
   const handleDismissError = useCallback(() => {
     manager.clearError();
@@ -380,6 +419,24 @@ export const AgentsSessionView = ({
 
   const rawTitle = fetchedSessionData?.title ?? '';
   const title = rawTitle === '' ? 'Session' : rawTitle;
+  const composerDisabledReason = ((): string | undefined => {
+    if (isReadOnly) {
+      return 'This session is read-only: no live agent is attached to it. Open its CLI to continue it, or start a new session.';
+    }
+    if (canSend) {
+      return undefined;
+    }
+    if (errorMessage !== null) {
+      return "Kilo could not reach this session's agent, so messages cannot be sent.";
+    }
+    if (activity?.type === 'connecting') {
+      return 'Connecting to the agent. Messages can be sent when it is ready.';
+    }
+    if (agentStatus?.type === 'disconnected') {
+      return 'The agent is disconnected. Go back and start a new session, or wait for it to reconnect.';
+    }
+    return 'This session cannot accept messages right now.';
+  })();
   const rawRepository = fetchedSessionData?.repository ?? fetchedSessionData?.gitUrl;
   const repository =
     rawRepository === null || rawRepository === undefined || rawRepository === ''
@@ -457,7 +514,7 @@ export const AgentsSessionView = ({
                     >
                       Dismiss
                     </button>
-                    {failedPrompt === null || retrySucceeded ? (
+                    {!retryFailed && (failedPrompt === null || retrySucceeded) ? (
                       <button
                         className="rounded-md border border-border bg-surface-overlay px-3 py-1 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:opacity-50"
                         disabled={retryingSwitch}
@@ -489,8 +546,26 @@ export const AgentsSessionView = ({
               return null;
             })()}
           </div>
+          {statusIndicator.type === 'error' && retryFailed ? (
+            <p className="mt-1 break-words">
+              Retrying did not help. Go back to the session list and start a new session.
+            </p>
+          ) : null}
         </div>
       )}
+
+      {showLiveConnectionLost && !isLoading && isReadOnly ? (
+        <div className="shrink-0 border-b border-border px-4 py-2">
+          <ErrorNotice
+            detail="This session stays read-only until the connection is back."
+            onRetry={() => {
+              userWebConnection.retryConnection();
+            }}
+            retryable
+            title="Kilo can't reach the live agent connection."
+          />
+        </div>
+      ) : null}
 
       {/* Error atom row */}
       {error === null ? null : (
@@ -515,7 +590,7 @@ export const AgentsSessionView = ({
                   </a>
                 );
               }
-              if (failedPrompt === null || retrySucceeded) {
+              if (!retryFailed && (failedPrompt === null || retrySucceeded)) {
                 return (
                   <button
                     className="shrink-0 rounded-md border border-border bg-surface-overlay px-3 py-1 type-label text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring disabled:opacity-50"
@@ -530,6 +605,11 @@ export const AgentsSessionView = ({
               return null;
             })()}
           </div>
+          {retryFailed && statusIndicator?.type !== 'error' ? (
+            <p className="mt-1 break-words">
+              Retrying did not help. Go back to the session list and start a new session.
+            </p>
+          ) : null}
         </div>
       )}
 
@@ -628,6 +708,7 @@ export const AgentsSessionView = ({
           <AgentsComposer
             canSend={canSend}
             canInterrupt={canInterrupt}
+            disabledReason={composerDisabledReason}
             isStreaming={isStreaming}
             isLoading={false}
             isReadOnly={isReadOnly}

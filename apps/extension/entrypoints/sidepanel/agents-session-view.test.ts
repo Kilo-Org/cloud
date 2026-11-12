@@ -565,6 +565,13 @@ const mockTrpcClient = {
   modelPreferences: { setLastSelected: { mutate: mockSetLastSelected } },
 };
 
+const mockStore = { get: vi.fn(() => null) };
+const mockUserWebConnection = {
+  isConnected: vi.fn(() => true),
+  onConnectionChange: vi.fn(() => () => {}),
+  retryConnection: vi.fn(),
+};
+
 /* The view reads stored auth and the gateway catalog through react-query. */
 const withQueryClient = (node: ReactElement): ReactElement =>
   h(
@@ -619,7 +626,9 @@ vi.mock('./agents-provider', () => ({
   useExtensionAgents: () => ({
     manager: mockManager,
     organizationId: storedOrganizationId,
+    store: mockStore,
     trpcClient: mockTrpcClient,
+    userWebConnection: mockUserWebConnection,
   }),
 }));
 

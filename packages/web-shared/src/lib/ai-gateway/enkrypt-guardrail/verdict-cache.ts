@@ -101,26 +101,21 @@ function configHash(config: ReadyConfig): Buffer {
  * it, and each unit is cached on its own wherever it appears. Text is hashed as UTF-16 code units
  * to stay exact for lone surrogates, which UTF-8 would replace.
  *
- * The scope is the organization, the part, and the detector configuration. Tool definitions and
- * system prompts are shared by the members of an organization, so the same ones, which coding
- * agents mostly ship, are scanned once for all of them; scan latency can therefore reveal to a
- * member that someone in their organization sent the same content before, which is accepted.
- * Conversation units are also scoped to the user, so no member can learn whether another sent a
- * given message.
+ * The scope is the organization, the part, and the detector configuration, but not the user, so
+ * members of an organization share verdicts: the same tool definitions, system prompts, and
+ * messages are scanned once for all of them. Scan latency can therefore reveal to a member that
+ * someone in their organization sent the same content before, which is accepted.
  */
 export function verdictCacheKey(
-  { organizationId, kiloUserId }: Pick<EnkryptGuardrailRequest, 'organizationId' | 'kiloUserId'>,
+  { organizationId }: Pick<EnkryptGuardrailRequest, 'organizationId'>,
   config: ReadyConfig,
   part: RequestPart,
   text: string
 ): string {
   const keyPrefix = `enkrypt-guardrail:verdict:v${VERDICT_CACHE_VERSION}:${organizationId}:${part}:`;
-  const user = part === 'conversation' ? kiloUserId : '';
   const hash = createHash('sha256')
     .update(keyPrefix)
     .update(configHash(config))
-    .update(`${user.length}:`)
-    .update(user, 'utf16le')
     .update(`${text.length}:`)
     .update(text, 'utf16le')
     .digest('hex');

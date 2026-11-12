@@ -640,11 +640,11 @@ const steps: Step[] = [
     request: chat(chatTurn2FollowUp),
     store: chatStore,
     kiloUserId: 'e2e-user-2',
-    // Tool definitions and system prompts are cached for the organization, conversations per user.
+    // Verdicts are shared within the organization, so only the two new messages are scanned.
     expected: both({
       tools: 'hit allow tools=3/0 calls=0',
       system: 'hit allow calls=0',
-      conversation: 'miss allow calls=1',
+      conversation: 'hit allow calls=1',
     }),
   },
   {

@@ -309,20 +309,11 @@ describe('verdictCacheKey', () => {
     );
   });
 
-  it('scopes conversation keys to the user, but shares tool and system keys within an organization', () => {
+  it('shares every key between users of an organization', () => {
     const keysOf = (kiloUserId: string) =>
       parts.map(part => keysFor(conversation, { kiloUserId }, part));
 
-    const [userTools, userSystem, userConversation] = keysOf('oauth/google:123');
-    const [otherTools, otherSystem, otherConversation] = keysOf('oauth/google:456');
-
-    expect(otherTools).toEqual(userTools);
-    expect(otherSystem).toEqual(userSystem);
-    for (const key of otherConversation) expect(userConversation).not.toContain(key);
-  });
-
-  it('separates the user from the text in a conversation key', () => {
-    expect(unitKey('c', { kiloUserId: 'ab' })).not.toBe(unitKey('bc', { kiloUserId: 'a' }));
+    expect(keysOf('oauth/google:456')).toEqual(keysOf('oauth/google:123'));
   });
 
   it('shares no key across organizations, configurations, or parts', () => {
@@ -766,7 +757,6 @@ describe('scanRequestWithVerdictCache', () => {
 
   it.each<[string, Partial<EnkryptGuardrailRequest>]>([
     ['another organization', { organizationId: '00000000-0000-4000-8000-000000000003' }],
-    ['another user', { kiloUserId: 'oauth/google:456' }],
     ['a changed configuration', { config: { ...config, blockingDetectors: ['injection_attack'] } }],
   ])('does not reuse a conversation verdict for %s', async (_name, overrides) => {
     const store = memoryStore(keysFor(conversation));
@@ -778,7 +768,7 @@ describe('scanRequestWithVerdictCache', () => {
   });
 
   it.each(['allow', 'block'] as const)(
-    "reuses another organization member's cached %s of tools and system prompt, but not of the conversation",
+    "reuses another organization member's cached %s of tools, system prompt, and conversation",
     async action => {
       const singleSystem = system.slice(0, 1);
       const store = memoryStore();
@@ -796,15 +786,14 @@ describe('scanRequestWithVerdictCache', () => {
         dependencies
       );
 
-      expect(scannedTexts(dependencies)).toEqual([render(single)]);
-      expect(results.map(result => result.verdict.action)).toEqual([action, action, 'allow']);
-      expect(results.map(result => result.report?.verdict_cache)).toEqual(['hit', 'hit', 'miss']);
+      expect(scannedTexts(dependencies)).toEqual([]);
+      expect(results.map(result => result.verdict.action)).toEqual([action, action, action]);
+      expect(results.map(result => result.report?.verdict_cache)).toEqual(['hit', 'hit', 'hit']);
     }
   );
 
   it.each<[string, Partial<EnkryptGuardrailRequest>]>([
     ['another organization', { organizationId: '00000000-0000-4000-8000-000000000003' }],
-    ['another user', { kiloUserId: 'oauth/google:456' }],
     ['a changed blocking set', { config: { ...config, blockingDetectors: ['injection_attack'] } }],
     [
       'changed detector settings',

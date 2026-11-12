@@ -197,8 +197,8 @@ export function useOlderMessagesPagination({
 } {
   const inFlightRef = useRef(false);
   const pendingPositionRef = useRef<PrependScrollPosition | null>(null);
-  const requestedScrollHeightRef = useRef(0);
-  const stalledScrollHeightRef = useRef<number | null>(null);
+  const requestedContentHeightRef = useRef(0);
+  const stalledContentHeightRef = useRef<number | null>(null);
   const wasLoadingRef = useRef(isLoadingOlderMessages);
   const restoreFrameRef = useRef(0);
   const captureFrameRef = useRef<number | null>(null);
@@ -206,8 +206,8 @@ export function useOlderMessagesPagination({
   useLayoutEffect(() => {
     inFlightRef.current = false;
     pendingPositionRef.current = null;
-    requestedScrollHeightRef.current = 0;
-    stalledScrollHeightRef.current = null;
+    requestedContentHeightRef.current = 0;
+    stalledContentHeightRef.current = null;
     wasLoadingRef.current = false;
     return () => {
       cancelAnimationFrame(restoreFrameRef.current);
@@ -231,7 +231,7 @@ export function useOlderMessagesPagination({
     const el = scrollElementRef.current;
     if (el) {
       pendingPositionRef.current = capturePrependScrollPosition(el);
-      requestedScrollHeightRef.current = pendingPositionRef.current.scrollHeight;
+      requestedContentHeightRef.current = (scrollContentRef?.current ?? el).scrollHeight;
     }
     inFlightRef.current = true;
     void Promise.resolve(onLoad()).finally(() => {
@@ -245,6 +245,7 @@ export function useOlderMessagesPagination({
     olderMessagesError,
     onLoad,
     ready,
+    scrollContentRef,
     scrollElementRef,
   ]);
 
@@ -257,7 +258,7 @@ export function useOlderMessagesPagination({
       el &&
       canAutoloadOlderMessages(el) &&
       el.scrollTop < OLDER_MESSAGES_NEAR_TOP_PX &&
-      el.scrollHeight !== stalledScrollHeightRef.current
+      (scrollContentRef?.current ?? el).scrollHeight !== stalledContentHeightRef.current
     ) {
       requestOlderMessages();
     }
@@ -268,6 +269,7 @@ export function useOlderMessagesPagination({
     olderMessagesError,
     ready,
     requestOlderMessages,
+    scrollContentRef,
     scrollElementRef,
   ]);
 
@@ -284,7 +286,7 @@ export function useOlderMessagesPagination({
     pendingPositionRef.current = null;
     if (!el) return;
     if (olderMessagesError != null) return;
-    const requestedScrollHeight = requestedScrollHeightRef.current;
+    const requestedContentHeight = requestedContentHeightRef.current;
     isProgrammaticScrollRef.current = true;
     restoreScrollAfterPrepend(el, previousPosition);
     lastScrollTopRef.current = el.scrollTop;
@@ -292,9 +294,9 @@ export function useOlderMessagesPagination({
       // The transcript runtime can commit its rows after the loading-state layout effect.
       restoreScrollAfterPrepend(el, previousPosition);
       lastScrollTopRef.current = el.scrollTop;
-      const completedScrollHeight = el.scrollHeight;
-      stalledScrollHeightRef.current =
-        completedScrollHeight <= requestedScrollHeight ? completedScrollHeight : null;
+      const completedContentHeight = (scrollContentRef?.current ?? el).scrollHeight;
+      stalledContentHeightRef.current =
+        completedContentHeight <= requestedContentHeight ? completedContentHeight : null;
       isProgrammaticScrollRef.current = false;
       tryAutoloadOlderMessages();
     });
@@ -305,6 +307,7 @@ export function useOlderMessagesPagination({
     olderMessagesError,
     ready,
     requestOlderMessages,
+    scrollContentRef,
     scrollElementRef,
     tryAutoloadOlderMessages,
   ]);

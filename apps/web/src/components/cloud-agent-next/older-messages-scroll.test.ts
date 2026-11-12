@@ -322,9 +322,12 @@ describe('useOlderMessagesPagination readiness', () => {
 
   function scrollingElement(height: () => number): {
     element: HTMLElement;
+    content: HTMLElement;
     heightReads: () => number;
   } {
     let reads = 0;
+    const content = document.createElement('div');
+    Object.defineProperty(content, 'scrollHeight', { get: height });
     const element = {
       hidden: false,
       clientHeight: 100,
@@ -333,10 +336,10 @@ describe('useOlderMessagesPagination readiness', () => {
       querySelectorAll: () => [],
       get scrollHeight() {
         reads += 1;
-        return height();
+        return Math.max(100, height());
       },
     };
-    return { element: element as unknown as HTMLElement, heightReads: () => reads };
+    return { element: element as unknown as HTMLElement, content, heightReads: () => reads };
   }
 
   function renderPagination(
@@ -461,11 +464,12 @@ describe('useOlderMessagesPagination readiness', () => {
     expect(onLoad).toHaveBeenCalledTimes(scenario.loads);
   });
 
-  it('loads consecutive pages until the earlier-history header leaves the viewport', async () => {
+  it('loads growing short pages despite viewport-clamped scroll height until the header leaves the viewport', async () => {
     let height = 50;
-    const { element } = scrollingElement(() => height);
+    const { element, content } = scrollingElement(() => height);
     const onLoad = jest.fn();
     const scrollElementRef = { current: element };
+    const scrollContentRef = { current: content };
     const isProgrammaticScrollRef = { current: false };
     const lastScrollTopRef = { current: 0 };
     const render = (loading: boolean) =>
@@ -476,6 +480,7 @@ describe('useOlderMessagesPagination readiness', () => {
         onLoad,
         onApi: () => undefined,
         scrollElementRef,
+        scrollContentRef,
         isProgrammaticScrollRef,
         lastScrollTopRef,
       });
@@ -483,19 +488,21 @@ describe('useOlderMessagesPagination readiness', () => {
     render(false);
     dom.flushFrame();
     expect(onLoad).toHaveBeenCalledTimes(1);
+    expect(element.scrollHeight).toBe(element.clientHeight);
     await act(async () => undefined);
     render(true);
     height = 70;
     render(false);
     dom.flushFrame();
+    expect(element.scrollHeight).toBe(element.clientHeight);
     expect(onLoad).toHaveBeenCalledTimes(2);
     await act(async () => undefined);
     render(true);
     height = 270;
     render(false);
     dom.flushFrame();
-    expect(element.scrollTop).toBe(220);
-    expect(lastScrollTopRef.current).toBe(220);
+    expect(element.scrollTop).toBe(170);
+    expect(lastScrollTopRef.current).toBe(170);
     expect(onLoad).toHaveBeenCalledTimes(2);
   });
 
@@ -503,10 +510,11 @@ describe('useOlderMessagesPagination readiness', () => {
     'stops autoloading when a page does not grow the height (%s)',
     async nextHeight => {
       let height = 50;
-      const { element } = scrollingElement(() => height);
+      const { element, content } = scrollingElement(() => height);
       const onLoad = jest.fn();
       let api: PaginationApi | null = null;
       const scrollElementRef = { current: element };
+      const scrollContentRef = { current: content };
       const isProgrammaticScrollRef = { current: false };
       const lastScrollTopRef = { current: 0 };
       const render = (loading: boolean, resetKey = 'no-progress') =>
@@ -519,6 +527,7 @@ describe('useOlderMessagesPagination readiness', () => {
             api = next;
           },
           scrollElementRef,
+          scrollContentRef,
           isProgrammaticScrollRef,
           lastScrollTopRef,
         });

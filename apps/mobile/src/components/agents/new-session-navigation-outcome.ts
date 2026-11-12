@@ -16,14 +16,14 @@ export type AgentStackState = {
 };
 
 /** The route the composer is registered under in `(app)/_layout.tsx`. */
-export const NEW_SESSION_ROUTE_NAME = 'agent-chat/new';
+const NEW_SESSION_ROUTE_NAME = 'agent-chat/new';
 
 /**
  * How long a press waits for the composer to appear before it reports a
  * failure, measured from the press. The first read happens immediately; these
  * are the re-checks, and the last one is the answer.
  */
-export const COMPOSER_TOP_RECHECK_DELAYS_MS = [250, 650] as const;
+const COMPOSER_TOP_RECHECK_DELAYS_MS = [250, 650] as const;
 
 /**
  * Whether a route name (or a full href, as tests and `push` payloads hold it)
@@ -87,7 +87,7 @@ export async function awaitComposerTop(input: {
 export type NewSessionOpenOutcome = 'opened' | 'ignored' | 'failed';
 
 /** Resolve after `ms`, for the composer re-checks `awaitComposerTop` runs. */
-export function delayMs(ms: number): Promise<undefined> {
+function delayMs(ms: number): Promise<undefined> {
   const { promise, resolve } = Promise.withResolvers<undefined>();
   setTimeout(() => {
     resolve(undefined);

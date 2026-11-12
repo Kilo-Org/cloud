@@ -72,7 +72,19 @@ export function formatRemainingTokens(remaining: number): string {
 }
 
 export type HeaderPillContent = {
+  /** The percentage reading; `null` when the model reports no context window. */
   primary: string | null;
+  /**
+   * What the percentage slot paints:
+   *
+   * - `value`: the reading itself.
+   * - `reserved`: the slot keeps the reading's layout width and paints nothing.
+   *   A session that reported tokens without a context window has no percentage
+   *   to show; the ring, the accessibility label and the context sheet carry
+   *   that, and the pill keeps the shape it had while the session resolved.
+   * - `none`: no percentage slot.
+   */
+  primarySlot: PillPrimarySlot;
   secondary: string | null;
   /**
    * What the cost slot paints:
@@ -101,13 +113,16 @@ export type HeaderPillContent = {
 
 type PillCostSlot = 'label' | 'loading' | 'unreported' | 'none';
 
+type PillPrimarySlot = 'value' | 'reserved' | 'none';
+
 /**
- * Value-slot placeholder of a session that has not reported usage yet. It marks
- * the slot as unfilled instead of standing in for a number: the pill keeps its
- * two slots while the session resolves, so a settled pill fills the slots it
- * already showed rather than growing a value out of a bare ring.
+ * Width the percentage slot keeps. A session that has not reported usage lays
+ * the marker out as a placeholder and paints it; a session that reported tokens
+ * without a context window lays it out and paints nothing, because the reading
+ * it stands for does not exist yet — and a marker painted there would sit right
+ * before the cost and read as a negative amount.
  */
-const UNKNOWN_WINDOW_LABEL = '—';
+export const UNKNOWN_WINDOW_LABEL = '—';
 
 /**
  * Single selector for the session-detail header pill. Always returns content
@@ -128,14 +143,15 @@ export function getHeaderPillContent({
     const tone = getContextTone(info.percentage);
     // The pill reports context usage as a percentage only. While the model's
     // context window is unresolved there is no honest denominator, so the slot
-    // keeps the dash instead of a token count; the sheet still shows the tokens.
+    // is reserved and paints nothing: a marker there would sit right before the
+    // cost and read as a negative amount. The sheet still shows the tokens, and
+    // the ring paints an indeterminate arc.
     const primary =
-      info.percentage === undefined
-        ? UNKNOWN_WINDOW_LABEL
-        : formatPercent(info.percentage, i18n.language);
+      info.percentage === undefined ? null : formatPercent(info.percentage, i18n.language);
     const secondary = formatSessionCostBadge(totalCostMicrodollars);
     return {
       primary,
+      primarySlot: primary === null ? 'reserved' : 'value',
       secondary,
       costSlot: secondary !== null ? 'label' : 'none',
       tone,
@@ -155,6 +171,7 @@ export function getHeaderPillContent({
   if (!hasMessages) {
     return {
       primary: UNKNOWN_WINDOW_LABEL,
+      primarySlot: 'value',
       secondary: UNKNOWN_WINDOW_LABEL,
       costSlot: loading ? 'loading' : 'unreported',
       tone: 'neutral',
@@ -165,10 +182,10 @@ export function getHeaderPillContent({
   }
   // A transcript without usage. The pill keeps the track-only ring and, when
   // this screen already knows it, the session's cost, and never a dash standing
-  // in for a value that has not arrived; only the dash above, for usage without
-  // a context window, is a real value.
+  // in for a value that has not arrived.
   return {
     primary: costText,
+    primarySlot: costText === null ? 'none' : 'value',
     secondary: null,
     costSlot: 'none',
     tone: 'neutral',

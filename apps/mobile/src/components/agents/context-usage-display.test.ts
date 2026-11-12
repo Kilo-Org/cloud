@@ -47,6 +47,7 @@ function pill(args: {
 
 const trackOnly: HeaderPillContent = {
   primary: null,
+  primarySlot: 'none',
   secondary: null,
   costSlot: 'none',
   tone: 'neutral',
@@ -61,6 +62,7 @@ const trackOnlyWhileLoading: HeaderPillContent = { ...trackOnly, usageUnavailabl
 /** No usage reported yet: both value slots stay open, the cost one with a dash. */
 const unreported: HeaderPillContent = {
   primary: '—',
+  primarySlot: 'value',
   secondary: '—',
   costSlot: 'unreported',
   tone: 'neutral',
@@ -181,6 +183,7 @@ describe('getHeaderPillContent', () => {
     });
     expect(result).toMatchObject({
       secondary: '$0.08',
+      primarySlot: 'value',
       costSlot: 'label',
       tone: 'primary',
       arcFraction: 0.42,
@@ -229,13 +232,15 @@ describe('getHeaderPillContent', () => {
     expect(result.interactive).toBe(true);
   });
 
-  it('falls back to compact tokens and neutral tone when capacity is unknown', () => {
+  it('reserves the percentage slot when capacity is unknown, so no dash sits before the cost', () => {
     const result = pill({
       info: info({ contextWindow: undefined, percentage: undefined, contextTokens: 32_418 }),
       totalCostMicrodollars: 120_000,
       hasMessages: true,
     });
     expect(result).toMatchObject({
+      primary: null,
+      primarySlot: 'reserved',
       secondary: '$0.12',
       costSlot: 'label',
       tone: 'neutral',
@@ -253,6 +258,8 @@ describe('getHeaderPillContent', () => {
         hasMessages: true,
       })
     ).toMatchObject({
+      primary: null,
+      primarySlot: 'reserved',
       secondary: null,
       costSlot: 'none',
       tone: 'neutral',
@@ -265,6 +272,7 @@ describe('getHeaderPillContent', () => {
   it('shows cost only, not interactive, arc 0 when transcript exists without context', () => {
     expect(pill({ totalCostMicrodollars: 80_000, hasMessages: true })).toEqual({
       primary: '$0.08',
+      primarySlot: 'value',
       secondary: null,
       costSlot: 'none',
       tone: 'neutral',

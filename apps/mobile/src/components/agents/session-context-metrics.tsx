@@ -12,6 +12,7 @@ import {
   type ContextTone,
   getHeaderPillContent,
   getMetricsAccessibilityLabel,
+  UNKNOWN_WINDOW_LABEL,
 } from './context-usage-display';
 
 type SessionContextMetricsProps = {
@@ -150,6 +151,12 @@ export function SessionContextMetrics({
   // naming a vertical inset, because the row's height scales with the font too.
   const valueRowLoading = content.costSlot === 'loading';
 
+  // The percentage slot is laid out only through the marker the selector owns,
+  // so a reserved slot keeps the exact width the placeholder pill showed. It
+  // paints nothing: an unknown context window has no reading, and the marker
+  // would sit right before the cost and read as a negative amount.
+  const primaryReserved = content.primarySlot === 'reserved';
+
   const body = (
     <>
       <ContextUsageRing
@@ -158,7 +165,7 @@ export function SessionContextMetrics({
         arcFraction={content.arcFraction}
         tone={content.tone}
       />
-      {content.primary != null || costSlot != null ? (
+      {content.primarySlot !== 'none' || costSlot != null ? (
         <View className="min-w-0 shrink">
           <View
             className={cn(
@@ -169,15 +176,19 @@ export function SessionContextMetrics({
               ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
               : {})}
           >
-            {content.primary != null ? (
+            {content.primarySlot !== 'none' ? (
               <Text
                 numberOfLines={1}
                 className={cn(
                   'min-w-0 shrink text-xs font-semibold tabular-nums',
-                  toneTextClass(content.tone)
+                  toneTextClass(content.tone),
+                  primaryReserved && 'opacity-0'
                 )}
+                {...(primaryReserved
+                  ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
+                  : {})}
               >
-                {content.primary}
+                {primaryReserved ? UNKNOWN_WINDOW_LABEL : content.primary}
               </Text>
             ) : null}
             {costSlot}

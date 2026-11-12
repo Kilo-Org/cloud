@@ -231,6 +231,9 @@ describe('SessionContextMetrics', () => {
     expect(label).not.toContain('Tap to view');
   });
 
+  // The unknown-context-window slot is measured in
+  // `session-context-metrics-unknown-window.test.ts`.
+
   // The header row hands the trailing cluster a capped 50% box, but RN's
   // default flexShrink is 0, so the pill must opt in to shrinking and let its
   // inner text row compress. Otherwise the pill keeps its natural width and

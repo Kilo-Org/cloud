@@ -270,6 +270,7 @@ budget or response change. Fields, with times in milliseconds from
 | Field | Meaning |
 |---|---|
 | `usage_id`, `execution_region` | The published usage ID and Vercel function region, as on the other publisher logs |
+| `usage_kind` | `enkrypt_usage` on Enkrypt publications to `/enkrypt-usage`, whose `usage_id` is the Enkrypt record id; omitted for LLM usage, as on the other publisher logs |
 | `attempt`, `max_attempts` | 1-based attempt number; `max_attempts` is 4 with retries and 1 for a single-attempt call |
 | `accepted` | The attempt received HTTP 202 |
 | `attempt_end` | `response_headers`, `timeout` (its abort signal fired) or `network_error` |
@@ -298,8 +299,10 @@ To join a publication to ingress, select these lines by `usage_id` and the
 `usage_ingest_enqueue_start`, `usage_ingest_enqueue` and
 `usage_ingest_enqueue_observed` events with the same `usage_id`. Each attempt that
 reached the Worker has its own ingress start. Order them by time but do not
-subtract timestamps across hosts as exact durations. An accepted attempt is queue
-acceptance only; `usage_record_completion` is the persistence signal.
+subtract timestamps across hosts as exact durations. Enkrypt attempts join the
+`/enkrypt-usage` start and enqueue events on both `usage_id` and `usage_kind`. An
+accepted attempt is queue acceptance only; for LLM usage `usage_record_completion`
+is the persistence signal.
 
 `duration_ms` covers the shared persistence call and its awaited follow-up work,
 not pure SQL time. `event_age_ms` retains the original event timestamp across

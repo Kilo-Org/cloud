@@ -58,7 +58,7 @@ function reportUnavailable(
 const SLOW_ATTEMPT_LOG_THRESHOLD_MS = 1_000;
 
 type AttemptDiagnostic = {
-  usageId: string;
+  identity: PublicationIdentity;
   attempt: number;
   maxAttempts: number;
   /** Set only when response headers arrived. */
@@ -93,13 +93,14 @@ function reportAttempt(diagnostic: AttemptDiagnostic): void {
   const accepted = diagnostic.reason === null;
   const alwaysLogged =
     !accepted || diagnostic.attempt > 1 || diagnostic.durationMs >= SLOW_ATTEMPT_LOG_THRESHOLD_MS;
-  if (!alwaysLogged && !inStableOnePercentSample(diagnostic.usageId)) return;
+  if (!alwaysLogged && !inStableOnePercentSample(diagnostic.identity.usageId)) return;
   try {
     console.info(
       JSON.stringify({
         event: 'usage_publisher_attempt',
         sample_rate: alwaysLogged ? 1 : 0.01,
-        usage_id: diagnostic.usageId,
+        usage_id: diagnostic.identity.usageId,
+        ...(diagnostic.identity.usage_kind && { usage_kind: diagnostic.identity.usage_kind }),
         execution_region: getVercelExecutionRegion(),
         attempt: diagnostic.attempt,
         max_attempts: diagnostic.maxAttempts,
@@ -236,7 +237,7 @@ async function publishToUsageIngest(
     const signal = AbortSignal.timeout(signalTimeoutMs);
     const attemptStartedAt = performance.now();
     const attemptContext = {
-      usageId: payload.core.id,
+      identity,
       attempt,
       maxAttempts,
       timeoutMs: signalTimeoutMs,

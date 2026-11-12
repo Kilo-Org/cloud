@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { captureException } from '@sentry/nextjs';
 import { createServer } from 'node:http';
 import {
+  enqueueEnkryptUsage,
   enqueueUsage,
   USAGE_ENQUEUE_TIMEOUT_MS,
   USAGE_ENQUEUE_MAX_ATTEMPTS,
@@ -15,7 +16,11 @@ import {
   USAGE_ENQUEUE_RETRY_BUDGET_MS,
   USAGE_ENQUEUE_FIRST_ATTEMPT_TIMEOUT_MS,
 } from './usage-publisher';
-import type { LlmUsageQueueMessage, UsageRecordRequest } from '@kilocode/usage-contracts';
+import type {
+  EnkryptUsageWriteInput,
+  LlmUsageQueueMessage,
+  UsageRecordRequest,
+} from '@kilocode/usage-contracts';
 import type * as UsagePublisherModule from './usage-publisher';
 
 const payload: LlmUsageQueueMessage = {
@@ -1193,7 +1198,7 @@ describe('publisher attempt diagnostics', () => {
     ...payload,
     core: { ...payload.core, id: sampledUsageId },
     metadata: { ...payload.metadata, id: sampledUsageId },
-  } satisfies UsageRecordRequest;
+  } satisfies LlmUsageQueueMessage;
 
   function attemptRows(): Record<string, unknown>[] {
     return info.mock.calls.flatMap(([line]) => {
@@ -1501,6 +1506,47 @@ describe('publisher attempt diagnostics', () => {
     expect(attemptRows()).toEqual([
       expect.objectContaining({ usage_id: sampledUsageId, accepted: true, http_status: 202 }),
     ]);
+  });
+
+  test('an Enkrypt publication labels its attempts with the usage kind and write ID', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const usageWrite = {
+      id: 'a8f2c3d4-5e6f-4a1b-9c2d-3e4f5a6b7c8d',
+      occurredAt: '2026-08-05T10:11:12.945Z',
+      organizationId: 'b9e1f2a3-4b5c-4d6e-8f7a-1b2c3d4e5f6a',
+      kiloUserId: 'oauth/synthetic',
+      sessionId: null,
+      apiKind: 'messages',
+      decision: 'blocked',
+      creditsCost: 7,
+      addedLatencyMs: 12,
+    } satisfies EnkryptUsageWriteInput;
+    mockFetch
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValue(new Response(null, { status: 202 }));
+    const result = enqueueEnkryptUsage(usageWrite);
+    await jest.runAllTimersAsync();
+    expect(await result).toEqual({ kind: 'accepted' });
+    expect(mockFetch.mock.calls.map(([url]) => url)).toEqual([
+      'https://usage.example.test/enkrypt-usage',
+      'https://usage.example.test/enkrypt-usage',
+    ]);
+    expect(
+      attemptRows().map(({ usage_id, usage_kind, attempt, http_status }) => ({
+        usage_id,
+        usage_kind,
+        attempt,
+        http_status,
+      }))
+    ).toEqual([
+      { usage_id: usageWrite.id, usage_kind: 'enkrypt_usage', attempt: 1, http_status: 503 },
+      { usage_id: usageWrite.id, usage_kind: 'enkrypt_usage', attempt: 2, http_status: 202 },
+    ]);
+    expect(warn).toHaveBeenCalledWith(
+      'usage enqueue retrying',
+      expect.objectContaining({ usageId: usageWrite.id, usage_kind: 'enkrypt_usage' })
+    );
   });
 
   test('a throwing logger changes neither retry classification nor confirmed acceptance', async () => {

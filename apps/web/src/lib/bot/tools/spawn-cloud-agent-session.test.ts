@@ -553,6 +553,29 @@ describe('spawnCloudAgentSession delegation', () => {
     );
   });
 
+  it('returns the specific connection reply for an invalid organization GitLab instance URL', async () => {
+    mockGetGitLabInstanceUrlForOrganization.mockResolvedValue('http://gitlab.example.test');
+
+    await expect(
+      spawnCloudAgentSession(
+        { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
+        'model',
+        { ...organizationIntegration, platform: 'slack' },
+        'auth-token',
+        'request-gitlab-invalid-organization-instance',
+        undefined,
+        { chatPlatform: 'slack', payerUserId: 'user-9' }
+      )
+    ).resolves.toEqual({
+      response:
+        "Error: The GitLab connection for this integration has an invalid instance URL. Update the integration's GitLab connection in Kilo Code settings.",
+    });
+    expect(mockGetGitLabInstanceUrlForUser).not.toHaveBeenCalled();
+    expect(mockValidateGitLabRepoAccessForOrganization).not.toHaveBeenCalled();
+    expect(mockGetGitLabTokenForOrganization).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+  });
+
   it('rejects an organization Slack GitLab project outside the organization connection before prepare', async () => {
     mockValidateGitLabRepoAccessForOrganization.mockResolvedValue(false);
     mockGetGitLabTokenForUser.mockResolvedValue(undefined);

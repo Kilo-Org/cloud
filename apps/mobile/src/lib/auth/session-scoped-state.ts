@@ -180,7 +180,7 @@ export function clearSessionScopedState(): void {
   runClear(clearSessionCatalogBestEffort);
   // The OS launcher surfaces are device-wide too, and their labels come from the
   // signed-in account's sessions: the Android dynamic shortcuts and
-  // quick-settings tile, and the iOS Home Screen Quick Actions. The account
+  // quick-settings tile, and the home-screen quick actions. The account
   // boundary drops them with the other account-scoped members, so each surface
   // names the account that is signed in.
   runClear(clearLauncherSurfaces);

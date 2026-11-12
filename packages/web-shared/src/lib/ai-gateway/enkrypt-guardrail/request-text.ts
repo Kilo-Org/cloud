@@ -208,15 +208,14 @@ function chatMessageItems(message: ChatMessage): Item[] {
   }
 }
 
+function chatFunctionDefinitionPieces(fn: OpenAI.FunctionDefinition): ToolPieces {
+  return toolPieces(fn.name, [toolDefinition(fn.name, [fn.description, jsonText(fn.parameters)])]);
+}
+
 function chatToolDefinitionPieces(tool: OpenAI.Chat.ChatCompletionTool): ToolPieces {
   switch (tool.type) {
     case 'function':
-      return toolPieces(tool.function.name, [
-        toolDefinition(tool.function.name, [
-          tool.function.description,
-          jsonText(tool.function.parameters),
-        ]),
-      ]);
+      return chatFunctionDefinitionPieces(tool.function);
     case 'custom': {
       const { format } = tool.custom;
       return toolPieces(tool.custom.name, [
@@ -256,9 +255,7 @@ function chatCompletionsParts(body: OpenRouterChatCompletionRequest): ScanPieces
   return {
     tools: [
       ...(body.tools ?? []).map(chatToolDefinitionPieces),
-      ...(body.functions ?? []).map(fn =>
-        toolPieces(fn.name, [toolDefinition(fn.name, [fn.description, jsonText(fn.parameters)])])
-      ),
+      ...(body.functions ?? []).map(chatFunctionDefinitionPieces),
       ...chatResponseFormatPieces(body.response_format),
     ],
     system: body.messages.slice(0, instructions).flatMap(chatMessageItems),
@@ -496,27 +493,44 @@ function responsesFormatTexts(
   }
 }
 
+/** The name of a tool, which also heads its definition; null for a tool without one. */
+function responsesToolName(tool: ResponsesTool): string | null {
+  switch (tool.type) {
+    case 'function':
+    case 'custom':
+    case 'namespace':
+      return tool.name;
+    case 'tool_search':
+      return 'tool_search';
+    case 'mcp':
+      return `MCP server ${tool.server_label}`;
+    default:
+      return null;
+  }
+}
+
 function responsesToolDefinitionPieces(tool: ResponsesTool): Piece[] {
+  const name = responsesToolName(tool);
   switch (tool.type) {
     case 'function':
       return [
-        toolDefinition(tool.name, [
+        toolDefinition(name, [
           tool.description,
           jsonText(tool.parameters),
           jsonText(tool.output_schema),
         ]),
       ];
     case 'custom':
-      return [toolDefinition(tool.name, [tool.description, ...responsesFormatTexts(tool.format)])];
+      return [toolDefinition(name, [tool.description, ...responsesFormatTexts(tool.format)])];
     case 'namespace':
       return [
-        toolDefinition(tool.name, [tool.description]),
+        toolDefinition(name, [tool.description]),
         ...tool.tools.flatMap(responsesToolDefinitionPieces),
       ];
     case 'tool_search':
-      return [toolDefinition('tool_search', [tool.description, jsonText(tool.parameters)])];
+      return [toolDefinition(name, [tool.description, jsonText(tool.parameters)])];
     case 'mcp':
-      return [toolDefinition(`MCP server ${tool.server_label}`, [tool.server_description])];
+      return [toolDefinition(name, [tool.server_description])];
     case 'file_search':
     case 'computer':
     case 'computer_use_preview':
@@ -541,22 +555,13 @@ function responsesToolDefinitionPieces(tool: ResponsesTool): Piece[] {
  * as an MCP server's, is not scanned and cached as one large item.
  */
 function responsesToolDefinitionItems(tool: ResponsesTool): ToolPieces[] {
-  switch (tool.type) {
-    case 'namespace':
-      return [
-        toolPieces(tool.name, [toolDefinition(tool.name, [tool.description])]),
-        ...tool.tools.flatMap(responsesToolDefinitionItems),
-      ];
-    case 'function':
-    case 'custom':
-      return [toolPieces(tool.name, responsesToolDefinitionPieces(tool))];
-    case 'tool_search':
-      return [toolPieces('tool_search', responsesToolDefinitionPieces(tool))];
-    case 'mcp':
-      return [toolPieces(`MCP server ${tool.server_label}`, responsesToolDefinitionPieces(tool))];
-    default:
-      return [toolPieces(null, responsesToolDefinitionPieces(tool))];
+  if (tool.type !== 'namespace') {
+    return [toolPieces(responsesToolName(tool), responsesToolDefinitionPieces(tool))];
   }
+  return [
+    toolPieces(tool.name, [toolDefinition(tool.name, [tool.description])]),
+    ...tool.tools.flatMap(responsesToolDefinitionItems),
+  ];
 }
 
 type ResponsesMessagePart =

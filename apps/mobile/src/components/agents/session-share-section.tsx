@@ -4,9 +4,14 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Share, View } from 'react-native';
+import { Share, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import {
+  DURATION_LABEL_KEYS,
+  ShareActiveLink,
+  type ShareCopyState,
+} from './session-share-active-link';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Switch } from '@/components/ui/switch';
@@ -18,16 +23,6 @@ import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** The share durations the worker accepts, in the order the row shows them. */
 const SHARE_DURATIONS: readonly SessionShareDuration[] = ['1h', '1d', '7d', '30d', 'forever'];
-
-const DURATION_LABEL_KEYS = {
-  '1h': 'sessionShare.duration1h',
-  '1d': 'sessionShare.duration1d',
-  '7d': 'sessionShare.duration7d',
-  '30d': 'sessionShare.duration30d',
-  forever: 'sessionShare.durationForever',
-} as const satisfies Record<SessionShareDuration, string>;
-
-type CopyState = 'idle' | 'copied' | 'failed';
 
 /**
  * The message to show for a failed share action: the server's own wording when
@@ -65,7 +60,7 @@ export function SessionShareSection({
   const [duration, setDuration] = useState<SessionShareDuration>('7d');
   const [includeNewMessages, setIncludeNewMessages] = useState(false);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
-  const [copyState, setCopyState] = useState<CopyState>('idle');
+  const [copyState, setShareCopyState] = useState<ShareCopyState>('idle');
   const [actionError, setActionError] = useState<string | null>(null);
 
   const shareStateQuery = useQuery(
@@ -80,7 +75,7 @@ export function SessionShareSection({
   // action rather than from the last attempt's feedback.
   useEffect(() => {
     if (!visible) {
-      setCopyState('idle');
+      setShareCopyState('idle');
       setActionError(null);
     }
   }, [visible]);
@@ -95,7 +90,7 @@ export function SessionShareSection({
     ...trpc.cliSessionsV2.share.mutationOptions(),
     onSuccess: created => {
       setCreatedUrl(`${WEB_BASE_URL}/s/${created.share_token}`);
-      setCopyState('idle');
+      setShareCopyState('idle');
       setActionError(null);
       notificationHaptic(Haptics.NotificationFeedbackType.Success);
       invalidateShareState();
@@ -109,7 +104,7 @@ export function SessionShareSection({
     ...trpc.cliSessionsV2.unshare.mutationOptions(),
     onSuccess: () => {
       setCreatedUrl(null);
-      setCopyState('idle');
+      setShareCopyState('idle');
       setActionError(null);
       notificationHaptic(Haptics.NotificationFeedbackType.Success);
       invalidateShareState();
@@ -140,9 +135,9 @@ export function SessionShareSection({
         throw new Error('Clipboard rejected the share link');
       }
       notificationHaptic(Haptics.NotificationFeedbackType.Success);
-      setCopyState('copied');
+      setShareCopyState('copied');
     } catch {
-      setCopyState('failed');
+      setShareCopyState('failed');
     }
   };
 
@@ -177,7 +172,7 @@ export function SessionShareSection({
   let actions: ReactNode = null;
   if (createdUrl !== null) {
     actions = (
-      <ActiveLink
+      <ShareActiveLink
         url={createdUrl}
         lifetime={duration}
         includeNewMessages={includeNewMessages}
@@ -284,97 +279,6 @@ export function SessionShareSection({
         </Text>
       ) : null}
       {dialog}
-    </View>
-  );
-}
-
-function ActiveLink({
-  url,
-  lifetime,
-  includeNewMessages,
-  copyState,
-  busy,
-  onCopy,
-  onShare,
-  onRevoke,
-}: Readonly<{
-  url: string;
-  /** The chosen lifetime; `forever` is the one that never expires. */
-  lifetime: SessionShareDuration;
-  includeNewMessages: boolean;
-  copyState: CopyState;
-  busy: boolean;
-  onCopy: () => void;
-  onShare: () => void;
-  onRevoke: () => void;
-}>) {
-  const { t } = useTranslation();
-  const lifetimeLabel =
-    lifetime === 'forever'
-      ? t('sessionShare.neverExpires')
-      : t('sessionShare.expiresIn', { duration: t(DURATION_LABEL_KEYS[lifetime]) });
-  return (
-    <View className="gap-3">
-      <View className="gap-1">
-        <Text variant="muted" className="text-xs">
-          {lifetimeLabel}
-        </Text>
-        <Text variant="muted" className="text-xs">
-          {includeNewMessages
-            ? t('sessionShare.includesNewMessages')
-            : t('sessionShare.excludesNewMessages')}
-        </Text>
-      </View>
-      <Pressable
-        onPress={onCopy}
-        accessibilityRole="button"
-        accessibilityLabel={t('common.copyLink')}
-        className="rounded-md border border-border bg-secondary p-3 active:opacity-70"
-        testID="session-share-url"
-      >
-        <Text variant="mono" className="text-xs text-foreground">
-          {url}
-        </Text>
-      </Pressable>
-      {copyState !== 'idle' ? (
-        <Text
-          className={
-            copyState === 'failed' ? 'text-xs text-destructive' : 'text-xs text-foreground'
-          }
-          testID="session-share-copy-status"
-        >
-          {copyState === 'failed'
-            ? t('agentChat.chatLink.couldNotCopyLink')
-            : t('agentChat.chatLink.linkCopied')}
-        </Text>
-      ) : null}
-      <Button
-        variant="outline"
-        className="w-full"
-        disabled={busy}
-        onPress={onCopy}
-        testID="session-share-copy"
-      >
-        {t('common.copyLink')}
-      </Button>
-      <Button
-        variant="outline"
-        className="w-full"
-        disabled={busy}
-        onPress={onShare}
-        testID="session-share-sheet"
-      >
-        {t('agentChat.chatLink.shareLink')}
-      </Button>
-      <Button
-        variant="outline-destructive"
-        className="w-full"
-        loading={busy}
-        onPress={onRevoke}
-        testID="session-share-revoke"
-      >
-        {t('sessionShare.revoke')}
-      </Button>
     </View>
   );
 }

@@ -327,19 +327,21 @@ export function createKilo2Harness(options: {
     },
     interrupt,
     async drainSession(input) {
+      const request: BunFetchRequestInit = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: { sessionID: input.sessionId, token: input.token } }),
+        // Bun's socket idle timeout can expire while native background work runs.
+        // The completion owner and native supervisor bound this wait instead.
+        timeout: false,
+        signal: input.signal,
+      };
       let response: Response;
       try {
         response = await fetchKiloServer(
           options.server,
           `/api/rpc/kilocode.session-drain/drain?${locationQuery(input.directory)}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ input: { sessionID: input.sessionId, token: input.token } }),
-            // Drain can wait for arbitrarily long native work. The completion owner bounds
-            // transport failures and missing markers without timing out a running child.
-            signal: input.signal,
-          }
+          request
         );
       } catch (error) {
         if (input.signal?.aborted) throw error;

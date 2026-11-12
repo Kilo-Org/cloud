@@ -781,12 +781,13 @@ describe('SessionIngestDO live activity + cost persist', () => {
   type LiveHarnessOptions = {
     /** Pre-seeded ingest_meta rows (throttle state, prior status, etc.). */
     seedMeta?: Record<string, string | null>;
-    /** Pre-seeded message item rows returned by cost SELECT .all(). */
+    /** Pre-seeded message item rows the cost seed reads in batches. */
     seedMessageRows?: Array<{
       item_data: string;
       item_id?: string;
       /** Stored contribution; omitted means a row that predates the column. */
       cost_usd?: number | null;
+      item_data_r2_key?: string | null;
     }>;
     /** If set, Postgres update rejects with this error. */
     persistError?: Error;
@@ -810,8 +811,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
         cost_usd: number | null;
       }
     >();
-    // Seeded message rows are stored rows: the full cost scan projects them like any other
-    // inline message row, so it stays a true recomputation of what the DO holds.
+    // Seeded message rows are stored rows: the cost seed projects them like any other stored
+    // message row, so it stays a true recomputation of what the DO holds.
     messageRows.forEach((row, index) => {
       const itemId = row.item_id ?? `message/seed-${index}`;
       itemRows.set(itemId, {
@@ -820,7 +821,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
         item_type: 'message',
         item_data: row.item_data,
         ingested_at: null,
-        item_data_r2_key: null,
+        item_data_r2_key: row.item_data_r2_key ?? null,
         cost_usd: row.cost_usd ?? null,
       });
     });
@@ -830,11 +831,15 @@ describe('SessionIngestDO live activity + cost persist', () => {
     // Replaced-row projections that returned a stored message body: the CASE materializes
     // one only for a row that has no stored contribution.
     let messageBodyReads = 0;
+    // Rows the cost seed read, and the pre-column bodies it materialized.
+    let costSeedRowsRead = 0;
+    let costSeedBodyReads = 0;
 
     type SelectKind =
       | 'meta_get'
       | 'item_guard'
       | 'message_cost'
+      | 'cost_seed'
       | 'metrics_window'
       | 'row_exists'
       | 'meta_rows'
@@ -959,6 +964,30 @@ describe('SessionIngestDO live activity + cost persist', () => {
           metricsWindowRowsRead += rows.length;
           return rows.map(projected);
         }
+        if (selectKind === 'cost_seed') {
+          const cursor = boundNumbers[0];
+          const rows = [...itemRows.values()]
+            .filter(
+              row =>
+                row.item_type === 'message' &&
+                row.item_data_r2_key === null &&
+                (cursor === undefined || row.id > cursor)
+            )
+            .sort((left, right) => left.id - right.id)
+            .slice(0, selectLimit);
+          costScanCount += 1;
+          costSeedRowsRead += rows.length;
+          return rows.map(row => {
+            // The projection materializes a body only for a row without a stored contribution.
+            const legacy = row.cost_usd === null;
+            if (legacy) costSeedBodyReads += 1;
+            return {
+              id: row.id,
+              cost_usd: row.cost_usd,
+              legacy_item_data: legacy ? row.item_data : null,
+            };
+          });
+        }
         if (selectKind === 'message_cost') {
           const rows = [...itemRows.values()]
             .filter(row => row.item_type === 'message' && row.item_data_r2_key === null)
@@ -967,9 +996,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
                 (right.ingested_at ?? 0) - (left.ingested_at ?? 0) || right.id - left.id
             )
             .map(row => ({ item_data: row.item_data }));
-          // The completed-turn lookup is ordered and bounded; the cost scan is neither.
+          // The completed-turn lookup is ordered and bounded.
           if (orderedQuery) return rows.slice(0, selectLimit);
-          costScanCount += 1;
           return rows;
         }
         return [];
@@ -993,9 +1021,11 @@ describe('SessionIngestDO live activity + cost persist', () => {
           selectKind = 'part_excerpt';
         } else if (cols && 'item_data' in cols && 'item_data_r2_key' in cols) {
           selectKind = 'parent_message';
+        } else if (cols && 'id' in cols && 'cost_usd' in cols && 'legacy_item_data' in cols) {
+          selectKind = 'cost_seed';
         } else if (cols && 'item_data' in cols && !('item_type' in cols) && !('value' in cols)) {
-          // Cost compute: select({ item_data }) ... all()
-          // OR item guard: select({ ingested_at, item_data_r2_key }) — has ingested_at
+          // Cost seed rows project their stored contribution and a body only for a
+          // row without one; the item guard has ingested_at.
           if ('ingested_at' in cols) {
             selectKind = 'item_guard';
           } else {
@@ -1168,6 +1198,12 @@ describe('SessionIngestDO live activity + cost persist', () => {
       },
       get costScanCount() {
         return costScanCount;
+      },
+      get costSeedRowsRead() {
+        return costSeedRowsRead;
+      },
+      get costSeedBodyReads() {
+        return costSeedBodyReads;
       },
       get messageBodyReads() {
         return messageBodyReads;
@@ -2487,6 +2523,65 @@ describe('SessionIngestDO live activity + cost persist', () => {
     expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('500000');
   });
 
+  it('seeds a long history in bounded batches whose total matches the stored rows', async () => {
+    const stored = Array.from({ length: 40 }, (_, index) =>
+      index % 2 === 0
+        ? { item_id: `message/s${index}`, item_data: '{}', cost_usd: 0.01 }
+        : {
+            item_id: `message/s${index}`,
+            item_data: JSON.stringify(assistantItem(`s${index}`, 0.02).data),
+          }
+    );
+    const harness = makeLiveHarness({ seedMessageRows: stored });
+
+    await harness.durableObject.ingest(
+      [assistantItem('m_new', 0.05)],
+      'usr_live',
+      'ses_live',
+      1,
+      1_000
+    );
+    await harness.settle();
+
+    // 40 stored rows plus the batch's own row, read in batches of 16.
+    expect(harness.costSeedRowsRead).toBe(41);
+    expect(harness.costScanCount).toBe(3);
+    // A body is materialized only for a row that predates the stored contribution.
+    expect(harness.costSeedBodyReads).toBe(20);
+    const expected = 20 * 0.01 + 20 * 0.02 + 0.05;
+    expect(Number(harness.meta.get('runningAssistantCostUsd'))).toBeCloseTo(expected, 10);
+    expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain(
+      String(Math.round(expected * 1_000_000))
+    );
+  });
+
+  it('rolls a batch over when its bodies pass the byte ceiling and keeps the total exact', async () => {
+    const filler = 'x'.repeat(1_250_000);
+    const costs = [0.5, 0.25, 0.125, 0.0625];
+    const harness = makeLiveHarness({
+      seedMeta: { status: 'busy' },
+      seedMessageRows: costs.map((cost, index) => ({
+        item_id: `message/big${index}`,
+        item_data: JSON.stringify({ ...assistantItem(`big${index}`, cost).data, filler }),
+      })),
+    });
+
+    await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      1_000
+    );
+    await harness.settle();
+
+    // Four bodies of 1.25 MiB do not share one 4 MiB batch: the first batch sums three and
+    // stops before the fourth, and the next batch reads it again. The ceiling drops no row.
+    expect(harness.costScanCount).toBe(2);
+    expect(harness.costSeedRowsRead).toBe(5);
+    expect(Number(harness.meta.get('runningAssistantCostUsd'))).toBeCloseTo(0.9375, 10);
+  });
+
   it('seeds a session without a stored total once', async () => {
     const harness = makeLiveHarness({
       seedMeta: { status: 'busy' },
@@ -2739,37 +2834,59 @@ describe('SessionIngestDO live activity + cost persist', () => {
     let pgInvoke = 0;
 
     const meta = new Map<string, string | null>();
-    const messageRows: Array<{ item_data: string }> = [];
+    // Stored message rows in row-id order, with the column each one carries.
+    const messageRows: Array<{ item_data: string; cost_usd: number | null }> = [];
     const itemRows = new Map<
       string,
       { ingested_at: number | null; item_data_r2_key: string | null }
     >();
-    let selectKind: 'meta_get' | 'item_guard' | 'message_cost' | 'other' = 'other';
+    let selectKind: 'meta_get' | 'item_guard' | 'cost_seed' | 'other' = 'other';
     let eqKey: string | undefined;
+    let seedCursor: number | undefined;
+    let seedLimit = Infinity;
 
     const selectQuery = {
       from: vi.fn(() => selectQuery),
       where: vi.fn((condition: unknown) => {
         const params = collectBoundParams(condition);
         eqKey = params.find((p): p is string => typeof p === 'string');
+        seedCursor = params.find((p): p is number => typeof p === 'number');
         return selectQuery;
       }),
       orderBy: vi.fn(() => selectQuery),
-      limit: vi.fn(() => selectQuery),
+      limit: vi.fn((limit: number) => {
+        seedLimit = limit;
+        return selectQuery;
+      }),
       get: vi.fn(() => {
         if (selectKind === 'item_guard' && eqKey !== undefined) return itemRows.get(eqKey);
         if (eqKey !== undefined && meta.has(eqKey)) return { value: meta.get(eqKey) };
         if (eqKey !== undefined) return meta.has(eqKey) ? { value: meta.get(eqKey) } : undefined;
         return undefined;
       }),
-      all: vi.fn(() => (selectKind === 'message_cost' ? messageRows : [])),
+      all: vi.fn(() => {
+        if (selectKind !== 'cost_seed') return [];
+        return messageRows
+          .map((row, index) => ({ ...row, id: index + 1 }))
+          .filter(row => seedCursor === undefined || row.id > seedCursor)
+          .slice(0, seedLimit)
+          .map(row => ({
+            id: row.id,
+            cost_usd: row.cost_usd,
+            legacy_item_data: row.cost_usd === null ? row.item_data : null,
+          }));
+      }),
     };
 
     const db = {
       select: vi.fn((columns?: unknown) => {
+        seedLimit = Infinity;
+        seedCursor = undefined;
         const cols = columns as Record<string, unknown> | undefined;
-        if (cols && 'item_data' in cols && !('item_type' in cols) && !('value' in cols)) {
-          selectKind = 'ingested_at' in cols ? 'item_guard' : 'message_cost';
+        if (cols && 'id' in cols && 'cost_usd' in cols && 'legacy_item_data' in cols) {
+          selectKind = 'cost_seed';
+        } else if (cols && 'item_data' in cols && !('item_type' in cols) && !('value' in cols)) {
+          selectKind = 'ingested_at' in cols ? 'item_guard' : 'other';
         } else if (cols && 'value' in cols) {
           selectKind = 'meta_get';
         } else if (cols && 'ingested_at' in cols) {
@@ -2789,6 +2906,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
             item_data?: string;
             item_data_r2_key?: string | null;
             ingested_at?: number | null;
+            cost_usd?: number | null;
           }) => ({
             onConflictDoUpdate: vi.fn(() => ({
               run: vi.fn(() => {
@@ -2800,7 +2918,10 @@ describe('SessionIngestDO live activity + cost persist', () => {
                     item_data_r2_key: values.item_data_r2_key ?? null,
                   });
                   if (values.item_type === 'message' && values.item_data) {
-                    messageRows.push({ item_data: values.item_data });
+                    messageRows.push({
+                      item_data: values.item_data,
+                      cost_usd: values.cost_usd ?? null,
+                    });
                   }
                 }
               }),

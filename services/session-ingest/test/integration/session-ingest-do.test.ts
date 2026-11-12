@@ -4107,6 +4107,76 @@ describe('SessionIngestDO integration', () => {
 
       await stub.clear();
     });
+
+    it('seeds a long history from its stored rows in bounded batches with an exact total', async () => {
+      const sessionId = 'ses_cost_aggregate_batched_4';
+      const stub = getStub(kiloUserId, sessionId);
+
+      // 40 stored message rows: half carry their contribution, half predate the column and
+      // need their body; one is R2-offloaded and contributes nothing; one carries a stored
+      // contribution that disagrees with its body, which must win.
+      await runInDurableObject(stub, async (_instance, state) => {
+        for (let index = 0; index < 40; index += 1) {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at, cost_usd) ' +
+              'VALUES (?, ?, ?, ?, ?)',
+            `message/b${index}`,
+            'message',
+            JSON.stringify(assistantMessage(`b${index}`, 0.02).data),
+            1_000 + index,
+            index >= 20 ? 0.01 : null
+          );
+        }
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, item_data_r2_key) ' +
+            'VALUES (?, ?, ?, ?)',
+          'message/offloaded',
+          'message',
+          '{}',
+          'items/offloaded'
+        );
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, cost_usd) VALUES (?, ?, ?, ?)',
+          'message/column_wins',
+          'message',
+          JSON.stringify(assistantMessage('column_wins', 9).data),
+          0.5
+        );
+      });
+
+      await stub.ingest([assistantMessage('msg_new', 0.05)], kiloUserId, sessionId, 1, 5_000);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        const [expected] = [
+          ...state.storage.sql.exec<{ total: number | null }>(
+            'SELECT SUM(CASE WHEN cost_usd IS NULL THEN json_extract(item_data, ' +
+              "'$.cost') ELSE cost_usd END) AS total FROM ingest_items " +
+              "WHERE item_type = 'message' AND item_data_r2_key IS NULL"
+          ),
+        ];
+        // 20 pre-column bodies at 0.02, 20 stored contributions at 0.01, the column row at
+        // 0.5 (its body says 9), and the batch's own message at 0.05.
+        expect(readStoredTotal(state)).toBeCloseTo(expected.total ?? 0, 10);
+        expect(readStoredTotal(state)).toBeCloseTo(20 * 0.02 + 20 * 0.01 + 0.5 + 0.05, 10);
+
+        // The read's projection hands the isolate a body only for a row without a stored
+        // contribution.
+        const projected = [
+          ...state.storage.sql.exec<{ item_id: string; legacy_item_data: string | null }>(
+            'SELECT item_id, CASE WHEN cost_usd IS NULL THEN item_data END AS legacy_item_data ' +
+              'FROM ingest_items WHERE item_id IN (?, ?) ORDER BY item_id',
+            'message/b0',
+            'message/b39'
+          ),
+        ];
+        expect(projected.map(row => [row.item_id, row.legacy_item_data !== null])).toEqual([
+          ['message/b0', true],
+          ['message/b39', false],
+        ]);
+      });
+
+      await stub.clear();
+    });
   });
 
   describe('metrics emission budget', () => {

@@ -23,6 +23,7 @@ import { SessionListHeader } from '@/components/agents/session-list-header';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { SessionStatusFilterBar } from '@/components/agents/session-status-filter-bar';
 import { SessionListSkeletonRows } from '@/components/agents/session-list-skeleton-rows';
+import { SessionListTouchGate } from '@/components/session-list-touch-gate';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { SessionListFab } from '@/components/agents/session-list-fab';
@@ -42,6 +43,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { STATE_ACTION_CLASS, textActionTargetClass } from '@/lib/a11y/tap-target';
 import { getRevisionSnapshot } from '@/lib/session-attention';
+import { holdSessionListTouch } from '@/lib/session-list-touch-gate';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { cn } from '@/lib/utils';
@@ -328,6 +330,10 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   // even when a search is also active. With a status filter set, the search and
   // any persisted filters still narrow the list, so the action drops all three;
   // clearing only the status would land on the same empty body.
+  //
+  // Every branch replaces the body in place, so the press also holds the list
+  // for the settle window: the rows mount under the finger that released the
+  // action, and a repeat tap would open the row there.
   const emptyCopyIsSearch = isSearching && statusKind === null;
   const { handleClearSearch, handleClearFilters } = query;
   const clearStatusAndFilters = useCallback(() => {
@@ -342,6 +348,17 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   } else if (isSearching) {
     clearNoMatch = query.handleClearSearch;
   }
+  const handleClearNoMatch = useCallback(() => {
+    holdSessionListTouch();
+    clearNoMatch();
+  }, [clearNoMatch]);
+  // The status bar's own Clear control sits above the list, so the rows it
+  // brings back land under the point it released too: it holds the list for the
+  // same window as the no-match action.
+  const handleClearStatusFilter = useCallback(() => {
+    holdSessionListTouch();
+    clearStatusFilter();
+  }, [clearStatusFilter]);
 
   let body: ReactNode = null;
   if (!query.hasLoaded || content === 'pending') {
@@ -375,7 +392,7 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
           <Button
             variant="outline"
             size={compactEmptyState ? 'sm' : 'default'}
-            onPress={clearNoMatch}
+            onPress={handleClearNoMatch}
             className={STATE_ACTION_CLASS}
           >
             <Text>{emptyCopyIsSearch ? t('common.clearSearch') : t('common.clearFilters')}</Text>
@@ -500,13 +517,15 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
           <SessionStatusFilterBar
             kind={statusKind}
             count={visibleSessions.length}
-            onClear={clearStatusFilter}
+            onClear={handleClearStatusFilter}
           />
         ) : null}
         {/* Android runs edge-to-edge and never resizes the window for the IME,
             so the body clears the IME natively: the shared lift pads by the
             keyboard this screen's own field raised. */}
-        <OwnedKeyboardLift occlusion={keyboard.occlusion}>{region}</OwnedKeyboardLift>
+        <SessionListTouchGate>
+          <OwnedKeyboardLift occlusion={keyboard.occlusion}>{region}</OwnedKeyboardLift>
+        </SessionListTouchGate>
         {/* Empty content owns its creation action; the no-match body owns the band. */}
         {showFab && <SessionListFab organizationId={organizationId} style={fabStyle} />}
         <SessionFilterModal

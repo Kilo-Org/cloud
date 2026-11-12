@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useNavigation } from 'expo-router';
 
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
+import { SessionListTouchGate } from '@/components/session-list-touch-gate';
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
 import { SessionListHeader } from '@/components/agents/session-list-header';
 import { selectSessionListIsLoading } from '@/components/agents/session-list-loading';
@@ -22,6 +23,7 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { SESSION_SEARCH_DRAFT_KEY } from '@/lib/persist/drafts';
 import { useOrganization } from '@/lib/organization-context';
+import { holdSessionListTouch } from '@/lib/session-list-touch-gate';
 
 /**
  * Pushed sibling of the live Agents tab. Owns the stored session history with
@@ -184,7 +186,11 @@ export function SessionHistoryScreen() {
   // The empty-state CTA reads "Clear search" or "Clear filters" depending on
   // isSearching, so it must clear exactly that. Clearing both under a label
   // naming one would silently drop the persisted filters.
+  // Either branch replaces the body in place, so the gate holds this screen's
+  // list for the settle window: the rows mount under the finger that just
+  // released the action, and a repeat tap would open the row there.
   const handleClearQuery = useCallback(() => {
+    holdSessionListTouch();
     if (isSearching) {
       clearSearchInput();
       searchController.clearSearchOnly();
@@ -266,7 +272,9 @@ export function SessionHistoryScreen() {
           />
         }
       />
-      <OwnedKeyboardLift occlusion={keyboard.occlusion}>{sessionListBody}</OwnedKeyboardLift>
+      <SessionListTouchGate>
+        <OwnedKeyboardLift occlusion={keyboard.occlusion}>{sessionListBody}</OwnedKeyboardLift>
+      </SessionListTouchGate>
       <SessionFilterModal
         visible={showFilterModal}
         selectedPlatforms={platformFilter}

@@ -104,7 +104,12 @@ async function readSnapshotJSON<T>(path: string, init?: RequestInit): Promise<T>
 }
 const signal = AbortSignal.timeout(180_000);
 const marker = `native-upload-${randomUUID().slice(0, 8)}`;
-const session = await startSession(config, { prompt: `__fake__:echo:${marker}-cold`, signal });
+// The browser path (`prepareSession`) stamps the trusted web origin that selects Kilo v2.
+const session = await startSession(
+  config,
+  { prompt: `__fake__:echo:${marker}-cold`, signal },
+  'legacy'
+);
 await writeFile(
   new URL(`../../../../dev/logs/${marker}.json`, import.meta.url),
   JSON.stringify(session),

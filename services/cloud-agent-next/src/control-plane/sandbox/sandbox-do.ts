@@ -5134,7 +5134,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
             .map(route => ({
               orgId: route.credentialSource?.orgId,
               billingOrigin: route.credentialSource?.billingOrigin,
-              createdOnPlatform: route.credentialSource?.createdOnPlatform,
             })),
           sandboxKind: pin.sandboxKind,
           sandboxId: this.sandboxId,

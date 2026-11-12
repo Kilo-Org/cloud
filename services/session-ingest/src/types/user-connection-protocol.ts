@@ -23,6 +23,54 @@ const instanceSchema = z.object({
 
 export type Instance = z.infer<typeof instanceSchema>;
 
+// -- Heartbeat session bounds -------------------------------------------------
+
+// One heartbeat's advertised sessions, and every free-form string in one row,
+// are bounded so that the durable object's per-session work for one frame
+// (rename catch-up reads, ready-push entries, owner bookkeeping, the broadcast)
+// is fixed by the contract instead of by the sender. The values keep clear
+// margin over what a supported producer sends, because a refused heartbeat
+// hides every session of that connection from `sessions.list`.
+
+// Above this count the frame is refused before any per-session work. The
+// presence relay caps an advertisement at 100 sessions, the socket attachment
+// frame holds roughly 270 minimal rows, and a CLI advertises only sessions with
+// a live status entry, so no supported producer approaches this bound.
+export const MAX_HEARTBEAT_SESSIONS = 256;
+// Session identifiers are `ses_` plus 26 characters today; the session-sync
+// contract caps an entity id at 256.
+export const MAX_HEARTBEAT_SESSION_ID_LENGTH = 256;
+// Derived statuses are idle, busy, question, permission, retry and scheduled;
+// `permission` is the longest at 10 characters.
+export const MAX_HEARTBEAT_STATUS_LENGTH = 64;
+// Every producer that caps a title allows 200 characters (web rename route, VS
+// Code rename helper, mobile rename dialog) and a generated title is one line.
+// A terminal rename dialog does not cap its input, so keep five times that.
+export const MAX_HEARTBEAT_TITLE_LENGTH = 1024;
+// A normalized git remote URL; the sibling `prLink.prUrl` uses the same bound.
+export const MAX_HEARTBEAT_GIT_URL_LENGTH = 2048;
+// A per-session branch is advertised untruncated; the create-session contract
+// caps `gitBranch` and `baseBranch` at 256.
+export const MAX_HEARTBEAT_GIT_BRANCH_LENGTH = 256;
+// A parent identifier is another session id, so it shares that bound.
+export const MAX_HEARTBEAT_PARENT_SESSION_ID_LENGTH = 256;
+
+// Reads only the advertised session count from a frame that may fail the full
+// heartbeat contract, so a refusal is diagnosable from its size alone.
+const HeartbeatSessionsEnvelopeSchema = z.object({
+  type: z.literal('heartbeat'),
+  sessions: z.array(z.unknown()),
+});
+
+/**
+ * Advertised session count of a heartbeat frame, including a frame the full
+ * contract refuses. Returns undefined for any other shape.
+ */
+export function heartbeatSessionCount(parsed: unknown): number | undefined {
+  const envelope = HeartbeatSessionsEnvelopeSchema.safeParse(parsed);
+  return envelope.success ? envelope.data.sessions.length : undefined;
+}
+
 export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('heartbeat'),
@@ -47,55 +95,57 @@ export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
     // persists it in the WebSocket attachment and exposes it via
     // `getConnectedInstances()`.
     instance: instanceSchema.optional(),
-    sessions: z.array(
-      z.object({
-        id: z.string(),
-        status: z.string(),
-        // Wake time for a `scheduled` session (ISO-8601). Sent beside `status`;
-        // absent for every other status and on legacy CLIs that predate
-        // scheduling. A producer that serializes the absent field as an explicit
-        // null, or a value that is not a time at all, reads as absent: rejecting
-        // the value would fail `CLIOutboundMessageSchema` and drop the whole
-        // heartbeat, so the session would never reach `sessions.list`.
-        scheduledAt: z.string().optional().catch(undefined),
-        title: z.string(),
-        gitUrl: z.string().optional(),
-        gitBranch: z.string().optional(),
-        parentSessionId: z.string().optional(),
-        // Platform the session is running on (e.g. "darwin", "linux", "vscode").
-        // Optional for backward compatibility with legacy CLIs.
-        platform: z.string().max(32).optional(),
-        // Pull-request link reported by the CLI. Distinct from `platform`
-        // above, which is the client OS and stays unchanged. Absent on legacy
-        // CLIs that predate this field.
-        prLink: z
-          .object({
-            platform: z.string().min(1).max(32),
-            prUrl: z.string().max(2048),
-            prNumber: z.number().int().positive(),
-            // Branch the session pushed and the commit it pushed to that
-            // branch. Optional for older CLIs; these fields supply per-session
-            // evidence for verification. Like parallel ingest, null means no
-            // evidence; normalize it to the legacy absent form without catching
-            // other errors.
-            headRef: z
-              .string()
-              .min(1)
-              .max(256)
-              .nullable()
-              .optional()
-              .transform(value => value ?? undefined),
-            headSha: z
-              .string()
-              .min(1)
-              .max(64)
-              .nullable()
-              .optional()
-              .transform(value => value ?? undefined),
-          })
-          .optional(),
-      })
-    ),
+    sessions: z
+      .array(
+        z.object({
+          id: z.string().max(MAX_HEARTBEAT_SESSION_ID_LENGTH),
+          status: z.string().max(MAX_HEARTBEAT_STATUS_LENGTH),
+          // Wake time for a `scheduled` session (ISO-8601). Sent beside `status`;
+          // absent for every other status and on legacy CLIs that predate
+          // scheduling. A producer that serializes the absent field as an explicit
+          // null, or a value that is not a time at all, reads as absent: rejecting
+          // the value would fail `CLIOutboundMessageSchema` and drop the whole
+          // heartbeat, so the session would never reach `sessions.list`.
+          scheduledAt: z.string().optional().catch(undefined),
+          title: z.string().max(MAX_HEARTBEAT_TITLE_LENGTH),
+          gitUrl: z.string().max(MAX_HEARTBEAT_GIT_URL_LENGTH).optional(),
+          gitBranch: z.string().max(MAX_HEARTBEAT_GIT_BRANCH_LENGTH).optional(),
+          parentSessionId: z.string().max(MAX_HEARTBEAT_PARENT_SESSION_ID_LENGTH).optional(),
+          // Platform the session is running on (e.g. "darwin", "linux", "vscode").
+          // Optional for backward compatibility with legacy CLIs.
+          platform: z.string().max(32).optional(),
+          // Pull-request link reported by the CLI. Distinct from `platform`
+          // above, which is the client OS and stays unchanged. Absent on legacy
+          // CLIs that predate this field.
+          prLink: z
+            .object({
+              platform: z.string().min(1).max(32),
+              prUrl: z.string().max(2048),
+              prNumber: z.number().int().positive(),
+              // Branch the session pushed and the commit it pushed to that
+              // branch. Optional for older CLIs; these fields supply per-session
+              // evidence for verification. Like parallel ingest, null means no
+              // evidence; normalize it to the legacy absent form without catching
+              // other errors.
+              headRef: z
+                .string()
+                .min(1)
+                .max(256)
+                .nullable()
+                .optional()
+                .transform(value => value ?? undefined),
+              headSha: z
+                .string()
+                .min(1)
+                .max(64)
+                .nullable()
+                .optional()
+                .transform(value => value ?? undefined),
+            })
+            .optional(),
+        })
+      )
+      .max(MAX_HEARTBEAT_SESSIONS),
   }),
   z.object({
     type: z.literal('event'),

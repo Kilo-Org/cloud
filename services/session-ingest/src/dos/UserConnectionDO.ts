@@ -10,6 +10,7 @@ import { refreshGlanceableSessions } from '../remote-session-notifications';
 import { prUrlMatchesGitUrl } from '../ingest/metadata';
 import {
   CLIOutboundMessageSchema,
+  heartbeatSessionCount,
   type CLIInboundMessage,
   type Instance,
   type SessionEventPayload,
@@ -710,10 +711,15 @@ export class UserConnectionDO extends DurableObject<Env> {
   ): void {
     const result = CLIOutboundMessageSchema.safeParse(parsed);
     if (!result.success) {
+      // A refused heartbeat returns before any per-session work. Its advertised
+      // count is read from the shape alone, so the log names the size and never
+      // an id, title or URL.
+      const sessionCount = heartbeatSessionCount(parsed);
       console.warn('CLI message parse failed', {
         role: 'cli',
         connectionId: attachment.connectionId,
         byteCount: binaryByteCount ?? new TextEncoder().encode(raw).byteLength,
+        ...(sessionCount === undefined ? {} : { sessionCount }),
         issues: result.error.issues.map(issue => ({
           path: issue.path,
           code: issue.code,

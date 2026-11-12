@@ -1572,7 +1572,9 @@ describe('session detail header right cluster', () => {
     expect(cluster?.props.className).toContain('shrink');
     expect(cluster?.findAllByType(SessionContextMetrics)).toHaveLength(1);
     expect(cluster?.children).toHaveLength(2);
-    expect(cluster?.children[0]?.type).toBe(SessionContextMetrics);
+    const [leading] = cluster?.children ?? [];
+    expect(typeof leading).toBe('object');
+    expect((leading as ReactTestInstance | undefined)?.type).toBe(SessionContextMetrics);
 
     // The pill is the flexible part of the cluster: it shrinks into the cap
     // with it, so the cluster can never paint past the slot edge.

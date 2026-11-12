@@ -478,22 +478,36 @@ export function ChatComposer({
   // leaf's first measurement lands.
   const [measureHeight, setMeasureHeight] = useState(inputMinHeight);
   const [inputMaxHeight, setInputMaxHeight] = useState(rawInputMaxHeight);
-  const handleMeasureChange = useCallback((height: number, maxHeight: number) => {
-    setMeasureHeight(height);
-    setInputMaxHeight(maxHeight);
-  }, []);
+  // The last reservation this composer published, so a repeated measurement
+  // publishes nothing and the mount can publish the floor once.
+  const reportedInputBottomInsetRef = useRef<number | null>(null);
+  const handleMeasureChange = useCallback(
+    (height: number, maxHeight: number) => {
+      setMeasureHeight(height);
+      setInputMaxHeight(maxHeight);
+      // The transcript's reservation has to land in the same commit as the
+      // height it reserves, so it is published here, beside that height, rather
+      // than from an effect that would need a second commit.
+      const nextInset = Math.max(0, height - inputMinHeight);
+      if (reportedInputBottomInsetRef.current !== nextInset) {
+        reportedInputBottomInsetRef.current = nextInset;
+        onInputBottomInsetChange?.(nextInset);
+      }
+    },
+    [inputMinHeight, onInputBottomInsetChange]
+  );
   const measureHandleRef = useRef<ChatComposerMeasureHandle | null>(null);
-  // The host reserves this in the transcript's layout, so it must change in the
-  // same commit as `measureHeight` and nothing else: a layout effect reports it
-  // before the frame is painted, and only when it actually moved. The floor is
-  // the input's own one-line height, so a taller window or a different font
-  // scale never reads as growth, and a cleared draft reports zero again.
+  // The host reserves this in the transcript's layout. The measurement path
+  // publishes it beside the height it reserves, so both land in one commit;
+  // this effect covers the two cases that carry no measurement: the mount, and
+  // a window or font-scale change that moves the one-line floor under a
+  // standing height. The floor is the input's own one-line height, so a taller
+  // window never reads as growth, and a cleared draft reports zero again.
   //
   // The mount reports the floor as well. A composer remounted under another
   // key starts on that floor and would otherwise publish nothing, leaving the
   // reservation of the instance it replaced in the transcript.
   const inputBottomInset = Math.max(0, measureHeight - inputMinHeight);
-  const reportedInputBottomInsetRef = useRef<number | null>(null);
   useLayoutEffect(() => {
     const previous = reportedInputBottomInsetRef.current;
     reportedInputBottomInsetRef.current = inputBottomInset;

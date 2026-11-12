@@ -170,6 +170,11 @@ function classNamesOf(instances: TestRenderer.ReactTestInstance[]): string[] {
   return instances.map(instance => String((instance.props as { className?: string }).className));
 }
 
+function classNameOf(instance: TestRenderer.ReactTestInstance): string {
+  const value: unknown = instance.props.className;
+  return typeof value === 'string' ? value : '';
+}
+
 function packRows(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
   return renderer.root.findAll(
     node =>
@@ -727,18 +732,20 @@ describe('CreditPurchaseScreen', () => {
         classes => classes.includes(PACK_ROW_SHELL) && classes.includes('opacity-50')
       )
     ).toBe(true);
-    // Each row reserves the status slot empty, so the store dropping or
-    // reconnecting with cached prices never changes a row's height.
+    // No row keeps an empty band for a status it does not state: the title row
+    // and the expiry note are the row's only children, at the row's usual gap.
     expect(
-      rows.every(
-        row =>
-          row.findAll(
-            node =>
-              String(node.type) === 'View' &&
-              String((node.props as { className?: string }).className).includes('min-h-5') &&
-              node.findAll(child => String(child.type) === 'Text').length === 0
-          ).length === 1
-      )
+      rows.every(row => {
+        const children = row.children;
+        const note = children[1];
+        return (
+          children.length === 2 &&
+          note !== undefined &&
+          typeof note !== 'string' &&
+          String(note.type) === 'Text' &&
+          classNameOf(note).includes('mt-2')
+        );
+      })
     ).toBe(true);
     unmount();
   });
@@ -763,26 +770,25 @@ describe('CreditPurchaseScreen', () => {
       'Price unavailable',
       'Credits purchased through the App Store do not expire.',
     ]);
-    // The status never shares the title's line, and every row reserves the same
-    // slot, so a row that gains or loses a status, or the store dropping or
-    // reconnecting with cached prices, never moves the rows below.
-    const slotClass = 'min-h-5';
-    const unpricedSlot = rows[3]?.findAll(
-      node =>
-        String(node.type) === 'View' &&
-        String((node.props as { className?: string }).className).includes(slotClass)
-    )[0];
-    expect(String(unpricedSlot?.props.className)).toContain('mt-1');
-    expect(String(unpricedSlot?.parent?.props.className)).not.toContain('flex-row');
-    expect(unpricedSlot?.findAll(node => String(node.type) === 'Text')).toHaveLength(1);
-    // The priced row reserves the same slot, with no status in it.
-    const pricedSlot = rows[0]?.findAll(
-      node =>
-        String(node.type) === 'View' &&
-        String((node.props as { className?: string }).className).includes(slotClass)
-    )[0];
-    expect(pricedSlot).toBeDefined();
-    expect(pricedSlot?.findAll(node => String(node.type) === 'Text')).toHaveLength(0);
+    // The status reads on its own line under the title, one small gap from it,
+    // and no row keeps an empty slot in its place.
+    const unpricedStatus = unpriced[1];
+    expect(String(unpricedStatus?.props.className)).toContain('mt-1');
+    expect(String(unpricedStatus?.parent?.props.className)).not.toContain('flex-row');
+    // The expiry note follows the last line of the title block tightly: after a
+    // status, and directly under a title that states none.
+    expect(String(unpriced[2]?.props.className)).toContain('mt-1');
+    expect(String(priced[2]?.props.className)).toContain('mt-2');
+    expect(
+      rows.every(
+        row =>
+          row.findAll(
+            node =>
+              String(node.type) === 'View' &&
+              String((node.props as { className?: string }).className).includes('min-h-5')
+          ).length === 0
+      )
+    ).toBe(true);
     unmount();
   });
 

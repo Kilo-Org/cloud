@@ -292,17 +292,22 @@ export function CreditPurchaseScreen() {
                       </Text>
                     )}
                   </View>
-                  {/* The slot keeps its height in every state, so a row never
-                      changes height: not when a purchase starts or ends, not
-                      when a pack gains its price, and not when the store drops
-                      or reconnects with cached prices. */}
-                  <View className="mt-1 min-h-5 justify-center">
-                    {statusLabel !== null && (
-                      <Text className="text-sm text-muted-foreground">{statusLabel}</Text>
-                    )}
-                  </View>
+                  {/* The status takes its own line, and the expiry note follows
+                      the last line of the title block at the same small gap a
+                      row without a status keeps. A row keeps no empty band for
+                      a status it does not state. */}
+                  {statusLabel !== null && (
+                    <Text className="mt-1 text-sm text-muted-foreground">{statusLabel}</Text>
+                  )}
                   {expiryMessage && (
-                    <Text className="mt-2 text-xs text-muted-foreground">{expiryMessage}</Text>
+                    <Text
+                      className={cn(
+                        'text-xs text-muted-foreground',
+                        statusLabel === null ? 'mt-2' : 'mt-1'
+                      )}
+                    >
+                      {expiryMessage}
+                    </Text>
                   )}
                 </Pressable>
               );

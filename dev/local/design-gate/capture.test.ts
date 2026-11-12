@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  InfraError,
   linkPath,
   loadingPlaceholder,
   runMatrix,
@@ -611,6 +612,68 @@ test('runMatrix skips a target that switches the language and resets it for the 
     [['warning', 'hindi', 'hindi switched the app language to hi; its rules were skipped']]
   );
   assert.deepEqual(state.languageCalls, ['system/en']);
+});
+
+test('a language reload the inspector never returns from relaunches the app', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const base = fakeProbe(state);
+  const probe: ProbeClient = {
+    ...base,
+    // The runtime reloads into an instance the inspector never lists again: the
+    // Arabic cell only sees its language after the app process restarts.
+    setLanguage: async (preference, resolved) => {
+      state.languageCalls.push(`${preference}/${resolved}`);
+      if (resolved === 'ar') return;
+      state.language = resolved;
+    },
+  };
+  const device: Device = {
+    ...fakeDevice(calls, state),
+    relaunch: () => {
+      calls.push('relaunch');
+      state.language = 'ar';
+    },
+  };
+  const ctx = context(device, probe);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'standard'), HOME);
+  assert.deepEqual(
+    calls.filter(call => call === 'relaunch'),
+    ['relaunch']
+  );
+  // The rtl cell is measured after the restart instead of aborting the run, and
+  // the restore brings the app back to English.
+  assert.equal(fs.existsSync(path.join(ctx.out, 'cells/rtl/home.timeline.json')), true);
+  assert.deepEqual(outcome.skipped, []);
+  assert.equal(state.language, 'en');
+});
+
+test('runMatrix records a target the probe cannot read instead of reporting a pass', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const base = fakeProbe(state);
+  const probe: ProbeClient = {
+    ...base,
+    openLink: async url => {
+      if (url === 'kiloapp://gone') throw new InfraError('No Metro debugger page for Pixel');
+      await base.openLink(url);
+    },
+  };
+  const outcome = await runMatrix(
+    context(fakeDevice(calls, state), probe),
+    matrixCells('android', 'base'),
+    [{ id: 'gone', link: 'kiloapp://gone' }, ...HOME]
+  );
+  // A target nothing measured is named, so the caller can report the run as
+  // inconclusive instead of a pass over the screens it did read.
+  assert.deepEqual(outcome.skipped, [
+    { cell: 'base', target: 'gone', reason: 'InfraError: No Metro debugger page for Pixel' },
+  ]);
+  assert.deepEqual(
+    outcome.cells[0]?.screens.map(screen => screen.target),
+    ['home']
+  );
+  assert.equal(calls.at(-1), 'restore');
 });
 
 test('runMatrix warms the target that has to reload the language back', async () => {

@@ -39,10 +39,10 @@ export type Device = {
   restore: () => void;
   /**
    * Restart the app process and point it back at its Metro: the recovery when
-   * the inspector does not survive a runtime reload. Takes the target Metro's
-   * port, because the relaunched app reattaches through it.
+   * the inspector does not survive a runtime reload. The device knows the Metro
+   * it was opened against, so the runner never has to supply it again.
    */
-  relaunch?: (metroPort: number) => void;
+  relaunch?: () => void;
   screenshot: (file: string) => void;
   record: (file: string, seconds: number) => Recording;
   tap?: (xPx: number, yPx: number) => void;
@@ -66,7 +66,17 @@ export type Screen = {
 };
 
 export type CellRun = { id: string; config: CellConfig; env?: ProbeEnv; screens: Screen[] };
-export type RunOutcome = { cells: CellRun[]; findings: Finding[] };
+/** A target the probe could not read in a cell: nothing was measured for it. */
+export type SkippedTarget = { cell: string; target: string; reason: string };
+export type RunOutcome = {
+  cells: CellRun[];
+  findings: Finding[];
+  /**
+   * Targets that were not measured. A run with a skip is inconclusive, never a
+   * pass: exit 0 must mean every target of every cell was read and graded.
+   */
+  skipped: SkippedTarget[];
+};
 
 export type CaptureContext = {
   device: Device;
@@ -565,7 +575,7 @@ async function ensureLanguage(ctx: CaptureContext, want: LanguageTarget): Promis
   if (!languageMatches(dump, want) && ctx.device.relaunch !== undefined) {
     ctx.log(`design-gate: language did not come back after the reload; relaunching the app`);
     ctx.probe.disconnect();
-    ctx.device.relaunch(Number(new URL(ctx.probe.metro).port) || 8081);
+    ctx.device.relaunch();
     settledDump = await waitForApp(
       ctx.probe,
       ctx.clock,
@@ -657,7 +667,7 @@ export async function runMatrix(
   const ltrLanguage: LanguageTarget = isRtlLanguage(baseline.resolved)
     ? { preference: LTR_FALLBACK_LANGUAGE, resolved: LTR_FALLBACK_LANGUAGE, rtl: false }
     : baseline;
-  const outcome: RunOutcome = { cells: [], findings: [] };
+  const outcome: RunOutcome = { cells: [], findings: [], skipped: [] };
   const trees = new Map<string, LayoutTree>();
   let baseWindow: ProbeEnv['window'] | undefined;
   let restored: Promise<unknown[]> | undefined;
@@ -795,13 +805,15 @@ export async function runMatrix(
         } catch (error) {
           // A reload window that outlives the probe client's own retry leaves
           // the target unreadable: the probe client reports it as an
-          // InfraError. The cell still measures its other targets; this one is
-          // logged and skipped rather than aborting the whole run. No finding
-          // without a dump: there is nothing measured to grade. Every other
-          // error (a failed screencap, a decode) is a real defect and still
-          // aborts.
+          // InfraError. The cell still measures its other targets, and this one
+          // is recorded as skipped rather than aborting the whole run. No
+          // finding without a dump: there is nothing measured to grade, and the
+          // run is inconclusive (exit 2) rather than a pass. Every other error
+          // (a failed screencap, a decode) is a real defect and still aborts.
           if (!(error instanceof InfraError)) throw error;
-          ctx.log(`design-gate: ${target.id} could not be read this cell: ${String(error)}`);
+          const reason = String(error);
+          ctx.log(`design-gate: ${target.id} could not be read this cell: ${reason}`);
+          outcome.skipped.push({ cell: config.id, target: target.id, reason });
         }
       }
     }

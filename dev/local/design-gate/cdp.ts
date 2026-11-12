@@ -334,10 +334,16 @@ export function createProbeClient(options: ProbeClientOptions): ProbeClient {
           return;
         }
         // The same target listed again is also fine when it answers: the
-        // runtime re-attached in place.
+        // runtime re-attached in place. The session closes on both outcomes: a
+        // readiness probe that fails stays inside the reload window and the
+        // loop opens another one, so a leaked session would pile up one socket
+        // per iteration.
         const probe = await openSession(page.webSocketDebuggerUrl, options.createSocket, timeoutMs);
-        await evaluate(probe, `${PROBE}?.ready() === true`, timeoutMs);
-        probe.close();
+        try {
+          await evaluate(probe, `${PROBE}?.ready() === true`, timeoutMs);
+        } finally {
+          probe.close();
+        }
         failedPageId = undefined;
         return;
       } catch {

@@ -240,7 +240,7 @@ test('writeArtifacts writes one sheet per target in matrix order and lists it', 
     exec,
     out,
     meta: { platform: 'android', device: 'd', matrix: 'standard', startedAt: 'S', finishedAt: 'F' },
-    outcome: { cells, findings: [] },
+    outcome: { cells, findings: [], skipped: [] },
   });
   const homeSheet = commands.find(command => command.at(-1) === path.join(out, 'sheets/home.png'));
   assert.ok(homeSheet);

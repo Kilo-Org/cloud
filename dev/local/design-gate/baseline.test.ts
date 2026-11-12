@@ -20,7 +20,7 @@ import {
   type Preparation,
   type Revision,
 } from './baseline';
-import type { RunOutcome } from './capture';
+import type { RunOutcome, SkippedTarget } from './capture';
 import type { Finding } from './findings';
 import type { ProbeDump } from './tree';
 
@@ -221,6 +221,7 @@ function capture(
     findings?: (Finding & { count?: number })[];
     width?: number;
     nodes?: ProbeDump['nodes'];
+    skipped?: SkippedTarget[];
   } = {}
 ) {
   fs.mkdirSync(dir);
@@ -271,6 +272,7 @@ function capture(
       },
     ],
     findings: options.findings ?? [],
+    skipped: options.skipped ?? [],
   };
   // Same omission of per-screen env as writeArtifacts.
   fs.writeFileSync(
@@ -421,6 +423,25 @@ test('empty/missing screen coverage and escaped dump paths fail closed', async t
   const outcome = capture(preparation, 'base', baseRun);
   outcome.cells[0].screens[0].dump = '../targets.json';
   assert.throws(() => targetReadiness(outcome, manifest, baseRun), /escapes/);
+});
+
+test('a target the probe could not read makes readiness inconclusive and names the cause', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'design-gate-skip-'));
+  const readiness = targetReadiness(
+    {
+      cells: [{ id: 'base', screens: [] }],
+      findings: [],
+      skipped: [{ cell: 'base', target: TARGET.id, reason: 'InfraError: no debugger page' }],
+    },
+    manifest,
+    dir
+  );
+  // The skip replaces the anonymous "missing screen" reason: a comparison that
+  // sees it must say which target was never read and why.
+  assert.deepEqual(readiness, [
+    'base: target coverage differs from manifest',
+    `base/${TARGET.id}: target could not be read (InfraError: no debugger page)`,
+  ]);
 });
 
 test('manifest screen identity uses the raw segments.join producer key, not a route path', () => {

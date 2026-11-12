@@ -50,8 +50,13 @@ export function resolveSerial(exec: Exec, requested: string | undefined): string
   );
 }
 
-export function createAndroidDevice(options: { exec: Exec; spawn: Spawn; serial: string }): Device {
-  const { exec, spawn, serial } = options;
+export function createAndroidDevice(options: {
+  exec: Exec;
+  spawn: Spawn;
+  serial: string;
+  metroPort: number;
+}): Device {
+  const { exec, spawn, serial, metroPort } = options;
   const adb = (args: readonly string[]) => exec('adb', ['-s', serial, ...args]);
   const shell = (...args: string[]) =>
     adb(['shell', ...args])
@@ -116,7 +121,7 @@ export function createAndroidDevice(options: { exec: Exec; spawn: Spawn; serial:
     // tunnel to Metro goes with it. Relaunch through the dev client's own deep
     // link (a launcher relaunch opens the launcher, not the app) after
     // re-establishing that tunnel; the runner waits for readiness afterwards.
-    relaunch: (metroPort: number) => {
+    relaunch: () => {
       adb(['reverse', `tcp:${metroPort}`, `tcp:${metroPort}`]);
       shell('am', 'force-stop', APP_ID);
       adb([

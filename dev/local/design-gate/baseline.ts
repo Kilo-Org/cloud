@@ -372,6 +372,8 @@ export async function verifyRuntimeSource(
 type ReadinessRun = {
   cells: { id: string; screens: { target: string; link: string; dump: string }[] }[];
   findings: { cell: string; target: string; rule: string }[];
+  /** Targets the probe could not read; a run that has any is inconclusive. */
+  skipped?: { cell: string; target: string; reason: string }[];
 };
 function artifactPath(out: string, file: string): string {
   const resolved = fs.realpathSync(path.resolve(out, file));
@@ -399,7 +401,14 @@ export function targetReadiness(
     for (const target of manifest.targets) {
       const screen = cell.screens.find(candidate => candidate.target === target.id);
       if (screen === undefined) {
-        failures.push(`${cell.id}/${target.id}: missing screen`);
+        const skipped = outcome.skipped?.find(
+          entry => entry.cell === cell.id && entry.target === target.id
+        );
+        failures.push(
+          skipped === undefined
+            ? `${cell.id}/${target.id}: missing screen`
+            : `${cell.id}/${target.id}: target could not be read (${skipped.reason})`
+        );
         continue;
       }
       const dump = parseDump(readJson(artifactPath(out, screen.dump)));

@@ -59,6 +59,16 @@ describe('toSharedTranscriptMessages', () => {
     expect(toSharedTranscriptMessages([{ info: userMessage('msg_1', []).info }])).toEqual([]);
   });
 
+  it('keeps a persisted part that omits sessionID, as the public page does', () => {
+    // The ingest seam persists a part under `id` + `messageID` only; the live
+    // stream is what adds `sessionID`.
+    const persistedPart = { id: 'prt_1', messageID: 'msg_1', type: 'text', text: 'hello' };
+
+    const messages = toSharedTranscriptMessages([userMessage('msg_1', [persistedPart])]);
+
+    expect(messages[0]?.parts).toEqual([{ ...persistedPart, sessionID: 'ses_test' }]);
+  });
+
   it('orders messages by their time-ordered ids, not ingest order', () => {
     const messages = toSharedTranscriptMessages([
       userMessage('msg_3', [textPart('msg_3', 'prt_3', 'third')]),

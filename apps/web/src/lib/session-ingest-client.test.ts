@@ -801,6 +801,41 @@ describe('fetchSharedSession', () => {
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
+  it('reads the metadata and the snapshot together, not one after the other', async () => {
+    const metadataGate = Promise.withResolvers<unknown>();
+    const snapshotGate = Promise.withResolvers<unknown>();
+    mockFetch.mockImplementation((url: string) =>
+      url.endsWith('/metadata') ? metadataGate.promise : snapshotGate.promise
+    );
+
+    const outcome = fetchSharedSession('share.jwt.token');
+    await Promise.resolve();
+
+    // Both requests are in flight before either answer exists. A sequential
+    // read would not have issued the snapshot request yet.
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    snapshotGate.resolve({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ info: {}, messages: [transcriptMessage] }),
+    });
+    metadataGate.resolve({ ok: true, status: 200, json: () => Promise.resolve(metadata) });
+
+    const shared = await outcome;
+    expect(shared?.messages.map(message => message.info.id)).toEqual(['msg_1']);
+  });
+
+  it('answers null for a dead link even when the snapshot read failed', async () => {
+    mockFetch.mockImplementation((url: string) =>
+      url.endsWith('/metadata')
+        ? Promise.resolve({ ok: false, status: 404, statusText: 'Not Found' })
+        : Promise.resolve({ ok: false, status: 500, statusText: 'Internal Server Error' })
+    );
+
+    await expect(fetchSharedSession('expired.jwt.token')).resolves.toBeNull();
+  });
+
   it('keeps the session and flags the transcript when the snapshot read fails', async () => {
     respondPerRoute({ ok: false, status: 503, statusText: 'Service Unavailable' });
 

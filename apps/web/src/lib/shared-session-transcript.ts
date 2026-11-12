@@ -17,14 +17,32 @@ const SnapshotMessageSchema = z.object({
 });
 
 /**
+ * A stored part is persisted under `id` + `messageID` only — the ingest seam and
+ * the Durable Object's part reader accept exactly that pair, and `sessionID` is
+ * written by the live stream, not by the snapshot
+ * (`persistedSdkPartIdentitySchema` in the session-ingest contract). The public
+ * web page keeps such a part as-is, so the mobile viewer fills the message's own
+ * `sessionID` in before validation rather than dropping a part the web page
+ * renders.
+ */
+function withMessageSessionId(rawPart: unknown, sessionID: string): unknown {
+  if (typeof rawPart !== 'object' || rawPart === null || 'sessionID' in rawPart) {
+    return rawPart;
+  }
+  return { ...rawPart, sessionID };
+}
+
+/**
  * Turn a public share snapshot's messages into renderable transcript messages.
  *
  * The snapshot is raw stored session data, so every message and every part is
  * validated at this boundary instead of being trusted by shape:
  * - a message whose info is not a stored user or assistant message is dropped —
  *   it has no bubble to render in;
- * - a part the SDK's boundary does not understand is dropped on its own, so one
- *   unreadable part never hides the rest of the message;
+ * - a stored part that omits `sessionID` is completed from its message first, so
+ *   the SDK schema reads the identity the ingest seam persisted;
+ * - a part the SDK's boundary still does not understand is dropped on its own,
+ *   so one unreadable part never hides the rest of the message;
  * - the survivors are put in display order, because the export streams in
  *   ingest order (see `sortSessionMessagesForDisplay`), which differs from
  *   conversation order when a session is re-ingested.
@@ -47,7 +65,9 @@ export function toSharedTranscriptMessages(
     }
     const parts: Part[] = [];
     for (const rawPart of envelope.data.parts) {
-      const part = cloudMessagePartSchema.safeParse(rawPart);
+      const part = cloudMessagePartSchema.safeParse(
+        withMessageSessionId(rawPart, info.data.sessionID)
+      );
       if (part.success) {
         parts.push(part.data);
       }

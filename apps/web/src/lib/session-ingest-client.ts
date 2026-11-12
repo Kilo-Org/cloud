@@ -646,27 +646,32 @@ export type SharedSessionRead = {
  * token is intentionally never included in errors or Sentry context.
  */
 export async function fetchSharedSession(shareToken: string): Promise<SharedSessionRead | null> {
-  const metadata = await fetchSharedSessionMetadata(shareToken);
+  // Both reads are capped by the same upstream budget, and the control-plane
+  // procedure budget is only slightly larger, so issuing them in sequence can
+  // fail a link that is valid. The public page reads them together too. A
+  // snapshot rejection is folded into a settled result so a dead link still
+  // answers null below rather than surfacing the snapshot's error.
+  const [metadata, snapshotRead] = await Promise.all([
+    fetchSharedSessionMetadata(shareToken),
+    fetchSharedSessionSnapshot(shareToken).then(
+      snapshot => ({ ok: true as const, snapshot }),
+      () => ({ ok: false as const, snapshot: null })
+    ),
+  ]);
   if (!metadata) {
     return null;
   }
 
-  let snapshot: SessionSnapshot | null;
-  try {
-    snapshot = await fetchSharedSessionSnapshot(shareToken);
-  } catch {
+  if (!snapshotRead.ok || snapshotRead.snapshot === null) {
     // A valid capability whose snapshot read failed is not a dead link: the
     // metadata above resolved, so the viewer keeps the session and reports the
     // transcript as unavailable rather than claiming the link expired.
     return { metadata, messages: [], transcriptUnavailable: true };
   }
-  if (!snapshot) {
-    return { metadata, messages: [], transcriptUnavailable: true };
-  }
 
   return {
     metadata,
-    messages: toSharedTranscriptMessages(snapshot.messages),
+    messages: toSharedTranscriptMessages(snapshotRead.snapshot.messages),
     transcriptUnavailable: false,
   };
 }

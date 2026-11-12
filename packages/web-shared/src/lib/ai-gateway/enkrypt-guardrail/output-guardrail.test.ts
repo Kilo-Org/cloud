@@ -749,6 +749,35 @@ describe('guardEnkryptOutput', () => {
         expect(response.headers.get('x-should-retry')).toBe('false');
       }
     );
+
+    it.each(FORMATS)(
+      'rejects a chat_completions %s response with blocked output in a content part type the gateway does not know',
+      async format => {
+        const fetchSpy = mockEnkrypt(({ text }) =>
+          text.includes(SECRET) ? detectPii() : allowAll()
+        );
+        const part = { type: 'output_audio', id: 'audio_1', transcript: MODEL_OUTPUT };
+        const body =
+          format === 'json'
+            ? JSON.stringify({ choices: [{ index: 0, message: { content: [part] } }] })
+            : sse([
+                { data: { choices: [{ index: 0, delta: { content: [part] } }] } },
+                { data: '[DONE]' },
+              ]);
+
+        const { client, release, onReject } = await guard(
+          upstreamResponse(body, format),
+          outputScan(blockingPii),
+          'chat_completions',
+          format === 'sse'
+        );
+
+        expect(await client.text()).not.toContain(SECRET);
+        expect(release).not.toHaveBeenCalled();
+        expect(rejection(onReject).verdict).toEqual({ action: 'block', message: BLOCK_MESSAGE });
+        expect(detectRequests(fetchSpy).map(({ text }) => text)).toEqual([MODEL_OUTPUT]);
+      }
+    );
   });
 
   describe('when the blocking scan cannot complete', () => {

@@ -865,14 +865,23 @@ describe('CreditPurchaseScreen', () => {
     await waitFor(() => packRows(renderer).length === 4);
 
     expect(allText(renderer)).toContain('Completing purchase');
-    // The in-flight row keeps its store price visible beside its state.
-    expect(allText(renderer)).toContain('$10.99');
     const rows = packRows(renderer);
-    // The in-flight row announces its state in the label too.
+    // The in-flight row swaps its store price for the state in the trailing
+    // slot, so it keeps its single trailing line and no row moves.
     const busyRow = rows.find(
       row =>
         (row.props as { accessibilityState?: { busy?: boolean } }).accessibilityState?.busy === true
     );
+    const busyTexts = busyRow?.findAll(node => String(node.type) === 'Text') ?? [];
+    expect(busyTexts.map(node => node.props.children)).toEqual([
+      `Add ${packAmount('$10.00')} of credits`,
+      'Completing purchase',
+      'Credits purchased through the App Store do not expire.',
+    ]);
+    // The state occupies the trailing slot of the title line, beside the title
+    // rather than on a line of its own, so the row keeps its height.
+    const busyState = busyTexts[1];
+    expect(busyState === undefined ? '' : classNameOf(busyState)).toContain('shrink-0');
     expect(
       (busyRow?.props as { accessibilityLabel?: string } | undefined)?.accessibilityLabel
     ).toBe(

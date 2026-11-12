@@ -240,17 +240,20 @@ export function CreditPurchaseScreen() {
               // drops them when initialization fails), so even a priced row
               // cannot complete: keep every row disabled until it reconnects.
               const disabled = purchasing || !connected || !hasStorePrice;
+              // The trailing slot carries the row's short state: the store price,
+              // or the in-flight label in its place. A swap there changes no
+              // row's height, so a purchase never moves the rows below.
+              const storePrice = hasStorePrice ? pack.displayPrice : null;
+              const trailingLabel = rowCompleting ? t('kiloPass.completingPurchase') : storePrice;
               // A status phrase reads on its own line under the title, so the
               // title keeps one line at the compact width. The store-unavailable
               // card above already names the failure, so no row repeats it
               // there: only the partly priced state, where the store answered
               // and left this pack out, needs the row to say it.
-              let statusLabel: string | null = null;
-              if (rowCompleting) {
-                statusLabel = t('kiloPass.completingPurchase');
-              } else if (!hasStorePrice && !storeUnavailable) {
-                statusLabel = t('credits.priceUnavailable');
-              }
+              const statusLabel =
+                !rowCompleting && !hasStorePrice && !storeUnavailable
+                  ? t('credits.priceUnavailable')
+                  : null;
               // The row is one accessible element: the explicit label replaces
               // its children, so the charge and the disabled reason must be in
               // the label itself (the canonical Kilo Pass row does the same).
@@ -258,7 +261,7 @@ export function CreditPurchaseScreen() {
               // above is its only visible statement.
               const rowAccessibilityLabel = [
                 packLabel,
-                statusLabel ?? pack.displayPrice ?? t('credits.priceUnavailable'),
+                trailingLabel ?? statusLabel ?? t('credits.priceUnavailable'),
                 expiryMessage,
               ]
                 .filter(Boolean)
@@ -283,19 +286,26 @@ export function CreditPurchaseScreen() {
                     <Text className="flex-1 font-semibold text-foreground" numberOfLines={1}>
                       {packLabel}
                     </Text>
-                    {/* Only a real store price takes the trailing slot, and it
-                        keeps its full width: the title yields instead, so the
-                        price a user pays is never truncated. */}
-                    {hasStorePrice && (
-                      <Text className="shrink-0 text-base font-semibold text-foreground tabular-nums">
-                        {pack.displayPrice}
+                    {/* The trailing slot keeps its one line in every state: the
+                        store price, or the in-flight label in its place. It keeps
+                        its full width, so the title yields instead and a price a
+                        user pays is never truncated. */}
+                    {trailingLabel !== null && (
+                      <Text
+                        className={cn(
+                          'shrink-0 text-base font-semibold text-foreground',
+                          !rowCompleting && 'tabular-nums'
+                        )}
+                      >
+                        {trailingLabel}
                       </Text>
                     )}
                   </View>
-                  {/* The status takes its own line, and the expiry note follows
-                      the last line of the title block at the same small gap a
-                      row without a status keeps. A row keeps no empty band for
-                      a status it does not state. */}
+                  {/* The status, when a row states one, takes its own line
+                      under the title. The expiry note then follows the last
+                      line of the title block: one small gap under a status
+                      line, and the row's usual gap under the title itself. No
+                      row keeps an empty band for a status it does not state. */}
                   {statusLabel !== null && (
                     <Text className="mt-1 text-sm text-muted-foreground">{statusLabel}</Text>
                   )}

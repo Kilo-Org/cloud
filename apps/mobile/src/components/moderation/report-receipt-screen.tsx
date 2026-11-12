@@ -15,10 +15,11 @@ import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useTRPC } from '@/lib/trpc';
+import { i18n } from '@/i18n';
 
 const ACCOUNT_ROUTE = '/(app)/(tabs)/(3_profile)/account' as Href;
 
-const ReceiptParamSchema = z.object({ receiptId: z.uuid() });
+const ReceiptParamSchema = z.object({ 'receipt-id': z.uuid() });
 
 const TRIAGE_KEYS = {
   received: 'profile.reportReceipt.triageReceived',
@@ -34,9 +35,14 @@ const APPEAL_KEYS = {
   rejected: 'profile.reportReceipt.appealRejected',
 } as const;
 
-/** Looks a status up by its literal key without widening the dictionary's type. */
+/**
+ * Translates a status the server reports, through the key its dictionary holds.
+ * An unrecognised status is shown as the server sent it, so a status added on the
+ * server is readable rather than blank.
+ */
 function statusLabel(dictionary: Readonly<Record<string, string>>, status: string): string {
-  return dictionary[status] ?? status;
+  const key = dictionary[status];
+  return key === undefined ? status : i18n.t(key);
 }
 
 function StatusRow({ label, value }: Readonly<{ label: string; value: string }>) {
@@ -70,7 +76,7 @@ export function ReportReceiptScreen() {
   const queryClient = useQueryClient();
   const params = useLocalSearchParams();
   const parsed = ReceiptParamSchema.safeParse(params);
-  const receiptId = parsed.success ? parsed.data.receiptId : null;
+  const receiptId = parsed.success ? parsed.data['receipt-id'] : null;
 
   const receipt = useQuery({
     ...trpc.moderation.getReportReceipt.queryOptions({ receiptId: receiptId ?? '' }),
@@ -162,7 +168,9 @@ export function ReportReceiptScreen() {
                   { text: t('common.cancel'), style: 'cancel' },
                   {
                     text: t('profile.reportReceipt.appealConfirm'),
-                    onPress: () => appeal.mutate({ receiptId }),
+                    onPress: () => {
+                      appeal.mutate({ receiptId });
+                    },
                   },
                 ]
               );

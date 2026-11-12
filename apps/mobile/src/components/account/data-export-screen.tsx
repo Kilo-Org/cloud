@@ -219,7 +219,7 @@ export function DataExportScreen() {
             key={dataExport.id}
             dataExport={dataExport}
             requestingCode={
-              requestCode.isPending && requestCode.variables?.exportId === dataExport.id
+              requestCode.isPending && requestCode.variables.exportId === dataExport.id
             }
             onRequestCode={() => {
               setCodeError(null);

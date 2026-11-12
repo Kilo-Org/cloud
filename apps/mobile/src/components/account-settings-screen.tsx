@@ -9,8 +9,8 @@ import {
   Lock,
   LogOut,
   Shield,
-  UserRound,
   Smartphone,
+  UserRound,
 } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -170,7 +170,9 @@ export function AccountSettingsScreen() {
               title: t('profile.signOutWeb.confirmTitle'),
               message: t('profile.signOutWeb.confirmMessage'),
               confirmLabel: t('common.signOut'),
-              onConfirm: () => signOutWeb.mutate(undefined),
+              onConfirm: () => {
+                signOutWeb.mutate(undefined);
+              },
             });
           }}
         />

@@ -19,6 +19,7 @@ import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useTRPC } from '@/lib/trpc';
+import { i18n } from '@/i18n';
 
 type ProviderKey = inferRouterOutputs<MobileRouter>['byok']['list'][number];
 
@@ -28,6 +29,17 @@ const PERSONAL_SCOPE = {};
 const ADD_KEY_ROUTE = '/(app)/(tabs)/(3_profile)/provider-key-add' as Href;
 
 const SKELETON_ROWS = [0, 1];
+
+/**
+ * The row's second line. A key the coding plan installed says so instead of
+ * reporting the switch, because the switch cannot move for it.
+ */
+function keyStateLabel(managed: boolean, enabled: boolean): string {
+  if (managed) {
+    return i18n.t('profile.providerKeys.managedByPlan');
+  }
+  return i18n.t(enabled ? 'profile.providerKeys.enabled' : 'profile.providerKeys.disabled');
+}
 
 function ProviderKeyRow({
   providerKey,
@@ -61,11 +73,7 @@ function ProviderKeyRow({
             {providerKey.provider_name}
           </Text>
           <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-            {managed
-              ? t('profile.providerKeys.managedByPlan')
-              : providerKey.is_enabled
-                ? t('profile.providerKeys.enabled')
-                : t('profile.providerKeys.disabled')}
+            {keyStateLabel(managed, providerKey.is_enabled)}
           </Text>
         </View>
         <Switch
@@ -215,7 +223,7 @@ export function ProviderKeysScreen() {
             key={providerKey.id}
             providerKey={providerKey}
             testing={testingId === providerKey.id}
-            toggling={setEnabled.isPending && setEnabled.variables?.id === providerKey.id}
+            toggling={setEnabled.isPending && setEnabled.variables.id === providerKey.id}
             deleting={deletingId === providerKey.id}
             onTest={() => {
               setTestingId(providerKey.id);

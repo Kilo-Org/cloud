@@ -111,7 +111,9 @@ function useCommentModeration(): CommentModeration {
           {
             action: {
               label: t('profile.reportReceipt.viewReceipt'),
-              onClick: () => router.push(reportReceiptRoute(result.receiptId)),
+              onClick: () => {
+                router.push(reportReceiptRoute(result.receiptId));
+              },
             },
           }
         ),
@@ -130,7 +132,9 @@ function useCommentModeration(): CommentModeration {
           {
             action: {
               label: t('profile.reportReceipt.viewReceipt'),
-              onClick: () => router.push(reportReceiptRoute(result.receiptId)),
+              onClick: () => {
+                router.push(reportReceiptRoute(result.receiptId));
+              },
             },
           }
         ),

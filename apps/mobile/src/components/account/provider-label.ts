@@ -24,7 +24,9 @@ const PROVIDER_LABEL_KEYS = {
   workos: 'profile.providerEnterpriseSso',
 } as const satisfies Record<string, string>;
 
+const PROVIDER_LABEL_MAP = new Map<string, string>(Object.entries(PROVIDER_LABEL_KEYS));
+
 export function providerLabel(provider: string): string {
-  const key = PROVIDER_LABEL_KEYS[provider as keyof typeof PROVIDER_LABEL_KEYS];
-  return key ? i18n.t(key) : provider;
+  const key = PROVIDER_LABEL_MAP.get(provider);
+  return key === undefined ? provider : i18n.t(key);
 }

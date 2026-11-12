@@ -2895,20 +2895,51 @@ describe('organization data-collection policy on provider-policy exempt routes',
     mockedIsCustomLlm.mockResolvedValue(false);
   });
 
-  // The three route shapes that `getProvider` marks `bypassAccessCheck`. Its model classifier only
-  // calls a model data-collection-required when it is free or a custom LLM, so the bespoke
-  // direct-BYOK case uses a free id to reach the guard on that shape at all.
+  // Each case builds the route its shape really produces, so the guard runs against a
+  // direct-BYOK route with a user key, not only against a `custom` provider. The model classifier
+  // calls a model data-collection-required only when it is free or a custom LLM, so the bespoke
+  // direct-BYOK case uses a free id to reach the guard at all.
+  const directByokRoute: ProviderRoute = {
+    provider: {
+      ...exemptProvider,
+      type: 'direct-byok',
+      async transformRequest(context) {
+        delete context.request.body.provider;
+      },
+    },
+    userByok: [{ decryptedAPIKey: 'test-key', providerId: 'openai' }],
+    isFree: false,
+    bypassAccessCheck: true,
+  };
+  const customLlmRoute: ProviderRoute = {
+    provider: exemptProvider,
+    userByok: null,
+    isFree: false,
+    bypassAccessCheck: true,
+  };
   it.each([
-    { route: 'a non-public custom LLM', model: 'acme/private-model', customLlm: true },
     {
-      route: 'a bespoke direct-BYOK id with a free model',
+      shape: 'a non-public custom LLM',
+      model: 'acme/private-model',
+      route: customLlmRoute,
+      customLlm: true,
+    },
+    {
+      shape: 'a bespoke direct-BYOK id with a free model',
       model: 'acme/bespoke-model:free',
+      route: directByokRoute,
       customLlm: false,
     },
-    { route: 'the local fake LLM', model: 'fake-deterministic', customLlm: false, localFake: true },
+    {
+      shape: 'the local fake LLM',
+      model: 'fake-deterministic',
+      route: customLlmRoute,
+      customLlm: false,
+      localFake: true,
+    },
   ])(
-    'rejects a data-collection-required model on $route for an organization that denies data collection',
-    async ({ model, customLlm, localFake }) => {
+    'rejects a data-collection-required model on an exempt route: $shape',
+    async ({ model, route, customLlm, localFake }) => {
       setOrganizationDataCollection('deny');
       if (customLlm) mockCustomLlm(privateCustomLlm(model));
       const localFakeEnv = localFake ? enableLocalFakeLlm() : null;
@@ -2918,12 +2949,7 @@ describe('organization data-collection policy on provider-policy exempt routes',
           expect(request.body.provider).toEqual(
             expect.objectContaining({ data_collection: 'deny' })
           );
-          return providerResult({
-            provider: exemptProvider,
-            userByok: null,
-            isFree: false,
-            bypassAccessCheck: true,
-          });
+          return providerResult(route);
         });
 
         const { handleLlmProxyRequest } = await import('./llm-proxy');

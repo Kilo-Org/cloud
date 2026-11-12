@@ -277,10 +277,11 @@ export async function resolveProviderAndPolicy(
       if (creditsBlocked) return await creditsBlocked();
     }
 
-    // The exemption on this flag is intentional: bespoke direct-BYOK ids and non-public custom
-    // LLMs already require explicit admin opt-in. It covers the organization model grant only.
-    // `llm-proxy.ts` merges the organization provider privacy into `request.body.provider` before
-    // routing, so the data-collection policy below still applies to these routes.
+    // Organization model and provider policies cover catalog ids. The exemption here is
+    // intentional: a bespoke direct-BYOK id, a non-public custom LLM and the local fake LLM
+    // already require explicit admin opt-in. `llm-proxy.ts` merges the organization provider
+    // privacy into `request.body.provider` before routing, so the data-collection policy below
+    // still applies to these routes.
     if (isAnonymous || route.bypassAccessCheck) return null;
     const {
       allowedProviders,

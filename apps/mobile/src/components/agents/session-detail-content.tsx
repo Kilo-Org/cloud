@@ -140,6 +140,7 @@ import {
   SessionSkeletonMessages,
 } from '@/components/agents/session-detail-skeleton';
 import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
+import { PULL_FEEDBACK_MIN_BEAT_MS } from '@/components/agents/use-pull-refresh';
 import {
   SESSION_SLOW_LOAD_MS,
   useSessionSlowLoadPhase,
@@ -1913,6 +1914,7 @@ export function SessionDetailContent({
   const [terminalRetry, setTerminalRetry] = useState<{
     sessionId: string;
     error: SessionTerminalError;
+    tappedAt: number;
   } | null>(null);
   const terminalRetryPending = terminalRetry?.sessionId === sessionId;
   useEffect(() => {
@@ -1928,17 +1930,46 @@ export function SessionDetailContent({
   }, [terminalRetryPending]);
   useEffect(() => {
     if (!terminalRetryPending) {
-      return;
+      return undefined;
     }
+    // The reopen's outcome owns the body again once content landed, the
+    // reopened failure is on screen, or — on the session branch — the open
+    // finished without a failure to show, which is a session that really is
+    // empty. That last case has to release: without it a successful retry on an
+    // empty session would keep the stale failure card up for the whole window.
     const settled =
       messages.length > 0 ||
       (terminalRetry.error.retryWith === 'connection'
         ? terminalError === null
-        : terminalError !== null && !isLoading);
-    if (settled) {
-      setTerminalRetry(null);
+        : !isLoading && (terminalError !== null || fetchedData?.kiloSessionId === sessionId));
+    if (!settled) {
+      return undefined;
     }
-  }, [terminalRetryPending, terminalRetry, terminalError, isLoading, messages.length]);
+    // The outcome is already on screen, but a refused reopen settles in well
+    // under a second: releasing at once makes the busy state a flash the reader
+    // misses, and the tap reads as lost again — the same device-defect
+    // reasoning the list's pull feedback uses. Hold the acknowledged state
+    // through that beat, then swap.
+    const beat = Math.max(0, PULL_FEEDBACK_MIN_BEAT_MS - (Date.now() - terminalRetry.tappedAt));
+    if (beat === 0) {
+      setTerminalRetry(null);
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setTerminalRetry(null);
+    }, beat);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [
+    terminalRetryPending,
+    terminalRetry,
+    terminalError,
+    isLoading,
+    messages.length,
+    fetchedData,
+    sessionId,
+  ]);
   const shownTerminalError =
     terminalRetryPending && messages.length === 0
       ? (terminalError ?? terminalRetry.error)
@@ -1947,7 +1978,7 @@ export function SessionDetailContent({
     if (terminalRetryPending) {
       return;
     }
-    setTerminalRetry({ sessionId, error: failure });
+    setTerminalRetry({ sessionId, error: failure, tappedAt: Date.now() });
     if (failure.retryWith === 'connection') {
       retrySessionConnection();
       return;

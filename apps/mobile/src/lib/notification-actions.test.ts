@@ -918,28 +918,59 @@ describe('handleNeedsInputNotificationResponse — default action', () => {
   });
 
   it('opens one KiloClaw page when a warm tap reaches both dispatchers', async () => {
-    // Expo hands a background body tap to the JS listener and to the
-    // registered background task, two separately deserialized responses with
-    // one OS identity.
-    const response = raiseResponse({
+    // Two separately deserialized responses carrying one OS identity, which is
+    // what the JS listener and the registered background task each receive:
+    // distinct objects, same notification identifier and action.
+    const response = {
       identifier: 'e2e-warm-double',
       actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
       data: { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
-    });
+    } as const;
+    const fromListener = raiseResponse(response);
+    const fromBackgroundTask = raiseResponse(response);
 
     const [first, second] = await Promise.all([
-      handleNeedsInputNotificationResponse(response, {
+      handleNeedsInputNotificationResponse(fromListener, {
         runInteraction: mocks.runNeedsInputInteraction,
       }),
-      handleNeedsInputNotificationResponse(response, {
+      handleNeedsInputNotificationResponse(fromBackgroundTask, {
         runInteraction: mocks.runNeedsInputInteraction,
       }),
     ]);
 
+    expect(fromListener).not.toBe(fromBackgroundTask);
     expect(first).toBe(false);
     expect(second).toBe(false);
     await vi.waitFor(() => {
       expect(mocks.openExternalUrl).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('opens again for a tap on a different notification', async () => {
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        identifier: 'e2e-warm-first',
+        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+        data: { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+    await vi.waitFor(() => {
+      expect(mocks.openExternalUrl).toHaveBeenCalledTimes(1);
+    });
+
+    // The dedupe is keyed by the OS identity, so another notification's tap is
+    // a new dispatch rather than a replay of the settled one.
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        identifier: 'e2e-warm-second',
+        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+        data: { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+    await vi.waitFor(() => {
+      expect(mocks.openExternalUrl).toHaveBeenCalledTimes(2);
     });
   });
 });

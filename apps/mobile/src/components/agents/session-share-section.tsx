@@ -174,7 +174,7 @@ export function SessionShareSection({
     label: t(DURATION_LABEL_KEYS[value]),
   }));
 
-  let actions: ReactNode;
+  let actions: ReactNode = null;
   if (createdUrl !== null) {
     actions = (
       <ActiveLink

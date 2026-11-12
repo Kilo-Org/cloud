@@ -2469,8 +2469,9 @@ export const cliSessionsV2Router = createTRPCRouter({
   /**
    * The cumulative file diff for a V2 Kilo session, from session start to its
    * latest step, as stored by session ingest. File paths are workspace
-   * relative. Read failures surface as INTERNAL_SERVER_ERROR (retryable on the
-   * client); an oversized diff is a typed `too_large` result.
+   * relative. A budget expiry surfaces as SERVICE_UNAVAILABLE and any other
+   * read failure as INTERNAL_SERVER_ERROR (both retryable on the client); an
+   * oversized diff is a typed `too_large` result.
    */
   getSessionDiff: baseProcedure
     .input(z.object({ session_id: sessionIdField }))

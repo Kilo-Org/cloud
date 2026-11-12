@@ -4,6 +4,7 @@ import { isEnkryptPublicModel, publishEnkryptBenchmark } from './enkrypt-publica
 import {
   getModelStatsSnapshot,
   isModelStatsSnapshotFresh,
+  type ModelStatsLoadClient,
   type ModelStatsSnapshot,
 } from './model-stats-cache';
 import type { EnkryptPublishedBenchmark } from '@kilocode/db/schema-types';
@@ -45,7 +46,9 @@ export function publishEnkryptModels<T extends { id: string; enkrypt?: unknown }
   });
 }
 
-export async function getEnkryptBenchmarks(): Promise<EnkryptBenchmarks> {
+export async function getEnkryptBenchmarks(
+  options: { fromDb?: ModelStatsLoadClient } = {}
+): Promise<EnkryptBenchmarks> {
   if (!ENKRYPT_PUBLICATION_ENABLED) return null;
-  return getModelStatsSnapshot().catch(() => null);
+  return getModelStatsSnapshot(options).catch(() => null);
 }

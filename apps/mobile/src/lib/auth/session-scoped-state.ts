@@ -166,6 +166,9 @@ export function clearSessionScopedState(): void {
   // and queued destinations stamped with a signed-in account, together with
   // their cache copies. A delivery staged before an account resolves stays in
   // memory, so a same-process sign-in can still open the gate for it (DEC-01).
+  // The durable drafts are left alone on purpose: each one lives under its own
+  // account's `draft:<userId>` scope, so another account cannot restore it, and
+  // user work survives a sign-out by design.
   runClear(clearAccountStagedSharePayloads);
   runClear(clearAccountStagedShareNavigation);
   // The phone's search index is device-wide, not scoped to the signed-in

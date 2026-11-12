@@ -109,17 +109,6 @@ describe('recordEnkryptUsage region routing', () => {
     expect(await microdollarsUsed(usageRecord.organizationId)).toBe(0);
   });
 
-  it('treats a duplicate response as handled without writing locally', async () => {
-    mockedIsUSRegion.mockReturnValue(true);
-    mockFetch.mockResolvedValue(Response.json({ status: 'duplicate' }));
-    const usageRecord = await usageRecordForNewOrganization();
-
-    await recordEnkryptUsage(usageRecord);
-
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(await ledgerRows(usageRecord.organizationId)).toEqual([]);
-  });
-
   it.each(['recorded', 'duplicate'])(
     'treats a %s response echoing the sent usage id as handled without writing locally',
     async status => {

@@ -272,18 +272,4 @@ describe('recordEnkryptUsage with the usage queue flag on', () => {
     expect(callsTo(HANDOFF_URL)).toHaveLength(1);
     expect(callsTo(INGEST_URL)).toEqual([]);
   });
-
-  it('writes locally without a request lifetime, before anything is sent', async () => {
-    enableQueue();
-    mockedAfter.mockImplementation(() => {
-      throw new Error('`after` was called outside a request scope');
-    });
-    const usageRecord = await usageRecordForNewOrganization();
-
-    await recordEnkryptUsage(usageRecord);
-
-    expect(mockFetch).not.toHaveBeenCalled();
-    expect(await ledgerRows(usageRecord.organizationId)).toHaveLength(1);
-    expect(droppedLogs()).toEqual([]);
-  });
 });

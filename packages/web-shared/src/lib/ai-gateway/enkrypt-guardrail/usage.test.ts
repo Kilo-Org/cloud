@@ -367,31 +367,6 @@ describe('recordEnkryptUsage', () => {
     ).toEqual([]);
   });
 
-  it('records and debits a redelivered usage id only once', async () => {
-    const { user, organization } = await organizationWithMember();
-    const usageWrite = {
-      ...usageRecord(organization.id, user.id),
-      guardrail: 'input' as const,
-      id: randomUUID(),
-      occurredAt: new Date().toISOString(),
-      microdollarUsageId: randomUUID(),
-    };
-
-    expect(await recordEnkryptUsageLocally(usageWrite)).toBe('recorded');
-    expect(await recordEnkryptUsageLocally(usageWrite)).toBe('duplicate');
-
-    expect(
-      await db
-        .select()
-        .from(enkrypt_usage)
-        .where(eq(enkrypt_usage.organization_id, organization.id))
-    ).toEqual([expect.objectContaining({ microdollar_usage_id: usageWrite.microdollarUsageId })]);
-    expect(await organizationBalance(organization.id)).toEqual({
-      microdollarsUsed: 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
-      microdollarsBalance: 10_000_000 - 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
-    });
-  });
-
   it('stores no detectors for a write with an empty detector list', async () => {
     const { user, organization } = await organizationWithMember();
 

@@ -97,6 +97,7 @@ function forbidden(message: string): never {
 }
 
 export type CreateControlTokenOptions = {
+  operation?: 'repository-access';
   headers?: Headers;
   organizationId?: string;
   tokenSource?: string;
@@ -383,6 +384,7 @@ async function createModernControlToken(
       botId: options?.extra?.botId,
       createdOnPlatform: options?.extra?.createdOnPlatform,
       runtimeAdmission: authority.runtimeAdmission,
+      ...(options?.operation ? { cloudAgentControlScope: options.operation } : {}),
     },
   });
   const token = jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: 'HS256' });
@@ -413,6 +415,7 @@ export async function createControlTokenForRequest(
     }
     const scope = verified.claims.cloudAgentAuthority;
     if (scope !== undefined) {
+      if (options?.operation) forbidden('Cloud Agent authority cannot change repository access');
       if (
         resource !== 'cloud-agent-next' ||
         (options?.organizationId ?? null) !== scope.organizationId
@@ -456,6 +459,10 @@ export async function createControlTokenForRequest(
   const authority = await getResourceDelegationAuthority(user, options);
   if (authority.organizationId) {
     forbidden('Organization-scoped credentials cannot mint resource control tokens');
+  }
+  if (options?.operation) {
+    if (authority.runtimeAdmission.source !== 'user') forbidden('User authorization required');
+    return createModernControlToken(authority, resource, options);
   }
   if (!isResourceTokenIssuanceEnabled(resource)) {
     if (authority.isModern) {

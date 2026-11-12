@@ -236,6 +236,8 @@ describe('prepared Vercel forwarding route', () => {
       requestMethod: 'POST',
       requestUrl: 'https://github.com/acme/repo.git/git-receive-pack',
       requestContentType: 'text/plain;charset=UTF-8',
+      requestBody: undefined,
+      workspaceSandboxId: 'sbx-test',
     });
   });
 

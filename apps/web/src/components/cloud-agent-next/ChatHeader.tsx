@@ -1,5 +1,7 @@
 'use client';
 
+import { RepositoryAccessDialog } from './RepositoryAccessDialog';
+
 import { useMemo, useRef, useState, type MouseEvent, type RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -119,6 +121,7 @@ export function ChatHeader({
   onSendStackInstruction,
   onStackOperationCompleted,
 }: ChatHeaderProps) {
+  const [repositoryAccessOpen, setRepositoryAccessOpen] = useState(false);
   const [showActionsDialog, setShowActionsDialog] = useState(false);
   const [showBranchOperations, setShowBranchOperations] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -153,6 +156,13 @@ export function ChatHeader({
 
   return (
     <>
+      <RepositoryAccessDialog
+        key={`${organizationId ?? 'personal'}:${cloudAgentSessionId}`}
+        open={repositoryAccessOpen}
+        onOpenChange={setRepositoryAccessOpen}
+        sessionId={cloudAgentSessionId}
+        organizationId={organizationId}
+      />
       <SessionInfoDialog
         open={sessionInfoOpen}
         onOpenChange={onSessionInfoOpenChange}
@@ -261,6 +271,9 @@ export function ChatHeader({
                 <DropdownMenuSeparator />
               </>
             )}
+            <DropdownMenuItem onSelect={() => setRepositoryAccessOpen(true)}>
+              Repository access
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setShowActionsDialog(true)}>
               Share or Fork
             </DropdownMenuItem>

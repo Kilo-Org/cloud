@@ -524,6 +524,7 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   abort(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneDispatchResult>;
   answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult>;
   release(payload: ControlPlaneSessionRefPayload): Promise<void>;
+  deleteSessionRepositoryAccess?(input: { sessionId: string }): Promise<void>;
   /** H4: the Sandbox DO returns the connected allocation fence for a bound handle. */
   getRuntimeCredentialProxyFence(input: {
     ownerId: string;
@@ -3008,6 +3009,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           'release'
         );
       }
+      if (peer?.deleteSessionRepositoryAccess)
+        await peer.deleteSessionRepositoryAccess({ sessionId: this.sessionId });
       await this.tearDownSession();
     });
   }

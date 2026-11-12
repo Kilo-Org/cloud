@@ -1,3 +1,7 @@
+import {
+  githubRepositoryPermissions,
+  type WorkspaceGitHubRepositoryAccess,
+} from '@kilocode/worker-utils/workspace-repository-access';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GitHubTaskGrant } from '@kilocode/worker-utils/github-task-grant';
 import { authorizeGitHubTaskRequest, type GitHubTaskRequest } from './github-task-policy.js';
@@ -30,6 +34,21 @@ const env = {
 };
 const tokens = { getToken: vi.fn(), getTokenForRepositoryIds: vi.fn() };
 const fetchMock = vi.fn();
+const approved: WorkspaceGitHubRepositoryAccess[] = [
+  {
+    repositoryId: 202,
+    nodeId: 'R_202',
+    owner: 'acme',
+    name: 'sibling',
+    mode: 'read',
+    source: 'user',
+    approvedBy: 'user',
+    approvedAt: 1,
+    integrationId: '00000000-0000-4000-8000-000000000001',
+    identity: { source: 'user', providerSubjectId: '1', appType: 'standard' },
+  },
+];
+let scopedIds: number[];
 const repo = (id: number, owner: string, name: string, privacy = true) => ({
   id,
   node_id: `R_${id}`,
@@ -49,19 +68,37 @@ const graphql = (owner: string, name: string): GitHubTaskRequest => ({
     })
   ),
 });
-async function credential(request: GitHubTaskRequest, identity = auth) {
+async function credential(
+  request: GitHubTaskRequest,
+  identity = auth,
+  approved: WorkspaceGitHubRepositoryAccess[] = []
+) {
   const decision = authorizeGitHubTaskRequest(request, grant);
   if (!decision.allowed) return decision;
-  return authorizeGitHubTaskCredential(env, tokens, identity, grant, decision, request.url);
+  return authorizeGitHubTaskCredential(
+    env,
+    tokens,
+    identity,
+    grant,
+    decision,
+    request.url,
+    approved
+  );
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  scopedIds = [];
   tokens.getToken.mockResolvedValue('trusted-org-installation-token');
   tokens.getTokenForRepositoryIds.mockResolvedValue('scoped-installation-token');
   fetchMock.mockReset().mockImplementation(async (input: string, init: RequestInit) => {
     const path = new URL(input).pathname;
     const headers = new Headers(init.headers);
+    if (path === '/user/installations/123/repositories')
+      return Response.json({
+        total_count: scopedIds.length,
+        repositories: scopedIds.map(id => ({ id })),
+      });
     if (path === '/repos/acme/current')
       return Response.json({ ...repo(101, 'acme', 'current'), node_id: 'R_current' });
     if (path === '/repos/acme/sibling') return Response.json(repo(202, 'acme', 'sibling'));
@@ -72,11 +109,14 @@ beforeEach(() => {
         : new Response(null, { status: 404 });
     if (path === '/repos/public-owner/public')
       return Response.json(repo(404, 'public-owner', 'public', false));
-    if (path.endsWith('/token/scoped'))
+    if (path.endsWith('/token/scoped')) {
+      const body = JSON.parse(typeof init.body === 'string' ? init.body : '');
+      scopedIds = body.repository_ids;
       return Response.json({
         token: 'owner-scoped-user-token',
-        installation: { repository_selection: 'selected' },
+        installation: { id: 123, repository_selection: 'selected', permissions: body.permissions },
       });
+    }
     throw new Error('Unexpected synthetic GitHub request');
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -102,7 +142,9 @@ describe('connected identity isolation for organization worktrees', () => {
     },
     graphql('personal-user', 'private'),
   ])('denies personal private access through $method $url', async request => {
-    await expect(credential(request)).rejects.toMatchObject({ reason: 'repository_mismatch' });
+    await expect(credential(request)).rejects.toMatchObject({
+      reason: 'repository_access_required',
+    });
     const foreign = fetchMock.mock.calls.filter(([url]) =>
       new URL(url).pathname.startsWith('/repos/personal-user/')
     );
@@ -118,12 +160,22 @@ describe('connected identity isolation for organization worktrees', () => {
     'https://github.com/acme/sibling.git/git-upload-pack',
   ])('permits same-owner private reads with owner-scoped credentials: %s', async url => {
     expect(
-      await credential({ method: url.includes('git-upload-pack') ? 'POST' : 'GET', url })
+      await credential(
+        { method: url.includes('git-upload-pack') ? 'POST' : 'GET', url },
+        auth,
+        approved
+      )
     ).toBe('owner-scoped-user-token');
-    expect(JSON.parse(fetchMock.mock.calls.at(-1)?.[1].body)).toEqual({
+    expect(
+      JSON.parse(
+        fetchMock.mock.calls.find(([url]) => new URL(url).pathname.endsWith('/token/scoped'))?.[1]
+          .body
+      )
+    ).toEqual({
       access_token: 'ambient-personal-token',
       target: 'acme',
       repository_ids: [101, 202],
+      permissions: githubRepositoryPermissions('read'),
     });
   });
   it('keeps write credentials restricted to the current repository and allows the default branch', async () => {
@@ -134,10 +186,16 @@ describe('connected identity isolation for organization worktrees', () => {
         contentType: 'application/x-git-receive-pack-request',
       })
     ).toBe('owner-scoped-user-token');
-    expect(JSON.parse(fetchMock.mock.calls.at(-1)?.[1].body)).toEqual({
+    expect(
+      JSON.parse(
+        fetchMock.mock.calls.find(([url]) => new URL(url).pathname.endsWith('/token/scoped'))?.[1]
+          .body
+      )
+    ).toEqual({
       access_token: 'ambient-personal-token',
       target: 'acme',
       repository_ids: [101],
+      permissions: githubRepositoryPermissions('contribute'),
     });
   });
   it('never redeems write credentials for another repository, including public ones', async () => {
@@ -168,10 +226,16 @@ describe('connected identity isolation for organization worktrees', () => {
   });
   it('keeps GraphQL authentication inside the org even when reading a public repository', async () => {
     expect(await credential(graphql('public-owner', 'public'))).toBe('owner-scoped-user-token');
-    expect(JSON.parse(fetchMock.mock.calls.at(-1)?.[1].body)).toEqual({
+    expect(
+      JSON.parse(
+        fetchMock.mock.calls.find(([url]) => new URL(url).pathname.endsWith('/token/scoped'))?.[1]
+          .body
+      )
+    ).toEqual({
       access_token: 'ambient-personal-token',
       target: 'acme',
       repository_ids: [101],
+      permissions: githubRepositoryPermissions('read'),
     });
   });
   it.each(['user', 'installation'] as const)(
@@ -195,17 +259,34 @@ describe('connected identity isolation for organization worktrees', () => {
       ];
       for (const request of requests) {
         expect(await credential(request, identity)).toBe(
-          source === 'user' ? 'owner-scoped-user-token' : 'current-repository-token'
+          source === 'user' ? 'owner-scoped-user-token' : 'scoped-installation-token'
         );
         if (source === 'user') {
-          expect(JSON.parse(fetchMock.mock.calls.at(-1)?.[1].body)).toEqual({
+          expect(
+            JSON.parse(
+              fetchMock.mock.calls.find(([url]) =>
+                new URL(url).pathname.endsWith('/token/scoped')
+              )?.[1].body
+            )
+          ).toEqual({
             access_token: 'current-repository-token',
             target: 'acme',
             repository_ids: [101],
+            permissions: githubRepositoryPermissions('read'),
           });
         }
       }
-      expect(tokens.getTokenForRepositoryIds).not.toHaveBeenCalled();
+      expect(tokens.getToken).not.toHaveBeenCalled();
+      if (source === 'installation') {
+        expect(tokens.getTokenForRepositoryIds).toHaveBeenCalledWith(
+          '123',
+          [101],
+          'standard',
+          'read'
+        );
+      } else {
+        expect(tokens.getTokenForRepositoryIds).not.toHaveBeenCalled();
+      }
     }
   );
 
@@ -218,10 +299,16 @@ describe('connected identity isolation for organization worktrees', () => {
     expect(
       await credential(
         { method: 'GET', url: 'https://api.github.com/repos/acme/sibling/contents/file' },
-        identity
+        identity,
+        approved
       )
     ).toBe('scoped-installation-token');
-    expect(tokens.getToken).toHaveBeenCalledWith('123', 'standard');
-    expect(tokens.getTokenForRepositoryIds).toHaveBeenCalledWith('123', [101, 202], 'standard');
+    expect(tokens.getToken).not.toHaveBeenCalled();
+    expect(tokens.getTokenForRepositoryIds).toHaveBeenCalledWith(
+      '123',
+      [101, 202],
+      'standard',
+      'read'
+    );
   });
 });

@@ -1,6 +1,6 @@
+import { workflowPermissionDenial } from './github-workflow-denial.js';
 import { getGitHubTaskArchive } from '@kilocode/worker-utils/github-task-archive';
 import { getGitHubTaskLfsRoute } from '@kilocode/worker-utils/github-task-lfs';
-import { GITHUB_TASK_CAPABILITY_PREFIX } from '@kilocode/worker-utils/scm-capability-contract';
 import { readBoundedRequestBodyBytes } from '../bounded-request-body.js';
 import { forwardGitHubTaskArchive } from '../github-task-archive.js';
 import { forwardGitHubTaskLfs } from '../github-task-lfs.js';
@@ -102,7 +102,8 @@ function sleep(ms: number): Promise<void> {
 async function forwardGitHubGitWithRateLimitReset(
   createRequest: () => Request,
   headersToApply: Record<string, string | undefined>,
-  maxRetryAttempts: number
+  maxRetryAttempts: number,
+  reauthorize: () => Promise<Record<string, string | undefined> | null>
 ): Promise<Response> {
   let response = await forwardRedeemedRequest(createRequest(), headersToApply);
   let attemptsUsed = 0;
@@ -129,7 +130,12 @@ async function forwardGitHubGitWithRateLimitReset(
       { retryDelayMs: delayMs, retryAttempt: attemptsUsed },
       'Managed GitHub git request rate limited; retrying after observed reset'
     );
-    response = await forwardRedeemedRequest(createRequest(), headersToApply);
+    const currentHeaders = await reauthorize();
+    if (!currentHeaders)
+      return new Response('authorization_unavailable: Retry the operation in this workspace.', {
+        status: 503,
+      });
+    response = await forwardRedeemedRequest(createRequest(), currentHeaders);
   }
   return response;
 }
@@ -138,7 +144,8 @@ async function handleManagedGitHubOutbound(
   request: Request,
   tokenService: unknown,
   capability: { capability: string },
-  outboundContainerId: string
+  outboundContainerId: string,
+  workspaceSandboxId?: string
 ): Promise<Response> {
   const logFields = {
     ...getSafeRequestLogFields(request),
@@ -157,9 +164,6 @@ async function handleManagedGitHubOutbound(
     return new Response('GitHub authorization unavailable', { status: 502 });
   }
 
-  if (!capability.capability.startsWith(GITHUB_TASK_CAPABILITY_PREFIX)) {
-    return new Response('GitHub task policy requires a new worktree', { status: 403 });
-  }
   // The guest presents its own credential. LFS follow-up requests must present it again.
   const presented = classifyScmAuthorization({
     authorization: request.headers.get('Authorization'),
@@ -174,6 +178,7 @@ async function handleManagedGitHubOutbound(
   try {
     result = await tokenService.redeemGitHubSessionCapability({
       capability: capability.capability,
+      ...(workspaceSandboxId ? { workspaceSandboxId } : {}),
       outboundContainerId,
       requestMethod: request.method,
       requestUrl: request.url,
@@ -201,9 +206,29 @@ async function handleManagedGitHubOutbound(
       'Managed GitHub outbound redemption rejected'
     );
     await request.body?.cancel().catch(() => undefined);
-    return new Response('GitHub request is outside the task policy', { status: 403 });
+    const retryable = ['authorization_unavailable', 'source_unavailable'].includes(result.reason);
+    return new Response(
+      `${result.reason}: Open Repository access, then retry the operation in this workspace.`,
+      { status: retryable ? 503 : 403 }
+    );
   }
 
+  const reauthorize = async () => {
+    try {
+      const current = await tokenService.redeemGitHubSessionCapability({
+        capability: capability.capability,
+        ...(workspaceSandboxId ? { workspaceSandboxId } : {}),
+        outboundContainerId,
+        requestMethod: request.method,
+        requestUrl: request.url,
+        requestContentType: request.headers.get('content-type') ?? undefined,
+        requestBody: prepared.policyBody,
+      });
+      return current.success ? { authorization: current.authorization ?? undefined } : null;
+    } catch {
+      return null;
+    }
+  };
   // A null authorization forwards the request anonymously.
   const headersToApply = { authorization: result.authorization ?? undefined };
   let response: Response;
@@ -233,14 +258,16 @@ async function handleManagedGitHubOutbound(
               body: bodyBytes,
             }),
           headersToApply,
-          GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS
+          GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS,
+          reauthorize
         );
       }
     } else {
       response = await forwardGitHubGitWithRateLimitReset(
         () => request,
         headersToApply,
-        GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS
+        GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS,
+        reauthorize
       );
     }
   } catch (error) {
@@ -256,6 +283,8 @@ async function handleManagedGitHubOutbound(
     return new Response('GitHub authorization unavailable', { status: 502 });
   }
 
+  const workflowDenied = await workflowPermissionDenial(response);
+  if (workflowDenied) return workflowDenied;
   logDiagnostic(
     'info',
     { ...logFields, upstreamStatus: response.status },
@@ -452,13 +481,20 @@ export function forwardResolvedScmCapability(
   request: Request,
   tokenService: unknown,
   capability: ResolvedScmCapability,
-  outboundContainerId: string
+  outboundContainerId: string,
+  workspaceSandboxId?: string
 ): Promise<Response> {
   const headers = new Headers(request.headers);
   headers.set('Host', new URL(request.url).host);
   request = new Request(request, { headers });
   if (capability.provider === 'github') {
-    return handleManagedGitHubOutbound(request, tokenService, capability, outboundContainerId);
+    return handleManagedGitHubOutbound(
+      request,
+      tokenService,
+      capability,
+      outboundContainerId,
+      workspaceSandboxId
+    );
   }
   if (capability.provider === 'bitbucket') {
     return handleManagedBitbucketOutbound(request, tokenService, capability, outboundContainerId);

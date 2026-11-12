@@ -42,6 +42,7 @@ export const kiloTokenPayload = z.object({
   deviceSessionId: z.string().optional(),
   // Org memberships (baked into tokens to avoid DB lookups)
   orgMemberships: z.array(z.object({ orgId: z.string(), role: organizationRole })).optional(),
+  cloudAgentControlScope: z.literal('repository-access').optional(),
   runtimeAdmission: runtimeAdmission.optional(),
   runtimeAuthorization: runtimeAuthorization.optional(),
   cloudAgentAuthority: CloudAgentAuthoritySchema.optional(),
@@ -69,6 +70,7 @@ export type SignKiloTokenExtra = Pick<
   | 'deviceAuthRequestCode'
   | 'deviceSessionId'
   | 'orgMemberships'
+  | 'cloudAgentControlScope'
   | 'runtimeAdmission'
   | 'runtimeAuthorization'
 >;

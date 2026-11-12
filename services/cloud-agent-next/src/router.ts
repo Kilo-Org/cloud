@@ -1,3 +1,4 @@
+import { createRepositoryAccessHandlers } from './router/handlers/repository-access.js';
 /**
  * tRPC Router - Main entry point
  *
@@ -41,6 +42,7 @@ import {
 import { getSessionMessagesPage } from './router/handlers/session-history.js';
 
 export const appRouter = router({
+  ...createRepositoryAccessHandlers(),
   getSessionMessagesPage,
   deleteWorktree,
   getSandboxSelectionOptions,

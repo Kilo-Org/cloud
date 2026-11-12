@@ -676,19 +676,24 @@ describe('a persisted V2 grant', () => {
         capability: capability('kgh2.vercel'),
       }),
     ],
-  ])('is invalid on a %s grant that holds additional repositories', (name, mode, launchScm) => {
-    const launch = githubEntry('acme/widgets', 'launch');
-    const gadgets = { ...githubEntry('acme/gadgets', 'gadgets'), scm: launchScm() };
-    const base = persisted();
-    // A direct grant is a legacy one: its Kilo credential has no alias.
-    const kilo = name === 'direct' ? { ...base.kilo, alias: undefined } : base.kilo;
-    const grant = persisted({ ...mode, kilo, scm: launchScm(), repository: launch.repository });
-    const without = { ...grant, additionalRepositories: undefined };
-    const withMembers = { ...grant, additionalRepositories: [gadgets] };
+  ])(
+    'enforces contained forwarding for a %s grant with additional repositories',
+    (name, mode, launchScm) => {
+      const launch = githubEntry('acme/widgets', 'launch');
+      const gadgets = { ...githubEntry('acme/gadgets', 'gadgets'), scm: launchScm() };
+      const base = persisted();
+      // A direct grant is a legacy one: its Kilo credential has no alias.
+      const kilo = name === 'direct' ? { ...base.kilo, alias: undefined } : base.kilo;
+      const grant = persisted({ ...mode, kilo, scm: launchScm(), repository: launch.repository });
+      const without = { ...grant, additionalRepositories: undefined };
+      const withMembers = { ...grant, additionalRepositories: [gadgets] };
 
-    expect(persistedSessionCredentialGrantSchema.safeParse(without).success).toBe(true);
-    expect(persistedSessionCredentialGrantSchema.safeParse(withMembers).success).toBe(false);
-  });
+      expect(persistedSessionCredentialGrantSchema.safeParse(without).success).toBe(true);
+      expect(persistedSessionCredentialGrantSchema.safeParse(withMembers).success).toBe(
+        name === 'Vercel'
+      );
+    }
+  );
 
   it('is invalid without a launch capability', () => {
     expect(

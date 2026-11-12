@@ -50,6 +50,13 @@
       "when": 1794258032795,
       "tag": "0006_third_silhouette",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1794409557254,
+      "tag": "0007_workspace_repository_access",
+      "breakpoints": true
     }
   ]
 }

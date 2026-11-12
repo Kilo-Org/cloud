@@ -43,8 +43,17 @@ async function readChunk(
 export async function prepareGitHubTaskRequest(
   request: Request
 ): Promise<PreparedGitHubTaskRequest | null> {
+  const url = new URL(request.url);
+  const compressedGit =
+    request.method === 'POST' &&
+    url.hostname === 'github.com' &&
+    /^\/[a-z0-9_.-]+\/[a-z0-9_.-]+\.git\/git-(?:upload|receive)-pack$/i.test(url.pathname) &&
+    request.headers.get('content-encoding')?.toLowerCase() === 'gzip' &&
+    /^application\/x-git-(?:upload|receive)-pack-request$/.test(
+      request.headers.get('content-type') ?? ''
+    );
   if (
-    request.headers.has('content-encoding') ||
+    (request.headers.has('content-encoding') && !compressedGit) ||
     request.headers.has('x-http-method-override') ||
     request.headers.has('x-method-override')
   )
@@ -54,7 +63,7 @@ export async function prepareGitHubTaskRequest(
     const value = request.headers.get(name);
     if (value !== null) headers.set(name, value);
   }
-  const url = new URL(request.url);
+  if (compressedGit) headers.set('content-encoding', 'gzip');
   for (const name of url.searchParams.keys()) {
     if (['access_token', 'token', 'client_secret', '_method'].includes(name.toLowerCase()))
       return null;

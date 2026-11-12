@@ -1,3 +1,23 @@
+import { REPOSITORY_ACCESS_PROTOCOL_VERSION } from '@kilocode/worker-utils/workspace-repository-access';
+import { grantScmEntries } from '../../sandbox-control/session-credential-members.js';
+import {
+  repositoryAccessView,
+  type RepositoryAccessChange,
+  type WorkspaceRepositoryScope,
+  type WorkspaceGitHubRepositoryAccess,
+  type WorkspaceRepositoryPolicyLookup,
+  type WorkspaceRepositoryPolicyResult,
+} from '@kilocode/worker-utils/workspace-repository-access';
+import {
+  readRepositoryAccess,
+  writeRepositoryAccess,
+  changeRepositoryAccess,
+  deleteRepositoryAccess,
+} from './repository-access.js';
+import {
+  repositoryAccessFromTrustedGrant,
+  repositoryAccessFromAdmittedSource,
+} from './repository-access-initialization.js';
 import { assertContainerAccountAvailable } from '../../container-account-admission.js';
 import { billingFailureFromAdmission } from '../../billing-failure.js';
 import {
@@ -1355,6 +1375,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
     );
   }
 
+  async deleteSessionRepositoryAccess(input: { sessionId: string }): Promise<void> {
+    await this.initialized;
+    await this.enqueue(async () => {
+      deleteRepositoryAccess(this.db, input.sessionId);
+    });
+  }
+
   async release(payload: ControlPlaneSessionRefPayload): Promise<void> {
     await this.initialized;
     const parsed = controlPlaneSessionRefPayloadSchema.parse(payload);
@@ -1583,6 +1610,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           throw new WorktreeDeletionIncompleteError('Shared worktree cleanup is not confirmed');
         }
         await this.revokeWorktreeRoutes(handoff.targetSessionIds);
+        deleteRepositoryAccess(this.db, parsed.worktreeId);
         this.worktreeChanges.purge(parsed.worktreeId);
         const journal = await finishWorktreeDeletion(
           this.ctx.storage,
@@ -1609,6 +1637,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // Revoke the worktree's routes/grants even for a confirmed stop, so a
       // failed route cannot keep the sandbox looking shared forever.
       await this.revokeWorktreeRoutes(handoff.targetSessionIds);
+      deleteRepositoryAccess(this.db, parsed.worktreeId);
       this.worktreeChanges.purge(parsed.worktreeId);
       if (handoff.plan.action === 'stop') {
         // Fence by allocation identity: a sibling prepare may have created a new
@@ -2081,6 +2110,197 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * `src/sandbox-outbound.ts` calls today. Matches the grant by alias, re-checks
    * expiry/containment, resolves and persists the refreshed grant.
    */
+  /** Initialization never replaces route grants, guest aliases, or allocation state. */
+  private repositoryPreparation: WorkspaceRepositoryScope | null = null;
+
+  private async ensureRepositoryAccess(grant: SessionCredentialGrant) {
+    const existing = readRepositoryAccess(this.db, grant.scopeId);
+    if (existing) return existing;
+    const candidate = await repositoryAccessFromTrustedGrant(grant, this.env.GIT_TOKEN_SERVICE);
+    // An external provider call cannot overwrite a policy another request initialized.
+    const latest = readRepositoryAccess(this.db, grant.scopeId);
+    if (latest) return latest;
+    writeRepositoryAccess(this.db, candidate);
+    return candidate;
+  }
+
+  async getRepositoryAccess(input: { ownerId: string; sessionId: string }) {
+    await this.initialized;
+    const grant = await this.enqueue(async () => {
+      if ((await this.requireOwner()) !== input.ownerId)
+        throw new Error('Repository access denied');
+      const route = await readRoute(this.db, input.sessionId);
+      if (!route?.grant) throw new Error('Repository authorization unavailable');
+      return route.grant;
+    });
+    return repositoryAccessView(await this.ensureRepositoryAccess(grant));
+  }
+
+  async changeRepositoryAccess(input: RepositoryAccessChange & { ownerId: string }) {
+    await this.initialized;
+    if (
+      (await this.env.GIT_TOKEN_SERVICE.repositoryAccessProtocolVersion?.()) !==
+      REPOSITORY_ACCESS_PROTOCOL_VERSION
+    )
+      throw new Error('authorization_unavailable');
+    const grant = await this.enqueue(async () => {
+      if ((await this.requireOwner()) !== input.ownerId)
+        throw new Error('Repository access denied');
+      const route = await readRoute(this.db, input.sessionId);
+      if (!route?.grant) throw new Error('Repository authorization unavailable');
+      return route.grant;
+    });
+    await this.requireOrganizationMembership(grant);
+    const access = await this.ensureRepositoryAccess(grant);
+    const current = access.repositories.find(repo => repo.repositoryId === input.repositoryId);
+    if (access.revision !== input.expectedRevision)
+      return { changed: false as const, current: repositoryAccessView(access) };
+    let candidate: WorkspaceGitHubRepositoryAccess | null = null;
+    if (input.mode === 'read' && current)
+      candidate = { ...current, mode: 'read', approvedBy: input.ownerId, approvedAt: Date.now() };
+    else if (input.mode !== 'remove') {
+      const result = await this.env.GIT_TOKEN_SERVICE.prepareWorkspaceRepositoryAccess?.({
+        userId: input.ownerId,
+        orgId: grant.orgId,
+        repositoryId: input.repositoryId,
+        mode: input.mode,
+        source: 'user',
+        existing: current,
+        ...(current ? { githubRepo: `${current.owner}/${current.name}` } : {}),
+      });
+      if (!result?.success) throw new Error(result?.reason ?? 'authorization_unavailable');
+      candidate = result.repository;
+    }
+    return this.enqueue(async () => {
+      if ((await this.requireOwner()) !== input.ownerId)
+        throw new Error('Repository access denied');
+      const route = await readRoute(this.db, input.sessionId);
+      if (!route?.grant || route.grant.scopeId !== grant.scopeId)
+        throw new Error('Repository authorization unavailable');
+      await this.requireOrganizationMembership(grant);
+      const result = changeRepositoryAccess(
+        this.db,
+        grant.scopeId,
+        input.expectedRevision,
+        input.repositoryId,
+        candidate
+      );
+      logger
+        .withFields({
+          actor: input.ownerId,
+          scopeId: grant.scopeId,
+          repositoryId: input.repositoryId,
+          oldMode: current?.mode ?? null,
+          newMode: input.mode,
+          result: result.changed ? 'updated' : 'conflict',
+        })
+        .info('Workspace repository access change');
+      return result.changed
+        ? { changed: true as const, current: repositoryAccessView(result.access) }
+        : result;
+    });
+  }
+
+  /** Read-only broker callback. It must never issue credentials or wait on the lifecycle queue. */
+  async readWorkspaceRepositoryPolicy(
+    input: WorkspaceRepositoryPolicyLookup
+  ): Promise<WorkspaceRepositoryPolicyResult> {
+    return this.readRepositoryPolicyForBinding(input, input.outboundContainerId);
+  }
+
+  async admitWorkspaceRepositoryCapability(
+    input: WorkspaceRepositoryScope
+  ): Promise<WorkspaceRepositoryPolicyResult> {
+    await this.initialized;
+    const pending = this.repositoryPreparation;
+    if (
+      pending &&
+      pending.sandboxId === input.sandboxId &&
+      pending.scopeId === input.scopeId &&
+      pending.userId === input.userId &&
+      pending.orgId === input.orgId &&
+      pending.outboundContainerId === input.outboundContainerId &&
+      (await this.requireOwner()) === input.userId &&
+      this.outboundContainerIdFor() === input.outboundContainerId
+    ) {
+      await this.requireOrganizationMembership(input);
+      const access = readRepositoryAccess(this.db, input.scopeId);
+      return access ? { sandboxId: this.sandboxId, access } : null;
+    }
+    return this.readWorkspaceRepositoryPolicyForScope(input);
+  }
+
+  async readWorkspaceRepositoryPolicyForScope(
+    input: WorkspaceRepositoryScope
+  ): Promise<WorkspaceRepositoryPolicyResult> {
+    await this.initialized;
+    if (
+      input.sandboxId !== this.sandboxId ||
+      (await this.requireOwner()) !== input.userId ||
+      this.outboundContainerIdFor() !== input.outboundContainerId
+    )
+      return null;
+    const state = await this.readAllocation();
+    if (state.kind === 'stopped' || state.kind === 'stopping') return null;
+    const routes = await listRoutes(this.db);
+    const grant = listScopeGrants(this.db).find(
+      grant =>
+        grant.scopeId === input.scopeId &&
+        grant.userId === input.userId &&
+        grant.orgId === input.orgId &&
+        grant.outboundContainerId === input.outboundContainerId &&
+        grant.preparedAt <= Date.now() &&
+        grant.expiresAt > Date.now() &&
+        grant.members.some(member =>
+          routes.some(route => route.sessionId === member.sessionId && route.state !== 'failed')
+        )
+    );
+    if (!grant) return null;
+    await this.requireOrganizationMembership(input);
+    const access = readRepositoryAccess(this.db, input.scopeId);
+    return access ? { sandboxId: this.sandboxId, access } : null;
+  }
+
+  private async readRepositoryPolicyForBinding(
+    input: WorkspaceRepositoryPolicyLookup,
+    grantOutboundContainerId: string
+  ): Promise<WorkspaceRepositoryPolicyResult> {
+    await this.initialized;
+    if (
+      (await this.requireOwner()) !== input.userId ||
+      this.outboundContainerIdFor() !== input.outboundContainerId
+    )
+      return null;
+    const state = await this.readAllocation();
+    if (state.kind === 'stopped' || state.kind === 'stopping') return null;
+    const routes = await listRoutes(this.db);
+    for (const grant of listScopeGrants(this.db)) {
+      if (
+        grant.userId !== input.userId ||
+        grant.orgId !== input.orgId ||
+        grant.outboundContainerId !== grantOutboundContainerId ||
+        (input.scopeId && grant.scopeId !== input.scopeId) ||
+        !grant.members.some(member =>
+          routes.some(route => route.sessionId === member.sessionId && route.state !== 'failed')
+        )
+      )
+        continue;
+      const entry = grantScmEntries(grant).find(
+        entry =>
+          entry.repository.type === 'github' &&
+          entry.repository.repo.toLowerCase() === `${input.owner}/${input.name}` &&
+          entry.scm.githubAuthSource === input.source &&
+          entry.scm.githubAppType === input.appType &&
+          JSON.stringify(entry.scm.author) === JSON.stringify(input.gitAuthor)
+      );
+      if (!entry) continue;
+      await this.requireOrganizationMembership(grant);
+      const access = readRepositoryAccess(this.db, grant.scopeId);
+      return access ? { sandboxId: this.sandboxId, access } : null;
+    }
+    return null;
+  }
+
   async resolveCredential(input: {
     credential: string;
     outboundContainerId: string;
@@ -2141,6 +2361,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private async readScmAdmissionContext() {
+    for (const grant of listScopeGrants(this.db)) {
+      if (
+        this.env.GIT_TOKEN_SERVICE?.prepareWorkspaceRepositoryAccess &&
+        grantScmEntries(grant).some(entry => entry.repository.type === 'github')
+      )
+        await this.ensureRepositoryAccess(grant);
+    }
     const allocation = await this.readAllocation();
     return {
       sandboxId: this.sandboxId,
@@ -3029,7 +3256,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * throws and each caller decides whether to fail the attempt or keep the route
    * and retry.
    */
-  private async requireOrganizationMembership(source: ControlPlaneCredentialSource): Promise<void> {
+  private async requireOrganizationMembership(
+    source: Pick<ControlPlaneCredentialSource, 'userId' | 'orgId'>
+  ): Promise<void> {
     const organizationId = source.orgId;
     if (organizationId === undefined) return;
     const timers = this.sandboxTimers();
@@ -3274,6 +3503,26 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const existing = scopes.find(
       grant => grant.scopeId === scopeId && hasRuntimeCredentialProxy(grant)
     );
+    if (
+      existing &&
+      this.env.GIT_TOKEN_SERVICE?.prepareWorkspaceRepositoryAccess &&
+      grantScmEntries(existing).some(entry => entry.repository.type === 'github')
+    )
+      await this.ensureRepositoryAccess(existing);
+    if (
+      !readRepositoryAccess(this.db, scopeId) &&
+      this.env.GIT_TOKEN_SERVICE?.prepareWorkspaceRepositoryAccess &&
+      (source.repository?.type === 'github' ||
+        environment?.repositories?.some(repo => repo.identity.platform === 'github'))
+    ) {
+      const initialized = await repositoryAccessFromAdmittedSource(
+        source,
+        environment,
+        this.env.GIT_TOKEN_SERVICE,
+        scopeId
+      );
+      if (!readRepositoryAccess(this.db, scopeId)) writeRepositoryAccess(this.db, initialized);
+    }
     const outboundContainerId = this.outboundContainerIdFor() ?? undefined;
     if (
       runtimeContract !== 'legacy' &&
@@ -3287,25 +3536,40 @@ export class SandboxControlV2 extends DurableObject<Env> {
       diagnostic?.record({ grantPhase: 'compatibility', grantFailureReason: 'scope_member_limit' });
       throw new ScopeMemberLimitError();
     }
-    const { grant, payload } = await prepareCredentialGrant(
-      {
-        env: this.env,
-        source,
-        sessionId: spec.sessionId,
-        sandboxId: this.sandboxId,
-        provider,
-        containmentEnabled: this.credentialContainmentEnabled(),
-        directory: spec.directory,
-        scopeId,
-        payload: base,
-        leaseMs: this.sandboxTimers().credentialGrantMs,
-        ...(environment ? { environment } : {}),
-        ...(existing === undefined ? {} : { existing }),
-        refreshBacking: existing !== undefined && this.grantNeedsReissue(existing),
-        ...(outboundContainerId === undefined ? {} : { outboundContainerId }),
-      },
-      diagnostic
-    );
+    this.repositoryPreparation = outboundContainerId
+      ? {
+          sandboxId: this.sandboxId,
+          scopeId,
+          userId: source.userId,
+          ...(source.orgId ? { orgId: source.orgId } : {}),
+          outboundContainerId,
+        }
+      : null;
+    let prepared;
+    try {
+      prepared = await prepareCredentialGrant(
+        {
+          env: this.env,
+          source,
+          sessionId: spec.sessionId,
+          sandboxId: this.sandboxId,
+          provider,
+          containmentEnabled: this.credentialContainmentEnabled(),
+          directory: spec.directory,
+          scopeId,
+          payload: base,
+          leaseMs: this.sandboxTimers().credentialGrantMs,
+          ...(environment ? { environment } : {}),
+          ...(existing === undefined ? {} : { existing }),
+          refreshBacking: existing !== undefined && this.grantNeedsReissue(existing),
+          ...(outboundContainerId === undefined ? {} : { outboundContainerId }),
+        },
+        diagnostic
+      );
+    } finally {
+      this.repositoryPreparation = null;
+    }
+    const { grant, payload } = prepared;
     // A worktree scope may adopt one canonical handle only when it already has
     // an accepted entry under the current fence. Rows on this fence are written
     // in the same transaction as an accepted entry, so once ANY entry exists

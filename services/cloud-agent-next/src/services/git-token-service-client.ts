@@ -217,7 +217,7 @@ function githubAuthorizationFailureMessage(reason: string): string {
   if (reason === 'user_authorization_unavailable')
     return 'GitHub user authorization is unavailable. Try again.';
   if (reason === 'invalid_task_scope')
-    return 'This worktree has no GitHub task authorization. Start a new worktree.';
+    return 'GitHub authorization is unavailable. Retry in this workspace.';
   return `GitHub managed auth lookup failed (${reason})`;
 }
 

@@ -1,3 +1,4 @@
+import { githubRepositoryPermissions } from '@kilocode/worker-utils/workspace-repository-access';
 import {
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
   GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
@@ -19,6 +20,7 @@ const serviceMocks = vi.hoisted(() => ({
   updateAccountLogin: vi.fn(),
   getTokenForRepo: vi.fn(),
   getRepositoryOnlyToken: vi.fn(),
+  getTokenForRepositoryIds: vi.fn(),
   refreshInstallationAccountLoginIfDue: vi.fn(),
   selectUserAuthorization: vi.fn(),
   disconnectUserAuthorization: vi.fn(),
@@ -40,6 +42,7 @@ vi.mock('./github-token-service.js', async importOriginal => ({
   GitHubTokenService: class GitHubTokenService {
     getTokenForRepo = serviceMocks.getTokenForRepo;
     getRepositoryOnlyToken = serviceMocks.getRepositoryOnlyToken;
+    getTokenForRepositoryIds = serviceMocks.getTokenForRepositoryIds;
     refreshInstallationAccountLoginIfDue = serviceMocks.refreshInstallationAccountLoginIfDue;
   },
 }));
@@ -76,9 +79,33 @@ function createService(): GitTokenRPCEntrypoint {
     {
       GITHUB_APP_CLIENT_ID: 'synthetic-client',
       GITHUB_APP_CLIENT_SECRET: 'synthetic-secret',
+      REPOSITORY_POLICY: {
+        readWorkspaceRepositoryPolicy: async () => ({
+          sandboxId: 'sandbox-1',
+          access: {
+            version: 1,
+            scopeId: 'scope',
+            revision: 0,
+            repositories: [
+              {
+                repositoryId: 101,
+                nodeId: 'R_repo',
+                owner: 'acme',
+                name: 'repo',
+                mode: 'contribute',
+                source: 'environment',
+                approvedBy: 'user_1',
+                approvedAt: 1,
+                integrationId: '00000000-0000-4000-8000-000000000001',
+                identity: { source: 'installation', providerSubjectId: '123', appType: 'standard' },
+              },
+            ],
+          },
+        }),
+      },
       GITHUB_APP_SLUG: 'kiloconnect',
       GITHUB_APP_BOT_USER_ID: '240665456',
-    } as CloudflareEnv
+    } as unknown as CloudflareEnv
   );
 }
 
@@ -87,7 +114,7 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
   beforeEach(() => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: string) => {
+      vi.fn(async (input: string, init?: RequestInit) => {
         const path = new URL(input).pathname;
         if (path === '/repos/acme/repo')
           return Response.json({
@@ -96,15 +123,22 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
             name: 'repo',
             owner: { login: 'acme' },
           });
+        if (path === '/user/installations/123/repositories')
+          return Response.json({ total_count: 1, repositories: [{ id: 101 }] });
         if (path.endsWith('/token/scoped'))
           return Response.json({
             token: 'scoped-user-token',
-            installation: { repository_selection: 'selected' },
+            installation: {
+              id: 123,
+              repository_selection: 'selected',
+              permissions: JSON.parse(typeof init?.body === 'string' ? init.body : '').permissions,
+            },
           });
-        throw new Error('Unexpected synthetic request');
+        return new Response(null, { status: 404 });
       })
     );
     vi.clearAllMocks();
+    serviceMocks.getTokenForRepositoryIds.mockResolvedValue('repository-only-token');
     serviceMocks.findManagedInstallationForRepo.mockResolvedValue({
       success: true,
       installationId: '123',
@@ -141,11 +175,39 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
     });
   });
 
-  it('issues repository-only installation authority but rejects it at the task redemption boundary', async () => {
+  it('pins repository-only installation authority at issuance and every redemption despite available user authorization', async () => {
     const key = Buffer.alloc(32, 7).toString('base64');
     const service = new GitTokenRPCEntrypoint(
       {} as ExecutionContext,
       {
+        REPOSITORY_POLICY: {
+          readWorkspaceRepositoryPolicy: async () => ({
+            sandboxId: 'sandbox-1',
+            access: {
+              version: 1,
+              scopeId: 'scope',
+              revision: 0,
+              repositories: [
+                {
+                  repositoryId: 101,
+                  nodeId: 'R_repo',
+                  owner: 'acme',
+                  name: 'repo',
+                  mode: 'contribute',
+                  source: 'environment',
+                  approvedBy: 'user_1',
+                  approvedAt: 1,
+                  integrationId: '00000000-0000-4000-8000-000000000001',
+                  identity: {
+                    source: 'installation',
+                    providerSubjectId: '123',
+                    appType: 'standard',
+                  },
+                },
+              ],
+            },
+          }),
+        },
         GITHUB_APP_SLUG: 'kiloconnect',
         GITHUB_APP_BOT_USER_ID: '240665456',
         SCM_SESSION_CAPABILITY_ENCRYPTION_KEY: key,
@@ -163,31 +225,112 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
       version: 2,
       source: 'installation',
       permissionScope: 'repository',
+      owner: 'acme',
+      repo: 'repo',
+      outboundContainerId: 'allocation-1',
     });
-    serviceMocks.getRepositoryOnlyToken.mockClear();
-    for (const requestUrl of [
-      'https://api.github.com/graphql',
-      'https://api.github.com/repos/acme/repo/issues/1',
-      'https://uploads.github.com/user-attachments/assets?repository_id=101',
+    for (const [requestMethod, requestUrl] of [
+      ['POST', 'https://api.github.com/graphql'],
+      ['PATCH', 'https://api.github.com/repos/acme/repo/issues/1'],
     ]) {
       expect(
         await service.redeemGitHubSessionCapability({
           capability: issued.capability,
           outboundContainerId: 'allocation-1',
-          requestMethod: 'POST',
+          requestMethod,
+          requestUrl,
+          requestContentType: 'application/json',
+          requestBody: new TextEncoder().encode(
+            JSON.stringify(
+              requestUrl.endsWith('/graphql')
+                ? { query: '{repository(owner:"acme",name:"repo"){id}}' }
+                : { title: 'Update' }
+            )
+          ),
+        })
+      ).toMatchObject({
+        success: true,
+        source: 'installation',
+        authorization: 'Bearer repository-only-token',
+      });
+    }
+    for (const requestUrl of [
+      'https://api.github.com/orgs/acme/members/octocat',
+      'https://api.github.com/repos/foreign/private',
+    ]) {
+      expect(
+        await service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId: 'allocation-1',
+          requestMethod: 'GET',
           requestUrl,
         })
-      ).toEqual({ success: false, reason: 'invalid_task_scope' });
+      ).toEqual({
+        success: false,
+        reason: requestUrl.includes('/orgs/')
+          ? 'operation_not_supported'
+          : 'repository_access_required',
+      });
     }
-    expect(serviceMocks.getRepositoryOnlyToken).not.toHaveBeenCalled();
-    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+    expect(
+      await service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId: 'allocation-1',
+        requestMethod: 'POST',
+        requestUrl:
+          'https://uploads.github.com/user-attachments/assets?name=screenshot.png&repository_id=1145038391',
+      })
+    ).toEqual({ success: false, reason: 'operation_not_supported' });
+    expect(serviceMocks.getRepositoryOnlyToken).toHaveBeenCalledTimes(1);
+    expect(serviceMocks.getRepositoryOnlyToken).toHaveBeenCalledWith('123', 'repo', 'standard', {
+      contents: 'write',
+      pull_requests: 'write',
+    });
+    expect(serviceMocks.getTokenForRepositoryIds).toHaveBeenCalled();
     expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+    expect(
+      await service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId: 'allocation-2',
+        requestMethod: 'GET',
+        requestUrl: 'https://api.github.com/repos/acme/repo',
+      })
+    ).toEqual({ success: false, reason: 'container_mismatch' });
+    expect(serviceMocks.getRepositoryOnlyToken).toHaveBeenCalledTimes(1);
   });
 
-  it('preserves recoverable permission lookup failures through native resolution and capability issuance', async () => {
+  it('preserves recoverable permission lookup failures through capability issuance and redemption', async () => {
     const service = new GitTokenRPCEntrypoint(
       {} as ExecutionContext,
       {
+        REPOSITORY_POLICY: {
+          readWorkspaceRepositoryPolicy: async () => ({
+            sandboxId: 'sandbox-1',
+            access: {
+              version: 1,
+              scopeId: 'scope',
+              revision: 0,
+              repositories: [
+                {
+                  repositoryId: 101,
+                  nodeId: 'R_repo',
+                  owner: 'acme',
+                  name: 'repo',
+                  mode: 'contribute',
+                  source: 'environment',
+                  approvedBy: 'user_1',
+                  approvedAt: 1,
+                  integrationId: '00000000-0000-4000-8000-000000000001',
+                  identity: {
+                    source: 'installation',
+                    providerSubjectId: '123',
+                    appType: 'standard',
+                  },
+                },
+              ],
+            },
+          }),
+        },
         GITHUB_APP_SLUG: 'kiloconnect',
         GITHUB_APP_BOT_USER_ID: '240665456',
         SCM_SESSION_CAPABILITY_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
@@ -208,15 +351,30 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
       reason: 'repository_permissions_unavailable',
     });
 
-    serviceMocks.getRepositoryOnlyToken.mockRejectedValueOnce(
+    const issued = await service.issueGitHubSessionCapability(params);
+    if (!issued.success) throw new Error('Expected repository capability');
+    const redemption = {
+      capability: issued.capability,
+      outboundContainerId: 'allocation-1',
+      requestMethod: 'POST',
+      requestUrl: 'https://api.github.com/graphql',
+      requestContentType: 'application/json',
+      requestBody: new TextEncoder().encode(
+        JSON.stringify({ query: '{repository(owner:"acme",name:"repo"){id}}' })
+      ),
+    };
+    serviceMocks.getTokenForRepositoryIds.mockRejectedValueOnce(
       new GitHubRepositoryPermissionsUnavailableError()
     );
-    expect(await service.getCloudAgentAuthForRepo(params)).toEqual({
+    expect(await service.redeemGitHubSessionCapability(redemption)).toEqual({
       success: false,
-      reason: 'repository_permissions_unavailable',
+      reason: 'authorization_unavailable',
     });
-    expect(await service.issueGitHubSessionCapability(params)).toMatchObject({ success: true });
-    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+    expect(await service.redeemGitHubSessionCapability(redemption)).toMatchObject({
+      success: true,
+      authorization: 'Bearer repository-only-token',
+    });
+    expect(serviceMocks.getTokenForRepositoryIds).toHaveBeenCalled();
     expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
   });
 
@@ -264,12 +422,17 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
     expect(result).toMatchObject({ success: true, githubToken: 'scoped-user-token' });
     expect(JSON.stringify(result)).not.toContain('"user-token"');
     const calls = vi.mocked(fetch).mock.calls;
-    const body = calls.at(-1)?.[1]?.body;
+    const body = calls.find(([url]) =>
+      new URL(
+        typeof url === 'string' ? url : url instanceof URL ? url.href : url.url
+      ).pathname.endsWith('/token/scoped')
+    )?.[1]?.body;
     if (typeof body !== 'string') throw new Error('Expected a JSON credential scope');
     expect(JSON.parse(body)).toEqual({
       access_token: 'user-token',
       target: 'acme',
       repository_ids: [101],
+      permissions: githubRepositoryPermissions('contribute'),
     });
   });
 

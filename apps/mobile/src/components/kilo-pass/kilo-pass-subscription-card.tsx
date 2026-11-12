@@ -12,6 +12,7 @@ import { rowTint } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getKiloPassCardContentState } from '@/lib/kilo-pass/state';
 import { isNarrowLayout } from '@/lib/narrow-layout';
+import { cn } from '@/lib/utils';
 import { useTRPC } from '@/lib/trpc';
 
 export function KiloPassSubscriptionCard({
@@ -129,8 +130,18 @@ export function KiloPassSubscriptionCard({
         >
           {cardBody(
             <>
-              <Text className="font-semibold">{contentState.title}</Text>
-              <Text className="text-xs text-muted-foreground">{contentState.description}</Text>
+              <Text className="font-semibold" numberOfLines={1}>
+                {contentState.title}
+              </Text>
+              {/* The stacked card keeps a two-line slot at every state so the
+                  reserved loading height is the height the card resolves to;
+                  the side-by-side layout clamps the line instead. */}
+              <Text
+                className={cn('text-xs text-muted-foreground', narrow && 'min-h-[28px]')}
+                numberOfLines={narrow ? 2 : 1}
+              >
+                {contentState.description}
+              </Text>
             </>,
             <Text className="shrink-0 text-xs font-medium text-primary">
               {contentState.actionLabel}
@@ -148,8 +159,18 @@ export function KiloPassSubscriptionCard({
         >
           {cardBody(
             <>
-              <Text className="font-semibold">{contentState.title}</Text>
-              <Text className="text-xs text-muted-foreground">{contentState.description}</Text>
+              <Text className="font-semibold" numberOfLines={1}>
+                {contentState.title}
+              </Text>
+              {/* The stacked card keeps a two-line slot at every state so the
+                  reserved loading height is the height the card resolves to;
+                  the side-by-side layout clamps the line instead. */}
+              <Text
+                className={cn('text-xs text-muted-foreground', narrow && 'min-h-[28px]')}
+                numberOfLines={narrow ? 2 : 1}
+              >
+                {contentState.description}
+              </Text>
             </>
           )}
         </Pressable>

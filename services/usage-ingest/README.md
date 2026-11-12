@@ -61,11 +61,14 @@ fields, but Exa log values never include the user, organization, path, cost, fea
 | Environment | Worker | Producer and consumer queue | DLQ (no consumer) |
 |---|---|---|---|
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing-eu` | `usage-ingest-processing-dlq-eu` |
+| Production stall hedge | `usage-ingest` | `usage-ingest-processing` | `usage-ingest-processing-dlq` |
 | Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging-eu` | `usage-ingest-processing-dlq-staging-eu` |
+| Staging stall hedge | `usage-ingest-staging` | `usage-ingest-processing-staging` | `usage-ingest-processing-dlq-staging` |
 
-Each environment connects only its EU pair. Production uses batch6/parallelism2/cap225 (up to 450 writer calls);
-staging keeps one consumer capped at200, batch size2. Old global queues remain intact
-for a paused/drained routing rollback. See [EU preparation and cutover](eu-queues.md).
+Each environment publishes to its EU pair. Production uses batch6/parallelism2/cap225 (up to 450 writer calls);
+staging keeps its EU consumer capped at200, batch size2. The old global pair of each
+environment is now also the [stall hedge](#stall-hedge-to-the-global-queue) target, with
+its own consumer capped at 25. See [EU preparation and cutover](eu-queues.md).
 
 ## Processing
 
@@ -378,7 +381,7 @@ two writer slots per invocation:
 |---|---|---|
 | `max_batch_size` | `6` in production, `2` in staging | Maximum messages delivered per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
-| `max_concurrency` | `225` in production, `200` in staging | Parallelism 2 allows at most `225 × 2 = 450` concurrent queue writer calls in production and `200 × 2 = 400` in staging. |
+| `max_concurrency` | `225` in production, `200` in staging | Parallelism 2 allows at most `225 × 2 = 450` concurrent queue writer calls in production and `200 × 2 = 400` in staging. The [stall hedge](#stall-hedge-to-the-global-queue) consumer adds `25 × 2 = 50` in each environment. |
 | `max_retries` | `20` | Initial delivery plus up to twenty retries, shared across failure classes. |
 | `retry_delay` | `60` seconds | Fallback for implicit/unexpected failures; handled failures use per-message jitter below. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |
@@ -633,6 +636,9 @@ Production uses its EU pair with batch6/parallelism2/cap225 and the existing ret
 Historical global production revisions retain normal provisioning; see the helper capability notes in [EU setup](eu-queues.md).
 `USAGE_INGEST_QUEUE` binds the source and `USAGE_INGEST_DLQ` binds its matching DLQ;
 only the source has a consumer. Exhausted failures route to that DLQ.
+`USAGE_INGEST_HEDGE_QUEUE` binds the global stall-hedge queue, which has its own
+consumer and DLQ; preparation creates or verifies that pair and never detaches its
+consumer. See [Stall hedge to the global queue](#stall-hedge-to-the-global-queue).
 
 To deploy directly from the repository root with Wrangler authenticated to the
 account in `wrangler.jsonc`:
@@ -729,8 +735,8 @@ Human-only steps, before the flag is turned on:
 
 ## Retention
 
-Each selected DLQ keeps messages for **14 days (1209600 seconds)**, Cloudflare's
-maximum. Retention is a property of the queue resource, and `wrangler.jsonc`
+Each selected DLQ, including the global stall-hedge DLQ, keeps messages for
+**14 days (1209600 seconds)**, Cloudflare's maximum. Retention is a property of the queue resource, and `wrangler.jsonc`
 cannot set it, so the queue preparation helper enforces it as
 `DLQ_MESSAGE_RETENTION_SECONDS`. It creates a missing DLQ with that retention. For
 an existing DLQ, it raises lower retention with a PATCH that resends the other
@@ -829,6 +835,146 @@ The log's own fields intentionally contain no raw request/headers or request ID.
 After a separately authorized rollout, an operator still needs to capture an
 actual rejection and its invocation/version to establish a production cause.
 This diagnostic does not recover missing usage or explain HTTP 409 responses.
+
+## Stall hedge to the global queue
+
+### Why
+
+Production, Nov 12 12:30–13:15 UTC (Axiom writer, admission and publisher-attempt
+logs): 16,263 LLM usage events, 3.8% of traffic, took over 5 s to be recorded. 87.5%
+of them had a `Queue.send` of 1 s or more on `usage-ingest-processing-eu`; 4.5%
+involved a writer admission rejection. 79% of sends that took 5 s or more started in
+two-second intervals where at least 90% of all sends were slow (84 s of the 46
+minutes), in both gateway regions equally. Correlated queue-send stalls dominate this
+observed tail. They are not shown to be total for the queue: earlier exact traces had
+later same-queue retries accepted while the original send stayed stalled. A second
+queue may reduce these stalls; that it behaves independently of the first is the
+hypothesis to test, not an established fact. When the second queue accepts first, its
+acceptance is used. No production benefit is claimed until it is measured as
+described below.
+
+### Behaviour
+
+Only LLM usage on `POST /usage` is hedged. `/enkrypt-usage` and `/exa-usage` are
+unchanged. Authentication, body reads and schema and size checks run first, as before.
+
+| Variable | Values | Default |
+|---|---|---|
+| `USAGE_INGEST_HEDGE_MODE` | `on` enables the hedge; any other value, or none, is `off` | `off` |
+| `USAGE_INGEST_HEDGE_DELAY_MS` | Whole milliseconds, clamped to 250–10000 | `1000` when missing or not a whole number |
+| `USAGE_INGEST_HEDGE_PERCENT` | Whole number 0–100; only read when the mode is `on` | `100` when missing or invalid |
+
+Production config sets `off`, delay 1000 and percent 50. Staging sets `on`, delay
+1000 and percent 100.
+
+- `off`, or an event that is not eligible: the single-queue path and its logs, unchanged.
+- An event is eligible when the value (0–15) of the last hex digit of its usage ID is
+  below `round(percent × 16 / 100)`: 50 selects last digits `0`–`7`, 100 selects all
+  and 0 selects none. A last character that is not a hex digit is never eligible.
+  Gateway usage IDs are random UUIDs, so the split is even.
+- `on` and eligible: the main send to `USAGE_INGEST_QUEUE` starts exactly as before,
+  including its `usage_ingest_enqueue_start`, `usage_ingest_enqueue` and
+  `usage_ingest_enqueue_observed` events, each logged once. If it settles within the
+  delay, the response is as before (202 on acceptance, 503 on failure) with no hedge.
+  A main send that fails before the delay is not hedged.
+- When the delay elapses first, exactly one `USAGE_INGEST_HEDGE_QUEUE.send` starts with
+  the same message and options. The first acceptance from either queue returns 202. A
+  failure on one side keeps waiting for the other; 503 only when both fail. The side
+  still pending after a 202 is kept alive with `ctx.waitUntil` and logged when it
+  settles; it is never cancelled. The hedge is never retried.
+- A missing hedge binding, a hedge send that throws, or a `waitUntil` registration
+  that fails (the hedge is then not sent) counts as a failed hedge: the request keeps
+  waiting on the main send, so the hedge cannot turn a request that would have
+  succeeded into a failure.
+
+Each hedged request logs one `usage_ingest_hedge` event when both sends have settled:
+`usage_id`, `hedge_delay_ms`, `winner` (`main`, `hedge` or `none`), `main_outcome`,
+`main_send_duration_ms`, `hedge_outcome` (`accepted`, `unavailable`, `not_configured`
+or `unregistered`), `hedge_send_duration_ms` when the hedge was sent, and
+`main_error_name` / `hedge_error_name` (the error's name only) on a failed send. A
+failed `waitUntil` registration logs `usage_ingest_hedge_unregistered`. Log failures
+never change the response.
+
+### Queues, consumer and data location
+
+The hedge target is the old global (non-EU) pair of each environment. EU
+jurisdiction was a latency experiment, not a residency requirement, so hedged copies
+stored outside the EU jurisdiction are accepted. Cloudflare requires a DLQ to share
+its source queue's [jurisdiction](https://developers.cloudflare.com/queues/configuration/data-location/#dead-letter-queues),
+so the hedge consumer dead-letters into the global DLQ, which queue preparation keeps
+at maximum [retention](#retention). Dead-letter alerting must cover
+`usage-ingest-processing-dlq` as well as the EU DLQ.
+
+The hedge consumer stays attached whatever the mode, with production batch 6 and
+staging batch 2, timeout 0, 20 retries, retry delay 60 and `max_concurrency` 25. The
+consumer handler is queue-agnostic and logs `batch.queue`. So:
+
+- Turning the hedge off stops new hedge sends; copies already in the hedge queue keep
+  draining.
+- Turning it on needs nothing else.
+- Capacity: the hedge consumer adds up to 25 invocations × parallelism 2 = 50 writer
+  calls, so the nominal production consumer ceiling is 500 instead of 450 (staging
+  450 instead of 400) while hedged copies are being consumed. Writer admission is
+  unchanged.
+
+A hedged event can be accepted by both queues. Duplicate deliveries of one LLM usage
+ID are safe: the writer's insert conflicts, its transaction rolls back and there are
+no post-commit side effects. The redelivery test in
+`packages/web-shared/src/lib/ai-gateway/first-usage-events.test.ts` shows one debit and
+one set of first-usage events for two deliveries of one usage ID. Duplicate
+completions rise by roughly the hedged share.
+
+### Flipping the toggle
+
+Change the variable in `wrangler.jsonc` in a small PR and redeploy the Worker through
+the normal workflow. `wrangler deploy` replaces dashboard-edited variables, so a
+dashboard change does not last. For the first production trial, set
+`USAGE_INGEST_HEDGE_MODE` to `on` and keep `USAGE_INGEST_HEDGE_PERCENT` at `50`.
+
+### Merge prerequisite
+
+Confirm the old production queue `usage-ingest-processing` is empty before merge. It
+is reported empty and never used; this change does not read it back. Merging attaches a consumer to it through the normal deployment workflow, so merging
+is not infrastructure-inert even with the toggle off. Merging also creates any
+missing global queue and raises the global DLQ's retention.
+
+### Removal
+
+Removal is a forward PR, not a revert:
+
+1. Set `USAGE_INGEST_HEDGE_MODE` to `off` and deploy.
+2. Wait until the hedge queue is empty.
+3. A new PR removes the hedge consumer, binding and variables. Its legacy-shaped config
+   makes queue preparation detach the global consumer, as it did before this change.
+
+A plain revert of this change restores the unconditional detach step and could leave
+hedge copies unprocessed, some of which may be the only accepted copy of an event.
+Queue preparation keeps accepting the legacy two-producer, one-consumer shape only so
+historical source revisions still deploy; that is not a safe rollback to an EU-only
+consumer once the hedge has been on. Any deployment whose config has that shape (a
+source revision from before this change, a plain revert, or a removal PR deployed
+before the hedge queue has drained) detaches the global consumer without checking the
+hedge queue's backlog. Messages stay in the queue, but nothing consumes them until a
+consumer is attached again. `provision-queues.test.mjs` pins that behaviour. Drain
+first, then remove forward.
+
+### Measuring
+
+The Worker's `usage_ingest_hedge` event and `batch.queue` are not in Axiom, but the
+usage ID is. At percent 50, last hex digits `0`–`7` of `usage_id` are the treatment
+and `8`–`f` the control, inside the same stalls. The primary measurement splits by
+that digit within the same hours:
+
+- `usage_record_completion`: age and the over-5 s share of recorded completions,
+  especially in stall hours.
+- `usage_publisher_attempt`: `duration_ms` of publisher attempts, and the share of
+  5 s or more.
+
+The treatment should show fewer attempts of 5 s or more and a lower over-5 s share,
+with duplicate completions rising by roughly the hedged share. In Cloudflare Workers
+Logs, `usage_ingest_hedge` winner counts show whether the second queue accepts while
+the first is blocked. A before/after comparison is only supporting evidence, because
+stalls vary a lot from day to day. No benefit is claimed before that measurement.
 
 ## First writer-admission retry baseline restoration
 

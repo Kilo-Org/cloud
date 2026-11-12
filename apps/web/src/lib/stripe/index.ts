@@ -51,6 +51,7 @@ import {
   reportChargeAttempted,
   type ChargeAttemptContext,
 } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { findOrganizationPayerFamily } from '@kilocode/worker-utils/account-access';
 import type { UnifiedInvoice } from '@/types/billing';
 import type { StripeConfig } from '@kilocode/web-shared/lib/credits';
 import { processTopUp } from '@kilocode/web-shared/lib/credits';
@@ -227,8 +228,9 @@ type BouncerCreditOwner = { userId: string; orgId: string | null };
 
 /**
  * Resolves the bouncer payer for a webhook charge or invoice: the metadata actor/org when present,
- * else the Stripe-customer mapping the dispute and early-fraud-warning observers use. Returns null
- * when no owner resolves, in which case callers skip the bouncer event.
+ * else the Stripe-customer mapping the dispute and early-fraud-warning observers use. An
+ * organization payer is reported as the root organization of its family. Returns null when no owner
+ * resolves, in which case callers skip the bouncer event.
  */
 async function resolveBouncerCreditOwner(params: {
   kiloUserId?: string | null;
@@ -246,7 +248,12 @@ async function resolveBouncerCreditOwner(params: {
             .limit(1)
         )[0];
     const actorUserId = params.kiloUserId ?? organizationRow?.actorUserId ?? null;
-    return actorUserId ? { userId: actorUserId, orgId: params.organizationId } : null;
+    if (!actorUserId) return null;
+    const family = await findOrganizationPayerFamily(db, params.organizationId);
+    return {
+      userId: actorUserId,
+      orgId: family?.payerRootOrganizationId ?? params.organizationId,
+    };
   }
   if (params.kiloUserId) {
     return { userId: params.kiloUserId, orgId: null };
@@ -260,9 +267,12 @@ async function resolveBouncerCreditOwner(params: {
     return { userId: user.id, orgId: null };
   }
   const organization = await findOrganizationByStripeCustomerId(customerId);
-  return organization?.created_by_kilo_user_id
-    ? { userId: organization.created_by_kilo_user_id, orgId: organization.id }
-    : null;
+  if (!organization?.created_by_kilo_user_id) return null;
+  const family = await findOrganizationPayerFamily(db, organization.id);
+  return {
+    userId: organization.created_by_kilo_user_id,
+    orgId: family?.payerRootOrganizationId ?? organization.id,
+  };
 }
 
 /** A credit event without its payer: `reportWebhookCreditEvent` resolves the payer. */

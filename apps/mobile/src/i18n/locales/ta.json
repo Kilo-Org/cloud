@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "நிறுவனத்தின் பெயர்",
       "balance": "இருப்பு",
       "organizationSeats": "நிறுவனப் பயனர் இடங்கள்",
+      "plan": "நிறுவனத் திட்டம்",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · முடிந்தது",
+      "planEnded": "நிறுவனத்தின் சோதனைக் காலம் முடிந்துவிட்டது, மேலும் செயலில் உள்ள திட்டம் எதுவும் இல்லை.",
+      "manageBilling": "கட்டணத்தை நிர்வகி",
       "lowBalanceBelow": "{{amount}}-ஐ விடக் குறைவாக"
     },
     "kiloPass": {

@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Organisaation nimi",
       "balance": "Saldo",
       "organizationSeats": "Organisaation käyttäjäpaikat",
+      "plan": "Organisaation paketti",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Päättynyt",
+      "planEnded": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa.",
+      "manageBilling": "Hallinnoi laskutusta",
       "lowBalanceBelow": "Alle {{amount}}"
     },
     "kiloPass": {

@@ -247,7 +247,9 @@ describe('event-service WebSocket connection tickets', () => {
     });
 
     const elapsed = Date.now() - startedAt;
-    expect(res.status).toBe(500);
+    // A stalled hop is not a fault here, so the route answers the retryable
+    // status the client's reconnect-and-retry path already handles.
+    expect(res.status).toBe(503);
     await expect(res.json()).resolves.toEqual({ error: 'Ticket mint failed' });
     // It waited for the budget rather than returning early, and stayed inside
     // the client's deadline, so the client never sees the gateway's 504.

@@ -3201,6 +3201,12 @@
       "renamePlaceholder": "Enw'r sefydliad",
       "balance": "Balans",
       "organizationSeats": "Seddau'r sefydliad",
+      "plan": "Cynllun y sefydliad",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Wedi dod i ben",
+      "planEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol.",
+      "manageBilling": "Rheoli bilio",
       "lowBalanceBelow": "O dan {{amount}}"
     },
     "kiloPass": {

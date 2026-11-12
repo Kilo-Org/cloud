@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "نام سازمان",
       "balance": "موجودی",
       "organizationSeats": "مجوزهای کاربری سازمان",
+      "plan": "طرح سازمان",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · به پایان رسیده",
+      "planEnded": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد.",
+      "manageBilling": "مدیریت صورتحساب",
       "lowBalanceBelow": "زیر {{amount}}"
     },
     "kiloPass": {

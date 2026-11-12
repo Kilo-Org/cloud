@@ -2887,6 +2887,12 @@
       "balance": "बैलेंस",
       "lowBalanceBelow": "{{amount}} से कम",
       "organizationSeats": "संगठन की सीटें",
+      "plan": "संगठन का प्लान",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · समाप्त",
+      "planEnded": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है।",
+      "manageBilling": "बिलिंग प्रबंधित करें",
       "renamePlaceholder": "संगठन का नाम",
       "renameTitle": "संगठन का नाम बदलें"
     },

@@ -8,9 +8,15 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 
+import { setProtectedDataAvailable } from '@/lib/protected-data';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
-import { getLastHomeWidgetData } from './home-widget-data';
+import {
+  _flushHomeWidgetMirrorForTests,
+  getLastHomeWidgetData,
+  rememberHomeWidgetData,
+  restoreHomeWidgetData,
+} from './home-widget-data';
 import {
   _flushGlanceableMirrorForTests,
   _resetGlanceablePersistForTests,
@@ -101,7 +107,9 @@ beforeEach(() => {
 afterEach(async () => {
   // Let a queued mirror write land before the next case clears the map.
   await _flushGlanceableMirrorForTests();
+  await _flushHomeWidgetMirrorForTests();
   _resetGlanceablePersistForTests();
+  setProtectedDataAvailable(true);
   store.clear();
 });
 
@@ -213,6 +221,27 @@ describe('restorePersistedGlanceable', () => {
     expect(getLastGlanceableSnapshot()).toBeNull();
     expect(isGlanceableRestoreUnavailable()).toBe(true);
     expect(isGlanceableRestoreSettled()).toBe(true);
+  });
+
+  it('reads a locked keychain as unavailable without calling it', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+    store.set(SCOPE_KEY, stored.scopeKey);
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    store.set(HOME_WIDGET_DATA_KEY, JSON.stringify({ snapshot: stored, details: details }));
+
+    // The cached state the app installed at launch says the keychain answers;
+    // the device has locked since, so every call would be refused.
+    setProtectedDataAvailable(false);
+    await restorePersistedGlanceable();
+
+    expect(getLastGlanceableSnapshot()).toBeNull();
+    expect(getLocalScopeKey()).toBeNull();
+    expect(isGlanceableRestoreUnavailable()).toBe(true);
+    expect(isGlanceableRestoreSettled()).toBe(true);
+    // Nothing is read at all: a skipped call is not a failed one, and the
+    // records on disk are untouched for the next unlocked start.
+    expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
   });
 
   it('does not report a restore settled until the first read finishes', async () => {
@@ -466,7 +495,53 @@ describe('restorePersistedGlanceable', () => {
   });
 });
 
+describe('the Home-widget record while the device is locked', () => {
+  it('leaves the stored record unread and does not call the keychain', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(HOME_WIDGET_DATA_KEY, JSON.stringify({ snapshot: stored, details: details }));
+
+    setProtectedDataAvailable(false);
+    await restoreHomeWidgetData(stored.scopeKey);
+
+    // The record is still on disk for the next unlocked start: a locked read
+    // drains nothing and adopts nothing.
+    expect(getLastHomeWidgetData()).toBeNull();
+    expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
+    expect(store.get(HOME_WIDGET_DATA_KEY)).toBe(
+      JSON.stringify({ snapshot: stored, details: details })
+    );
+  });
+
+  it('keeps the in-memory record and skips the mirror write', async () => {
+    const snapshot = snapshotFor([{ status: 'busy' }]);
+
+    setProtectedDataAvailable(false);
+    rememberHomeWidgetData({ snapshot, details });
+    await _flushHomeWidgetMirrorForTests();
+
+    // The in-memory record is authoritative, so the Home surface still draws
+    // it; only the write it cannot make is skipped.
+    expect(getLastHomeWidgetData()).toMatchObject({ snapshot: { scopeKey: snapshot.scopeKey } });
+    expect(secureStoreMock.setItemAsync).not.toHaveBeenCalled();
+    expect(store.has(HOME_WIDGET_DATA_KEY)).toBe(false);
+  });
+});
+
 describe('mirror writes', () => {
+  it('skips the write while the device is locked and keeps the frame in memory', async () => {
+    const snapshot = snapshotFor([{ status: 'busy' }]);
+
+    setProtectedDataAvailable(false);
+    persistGlanceableSink.publish(snapshot);
+    await _flushGlanceableMirrorForTests();
+
+    // The in-memory snapshot is authoritative, so the surfaces still draw it;
+    // the write it cannot make waits for the next unlocked publish.
+    expect(getLastGlanceableSnapshot()).toEqual(snapshot);
+    expect(secureStoreMock.setItemAsync).not.toHaveBeenCalled();
+    expect(store.has(SNAPSHOT_KEY)).toBe(false);
+  });
+
   // A publish is fire-and-forget, so without a chain the slow happy frame can
   // reach SecureStore after the terminal blank that replaced it, and the next
   // JS restart brings back a state the user already left.

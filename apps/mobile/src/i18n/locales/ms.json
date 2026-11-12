@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Nama organisasi",
       "balance": "Baki",
       "organizationSeats": "Slot pengguna organisasi",
+      "plan": "Pelan organisasi",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Tamat",
+      "planEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif.",
+      "manageBilling": "Urus pengebilan",
       "lowBalanceBelow": "Di bawah {{amount}}"
     },
     "kiloPass": {

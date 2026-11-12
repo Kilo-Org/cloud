@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Maqaa dhaabbataa",
       "balance": "Haftee",
       "organizationSeats": "Bakka miseensotaa dhaabbataa",
+      "plan": "Karoora dhaabbataa",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Xumurameera",
+      "planEnded": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu.",
+      "manageBilling": "Kaffaltii bulchi",
       "lowBalanceBelow": "{{amount}} gadi"
     },
     "kiloPass": {

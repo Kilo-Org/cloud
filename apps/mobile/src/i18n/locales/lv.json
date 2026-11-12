@@ -3042,6 +3042,12 @@
       "renamePlaceholder": "Organizācijas nosaukums",
       "balance": "Atlikums",
       "organizationSeats": "Organizācijas vietas",
+      "plan": "Organizācijas plāns",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Beidzies",
+      "planEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna.",
+      "manageBilling": "Norēķinu pārvaldība",
       "lowBalanceBelow": "Zem {{amount}}"
     },
     "kiloPass": {

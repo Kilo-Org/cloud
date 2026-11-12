@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Təşkilatın adı",
       "balance": "Balans",
       "organizationSeats": "Təşkilatın istifadəçi yerləri",
+      "plan": "Təşkilat planı",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Başa çatıb",
+      "planEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur.",
+      "manageBilling": "Ödənişi idarə et",
       "lowBalanceBelow": "{{amount}}-dan aşağı"
     },
     "kiloPass": {

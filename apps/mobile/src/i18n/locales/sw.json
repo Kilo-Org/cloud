@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Jina la shirika",
       "balance": "Salio",
       "organizationSeats": "Nafasi za shirika",
+      "plan": "Mpango wa shirika",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Umeisha",
+      "planEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika.",
+      "manageBilling": "Dhibiti bili",
       "lowBalanceBelow": "Chini ya {{amount}}"
     },
     "kiloPass": {

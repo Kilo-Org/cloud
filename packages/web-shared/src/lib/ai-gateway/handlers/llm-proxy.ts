@@ -400,6 +400,15 @@ export async function handleLlmProxyRequest(
   });
 
   const promptInfo = extractPromptInfo(requestBodyParsed);
+  const bouncerUsageFields = {
+    occurredAt: new Date(requestStartedAtMs),
+    clientAttributed: usageBase.clientAttributed,
+    requestedLogprobs: requestedLogprobs(requestBodyParsed.body),
+    samples: requestedSamples(requestBodyParsed.body),
+    // Hash now (about 0.1 ms for the 4 KiB cap), so the raw prompt never rides on the
+    // usage context, which reaches Sentry and several helpers.
+    promptSimHash: simHash64(lastUserPromptText(requestBodyParsed) ?? ''),
+  };
   const usageContext: MicrodollarUsageContext = {
     ...usageBase.context,
     api_kind: requestBodyParsed.kind,
@@ -419,15 +428,12 @@ export async function handleLlmProxyRequest(
     clientRequestId: headers.clientRequestId,
     usageId,
     providerMetadataCapture,
-    bouncer: bouncer.usage({
-      occurredAt: new Date(requestStartedAtMs),
-      clientAttributed: usageBase.clientAttributed,
-      requestedLogprobs: requestedLogprobs(requestBodyParsed.body),
-      samples: requestedSamples(requestBodyParsed.body),
-      // Hash now (about 0.1 ms for the 4 KiB cap), so the raw prompt never rides on the
-      // usage context, which reaches Sentry and several helpers.
-      promptSimHash: simHash64(lastUserPromptText(requestBodyParsed) ?? ''),
-    }),
+    bouncer: await (bouncer.kind === 'signed-in'
+      ? bouncer.usage(
+          bouncerUsageFields,
+          balanceAndSettingsPromise.then(({ payer }) => payer)
+        )
+      : bouncer.usage(bouncerUsageFields)),
   };
 
   setTag('ui.ai_model', requestBodyParsed.body.model);

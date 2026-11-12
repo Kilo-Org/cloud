@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Nafn félags",
       "balance": "Inneign",
       "organizationSeats": "Notendasæti félagsins",
+      "plan": "Áætlun fyrirtækis",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Lokið",
+      "planEnded": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun.",
+      "manageBilling": "Stjórna innheimtu",
       "lowBalanceBelow": "Undir {{amount}}"
     },
     "kiloPass": {

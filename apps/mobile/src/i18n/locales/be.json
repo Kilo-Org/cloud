@@ -3095,6 +3095,12 @@
       "renamePlaceholder": "Назва арганізацыі",
       "balance": "Баланс",
       "organizationSeats": "Месцы ў арганізацыі",
+      "plan": "План арганізацыі",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Скончыўся",
+      "planEnded": "Пробны перыяд арганізацыі скончыўся, і ў яе няма актыўнага плана.",
+      "manageBilling": "Кіраванне плацяжамі",
       "lowBalanceBelow": "Менш за {{amount}}"
     },
     "kiloPass": {

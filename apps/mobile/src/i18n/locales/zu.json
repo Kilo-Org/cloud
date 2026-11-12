@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Igama lenhlangano",
       "balance": "Ibhalansi",
       "organizationSeats": "Izikhala zamalungu enhlangano",
+      "plan": "Uhlelo lwenhlangano",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Oluphelile",
+      "planEnded": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo.",
+      "manageBilling": "Phatha ukukhokha",
       "lowBalanceBelow": "Ngaphansi kwe-{{amount}}"
     },
     "kiloPass": {

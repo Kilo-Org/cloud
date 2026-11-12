@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Sunan ƙungiya",
       "balance": "Ragowar kuɗi",
       "organizationSeats": "Guraben membobin ƙungiya",
+      "plan": "Tsarin ƙungiya",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Ya ƙare",
+      "planEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki.",
+      "manageBilling": "Sarrafa biyan kuɗi",
       "lowBalanceBelow": "Ƙasa da {{amount}}"
     },
     "kiloPass": {

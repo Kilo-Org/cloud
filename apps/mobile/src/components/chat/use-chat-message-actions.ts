@@ -7,6 +7,7 @@ import {
   type MessageDeliveryStatement,
 } from '@/components/agents/message-failure-state';
 import { CREDITS_FAILURE_KEY } from '@/lib/chat/backend-target';
+import { type AddCreditsDestination } from '@/lib/credits/add-credits-destination';
 import { type ChatState, type Displaced } from '@/lib/chat/state';
 import { askedMessageId, displacedMessageId } from '@/lib/chat/turns';
 
@@ -46,7 +47,7 @@ type BubbleActions = {
   onLongPressDetails: (message: StoredMessage) => void;
   deliveryState?: MessageDeliveryStatement;
   onRetryMessage?: () => void;
-  onAddCredits?: () => void;
+  addCredits?: AddCreditsDestination;
   onCopyToComposer?: (text: string) => void;
 };
 
@@ -78,7 +79,7 @@ export function useChatMessageActions(
   messages: readonly StoredMessage[],
   recovery: {
     readonly retry: (displaced?: Displaced) => Promise<void>;
-    readonly addCredits: () => void;
+    readonly addCredits?: AddCreditsDestination;
   }
 ) {
   const { retry, addCredits } = recovery;
@@ -151,7 +152,7 @@ export function useChatMessageActions(
           /* A refused send carries the action that settles it instead of a Retry
              that would meet the same balance. */
           ...(credits
-            ? { onAddCredits: addCredits }
+            ? { addCredits }
             : {
                 onRetryMessage: () => {
                   void retry();
@@ -170,7 +171,7 @@ export function useChatMessageActions(
           /* A kept question the balance refused offers the action that settles
              it, as it did in the slot; every other kept question keeps Retry. */
           ...(earlier.refused
-            ? { onAddCredits: addCredits }
+            ? { addCredits }
             : {
                 onRetryMessage: () => {
                   void retry(earlier.question);

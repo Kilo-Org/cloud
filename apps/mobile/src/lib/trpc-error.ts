@@ -25,6 +25,22 @@ const ShapedErrorSchema = z.looseObject({
   }),
 });
 const TopLevelCodeSchema = z.looseObject({ code: z.string() });
+const NamedErrorSchema = z.looseObject({ name: z.string() });
+
+/**
+ * True when the error is a tRPC client error: one named `TRPCClientError`, or
+ * one carrying a `data` / `shape.data` envelope. A bare top-level `code` is not
+ * enough — filesystem, transport and domain errors carry one too — so a caller
+ * that acts on a server verdict must not read it from an unrelated error.
+ */
+export function isTrpcClientError(error: unknown): boolean {
+  const named = NamedErrorSchema.safeParse(error);
+  return (
+    (named.success && named.data.name === 'TRPCClientError') ||
+    DirectErrorSchema.safeParse(error).success ||
+    ShapedErrorSchema.safeParse(error).success
+  );
+}
 
 /**
  * Extracts a field from an unknown tRPC error. Reads `data[field]` first,

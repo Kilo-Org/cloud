@@ -10,3 +10,5 @@ export { EnvironmentBuild } from './environment-build/environment-build-do.js';
 export { VercelSnapshotBuild } from './persistence/VercelSnapshotBuild.js';
 export { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
+
+export { RepositoryPolicyReader } from './scm-broker/repository-policy-reader.js';

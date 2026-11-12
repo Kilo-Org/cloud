@@ -63,7 +63,7 @@ const commentSchema = z
 const reviewSchema = z
   .object({
     pullRequestId: z.string().min(1),
-    event: z.enum(['COMMENT', 'REQUEST_CHANGES', 'APPROVE']),
+    event: z.enum(['COMMENT', 'REQUEST_CHANGES']),
     body: z.string().max(65_536).optional(),
     commitOID: z
       .string()
@@ -280,15 +280,11 @@ export function authorizeGitHubTaskGraphql(
           )
             return deny('repository_mismatch');
           if (args.followRenames === true) return deny('operation_not_allowed');
-          if (
-            args.owner.toLowerCase() !== grant.repository.owner ||
-            args.name.toLowerCase() !== grant.repository.name
-          )
-            checks.push({
-              kind: 'repository-read',
-              owner: args.owner.toLowerCase(),
-              name: args.name.toLowerCase(),
-            });
+          checks.push({
+            kind: 'repository-read',
+            owner: args.owner.toLowerCase(),
+            name: args.name.toLowerCase(),
+          });
         }
         if (shapeName === 'query' && ['organization', 'user'].includes(name)) {
           if (typeof args.login !== 'string' || args.login.toLowerCase() !== grant.repository.owner)

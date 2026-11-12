@@ -105,7 +105,8 @@ export async function handleVercelScmForward(
       upstream,
       env.GIT_TOKEN_SERVICE,
       { provider: admission.authority.provider, capability: admission.authority.capability },
-      admission.authority.outboundContainerId
+      admission.authority.outboundContainerId,
+      sandboxId
     );
   } catch {
     return Response.json({ code: 'forwarding_unavailable' }, { status: 503 });

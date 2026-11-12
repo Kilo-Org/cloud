@@ -1,3 +1,8 @@
+import { createControlTokenForRequest as createRepositoryAccessToken } from '@/lib/auth/resource-delegation';
+import {
+  repositoryAccessChangeSchema,
+  repositoryAccessViewSchema,
+} from '@kilocode/worker-utils/workspace-repository-access';
 import 'server-only';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { sandboxSelectionCapabilitiesSchema } from '@kilocode/worker-utils/sandbox-allocation';
@@ -938,6 +943,34 @@ export const cloudAgentNextRouter = createTRPCRouter({
       const client = createCloudAgentNextClient(authToken);
 
       return await client.getSession(input.cloudAgentSessionId);
+    }),
+
+  getRepositoryAccess: baseProcedure
+    .input(z.object({ sessionId: z.string().min(1) }))
+    .output(repositoryAccessViewSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
+      const { token } = await createRepositoryAccessToken(ctx.user, 'cloud-agent-next', {
+        headers: ctx.headersList,
+        operation: 'repository-access',
+      });
+      return createCloudAgentNextClient(token).getRepositoryAccess({ sessionId: input.sessionId });
+    }),
+  changeRepositoryAccess: baseProcedure
+    .input(repositoryAccessChangeSchema)
+    .output(z.object({ changed: z.boolean(), current: repositoryAccessViewSchema }))
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
+      const { token } = await createRepositoryAccessToken(ctx.user, 'cloud-agent-next', {
+        headers: ctx.headersList,
+        operation: 'repository-access',
+      });
+      return createCloudAgentNextClient(token).changeRepositoryAccess({
+        sessionId: input.sessionId,
+        expectedRevision: input.expectedRevision,
+        repositoryId: input.repositoryId,
+        mode: input.mode,
+      });
     }),
 
   getEgressAudit: baseProcedure

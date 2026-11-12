@@ -1,12 +1,23 @@
+import { REPOSITORY_ACCESS_PROTOCOL_VERSION } from '@kilocode/worker-utils/workspace-repository-access';
+import { redeemWorkspaceGitHubRequest } from './workspace-github-redemption.js';
+import {
+  workspaceRepositoryAccessSchema,
+  type WorkspaceRepositoryPolicyLookup,
+  type WorkspaceRepositoryPolicyResult,
+  type WorkspaceRepositoryScope,
+  type IssueWorkspaceGitHubCapabilityResult,
+  type IssueWorkspaceGitHubCapabilityParams,
+} from '@kilocode/worker-utils/workspace-repository-access';
+import {
+  prepareWorkspaceRepository,
+  type PrepareWorkspaceRepositoryParams,
+  type PrepareWorkspaceRepositoryResult,
+} from './workspace-repository-authorization.js';
 import {
   GitHubIdentityPreconditionSchema,
   GitHubIdentityConflictError,
 } from '@kilocode/db/github-identity';
-import {
-  authorizeGitHubTaskCredential,
-  scopeNativeGitHubCredential,
-} from './github-task-authorization.js';
-import { authorizeGitHubTaskRequest } from './github-task-policy.js';
+import { scopeNativeGitHubCredential } from './github-task-authorization.js';
 import {
   GitHubTaskResources,
   GitHubTaskResourceError,
@@ -168,6 +179,7 @@ export type {
 export type ManagedGitHubFallbackReason = UserAuthorizationFallbackReason | 'lite_installation';
 
 export type GetCloudAgentAuthForRepoParams = GetTokenForRepoParams & {
+  repositoryMode?: 'read' | 'contribute';
   accessPurpose?: 'workflow' | 'agent';
   allowUserAuthorization?: boolean;
   permissionScope?: 'repository';
@@ -186,6 +198,7 @@ export type GetCloudAgentAuthForRepoSuccess = {
 };
 
 export type GitHubUserAuthorizationFailure =
+  | 'user_authorization_revoked'
   | 'user_authorization_unavailable'
   | 'provided_token_not_supported';
 export type GetCloudAgentAuthForRepoResult =
@@ -219,6 +232,7 @@ export type IssueGitHubSessionCapabilityResult =
     };
 
 export type RedeemGitHubSessionCapabilityParams = {
+  workspaceSandboxId?: string;
   requestContentType?: string;
   requestBody?: Uint8Array;
   capability: string;
@@ -230,9 +244,9 @@ export type RedeemGitHubSessionCapabilitySuccess = {
   success: true;
   /** Null means the request is forwarded anonymously. */
   authorization: string | null;
-  installationId: string;
-  source: 'user' | 'installation';
-  appType: GitHubAppType;
+  installationId?: string;
+  source?: 'user' | 'installation';
+  appType?: GitHubAppType;
 };
 export type RedeemGitHubSessionCapabilityFailureReason =
   | GitHubSessionCapabilityFailureReason
@@ -548,7 +562,34 @@ function validateBitbucketCapabilityUpstream(
   return { failure: null, authSurface };
 }
 
+type RepositoryPolicyBinding = {
+  readWorkspaceRepositoryPolicy(
+    input: WorkspaceRepositoryPolicyLookup
+  ): Promise<WorkspaceRepositoryPolicyResult>;
+  repositoryAccessProtocolVersion?(): Promise<number>;
+  readWorkspaceRepositoryPolicyForScope?(
+    input: WorkspaceRepositoryScope
+  ): Promise<WorkspaceRepositoryPolicyResult>;
+  admitWorkspaceRepositoryCapability?(
+    input: WorkspaceRepositoryScope
+  ): Promise<WorkspaceRepositoryPolicyResult>;
+};
+
+function isRepositoryPolicyBinding(value: unknown): value is RepositoryPolicyBinding {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'readWorkspaceRepositoryPolicy' in value &&
+    typeof value.readWorkspaceRepositoryPolicy === 'function'
+  );
+}
+
 export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
+  private get repositoryPolicyReader(): RepositoryPolicyBinding | undefined {
+    const binding: unknown = this.env.REPOSITORY_POLICY;
+    return isRepositoryPolicyBinding(binding) ? binding : undefined;
+  }
+
   private githubService: GitHubTokenService;
   private installationLookupService: InstallationLookupService;
   private gitlabLookupService: GitLabLookupService;
@@ -805,16 +846,28 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
     if (params.permissionScope === 'repository' || params.allowUserAuthorization !== true)
       return installationAuth();
-    if (installation.githubAppType === 'lite') return installationAuth('lite_installation');
+    if (installation.githubAppType === 'lite' && params.repositoryMode !== 'read')
+      return installationAuth('lite_installation');
     if (
-      installation.permissions?.contents !== 'write' ||
-      installation.permissions?.pull_requests !== 'write'
+      params.repositoryMode !== 'read' &&
+      (installation.permissions?.contents !== 'write' ||
+        installation.permissions?.pull_requests !== 'write')
     ) {
       return installationAuth('insufficient_user_access');
     }
 
     const selection = await this.githubUserAuthorizationService.selectUserAuthorization(params);
-    if (!selection.selected) return installationAuth(selection.reason);
+    if (!selection.selected) {
+      if (params.repositoryMode === 'read' && selection.reason !== 'no_user_authorization')
+        return {
+          success: false,
+          reason:
+            selection.reason === 'revoked'
+              ? 'user_authorization_revoked'
+              : 'user_authorization_unavailable',
+        };
+      return installationAuth(selection.reason);
+    }
     if (selection.credentialSource === 'provided_token')
       return { success: false, reason: 'provided_token_not_supported' };
 
@@ -828,6 +881,83 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       gitAuthor: selection.gitAuthor,
       commitCoAuthor: installationAuthor,
     };
+  }
+
+  async repositoryAccessProtocolVersion(): Promise<number> {
+    try {
+      return (await this.repositoryPolicyReader?.repositoryAccessProtocolVersion?.()) ===
+        REPOSITORY_ACCESS_PROTOCOL_VERSION
+        ? REPOSITORY_ACCESS_PROTOCOL_VERSION
+        : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  async issueWorkspaceGitHubSessionCapability(
+    input: IssueWorkspaceGitHubCapabilityParams
+  ): Promise<IssueWorkspaceGitHubCapabilityResult> {
+    try {
+      const scope: WorkspaceRepositoryScope = {
+        sandboxId: input.sandboxId,
+        scopeId: input.scopeId,
+        userId: input.userId,
+        ...(input.orgId ? { orgId: input.orgId } : {}),
+        outboundContainerId: input.outboundContainerId,
+      };
+      const policy = await this.repositoryPolicyReader?.admitWorkspaceRepositoryCapability?.(scope);
+      if (!policy || !workspaceRepositoryAccessSchema.safeParse(policy.access).success)
+        return { success: false, reason: 'authorization_unavailable' };
+      const key = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      const repository = policy.access.repositories.find(
+        repo => `${repo.owner}/${repo.name}` === input.repository?.toLowerCase()
+      );
+      return {
+        success: true,
+        capability: new GitHubSessionCapabilityCodec(key).issueWorkspace(scope),
+        ...(repository
+          ? {
+              attribution: {
+                author: repository.gitAuthor,
+                appType: repository.identity.appType,
+                source: repository.identity.source,
+              },
+            }
+          : {}),
+      };
+    } catch {
+      return { success: false, reason: 'authorization_unavailable' };
+    }
+  }
+
+  async prepareWorkspaceRepositoryAccess(
+    params: PrepareWorkspaceRepositoryParams
+  ): Promise<PrepareWorkspaceRepositoryResult> {
+    let expectedIdentity;
+    if (params.persistedCapability) {
+      try {
+        const key = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+        const claims = new GitHubSessionCapabilityCodec(key).decodePersistedIdentity(
+          params.persistedCapability
+        );
+        if (
+          claims.version === 4 ||
+          claims.userId !== params.userId ||
+          claims.orgId !== params.orgId ||
+          `${claims.owner}/${claims.repo}` !== params.githubRepo?.toLowerCase()
+        )
+          return { success: false, reason: 'authorization_unavailable' };
+        expectedIdentity = { source: claims.source, ...claims.identity };
+      } catch {
+        return { success: false, reason: 'authorization_unavailable' };
+      }
+    }
+    return prepareWorkspaceRepository(this.env, params, {
+      findInstallation: input => this.findManagedInstallationWithLoginRepair(input),
+      resolveAuth: input => this.resolveCloudAgentAuthForRepo(input),
+      tokens: this.githubService,
+      expectedIdentity,
+    });
   }
 
   async issueGitHubSessionCapability(
@@ -848,6 +978,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     const auth = await this.resolveCloudAgentAuthForRepo({
       ...params,
       githubRepo: `${repository.owner}/${repository.repo}`,
+      ...(params.taskScope ? { repositoryMode: 'read' as const } : {}),
     });
     if (!auth.success) return auth;
 
@@ -919,82 +1050,71 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       return { success: false, reason: 'container_mismatch' };
     }
 
-    // Every redeemed capability must carry a task grant, for either credential source.
-    if (claims.version !== 3) return { success: false, reason: 'invalid_task_scope' };
-
-    // Validate the URL before evaluating the task request.
+    if (claims.version === 4) {
+      try {
+        const policy = await this.repositoryPolicyReader?.readWorkspaceRepositoryPolicyForScope?.({
+          sandboxId: claims.sandboxId,
+          scopeId: claims.scopeId,
+          userId: claims.userId,
+          orgId: claims.orgId,
+          outboundContainerId: claims.outboundContainerId,
+        });
+        const parsed = workspaceRepositoryAccessSchema.safeParse(policy?.access);
+        if (!policy || !parsed.success || policy.sandboxId !== claims.sandboxId)
+          return { success: false, reason: 'authorization_unavailable' };
+        return await redeemWorkspaceGitHubRequest(
+          { ...params, ownerId: claims.userId, organizationId: claims.orgId },
+          parsed.data,
+          {
+            env: this.env,
+            tokens: this.githubService,
+            resolveAuth: input => this.resolveCloudAgentAuthForRepo(input),
+          }
+        );
+      } catch {
+        return { success: false, reason: 'authorization_unavailable' };
+      }
+    }
     const parsedRequest = parseGitHubCapabilityRequest(params.requestMethod, params.requestUrl);
     if (parsedRequest.failure) return { success: false, reason: parsedRequest.failure };
-
-    const taskDecision = authorizeGitHubTaskRequest(
-      {
-        method: params.requestMethod,
-        url: params.requestUrl,
-        contentType: params.requestContentType,
-        body: params.requestBody,
-      },
-      claims.taskGrant
-    );
-    if (!taskDecision.allowed) return { success: false, reason: taskDecision.reason };
-
-    const authParams = {
-      userId: claims.userId,
-      accessPurpose: claims.accessPurpose ?? 'workflow',
-      ...(claims.orgId !== undefined ? { orgId: claims.orgId } : {}),
-      ...(claims.integrationId !== undefined
-        ? { expectedIntegrationId: claims.integrationId }
-        : {}),
-      githubRepo: `${claims.owner}/${claims.repo}`,
-    };
-    let auth: GetCloudAgentAuthForRepoResult | null;
-    if (claims.source === 'user') {
-      auth = await this.redeemPinnedUserAuthorization(authParams);
-    } else {
-      try {
-        auth = await this.getCloudAgentAuthForRepo(authParams);
-      } catch {
-        return { success: false, reason: 'source_unavailable' };
-      }
-    }
-    if (auth && !auth.success && auth.reason === 'integration_mismatch') {
-      return { success: false, reason: 'integration_mismatch' };
-    }
-    if (auth && !auth.success && auth.reason === 'repository_permissions_unavailable') {
-      return { success: false, reason: 'repository_permissions_unavailable' };
-    }
-    if (!auth || !auth.success || auth.source !== claims.source) {
-      return { success: false, reason: 'source_unavailable' };
-    }
-    if (!this.matchesSessionIdentity(claims.identity, auth)) {
-      return { success: false, reason: 'identity_mismatch' };
-    }
-
-    let authorization: string | null;
     try {
-      authorization = await authorizeGitHubTaskCredential(
-        this.env,
-        this.githubService,
-        auth,
-        claims.taskGrant,
-        taskDecision,
-        params.requestUrl
+      const policy = await this.repositoryPolicyReader?.readWorkspaceRepositoryPolicy({
+        sandboxId: params.workspaceSandboxId,
+        userId: claims.userId,
+        orgId: claims.orgId,
+        scopeId: claims.version === 3 ? claims.taskGrant.scopeId : undefined,
+        outboundContainerId: params.outboundContainerId,
+        owner: claims.owner,
+        name: claims.repo,
+        source: claims.source,
+        installationId: claims.identity.installationId,
+        appType: claims.identity.appType,
+        gitAuthor: claims.identity.gitAuthor,
+      });
+      const access = workspaceRepositoryAccessSchema.safeParse(policy?.access);
+      if (!policy || !access.success)
+        return { success: false, reason: 'authorization_unavailable' };
+      return await redeemWorkspaceGitHubRequest(
+        {
+          ...params,
+          ownerId: claims.userId,
+          organizationId: claims.orgId,
+          anchor: {
+            installationId: claims.identity.installationId,
+            source: claims.source,
+            appType: claims.identity.appType,
+          },
+        },
+        access.data,
+        {
+          env: this.env,
+          tokens: this.githubService,
+          resolveAuth: input => this.resolveCloudAgentAuthForRepo(input),
+        }
       );
-      if (authorization !== null) {
-        authorization = this.formatUpstreamAuthorization(params.requestUrl, authorization);
-      }
-    } catch (error) {
-      return {
-        success: false,
-        reason: error instanceof GitHubTaskResourceError ? error.reason : 'source_unavailable',
-      };
+    } catch {
+      return { success: false, reason: 'authorization_unavailable' };
     }
-    return {
-      success: true,
-      authorization,
-      installationId: auth.installationId,
-      source: auth.source,
-      appType: auth.appType,
-    };
   }
 
   private getSessionIdentity(auth: GetCloudAgentAuthForRepoSuccess): GitHubSessionIdentity {
@@ -1004,47 +1124,6 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       appType: auth.appType,
       gitAuthor: auth.gitAuthor,
       ...(auth.commitCoAuthor !== undefined ? { commitCoAuthor: auth.commitCoAuthor } : {}),
-    };
-  }
-
-  private matchesSessionIdentity(
-    issuedIdentity: GitHubSessionIdentity,
-    auth: GetCloudAgentAuthForRepoSuccess
-  ): boolean {
-    return JSON.stringify(issuedIdentity) === JSON.stringify(this.getSessionIdentity(auth));
-  }
-
-  private formatUpstreamAuthorization(requestUrl: string, token: string): string {
-    return new URL(requestUrl).hostname === 'github.com'
-      ? `Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`
-      : `Bearer ${token}`;
-  }
-
-  private async redeemPinnedUserAuthorization(
-    params: GetCloudAgentAuthForRepoParams
-  ): Promise<GetCloudAgentAuthForRepoResult | null> {
-    const installation = await this.findManagedInstallationWithLoginRepair(params);
-    if (!installation.success && installation.reason === 'integration_mismatch') {
-      return { success: false, reason: 'integration_mismatch' };
-    }
-    if (!installation.success || installation.githubAppType === 'lite') return null;
-    if (
-      installation.permissions?.contents !== 'write' ||
-      installation.permissions?.pull_requests !== 'write'
-    ) {
-      return null;
-    }
-    const selection = await this.githubUserAuthorizationService.selectUserAuthorization(params);
-    if (!selection.selected) return null;
-    return {
-      success: true,
-      githubToken: selection.token,
-      installationId: installation.installationId,
-      accountLogin: installation.accountLogin,
-      appType: installation.githubAppType,
-      source: 'user',
-      gitAuthor: selection.gitAuthor,
-      commitCoAuthor: this.getInstallationAuthor(installation.githubAppType),
     };
   }
 

@@ -12,6 +12,7 @@ import {
   scopeGrants,
   workspaceDiskAllocation,
   workspaceDiskSnapshots,
+  workspaceRepositoryAccess,
 } from '../../src/control-plane/sandbox/sqlite-schema.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
@@ -76,6 +77,7 @@ const ROUTE_ENVIRONMENT_MIGRATION_AT = 1792104724546;
 const WORKSPACE_DISK_MIGRATION_AT = 1793713237356;
 const CREATE_ATTEMPT_MIGRATION_AT = 1794145671968;
 const BILLING_FAILURE_MIGRATION_AT = 1794258032795;
+const REPOSITORY_ACCESS_MIGRATION_AT = 1794409557254;
 
 const OLD_FOUR_MIGRATIONS = {
   journal: {
@@ -126,6 +128,7 @@ function newSandboxStub(): DurableObjectStub<SandboxControlV2> {
 }
 
 function clearSchema(db: MigrationDb): void {
+  db.run(sql`DROP TABLE IF EXISTS workspace_repository_access`);
   db.run(sql`DROP TABLE IF EXISTS workspace_disk_allocation`);
   db.run(sql`DROP TABLE IF EXISTS workspace_disk_snapshots`);
   db.run(sql`DROP TABLE IF EXISTS scope_grants`);
@@ -189,6 +192,7 @@ describe('sandbox control V2 consolidated migrations', () => {
         'scope_grants',
         'workspace_disk_allocation',
         'workspace_disk_snapshots',
+        'workspace_repository_access',
       ]);
       expect(columnSignatures(db, 'allocation')).toEqual(EXPECTED_ALLOCATION_COLUMNS);
       expect(columnSignatures(db, 'routes')).toEqual(EXPECTED_ROUTES_COLUMNS);
@@ -202,6 +206,11 @@ describe('sandbox control V2 consolidated migrations', () => {
       ]);
       expect(db.select().from(workspaceDiskAllocation).all()).toEqual([]);
       expect(db.select().from(workspaceDiskSnapshots).all()).toEqual([]);
+      expect(columnSignatures(db, 'workspace_repository_access')).toEqual([
+        { name: 'data', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
+        { name: 'scope_id', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
+      ]);
+      expect(db.select().from(workspaceRepositoryAccess).all()).toEqual([]);
 
       expect(columnSignatures(db, 'scope_grants')).toEqual([
         { name: 'grant', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
@@ -215,6 +224,7 @@ describe('sandbox control V2 consolidated migrations', () => {
         { hash: '', created_at: WORKSPACE_DISK_MIGRATION_AT },
         { hash: '', created_at: CREATE_ATTEMPT_MIGRATION_AT },
         { hash: '', created_at: BILLING_FAILURE_MIGRATION_AT },
+        { hash: '', created_at: REPOSITORY_ACCESS_MIGRATION_AT },
       ]);
       const applied = appliedMigrations(db);
       await migrate(db, migrations);
@@ -229,7 +239,6 @@ describe('sandbox control V2 consolidated migrations', () => {
       clearSchema(db);
       await migrate(db, OLD_FOUR_MIGRATIONS);
 
-      const oldAllocationColumns = columnSignatures(db, 'allocation');
       const oldRoutesColumns = columnSignatures(db, 'routes');
       const oldApplied = appliedMigrations(db);
       expect(oldApplied.at(-1)?.created_at).toBe(1790511032804);
@@ -257,6 +266,7 @@ describe('sandbox control V2 consolidated migrations', () => {
         { hash: '', created_at: WORKSPACE_DISK_MIGRATION_AT },
         { hash: '', created_at: CREATE_ATTEMPT_MIGRATION_AT },
         { hash: '', created_at: BILLING_FAILURE_MIGRATION_AT },
+        { hash: '', created_at: REPOSITORY_ACCESS_MIGRATION_AT },
       ]);
       expect(db.select().from(scopeGrants).all()).toEqual([]);
       expect(columnSignatures(db, 'allocation')).toEqual(EXPECTED_ALLOCATION_COLUMNS);
@@ -271,6 +281,11 @@ describe('sandbox control V2 consolidated migrations', () => {
       ]);
       expect(db.select().from(workspaceDiskAllocation).all()).toEqual([]);
       expect(db.select().from(workspaceDiskSnapshots).all()).toEqual([]);
+      expect(columnSignatures(db, 'workspace_repository_access')).toEqual([
+        { name: 'data', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
+        { name: 'scope_id', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
+      ]);
+      expect(db.select().from(workspaceRepositoryAccess).all()).toEqual([]);
 
       expect(
         columnSignatures(db, 'routes').filter(

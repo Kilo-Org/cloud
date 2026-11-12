@@ -120,11 +120,11 @@ export function fakeOutboundContainerId(logicalSandboxId: string): string {
  * `organizationMembershipFor` afterwards.
  */
 export function installFakeSandboxEnv(
-  instance: Pick<SandboxControlV2, 'env' | 'organizationMembershipFor'>,
+  instance: Pick<SandboxControlV2, 'organizationMembershipFor'>,
   broker: FakeCredentialBroker,
   extra: Record<string, unknown> = {}
 ): void {
-  Object.assign(instance.env as object, {
+  Object.assign(Reflect.get(instance, 'env') as object, {
     GIT_TOKEN_SERVICE: broker,
     SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINERS_NAMESPACE,
     WORKER_URL: 'https://worker.example.com',

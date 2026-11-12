@@ -1,3 +1,7 @@
+import {
+  repositoryAccessChangeSchema,
+  repositoryAccessViewSchema,
+} from '@kilocode/worker-utils/workspace-repository-access';
 import 'server-only';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { sandboxSelectionCapabilitiesSchema } from '@kilocode/worker-utils/sandbox-allocation';
@@ -1383,6 +1387,44 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         ctx.cloudAgentAuthority === undefined ? undefined : input.organizationId;
 
       return await client.getSession(input.cloudAgentSessionId, workerOrganizationId);
+    }),
+
+  getRepositoryAccess: organizationMemberProcedure
+    .input(z.object({ sessionId: z.string().min(1), organizationId: z.string().uuid() }))
+    .output(repositoryAccessViewSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
+      const { token } = await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+        headers: ctx.headersList,
+        organizationId: input.organizationId,
+        operation: 'repository-access',
+      });
+      return createCloudAgentNextClient(token).getRepositoryAccess({ sessionId: input.sessionId });
+    }),
+  changeRepositoryAccess: organizationMemberMutationProcedure
+    .input(repositoryAccessChangeSchema.extend({ organizationId: z.string().uuid() }))
+    .output(z.object({ changed: z.boolean(), current: repositoryAccessViewSchema }))
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
+      const { token } = await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+        headers: ctx.headersList,
+        organizationId: input.organizationId,
+        operation: 'repository-access',
+      });
+      return createCloudAgentNextClient(token).changeRepositoryAccess({
+        sessionId: input.sessionId,
+        expectedRevision: input.expectedRevision,
+        repositoryId: input.repositoryId,
+        mode: input.mode,
+      });
     }),
 
   getEgressAudit: organizationMemberProcedure

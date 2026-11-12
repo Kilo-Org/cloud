@@ -6654,6 +6654,30 @@
     ],
     "searchBlob": "cloudAgentNext.getPreviewOptions Check whether live previews are enabled for a Cloud Agent session and get the preview URL template to use, given the session and organization. cloudagentnext getpreviewoptions organizationid worktreeid cloudagentsessionid organizationId worktreeId cloudAgentSessionId"
   },
+  "cloudAgentNext.getRepositoryAccess": {
+    "path": "cloudAgentNext.getRepositoryAccess",
+    "kind": "query",
+    "summary": "Check which repositories a Cloud Agent session can access, along with its current access mode and revision. Use it to inspect or review a session's repository permissions before making changes.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "getrepositoryaccess",
+      "sessionid"
+    ],
+    "searchBlob": "cloudAgentNext.getRepositoryAccess Check which repositories a Cloud Agent session can access, along with its current access mode and revision. Use it to inspect or review a session's repository permissions before making changes. cloudagentnext getrepositoryaccess sessionid sessionId"
+  },
   "cloudAgentNext.getSandboxSelectionOptions": {
     "path": "cloudAgentNext.getSandboxSelectionOptions",
     "kind": "query",
@@ -18388,6 +18412,38 @@
       "cloudagentsessionid"
     ],
     "searchBlob": "organizations.cloudAgentNext.getPendingInteractions Retrieves the interactions a Cloud Agent session is currently waiting on, such as questions or approval requests that need a response before the agent can continue. organizations cloudagentnext getpendinginteractions organizationid cloudagentsessionid organizationId cloudAgentSessionId"
+  },
+  "organizations.cloudAgentNext.getRepositoryAccess": {
+    "path": "organizations.cloudAgentNext.getRepositoryAccess",
+    "kind": "query",
+    "summary": "View which repositories a cloud agent session has access to, including each repository's current access mode and revision. Use to inspect or review repository permissions for a session before changing them.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "organizationId",
+        "sessionId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getrepositoryaccess",
+      "organizationid",
+      "sessionid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getRepositoryAccess View which repositories a cloud agent session has access to, including each repository's current access mode and revision. Use to inspect or review repository permissions for a session before changing them. organizations cloudagentnext getrepositoryaccess organizationid sessionid organizationId sessionId"
   },
   "organizations.cloudAgentNext.getSandboxSelectionOptions": {
     "path": "organizations.cloudAgentNext.getSandboxSelectionOptions",

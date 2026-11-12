@@ -46,7 +46,9 @@ function createDb(rows: InstallationRow[], updatedRows = [{ id: 'integration-1' 
 }
 
 function createService(rows: InstallationRow[]) {
-  vi.mocked(getWorkerDb).mockReturnValue(createDb(rows) as never);
+  vi.mocked(getWorkerDb).mockReturnValue(
+    createDb(rows.map(row => ({ id: '00000000-0000-4000-8000-000000000002', ...row }))) as never
+  );
   return new InstallationLookupService({
     HYPERDRIVE: { connectionString: 'postgres://test' },
   } as CloudflareEnv);
@@ -271,6 +273,7 @@ describe('InstallationLookupService', () => {
     ).resolves.toEqual({
       success: true,
       installationId: '100',
+      integrationId,
       accountLogin: 'renamed-owner',
       githubAppType: 'standard',
       repoName: 'repository',

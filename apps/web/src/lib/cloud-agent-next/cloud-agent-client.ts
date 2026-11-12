@@ -1,3 +1,8 @@
+import {
+  repositoryAccessViewSchema,
+  type RepositoryAccessView,
+  type RepositoryAccessChange,
+} from '@kilocode/worker-utils/workspace-repository-access';
 import type { CloudSessionMessagesWirePage } from '@kilocode/cloud-agent-sdk/schemas';
 import {
   cloudToolPartDetailInputSchema,
@@ -724,6 +729,8 @@ type CloudAgentNextTRPCClient = {
   getPreparationAttempts: {
     query: (input: GetSessionInput) => Promise<PreparationAttempt[]>;
   };
+  getRepositoryAccess: { query: (input: { sessionId: string }) => Promise<unknown> };
+  changeRepositoryAccess: { mutate: (input: RepositoryAccessChange) => Promise<unknown> };
   getEgressAudit: {
     query: (input: GetEgressAuditInput) => Promise<unknown>;
   };
@@ -1144,6 +1151,15 @@ export class CloudAgentNextClient {
     return getWorktreeChangesOutputSchema.parse(
       await this.client.getWorktreeChanges.query({ cloudAgentSessionId })
     );
+  }
+
+  async getRepositoryAccess(input: { sessionId: string }): Promise<RepositoryAccessView> {
+    return repositoryAccessViewSchema.parse(await this.client.getRepositoryAccess.query(input));
+  }
+  async changeRepositoryAccess(input: RepositoryAccessChange) {
+    return z
+      .object({ changed: z.boolean(), current: repositoryAccessViewSchema })
+      .parse(await this.client.changeRepositoryAccess.mutate(input));
   }
 
   async getEgressAudit(input: GetEgressAuditInput): Promise<GetEgressAuditResponse> {

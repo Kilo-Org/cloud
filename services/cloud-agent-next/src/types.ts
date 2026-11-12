@@ -1,3 +1,9 @@
+import type {
+  PrepareWorkspaceRepositoryParams,
+  PrepareWorkspaceRepositoryResult,
+  IssueWorkspaceGitHubCapabilityResult,
+  IssueWorkspaceGitHubCapabilityParams,
+} from '@kilocode/worker-utils/workspace-repository-access';
 import type { SessionId } from './types/ids.js';
 import type { EnvironmentBuild } from './environment-build/environment-build-do.js';
 import type { GitHubTaskScope, GitHubTaskGrant } from '@kilocode/worker-utils/github-task-grant';
@@ -245,6 +251,7 @@ type GetCloudAgentAuthForRepoResult =
       reason:
         | GitHubRepositoryAuthorizationFailureReason
         | 'repository_permissions_unavailable'
+        | 'user_authorization_revoked'
         | 'provided_token_not_supported'
         | 'user_authorization_unavailable';
     };
@@ -270,6 +277,7 @@ type IssueGitHubSessionCapabilityResult =
         | GitHubRepositoryAuthorizationFailureReason
         | 'capability_configuration_error'
         | 'repository_permissions_unavailable'
+        | 'user_authorization_revoked'
         | 'provided_token_not_supported'
         | 'user_authorization_unavailable'
         | 'invalid_task_scope'
@@ -412,6 +420,12 @@ type RedeemBitbucketSessionCapabilityResult =
     };
 
 export type GitTokenService = {
+  issueWorkspaceGitHubSessionCapability?(
+    params: IssueWorkspaceGitHubCapabilityParams
+  ): Promise<IssueWorkspaceGitHubCapabilityResult>;
+  prepareWorkspaceRepositoryAccess?(
+    params: PrepareWorkspaceRepositoryParams
+  ): Promise<PrepareWorkspaceRepositoryResult>;
   authorizeCloudAgentGitHubRepo?(
     params: Omit<ManagedGitHubAuthParams, 'allowUserAuthorization'>
   ): Promise<GitHubRepositoryAuthorizationResult>;
@@ -432,7 +446,9 @@ export type GitTokenService = {
       taskScope?: GitHubTaskScope;
     }
   ): Promise<IssueGitHubSessionCapabilityResult>;
+  repositoryAccessProtocolVersion?(): Promise<number>;
   redeemGitHubSessionCapability(params: {
+    workspaceSandboxId?: string;
     requestContentType?: string;
     requestBody?: Uint8Array;
     capability: string;

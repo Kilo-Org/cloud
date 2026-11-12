@@ -4388,7 +4388,7 @@ describe('SandboxControlV2 environment repository credentials', () => {
     expect(broker.githubIssued()).toBeGreaterThan(0);
   });
 
-  it('fails a V2 start on a Vercel sandbox and still starts a V1 session there', async () => {
+  it('rejects Vercel GitHub forwarding without a verified contract and still starts an unmanaged repository', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
     const stub = await setupVercel(provider, broker);
@@ -4397,13 +4397,14 @@ describe('SandboxControlV2 environment repository credentials', () => {
     const events = capture.forAttempt(failedAttemptId(view));
     capture.restore();
 
+    expect(view).toMatchObject({ state: 'failed', reason: 'provider_identity_mismatch' });
     expect(events[0]).toMatchObject({
-      grantPhase: 'validation',
-      grantFailureReason: 'invalid_grant',
+      stage: 'credential_grant_failed',
+      reason: 'provider_identity_mismatch',
       provider: 'vercel',
     });
-    expect(broker.githubIssued()).toBe(0);
-    // The same sandbox serves a V1 session.
+    expect((await readRouteRow(stub, SESSION))?.grant).toBeNull();
+    // The same sandbox can still prepare an unmanaged repository.
     expect(
       await stub.prepare(prepareInput(SESSION_NEXT, vercelSource(SESSION_NEXT)))
     ).toMatchObject({

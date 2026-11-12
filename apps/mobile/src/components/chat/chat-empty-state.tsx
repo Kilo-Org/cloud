@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next';
 
-import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { MessageCircle } from '@/components/ui/icons';
 
@@ -18,17 +17,15 @@ import { MessageCircle } from '@/components/ui/icons';
 export function ChatEmptyState() {
   const { t } = useTranslation();
   return (
-    <CenteredState band="viewport">
-      <EmptyState
-        icon={MessageCircle}
-        band="viewport"
-        // i18n-dup-ok: 'modelChat.empty.title' was renamed from the base catalog's
-        // quickChat.empty.title in the harness-chat rebuild; no other live key carries it.
-        title={t('modelChat.empty.title')}
-        // i18n-dup-ok: 'modelChat.empty.description' was renamed from the base catalog's
-        // quickChat.empty.description in the harness-chat rebuild; no other live key carries it.
-        description={t('modelChat.empty.description')}
-      />
-    </CenteredState>
+    <EmptyState
+      icon={MessageCircle}
+      band="viewport"
+      // i18n-dup-ok: 'modelChat.empty.title' was renamed from the base catalog's
+      // quickChat.empty.title in the harness-chat rebuild; no other live key carries it.
+      title={t('modelChat.empty.title')}
+      // i18n-dup-ok: 'modelChat.empty.description' was renamed from the base catalog's
+      // quickChat.empty.description in the harness-chat rebuild; no other live key carries it.
+      description={t('modelChat.empty.description')}
+    />
   );
 }

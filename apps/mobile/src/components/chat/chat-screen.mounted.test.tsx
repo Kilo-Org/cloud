@@ -281,7 +281,7 @@ function isHandler(value: unknown): value is (...args: unknown[]) => unknown {
 }
 
 /** The props each state surface on screen was drawn with. */
-type StateProps = { title?: unknown; description?: unknown; action?: unknown };
+type StateProps = { title?: unknown; description?: unknown; action?: unknown; band?: unknown };
 
 const emptyStatesOf = (tree: ReactTestRenderer): StateProps[] =>
   tree.root.findAll(node => (node.type as string) === 'EmptyState').map(node => node.props);
@@ -357,10 +357,12 @@ describe('the chat transcript while it opens', () => {
     expect(count(tree, 'ChatComposer')).toBe(1);
     /* The state centers in the transcript area it fills, not in the whole
        window: the pending paint and the measured placement then agree from the
-       first frame, so the state does not move when a measurement lands. */
-    const empty = tree.root.find(node => (node.type as string) === 'CenteredState');
-    expect(empty.props.band).toBe('viewport');
-    expect(empty.findAll(node => (node.type as string) === 'EmptyState')).toHaveLength(1);
+       first frame, so the state does not move when a measurement lands. The
+       state centers through its own scroller, so the band reaches that scroller
+       and no second one wraps it. */
+    const [empty] = emptyStatesOf(tree);
+    expect(empty?.band).toBe('viewport');
+    expect(count(tree, 'CenteredState')).toBe(0);
   });
 
   it.each([

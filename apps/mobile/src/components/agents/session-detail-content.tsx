@@ -228,10 +228,7 @@ import {
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
 import { useRemoteModelCatalogRetry } from '@/lib/hooks/use-remote-model-catalog-retry';
-import {
-  computeChargesMicrodollars,
-  sessionTotalMicrodollars,
-} from '@/lib/session-compute-total';
+import { computeChargesMicrodollars, sessionTotalMicrodollars } from '@/lib/session-compute-total';
 import { useSessionComputeCharges } from '@/lib/hooks/use-session-compute';
 import { useSessionRaiseReader } from '@/lib/hooks/use-session-raise-reader';
 import {

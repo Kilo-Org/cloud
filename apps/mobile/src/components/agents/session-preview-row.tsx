@@ -273,7 +273,11 @@ function SessionPreviewSheet({
 
   return (
     <SessionPageSheet visible={visible} onClose={onClose} dismissible>
-      <SheetHeader title={t('cloudAgent.preview.title')} onDone={onClose} topInset="ios-page-sheet" />
+      <SheetHeader
+        title={t('cloudAgent.preview.title')}
+        onDone={onClose}
+        topInset="ios-page-sheet"
+      />
       <ScrollView className="flex-1" contentContainerClassName="gap-3 px-6 pb-6 pt-3">
         <View className="flex-row items-center justify-between gap-3">
           <Text className="text-xs uppercase tracking-wide text-muted-foreground">

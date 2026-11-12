@@ -86,7 +86,9 @@ export function SessionComputeSection({
           </Text>
         </View>
         <View className="flex-row items-center justify-between gap-3">
-          <Text className="text-xs text-muted-foreground">{t('cloudAgent.compute.loadFailed')}</Text>
+          <Text className="text-xs text-muted-foreground">
+            {t('cloudAgent.compute.loadFailed')}
+          </Text>
           <Pressable
             onPress={onRetry}
             accessibilityRole="button"
@@ -160,10 +162,7 @@ export function SessionComputeSection({
               return null;
             }
             return (
-              <View
-                key={rate.instance}
-                className="flex-row items-center justify-between gap-3"
-              >
+              <View key={rate.instance} className="flex-row items-center justify-between gap-3">
                 <Text className="text-xs text-foreground">{label}</Text>
                 <Text className="text-xs text-foreground tabular-nums">
                   {t('cloudAgent.compute.perHour', {
@@ -183,7 +182,8 @@ function ComputeRunRow({ run }: Readonly<{ run: SessionComputeRun }>) {
   const locale = i18n.language;
   const start = parseTimestamp(run.startedAt);
   const stopped = run.running || run.stoppedAt === null ? null : parseTimestamp(run.stoppedAt);
-  const end = stopped === null ? i18n.t('cloudAgent.compute.now') : formatClockTime(stopped, locale);
+  const end =
+    stopped === null ? i18n.t('cloudAgent.compute.now') : formatClockTime(stopped, locale);
   const today = formatDate(new Date(), locale, { dateStyle: 'short' });
   const startDay = formatDate(start, locale, { dateStyle: 'short' });
   const startLabel =

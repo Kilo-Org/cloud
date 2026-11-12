@@ -6,10 +6,7 @@
  *
  * A trailing slash on the base URL is dropped so the two halves never double up.
  */
-export function getCloudTriggersUrl(
-  webBaseUrl: string,
-  organizationId?: string | null
-): string {
+export function getCloudTriggersUrl(webBaseUrl: string, organizationId?: string | null): string {
   const base = webBaseUrl.endsWith('/') ? webBaseUrl.slice(0, -1) : webBaseUrl;
   return organizationId
     ? `${base}/organizations/${organizationId}/cloud/triggers`

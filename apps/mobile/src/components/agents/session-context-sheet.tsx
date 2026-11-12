@@ -252,7 +252,10 @@ export function SessionContextSheet({
   const computeCharges = useSessionComputeCharges({ cloudAgentSessionId, organizationId });
   const totalCostText =
     formatSessionTotalCost(
-      sessionTotalMicrodollars(totalCostMicrodollars, computeChargesMicrodollars(computeCharges.data))
+      sessionTotalMicrodollars(
+        totalCostMicrodollars,
+        computeChargesMicrodollars(computeCharges.data)
+      )
     ) ?? content.cost;
 
   return (

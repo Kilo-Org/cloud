@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type PreparationAttempt, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { askedMessageId, asMessages } from '@/lib/chat/turns';
@@ -8,6 +8,7 @@ import { type AddCreditsDestination } from '@/lib/credits/add-credits-destinatio
 
 import { MessageBubble } from './message-bubble';
 import { PartDetailSheetHost } from './part-detail-sheet-host';
+import { PreparationGroup } from './preparation-group';
 import { SessionContextMetrics } from './session-context-metrics';
 
 // Development-only visual fixture, opened through the development fixture path.
@@ -155,6 +156,55 @@ const creditsDeliveryMessages = asMessages({
 const CREDITS_DELIVERY_FAILURE = { status: 'failed', error: '', reason: 'credits' } as const;
 
 /**
+ * The question whose sandbox preparation failed, drawn the way the chat screen
+ * draws it: the asked question carries the run's failure and the preparation
+ * group under it names the stage that stopped and the reason. The group states
+ * the failure, so the question's row keeps only its recovery actions. A runtime
+ * reload restores a settled failure from its stored records, so this state
+ * cannot be re-opened by a link afterwards; the fixture is how the design gate
+ * measures it in each cell.
+ */
+const preparationFailureMessages = asMessages({
+  sessionId: SESSION,
+  asked: 'And what time is it in Lisbon?',
+  askedImages: [],
+  answering: [],
+  waiting: [],
+  turns: [...transcriptTurns],
+});
+
+const PREPARATION_FAILURE = { status: 'failed', error: '', reason: 'execution' } as const;
+
+/**
+ * The failed attempt the group renders: the sandbox stage stopped on a
+ * configuration the provider refused, which is the reason the control plane
+ * reports for it.
+ */
+const PREPARATION_FAILURE_ATTEMPT: PreparationAttempt = {
+  id: 'fixture-attempt',
+  triggerMessageId: askedMessageId(SESSION),
+  status: 'failed',
+  startedAt: 0,
+  completedAt: 1,
+  safeError: 'invalid_configuration',
+  revision: 2,
+  steps: [
+    {
+      id: 'fixture-sandbox-step',
+      key: 'sandbox_provision',
+      kind: 'phase',
+      label: 'sandbox provision',
+      status: 'failed',
+      startedAt: 0,
+      completedAt: 1,
+      revision: 1,
+      latestDetail: 'Creating sandbox',
+      safeError: 'invalid_configuration',
+    },
+  ],
+};
+
+/**
  * The message the transport gave up on after several attempts. It never
  * reached the agent, so the failure belongs to the message's own column rather
  * than the response's; the SDK stores it on a queued row of the transcript.
@@ -172,6 +222,7 @@ const failedRowByFailure = {
   execution: { id: askedId, deliveryState: EXECUTION_FAILURE },
   creditsDelivery: { id: askedId, deliveryState: CREDITS_DELIVERY_FAILURE },
   undelivered: { id: 'hello-there', deliveryState: UNDELIVERED_FAILURE },
+  preparation: { id: askedId, deliveryState: PREPARATION_FAILURE },
 } as const;
 
 /** The fixture never sends a retry; the row only needs the handler to draw its action. */
@@ -190,13 +241,20 @@ const FIXTURE_ADD_CREDITS: AddCreditsDestination = { kind: 'inApp', onPress: ign
  * The failure the fixture draws: the retryable answer, the terminal one, the
  * one the account's balance refused to send, or the asked question's.
  */
-type FixtureFailure = 'retryable' | 'terminal' | 'creditsDelivery' | 'execution' | 'undelivered';
+type FixtureFailure =
+  | 'retryable'
+  | 'terminal'
+  | 'creditsDelivery'
+  | 'execution'
+  | 'preparation'
+  | 'undelivered';
 
 const MESSAGES_BY_FAILURE = {
   retryable: retryableMessages,
   terminal: terminalMessages,
   creditsDelivery: creditsDeliveryMessages,
   execution: executionFailureMessages,
+  preparation: preparationFailureMessages,
   undelivered: turns,
 } satisfies Record<FixtureFailure, readonly StoredMessage[]>;
 
@@ -207,7 +265,10 @@ export function TranscriptStyleFixture({
   const { t } = useTranslation();
   const messages = MESSAGES_BY_FAILURE[failure];
   const failedRow =
-    failure === 'execution' || failure === 'creditsDelivery' || failure === 'undelivered'
+    failure === 'execution' ||
+    failure === 'creditsDelivery' ||
+    failure === 'undelivered' ||
+    failure === 'preparation'
       ? failedRowByFailure[failure]
       : undefined;
 
@@ -237,11 +298,17 @@ export function TranscriptStyleFixture({
             onRetryMessage={retryAvailable ? ignoreRetry : undefined}
             addCredits={FIXTURE_ADD_CREDITS}
             retryAvailable={retryAvailable}
+            failureStatedByPreparation={failure === 'preparation'}
             {...(failedRow !== undefined && message.info.id === failedRow.id
               ? { deliveryState: failedRow.deliveryState, onCopyToComposer: ignoreCopy }
               : {})}
           />
         ))}
+        {/* The transcript emits a failed attempt right after the question that
+            triggered it, so the group closes this turn. */}
+        {failure === 'preparation' ? (
+          <PreparationGroup attempt={PREPARATION_FAILURE_ATTEMPT} />
+        ) : null}
       </PartDetailSheetHost>
     </View>
   );

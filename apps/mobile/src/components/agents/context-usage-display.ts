@@ -75,17 +75,14 @@ export type HeaderPillContent = {
   primary: string | null;
   secondary: string | null;
   /**
-   * What the cost slot paints:
+   * What the cost part of the reading paints:
    *
    * - `label`: the session's cost, as text.
-   * - `loading`: the same dashes, laid out but painted invisible, with one bar
-   *   across the row they take. A bar of fixed width matched the settled row
-   *   only at the default font scale, and a dash beside a bar read as
-   *   half-painted content.
-   * - `unreported`: the dash, in the label's width. The session settled without
-   *   a cost, so nothing will fill the slot; it keeps the width so the pill does
-   *   not shrink when it settles.
-   * - `none`: no cost slot at all.
+   * - `loading`: the session is still resolving, so the pill paints nothing and
+   *   the accessibility label says a cost is coming.
+   * - `unreported`: the session settled without a cost, so nothing will fill
+   *   it and the pill paints only the values it has.
+   * - `none`: no cost to paint.
    */
   costSlot: PillCostSlot;
   tone: ContextTone;
@@ -102,10 +99,10 @@ export type HeaderPillContent = {
 type PillCostSlot = 'label' | 'loading' | 'unreported' | 'none';
 
 /**
- * Value-slot placeholder of a session that has not reported usage yet. It marks
- * the slot as unfilled instead of standing in for a number: the pill keeps its
- * two slots while the session resolves, so a settled pill fills the slots it
- * already showed rather than growing a value out of a bare ring.
+ * The reading of a session whose usage has no denominator: it reported tokens
+ * but no context window to divide them by. It is a real value, not a
+ * placeholder, so the pill paints it; a value that has not arrived paints
+ * nothing at all.
  */
 const UNKNOWN_WINDOW_LABEL = '—';
 
@@ -146,16 +143,13 @@ export function getHeaderPillContent({
   }
 
   const costText = hasMessages ? formatSessionCostBadge(totalCostMicrodollars) : null;
-  // Nothing has reported usage yet. A settled pill keeps both value slots, each
-  // marked with the dash, instead of collapsing to a bare ring: the header then
-  // reads as the same pill before and after the transcript resolves, and the
-  // slots it showed fill in place. Neither dash stands in for a value that has
-  // arrived; while the open resolves they lay out the row the values will take
-  // and the pill paints one bar across it.
+  // Nothing has reported usage yet, so the pill paints nothing beside its ring:
+  // a value that has not arrived is not a value, and painting a dash for it
+  // would read as a reading that is still pending.
   if (!hasMessages) {
     return {
-      primary: UNKNOWN_WINDOW_LABEL,
-      secondary: UNKNOWN_WINDOW_LABEL,
+      primary: null,
+      secondary: null,
       costSlot: loading ? 'loading' : 'unreported',
       tone: 'neutral',
       arcFraction: 0,
@@ -164,13 +158,13 @@ export function getHeaderPillContent({
     };
   }
   // A transcript without usage. The pill keeps the track-only ring and, when
-  // this screen already knows it, the session's cost, and never a dash standing
-  // in for a value that has not arrived; only the dash above, for usage without
-  // a context window, is a real value.
+  // this screen already knows it, the session's cost; it never paints a dash
+  // standing in for a value that has not arrived. Only the dash above, for
+  // usage without a context window, is a real value.
   return {
-    primary: costText,
-    secondary: null,
-    costSlot: 'none',
+    primary: null,
+    secondary: costText,
+    costSlot: costText === null ? 'none' : 'label',
     tone: 'neutral',
     arcFraction: 0,
     interactive: false,

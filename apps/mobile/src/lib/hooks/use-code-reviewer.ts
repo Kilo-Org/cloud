@@ -241,11 +241,12 @@ export function gitLabWebhookWarningQueryKey(scope: string, platform: ReviewerPl
  * sync repository webhooks (`saveReviewConfig` still resolves `success:
  * true` in that case — the sync errors are nested in `webhookSync.errors`
  * and easy to miss). Stored in the query cache rather than component state
- * so it survives navigation. `useSaveReviewConfig`'s mutationFn recomputes
- * this flag from the fresh `webhookSync.errors` on every successful save
- * (including a "Retry" that just resubmits the current config), so it
- * clears itself once the sync actually succeeds — there is no separate
- * dismiss action.
+ * so it survives navigation. Only a save that carries the repository
+ * selection can re-run the project-hook sync, so `useSaveReviewConfig`'s
+ * mutationFn rewrites this flag from the fresh `webhookSync.errors` for such
+ * a save (including a "Retry" that resends the current selection), and only
+ * when the response reports a sync at all. It clears once a sync actually
+ * succeeds — there is no separate dismiss action.
  */
 export function useGitLabWebhookWarning(scope: string, platform: ReviewerPlatform) {
   const queryKey = gitLabWebhookWarningQueryKey(scope, platform);
@@ -363,11 +364,18 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
         if (!result.success) {
           throw new Error(i18n.t('codeReviewer.configSaveFailed'));
         }
-        if (platform === 'gitlab') {
-          queryClient.setQueryData<boolean>(
-            webhookWarningQueryKey,
-            (result.webhookSync?.errors.length ?? 0) > 0
-          );
+        // Webhook health is evidence, not the absence of it: only a patch that
+        // carries the selection can re-run the project-hook sync, and the
+        // server reports `webhookSync: null` when it skips the sync (no
+        // connected integration, or no stored hook secret). A save that edits
+        // anything else, or one whose sync never ran, must not dismiss a
+        // warning whose hooks were not re-checked.
+        const webhookSync =
+          platform === 'gitlab' && rawSelectedRepositoryIds !== undefined
+            ? result.webhookSync
+            : null;
+        if (webhookSync !== null) {
+          queryClient.setQueryData<boolean>(webhookWarningQueryKey, webhookSync.errors.length > 0);
         }
         return result;
       }),

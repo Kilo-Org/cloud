@@ -238,9 +238,13 @@ export function PlatformOverviewScreen({
                     variant="outline"
                     size="sm"
                     className={cn(STATE_ACTION_CLASS, 'flex-row gap-2')}
-                    disabled={save.isPending}
+                    disabled={!canEdit || save.isPending}
                     onPress={() => {
-                      save.mutate({});
+                      // The PATCH routers re-sync project hooks only for a
+                      // patch that carries the repository selection, so the
+                      // retry re-sends the current one. An empty patch neither
+                      // syncs nor proves the hooks healthy.
+                      save.mutate({ selectedRepositoryIds: data.selectedRepositoryIds });
                     }}
                   >
                     {save.isPending ? (

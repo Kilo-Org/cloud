@@ -58,10 +58,10 @@ const trackOnly: HeaderPillContent = {
 /** A transcript without usage: the same ring, no dash slot. */
 const trackOnlyWhileLoading: HeaderPillContent = { ...trackOnly, usageUnavailable: false };
 
-/** No usage reported yet: both value slots stay open, the cost one with a dash. */
+/** No usage reported yet: the pill paints nothing beside its ring. */
 const unreported: HeaderPillContent = {
-  primary: '—',
-  secondary: '—',
+  primary: null,
+  secondary: null,
   costSlot: 'unreported',
   tone: 'neutral',
   arcFraction: 0,
@@ -70,9 +70,8 @@ const unreported: HeaderPillContent = {
 };
 
 /**
- * The same pill while the session still resolves: the two dashes keep the row's
- * layout and paint invisible, with one bar across it, so the pill is already as
- * wide as its settled form.
+ * The same pill while the session still resolves: nothing paints, and the
+ * accessibility label says a cost is coming.
  */
 const unreportedWhileLoading: HeaderPillContent = {
   ...unreported,
@@ -158,7 +157,7 @@ describe('formatRemainingTokens', () => {
 });
 
 describe('getHeaderPillContent', () => {
-  it('keeps both value slots open, non-interactive, with no info and no transcript', () => {
+  it('paints no reading before a transcript exists', () => {
     expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false })).toEqual(unreported);
     expect(pill({ totalCostMicrodollars: 0, hasMessages: false })).toEqual(unreported);
     expect(pill({ totalCostMicrodollars: null, hasMessages: false })).toEqual(unreported);
@@ -264,9 +263,9 @@ describe('getHeaderPillContent', () => {
 
   it('shows cost only, not interactive, arc 0 when transcript exists without context', () => {
     expect(pill({ totalCostMicrodollars: 80_000, hasMessages: true })).toEqual({
-      primary: '$0.08',
-      secondary: null,
-      costSlot: 'none',
+      primary: null,
+      secondary: '$0.08',
+      costSlot: 'label',
       tone: 'neutral',
       arcFraction: 0,
       interactive: false,
@@ -598,6 +597,10 @@ describe('pure integration fallback', () => {
     const result = pill({ totalCostMicrodollars: 80_000, hasMessages: true });
     expect(result.interactive).toBe(false);
     expect(result.arcFraction).toBe(0);
-    expect(result.primary).toBe('$0.08');
+    // The cost takes the cost slot, which holds the widest badge; the
+    // percentage slot stays reserved and empty.
+    expect(result.primary).toBeNull();
+    expect(result.secondary).toBe('$0.08');
+    expect(result.costSlot).toBe('label');
   });
 });

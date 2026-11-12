@@ -277,8 +277,8 @@ describe('PreparationGroup incomplete restore', () => {
       )[0];
     expect(row('Workspace setup')?.findAllByType('Check')).toHaveLength(1);
     expect(row('Workspace setup')?.findAllByType('AlertCircle')).toHaveLength(0);
-    expect(row('Starting sandbox')?.findAllByType('AlertCircle')).toHaveLength(1);
-    expect(row('Starting sandbox')?.findAllByType('Check')).toHaveLength(0);
+    expect(row('Sandbox start')?.findAllByType('AlertCircle')).toHaveLength(1);
+    expect(row('Sandbox start')?.findAllByType('Check')).toHaveLength(0);
     mounted.unmount();
   });
 

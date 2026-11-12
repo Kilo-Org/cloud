@@ -15,7 +15,7 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
 import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
-import { OwnedKeyboardLift } from '@/components/agents/owned-keyboard-lift';
+import { OwnedKeyboardLift, useKeyboardLiftPad } from '@/components/agents/owned-keyboard-lift';
 import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
 import { SESSION_FILTERS_KEY } from '@/lib/storage-keys';
@@ -73,6 +73,7 @@ export function SessionHistoryScreen() {
     restoreSettled: searchDraftState.settled,
   });
   const keyboard = useOwnedKeyboard();
+  const keyboardLift = useKeyboardLiftPad(keyboard.occlusion);
 
   const ready = filtersLoaded && orgLoaded;
 
@@ -273,7 +274,9 @@ export function SessionHistoryScreen() {
         }
       />
       <SessionListTouchGate>
-        <OwnedKeyboardLift occlusion={keyboard.occlusion}>{sessionListBody}</OwnedKeyboardLift>
+        <OwnedKeyboardLift pad={keyboardLift.pad} onLayout={keyboardLift.handleLayout}>
+          {sessionListBody}
+        </OwnedKeyboardLift>
       </SessionListTouchGate>
       <SessionFilterModal
         visible={showFilterModal}

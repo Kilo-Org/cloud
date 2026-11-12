@@ -41,8 +41,10 @@ import {
   isAutoFreeEligibleModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
-import { isVercelModel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import {
+  isVercelModel,
+  isVercelRoutingEnabledForModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { getCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { getCustomLlmApiKinds } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/api-kinds';
 import {
@@ -87,10 +89,9 @@ async function getEligibleAutoFreeModels(
   const configuredModels = await getConfiguredAutoFreeModels();
   if (!configuredModels) return [AUTO_FREE_FALLBACK_MODEL];
 
-  const [openRouterModels, customLlmsById, routingConfig] = await Promise.all([
+  const [openRouterModels, customLlmsById] = await Promise.all([
     getOpenRouterModelsFromDatabase(),
     getCustomLlmsById(),
-    getRuntimeGatewayRoutingConfig(),
   ]);
   const isEligible = async (model: string) => {
     const customLlm = customLlmsById.get(model.toLowerCase());
@@ -100,9 +101,7 @@ async function getEligibleAutoFreeModels(
     }
     return (
       openRouterModels.has(model) ||
-      (routingConfig.vercelEnabled &&
-        !routingConfig.vercelOptOutModels.has(model) &&
-        (await isVercelModel(model)))
+      ((await isVercelRoutingEnabledForModel(model)) && (await isVercelModel(model)))
     );
   };
   const eligible = await Promise.all(configuredModels.map(({ model }) => isEligible(model)));

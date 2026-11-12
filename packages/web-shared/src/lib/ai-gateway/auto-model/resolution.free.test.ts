@@ -6,6 +6,7 @@ import { getConfiguredAutoFreeModels } from '@kilocode/web-shared/lib/ai-gateway
 import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
 import type * as AutoFreeConfigModule from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type * as VercelModule from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   customLlmDefinition,
   deleteCustomLlmForTest,
@@ -28,6 +29,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
+  ...jest.requireActual<typeof VercelModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/vercel'
+  ),
   isVercelModel: jest.fn(async (model: string) => model === 'reflection/beam-free'),
 }));
 

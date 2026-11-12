@@ -118,6 +118,18 @@ export async function shouldRouteToVercel(
     return false;
   }
 
+  if (!(await isVercelRoutingEnabledForModel(requestedModel))) {
+    return false;
+  }
+
+  return await canRouteToVercel(requestedModel, getRoutingProviderConfig);
+}
+
+/**
+ * Whether Kilo's routing config sends the model to Vercel: Vercel routing is on and the model is
+ * not opted out. Vercel must still serve the model.
+ */
+export async function isVercelRoutingEnabledForModel(requestedModel: string) {
   const routingConfig = await getRuntimeGatewayRoutingConfig();
   if (!routingConfig.vercelEnabled) {
     return false;
@@ -128,7 +140,7 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  return await canRouteToVercel(requestedModel, getRoutingProviderConfig);
+  return true;
 }
 
 /** Whether Vercel serves the model, regardless of the request's routing settings. */

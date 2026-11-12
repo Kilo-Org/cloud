@@ -145,6 +145,30 @@ describe('durable terminal revocation cleanup', () => {
     expect(await revocations.hasUnconfirmed()).toBe(false);
   });
 
+  it('stops outage alarms after five minutes across eviction and retains unconfirmed cleanup', async () => {
+    const { revocations, create, getWrapperId, request, reportUnconfirmed } = fixture();
+    await revocations.enqueue(record);
+    getWrapperId.mockResolvedValue(undefined);
+    await revocations.drain();
+    for (let probe = 0; probe < 10; probe++) {
+      expect(await create().nextAttemptAt()).toBe(Date.now() + 30_000);
+      await vi.advanceTimersByTimeAsync(30_000);
+      await create().drain();
+    }
+    expect(await create().nextAttemptAt()).toBeNull();
+    expect(await create().hasUnconfirmed()).toBe(true);
+    expect(request).not.toHaveBeenCalled();
+    expect(reportUnconfirmed).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(60_000);
+    await create().drain();
+    expect(await create().nextAttemptAt()).toBeNull();
+    expect(reportUnconfirmed).toHaveBeenCalledOnce();
+    getWrapperId.mockResolvedValue(record.wrapperId);
+    await create().drain();
+    expect(request).toHaveBeenCalledOnce();
+    expect(await create().hasUnconfirmed()).toBe(false);
+  });
+
   it('schedules persisted paused obligations from an older instance', async () => {
     const { revocations, create, values, getWrapperId, request } = fixture();
     await revocations.enqueue(record);

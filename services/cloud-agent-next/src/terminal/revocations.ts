@@ -4,6 +4,7 @@ import type { SandboxTerminalRecord } from '../sandbox-session/terminal-bridge.j
 const PREFIX = 'control_terminal_revocation:';
 const RETRY_MS = 5_000;
 const WRAPPER_PROBE_MS = 30_000;
+const WRAPPER_PROBE_BUDGET_MS = 5 * 60_000;
 const MAX_ATTEMPTS = 3;
 const REQUEST_TIMEOUT_MS = 5_000;
 
@@ -27,9 +28,10 @@ const pendingSchema = z.object({
   session: z.object({ sessionId: z.string(), kiloSessionId: z.string(), directory: z.string() }),
   attempts: z.number().int().min(0).max(MAX_ATTEMPTS),
   nextAt: z.number().int().nonnegative().nullable(),
+  probeUntil: z.number().int().nonnegative().optional(),
 });
 type Pending = z.infer<typeof pendingSchema>;
-export type TerminalRevocation = Omit<Pending, 'attempts' | 'nextAt'>;
+export type TerminalRevocation = Omit<Pending, 'attempts' | 'nextAt' | 'probeUntil'>;
 type Deps = {
   storage: Pick<DurableObjectStorage, 'get' | 'put' | 'delete' | 'list'>;
   getWrapperId: () => Promise<string | undefined>;
@@ -85,10 +87,19 @@ export function createTerminalRevocations(deps: Deps) {
       if (item.attempts === MAX_ATTEMPTS || (item.nextAt !== null && item.nextAt > Date.now()))
         continue;
       if (wrapperId === undefined) {
-        // Keep an alarm scheduled without spending a close attempt during an outage.
+        const probeUntil = item.probeUntil ?? Date.now() + WRAPPER_PROBE_BUDGET_MS;
+        if (Date.now() >= probeUntil) {
+          if (item.nextAt !== null) {
+            await deps.storage.put(key, { ...item, probeUntil, nextAt: null } satisfies Pending);
+            deps.reportUnconfirmed(item.ptyId);
+          }
+          continue;
+        }
+        // Outages do not consume close attempts or keep the alarm alive indefinitely.
         await deps.storage.put(key, {
           ...item,
-          nextAt: Date.now() + WRAPPER_PROBE_MS,
+          probeUntil,
+          nextAt: Math.min(Date.now() + WRAPPER_PROBE_MS, probeUntil),
         } satisfies Pending);
         continue;
       }
@@ -121,9 +132,12 @@ export function createTerminalRevocations(deps: Deps) {
   }
 
   async function nextAttemptAt(): Promise<number | null> {
-    const times = (await pending()).flatMap(item =>
-      item.attempts === MAX_ATTEMPTS ? [] : [item.nextAt ?? Date.now() + WRAPPER_PROBE_MS]
-    );
+    const times = (await pending()).flatMap(item => {
+      if (item.attempts === MAX_ATTEMPTS) return [];
+      if (item.nextAt !== null) return [item.nextAt];
+      if (item.probeUntil !== undefined && item.probeUntil <= Date.now()) return [];
+      return [Date.now() + WRAPPER_PROBE_MS];
+    });
     return times.length ? Math.min(...times) : null;
   }
 

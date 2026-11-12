@@ -63,7 +63,7 @@ export function ShareActiveLink({
         onPress={onCopy}
         accessibilityRole="button"
         accessibilityLabel={t('common.copyLink')}
-        className="rounded-md border border-border bg-secondary p-3 active:opacity-70"
+        className="min-h-[44px] justify-center rounded-md border border-border bg-secondary p-3 active:opacity-70"
         testID="session-share-url"
       >
         <Text variant="mono" className="text-xs text-foreground">

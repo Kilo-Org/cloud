@@ -145,4 +145,25 @@ describe('RoutingSections BYOK failover', () => {
     expect(text).toContain(title);
     expect(text).not.toContain('Every BYOK key');
   });
+
+  it('does not say the Vercel AI Gateway key went through Vercel AI Gateway', () => {
+    const document = render(
+      routing([
+        openAiFailed,
+        {
+          provider_type: 'vercel',
+          byok_provider_ids: ['vercel-ai-gateway'],
+          status: 200,
+          duration_ms: 700,
+          outcome: 'served',
+        },
+      ])
+    );
+
+    const attempts = [...document.querySelectorAll('[aria-label="BYOK failover attempts"] li')].map(
+      row => row.textContent ?? ''
+    );
+    expect(attempts[0]).toContain('via Vercel AI Gateway');
+    expect(attempts[1]).not.toContain('via Vercel AI Gateway');
+  });
 });

@@ -18,7 +18,6 @@ import type {
   VercelProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   getCachedVercelInferenceProviderIdsForModel,
   getVercelModelsFromDatabase,
@@ -152,29 +151,14 @@ export async function isVercelModel(requestedModel: string) {
   return vercelModels.has(vercelModelId);
 }
 
-// The cached empty id set is the same instance for a whole TTL window, so warning once per distinct
-// empty snapshot reports an outage once per window instead of once per validated model id.
-let warnedMissingVercelModelMetadataFor: ReadonlySet<string> | null = null;
-
 /**
  * Whether a request to Vercel may name the model. Like `isValidOpenRouterModelId`, it assumes the
  * model is valid while Vercel's model list is unavailable, so requests through a user's own Vercel
  * key keep working during a metadata outage.
  */
 export async function isValidVercelModelId(requestedModel: string) {
-  const [vercelModels, vercelModelId] = await Promise.all([
-    getVercelModelsFromDatabase(),
-    mapModelIdToVercel(requestedModel),
-  ]);
-  if (vercelModels.size === 0) {
-    if (warnedMissingVercelModelMetadataFor !== vercelModels) {
-      warnedMissingVercelModelMetadataFor = vercelModels;
-      warnExceptInTest('[isValidVercelModelId] no model metadata available, assuming id is valid');
-    }
-    return true;
-  }
-  warnedMissingVercelModelMetadataFor = null;
-  return vercelModels.has(vercelModelId);
+  const vercelModels = await getVercelModelsFromDatabase();
+  return vercelModels.size === 0 || vercelModels.has(await mapModelIdToVercel(requestedModel));
 }
 
 /**

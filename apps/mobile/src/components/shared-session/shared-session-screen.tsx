@@ -69,7 +69,7 @@ export function SharedSessionScreen({ shareToken }: Readonly<{ shareToken: strin
     void query.refetch();
   };
 
-  let body: ReactNode;
+  let body: ReactNode = null;
   if (query.isError) {
     // A dead link is terminal: NOT_FOUND is the expired/revoked/rotated-out
     // answer, so the screen offers no retry that cannot succeed.

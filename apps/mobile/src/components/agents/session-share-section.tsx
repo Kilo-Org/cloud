@@ -2,7 +2,7 @@ import { type SessionShareDuration } from '@kilocode/session-ingest-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Share, View } from 'react-native';
 
@@ -174,6 +174,101 @@ export function SessionShareSection({
     label: t(DURATION_LABEL_KEYS[value]),
   }));
 
+  let actions: ReactNode;
+  if (createdUrl !== null) {
+    actions = (
+      <ActiveLink
+        url={createdUrl}
+        lifetime={duration}
+        includeNewMessages={includeNewMessages}
+        copyState={copyState}
+        busy={busy}
+        onCopy={() => {
+          void copyLink();
+        }}
+        onShare={() => {
+          void shareLink();
+        }}
+        onRevoke={revokeLink}
+      />
+    );
+  } else if (hasActiveLink) {
+    actions = (
+      <View className="gap-3">
+        <Text className="text-sm font-medium text-foreground" testID="session-share-active">
+          {t('sessionShare.activeTitle')}
+        </Text>
+        <Text variant="muted" className="text-xs">
+          {t('sessionShare.activeDescription')}
+        </Text>
+        <Button
+          variant="outline"
+          className="w-full"
+          loading={shareMutation.isPending}
+          disabled={busy}
+          onPress={createLink}
+          testID="session-share-rotate"
+        >
+          {t('sessionShare.rotate')}
+        </Button>
+        <Button
+          variant="outline-destructive"
+          className="w-full"
+          loading={unshareMutation.isPending}
+          disabled={busy}
+          onPress={revokeLink}
+          testID="session-share-revoke"
+        >
+          {t('sessionShare.revoke')}
+        </Button>
+      </View>
+    );
+  } else {
+    actions = (
+      <View className="gap-3">
+        <View className="gap-2">
+          <Text className="text-xs uppercase tracking-wide text-muted-foreground">
+            {t('sessionShare.durationLabel')}
+          </Text>
+          <SegmentedControl
+            options={durationLabels}
+            value={duration}
+            onChange={setDuration}
+            accessibilityLabel={t('sessionShare.durationLabel')}
+          />
+        </View>
+        <View className="flex-row items-center justify-between gap-3">
+          <View className="flex-1 gap-1">
+            <Text className="text-sm font-medium text-foreground">
+              {t('sessionShare.includeNewMessages')}
+            </Text>
+            <Text variant="muted" className="text-xs">
+              {includeNewMessages
+                ? t('sessionShare.includeNewMessagesOn')
+                : t('sessionShare.includeNewMessagesOff')}
+            </Text>
+          </View>
+          <Switch
+            testID="session-share-include-new"
+            accessibilityLabel={t('sessionShare.includeNewMessages')}
+            value={includeNewMessages}
+            disabled={busy}
+            onValueChange={setIncludeNewMessages}
+          />
+        </View>
+        <Button
+          className="w-full"
+          loading={shareMutation.isPending}
+          disabled={busy}
+          onPress={createLink}
+          testID="session-share-create"
+        >
+          {t('sessionShare.create')}
+        </Button>
+      </View>
+    );
+  }
+
   return (
     <View className="gap-3" testID="session-share-section">
       <Text className="text-sm font-semibold text-foreground">{t('sessionShare.title')}</Text>
@@ -181,93 +276,7 @@ export function SessionShareSection({
         {t('sessionShare.subtitle')}
       </Text>
 
-      {createdUrl !== null ? (
-        <ActiveLink
-          url={createdUrl}
-          lifetime={duration}
-          includeNewMessages={includeNewMessages}
-          copyState={copyState}
-          busy={busy}
-          onCopy={() => {
-            void copyLink();
-          }}
-          onShare={() => {
-            void shareLink();
-          }}
-          onRevoke={revokeLink}
-        />
-      ) : hasActiveLink ? (
-        <View className="gap-3">
-          <Text className="text-sm font-medium text-foreground" testID="session-share-active">
-            {t('sessionShare.activeTitle')}
-          </Text>
-          <Text variant="muted" className="text-xs">
-            {t('sessionShare.activeDescription')}
-          </Text>
-          <Button
-            variant="outline"
-            className="w-full"
-            loading={shareMutation.isPending}
-            disabled={busy}
-            onPress={createLink}
-            testID="session-share-rotate"
-          >
-            {t('sessionShare.rotate')}
-          </Button>
-          <Button
-            variant="outline-destructive"
-            className="w-full"
-            loading={unshareMutation.isPending}
-            disabled={busy}
-            onPress={revokeLink}
-            testID="session-share-revoke"
-          >
-            {t('sessionShare.revoke')}
-          </Button>
-        </View>
-      ) : (
-        <View className="gap-3">
-          <View className="gap-2">
-            <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-              {t('sessionShare.durationLabel')}
-            </Text>
-            <SegmentedControl
-              options={durationLabels}
-              value={duration}
-              onChange={setDuration}
-              accessibilityLabel={t('sessionShare.durationLabel')}
-            />
-          </View>
-          <View className="flex-row items-center justify-between gap-3">
-            <View className="flex-1 gap-1">
-              <Text className="text-sm font-medium text-foreground">
-                {t('sessionShare.includeNewMessages')}
-              </Text>
-              <Text variant="muted" className="text-xs">
-                {includeNewMessages
-                  ? t('sessionShare.includeNewMessagesOn')
-                  : t('sessionShare.includeNewMessagesOff')}
-              </Text>
-            </View>
-            <Switch
-              testID="session-share-include-new"
-              accessibilityLabel={t('sessionShare.includeNewMessages')}
-              value={includeNewMessages}
-              disabled={busy}
-              onValueChange={setIncludeNewMessages}
-            />
-          </View>
-          <Button
-            className="w-full"
-            loading={shareMutation.isPending}
-            disabled={busy}
-            onPress={createLink}
-            testID="session-share-create"
-          >
-            {t('sessionShare.create')}
-          </Button>
-        </View>
-      )}
+      {actions}
 
       {actionError !== null ? (
         <Text className="text-xs text-destructive" testID="session-share-error">

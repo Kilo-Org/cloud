@@ -14,11 +14,12 @@ import {
 } from '@kilocode/app-shared/home-widget';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications/schemas';
 
+import { formatGlanceableCount } from '@/lib/glanceable/count-format';
 import {
   type GlanceableCountKind,
   glanceableCountLines,
   glanceableScheduledAt,
-  glanceableSpokenLabel,
+  glanceableSpokenText,
   type GlanceableStatus,
   glanceableStatusCopyKey,
   type GlanceableSurfaceFlags,
@@ -182,6 +183,7 @@ export function buildGlanceableViewProps(
   // about — nothing waiting — instead of the generic no-work copy.
   const copy = (key: string): string =>
     key === 'glanceable.empty' ? translate('glanceable.noneWaiting') : translate(key);
+  const statusLine = statusKey === null ? null : copy(statusKey);
 
   const extras = getSurfaceExtras();
   const newestTitle = newestTitleFor(extras, status, translate);
@@ -196,7 +198,7 @@ export function buildGlanceableViewProps(
   );
   return {
     home,
-    statusLine: statusKey === null ? null : copy(statusKey),
+    statusLine,
     countLines,
     primaryLabel: primary === null ? null : translate(primary.key),
     primaryKind: primary === null ? null : primary.kind,
@@ -214,7 +216,9 @@ export function buildGlanceableViewProps(
     newestResultKind,
     newestResultLabel,
     newestResultAt: newestResultKind === null ? null : snapshot.newestResultAt,
-    accessibilityLabel: glanceableSpokenLabel(snapshot, flags, copy),
+    // Built from the values above, so the spoken text cannot name a count this
+    // frame does not draw.
+    accessibilityLabel: glanceableSpokenText(statusLine, countLines, copy, formatGlanceableCount),
   };
 }
 

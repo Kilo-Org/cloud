@@ -209,8 +209,7 @@ enum HomeWidgetRefreshStore {
             defaults.set(["scopeKey": config["scopeKey"]!, "accountEpoch": config["accountEpoch"]!], forKey: "homeWidgetTerminalFence")
             let copy = config["copy"] as? [String: String] ?? [:]
             defaults.set([["timestamp": Int(Date().timeIntervalSince1970 * 1000),
-              "props": ["statusLine": copy["privacy"] ?? "", "countLines": [], "primaryCount": 0,
-                "actions": ["approve": false, "newAgent": false]]]], forKey: timelineKey)
+              "props": HomeWidgetEntryProps.terminal(copy: copy)]], forKey: timelineKey)
             defaults.synchronize()
           }
         }
@@ -249,35 +248,14 @@ enum HomeWidgetRefreshStore {
         let baseProps = (stored?.first?["props"] as? [String: Any]) ?? [:]
         var entries = phases.compactMap { phase -> [String: Any]? in
           guard let at = phase["at"] as? Double, let presentation = phase["home"] as? [String: Any] else { return nil }
-          var props = baseProps
-          props["home"] = presentation
-          var counts = presentation["secondaryCounts"] as? [[String: Any]] ?? []
-          if let kind = presentation["primaryKind"] as? String, let count = presentation["primaryCount"] as? Int, count > 0 {
-            counts.insert(["kind": kind, "count": count], at: 0)
-          }
-          props["countLines"] = counts.map { count -> [String: Any] in
-            var line = count
-            line["label"] = copy[count["kind"] as? String ?? ""] ?? ""
-            return line
-          }
-          props["primaryKind"] = presentation["primaryKind"]
-          props["primaryCount"] = presentation["primaryCount"]
-          props["primaryLabel"] = copy[presentation["primaryKind"] as? String ?? ""]
-          let status = presentation["status"] as? String ?? "waiting"
-          props["statusLine"] = status == "content" ? nil : copy[status]
-          if let expires, at >= expires {
-            props["countLines"] = []
-            props["primaryKind"] = nil
-            props["primaryCount"] = 0
-            props["primaryLabel"] = nil
-            props["statusLine"] = copy["expired"]
-          }
-          props["actions"] = ["approve": presentation["canApprove"] as? Bool ?? false, "newAgent": presentation["canCreate"] as? Bool ?? false]
-          props["needsInputSince"] = snapshot["needsInputSince"]
-          props["scheduledAt"] = presentation["scheduledAt"]
-          props["newestTitle"] = nil
-          props["actionFeedback"] = nil
-          props["accessibilityLabel"] = counts.map { "\($0["count"] ?? 0) \(copy[$0["kind"] as? String ?? ""] ?? "")" }.joined(separator: ", ")
+          var props = HomeWidgetEntryProps.refreshed(
+            base: baseProps,
+            presentation: presentation,
+            snapshot: snapshot,
+            copy: copy,
+            at: at,
+            expires: expires
+          )
           // The rebuild owns the marker: strip every copy so only the carried
           // press below can put one back on the first entry while it is fresh.
           props.removeValue(forKey: "pendingAction")

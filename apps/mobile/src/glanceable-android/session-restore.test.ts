@@ -68,7 +68,11 @@ vi.mock('@/lib/glanceable/approve-ask', () => ({
 
 vi.mock('./count-format', () => ({
   formatGlanceableClock: (at: string) => at.slice(11, 16),
+}));
+vi.mock('@/lib/glanceable/count-format', () => ({
   formatGlanceableCount: String,
+  glanceableDigits: () => '',
+  glanceableGroupSeparator: () => ',',
 }));
 
 vi.mock('./ensure-notification-channels', () => ({

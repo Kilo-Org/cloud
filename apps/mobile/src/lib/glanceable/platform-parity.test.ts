@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { buildAndroidWidgetProps } from '@/glanceable-android/widget-props';
 import { buildGlanceableViewProps } from '@/glanceable-ios/view-props';
 
+import { formatGlanceableCount } from './count-format';
 import { type GlanceableActionFeedback, setSurfaceExtras } from './surface-extras';
 
 /**
@@ -38,6 +39,7 @@ const COPY: Record<string, string> = {
   'glanceable.couldNotApprove': 'Could not approve',
   'glanceable.newestSession': 'Newest: {{title}}',
   'common.approve': 'Approve',
+  'common.listJoiner': ', ',
 };
 const translate = (key: string): string => COPY[key] ?? key;
 
@@ -62,7 +64,9 @@ function snapshotFor(
 /** The state the user sees, as both builders describe it. */
 function visible(snapshot: GlanceableAgentsSnapshot) {
   const ios = buildGlanceableViewProps(snapshot, {}, translate);
-  const android = buildAndroidWidgetProps(snapshot, {}, translate);
+  // Android takes its formatter by injection and iOS reads the production one,
+  // so the shared formatter makes the spoken label comparable word for word.
+  const android = buildAndroidWidgetProps(snapshot, {}, translate, formatGlanceableCount);
   return {
     statusLine: [ios.statusLine, android.statusLine],
     countLines: [
@@ -106,6 +110,12 @@ describe('iOS and Android widget props parity', () => {
   it.each(MATRIX)('shows the same compact primary count for %s', (_label, snapshot) => {
     const seen = visible(snapshot);
     expect(seen.primaryLabel[1]).toBe(seen.primaryLabel[0]);
+  });
+
+  it('speaks a four-figure count with the same grouping on both platforms', () => {
+    const seen = visible({ ...snapshotFor([{ status: 'busy' }]), running: 1234 });
+    expect(seen.spoken[1]).toBe(seen.spoken[0]);
+    expect(seen.spoken[0]).toContain('1,234 Working');
   });
 
   const FEEDBACK: { label: string; feedback: GlanceableActionFeedback }[] = [

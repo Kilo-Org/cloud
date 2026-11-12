@@ -42,6 +42,7 @@ const COPY: Record<string, string> = {
   'glanceable.answerNeeded': 'Answer needed',
   'glanceable.waitingToRetry': 'Waiting to retry',
   'glanceable.scheduledWakes': 'wakes {{time}}',
+  'common.listJoiner': ', ',
 };
 const translate = (key: string) => COPY[key] ?? key;
 const clock = (at: string) => `clock:${at}`;

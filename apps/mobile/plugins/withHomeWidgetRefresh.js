@@ -11,7 +11,19 @@ const {
 const TARGET = 'ExpoWidgetsTarget';
 const GROUP = 'group.com.kilocode.kiloapp';
 const KEYCHAIN = '$(AppIdentifierPrefix)com.kilocode.kiloapp.home-widget-refresh';
-const FILES = ['HomeWidgetRefreshStore.swift', 'HomeWidgetTimelineProvider.swift'];
+// Each entry is the file name in the generated target and its path under
+// `modules/home-widget-refresh/ios`. The copy step and the Sources phase both
+// read this list, so a new extension source cannot reach one and miss the other.
+const SOURCES = [
+  { file: 'HomeWidgetRefreshStore.swift', path: 'HomeWidgetRefreshStore.swift' },
+  { file: 'HomeWidgetSpokenLabel.swift', path: 'HomeWidgetSpokenLabel.swift' },
+  { file: 'HomeWidgetEntryProps.swift', path: 'HomeWidgetEntryProps.swift' },
+  {
+    file: 'HomeWidgetTimelineProvider.swift',
+    path: 'WidgetExtension/HomeWidgetTimelineProvider.swift',
+  },
+];
+const FILES = SOURCES.map(entry => entry.file);
 
 function integrateProvider(source) {
   if (source.includes('HomeWidgetTimelineProvider(name: name)')) return source;
@@ -88,8 +100,9 @@ module.exports = function withHomeWidgetRefresh(config) {
       const module = path.join(cfg.modRequest.projectRoot, 'modules/home-widget-refresh/ios');
       if (!fs.existsSync(path.join(root, 'ActiveAgentsWidget.swift')))
         throw new Error('expo-widgets must generate its target before Home refresh');
-      fs.copyFileSync(path.join(module, FILES[0]), path.join(root, FILES[0]));
-      fs.copyFileSync(path.join(module, 'WidgetExtension', FILES[1]), path.join(root, FILES[1]));
+      for (const entry of SOURCES) {
+        fs.copyFileSync(path.join(module, entry.path), path.join(root, entry.file));
+      }
       const widgetPath = path.join(root, 'ActiveAgentsWidget.swift');
       fs.writeFileSync(widgetPath, integrateProvider(fs.readFileSync(widgetPath, 'utf8')));
       const infoPath = path.join(root, 'Info.plist');

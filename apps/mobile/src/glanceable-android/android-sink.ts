@@ -12,6 +12,7 @@ import {
 import { requestWidgetUpdate } from 'react-native-android-widget';
 
 import { i18n } from '@/i18n';
+import { formatGlanceableCount } from '@/lib/glanceable/count-format';
 import {
   getHomeWidgetDataForSnapshot,
   getLastHomeWidgetData,
@@ -30,12 +31,7 @@ import {
   setGlanceableActionNotice,
 } from './action-notice';
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
-import {
-  formatGlanceableAgo,
-  formatGlanceableClock,
-  formatGlanceableCount,
-  isWidgetRtl,
-} from './count-format';
+import { formatGlanceableAgo, formatGlanceableClock, isWidgetRtl } from './count-format';
 import { ensureAndroidNotificationChannels } from './ensure-notification-channels';
 import {
   end as endLiveUpdate,

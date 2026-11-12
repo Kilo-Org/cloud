@@ -176,6 +176,6 @@ export function buildAndroidHomeCopy(
       translate('glanceable.openAgents'),
     ]
       .filter(Boolean)
-      .join(', '),
+      .join(translate('common.listJoiner')),
   };
 }

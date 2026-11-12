@@ -5,9 +5,10 @@ import {
 
 import { formatSessionTotalCost } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';
+import { formatGlanceableCount } from '@/lib/glanceable/count-format';
 import { launcherSessionUrl } from '@/lib/launcher-surfaces';
 
-import { formatGlanceableClock, formatGlanceableCount } from './count-format';
+import { formatGlanceableClock } from './count-format';
 import { type SessionCardScope, type SessionNotificationCard } from './session-notification';
 
 /**

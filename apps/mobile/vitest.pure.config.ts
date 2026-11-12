@@ -72,6 +72,7 @@ export default defineProject({
       'src/lib/app-actions/**/*.test.ts',
       'src/lib/app-actions/**/!(*.mounted).test.tsx',
       'modules/kilo-app-actions/*.test.ts',
+      'modules/home-widget-refresh/*.test.ts',
       'modules/kilo-apple-model/*.test.ts',
       'src/lib/query/**/*.test.ts',
       'src/lib/settings/**/*.test.ts',

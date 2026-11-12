@@ -10,6 +10,7 @@ import {
   glanceableScheduledAt,
   glanceableSpokenLabel,
   glanceableSpokenLabelKeys,
+  glanceableSpokenText,
   glanceableStatusCopyKey,
   primaryGlanceableCount,
   resolveGlanceableStatus,
@@ -174,38 +175,6 @@ describe('spoken label shape', () => {
     ]);
   });
 });
-describe('numeric spoken label', () => {
-  it('speaks numeric counts then Open agents for happy', () => {
-    const happy = snapshot({
-      sessions: [{ status: 'busy' }, { status: 'busy' }, { status: 'question' }],
-    });
-    expect(glanceableSpokenLabel(happy, {}, key => key)).toBe(
-      '1 glanceable.needsInput, 2 common.working, glanceable.openAgents'
-    );
-  });
-
-  it('speaks the status word, numeric counts, then Open agents for stale', () => {
-    const stale = snapshot({ sessions: [{ status: 'busy' }], status: 'stale' });
-    expect(glanceableSpokenLabel(stale, {}, key => key)).toBe(
-      'glanceable.stale, 1 common.working, glanceable.openAgents'
-    );
-  });
-
-  it('speaks the status word then Open agents when no counts exist', () => {
-    expect(glanceableSpokenLabel(snapshot({ status: 'empty' }), {}, key => key)).toBe(
-      'glanceable.empty, glanceable.openAgents'
-    );
-  });
-
-  it('never speaks a title, organization name, or raw id', () => {
-    const spoken = glanceableSpokenLabel(
-      snapshot({ sessions: [{ status: 'busy' }] }),
-      {},
-      key => key
-    );
-    expect(spoken).not.toContain('u1');
-  });
-});
 
 describe('numeric spoken label', () => {
   const copy: Record<string, string> = {
@@ -220,8 +189,12 @@ describe('numeric spoken label', () => {
     'glanceable.signedOut': 'Sign in to see agents',
     'glanceable.privacy': 'Open Kilo to see agents',
     'glanceable.openAgents': 'Open agents',
+    'common.listJoiner': ', ',
   };
   const translate = (key: string): string => copy[key] ?? key;
+  /** Identity wording with the list joiner resolved, so the key name is not the separator. */
+  const spokenKey = (key: string): string => (key === 'common.listJoiner' ? ', ' : key);
+  const plain = String;
   const mixed = {
     ...snapshot({ status: 'happy' }),
     needsInput: 2,
@@ -229,20 +202,52 @@ describe('numeric spoken label', () => {
     running: 4,
   };
 
+  it('speaks numeric counts then Open agents for happy', () => {
+    const happy = snapshot({
+      sessions: [{ status: 'busy' }, { status: 'busy' }, { status: 'question' }],
+    });
+    expect(glanceableSpokenLabel(happy, {}, spokenKey, plain)).toBe(
+      '1 glanceable.needsInput, 2 common.working, glanceable.openAgents'
+    );
+  });
+
+  it('speaks the status word, numeric counts, then Open agents for stale', () => {
+    const stale = snapshot({ sessions: [{ status: 'busy' }], status: 'stale' });
+    expect(glanceableSpokenLabel(stale, {}, spokenKey, plain)).toBe(
+      'glanceable.stale, 1 common.working, glanceable.openAgents'
+    );
+  });
+
+  it('speaks the status word then Open agents when no counts exist', () => {
+    expect(glanceableSpokenLabel(snapshot({ status: 'empty' }), {}, spokenKey, plain)).toBe(
+      'glanceable.empty, glanceable.openAgents'
+    );
+  });
+
+  it('never speaks a title, organization name, or raw id', () => {
+    const spoken = glanceableSpokenLabel(
+      snapshot({ sessions: [{ status: 'busy' }] }),
+      {},
+      spokenKey,
+      plain
+    );
+    expect(spoken).not.toContain('u1');
+  });
+
   it('speaks each numeric count in rank order before Open agents', () => {
-    expect(glanceableSpokenLabel(mixed, {}, translate)).toBe(
+    expect(glanceableSpokenLabel(mixed, {}, translate, plain)).toBe(
       '2 Needs input, 4 Working, 3 Idle, Open agents'
     );
   });
 
   it('speaks the translated stale warning before retained numeric counts', () => {
-    expect(glanceableSpokenLabel({ ...mixed, status: 'stale' }, {}, translate)).toBe(
+    expect(glanceableSpokenLabel({ ...mixed, status: 'stale' }, {}, translate, plain)).toBe(
       'Updates delayed, 2 Needs input, 4 Working, 3 Idle, Open agents'
     );
   });
 
   it('speaks stale copy without inventing counts when none remain', () => {
-    expect(glanceableSpokenLabel(snapshot({ status: 'stale' }), {}, translate)).toBe(
+    expect(glanceableSpokenLabel(snapshot({ status: 'stale' }), {}, translate, plain)).toBe(
       'Updates delayed, Open agents'
     );
   });
@@ -254,16 +259,59 @@ describe('numeric spoken label', () => {
     ['signed_out', 'Sign in to see agents, Open agents'],
     ['privacy', 'Open Kilo to see agents, Open agents'],
   ] as const)('hides numeric counts when the status is %s', (status, expected) => {
-    expect(glanceableSpokenLabel({ ...mixed, status }, {}, translate)).toBe(expected);
+    expect(glanceableSpokenLabel({ ...mixed, status }, {}, translate, plain)).toBe(expected);
   });
 
   it('keeps signed-out and privacy overrides ahead of stale counts', () => {
     const stale = { ...mixed, status: 'stale' as const };
-    expect(glanceableSpokenLabel(stale, { signedOut: true, orgInvalid: true }, translate)).toBe(
-      'Sign in to see agents, Open agents'
-    );
-    expect(glanceableSpokenLabel(stale, { orgInvalid: true }, translate)).toBe(
+    expect(
+      glanceableSpokenLabel(stale, { signedOut: true, orgInvalid: true }, translate, plain)
+    ).toBe('Sign in to see agents, Open agents');
+    expect(glanceableSpokenLabel(stale, { orgInvalid: true }, translate, plain)).toBe(
       'Open Kilo to see agents, Open agents'
+    );
+  });
+
+  it('writes each count with the surface formatter', () => {
+    expect(glanceableSpokenLabel(mixed, {}, translate, value => `«${value}`)).toBe(
+      '«2 Needs input, «4 Working, «3 Idle, Open agents'
+    );
+  });
+});
+
+describe('spoken text from the values a surface draws', () => {
+  const copy: Record<string, string> = {
+    'glanceable.openAgents': 'Open agents',
+    'common.listJoiner': '، ',
+  };
+  const translate = (key: string): string => copy[key] ?? key;
+  const arabic = (value: number): string => `digit:${value}`;
+
+  it('joins the parts with the catalog’s own list separator', () => {
+    // Arabic separates its list items with its own comma and space, so a
+    // literal ", " would leave the spoken label in the wrong language.
+    expect(
+      glanceableSpokenText(
+        null,
+        [
+          { label: 'قيد الانتظار', count: 2 },
+          { label: 'عامل', count: 4 },
+        ],
+        translate,
+        arabic
+      )
+    ).toBe('digit:2 قيد الانتظار، digit:4 عامل، Open agents');
+  });
+
+  it('speaks the status alone when the surface draws no counts', () => {
+    expect(glanceableSpokenText('Status expired', [], translate, arabic)).toBe(
+      'Status expired، Open agents'
+    );
+  });
+
+  it('skips a zero count that only holds the layout still', () => {
+    expect(glanceableSpokenText(null, [{ label: 'Idle', count: 0 }], translate, arabic)).toBe(
+      'Open agents'
     );
   });
 });

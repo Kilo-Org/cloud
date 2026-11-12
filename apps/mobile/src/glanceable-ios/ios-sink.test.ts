@@ -1468,16 +1468,19 @@ describe('buildGlanceableViewProps', () => {
   });
 
   it('speaks the status word, numeric counts, then Open agents', () => {
+    // Identity wording keeps the copy keys visible; the list joiner still
+    // resolves, because a label joined with its own key name would prove nothing.
+    const spoken = (key: string): string => (key === 'common.listJoiner' ? ', ' : key);
     const stale = buildGlanceableViewProps(
       snapshotFor([{ status: 'busy' }, { status: 'busy' }, { status: 'question' }], 1, 'stale'),
       {},
-      key => key
+      spoken
     );
     expect(stale.accessibilityLabel).toBe(
       'glanceable.stale, 1 glanceable.needsInput, 2 common.working, glanceable.openAgents'
     );
 
-    const happy = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, key => key);
+    const happy = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, spoken);
     expect(happy.accessibilityLabel).toBe('1 common.working, glanceable.openAgents');
 
     const empty = buildGlanceableSnapshot({
@@ -1487,7 +1490,7 @@ describe('buildGlanceableViewProps', () => {
       previousRevision: 1,
       status: 'empty',
     });
-    expect(buildGlanceableViewProps(empty, {}, key => key).accessibilityLabel).toBe(
+    expect(buildGlanceableViewProps(empty, {}, spoken).accessibilityLabel).toBe(
       'glanceable.noneWaiting, glanceable.openAgents'
     );
   });

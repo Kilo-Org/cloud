@@ -11,6 +11,6 @@ Pod::Spec.new do |s|
   s.swift_version = '5.9'
   s.static_framework = true
   s.dependency 'ExpoModulesCore'
-  s.source_files = 'HomeWidgetRefreshModule.swift', 'HomeWidgetRefreshStore.swift'
+  s.source_files = 'HomeWidgetRefreshModule.swift', 'HomeWidgetRefreshStore.swift', 'HomeWidgetSpokenLabel.swift', 'HomeWidgetEntryProps.swift'
   s.frameworks = 'Security', 'WidgetKit'
 end

@@ -1,6 +1,11 @@
 import { i18n } from '@/i18n';
+import { glanceableDigits, glanceableGroupSeparator } from '@/lib/glanceable/count-format';
 
-/** Both native renderers and the background provider use the same translated labels. */
+/**
+ * Both native renderers and the background provider use the same translated
+ * labels. `digits` and `group` are the app language's number data, which the
+ * iOS widget process needs for the counts it writes into its spoken label.
+ */
 export function getHomeWidgetCopy() {
   return {
     needsInput: i18n.t('glanceable.needsInput'),
@@ -11,6 +16,8 @@ export function getHomeWidgetCopy() {
     empty: i18n.t('home.noLiveSessions'),
     signed_out: i18n.t('glanceable.signedOut'),
     privacy: i18n.t('glanceable.privacy'),
+    expired: i18n.t('glanceable.expired'),
+    unavailable: i18n.t('glanceable.privacy'),
     checked: i18n.t('glanceable.checked'),
     lastKnown: i18n.t('glanceable.lastKnown'),
     awaitingUpdate: i18n.t('glanceable.awaitingUpdate'),
@@ -26,6 +33,9 @@ export function getHomeWidgetCopy() {
     approve: i18n.t('common.approve'),
     newAgent: i18n.t('glanceable.newAgent'),
     openAgents: i18n.t('glanceable.openAgents'),
+    listJoiner: i18n.t('common.listJoiner'),
+    digits: glanceableDigits(),
+    group: glanceableGroupSeparator(),
     locale: i18n.language,
   };
 }

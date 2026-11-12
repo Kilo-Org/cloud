@@ -132,21 +132,55 @@ export function glanceableSpokenLabelKeys(
 }
 
 /** Translated status, numeric counts in rank order, then the Open agents action. */
+// eslint-disable-next-line max-params -- snapshot, flags, the translator, and the surface's own count formatter
 export function glanceableSpokenLabel(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
-  translate: (key: string) => string
+  translate: (key: string) => string,
+  formatCount: (value: number) => string
 ): string {
   const status = resolveGlanceableStatus(snapshot, flags);
+  const counts =
+    status === 'happy' || status === 'stale'
+      ? glanceableCountLines(snapshot).map(({ key, count }) => ({ label: translate(key), count }))
+      : [];
+  return glanceableSpokenText(
+    status === 'happy' ? null : translate(GLANCEABLE_STATUS_COPY_KEY[status]),
+    counts,
+    translate,
+    formatCount
+  );
+}
+
+/**
+ * The spoken sentence of one rendered surface: the status line it shows, then
+ * each count it draws that is above zero, then the Open agents action.
+ *
+ * Every surface builds this from what it renders rather than from the snapshot,
+ * so a surface that hides its counts (expired, signed out, privacy) never
+ * announces them. The parts are joined the way the catalog joins a list, and
+ * each count is written by the surface's own formatter, because the widget
+ * process has no `Intl`.
+ */
+// eslint-disable-next-line max-params -- the status line, its counts, the translator, and the surface's count formatter
+export function glanceableSpokenText(
+  statusLine: string | null,
+  counts: readonly { label: string; count: number }[],
+  translate: (key: string) => string,
+  formatCount: (value: number) => string
+): string {
   const parts: string[] = [];
-  if (status !== 'happy') {
-    parts.push(translate(GLANCEABLE_STATUS_COPY_KEY[status]));
+  if (statusLine !== null && statusLine.length > 0) {
+    parts.push(statusLine);
   }
-  if (status === 'happy' || status === 'stale') {
-    for (const { key, count } of glanceableCountLines(snapshot).filter(line => line.count > 0)) {
-      parts.push(`${count} ${translate(key)}`);
+  for (const { label, count } of counts) {
+    if (count > 0) {
+      parts.push(`${formatCount(count)} ${label}`);
     }
   }
-  parts.push(translate('glanceable.openAgents'));
-  return parts.join(', ');
+  const openAgents = translate('glanceable.openAgents');
+  if (openAgents.length > 0) {
+    parts.push(openAgents);
+  }
+  return parts.join(translate('common.listJoiner'));
 }

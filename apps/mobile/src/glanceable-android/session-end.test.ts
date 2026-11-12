@@ -72,7 +72,11 @@ vi.mock('@/lib/glanceable/approve-ask', () => ({ runGlanceableApprove: vi.fn() }
 
 vi.mock('./count-format', () => ({
   formatGlanceableClock: (at: string) => at.slice(11, 16),
+}));
+vi.mock('@/lib/glanceable/count-format', () => ({
   formatGlanceableCount: String,
+  glanceableDigits: () => '',
+  glanceableGroupSeparator: () => ',',
 }));
 
 const NOW = Date.parse('2026-10-12T10:00:00.000Z');

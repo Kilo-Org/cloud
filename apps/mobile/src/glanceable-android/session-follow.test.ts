@@ -53,7 +53,11 @@ const mocks = vi.hoisted(() => ({
 // the times are asserted through the native post arguments below instead.
 vi.mock('./count-format', () => ({
   formatGlanceableClock: (at: string) => at.slice(11, 16),
+}));
+vi.mock('@/lib/glanceable/count-format', () => ({
   formatGlanceableCount: String,
+  glanceableDigits: () => '',
+  glanceableGroupSeparator: () => ',',
 }));
 
 vi.mock('./session-notification', () => ({

@@ -1386,10 +1386,14 @@ export function SessionDetailContent({
   // One destination object for every row: a fresh one per render would
   // re-create each memoized row's props. The session records the balance that
   // pays for it, so an organization's session is settled on that organization's
-  // billing page and a personal one on the in-app purchase screen.
+  // billing page and a personal one on the in-app purchase screen. Until the
+  // CURRENT session's metadata is the loaded one, that record is unknown, so the
+  // row offers no action rather than reading "no organization" from a load that
+  // has not answered yet — the fallback would be the personal balance.
   const addCredits = useMemo(
-    () => addCreditsDestinationFor(organizationId, handleAddCredits),
-    [handleAddCredits, organizationId]
+    () =>
+      sessionDataLoaded ? addCreditsDestinationFor(organizationId, handleAddCredits) : undefined,
+    [handleAddCredits, organizationId, sessionDataLoaded]
   );
 
   const handleRetryMessage = useCallback(

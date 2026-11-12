@@ -89,27 +89,35 @@ export function NewSessionCloudEnvironmentRow({
     </>
   );
 
+  const canOpen = opensPicker && !disabled;
+
   return (
     <View className="mt-5">
       <Text className="mb-2 text-sm font-medium text-muted-foreground">
         {t('agentChat.newSession.cloudEnvironment')}
       </Text>
       {/* The card's own chrome lives on the Pressable, exactly as the profile
-          row below does. An unstyled Pressable around a styled card is
-          flattened away by the native view hierarchy, and the row then paints
-          but never receives a touch: the press handlers never fire. */}
+          row below does, and the Pressable is never flattened: an unstyled
+          Pressable around a styled card collapses into that card's native view
+          and then paints without ever receiving a touch, so no press handler
+          fires in any pickable state. `onPress` carries the disable instead of
+          the `disabled` prop, which also suppresses press-in. */}
       {opensPicker ? (
         <Pressable
-          onPress={onOpen}
-          disabled={disabled}
+          testID="session-cloud-environment-row"
+          onPress={canOpen ? onOpen : undefined}
+          collapsable={false}
           accessibilityRole="button"
+          accessibilityState={{ disabled: !canOpen }}
           accessibilityLabel={t('agentChat.environment.environmentAccessibility', { label })}
-          className={cn(CARD_CLASS, disabled ? 'opacity-60' : 'active:opacity-70')}
+          className={cn(CARD_CLASS, canOpen ? 'active:opacity-70' : 'opacity-60')}
         >
           {body}
         </Pressable>
       ) : (
-        <View className={CARD_CLASS}>{body}</View>
+        <View testID="session-cloud-environment-row" className={CARD_CLASS}>
+          {body}
+        </View>
       )}
       {selection.status === 'unknown' ? (
         <Pressable

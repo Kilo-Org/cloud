@@ -28,6 +28,9 @@ const i18nManager = vi.hoisted(() => ({
   forceRTL: vi.fn(),
 }));
 const prevention = vi.hoisted(() => ({ enabled: false, disable: vi.fn() }));
+const sheetSurface = vi.hoisted(() => ({
+  topInset: 'bottom-form-sheet' as 'bottom-form-sheet' | 'android-window-top',
+}));
 // FlashList renders through a callback, so a host-string mock would drop every
 // row. This mock calls the render props so the row assertions still see rows.
 const flashListMock = vi.hoisted(
@@ -127,6 +130,11 @@ vi.mock('@/components/picker-sheet', () => ({
     ),
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+// The rule that decides who owns the top of the window is covered by its own
+// suite; here the harness owns its answer so the shell's prop is assertable.
+vi.mock('@/lib/navigation/sheet-header-top-inset', () => ({
+  useFormSheetHeaderTopInset: () => sheetSurface.topInset,
+}));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/icons', () => ({ Search: 'Search', SearchX: 'SearchX' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -738,6 +746,23 @@ describe('LanguagePickerSheet apply', () => {
     expect(i18n.language).toBe('en');
     expect(reloadAppAsync).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+});
+
+describe('LanguagePickerSheet header clearance', () => {
+  afterEach(() => {
+    sheetSurface.topInset = 'bottom-form-sheet';
+  });
+
+  it('hands the shell the rule for the surface that presents the sheet', async () => {
+    sheetSurface.topInset = 'android-window-top';
+    const renderer = await mountSheet(vi.fn<() => void>());
+
+    const shells = findByType(renderer.root, 'PickerSheet');
+    expect(shells).toHaveLength(1);
+    expect(shells[0]?.props.topInset).toBe('android-window-top');
 
     renderer.unmount();
   });

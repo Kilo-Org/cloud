@@ -28,6 +28,7 @@ import { resolveDeviceLanguage } from '@/i18n/resolve-language';
 import { isRtlLanguage } from '@/i18n/rtl';
 import { type LanguageReturnTarget } from '@/i18n/return-target';
 import { searchPickerHeaderInList } from '@/lib/form-sheet-detents';
+import { useFormSheetHeaderTopInset } from '@/lib/navigation/sheet-header-top-inset';
 import { cn } from '@/lib/utils';
 import {
   getLanguagePreference,
@@ -62,6 +63,11 @@ export function LanguagePickerSheet({
 }>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  // The shell that presents this sheet decides who owns the top of the window:
+  // a sheet pushed over another screen settles a status-bar inset lower, so its
+  // header reserves nothing; a sheet that is its stack's first screen reaches
+  // the window top, so its header clears the top system inset itself.
+  const sheetTopInset = useFormSheetHeaderTopInset();
   const colors = useThemeColors();
   // A sheet shorter than its header plus one row (a short window, and the
   // keyboard takes more of it) cannot show a pinned search field and a result
@@ -268,6 +274,7 @@ export function LanguagePickerSheet({
         cancelLabel={t('common.continue')}
         disabled={busy}
         scrollable={false}
+        topInset={sheetTopInset}
       >
         <CenteredState>
           <View className="items-center px-6">
@@ -292,6 +299,7 @@ export function LanguagePickerSheet({
         doneLabel={t('common.done')}
         disabled
         scrollable={false}
+        topInset={sheetTopInset}
       >
         <CenteredState>
           <View className="items-center gap-3 px-6">
@@ -359,6 +367,7 @@ export function LanguagePickerSheet({
       doneLabel={t('common.done')}
       disabled={busy}
       scrollable={false}
+      topInset={sheetTopInset}
       headerInBody={searchInList}
       headerContent={searchField}
     >

@@ -2438,6 +2438,9 @@ importers:
       '@hono/trpc-server':
         specifier: 0.4.2
         version: 0.4.2(@trpc/server@11.19.0(typescript@7.0.2))(hono@4.13.13)
+      '@kilocode/app-shared':
+        specifier: workspace:*
+        version: link:../../packages/app-shared
       '@kilocode/cloud-agent-profile':
         specifier: workspace:*
         version: link:../../packages/cloud-agent-profile
@@ -2557,6 +2560,9 @@ importers:
 
   services/code-review-infra:
     dependencies:
+      '@kilocode/app-shared':
+        specifier: workspace:*
+        version: link:../../packages/app-shared
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

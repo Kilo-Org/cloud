@@ -13,6 +13,7 @@ import {
   type CodeReviewTerminalReason as CloudAgentTerminalReason,
 } from '@kilocode/db/schema-types';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
+import type { GateThreshold } from '@kilocode/app-shared/code-review';
 import type { EgressMode } from './egress-allowlist.js';
 import type { SandboxAllocationInput } from './sandbox-allocation.js';
 import {
@@ -72,7 +73,7 @@ export type CloudAgentPrepareSessionInput = {
   upstreamBranch?: string;
   callbackTarget?: CallbackTarget;
   createdOnPlatform?: string;
-  gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  gateThreshold?: GateThreshold;
   sandboxAllocation?: SandboxAllocationInput;
   egressMode?: EgressMode;
   egressAllowlist?: string[];

@@ -15,6 +15,7 @@ import { Text } from '@/components/ui/text';
 import { useSheetHeaderTopClearance } from '@/lib/form-sheet';
 import { getKiloPassDetailState, type KiloPassDetail } from '@/lib/kilo-pass/state';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 /**
  * The screen's frame: one header for every state, above the body it owns. The
@@ -96,10 +97,17 @@ function KiloPassErrorScreen({ onRetry }: { onRetry: () => void }) {
 function KiloPassDetailBody({ detail }: { detail: Extract<KiloPassDetail, { kind: 'active' }> }) {
   return (
     <KiloPassFrame>
-      <DetailScreenScrollView contentContainerClassName="gap-4 px-5">
+      <DetailScreenScrollView contentContainerClassName="grow justify-center gap-4 px-5">
         <View className="gap-1">
           <Text className="text-base font-semibold text-foreground">{detail.planLabel}</Text>
-          <Text className="text-sm text-muted-foreground">{detail.statusLabel}</Text>
+          <Text
+            className={cn(
+              'text-sm',
+              detail.statusTone === 'danger' ? 'text-destructive' : 'text-muted-foreground'
+            )}
+          >
+            {detail.statusLabel}
+          </Text>
         </View>
         {detail.rows.length > 0 ? (
           <View className="rounded-lg bg-secondary px-3">

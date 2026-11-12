@@ -87,6 +87,7 @@ describe('getKiloPassDetailState', () => {
       kind: 'active',
       planLabel: 'Pro · Monthly',
       statusLabel: 'Active',
+      statusTone: 'default',
       rows: [
         { id: 'renewal', label: 'Renews', value: 'Dec 5, 2026' },
         { id: 'usage', label: "This month's usage", value: '$12.50 / $58.80' },
@@ -111,6 +112,20 @@ describe('getKiloPassDetailState', () => {
       label: 'Active until',
       value: 'Dec 5, 2026',
     });
+  });
+
+  it('flags a failed payment with the danger tone', () => {
+    const detail = getKiloPassDetailState({
+      subscription: subscription({ status: 'past_due' }),
+      isError: false,
+      isPending: false,
+    });
+
+    if (detail.kind !== 'active') {
+      throw new Error(`unexpected state: ${detail.kind}`);
+    }
+    expect(detail.statusLabel).toBe('Payment past due');
+    expect(detail.statusTone).toBe('danger');
   });
 
   it('prefers the resume date of a paused pass', () => {

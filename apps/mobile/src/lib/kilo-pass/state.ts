@@ -60,6 +60,8 @@ export type KiloPassDetail =
       kind: 'active';
       planLabel: string;
       statusLabel: string;
+      /** `danger` marks a pass whose payment needs the reader's attention. */
+      statusTone: 'default' | 'danger';
       rows: readonly KiloPassRow[];
     };
 
@@ -215,6 +217,10 @@ export function getKiloPassDetailState(params: KiloPassQueryFields): KiloPassDet
       kind: 'active',
       planLabel: planLabel(subscription),
       statusLabel: statusLabel(subscription),
+      statusTone:
+        subscription.status === 'past_due' || subscription.status === 'incomplete'
+          ? 'danger'
+          : 'default',
       rows: activeRows(subscription),
     };
   }

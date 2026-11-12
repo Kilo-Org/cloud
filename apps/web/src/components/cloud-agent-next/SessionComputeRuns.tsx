@@ -39,7 +39,9 @@ export function SessionComputeRuns({
   const instances = new Set(charges.runs.map(run => run.instance));
   const [instance] = instances;
   const meta = [
-    instances.size === 1 && instance ? computeInstanceLabel(instance) : null,
+    charges.earlierRuns === null && instances.size === 1 && instance
+      ? computeInstanceLabel(instance)
+      : null,
     runCount === 1 ? '1 run' : `${runCount} runs`,
   ]
     .filter(Boolean)

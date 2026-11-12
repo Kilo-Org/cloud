@@ -140,7 +140,7 @@ describe('SessionInfoDialog compute costs', () => {
   it('lists each sandbox run as duration times hourly rate, with earlier runs combined', () => {
     mockCompute = { data: workspaceCompute, isError: false };
     const markup = render();
-    expect(markup).toContain('Large · 3 runs');
+    expect(markup).toMatch(/>3 runs<\/span>/);
     expect(markup).toMatch(
       / – now<\/span><span[^>]*>20 min × \$1\.20\/hr<\/span><span[^>]*>\$0\.40</
     );

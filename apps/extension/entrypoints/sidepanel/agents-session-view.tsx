@@ -546,6 +546,9 @@ export const AgentsSessionView = ({
               return null;
             })()}
           </div>
+          {statusIndicator.detail === undefined ? null : (
+            <p className="mt-1 break-words text-foreground-muted">{statusIndicator.detail}</p>
+          )}
           {statusIndicator.type === 'error' && retryFailed ? (
             <p className="mt-1 break-words">
               Retrying did not help. Go back to the session list and start a new session.

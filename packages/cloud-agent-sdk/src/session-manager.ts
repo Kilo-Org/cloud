@@ -780,7 +780,24 @@ function isSelectedModelUnavailable(message: string | undefined): boolean {
   return message?.toLowerCase().includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ?? false;
 }
 
-type FormattedErrorDetail = { message: string; code: SdkStatusMessageCode };
+type FormattedErrorDetail = { message: string; code: SdkStatusMessageCode; detail?: string };
+
+const MAX_ERROR_DETAIL_CHARS = 240;
+const TRANSPORT_ERROR_TEXT =
+  /failed to fetch|fetch failed|network ?error|load failed|econn(refused|reset)|socket (hang up|closed)/i;
+
+/**
+ * The server's own reason for a failure the SDK has no copy for. It rides along
+ * as an optional detail so clients that render only `message` keep their exact
+ * current text, while a client that wants the cause can show it.
+ */
+function serverErrorReason(message: string | undefined): string | undefined {
+  if (message === undefined) return undefined;
+  const reason = message.replaceAll(/\s+/g, ' ').trim().slice(0, MAX_ERROR_DETAIL_CHARS);
+  if (reason === '' || reason === GENERIC_ERROR) return undefined;
+  if (TRANSPORT_ERROR_TEXT.test(reason)) return undefined;
+  return reason;
+}
 
 /**
  * Pairs the SDK's English failure copy with a stable, locale-free code so a
@@ -817,7 +834,12 @@ function formatErrorDetail(err: unknown): FormattedErrorDetail {
         code: 'service-temporarily-unavailable',
       };
     if (code !== undefined || http !== undefined) {
-      return { message: GENERIC_ERROR, code: 'generic-error' };
+      const reason = serverErrorReason(r.data.message);
+      return {
+        message: GENERIC_ERROR,
+        code: 'generic-error',
+        ...(reason === undefined ? {} : { detail: reason }),
+      };
     }
     // `errorShapeSchema` uses `.passthrough()`, so `safeParse` succeeds on any
     // object — including plain `Error` instances whose own properties satisfy
@@ -3199,6 +3221,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           message: detail.message,
           timestamp: Date.now(),
           code: detail.code,
+          ...(detail.detail === undefined ? {} : { detail: detail.detail }),
         });
       };
       if (!open.cacheReadPending) {
@@ -4018,6 +4041,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           message: detail.message,
           timestamp: Date.now(),
           code: detail.code,
+          ...(detail.detail === undefined ? {} : { detail: detail.detail }),
         });
       }
       return false;
@@ -4263,6 +4287,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         message: detail.message,
         timestamp: Date.now(),
         code: detail.code,
+        ...(detail.detail === undefined ? {} : { detail: detail.detail }),
       });
     }
   }

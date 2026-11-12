@@ -440,3 +440,61 @@ describe('SdkStatusMessageCode coverage', () => {
     expect(observed.size).toBe(Object.keys(EXPECTED_COPY).length);
   });
 });
+
+/*
+ * A coded failure the SDK has no copy for keeps the server's own wording beside
+ * the generic copy, so a client can name the cause without changing the
+ * message every other client already renders.
+ */
+describe('formatErrorDetail keeps the server reason for unmapped codes', () => {
+  it('carries the server message beside the generic copy', () => {
+    const err = Object.assign(new Error('Workspace quota exhausted for org org-1'), {
+      data: { code: 'SUBSCRIPTION_INACTIVE', httpStatus: 500 },
+    });
+
+    const detail = formatErrorDetail(err);
+
+    expect(detail).toEqual({
+      message: EXPECTED_COPY['generic-error'],
+      code: 'generic-error',
+      detail: 'Workspace quota exhausted for org org-1',
+    });
+    expect(formatError(err)).toBe(EXPECTED_COPY['generic-error']);
+  });
+
+  it('collapses whitespace and caps the reason', () => {
+    const err = Object.assign(new Error(`line one\n\nline two ${'x'.repeat(400)}`), {
+      data: { code: 'SUBSCRIPTION_INACTIVE', httpStatus: 500 },
+    });
+
+    const { detail } = formatErrorDetail(err);
+
+    expect(detail?.startsWith('line one line two xxx')).toBe(true);
+    expect(detail).not.toContain('\n');
+    expect(detail).toHaveLength(240);
+  });
+
+  it('never repeats a transport failure or the generic copy as the reason', () => {
+    const genericOnly = { message: EXPECTED_COPY['generic-error'], code: 'generic-error' };
+
+    expect(
+      formatErrorDetail({ message: 'Failed to fetch', data: { code: 'INTERNAL_SERVER_ERROR' } })
+    ).toEqual(genericOnly);
+    expect(
+      formatErrorDetail({
+        message: EXPECTED_COPY['generic-error'],
+        data: { code: 'INTERNAL_SERVER_ERROR' },
+      })
+    ).toEqual(genericOnly);
+    expect(formatErrorDetail({ data: { code: 'INTERNAL_SERVER_ERROR' } })).toEqual(genericOnly);
+  });
+
+  it('leaves mapped codes without a reason of their own', () => {
+    expect(
+      formatErrorDetail({ message: 'Payment required', data: { code: 'PAYMENT_REQUIRED' } })
+    ).toEqual({
+      message: EXPECTED_COPY['insufficient-credits'],
+      code: 'insufficient-credits',
+    });
+  });
+});

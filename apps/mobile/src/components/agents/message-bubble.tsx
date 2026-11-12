@@ -174,9 +174,9 @@ function MessageBubbleImpl({
     }
   };
 
-  // Compaction-only message renders as a separator
-  const firstPart = parts[0];
-  if (parts.length === 1 && firstPart?.type === 'compaction') {
+  // Compaction-only message renders as a separator, excluding hidden display parts.
+  const firstPart = visibleParts[0];
+  if (visibleParts.length === 1 && firstPart?.type === 'compaction') {
     return (
       <View className="px-4">
         <CompactionSeparator

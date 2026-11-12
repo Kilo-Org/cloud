@@ -77,8 +77,7 @@ export async function getGitHubRepositoryPermission(
       input.repo,
       input.username,
       input.appType,
-      input.platformIntegrationId,
-      'workflow'
+      input.platformIntegrationId
     );
     if (permission !== null) {
       const expiresAtMs = Date.now() + GITHUB_REPOSITORY_PERMISSION_CACHE_TTL_MS;

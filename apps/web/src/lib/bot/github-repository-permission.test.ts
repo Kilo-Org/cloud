@@ -64,8 +64,7 @@ describe('authorizeGitHubRepository', () => {
       'widgets',
       `permission-${permission}`,
       'standard',
-      'pi_github_1',
-      'workflow'
+      'pi_github_1'
     );
   });
 
@@ -163,7 +162,7 @@ describe('authorizeGitHubRepository', () => {
       }
     );
 
-    test('leaves repository availability to the session tool', async () => {
+    test('allows a chat integration call without a repository', async () => {
       const fetchPermission = createFetchPermission('none');
 
       const result = await authorizeGitHubRepository({

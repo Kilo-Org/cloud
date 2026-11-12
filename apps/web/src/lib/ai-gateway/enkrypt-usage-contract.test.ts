@@ -13,7 +13,6 @@ import {
   enkrypt_usage,
   enkrypt_usage_detector,
   enkrypt_usage_guardrail,
-  organizations,
 } from '@kilocode/db/schema';
 import {
   EnkryptUsageWriteSchema,
@@ -28,38 +27,16 @@ import {
   type EnkryptUsageRecord,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import { recordEnkryptUsageInPrimaryRegion } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage-primary-region';
-import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  enkryptUsageRecordForNewOrganization,
+  organizationMicrodollarsUsed,
+} from '@kilocode/web-shared/tests/helpers/enkrypt-usage.helper';
 
 const mockedHandoff = jest.mocked(recordEnkryptUsageInPrimaryRegion);
 
 beforeEach(() => {
   mockedHandoff.mockClear();
 });
-
-async function usageRecordForNewOrganization(
-  overrides: Partial<EnkryptUsageRecord> = {}
-): Promise<EnkryptUsageRecord> {
-  const user = await insertTestUser();
-  const organization = await createTestOrganization(
-    `enkrypt-contract-${randomUUID()}`,
-    user.id,
-    10_000_000
-  );
-  return {
-    organizationId: organization.id,
-    kiloUserId: user.id,
-    sessionId: 'ses_guardrail',
-    microdollarUsageId: randomUUID(),
-    apiKind: 'messages',
-    decision: 'blocked',
-    creditsCost: 7,
-    scannedCharacters: 2_400,
-    totalCharacters: 10_000,
-    addedLatencyMs: 212,
-    ...overrides,
-  };
-}
 
 async function writeInputFromGateway(usageRecord: EnkryptUsageRecord) {
   await recordEnkryptUsage(usageRecord);
@@ -101,14 +78,6 @@ async function ledgerRows(organizationId: string) {
   }));
 }
 
-async function microdollarsUsed(organizationId: string) {
-  const [row] = await db
-    .select({ microdollarsUsed: organizations.microdollars_used })
-    .from(organizations)
-    .where(eq(organizations.id, organizationId));
-  return row?.microdollarsUsed;
-}
-
 async function expectWrittenOnceAndReplayedAsDuplicate(usageWrite: EnkryptUsageWrite) {
   const charged = 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT;
 
@@ -132,12 +101,15 @@ async function expectWrittenOnceAndReplayedAsDuplicate(usageWrite: EnkryptUsageW
       totalCharacters: usageWrite.totalCharacters ?? null,
     },
   ]);
-  expect(await microdollarsUsed(usageWrite.organizationId)).toBe(charged);
+  expect(await organizationMicrodollarsUsed(usageWrite.organizationId)).toBe(charged);
 }
 
 describe('Enkrypt usage write across gateway, contract and writer', () => {
   test('carries an output guardrail write unchanged into one ledger row and one debit', async () => {
-    const usageRecord = await usageRecordForNewOrganization({ guardrail: 'output' });
+    const usageRecord = await enkryptUsageRecordForNewOrganization({
+      microdollarUsageId: randomUUID(),
+      guardrail: 'output',
+    });
 
     const writeInput = await writeInputFromGateway(usageRecord);
 
@@ -153,7 +125,9 @@ describe('Enkrypt usage write across gateway, contract and writer', () => {
   });
 
   test('carries an input guardrail write, which omits the guardrail, as input', async () => {
-    const usageRecord = await usageRecordForNewOrganization();
+    const usageRecord = await enkryptUsageRecordForNewOrganization({
+      microdollarUsageId: randomUUID(),
+    });
 
     const writeInput = await writeInputFromGateway(usageRecord);
 
@@ -165,7 +139,8 @@ describe('Enkrypt usage write across gateway, contract and writer', () => {
   });
 
   test('carries the detectors of a log-only detection into the ledger row', async () => {
-    const usageRecord = await usageRecordForNewOrganization({
+    const usageRecord = await enkryptUsageRecordForNewOrganization({
+      microdollarUsageId: randomUUID(),
       decision: 'allowed',
       detectorsFired: ['pii', 'toxicity'],
     });
@@ -184,7 +159,10 @@ describe('Enkrypt usage write across gateway, contract and writer', () => {
   });
 
   test('omits an empty detector list, so an older writer still accepts the write', async () => {
-    const usageRecord = await usageRecordForNewOrganization({ detectorsFired: [] });
+    const usageRecord = await enkryptUsageRecordForNewOrganization({
+      microdollarUsageId: randomUUID(),
+      detectorsFired: [],
+    });
 
     const writeInput = await writeInputFromGateway(usageRecord);
 
@@ -195,8 +173,10 @@ describe('Enkrypt usage write across gateway, contract and writer', () => {
   });
 
   test('carries a write without an inference usage id', async () => {
-    const { microdollarUsageId: _microdollarUsageId, ...usageRecord } =
-      await usageRecordForNewOrganization({ decision: 'allowed', apiKind: 'responses' });
+    const usageRecord = await enkryptUsageRecordForNewOrganization({
+      decision: 'allowed',
+      apiKind: 'responses',
+    });
 
     const writeInput = await writeInputFromGateway(usageRecord);
 

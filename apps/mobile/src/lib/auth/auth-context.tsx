@@ -25,6 +25,7 @@ import { clearPendingConsentOutcome } from '@/lib/consent';
 import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
 import {
   clearAccountBoundPendingDeepLink,
+  getPendingDeepLinkSnapshot,
   setCurrentDeepLinkUserId,
   setPendingDeepLink,
 } from '@/lib/deep-link-launch';
@@ -457,11 +458,13 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // URL natively, and the signed-in launcher mount is its only reader.
         // Take the account-independent destination before the teardown below
         // clears the launcher surfaces, and stage it for the account that just
-        // signed in, so the tap still lands where it points.
+        // signed in, so the tap still lands where it points. The parked URL has
+        // no deadline while a captured link is live, so an occupied slot keeps
+        // the destination the person actually opened.
         const parkedLaunchUrl = takeAccountIndependentLaunchUrl();
         const parkedLaunchHref =
           parkedLaunchUrl === null ? null : resolveIncomingUrl(parkedLaunchUrl);
-        if (parkedLaunchHref !== null) {
+        if (parkedLaunchHref !== null && getPendingDeepLinkSnapshot() === null) {
           setPendingDeepLink(parkedLaunchHref, 'universal-link');
         }
         // Every account boundary drops the session-scoped local state: trusted

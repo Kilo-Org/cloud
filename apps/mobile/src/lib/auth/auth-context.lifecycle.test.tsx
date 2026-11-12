@@ -90,6 +90,7 @@ const hoisted = vi.hoisted(() => {
 
   const deepLinkLaunch = {
     clearAccountBoundPendingDeepLink: vi.fn(),
+    getPendingDeepLinkSnapshot: vi.fn<() => string | null>(() => null),
     setCurrentDeepLinkUserId: vi.fn(),
     setPendingDeepLink: vi.fn(),
   };
@@ -261,6 +262,7 @@ vi.mock('@/lib/appsflyer', () => ({
 
 vi.mock('@/lib/deep-link-launch', () => ({
   clearAccountBoundPendingDeepLink: hoisted.deepLinkLaunch.clearAccountBoundPendingDeepLink,
+  getPendingDeepLinkSnapshot: hoisted.deepLinkLaunch.getPendingDeepLinkSnapshot,
   setCurrentDeepLinkUserId: hoisted.deepLinkLaunch.setCurrentDeepLinkUserId,
   setPendingDeepLink: hoisted.deepLinkLaunch.setPendingDeepLink,
 }));
@@ -977,6 +979,28 @@ describe('sign-out teardown ordering', () => {
       expect.stringContaining('/agent-chat/new'),
       'universal-link'
     );
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('keeps the destination already in the pending slot over the parked one', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl.mockReturnValueOnce(
+      'kiloapp:///cloud/sessions/new'
+    );
+    hoisted.deepLinkLaunch.getPendingDeepLinkSnapshot.mockReturnValue(
+      '/(app)/pr-review/github/octocat/hello/7'
+    );
+    hoisted.deepLinkLaunch.setPendingDeepLink.mockClear();
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    // The parked URL has no deadline and the captured link is live, so the
+    // occupied slot keeps the destination the person opened.
+    expect(hoisted.deepLinkLaunch.setPendingDeepLink).not.toHaveBeenCalled();
     expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
 
     unmount();

@@ -93,11 +93,14 @@ rounding to whole cents uses round-half-up (ties round toward positive infinity)
 ## Overview
 
 Kilo Pass exchanges a recurring payment for monthly base credits and a usage-triggered bonus. Stripe supports monthly
-and yearly subscriptions. The mobile app does not expose native Kilo Pass purchases, restores, or store management.
-Its Profile card and `/kilo-pass` route render the backend purchase presentation: `unavailable` has no purchase controls,
-while `web_management` exposes Manage, which opens the returned `webUrl`. Native credit-pack purchases are unchanged.
-Backend store verification, purchase completion, provider notifications, and expiry reconciliation remain available
-for existing Kilo Pass store subscriptions independently of the mobile presentation.
+and yearly subscriptions. The mobile app does not expose native Kilo Pass purchases, restores, store management, or
+links to the web console. Its Profile card and `/kilo-pass` route read `kiloPass.getState`: an account without a pass
+shows that Kilo Pass is not available in the app; an active pass shows its tier and cadence, status, renewal or
+paid-through date, current-period usage against the available credits, and the bonus credits for the period; a pass with
+a terminal provider status shows the ended message. Neither surface has a control that buys, cancels, resumes, or
+manages a pass. Native credit-pack purchases are unchanged. Backend store verification, purchase completion, provider
+notifications, and expiry reconciliation remain available for existing Kilo Pass store subscriptions independently of
+the mobile presentation.
 
 A successful base-credit grant writes one threshold on the user row. When cumulative user usage reaches the effective
 threshold, bonus logic acts on the selected effective active subscription. Monthly subscriptions use the tenure ramp

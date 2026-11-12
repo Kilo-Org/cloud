@@ -9,6 +9,7 @@ import {
   type SessionComputeCharges,
   type SessionComputeRate,
   type SessionComputeRun,
+  computeHourlyUsdFromCentsPerSecond,
 } from '@/lib/session-compute-total';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -33,7 +34,7 @@ function formatComputeAmount(microdollars: number): string {
 /** The hour rate a charged run was billed at, from its per-second rate. */
 function formatRunRate(rateCentsPerSecond: number): string {
   return i18n.t('cloudAgent.compute.perHour', {
-    rate: formatCurrency((rateCentsPerSecond * 36) / 100, i18n.language, 2),
+    rate: formatCurrency(computeHourlyUsdFromCentsPerSecond(rateCentsPerSecond), i18n.language, 2),
   });
 }
 

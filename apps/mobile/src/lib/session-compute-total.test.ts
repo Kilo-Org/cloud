@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   computeChargesMicrodollars,
+  computeHourlyUsdFromCentsPerSecond,
   isCloudAgentSessionId,
   sessionTotalMicrodollars,
 } from './session-compute-total';
@@ -52,5 +53,17 @@ describe('sessionTotalMicrodollars', () => {
 
   it('paints no total when neither is known', () => {
     expect(sessionTotalMicrodollars(null, null)).toBeNull();
+  });
+});
+
+describe('computeHourlyUsdFromCentsPerSecond', () => {
+  it('converts cents per second to dollars per hour', () => {
+    // $0.60 for a five-minute run is $7.20/hour.
+    expect(computeHourlyUsdFromCentsPerSecond(0.2)).toBeCloseTo(7.2, 10);
+  });
+
+  it('agrees with the catalogue rate the sheet prints', () => {
+    // The server multiplies the same column by 36 for its hourly catalogue.
+    expect(computeHourlyUsdFromCentsPerSecond(0.001)).toBeCloseTo(0.036, 10);
   });
 });

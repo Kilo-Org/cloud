@@ -22,6 +22,16 @@ export function isCloudAgentSessionId(value: unknown): value is `workspace_${str
   return cloudAgentSessionIdSchema.safeParse(value).success;
 }
 
+/**
+ * One run's hour rate in dollars, from the cents-per-second rate the billing
+ * rows carry. 3600 seconds × cents ÷ 100 cents per dollar is × 36, and the
+ * catalogue reads its own rates the same way, so a run's row and the current
+ * rates agree.
+ */
+export function computeHourlyUsdFromCentsPerSecond(rateCentsPerSecond: number): number {
+  return rateCentsPerSecond * 36;
+}
+
 /** The session's compute amount in microdollars, or null when none is recorded. */
 export function computeChargesMicrodollars(
   charges: Pick<SessionComputeCharges, 'amountMicrodollars'> | undefined

@@ -24,6 +24,8 @@ export async function handleModelsByProviderRequest() {
     );
   }
 
+  // Public catalog read; `gateway-admission.ts` documents catalog caller
+  // handling.
   const auth = await getUserFromAuth({
     adminOnly: false,
     expectedAudience: KILO_GATEWAY_AUDIENCE,

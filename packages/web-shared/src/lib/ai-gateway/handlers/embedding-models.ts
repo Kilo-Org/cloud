@@ -16,6 +16,8 @@ export async function handleEmbeddingModelsRequest(): Promise<NextResponse> {
       { status: 503, headers: { 'Retry-After': '30' } }
     );
   }
+  // Public catalog read; `gateway-admission.ts` documents catalog caller
+  // handling.
   const auth = await getUserFromAuth({
     adminOnly: false,
     expectedAudience: KILO_GATEWAY_AUDIENCE,

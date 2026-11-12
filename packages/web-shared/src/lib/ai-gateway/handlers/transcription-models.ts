@@ -19,6 +19,8 @@ export async function handleTranscriptionModelsRequest(): Promise<
 > {
   try {
     const data = await getOpenRouterTranscriptionModels();
+    // Public catalog read; `gateway-admission.ts` documents catalog caller
+    // handling.
     const auth = await getUserFromAuth({
       adminOnly: false,
       expectedAudience: KILO_GATEWAY_AUDIENCE,

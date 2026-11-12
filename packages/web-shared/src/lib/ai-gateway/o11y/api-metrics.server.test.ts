@@ -370,7 +370,16 @@ describe('emitApiMetricsForResponse', () => {
 
     moduleWithoutSecret.emitApiMetricsForResponse(params, Promise.resolve(null), 100);
     moduleWithoutSecret.emitGatewayApiMetrics({ ...params, completeRequestMs: 20 });
-    await Promise.resolve();
+    await new Promise(resolve => setImmediate(resolve));
+
+    // Run whatever the emitters deferred, so a missing guard would reach the fetch mock.
+    const { after: afterForLoadedModule } = jest.requireMock('next/server') as { after: jest.Mock };
+    const deferred = afterForLoadedModule.mock.calls.map(([task]) =>
+      Promise.resolve(typeof task === 'function' ? (task as () => unknown)() : task)
+    );
+    expect(deferred).toHaveLength(0);
+    await Promise.all(deferred);
+    await new Promise(resolve => setImmediate(resolve));
 
     expect(mockedFetch).not.toHaveBeenCalled();
   });

@@ -112,11 +112,21 @@ export function createAndroidDevice(options: { exec: Exec; spawn: Spawn; serial:
     },
     // The dev client's inspector does not survive a runtime reload on every
     // emulator: after a language switch the app keeps painting while the page
-    // list stays empty until the process restarts. Relaunch is the recovery
-    // the app itself supports; the runner waits for readiness afterwards.
-    relaunch: () => {
+    // list stays empty until the process restarts. Relaunch through the dev
+    // client's own deep link (a launcher relaunch would open the launcher, not
+    // the app); the runner waits for readiness afterwards.
+    relaunch: (metroPort: number) => {
       shell('am', 'force-stop', APP_ID);
-      shell('monkey', '-p', APP_ID, '-c', 'android.intent.category.LAUNCHER', '1');
+      adb([
+        'shell',
+        'am',
+        'start',
+        '-a',
+        'android.intent.action.VIEW',
+        '-d',
+        `kiloapp://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A${metroPort}`,
+        APP_ID,
+      ]);
     },
     restore: () => {
       const errors: unknown[] = [];

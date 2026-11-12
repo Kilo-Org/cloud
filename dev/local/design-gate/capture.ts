@@ -37,8 +37,12 @@ export type Device = {
   names: readonly string[];
   apply: (config: CellConfig) => void;
   restore: () => void;
-  /** Restart the app process: the recovery when its inspector does not come back. */
-  relaunch?: () => void;
+  /**
+   * Restart the app process and point it back at its Metro: the recovery when
+   * the inspector does not survive a runtime reload. Takes the target Metro's
+   * port, because the relaunched app reattaches through it.
+   */
+  relaunch?: (metroPort: number) => void;
   screenshot: (file: string) => void;
   record: (file: string, seconds: number) => Recording;
   tap?: (xPx: number, yPx: number) => void;
@@ -549,11 +553,12 @@ async function ensureLanguage(ctx: CaptureContext, want: LanguageTarget): Promis
   // painting while the page list stays empty until the process restarts. When
   // the wait ended without the language matching, restart the app — the
   // recovery the app itself supports — and wait again.
+  let settledDump = dump;
   if (!languageMatches(dump, want) && ctx.device.relaunch !== undefined) {
     ctx.log(`design-gate: language did not come back after the reload; relaunching the app`);
     ctx.probe.disconnect();
-    ctx.device.relaunch();
-    await waitForApp(
+    ctx.device.relaunch(Number(new URL(ctx.probe.metro).port) || 8081);
+    settledDump = await waitForApp(
       ctx.probe,
       ctx.clock,
       current => languageMatches(current, want),
@@ -561,7 +566,7 @@ async function ensureLanguage(ctx: CaptureContext, want: LanguageTarget): Promis
     );
   }
   await waitForStableLayout(ctx.probe, ctx.clock);
-  return { matched: languageMatches(dump, want), reloaded: true };
+  return { matched: languageMatches(settledDump, want), reloaded: true };
 }
 
 export function layoutSignature(dump: ProbeDump): string {

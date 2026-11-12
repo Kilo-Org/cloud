@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -13,6 +13,7 @@ import {
   type OverviewSectionKey,
   overviewSectionRows,
 } from '@/components/profiles/profile-overview-model';
+import { ProfileConfigImportSheet } from '@/components/profiles/profile-config-import-sheet';
 import { ProfileMetadataForm } from '@/components/profiles/profile-metadata-form';
 import { ProfileOverviewSkeleton } from '@/components/profiles/profile-overview-skeleton';
 import { ProfileRepoPinsSection } from '@/components/profiles/profile-repo-pins-section';
@@ -26,6 +27,8 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import {
   Bot,
   CornerDownLeft,
+  Download,
+  FileText,
   KeyRound,
   type LucideIcon,
   Server,
@@ -46,6 +49,7 @@ import { useTRPC } from '@/lib/trpc';
 import {
   getProfileAgentsPath,
   getProfileCommandsPath,
+  getProfileInstructionsPath,
   getProfileMcpPath,
   getProfileSkillsPath,
   getProfileSlashCommandsPath,
@@ -61,6 +65,7 @@ const SECTION_ICONS = {
   slashCommands: CornerDownLeft,
   mcp: Server,
   skills: Sparkles,
+  instructions: FileText,
   agents: Bot,
 } satisfies Record<OverviewSectionKey, LucideIcon>;
 
@@ -71,6 +76,7 @@ const SECTION_PATHS = {
   slashCommands: getProfileSlashCommandsPath,
   mcp: getProfileMcpPath,
   skills: getProfileSkillsPath,
+  instructions: getProfileInstructionsPath,
   agents: getProfileAgentsPath,
 } satisfies Record<
   OverviewSectionKey,
@@ -112,6 +118,9 @@ export function ProfileOverviewScreen({
   // profile form sheets do. A read-only viewer cannot edit the form, so the
   // guard stays off for them.
   const metadataGuard = useMetadataLeaveGuard({ enabled: canManage });
+  // The config-import sheet is a modal over this screen, so it holds no route
+  // and no draft of its own.
+  const [importOpen, setImportOpen] = useState(false);
 
   const profile = profileQuery.data;
   const isOrgOwned = organizationId !== undefined;
@@ -280,12 +289,23 @@ export function ProfileOverviewScreen({
                     icon={SECTION_ICONS[row.key]}
                     title={t(row.titleKey)}
                     subtitle={String(row.count)}
-                    last={index === rows.length - 1}
+                    last={index === rows.length - 1 && !canManage}
                     onPress={() => {
                       router.push(SECTION_PATHS[row.key](profileId, organizationId, stack));
                     }}
                   />
                 ))}
+                {canManage ? (
+                  <ConfigureRow
+                    icon={Download}
+                    title={t('profiles.importConfigTitle')}
+                    subtitle={t('profiles.importConfigRowSubtitle')}
+                    last
+                    onPress={() => {
+                      setImportOpen(true);
+                    }}
+                  />
+                ) : null}
               </View>
             </View>
 
@@ -308,6 +328,15 @@ export function ProfileOverviewScreen({
 
       {dialog}
       {metadataGuard.dialog}
+      {importOpen ? (
+        <ProfileConfigImportSheet
+          profileId={profileId}
+          organizationId={organizationId}
+          onClose={() => {
+            setImportOpen(false);
+          }}
+        />
+      ) : null}
     </View>
   );
 }

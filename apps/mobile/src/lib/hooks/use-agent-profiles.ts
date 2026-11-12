@@ -2,13 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { splitProfilesByOwner } from '@/components/profiles/profile-owner-model';
-import {
-  type AgentProfileDetail,
-  type AgentProfileListItem,
-} from '@/lib/hooks/agent-profile-types';
+import { type AgentProfileListItem } from '@/lib/hooks/agent-profile-types';
 import { useTRPC } from '@/lib/trpc';
 
-export type { AgentProfileDetail, AgentProfileListItem };
+export type {
+  AgentProfileDetail,
+  AgentProfileInstructionRow,
+  AgentProfileListItem,
+} from '@/lib/hooks/agent-profile-types';
 export { useAgentProfileMutations } from '@/lib/hooks/use-agent-profile-mutations';
 export { useAgentProfileSectionMutations } from '@/lib/hooks/use-agent-profile-section-mutations';
 
@@ -190,6 +191,20 @@ export function useAgentProfileKiloCommands(profileId: string, organizationId?: 
   return useQuery({
     ...trpc.agentProfiles.kiloCommands.queryOptions({ profileId, organizationId }),
     ...PROFILE_READ_OPTIONS,
+  });
+}
+
+/**
+ * A single profile's instruction files. The router exposes no section read for
+ * instructions — `get` carries them — so this reads `get` and selects the one
+ * collection the screen renders.
+ */
+export function useAgentProfileInstructions(profileId: string, organizationId?: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.get.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+    select: data => data.instructions,
   });
 }
 

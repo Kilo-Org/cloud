@@ -40,11 +40,14 @@ const PACK_SKELETON_ROWS = 4;
 /**
  * The height the pack area holds in every state.
  *
- * The tallest state is the store's notice card above four unpriced rows: the
- * backend catalog still names the packs when the store cannot price them, so
- * the notice and the rows render together in one `gap-3` column. That state is
- * five children, so it lays out four content gaps. Every block's height is
- * fixed, which makes the reservation exact rather than a guess:
+ * The tallest state carries every surface the area can show at once: the
+ * inline purchase error, the store's notice, and one unpriced row per catalog
+ * pack. All three are reachable together, because a purchase error survives
+ * the store dropping — it is cleared only by a new purchase attempt or a
+ * completed one — and the backend catalog still names the packs when the store
+ * cannot price them.
+ *
+ * Every block's height is fixed, which makes the reservation exact:
  *
  * - a row is 80 dp: its 20 dp paddings, one title line, an 8 dp gap and its
  *   12 dp expiry line. Its title is capped at one line, so a longer pack name
@@ -52,24 +55,27 @@ const PACK_SKELETON_ROWS = 4;
  * - the notice is 180 dp with a three-line body: its 20 dp paddings, the title
  *   line, three body lines, the retry control, and the gaps between them. Its
  *   body is capped at three lines for the same reason;
- * - the gap between siblings is the scroller's 10.5 dp step.
+ * - the purchase error is two capped lines of `text-sm`;
+ * - the gap between siblings is the scroller's 10.5 dp step, and the column
+ *   lays out one gap more than it has rows because the notice and the error
+ *   are siblings too.
  *
- * The sum is 542 dp for the four packs the catalog sells. A shorter state keeps
- * the difference as blank space after its own content, between the pack surface
- * and the copy, so no store answer moves the description or the legal links.
- *
- * The inline purchase error needs no term of its own. It appears only after a
- * purchase attempt, which needs a priced row, so it never shares the notice
- * state: the rows it accompanies total 362 dp, which leaves the error's two
- * capped lines well inside the floor. The row count follows the catalog, so a
- * catalog that ever sells more packs widens the reservation instead of pushing
- * the copy down.
+ * The sum is 587.5 dp for the four packs the catalog sells. A state that shows
+ * fewer of these surfaces keeps the difference as blank space after its own
+ * content, between the pack surface and the copy, so no store answer and no
+ * purchase attempt moves the description or the legal links. The row count
+ * follows the catalog, so a catalog that ever sells more packs widens the
+ * reservation instead of pushing the copy down.
  */
 const PACK_ROW_HEIGHT = 80;
 const PACK_CONTENT_GAP = 10.5;
 const STORE_NOTICE_HEIGHT = 180;
+const PURCHASE_ERROR_HEIGHT = 35;
 const packAreaMinHeight = (rows: number): number =>
-  rows * (PACK_ROW_HEIGHT + PACK_CONTENT_GAP) + STORE_NOTICE_HEIGHT;
+  rows * (PACK_ROW_HEIGHT + PACK_CONTENT_GAP) +
+  PACK_CONTENT_GAP +
+  STORE_NOTICE_HEIGHT +
+  PURCHASE_ERROR_HEIGHT;
 
 /**
  * One-off credit packs bought with the store's own purchase sheet.

@@ -781,10 +781,11 @@ describe('CreditPurchaseScreen', () => {
     // area reserves the tallest state's height and the copy follows it, so no
     // one of those arrivals changes where the copy sits.
     const DESCRIPTION_PREFIX = 'Credits are a one-time purchase';
-    // The tallest state — the store's notice beside four unpriced rows — is
-    // 542 dp of fixed-height blocks. The reservation equals it, and the same
-    // value holds in every state, so the copy cannot move.
-    const TALLEST_STATE_MIN_HEIGHT = 542;
+    // The tallest state — the purchase error, the store's notice and four
+    // unpriced rows together — is 587.5 dp of fixed-height blocks. The
+    // reservation equals it, and the same value holds in every state, so the
+    // copy cannot move.
+    const TALLEST_STATE_MIN_HEIGHT = 587;
     const styleOf = (node: TestRenderer.ReactTestInstance): Record<string, unknown> => {
       const style: unknown = node.props.style;
       return typeof style === 'object' && style !== null && !Array.isArray(style)
@@ -851,6 +852,19 @@ describe('CreditPurchaseScreen', () => {
         },
         isPackSurface: node =>
           String(node.type) === 'Pressable' && labelOf(node).includes('of credits'),
+      },
+      {
+        // Reachable: a purchase error survives the store dropping, because
+        // only a new purchase attempt or a completed one clears it. Every
+        // surface the area can show renders at once here, which is the tallest
+        // state the reservation has to hold.
+        state: 'purchase error with the store notice',
+        prepare: () => {
+          owner.errorMessageKey = 'credits.purchaseOwnedByAnotherAccount';
+          owner.fetchStoreProducts.mockRejectedValue(new Error('Failed to query product for sku'));
+        },
+        isPackSurface: node =>
+          node.children.some(child => child === 'App Store products unavailable'),
       },
     ];
 

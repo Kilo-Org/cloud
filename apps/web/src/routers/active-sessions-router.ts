@@ -256,3 +256,5 @@ export const activeSessionsRouter = createTRPCRouter({
     return connectedInstancesResponseSchema.parse(raw);
   }),
 });
+
+// Path-filter observation touch for CI: no script suite reads this file.

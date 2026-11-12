@@ -164,6 +164,44 @@ describe('signKiloToken', () => {
       runtimeAdmission: { source: 'user' },
     });
   });
+
+  it('keeps the runtime authorization claim closed on both sides', async () => {
+    const claim = {
+      id: '11111111-1111-4111-8111-111111111111',
+      resourceKind: 'cloud-agent-next' as const,
+      resourceId: 'workspace_22222222-2222-4222-8222-222222222222',
+    };
+
+    const { token } = await signKiloToken({
+      userId: 'user-runtime-claim',
+      pepper: null,
+      secret: SECRET,
+      expiresInSeconds: 60,
+      extra: { runtimeAuthorization: claim },
+    });
+    await expect(verifyKiloToken(token, SECRET)).resolves.toMatchObject({
+      runtimeAuthorization: claim,
+    });
+
+    await expect(
+      signKiloToken({
+        userId: 'user-runtime-claim',
+        pepper: null,
+        secret: SECRET,
+        expiresInSeconds: 60,
+        extra: {
+          runtimeAuthorization: { ...claim, extraKey: true },
+        } as unknown as SignKiloTokenExtra,
+      })
+    ).rejects.toThrow();
+
+    const widened = await sign({
+      version: 3,
+      kiloUserId: 'user-runtime-claim',
+      runtimeAuthorization: { ...claim, extraKey: true },
+    });
+    await expect(verifyKiloToken(widened, SECRET)).rejects.toThrow();
+  });
 });
 
 describe('verifyKiloToken', () => {

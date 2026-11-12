@@ -8,11 +8,9 @@ import type {
   EnkryptToolScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import type { ReactNode } from 'react';
-import {
-  DETECTOR_DETAILS,
-  PII_ENTITY_DETAILS,
-} from '@/components/organizations/guardrails/EnkryptDetectorList';
+import { PII_ENTITY_DETAILS } from '@/components/organizations/guardrails/EnkryptDetectorList';
 import { DetailGrid, DetailSection, ToneBadge, yesNo, type DetailItem } from './detail-primitives';
+import { detectorLabel } from './enkrypt-usage-labels';
 import { ABSENT, formatCount, formatDurationMs } from './format';
 import type { StepTone } from './routing-labels';
 
@@ -67,10 +65,6 @@ const NOT_SCANNED_REASON_LABELS: Record<
   output_too_large: 'Response too large',
   held_output_too_large: 'Held-back response too large',
 };
-
-export function detectorLabel(detector: EnkryptDetectorId): string {
-  return DETECTOR_DETAILS[detector].label;
-}
 
 function detectorNote(setting: DetectorSetting): string | null {
   if (setting.pii_entities) {
@@ -213,11 +207,7 @@ function ScanCard({ scan }: { scan: Scan }) {
 type GuardrailReportBodyProps = {
   title: string;
   description: string;
-  verdict: Verdict;
-  unavailableReason: EnkryptGuardrailReport['unavailable_reason'];
-  addedLatencyMs: number | null;
-  settings: Settings | null;
-  scans: Scan[];
+  report: EnkryptGuardrailReport | EnkryptOutputGuardrailReport;
   items?: DetailItem[];
   notice?: ReactNode;
 };
@@ -225,15 +215,12 @@ type GuardrailReportBodyProps = {
 function GuardrailReportBody({
   title,
   description,
-  verdict,
-  unavailableReason,
-  addedLatencyMs,
-  settings,
-  scans,
+  report,
   items = [],
   notice,
 }: GuardrailReportBodyProps) {
-  const verdictDetails = VERDICTS[verdict];
+  const { settings, scans } = report;
+  const verdictDetails = VERDICTS[report.verdict];
   return (
     <DetailSection title={title} description={description}>
       <DetailGrid
@@ -242,12 +229,12 @@ function GuardrailReportBody({
             label: 'Verdict',
             value: <ToneBadge tone={verdictDetails.tone}>{verdictDetails.label}</ToneBadge>,
           },
-          { label: 'Added latency', value: formatDurationMs(addedLatencyMs) },
-          ...(unavailableReason
+          { label: 'Added latency', value: formatDurationMs(report.added_latency_ms) },
+          ...(report.unavailable_reason
             ? [
                 {
                   label: 'Unavailable because',
-                  value: UNAVAILABLE_REASON_LABELS[unavailableReason],
+                  value: UNAVAILABLE_REASON_LABELS[report.unavailable_reason],
                 },
               ]
             : []),
@@ -291,11 +278,7 @@ export function EnkryptReportSection({ report }: { report: EnkryptGuardrailRepor
     <GuardrailReportBody
       title="Enkrypt input guardrail"
       description="How the organization's Enkrypt guardrail scanned this request."
-      verdict={report.verdict}
-      unavailableReason={report.unavailable_reason}
-      addedLatencyMs={report.added_latency_ms}
-      settings={report.settings}
-      scans={report.scans}
+      report={report}
       notice={
         report.settings === null && (
           <p className="text-status-destructive text-xs">
@@ -312,11 +295,7 @@ export function EnkryptOutputReportSection({ report }: { report: EnkryptOutputGu
     <GuardrailReportBody
       title="Enkrypt output guardrail"
       description="How the organization's Enkrypt guardrail scanned the response."
-      verdict={report.verdict}
-      unavailableReason={report.unavailable_reason}
-      addedLatencyMs={report.added_latency_ms}
-      settings={report.settings}
-      scans={report.scans}
+      report={report}
       items={[
         { label: 'Held back', value: yesNo(report.held_back) },
         { label: 'Held for', value: formatDurationMs(report.held_ms) },

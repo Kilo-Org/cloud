@@ -429,6 +429,11 @@ export function NewSessionConfigureForm({
           onRequestReveal={revealAdvancedConfig}
         />
       ) : null}
+      {/* The footer is pinned over the scroll viewport, so without this the
+          last rows end underneath it: a row at the bottom of the scroll painted
+          but could no longer be reached or pressed. The spacer reserves exactly
+          the footer's measured height, so every row scrolls clear of Start. */}
+      <View style={{ height: footerHeight }} />
     </ScrollView>
   );
 

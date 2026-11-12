@@ -1,8 +1,15 @@
 import { useEffect } from 'react';
 
-import { discardPostHog, identifyUser, initPostHog, resumePostHog } from '@/lib/analytics/posthog';
+import {
+  discardPostHog,
+  identifyUser,
+  initPostHog,
+  isPostHogReady,
+  resumePostHog,
+} from '@/lib/analytics/posthog';
 import { initAppsFlyer, resetAppsFlyerState } from '@/lib/appsflyer';
 import {
+  allowsOptional,
   clearTelemetryDecision,
   currentAccountId,
   currentEpoch,
@@ -33,15 +40,35 @@ async function discardOptionalTelemetry(epoch: number): Promise<void> {
   purgePostHogPersistence();
 }
 
-async function startOptionalTelemetry(epoch: number, email: string | undefined): Promise<void> {
+/**
+ * Bring telemetry up for the signed-in account. A client already running under
+ * another account, or another consent state, is torn down first: its queue may
+ * hold events the current consent forbids, and a consent change needs a fresh
+ * client because the capture options are constructor-only. A cold start has no
+ * client, so its storage survives.
+ *
+ * `initPostHog` then creates the client the current consent allows — capture on
+ * with optional consent, flags-only without it. A flags-only client still
+ * resolves feature flags for the identified person, so a flag-gated surface
+ * shows the rollout decision the web shows for that account.
+ */
+async function startTelemetry(epoch: number, email: string | undefined): Promise<void> {
   if (currentEpoch() !== epoch) {
     return;
+  }
+  if (isPostHogReady()) {
+    await discardOptionalTelemetry(epoch);
+    if (currentEpoch() !== epoch) {
+      return;
+    }
   }
   await resumePostHog();
   if (currentEpoch() !== epoch) {
     return;
   }
-  initAppsFlyer();
+  if (allowsOptional()) {
+    initAppsFlyer();
+  }
   initPostHog();
   if (email) {
     identifyUser(email);
@@ -83,11 +110,11 @@ export function useAnalyticsConsentGate({
       setTelemetryDecision(accountId, false);
       const epoch = currentEpoch();
       resetAppsFlyerState();
-      void discardOptionalTelemetry(epoch);
+      void startTelemetry(epoch, email);
       return;
     }
     setTelemetryDecision(accountId, true);
     const epoch = currentEpoch();
-    void startOptionalTelemetry(epoch, email);
+    void startTelemetry(epoch, email);
   }, [resolving, hasToken, consentChecked, needsConsent, email, accountId, optionalConsent]);
 }

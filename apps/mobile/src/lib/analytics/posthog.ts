@@ -3,6 +3,7 @@ import {
   type AnalyticsEventMap,
   redactProhibitedProperties,
 } from '@kilocode/app-shared/analytics';
+import { type FeatureFlagKey } from '@kilocode/app-shared/feature-flags';
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
 import PostHog, { PostHogPersistedProperty } from 'posthog-react-native';
@@ -14,7 +15,7 @@ import {
   getFeatureFlagDefinition,
   isAppVersionAtLeast,
 } from '@/lib/feature-flags';
-import { allowsOptional, currentGeneration } from '@/lib/telemetry/controller';
+import { allowsMandatory, allowsOptional, currentGeneration } from '@/lib/telemetry/controller';
 import {
   posthogCustomStorage,
   purgePostHogPersistence,
@@ -45,6 +46,13 @@ import {
  * via the `customAppProperties` constructor option (merges into `_appProperties`,
  * lands on every event including the first, survives `client.reset()` — unlike
  * `register()`). We do not override the reserved `$device_type`.
+ *
+ * Consent: a signed-in account creates a client either way. Optional-analytics
+ * consent decides whether that client may capture; without it the client is
+ * opted out and exists only to evaluate feature flags (`initPostHog`), so a
+ * flag-gated surface follows the same rollout decision as the web for the same
+ * person. No event, lifecycle ping, survey, or screen leaves the device without
+ * that consent.
  */
 
 // Event names come from the shared analytics contract (P1-A-07a / DEC-05) and
@@ -182,17 +190,36 @@ function deviceFormFactor(): 'phone' | 'tablet' | 'desktop' | 'tv' | 'unknown' {
  * `$screen_height`. Anything outside this list needs a DEC-02 amendment.
  */
 export function initPostHog(): void {
-  if (!allowsOptional()) {
+  // A signed-in account with a consent decision is what creates the client.
+  // Feature-flag evaluation is functional, not analytics: without optional
+  // consent the client still resolves flags (so a flag-gated surface shows the
+  // same rollout decision the web shows for this person) while every capture
+  // path stays closed.
+  if (!allowsMandatory()) {
     return;
   }
   if (client) {
     return;
   }
+  // The SDK drops every capture while it is opted out, so `defaultOptIn: false`
+  // is the flags-only mode: nothing is enqueued, and the switches below keep the
+  // SDK from registering the traffic it would otherwise send on its own. With
+  // consent, each switch equals the SDK default, so the consented client is
+  // unchanged.
+  //
+  // Dev builds never capture, but they do evaluate flags: a `disabled` client
+  // would answer every flag with its default, so a flag-gated surface could
+  // never be exercised in development or measured by the design gate.
+  const captureAllowed = allowsOptional() && !__DEV__;
   client = new PostHog(POSTHOG_API_KEY, {
     host: 'https://us.i.posthog.com',
     disableGeoip: true,
-    // No events are sent from dev builds.
-    disabled: __DEV__,
+    defaultOptIn: captureAllowed,
+    captureAppLifecycleEvents: captureAllowed,
+    sendFeatureFlagEvent: captureAllowed,
+    capturePushNotificationSubscriptions: captureAllowed,
+    capturePushNotificationOpened: captureAllowed,
+    disableSurveys: !captureAllowed,
     customAppProperties: properties => ({
       ...properties,
       device_form_factor: deviceFormFactor(),
@@ -205,8 +232,12 @@ export function initPostHog(): void {
   // without relying on $lib.
   void client.register({ platform: 'mobile' });
   // Feed app version/build into flag evaluation so flags can target by release
-  // even before (or without) an identified user. Triggers a flag reload.
-  client.setPersonPropertiesForFlags(appVersionProperties());
+  // even before (or without) an identified user. Triggers a flag reload. Person
+  // properties are analytics data, so only the consented client writes them;
+  // the release gate itself is client-side (`minAppVersion` below).
+  if (captureAllowed) {
+    client.setPersonPropertiesForFlags(appVersionProperties());
+  }
   client.onFeatureFlags(() => {
     for (const listener of flagListeners) {
       listener();
@@ -264,15 +295,20 @@ export function captureScreen(name: string): void {
 }
 
 export function identifyUser(email: string): void {
-  if (!allowsOptional() || currentGeneration() !== clientGeneration) {
+  if (!client || currentGeneration() !== clientGeneration) {
     return;
   }
+  // The distinct ID is the account email, matching the web's PostHogProvider, so
+  // one person resolves the same flag value in both clients. Identifying is not
+  // event capture: a client without optional consent is opted out, so nothing is
+  // enqueued, while flags still load for the identified person.
   // Persist version/build on the person profile too, so cohorts and insights
   // can segment by release (not just flag targeting). No email or name — the
-  // allowed-field list above this function governs person properties.
-  client?.identify(email, appVersionProperties());
+  // allowed-field list above this function governs person properties, and a
+  // flags-only client writes no person properties at all.
+  client.identify(email, allowsOptional() ? appVersionProperties() : undefined);
   // Pull the freshly-identified user's flags so gated UI resolves promptly.
-  void client?.reloadFeatureFlags();
+  client.reloadFeatureFlags();
 }
 
 /**
@@ -422,7 +458,7 @@ function isFeatureEnabled(key: string, defaultValue: boolean): boolean {
  * remote value only when this build is at or above the flag's minimum app
  * version; older builds get the flag's default instead.
  */
-export function useFeatureFlag(key: string, defaultValue = false): boolean {
+export function useFeatureFlag(key: FeatureFlagKey, defaultValue = false): boolean {
   const subscribe = useCallback((onChange: () => void) => {
     flagListeners.add(onChange);
     return () => {
@@ -439,6 +475,6 @@ export function useFeatureFlag(key: string, defaultValue = false): boolean {
  * not a subscription. Same fail-open contract as `useFeatureFlag`: an
  * uninitialized client or unloaded flag returns `defaultValue`.
  */
-export function isFeatureFlagEnabled(key: string, defaultValue = false): boolean {
+export function isFeatureFlagEnabled(key: FeatureFlagKey, defaultValue = false): boolean {
   return isFeatureEnabled(key, defaultValue);
 }

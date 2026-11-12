@@ -34,8 +34,8 @@ import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-re
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import {
   getOrganizationAutoRoute,
-  ORGANIZATION_AUTO_MODEL_FLAG,
 } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
+import { ORGANIZATION_AUTO_MODEL_FLAG } from '@kilocode/app-shared/feature-flags';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';

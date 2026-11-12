@@ -261,7 +261,7 @@ describe('discard closes capture', () => {
     const { initPostHog, captureEvent } = await loadPostHogModule();
     const ctrl = await import('@/lib/telemetry/controller');
     ctrl.setTelemetryDecision('test', false);
-    // initPostHog returns early — optional is false.
+    // The client exists for flag evaluation; capture is what stays closed.
     initPostHog();
 
     captureEvent('test-event');
@@ -330,6 +330,7 @@ describe('optional telemetry lifecycle', () => {
   });
 
   it('purges when the epoch remains unchanged after discard', async () => {
+    vi.useFakeTimers();
     const mod = await loadPostHogWithGate();
     mod.ctrl.setTelemetryDecision('test', true);
     mod.initPostHog();
@@ -360,7 +361,12 @@ describe('optional telemetry lifecycle', () => {
 
     expect(hoisted.storage.purgePostHogPersistence).toHaveBeenCalledTimes(1);
 
+    // Finish the 110 ms resume this path now starts, so no continuation
+    // outlives the test.
+    await vi.advanceTimersByTimeAsync(120);
+
     renderer.unmount();
+    vi.useRealTimers();
   });
 
   it('does not initialize SDKs when resume is superseded', async () => {
@@ -414,7 +420,8 @@ describe('needsConsent gate teardown', () => {
     hoisted.appsFlyer.create.mockResolvedValue(undefined);
   });
 
-  it('gate hook tears down AppsFlyer and PostHog when needsConsent becomes true', async () => {
+  it('gate hook tears down AppsFlyer and capture when needsConsent becomes true', async () => {
+    vi.useFakeTimers();
     const gate = await loadPostHogWithGate();
 
     // Arm telemetry first so the PostHog client exists when teardown runs.
@@ -463,7 +470,13 @@ describe('needsConsent gate teardown', () => {
     expect(hoisted.client.optOut).toHaveBeenCalled();
     expect(hoisted.storage.purgePostHogPersistence).toHaveBeenCalledTimes(1);
 
+    // The branch then brings up the capture-free client (flag evaluation), so
+    // finish that 110 ms resume inside the test instead of letting it outlive.
+    await vi.advanceTimersByTimeAsync(120);
+    expect(hoisted.holder.options).toMatchObject({ defaultOptIn: false });
+
     rendererRef.current?.unmount();
+    vi.useRealTimers();
   });
 });
 
@@ -748,7 +761,10 @@ describe('unsettled consent teardown', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(hoisted.client.optOut).toHaveBeenCalledTimes(0);
+    // The flags-only client is torn down on the way up, so the shared optOut
+    // mock records that teardown. Recovery is proven by the NEW client: it
+    // starts opted in and its captures reach the SDK.
+    expect(hoisted.holder.options).toMatchObject({ defaultOptIn: true });
 
     hoisted.client.capture.mockClear();
     mod.captureEvent('after-recovery');

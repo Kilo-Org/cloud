@@ -1,5 +1,6 @@
 import { decodeJwt } from 'jose';
 import { z } from 'zod';
+import { RUNTIME_CREDENTIAL_PROXY_AUDIENCE } from './internal-service-token-audiences';
 
 export const CLOUD_AGENT_SESSION_SYNC_ORIGIN = 'https://session-sync.kiloapps.io';
 
@@ -21,7 +22,7 @@ export type CloudAgentSyncAuthorizationBinding = {
 export function isCloudAgentSyncHandle(token: string): boolean {
   if (token.length > 4096) return false;
   try {
-    return decodeJwt(token).aud === 'cloud-agent-next:runtime-credential-proxy';
+    return decodeJwt(token).aud === RUNTIME_CREDENTIAL_PROXY_AUDIENCE;
   } catch {
     return false;
   }

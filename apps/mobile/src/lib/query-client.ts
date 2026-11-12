@@ -199,10 +199,12 @@ function queryKeyInput(queryKey: unknown): QueryKeyInput | undefined {
 
 /**
  * Drops a permission-denied query from the cache so the next persister save
- * omits it. An org-scoped query is cleared by its org prefix (procedure path +
+ * omits it. An org-scoped query is dropped by its org prefix (procedure path +
  * `input.organizationId`), which also covers every sibling variant of that
- * procedure for the same org; a non-org query is cleared by its exact key. An
- * observed query keeps its slot: its screen would rebuild and refetch it.
+ * procedure for the same org; a non-org query is dropped by its exact key. A
+ * sibling a screen observes keeps its slot — removing it rebuilds and refetches,
+ * which fails again for as long as its error screen mounts — and loses only the
+ * denied rows, so every other sibling leaves the cache.
  */
 function dropPermissionDeniedQuery(
   queryClient: QueryClient,
@@ -214,20 +216,21 @@ function dropPermissionDeniedQuery(
   }
   const input = queryKeyInput(query.queryKey);
   const organizationId = input?.organizationId;
-  if (organizationId !== undefined && organizationId !== null) {
+  if (organizationId === undefined || organizationId === null) {
     if (query.isActive()) {
-      query.setState({ data: undefined });
       return;
     }
-    queryClient.removeQueries({
-      queryKey: [query.queryKey[0], { input: { organizationId } }],
-    });
+    queryClient.removeQueries({ queryKey: query.queryKey });
     return;
   }
-  if (query.isActive()) {
-    return;
+  const orgPrefix = [query.queryKey[0], { input: { organizationId } }];
+  queryClient.removeQueries({ queryKey: orgPrefix, type: 'inactive' });
+  for (const observed of queryClient.getQueryCache().findAll({
+    queryKey: orgPrefix,
+    type: 'active',
+  })) {
+    observed.setState({ data: undefined });
   }
-  queryClient.removeQueries({ queryKey: query.queryKey });
 }
 
 /**

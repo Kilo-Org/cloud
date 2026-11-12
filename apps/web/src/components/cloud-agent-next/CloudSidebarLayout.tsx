@@ -232,8 +232,13 @@ export function CloudSidebarLayout(props: CloudSidebarLayoutProps) {
         session.organizationId,
         attempt
       );
-      void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
-      void queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter());
+      const worktreeId = cloudAgentWorktreeIdSchema.safeParse(session.worktreeId);
+      if (worktreeId.success) {
+        void queryClient.invalidateQueries(
+          trpc.cliSessionsV2.list.queryFilter({ worktreeId: worktreeId.data }),
+          { cancelRefetch: false }
+        );
+      }
       return serverId;
     },
     [queryClient, trpc, trpcClient]
@@ -498,8 +503,8 @@ function CloudSidebarLayoutContent({
     );
     return parsedWorktreeId.success ? parsedWorktreeId.data : null;
   }, [cachedSessions, currentSessionId, fetchedSessionData, organizationId, worktreeIdFromParams]);
-  const { data: worktreeSessionsData } = useQuery(
-    trpc.cliSessionsV2.list.queryOptions(
+  const { data: worktreeSessionsData } = useQuery({
+    ...trpc.cliSessionsV2.list.queryOptions(
       selectedWorktreeId
         ? {
             organizationId: organizationId ?? null,
@@ -508,8 +513,9 @@ function CloudSidebarLayoutContent({
             orderBy: 'updated_at',
           }
         : skipToken
-    )
-  );
+    ),
+    staleTime: 5000,
+  });
   const worktreeChats = useMemo(() => {
     if (!selectedWorktreeId) return [];
 

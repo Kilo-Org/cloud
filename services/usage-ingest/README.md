@@ -46,6 +46,18 @@ log `error_name`, never the error message. Enkrypt schema rejections log only
 issue codes and top-level schema field names. Deploy the consumer that routes tagged Enkrypt
 messages before this ingress, and this ingress before any gateway publishes to it.
 
+Authenticated `POST /exa-usage` works the same way for Exa: it accepts one bare record that
+parses under `ExaUsageRecordSchema` and sends exactly one `{kind: 'exa_usage', v: 1, record}`
+message to the same queue. An envelope-shaped body, an LLM usage body, an Enkrypt record or
+any other unknown key returns 400, and an Exa record on `/usage` or `/enkrypt-usage` returns 400.
+The organization id stays a strict UUID, as the Exa contract defines. It uses the same
+`USAGE_INGEST_PUBLISH_SECRET`, checked before the body is read. The web app, the only Exa
+producer, already holds `INTERNAL_API_SECRET`, which writes usage directly to the writer
+routes, so also holding the publish secret adds little. The 8,192-byte cap, statuses and logs
+match `/enkrypt-usage`, with `usage_kind: "exa_usage"`. Schema rejections name top-level
+fields, but Exa log values never include the user, organization, path, cost, feature, type or
+`occurredAt`. See [Exa usage rollout](#exa-usage-rollout).
+
 | Environment | Worker | Producer and consumer queue | DLQ (no consumer) |
 |---|---|---|---|
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing-eu` | `usage-ingest-processing-dlq-eu` |
@@ -165,15 +177,18 @@ helper logs `usage writer response release failed` with the usage ID, usage kind
 and error name only, and the write outcome is unchanged. A body that was already
 read is not released again.
 
-### Tagged Enkrypt usage
+### Tagged Enkrypt and Exa usage
 
-The same queue can also carry Enkrypt guardrail usage. Such a message is a tagged
-envelope, `{"kind":"enkrypt_usage","v":1,"record":<EnkryptUsageWrite>}`
-(`EnkryptUsageQueueMessageSchema` in `@kilocode/usage-contracts`). LLM usage stays
-untagged and unchanged; its ingress schema strips unknown keys, so a body with its
-own `kind` key is always a tagged message. The gateway produces Enkrypt messages
+The same queue can also carry Enkrypt guardrail usage and Exa usage. Such a message is a
+tagged envelope: `{"kind":"enkrypt_usage","v":1,"record":<EnkryptUsageWrite>}`
+(`EnkryptUsageQueueMessageSchema` in `@kilocode/usage-contracts`) or
+`{"kind":"exa_usage","v":1,"record":<ExaUsageRecord>}` (`ExaUsageQueueMessageSchema`).
+LLM usage stays untagged and unchanged; its ingress schema strips unknown keys, so a body
+with its own `kind` key is always a tagged message. The gateway produces Enkrypt messages
 only through `/enkrypt-usage`, behind a default-off flag; see
-[Enkrypt usage rollout](#enkrypt-usage-rollout).
+[Enkrypt usage rollout](#enkrypt-usage-rollout). Exa messages come only through
+`/exa-usage`, and only as a fallback after a failed direct write; see
+[Exa usage rollout](#exa-usage-rollout).
 
 The consumer reads the tag before anything else:
 
@@ -181,35 +196,38 @@ The consumer reads the tag before anything else:
 |---|---|---|---|
 | Untagged | Existing LLM writer at `USAGE_WRITER_URL` | Unchanged | Unchanged |
 | `enkrypt_usage`, `v: 1`, valid record | `/api/internal/enkrypt-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id` | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
-| `enkrypt_usage`, `v: 1`, invalid record or extra key | None | Never | Conservative retry (`invalid_event`) |
+| `exa_usage`, `v: 1`, valid record | `/api/internal/exa-usage/record` with `x-usage-write-source: queue` | `recorded` or `duplicate` whose `usageId` equals `record.id` | Any other response, including a wrong or missing id echo, HTTP 429 and 503 |
+| `enkrypt_usage` or `exa_usage`, `v: 1`, invalid record or extra key | None | Never | Conservative retry (`invalid_event`) |
 | Any other `kind`, or another `v` | None | Never | Conservative retry (`unsupported_kind`) |
 
 A message that never ACKs exhausts the shared 20-retry budget and goes to the DLQ,
-so the DLQ can hold both kinds. A recognized admission 429 takes the admission
+so the DLQ can hold all three kinds. A recognized admission 429 takes the admission
 retry schedule, and HTTP 429/503 rejects the invocation, exactly as for LLM usage.
 The invocation launch budget is shared. Consumer settings are unchanged. On the
 writer, these queue writes take the `non_llm` admission class described under
 [writer admission protection](#writer-admission-protection); its ceiling rejection
 is a recognized `queue_limit` 429.
 
-The Enkrypt writer URL is `USAGE_WRITER_URL` with its documented
-`/api/internal/usage/record` suffix replaced by the Enkrypt path, so no new
+The Enkrypt and Exa writer URLs are `USAGE_WRITER_URL` with its documented
+`/api/internal/usage/record` suffix replaced by the kind's path, so no new
 variable is needed. If `USAGE_WRITER_URL` is missing or does not end with that
-suffix, Enkrypt messages retry as `missing_config` without network I/O. The writer
+suffix, tagged messages retry as `missing_config` without network I/O. The writer
 credential, bypass and 160-second timeout are shared.
 
 Tagged messages add `usage_kind` to `usage_ingest_handler_entry`,
 `usage_ingest_processing` and the writer helper logs (`usageKind` there):
-`enkrypt_usage`, or `unknown` for an unrecognized tag (the raw tag is not logged).
-Untagged LLM logs keep exactly their existing fields, so filter LLM-only counts
-with a missing `usage_kind`. Enkrypt logs carry only the usage id and kind: no
+`enkrypt_usage`, `exa_usage`, or `unknown` for an unrecognized tag (the raw tag is
+not logged). Untagged LLM logs keep exactly their existing fields, so filter LLM-only
+counts with a missing `usage_kind`. Tagged logs carry only the usage id and kind: no
 payer, user, session, cost or `occurredAt`-derived age.
 
 Deploy order: this consumer first, then the ingress, then the producer with its
-flag off. Never roll the consumer back to an LLM-only version while tagged
-messages may be in flight or retrying: an LLM-only consumer fails them as invalid
-events and they reach the DLQ after 20 retries. To stop tagged traffic, turn the
-producer flag off and let the consumer drain.
+flag off. Never roll the consumer back to a version that does not route a kind
+while messages of that kind may be in flight or retrying: such a consumer retries
+them as invalid or unsupported events and they reach the DLQ after 20 retries. In
+particular, never roll back to a consumer from before Exa routing while Exa
+messages may be queued. To stop tagged traffic, turn the producer flag off and let
+the consumer drain.
 
 ## Observability
 
@@ -394,7 +412,8 @@ pre-write rejection describes this HTTP attempt only; an earlier delivery of the
 same usage ID may already have committed. Generic errors can include ambiguous
 writes, so stable IDs and idempotent persistence remain essential.
 
-For native attempt `a` (initial delivery 1), calculate
+For recognized admission 429 on native attempt 1, choose an integer uniformly
+from 1 through 4, inclusive. Otherwise, for native attempt `a`, calculate
 `base = min(300, 2 ** min(a - 1, 9))`; for all failures except recognized
 admission 429, use `base = max(60, base)`. Choose an integer uniformly from
 `base` through `2 * base`, inclusive. Positive safe-integer attempts are capped
@@ -403,7 +422,7 @@ share the same native count; switching classes never resets it.
 
 | Native attempt | Recognized admission 429 | Other handled failure |
 |---|---|---|
-| 1 | 1–2 s | 60–120 s |
+| 1 | 1–4 s | 60–120 s |
 | 2 | 2–4 s | 60–120 s |
 | 3 | 4–8 s | 60–120 s |
 | 4 | 8–16 s | 60–120 s |
@@ -435,7 +454,7 @@ needs one. At-least-once delivery and operator replay can add further attempts.
 Under sustained failure, polling eventually slows to **5–10 minutes** between
 eligible attempts, so recovery can still wait that long plus scheduling/backlog.
 For a new event receiving only recognized admission rejections, the 20 requested
-delays sum to 63m 31s–127m 02s; for only other handled failures, 68m 28s–136m 56s.
+delays sum to 63m 31s–127m 04s; for only other handled failures, 68m 28s–136m 56s.
 These are conditional scheduled-delay sums, **not DLQ timing guarantees**, minimum
 recovery windows, or retention requirements. Processing, implicit 60-second
 retries, mixed histories, consumed attempts, scheduling and retention affect the
@@ -516,8 +535,9 @@ batch size at 6 in production and 2 in staging; retry settings also stay unchang
 There is no new environment knob; merging this change activates queue rejection
 when the normal automatic deployment reaches the writer.
 
-Queue writes to the Enkrypt writer (`/api/internal/enkrypt-usage/record`) use the
-same guard and the same shared limit, as writer class `non_llm`. That class has
+Queue writes to the Enkrypt writer (`/api/internal/enkrypt-usage/record`) and the Exa
+writer (`/api/internal/exa-usage/record`) use the same guard and the same shared limit,
+as writer class `non_llm`; Enkrypt and Exa share that one class. That class has
 its own ceiling inside the shared limit: `max(1, min(2, limit - 1))`, currently
 **2 of 8**. A `non_llm` call over the ceiling gets the same HTTP 429 body with
 reason `queue_limit` and is not written. Its active plus queued calls never exceed
@@ -674,6 +694,40 @@ Human-only steps, before the flag is turned on:
 - confirm the existing DLQ alerting covers it;
 - set the flag on `kilocode-ai-gateway` and redeploy.
 
+## Exa usage rollout
+
+Exa usage keeps its direct Frankfurt write as the normal path. The queue is only a durable
+fallback: when the direct write fails, the web app posts the same bare record, with the same
+`id` and `occurredAt`, to `/exa-usage`, and the ingress wraps it in the tagged envelope. The
+Exa writer is idempotent by the `id`/`occurredAt` pair, so a queued copy of a write that did
+commit returns `duplicate` and makes no second debit; a replay must keep both values. The
+producer is a separate change behind the
+`kilocode-app` flag `EXA_USAGE_QUEUE_FALLBACK_ENABLED`; until it lands with the flag on,
+nothing sends Exa messages.
+
+Deploy in this order. Each step must be deployed and verified before the next:
+
+1. This Worker's consumer that routes tagged Exa messages and its `/exa-usage` ingress, and
+   the web app's Exa writer taking the `non_llm` admission class for queue writes. They ship
+   together and nothing posts to the ingress yet. The production Worker deploy is not
+   ordered against the Vercel promotion, so confirm both before step 2.
+2. The web app producer, with the flag off.
+3. The flag on.
+
+Rollback: set the flag to anything other than `true` and redeploy the web app. Failed direct
+writes then stop publishing, and the consumer drains what the queue already accepted. Never
+roll the consumer back to a version without Exa routing while Exa messages may still be in
+the source queue or in flight: they would fail every retry and reach the DLQ.
+
+Human-only steps, before the flag is turned on:
+
+- give `kilocode-app` the ingress address and the existing `USAGE_INGEST_PUBLISH_SECRET`;
+  no new Worker secret is needed;
+- name a replay owner for the mixed DLQ, with a replay that handles LLM, Enkrypt and Exa
+  messages;
+- confirm the existing DLQ alerting covers it;
+- set the flag on `kilocode-app` and redeploy.
+
 ## Retention
 
 Each selected DLQ keeps messages for **14 days (1209600 seconds)**, Cloudflare's
@@ -776,3 +830,53 @@ The log's own fields intentionally contain no raw request/headers or request ID.
 After a separately authorized rollout, an operator still needs to capture an
 actual rejection and its invocation/version to establish a production cause.
 This diagnostic does not recover missing usage or explain HTTP 409 responses.
+
+## First writer-admission retry spread
+
+A recognized writer-admission HTTP 429 (`queue_limit`, `pool_busy` or
+`pool_waiting`) on normalized delivery attempt 1 now retries after a uniformly
+distributed integer 1–4 seconds, replacing 1–2 seconds. There is no runtime flag
+or environment selector. Invalid attempt metadata still normalizes to 1. Each
+retry consumes one random draw. Later admission retries keep their existing
+exponential jitter; generic 429, 503, invalid events, missing configuration and
+other conservative failures keep their minimum 60-second delay. All usage kinds
+share the same native 20-retry budget and DLQ policy. Individual ACK/retry and
+overload invocation feedback, payloads, identity and writer admission are unchanged.
+
+The measured 637 repeat admission rejects motivate the hypothesis that a wider
+first window reduces repeated pressure; they do not prove a performance gain.
+A wider first delay can worsen recovery after a short pressure pulse by up to two
+additional seconds: a message may wait after the writer has recovered. Fewer
+repeated rejects alone is not a win. Four mature November 12 post-deploy minutes
+and late accepted publisher sends/duplicate deliveries do not select a winning
+retry value. Logs are not a persistence ledger.
+
+For a separately authorized before/after comparison, record exact deployed
+revision/version, environment and UTC transition bounds. Repository production
+workflows deploy eligible main revisions after CI, with an hourly catch-up;
+merging can therefore schedule deployment of this behavior. This change does not
+itself perform a deployment or a production experiment. Existing
+`retry_delay_seconds`, `admission_reason` and `delivery_attempts` identify affected
+retries without adding all-request events. Keep publisher timeouts at 20/5/40/4,
+batch6/parallelism2/cap225 in production, admission wait250ms, writer pool, shared
+limits, source retention and DLQ policy fixed. Staging keeps its existing capacity.
+The LLM direct lane remains parked.
+
+Before measurement, choose matched accepted-volume and usage-kind/producer-region
+cohorts, pressure profiles and equal observation durations, plus numerical stop
+thresholds against the matched baseline. Include quiet periods and short pressure
+pulses. Compare mature creation cohorts only after completion/retry observation
+windows close; report censored or unmatched IDs separately.
+
+Report baseline and changed behavior side by side: rejection rows per unique
+usage ID and repeat rejections beyond the first, end-to-end creation-to-recorded
+age p95/p99, first-reject-to-recorded latency, quiet latency, drain time, native
+backlog slope/size, oldest message age and DLQ arrivals. Retain duplicate and
+terminal outcomes. Stop and prepare a small revert PR on any new unexplained DLQ
+arrival or terminal/loss signal, sustained growing backlog/oldest age, or p95/p99,
+quiet latency or drain time exceeding the predeclared limits. Investigate and
+reconcile unresolved IDs; do not purge or replay as part of the comparison.
+
+Rollback is a small follow-up PR restoring the first admission window to 1–2
+seconds, followed by the normal review/deployment process. Already scheduled
+delayed deliveries remain scheduled. There is no runtime switch for rollback.

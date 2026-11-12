@@ -1,3 +1,5 @@
+import { type Href } from 'expo-router';
+
 /**
  * Whether the cold-start relaunch repair should navigate to the recorded
  * route: the record must belong to this account, name a recordable route
@@ -29,8 +31,14 @@ export function shouldRepairRestoredRoute(input: {
   if (input.recordedHref === null) {
     return false;
   }
-  return normalizeRoutePath(input.recordedHref) !== normalizeRoutePath(input.restoredRoute);
+  return normalizedRoutePath(input.recordedHref) !== normalizedRoutePath(input.restoredRoute);
 }
+
+/**
+ * Where an automatic restore falls back when the recorded route cannot open:
+ * the Home tab, the screen the app starts on.
+ */
+export const RESTORED_ROUTE_FALLBACK_HREF = '/(app)/(tabs)/(0_home)' as Href;
 
 /** Route groups that name a layout, not a destination. */
 const LAYOUT_GROUPS = {
@@ -39,7 +47,12 @@ const LAYOUT_GROUPS = {
   '(tabs)': true,
 } as const;
 
-function normalizeRoutePath(path: string): string {
+/**
+ * The path two routes are compared on: the query dropped and the layout groups
+ * stripped, so a recorded href (`/(app)/agent-chat/ses_1?at=msg_2`) and the
+ * pathname the screen reports (`/agent-chat/ses_1`) name the same destination.
+ */
+export function normalizedRoutePath(path: string): string {
   const withoutQuery = path.includes('?') ? path.slice(0, path.indexOf('?')) : path;
   return withoutQuery
     .split('/')

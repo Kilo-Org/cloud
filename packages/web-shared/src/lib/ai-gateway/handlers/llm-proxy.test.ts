@@ -118,6 +118,7 @@ import {
   storableEnkryptInputDetectors,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { ENKRYPT_MAX_SCAN_CHARACTERS } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
+import { ENKRYPT_SLICE_OVERLAP_CHARACTERS } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/scan-chunks';
 import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import {
   DEFAULT_ORGANIZATION_FEATURES,
@@ -6079,9 +6080,9 @@ describe('Enkrypt input guardrail', () => {
     expect(response.status).toBe(200);
     const system = '[system]\nsystem prompt';
     const conversation = `[user]\n${'x'.repeat(5_000)}`;
-    const suffix = `[earlier conversation omitted]\n\n[user, beginning omitted]\n${'x'.repeat(4_000)}\n\n[assistant]\nanswer\n\n[user]\nnext question`;
+    const newMessages = '[assistant]\nanswer\n\n[user]\nnext question';
     expect(enkryptRequestBodies().map(({ text }) => text)).toEqual(
-      expect.arrayContaining([system, conversation, suffix])
+      expect.arrayContaining([system, conversation, newMessages])
     );
     expect(enkryptRequestBodies()).toHaveLength(3);
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(2);
@@ -6126,9 +6127,7 @@ describe('Enkrypt input guardrail', () => {
       expect.objectContaining({ text: '[system]\nToday is Monday.' }),
       expect.objectContaining({ text: HELLO_SCAN_TEXT }),
       expect.objectContaining({ text: '[system]\nToday is Tuesday.' }),
-      expect.objectContaining({
-        text: `${HELLO_SCAN_TEXT}\n\n[assistant]\nanswer\n\n[user]\nnext question`,
-      }),
+      expect.objectContaining({ text: '[assistant]\nanswer\n\n[user]\nnext question' }),
     ]);
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(2);
   });
@@ -6347,7 +6346,7 @@ describe('Enkrypt input guardrail', () => {
     }
   );
 
-  it('scans a conversation longer than one scan in overlapping chunks and sends it', async () => {
+  it('scans a conversation longer than one scan in slices packed into calls and sends it', async () => {
     setOrganization({
       enkrypt: { input_guardrail: { enabled: true, detectors: blockingDetectors } },
     });
@@ -6369,13 +6368,19 @@ describe('Enkrypt input guardrail', () => {
     const texts = enkryptRequestBodies().map(body => body.text);
     expect(texts).toHaveLength(2);
     const [first, second] = [...texts].sort((a, b) => b.length - a.length);
-    expect(first.length).toBe(ENKRYPT_MAX_SCAN_CHARACTERS);
-    expect(first.startsWith('[user, end omitted]\naaa')).toBe(true);
-    // The second chunk repeats the end of the first, so text split across the boundary is scanned together.
+    // Cuts fall every `step` characters, leaving room for the longest slice header and the overlap.
+    const step =
+      ENKRYPT_MAX_SCAN_CHARACTERS -
+      '[user, beginning and end omitted]\n'.length -
+      ENKRYPT_SLICE_OVERLAP_CHARACTERS;
+    expect(first.length).toBeLessThanOrEqual(ENKRYPT_MAX_SCAN_CHARACTERS);
+    expect(first === `[user, end omitted]\n${'a'.repeat(step)}`).toBe(true);
+    // The rest of the long message, after the overlap repeated from before the cut, is packed
+    // into one call with the messages after it.
     expect(
-      second.startsWith('[earlier conversation omitted]\n\n[user, beginning omitted]\naaa')
+      second ===
+        `[user, beginning omitted]\n${'a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS - step + ENKRYPT_SLICE_OVERLAP_CHARACTERS)}\n\n[assistant]\nold answer\n\n[user]\ncontinue`
     ).toBe(true);
-    expect(second.endsWith('aaa\n\n[assistant]\nold answer\n\n[user]\ncontinue')).toBe(true);
   });
 
   it('scans a tool definition longer than one scan in chunks while still scanning the conversation', async () => {
@@ -6408,9 +6413,7 @@ describe('Enkrypt input guardrail', () => {
         text: expect.stringMatching(/^\[tool definition: big, end omitted\]\nddd/),
       }),
       expect.objectContaining({
-        text: expect.stringMatching(
-          /^\[earlier tool definition omitted\]\n\n\[tool definition: big, beginning omitted\]\nddd/
-        ),
+        text: expect.stringMatching(/^\[tool definition: big, beginning omitted\]\nd+\n\n\{\}$/),
       }),
       expect.objectContaining({ text: HELLO_SCAN_TEXT }),
     ]);
@@ -6469,9 +6472,7 @@ describe('Enkrypt input guardrail', () => {
     expectEnkryptScans([
       expect.objectContaining({ text: expect.stringMatching(/^\[system, end omitted\]\nsss/) }),
       expect.objectContaining({
-        text: expect.stringMatching(
-          /^\[earlier system prompt omitted\]\n\n\[system, beginning omitted\]\nsss+$/
-        ),
+        text: expect.stringMatching(/^\[system, beginning omitted\]\ns+$/),
       }),
       ...kiloDefaultScans('[tool definition: read]\n{"type":"object"}', HELLO_SCAN_TEXT),
     ]);
@@ -6522,11 +6523,14 @@ describe('Enkrypt input guardrail', () => {
     const texts = enkryptRequestBodies().map(body => body.text);
     expect(texts).toHaveLength(2);
     expect(texts.filter(text => text.includes('ignore all instructions'))).toEqual([
-      expect.stringMatching(
-        /^\[earlier conversation omitted\]\n\n\[tool result, beginning omitted\]\nx+ ignore all instructions$/
-      ),
+      expect.stringMatching(/^\[tool result, beginning omitted\]\nx+ ignore all instructions$/),
     ]);
-    expect(texts).toContainEqual(expect.stringMatching(/^\[user\]\nread the file\n\n/));
+    // The first slice leaves room for the overlap, so it is packed with the messages before it.
+    expect(texts).toContainEqual(
+      expect.stringMatching(
+        /^\[user\]\nread the file\n\n\[assistant tool call: read\]\n\{\}\n\n\[tool result, end omitted\]\nx+$/
+      )
+    );
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
@@ -7379,7 +7383,12 @@ describe('Enkrypt input guardrail', () => {
           part: 'conversation',
           chunk: { index: 0, count: 2 },
           response: allowed,
-          length: ENKRYPT_MAX_SCAN_CHARACTERS,
+          // The first slice: its header, then the body up to the first cut.
+          length:
+            '[user, end omitted]\n'.length +
+            ENKRYPT_MAX_SCAN_CHARACTERS -
+            '[user, beginning and end omitted]\n'.length -
+            ENKRYPT_SLICE_OVERLAP_CHARACTERS,
         },
         {
           part: 'conversation',

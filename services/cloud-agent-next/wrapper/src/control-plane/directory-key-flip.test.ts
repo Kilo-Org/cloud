@@ -301,7 +301,7 @@ describe('directory-key flip (production dispatcher)', () => {
         h.turns.observeKiloEvent({
           type: 'session.turn.open',
           properties: { sessionID: opts.sessionId },
-          nativeRuntimeId: 'rt',
+          nativeRuntimeId: h.runtimes.get(DIRECTORY)!.nativeRuntimeId!,
         });
       };
       client.interrupt = async opts => {
@@ -486,8 +486,16 @@ describe('directory-key flip (production dispatcher)', () => {
         h.turns.observeKiloEvent({
           type: 'session.turn.open',
           properties: { sessionID: opts.sessionId },
-          nativeRuntimeId: 'rt',
+          nativeRuntimeId: h.runtimes.get(DIRECTORY)!.nativeRuntimeId!,
         });
+      };
+      retiredClient.drainSession = async input => {
+        h.turns.observeKiloEvent({
+          type: 'session.drained',
+          properties: { sessionID: input.sessionId, token: input.token },
+          nativeRuntimeId: h.runtimes.get(DIRECTORY)!.nativeRuntimeId!,
+        });
+        return true;
       };
       // If release cleanup used this retired client, these would record it.
       retiredClient.release = async input => {
@@ -517,7 +525,7 @@ describe('directory-key flip (production dispatcher)', () => {
       h.turns.observeKiloEvent({
         type: 'session.turn.close',
         properties: { sessionID: 'ses_kilo_a', reason: 'completed' },
-        nativeRuntimeId: 'rt',
+        nativeRuntimeId: h.runtimes.get(DIRECTORY)!.nativeRuntimeId!,
       });
       await waitFor(() => h.spawner.spawnCount() === 2);
       await Bun.sleep(20);

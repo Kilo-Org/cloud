@@ -5,13 +5,13 @@ import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type { PaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy';
 import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
-import { APPLE_STORE_BUNDLE_ID } from '@/lib/kilo-pass/apple-store-sdk';
 import {
+  APPLE_STORE_BUNDLE_ID,
   decodeAppleStoreTransactionJws,
   normalizeEnvironment,
   type AppleStoreDecodedTransaction,
   type AppleStoreEnvironment,
-} from '@/lib/kilo-pass/apple-store-verifier';
+} from '@/lib/kilo-pass/apple-store-sdk';
 import {
   consumeGooglePlayProductPurchase,
   getGooglePlayProductPurchase,
@@ -241,10 +241,8 @@ export async function verifyGooglePlayCreditPurchase(params: {
     // A test (license-tester) purchase is credited like a paid one on purpose,
     // and this is the documented exception: the stores offer no other path to
     // exercise a real charge end to end, the amount always comes from the
-    // catalog and never from the caller, and the grant is idempotent. It
-    // mirrors the Kilo Pass store flow, which also grants on a Sandbox
-    // purchase. Refusing Sandbox here would make the only testable store path
-    // uncreditable.
+    // catalog and never from the caller, and the grant is idempotent.
+    // Refusing Sandbox here would make the only testable store path uncreditable.
     environment: apiData.purchaseType === 0 ? 'Sandbox' : 'Production',
     rawPayload: apiData,
   };

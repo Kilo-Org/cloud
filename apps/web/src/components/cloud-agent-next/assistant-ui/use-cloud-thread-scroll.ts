@@ -124,6 +124,8 @@ export function useCloudThreadScroll({
     resetKey: sessionIdFromParams,
     overflowCheckKey: `${chatTabActive}:${staticMessages.length + dynamicMessages.length}`,
     ready: transcriptReady,
+    autoloadOnMount: false,
+    initialPositionedRef: transcriptPositionedRef,
   });
 
   const autoScrollFrameRef = useRef(0);

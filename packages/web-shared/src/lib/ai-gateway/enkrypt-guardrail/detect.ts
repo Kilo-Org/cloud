@@ -62,9 +62,8 @@ const detectResponseSchema = z.object({
 export type EnkryptScanPart = 'tools' | 'system' | 'conversation' | 'response';
 
 /**
- * How much of the part `text` covers. With a cached conversation prefix, `text` is only the
- * uncached suffix plus an overlap of already-scanned text. A part too long for one call is split
- * into chunks, each scanned on its own; `chunk` locates this one.
+ * How much of the part `text` covers. Segments with a cached verdict are left out, and the rest are
+ * packed into calls of at most `ENKRYPT_MAX_SCAN_CHARACTERS`; `chunk` locates this call among them.
  */
 export type EnkryptScanCoverage = {
   part: EnkryptScanPart;

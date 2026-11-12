@@ -1,4 +1,10 @@
 import type { CloudSessionMessagesWirePage } from '@kilocode/cloud-agent-sdk/schemas';
+import {
+  cloudToolPartDetailInputSchema,
+  cloudToolPartDetailWireSchema,
+  type CloudToolPartDetailInput,
+  type CloudToolPartDetailWire,
+} from '@kilocode/cloud-agent-sdk/tool-part-detail';
 import 'server-only';
 import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
@@ -709,6 +715,9 @@ type CloudAgentNextTRPCClient = {
   getSessionMessagesPage: {
     query: (input: GetSessionMessagesPageInput) => Promise<unknown>;
   };
+  getSessionToolPartDetail: {
+    query: (input: CloudToolPartDetailInput) => Promise<unknown>;
+  };
   getSandboxStatus: {
     query: (input: GetSessionInput) => Promise<unknown>;
   };
@@ -1068,6 +1077,15 @@ export class CloudAgentNextClient {
     const request = cloudSessionMessagesPageInputSchema.parse(input);
     return cloudSessionMessagesPageWireSchema.parse(
       await this.client.getSessionMessagesPage.query(request)
+    );
+  }
+
+  async getSessionToolPartDetail(
+    input: CloudToolPartDetailInput
+  ): Promise<CloudToolPartDetailWire> {
+    const request = cloudToolPartDetailInputSchema.parse(input);
+    return cloudToolPartDetailWireSchema.parse(
+      await this.client.getSessionToolPartDetail.query(request)
     );
   }
 

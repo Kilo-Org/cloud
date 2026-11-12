@@ -6772,6 +6772,13 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 100
+        },
+        "toolDisplay": {
+          "type": "string",
+          "enum": [
+            "full",
+            "preview"
+          ]
         }
       },
       "required": [
@@ -6784,9 +6791,61 @@
       "sessionid",
       "kilosessionid",
       "cursor",
-      "limit"
+      "limit",
+      "tooldisplay"
     ],
-    "searchBlob": "cloudAgentNext.getSessionMessagesPage Retrieve a paginated page of messages and conversation history for one of your Cloud Agent sessions, with an optional cursor for older messages. Use it to load or scroll through session history. cloudagentnext getsessionmessagespage sessionid kilosessionid cursor limit sessionId kiloSessionId cursor limit"
+    "searchBlob": "cloudAgentNext.getSessionMessagesPage Retrieve a paginated page of messages and conversation history for one of your Cloud Agent sessions, with an optional cursor for older messages. Use it to load or scroll through session history. cloudagentnext getsessionmessagespage sessionid kilosessionid cursor limit tooldisplay sessionId kiloSessionId cursor limit toolDisplay"
+  },
+  "cloudAgentNext.getSessionToolPartDetail": {
+    "path": "cloudAgentNext.getSessionToolPartDetail",
+    "kind": "query",
+    "summary": "Get the full detail of a single tool call part within a Cloud Agent session, including its input, output, and status. Use to inspect exactly what a specific tool invocation did during an agent run.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "kiloSessionId": {
+          "type": "string",
+          "minLength": 30,
+          "maxLength": 30,
+          "format": "starts_with",
+          "pattern": "^ses_.*"
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "partId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "callId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "sessionId",
+        "messageId",
+        "partId"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "getsessiontoolpartdetail",
+      "sessionid",
+      "kilosessionid",
+      "messageid",
+      "partid",
+      "callid"
+    ],
+    "searchBlob": "cloudAgentNext.getSessionToolPartDetail Get the full detail of a single tool call part within a Cloud Agent session, including its input, output, and status. Use to inspect exactly what a specific tool invocation did during an agent run. cloudagentnext getsessiontoolpartdetail sessionid kilosessionid messageid partid callid sessionId kiloSessionId messageId partId callId"
   },
   "cloudAgentNext.getStackedWorkspaceSource": {
     "path": "cloudAgentNext.getStackedWorkspaceSource",
@@ -13519,134 +13578,6 @@
     ],
     "searchBlob": "kiloPass.cancelSubscription Cancel a user's Kilo Pass subscription at the end of the current billing period so it does not renew. kilopass cancelsubscription"
   },
-  "kiloPass.completeAppStorePurchase": {
-    "path": "kiloPass.completeAppStorePurchase",
-    "kind": "mutation",
-    "summary": "Finish an Apple App Store Kilo Pass purchase by validating the App Store receipt and activating the subscription on the user's account.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "signedTransactionJws": {
-          "type": "string",
-          "minLength": 1
-        },
-        "platform": {
-          "type": "string",
-          "enum": [
-            "ios",
-            "android"
-          ]
-        },
-        "storefront": {
-          "type": "string",
-          "enum": [
-            "app_store",
-            "play",
-            "web"
-          ]
-        },
-        "product": {
-          "type": "string",
-          "enum": [
-            "kilo_pass",
-            "credits"
-          ]
-        },
-        "program": {
-          "anyOf": [
-            {
-              "type": "string",
-              "maxLength": 64
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "signedTransactionJws",
-        "platform",
-        "storefront",
-        "product"
-      ]
-    },
-    "tags": [
-      "kilopass",
-      "completeappstorepurchase",
-      "signedtransactionjws",
-      "platform",
-      "storefront",
-      "product",
-      "program"
-    ],
-    "searchBlob": "kiloPass.completeAppStorePurchase Finish an Apple App Store Kilo Pass purchase by validating the App Store receipt and activating the subscription on the user's account. kilopass completeappstorepurchase signedtransactionjws platform storefront product program signedTransactionJws platform storefront product program"
-  },
-  "kiloPass.completePlayPurchase": {
-    "path": "kiloPass.completePlayPurchase",
-    "kind": "mutation",
-    "summary": "Finish a Google Play Kilo Pass purchase by validating the Play purchase token and activating the subscription on the user's account.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "purchaseToken": {
-          "type": "string",
-          "minLength": 1
-        },
-        "platform": {
-          "type": "string",
-          "enum": [
-            "ios",
-            "android"
-          ]
-        },
-        "storefront": {
-          "type": "string",
-          "enum": [
-            "app_store",
-            "play",
-            "web"
-          ]
-        },
-        "product": {
-          "type": "string",
-          "enum": [
-            "kilo_pass",
-            "credits"
-          ]
-        },
-        "program": {
-          "anyOf": [
-            {
-              "type": "string",
-              "maxLength": 64
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "purchaseToken",
-        "platform",
-        "storefront",
-        "product"
-      ]
-    },
-    "tags": [
-      "kilopass",
-      "completeplaypurchase",
-      "purchasetoken",
-      "platform",
-      "storefront",
-      "product",
-      "program"
-    ],
-    "searchBlob": "kiloPass.completePlayPurchase Finish a Google Play Kilo Pass purchase by validating the Play purchase token and activating the subscription on the user's account. kilopass completeplaypurchase purchasetoken platform storefront product program purchaseToken platform storefront product program"
-  },
   "kiloPass.createCheckoutSession": {
     "path": "kiloPass.createCheckoutSession",
     "kind": "mutation",
@@ -13866,17 +13797,6 @@
       "returnurl"
     ],
     "searchBlob": "kiloPass.getCustomerPortalUrl Get a Stripe billing portal link where a user can view and manage their Kilo Pass subscription and payment details. kilopass getcustomerportalurl returnurl returnUrl"
-  },
-  "kiloPass.getMobileStoreProducts": {
-    "path": "kiloPass.getMobileStoreProducts",
-    "kind": "query",
-    "summary": "Get the available Kilo Pass products and app store account token for in-app / mobile store purchases.",
-    "inputSchema": {},
-    "tags": [
-      "kilopass",
-      "getmobilestoreproducts"
-    ],
-    "searchBlob": "kiloPass.getMobileStoreProducts Get the available Kilo Pass products and app store account token for in-app / mobile store purchases. kilopass getmobilestoreproducts"
   },
   "kiloPass.getPurchasePresentation": {
     "path": "kiloPass.getPurchasePresentation",
@@ -18618,6 +18538,13 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 100
+        },
+        "toolDisplay": {
+          "type": "string",
+          "enum": [
+            "full",
+            "preview"
+          ]
         }
       },
       "required": [
@@ -18633,9 +18560,69 @@
       "sessionid",
       "kilosessionid",
       "cursor",
-      "limit"
+      "limit",
+      "tooldisplay"
     ],
-    "searchBlob": "organizations.cloudAgentNext.getSessionMessagesPage Get a paginated page of chat messages from a cloud agent session, using a cursor and limit to page through the conversation history. Use to load earlier or later messages in a session transcript for an organization. organizations cloudagentnext getsessionmessagespage organizationid sessionid kilosessionid cursor limit organizationId sessionId kiloSessionId cursor limit"
+    "searchBlob": "organizations.cloudAgentNext.getSessionMessagesPage Get a paginated page of chat messages from a cloud agent session, using a cursor and limit to page through the conversation history. Use to load earlier or later messages in a session transcript for an organization. organizations cloudagentnext getsessionmessagespage organizationid sessionid kilosessionid cursor limit tooldisplay organizationId sessionId kiloSessionId cursor limit toolDisplay"
+  },
+  "organizations.cloudAgentNext.getSessionToolPartDetail": {
+    "path": "organizations.cloudAgentNext.getSessionToolPartDetail",
+    "kind": "query",
+    "summary": "Fetch the full stored details of a single tool call inside an organization's Cloud Agent session chat, such as the tool's input, output, status, and error, identified by message, part, and call ID. Use it to expand a tool-call preview in session history or inspect what a specific tool actually did.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "kiloSessionId": {
+          "type": "string",
+          "minLength": 30,
+          "maxLength": 30,
+          "format": "starts_with",
+          "pattern": "^ses_.*"
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "partId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "callId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "organizationId",
+        "sessionId",
+        "messageId",
+        "partId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getsessiontoolpartdetail",
+      "organizationid",
+      "sessionid",
+      "kilosessionid",
+      "messageid",
+      "partid",
+      "callid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getSessionToolPartDetail Fetch the full stored details of a single tool call inside an organization's Cloud Agent session chat, such as the tool's input, output, status, and error, identified by message, part, and call ID. Use it to expand a tool-call preview in session history or inspect what a specific tool actually did. organizations cloudagentnext getsessiontoolpartdetail organizationid sessionid kilosessionid messageid partid callid organizationId sessionId kiloSessionId messageId partId callId"
   },
   "organizations.cloudAgentNext.getStackedWorkspaceSource": {
     "path": "organizations.cloudAgentNext.getStackedWorkspaceSource",

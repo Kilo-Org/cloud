@@ -122,6 +122,8 @@ type UseOlderMessagesPaginationInputs = {
   resetKey: string | null | undefined;
   overflowCheckKey?: unknown;
   ready: boolean;
+  autoloadOnMount?: boolean;
+  initialPositionedRef?: RefObject<boolean>;
 };
 
 export function useOlderMessagesPagination({
@@ -135,6 +137,8 @@ export function useOlderMessagesPagination({
   resetKey,
   overflowCheckKey,
   ready,
+  autoloadOnMount = true,
+  initialPositionedRef,
 }: UseOlderMessagesPaginationInputs): {
   requestOlderMessages: () => void;
   tryLoadOlderFromScroll: (scrollTop: number) => void;
@@ -196,6 +200,7 @@ export function useOlderMessagesPagination({
       isProgrammaticScrollRef.current = false;
       if (
         canAutoloadOlderMessages(el) &&
+        autoloadOnMount &&
         el.scrollTop < OLDER_MESSAGES_NEAR_TOP_PX &&
         olderMessagesError === null
       ) {
@@ -210,10 +215,11 @@ export function useOlderMessagesPagination({
     ready,
     requestOlderMessages,
     scrollElementRef,
+    autoloadOnMount,
   ]);
 
   useLayoutEffect(() => {
-    if (!ready) return;
+    if (!ready || !autoloadOnMount) return;
     if (olderMessagesError) return;
     const el = scrollElementRef.current;
     if (!el) return;
@@ -221,15 +227,23 @@ export function useOlderMessagesPagination({
     if (el.scrollHeight <= el.clientHeight) {
       requestOlderMessages();
     }
-  }, [olderMessagesError, overflowCheckKey, ready, requestOlderMessages, scrollElementRef]);
+  }, [
+    autoloadOnMount,
+    olderMessagesError,
+    overflowCheckKey,
+    ready,
+    requestOlderMessages,
+    scrollElementRef,
+  ]);
 
   const tryLoadOlderFromScroll = useCallback(
     (scrollTop: number) => {
+      if (isProgrammaticScrollRef.current || initialPositionedRef?.current === false) return;
       if (scrollTop < OLDER_MESSAGES_NEAR_TOP_PX) {
         requestOlderMessages();
       }
     },
-    [requestOlderMessages]
+    [requestOlderMessages, initialPositionedRef, isProgrammaticScrollRef]
   );
 
   return { requestOlderMessages, tryLoadOlderFromScroll };

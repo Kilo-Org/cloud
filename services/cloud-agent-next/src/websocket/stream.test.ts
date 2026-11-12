@@ -165,6 +165,41 @@ describe('stream handler replayEvents', () => {
     ]);
   });
 
+  it('projects completed tool bodies in replay only when previews are requested', async () => {
+    const output = 'x'.repeat(20_000);
+    const part = {
+      id: 'prt_1',
+      messageID: 'msg_1',
+      sessionID: 'ses_1',
+      type: 'tool',
+      callID: 'call_1',
+      tool: 'bash',
+      state: { status: 'completed', input: { command: 'ls' }, output, time: { start: 1, end: 2 } },
+    };
+    const rows = [{ ...makeKiloEvent(4, 'message.part.updated', { part }), mutation_cursor: 30 }];
+    const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries(rows), SESSION_ID, {
+      getUpdateCursor: () => 30,
+    });
+    const full = makeFakeWebSocket();
+    await handler.replayEvents(full, { sessionId: SESSION_ID, afterCursor: 0 });
+    expect(parseSentMessages(full)[0]?.data).toMatchObject({ properties: { part } });
+
+    const preview = makeFakeWebSocket();
+    await handler.replayEvents(preview, {
+      sessionId: SESSION_ID,
+      afterCursor: 0,
+      toolDisplay: 'preview',
+    });
+    const replayed = parseSentMessages(preview)[0]?.data as {
+      properties: { part: { state: { output: string }; cloudDetail: unknown } };
+    };
+    expect(replayed.properties.part.state.output.length).toBeLessThan(output.length);
+    expect(replayed.properties.part.cloudDetail).toMatchObject({ revision: 30 });
+    expect(parseStreamFilters(new URL('https://w/stream?toolDisplay=preview'), SESSION_ID)).toEqual(
+      expect.objectContaining({ toolDisplay: 'preview' })
+    );
+  });
+
   it('retains persisted cursor when formatting mutable rows', () => {
     expect(formatStreamEvent({ ...makeEvent(2), mutation_cursor: 77 }, SESSION_ID)).toMatchObject({
       eventId: 2,

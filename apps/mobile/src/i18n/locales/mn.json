@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Байгууллагын нэр",
       "balance": "Үлдэгдэл",
       "organizationSeats": "Байгууллагын хэрэглэгчийн эрх",
+      "plan": "Байгууллагын төлөвлөгөө",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Төлбөрийн удирдлага",
       "lowBalanceBelow": "{{amount}}-оос доош"
     },
     "kiloPass": {

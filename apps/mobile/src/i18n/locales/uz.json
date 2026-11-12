@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Tashkilot nomi",
       "balance": "Balans",
       "organizationSeats": "Tashkilotdagi o'rinlar",
+      "plan": "Tashkilot tarifi",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "To'lovni boshqarish",
       "lowBalanceBelow": "{{amount}} dan kam"
     },
     "kiloPass": {

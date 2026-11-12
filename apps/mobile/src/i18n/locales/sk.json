@@ -3057,6 +3057,10 @@
       "renamePlaceholder": "Názov organizácie",
       "balance": "Zostatok",
       "organizationSeats": "Miesta v organizácii",
+      "plan": "Plán organizácie",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Spravovať fakturáciu",
       "lowBalanceBelow": "Pod {{amount}}"
     },
     "kiloPass": {

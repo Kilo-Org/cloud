@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "ឈ្មោះអង្គការ",
       "balance": "សមតុល្យ",
       "organizationSeats": "កន្លែងសមាជិកក្នុងអង្គការ",
+      "plan": "គម្រោងស្ថាប័ន",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "គ្រប់គ្រងការគិតប្រាក់",
       "lowBalanceBelow": "ក្រោម {{amount}}"
     },
     "kiloPass": {

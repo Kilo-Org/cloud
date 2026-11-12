@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "ಸಂಸ್ಥೆಯ ಹೆಸರು",
       "balance": "ಉಳಿಕೆ",
       "organizationSeats": "ಸಂಸ್ಥೆಯ ಸೀಟ್‌ಗಳು",
+      "plan": "ಸಂಸ್ಥೆಯ ಯೋಜನೆ",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "ಬಿಲ್ಲಿಂಗ್ ನಿರ್ವಹಿಸಿ",
       "lowBalanceBelow": "{{amount}} ಕ್ಕಿಂತ ಕಡಿಮೆ"
     },
     "kiloPass": {

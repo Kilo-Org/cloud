@@ -3057,6 +3057,10 @@
       "renamePlaceholder": "Ime organizacije",
       "balance": "Stanje",
       "organizationSeats": "Uporabniška mesta organizacije",
+      "plan": "Načrt organizacije",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Upravljanje obračunavanja",
       "lowBalanceBelow": "Pod {{amount}}"
     },
     "kiloPass": {

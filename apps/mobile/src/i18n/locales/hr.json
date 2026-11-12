@@ -3004,6 +3004,10 @@
       "renamePlaceholder": "Naziv organizacije",
       "balance": "Saldo",
       "organizationSeats": "Korisnička mjesta organizacije",
+      "plan": "Plan organizacije",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Upravljanje naplatom",
       "lowBalanceBelow": "Ispod {{amount}}"
     },
     "kiloPass": {

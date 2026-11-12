@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Szervezet neve",
       "balance": "Egyenleg",
       "organizationSeats": "Szervezeti férőhelyek",
+      "plan": "Szervezeti csomag",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Számlázás kezelése",
       "lowBalanceBelow": "{{amount}} alatt"
     },
     "kiloPass": {

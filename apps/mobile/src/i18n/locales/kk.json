@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Ұйым атауы",
       "balance": "Баланс",
       "organizationSeats": "Ұйымдағы орындар",
+      "plan": "Ұйым жоспары",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Төлемдерді басқару",
       "lowBalanceBelow": "{{amount}} сомасынан төмен"
     },
     "kiloPass": {

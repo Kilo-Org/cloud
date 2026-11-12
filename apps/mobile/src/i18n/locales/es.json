@@ -2902,6 +2902,10 @@
       "balance": "Saldo",
       "lowBalanceBelow": "Por debajo de {{amount}}",
       "organizationSeats": "Licencias de la organización",
+      "plan": "Plan de la organización",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Gestionar facturación",
       "renamePlaceholder": "Nombre de la organización",
       "renameTitle": "Cambiar nombre de la organización"
     },

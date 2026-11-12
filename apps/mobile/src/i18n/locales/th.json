@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "ชื่อองค์กร",
       "balance": "ยอดคงเหลือ",
       "organizationSeats": "สิทธิ์ใช้งานขององค์กร",
+      "plan": "แผนขององค์กร",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "จัดการการเรียกเก็บเงิน",
       "lowBalanceBelow": "ต่ำกว่า {{amount}}"
     },
     "kiloPass": {

@@ -3110,6 +3110,10 @@
       "renamePlaceholder": "Ainm na heagraíochta",
       "balance": "Iarmhéid",
       "organizationSeats": "Suíocháin eagraíochta",
+      "plan": "Plean eagraíochta",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Bainistigh billeáil",
       "lowBalanceBelow": "Faoi {{amount}}"
     },
     "kiloPass": {

@@ -2903,6 +2903,10 @@
       "balance": "Solde",
       "lowBalanceBelow": "Moins de {{amount}}",
       "organizationSeats": "Licences de l'organisation",
+      "plan": "Formule de l'organisation",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Gérer la facturation",
       "renamePlaceholder": "Nom de l'organisation",
       "renameTitle": "Renommer l'organisation"
     },

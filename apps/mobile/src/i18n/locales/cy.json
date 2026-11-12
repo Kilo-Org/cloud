@@ -3163,6 +3163,10 @@
       "renamePlaceholder": "Enw'r sefydliad",
       "balance": "Balans",
       "organizationSeats": "Seddau'r sefydliad",
+      "plan": "Cynllun y sefydliad",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Rheoli bilio",
       "lowBalanceBelow": "O dan {{amount}}"
     },
     "kiloPass": {

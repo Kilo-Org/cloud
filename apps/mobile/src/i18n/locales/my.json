@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "အဖွဲ့အစည်းအမည်",
       "balance": "လက်ကျန်",
       "organizationSeats": "အဖွဲ့အစည်း၏ အသုံးပြုခွင့်နေရာများ",
+      "plan": "အဖွဲ့အစည်း၏ အစီအစဉ်",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "ငွေတောင်းခံမှု စီမံခန့်ခွဲရန်",
       "lowBalanceBelow": "{{amount}} အောက်"
     },
     "kiloPass": {

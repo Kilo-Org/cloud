@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Non òganizasyon an",
       "balance": "Balans",
       "organizationSeats": "Plas nan òganizasyon an",
+      "plan": "Plan òganizasyon an",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Jere faktirasyon",
       "lowBalanceBelow": "Anba {{amount}}"
     },
     "kiloPass": {

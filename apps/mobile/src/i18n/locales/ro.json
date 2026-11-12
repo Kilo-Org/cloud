@@ -3004,6 +3004,10 @@
       "renamePlaceholder": "Numele organizației",
       "balance": "Sold",
       "organizationSeats": "Locuri în organizație",
+      "plan": "Planul organizației",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Gestionează facturarea",
       "lowBalanceBelow": "Sub {{amount}}"
     },
     "kiloPass": {

@@ -3057,6 +3057,10 @@
       "renamePlaceholder": "Organizacijos pavadinimas",
       "balance": "Likutis",
       "organizationSeats": "Organizacijos vietos",
+      "plan": "Organizacijos planas",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Atsiskaitymų valdymas",
       "lowBalanceBelow": "Mažiau nei {{amount}}"
     },
     "kiloPass": {

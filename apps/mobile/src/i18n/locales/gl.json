@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Nome da organización",
       "balance": "Saldo",
       "organizationSeats": "Prazas da organización",
+      "plan": "Plan da organización",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Xestionar a facturación",
       "lowBalanceBelow": "Por baixo de {{amount}}"
     },
     "kiloPass": {

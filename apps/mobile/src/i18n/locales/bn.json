@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "সংস্থার নাম",
       "balance": "ব্যালেন্স",
       "organizationSeats": "সংস্থার সিট",
+      "plan": "সংস্থার প্ল্যান",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "বিলিং পরিচালনা করুন",
       "lowBalanceBelow": "{{amount}}-এর নিচে"
     },
     "kiloPass": {

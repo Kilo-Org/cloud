@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Te ingoa o te rōpū",
       "balance": "Te toenga",
       "organizationSeats": "Ngā raihana kaiwhakamahi o te rōpū",
+      "plan": "Mahere whakahaerenga",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Whakahaere utu",
       "lowBalanceBelow": "I raro i te {{amount}}"
     },
     "kiloPass": {

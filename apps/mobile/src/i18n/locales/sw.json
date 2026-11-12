@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Jina la shirika",
       "balance": "Salio",
       "organizationSeats": "Nafasi za shirika",
+      "plan": "Mpango wa shirika",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Dhibiti bili",
       "lowBalanceBelow": "Chini ya {{amount}}"
     },
     "kiloPass": {

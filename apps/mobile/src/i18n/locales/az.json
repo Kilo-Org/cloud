@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Təşkilatın adı",
       "balance": "Balans",
       "organizationSeats": "Təşkilatın istifadəçi yerləri",
+      "plan": "Təşkilat planı",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Ödənişi idarə et",
       "lowBalanceBelow": "{{amount}}-dan aşağı"
     },
     "kiloPass": {

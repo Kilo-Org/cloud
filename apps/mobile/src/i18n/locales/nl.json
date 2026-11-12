@@ -2849,6 +2849,10 @@
       "balance": "Saldo",
       "lowBalanceBelow": "Onder {{amount}}",
       "organizationSeats": "Gebruikerslicenties van de organisatie",
+      "plan": "Organisatieplan",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Facturering beheren",
       "renamePlaceholder": "Naam van de organisatie",
       "renameTitle": "Organisatie hernoemen"
     },

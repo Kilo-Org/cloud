@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Magaca ururka",
       "balance": "Hadhaaga",
       "organizationSeats": "Boosaska ururka",
+      "plan": "Qorshaha ururka",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Maaree biilasha",
       "lowBalanceBelow": "Ka yar {{amount}}"
     },
     "kiloPass": {

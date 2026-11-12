@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "ຊື່ອົງກອນ",
       "balance": "ຍອດເງິນຄົງເຫຼືອ",
       "organizationSeats": "ຈຳນວນສິດຜູ້ໃຊ້ໃນອົງກອນ",
+      "plan": "ແຜນອົງກອນ",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "ຈັດການການຮຽກເກັບເງິນ",
       "lowBalanceBelow": "ຕໍ່າກວ່າ {{amount}}"
     },
     "kiloPass": {

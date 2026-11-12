@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "نام سازمان",
       "balance": "موجودی",
       "organizationSeats": "مجوزهای کاربری سازمان",
+      "plan": "طرح سازمان",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "مدیریت صورتحساب",
       "lowBalanceBelow": "زیر {{amount}}"
     },
     "kiloPass": {

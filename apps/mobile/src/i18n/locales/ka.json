@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "ორგანიზაციის სახელი",
       "balance": "ბალანსი",
       "organizationSeats": "ორგანიზაციის ადგილები",
+      "plan": "ორგანიზაციის გეგმა",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "ანგარიშსწორების მართვა",
       "lowBalanceBelow": "{{amount}}-ზე ნაკლები"
     },
     "kiloPass": {

@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Organisasjonsnavn",
       "balance": "Saldo",
       "organizationSeats": "Brukerplasser i organisasjonen",
+      "plan": "Organisasjonsplan",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Administrer fakturering",
       "lowBalanceBelow": "Under {{amount}}"
     },
     "kiloPass": {

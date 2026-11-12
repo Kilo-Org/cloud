@@ -2849,6 +2849,10 @@
       "balance": "残高",
       "lowBalanceBelow": "{{amount}}未満",
       "organizationSeats": "組織のシート数",
+      "plan": "組織のプラン",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "請求を管理",
       "renamePlaceholder": "組織名",
       "renameTitle": "組織名を変更"
     },

@@ -2849,6 +2849,10 @@
       "balance": "Số dư",
       "lowBalanceBelow": "Dưới {{amount}}",
       "organizationSeats": "Số suất sử dụng của tổ chức",
+      "plan": "Gói tổ chức",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Quản lý thanh toán",
       "renamePlaceholder": "Tên tổ chức",
       "renameTitle": "Đổi tên tổ chức"
     },

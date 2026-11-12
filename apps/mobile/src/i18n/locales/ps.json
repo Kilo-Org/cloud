@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "د سازمان نوم ولیکئ",
       "balance": "بیلانس",
       "organizationSeats": "د سازمان د غړیتوب ځایونه",
+      "plan": "د سازمان پلان",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "د بلونو مدیریت",
       "lowBalanceBelow": "له {{amount}} څخه کم"
     },
     "kiloPass": {

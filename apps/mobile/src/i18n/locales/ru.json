@@ -2955,6 +2955,10 @@
       "balance": "Баланс",
       "lowBalanceBelow": "Ниже {{amount}}",
       "organizationSeats": "Места в организации",
+      "plan": "План организации",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Управление оплатой",
       "renamePlaceholder": "Название организации",
       "renameTitle": "Переименовать организацию"
     },

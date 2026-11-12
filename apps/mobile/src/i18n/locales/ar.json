@@ -3061,6 +3061,10 @@
       "balance": "الرصيد",
       "lowBalanceBelow": "أقل من {{amount}}",
       "organizationSeats": "مقاعد المؤسسة",
+      "plan": "خطة المؤسسة",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "إدارة الفوترة",
       "renamePlaceholder": "اسم المؤسسة",
       "renameTitle": "إعادة تسمية المؤسسة"
     },

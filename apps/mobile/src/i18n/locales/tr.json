@@ -2849,6 +2849,10 @@
       "balance": "Bakiye",
       "lowBalanceBelow": "{{amount}} altı",
       "organizationSeats": "Kuruluş lisansları",
+      "plan": "Kuruluş planı",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Faturalandırmayı yönet",
       "renamePlaceholder": "Kuruluş adı",
       "renameTitle": "Kuruluşu yeniden adlandır"
     },

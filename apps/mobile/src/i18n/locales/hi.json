@@ -2849,6 +2849,10 @@
       "balance": "बैलेंस",
       "lowBalanceBelow": "{{amount}} से कम",
       "organizationSeats": "संगठन की सीटें",
+      "plan": "संगठन का प्लान",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "बिलिंग प्रबंधित करें",
       "renamePlaceholder": "संगठन का नाम",
       "renameTitle": "संगठन का नाम बदलें"
     },

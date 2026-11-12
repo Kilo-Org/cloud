@@ -2955,6 +2955,10 @@
       "balance": "Баланс",
       "lowBalanceBelow": "Менше ніж {{amount}}",
       "organizationSeats": "Місця в організації",
+      "plan": "План організації",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Керувати оплатою",
       "renamePlaceholder": "Назва організації",
       "renameTitle": "Перейменувати організацію"
     },

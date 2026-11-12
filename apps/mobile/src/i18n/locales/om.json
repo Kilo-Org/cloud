@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Maqaa dhaabbataa",
       "balance": "Haftee",
       "organizationSeats": "Bakka miseensotaa dhaabbataa",
+      "plan": "Karoora dhaabbataa",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Kaffaltii bulchi",
       "lowBalanceBelow": "{{amount}} gadi"
     },
     "kiloPass": {

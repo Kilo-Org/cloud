@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "تنظیم کا نام",
       "balance": "بیلنس",
       "organizationSeats": "تنظیم کی سیٹیں",
+      "plan": "تنظیم کا پلان",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "بلنگ کا انتظام کریں",
       "lowBalanceBelow": "{{amount}} سے کم"
     },
     "kiloPass": {

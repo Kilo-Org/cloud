@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Organisaation nimi",
       "balance": "Saldo",
       "organizationSeats": "Organisaation käyttäjäpaikat",
+      "plan": "Organisaation paketti",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Hallinnoi laskutusta",
       "lowBalanceBelow": "Alle {{amount}}"
     },
     "kiloPass": {

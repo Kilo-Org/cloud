@@ -2902,6 +2902,10 @@
       "balance": "יתרה",
       "lowBalanceBelow": "מתחת ל-{{amount}}",
       "organizationSeats": "רישיונות הארגון",
+      "plan": "תוכנית הארגון",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "ניהול חיובים",
       "renamePlaceholder": "שם הארגון",
       "renameTitle": "שינוי שם הארגון"
     },

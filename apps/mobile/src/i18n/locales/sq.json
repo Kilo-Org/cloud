@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Emri i organizatës",
       "balance": "Gjendja",
       "organizationSeats": "Vendet për anëtarë në organizatë",
+      "plan": "Plani i organizatës",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Menaxho faturimin",
       "lowBalanceBelow": "Nën {{amount}}"
     },
     "kiloPass": {

@@ -2849,6 +2849,10 @@
       "balance": "잔액",
       "lowBalanceBelow": "{{amount}} 미만",
       "organizationSeats": "조직 라이선스",
+      "plan": "조직 요금제",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "결제 관리",
       "renamePlaceholder": "조직 이름",
       "renameTitle": "조직 이름 변경"
     },

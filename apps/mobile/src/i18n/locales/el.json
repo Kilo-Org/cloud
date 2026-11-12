@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Όνομα οργανισμού",
       "balance": "Υπόλοιπο",
       "organizationSeats": "Θέσεις οργανισμού",
+      "plan": "Πλάνο οργανισμού",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Διαχείριση χρέωσης",
       "lowBalanceBelow": "Κάτω από {{amount}}"
     },
     "kiloPass": {

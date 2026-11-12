@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Erakundearen izena",
       "balance": "Saldoa",
       "organizationSeats": "Erakundearen lizentziak",
+      "plan": "Erakundearen plana",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Kudeatu fakturazioa",
       "lowBalanceBelow": "{{amount}} baino gutxiago"
     },
     "kiloPass": {

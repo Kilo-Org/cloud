@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Nama organisasi",
       "balance": "Baki",
       "organizationSeats": "Slot pengguna organisasi",
+      "plan": "Pelan organisasi",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Urus pengebilan",
       "lowBalanceBelow": "Di bawah {{amount}}"
     },
     "kiloPass": {

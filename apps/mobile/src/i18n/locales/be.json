@@ -3057,6 +3057,10 @@
       "renamePlaceholder": "Назва арганізацыі",
       "balance": "Баланс",
       "organizationSeats": "Месцы ў арганізацыі",
+      "plan": "План арганізацыі",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Кіраванне плацяжамі",
       "lowBalanceBelow": "Менш за {{amount}}"
     },
     "kiloPass": {

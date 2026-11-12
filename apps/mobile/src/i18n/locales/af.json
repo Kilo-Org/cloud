@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Organisasienaam",
       "balance": "Saldo",
       "organizationSeats": "Gebruikersplekke in die organisasie",
+      "plan": "Organisasieplan",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Bestuur fakturering",
       "lowBalanceBelow": "Onder {{amount}}"
     },
     "kiloPass": {

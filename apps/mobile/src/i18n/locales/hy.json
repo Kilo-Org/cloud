@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Կազմակերպության անունը",
       "balance": "Մնացորդ",
       "organizationSeats": "Կազմակերպության տեղեր",
+      "plan": "Կազմակերպության պլան",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Կառավարել վճարումները",
       "lowBalanceBelow": "{{amount}}-ից ցածր"
     },
     "kiloPass": {

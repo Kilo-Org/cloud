@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Anaran'ny fikambanana",
       "balance": "Ambim-bola",
       "organizationSeats": "Toerana ho an'ny mpikambana",
+      "plan": "Drafitry ny fikambanana",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Hitantana faktiora",
       "lowBalanceBelow": "Latsaky ny {{amount}}"
     },
     "kiloPass": {

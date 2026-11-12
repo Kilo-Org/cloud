@@ -2955,6 +2955,10 @@
       "balance": "Saldo",
       "lowBalanceBelow": "Poniżej {{amount}}",
       "organizationSeats": "Miejsca w organizacji",
+      "plan": "Plan organizacji",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Zarządzaj rozliczeniami",
       "renamePlaceholder": "Nazwa organizacji",
       "renameTitle": "Zmień nazwę organizacji"
     },

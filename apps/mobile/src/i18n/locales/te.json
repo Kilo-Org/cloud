@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "సంస్థ పేరు",
       "balance": "బ్యాలెన్స్",
       "organizationSeats": "సంస్థ సీట్లు",
+      "plan": "సంస్థ ప్లాన్",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "బిల్లింగ్ను నిర్వహించండి",
       "lowBalanceBelow": "{{amount}} కంటే తక్కువ"
     },
     "kiloPass": {

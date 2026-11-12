@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Име на организацијата",
       "balance": "Состојба",
       "organizationSeats": "Места во организацијата",
+      "plan": "План на организацијата",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Управување со наплата",
       "lowBalanceBelow": "Под {{amount}}"
     },
     "kiloPass": {

@@ -2849,6 +2849,10 @@
       "balance": "餘額",
       "lowBalanceBelow": "低於 {{amount}}",
       "organizationSeats": "組織席次",
+      "plan": "組織套餐",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "管理帳單",
       "renamePlaceholder": "組織名稱",
       "renameTitle": "重新命名組織"
     },

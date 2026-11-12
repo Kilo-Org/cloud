@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Nafn félags",
       "balance": "Inneign",
       "organizationSeats": "Notendasæti félagsins",
+      "plan": "Áætlun fyrirtækis",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Stjórna innheimtu",
       "lowBalanceBelow": "Undir {{amount}}"
     },
     "kiloPass": {

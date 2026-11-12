@@ -2951,6 +2951,10 @@
       "renamePlaceholder": "Orúkọ àjọ",
       "balance": "Owó tó kù",
       "organizationSeats": "Àwọn ààyè ọmọ ẹgbẹ́ àjọ",
+      "plan": "Ètò àjọ",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "manageBilling": "Ṣàkóso ìsanwó",
       "lowBalanceBelow": "Ó dín ju {{amount}} lọ"
     },
     "kiloPass": {

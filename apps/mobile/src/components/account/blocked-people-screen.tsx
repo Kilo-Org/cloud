@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -106,7 +106,6 @@ export function BlockedPeopleScreen() {
   const { t } = useTranslation();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [busyLogin, setBusyLogin] = useState<string | null>(null);
   const listKey = trpc.moderation.listHiddenUsers.queryKey();
   const hidden = useQuery(trpc.moderation.listHiddenUsers.queryOptions());
 
@@ -119,9 +118,6 @@ export function BlockedPeopleScreen() {
         announcingToast.success(t('profile.blockedPeople.unblocked', { login: input.githubLogin }));
       },
       onError: error => toast.error(error.message),
-      onSettled: () => {
-        setBusyLogin(null);
-      },
     })
   );
 
@@ -132,9 +128,6 @@ export function BlockedPeopleScreen() {
         announcingToast.success(t('profile.blockedPeople.unmuted', { login: input.githubLogin }));
       },
       onError: error => toast.error(error.message),
-      onSettled: () => {
-        setBusyLogin(null);
-      },
     })
   );
 
@@ -166,9 +159,8 @@ export function BlockedPeopleScreen() {
           logins={hidden.data.blockedLogins}
           actionLabel={t('profile.blockedPeople.unblock')}
           actionA11y={login => t('profile.blockedPeople.unblockA11y', { login })}
-          busyLogin={busyLogin}
+          busyLogin={unblock.isPending ? (unblock.variables?.githubLogin ?? null) : null}
           onAction={login => {
-            setBusyLogin(login);
             unblock.mutate({ githubLogin: login });
           }}
         />
@@ -177,9 +169,8 @@ export function BlockedPeopleScreen() {
           logins={hidden.data.mutedLogins}
           actionLabel={t('profile.blockedPeople.unmute')}
           actionA11y={login => t('profile.blockedPeople.unmuteA11y', { login })}
-          busyLogin={busyLogin}
+          busyLogin={unmute.isPending ? (unmute.variables?.githubLogin ?? null) : null}
           onAction={login => {
-            setBusyLogin(login);
             unmute.mutate({ githubLogin: login });
           }}
         />

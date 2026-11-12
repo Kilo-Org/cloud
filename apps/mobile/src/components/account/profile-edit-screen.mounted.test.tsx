@@ -29,6 +29,7 @@ const state = vi.hoisted((): ScreenState => ({
   error: false,
   mutations: [] as MutationOptions[],
   mutate: vi.fn(),
+  invalidate: vi.fn(),
   back: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -48,6 +49,7 @@ vi.mock('@tanstack/react-query', async importOriginal => {
       isFetching: false,
       refetch: vi.fn(),
     }),
+    useQueryClient: () => ({ invalidateQueries: state.invalidate }),
     useMutation: (options: MutationOptions) => {
       state.mutations.push(options);
       return { mutate: state.mutate, isPending: false };
@@ -117,6 +119,7 @@ beforeEach(() => {
   state.error = false;
   state.mutations = [];
   state.mutate.mockClear();
+  state.invalidate.mockClear();
   state.back.mockClear();
   state.toastError.mockClear();
 });
@@ -153,6 +156,7 @@ describe('ProfileEditScreen', () => {
     act(() => {
       state.mutations[0]?.onSuccess?.();
     });
+    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [] });
     expect(state.back).toHaveBeenCalledTimes(1);
   });
 

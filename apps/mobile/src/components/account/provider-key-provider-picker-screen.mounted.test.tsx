@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -165,6 +165,24 @@ describe('ProviderKeyProviderPickerScreen', () => {
     });
 
     expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['OpenAI']);
+  });
+
+  it('matches an id whose capital I was typed in a Turkish locale', async () => {
+    state.providers = [{ id: 'vercel-ai-gateway', name: 'Vercel AI Gateway' }];
+    await i18n.changeLanguage('tr');
+    try {
+      const root = await mount();
+
+      act(() => {
+        (searchInput(root).props.onChangeText as (value: string) => void)('Vercel-AI-Gateway');
+      });
+
+      expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual([
+        'Vercel AI Gateway',
+      ]);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('keeps a retry when the provider list cannot be read', async () => {

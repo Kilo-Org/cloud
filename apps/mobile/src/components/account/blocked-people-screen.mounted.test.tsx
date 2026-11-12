@@ -19,6 +19,8 @@ type ScreenState = {
   mutedLogins: string[];
   error: boolean;
   mutations: Record<string, MutationOptions>;
+  pending: string | null;
+  pendingVariables: { githubLogin: string } | null;
   calls: { name: string; input: unknown }[];
   toastError: Mock;
 };
@@ -28,6 +30,8 @@ const state = vi.hoisted((): ScreenState => ({
   mutedLogins: [],
   error: false,
   mutations: {},
+  pending: null,
+  pendingVariables: null,
   calls: [],
   toastError: vi.fn(),
 }));
@@ -48,11 +52,13 @@ vi.mock('@tanstack/react-query', async importOriginal => {
     }),
     useMutation: (options: { kind: string } & MutationOptions) => {
       state.mutations[options.kind] = options;
+      const pending = state.pending === options.kind;
       return {
         mutate: (input: unknown) => {
           state.calls.push({ name: options.kind, input });
         },
-        isPending: false,
+        isPending: pending,
+        variables: pending ? state.pendingVariables : undefined,
       };
     },
     useQueryClient: () => ({ invalidateQueries: vi.fn() }),
@@ -118,6 +124,8 @@ beforeEach(() => {
   state.error = false;
   state.mutations = {};
   state.calls = [];
+  state.pending = null;
+  state.pendingVariables = null;
   state.toastError.mockClear();
 });
 
@@ -153,6 +161,25 @@ describe('BlockedPeopleScreen', () => {
     });
 
     expect(state.calls).toEqual([{ name: 'unmute', input: { githubLogin: 'loudmouth' } }]);
+  });
+
+  it('keeps each list independent while a reveal is in flight', async () => {
+    state.pending = 'unblock';
+    state.pendingVariables = { githubLogin: 'spammer' };
+    const root = await mount();
+
+    expect(action(root, 'Unblock spammer').props.disabled).toBe(true);
+    expect(action(root, 'Unmute loudmouth').props.disabled).toBe(false);
+
+    act(() => renderer?.unmount());
+    renderer = undefined;
+
+    state.pending = 'unmute';
+    state.pendingVariables = { githubLogin: 'loudmouth' };
+    const second = await mount();
+
+    expect(action(second, 'Unblock spammer').props.disabled).toBe(false);
+    expect(action(second, 'Unmute loudmouth').props.disabled).toBe(true);
   });
 
   it('shows the server message when a reveal is refused', async () => {

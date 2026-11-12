@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -61,6 +61,7 @@ function ProfileLinkForm({ linkedinUrl, githubUrl }: FieldsProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const linkedinRef = useRef(linkedinUrl ?? '');
   const githubRef = useRef(githubUrl ?? '');
   const [linkedinError, setLinkedinError] = useState<string | null>(null);
@@ -70,6 +71,9 @@ function ProfileLinkForm({ linkedinUrl, githubUrl }: FieldsProps) {
   const update = useMutation(
     trpc.user.updateProfile.mutationOptions({
       onSuccess: () => {
+        // The screen's read is cached for the default staleTime, so a quick return
+        // would show the links as they were before this save.
+        void queryClient.invalidateQueries({ queryKey: trpc.user.getProfileLinks.queryKey() });
         announcingToast.success(t('profile.editProfile.saved'));
         router.back();
       },

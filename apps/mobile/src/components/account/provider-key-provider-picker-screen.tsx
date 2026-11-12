@@ -23,6 +23,9 @@ import { cn } from '@/lib/utils';
 
 type ProviderOption = inferRouterOutputs<MobileRouter>['byok']['listProviders'][number];
 
+/** Ids are ASCII slugs: folding them here keeps the comparison locale-independent. */
+const ID_FOLD_LOCALE = 'en';
+
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = {
   flexGrow: 1,
@@ -76,16 +79,20 @@ export function ProviderKeyProviderPickerScreen() {
 
   const filtered = useMemo(() => {
     const rows = providers.data ?? [];
-    // Fold in the reader's language: Turkish has no bare i, so a lowercased
-    // search term must be built with the same locale the names are read in.
-    const needle = query.trim().toLocaleLowerCase(i18n.language);
-    if (needle === '') {
+    const trimmed = query.trim();
+    if (trimmed === '') {
       return rows;
     }
+    // The two columns fold differently on purpose. A display name is read in the
+    // reader's language, so it folds in that locale. An id is an ASCII slug, so it
+    // folds in a fixed one: a Turkish capital I becomes "ı" in the name needle and
+    // would otherwise stop matching the `…-ai-…` id it used to.
+    const nameNeedle = trimmed.toLocaleLowerCase(i18n.language);
+    const idNeedle = trimmed.toLocaleLowerCase(ID_FOLD_LOCALE);
     return rows.filter(
       provider =>
-        provider.name.toLocaleLowerCase(i18n.language).includes(needle) ||
-        provider.id.includes(needle)
+        provider.name.toLocaleLowerCase(i18n.language).includes(nameNeedle) ||
+        provider.id.toLocaleLowerCase(ID_FOLD_LOCALE).includes(idNeedle)
     );
   }, [providers.data, query, i18n.language]);
 

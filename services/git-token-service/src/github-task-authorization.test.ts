@@ -242,6 +242,22 @@ describe('connected identity isolation for organization worktrees', () => {
     'keeps owner discovery and mixed GraphQL requests repository-scoped for %s credentials',
     async source => {
       const identity = { ...auth, source, githubToken: 'current-repository-token' };
+      const currentApproval: WorkspaceGitHubRepositoryAccess = {
+        repositoryId: grant.repository.id,
+        nodeId: grant.repository.nodeId,
+        owner: grant.repository.owner,
+        name: grant.repository.name,
+        mode: 'contribute',
+        source: 'user',
+        approvedBy: 'user',
+        approvedAt: 1,
+        integrationId: '00000000-0000-4000-8000-000000000001',
+        identity: {
+          source,
+          providerSubjectId: source === 'user' ? '1' : '123',
+          appType: 'standard',
+        },
+      };
       const requests: GitHubTaskRequest[] = [
         { method: 'GET', url: 'https://api.github.com/orgs/acme/repos' },
         { method: 'GET', url: 'https://api.github.com/users/acme/repos' },
@@ -258,7 +274,7 @@ describe('connected identity isolation for organization worktrees', () => {
         },
       ];
       for (const request of requests) {
-        expect(await credential(request, identity)).toBe(
+        expect(await credential(request, identity, [currentApproval])).toBe(
           source === 'user' ? 'owner-scoped-user-token' : 'scoped-installation-token'
         );
         if (source === 'user') {

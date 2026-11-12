@@ -241,14 +241,47 @@ describe('artifacts mirror manifest contract', () => {
     expect(providerSource).toContain(
       `private const val MANIFEST_FILE_NAME = "${MIRROR_MANIFEST_FILE_NAME}"`
     );
-    // `<filesDir>/artifacts/sessions/<sessionId>/<fileId>`.
+    // `<filesDir>/artifacts/sessions/<sessionId>/<fileId>`, built from the
+    // manifest's ids: the display name never reaches the filesystem.
     expect(providerSource).toContain(
-      'File(File(artifactsDirectory, SESSIONS_DIRECTORY_NAME), file.session.id)'
+      'File(File(File(artifactsDirectory, SESSIONS_DIRECTORY_NAME), sessionId), entry.id)'
     );
-    expect(providerSource).toContain('File(sessionDirectory, file.entry.id)');
     expect(providerSource).toContain(
       `private const val SUPPORTED_MANIFEST_VERSION = ${MIRROR_MANIFEST.version}`
     );
+  });
+
+  it('serves a manifest entry only while its bytes are a file', () => {
+    // The index is written last and pruned by the next sync, so an entry can
+    // outlive its bytes. Such an entry is not a document: DocumentsUI would
+    // list the row, the open would fail, and the picker reports that failure as
+    // the same cancel a Back produces.
+    expect(functionBody(providerSource, 'servedDocument')).toContain(
+      'return file.takeIf { mirrorFile(it.session.id, it.entry).isFile }'
+    );
+
+    const childBody = functionBody(providerSource, 'queryChildDocuments');
+    const listing =
+      /for \(file in session\.files\) \{([\s\S]*?)\n {4}\}/.exec(childBody)?.[1] ?? '';
+    expect(listing).toContain('if (!mirrorFile(session.id, file).isFile)');
+    expect(listing).toContain('continue');
+    // The row is added after the check, so a skipped entry never reaches the
+    // cursor.
+    expect(listing.indexOf('.isFile')).toBeLessThan(listing.indexOf('fileRow('));
+
+    // A stale id answers a missing document on every read entry point rather
+    // than a row whose bytes are gone.
+    expect(functionBody(providerSource, 'queryDocument')).toContain(
+      'servedDocument(documentId, sessions)'
+    );
+    expect(functionBody(providerSource, 'getDocumentType')).toContain(
+      'servedDocument(documentId, sessions)?.entry?.mime'
+    );
+    const openBody = functionBody(providerSource, 'openDocument');
+    expect(openBody).toContain('servedDocument(documentId, readSessions())');
+    expect(openBody).toContain('throw FileNotFoundException("No artifact file on disk for ');
+    // The read still opens read-only.
+    expect(openBody).toContain('ParcelFileDescriptor.MODE_READ_ONLY');
   });
 
   it('parses only manifest keys the fixture carries', () => {

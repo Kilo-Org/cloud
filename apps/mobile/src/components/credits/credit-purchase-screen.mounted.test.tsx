@@ -806,7 +806,7 @@ describe('CreditPurchaseScreen', () => {
     const descends = (
       node: TestRenderer.ReactTestInstance,
       predicate: (child: TestRenderer.ReactTestInstance) => boolean
-    ): boolean => node.findAll(() => true).some(predicate);
+    ): boolean => node.findAll(() => true).some(child => predicate(child));
     const cases: {
       state: string;
       prepare: () => void;
@@ -886,7 +886,7 @@ describe('CreditPurchaseScreen', () => {
       const scroller = renderer.root.findByType(DetailScreenScrollView);
       const reserved = scroller
         .findAll(node => minHeightOf(node) > 0)
-        .filter(node => descends(node, scenario.isPackSurface))[0];
+        .find(node => descends(node, scenario.isPackSurface));
       const packAreaIndex = scroller.children.findIndex(
         child =>
           typeof child !== 'string' &&
@@ -907,11 +907,11 @@ describe('CreditPurchaseScreen', () => {
       );
       measured.push({
         state: scenario.state,
-        copyInScroller: copyIndex >= 0,
+        copyInScroller: copyIndex !== -1,
         legalInScroller: legalLinkNodes(scroller).length,
         packSurfaceInScroller: scroller.findAll(node => scenario.isPackSurface(node)).length,
         reservedHeight: reserved === undefined ? 0 : minHeightOf(reserved),
-        copyFollowsPackArea: packAreaIndex >= 0 && copyIndex > packAreaIndex,
+        copyFollowsPackArea: packAreaIndex !== -1 && copyIndex > packAreaIndex,
       });
       unmount();
       vi.clearAllMocks();

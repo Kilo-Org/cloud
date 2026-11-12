@@ -68,7 +68,7 @@ const PACK_SKELETON_ROWS = 4;
 const PACK_ROW_HEIGHT = 80;
 const PACK_CONTENT_GAP = 10.5;
 const STORE_NOTICE_HEIGHT = 180;
-const PACK_AREA_MIN_HEIGHT = (rows: number): number =>
+const packAreaMinHeight = (rows: number): number =>
   rows * (PACK_ROW_HEIGHT + PACK_CONTENT_GAP) + STORE_NOTICE_HEIGHT;
 
 /**
@@ -259,7 +259,7 @@ export function CreditPurchaseScreen() {
           <View
             className="gap-3"
             style={{
-              minHeight: PACK_AREA_MIN_HEIGHT(Math.max(PACK_SKELETON_ROWS, products.length)),
+              minHeight: packAreaMinHeight(Math.max(PACK_SKELETON_ROWS, products.length)),
             }}
           >
             {/* The purchase error rides inside the reserved area too: it comes

@@ -12,13 +12,16 @@ import {
   type AgentEnvironmentProfile,
 } from '@kilocode/db/schema';
 import { eq, and, sql, count, inArray } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
 import type { ProfileDatabase, ProfileOwner, ProfileSummary, ProfileResponse } from './types';
 import {
   buildOwnershipCondition,
   lockProfileOwnership,
+  profileOwnerLockKey,
   verifyProfileOwnership,
 } from './profile-utils';
 import { withProfileTransaction } from './database';
+import { MAX_OWNER_PROFILES } from './contracts/profiles';
 import { listMcpServersForProfile } from './profile-mcp-service';
 import { listSkillsForProfile } from './profile-skills-service';
 import { listAgentsForProfile } from './profile-agents-service';
@@ -31,6 +34,10 @@ import { listInstructionsForProfile } from './profile-instructions-service';
  * `createdByUserId` records the user who initiated the creation. For
  * user-owned profiles this matches `owner.id`; for org-owned profiles it
  * identifies the member who authored the shared profile.
+ *
+ * The owner may hold at most {@link MAX_OWNER_PROFILES} profiles. The count and
+ * the insert run in one transaction that first takes an owner-scoped advisory
+ * lock, so concurrent creates for one owner stay within the cap.
  */
 export async function createProfile(
   db: WorkerDb,
@@ -39,18 +46,39 @@ export async function createProfile(
   name: string,
   description?: string
 ): Promise<{ id: string }> {
-  const [profile] = await db
-    .insert(agent_environment_profiles)
-    .values({
-      owned_by_organization_id: owner.type === 'organization' ? owner.id : null,
-      owned_by_user_id: owner.type === 'user' ? owner.id : null,
-      created_by_user_id: createdByUserId,
-      name,
-      description: description ?? null,
-    })
-    .returning({ id: agent_environment_profiles.id });
+  return withProfileTransaction(db, async tx => {
+    // The lock serializes creates for this owner. `pg_advisory_xact_lock`
+    // releases on commit or rollback, so the lock never outlives the
+    // transaction that inserts.
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${profileOwnerLockKey(owner)}, 0))`
+    );
 
-  return { id: profile.id };
+    const [row] = await tx
+      .select({ n: count() })
+      .from(agent_environment_profiles)
+      .where(buildOwnershipCondition(owner));
+
+    if (Number(row.n) >= MAX_OWNER_PROFILES) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: `Profiles are limited to ${MAX_OWNER_PROFILES} per account`,
+      });
+    }
+
+    const [profile] = await tx
+      .insert(agent_environment_profiles)
+      .values({
+        owned_by_organization_id: owner.type === 'organization' ? owner.id : null,
+        owned_by_user_id: owner.type === 'user' ? owner.id : null,
+        created_by_user_id: createdByUserId,
+        name,
+        description: description ?? null,
+      })
+      .returning({ id: agent_environment_profiles.id });
+
+    return { id: profile.id };
+  });
 }
 
 /**

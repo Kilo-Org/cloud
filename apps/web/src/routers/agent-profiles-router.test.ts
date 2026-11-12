@@ -17,6 +17,7 @@ import { eq } from 'drizzle-orm';
 import {
   bindProfileToRepo,
   MASKED_SECRET_VALUE,
+  MAX_OWNER_PROFILES,
   MAX_PROFILE_KILO_COMMANDS,
   MAX_PROFILE_VARS,
 } from '@kilocode/cloud-agent-profile';
@@ -159,6 +160,25 @@ describe('Agent Profiles Router', () => {
 
         expect(dbProfile.owned_by_user_id).toBe(memberUser.id);
         expect(dbProfile.owned_by_organization_id).toBeNull();
+      });
+
+      test('applies the owner cap to new profiles', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        await db.insert(agent_environment_profiles).values(
+          Array.from({ length: MAX_OWNER_PROFILES }, (_, index) => ({
+            owned_by_user_id: ownerUser.id,
+            name: `Existing ${String(index)}`,
+          }))
+        );
+
+        await expect(caller.agentProfiles.create({ name: 'One too many' })).rejects.toMatchObject({
+          code: 'PRECONDITION_FAILED',
+        });
+
+        const otherCaller = await createCallerForUser(otherUser.id);
+        await expect(otherCaller.agentProfiles.create({ name: 'Other owner' })).resolves.toEqual({
+          id: expect.any(String),
+        });
       });
     });
 

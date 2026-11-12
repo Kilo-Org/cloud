@@ -1407,6 +1407,49 @@ describe('session detail active-profile indicator', () => {
   });
 });
 
+/**
+ * The props the screen hands one transcript row's bubble. The list is stubbed,
+ * so read the element the stub renders: the bubble itself is a memo component,
+ * which a rendered-tree lookup does not resolve to the imported symbol.
+ */
+function messageBubbleProps(
+  renderer: ReactTestRenderer,
+  messageId: string
+): { onLongPressDetails: (message: StoredMessage) => void } {
+  const list = renderer.root.findAllByType(SessionMessageList)[0];
+  if (!list) {
+    throw new Error('the transcript list was expected to paint');
+  }
+  const props = list.props as {
+    items: readonly SessionTranscriptItem[];
+    renderItem: (args: { item: SessionTranscriptItem }) => ReactElement<{ children: ReactNode }>;
+  };
+  const item = props.items.find(
+    candidate => candidate.type === 'message' && candidate.message.info.id === messageId
+  );
+  if (!item) {
+    throw new Error(`no transcript row for ${messageId}`);
+  }
+  const rendered = props.renderItem({ item });
+  const children = rendered.props.children;
+  const bubble = (Array.isArray(children) ? children : [children]).find(
+    (child: ReactNode): child is ReactElement =>
+      isValidElement(child) && child.type === MessageBubble
+  );
+  if (!bubble) {
+    throw new Error(`no bubble for ${messageId}`);
+  }
+  return bubble.props as { onLongPressDetails: (message: StoredMessage) => void };
+}
+
+function detailsSheetNode(renderer: ReactTestRenderer) {
+  const [sheet] = renderer.root.findAll(node => Object.is(node.type, 'MessageDetailsSheet'));
+  if (!sheet) {
+    throw new Error('the message details sheet was expected to mount');
+  }
+  return sheet;
+}
+
 describe('session detail organization scope', () => {
   it('uses the displayed session organization once its row resolves', async () => {
     goalMountOptions = { resolvedType: 'remote' };
@@ -1522,6 +1565,10 @@ describe('session detail organization scope', () => {
     // the composer is on screen before the session's own row arrives.
     const metadata = Promise.withResolvers<undefined>();
     const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const cachedRow = cachedRows[0];
+    if (!cachedRow) {
+      throw new Error('the cached row fixture was expected');
+    }
     scopeReads.catalogModels = [
       {
         id: 'deepseek/deepseek-v4.1-flash',
@@ -1546,6 +1593,11 @@ describe('session detail organization scope', () => {
       throw new Error('the composer was expected for a cached transcript');
     }
     expect(composer.props.modelOptions).toEqual([]);
+    // The bottom slot holds one block: the live composer never shares it with
+    // the read-only reserve.
+    expect(
+      view.renderer.root.findAll(node => Object.is(node.type, 'SessionReadOnlyFooterPlaceholder'))
+    ).toHaveLength(0);
 
     // Start and Restart do nothing while the scope is unresolved.
     await act(async () => {
@@ -1556,28 +1608,58 @@ describe('session detail organization scope', () => {
     expect(createAndNavigateAgentSession).not.toHaveBeenCalled();
     expect(restartAgentSession).not.toHaveBeenCalled();
 
-    // The read-only footer's Continue is likewise unavailable: the same window
-    // paints it for a read-only transcript, and pressing it opens nothing.
+    // The read-only footer's Continue is the same class of action: the same
+    // window paints that footer, so it keeps its reserve instead of offering a
+    // Continue that cannot open a destination.
     await act(async () => {
       view.store.set(view.manager.atoms.activeSessionType, 'read-only');
       await Promise.resolve();
     });
-    const continueRoute = navigationRoutes.lastIndexOf('session-detail');
-    const [continueControl] = view.renderer.root.findAll(
-      node =>
-        Object.is(node.type, 'Button') &&
-        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
-    );
-    if (!continueControl) {
-      throw new Error('the Continue control was expected for a read-only transcript');
-    }
-    act(() => {
-      (continueControl.props.onPress as () => void)();
-    });
-    expect(navigationRoutes.lastIndexOf('session-detail')).toBe(continueRoute);
+    expect(
+      view.renderer.root.findAll(node => Object.is(node.type, 'SessionReadOnlyFooterPlaceholder'))
+    ).toHaveLength(1);
+    expect(
+      view.renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Button') &&
+          node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+      )
+    ).toHaveLength(0);
     expect(
       navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
     ).toHaveLength(0);
+
+    // Fork from a message's details is the same held destination, so the sheet
+    // offers no fork entry in this window.
+    act(() => {
+      messageBubbleProps(view.renderer, cachedRow.info.id).onLongPressDetails(cachedRow);
+    });
+    const detailsSheet = detailsSheetNode(view.renderer);
+    expect(detailsSheet.props.visible).toBe(true);
+    expect(detailsSheet.props.onForkFromHere).toBeUndefined();
+  });
+
+  it('offers the fork entry once the session row resolves', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const row = childMessage(ROOT_ID, 'resolved row');
+    const view = await mountDetails([row], { sessionOrganizationId: 'org-a' });
+    await waitFor(
+      () => view.store.get(view.manager.atoms.fetchedSessionData)?.kiloSessionId === ROOT_ID
+    );
+
+    act(() => {
+      messageBubbleProps(view.renderer, row.info.id).onLongPressDetails(row);
+    });
+    const detailsSheet = detailsSheetNode(view.renderer);
+    const fork = detailsSheet.props.onForkFromHere;
+    expect(typeof fork).toBe('function');
+
+    act(() => {
+      (fork as () => void)();
+    });
+    const destination = navigationRoutes.at(-1) ?? '';
+    expect(destination.startsWith('/(app)/agent-chat/new?organizationId=org-a')).toBe(true);
+    expect(destination).toContain(`cloneUpToMessageId=${row.info.id}`);
   });
 });
 

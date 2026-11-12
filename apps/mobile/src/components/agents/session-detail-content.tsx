@@ -2143,10 +2143,15 @@ export function SessionDetailContent({
   // the transcript is painted, not merely once the open resolves: a read-only
   // footer above rows that are still skeletons is the same two states at once,
   // so the reserve holds for that window too (see `isSessionChromePending`).
+  // Continue opens a new session in this session's organization, so its control
+  // waits for the session's own row the same way the scoped reads do. Until that
+  // row names this open, the read-only slot keeps the reserve it already holds
+  // rather than painting a control that cannot act.
+  const isReadOnlyFooterPending = isSessionChromePending || !sessionDataLoaded;
   const isComposerVisible =
     !hasBlockingInteraction && !isReadOnlySession && !isSessionChromePending;
   const isReadOnlyContinueVisible =
-    isReadOnlySession && !hasBlockingInteraction && !isSessionChromePending;
+    isReadOnlySession && !hasBlockingInteraction && !isReadOnlyFooterPending;
   // The pending slot holds the shape its session will end in. The kind is only
   // set once the transport answers, but the metadata read lands before that and
   // names a cloud-agent session, which is writable by construction; the id
@@ -2158,8 +2163,10 @@ export function SessionDetailContent({
   const isPendingComposer =
     isWritableResolved ||
     (fetchedData?.kiloSessionId === sessionId && fetchedData.cloudAgentSessionId !== null);
+  // The reserve never shares the slot with a live control: a settled composer
+  // already holds it, and the hold only owns the slot when nothing else does.
   const isReadOnlyFooterPlaceholderVisible =
-    isSessionChromePending && !hasBlockingInteraction && !isPendingComposer;
+    isReadOnlyFooterPending && !hasBlockingInteraction && !isPendingComposer && !isComposerVisible;
   const isComposerSkeletonVisible =
     isSessionChromePending && !hasBlockingInteraction && isPendingComposer;
   // Structural locks only. The live send capability is passed separately so a
@@ -2645,7 +2652,9 @@ export function SessionDetailContent({
                 ? t('agentChat.session.cancelQueuedUpgradeRequired')
                 : null
             }
-            onForkFromHere={detailsForkCut ? handleForkFromHere : undefined}
+            onForkFromHere={
+              detailsForkCut !== null && sessionDataLoaded ? handleForkFromHere : undefined
+            }
           />
 
           {childSessionSheet.sheet ? (

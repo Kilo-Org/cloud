@@ -3,6 +3,7 @@ import {
   getClaudeVersion,
   isClaudeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
+import type { GatewayMessagesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { TransformRequestContext } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   isWhitespaceOnlyMessage,
@@ -25,6 +26,38 @@ function bindsThinkingToPrefix(model: string) {
   const version = getClaudeVersion(model);
   if (!version) return false;
   return version.major > 5 || (version.major === 5 && version.minor >= 1);
+}
+
+function stripHistoricalThinkingBlocks(
+  messages: GatewayMessagesRequest['messages']
+): GatewayMessagesRequest['messages'] {
+  const cleanedMessages: GatewayMessagesRequest['messages'] = [];
+  for (const message of messages) {
+    if (message.role !== 'assistant' || !Array.isArray(message.content)) {
+      cleanedMessages.push(message);
+      continue;
+    }
+    const content = message.content.filter(
+      block => block.type !== 'thinking' && block.type !== 'redacted_thinking'
+    );
+    if (content.length === message.content.length) {
+      cleanedMessages.push(message);
+      continue;
+    }
+    const strippedMessage = { ...message, content };
+    if (!isWhitespaceOnlyMessage(strippedMessage)) {
+      cleanedMessages.push(strippedMessage);
+      continue;
+    }
+    const previousMessage = cleanedMessages.at(-1);
+    if (previousMessage) {
+      cleanedMessages[cleanedMessages.length - 1] = preserveCacheControl(
+        previousMessage,
+        strippedMessage
+      );
+    }
+  }
+  return cleanedMessages;
 }
 
 /**
@@ -60,30 +93,7 @@ export function dropThinkingBlocksOnPrefixMismatch({
   if (thinking.type !== 'adaptive') {
     // block_binding is adaptive-only. Remove whole blocks, including signatures and redacted data,
     // without changing the explicit mode or touching nested tool results and user content.
-    const messages: typeof request.body.messages = [];
-    for (const message of request.body.messages) {
-      if (message.role !== 'assistant' || !Array.isArray(message.content)) {
-        messages.push(message);
-        continue;
-      }
-      const content = message.content.filter(
-        block => block.type !== 'thinking' && block.type !== 'redacted_thinking'
-      );
-      if (content.length === message.content.length) {
-        messages.push(message);
-        continue;
-      }
-      const strippedMessage = { ...message, content };
-      if (!isWhitespaceOnlyMessage(strippedMessage)) {
-        messages.push(strippedMessage);
-        continue;
-      }
-      const previousMessage = messages.at(-1);
-      if (previousMessage) {
-        messages[messages.length - 1] = preserveCacheControl(previousMessage, strippedMessage);
-      }
-    }
-    request.body.messages = messages;
+    request.body.messages = stripHistoricalThinkingBlocks(request.body.messages);
     return;
   }
   const binding = thinking.block_binding ?? {};

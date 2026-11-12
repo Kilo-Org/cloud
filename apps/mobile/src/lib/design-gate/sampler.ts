@@ -23,7 +23,17 @@ const MAX_RETAINED_CHARS = 4_000_000;
  * the retained dump costs. It is measured once per tick, which the signature
  * already computes.
  */
-export function createSampler<T extends PaintState>(snapshot: () => T) {
+export function createSampler<T extends PaintState>(
+  snapshot: () => T,
+  options: Readonly<{ intervalFloorMs?: number }> = {}
+) {
+  // A tick walks the whole document and serializes it twice (the dump and its
+  // paint signature). Measured on a mid-size screen on the emulator: ~150 ms per
+  // tick, so a 120 ms interval asks for more than the JS thread has and the app
+  // cannot finish hydrating while a cell samples it — the gate then measures a
+  // screen that is stuck on its own loading skeleton. The runner may ask for any
+  // cadence it likes; the device never samples faster than this floor.
+  const MIN_INTERVAL_MS = options.intervalFloorMs ?? 250;
   let samples: Sample<T>[] = [];
   // Weight of the sample at the same index, kept beside it so the wire shape of a
   // sample does not grow a runner-only field.
@@ -46,6 +56,7 @@ export function createSampler<T extends PaintState>(snapshot: () => T) {
     stop();
     truncated = false;
     let last = '';
+    const interval = Math.max(intervalMs, MIN_INTERVAL_MS);
     const overBudget = () =>
       samples.length > 1 && (samples.length > MAX_SAMPLES || retainedChars > MAX_RETAINED_CHARS);
     const evictOldest = () => {
@@ -75,13 +86,13 @@ export function createSampler<T extends PaintState>(snapshot: () => T) {
       }
     };
     tick();
-    const interval = setInterval(tick, intervalMs);
+    const timer = setInterval(tick, interval);
     // A runner that dies mid-run must not leave the app sampling forever.
     const deadline = setTimeout(() => {
-      clearInterval(interval);
+      clearInterval(timer);
     }, maxMs);
     stopTimers = () => {
-      clearInterval(interval);
+      clearInterval(timer);
       clearTimeout(deadline);
     };
   };

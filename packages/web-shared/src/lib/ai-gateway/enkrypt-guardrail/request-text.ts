@@ -184,28 +184,28 @@ function chatToolCallPiece(call: OpenAI.Chat.ChatCompletionMessageToolCall): Pie
 
 type ChatMessage = OpenAI.Chat.ChatCompletionMessageParam & MessageWithReasoning;
 
-function chatMessagePieces(message: ChatMessage): Piece[] {
+function chatMessageItems(message: ChatMessage): Item[] {
   switch (message.role) {
     case 'tool':
-      return chatContentPieces('tool result', message.content);
+      return [chatContentPieces('tool result', message.content)];
     case 'function':
-      return [piece(`function result: ${message.name}`, [message.content])];
+      return [[piece(`function result: ${message.name}`, [message.content])]];
     case 'system':
     case 'developer':
     case 'user':
-      return chatContentPieces(message.role, message.content);
+      return [chatContentPieces(message.role, message.content)];
     case 'assistant':
       return [
-        chatReasoning(message),
-        ...chatContentPieces('assistant', message.content),
-        piece('assistant refusal', [message.refusal]),
+        [chatReasoning(message)],
+        chatContentPieces('assistant', message.content),
+        [piece('assistant refusal', [message.refusal])],
         ...(message.function_call
-          ? [toolCall('assistant', message.function_call.name, message.function_call.arguments)]
+          ? [[toolCall('assistant', message.function_call.name, message.function_call.arguments)]]
           : []),
-        ...(message.tool_calls ?? []).flatMap(chatToolCallPiece),
+        ...(message.tool_calls ?? []).map(chatToolCallPiece),
       ];
     default:
-      return unrecognized(null, message);
+      return [unrecognized(null, message)];
   }
 }
 
@@ -262,8 +262,8 @@ function chatCompletionsParts(body: OpenRouterChatCompletionRequest): ScanPieces
       ),
       ...chatResponseFormatPieces(body.response_format),
     ],
-    system: body.messages.slice(0, instructions).map(chatMessagePieces),
-    conversation: body.messages.slice(instructions).map(chatMessagePieces),
+    system: body.messages.slice(0, instructions).flatMap(chatMessageItems),
+    conversation: body.messages.slice(instructions).flatMap(chatMessageItems),
   };
 }
 
@@ -428,10 +428,19 @@ function anthropicBlockPieces(role: string, block: AnthropicBlock): Piece[] {
   }
 }
 
-function anthropicMessagePieces(message: Anthropic.Beta.BetaMessageParam): Piece[] {
-  return typeof message.content === 'string'
-    ? [piece(message.role, [message.content])]
-    : message.content.flatMap(block => anthropicBlockPieces(message.role, block));
+/** Each block is an item of its own, except that consecutive text blocks are one item. */
+function anthropicMessageItems(message: Anthropic.Beta.BetaMessageParam): Item[] {
+  if (typeof message.content === 'string') return [[piece(message.role, [message.content])]];
+  const items: Item[] = [];
+  let previous: AnthropicBlock | undefined;
+  for (const block of message.content) {
+    const pieces = anthropicBlockPieces(message.role, block);
+    const item = items.at(-1);
+    if (item && block.type === 'text' && previous?.type === 'text') item.push(...pieces);
+    else items.push(pieces);
+    previous = block;
+  }
+  return items;
 }
 
 function anthropicToolDefinitionPieces(tool: Anthropic.Beta.BetaToolUnion): ToolPieces {
@@ -469,7 +478,7 @@ function messagesParts(request: GatewayMessagesRequest): ScanPieces {
         jsonText(body.output_config?.format?.schema),
       ]),
     ],
-    conversation: body.messages.map(anthropicMessagePieces),
+    conversation: body.messages.flatMap(anthropicMessageItems),
   };
 }
 
@@ -731,8 +740,14 @@ function responsesParts(body: GatewayResponsesRequest): ScanPieces {
   };
 }
 
-/** Pieces grouped by the tool definition, message, or input item they came from. */
-type ScanPieces = { tools: ToolPieces[]; system: Piece[][]; conversation: Piece[][] };
+/**
+ * The pieces of one model-visible item: a message's text, one tool call, one tool result, or one
+ * Responses input item. Each item becomes at least one segment of its own.
+ */
+type Item = Piece[];
+
+/** Pieces grouped by the tool definition or item they came from. */
+type ScanPieces = { tools: ToolPieces[]; system: Item[]; conversation: Item[] };
 
 function scanPieces(request: GatewayRequest): ScanPieces {
   switch (request.kind) {
@@ -760,10 +775,12 @@ export function renderSegment({ header, body }: RequestSegment): string {
 }
 
 /**
- * Pieces of one message are segments of their own; consecutive pieces with the same header, such as
- * two text parts, are merged.
+ * Pieces of one item are segments of their own; consecutive pieces with the same header, such as
+ * two text parts of one message, are merged. Items are never merged, so each tool call and tool
+ * result, including parallel ones, is a segment of its own: segment boundaries are where the
+ * verdict cache can resume and where a long scan is preferably split.
  */
-function messageSegments(pieces: Piece[]): RequestSegment[] {
+function itemSegments(pieces: Item): RequestSegment[] {
   const groups: { header: string; texts: string[] | null }[] = [];
   for (const { header, texts } of pieces) {
     const trimmed =
@@ -793,10 +810,10 @@ export function extractRequestParts(request: GatewayRequest): RequestScanParts {
   const { tools, system, conversation } = scanPieces(request);
   return {
     tools: tools.flatMap(({ kind, name, pieces }) => {
-      const segments = messageSegments(pieces);
+      const segments = itemSegments(pieces);
       return segments.length > 0 ? [{ kind, name, segments }] : [];
     }),
-    system: system.flatMap(messageSegments),
-    conversation: conversation.flatMap(messageSegments),
+    system: system.flatMap(itemSegments),
+    conversation: conversation.flatMap(itemSegments),
   };
 }

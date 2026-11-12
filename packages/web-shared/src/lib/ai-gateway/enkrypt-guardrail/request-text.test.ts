@@ -165,7 +165,8 @@ describe('extractRequestParts', () => {
         conversation: lines(
           seg('user', 'old question'),
           seg('assistant tool call: read', '{}'),
-          seg('tool result', 'file contents', 'web page text'),
+          seg('tool result', 'file contents'),
+          seg('tool result', 'web page text'),
           omit('tool result image'),
           seg('user document', 'document text'),
           seg('user', 'summarize')
@@ -852,6 +853,141 @@ describe('same-header merging', () => {
     ]);
   });
 
+  it('splits each parallel Anthropic tool_result block into a segment of its own', () => {
+    expect(
+      extractRequestParts(
+        request('messages', {
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'tool_result', tool_use_id: 'toolu_1', content: 'first result' },
+                { type: 'tool_result', tool_use_id: 'toolu_2', content: 'second result' },
+                { type: 'tool_result', tool_use_id: 'toolu_3', content: 'third result' },
+              ],
+            },
+          ],
+        })
+      ).conversation
+    ).toEqual([
+      { header: 'tool result', body: 'first result' },
+      { header: 'tool result', body: 'second result' },
+      { header: 'tool result', body: 'third result' },
+    ]);
+  });
+
+  it('merges the text parts of one Anthropic tool_result into one segment', () => {
+    expect(
+      extractRequestParts(
+        request('messages', {
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'tool_result',
+                  tool_use_id: 'toolu_1',
+                  content: [
+                    { type: 'text', text: 'one' },
+                    { type: 'text', text: 'two' },
+                  ],
+                },
+              ],
+            },
+          ],
+        })
+      ).conversation
+    ).toEqual([{ header: 'tool result', body: 'one\n\ntwo' }]);
+  });
+
+  it('merges consecutive Anthropic text blocks but keeps text on either side of a tool call apart', () => {
+    expect(
+      extractRequestParts(
+        request('messages', {
+          messages: [
+            {
+              role: 'assistant',
+              content: [
+                { type: 'text', text: 'one' },
+                { type: 'text', text: 'two' },
+                { type: 'tool_use', id: 'toolu_1', name: 'read', input: {} },
+                { type: 'text', text: 'three' },
+              ],
+            },
+          ],
+        })
+      ).conversation
+    ).toEqual([
+      { header: 'assistant', body: 'one\n\ntwo' },
+      { header: 'assistant tool call: read', body: '{}' },
+      { header: 'assistant', body: 'three' },
+    ]);
+  });
+
+  it('splits parallel chat tool calls of the same function into segments of their own', () => {
+    expect(
+      extractRequestParts(
+        request('chat_completions', {
+          messages: [
+            {
+              role: 'assistant',
+              content: null,
+              tool_calls: [
+                {
+                  id: 'call_1',
+                  type: 'function',
+                  function: { name: 'read', arguments: '{"path":"a"}' },
+                },
+                {
+                  id: 'call_2',
+                  type: 'function',
+                  function: { name: 'read', arguments: '{"path":"b"}' },
+                },
+              ],
+            },
+          ],
+        })
+      ).conversation
+    ).toEqual([
+      { header: 'assistant tool call: read', body: '{"path":"a"}' },
+      { header: 'assistant tool call: read', body: '{"path":"b"}' },
+    ]);
+  });
+
+  it('splits consecutive Responses function_call_output items into tool results of their own', () => {
+    expect(
+      extractRequestParts(
+        request('responses', {
+          input: [
+            { type: 'function_call_output', call_id: 'call_1', output: 'first output' },
+            { type: 'function_call_output', call_id: 'call_2', output: 'second output' },
+          ],
+        })
+      ).conversation
+    ).toEqual([
+      { header: 'tool result', body: 'first output' },
+      { header: 'tool result', body: 'second output' },
+    ]);
+  });
+
+  it('merges the text parts of one chat user message into one segment', () => {
+    expect(
+      extractRequestParts(
+        request('chat_completions', {
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: 'one' },
+                { type: 'text', text: 'two' },
+              ],
+            },
+          ],
+        })
+      ).conversation
+    ).toEqual([{ header: 'user', body: 'one\n\ntwo' }]);
+  });
+
   it('does not merge tool definitions from different tools', () => {
     expect(
       extractRequestParts(
@@ -907,7 +1043,8 @@ describe('additional input', () => {
           'edited reasoning content',
           'edited reasoning text'
         ),
-        seg('assistant refusal', 'edited refusal part', 'edited refusal message'),
+        seg('assistant refusal', 'edited refusal part'),
+        seg('assistant refusal', 'edited refusal message'),
         seg('assistant tool call: legacy', '{"text":"edited legacy arguments"}'),
         seg('assistant tool call: read', '{"path":"edited path"}'),
         seg('assistant tool call: patch', 'edited patch'),
@@ -957,13 +1094,8 @@ describe('additional input', () => {
         seg('assistant tool call: read', '{"path":"edited path"}'),
         seg('assistant tool call: web_search', '{"query":"edited query"}'),
         seg('assistant tool call: remote', '{"text":"edited remote input"}'),
-        seg(
-          'user document',
-          'edited title',
-          'edited context',
-          'document text',
-          'plain text source'
-        ),
+        seg('user document', 'edited title', 'edited context', 'document text'),
+        seg('user document', 'plain text source'),
         omit('user document'),
         omit('user image')
       ),
@@ -1091,7 +1223,8 @@ describe('structured tool results', () => {
 
     expect(render(gatewayRequest).conversation).toBe(
       lines(
-        seg('text editor result', 'edited line', 'edited error'),
+        seg('text editor result', 'edited line'),
+        seg('text editor result', 'edited error'),
         seg('tool search result', 'edited search error')
       )
     );

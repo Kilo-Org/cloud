@@ -4,10 +4,10 @@ import {
   ENKRYPT_GUARDRAIL_TIMEOUT_MS,
   ENKRYPT_MAX_SCAN_CHARACTERS,
   guardrailBlockMessage,
+  REQUEST_TOO_LARGE_MESSAGE,
+  RESPONSE_TOO_LARGE_MESSAGE,
   responseBlockMessage,
-  SCAN_TOO_LARGE_MESSAGES,
   scanRequest,
-  scanTooLargeMessage,
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
   type EnkryptUnavailableReason,
@@ -217,6 +217,49 @@ describe('scanRequest', () => {
     expect(await Promise.all(calls)).toEqual([
       expect.objectContaining({ guardrail: 'input', scan: 'blocking', part: 'system' }),
     ]);
+  });
+
+  it('records the chunk a scan covers in its request log entry and log fields', async () => {
+    const calls: Promise<EnkryptRequestLog>[] = [];
+    const dependencies = deps(async () => detectResponse({ summary: {} }), {
+      requestLog: { guardrail: 'input', capture: entry => calls.push(entry) },
+    });
+
+    await scanRequest(
+      makeScan({ coverage: { ...makeScan().coverage, chunk: { index: 1, count: 3 } } }),
+      dependencies
+    );
+
+    expect(await Promise.all(calls)).toEqual([
+      expect.objectContaining({
+        guardrail: 'input',
+        scan: 'blocking',
+        part: 'conversation',
+        chunk: { index: 1, count: 3 },
+      }),
+    ]);
+    expect(console.debug).toHaveBeenCalledWith(
+      '[enkrypt-guardrail] decision',
+      expect.objectContaining({ chunk: { index: 1, count: 3 } })
+    );
+  });
+
+  it('leaves the chunk out of the request log entry for an unchunked scan', async () => {
+    const calls: Promise<EnkryptRequestLog>[] = [];
+
+    await scanRequest(
+      makeScan(),
+      deps(async () => detectResponse({ summary: {} }), {
+        requestLog: { guardrail: 'input', capture: entry => calls.push(entry) },
+      })
+    );
+
+    const [entry] = await Promise.all(calls);
+    expect(entry).not.toHaveProperty('chunk');
+    expect(console.debug).not.toHaveBeenCalledWith(
+      '[enkrypt-guardrail] decision',
+      expect.objectContaining({ chunk: expect.anything() })
+    );
   });
 
   it('blocks when a block-type detector fires and shows the Enkrypt block message', async () => {
@@ -533,74 +576,48 @@ describe('scanRequest', () => {
   describe('a request above the scan limit', () => {
     const text = 'a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 1);
 
-    it('is rejected with the reason, never truncated or sent', async () => {
-      const dependencies = deps(async () => detectResponse({ summary: {} }));
-
-      const result = await scanRequest(makeScan({ text }), dependencies);
-
-      expect(result).toEqual({
-        report: expect.any(Object),
-        verdict: {
-          action: 'block',
-          message: expect.stringContaining('cannot scan more than 100,000 characters'),
-        },
-        usageRecords: [],
-      });
-      expect(result.verdict).toMatchObject({
-        message: expect.stringContaining('Compact or prune earlier conversation history'),
-      });
-      expect(result.verdict).toMatchObject({
-        message: expect.stringContaining('Retrying the unchanged request will not help.'),
-      });
-      expect(dependencies.fetch).not.toHaveBeenCalled();
-    });
-
     it.each([
-      ['system', 'system prompt', 'Shorten the system prompt'],
-      ['conversation', 'new conversation text', 'Compact or prune earlier conversation history'],
-      ['response', 'model output', 'Ask for a shorter response'],
-    ] as const)('names what to shorten for the %s', async (part, scope, advice) => {
-      const dependencies = deps(async () => detectResponse({ summary: {} }));
+      ['tools', REQUEST_TOO_LARGE_MESSAGE],
+      ['system', REQUEST_TOO_LARGE_MESSAGE],
+      ['conversation', REQUEST_TOO_LARGE_MESSAGE],
+      ['response', RESPONSE_TOO_LARGE_MESSAGE],
+    ] as const)(
+      'is rejected for the %s part without truncating or sending it',
+      async (part, message) => {
+        const dependencies = deps(async () => detectResponse({ summary: {} }));
 
-      const result = await scanRequest(
-        makeScan({ text, coverage: { ...makeScan().coverage, part } }),
-        dependencies
-      );
+        const result = await scanRequest(
+          makeScan({ text, coverage: { ...makeScan().coverage, part } }),
+          dependencies
+        );
 
-      expect(result.verdict).toEqual({ action: 'block', message: SCAN_TOO_LARGE_MESSAGES[part] });
-      expect(SCAN_TOO_LARGE_MESSAGES[part]).toContain(
-        `cannot scan more than 100,000 characters of ${scope} at once`
-      );
-      expect(SCAN_TOO_LARGE_MESSAGES[part]).toContain(advice);
-      expect(result.report).toMatchObject({
-        part,
-        decision: 'error_fail_closed',
-        error: 'request_too_large',
-        scanned_characters: ENKRYPT_MAX_SCAN_CHARACTERS + 1,
-      });
-      expect(dependencies.fetch).not.toHaveBeenCalled();
+        expect(result).toEqual({
+          report: expect.any(Object),
+          verdict: { action: 'block', message },
+          usageRecords: [],
+        });
+        expect(result.report).toMatchObject({
+          part,
+          decision: 'error_fail_closed',
+          error: 'request_too_large',
+          scanned_characters: ENKRYPT_MAX_SCAN_CHARACTERS + 1,
+        });
+        expect(dependencies.fetch).not.toHaveBeenCalled();
+      }
+    );
+  });
+
+  describe('the too-large messages', () => {
+    it('say that a request is split into scans, and that retrying unchanged will not help', () => {
+      expect(REQUEST_TOO_LARGE_MESSAGE).toContain('100,000 characters');
+      expect(REQUEST_TOO_LARGE_MESSAGE).toContain('splits long requests into scans');
+      expect(REQUEST_TOO_LARGE_MESSAGE).toContain('Retrying the unchanged request will not help.');
     });
 
-    it('names the oversized tool definition', async () => {
-      const dependencies = deps(async () => detectResponse({ summary: {} }));
-      const coverage = {
-        ...makeScan().coverage,
-        part: 'tools',
-        tool: { kind: 'tool', name: 'read_file' },
-      } as const;
-
-      const result = await scanRequest(makeScan({ text, coverage }), dependencies);
-
-      expect(result.verdict).toEqual({ action: 'block', message: scanTooLargeMessage(coverage) });
-      expect(result.verdict).toMatchObject({
-        message: expect.stringContaining('the definition of the tool "read_file" is longer'),
-      });
-      expect(result.report).toMatchObject({
-        part: 'tools',
-        decision: 'error_fail_closed',
-        error: 'request_too_large',
-      });
-      expect(dependencies.fetch).not.toHaveBeenCalled();
+    it('say that a response is withheld above 100,000 characters', () => {
+      expect(RESPONSE_TOO_LARGE_MESSAGE).toContain('100,000 characters');
+      expect(RESPONSE_TOO_LARGE_MESSAGE).toContain('model output');
+      expect(RESPONSE_TOO_LARGE_MESSAGE).toContain('so this response was withheld');
     });
   });
 
@@ -1433,59 +1450,6 @@ describe('scanRequest', () => {
       );
     });
   });
-});
-
-describe('scanTooLargeMessage', () => {
-  const coverage = { part: 'tools' } as const;
-
-  it('names the tool whose definition is too large', () => {
-    const message = scanTooLargeMessage({ ...coverage, tool: { kind: 'tool', name: 'read_file' } });
-
-    expect(message).toContain('cannot scan a tool definition longer than 100,000 characters');
-    expect(message).toContain('the definition of the tool "read_file" is longer');
-    expect(message).toContain('Disable that tool or the MCP server providing it');
-    expect(message).toContain('Retrying the unchanged request will not help.');
-  });
-
-  it.each([
-    ['a tool without a name', { kind: 'tool', name: null }],
-    ['a tool with an empty name', { kind: 'tool', name: '' }],
-    ['no tool', undefined],
-  ] as const)('refers to an unnamed tool definition for %s', (_name, tool) => {
-    const message = scanTooLargeMessage({ ...coverage, tool });
-
-    expect(message).toContain('and a tool definition is longer');
-    expect(message).not.toContain('"');
-  });
-
-  it('words a response format on its own', () => {
-    const message = scanTooLargeMessage({
-      ...coverage,
-      tool: { kind: 'response_format', name: null },
-    });
-
-    expect(message).toContain('cannot scan a response format longer than 100,000 characters');
-    expect(message).toContain('Shorten the response format schema');
-    expect(message).not.toContain('tool');
-  });
-
-  it('replaces control characters in the tool name and caps its length', () => {
-    const name = `evil\n\u0007tool${'x'.repeat(200)}`;
-
-    const message = scanTooLargeMessage({ ...coverage, tool: { kind: 'tool', name } });
-
-    const quoted = /the definition of the tool "([^"]*)"/.exec(message)?.[1];
-    expect(quoted).toBe(`evil  tool${'x'.repeat(90)}`);
-    expect(quoted).toHaveLength(100);
-    expect(message).not.toMatch(/\p{Cc}/u);
-  });
-
-  it.each(['system', 'conversation', 'response'] as const)(
-    'uses the fixed message for the %s',
-    part => {
-      expect(scanTooLargeMessage({ part })).toBe(SCAN_TOO_LARGE_MESSAGES[part]);
-    }
-  );
 });
 
 describe('responseBlockMessage', () => {

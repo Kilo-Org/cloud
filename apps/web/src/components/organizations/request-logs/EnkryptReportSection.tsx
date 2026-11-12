@@ -126,6 +126,18 @@ function FlaggedTools({ scan }: { scan: EnkryptToolScanReport }) {
   );
 }
 
+/** Counts overlaps and headers repeated across chunks, so it can exceed the part's length. */
+function charactersSent(scan: Scan): DetailItem {
+  return { label: 'Characters sent', value: formatCount(scan.scanned_characters) };
+}
+
+function charactersCached(scan: Scan): DetailItem {
+  return {
+    label: 'Characters cached',
+    value: `${formatCount(scan.cached_characters)} of ${formatCount(scan.total_characters)}`,
+  };
+}
+
 function scanItems(scan: Scan): DetailItem[] {
   if (scan.part === 'tools' && 'tools_total' in scan) {
     return [
@@ -134,14 +146,8 @@ function scanItems(scan: Scan): DetailItem[] {
         value: `${formatCount(scan.tools_total)} total, ${formatCount(scan.tools_cached)} cached, ${formatCount(scan.tools_scanned)} scanned`,
       },
       { label: 'Verdict cache', value: verdictCacheValue(scan) },
-      {
-        label: 'Characters scanned',
-        value: `${formatCount(scan.scanned_characters)} of ${formatCount(scan.total_characters)}`,
-      },
-      {
-        label: 'Characters cached',
-        value: `${formatCount(scan.cached_characters)} of ${formatCount(scan.total_characters)}`,
-      },
+      charactersSent(scan),
+      charactersCached(scan),
       { label: 'Enkrypt calls', value: formatCount(scan.attempts) },
     ];
   }
@@ -150,16 +156,10 @@ function scanItems(scan: Scan): DetailItem[] {
     ...(scan.part === 'response'
       ? []
       : [{ label: 'Verdict cache', value: verdictCacheValue(scan) }]),
-    {
-      label: 'Characters scanned',
-      value: `${formatCount(scan.scanned_characters)} of ${formatCount(scan.total_characters)}`,
-    },
+    charactersSent(scan),
+    ...(scan.part === 'response' ? [] : [charactersCached(scan)]),
     ...(scan.part === 'conversation'
       ? [
-          {
-            label: 'Characters cached',
-            value: `${formatCount(scan.cached_characters)} of ${formatCount(scan.total_characters)}`,
-          },
           {
             label: 'Segments cached',
             value: `${formatCount(scan.cached_segments)} of ${formatCount(scan.total_segments)}`,
@@ -167,6 +167,7 @@ function scanItems(scan: Scan): DetailItem[] {
           { label: 'Attachments omitted', value: formatCount(scan.omitted_attachments) },
         ]
       : []),
+    ...('chunks' in scan ? [{ label: 'Chunks', value: formatCount(scan.chunks) }] : []),
     { label: 'Enkrypt calls', value: formatCount(scan.attempts) },
   ];
 }

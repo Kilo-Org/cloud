@@ -14,6 +14,8 @@ export const enkryptRequestLogSchema = z.object({
   guardrail: z.enum(['input', 'output']),
   scan: z.enum(['blocking', 'log_only']),
   part: z.enum(['tools', 'system', 'conversation', 'response']),
+  /** Which of the input part's chunks the call scanned; each chunk is scanned by its own calls. */
+  chunk: z.object({ index: z.number(), count: z.number() }).optional(),
   request: z.object({
     text: z.string(),
     detectors: z.record(z.string(), z.unknown()),

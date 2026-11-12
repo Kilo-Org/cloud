@@ -14,18 +14,22 @@ import {
 import {
   joinSegments,
   renderSegment,
-  SEGMENT_SEPARATOR,
-  segmentHeaderLine,
   type RequestScanParts,
   type RequestSegment,
   type RequestToolDefinition,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/request-text';
+import {
+  OMITTED_TEXT_MARKERS,
+  scanChunks,
+  type ScanChunk,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/scan-chunks';
 import type { EnkryptGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import {
   MAX_REPORTED_FLAGGED_TOOLS,
   type EnkryptFlaggedTool,
   type EnkryptGuardrailReport,
   type EnkryptInputPartScanReport,
+  type EnkryptScanReport,
   type EnkryptToolScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -38,18 +42,9 @@ export const ENKRYPT_VERDICT_CACHE_ENABLED = true;
  * results are parsed or which detections block, so entries written by older code stop matching.
  * Extraction changes already change the hashed segments.
  */
-const VERDICT_CACHE_VERSION = 4;
+const VERDICT_CACHE_VERSION = 5;
 
 export const ENKRYPT_VERDICT_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
-
-/**
- * Already-scanned conversation text sent ahead of the uncached suffix, so content split across the
- * boundary is still scanned together. Context-dependent detection further back is not re-evaluated.
- */
-export const ENKRYPT_SCAN_OVERLAP_CHARACTERS = 4_000;
-
-/** Precedes the overlap when earlier conversation text is left out of a scan. */
-export const OMITTED_CONVERSATION_MARKER = '[earlier conversation omitted]';
 
 /**
  * Bounds the lookup. Cached prefixes are earlier requests of the same conversation, which end near
@@ -203,53 +198,6 @@ async function cachedPrefix(
   return { cachedSegments, verdict: 'allow' };
 }
 
-function isLowSurrogate(codeUnit: number): boolean {
-  return codeUnit >= 0xdc00 && codeUnit <= 0xdfff;
-}
-
-/** The last `length` characters, never starting between the two halves of a surrogate pair. */
-function tail(text: string, length: number): string {
-  const start = Math.max(0, text.length - length);
-  return text.slice(isLowSurrogate(text.charCodeAt(start)) ? start + 1 : start);
-}
-
-/**
- * The uncached conversation segments, preceded by up to `ENKRYPT_SCAN_OVERLAP_CHARACTERS` of the
- * cached ones. A segment cut by the overlap keeps its header, marked as missing its beginning, and
- * `OMITTED_CONVERSATION_MARKER` leads when any earlier text is left out.
- */
-export function conversationScanText(
-  segments: RequestSegment[],
-  rendered: string[],
-  cachedSegments: number
-): string {
-  if (cachedSegments === segments.length) return '';
-  const overlap: string[] = [];
-  let remaining = ENKRYPT_SCAN_OVERLAP_CHARACTERS;
-  let index = cachedSegments;
-  while (index > 0 && remaining > 0) {
-    const segment = segments[index - 1];
-    const text = rendered[index - 1];
-    if (!segment || text === undefined) break;
-    // The budget counts the body: a body that fits is kept whole, even when its header does not.
-    if (text.length > remaining && (segment.body === null || segment.body.length > remaining)) {
-      if (segment.body !== null) {
-        const header = segmentHeaderLine(`${segment.header}, beginning omitted`);
-        overlap.unshift(`${header}\n${tail(segment.body, remaining)}`);
-      }
-      break;
-    }
-    overlap.unshift(text);
-    remaining -= text.length + SEGMENT_SEPARATOR.length;
-    index--;
-  }
-  return joinSegments([
-    ...(index > 0 ? [OMITTED_CONVERSATION_MARKER] : []),
-    ...overlap,
-    ...rendered.slice(cachedSegments),
-  ]);
-}
-
 /**
  * A log-only scan gates nothing, so its result is cached even when it fails, unless the client
  * disconnected or the scan ran out of time before any call. Otherwise a failure that recurs, such
@@ -268,20 +216,135 @@ function isCacheableAllow({ verdict, report, usageRecords }: EnkryptGuardrailSca
 }
 
 /** What to cache for a scan whose content had no cached verdict: an allow, a genuine block, or nothing. */
-function cacheEntryFor(
-  key: string,
+function cacheableVerdict(
   result: EnkryptGuardrailScanResult,
   config: ReadyConfig
-): EnkryptVerdictCacheEntry | null {
-  if (isCacheableAllow(result)) return { key, verdict: 'allow' };
+): EnkryptVerdictCacheEntry['verdict'] | null {
+  if (isCacheableAllow(result)) return 'allow';
   const blockingDetectors = result.report.detectors_fired.filter(detector =>
     config.blockingDetectors.includes(detector)
   );
   return result.verdict.action === 'block' &&
     result.usageRecords.at(-1)?.decision === 'blocked' &&
     blockingDetectors.length > 0
-    ? { key, verdict: { action: 'block', detectors: blockingDetectors } }
+    ? { action: 'block', detectors: blockingDetectors }
     : null;
+}
+
+/**
+ * Where a part's verdicts are cached: `allow(through)` is the key for its content up to segment
+ * `through`, or null when only the whole part is keyed and `through` falls short of it, and
+ * `block(reaches)` the key for a block found in content reaching into segment `reaches`.
+ */
+type PartKeys = {
+  allow(through: number): string | null;
+  block(reaches: number): string;
+};
+
+/** The conversation is keyed by prefix, so every segment boundary has a key. */
+function prefixKeys(keys: string[]): PartKeys {
+  return {
+    allow: through => keys[through - 1] ?? null,
+    block: reaches => required(keys[reaches - 1]),
+  };
+}
+
+/** A tool definition or the system prompt is keyed only as a whole. */
+function wholeKey(key: string, segments: number): PartKeys {
+  return { allow: through => (through === segments ? key : null), block: () => key };
+}
+
+/**
+ * What to cache for a part scanned in chunks. Each run of allowed chunks from the start caches an
+ * allow at the boundary it reached, so after a chunk fails or runs out of time, the next request of
+ * the conversation resumes from there. Cold scans are rare, the writes are deferred, and an allow
+ * is never overwritten, so a few writes for them are cheap. The first genuine block is cached for
+ * every request retaining the content its chunk reached into.
+ */
+function chunkCacheEntries(
+  chunks: ScanChunk[],
+  results: EnkryptGuardrailScanResult[],
+  config: ReadyConfig,
+  cachedSegments: number,
+  keys: PartKeys
+): EnkryptVerdictCacheEntry[] {
+  const entries: EnkryptVerdictCacheEntry[] = [];
+  let allowedThrough: number | null = cachedSegments;
+  for (const [index, chunk] of chunks.entries()) {
+    const verdict = cacheableVerdict(required(results[index]), config);
+    if (verdict !== 'allow') {
+      allowedThrough = null;
+      if (verdict) return [...entries, { key: keys.block(chunk.reaches), verdict }];
+      continue;
+    }
+    if (allowedThrough === null || chunk.through <= allowedThrough) continue;
+    allowedThrough = chunk.through;
+    const key = keys.allow(chunk.through);
+    if (key) entries.push({ key, verdict });
+  }
+  return entries;
+}
+
+const DECISION_SEVERITY: readonly EnkryptScanReport['decision'][] = [
+  'blocked',
+  'error_fail_closed',
+  'error_logged',
+  'client_aborted',
+  'allowed',
+];
+
+function bySeverity<T extends { decision: EnkryptScanReport['decision'] }>(a: T, b: T): number {
+  return DECISION_SEVERITY.indexOf(a.decision) - DECISION_SEVERITY.indexOf(b.decision);
+}
+
+function sum(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0);
+}
+
+function totalCredits(reports: { credits_cost: number | null }[]): number | null {
+  const credits = reports.flatMap(report =>
+    report.credits_cost === null ? [] : [report.credits_cost]
+  );
+  return credits.length === 0 ? null : sum(credits);
+}
+
+/**
+ * The result of a part scanned in chunks: it blocks when any chunk blocks, and is otherwise
+ * unavailable when any chunk's scan is, so a chunk that fails never lets the part through.
+ */
+function combineChunks(results: EnkryptGuardrailScanResult[]): EnkryptGuardrailScanResult {
+  const reports = results.map(result => result.report);
+  const [first] = reports;
+  if (!first || reports.length === 1) return required(results[0]);
+  const bySeverest = [...reports].sort(bySeverity);
+  return {
+    verdict: mostSevereVerdict(results.map(result => result.verdict)),
+    usageRecords: results.flatMap(result => result.usageRecords),
+    report: {
+      ...first,
+      scanned_characters: sum(reports.map(report => report.scanned_characters)),
+      decision: required(bySeverest[0]).decision,
+      error: bySeverest.find(report => report.error !== null)?.error ?? null,
+      detectors_fired: ENKRYPT_DETECTOR_IDS.filter(id =>
+        reports.some(report => report.detectors_fired.includes(id))
+      ),
+      attempts: sum(reports.map(report => report.attempts)),
+      credits_cost: totalCredits(reports),
+      latency_ms: Math.max(...reports.map(report => report.latency_ms)),
+    },
+  };
+}
+
+function chunkScans(
+  request: Omit<EnkryptGuardrailRequest, 'parts'>,
+  coverage: EnkryptScanCoverage,
+  chunks: ScanChunk[]
+): EnkryptGuardrailScan[] {
+  return chunks.map((chunk, index) => ({
+    ...request,
+    text: chunk.text,
+    coverage: { ...coverage, chunk: { index, count: chunks.length } },
+  }));
 }
 
 function logFields(request: Omit<EnkryptGuardrailRequest, 'parts'>) {
@@ -295,19 +358,42 @@ function logFields(request: Omit<EnkryptGuardrailRequest, 'parts'>) {
 
 /**
  * A part's verdict cache lookup, done before any of the request's scans start: the Enkrypt calls it
- * still needs, and how to turn their results into the part's result.
+ * still needs, as the chunks of each text it scans in order, and how to turn their results, in the
+ * same order, into the part's result.
  */
 type PartPlan = {
-  scans: EnkryptGuardrailScan[];
+  texts: EnkryptGuardrailScan[][];
   finish(results: EnkryptGuardrailScanResult[]): EnkryptCachedScanResult;
 };
 
 /**
+ * The chunks of a part's uncached text, from segment `start` on, and a scan for each. With nothing
+ * to scan, one scan of no text still reports the part, without an Enkrypt call.
+ */
+function chunkedPlan(
+  part: keyof RequestScanParts,
+  segments: RequestSegment[],
+  start: number,
+  request: Omit<EnkryptGuardrailRequest, 'parts'>,
+  coverage: EnkryptScanCoverage
+): { chunks: ScanChunk[]; scans: EnkryptGuardrailScan[] } {
+  const chunks = scanChunks(segments, start, OMITTED_TEXT_MARKERS[part]);
+  return {
+    chunks,
+    scans:
+      chunks.length > 0
+        ? chunkScans(request, coverage, chunks)
+        : [{ ...request, text: '', coverage }],
+  };
+}
+
+/**
  * Plans the system prompt or the conversation. The conversation is scanned only from where no
  * earlier allowed request with the same scope covered it, plus an overlap; the system prompt is
- * skipped only when the whole of it was allowed before. A cached block rejects requests retaining
- * that content. A cache failure scans the part in full, so it never lets unscanned content through.
- * A failed blocking scan is never cached; see `isCacheableAllow` for log-only scans.
+ * skipped only when the whole of it was allowed before. Text too long for one Enkrypt call is
+ * scanned in chunks. A cached block rejects requests retaining that content. A cache failure scans
+ * the part in full, so it never lets unscanned content through. A failed blocking scan is never
+ * cached; see `isCacheableAllow` for log-only scans.
  */
 async function planSegmentsPart(
   part: 'system' | 'conversation',
@@ -327,19 +413,22 @@ async function planSegmentsPart(
     omittedAttachments: segments.filter(segment => segment.body === null).length,
   };
   const { config } = request;
-  const scanOf = (result: EnkryptGuardrailScanResult, key?: string): EnkryptCachedScanResult => {
-    const cacheEntry = key && config.status === 'ready' && cacheEntryFor(key, result, config);
-    return {
-      ...result,
-      report: { ...result.report, part },
-      cacheEntries: cacheEntry ? [cacheEntry] : [],
-    };
-  };
+  const scanOf = (
+    { chunks, scans }: ReturnType<typeof chunkedPlan>,
+    cacheEntries: (results: EnkryptGuardrailScanResult[]) => EnkryptVerdictCacheEntry[]
+  ): PartPlan => ({
+    texts: [scans],
+    finish(results) {
+      const result = combineChunks(results);
+      return {
+        ...result,
+        report: { ...result.report, part, chunks: chunks.length },
+        cacheEntries: cacheEntries(results),
+      };
+    },
+  });
   if (!store || config.status !== 'ready' || segments.length === 0) {
-    return {
-      scans: [{ ...request, text, coverage: uncached }],
-      finish: ([result]) => scanOf(required(result)),
-    };
+    return scanOf(chunkedPlan(part, segments, 0, request, uncached), () => []);
   }
 
   const keys = verdictCacheKeys(request, config, part, rendered);
@@ -374,10 +463,11 @@ async function planSegmentsPart(
       attempts: 0,
       credits_cost: null,
       latency_ms: 0,
+      chunks: 0,
     };
     console.debug('[enkrypt-guardrail] decision', { ...logFields(request), ...report });
     return {
-      scans: [],
+      texts: [],
       finish: () => ({
         verdict: { action: 'block', message: guardrailBlockMessage(detectors, null) },
         usageRecords: [],
@@ -386,34 +476,17 @@ async function planSegmentsPart(
       }),
     };
   }
-  const fullyCached = cachedSegments === segments.length;
-  const scannedText =
-    part === 'conversation'
-      ? conversationScanText(segments, rendered, cachedSegments)
-      : fullyCached
-        ? ''
-        : text;
-  return {
-    scans: [{ ...request, text: scannedText, coverage }],
-    finish: ([result]) => scanOf(required(result), fullyCached ? undefined : keys.at(-1)),
-  };
+  const plan = chunkedPlan(part, segments, cachedSegments, request, coverage);
+  const partKeys =
+    part === 'conversation' ? prefixKeys(keys) : wholeKey(required(keys.at(-1)), keys.length);
+  return scanOf(plan, results =>
+    chunkCacheEntries(plan.chunks, results, config, cachedSegments, partKeys)
+  );
 }
 
 function required<T>(value: T | undefined): T {
   if (value === undefined) throw new Error('missing scan result');
   return value;
-}
-
-const DECISION_SEVERITY: readonly EnkryptToolScanReport['decision'][] = [
-  'blocked',
-  'error_fail_closed',
-  'error_logged',
-  'client_aborted',
-  'allowed',
-];
-
-function bySeverity<T extends { decision: EnkryptToolScanReport['decision'] }>(a: T, b: T): number {
-  return DECISION_SEVERITY.indexOf(a.decision) - DECISION_SEVERITY.indexOf(b.decision);
 }
 
 /** A verdict acts on its most severe source: a block, then an unavailable scan. */
@@ -425,13 +498,17 @@ export function mostSevereVerdict(verdicts: EnkryptGuardrailVerdict[]): EnkryptG
   );
 }
 
-/** The outcome of one tool definition: its cached verdict, or the scan of it. */
+/** The outcome of one tool definition: its cached verdict, or the scan of it, in chunks. */
 type ToolOutcome = {
   tool: RequestToolDefinition;
   characters: number;
   outcome:
     | { kind: 'cached'; verdict: EnkryptVerdictCacheEntry['verdict'] }
-    | { kind: 'scanned'; result: EnkryptGuardrailScanResult; key: string | null };
+    | {
+        kind: 'scanned';
+        result: EnkryptGuardrailScanResult;
+        cacheEntries: EnkryptVerdictCacheEntry[];
+      };
 };
 
 function flaggedTool({
@@ -455,10 +532,6 @@ function flaggedTool({
   };
 }
 
-function sum(values: number[]): number {
-  return values.reduce((total, value) => total + value, 0);
-}
-
 function toolsReport(
   kind: EnkryptToolScanReport['scan'],
   config: EnkryptGuardrailConfig,
@@ -475,9 +548,6 @@ function toolsReport(
     ...flagged.map(each => each.decision),
   ];
   const decision = DECISION_SEVERITY.find(each => decisions.includes(each)) ?? 'allowed';
-  const credits = reports.flatMap(report =>
-    report.credits_cost === null ? [] : [report.credits_cost]
-  );
   return {
     scan: kind,
     part: 'tools',
@@ -500,7 +570,7 @@ function toolsReport(
       flagged.some(each => each.detectors_fired.includes(id))
     ),
     attempts: sum(reports.map(report => report.attempts)),
-    credits_cost: credits.length === 0 ? null : sum(credits),
+    credits_cost: totalCredits(reports),
     latency_ms: reports.reduce((latest, report) => Math.max(latest, report.latency_ms), 0),
     flagged_tools: flagged.slice(0, MAX_REPORTED_FLAGGED_TOOLS).map(each => ({
       kind: each.kind,
@@ -514,11 +584,11 @@ function toolsReport(
 /**
  * Plans the tool definitions and response formats. Each is looked up and cached by exact match on
  * its own, so a changed, added, or removed tool rescans only that tool, and each uncached one is
- * scanned by its own Enkrypt call, which also keeps every call far below the scan limit. Each call
- * pays Enkrypt's per-call minimum, so an uncached tool set costs more than one combined call would;
- * verdicts are shared across the organization, so that is paid once per tool and detector set.
- * The results are aggregated into one result for the part: it blocks when any tool blocks, and is
- * otherwise unavailable when any tool's scan is.
+ * scanned by its own Enkrypt calls: one, unless it is too long for one call and is scanned in
+ * chunks. Each call pays Enkrypt's per-call minimum, so an uncached tool set costs more than one
+ * combined call would; verdicts are shared across the organization, so that is paid once per tool
+ * and detector set. The results are aggregated into one result for the part: it blocks when any
+ * tool blocks, and is otherwise unavailable when any tool's scan is.
  */
 async function planTools(
   tools: RequestToolDefinition[],
@@ -534,42 +604,48 @@ async function planTools(
   const values = store && keys ? await lookup(request.organizationId, keys, store) : null;
   const cache: EnkryptToolScanReport['verdict_cache'] =
     values === null ? 'off' : values === 'error' ? 'error' : 'miss';
-  const verdicts = tools.map((_, index) =>
-    ready && Array.isArray(values) ? cachedVerdict(values[index], ready) : null
-  );
-  const scans = tools.flatMap((tool, index): EnkryptGuardrailScan[] => {
-    if (verdicts[index]) return [];
-    const text = texts[index] ?? '';
-    return [
-      {
-        ...request,
-        text,
-        coverage: {
-          part: 'tools',
-          cache,
-          totalCharacters: text.length,
-          totalSegments: tool.segments.length,
-          cachedCharacters: 0,
-          cachedSegments: 0,
-          omittedAttachments: 0,
-          tool: { kind: tool.kind, name: tool.name },
-        },
-      },
-    ];
+  const plans = tools.map((tool, index) => {
+    const verdict = ready && Array.isArray(values) ? cachedVerdict(values[index], ready) : null;
+    if (verdict) return { verdict };
+    return chunkedPlan('tools', tool.segments, 0, request, {
+      part: 'tools',
+      cache,
+      totalCharacters: texts[index]?.length ?? 0,
+      totalSegments: tool.segments.length,
+      cachedCharacters: 0,
+      cachedSegments: 0,
+      omittedAttachments: 0,
+    });
   });
   return {
-    scans,
+    texts: plans.flatMap(plan => ('scans' in plan ? [plan.scans] : [])),
     finish(results) {
       let scanned = 0;
       const outcomes = tools.map((tool, index): ToolOutcome => {
         const characters = texts[index]?.length ?? 0;
-        const verdict = verdicts[index];
-        if (verdict) return { tool, characters, outcome: { kind: 'cached', verdict } };
-        const result = required(results[scanned++]);
+        const plan = required(plans[index]);
+        if ('verdict' in plan) {
+          return { tool, characters, outcome: { kind: 'cached', verdict: plan.verdict } };
+        }
+        const chunkResults = results.slice(scanned, (scanned += plan.scans.length));
+        const key = keys?.[index];
         return {
           tool,
           characters,
-          outcome: { kind: 'scanned', result, key: keys?.[index] ?? null },
+          outcome: {
+            kind: 'scanned',
+            result: combineChunks(chunkResults),
+            cacheEntries:
+              ready && key
+                ? chunkCacheEntries(
+                    plan.chunks,
+                    chunkResults,
+                    ready,
+                    0,
+                    wholeKey(key, tool.segments.length)
+                  )
+                : [],
+          },
         };
       });
       const report = toolsReport(scanKind(config), config, cache, outcomes);
@@ -592,10 +668,9 @@ async function planTools(
           outcome.kind === 'scanned' ? outcome.result.usageRecords : []
         ),
         report,
-        cacheEntries: outcomes.flatMap(({ outcome }) => {
-          if (outcome.kind !== 'scanned' || !outcome.key || !ready) return [];
-          return cacheEntryFor(outcome.key, outcome.result, ready) ?? [];
-        }),
+        cacheEntries: outcomes.flatMap(({ outcome }) =>
+          outcome.kind === 'scanned' ? outcome.cacheEntries : []
+        ),
       };
     },
   };
@@ -608,8 +683,10 @@ async function planTools(
  *
  * Every verdict cache lookup finishes before any scan starts. The scans then start longest text
  * first, so with `deps.limiter` capping concurrent calls the long ones do not run last and hold up
- * the verdict. They share one deadline, started before the lookups, which includes time spent
- * waiting for a call slot, so the part results arrive within `deps.timeoutMs` plus the lookup.
+ * the verdict. A text's chunks start in order, ranked by its longest chunk, so when the deadline
+ * cuts a long conversation short, its allowed chunks are a prefix the next request resumes from.
+ * They share one deadline, started before the lookups, which includes time spent waiting for a
+ * call slot, so the part results arrive within `deps.timeoutMs` plus the lookup.
  */
 export async function scanRequestWithVerdictCache(
   { parts, ...request }: EnkryptGuardrailRequest,
@@ -624,12 +701,16 @@ export async function scanRequestWithVerdictCache(
     ...(parts.system.length > 0 ? [planSegmentsPart('system', parts.system, request, store)] : []),
     planSegmentsPart('conversation', parts.conversation, request, store),
   ]);
+  const longestChunk = (chunks: EnkryptGuardrailScan[]) =>
+    Math.max(0, ...chunks.map(scan => scan.text.length));
   const started = new Map<EnkryptGuardrailScan, Promise<EnkryptGuardrailScanResult>>();
-  const byLength = plans.flatMap(plan => plan.scans).sort((a, b) => b.text.length - a.text.length);
-  for (const scan of byLength) started.set(scan, scanRequest(scan, scanDeps));
+  const byLength = plans
+    .flatMap(plan => plan.texts)
+    .sort((a, b) => longestChunk(b) - longestChunk(a));
+  for (const scan of byLength.flat()) started.set(scan, scanRequest(scan, scanDeps));
   return Promise.all(
     plans.map(async plan =>
-      plan.finish(await Promise.all(plan.scans.map(scan => required(started.get(scan)))))
+      plan.finish(await Promise.all(plan.texts.flat().map(scan => required(started.get(scan)))))
     )
   );
 }

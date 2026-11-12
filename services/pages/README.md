@@ -7,7 +7,10 @@ their Kilo accounts.
 Pages source lives in `nteract/nteract`, directory `apps/pages`. nteract
 builds it and publishes each build as a release asset. This folder holds what
 this repository decides about a deployment: which release is deployed, and the
-Worker's Wrangler configuration. No nteract code runs here.
+Worker's Wrangler configuration. The build runs no nteract code. One exception
+sits in Wrangler: when Cloudflare refuses an upload with a startup error,
+`wrangler deploy` loads the bundle in a local workerd to explain it. There it
+has network access but no environment, files or `nodejs_compat`.
 
 ## Architecture
 
@@ -37,7 +40,11 @@ the pull request that moves the pin, where it is reviewed.
 The build reads the archive as untrusted input. It accepts regular files at
 the package's paths only: no links, no directory entries, no `.` or `..`
 components, no file outside `worker/`, `public/`, `build-receipt.json` and
-`wrangler.json`.
+`wrangler.json`, and no two names that differ only in case. Under `public/`,
+names starting with `_` configure the asset server, so it refuses them except
+the package's `_headers`. Its contents are not checked: the Worker runs before
+the asset server and can set any header itself. Names from the archive are
+quoted when printed, so they cannot write workflow commands into the job log.
 
 ## Environments
 

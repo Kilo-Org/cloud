@@ -34,6 +34,22 @@ const MEMBER = new RegExp(
   `^(build-receipt\\.json|wrangler\\.json|worker/${SEGMENT}|public/(${SEGMENT}/)*${SEGMENT})$`
 );
 
+// Under `public/`, Workers static assets read names starting with `_` (such as
+// `_headers` and `_redirects`) as configuration. A package ships only
+// `_headers`; any other such name is refused. Its contents are not checked:
+// with `run_worker_first`, the package's Worker answers every request first
+// and can set any header itself.
+const HEADERS = 'public/_headers';
+const ASSET_CONFIG = /(^|\/)_/;
+
+/** A name or value from the archive, safe to print in a CI log: plain names
+ * stay as they are, anything else is quoted with control characters escaped,
+ * so it cannot start a line the runner reads as a workflow command. */
+export function printable(value) {
+  const text = String(value);
+  return /^[\w./-]{1,200}$/.test(text) ? text : JSON.stringify(text.slice(0, 200));
+}
+
 const field = (header, start, length) => {
   const bytes = header.subarray(start, start + length);
   const end = bytes.indexOf(0);
@@ -46,6 +62,9 @@ const field = (header, start, length) => {
 export function readArchive(gzipped) {
   const tar = gunzipSync(gzipped);
   const files = new Map();
+  // Case-folded, so two names that one file system keeps apart and another
+  // merges count as the same member.
+  const seen = new Set();
   const problems = [];
   for (let offset = 0; offset + 512 <= tar.length;) {
     const header = tar.subarray(offset, offset + 512);
@@ -65,7 +84,7 @@ export function readArchive(gzipped) {
     // would let `offset` stand still or move back.
     const sizeField = field(header, 124, 12).trim();
     if (!/^[0-7]*$/.test(sizeField))
-      return { files, problems: [`${field(header, 0, 100)} has an invalid size`] };
+      return { files, problems: [`${printable(field(header, 0, 100))} has an invalid size`] };
     const size = Number.parseInt(sizeField || '0', 8);
     const type = String.fromCharCode(header[156]);
     const start = offset + 512;
@@ -73,10 +92,20 @@ export function readArchive(gzipped) {
       return { files, problems: ['The archive is truncated'] };
     offset = start + Math.ceil(size / 512) * 512;
 
-    if (type !== '0' && type !== '\0') problems.push(`${member} is not a regular file`);
-    else if (!MEMBER.test(member)) problems.push(`${member} is not part of a Pages package`);
-    else if (files.has(member)) problems.push(`${member} appears twice`);
-    else files.set(member, tar.subarray(start, start + size));
+    const shown = printable(member);
+    if (type !== '0' && type !== '\0') problems.push(`${shown} is not a regular file`);
+    else if (!MEMBER.test(member)) problems.push(`${shown} is not part of a Pages package`);
+    else if (
+      member.startsWith('public/') &&
+      member !== HEADERS &&
+      ASSET_CONFIG.test(member.slice('public/'.length))
+    )
+      problems.push(`${shown} would configure the asset server`);
+    else if (seen.has(member.toLowerCase())) problems.push(`${shown} appears twice`);
+    else {
+      seen.add(member.toLowerCase());
+      files.set(member, tar.subarray(start, start + size));
+    }
   }
   return { files, problems };
 }
@@ -99,10 +128,12 @@ export function configProblems(packaged, committed) {
       for (const [key, value] of Object.entries(expected.vars ?? {}))
         if (committed.vars?.[key] !== value)
           problems.push(
-            `vars.${key} in wrangler.jsonc differs from what the Pages package expects`
+            `${printable(`vars.${key}`)} in wrangler.jsonc differs from what the Pages package expects`
           );
     } else if (!isDeepStrictEqual(expected[name], committed[name]))
-      problems.push(`${name} in wrangler.jsonc differs from what the Pages package expects`);
+      problems.push(
+        `${printable(name)} in wrangler.jsonc differs from what the Pages package expects`
+      );
   }
   return problems;
 }

@@ -8,6 +8,9 @@
 // against `wrangler.jsonc` before anything is copied. It runs as `predeploy`,
 // so `deploy-workers.yml` fills `dist/` right before `wrangler deploy`.
 //
+// Every string it prints from the archive goes through `printable`, so the
+// package cannot write a workflow command into the job log.
+//
 // `--archive FILE` reads a local archive instead of downloading one, for a
 // package built by hand. The digest check still applies.
 import { createHash } from 'node:crypto';
@@ -23,6 +26,7 @@ import {
   archiveName,
   configProblems,
   packageFileProblems,
+  printable,
   readArchive,
 } from './package.mjs';
 
@@ -62,6 +66,16 @@ async function download(source) {
   return Buffer.concat(chunks);
 }
 
+/** A JSON file of the package. A parse error quotes the input, so it is
+ * replaced with one that does not. */
+function packageJson(directory, name) {
+  try {
+    return JSON.parse(readFileSync(path.join(directory, name), 'utf8'));
+  } catch {
+    throw new Error(`The package's ${name} is not JSON`);
+  }
+}
+
 async function build(localArchive) {
   const source = readSource();
   const committed = parse(readFileSync(path.join(service, 'wrangler.jsonc'), 'utf8'));
@@ -85,14 +99,14 @@ async function build(localArchive) {
     const layout = packageFileProblems(staged);
     if (layout.length) throw new Error(layout.join('\n'));
 
-    const packaged = JSON.parse(readFileSync(path.join(staged, 'wrangler.json'), 'utf8'));
+    const packaged = packageJson(staged, 'wrangler.json');
     const config = configProblems(packaged, committed);
     if (config.length) throw new Error(config.join('\n'));
 
-    const receipt = JSON.parse(readFileSync(path.join(staged, 'build-receipt.json'), 'utf8'));
+    const receipt = packageJson(staged, 'build-receipt.json');
     if (`pages-${receipt.build_id}` !== source.tag)
       throw new Error(
-        `The package reports build ${receipt.build_id}, not the one ${source.tag} names`
+        `The package reports build ${printable(receipt.build_id)}, not the one ${source.tag} names`
       );
 
     const output = path.join(service, OUTPUT);

@@ -5,7 +5,13 @@ import path from 'node:path';
 import test from 'node:test';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { parse } from 'jsonc-parser';
-import { archiveName, configProblems, packageFileProblems, readArchive } from './package.mjs';
+import {
+  archiveName,
+  configProblems,
+  packageFileProblems,
+  printable,
+  readArchive,
+} from './package.mjs';
 
 const committed = parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
 
@@ -141,6 +147,31 @@ for (const [name, member] of Object.entries(refusedMembers)) {
 test('refuses a member that appears twice', () => {
   const { problems } = readArchive(archiveOf([...goodMembers, ['worker/index.js', 'again']]));
   assert.deepEqual(problems, ['worker/index.js appears twice']);
+});
+
+test('refuses a member that differs from another only in case', () => {
+  const { problems } = readArchive(archiveOf([...goodMembers, ['worker/Index.js', 'again']]));
+  assert.deepEqual(problems, ['worker/Index.js appears twice']);
+});
+
+test('accepts public/_headers', () => {
+  const headers = '/*\n  X-Content-Type-Options: nosniff\n';
+  const { problems } = readArchive(archiveOf([...goodMembers, ['public/_headers', headers]]));
+  assert.deepEqual(problems, []);
+});
+
+for (const name of ['public/_redirects', 'public/_worker.js', 'public/chunks/_routes.json'])
+  test(`refuses ${name}`, () => {
+    const { problems } = readArchive(archiveOf([...goodMembers, [name, '/* https://example.com']]));
+    assert.deepEqual(problems, [`${name} would configure the asset server`]);
+  });
+
+test('quotes a name that could start a workflow command', () => {
+  const name = 'worker/a\n::add-mask::x';
+  assert.equal(printable(name), JSON.stringify(name));
+  assert.equal(printable('worker/index.js'), 'worker/index.js');
+  const { problems } = readArchive(archiveOf([...goodMembers, [name, 'x']]));
+  assert.ok(problems.every(problem => !problem.includes('\n')));
 });
 
 test('refuses a negative member size instead of reading the header again', () => {

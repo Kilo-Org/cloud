@@ -91,9 +91,11 @@ describe('canManageProvider', () => {
     { provider: 'discord', action: 'disconnect', allowed: ['owner', 'admin', 'billing_manager'] },
     { provider: 'linear', action: 'connect', allowed: ['owner', 'admin', 'billing_manager'] },
     { provider: 'linear', action: 'disconnect', allowed: ['owner', 'admin', 'billing_manager'] },
-    // Bitbucket's connect and its web controls both follow the billing role set.
-    { provider: 'bitbucket', action: 'connect', allowed: ['owner', 'admin', 'billing_manager'] },
-    { provider: 'bitbucket', action: 'disconnect', allowed: ['owner', 'admin', 'billing_manager'] },
+    // Bitbucket is web-managed: the page it opens gates its controls on
+    // owner or billing manager (`organizationBitbucketRouter.getStatus`), so an
+    // admin reaches a read-only notice and gets no mobile action.
+    { provider: 'bitbucket', action: 'connect', allowed: ['owner', 'billing_manager'] },
+    { provider: 'bitbucket', action: 'disconnect', allowed: ['owner', 'billing_manager'] },
   ];
 
   const ROLES = ['owner', 'admin', 'billing_manager', 'member'] as const;

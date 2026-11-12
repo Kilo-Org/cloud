@@ -38,6 +38,9 @@ type ProviderDefinition = {
   replaceRoles?: readonly OrganizationRole[];
 };
 
+/** Bitbucket's hub page gate: `organizationBitbucketRouter.getStatus.canManage`. */
+const BITBUCKET_ROLES = ['owner', 'billing_manager'] as const satisfies readonly OrganizationRole[];
+
 /**
  * Mirrors the server, per action, instead of one role set per provider:
  * `githubApps.uninstallApp` and `slack.uninstallApp` name
@@ -79,13 +82,16 @@ const PROVIDERS = {
     connectRoles: ORGANIZATION_BILLING_ROLES,
     disconnectRoles: ORGANIZATION_BILLING_ROLES,
   },
-  // Bitbucket is org-only, and its web controls are shown to owners and billing
-  // managers (see `BitbucketIntegrationControls` and the server's `canManage`).
+  // Bitbucket is org-only and web-managed: the row opens the web page, so the
+  // page's own gate is the rule. `organizationBitbucketRouter.getStatus`
+  // computes `canManage = role === 'owner' || role === 'billing_manager'`, and
+  // that flag is what renders its Connect form and its management controls —
+  // admins land on a read-only notice, so they get no mobile action either.
   bitbucket: {
     scope: ['organization'],
     hiddenUnlessInstalled: false,
-    connectRoles: ORGANIZATION_BILLING_ROLES,
-    disconnectRoles: ORGANIZATION_BILLING_ROLES,
+    connectRoles: BITBUCKET_ROLES,
+    disconnectRoles: BITBUCKET_ROLES,
   },
 } satisfies Record<IntegrationProvider, ProviderDefinition>;
 

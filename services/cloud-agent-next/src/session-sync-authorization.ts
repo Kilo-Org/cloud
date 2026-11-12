@@ -5,7 +5,7 @@ import {
   type CloudAgentSyncAuthorization,
 } from '@kilocode/worker-utils/cloud-agent-session-sync';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { z } from 'zod';
 import { getPgDb } from './db/pg.js';
 import { getSandboxSessionStub } from './sandbox-session/session-stub.js';
@@ -52,9 +52,25 @@ export class SessionSyncAuthorization extends WorkerEntrypoint<Env> {
       retryConfig
     );
     if (!credential || credential.runtimeAuthorization.userId !== claims.userId) return null;
-    const roots = credential.scopeView?.memberRootKiloSessionIds ?? [claims.kiloSessionId];
+    // The handle signature binds its own root; scope members only add roots.
+    const roots = [
+      ...new Set([claims.kiloSessionId, ...(credential.scopeView?.memberRootKiloSessionIds ?? [])]),
+    ];
     if (sessionID !== undefined && !roots.includes(sessionID)) {
-      const rows = await getPgDb(this.env)
+      const db = getPgDb(this.env);
+      // Stored lineage comes from runtime events, so it cannot claim another user's session.
+      const [foreign] = await db
+        .select({ sessionId: cli_sessions_v2.session_id })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, sessionID),
+            ne(cli_sessions_v2.kilo_user_id, claims.userId)
+          )
+        )
+        .limit(1);
+      if (foreign) return null;
+      const rows = await db
         .select({
           sessionId: cli_sessions_v2.cloud_agent_session_id,
           rootId: cli_sessions_v2.session_id,

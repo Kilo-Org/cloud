@@ -1,5 +1,6 @@
 import { createExecutionContext, env, reset, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { drizzle } from 'drizzle-orm/pg-proxy';
 import { SessionSyncAuthorization } from '../../src/session-sync-authorization.js';
 import {
   createRuntimeProxyGrant,
@@ -7,13 +8,32 @@ import {
 } from '../../src/runtime-credential-proxy.js';
 import { getSandboxSessionStub } from '../../src/sandbox-session/session-stub.js';
 import type { Env } from '../../src/types.js';
+import type { ScopeGrantView } from '../../src/control-plane/sandbox/scope-view.js';
+
+const { getPgDb } = vi.hoisted(() => ({ getPgDb: vi.fn() }));
+vi.mock('../../src/db/pg.js', () => ({ getPgDb }));
+
+type Statement = { sql: string; params: unknown[] };
+
+/** Answers the foreign-owner lookup first, then the owned-root lookup. */
+function postgres(input: { foreign?: boolean; roots?: [string, string][] }) {
+  const statements: Statement[] = [];
+  getPgDb.mockReturnValue(
+    drizzle(async (sql, params) => {
+      statements.push({ sql, params });
+      if (statements.length === 1) return { rows: input.foreign ? [['ses_foreign']] : [] };
+      return { rows: input.roots ?? [] };
+    })
+  );
+  return statements;
+}
 
 afterEach(async () => {
   vi.restoreAllMocks();
   await reset();
 });
 
-async function fixture() {
+async function fixture(scopeView?: ScopeGrantView) {
   const bindings = env as Env;
   const userId = 'synthetic-sync-owner';
   const sessionId = `workspace_${crypto.randomUUID()}`;
@@ -45,6 +65,7 @@ async function fixture() {
         authorizationId: grant.authorizationId,
         resourceId: sessionId,
       },
+      ...(scopeView ? { scopeView } : {}),
     });
   });
   return {
@@ -82,5 +103,70 @@ describe('Session Sync binding-only authorization', () => {
     expect(
       await f.service.authorizeUpload({ handle: f.handle, userId: 'synthetic-other-owner' })
     ).toBeNull();
+  });
+});
+
+describe('Session Sync descendant authorization', () => {
+  const childId = 'ses_syntheticchild';
+  const memberRoot = 'ses_syntheticmember';
+  const memberCloudSessionId = `workspace_${crypto.randomUUID()}`;
+
+  async function spyDescendant(f: Awaited<ReturnType<typeof fixture>>, owned: boolean) {
+    const calls: [string, string][] = [];
+    await runInDurableObject(f.stub, instance => {
+      vi.spyOn(Object.getPrototypeOf(instance), 'hasSessionSyncDescendant').mockImplementation(
+        async (root: unknown, child: unknown) => {
+          calls.push([String(root), String(child)]);
+          return owned;
+        }
+      );
+    });
+    return calls;
+  }
+
+  it('keeps the handle root when the scope view is empty', async () => {
+    const f = await fixture({
+      scopeId: 'synthetic-scope',
+      expectedOrganizationId: null,
+      memberRootKiloSessionIds: [],
+    });
+    expect(
+      await f.service.authorizeUpload({ handle: f.handle, sessionID: f.kiloSessionId })
+    ).toEqual({ userID: f.userId, expiresAt: expect.any(Number) });
+  });
+
+  it('checks a descendant against the handle root and every scope member', async () => {
+    const f = await fixture({
+      scopeId: 'synthetic-scope',
+      expectedOrganizationId: null,
+      memberRootKiloSessionIds: [memberRoot],
+    });
+    const statements = postgres({ roots: [[memberCloudSessionId, memberRoot]] });
+    const calls = await spyDescendant(f, true);
+    expect(await f.service.authorizeUpload({ handle: f.handle, sessionID: childId })).toEqual({
+      userID: f.userId,
+      expiresAt: expect.any(Number),
+    });
+    expect(statements).toHaveLength(2);
+    expect(statements[0].params).toEqual([childId, f.userId, 1]);
+    expect(statements[1].params).toEqual([f.userId, f.kiloSessionId, memberRoot]);
+    expect(calls).toEqual([[memberRoot, childId]]);
+  });
+
+  it('rejects a session that another user owns before it reads runtime lineage', async () => {
+    const f = await fixture();
+    postgres({ foreign: true, roots: [[memberCloudSessionId, f.kiloSessionId]] });
+    const calls = await spyDescendant(f, true);
+    expect(await f.service.authorizeUpload({ handle: f.handle, sessionID: childId })).toBeNull();
+    expect(calls).toEqual([]);
+  });
+
+  it('asks the uploader to retry while descendant lineage is not stored yet', async () => {
+    const f = await fixture();
+    postgres({ roots: [[memberCloudSessionId, f.kiloSessionId]] });
+    await spyDescendant(f, false);
+    await expect(
+      f.service.authorizeUpload({ handle: f.handle, sessionID: childId })
+    ).rejects.toThrow('Native session ownership is not available');
   });
 });

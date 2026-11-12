@@ -229,11 +229,7 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
     logger.withFields({ cloudAgentSessionId, userId }).warn('/terminal: Missing ticket nonce');
     return new Response('Missing ticket nonce', { status: 401 });
   }
-  const consumed = await consumeStreamTicketNonce(
-    env,
-    nonce,
-    (ticketResult.payload as unknown as { exp: number }).exp * 1000
-  );
+  const consumed = await consumeStreamTicketNonce(env, nonce, ticketResult.payload.exp * 1000);
   if (!consumed) {
     logger.withFields({ cloudAgentSessionId, userId }).warn('/terminal: Ticket nonce already used');
     return new Response('Ticket nonce already used', { status: 401 });
@@ -806,11 +802,7 @@ app.get('/stream', async (c: Context<HonoContext>) => {
     logger.withFields({ cloudAgentSessionId, userId }).warn('/stream: Missing ticket nonce');
     return c.text('Missing ticket nonce', 401);
   }
-  const consumed = await consumeStreamTicketNonce(
-    c.env,
-    nonce,
-    (ticketResult.payload as unknown as { exp: number }).exp * 1000
-  );
+  const consumed = await consumeStreamTicketNonce(c.env, nonce, ticketResult.payload.exp * 1000);
   if (!consumed) {
     logger.withFields({ cloudAgentSessionId, userId }).warn('/stream: Ticket nonce already used');
     return c.text('Ticket nonce already used', 401);

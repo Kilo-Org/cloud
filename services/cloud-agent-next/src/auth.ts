@@ -3,19 +3,27 @@ import { z } from 'zod';
 import { verifyKiloToken, extractBearerToken } from '@kilocode/worker-utils';
 import { previewTargetSchema } from './shared/preview-target.js';
 
-type StreamTicketPayload = {
-  type: 'stream_ticket';
-  purpose?: 'stream' | 'terminal' | 'preview';
-  userId?: string;
-  kiloSessionId?: string;
-  cloudAgentSessionId?: string;
-  sessionId?: string;
-  organizationId?: string;
-  ptyId?: string;
-  port?: number;
-  nonce?: string;
-  aud?: string;
-};
+/**
+ * The claims an entry ticket carries. The parse keeps only the declared
+ * fields, so declare a claim here before reading it.
+ */
+const streamTicketPayloadSchema = z.object({
+  type: z.literal('stream_ticket'),
+  exp: z.number(),
+  aud: z.string().optional(),
+  purpose: z.enum(['stream', 'terminal', 'preview']).optional(),
+  userId: z.string().optional(),
+  kiloSessionId: z.string().optional(),
+  cloudAgentSessionId: z.string().optional(),
+  sessionId: z.string().optional(),
+  worktreeId: z.string().optional(),
+  organizationId: z.string().optional(),
+  ptyId: z.string().optional(),
+  port: z.number().optional(),
+  nonce: z.string().optional(),
+});
+
+type StreamTicketPayload = z.infer<typeof streamTicketPayloadSchema>;
 
 export const STREAM_TICKET_AUDIENCE = 'cloud-agent-stream';
 export const TERMINAL_TICKET_AUDIENCE = 'cloud-agent-terminal';
@@ -114,19 +122,20 @@ export function validateStreamTicket(
   }
 
   try {
-    const payload = jwt.verify(ticket, secret, {
+    const verified: unknown = jwt.verify(ticket, secret, {
       algorithms: ['HS256'],
-    }) as StreamTicketPayload;
+    });
 
-    if (payload.type !== 'stream_ticket') {
-      return { success: false, error: 'Invalid ticket type' };
+    const parsed = streamTicketPayloadSchema.safeParse(verified);
+    if (!parsed.success) {
+      return { success: false, error: 'Invalid ticket payload' };
     }
 
-    if (payload.aud !== expectedAudience) {
+    if (parsed.data.aud !== expectedAudience) {
       return { success: false, error: 'Invalid ticket audience' };
     }
 
-    return { success: true, payload };
+    return { success: true, payload: parsed.data };
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       return { success: false, error: 'Ticket expired' };

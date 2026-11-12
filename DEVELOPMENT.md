@@ -264,7 +264,8 @@ pnpm web:env set WATCHWOOD_SHADOW_ENABLED
 
 Set the enabled value to exact `true`, then redeploy.
 The browser receives only the organization and a server-generated signup identity.
-The signup endpoint validates the browser token, Turnstile context, and trusted client IP, then keeps the token server-side in Redis for up to ten minutes.
+The signup endpoint validates the browser token, Turnstile context, and trusted client IP, then keeps the token server-side in Redis for up to one hour, matching the signed identity cookie.
+The record outlives the SDK token, so an expired token reaches OpenAI as a client error instead of disappearing from coverage.
 The record is single use, so the next check consumes it.
 Sign-in reads the signed identity cookie with a fresh Turnstile claim and deletes the identity cookie.
 New-account creation sends the provider email address, the stored token, and the trusted client IP to OpenAI.

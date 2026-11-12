@@ -261,7 +261,7 @@ describe('Watchwood signup token storage', () => {
       receivedAt: expect.any(Number),
       status: 'pending',
     });
-    expect(options).toEqual({ ex: 600 });
+    expect(options).toEqual({ ex: 3600 });
     expect(mockFetch).not.toHaveBeenCalled();
     expect(logEntry('[auth] Watchwood signup token')).toEqual({
       shadow: true,
@@ -656,6 +656,20 @@ describe('Watchwood signup check', () => {
     const assessment = await pending;
     expect(assessment).toMatchObject({ status: 'unavailable', latencyMs: 1000 });
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing for a creation path without a browser context', async () => {
+    await expect(
+      checkWatchwoodSignup({
+        operationId: 'operation',
+        context: undefined,
+        email: 'user@example.com',
+        ip,
+      })
+    ).resolves.toBeUndefined();
+    expect(mockGetdel).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(info).not.toHaveBeenCalled();
   });
 
   it('does nothing and adds no calls when Watchwood is disabled', async () => {

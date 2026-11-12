@@ -10,7 +10,6 @@ import { getTrustedSignupClientIp } from '@/lib/auth/trusted-signup-ip';
 
 const SESSION_COOKIE = 'watchwood_signup_session';
 const MAX_AGE_SECONDS = 60 * 60;
-const TOKEN_TTL_SECONDS = 10 * 60;
 const DEADLINE_MS = 1000;
 const MAX_BODY_BYTES = 16 * 1024;
 const CREATE_ACCOUNT_URL = 'https://api.openai.com/v1/watchwood/check/create_account';
@@ -127,7 +126,7 @@ async function storeToken(
   await withinDeadline(
     () =>
       redisClient.set(tokenKey(safetyIdentifier), JSON.stringify(record), {
-        ex: TOKEN_TTL_SECONDS,
+        ex: MAX_AGE_SECONDS,
       }),
     signal
   );
@@ -220,7 +219,7 @@ export async function checkWatchwoodSignup({
   ip: string | undefined;
 }): Promise<WatchwoodSignupAssessment | undefined> {
   const enabled = config();
-  if (!enabled) return undefined;
+  if (!enabled || !context) return undefined;
   const startedAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DEADLINE_MS);
@@ -233,9 +232,7 @@ export async function checkWatchwoodSignup({
   let upstreamStatus: number | undefined;
   let riskReasonsUnrecognized = false;
   try {
-    if (!context) {
-      status = 'missing';
-    } else if ('status' in context) {
+    if ('status' in context) {
       status = context.status;
     } else {
       safetyIdentifier = context.safetyIdentifier;

@@ -770,33 +770,48 @@ describe('SessionMessageList anchor reporting', () => {
 });
 
 describe('SessionMessageList chrome ride-up', () => {
-  function contentTransformY(): number | null {
-    const style = flashListProps.current?.contentContainerStyle as
-      | { transform?: readonly { translateY?: number }[] }
-      | undefined;
-    const value = style?.transform?.[0]?.translateY;
-    return typeof value === 'number' ? value : null;
+  function holderStyle(renderer: TestRenderer.ReactTestRenderer) {
+    const node = renderer.root
+      .findAll(candidate => Object.is(candidate.type, 'View'))
+      .find(
+        candidate =>
+          (candidate.props.style as { overflow?: string } | undefined)?.overflow === 'hidden'
+      );
+    return node?.props.style as { overflow?: string; marginBottom?: number } | undefined;
   }
 
-  it('shifts the content by the chrome growth while the transcript is anchored', () => {
-    mountList({ chromeGrowthDp: 64 });
+  function listTransformY(): number | null {
+    const raw = flashListProps.current?.style;
+    const styles: unknown[] = Array.isArray(raw) ? raw : [raw];
+    for (const entry of styles) {
+      const value = (entry as { transform?: readonly { translateY?: number }[] } | undefined)
+        ?.transform?.[0]?.translateY;
+      if (typeof value === 'number') return value;
+    }
+    return null;
+  }
+
+  it('shifts the list by the chrome growth while the transcript is anchored', () => {
+    const renderer = mountList({ chromeGrowthDp: 64 });
     settleAtBottom();
-    expect(contentTransformY()).toBe(-64);
+    expect(listTransformY()).toBe(-64);
+    expect(holderStyle(renderer)?.marginBottom).toBe(-64);
+    expect(holderStyle(renderer)?.overflow).toBe('hidden');
   });
 
   it('applies the shift in the render that publishes the growth', () => {
     const renderer = mountList({ chromeGrowthDp: 0 });
     settleAtBottom();
-    expect(contentTransformY()).toBeNull();
+    expect(listTransformY()).toBeNull();
     rerenderList(renderer, { chromeGrowthDp: 64 });
-    expect(contentTransformY()).toBe(-64);
+    expect(listTransformY()).toBe(-64);
   });
 
   it('keeps the content still once the reader is above the tail', () => {
     mountList({ chromeGrowthDp: 64 });
     settleAtBottom();
     scrollAwayFromBottom();
-    expect(contentTransformY()).toBeNull();
+    expect(listTransformY()).toBeNull();
   });
 
   it('keeps a transcript that cannot scroll still', () => {
@@ -808,6 +823,6 @@ describe('SessionMessageList chrome ride-up', () => {
         layoutMeasurement: { height: 500, width: 0 },
       },
     });
-    expect(contentTransformY()).toBeNull();
+    expect(listTransformY()).toBeNull();
   });
 });

@@ -2,7 +2,7 @@ import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import { ChevronDown } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { AccessibilityInfo, Pressable, View, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,7 +12,10 @@ import { useSessionListAnchorReport } from '@/components/agents/use-session-list
 import { useSessionListOpenSettle } from '@/components/agents/use-session-list-open-settle';
 import { useSessionListResumeScroll } from '@/components/agents/use-session-list-resume-scroll';
 import { SessionPaginationHeader } from '@/components/agents/session-pagination-header';
-import { resolveTranscriptRideUp } from '@/components/agents/session-message-list-anchor';
+import {
+  resolveTranscriptFrame,
+  resolveTranscriptRideUp,
+} from '@/components/agents/session-message-list-anchor';
 import { SessionTranscriptOpenGate } from '@/components/agents/session-transcript-open-gate';
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
 import {
@@ -179,7 +182,6 @@ export function SessionMessageList<T>({
     resetKey: sessionId,
     initialAutoScroll: followTailAtMount,
     resumeKey: resumeAnchor,
-    coveredViewportGrowthDp: chromeGrowthDp ?? 0,
   });
   // The transcript stays behind the loading skeleton until its rows stop
   // measuring, so the position it is first seen in is the position it keeps.
@@ -340,7 +342,18 @@ export function SessionMessageList<T>({
   // bottom, so the newest row keeps the chrome's top edge in the same commit
   // that grows the chrome. A list that cannot scroll has no row to bring back,
   // so it never shifts.
-  const chromeRideUp = resolveTranscriptRideUp(chromeGrowthDp ?? 0, isAtBottom && isScrollable);
+  const transcriptFrame = resolveTranscriptFrame(
+    resolveTranscriptRideUp(chromeGrowthDp ?? 0, isAtBottom && isScrollable)
+  );
+  // The helper hands both slots the same shareable fill while nothing rides
+  // up, so an unchanged frame keeps the list's style identity.
+  const listFrameStyle = useMemo<StyleProp<ViewStyle>>(
+    () =>
+      transcriptFrame.content === transcriptFrame.holder
+        ? listStyle
+        : [listStyle, transcriptFrame.content],
+    [transcriptFrame]
+  );
 
   // When the optional `contentBottomInset` is omitted and the landscape side
   // insets are 0 (portrait) we return the original module-level
@@ -349,10 +362,9 @@ export function SessionMessageList<T>({
   // extend the bottom padding to clear safe areas such as the home indicator
   // on curved-bottom iPhones, and the side padding keeps transcript text clear
   // of the landscape sensor housing; portrait insets are 0, keeping the
-  // geometry unchanged. A ride-up is a paint offset on the content, so the rows
-  // keep their frames, offsets and at-bottom verdict.
-  const resolvedContentContainerStyle = useMemo<ViewStyle>(() => {
-    const base =
+  // geometry unchanged.
+  const resolvedContentContainerStyle = useMemo<ViewStyle>(
+    () =>
       !contentBottomInset && left === 0 && right === 0
         ? listContentContainerStyle
         : {
@@ -360,9 +372,9 @@ export function SessionMessageList<T>({
             paddingBottom: 8 + (contentBottomInset ?? 0),
             paddingLeft: left,
             paddingRight: right,
-          };
-    return chromeRideUp > 0 ? { ...base, transform: [{ translateY: -chromeRideUp }] } : base;
-  }, [contentBottomInset, left, right, chromeRideUp]);
+          },
+    [contentBottomInset, left, right]
+  );
 
   // The host passes a fresh inline arrow for `onLoadOlderMessages` on every
   // render, so the handler is held in a ref (the same pattern as
@@ -399,10 +411,10 @@ export function SessionMessageList<T>({
 
   return (
     <SessionTranscriptOpenGate settled={openSettled} sessionId={sessionId}>
-      <View className="flex-1">
+      <View className="flex-1" style={transcriptFrame.holder}>
         <FlashList<T>
           ref={listRef}
-          style={listStyle}
+          style={listFrameStyle}
           contentContainerStyle={resolvedContentContainerStyle}
           data={items}
           keyExtractor={keyExtractor}

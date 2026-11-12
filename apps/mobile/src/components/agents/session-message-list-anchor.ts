@@ -1,5 +1,22 @@
+import { type ViewStyle } from 'react-native';
+
 /**
  * How far the transcript rides up while the chrome under it grows.
+ *
+ * The shift applies only while the transcript is anchored at its bottom and its
+ * content overflows the viewport: a reader above the tail keeps the rows they
+ * are reading, and a transcript that cannot scroll has no anchoring problem to
+ * solve.
+ */
+export function resolveTranscriptRideUp(chromeGrowth: number, anchoredAtBottom: boolean): number {
+  if (!anchoredAtBottom || !(chromeGrowth > 0) || !Number.isFinite(chromeGrowth)) {
+    return 0;
+  }
+  return chromeGrowth;
+}
+
+/**
+ * The frame that holds a transcript above chrome which grows.
  *
  * A transcript keeps its newest row on the bottom edge of its viewport. When
  * the chrome under it grows, the viewport shrinks in the layout pass and the
@@ -7,23 +24,28 @@
  * that pass; the scroll it issues lands later still. The transcript is then
  * painted clipped and jumps once it catches up.
  *
- * So the transcript's content is shifted up by the growth itself, in the same
- * commit that grows the chrome: the rows keep their order and their offsets, no
- * scroll command is issued, and the newest row stays on the chrome's top edge.
- * The shift is a paint offset on the list's content, which a scroll view clips
- * exactly as it clips the rows a scroll moves past its edge.
- *
- * The shift applies only while the transcript is anchored at its bottom and its
- * content overflows the viewport. The rows the shift hides are the ones a
- * scroll to the same position would hide, and the list keeps enough scroll range
- * to bring them back; a transcript that cannot scroll has no anchoring problem
- * to solve, so it never shifts.
+ * So the growth is held out of the list's own height instead: the holder takes
+ * the growth back with a negative bottom margin and shifts its content up by
+ * that amount, all in the same commit that grows the chrome. The list keeps the
+ * viewport it had before the growth, so its rows, content height, scroll offset
+ * and at-bottom verdict keep describing the same rows and no scroll command is
+ * issued; the shift is a paint offset, so the newest row lands on the chrome's
+ * top edge. The holder clips the strip the shift pushes above its top edge,
+ * exactly as a scroll view clips the rows a scroll moves past its edge, and the
+ * chrome paints over the part of the holder that lies behind it.
  */
-export function resolveTranscriptRideUp(chromeGrowth: number, anchoredAtBottom: boolean): number {
-  if (!anchoredAtBottom || !(chromeGrowth > 0) || !Number.isFinite(chromeGrowth)) {
-    return 0;
+export type TranscriptFrame = Readonly<{ holder: ViewStyle; content: ViewStyle }>;
+
+const FILL: ViewStyle = { flex: 1 };
+
+export function resolveTranscriptFrame(chromeGrowth: number): TranscriptFrame {
+  if (!(chromeGrowth > 0)) {
+    return { holder: FILL, content: FILL };
   }
-  return chromeGrowth;
+  return {
+    holder: { flex: 1, overflow: 'hidden', marginBottom: -chromeGrowth },
+    content: { flex: 1, transform: [{ translateY: -chromeGrowth }] },
+  };
 }
 
 /**

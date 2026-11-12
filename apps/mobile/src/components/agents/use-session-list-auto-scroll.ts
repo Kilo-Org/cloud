@@ -43,18 +43,6 @@ type UseSessionListAutoScrollParams = {
    * take-over released and the follow policy re-applied.
    */
   resumeKey?: string | null;
-  /**
-   * How much of a viewport shrink the caller already covers by shifting its
-   * content, in dp. The chrome under the list grows, the layout pass takes that
-   * height from the list, and the caller moves the content up by the same
-   * amount in the same commit, so the rows the reader sees and the distance to
-   * the newest row do not change. Treating that shrink as a viewport change
-   * would re-pin the tail and move the content a second time, and treating it
-   * as "away from the bottom" would show the scroll-to-bottom control beside a
-   * transcript that is still on its newest row. Absent or 0 keeps every other
-   * caller byte-identical.
-   */
-  coveredViewportGrowthDp?: number;
 };
 
 /**
@@ -70,13 +58,8 @@ export function useSessionListAutoScroll<ItemT>({
   resetKey,
   initialAutoScroll = true,
   resumeKey = null,
-  coveredViewportGrowthDp = 0,
 }: UseSessionListAutoScrollParams) {
   const listRef = useRef<FlashListRef<ItemT>>(null);
-  // Read by the layout and scroll handlers, which must not be re-created on
-  // every growth: the value they need is the current one, not a closure's.
-  const coveredViewportGrowthRef = useRef(coveredViewportGrowthDp);
-  coveredViewportGrowthRef.current = coveredViewportGrowthDp;
   const { scrollAnimated } = useMotionPolicy();
   const shouldAutoScrollRef = useRef(true);
   // React state mirror of `shouldAutoScrollRef`'s at-bottom side, so the
@@ -145,37 +128,17 @@ export function useSessionListAutoScroll<ItemT>({
     }
   }, []);
 
-  // The newest row's bottom belongs to the viewport the reader sees. When the
-  // caller covers part of the viewport by shifting the content, the list's own
-  // end is that cover short of where the newest row must land, so the follow
-  // targets the perceived bottom instead of the box's.
-  const scrollToPerceivedBottom = useCallback((animated: boolean) => {
-    const list = listRef.current;
-    if (!list) {
-      return;
-    }
-    const covered = coveredViewportGrowthRef.current;
-    if (covered > 0 && lastViewportHeightRef.current > 0) {
-      list.scrollToOffset({
-        offset: Math.max(0, lastContentHeightRef.current - lastViewportHeightRef.current),
-        animated,
-      });
-      return;
-    }
-    list.scrollToEnd({ animated });
-  }, []);
-
   const scrollToLatestMessage = useCallback(() => {
     isAutoScrollingRef.current = true;
     clearAutoScrollResetTimeout();
     // FlashList in v2 supports `scrollToEnd` directly. The list is rendered
     // in chronological order, so the end is the newest message.
-    scrollToPerceivedBottom(false);
+    listRef.current?.scrollToEnd({ animated: false });
     autoScrollResetTimeoutRef.current = setTimeout(() => {
       isAutoScrollingRef.current = false;
       autoScrollResetTimeoutRef.current = null;
     }, 150);
-  }, [clearAutoScrollResetTimeout, scrollToPerceivedBottom]);
+  }, [clearAutoScrollResetTimeout]);
 
   // Animated scroll for the user-initiated "scroll to bottom" button.
   // Intentionally does NOT set `isAutoScrollingRef`: that flag suppresses
@@ -184,8 +147,8 @@ export function useSessionListAutoScroll<ItemT>({
   // `updateAutoScrollFromEvent` so the at-bottom detection flips and the
   // button fades out on completion.
   const scrollToLatestAnimated = useCallback(() => {
-    scrollToPerceivedBottom(scrollAnimated);
-  }, [scrollAnimated, scrollToPerceivedBottom]);
+    listRef.current?.scrollToEnd({ animated: scrollAnimated });
+  }, [scrollAnimated]);
 
   /**
    * A send takes the transcript position over. The user pressed Send wherever
@@ -347,14 +310,10 @@ export function useSessionListAutoScroll<ItemT>({
   const updateAutoScrollFromEvent = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-      // The cover the caller applies in the same commit belongs to the viewport
-      // the reader sees: without it, the shrink reads as a scroll away from the
-      // newest row.
-      const viewportHeight = layoutMeasurement.height + coveredViewportGrowthRef.current;
-      updateScrollableFromSizes(contentSize.height, viewportHeight);
+      updateScrollableFromSizes(contentSize.height, layoutMeasurement.height);
       const nextIsAtBottom = isSessionListAtBottom({
         contentHeight: contentSize.height,
-        viewportHeight,
+        viewportHeight: layoutMeasurement.height,
         offsetY: contentOffset.y,
         thresholdPx: SESSION_LIST_BOTTOM_THRESHOLD_PX,
       });
@@ -449,21 +408,9 @@ export function useSessionListAutoScroll<ItemT>({
   const handleListLayout = useCallback(
     (event: LayoutChangeEvent) => {
       const { height } = event.nativeEvent.layout;
-      // The height the reader perceives includes the shrink the caller covers
-      // by shifting the content: a layout pass that takes exactly that shrink
-      // away is not a viewport change.
-      const covered = coveredViewportGrowthRef.current;
-      const previousViewportHeight = lastViewportHeightRef.current;
-      const viewportHeight = height + covered;
-      const didViewportHeightChange = viewportHeight !== previousViewportHeight;
-      const coveredShrink = covered > 0 && !didViewportHeightChange;
-      lastViewportHeightRef.current = viewportHeight;
-      updateScrollableFromSizes(lastContentHeightRef.current, viewportHeight);
-      // The caller already put the newest row where this pass would; a follow
-      // scroll here would move the content a second time, one frame late.
-      if (coveredShrink) {
-        return;
-      }
+      const didViewportHeightChange = height !== lastViewportHeightRef.current;
+      lastViewportHeightRef.current = height;
+      updateScrollableFromSizes(lastContentHeightRef.current, height);
       // A viewport resize is the same hazard as a content-size change: the
       // fixed status rows mount OUTSIDE the list, so the list gets shorter
       // while its offset stays put and the newest row is left below the fold,

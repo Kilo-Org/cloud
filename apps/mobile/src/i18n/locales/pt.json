@@ -3048,6 +3048,12 @@
       "renamePlaceholder": "Nome da organização",
       "balance": "Saldo",
       "organizationSeats": "Lugares da organização",
+      "plan": "Plano da organização",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Terminado",
+      "planEnded": "O período de teste da organização terminou e esta não tem um plano ativo.",
+      "manageBilling": "Gerir faturação",
       "lowBalanceBelow": "Abaixo de {{amount}}"
     },
     "kiloPass": {

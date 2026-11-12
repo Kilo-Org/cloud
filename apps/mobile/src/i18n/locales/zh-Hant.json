@@ -2887,6 +2887,12 @@
       "balance": "餘額",
       "lowBalanceBelow": "低於 {{amount}}",
       "organizationSeats": "組織席次",
+      "plan": "組織套餐",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · 已結束",
+      "planEnded": "組織的試用期已結束，且沒有使用中的方案。",
+      "manageBilling": "管理帳單",
       "renamePlaceholder": "組織名稱",
       "renameTitle": "重新命名組織"
     },

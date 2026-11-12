@@ -3042,6 +3042,12 @@
       "renamePlaceholder": "Numele organizației",
       "balance": "Sold",
       "organizationSeats": "Locuri în organizație",
+      "plan": "Planul organizației",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Încheiat",
+      "planEnded": "Perioada de probă a organizației s-a încheiat și nu are un plan activ.",
+      "manageBilling": "Gestionează facturarea",
       "lowBalanceBelow": "Sub {{amount}}"
     },
     "kiloPass": {

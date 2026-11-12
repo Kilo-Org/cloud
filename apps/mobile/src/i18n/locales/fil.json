@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Pangalan ng organisasyon",
       "balance": "Balanse",
       "organizationSeats": "Mga puwesto sa organisasyon",
+      "plan": "Plano ng organisasyon",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Natapos",
+      "planEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano.",
+      "manageBilling": "Pamahalaan ang pagsingil",
       "lowBalanceBelow": "Mas mababa sa {{amount}}"
     },
     "kiloPass": {

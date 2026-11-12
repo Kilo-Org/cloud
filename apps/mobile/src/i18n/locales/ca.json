@@ -3042,6 +3042,12 @@
       "renamePlaceholder": "Nom de l'organització",
       "balance": "Saldo",
       "organizationSeats": "Llicències de l'organització",
+      "plan": "Pla de l'organització",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Caducat",
+      "planEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu.",
+      "manageBilling": "Gestiona la facturació",
       "lowBalanceBelow": "Per sota de {{amount}}"
     },
     "kiloPass": {

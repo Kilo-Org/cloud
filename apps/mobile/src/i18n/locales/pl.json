@@ -2993,6 +2993,12 @@
       "balance": "Saldo",
       "lowBalanceBelow": "Poniżej {{amount}}",
       "organizationSeats": "Miejsca w organizacji",
+      "plan": "Plan organizacji",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Zakończony",
+      "planEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu.",
+      "manageBilling": "Zarządzaj rozliczeniami",
       "renamePlaceholder": "Nazwa organizacji",
       "renameTitle": "Zmień nazwę organizacji"
     },

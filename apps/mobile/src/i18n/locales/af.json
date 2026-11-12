@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Organisasienaam",
       "balance": "Saldo",
       "organizationSeats": "Gebruikersplekke in die organisasie",
+      "plan": "Organisasieplan",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Het geëindig",
+      "planEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie.",
+      "manageBilling": "Bestuur fakturering",
       "lowBalanceBelow": "Onder {{amount}}"
     },
     "kiloPass": {

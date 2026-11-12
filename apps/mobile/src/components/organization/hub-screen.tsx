@@ -19,6 +19,7 @@ import {
   type OrgKiloPassRowState,
 } from '@/components/organization/org-kilo-pass-row-state';
 import { OrgUsageStats } from '@/components/organization/org-usage-stats';
+import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -173,6 +174,25 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   // One string for the painted balance and its spoken label, in the shape the
   // Profile credits card paints the same balance.
   const balanceAmount = formatPrefixedMoney(fromMicrodollars(org.balance), i18n.language);
+  // The plan and the subscription gate's own verdict arrive on the same
+  // membership row that decides whether this screen renders at all, so both
+  // paint settled on the first frame: there is no plan loading or plan error
+  // state to reserve room for, and a refetch that fails keeps the last verdict
+  // exactly as it does for the new-session composer. Only the server's boolean
+  // is read; nothing re-derives the plan state from seats or balance.
+  const planEnded = org.isTrialExpiredForEnforcement;
+  const planName =
+    org.plan === 'enterprise'
+      ? t('organization.hub.planEnterprise')
+      : t('organization.hub.planTeams');
+  const planBillingUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`;
+  // A role that gets the billing action below the block needs only the state,
+  // because the action is the next step. A role that cannot change the plan
+  // gets the sentence the rest of the app shows with the same explanation, so
+  // the member still learns who can end the state.
+  const planMessage = showMoney
+    ? t('organization.hub.planEnded')
+    : t('common.organizationTrialEnded');
 
   return (
     <View className="flex-1 bg-background">
@@ -200,6 +220,31 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
         contentContainerClassName="px-6 gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
+        {/* A lapsed plan blocks every new session for every member of this
+            organization, so it is stated before the numbers the screen opens
+            on. Only a billing role gets the action, because the web billing
+            page refuses the other roles; the sentence then stops at the state
+            so it does not restate the control below it, while a role without
+            the action keeps the next step in the sentence. The plan row inside
+            the card below states the tier and its status, so this block adds
+            neither. */}
+        {planEnded ? (
+          <OrganizationPlanRefusal
+            message={planMessage}
+            action={
+              showMoney
+                ? {
+                    label: t('organization.hub.manageBilling'),
+                    onPress: () => {
+                      void openExternalUrl(planBillingUrl, {
+                        label: t('organization.hub.manageBilling'),
+                      });
+                    },
+                  }
+                : undefined
+            }
+          />
+        ) : null}
         <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">
           {showMoney && (
             <KvRow
@@ -241,6 +286,21 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 : formatNumber(org.seatCount.used, i18n.language)
             }
             valueFace="numeric"
+          />
+          {/* The plan is the tier the seats belong to, so it closes the card
+              the seats are counted in and paints in every state. A lapsed plan
+              states that in this row: the tier alone beside the block above
+              would read as an active plan, and the tier keeps the row's own ink
+              so only the state carries the warning. */}
+          <KvRow
+            label={t('organization.hub.plan')}
+            value={planName}
+            valueStatus={
+              planEnded
+                ? { label: t('organization.hub.planStatusLapsed'), tone: 'danger' }
+                : undefined
+            }
+            valueFace="text"
             last
           />
         </Animated.View>

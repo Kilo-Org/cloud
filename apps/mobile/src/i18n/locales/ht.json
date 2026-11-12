@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Non òganizasyon an",
       "balance": "Balans",
       "organizationSeats": "Plas nan òganizasyon an",
+      "plan": "Plan òganizasyon an",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Fini",
+      "planEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif.",
+      "manageBilling": "Jere faktirasyon",
       "lowBalanceBelow": "Anba {{amount}}"
     },
     "kiloPass": {

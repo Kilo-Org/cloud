@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Име на организацијата",
       "balance": "Состојба",
       "organizationSeats": "Места во организацијата",
+      "plan": "План на организацијата",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Истечен",
+      "planEnded": "Пробниот период на организацијата заврши и таа нема активен план.",
+      "manageBilling": "Управување со наплата",
       "lowBalanceBelow": "Под {{amount}}"
     },
     "kiloPass": {

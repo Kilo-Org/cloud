@@ -2989,6 +2989,12 @@
       "renamePlaceholder": "Organisationens navn",
       "balance": "Saldo",
       "organizationSeats": "Pladser i organisationen",
+      "plan": "Organisationsplan",
+      "planTeams": "Teams",
+      "planEnterprise": "Enterprise",
+      "planStatusLapsed": " · Udløbet",
+      "planEnded": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan.",
+      "manageBilling": "Administrer fakturering",
       "lowBalanceBelow": "Under {{amount}}"
     },
     "kiloPass": {

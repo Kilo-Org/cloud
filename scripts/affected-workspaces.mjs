@@ -30,6 +30,17 @@
 // data cannot change its types, lint results or exports. When a file in the
 // workspace it reads changes, only the reader's tests need to run
 // (`test_only_*`), and nothing that reads the reader follows.
+//
+// The other direction narrows the same way: a change whose files in a workspace
+// are all test files selects that workspace, so its own typecheck, lint and test
+// row still run, but not the workspaces that read it, because a test file cannot
+// change the types the workspace exports. The narrow holds only when the
+// workspace's own test script runs those files, which the test matrix requires
+// before it keeps a row: a workspace without a `test` script keeps the full
+// reader selection, because another workspace's runner may be the only one that
+// runs its tests (a nested workspace whose parent's suite reaches into it). A
+// non-test file in the same workspace, an EXTRA_INPUTS match or a dependency
+// consumer keeps the full reader selection as well.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { posix } from 'node:path';
@@ -250,6 +261,12 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
   const dirs = items.map(item => item.dir);
   const dirOf = new Map(items.map(item => [item.name, item.dir]));
   const nameOf = new Map(items.map(item => [item.dir, item.name]));
+  // Workspaces whose own test script runs their tests. The narrow below needs
+  // it: without a test script no matrix row runs the workspace, so a reader's
+  // runner may be the only one that does.
+  const testScripted = new Set(
+    items.filter(item => item.manifest?.scripts?.test).map(item => item.dir)
+  );
   // readers.get(x): workspaces that read workspace x
   const readers = new Map(dirs.map(dir => [dir, new Set()]));
   const read = (reader, dir) => {
@@ -307,10 +324,17 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
   const reasons = [];
   const fullChecks = new Set();
   const changed = new Set();
+  // Workspaces whose own changed files are all test files. They join the
+  // selection without their readers, unless something else adds them to
+  // `changed`.
+  const testOnlyChanged = new Set();
   for (const file of changedFiles) {
     const dir = owner(dirs, file);
     if (dir) {
-      if (!file.endsWith('.md')) changed.add(dir);
+      if (!file.endsWith('.md')) {
+        if (TEST_FILE.test(file)) testOnlyChanged.add(dir);
+        else changed.add(dir);
+      }
       for (const [reader, workspace, testFile] of testReads) {
         if (file.startsWith(`${workspace}/`)) tested.push([reader, testFile]);
       }
@@ -356,6 +380,15 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
   }
 
   const full = reasons.length > 0;
+  // A test-only change that cannot narrow keeps the fan-out of a source change:
+  // a workspace whose own test script does not run these files has no matrix row
+  // of its own, so a reader may be their only runner.
+  for (const dir of testOnlyChanged) {
+    if (!testScripted.has(dir)) changed.add(dir);
+  }
+  // A workspace that `changed` also names keeps the fan-out: the mixed,
+  // EXTRA_INPUTS and dependency cases.
+  const narrowed = full ? [] : [...testOnlyChanged].filter(dir => !changed.has(dir));
   const affected = new Set(full ? dirs : []);
   const queue = full ? [] : [...changed];
   while (queue.length) {
@@ -364,6 +397,9 @@ export function selectAffected({ items, changedFiles, dependencyDirs, references
     affected.add(dir);
     queue.push(...readers.get(dir));
   }
+  // A narrowed workspace that the closure reached anyway already fans out: it
+  // reads another changed workspace, so its readers see that change through it.
+  for (const dir of narrowed) affected.add(dir);
   // Workspaces that only need their tests run, with the test files that read
   // changed data.
   const testOnly = new Map();

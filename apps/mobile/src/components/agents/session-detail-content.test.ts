@@ -4884,9 +4884,10 @@ describe('session detail read-only composer', () => {
     expect(controlLabels).toContain(i18n.t('agentChat.session.continueInNewSession'));
   });
 
-  // The transcript paints a skeleton until its rows stop measuring. The chrome
-  // around it reads the same fact: a live continue footer, or a pill settled on
-  // a bare ring, beside a loading body is the screen showing two states at once.
+  // The transcript paints a skeleton until its rows stop measuring. The footer
+  // does not wait for that verdict: it holds the session's one control from the
+  // moment the kind resolves, and the pill's box holds its own row. Both stay
+  // where they are while the body fills in.
   it('keeps the continue control on screen while the rows are still measuring', async () => {
     // The transcript paints in two steps and the list reports its settle from
     // its own measurement, which lands after the rows it just rendered. The

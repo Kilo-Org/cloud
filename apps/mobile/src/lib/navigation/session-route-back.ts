@@ -1,4 +1,4 @@
-import { type Href, useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { BackHandler } from 'react-native';
 
@@ -25,7 +25,7 @@ export function useSessionRouteBack(): void {
         if (router.canGoBack()) {
           return false;
         }
-        router.dismissTo(AGENTS_SESSIONS_HREF as Href);
+        router.dismissTo(AGENTS_SESSIONS_HREF);
         return true;
       });
       return () => {

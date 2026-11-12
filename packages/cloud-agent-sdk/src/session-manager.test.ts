@@ -3511,8 +3511,183 @@ describe('createSessionManager', () => {
       expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(1);
 
       rejectSend!(new Error('ECONNREFUSED'));
-      await sendPromise;
+      // Nothing was delivered, so the send reports failure and the caller may
+      // keep the prompt as its draft for another attempt.
+      await expect(sendPromise).resolves.toBe(false);
       expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Hello');
+      expect(atomValue(config.store, mgr.atoms.deliveredFailedPrompt)).toBeNull();
+    });
+
+    it('withdraws the restored prompt once the server confirms the failed send', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const storage = mockSession.storage;
+      if (!storage) throw new Error('expected session storage');
+
+      let rejectSend: (error: Error) => void;
+      mockSession.send.mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectSend = reject;
+          })
+      );
+      const sendPromise = mgr.send({
+        payload: { type: 'prompt', prompt: 'Delivered late', mode: 'code' },
+      });
+      const [messageId] = storage.getMessageIds();
+      expect(messageId).toBeDefined();
+
+      // The response was lost while the server accepted the message: the row is
+      // withdrawn and the caller is told to keep the text.
+      rejectSend!(new Error('ECONNRESET'));
+      await expect(sendPromise).resolves.toBe(false);
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Delivered late');
+      expect(atomValue(config.store, mgr.atoms.deliveredFailedPrompt)).toBeNull();
+
+      // The confirmed record arrives with the next page: the transcript owns the
+      // text now, so the restored draft must go with it. The server keeps the
+      // client id, and the row is the client's own synthetic placeholder that the
+      // server echoed — the client deleted its row when the send failed.
+      storage.upsertMessage(
+        stubUserMessage({
+          id: messageId!,
+          sessionID: kiloId('ses-1'),
+          time: { created: 2 },
+          agent: 'test-agent',
+          model: { providerID: 'test-provider', modelID: 'test-model' },
+          synthetic: true,
+        })
+      );
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBeNull();
+      expect(atomValue(config.store, mgr.atoms.deliveredFailedPrompt)).toEqual({
+        messageId,
+        text: 'Delivered late',
+        sequence: 1,
+      });
+      // The delivered prompt is a send, not a draft: returning offers nothing.
+      await mgr.switchSession(kiloId('ses-2'));
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBeNull();
+    });
+
+    it('keeps the restored prompt while no row carries its message id', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const storage = mockSession.storage;
+      if (!storage) throw new Error('expected session storage');
+
+      let rejectSend: (error: Error) => void;
+      mockSession.send.mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectSend = reject;
+          })
+      );
+      const sendPromise = mgr.send({
+        payload: { type: 'prompt', prompt: 'Never delivered', mode: 'code' },
+      });
+      rejectSend!(new Error('ECONNREFUSED'));
+      await expect(sendPromise).resolves.toBe(false);
+
+      // A confirmed row under another id is some other message: it says nothing
+      // about this prompt, so the draft stays where the caller put it.
+      storage.upsertMessage(
+        stubUserMessage({
+          id: 'msg-someone-else',
+          sessionID: kiloId('ses-1'),
+          time: { created: 2 },
+          agent: 'test-agent',
+          model: { providerID: 'test-provider', modelID: 'test-model' },
+        })
+      );
+
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe(
+        'Never delivered'
+      );
+      expect(atomValue(config.store, mgr.atoms.deliveredFailedPrompt)).toBeNull();
+    });
+
+    it('settles a failed send whose confirmation arrives on a later open', async () => {
+      const persisted: { messageId: string; text: string }[] = [];
+      const config = createMockConfig({
+        readPendingSendConfirmations: async () => [...persisted],
+        persistPendingSendConfirmation: (_id, messageId, text) => {
+          persisted.push({ messageId, text });
+        },
+        clearPendingSendConfirmation: (_id, messageId) => {
+          persisted.splice(
+            persisted.findIndex(entry => entry.messageId === messageId),
+            1
+          );
+        },
+      });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      let rejectSend: (error: Error) => void;
+      mockSession.send.mockImplementation(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectSend = reject;
+          })
+      );
+      const sendPromise = mgr.send({
+        payload: { type: 'prompt', prompt: 'Lost response', mode: 'code' },
+      });
+      const storage = mockSession.storage;
+      if (!storage) throw new Error('expected session storage');
+      const [messageId] = storage.getMessageIds();
+      rejectSend!(new Error('ECONNRESET'));
+      await expect(sendPromise).resolves.toBe(false);
+      expect(persisted).toEqual([{ messageId, text: 'Lost response' }]);
+
+      // The route that sent it is gone; a fresh manager opens the session and
+      // its page carries the row the server had accepted.
+      const persisted0 = persisted[0]!.messageId;
+      mgr.destroy();
+      const reopenedStore = createStore();
+      const reopened = createSessionManager({
+        ...config,
+        store: reopenedStore,
+        fetchSnapshotPage: async () =>
+          makePage({
+            messages: [makePageMessage(persisted[0]!.messageId, kiloId('ses-1'), 'Lost response')],
+          }),
+      });
+      await reopened.switchSession(kiloId('ses-1'));
+
+      // The transcript owns the delivered message, so the restore is withdrawn.
+      await new Promise(resolve => setImmediate(resolve));
+      expect(atomValue(reopenedStore, reopened.atoms.deliveredFailedPrompt)).toMatchObject({
+        messageId: persisted0,
+        text: 'Lost response',
+      });
+      expect(persisted).toEqual([]);
+      reopened.destroy();
+    });
+
+    it('records no pending confirmation for a refusal the server answered', async () => {
+      const persistPendingSendConfirmation = jest.fn();
+      const config = createMockConfig({ persistPendingSendConfirmation });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockRejectedValueOnce(
+        Object.assign(new Error('Insufficient credits'), {
+          data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 },
+        })
+      );
+      await expect(
+        mgr.send({ payload: { type: 'prompt', prompt: 'No balance', mode: 'code' } })
+      ).resolves.toBe(false);
+
+      // A refusal never produced a message, so no confirmation can arrive.
+      expect(persistPendingSendConfirmation).not.toHaveBeenCalled();
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('No balance');
     });
 
     it('removes the optimistic row from the storage that sent it when a switch lands mid-send', async () => {
@@ -3677,7 +3852,10 @@ describe('createSessionManager', () => {
       );
 
       rejectSend!(new Error('ECONNRESET'));
-      await expect(sendPromise).resolves.toBe(false);
+      // The server accepted the prompt, so the send succeeded even though the
+      // response was lost: the caller keeps its composer empty rather than
+      // putting the same text back beside the confirmed row.
+      await expect(sendPromise).resolves.toBe(true);
 
       // Server history stays in the transcript, and a delivered prompt is not
       // also offered as a draft to send twice.
@@ -3739,7 +3917,9 @@ describe('createSessionManager', () => {
       expect(cached.get('ses-1')?.messages.map(message => message.info.id)).toContain(messageId);
 
       rejectSend!(new Error('ECONNRESET'));
-      await expect(sendPromise).resolves.toBe(false);
+      // The server accepted the prompt, so this is a sent message, not a draft:
+      // the caller must not offer it for a second send.
+      await expect(sendPromise).resolves.toBe(true);
 
       // The delivered prompt consumes the draft: returning offers nothing to resend.
       await mgr.switchSession(kiloId('ses-1'));

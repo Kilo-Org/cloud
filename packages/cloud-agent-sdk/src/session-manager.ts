@@ -436,6 +436,27 @@ type SessionManagerConfig = {
    */
   persistResolvedDeliveryFailure?: (kiloSessionId: KiloSessionId, messageId: string) => void;
   /**
+   * Optional durable memory of failed sends whose outcome is unknown, scoped to
+   * one session: the transport reported an error but the server may have
+   * accepted the message, so the confirmed row can still arrive — on a live
+   * update, or with a later open's page. Read on `switchSession`, because the
+   * route that sent the message may be gone by the time the confirmation
+   * arrives, and the draft the caller restored survives that teardown. Callers
+   * without a reader keep the in-memory-only behaviour, which covers a
+   * confirmation that arrives while the same manager is open.
+   */
+  readPendingSendConfirmations?: (
+    kiloSessionId: KiloSessionId
+  ) => Promise<readonly PendingSendConfirmation[]>;
+  /** Optional sink for a failed send whose outcome is unknown. */
+  persistPendingSendConfirmation?: (
+    kiloSessionId: KiloSessionId,
+    messageId: string,
+    text: string
+  ) => void;
+  /** Optional sink retiring that record once the confirmation arrived. */
+  clearPendingSendConfirmation?: (kiloSessionId: KiloSessionId, messageId: string) => void;
+  /**
    * Optional sink for tool attachment bytes, called just before the chat
    * processor strips a completed tool part's attachment data URLs for storage.
    *
@@ -462,6 +483,21 @@ type SessionManagerConfig = {
 };
 
 type W<T> = WritableAtom<T, [T], void>;
+
+/**
+ * A failed send the server accepted: see `SessionManagerAtoms.deliveredFailedPrompt`.
+ */
+type DeliveredFailedPrompt = {
+  messageId: string;
+  text: string;
+  sequence: number;
+};
+
+/**
+ * A send whose outcome the transport could not confirm: see
+ * `SessionManagerConfig.readPendingSendConfirmations`.
+ */
+type PendingSendConfirmation = { messageId: string; text: string };
 
 type SessionManagerAtoms = {
   isStreaming: W<boolean>;
@@ -538,6 +574,15 @@ type SessionManagerAtoms = {
   sendingMessageIds: W<ReadonlySet<string>>;
   failedPrompt: W<string | null>;
   billingFailure: W<CustomerBillingFailure | null>;
+  /**
+   * The failed send the server accepted after all, for the active session: the
+   * response was lost, so the caller had already put the text back, and the
+   * confirmed row then arrived under the saved message id. A client withdraws
+   * the text it restored — its restored attachments too — so the message stays
+   * in the transcript alone. `sequence` increments per event, so a client effect
+   * that clears once runs once even when the same text is delivered twice.
+   */
+  deliveredFailedPrompt: W<DeliveredFailedPrompt | null>;
   fetchedSessionData: W<FetchedSessionData | null>;
   /** Slash command catalog reported by the wrapper for the current session. */
   availableCommands: W<SlashCommandInfo[]>;
@@ -627,6 +672,13 @@ type SessionManager = {
    * current `fetchedSessionData` atom. Mobile calls this after a focus refetch.
    */
   updateFetchedAssociatedPr(pr: AssociatedPrData | null): void;
+  /**
+   * Whether the server accepted the prompt, so the transcript owns its text and
+   * the caller must not put it back in the composer. A confirmed row under the
+   * client message id counts as accepted even when the response was lost: the
+   * server already holds the message, so a restored draft beside that row would
+   * show it twice and a second send would duplicate it.
+   */
   send(input: {
     payload: SessionManagerSendPayload;
     attachments?: CloudAgentAttachments;
@@ -1102,6 +1154,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const sendingMessageIdsAtom = atom<ReadonlySet<string>>(new Set<string>());
   const failedPromptAtom = atom<string | null>(null);
   const billingFailureAtom = atom<CustomerBillingFailure | null>(null);
+  const deliveredFailedPromptAtom = atom<DeliveredFailedPrompt | null>(null);
+  let deliveredFailedPromptSequence = 0;
   const fetchedSessionDataAtom = atom<FetchedSessionData | null>(null);
   /**
    * Catalog of kilo slash commands the wrapper has reported. Populated by
@@ -1411,15 +1465,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   const supersededInFlightBySession = new Map<KiloSessionId, Set<string>>();
   /**
-   * Prompt text a failed send removed from the transcript, keyed by the session
-   * that owned the optimistic row. The composer clears its draft when the row is
-   * inserted, so a failure has to hand the text back to the session that sent
-   * it — and `switchSession` may already have retargeted the manager to another
-   * session by then. The record is restored into the composer when that session
-   * becomes active again and is dropped by a send from it that the server
-   * accepts.
+   * The prompt a failed send removed from the transcript, and the message id it
+   * was sent under, keyed by the session that owned the optimistic row. The
+   * composer clears its draft when the row is inserted, so a failure has to hand
+   * the text back to the session that sent it — and `switchSession` may already
+   * have retargeted the manager to another session by then. The record is
+   * restored into the composer when that session becomes active again and is
+   * dropped by a send from it that the server accepts.
+   *
+   * The message id is what settles the one case the send call cannot: a failure
+   * whose response was lost although the server accepted the message. The
+   * confirmed row then arrives later (a live update or a page load) under that
+   * id, and the text the caller put back must be withdrawn instead of staying as
+   * a draft beside the delivered message (see `deliveredFailedPromptAtom`).
    */
-  const failedPromptBySession = new Map<KiloSessionId, string>();
+  const failedPromptBySession = new Map<KiloSessionId, { text: string; messageId: string }>();
   /**
    * Session ids the server answered as not available. Insertion order is the
    * eviction order (`rememberDeniedSession`).
@@ -1621,6 +1681,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(sendingMessageIdsAtom, new Set<string>());
     store.set(failedPromptAtom, null);
     store.set(billingFailureAtom, null);
+    store.set(deliveredFailedPromptAtom, null);
     store.set(fetchedSessionDataAtom, null);
     store.set(childSessionHydrationStatesAtom, new Map());
     store.set(childSessionErrorsAtom, new Map());
@@ -2550,13 +2611,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   /**
-   * Remember a prompt a failed send could not deliver, under the session that
-   * owned the optimistic row (see `failedPromptBySession`). Refreshes insertion
-   * order so the most recently touched sessions survive eviction.
+   * Remember a prompt a failed send could not deliver, and the message id it
+   * was sent under, for the session that owned the optimistic row (see
+   * `failedPromptBySession`). Refreshes insertion order so the most recently
+   * touched sessions survive eviction.
    */
-  function recordFailedPrompt(kiloSessionId: KiloSessionId, messageText: string): void {
+  function recordFailedPrompt(
+    kiloSessionId: KiloSessionId,
+    messageText: string,
+    messageId: string
+  ): void {
     failedPromptBySession.delete(kiloSessionId);
-    failedPromptBySession.set(kiloSessionId, messageText);
+    failedPromptBySession.set(kiloSessionId, { text: messageText, messageId });
     if (failedPromptBySession.size <= FAILED_PROMPT_MEMORY_MAX_SESSIONS) return;
     for (const key of failedPromptBySession.keys()) {
       if (key !== kiloSessionId && key !== activeSessionId) {
@@ -2564,6 +2630,95 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         return;
       }
     }
+  }
+
+  /**
+   * Sends whose outcome the transport could not confirm, keyed by the session
+   * that sent them: the transport reported an error, but the server may have
+   * accepted the message before the response was lost. The row for that message
+   * id then arrives later — a live update, or a later open's page — and the text
+   * the caller restored is a duplicate of the message that did arrive (see
+   * `settleDeliveredFailedPrompt`).
+   *
+   * The value is the prompt text, so a confirmation that arrives after this
+   * manager was destroyed can still retire its durable entry.
+   */
+  const pendingConfirmationBySession = new Map<KiloSessionId, Map<string, string>>();
+
+  /**
+   * The prompt a stored user row renders, or `null` while its text part has not
+   * arrived. The row's info and its parts land as separate storage changes, so
+   * an unresolved text part means "not yet": settling then would withdraw
+   * nothing and drop the record.
+   */
+  function confirmedUserPromptText(storage: JotaiSessionStorage, messageId: string): string | null {
+    const parts = storage.getParts(messageId);
+    if (parts.length === 0) return null;
+    const authoritative = parts.find(part => part.type === 'text' && part.synthetic !== true);
+    if (authoritative?.type === 'text') return authoritative.text;
+    const placeholder = parts.find(part => part.type === 'text');
+    return placeholder?.type === 'text' ? placeholder.text : '';
+  }
+
+  /**
+   * Remember a failed send whose outcome is unknown, under the session that
+   * owned the optimistic row (see `pendingConfirmationBySession`), and persist
+   * it so an open after this route is gone still settles it.
+   */
+  function rememberPendingConfirmation(
+    kiloSessionId: KiloSessionId,
+    messageId: string,
+    text: string
+  ): void {
+    const pending = pendingConfirmationBySession.get(kiloSessionId) ?? new Map<string, string>();
+    if (pending.has(messageId)) return;
+    pending.set(messageId, text);
+    pendingConfirmationBySession.set(kiloSessionId, pending);
+    config.persistPendingSendConfirmation?.(kiloSessionId, messageId, text);
+  }
+
+  /**
+   * Settles a failed send the server accepted anyway. The response was lost, so
+   * the failure reached the caller and it put the text back; the row for that
+   * message id arrives later. Withdrawing the text is what keeps the message in
+   * one place: the transcript owns it now, and a restored draft beside it would
+   * send a duplicate on the next press.
+   *
+   * A row under the failed send's id is the server's record, whatever its
+   * `synthetic` flag says: the client deleted its own optimistic row when the
+   * send failed, and the server stores the turn under the id the client sent
+   * (a queue synthesize carries it too). Only the active session publishes,
+   * because the atom speaks for the chat the user is looking at; another session
+   * keeps its record, and its own activation publishes it.
+   */
+  function settleDeliveredFailedPrompt(kiloSessionId: KiloSessionId): void {
+    const pending = pendingConfirmationBySession.get(kiloSessionId);
+    if (pending === undefined || pending.size === 0) return;
+    const storage = store.get(sessionStorageAtom);
+    if (storage === null) return;
+    for (const [messageId, text] of pending) {
+      const info = storage.getMessageInfo(messageId);
+      if (info === undefined || info.role !== 'user') continue;
+      const failed = failedPromptBySession.get(kiloSessionId);
+      const restored = failed?.messageId === messageId;
+      const rowText = restored ? failed.text : confirmedUserPromptText(storage, messageId);
+      if (rowText === null) continue;
+      pending.delete(messageId);
+      config.clearPendingSendConfirmation?.(kiloSessionId, messageId);
+      if (restored) failedPromptBySession.delete(kiloSessionId);
+      if (activeSessionId !== kiloSessionId) continue;
+      if (restored) {
+        store.set(failedPromptAtom, null);
+        store.set(billingFailureAtom, null);
+      }
+      deliveredFailedPromptSequence += 1;
+      store.set(deliveredFailedPromptAtom, {
+        messageId,
+        text: rowText,
+        sequence: deliveredFailedPromptSequence,
+      });
+    }
+    if (pending.size === 0) pendingConfirmationBySession.delete(kiloSessionId);
   }
 
   /**
@@ -2696,6 +2851,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const preserveTranscript = preserveTranscriptOnOpen(kiloSessionId);
     const expectedGeneration = beginSessionOpen(kiloSessionId);
     const resolvedFailures = seedResolvedDeliveryFailures(kiloSessionId, expectedGeneration);
+    seedPendingSendConfirmations(kiloSessionId, expectedGeneration);
 
     const open = startCleanSessionOpen(
       kiloSessionId,
@@ -2807,6 +2963,29 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     return resolvedFailures;
   }
 
+  function seedPendingSendConfirmations(
+    kiloSessionId: KiloSessionId,
+    expectedGeneration: number
+  ): void {
+    const pending = pendingConfirmationBySession.get(kiloSessionId) ?? new Map<string, string>();
+    pendingConfirmationBySession.set(kiloSessionId, pending);
+    if (!config.readPendingSendConfirmations) return;
+    // Not awaited: the first page arrives on its own schedule, and the
+    // transcript subscription settles whatever is pending when it does.
+    void config
+      .readPendingSendConfirmations(kiloSessionId)
+      .then(entries => {
+        if (expectedGeneration !== switchGeneration) return;
+        for (const entry of entries) {
+          pending.set(entry.messageId, entry.text);
+        }
+        settleDeliveredFailedPrompt(kiloSessionId);
+      })
+      .catch(() => {
+        // An unreadable memory is a miss, never a failed open.
+      });
+  }
+
   /** Resets the store for the new session and captures this open's flags. */
   function startCleanSessionOpen(
     kiloSessionId: KiloSessionId,
@@ -2820,7 +2999,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     remoteOptimisticIds.clear();
     // A prompt this session failed to deliver is this session's draft: restore
     // it so returning to the chat offers the retry.
-    store.set(failedPromptAtom, failedPromptBySession.get(kiloSessionId) ?? null);
+    store.set(failedPromptAtom, failedPromptBySession.get(kiloSessionId)?.text ?? null);
     store.set(rootSessionIdAtom, kiloSessionId);
     store.set(isLoadingAtom, true);
     // A retry that keeps the transcript mounted must also keep advertising that
@@ -3723,23 +3902,43 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         mountedStorage.deleteMessage(messageId);
       }
       remoteOptimisticIds.delete(messageId);
+      const detail = formatErrorDetail(err);
+      // Only a transport-level answer leaves the outcome unknown: the request
+      // may have reached the server, so the confirmed row can still arrive and
+      // the text the caller restores must leave again when it does. A classified
+      // refusal (credits, authorization, conflict, service) is the server's own
+      // answer to this send, so no row will ever confirm it.
+      const outcomeUnknown =
+        detail.code === 'connection-failed' ||
+        detail.code === 'connection-lost' ||
+        detail.code === 'generic-error';
       if (insertedOptimisticRow && kiloSessionId) {
         if (delivered) {
           failedPromptBySession.delete(kiloSessionId);
         } else {
-          recordFailedPrompt(kiloSessionId, messageText);
+          recordFailedPrompt(kiloSessionId, messageText, messageId);
           forgetCachedOptimisticRow(kiloSessionId, messageId);
+          if (outcomeUnknown) {
+            rememberPendingConfirmation(kiloSessionId, messageId, messageText);
+          }
         }
       }
-      if (!stillOnSendingChat) return false;
+      // The server accepted the prompt and only the response was lost, so the
+      // send succeeded: the confirmed row in the transcript owns the text. It is
+      // not a draft the caller may put back — a client that restored it beside
+      // the confirmed bubble showed the same message twice, and a second Send
+      // duplicated it. The atom writes speak for the chat the user is looking
+      // at, so they stay out of the switched-away case (see above).
       if (delivered) {
-        store.set(failedPromptAtom, null);
-        store.set(billingFailureAtom, null);
-        return false;
+        if (stillOnSendingChat) {
+          store.set(failedPromptAtom, null);
+          store.set(billingFailureAtom, null);
+        }
+        return true;
       }
+      if (!stillOnSendingChat) return false;
       store.set(failedPromptAtom, messageText);
       store.set(billingFailureAtom, parseCustomerBillingFailure(err));
-      const detail = formatErrorDetail(err);
       config.onSendFailed?.(messageText, detail.message, err);
       // A connection-level failure is what the "Agent connection lost" line
       // already states, so a disconnected agent keeps that line instead of
@@ -4068,7 +4267,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     return currentSession.exitRemoteSession();
   }
 
+  /**
+   * Settles a failed send once its confirmed row lands. The transcript is the
+   * only place the confirmation appears — a live `message.updated`, a page
+   * load, or a cache restore all reach it — so that atom is the one seam that
+   * covers every arrival path. The listener returns immediately unless the
+   * active session still has a send whose outcome is unknown, so a healthy
+   * transcript pays one map lookup per change.
+   */
+  const unsubDeliveredFailedPrompt = store.sub(messagesListAtom, () => {
+    const sessionId = activeSessionId;
+    if (sessionId === null) return;
+    settleDeliveredFailedPrompt(sessionId);
+  });
+
   function destroy(): void {
+    unsubDeliveredFailedPrompt();
     cacheActiveSessionPage();
     for (const cleanup of metadataRecoveryCleanups) cleanup();
     metadataRecoveryCleanups = [];
@@ -4087,6 +4301,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     resolvedDeliveryFailuresBySession.clear();
     supersededInFlightBySession.clear();
     failedPromptBySession.clear();
+    pendingConfirmationBySession.clear();
     deniedSessionIds.clear();
     activeSessionId = null;
     activeSessionType = null;
@@ -4170,6 +4385,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       sendingMessageIds: sendingMessageIdsAtom,
       failedPrompt: failedPromptAtom,
       billingFailure: billingFailureAtom,
+      deliveredFailedPrompt: deliveredFailedPromptAtom,
       fetchedSessionData: fetchedSessionDataAtom,
       availableCommands: availableCommandsAtom,
       availableCommandsCatalogStatus: availableCommandsCatalogStatusAtom,
@@ -4208,6 +4424,8 @@ export type {
   StandaloneSuggestion,
   ChildSessionHydrationState,
   StoredMessage,
+  DeliveredFailedPrompt,
+  PendingSendConfirmation,
   FetchedSessionData,
   AssociatedPrData,
   PrepareInput,

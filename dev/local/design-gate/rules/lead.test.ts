@@ -116,3 +116,84 @@ test('leading-gap: a painted first block at the padding passes in a content box 
     []
   );
 });
+
+/**
+ * A platform dump: the frames of a vertical scroller, its content and the first
+ * block, with no styles at all. `uiautomator` and `agent-device` report no
+ * padding, so `CenteredState`'s measured `paddingTop`/`paddingBottom` are
+ * invisible and the block's distance from the content's top edge is all the
+ * rule can read. Measured on the Agents tab: the scroller and its content span
+ * y 174.48–914.29, the centred block starts at 342.86 and ends at 571.81.
+ */
+function platformScreen(options: { content?: Rect; block: Rect; holder?: Rect; text: Rect }) {
+  const nodes: ProbeNode[] = [
+    { parent: 0, tag: 'ScrollView', rect: [0, 174.48, 400, 739.81] },
+    { parent: 1, tag: 'ViewGroup', rect: options.content ?? [0, 174.48, 400, 739.81] },
+    { parent: 2, tag: 'ViewGroup', rect: options.block },
+    ...(options.holder ? [{ parent: 3, tag: 'ViewGroup', rect: options.holder } as ProbeNode] : []),
+    {
+      parent: options.holder ? 4 : 3,
+      tag: 'Paragraph',
+      rect: options.text,
+      text: 'Nothing running right now',
+    } as ProbeNode,
+  ];
+  return checkScreen(tree(nodes, { source: 'uiautomator' })).filter(
+    finding => finding.rule === 'leading-gap'
+  );
+}
+
+test('leading-gap: a filled body that centres its first block passes on a platform dump', () => {
+  assert.deepEqual(
+    platformScreen({
+      block: [0, 342.86, 400, 228.95],
+      text: [112.38, 342.86, 187.05, 24.76],
+    }),
+    []
+  );
+});
+
+test('leading-gap: a first block pushed down in a content that runs past the viewport is an error', () => {
+  const [finding] = platformScreen({
+    content: [0, 174.48, 400, 1200],
+    block: [14, 200, 372, 120],
+    text: [14, 200, 100, 20],
+  });
+  assert.equal(finding?.measured, 25.52);
+  assert.match(finding?.message ?? '', /top margin/);
+});
+
+test('leading-gap: a centred body whose block holds its text low is placement, not a hole', () => {
+  // The reported Agents-tab shape: the block is centred in a filled scroller and
+  // a box inside it carries the paragraph at its bottom. The gap belongs to the
+  // state's placement, so the rule must not report a control's touch frame.
+  assert.deepEqual(
+    platformScreen({
+      block: [0, 342.86, 400, 228.95],
+      holder: [0, 342.86, 400, 120],
+      text: [10, 440, 100, 20],
+    }),
+    []
+  );
+});
+
+test('leading-gap: a block near the bottom of a filled body is still an error', () => {
+  // A margin can push the first block down without centring it: more air above
+  // the block than below it is a hole under the title, not placement.
+  const [finding] = platformScreen({
+    block: [14, 600, 372, 120],
+    text: [14, 600, 100, 20],
+  });
+  assert.equal(finding?.measured, 425.52);
+  assert.match(finding?.message ?? '', /top margin/);
+});
+
+test('leading-gap: a taller box inside the first block is an error on a platform dump', () => {
+  const [finding] = platformScreen({
+    block: [0, 174.48, 400, 350],
+    holder: [0, 174.48, 400, 300],
+    text: [10, 400, 100, 20],
+  });
+  assert.equal(finding?.element.text, 'Nothing running right now');
+  assert.match(finding?.message ?? '', /hitSlop/);
+});

@@ -508,6 +508,19 @@ describe('MessageBubble failure footer', () => {
     expect(footerOf(tree)).not.toBeNull();
   });
 
+  it('draws no footer when the group states the failure and no action can render', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-prep-empty'), {
+      deliveryState: { status: 'failed', error: '', reason: 'execution' },
+      failureStatedByPreparation: true,
+      retryAvailable: false,
+    });
+
+    // Nothing but a padded block would be left above the group, so the footer
+    // is skipped rather than drawn empty.
+    expect(footerOf(tree)).toBeNull();
+    expect(findText(tree, t => t === 'Response failed')).toBe(false);
+  });
+
   it('keeps a classified statement on a turn whose preparation also failed', async () => {
     const tree = await renderBubbleWithHandlers(userMessage('m-prep-credits'), {
       deliveryState: { status: 'failed', error: '', reason: 'credits' },

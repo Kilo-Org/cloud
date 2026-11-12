@@ -337,10 +337,10 @@ export function messageFailureLabel(
  * spent balance, an aborted or overflowing turn — names something the reader
  * cannot get anywhere else, so it is not generic.
  */
-const GENERIC_RESPONSE_FAILURE_DETAIL_KEYS: readonly (string | null)[] = [
+const GENERIC_RESPONSE_FAILURE_DETAIL_KEYS: ReadonlySet<string | null> = new Set([
   null,
   'agentChat.messageFailure.deliveryExecution',
-];
+]);
 
 /**
  * Whether this failure states only that the response failed. A question whose
@@ -354,7 +354,7 @@ export function isGenericResponseFailure(
 ): boolean {
   return (
     failure.titleKey === 'agentChat.messageFailure.assistantTitle' &&
-    GENERIC_RESPONSE_FAILURE_DETAIL_KEYS.includes(failure.detailKey)
+    GENERIC_RESPONSE_FAILURE_DETAIL_KEYS.has(failure.detailKey)
   );
 }
 

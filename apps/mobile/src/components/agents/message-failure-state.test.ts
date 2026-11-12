@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- The failure selector and the every-catalog label check share one subject. */
 import { describe, expect, it } from 'vitest';
 
-import { type MessageDeliveryState, type MessageInfo } from '@kilocode/cloud-agent-sdk';
+import { type MessageInfo } from '@kilocode/cloud-agent-sdk';
 
 import { CATALOG_LOADERS } from '@/i18n/catalogs';
 import { i18n } from '@/i18n';

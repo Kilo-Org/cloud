@@ -22,8 +22,8 @@ import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y
 import { MessageErrorBoundary } from './message-error-boundary';
 import { MessageLongPressProvider } from './message-long-press-context';
 import {
-  type MessageDeliveryStatement,
   isGenericResponseFailure,
+  type MessageDeliveryStatement,
   messageFailureLabel,
   selectMessageFailure,
 } from './message-failure-state';
@@ -210,6 +210,14 @@ function MessageBubbleImpl({
           onCopyToComposer !== undefined ||
           (failure.canAddCredits && onAddCredits !== undefined)
         : onRetryMessage !== undefined || (failure.canAddCredits && onAddCredits !== undefined)));
+  // The actions this row would draw, resolved once: the footer is skipped when
+  // the preparation group states the failure and no action is left, so a blank
+  // padded block never sits above that group.
+  const retryAction = failure?.canRetry === true ? onRetryMessage : undefined;
+  const creditsAction = failure?.canAddCredits === true ? onAddCredits : undefined;
+  const copyAction = failure?.canCopy === true && copyText !== '' ? onCopyToComposer : undefined;
+  const actionRenders =
+    retryAction !== undefined || creditsAction !== undefined || copyAction !== undefined;
   // The footer is the failed turn's status, so it sits in the column that turn
   // occupies rather than the row that carries it: a message that never reached
   // the agent is the user's own row, and its title, detail and action row stay
@@ -224,7 +232,7 @@ function MessageBubbleImpl({
   // interface's own start edge, as the assistant rows around them do.
   const trailingFailure = failure?.side === 'user';
   const failureFooter =
-    failure !== null && relevantHandlerWired ? (
+    failure !== null && relevantHandlerWired && (!statedByPreparation || actionRenders) ? (
       /* The actions close the turn rather than opening the next one: the space
          under them is the gap between turns, so a Retry is never read as part of
          the message that follows it. 24 dp is more than twice the gap between a
@@ -265,13 +273,13 @@ function MessageBubbleImpl({
           </>
         )}
         <View className="flex-row gap-2">
-          {failure.canRetry && onRetryMessage ? (
+          {retryAction ? (
             <Button
               variant="outline"
               size="sm"
               className={STATE_ACTION_CLASS}
               onPress={() => {
-                onRetryMessage(message);
+                retryAction(message);
               }}
               accessibilityRole="button"
               accessibilityLabel={t('common.retry')}
@@ -279,7 +287,7 @@ function MessageBubbleImpl({
               <Text>{t('common.retry')}</Text>
             </Button>
           ) : null}
-          {failure.canAddCredits && onAddCredits ? (
+          {creditsAction ? (
             // The failure's one recovery action, so it takes the accent surface
             // the person's own bubble and the enabled send control fill with,
             // in both schemes; the theme's `--primary` is olive in light, which
@@ -290,20 +298,20 @@ function MessageBubbleImpl({
               variant="default"
               size="sm"
               className={cn(STATE_ACTION_CLASS, 'bg-accent-soft')}
-              onPress={onAddCredits}
+              onPress={creditsAction}
               accessibilityRole="button"
               accessibilityLabel={t('addCredits.cta')}
             >
               <Text className="text-accent-soft-foreground">{t('addCredits.cta')}</Text>
             </Button>
           ) : null}
-          {failure.canCopy && onCopyToComposer && copyText !== '' ? (
+          {copyAction ? (
             <Button
               variant="outline"
               size="sm"
               className={STATE_ACTION_CLASS}
               onPress={() => {
-                onCopyToComposer(copyText);
+                copyAction(copyText);
               }}
               accessibilityRole="button"
               accessibilityLabel={t('agentChat.messageBubble.copyToComposer')}

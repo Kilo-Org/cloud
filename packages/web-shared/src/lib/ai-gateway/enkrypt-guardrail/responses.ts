@@ -178,8 +178,9 @@ export function enkryptGuardrailRejectionResponse(
 }
 
 /**
- * The response that replaces the model's after the output guardrail rejected it. A streamed request has not received any headers yet, but its client expects a stream, so the
- * rejection is a well-formed stream with one error event.
+ * The response that replaces the model's after the output guardrail rejected it. A streamed
+ * request has not received any headers yet, but its client expects a stream, so the rejection is a
+ * well-formed stream with one error event.
  */
 export function enkryptOutputGuardrailRejectionResponse(
   kind: GatewayChatApiKind,

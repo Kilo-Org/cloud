@@ -19,8 +19,8 @@ describe('session sharing availability', () => {
     }
   });
 
-  it('keeps v1 sharing available, including legacy pages without a source field', () => {
-    for (const history of [{ source: { version: 'v1' as const } }, {}]) {
+  it('keeps v1 sharing available, including legacy sessions without a source or registration', () => {
+    for (const history of [{ source: { version: 'v1' as const } }, {}, null]) {
       expect(getSessionSharingDisabledReason({ ...cloudSession, history })).toBeUndefined();
     }
   });
@@ -31,8 +31,8 @@ describe('session sharing availability', () => {
     );
   });
 
-  it('does not enable sharing when history is missing or unavailable', () => {
-    for (const state of [{ history: null }, { isError: true }, { history: {}, isError: true }]) {
+  it('does not enable sharing when the history check fails', () => {
+    for (const state of [{ isError: true }, { history: {}, isError: true }]) {
       expect(getSessionSharingDisabledReason({ ...cloudSession, ...state })).toContain(
         'could not be checked'
       );

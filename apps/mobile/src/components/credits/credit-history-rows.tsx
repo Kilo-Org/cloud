@@ -110,6 +110,9 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
         {channel === 'card' && (
           <Pressable
             className="w-5 items-center justify-center active:opacity-70"
+            // The glyph is 14 dp; the slop gives the action a 44 dp touch box
+            // without widening the column the amount aligns against.
+            hitSlop={15}
             disabled={isOpeningReceipt}
             accessibilityRole="button"
             accessibilityState={{ busy: isOpeningReceipt }}

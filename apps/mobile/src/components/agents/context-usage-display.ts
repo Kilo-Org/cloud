@@ -180,14 +180,15 @@ export function getHeaderPillContent({
       usageUnavailable: !loading,
     };
   }
-  // A transcript without usage. The pill keeps the track-only ring and, when
-  // this screen already knows it, the session's cost, and never a dash standing
-  // in for a value that has not arrived.
+  // A transcript without usage. The pill keeps the track-only ring, the cost
+  // slot and the reserved percentage slot the placeholder showed, so the cost
+  // arriving fills the row in place instead of shrinking the pill and moving
+  // the title beside it. A value that has not arrived paints nothing.
   return {
-    primary: costText,
-    primarySlot: costText === null ? 'none' : 'value',
-    secondary: null,
-    costSlot: 'none',
+    primary: null,
+    primarySlot: 'reserved',
+    secondary: costText,
+    costSlot: costText === null ? 'none' : 'label',
     tone: 'neutral',
     arcFraction: 0,
     interactive: false,

@@ -182,7 +182,7 @@ describe('SessionContextMetrics', () => {
     expect(
       texts.some(el => {
         const children = (el.props as { children?: unknown }).children;
-        return children === '$0.15';
+        return String(children).includes('$0.15');
       })
     ).toBe(true);
     expect(root.type).not.toBe('Pressable');
@@ -283,9 +283,8 @@ describe('SessionContextMetrics', () => {
     expect(
       (root.props as { accessibilityElementsHidden?: boolean }).accessibilityElementsHidden
     ).toBeUndefined();
-    // A transcript that reports neither usage nor cost keeps the ring alone:
-    // there is no unresolved value to hold a slot for.
-    expect(findAll(root, el => el.type === 'Text')).toHaveLength(0);
+    // The placeholder slot's painting is covered in
+    // `session-context-metrics-unknown-window.test.ts`.
     const ring = findAll(root, el => el.type === 'ContextUsageRing')[0];
     expect(ring).toBeDefined();
     if (ring == null) {

@@ -47,7 +47,7 @@ function pill(args: {
 
 const trackOnly: HeaderPillContent = {
   primary: null,
-  primarySlot: 'none',
+  primarySlot: 'reserved',
   secondary: null,
   costSlot: 'none',
   tone: 'neutral',
@@ -269,12 +269,12 @@ describe('getHeaderPillContent', () => {
     });
   });
 
-  it('shows cost only, not interactive, arc 0 when transcript exists without context', () => {
+  it('shows cost only, filling the placeholder slots, when transcript lacks context', () => {
     expect(pill({ totalCostMicrodollars: 80_000, hasMessages: true })).toEqual({
-      primary: '$0.08',
-      primarySlot: 'value',
-      secondary: null,
-      costSlot: 'none',
+      primary: null,
+      primarySlot: 'reserved',
+      secondary: '$0.08',
+      costSlot: 'label',
       tone: 'neutral',
       arcFraction: 0,
       interactive: false,
@@ -606,6 +606,7 @@ describe('pure integration fallback', () => {
     const result = pill({ totalCostMicrodollars: 80_000, hasMessages: true });
     expect(result.interactive).toBe(false);
     expect(result.arcFraction).toBe(0);
-    expect(result.primary).toBe('$0.08');
+    expect(result.primary).toBeNull();
+    expect(result.secondary).toBe('$0.08');
   });
 });

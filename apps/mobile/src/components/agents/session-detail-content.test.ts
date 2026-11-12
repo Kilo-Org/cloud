@@ -1588,11 +1588,14 @@ describe('session detail header right cluster', () => {
     const { renderer } = await mountDetails([priced]);
     const expected = formatSessionCostBadge(1234.56 * 1_000_000);
     expect(expected).not.toBeNull();
+    if (expected === null) {
+      throw new Error('expected a cost label');
+    }
     const metrics = renderer.root.findByProps({ testID: 'session-context-metrics' });
     const cost = metrics.find(
       node =>
         Object.is(node.type, 'Text') &&
-        node.children.some(child => typeof child === 'string' && child === expected)
+        node.children.some(child => typeof child === 'string' && child.includes(expected))
     );
     expect(cost.props.numberOfLines).toBe(1);
     expect(cost.props.className).toContain('shrink');

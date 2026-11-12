@@ -13,7 +13,7 @@ export type KiloEmbeddingModelCatalog = {
   aliases: Record<string, string>;
 };
 
-export const KILO_DEFAULT_EMBEDDING_MODEL = 'openai/text-embedding-3-small';
+export const KILO_DEFAULT_EMBEDDING_MODEL = 'mistralai/mistral-embed-2312';
 
 // Catalog snapshot checked 2026-11-12 against https://openrouter.ai/api/v1/embeddings/models.
 export const KILO_EMBEDDING_MODELS = [
@@ -26,14 +26,14 @@ export const KILO_EMBEDDING_MODELS = [
     dimensionMode: 'fixed',
   },
   {
-    id: 'mistralai/mistral-embed-2312',
+    id: KILO_DEFAULT_EMBEDDING_MODEL,
     name: 'Mistral Embed 2312',
     dimension: 1024,
     scoreThreshold: 0.35,
     dimensionMode: 'fixed',
   },
   {
-    id: KILO_DEFAULT_EMBEDDING_MODEL,
+    id: 'openai/text-embedding-3-small',
     name: 'OpenAI Text Embedding 3 Small',
     dimension: 1536,
     scoreThreshold: 0.4,
@@ -251,7 +251,7 @@ export const KILO_EMBEDDING_MODEL_ALIASES: Record<string, string> = {
   'text-embedding-3-large': 'openai/text-embedding-3-large',
   'text-embedding-ada-002': 'openai/text-embedding-ada-002',
   'codestral-embed-2505': 'mistralai/codestral-embed-2505',
-  'mistral-embed-2312': 'mistralai/mistral-embed-2312',
+  'mistral-embed-2312': KILO_DEFAULT_EMBEDDING_MODEL,
 };
 
 export const KILO_EMBEDDING_MODEL_CATALOG = {

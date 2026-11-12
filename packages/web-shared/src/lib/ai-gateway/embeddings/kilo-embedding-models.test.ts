@@ -50,7 +50,13 @@ describe('Kilo embedding model catalog', () => {
 
     expect(new Set(modelIds).size).toBe(modelIds.length);
     expect(modelIds.filter(id => id === KILO_DEFAULT_EMBEDDING_MODEL)).toHaveLength(1);
-    expect(KILO_DEFAULT_EMBEDDING_MODEL).toBe('openai/text-embedding-3-small');
+    expect(KILO_DEFAULT_EMBEDDING_MODEL).toBe('mistralai/mistral-embed-2312');
+    expect(getKiloEmbeddingModel(KILO_DEFAULT_EMBEDDING_MODEL)).toMatchObject({
+      id: 'mistralai/mistral-embed-2312',
+      dimension: 1024,
+      scoreThreshold: 0.35,
+      dimensionMode: 'fixed',
+    });
   });
 
   it('points every alias to an existing catalog model', () => {

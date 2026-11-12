@@ -2603,7 +2603,7 @@
     "thisDevice": "Ngwaọrụ a",
     "viewProfile": "Lelee profaịlụ",
     "signOutThisDevice": "Pụọ na ngwaọrụ a",
-    "signOutSessionLabel": "Pụọ na {{device}}, a banyere na {{signedIn}}",
+    "signOutSessionLabel": "Pụọ na {{device}}, a banyere na {{signedIn}}, A hụrụ ikpeazụ na {{lastSeen}}",
     "sessionSignedOut": "Apụrụ na nnọkọ ahụ.",
     "signOutThisDeviceTitle": "Pụọ na ngwaọrụ a?",
     "signOutThisSessionTitle": "Pụọ na nnọkọ a?",

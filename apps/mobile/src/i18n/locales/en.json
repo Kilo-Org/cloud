@@ -2670,7 +2670,7 @@
     "thisDevice": "This device",
     "viewProfile": "View profile",
     "signOutThisDevice": "Sign out this device",
-    "signOutSessionLabel": "Sign out {{device}}, signed in {{signedIn}}",
+    "signOutSessionLabel": "Sign out {{device}}, signed in {{signedIn}}, last seen {{lastSeen}}",
     "sessionSignedOut": "Session signed out.",
     "signOutThisDeviceTitle": "Sign out this device?",
     "signOutThisSessionTitle": "Sign out this session?",

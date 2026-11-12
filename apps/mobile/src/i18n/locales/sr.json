@@ -2655,7 +2655,7 @@
     "thisDevice": "Ovaj uređaj",
     "viewProfile": "Prikaži profil",
     "signOutThisDevice": "Odjavi ovaj uređaj",
-    "signOutSessionLabel": "Odjavi uređaj {{device}}, prijava: {{signedIn}}",
+    "signOutSessionLabel": "Odjavi uređaj {{device}}, prijava: {{signedIn}}, Poslednja aktivnost: {{lastSeen}}",
     "sessionSignedOut": "Sesija je odjavljena.",
     "signOutThisDeviceTitle": "Odjaviti ovaj uređaj?",
     "signOutThisSessionTitle": "Odjaviti ovu sesiju?",

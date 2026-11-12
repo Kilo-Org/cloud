@@ -2603,7 +2603,7 @@
     "thisDevice": "Gailu hau",
     "viewProfile": "Ikusi profila",
     "signOutThisDevice": "Itxi saioa gailu honetan",
-    "signOutSessionLabel": "Itxi saioa: {{device}}, saio-hasiera: {{signedIn}}",
+    "signOutSessionLabel": "Itxi saioa: {{device}}, saio-hasiera: {{signedIn}}, Azken jarduera: {{lastSeen}}",
     "sessionSignedOut": "Saioa itxi da.",
     "signOutThisDeviceTitle": "Itxi saioa gailu honetan?",
     "signOutThisSessionTitle": "Itxi saio hau?",

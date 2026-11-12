@@ -2656,7 +2656,7 @@
     "webBrowser": "Navegador web",
     "viewProfile": "Mostra el perfil",
     "signOutThisDevice": "Tanca la sessió d'aquest dispositiu",
-    "signOutSessionLabel": "Tanca la sessió de {{device}}, inici de sessió: {{signedIn}}",
+    "signOutSessionLabel": "Tanca la sessió de {{device}}, inici de sessió: {{signedIn}}, Última activitat: {{lastSeen}}",
     "sessionSignedOut": "Sessió tancada.",
     "signOutThisDeviceTitle": "Vols tancar la sessió d'aquest dispositiu?",
     "signOutThisSessionTitle": "Vols tancar aquesta sessió?",

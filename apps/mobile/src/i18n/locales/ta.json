@@ -2603,7 +2603,7 @@
     "thisDevice": "இந்தச் சாதனம்",
     "viewProfile": "சுயவிவரத்தைப் பார்க்கவும்",
     "signOutThisDevice": "இந்தச் சாதனத்திலிருந்து வெளியேறவும்",
-    "signOutSessionLabel": "{{device}}-இலிருந்து வெளியேறவும், உள்நுழைந்தது: {{signedIn}}",
+    "signOutSessionLabel": "{{device}}-இலிருந்து வெளியேறவும், உள்நுழைந்தது: {{signedIn}}, கடைசியாகச் செயல்பட்டது: {{lastSeen}}",
     "sessionSignedOut": "அமர்விலிருந்து வெளியேறப்பட்டது.",
     "signOutThisDeviceTitle": "இந்தச் சாதனத்திலிருந்து வெளியேறவா?",
     "signOutThisSessionTitle": "இந்த அமர்விலிருந்து வெளியேறவா?",

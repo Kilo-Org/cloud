@@ -2603,7 +2603,7 @@
     "thisDevice": "دا وسیله",
     "viewProfile": "پروفایل وګورئ",
     "signOutThisDevice": "له دې وسیلې ووځئ",
-    "signOutSessionLabel": "له {{device}} ووځئ، د ننوتلو وخت: {{signedIn}}",
+    "signOutSessionLabel": "له {{device}} ووځئ، د ننوتلو وخت: {{signedIn}}، وروستی لیدل شوی وخت: {{lastSeen}}",
     "sessionSignedOut": "له ناستې ووتل شو.",
     "signOutThisDeviceTitle": "له دې وسیلې حساب وباسم؟",
     "signOutThisSessionTitle": "له دې ناستې ووځم؟",

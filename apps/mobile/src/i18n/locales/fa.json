@@ -2603,7 +2603,7 @@
     "thisDevice": "این دستگاه",
     "viewProfile": "مشاهدهٔ پروفایل",
     "signOutThisDevice": "خروج از این دستگاه",
-    "signOutSessionLabel": "خروج از {{device}}، ورود در {{signedIn}}",
+    "signOutSessionLabel": "خروج از {{device}}، ورود در {{signedIn}}، آخرین بازدید {{lastSeen}}",
     "sessionSignedOut": "خروج از نشست انجام شد.",
     "signOutThisDeviceTitle": "از حساب خود در این دستگاه خارج می‌شوید؟",
     "signOutThisSessionTitle": "از این نشست خارج می‌شوید؟",

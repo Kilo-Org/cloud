@@ -346,6 +346,83 @@ describe('EventServiceClient', () => {
     }
   });
 
+  it('stops at the first refused ticket when no onUnauthorized handler is configured', async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const statuses = [401, 403];
+      let ticketRequests = 0;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          const status = statuses[ticketRequests % statuses.length];
+          ticketRequests++;
+          return new Response(null, { status });
+        })
+      );
+
+      const client = new EventServiceClient({
+        url: 'ws://localhost:8080',
+        getToken: () => Promise.resolve('h.p.s'),
+      });
+
+      await client.connect();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(allMockWs).toHaveLength(0);
+      expect(client.isConnected()).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(allMockWs).toHaveLength(0);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      warn.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops after the recovery bound when refused tickets alternate 401 and 403', async () => {
+    vi.useFakeTimers();
+    try {
+      const statuses = [401, 403];
+      let ticketRequests = 0;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          const status = statuses[ticketRequests % statuses.length];
+          ticketRequests++;
+          return new Response(null, { status });
+        })
+      );
+      const retryAuth = (): 'retry' => 'retry';
+      const onUnauthorized = vi.fn(retryAuth);
+
+      const client = new EventServiceClient({
+        url: 'ws://localhost:8080',
+        getToken: () => Promise.resolve('h.p.s'),
+        onUnauthorized,
+      });
+
+      await client.connect();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(allMockWs).toHaveLength(0);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps reconnecting after repeated pre-open failures', async () => {
     vi.useFakeTimers();
     const reconnectDelay = vi.spyOn(Math, 'random').mockReturnValue(1);

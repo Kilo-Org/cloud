@@ -602,6 +602,24 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(picker(ui).props.accessibilityHint).toBe('Select account');
   });
 
+  it('keeps the picker on a failed refetch that still has cached memberships', async () => {
+    storage.read.mockResolvedValue('org-a');
+    const ui = await mount({ failurePlacement: 'row' });
+    await waitFor(() => texts(ui).includes(name));
+    // A background refetch fails while the memberships the picker needs are
+    // still cached: the list is usable, so the row stays the picker and opens
+    // the sheet, and the one-row placement only stops adding failure rows below.
+    list.mockRejectedValue(new Error('offline'));
+    await act(async () => {
+      await ui.queryClient.invalidateQueries();
+    });
+    await waitFor(() => texts(ui).includes(name));
+    expect(texts(ui)).not.toContain('Retry');
+    expect(picker(ui).props.accessibilityHint).toBe('Select account');
+    await openSheet(ui);
+    expect(rows(ui).map(row => row.label)).toEqual(['Personal', name]);
+  });
+
   it('keeps the stored choice failure in the control even when the list failure moves out', async () => {
     // Nothing else on the screen reaches the provider's own read/write failure,
     // so that message and its Retry stay wherever the control is mounted.

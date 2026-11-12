@@ -135,16 +135,18 @@ const FIELD_TRIGGER_CLASS =
  *
  * - `rows` (default) stacks the message and a Retry under the label, for a
  *   screen whose body has no other recovery for that query.
- * - `row` keeps the control one row tall and makes that row the retry: the
- *   label becomes the message and a press refetches the list. Nothing is added
- *   below, so the header keeps its height in every state.
+ * - `row` keeps the control one row tall and, while there is no usable list,
+ *   makes that row the retry: the label becomes the message and a press
+ *   refetches the list. A failed refetch that still has cached memberships
+ *   keeps the picker row, because the picker works from them. Nothing is added
+ *   below either way, so the header keeps its height in every state.
  * - `none` draws neither, for a surface that states the failure and retries it
  *   elsewhere. Two rows here made a fixed header grow by their combined height,
  *   so the whole body moved down while the list failed and back up when it
  *   recovered (the pending-to-error jump).
  *
- * The provider's own stored-choice read or write failure keeps its `rows` form
- * under every placement: no other surface reaches it.
+ * The provider's own stored-choice read or write failure always renders the
+ * `rows` form, whatever the placement: no other surface reaches it.
  */
 export function ContextControl({
   scope,
@@ -215,10 +217,14 @@ export function ContextControl({
   }
   // The one-row placement moves the message and the action into the control's
   // own row: no message line and no second Retry row, so the header keeps its
-  // height. A failure without a retry action (an unavailable organization) has
-  // nothing to press, so it keeps the default rows.
-  const rowIsRetry = failurePlacement === 'row' && errorMessage !== null && retry !== undefined;
-  const placedMessage = rowIsRetry ? null : errorMessage;
+  // height. It applies only while there is no usable list. A failed background
+  // refetch leaves cached memberships present, and the picker still works from
+  // them, so that frame keeps the picker row and simply adds no failure rows.
+  // The provider's own stored-choice failure keeps the default rows under every
+  // placement, because no other surface reaches it.
+  const rowIsRetry =
+    failurePlacement === 'row' && !providerError && retry !== undefined && orgs === undefined;
+  const placedMessage = providerError || failurePlacement === 'rows' ? errorMessage : null;
   const retryBusy =
     providerError === 'save' ? context.isSaving : !providerError && organizations.isFetching;
   const disabled = !isResolved || orgs === undefined;

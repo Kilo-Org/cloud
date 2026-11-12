@@ -104,9 +104,8 @@ export type HeaderPillContent = {
 type PillCostSlot = 'label' | 'loading' | 'unreported';
 
 /**
- * The widest reading each value slot has to hold: the percentage at `100` and a
- * cost badge in its widest form, both read through the formatters the painted
- * values use so the slot holds at every font scale and in every locale.
+ * The widest reading each value slot reserves, read through the formatters the
+ * painted values use so the slot holds at every font scale and in every locale.
  *
  * The pill lays each slot out at this width and paints the reading over it.
  * A slot therefore never collapses for a value that has not arrived, and a
@@ -114,10 +113,17 @@ type PillCostSlot = 'label' | 'loading' | 'unreported';
  * pill — and the title and trailing control beside it — after the screen
  * settled.
  *
- * A badge has two shapes: four decimals below half a cent and two at or above
- * it, so the sizer is the wider of the two rather than a guess at one of them.
- * The four-decimal shape carries one more digit and is the wider of the two at
- * the same type size.
+ * The percentage reserves a whole-window reading. The cost reserves a badge in
+ * both of its shapes, since one carries two decimals at or above half a cent and
+ * the other four decimals below it, so the reserve is the wider of the two.
+ *
+ * The reserve stops there on purpose. A total wide enough to need a grouping
+ * separator paints past it and truncates inside its one line, the way a long
+ * total already truncates under the header's cap. Reserving the grouped form
+ * was measured against the compact window: it leaves the header's title row
+ * 5 dp narrower than the title's own badge needs, which clips that badge — a
+ * defect the design gate reports as an error, on every screen, not only on a
+ * session that happens to spend four figures.
  */
 const COST_SLOT_SIZER_TWO_DECIMALS_MICRODOLLARS = 12_340_000;
 const COST_SLOT_SIZER_FOUR_DECIMALS_MICRODOLLARS = 4_999;

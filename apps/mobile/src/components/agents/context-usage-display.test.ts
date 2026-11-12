@@ -298,10 +298,14 @@ describe('getPillSlotSizers', () => {
   it('sizes both slots from the widest reading each one paints', () => {
     const sizers = getPillSlotSizers();
     expect(sizers.percentage).toBe(formatPercent(100, i18n.language));
-    // The cost sizer is a badge in its widest shape: four decimals carry one
-    // more digit than two, so the four-decimal shape holds both.
+    // The cost sizer holds both badge shapes: the four-decimal one below half a
+    // cent is the wider of the two, so it is the reserve.
     expect(sizers.cost).toBe(formatSessionCostBadge(4_999));
-    for (const painted of [formatSessionCostBadge(20_000), formatSessionCostBadge(1_234_567)]) {
+    for (const painted of [
+      formatSessionCostBadge(4_999),
+      formatSessionCostBadge(20_000),
+      formatSessionCostBadge(12_340_000),
+    ]) {
       expect(painted).not.toBeNull();
       expect((painted ?? '').length).toBeLessThanOrEqual(sizers.cost.length);
     }

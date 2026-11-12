@@ -44,7 +44,7 @@ const RING_SIZE = 28;
 const RING_STROKE = 3;
 
 /**
- * The pill holds the ring, then the two value slots its reading fills. `gap-2`
+ * The pill holds the ring, then the two value slots its reading fills. `gap-1.5`
  * keeps the reading clear of the ring, and the row's own `gap-1` separates the
  * percentage from the cost, so the parts of a settled reading each stand on
  * their own.

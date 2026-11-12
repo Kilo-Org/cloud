@@ -231,7 +231,7 @@ describe('SessionContextMetrics', () => {
   });
 
   // The header caps the trailing cluster, and RN's flexShrink is 0 by default,
-  // so the pill and its reading must all opt in or they paint off-screen. The
+  // so the pill and its reading must all opt in or they paint off-screen.
   it('keeps the pill compressible and each reading on one line', () => {
     const root = render({
       hasMessages: true,
@@ -303,16 +303,11 @@ describe('SessionContextMetrics', () => {
       onPress: vi.fn<() => void>(),
     });
     const pill = pillOf(root);
-    const [row] = findAll(pill, el => classNameOf(el).includes('gap-1'));
+    const [row] = findAll(pill, el => classNameOf(el).split(' ').includes('gap-1'));
     expect(row).toBeDefined();
     expect(classNameOf(row ?? root)).toContain('flex-row');
     const texts = visibleTextsOf(pill);
-    expect(texts.map(el => propsOf(el).children)).toEqual([
-      propsOf(texts[0] ?? root).children,
-      propsOf(texts[1] ?? root).children,
-    ]);
-    expect(texts[0]).toBeDefined();
-    expect(texts[1]).toBeDefined();
+    expect(texts).toHaveLength(2);
     expect(propsOf(texts[0] ?? root).children).toBe('16%');
     expect(String(propsOf(texts[1] ?? root).children)).toContain('$0.15');
     // Each painted value sits over the slot that reserved its width.

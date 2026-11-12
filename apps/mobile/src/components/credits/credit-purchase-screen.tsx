@@ -39,45 +39,38 @@ import { CreditExpiryNote } from './credit-expiry-note';
 const PACK_SKELETON_ROWS = 4;
 
 /**
- * The height the pack area holds in every state.
+ * The height the pack area holds, at the default font scale.
  *
- * The tallest state carries every surface the area can show at once: the
- * inline purchase error, the store's notice, and one unpriced row per catalog
- * pack. All three are reachable together, because a purchase error survives
- * the store dropping — it is cleared only by a new purchase attempt or a
- * completed one — and the backend catalog still names the packs when the store
- * cannot price them.
+ * The pack surface shows one of four mutually exclusive things: placeholder
+ * rows while the store connects, the priced rows, the empty-catalogue card, or
+ * the store's notice. They share one slot sized to the tallest of them, the
+ * row list, so the description and the legal links below it keep their place
+ * when the store answers, and the normal state has no blank band because the
+ * rows fill the slot.
  *
- * The reservation separates the two kinds of measurement a block is made of,
- * because the system font scale moves only one of them:
+ * The shorter cards are laid out inside the slot from its top, so the space
+ * they leave stays below them rather than moving the copy.
  *
- * - text lines scale. Every text block is capped at a line count — the pack
- *   title and its price at one line, the row's expiry line at two, the notice
- *   title at two, its body at three, and the purchase error at two — so the
- *   scale multiplies those lines and nothing else;
- * - spacing does not scale. A row's 20 dp paddings and its 8 dp gap above the
- *   expiry line, the notice's paddings, and every 10.5 dp step the column lays
- *   out between siblings keep their size at any scale.
- *
- * Both are measured at the default scale. The column lays out one gap more
- * than it has rows because the notice and the error are siblings of the rows.
- * Reserving the capped line counts rather than the lines one locale happens to
- * use leaves blank space after a shorter state's content, below the pack
- * surface; it is the price of the copy never moving, and it keeps that price
- * to the area that is already scrolled.
+ * A row's height is its text plus its spacing. The text is one line of title
+ * with the price beside it and one line of expiry, each capped; only that text
+ * grows with the system font scale, so only it is multiplied. The spacing —
+ * the row's 20 dp paddings and the 8 dp gap above the expiry line, plus the
+ * column's 10.5 dp step between rows — is fixed.
  */
-const PACK_ROW_TEXT_HEIGHT = 50;
-const PACK_ROW_SPACING = 48;
+const PACK_ROW_TEXT_HEIGHT = 35.4;
+const PACK_ROW_SPACING = 44.2;
 const PACK_CONTENT_GAP = 10.5;
-const STORE_NOTICE_TEXT_HEIGHT = 140;
-const STORE_NOTICE_SPACING = 72;
-const PURCHASE_ERROR_TEXT_HEIGHT = 35;
-const packAreaMinHeight = (rows: number, fontScale: number): number =>
-  rows * (PACK_ROW_TEXT_HEIGHT * fontScale + PACK_ROW_SPACING + PACK_CONTENT_GAP) +
-  PACK_CONTENT_GAP +
-  STORE_NOTICE_TEXT_HEIGHT * fontScale +
-  STORE_NOTICE_SPACING +
-  PURCHASE_ERROR_TEXT_HEIGHT * fontScale;
+
+/** One row's height at the live font scale. */
+const packRowHeight = (fontScale: number): number =>
+  PACK_ROW_TEXT_HEIGHT * fontScale + PACK_ROW_SPACING;
+
+/**
+ * The slot's height for `rows` rows: the tallest state the pack area shows.
+ * A card that replaces the rows is laid out inside this height.
+ */
+const packSlotHeight = (rows: number, fontScale: number): number =>
+  rows === 0 ? 0 : rows * packRowHeight(fontScale) + (rows - 1) * PACK_CONTENT_GAP;
 
 /**
  * One-off credit packs bought with the store's own purchase sheet.
@@ -158,6 +151,13 @@ export function CreditPurchaseScreen() {
   // query that is pending, paused or failed must not hide the packs the backend
   // catalog named.
   const packsEmpty = !isLoading && catalogEmpty;
+  // The pack surface shows one of five things at a time: the account read's
+  // failure, the store's notice, the empty catalogue, the placeholder rows or
+  // the priced rows. They are exclusive so the slot paints one surface and the
+  // copy below it never sees two stacked.
+  const storeUnavailableAlone = storeUnavailable && !identityUnavailable;
+  const showPlaceholders = isLoading && !identityUnavailable && !storeUnavailable;
+  const showRows = !isLoading && !identityUnavailable && !storeUnavailable && !packsEmpty;
   const balancePending = balanceQuery.isPending;
   const balanceFailed = balanceQuery.isError;
   // The card's title and its default body come from one per-store source, so
@@ -257,40 +257,24 @@ export function CreditPurchaseScreen() {
             <View className="mt-1 min-h-8 justify-center">{renderExpirySlot()}</View>
           </View>
 
-          {/* The pack area holds one height in every state, and the description
-              and the legal links follow it in this scroller. The store answers
-              after the first frame — placeholder rows while it connects, the
-              priced rows after, an empty card or the store's notice beside
-              them — so an area sized by its content pushed the copy down the
-              screen on every one of those swaps. The reservation covers the
-              tallest state; a shorter state keeps the remainder as blank space
-              after its own content, below the pack surface and above the copy.
-              Its row count is the catalog's, so the placeholder count and the
-              loaded count agree. */}
+          {/* The pack surface shows exactly one of four things — placeholder
+              rows while the store connects, the priced rows, the empty
+              catalogue card, or the store's notice — and they share one slot
+              sized to the row list. The description and the legal links follow
+              that slot, so a store answer changes what the slot paints without
+              moving them, and the normal state leaves no blank band because the
+              rows fill the slot. A shorter card starts at the slot's top. */}
           <View
             className="gap-3"
             style={{
-              minHeight: packAreaMinHeight(
-                Math.max(PACK_SKELETON_ROWS, products.length),
-                fontScale
-              ),
+              minHeight: packSlotHeight(Math.max(PACK_SKELETON_ROWS, products.length), fontScale),
             }}
           >
-            {/* The purchase error rides inside the reserved area too: it comes
-                and goes with a purchase attempt, and above the pack area it
-                would move the copy for as long as it showed. Two lines is the
-                height the reservation gives it, so a longer message truncates
-                rather than growing the area. */}
-            <AccessibleStatus
-              message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
-              className="px-1 text-sm"
-              numberOfLines={2}
-            />
-
-            {/* The identity read gates both catalog reads, so its failure is the
-              one state where nothing else can settle. It gets the same card
-              shape as the store's failure, with its own retry: an empty pack
-              area would read as "nothing for sale" and offer no way back. */}
+            {/* The account read gates both catalogue reads, so its failure is
+                the one state where nothing else can settle. It gets the same
+                card shape as the store's failure, with its own retry: an empty
+                pack area would read as "nothing for sale" and offer no way
+                back. */}
             {identityUnavailable && (
               <View className="gap-3 rounded-xl border border-border bg-card p-5">
                 <Text className="font-semibold text-foreground">{t('queryError.serverTitle')}</Text>
@@ -312,7 +296,7 @@ export function CreditPurchaseScreen() {
               </View>
             )}
 
-            {storeUnavailable && (
+            {storeUnavailableAlone && (
               <View className="gap-3 rounded-xl border border-border bg-card p-5">
                 <Text className="font-semibold text-foreground" numberOfLines={2}>
                   {t(storeUnavailableCopy.titleKey)}
@@ -341,9 +325,14 @@ export function CreditPurchaseScreen() {
               </View>
             )}
 
-            {isLoading &&
+            {showPlaceholders &&
               Array.from({ length: PACK_SKELETON_ROWS }, (_, index) => (
-                <View key={index} className="rounded-xl border border-border bg-card p-5">
+                <View
+                  key={index}
+                  className="justify-center rounded-xl border border-border bg-card px-5"
+                  style={{ height: packRowHeight(fontScale) }}
+                  testID="credit-pack-placeholder"
+                >
                   <View className="flex-row items-start justify-between gap-4">
                     <Skeleton className="h-6 flex-1 rounded" />
                     <Skeleton className="h-6 w-16 rounded" />
@@ -352,11 +341,11 @@ export function CreditPurchaseScreen() {
                 </View>
               ))}
 
-            {!isLoading &&
+            {showRows &&
               products.map(pack => {
-                // The pack names a credit amount in the same shape as the balance
-                // above it. The store's own localized price stays as the store
-                // wrote it.
+                // The pack names a credit amount in the same shape as the
+                // balance above it. The store's own localized price stays as
+                // the store wrote it.
                 const packLabel = t('credits.packLabel', {
                   amount: isolateLtrBidiText(
                     formatPrefixedMoney(pack.backend.amountUsd, i18n.language)
@@ -377,6 +366,8 @@ export function CreditPurchaseScreen() {
                 // The row is one accessible element: the explicit label replaces
                 // its children, so the charge and the disabled reason must be in
                 // the label itself (the canonical Kilo Pass row does the same).
+                // It also carries the full expiry sentence, which the row paints
+                // on one capped line.
                 const rowAccessibilityLabel = [packLabel, priceLabel, expiryMessage]
                   .filter(Boolean)
                   .join(', ');
@@ -388,19 +379,20 @@ export function CreditPurchaseScreen() {
                     accessibilityRole="button"
                     accessibilityState={{ busy: rowCompleting, disabled }}
                     className={cn(
-                      'rounded-xl border border-border bg-card p-5 active:opacity-80',
+                      'justify-center rounded-xl border border-border bg-card px-5 active:opacity-80',
                       disabled && 'opacity-50'
                     )}
                     disabled={disabled}
                     onPress={() => {
                       handlePackPress(pack);
                     }}
+                    style={{ height: packRowHeight(fontScale) }}
+                    testID="credit-pack-row"
                   >
+                    {/* Every line is capped at the count the row's height
+                        reserves, so a longer pack name, price or expiry
+                        sentence truncates instead of growing the row. */}
                     <View className="flex-row items-start justify-between gap-4">
-                      {/* One line each, which is the height the reservation
-                        above assumes: a longer pack name or a longer price
-                        truncates instead of making this row and the copy below
-                        it taller. */}
                       <Text className="flex-1 font-semibold text-foreground" numberOfLines={1}>
                         {packLabel}
                       </Text>
@@ -412,7 +404,7 @@ export function CreditPurchaseScreen() {
                       </Text>
                     </View>
                     {expiryMessage && (
-                      <Text className="mt-2 text-xs text-muted-foreground" numberOfLines={2}>
+                      <Text className="mt-2 text-xs text-muted-foreground" numberOfLines={1}>
                         {expiryMessage}
                       </Text>
                     )}
@@ -451,6 +443,16 @@ export function CreditPurchaseScreen() {
             </Pressable>
           </View>
         </DetailScreenScrollView>
+        {/* The purchase error is an overlay, not a block in the flow: it comes
+            and goes with a purchase attempt, and the four pack states are the
+            ones whose heights the slot holds. Floating it over the surface
+            keeps its announcement and leaves the layout untouched. */}
+        <View className="pointer-events-none absolute inset-x-0 bottom-4 px-5">
+          <AccessibleStatus
+            message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
+            className="rounded-xl border border-destructive bg-card px-4 py-3 text-sm"
+          />
+        </View>
       </View>
     </View>
   );

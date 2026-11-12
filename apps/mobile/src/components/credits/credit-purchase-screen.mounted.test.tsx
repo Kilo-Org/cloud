@@ -186,15 +186,16 @@ const STORE_LISTINGS = [
   { id: 'credits.usd500.v1', displayPrice: '$549.99' },
 ];
 
-const PACK_ROW_SHELL = 'rounded-xl border border-border bg-card p-5';
+// The row and the placeholder share one height and one surface; their classes
+// differ only in the padding axis, so the tests match them by the testIDs the
+// screen sets rather than by a class string.
+const PACK_ROW_SHELL = 'rounded-xl border border-border bg-card';
 
 function placeholderShells(
   renderer: TestRenderer.ReactTestRenderer
 ): TestRenderer.ReactTestInstance[] {
   return renderer.root.findAll(
-    node =>
-      String(node.type) === 'View' &&
-      (node.props as { className?: string }).className === PACK_ROW_SHELL
+    node => (node.props as { testID?: string }).testID === 'credit-pack-placeholder'
   );
 }
 
@@ -277,6 +278,13 @@ const packAmount = (amount: string): string => `\u2066${amount}\u2069`;
 describe('CreditPurchaseScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // A one-shot implementation a test queued and did not consume would
+    // otherwise answer the next test's first call. Reset the queue, then set
+    // this test's defaults below.
+    owner.fetchStoreProducts.mockReset();
+    owner.reconnectStore.mockReset();
+    owner.purchase.mockReset();
+    identity.refetchAsync.mockReset();
     mockedPlatform.OS = 'ios';
     backend.response = {
       appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
@@ -458,7 +466,7 @@ describe('CreditPurchaseScreen', () => {
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => allText(renderer).includes('App Store products unavailable'));
 
-    expect(packRows(renderer)).toHaveLength(4);
+    expect(packRows(renderer)).toHaveLength(0);
     expect(allText(renderer)).toContain(
       'Could not connect to the App Store. Check your connection and try again.'
     );
@@ -471,7 +479,6 @@ describe('CreditPurchaseScreen', () => {
     // A store failure is not a catalog claim: the no-match body belongs to a
     // store that answered and priced no pack.
     expect(allText(renderer)).not.toContain('No matching credit packs were returned by App Store.');
-    expect(allText(renderer)).toContain('Price unavailable');
     // The store SDK's own wording never reaches the screen.
     expect(allText(renderer)).not.toContain('Failed to query product');
 
@@ -485,8 +492,7 @@ describe('CreditPurchaseScreen', () => {
     });
     await waitFor(() => owner.fetchStoreProducts.mock.calls.length >= 2);
 
-    expect(packRows(renderer)).toHaveLength(4);
-    expect(allText(renderer)).toContain('Price unavailable');
+    expect(packRows(renderer)).toHaveLength(0);
     unmount();
   });
 
@@ -505,7 +511,7 @@ describe('CreditPurchaseScreen', () => {
     expect(allText(renderer)).not.toContain(
       'Could not connect to the App Store. Check your connection and try again.'
     );
-    expect(packRows(renderer)).toHaveLength(4);
+    expect(packRows(renderer)).toHaveLength(0);
     unmount();
   });
 
@@ -533,9 +539,10 @@ describe('CreditPurchaseScreen', () => {
       expect(allText(renderer)).not.toContain(
         'Could not connect to Google Play. Check your connection and try again.'
       );
-      // The backend amounts stay on screen, unpriced, with a retry to offer.
-      expect(packRows(renderer)).toHaveLength(4);
-      expect(allText(renderer)).toContain('Price unavailable');
+      // The notice fills the pack slot, with a retry to offer, and no row
+      // renders beneath it: the slot paints one surface at a time.
+      expect(packRows(renderer)).toHaveLength(0);
+      expect(tryAgainButton(renderer)).toBeDefined();
       unmount();
     } finally {
       vi.useRealTimers();
@@ -551,7 +558,7 @@ describe('CreditPurchaseScreen', () => {
 
     expect(allText(renderer)).toContain('No matching credit packs were returned by Google Play.');
     expect(allText(renderer)).not.toContain("Google Play didn't respond in time. Try again.");
-    expect(packRows(renderer)).toHaveLength(4);
+    expect(packRows(renderer)).toHaveLength(0);
     unmount();
   });
 
@@ -616,7 +623,7 @@ describe('CreditPurchaseScreen', () => {
 
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => allText(renderer).includes('App Store products unavailable'));
-    expect(packRows(renderer)).toHaveLength(4);
+    expect(packRows(renderer)).toHaveLength(0);
 
     const retry = tryAgainButton(renderer);
     if (!retry) {
@@ -628,13 +635,14 @@ describe('CreditPurchaseScreen', () => {
     });
 
     expect(owner.fetchStoreProducts.mock.calls.length).toBe(2);
-    expect(packRows(renderer)).toHaveLength(4);
+    // The notice keeps the slot while the retry runs; no row or placeholder
+    // renders under it.
+    expect(packRows(renderer)).toHaveLength(0);
+    expect(placeholderShells(renderer)).toHaveLength(0);
     expect(allText(renderer)).toContain('App Store products unavailable');
     expect(allText(renderer)).toContain(
       'Could not connect to the App Store. Check your connection and try again.'
     );
-    expect(allText(renderer)).toContain('Price unavailable');
-    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
     // The button that started the retry stays on screen, busy and disabled.
     const pendingRetry = tryAgainButton(renderer);
     if (!pendingRetry) {
@@ -695,7 +703,7 @@ describe('CreditPurchaseScreen', () => {
         await vi.advanceTimersByTimeAsync(8000);
       });
       expect(allText(renderer)).toContain('App Store products unavailable');
-      expect(allText(renderer)).toContain('Price unavailable');
+      expect(packRows(renderer)).toHaveLength(0);
 
       // The store reconnects with the cached prices still fresh, so React Query
       // keeps `status: success` and never refetches: only the connection itself
@@ -764,13 +772,13 @@ describe('CreditPurchaseScreen', () => {
     mockedPlatform.OS = 'android';
 
     const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
-    await waitFor(() => packRows(renderer).length === 4);
+    await waitFor(() => renderer.root.findAllByType(AccessibleStatus).length > 0);
 
-    const status = renderer.root.findByType(AccessibleStatus);
-    expect(status.props.message).toBe(
+    const [status] = renderer.root.findAllByType(AccessibleStatus);
+    expect(status?.props.message).toBe(
       'The credits on this Apple Account belong to a different Kilo account. Sign in to that Kilo account to use them.'
     );
-    expect(status.findByType('Text').props.accessibilityLiveRegion).toBe('polite');
+    expect(status?.findByType('Text').props.accessibilityLiveRegion).toBe('polite');
     unmount();
   });
 
@@ -785,21 +793,15 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
-  it('keeps the description and the legal links after a pack area of one reserved height in every state', async () => {
-    // The pack area's content depends on the store: placeholder rows, priced
-    // rows, an empty card, the store's notice, and its own purchase error. The
-    // area reserves the tallest state's height and the copy follows it, so no
-    // one of those arrivals changes where the copy sits.
+  it('shows one pack surface in a slot of the row list height in every state', async () => {
+    // The four states are mutually exclusive and share one slot, so a store
+    // answer changes what the slot paints without moving the description and
+    // the legal links below it. The slot is the row list's own height.
     const DESCRIPTION_PREFIX = 'Credits are a one-time purchase';
-    // The tallest state — the purchase error, the store's notice and four
-    // unpriced rows together — is the sum of the capped blocks at the default
-    // scale. The reservation equals it, holds in every state, and grows only
-    // with the text, so the copy cannot move.
-    const TALLEST_STATE_MIN_HEIGHT = 691;
-    // The purchase error's own sentence. Its two capped lines are the height
-    // the reservation adds for it, so the case that shares it with the notice
-    // must render it.
-    const PURCHASE_ERROR_TEXT = 'The credits on this';
+    const ROW_COUNT = 4;
+    const GAP = 10.5;
+    const surfaceKinds = ['row', 'placeholder', 'empty', 'notice', 'account'] as const;
+    type SurfaceKind = (typeof surfaceKinds)[number];
 
     const styleOf = (node: TestRenderer.ReactTestInstance): Record<string, unknown> => {
       const style: unknown = node.props.style;
@@ -811,93 +813,69 @@ describe('CreditPurchaseScreen', () => {
       const value = styleOf(node).minHeight;
       return typeof value === 'number' ? value : 0;
     };
-    const labelOf = (node: TestRenderer.ReactTestInstance): string => {
-      const label: unknown = node.props.accessibilityLabel;
-      return typeof label === 'string' ? label : '';
-    };
-    const classNameOf = (node: TestRenderer.ReactTestInstance): string => {
-      const value: unknown = node.props.className;
+    const testIDOf = (node: TestRenderer.ReactTestInstance): string => {
+      const value: unknown = node.props.testID;
       return typeof value === 'string' ? value : '';
     };
-    const descends = (
-      node: TestRenderer.ReactTestInstance,
-      predicate: (child: TestRenderer.ReactTestInstance) => boolean
-    ): boolean => node.findAll(() => true).some(child => predicate(child));
-    const cases: {
-      state: string;
-      prepare: () => void;
-      isPackSurface: (node: TestRenderer.ReactTestInstance) => boolean;
-    }[] = [
+    const surfaceOf = (node: TestRenderer.ReactTestInstance): SurfaceKind | undefined => {
+      if (testIDOf(node) === 'credit-pack-row') {
+        return 'row';
+      }
+      if (testIDOf(node) === 'credit-pack-placeholder') {
+        return 'placeholder';
+      }
+      if (node.children.some(child => child === 'Credit packs are unavailable right now.')) {
+        return 'empty';
+      }
+      if (node.children.some(child => child === 'App Store products unavailable')) {
+        return 'notice';
+      }
+      if (node.children.some(child => child === 'Could not load')) {
+        return 'account';
+      }
+      return undefined;
+    };
+
+    const cases: { state: string; expected: SurfaceKind; prepare: () => void }[] = [
       {
         state: 'loading',
+        expected: 'placeholder',
         prepare: () => {
           owner.connected = false;
         },
-        isPackSurface: node => classNameOf(node) === PACK_ROW_SHELL,
       },
-      {
-        state: 'happy',
-        prepare: () => undefined,
-        isPackSurface: node =>
-          String(node.type) === 'Pressable' && labelOf(node).includes('of credits'),
-      },
+      { state: 'happy', expected: 'row', prepare: () => undefined },
       {
         state: 'empty',
+        expected: 'empty',
         prepare: () => {
           backend.response = {
             appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
             products: [],
           };
         },
-        isPackSurface: node =>
-          node.children.some(child => child === 'Credit packs are unavailable right now.'),
       },
       {
         state: 'store unavailable',
+        expected: 'notice',
         prepare: () => {
           owner.fetchStoreProducts.mockRejectedValue(new Error('Failed to query product for sku'));
         },
-        isPackSurface: node =>
-          node.children.some(child => child === 'App Store products unavailable'),
-      },
-      {
-        state: 'purchase error',
-        prepare: () => {
-          owner.errorMessageKey = 'credits.purchaseOwnedByAnotherAccount';
-        },
-        isPackSurface: node =>
-          String(node.type) === 'Pressable' && labelOf(node).includes('of credits'),
-      },
-      {
-        // Reachable: a purchase error survives the store dropping, because
-        // only a new purchase attempt or a completed one clears it. Every
-        // surface the area can show renders at once here, which is the tallest
-        // state the reservation has to hold.
-        state: 'purchase error with the store notice',
-        prepare: () => {
-          owner.errorMessageKey = 'credits.purchaseOwnedByAnotherAccount';
-          owner.fetchStoreProducts.mockRejectedValue(new Error('Failed to query product for sku'));
-        },
-        isPackSurface: node =>
-          node.children.some(child => child === 'App Store products unavailable'),
       },
     ];
 
     const measured: {
       state: string;
+      surfaces: SurfaceKind[];
+      slotHeight: number;
+      rowHeight: number;
       copyInScroller: boolean;
       legalInScroller: number;
-      packSurfaceInScroller: number;
-      reservedHeight: number;
-      copyFollowsPackArea: boolean;
-      errorRendered: boolean;
     }[] = [];
     // Sequential, not parallel: every scenario mutates the same owner mock and
     // the same backend fixture, so two mounted screens would race.
     /* eslint-disable no-await-in-loop -- each scenario mutates the shared mocks */
     for (const scenario of cases) {
-      // Each scenario starts from a connected store with the backend catalog,
-      // because a scenario mutates the shared owner mock.
       owner.connected = true;
       owner.fetchStoreProducts.mockResolvedValue(STORE_LISTINGS);
       backend.response = {
@@ -906,142 +884,151 @@ describe('CreditPurchaseScreen', () => {
       };
       scenario.prepare();
       const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
-      // Wait for the state's own pack-area surface as well as the copy: the
-      // rows arrive after the store answers, so only the pair proves the state.
       await waitFor(
         () =>
           allText(renderer).includes(DESCRIPTION_PREFIX) &&
-          renderer.root.findAll(() => true).some(node => scenario.isPackSurface(node))
+          renderer.root.findAll(() => true).some(node => surfaceOf(node) === scenario.expected)
       );
       const scroller = renderer.root.findByType(DetailScreenScrollView);
-      const reserved = scroller
-        .findAll(node => minHeightOf(node) > 0)
-        .find(node => descends(node, scenario.isPackSurface));
-      const packAreaIndex = scroller.children.findIndex(
-        child =>
-          typeof child !== 'string' &&
-          descends(child, scenario.isPackSurface) &&
-          minHeightOf(child) > 0
-      );
+      const slot = scroller.findAll(node => minHeightOf(node) > 0);
+      const surfaces = renderer.root
+        .findAll(node => surfaceOf(node) !== undefined)
+        .map(node => surfaceOf(node))
+        .filter((kind): kind is SurfaceKind => kind !== undefined);
       const copyIndex = scroller.children.findIndex(
         child =>
           typeof child !== 'string' &&
-          descends(
-            child,
-            node =>
-              String(node.type) === 'Text' &&
-              node.children.some(
-                part => typeof part === 'string' && part.startsWith(DESCRIPTION_PREFIX)
-              )
-          )
+          child
+            .findAll(() => true)
+            .some(
+              node =>
+                String(node.type) === 'Text' &&
+                node.children.some(
+                  part => typeof part === 'string' && part.startsWith(DESCRIPTION_PREFIX)
+                )
+            )
       );
+      const [firstRow] = renderer.root.findAll(
+        node => testIDOf(node) === 'credit-pack-row' || testIDOf(node) === 'credit-pack-placeholder'
+      );
+      const rowStyle: unknown = firstRow?.props.style;
+      const rowHeight =
+        typeof rowStyle === 'object' && rowStyle !== null && 'height' in rowStyle
+          ? Number(rowStyle.height)
+          : 0;
       measured.push({
         state: scenario.state,
+        surfaces,
+        slotHeight: slot.length === 1 ? minHeightOf(slot[0] as TestRenderer.ReactTestInstance) : 0,
+        rowHeight,
         copyInScroller: copyIndex !== -1,
         legalInScroller: legalLinkNodes(scroller).length,
-        packSurfaceInScroller: scroller.findAll(node => scenario.isPackSurface(node)).length,
-        reservedHeight: reserved === undefined ? 0 : minHeightOf(reserved),
-        copyFollowsPackArea: packAreaIndex !== -1 && copyIndex > packAreaIndex,
-        errorRendered: allText(renderer).includes(PURCHASE_ERROR_TEXT),
       });
       unmount();
       vi.clearAllMocks();
     }
     /* eslint-enable no-await-in-loop */
 
-    const reservedHeights = new Set(measured.map(result => result.reservedHeight));
-    expect(reservedHeights.size, 'one reserved height for every state').toBe(1);
     for (const result of measured) {
-      // The case that shares the notice with a purchase error must render the
-      // error too, or its reserved height would be unverified.
-      expect(result.errorRendered, result.state).toBe(
-        result.state !== 'loading' &&
-          result.state !== 'happy' &&
-          result.state !== 'empty' &&
-          result.state !== 'store unavailable'
-      );
+      const scenario = cases.find(candidate => candidate.state === result.state);
+      // One surface at a time: a store answer swaps what the slot paints, it
+      // does not stack another surface on top of the rows.
+      expect([...new Set(result.surfaces)], result.state).toEqual([scenario?.expected]);
+      expect(result.surfaces.length, result.state).toBeGreaterThan(0);
+      // One slot in every state, so a store answer cannot move the copy.
+      expect(result.slotHeight, result.state).toBeGreaterThan(0);
       expect(result.copyInScroller, result.state).toBe(true);
       expect(result.legalInScroller, result.state).toBe(2);
-      expect(result.packSurfaceInScroller, result.state).toBeGreaterThan(0);
-      expect(result.reservedHeight, result.state).toBeGreaterThanOrEqual(TALLEST_STATE_MIN_HEIGHT);
-      expect(result.copyFollowsPackArea, result.state).toBe(true);
     }
+    // The slot is the row list's own height, and it is the same in every state:
+    // four rows plus the steps between them.
+    const slotHeights = new Set(measured.map(result => result.slotHeight));
+    expect(slotHeights.size, 'one slot height in every state').toBe(1);
+    const rowHeights = measured
+      .filter(result => result.rowHeight > 0)
+      .map(result => result.rowHeight);
+    expect(new Set(rowHeights).size, 'rows and placeholders share one height').toBe(1);
+    const [rowHeight] = rowHeights;
+    expect(rowHeight).toBeDefined();
+    expect([...slotHeights][0]).toBeCloseTo(
+      ROW_COUNT * Number(rowHeight) + (ROW_COUNT - 1) * GAP,
+      1
+    );
   });
 
-  it('caps every text block the pack reservation sizes', async () => {
-    // The reservation multiplies a fixed line count by the font scale, so each
-    // block it counts must stop at that count. An uncapped block would grow the
-    // area past the reservation at a raised scale and move the copy.
-    const lineCapOf = (node: TestRenderer.ReactTestInstance | undefined): number | undefined => {
-      if (node === undefined) {
-        return undefined;
+  it('sizes a pack row and its placeholder to the same height', async () => {
+    const heightOf = (node: TestRenderer.ReactTestInstance): number => {
+      const style: unknown = node.props.style;
+      if (typeof style !== 'object' || style === null || !('height' in style)) {
+        return 0;
       }
-      const cap: unknown = node.props.numberOfLines;
-      return typeof cap === 'number' ? cap : undefined;
+      const value = style.height;
+      return typeof value === 'number' ? value : 0;
     };
-    const textWith = (
-      renderer: TestRenderer.ReactTestRenderer,
-      needle: string
-    ): TestRenderer.ReactTestInstance | undefined =>
-      renderer.root
-        .findAll(node =>
-          node.children.some(part => typeof part === 'string' && part.includes(needle))
-        )
-        .find(node => typeof node.props.numberOfLines === 'number');
 
     const priced = await renderWithProviders(createElement(CreditPurchaseScreen));
     await waitFor(() => packRows(priced.renderer).length === 4);
-    expect(lineCapOf(textWith(priced.renderer, 'do not expire.'))).toBe(2);
+    const rowHeights = priced.renderer.root
+      .findAll(node => (node.props as { testID?: string }).testID === 'credit-pack-row')
+      .map(node => heightOf(node));
     priced.unmount();
     vi.clearAllMocks();
 
-    owner.fetchStoreProducts.mockRejectedValue(new Error('Failed to query product for sku'));
-    const notice = await renderWithProviders(createElement(CreditPurchaseScreen));
-    await waitFor(() => allText(notice.renderer).includes('App Store products unavailable'));
-    expect(lineCapOf(textWith(notice.renderer, 'App Store products unavailable'))).toBe(2);
-    expect(lineCapOf(textWith(notice.renderer, 'Could not connect to'))).toBe(3);
-    expect(lineCapOf(textWith(notice.renderer, 'do not expire.'))).toBe(2);
-    notice.unmount();
+    owner.connected = false;
+    const loading = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => placeholderShells(loading.renderer).length === 4);
+    const placeholderHeights = placeholderShells(loading.renderer).map(node => heightOf(node));
+    loading.unmount();
+
+    expect(rowHeights).toHaveLength(4);
+    expect(placeholderHeights).toHaveLength(4);
+    expect(new Set([...rowHeights, ...placeholderHeights]).size).toBe(1);
+    expect(rowHeights[0]).toBeGreaterThan(0);
   });
 
-  it('scales the pack area reservation with the system font scale', async () => {
-    // Line caps bound a line count, not a line height: at a raised scale every
-    // reserved text line is taller, so a fixed dp floor would let the copy move
-    // again. The reservation follows the live scale.
-    const minHeightOf = (node: TestRenderer.ReactTestInstance): number => {
-      const style: unknown = node.props.style;
-      if (typeof style !== 'object' || style === null || !('minHeight' in style)) {
-        return 0;
-      }
-      const value = style.minHeight;
-      return typeof value === 'number' ? value : 0;
-    };
-    const reservedHeight = async (): Promise<number> => {
+  it('caps every text block a pack row sizes', async () => {
+    // The row's height is its capped text plus its spacing, so an uncapped line
+    // would grow the row and the copy below it.
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+    const caps = renderer.root
+      .findAll(node => typeof node.props.numberOfLines === 'number')
+      .map(node => Number(node.props.numberOfLines));
+    // The four rows carry a title, a price and an expiry line each.
+    expect(caps.filter(cap => cap === 1)).toHaveLength(12);
+    unmount();
+  });
+
+  it('scales the row height with the system font scale', async () => {
+    // Only the row's text scales; its paddings and the content gaps keep their
+    // size. A static height would clip the text or leave the slot short of it.
+    const rowHeight = async (): Promise<number> => {
       const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
       await waitFor(() => packRows(renderer).length === 4);
-      const scroller = renderer.root.findByType(DetailScreenScrollView);
-      const value = scroller
-        .findAll(node => minHeightOf(node) > 0)
-        .map(node => minHeightOf(node))
-        .at(0);
+      const [row] = renderer.root.findAll(
+        node => (node.props as { testID?: string }).testID === 'credit-pack-row'
+      );
+      const style: unknown = row?.props.style;
+      const value =
+        typeof style === 'object' && style !== null && 'height' in style ? style.height : 0;
       unmount();
-      return value ?? 0;
+      return typeof value === 'number' ? value : 0;
     };
 
     dimensions.fontScale = 1;
-    const single = await reservedHeight();
-    dimensions.fontScale = 2;
-    const doubled = await reservedHeight();
-    // Only text lines scale, so a reduced scale keeps the spacing it does not
-    // change and a raised one adds exactly the text it enlarges.
+    const single = await rowHeight();
+    dimensions.fontScale = 1.5;
+    const raised = await rowHeight();
     dimensions.fontScale = 0.85;
-    const reduced = await reservedHeight();
+    const reduced = await rowHeight();
     dimensions.fontScale = 1;
 
-    expect(single).toBe(691.5);
-    expect(doubled).toBeGreaterThan(single);
-    expect(reduced).toBeGreaterThan(single * 0.85);
+    expect(single).toBeGreaterThan(0);
+    expect(raised).toBeGreaterThan(single);
+    // The spacing does not scale, so a reduced scale shrinks the row by less
+    // than the scale itself.
     expect(reduced).toBeLessThan(single);
+    expect(reduced).toBeGreaterThan(single * 0.85);
   });
 
   it('names an expiring balance and says nothing when none expires', async () => {

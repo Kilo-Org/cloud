@@ -16,7 +16,7 @@ vi.mock('expo-router', () => ({
     state.focusEffects.push(effect);
   },
 }));
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({ View: 'View', useColorScheme: () => 'light' }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

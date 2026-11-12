@@ -89,15 +89,7 @@ export function GlanceableActiveCard({
   const empty = newestSession === null;
 
   return (
-    <View
-      className={cn(
-        CARD_CLASS,
-        embedded && 'rounded-none border-0 bg-transparent',
-        // The frame reserves the counts card's height, so the zero state fills
-        // that height with its one message instead of leaving a band below it.
-        empty && 'flex-1'
-      )}
-    >
+    <View className={cn(CARD_CLASS, embedded && 'rounded-none border-0 bg-transparent')}>
       {empty ? null : (
         <>
           <View className={COUNTS_CLASS}>
@@ -174,10 +166,11 @@ export function GlanceableActiveCard({
           </View>
         </CardControl>
       ) : (
-        <View key="no-session" className="flex-1 justify-center">
-          {/* The card keeps its reserved frame with nothing live, so the zero
-              state fills that frame with the shared empty state's icon, title
-              and one-line hint instead of a lone line in a blank card. */}
+        <View key="no-session" className="py-6">
+          {/* The zero state sizes to its own message. The frame no longer
+              reserves the counts card's height behind it, so vertical padding
+              (24 dp) is the whole frame a compact screen gives this card; the
+              reserved band pushed the Explore rows under the tab bar. */}
           <EmptyState
             placement="static"
             icon={Bot}

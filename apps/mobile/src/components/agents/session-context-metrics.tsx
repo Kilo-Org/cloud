@@ -36,7 +36,7 @@ type SessionContextMetricsProps = {
    * Marks a settled session that will never report usage and cannot open any
    * sheet: an empty stored transcript reports no usage, and its sheet has no
    * permission settings (read-only sessions cannot auto-approve). The layout
-   * box stays reserved so the header does not shift; the dash value would
+   * box stays reserved so the header does not shift; the track-only ring would
    * otherwise read as a permanent placeholder beside the finished empty state.
    */
   onNothingToReport?: boolean;

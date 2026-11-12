@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- one case per pill state: permission controls, the reserved box, the hugging content and the loading bar share these render helpers. */
+/* eslint-disable max-lines -- one case per pill state: permission controls, the reserved box and the hugging content share these render helpers. */
 import { describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -255,17 +255,10 @@ describe('SessionContextMetrics', () => {
     const pill = pillOf(root);
     expect(propsOf(pill).className ?? '').not.toContain('opacity-0');
     expect(propsOf(pill).accessibilityElementsHidden).toBeUndefined();
-    // The only texts in the pill are the hidden sizers of the reserve, which
-    // paint nothing and stay out of the reading.
-    for (const text of findAll(pill, el => el.type === 'Text')) {
-      expect(classNameOf(text)).toContain('opacity-0');
-      expect(propsOf(text).accessibilityElementsHidden).toBe(true);
-    }
-    // Nothing paints beside the ring: the value run is absent, not reserved.
+    // Nothing paints beside the ring: the value run is absent from the pill, and
+    // the reserved copy that holds its width lives in the sibling box.
     expect(findAll(pill, el => el.type === 'ContextUsageRing')).toHaveLength(1);
-    expect(
-      findAll(pill, el => el.type === 'Text' && !classNameOf(el).includes('opacity-0'))
-    ).toHaveLength(0);
+    expect(findAll(pill, el => el.type === 'Text')).toHaveLength(0);
   });
 
   // The reserve is a zero-height copy of the widest reading the pill can show, so

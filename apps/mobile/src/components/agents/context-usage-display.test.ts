@@ -70,9 +70,8 @@ const unreported: HeaderPillContent = {
 };
 
 /**
- * The same pill while the session still resolves: the widest run lays out
- * invisibly with one bar across it, so the bar is as wide as the reading can
- * become.
+ * The same pill while the session still resolves: nothing paints, and the
+ * reserved box around the pill still holds the row's width.
  */
 const unreportedWhileLoading: HeaderPillContent = {
   ...unreported,

@@ -78,10 +78,9 @@ export type HeaderPillContent = {
    * What the cost part of the reading paints:
    *
    * - `label`: the session's cost, as text.
-   * - `loading`: the widest run, laid out but painted invisible, with one bar
-   *   across the row it takes. A bar of fixed width matched the settled row
-   *   only at the default font scale, and a dash beside a bar read as
-   *   half-painted content.
+   * - `loading`: the session is still resolving, so the pill paints nothing and
+   *   the accessibility label says a cost is coming. The reserved box around the
+   *   pill already holds the row's width, so no bar is needed to hold it.
    * - `unreported`: the session settled without a cost, so nothing will fill
    *   it and the pill paints only the values it has.
    * - `none`: no cost to paint.

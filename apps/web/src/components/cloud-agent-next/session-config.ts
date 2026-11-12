@@ -199,10 +199,10 @@ export type SendSelection = {
 };
 
 /**
- * Resolve the mode/model/variant a send carries. A runtime agent's model pin
- * wins because the worker materializes that agent with its own model. Its
- * variant only applies when it also pins a model, since variants are
- * model-specific; otherwise the user's session variant applies.
+ * A runtime agent's model pin wins because the worker materializes that agent
+ * with its own model. Variants are model-specific and stay with their model.
+ * Without a pin, the current picker model and variant take precedence over
+ * session metadata.
  */
 export function resolveSendSelection(
   config:

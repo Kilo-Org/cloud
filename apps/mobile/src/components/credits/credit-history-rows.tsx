@@ -145,11 +145,14 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
         <Text className="text-xs text-muted-foreground">
           {formatDate(parseTimestamp(entry.date), i18n.language)}
         </Text>
+        {/* Both lines, not either: a pack Play sold still expires a year after
+            purchase, so its row keeps the expiry beside the store that holds
+            the receipt. */}
+        {expiryLabel != null && (
+          <Text className="text-xs text-muted-foreground">{expiryLabel}</Text>
+        )}
         {storeReceiptNote != null && (
           <Text className="text-xs text-muted-foreground">{storeReceiptNote}</Text>
-        )}
-        {storeReceiptNote == null && expiryLabel != null && (
-          <Text className="text-xs text-muted-foreground">{expiryLabel}</Text>
         )}
       </View>
     </View>

@@ -44,23 +44,28 @@ function textValues(node: Node): string[] {
   );
 }
 
-/** The className of the closed selector's value line, the only `flex-1` text. */
-function valueClassName(node: Node): string | undefined {
+/** The props of the closed selector's value line, the only `flex-1` text. */
+function valueProps(node: Node): Record<string, unknown> | undefined {
   if (node === null || typeof node !== 'object') {
     return undefined;
   }
-  const className = node.props?.className;
-  if (typeof className === 'string' && className.includes('flex-1')) {
-    return className;
+  const props = node.props;
+  if (typeof props?.className === 'string' && props.className.includes('flex-1')) {
+    return props;
   }
-  const children = node.props?.children;
+  const children = props?.children;
   for (const child of Array.isArray(children) ? children : [children]) {
-    const found = valueClassName(child as Node);
+    const found = valueProps(child as Node);
     if (found) {
       return found;
     }
   }
   return undefined;
+}
+
+function valueClassName(node: Node): string | undefined {
+  const className = valueProps(node)?.className;
+  return typeof className === 'string' ? className : undefined;
 }
 
 const INSTANCE = {
@@ -139,5 +144,30 @@ describe('InstanceSelector closed label ink', () => {
     const element = InstanceSelector(props) as Node;
 
     expect(valueClassName(element) ?? '').toContain('text-muted-foreground');
+  });
+});
+
+describe('InstanceSelector closed label truncation', () => {
+  it('truncates a selected target in the middle so its project stays visible', async () => {
+    const { InstanceSelector } = await import('./instance-selector');
+    const props = { ...baseProps(), value: INSTANCE };
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = InstanceSelector(props) as Node;
+
+    expect(valueProps(element)?.ellipsizeMode).toBe('middle');
+  });
+
+  it.each([
+    ['the Cloud Agent default', baseProps],
+    ['the loading copy', () => ({ ...baseProps(), isLoading: true })],
+    ['the unbound computer', () => ({ ...baseProps(), pendingComputer: true })],
+  ])('keeps a tail cut for %s', async (_name, buildProps) => {
+    const { InstanceSelector } = await import('./instance-selector');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = InstanceSelector(buildProps()) as Node;
+
+    expect(valueProps(element)?.ellipsizeMode).toBe('tail');
   });
 });

@@ -109,10 +109,16 @@ export function InstanceSelector({
     >
       <Text
         className={cn(
-          'flex-1 text-base',
+          'min-w-0 flex-1 text-base',
           isPlaceholder ? 'text-muted-foreground' : 'text-foreground'
         )}
         numberOfLines={1}
+        // A connected target is told apart by the end of its value: the project
+        // follows the computer name, and two targets on one workspace share
+        // their leading words. A tail cut hid the project on a compact screen,
+        // so a selected target truncates in the middle. Every other label is
+        // prose or a product name, which is read from the start.
+        ellipsizeMode={value === null ? 'tail' : 'middle'}
       >
         {label}
       </Text>

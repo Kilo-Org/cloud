@@ -56,7 +56,12 @@ import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getUserConnectionDO } from './dos/UserConnectionDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { notifyUserSessionEvent } from './session-events';
-import { QUEUE_RETRY_DELAY_SECONDS, createItemExtractor, queue } from './queue-consumer';
+import {
+  QUEUE_MAX_RETRIES,
+  QUEUE_RETRY_DELAY_SECONDS,
+  createItemExtractor,
+  queue,
+} from './queue-consumer';
 import { computeSessionMetadataUpdates } from './ingest/metadata';
 import { INGEST_CHUNK_MAX_BYTES } from './util/ingest-limits';
 
@@ -892,7 +897,7 @@ describe('queue', () => {
     expect(deleteObject).not.toHaveBeenCalled();
   });
 
-  it('does not flush buffered items when malformed JSON forces a retry', async () => {
+  it('answers a request whose payload is not JSON', async () => {
     const ingest = vi.fn(async () => ({ changes: [] }));
     mockIngestWithR2(ingest);
 
@@ -915,6 +920,7 @@ describe('queue', () => {
     } as never;
     const ack = vi.fn();
     const retry = vi.fn();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     await queue(
       {
@@ -927,6 +933,7 @@ describe('queue', () => {
               ingestVersion: 1,
               ingestedAt: 1,
             },
+            attempts: 2,
             ack,
             retry,
           },
@@ -938,9 +945,14 @@ describe('queue', () => {
 
     expect(ingest).not.toHaveBeenCalled();
     expect(transaction).not.toHaveBeenCalled();
-    expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
-    expect(ack).not.toHaveBeenCalled();
-    expect(deleteObject).not.toHaveBeenCalled();
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+    expect(deleteObject).toHaveBeenCalledWith('staging/malformed');
+    expect(error).toHaveBeenCalledWith(
+      'Staged ingest object is not parseable JSON; object removed and message acknowledged',
+      expect.objectContaining({ r2Key: 'staging/malformed' })
+    );
+    error.mockRestore();
   });
 
   it('flushes already-committed metadata changes when a later chunk fails', async () => {
@@ -993,6 +1005,7 @@ describe('queue', () => {
               ingestVersion: 1,
               ingestedAt: 1,
             },
+            attempts: 2,
             ack,
             retry,
           },
@@ -1011,6 +1024,60 @@ describe('queue', () => {
     expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
     expect(ack).not.toHaveBeenCalled();
     expect(deleteObject).not.toHaveBeenCalled();
+  });
+
+  it('removes the object after the last attempt', async () => {
+    const ingest = vi.fn(async () => {
+      throw new Error('Durable Object is overloaded.');
+    });
+    mockIngestWithR2(ingest);
+
+    const transaction = vi.fn(async () => null);
+    const limit = vi.fn(async () => [{ session_id: 'ses_last_attempt' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select, transaction } as never);
+
+    const body = JSON.stringify({ data: [{ type: 'message', data: { id: 'msg_1' } }] });
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put: vi.fn(async () => undefined),
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/last_attempt',
+              kiloUserId: 'usr_last_attempt',
+              sessionId: 'ses_last_attempt',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            attempts: QUEUE_MAX_RETRIES + 1,
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    expect(deleteObject).toHaveBeenCalledWith('staging/last_attempt');
+    expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
+    expect(ack).not.toHaveBeenCalled();
+    error.mockRestore();
   });
 });
 

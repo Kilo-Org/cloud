@@ -342,7 +342,7 @@ describe('spawnCloudAgentSession delegation', () => {
         'auth-token',
         'request-chat-allowed',
         undefined,
-        { chatPlatform: 'slack', requesterUserId: 'user-without-github' }
+        { chatPlatform: 'slack', payerUserId: 'user-without-github' }
       )
     ).resolves.toEqual({
       response:
@@ -388,7 +388,7 @@ describe('spawnCloudAgentSession delegation', () => {
         'auth-token',
         'request-chat-unavailable',
         undefined,
-        { chatPlatform: 'slack', requesterUserId: 'user-without-github' }
+        { chatPlatform: 'slack', payerUserId: 'user-without-github' }
       )
     ).resolves.toEqual({
       response:
@@ -495,9 +495,7 @@ describe('spawnCloudAgentSession delegation', () => {
       'model',
       organizationIntegration,
       'auth-token',
-      'request-gitlab-org',
-      undefined,
-      { requesterUserId: 'user-9' }
+      'request-gitlab-org'
     );
 
     expect(mockValidateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
@@ -527,7 +525,7 @@ describe('spawnCloudAgentSession delegation', () => {
         'auth-token',
         'request-gitlab-no-identity',
         undefined,
-        { chatPlatform: 'slack', payerUserId: 'user-9', requesterUserId: 'user-9' }
+        { chatPlatform: 'slack', payerUserId: 'user-9' }
       )
     ).resolves.toEqual({
       response:

@@ -45,12 +45,10 @@ export type BotPlatform = {
   /**
    * Conversation-level authorization gate for bot actions that can change
    * code. Runs after the account is resolved and before any bot request is
-   * created. GitHub checks that the triggering account can write to the
-   * conversation's repository. Only GitHub-triggered actions check the actor's
-   * GitHub write access. Chat integrations (Slack, Linear) authorize GitHub
-   * repositories through the organization's connection in `spawnCloudAgentSession`.
-   * GitLab projects still require write access through the requesting account's
-   * own GitLab connection. Platforms without this hook allow every message.
+   * created. Only GitHub-triggered actions check the actor's write access to
+   * the conversation's repository. Chat integrations authorize GitHub repositories
+   * and GitLab projects through the organization's connection, without requiring
+   * a personal provider identity. Platforms without this hook allow every message.
    */
   authorizeBotActions?(params: {
     thread: Thread;

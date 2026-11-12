@@ -102,8 +102,6 @@ export default async function spawnCloudAgentSession(
     attachments?: CloudAgentAttachments;
     /** Linked Kilo user the caller authenticates as; selects the balance-check client for org payers. */
     payerUserId?: string;
-    /** Linked Kilo user that triggered this bot run; authorizes GitLab project access. */
-    requesterUserId?: string;
     /** GitHub login of the account that triggered this bot run. */
     actorLogin?: string;
     /** Repository of the conversation the bot was mentioned in. */

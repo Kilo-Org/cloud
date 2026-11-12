@@ -40,28 +40,36 @@ const PACK_SKELETON_ROWS = 4;
 /**
  * The height the pack area holds in every state.
  *
- * The tallest state is the store's notice card beside four priced rows, because
- * the backend catalogue still names the packs when the store cannot price them.
- * Measured on the compact window and confirmed by the design-gate cells:
+ * The tallest state is the store's notice card above four unpriced rows: the
+ * backend catalog still names the packs when the store cannot price them, so
+ * the notice and the rows render together in one `gap-3` column. That state is
+ * five children, so it lays out four content gaps. Every block's height is
+ * fixed, which makes the reservation exact rather than a guess:
  *
- * - a priced row is 80 dp (its 20 dp paddings, one title line, and its expiry
- *   line), and four of them are 320 dp;
- * - the content gap between them is 10.5 dp, so three of them are 31.5 dp;
- * - the notice card is 190 dp with a three-line body: its 20 dp paddings, the
- *   title line, three body lines, the retry control, and the 10.5 dp steps
- *   between those four blocks.
+ * - a row is 80 dp: its 20 dp paddings, one title line, an 8 dp gap and its
+ *   12 dp expiry line. Its title is capped at one line, so a longer pack name
+ *   cannot make a row taller;
+ * - the notice is 180 dp with a three-line body: its 20 dp paddings, the title
+ *   line, three body lines, the retry control, and the gaps between them. Its
+ *   body is capped at three lines for the same reason;
+ * - the gap between siblings is the scroller's 10.5 dp step.
  *
- * The reservation is the sum, 541.5 dp. A shorter state keeps the difference as
- * blank space after its own content, between the pack surface and the copy, so
- * a store answer never moves the description or the legal links.
+ * The sum is 542 dp for the four packs the catalog sells. A shorter state keeps
+ * the difference as blank space after its own content, between the pack surface
+ * and the copy, so no store answer moves the description or the legal links.
+ *
+ * The inline purchase error needs no term of its own. It appears only after a
+ * purchase attempt, which needs a priced row, so it never shares the notice
+ * state: the rows it accompanies total 362 dp, which leaves the error's two
+ * capped lines well inside the floor. The row count follows the catalog, so a
+ * catalog that ever sells more packs widens the reservation instead of pushing
+ * the copy down.
  */
 const PACK_ROW_HEIGHT = 80;
 const PACK_CONTENT_GAP = 10.5;
-const STORE_NOTICE_HEIGHT = 190;
-const PACK_AREA_MIN_HEIGHT =
-  PACK_SKELETON_ROWS * PACK_ROW_HEIGHT +
-  (PACK_SKELETON_ROWS - 1) * PACK_CONTENT_GAP +
-  STORE_NOTICE_HEIGHT;
+const STORE_NOTICE_HEIGHT = 180;
+const PACK_AREA_MIN_HEIGHT = (rows: number): number =>
+  rows * (PACK_ROW_HEIGHT + PACK_CONTENT_GAP) + STORE_NOTICE_HEIGHT;
 
 /**
  * One-off credit packs bought with the store's own purchase sheet.
@@ -245,14 +253,24 @@ export function CreditPurchaseScreen() {
               them — so an area sized by its content pushed the copy down the
               screen on every one of those swaps. The reservation covers the
               tallest state; a shorter state keeps the remainder as blank space
-              after its own content, below the pack surface and above the copy. */}
-          <View className="gap-3" style={{ minHeight: PACK_AREA_MIN_HEIGHT }}>
+              after its own content, below the pack surface and above the copy.
+              Its row count is the catalog's, so the placeholder count and the
+              loaded count agree. */}
+          <View
+            className="gap-3"
+            style={{
+              minHeight: PACK_AREA_MIN_HEIGHT(Math.max(PACK_SKELETON_ROWS, products.length)),
+            }}
+          >
             {/* The purchase error rides inside the reserved area too: it comes
                 and goes with a purchase attempt, and above the pack area it
-                would move the copy for as long as it showed. */}
+                would move the copy for as long as it showed. Two lines is the
+                height the reservation gives it, so a longer message truncates
+                rather than growing the area. */}
             <AccessibleStatus
               message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
               className="px-1 text-sm"
+              numberOfLines={2}
             />
 
             {/* The identity read gates both catalog reads, so its failure is the
@@ -285,7 +303,9 @@ export function CreditPurchaseScreen() {
                 <Text className="font-semibold text-foreground">
                   {t(storeUnavailableCopy.titleKey)}
                 </Text>
-                <Text className="text-sm text-muted-foreground">{t(storeBannerBodyKey)}</Text>
+                <Text className="text-sm text-muted-foreground" numberOfLines={3}>
+                  {t(storeBannerBodyKey)}
+                </Text>
                 <Button
                   accessibilityLabel={t('common.tryAgain')}
                   accessibilityState={{ busy: isRefetching, disabled: isRefetching }}
@@ -363,8 +383,17 @@ export function CreditPurchaseScreen() {
                     }}
                   >
                     <View className="flex-row items-start justify-between gap-4">
-                      <Text className="flex-1 font-semibold text-foreground">{packLabel}</Text>
-                      <Text className="text-base font-semibold text-foreground tabular-nums">
+                      {/* One line each, which is the height the reservation
+                        above assumes: a longer pack name or a longer price
+                        truncates instead of making this row and the copy below
+                        it taller. */}
+                      <Text className="flex-1 font-semibold text-foreground" numberOfLines={1}>
+                        {packLabel}
+                      </Text>
+                      <Text
+                        className="text-base font-semibold text-foreground tabular-nums"
+                        numberOfLines={1}
+                      >
                         {priceLabel}
                       </Text>
                     </View>

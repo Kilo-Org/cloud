@@ -781,10 +781,10 @@ describe('CreditPurchaseScreen', () => {
     // area reserves the tallest state's height and the copy follows it, so no
     // one of those arrivals changes where the copy sits.
     const DESCRIPTION_PREFIX = 'Credits are a one-time purchase';
-    // The tallest state — the store's notice beside four priced rows — needs
-    // about 522 dp on the compact window. The reservation covers it, and the
-    // same value holds in every other state.
-    const TALLEST_STATE_MIN_HEIGHT = 520;
+    // The tallest state — the store's notice beside four unpriced rows — is
+    // 542 dp of fixed-height blocks. The reservation equals it, and the same
+    // value holds in every state, so the copy cannot move.
+    const TALLEST_STATE_MIN_HEIGHT = 542;
     const styleOf = (node: TestRenderer.ReactTestInstance): Record<string, unknown> => {
       const style: unknown = node.props.style;
       return typeof style === 'object' && style !== null && !Array.isArray(style)

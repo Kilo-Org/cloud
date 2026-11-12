@@ -368,13 +368,19 @@ describe('ContainersOutbound egress enforcement', () => {
       new Request('https://session-sync.kiloapps.io/v1/sessions/ses_synthetic', { method: 'PUT' })
     );
     expect(await synced.text()).toBe('synced');
-    const plain = await worker.fetch(
-      new Request('http://session-sync.kiloapps.io/v1/sessions/ses_synthetic', {
-        method: 'PUT',
-        headers: { Authorization: 'Bearer synthetic-handle' },
-      })
-    );
-    expect(plain.status).toBe(403);
+    for (const origin of [
+      'http://session-sync.kiloapps.io',
+      'https://session-sync.kiloapps.io.',
+      'http://session-sync.kiloapps.io.',
+    ]) {
+      const refused = await worker.fetch(
+        new Request(`${origin}/v1/sessions/ses_synthetic`, {
+          method: 'PUT',
+          headers: { Authorization: 'Bearer synthetic-handle' },
+        })
+      );
+      expect(refused.status, origin).toBe(403);
+    }
     expect(sessionSync).toHaveBeenCalledTimes(1);
     expect(handleManagedScmOutbound).not.toHaveBeenCalled();
   });

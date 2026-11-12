@@ -7,7 +7,7 @@ import {
   type ModelStatsSnapshot,
 } from './model-stats-cache';
 import type { EnkryptPublishedBenchmark } from '@kilocode/db/schema-types';
-import { unprefixKiloGatewayModelId } from '@kilocode/worker-utils/kilo-model-id';
+import { lookupModelWithKiloGatewayFallback } from './model-id-lookup';
 
 export { ENKRYPT_STALE_AFTER_MS } from '@kilocode/db/schema-types';
 
@@ -25,10 +25,9 @@ export function enkryptFor(
   ) {
     return undefined;
   }
-  const unprefixed = unprefixKiloGatewayModelId(id);
-  const entry =
-    snapshot.entries.find(({ stat }) => stat.openrouterId === id) ??
-    (unprefixed && snapshot.entries.find(({ stat }) => stat.openrouterId === unprefixed));
+  const entry = lookupModelWithKiloGatewayFallback(id, candidate =>
+    snapshot.entries.find(({ stat }) => stat.openrouterId === candidate)
+  );
   return entry && isEnkryptPublicModel(entry.stat, snapshot.customLlmIds)
     ? publishEnkryptBenchmark(entry.stat.benchmarks?.enkrypt, Date.now(), entry.verification)
     : undefined;

@@ -213,6 +213,7 @@ describe('verifyAppleCreditPurchase', () => {
     ['VERIFICATION_FAILURE', VerificationStatus.VERIFICATION_FAILURE],
     ['INVALID_APP_IDENTIFIER', VerificationStatus.INVALID_APP_IDENTIFIER],
     ['INVALID_ENVIRONMENT', VerificationStatus.INVALID_ENVIRONMENT],
+    ['INVALID_CHAIN_LENGTH', VerificationStatus.INVALID_CHAIN_LENGTH],
   ])('refuses a transaction Apple rejects with %s as terminal', async (_name, status) => {
     const { verifyAppleCreditPurchase } = loadVerifier();
     const signedTransactionJws = 'not-a-decodable-jws-secret-value';

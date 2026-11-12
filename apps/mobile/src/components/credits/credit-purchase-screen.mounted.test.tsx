@@ -810,9 +810,12 @@ describe('CreditPurchaseScreen', () => {
     const raised = await contentHeights();
     dimensions.fontScale = 1;
 
-    // The clearance is a child sized at 100 dp per unit of text scale.
-    expect(single.some(height => Math.abs(height - 100) <= 0.5)).toBe(true);
-    expect(raised.some(height => Math.abs(height - 150) <= 0.5)).toBe(true);
+    // Only the card's text scales: its chrome and the gap under it are fixed.
+    // The stub has no bottom inset, so the gap is the 16 dp floor plus 8.
+    const textHeight = 63;
+    const fixed = 26 + 24;
+    expect(single.some(height => Math.abs(height - (textHeight + fixed)) <= 0.5)).toBe(true);
+    expect(raised.some(height => Math.abs(height - (textHeight * 1.5 + fixed)) <= 0.5)).toBe(true);
   });
 
   it('floats the purchase error clear of the copy without taking layout height', async () => {

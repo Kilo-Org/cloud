@@ -37,14 +37,24 @@ import { useCreditNativeIap } from './credit-native-iap-owner';
 import { CreditExpiryNote } from './credit-expiry-note';
 
 /**
- * The room the scroller keeps at its end for the floating purchase error: the
- * card's own height at three capped lines plus its margins, at the live font
- * scale, because the card is text. Reserved in every state, so the copy can
- * scroll above the card and the clearance never depends on whether the error
- * shows.
+ * The room the scroller keeps at its end for the floating purchase error.
+ *
+ * Only the card's text scales, so only the text is multiplied: three capped
+ * `text-sm` lines, then the card's own `py-3` and its border, then the gap
+ * beneath it, which clears the home-indicator band. Multiplying the whole sum
+ * would under-reserve at a scale below 1 and leave the copy under the card.
+ *
+ * Reserved in every state, so the copy can scroll above the card and the
+ * clearance never depends on whether the error shows.
  */
-const PURCHASE_ERROR_CLEARANCE = 100;
-const purchaseErrorClearance = (fontScale: number): number => PURCHASE_ERROR_CLEARANCE * fontScale;
+const PURCHASE_ERROR_TEXT_HEIGHT = 63;
+const PURCHASE_ERROR_CHROME = 26;
+const purchaseErrorClearance = (fontScale: number, bottomInset: number): number =>
+  PURCHASE_ERROR_TEXT_HEIGHT * fontScale +
+  PURCHASE_ERROR_CHROME +
+  // The gap under the card is the same one the card's own wrapper uses.
+  Math.max(bottomInset, 16) +
+  8;
 
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
@@ -467,7 +477,7 @@ export function CreditPurchaseScreen() {
               content, as a child of the content rather than a container style
               (see the scroller's comment). It scales with the text, because the
               card it clears does. */}
-          <View style={{ height: purchaseErrorClearance(fontScale) }} />
+          <View style={{ height: purchaseErrorClearance(fontScale, bottomInset) }} />
         </DetailScreenScrollView>
         {/* The purchase error floats above the bottom of the scroll area. It
             is not one of the four pack states, so it takes no layout height,

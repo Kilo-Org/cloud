@@ -9,6 +9,7 @@ import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
 import {
   confirmGlanceableOrgMembership,
+  getGlanceableOrgConfirmationEpoch,
   getTerminalBlankEpoch,
   isGlanceableOrgLost,
   planOrgFenceAction,
@@ -251,6 +252,23 @@ describe('cleanup', () => {
       publisher.dispose();
       rebuilt?.dispose();
     }
+  });
+
+  it('advances the org confirmation epoch only when a lost org comes back', () => {
+    // The Home widget credential latches a refusal against this value: a plain
+    // confirmation must not release it, or a revoked credential would be asked
+    // for again on every org list.
+    const before = getGlanceableOrgConfirmationEpoch();
+
+    confirmGlanceableOrgMembership();
+    expect(getGlanceableOrgConfirmationEpoch()).toBe(before);
+
+    writeLostOrgSnapshotAndEnd();
+    confirmGlanceableOrgMembership();
+    expect(getGlanceableOrgConfirmationEpoch()).toBe(before + 1);
+
+    confirmGlanceableOrgMembership();
+    expect(getGlanceableOrgConfirmationEpoch()).toBe(before + 1);
   });
 
   it('blanks to privacy only after a successful list misses the selection', () => {

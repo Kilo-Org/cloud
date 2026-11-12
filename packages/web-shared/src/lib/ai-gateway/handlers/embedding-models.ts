@@ -16,8 +16,9 @@ export async function handleEmbeddingModelsRequest(): Promise<NextResponse> {
       { status: 503, headers: { 'Retry-After': '30' } }
     );
   }
-  // Public catalog read; `gateway-admission.ts` documents catalog caller
-  // handling.
+  // Public catalog read. Every caller receives the public catalog, and a
+  // verified organization member receives it filtered to that member's own
+  // model access; `gateway-admission.ts` covers the inference admission rule.
   const auth = await getUserFromAuth({
     adminOnly: false,
     expectedAudience: KILO_GATEWAY_AUDIENCE,

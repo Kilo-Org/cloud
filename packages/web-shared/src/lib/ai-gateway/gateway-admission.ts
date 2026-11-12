@@ -46,8 +46,8 @@ export type GatewayCaller = SignedInGatewayCaller | AnonymousGatewayCaller | Rej
  * verification is never downgraded to anonymous; see `invalidTokenResponse`.
  *
  * This rule covers inference requests only. The public model catalog routes
- * answer every catalog read, and apply the organization member's own model
- * access to the catalog they return.
+ * return the catalog to every caller, and a verified organization member
+ * receives it filtered to that member's own model access.
  *
  * A refused authorization always returns the authentication layer's response,
  * whether or not `passThroughAuthFailure` is set. That covers a blocked

@@ -36,7 +36,10 @@ import {
   ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
   ORGANIZATION_MANAGE_ROLES,
 } from '@kilocode/app-shared/organizations';
-import { assertInviteSeatCapacity } from '@/lib/organizations/organization-seats';
+import {
+  assertInviteSeatCapacity,
+  lockOrganizationInvites,
+} from '@/lib/organizations/organization-seats';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import {
   getOrganizationMembershipRoles,
@@ -608,13 +611,15 @@ export const organizationsMembersRouter = createTRPCRouter({
       // Owners and Kilo admins can invite any role. Billing managers can invite members only.
       try {
         const result = await db.transaction(async tx => {
+          // One lock orders everything an invitation does — the duplicate
+          // lookup, the seat check and the insert — so two concurrent invites
+          // for one address cannot both pass the lookup, and neither can take
+          // the last free seat twice.
+          await lockOrganizationInvites(tx, organizationId);
           // An existing member or an outstanding invitation answers first: a
           // full organization must not describe an address it already has as a
           // seat problem.
           await assertInviteeAddressIsAvailable(tx, organizationId, email);
-          // Refuse before writing anything when the organization has no free
-          // seat: the advisory lock it takes makes two concurrent invites
-          // serialize, so neither can take the last seat twice.
           await assertInviteSeatCapacity(tx, organizationId, role);
           const invitation = await inviteUserToOrganization(
             organizationId,

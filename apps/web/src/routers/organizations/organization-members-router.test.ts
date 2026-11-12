@@ -2374,6 +2374,43 @@ describe('organizations members trpc router', () => {
       });
     });
 
+    it('creates one invitation when the same new address is invited twice at once', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const email = `${crypto.randomUUID()}@concurrent-invite.example.com`;
+      const invite = () =>
+        caller.organizations.members.invite({
+          organizationId: testOrganization.id,
+          email,
+          role: 'member',
+        });
+
+      // Two transactions take the same organization's invite lock, so the
+      // second waits for the first and then sees its invitation. There is no
+      // unique constraint on (organization_id, email) to fall back on.
+      const results = await Promise.allSettled([invite(), invite()]);
+
+      expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          expect(result.reason).toMatchObject({
+            code: 'CONFLICT',
+            message: 'This email already has a pending invitation',
+          });
+        }
+      }
+
+      const invitations = await db
+        .select({ id: organization_invitations.id })
+        .from(organization_invitations)
+        .where(
+          and(
+            eq(organization_invitations.organization_id, testOrganization.id),
+            eq(organization_invitations.email, email)
+          )
+        );
+      expect(invitations).toHaveLength(1);
+    });
+
     it('should invite member for organization owner', async () => {
       const caller = await createCallerForUser(regularUser.id);
 

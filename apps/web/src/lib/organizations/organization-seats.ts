@@ -121,15 +121,33 @@ export async function getOrganizationSeatUsage(
 }
 
 /**
+ * Serializes everything one organization's invitations do: the duplicate
+ * lookup, the seat check and the insert. A caller takes it first, so two
+ * concurrent invites for the same address cannot both pass the duplicate
+ * lookup (there is no unique constraint on `(organization_id, email)`), and
+ * neither can take the last free seat twice.
+ *
+ * `pg_advisory_xact_lock` blocks the second transaction until the first
+ * commits, and the lock releases at commit or rollback. It is advisory rather
+ * than a row lock on `organizations`, so it orders only invitations and leaves
+ * unrelated writes to that row alone.
+ */
+export async function lockOrganizationInvites(
+  tx: DrizzleTransaction,
+  organizationId: Organization['id']
+): Promise<void> {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended(${organizationId} || ':invite', 0))`
+  );
+}
+
+/**
  * Refuses an invitation that would take a seat the organization does not have,
  * using the same rule the invite dialogs show (`hasInviteSeatCapacity`). A
  * billing manager takes no seat, so that role is never gated.
  *
- * The invitation is serialized by an advisory lock on the organization, so two
- * concurrent invites cannot both read the same free seat: the second waits for
- * the first to commit and then counts the invitation it wrote. The lock is
- * advisory rather than a row lock on `organizations`, so it orders only the
- * seat check and leaves unrelated writes to that row alone.
+ * The caller must already hold {@link lockOrganizationInvites}, which is what
+ * makes the read-then-insert safe against a concurrent invite.
  *
  * This gates invitations only. Adding a membership directly — SCIM directory
  * sync (`directory-sync.ts`), SSO sign-in (`user/sso.ts`), the admin add-member
@@ -145,9 +163,6 @@ export async function assertInviteSeatCapacity(
   if (!inviteConsumesSeat(role)) {
     return;
   }
-  await tx.execute(
-    sql`SELECT pg_advisory_xact_lock(hashtextextended(${organizationId} || ':invite-seat', 0))`
-  );
   const [organization] = await tx
     .select({
       plan: organizations.plan,

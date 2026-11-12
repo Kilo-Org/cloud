@@ -159,24 +159,38 @@ describe('awsBedrock definition', () => {
     expect(chat.extraHeaders).toEqual({});
   });
 
-  it.each([
-    {
-      model: 'bedrock-byok/global.anthropic.claude-sonnet-5-5',
-      upstreamModel: 'global.anthropic.claude-sonnet-5-5',
-    },
-    {
-      model: 'bedrock-byok/global.anthropic.claude-sonnet-latest',
-      upstreamModel: 'global.anthropic.claude-sonnet-latest',
-    },
-  ])('drops mismatched Claude thinking blocks for $model', ({ model, upstreamModel }) => {
+  it.each(
+    [
+      {
+        model: 'bedrock-byok/global.anthropic.claude-sonnet-5-5',
+        upstreamModel: 'global.anthropic.claude-sonnet-5-5',
+      },
+      {
+        model: 'bedrock-byok/global.anthropic.claude-sonnet-latest',
+        upstreamModel: 'global.anthropic.claude-sonnet-latest',
+      },
+    ].flatMap(models =>
+      (['adaptive', 'disabled', 'omitted'] as const).map(mode => ({ ...models, mode }))
+    )
+  )('handles $mode Claude thinking for $model', ({ model, upstreamModel, mode }) => {
     const context = createContext(
       {
         kind: 'messages',
         body: {
           model: upstreamModel,
-          messages: [],
+          messages: [
+            { role: 'user', content: 'hello' },
+            {
+              role: 'assistant',
+              content: [
+                { type: 'thinking', thinking: '', signature: 'FAKE_BEDROCK_TEST_SIGNATURE' },
+                { type: 'redacted_thinking', data: 'FAKE_BEDROCK_TEST_REDACTED_DATA' },
+                { type: 'text', text: 'Previous answer.' },
+              ],
+            },
+          ],
           max_tokens: 10,
-          thinking: { type: 'adaptive' },
+          ...(mode !== 'omitted' && { thinking: { type: mode } }),
         },
       },
       model
@@ -185,7 +199,18 @@ describe('awsBedrock definition', () => {
     awsBedrock.transformRequest(context);
 
     expect(context.request.body).toMatchObject({
-      thinking: { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } },
+      thinking:
+        mode === 'disabled'
+          ? { type: 'disabled' }
+          : { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } },
+    });
+    if (context.request.kind !== 'messages') throw new Error('Expected Messages request');
+    expect(context.request.body.messages[1]).toMatchObject({
+      role: 'assistant',
+      content:
+        mode === 'disabled'
+          ? [{ type: 'text', text: 'Previous answer.' }]
+          : [{ type: 'thinking' }, { type: 'redacted_thinking' }, { type: 'text' }],
     });
     expect(context.extraHeaders).toEqual({
       'anthropic-version': '2023-06-01',

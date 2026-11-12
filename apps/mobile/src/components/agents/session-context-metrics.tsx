@@ -48,16 +48,18 @@ const RING_STROKE = 3;
  * settled reading each stand on their own.
  *
  * The pill is the cluster's leading control, beside the trailing action, so a
- * reading that arrives widens it into the header's free space instead of moving
- * the action at the end of the row. `shrink min-w-0` keeps it inside the
- * header's capped trailing slot: RN's default flexShrink is 0, so without them a
- * long reading would paint past the row's right edge. The cost is the only
- * unbounded part of the reading, so both value texts truncate to one line.
+ * reading that arrives widens it into the row and the heading beside it gives up
+ * that width — the heading keeps its own line cap and tail ellipsis. `shrink
+ * min-w-0` keeps the pill inside the header's capped trailing slot: RN's default
+ * flexShrink is 0, so without them a long reading would paint past the row's
+ * right edge. The percentage is a few glyphs at most, so it keeps its width; the
+ * cost is the only unbounded part, so it is the one that truncates to one line.
  */
 const PILL_CLASS =
   'h-[44px] shrink min-w-0 flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
 const VALUE_ROW_CLASS = 'min-w-0 shrink flex-row items-baseline gap-1';
-const VALUE_CLASS = 'min-w-0 shrink text-xs tabular-nums';
+const PRIMARY_VALUE_CLASS = 'shrink-0 text-xs tabular-nums';
+const COST_VALUE_CLASS = 'min-w-0 shrink text-xs tabular-nums';
 
 const TONE_TEXT_CLASS = {
   destructive: 'text-destructive',
@@ -119,7 +121,7 @@ export function SessionContextMetrics({
           {content.primary !== null ? (
             <Text
               numberOfLines={1}
-              className={cn(VALUE_CLASS, 'font-semibold', TONE_TEXT_CLASS[content.tone])}
+              className={cn(PRIMARY_VALUE_CLASS, 'font-semibold', TONE_TEXT_CLASS[content.tone])}
             >
               {content.primary}
             </Text>
@@ -127,7 +129,7 @@ export function SessionContextMetrics({
           {costLabel !== null ? (
             <Text
               numberOfLines={1}
-              className={cn(VALUE_CLASS, 'text-muted-foreground')}
+              className={cn(COST_VALUE_CLASS, 'text-muted-foreground')}
               accessibilityElementsHidden
               importantForAccessibility="no"
             >

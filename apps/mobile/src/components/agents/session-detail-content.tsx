@@ -2019,7 +2019,9 @@ export function SessionDetailContent({
     // The pill leads and the Follow control takes the trailing edge. The pill
     // grows by one reading when the session starts reporting usage, and a
     // control after it would move by that width; at the end of the row it keeps
-    // one position, and the pill widens into the header's free space instead.
+    // one position instead. The growth comes out of the heading beside it, which
+    // keeps its own line cap and tail ellipsis — the trade this row makes to
+    // leave the title the width up to the pill's painted size.
     <View className="min-w-0 shrink flex-row items-center gap-2">
       <SessionContextMetrics
         info={contextInfo}

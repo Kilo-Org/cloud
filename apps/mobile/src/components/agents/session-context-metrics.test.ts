@@ -221,7 +221,8 @@ describe('SessionContextMetrics', () => {
   });
 
   // The header caps the trailing cluster, and RN's flexShrink is 0 by default,
-  // so the pill and its reading must all opt in or they paint off-screen.
+  // so the pill and its reading must all opt in or they paint off-screen. The
+  // percentage keeps its width and the cost is the part that truncates.
   it('lets the pill and its reading compress inside a constrained header row', () => {
     const root = render({
       hasMessages: true,
@@ -234,10 +235,10 @@ describe('SessionContextMetrics', () => {
     const pill = pillOf(root);
     const runs = findAll(pill, el => propsOf(el).numberOfLines === 1);
     expect(runs).toHaveLength(2);
-    for (const run of runs) {
-      expect(classNameOf(run)).toContain('shrink');
-      expect(classNameOf(run)).toContain('min-w-0');
-    }
+    const [percentage, cost] = runs;
+    expect(classNameOf(percentage ?? root)).toContain('shrink-0');
+    expect(classNameOf(cost ?? root)).toContain('shrink');
+    expect(classNameOf(cost ?? root)).toContain('min-w-0');
   });
 
   // A transcript that reports no usage and no cost paints a bare ring: the pill

@@ -23,7 +23,12 @@ import {
   getDataCollectionRequiredModelIds,
   getProviderSlugsForModels,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getOpenRouterModelsMetadataFromDatabase,
+  getVercelModelsMetadataFromDatabase,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type * as MapModelIdToVercelModule from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { resolveCatalogVariant } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
 import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type * as UnavailableModelsModule from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
@@ -38,6 +43,14 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => {
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
+  getVercelModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
+  ...jest.requireActual<typeof MapModelIdToVercelModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel'
+  ),
+  getVercelModelIdOverrides: jest.fn(() => Promise.resolve(new Map())),
 }));
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models', () => ({
@@ -433,6 +446,8 @@ describe('Vercel-only models', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+    jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({});
     jest
       .mocked(getProviderSlugsForModels)
       .mockImplementation(async ids => new Map(ids.map(id => [id, new Set<string>()])));
@@ -452,6 +467,36 @@ describe('Vercel-only models', () => {
       inference_provider_ids: ['amazon-bedrock', 'vendor'],
       isFree: false,
     });
+  });
+
+  it('advertises Vercel reasoning variants that request-time variant resolution accepts', async () => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      'vendor/model': { id: 'vendor/model', name: 'Test Model', endpoints: [] },
+    });
+    jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({
+      [vercelOnlyModel.id]: {
+        id: vercelOnlyModel.id,
+        name: 'Vercel Only',
+        type: 'language',
+        context_window: 32_000,
+        modalities: { input: ['text'], output: ['text'] },
+        pricing: { input: '0.000001', output: '0.000005' },
+        reasoning_options: [{ type: 'effort', values: ['low', 'medium', 'high'] }],
+        endpoints: [{ provider_name: 'vendor' }],
+      },
+    });
+
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+    const variants =
+      models.data.find(model => model.id === vercelOnlyModel.id)?.opencode?.variants ?? {};
+
+    expect(Object.keys(variants)).toEqual(['low', 'medium', 'high']);
+    for (const [variant, settings] of Object.entries(variants)) {
+      expect(await resolveCatalogVariant(vercelOnlyModel.id, variant)).toEqual({
+        model: vercelOnlyModel.id,
+        reasoning: settings.reasoning,
+      });
+    }
   });
 
   it('hides unavailable ones', async () => {

@@ -65,8 +65,8 @@ import {
   getVercelModelIdOverrides,
   mapModelIdToVercel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { findVercelOnlyModels } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/find-vercel-only-models';
 import {
-  findVercelOnlyModels,
   getVendorNamesByModelPrefix,
   getVercelOnlyModelName,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/vercel-only-models';

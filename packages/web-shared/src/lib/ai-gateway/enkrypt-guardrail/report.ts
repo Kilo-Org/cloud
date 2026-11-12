@@ -30,38 +30,110 @@ const GuardrailSettingsSchema = z.object({
   detectors: z.array(DetectorSettingsSchema),
 });
 
-/**
- * One Enkrypt scan: of the blocking detectors or the log-only detectors, over the request's tool
- * definitions, its system prompt, its conversation, or the model's response.
- */
-export const EnkryptScanReportSchema = z.object({
+const ScanDecisionSchema = z.enum([
+  'allowed',
+  'blocked',
+  'error_fail_closed',
+  'error_logged',
+  'client_aborted',
+]);
+
+const VerdictCacheSchema = z.enum(['off', 'miss', 'hit', 'error']);
+
+/** Fields shared by a single scan and the aggregate of a request's tool definition scans. */
+const scanOutcomeShape = {
   scan: z.enum(['blocking', 'log_only']),
-  part: z.enum(['tools', 'system', 'conversation', 'response']),
   detectors_enabled: z.array(DetectorIdSchema),
   detectors_blocking: z.array(DetectorIdSchema),
-  verdict_cache: z.enum(['off', 'miss', 'hit', 'error']),
+  verdict_cache: VerdictCacheSchema,
   total_characters: z.number(),
-  total_segments: z.number(),
   cached_characters: z.number(),
+  /** Includes the overlap of already-scanned text and omission markers. */
+  scanned_characters: z.number(),
+  decision: ScanDecisionSchema,
+  error: z.string().nullable(),
+  detectors_fired: z.array(DetectorIdSchema),
+  /** Enkrypt calls made, including retries. */
+  attempts: z.number(),
+  credits_cost: z.number().nullable(),
+  /** Includes time spent waiting for a free call slot. */
+  latency_ms: z.number(),
+};
+
+/**
+ * One Enkrypt scan: of the blocking detectors or the log-only detectors, over one of the request's
+ * tool definitions, its system prompt, its conversation, or the model's response.
+ */
+export const EnkryptScanReportSchema = z.object({
+  ...scanOutcomeShape,
+  part: z.enum(['tools', 'system', 'conversation', 'response']),
+  total_segments: z.number(),
   cached_segments: z.number(),
   /** Attachments, such as images, sent to Enkrypt only as an omission marker. */
   omitted_attachments: z.number(),
-  /** Includes the overlap of already-scanned text and omission markers. */
-  scanned_characters: z.number(),
-  decision: z.enum(['allowed', 'blocked', 'error_fail_closed', 'error_logged', 'client_aborted']),
-  error: z.string().nullable(),
-  detectors_fired: z.array(DetectorIdSchema),
-  /** Enkrypt calls made, including a retry. */
-  attempts: z.number(),
-  credits_cost: z.number().nullable(),
-  latency_ms: z.number(),
 });
 
 export type EnkryptScanReport = z.infer<typeof EnkryptScanReportSchema>;
 
+/** At most this many flagged tools are listed; `tools_flagged` counts them all. */
+export const MAX_REPORTED_FLAGGED_TOOLS = 20;
+
+/** A tool definition or response format whose scan fired a detector or failed. */
+const FlaggedToolSchema = z.object({
+  kind: z.enum(['tool', 'response_format']),
+  name: z.string().nullable(),
+  detectors_fired: z.array(DetectorIdSchema),
+  error: z.string().nullable(),
+});
+
+export type EnkryptFlaggedTool = z.infer<typeof FlaggedToolSchema>;
+
 /**
- * What the input guardrail did for one request. Holds settings, counts, and outcomes only, never
- * request text, Enkrypt's messages, or verdict cache keys.
+ * The scans of a request's tool definitions and response formats by the blocking or the log-only
+ * detectors, aggregated: each is cached and scanned on its own, so a request can make one Enkrypt
+ * call per tool. `verdict_cache` is `hit` when the cache covered at least one of them. The decision
+ * and error are those of the most severe tool. Characters, calls, and credits are summed; the
+ * latency runs until the last tool's scan finished.
+ */
+export const EnkryptToolScanReportSchema = z.object({
+  ...scanOutcomeShape,
+  part: z.literal('tools'),
+  tools_total: z.number(),
+  /** Allowed before with the same organization and detectors, so not scanned again. */
+  tools_cached: z.number(),
+  /** Not covered by the cache, so each was scanned by its own call, or failed. */
+  tools_scanned: z.number(),
+  tools_flagged: z.number(),
+  /** The tools that fired a detector or failed, most severe first, by name only. */
+  flagged_tools: z.array(FlaggedToolSchema),
+});
+
+export type EnkryptToolScanReport = z.infer<typeof EnkryptToolScanReportSchema>;
+
+const VerdictCacheWriteSchema = z.enum(['written', 'failed', 'skipped']);
+
+/** The verdict cache write of a scan: for tool definitions, `failed` if any write failed, else `written` if any was written. */
+const verdictCacheWriteShape = { verdict_cache_write: VerdictCacheWriteSchema };
+
+/** A scan of the input guardrail: the aggregate of the tool definitions, the system prompt, or the conversation. */
+export const EnkryptInputScanReportSchema = z.union([
+  EnkryptToolScanReportSchema.extend(verdictCacheWriteShape),
+  EnkryptScanReportSchema.extend({
+    part: z.enum(['system', 'conversation']),
+    ...verdictCacheWriteShape,
+  }),
+]);
+
+export type EnkryptInputScanReport = z.infer<typeof EnkryptInputScanReportSchema>;
+
+/** An input guardrail scan before its verdict cache write is known. */
+export type EnkryptInputPartScanReport =
+  | EnkryptToolScanReport
+  | (EnkryptScanReport & { part: 'system' | 'conversation' });
+
+/**
+ * What the input guardrail did for one request. Holds settings, counts, outcomes, and the names of
+ * flagged tools only, never other request text, Enkrypt's messages, or verdict cache keys.
  */
 export const EnkryptGuardrailReportSchema = z.object({
   /** Null when the scan could not be prepared, which rejects the request. */
@@ -71,12 +143,7 @@ export const EnkryptGuardrailReportSchema = z.object({
   unavailable_reason: z.enum(['transient', 'timeout', 'failed']).nullable(),
   /** How long the request waited for the verdict, or null when it never waited. */
   added_latency_ms: z.number().nullable(),
-  scans: z.array(
-    EnkryptScanReportSchema.extend({
-      /** Whether this scan's allow was stored in the verdict cache. */
-      verdict_cache_write: z.enum(['written', 'failed', 'skipped']),
-    })
-  ),
+  scans: z.array(EnkryptInputScanReportSchema),
 });
 
 export type EnkryptGuardrailReport = z.infer<typeof EnkryptGuardrailReportSchema>;

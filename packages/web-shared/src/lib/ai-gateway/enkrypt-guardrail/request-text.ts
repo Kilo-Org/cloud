@@ -34,13 +34,25 @@ function omitted(header: string): Piece {
 export type RequestSegment = { header: string; body: string | null };
 
 /**
+ * One tool definition, or the request's response or output format, which constrains the model's
+ * output like a tool's schema does. Each is scanned and cached on its own.
+ */
+export type RequestToolDefinition = {
+  kind: 'tool' | 'response_format';
+  /** The tool's name; null for a response format or a tool without one. */
+  name: string | null;
+  segments: RequestSegment[];
+};
+
+/**
  * A request in three parts, each scanned and cached on its own. `tools` holds tool definitions and
- * output formats, which rarely change within a session. `system` is the system prompt, which
- * clients rebuild more often, for example with the date or workspace state. Both are cached as a
+ * response formats, which rarely change within a session; each is cached as a whole, so adding,
+ * removing, or changing one tool rescans only that tool. `system` is the system prompt, which
+ * clients rebuild more often, for example with the date or workspace state, and is cached as a
  * whole. `conversation` is the message history, which grows request by request.
  */
 export type RequestScanParts = {
-  tools: RequestSegment[];
+  tools: RequestToolDefinition[];
   system: RequestSegment[];
   conversation: RequestSegment[];
 };
@@ -90,6 +102,17 @@ function toolCall(role: string, name: Text, input: Text): Piece {
 
 function toolDefinition(name: Text, texts: Text[]): Piece {
   return piece(name ? `tool definition: ${name}` : 'tool definition', texts);
+}
+
+/** The pieces of one `RequestToolDefinition`. */
+type ToolPieces = { kind: RequestToolDefinition['kind']; name: string | null; pieces: Piece[] };
+
+function toolPieces(name: Text, pieces: Piece[]): ToolPieces {
+  return { kind: 'tool', name: name || null, pieces };
+}
+
+function responseFormatPieces(texts: Text[]): ToolPieces {
+  return { kind: 'response_format', name: null, pieces: [piece('response format', texts)] };
 }
 
 function namedFile(header: string, filename: Text): Piece {
@@ -186,35 +209,35 @@ function chatMessagePieces(message: ChatMessage): Piece[] {
   }
 }
 
-function chatToolDefinitionPieces(tool: OpenAI.Chat.ChatCompletionTool): Piece[] {
+function chatToolDefinitionPieces(tool: OpenAI.Chat.ChatCompletionTool): ToolPieces {
   switch (tool.type) {
     case 'function':
-      return [
+      return toolPieces(tool.function.name, [
         toolDefinition(tool.function.name, [
           tool.function.description,
           jsonText(tool.function.parameters),
         ]),
-      ];
+      ]);
     case 'custom': {
       const { format } = tool.custom;
-      return [
+      return toolPieces(tool.custom.name, [
         toolDefinition(tool.custom.name, [
           tool.custom.description,
           format?.type === 'grammar' ? format.grammar.definition : undefined,
         ]),
-      ];
+      ]);
     }
     default:
-      return unrecognized('tool definition', tool);
+      return toolPieces(null, unrecognized('tool definition', tool));
   }
 }
 
 function chatResponseFormatPieces(
   format: OpenRouterChatCompletionRequest['response_format']
-): Piece[] {
+): ToolPieces[] {
   if (format?.type !== 'json_schema') return [];
   const { name, description, schema } = format.json_schema;
-  return [piece('response format', [name, description, jsonText(schema)])];
+  return [responseFormatPieces([name, description, jsonText(schema)])];
 }
 
 function isInstructionRole(role: unknown): boolean {
@@ -234,10 +257,10 @@ function chatCompletionsParts(body: OpenRouterChatCompletionRequest): ScanPieces
   return {
     tools: [
       ...(body.tools ?? []).map(chatToolDefinitionPieces),
-      ...(body.functions ?? []).map(fn => [
-        toolDefinition(fn.name, [fn.description, jsonText(fn.parameters)]),
-      ]),
-      chatResponseFormatPieces(body.response_format),
+      ...(body.functions ?? []).map(fn =>
+        toolPieces(fn.name, [toolDefinition(fn.name, [fn.description, jsonText(fn.parameters)])])
+      ),
+      ...chatResponseFormatPieces(body.response_format),
     ],
     system: body.messages.slice(0, instructions).map(chatMessagePieces),
     conversation: body.messages.slice(instructions).map(chatMessagePieces),
@@ -411,11 +434,14 @@ function anthropicMessagePieces(message: Anthropic.Beta.BetaMessageParam): Piece
     : message.content.flatMap(block => anthropicBlockPieces(message.role, block));
 }
 
-function anthropicToolDefinitionPiece(tool: Anthropic.Beta.BetaToolUnion): Piece {
-  return toolDefinition('name' in tool ? tool.name : undefined, [
-    'description' in tool ? tool.description : undefined,
-    'input_schema' in tool ? jsonText(tool.input_schema) : undefined,
-    'input_examples' in tool ? jsonText(tool.input_examples) : undefined,
+function anthropicToolDefinitionPieces(tool: Anthropic.Beta.BetaToolUnion): ToolPieces {
+  const name = 'name' in tool ? tool.name : undefined;
+  return toolPieces(name, [
+    toolDefinition(name, [
+      'description' in tool ? tool.description : undefined,
+      'input_schema' in tool ? jsonText(tool.input_schema) : undefined,
+      'input_examples' in tool ? jsonText(tool.input_examples) : undefined,
+    ]),
   ]);
 }
 
@@ -437,13 +463,11 @@ function messagesParts(request: GatewayMessagesRequest): ScanPieces {
       ],
     ],
     tools: [
-      ...(body.tools ?? []).map(tool => [anthropicToolDefinitionPiece(tool)]),
-      [
-        piece('response format', [
-          jsonText(body.output_format?.schema),
-          jsonText(body.output_config?.format?.schema),
-        ]),
-      ],
+      ...(body.tools ?? []).map(anthropicToolDefinitionPieces),
+      responseFormatPieces([
+        jsonText(body.output_format?.schema),
+        jsonText(body.output_config?.format?.schema),
+      ]),
     ],
     conversation: body.messages.map(anthropicMessagePieces),
   };
@@ -501,6 +525,29 @@ function responsesToolDefinitionPieces(tool: ResponsesTool): Piece[] {
       return [];
     default:
       return unrecognized('tool definition', tool);
+  }
+}
+
+/**
+ * Each tool of a namespace is a tool definition of its own, so a namespace holding many tools, such
+ * as an MCP server's, is not scanned and cached as one large item.
+ */
+function responsesToolDefinitionItems(tool: ResponsesTool): ToolPieces[] {
+  switch (tool.type) {
+    case 'namespace':
+      return [
+        toolPieces(tool.name, [toolDefinition(tool.name, [tool.description])]),
+        ...tool.tools.flatMap(responsesToolDefinitionItems),
+      ];
+    case 'function':
+    case 'custom':
+      return [toolPieces(tool.name, responsesToolDefinitionPieces(tool))];
+    case 'tool_search':
+      return [toolPieces('tool_search', responsesToolDefinitionPieces(tool))];
+    case 'mcp':
+      return [toolPieces(`MCP server ${tool.server_label}`, responsesToolDefinitionPieces(tool))];
+    default:
+      return [toolPieces(null, responsesToolDefinitionPieces(tool))];
   }
 }
 
@@ -670,8 +717,8 @@ function responsesParts(body: GatewayResponsesRequest): ScanPieces {
   const instructions = leadingInstructionCount(items, isInstructionItem);
   return {
     tools: [
-      ...(body.tools ?? []).map(responsesToolDefinitionPieces),
-      [piece('response format', responsesFormatTexts(body.text?.format))],
+      ...(body.tools ?? []).flatMap(responsesToolDefinitionItems),
+      responseFormatPieces(responsesFormatTexts(body.text?.format)),
     ],
     system: [
       [piece('instructions', [body.instructions])],
@@ -685,7 +732,7 @@ function responsesParts(body: GatewayResponsesRequest): ScanPieces {
 }
 
 /** Pieces grouped by the tool definition, message, or input item they came from. */
-type ScanPieces = Record<keyof RequestScanParts, Piece[][]>;
+type ScanPieces = { tools: ToolPieces[]; system: Piece[][]; conversation: Piece[][] };
 
 function scanPieces(request: GatewayRequest): ScanPieces {
   switch (request.kind) {
@@ -745,7 +792,10 @@ function messageSegments(pieces: Piece[]): RequestSegment[] {
 export function extractRequestParts(request: GatewayRequest): RequestScanParts {
   const { tools, system, conversation } = scanPieces(request);
   return {
-    tools: tools.flatMap(messageSegments),
+    tools: tools.flatMap(({ kind, name, pieces }) => {
+      const segments = messageSegments(pieces);
+      return segments.length > 0 ? [{ kind, name, segments }] : [];
+    }),
     system: system.flatMap(messageSegments),
     conversation: conversation.flatMap(messageSegments),
   };

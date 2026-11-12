@@ -1,8 +1,11 @@
 import type { EnkryptDetectorId } from '@kilocode/db/schema-types';
 import type {
+  EnkryptFlaggedTool,
   EnkryptGuardrailReport,
+  EnkryptInputScanReport,
   EnkryptOutputGuardrailReport,
   EnkryptScanReport,
+  EnkryptToolScanReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
 import type { ReactNode } from 'react';
 import {
@@ -14,7 +17,7 @@ import { ABSENT, formatCount, formatDurationMs } from './format';
 import type { StepTone } from './routing-labels';
 
 type Verdict = EnkryptGuardrailReport['verdict'];
-type Scan = EnkryptScanReport & { verdict_cache_write?: 'written' | 'failed' | 'skipped' };
+type Scan = EnkryptInputScanReport | EnkryptScanReport;
 type Settings = NonNullable<EnkryptGuardrailReport['settings']>;
 type DetectorSetting = Settings['detectors'][number];
 
@@ -87,6 +90,87 @@ function DetectorList({ detectors }: { detectors: EnkryptDetectorId[] }) {
   return <>{detectors.map(detectorLabel).join(', ')}</>;
 }
 
+function verdictCacheValue(scan: Scan): string {
+  const stored = 'verdict_cache_write' in scan && scan.verdict_cache_write === 'written';
+  return `${VERDICT_CACHE_LABELS[scan.verdict_cache]}${stored ? ', stored' : ''}`;
+}
+
+function flaggedToolName(tool: EnkryptFlaggedTool): string {
+  if (tool.kind === 'response_format') return 'Response format';
+  return tool.name ?? 'Unnamed tool';
+}
+
+function FlaggedTools({ scan }: { scan: EnkryptToolScanReport }) {
+  if (scan.flagged_tools.length === 0) return null;
+  const more = scan.tools_flagged - scan.flagged_tools.length;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-muted-foreground text-xs">Flagged tools</span>
+      <ul className="flex flex-col gap-1">
+        {scan.flagged_tools.map((tool, index) => (
+          <li key={index} className="flex flex-wrap items-baseline gap-x-2 text-xs">
+            <span className="font-mono">{flaggedToolName(tool)}</span>
+            {tool.detectors_fired.length > 0 && (
+              <span className="text-status-destructive">
+                <DetectorList detectors={tool.detectors_fired} />
+              </span>
+            )}
+            {tool.error && <span className="text-status-destructive">{tool.error}</span>}
+          </li>
+        ))}
+      </ul>
+      {more > 0 && (
+        <span className="text-muted-foreground text-xs">and {formatCount(more)} more</span>
+      )}
+    </div>
+  );
+}
+
+function scanItems(scan: Scan): DetailItem[] {
+  if (scan.part === 'tools' && 'tools_total' in scan) {
+    return [
+      {
+        label: 'Tools',
+        value: `${formatCount(scan.tools_total)} total, ${formatCount(scan.tools_cached)} cached, ${formatCount(scan.tools_scanned)} scanned`,
+      },
+      { label: 'Verdict cache', value: verdictCacheValue(scan) },
+      {
+        label: 'Characters scanned',
+        value: `${formatCount(scan.scanned_characters)} of ${formatCount(scan.total_characters)}`,
+      },
+      {
+        label: 'Characters cached',
+        value: `${formatCount(scan.cached_characters)} of ${formatCount(scan.total_characters)}`,
+      },
+      { label: 'Enkrypt calls', value: formatCount(scan.attempts) },
+    ];
+  }
+  if (!('total_segments' in scan)) return [];
+  return [
+    ...(scan.part === 'response'
+      ? []
+      : [{ label: 'Verdict cache', value: verdictCacheValue(scan) }]),
+    {
+      label: 'Characters scanned',
+      value: `${formatCount(scan.scanned_characters)} of ${formatCount(scan.total_characters)}`,
+    },
+    ...(scan.part === 'conversation'
+      ? [
+          {
+            label: 'Characters cached',
+            value: `${formatCount(scan.cached_characters)} of ${formatCount(scan.total_characters)}`,
+          },
+          {
+            label: 'Segments cached',
+            value: `${formatCount(scan.cached_segments)} of ${formatCount(scan.total_segments)}`,
+          },
+          { label: 'Attachments omitted', value: formatCount(scan.omitted_attachments) },
+        ]
+      : []),
+    { label: 'Enkrypt calls', value: formatCount(scan.attempts) },
+  ];
+}
+
 function ScanCard({ scan }: { scan: Scan }) {
   const decision = DECISIONS[scan.decision];
   const part = PART_LABELS[scan.part];
@@ -116,37 +200,10 @@ function ScanCard({ scan }: { scan: Scan }) {
                 'None'
               ),
           },
-          ...(scan.part === 'response'
-            ? []
-            : [
-                {
-                  label: 'Verdict cache',
-                  value: `${VERDICT_CACHE_LABELS[scan.verdict_cache]}${scan.verdict_cache_write === 'written' ? ', stored' : ''}`,
-                },
-              ]),
-          {
-            label: 'Characters scanned',
-            value: `${formatCount(scan.scanned_characters)} of ${formatCount(scan.total_characters)}`,
-          },
-          ...(scan.part === 'conversation'
-            ? [
-                {
-                  label: 'Characters cached',
-                  value: `${formatCount(scan.cached_characters)} of ${formatCount(scan.total_characters)}`,
-                },
-                {
-                  label: 'Segments cached',
-                  value: `${formatCount(scan.cached_segments)} of ${formatCount(scan.total_segments)}`,
-                },
-                { label: 'Attachments omitted', value: formatCount(scan.omitted_attachments) },
-              ]
-            : []),
-          {
-            label: 'Enkrypt calls',
-            value: formatCount(scan.attempts),
-          },
+          ...scanItems(scan),
         ]}
       />
+      {'flagged_tools' in scan && <FlaggedTools scan={scan} />}
       {scan.error && <p className="text-status-destructive text-xs">{scan.error}</p>}
     </li>
   );

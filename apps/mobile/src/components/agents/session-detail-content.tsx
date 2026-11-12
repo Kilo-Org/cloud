@@ -5,7 +5,13 @@ import {
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
+import {
+  type Href,
+  useFocusEffect,
+  useIsFocused,
+  useNavigationContainerRef,
+  useRouter,
+} from 'expo-router';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -292,6 +298,12 @@ export function SessionDetailContent({
   const manager = useSessionManager();
   const { t } = useTranslation();
   const router = useRouter();
+  // The root container this screen's `setParams` lands on, read at the moment
+  // of the call rather than through state: `setParams` asserts the container is
+  // mounted and throws "Attempted to navigate before mounting the Root Layout
+  // component" otherwise (KILO-APP-6VA). The debounced publish below is the one
+  // call that can outlive the container.
+  const navigationRef = useNavigationContainerRef();
   const { openNewSessionHref } = useNewSessionNavigator();
   const { confirm, dialog } = useConfirmDialog();
   // The router behind the failure row's one navigation. Read through a ref so a
@@ -470,13 +482,20 @@ export function SessionDetailContent({
       return undefined;
     }
     const timer = setTimeout(() => {
+      // The container can go away between this effect and its timer: an
+      // activity recreate, or the bootstrap-error surface that renders no
+      // `Slot`. Dropping the publish costs one resume position; writing it
+      // would throw out of the timer and take the app to the fatal screen.
+      if (!navigationRef.isReady()) {
+        return;
+      }
       publishedAnchorRef.current = anchor;
       router.setParams({ at: anchor });
     }, ANCHOR_PUBLISH_DEBOUNCE_MS);
     return () => {
       clearTimeout(timer);
     };
-  }, [anchor, router]);
+  }, [anchor, navigationRef, router]);
 
   // A send takes the transcript position over: the sent message and its reply
   // must be on screen, even when a `?at=` resume left the transcript parked on

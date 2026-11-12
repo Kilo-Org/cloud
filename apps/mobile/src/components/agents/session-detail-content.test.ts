@@ -145,6 +145,14 @@ const profileRowsState = vi.hoisted(() => {
   };
 });
 const routerSetParams = vi.hoisted(() => vi.fn());
+// The root container ref, which is one module-level singleton in expo-router.
+// A test flips `ready` to model the container going away (an activity recreate)
+// between arming the publish and its timer firing.
+const navigationContainer = vi.hoisted(() => ({
+  ready: true,
+  addListener: () => () => undefined,
+  isReady: () => navigationContainer.ready,
+}));
 const handoffAdvertiserCalls = vi.hoisted(() => ({
   props: [] as { anchorMessageId?: string | null }[],
 }));
@@ -209,7 +217,7 @@ vi.mock('@/lib/app-unlock-context', () => ({
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
-  useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
+  useNavigationContainerRef: () => navigationContainer,
   usePreventRemove: vi.fn(),
   useNavigation: () => ({
     getState: () => ({
@@ -841,6 +849,8 @@ function transcriptKeys(renderer: ReactTestRenderer): string[] {
 
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+  routerSetParams.mockClear();
+  navigationContainer.ready = true;
   profileRowsState.personal = [];
   profileRowsState.combined = { orgProfiles: [], personalProfiles: [], effectiveDefaultId: null };
   profileRowsState.agentsById = {};
@@ -4522,6 +4532,33 @@ describe('SessionDetailContent live position', () => {
       });
     });
     expect(routerSetParams).toHaveBeenCalledWith({ at: 'msg-77' });
+  });
+
+  it('drops the publish when the container is gone before the debounce fires', async () => {
+    routerSetParams.mockClear();
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    act(() => {
+      (list.props as ComponentProps<typeof SessionMessageList>).onAnchorChange?.('msg-77');
+    });
+
+    // The container leaves before the timer fires — an activity recreate, or
+    // the bootstrap-error surface that renders no `Slot`. `setParams` asserts
+    // the container is mounted and throws out of this callback otherwise; the
+    // resume position is simply dropped.
+    navigationContainer.ready = false;
+
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 600);
+      });
+    });
+
+    expect(routerSetParams).not.toHaveBeenCalled();
   });
 });
 

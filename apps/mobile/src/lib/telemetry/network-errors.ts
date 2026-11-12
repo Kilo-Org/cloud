@@ -55,7 +55,7 @@ type NetworkOutcome = 'http_error' | 'failed';
 type TransportOutcome = 'timeout' | 'failed';
 
 export type TrpcErrorContext = {
-  code?: string;
+  code?: TrpcErrorCode;
   httpStatus?: number;
   path?: string;
 };
@@ -87,11 +87,16 @@ export type NetworkErrorFetchOptions = {
 };
 
 /**
- * The error code names tRPC defines (`TRPC_ERROR_CODES_BY_KEY` in
- * `@trpc/server/rpc`), the only vocabulary a code may come from. Any other
- * string is not a tRPC code: the edge firewall answers a blocked region with
- * `{"error":{"code":"403"}}`, and reading that number as a code made every
- * blocked request look like app code and escaped the expected-answer rule below.
+ * The error code names tRPC defines, copied from `TRPC_ERROR_CODES_BY_KEY` in
+ * `@trpc/server/rpc`. The app cannot import that map — `@trpc/server` is a
+ * server package and not one of this app's dependencies — so the list lives
+ * here; a name tRPC adds later is read as "no tRPC code", which keeps the status
+ * and path that name the defect.
+ *
+ * Any other string is not a tRPC code: the edge firewall answers a blocked
+ * region with `{"error":{"code":"403"}}`, and reading that number as a code
+ * made every blocked request look like app code and escaped the
+ * expected-answer rule below.
  */
 const TRPC_ERROR_CODE_NAMES = [
   'PARSE_ERROR',
@@ -117,12 +122,22 @@ const TRPC_ERROR_CODE_NAMES = [
   'CLIENT_CLOSED_REQUEST',
 ] as const;
 
-const TrpcErrorCodeSchema = z.enum(TRPC_ERROR_CODE_NAMES);
+/** One code name {@link TRPC_ERROR_CODE_NAMES} lists. */
+type TrpcErrorCode = (typeof TRPC_ERROR_CODE_NAMES)[number];
+
+const TRPC_ERROR_CODES: ReadonlySet<string> = new Set(TRPC_ERROR_CODE_NAMES);
+
+function isTrpcErrorCode(code: string): code is TrpcErrorCode {
+  return TRPC_ERROR_CODES.has(code);
+}
 
 // tRPC server error shape (packages @trpc/server `getErrorShape`) exposes
-// `data.httpStatus` / `data.path`; v11 client errors expose flat `data.*`.
+// `data.httpStatus` / `data.path`; v11 client errors expose flat `data.*`. A
+// code stays a plain string here: a name this module does not know must not
+// discard the status and path the same body carries (a batch item's status is
+// what names its defect), so membership is checked when the code is read.
 const TrpcErrorDataSchema = z.looseObject({
-  code: TrpcErrorCodeSchema.optional(),
+  code: z.string().optional(),
   httpStatus: z.number().optional(),
   path: z.string().optional(),
 });
@@ -135,7 +150,7 @@ const ShapedTrpcErrorSchema = z.looseObject({
   shape: z.looseObject({ data: TrpcErrorDataSchema.optional() }),
 });
 
-const TopLevelCodeSchema = z.looseObject({ code: TrpcErrorCodeSchema });
+const TopLevelCodeSchema = z.looseObject({ code: z.string() });
 
 // The `error` of a tRPC failure body (batch item or direct body) is a plain
 // object; anything else yields no context.
@@ -219,7 +234,9 @@ export function trpcProcedureFromUrl(url: string): string | undefined {
 /**
  * Read tRPC error metadata from a direct (`data.*`) or server-shaped
  * (`shape.data.*`) error. The body's own `message` is untrusted text and is
- * never read. Total: an unrecognized value yields `{}`.
+ * never read, and a `code` counts only when it names a code tRPC defines: a
+ * status a proxy put there is not app code. Total: an unrecognized value yields
+ * `{}`.
  */
 export function readTrpcErrorContext(error: unknown): TrpcErrorContext {
   try {
@@ -228,11 +245,12 @@ export function readTrpcErrorContext(error: unknown): TrpcErrorContext {
     const directData = direct.success ? direct.data.data : undefined;
     const shapedData = shaped.success ? shaped.data.shape.data : undefined;
     const topLevelCode = TopLevelCodeSchema.safeParse(error);
+    const code =
+      directData?.code ??
+      shapedData?.code ??
+      (topLevelCode.success ? topLevelCode.data.code : undefined);
     return {
-      code:
-        directData?.code ??
-        shapedData?.code ??
-        (topLevelCode.success ? topLevelCode.data.code : undefined),
+      code: code !== undefined && isTrpcErrorCode(code) ? code : undefined,
       httpStatus: directData?.httpStatus ?? shapedData?.httpStatus,
       path: directData?.path ?? shapedData?.path,
     };

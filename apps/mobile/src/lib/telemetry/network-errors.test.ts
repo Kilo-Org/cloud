@@ -766,6 +766,39 @@ describe('createNetworkErrorFetch', () => {
     expect(errorMessageOf(event)).toBe('GET /api/trpc/session.list -> 500');
     expect(event?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'http.500']);
   });
+
+  // A code this app does not know yet must not cost the item's status and path:
+  // reading the code permissively is what keeps the failure reportable when tRPC
+  // adds a name.
+  it('(k5) keeps a 207 batch item’s status and path when its code is unknown', async () => {
+    const response = Response.json(
+      [
+        { result: { data: 'ok' } },
+        {
+          error: {
+            message: 'boom',
+            code: -32_000,
+            data: { code: 'SOMETHING_NEW', httpStatus: 422, path: 'user.getMe' },
+          },
+        },
+      ],
+      { status: 207 }
+    );
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response), trpcBatchOptions);
+
+    await wrapped('https://example.com/api/trpc/a.b,c.d?batch=1', { method: 'POST' });
+
+    const event = reportedEvent();
+    expect(events).toHaveLength(1);
+    expect(breadcrumbs).toHaveLength(0);
+    expect(errorMessageOf(event)).toBe('POST /api/trpc/user.getMe -> 422');
+    expect(event?.tags).toMatchObject({ 'http.status': 207, 'trpc.procedure': 'user.getMe' });
+    expect(event?.fingerprint).toEqual(['network-error', 'trpc', 'user.getMe', 'http.422']);
+    expect(event?.contexts?.[NETWORK_BODY_CONTEXT]).toEqual({
+      httpStatus: 422,
+      path: 'user.getMe',
+    });
+  });
 });
 
 describe('createNetworkErrorFetch status policy', () => {

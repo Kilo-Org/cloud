@@ -178,8 +178,10 @@ it('emits the full unavailable enqueue fields without a flag', async () => {
       outcome: 'unavailable',
       after_send_at_ms: 1250,
       send_duration_ms: 37,
+      error_name: 'Error',
     },
   ]);
+  expect(JSON.stringify(logs())).not.toContain('sensitive-queue-error');
 });
 
 function message() {

@@ -1,8 +1,11 @@
 # Usage ingest
 
 Authenticated `POST /usage` validates the existing usage request contract and
-publishes it to `USAGE_INGEST_QUEUE`, preserving the supplied usage ID. A 202 means
-queue acceptance after `send` resolves, not consumer completion. The same Worker
+publishes it to `USAGE_INGEST_QUEUE`, preserving the supplied usage ID. With the
+[direct lane](#direct-lane) `off` (the production setting), a 202 means queue
+acceptance after `send` resolves, not consumer completion. In `first` or `on_stall`,
+a 202 means either queue acceptance or a matching `recorded`/`duplicate` answer from
+the Frankfurt writer. The same Worker
 always processes queued events through the existing Frankfurt writer. Only a
 matching recorded/duplicate writer response permits ACK; invalid events and
 missing writer configuration retry and can exhaust into the DLQ.
@@ -54,6 +57,219 @@ messages before this ingress, and this ingress before any gateway publishes to i
 Each environment connects only its EU pair. Production uses batch6/parallelism2/cap225 (up to 450 writer calls);
 staging keeps one consumer capped at200, batch size2. Old global queues remain intact
 for a paused/drained routing rollback. See [EU preparation and cutover](eu-queues.md).
+
+## Direct lane
+
+On `usage-ingest-processing-eu` we have observed paired pauses several times an
+hour: `Queue.send` blocks for 10–20 seconds and consumer delivery pauses at the
+same time. We found no correlation with our deploys or with writer load. Other
+queues in the account did not show the same pauses in the windows we checked, but
+they do not carry comparable traffic, so this does not isolate the cause. The
+platform cause is unknown and outside our direct control.
+
+These pauses contribute materially to the accounting-freshness tail. In the worst
+75-minute window, 88.8% of usage was recorded within 5 seconds, against 99.7% in
+quiet hours. The direct lane lets the ingress Worker write straight to the
+Frankfurt writer and keeps the queue for overflow and durability. It is a
+hypothesis to test in staging (see [rollout](#rollout-and-measurement)); no
+production benefit has been measured yet.
+
+| Variable | Values | Default | Production | Staging |
+|---|---|---|---|---|
+| `USAGE_INGEST_DIRECT_MODE` | `off`, `on_stall`, `first`; any other or missing value is `off` | `off` | `off` | `on_stall` |
+| `USAGE_INGEST_DIRECT_TIMEOUT_MS` | Positive integer milliseconds for the one direct attempt, rate-limiter call and writer call together | `2000` | `2000` | `2000` |
+| `USAGE_INGEST_STALL_HEDGE_MS` | Positive integer milliseconds `on_stall` waits for `Queue.send` before hedging | `2000` | `2000` | `2000` |
+| `USAGE_DIRECT_LIMITER` | Workers Rate Limiting binding, constant key `ingress_direct` | — | 12,600 per 10 s (namespace `1040`) | 12,600 per 10 s (namespace `1041`) |
+
+Every mode runs authentication, the body read, schema validation and the size check
+exactly as before any lane is chosen. A failed or throwing `Queue.send` still
+returns `503 Queue unavailable` in `off` and `first`. In `on_stall` it does so only
+when the direct lane does not accept either; a send that fails after the hedge
+while the direct write succeeds returns 202 (see the table below).
+
+- **`off`.** Today's queue path: the same send, statuses and events, with no
+  limiter call, no writer call and no `usage_ingest_publish` event. The only
+  difference is that a failed send's `usage_ingest_enqueue` event carries
+  `error_name`.
+- **`first`.** One direct attempt. A matching `recorded` or `duplicate` returns 202
+  and the queue is never touched. Any other outcome makes the same `Queue.send` call
+  as `off`, with its existing diagnostics and statuses.
+- **`on_stall`.** `Queue.send` starts at once and races a
+  `USAGE_INGEST_STALL_HEDGE_MS` timer. If the send settles first, the response is the
+  same as `off`. If the timer fires first, the Worker starts one direct attempt and
+  races it against the pending send. Whichever produces an acceptance first answers:
+
+  | Settles first | Then | Response |
+  |---|---|---|
+  | Send accepted | Direct still in flight | 202 at once. The direct attempt is not awaited; it is kept alive with `ctx.waitUntil`, and `usage_ingest_direct_observed` reports its outcome. |
+  | Send failed | Direct accepted later | 202 from the direct write |
+  | Send failed | Direct failed later | `503 Queue unavailable` |
+  | Direct accepted | Send still pending | 202 at once. The send's completion handler is kept alive with `ctx.waitUntil`. |
+  | Direct failed | — | The Worker awaits the send as `off` does |
+
+  The queue lane's `usage_ingest_enqueue` fires exactly once per started send, when
+  that send settles, including after a direct 202. `usage_ingest_enqueue_observed`
+  fires once too, as before.
+
+Only a strict `recorded` or `duplicate` acknowledgement for the same usage ID, as
+checked by the shared writer client, counts as direct success. Everything else falls
+through to the queue: HTTP 429 (including the writer's admission rejection), 5xx,
+timeout, `not_recorded`, `invalid_response`, `request_failed`, `missing_config`, a
+refusal from the rate limiter, a missing limiter binding, and a limiter error. The
+direct lane never retries, never fails a request on its own, and sends
+`x-usage-write-source: ingress_direct` with `USAGE_INGEST_DIRECT_TIMEOUT_MS` as the
+client timeout.
+
+### Duplicate writes are intended
+
+`on_stall` deliberately makes a direct write after a queue send that may already
+have succeeded, so the same event can reach the writer twice. `first` can do the
+same after an ambiguous direct failure, such as a client timeout while the writer is
+still committing. Both deliveries carry the same usage ID. The writer's insert has
+no `ON CONFLICT` clause, so the second transaction fails on the `microdollar_usage`
+primary key. It rolls back, including the balance update, the organization
+consumption, the daily rollup repair and the Bouncer outbox row, and the writer
+answers `duplicate`. Post-commit work (Bouncer delivery, organization alerts,
+auto-top-up and the Kilo Pass bonus) and PostHog first-usage events run only for
+the delivery that committed. The queue consumer ACKs a `duplicate`. Expect almost
+every hedged event in `on_stall` to appear later as a queue `duplicate`.
+
+A 202 in `on_stall` does not wait for the other lane. Work after the response is
+registered with `ctx.waitUntil` when a context exists. If registration throws,
+`usage_ingest_background_unregistered` is logged, and the pending promises still
+have handlers, so nothing is left as an unhandled rejection. One deadline,
+`USAGE_INGEST_DIRECT_TIMEOUT_MS`, covers the rate-limiter call and the writer call,
+so a limiter that never answers counts as `limiter_unavailable` once the deadline
+passes and cannot hold a request open. Cloudflare's
+`waitUntil` allowance (30 seconds after the response), a hard termination or a
+missing context can end that work before it settles. Then the parked queue result,
+the direct observation, or the queued duplicate itself may never be logged or
+delivered. The response is already backed by a confirmed acceptance in each case.
+
+### Attack and overload bound
+
+- **Writer admission.** `ingress_direct` may hold at most 5 of the 8 admission slots
+  in each writer runtime instance. Over that ceiling the writer returns the existing
+  `queue_limit` 429 and the event goes to the queue. A direct call never waits in
+  the writer's 250 ms admission FIFO, so it cannot take a place ahead of a queue
+  write. The Enkrypt `non_llm` class keeps its own ceiling of 2 in the same shared
+  limit; see [writer admission protection](#writer-admission-protection). These
+  are per-instance counters inside the existing limit. They reserve no database
+  connections and do not guarantee queue capacity across the fleet.
+- **Rate limiter.** `USAGE_DIRECT_LIMITER` caps direct attempts at roughly 3× the
+  observed 420/s peak release rate over the shortest period Cloudflare allows
+  (10 seconds). The key is a constant, so the limit is shared by all payers. Per
+  Cloudflare's documentation the limit applies separately in each Cloudflare
+  location and is approximate, not one fleet-wide cap, and requests can exceed it
+  while counts synchronize. A refusal, a missing binding or a limiter error skips the
+  direct attempt.
+- **Queue overflow.** Every refused or failed direct attempt makes the same
+  `Queue.send` call as today, so the queue remains the durable path.
+
+The limiter and the ceiling bound how hard the direct lane can push on the writer.
+They are not authentication: only callers that hold `USAGE_INGEST_PUBLISH_SECRET`
+reach any lane.
+
+### Diagnostics
+
+`first` and `on_stall` emit exactly one `usage_ingest_publish` event per request
+that passes validation, when the response is decided:
+
+| Field | Meaning |
+|---|---|
+| `mode` | `first` or `on_stall` |
+| `lane` | `direct` when the direct write produced the 202; otherwise `queue` |
+| `status` | HTTP status returned |
+| `rate_limited` | `true` when the limiter refused, was missing or threw; `false` while the direct attempt is still pending |
+| `direct_outcome` | `recorded`, `duplicate`, a writer-client reason, `rate_limited` or `limiter_unavailable`; absent when no direct attempt was due or it was still pending |
+| `direct_pending` | `true` when the queue answered while the direct attempt was still in flight |
+| `direct_duration_ms` | Monotonic duration of the writer call |
+| `direct_status`, `direct_admission_reason` | Writer HTTP status and recognized admission reason, when present |
+| `send_duration_ms` | Monotonic duration of the awaited send; absent when the send was not awaited |
+| `usage_id` | Validated usage ID |
+
+`usage_ingest_direct_observed` (usage ID, `rate_limited` and the direct fields
+above) reports a direct attempt that finished after the queue had already answered.
+The queue lane keeps `usage_ingest_enqueue_start`, `usage_ingest_enqueue` and
+`usage_ingest_enqueue_observed`, each once per started send, so existing queries
+keep working. The shared writer
+client also logs `usage writer acknowledged` or `usage writer unavailable` for each
+direct attempt.
+
+Every failure handler names what failed with a bounded `error_name`, never the
+error message, body, headers or URL: `usage_ingest_direct_limiter_failed` (limiter
+error, or `TimeoutError` at the deadline), `usage_ingest_direct_failed` (the writer
+client threw instead of returning an outcome), `usage_ingest_background_failed`,
+`usage_ingest_background_unregistered`, `usage_ingest_serialization_failed`, and
+`usage_ingest_enqueue` with `outcome: unavailable`. That last field is the one
+change `off` mode can show: a failed send's event gains `error_name`, as the
+Enkrypt ingress already logs. Successful `off` traffic logs exactly as before.
+
+### Deployment prerequisite
+
+The Frankfurt writer in the target environment must accept
+`x-usage-write-source: ingress_direct` before that environment's Worker runs a
+direct mode. An older writer does not reject the header: it maps it to `unknown`
+and skips writer admission, so direct writes would still succeed but without the
+5-slot direct ceiling.
+
+Neither scheduled workflow orders the Worker after the writer. In both
+`deploy-staging.yml` and `deploy-production.yml`, `deploy-workers` needs only
+`check-changes`, `db-gate` and `detect-workers`, so it runs beside the web app
+deploy, and a pending or failed app deploy does not hold it back. A manual
+`deploy-workers.yml` dispatch, a Worker redeploy or a Worker rollback does not check
+the writer either. The ordering is therefore a merge and deploy gate, not something
+CI enforces:
+
+- Merge the writer change first, and merge the Worker change only after the writer
+  that recognizes `ingress_direct` is confirmed live in staging. Staging commits
+  `on_stall`, so the next staging Worker deploy turns the lane on. Production is
+  `off` and needs no gate until a production mode change.
+- Before a manual Worker deploy or rollback, confirm that the environment's
+  deployed writer includes the change.
+- Before rolling the writer back to a version without it, deploy that environment's
+  Worker with `USAGE_INGEST_DIRECT_MODE` set to `off` first.
+
+Source on a branch or on `main` is not evidence of deployed state. Once direct
+traffic exists, `usage_writer_admission` or `usage_record_completion` lines with
+`writer_caller: ingress_direct` from that writer show that it recognizes the source.
+
+### Rollout and measurement
+
+This change ships with production `off` and staging `on_stall`.
+
+- **Staging.** Deploying this configuration activates `on_stall` in staging; no
+  further flag change is needed. Validate it with the controlled procedure in
+  [validate the `on_stall` direct lane](load-test.md#validate-the-on_stall-direct-lane).
+  A normal load run can pass without ever making a direct write.
+- **Production.** Stays `off`. Enabling `on_stall` or `first` in production is a
+  separate decision by the service owner, made after staging evidence and a
+  capacity assessment of the shared writer and database. This change does not
+  approve either mode or a sequence between them. `on_stall` is not inherently
+  safe under attack or surges, and it is not a required step before `first`. The
+  bounds above are per writer instance and per Cloudflare location, not
+  fleet-wide.
+
+Each mode change is a committed variable and a normal Worker deploy. This change
+flips no production variable.
+
+Measure:
+
+- **Stall-release share of records over 5 s.** Measure the minute before, the
+  minute of, and the minute after each stall release. Today the values are about
+  4.0% / 11.4% / 2.4% across 89 releases with high rejection rates.
+- **Direct attempts and overflow.** Writer-side `ingress_direct` attempts
+  (`usage_record_completion` and `usage_writer_admission` with
+  `writer_caller: ingress_direct`), kept separate from hedge candidates and from
+  skips that never reached the writer (`rate_limited`, `limiter_unavailable`,
+  `missing_config`). Report the share of `lane: queue` among hedged requests by
+  `direct_outcome`. See
+  [validate the `on_stall` direct lane](load-test.md#validate-the-on_stall-direct-lane).
+- **Duplicate rate.** `usage_ingest_processing` with outcome `duplicate`, and
+  `usage_record_completion` with `writer_caller: queue` and outcome `duplicate`.
+
+Non-goals: no retries in the direct lane, no change to the consumer, no change to
+the gateway publisher, and no production variable change.
 
 ## Processing
 
@@ -107,7 +323,8 @@ single send is awaited, so it is intended to report the completion of that same 
 when the caller has already disconnected. It records only the validated usage ID, the
 outcome and the monotonic send duration; it adds no send, retry, response or authentication
 change. This extends only the post-response observation lifetime: the HTTP status still
-comes from the awaited send, and no log proves the consumer committed a database row. A
+comes from the awaited send (except a direct-lane 202 in `on_stall`, described under
+[direct lane](#direct-lane)), and no log proves the consumer committed a database row. A
 stall longer than Cloudflare's `waitUntil` allowance after the response or disconnect (30 s)
 can still end before the send settles, and a hard kill can lose the observation entirely; a
 missing observation is therefore not evidence that the send failed.
